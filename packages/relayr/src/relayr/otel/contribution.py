@@ -1,33 +1,16 @@
-"""relayr's contribution: its scope, its metric views, and its spans' place in traces."""
+"""relayr's contribution: its scope, its metric views, and its spans' place in traces.
 
-from collections.abc import Callable, Sequence
-from dataclasses import dataclass
-from typing import Literal
+It is a :class:`~lattice_core.otel.contribution.Contribution`, the contract the libraries'
+``configure_telemetry`` reads (lattice ADR-0020).
+"""
 
 from opentelemetry.sdk.metrics.view import View
 from opentelemetry.sdk.trace import ReadableSpan
 
+from lattice_core.otel.contribution import Contribution, MetricsDetail
 from relayr.telemetry import METRICS, SCOPE, SCOPED, TENANT_ID
 
-MetricsDetail = Literal["workspace", "tenant", "none"]
-"""How much tenancy detail metrics keep, as the libraries' `MetricsDetail` says."""
-
-
-@dataclass(frozen=True)
-class Contribution:
-    """What the libraries' `configure_telemetry` reads from a contribution (artifactr ADR-0046).
-
-    Args:
-        name: The instrumentation scope.
-        metric_views: Returns the views that keep only the attributes allowed at a detail.
-        should_export_span: Whether a span belongs in relayr's traces.
-        instrument: The instrumentations relayr advises: none of its own.
-    """
-
-    name: str
-    metric_views: Callable[[MetricsDetail], Sequence[View]]
-    should_export_span: Callable[[ReadableSpan], bool]
-    instrument: frozenset[str]
+__all__ = ["Contribution", "MetricsDetail", "metric_views", "telemetry"]
 
 
 def telemetry() -> Contribution:

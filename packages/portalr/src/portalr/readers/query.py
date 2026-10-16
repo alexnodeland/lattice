@@ -6,7 +6,7 @@ grantr has checked already, and is quoted.
 """
 
 import json
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Annotated, Final, Self
 
 from pydantic import (
@@ -31,6 +31,17 @@ def quoted(value: str) -> str:
     return json.dumps(value, ensure_ascii=False)
 
 
+EPOCH: Final = datetime(1970, 1, 1, tzinfo=UTC)
+
+
+def nanoseconds(at: datetime) -> int:
+    """A moment as nanoseconds since the epoch, in whole numbers: no float to lose a few."""
+    return (at - EPOCH) // timedelta(microseconds=1) * 1000
+
+
+LATEST: Final = datetime(2200, 1, 1, tzinfo=UTC)
+"""The latest a span may end: well within the nanoseconds a signed 64-bit number holds (to 2262)."""
+
 EARLIEST: Final = datetime(2000, 1, 1, tzinfo=UTC)
 """The earliest a span may start: before anything the libraries record, and late enough that a
 reader may look back from it."""
@@ -50,6 +61,22 @@ class Span(BaseModel):
             raise ValueError(f"a span starts in {EARLIEST.year} or later")
         if self.end <= self.start:
             raise ValueError("a span ends after it starts")
+        if self.end > LATEST:
+            raise ValueError(f"a span ends in {LATEST.year - 1} or earlier")
+        return self
+
+
+MOST_DAYS: Final = 91
+"""The longest window a read sums, in days: a quarter, and a day's slack for its edges."""
+
+
+class BoundedSpan(Span):
+    """A span of at most ``MOST_DAYS``, for a read that sums by day."""
+
+    @model_validator(mode="after")
+    def _within_most_days(self) -> Self:
+        if self.end - self.start > timedelta(days=MOST_DAYS):
+            raise ValueError(f"a window is at most {MOST_DAYS} days")
         return self
 
 
@@ -57,3 +84,14 @@ class Window(Span):
     """A span of time, and how many results to return from it."""
 
     limit: Annotated[int, Field(ge=1, le=1000)] = 100
+
+
+def day_of(at: datetime) -> date:
+    """The day a moment is in, in UTC."""
+    return at.astimezone(UTC).date()
+
+
+def days_in(span: Span) -> list[date]:
+    """Each day the span touches, in UTC, the first first."""
+    first, last = day_of(span.start), day_of(span.end - timedelta(microseconds=1))
+    return [first + timedelta(days=n) for n in range((last - first).days + 1)]

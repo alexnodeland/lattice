@@ -1,6 +1,6 @@
 # ADR-0024: Langfuse sessions tagged with each other
 
-**Status:** Accepted, amended by [ADR-0026](0026-a-retried-send-asks-again-and-turns-traced-by-their-messages.md)
+**Status:** Accepted, amended by [ADR-0026](0026-a-retried-send-asks-again-and-turns-traced-by-their-messages.md) and [lattice ADR-0022](../../adr/0022-litellm-requests-carry-the-propagated-trace-tags.md)
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 **Amends:** [ADR-0013](0013-relayr-in-lattice.md): relayr's `langfuse` extra needs evalr

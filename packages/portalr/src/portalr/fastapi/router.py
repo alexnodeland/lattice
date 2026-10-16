@@ -5,12 +5,14 @@ library's own routes; portalr adds only reading the stack's tools for one tenant
 and, for operators, the deployment's tenants and deep links (lattice RFC-0002).
 """
 
+import re
 from collections.abc import Awaitable, Callable
 from importlib.resources import files
 from pathlib import Path
 from typing import Annotated, Any, Final
 
-from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Request
+from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Request, Response
+from fastapi import Path as PathParam
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from grantr.core import (
@@ -25,6 +27,7 @@ from grantr.core import (
 )
 from grantr.fastapi import STATUS_CODES, Caller, ResolveActor, Unauthorized
 from grantr.grants import Grants
+from lattice_core.refusals import Refused, refusals
 from portalr.actions import READ_DEPLOYMENT, READ_SPEND, READ_TELEMETRY
 from portalr.fastapi.site import Site, Surfaces
 from portalr.fastapi.ui import ui_router
@@ -32,8 +35,9 @@ from portalr.invites import Invite, InviteFailed
 from portalr.readers import (
     Feedback,
     FeedbackQuery,
-    LogLine,
     LogQuery,
+    LogRecord,
+    Logs,
     MetricQuery,
     Ok,
     Point,
@@ -46,10 +50,14 @@ from portalr.readers import (
     TraceSummary,
     Unavailable,
     Unconfigured,
+    Usage,
+    UsageQuery,
     Window,
     read_feedback,
+    read_usage,
     reading,
 )
+from portalr.readers.loki import RECORD_ID
 from portalr.readers.query import Id
 from portalr.tenant import Tenant, allowed
 
@@ -95,6 +103,34 @@ class Invited(BaseModel):
     user: str
 
 
+EMAIL: Final = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+"""What an owner's email must look like: checked here by hand, so that a malformed one is refused
+without being echoed back, as a model's validation error would."""
+
+MOST_EMAIL: Final = 254
+
+
+class NewTenant(BaseModel):
+    """A tenant to create, and the email of its first owner."""
+
+    model_config = ConfigDict(frozen=True)
+
+    tenant: TenantId
+    owner_email: str
+
+
+class CreatedTenant(BaseModel):
+    """The tenant a creation made, and its owner.
+
+    The owner is by the user id their tokens carry, never by email.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    tenant: str
+    owner: str
+
+
 class DeploymentTenants(BaseModel):
     """Every tenant, and their spend, as one LiteLLM team list reads it."""
 
@@ -117,40 +153,9 @@ class Links(BaseModel):
     grafana_logs: str | None = None
 
 
-class RejectionDetail(BaseModel):
-    """A refusal portalr or grantr gives: its ``type`` and its ``message``."""
-
-    model_config = ConfigDict(extra="allow")
-
-    type: str
-    message: str
-
-
-class FieldError(BaseModel):
-    """One problem FastAPI found with a request's parameters or body."""
-
-    model_config = ConfigDict(extra="allow")
-
-    loc: list[str | int]
-    msg: str
-    type: str
-
-
-class Refused(BaseModel):
-    """The body of a refused request, in the shape artifactr's and reflexr's routers document.
-
-    ``detail`` is the refusal, the message of one FastAPI gives, or the problems it found with the
-    request's parameters or body.
-    """
-
-    detail: RejectionDetail | str | list[FieldError]
-
-
-REFUSALS: Final[dict[int | str, dict[str, Any]]] = {
-    status: {"model": Refused, "description": "Refused"} for status in (400, 401, 403, 422)
-}
-"""The refused responses every route under ``/v1`` documents, described in words of portalr's
-own, since FastAPI's default is Python's phrase for the status, which changes between versions."""
+REFUSALS: Final = refusals(400, 401, 403, 422)
+"""The refused responses every route under ``/v1`` documents: no route of portalr's answers 404 or
+409, which artifactr's and reflexr's document."""
 
 
 TenantHeader = Annotated[TenantId | None, Header(alias="X-Tenant")]
@@ -237,17 +242,48 @@ def portalr_router(
 
     @api.get("/v1/traces/{trace_id}", response_model=reading(Trace | None))
     async def trace(
-        trace_id: Id, tenant: Tenant = telemetry
+        trace_id: Id,
+        response: Response,
+        content: bool = False,
+        span: Id | None = None,
+        tenant: Tenant = telemetry,
     ) -> Ok[Trace | None] | Unavailable | Unconfigured:
-        """A trace, if it is the tenant's: its spans, for its waterfall."""
-        return await readers.tempo.trace(tenant, trace_id) if readers.tempo else Unconfigured()
+        """A trace, if it is the tenant's: its spans, for its waterfall.
 
-    @api.get("/v1/logs", response_model=reading(list[LogLine]))
+        Only the attributes known to be safe are shown. ``content=true`` and ``span`` ask for one
+        span's others, its prompt and completion among them, and nothing of any other span's; the
+        answer is not to be kept.
+        """
+        if content and span is None:
+            raise HTTPException(422, "content is asked for a span: name it with span")
+        if not readers.tempo:
+            return Unconfigured()
+        if content:
+            response.headers["Cache-Control"] = "no-store"
+        return await readers.tempo.trace(tenant, trace_id, reveal=span if content else None)
+
+    @api.get("/v1/logs", response_model=reading(Logs))
     async def logs(
         query: Annotated[LogQuery, Query()], tenant: Tenant = telemetry
-    ) -> Ok[list[LogLine]] | Unavailable | Unconfigured:
-        """The tenant's logs, a thread's or a run's, from Loki."""
+    ) -> Ok[Logs] | Unavailable | Unconfigured:
+        """The tenant's logs, a thread's or a run's, from Loki, without their lines.
+
+        A record has its time, level, service, thread, run and its line's length, and the labels
+        known to be safe; the line and the other labels are withheld, and named.
+        """
         return await readers.loki.logs(tenant, query) if readers.loki else Unconfigured()
+
+    @api.get("/v1/logs/{record_id}", response_model=reading(LogRecord | None))
+    async def log_line(
+        record_id: Annotated[str, PathParam(pattern=RECORD_ID)],
+        response: Response,
+        tenant: Tenant = telemetry,
+    ) -> Ok[LogRecord | None] | Unavailable | Unconfigured:
+        """One of the tenant's log records by its id, with its line: asked for, and not kept."""
+        if not readers.loki:
+            return Unconfigured()
+        response.headers["Cache-Control"] = "no-store"
+        return await readers.loki.record(tenant, record_id)
 
     @api.get("/v1/metrics", response_model=reading(list[Point]))
     async def metrics(
@@ -283,6 +319,19 @@ def portalr_router(
         """The tenant's usage and spend, against its budget, from its LiteLLM team."""
         return await readers.litellm.spend(tenant) if readers.litellm else Unconfigured()
 
+    @api.get("/v1/usage", response_model=reading(Usage))
+    async def usage(
+        query: Annotated[UsageQuery, Query()], tenant: Tenant = spending
+    ) -> Ok[Usage] | Unavailable | Unconfigured:
+        """The tenant's spend per day from LiteLLM, and each named workspace's, with its budget.
+
+        The window is at most 91 days, and the read is bounded: ``complete`` is false where it
+        stopped at a bound. Only the named workspaces' tags are asked after.
+        """
+        if not readers.litellm:
+            return Unconfigured()
+        return await read_usage(readers.litellm, tenant, query)
+
     @api.get("/v1/deployment/tenants")
     async def deployment_tenants(by: Subject = operating) -> DeploymentTenants:
         """Every tenant, with its spend from one LiteLLM team list, for operators."""
@@ -308,6 +357,7 @@ def portalr_router(
 
     if invite is not None:
         _invitations(api, grants, invite, current)
+        _tenant_creation(api, grants, invite, operating)
     router.include_router(api)
 
     return router
@@ -315,6 +365,54 @@ def portalr_router(
 
 def _refused(error: GrantrError) -> HTTPException:
     return _refusal("forbidden" if isinstance(error, Forbidden) else "invalid", str(error))
+
+
+def _tenant_creation(router: APIRouter, grants: Grants, invite: Invite, operating: Any) -> None:
+    failed = {
+        "model": Refused,
+        "description": "Supabase Auth didn't invite or find the owner: `invite_failed`",
+    }
+
+    @router.post(
+        "/v1/deployment/tenants",
+        status_code=201,
+        responses={502: failed},
+        response_model=CreatedTenant,
+    )
+    async def create_tenant(
+        body: Annotated[NewTenant, Body()], by: Subject = operating
+    ) -> CreatedTenant:
+        """Create a tenant, with its first owner invited, or found, by email, for operators.
+
+        Only operators, who may create tenants, get past the checks, which come before Supabase is
+        asked about anyone: a tenant that exists is refused without an invitation, so a repeated
+        request invites no one again and creates nothing twice. The email is never logged or
+        answered with: the answer names the tenant and the owner's user id.
+        """
+        # grantr checks this again on every call below, but its refusals come after the email is
+        # read: asking here answers a caller who may not with a plain 403 first, whatever they sent.
+        if not await grants.check(DEPLOYMENT_CHECK, by, "grantr:create_tenant", DEPLOYMENT):
+            raise _refusal("forbidden", "the caller may not create tenants")
+        email = body.owner_email.strip()
+        if len(email) > MOST_EMAIL or not EMAIL.fullmatch(email):
+            raise _refusal("invalid", "the owner's email isn't an email address")
+        if body.tenant in await grants.tenants(by=by):
+            raise _refusal("invalid", f"{body.tenant} exists")
+        try:
+            owner = await invite(email)
+        except InviteFailed as error:
+            detail = {"type": "invite_failed", "message": str(error)}
+            raise HTTPException(status_code=502, detail=detail) from error
+        try:
+            await grants.create_tenant(body.tenant, owner=owner, by=by)
+        except (Forbidden, Invalid) as error:
+            raise _refused(error) from error
+        except Exception as error:
+            # A storage error: the owner was invited, and no tenant was made. What storage said
+            # may name the owner or the tenant, so none of it is answered.
+            detail = {"type": "unavailable", "message": "the tenant couldn't be created"}
+            raise HTTPException(status_code=503, detail=detail) from error
+        return CreatedTenant(tenant=body.tenant, owner=owner)
 
 
 def _invitations(router: APIRouter, grants: Grants, invite: Invite, current: Any) -> None:

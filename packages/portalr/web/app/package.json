@@ -13,6 +13,7 @@
   },
   "devDependencies": {
     "@playwright/test": "1.64.0",
+    "@portalr/notices": "workspace:*",
     "@tailwindcss/vite": "4.3.3",
     "@tanstack/router-generator": "1.167.40",
     "@tanstack/router-plugin": "1.168.42",

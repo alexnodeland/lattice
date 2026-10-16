@@ -20,6 +20,7 @@ import type * as reflexrV1 from "./generated/reflexr.v1";
 import { reasons } from "./reasons";
 import * as reflexr from "./reflexr";
 import { type Api, named } from "./rest";
+import { wholeTrace } from "./traces";
 
 type Check = Grantr["schemas"]["Check"];
 type AuditQuery = NonNullable<
@@ -96,6 +97,8 @@ export const keys = {
      */
     catalog: () => ["grantr", "~catalog"] as const,
     keyring: (tenant: string) => [...keys.grantr.access(tenant), "keys"] as const,
+    /** The deployment's audit log, as the signed-in operator, `user`, reads it. */
+    deploymentAudit: (user: string) => ["grantr", "deployment", "audit", user] as const,
     /** A tenant's audit log, as a filter keeps it: a change to access there adds to it. */
     audit: (tenant: string, filter: AuditFilter) =>
       [...keys.grantr.tenant(tenant), "audit", filter] as const,
@@ -109,6 +112,18 @@ export const keys = {
       [...keys.portalr.tenant(tenant), "metrics", metric, window] as const,
     feedback: (tenant: string, window: TimeSpan, workspace: string | null) =>
       [...keys.portalr.tenant(tenant), "feedback", window, workspace] as const,
+    usage: (tenant: string, window: TimeSpan, workspaces: readonly string[]) =>
+      [...keys.portalr.tenant(tenant), "usage", window, workspaces] as const,
+    traces: (tenant: string, window: TimeSpan, filter: TraceFilter) =>
+      [...keys.portalr.tenant(tenant), "traces", "list", window, filter] as const,
+    logs: (tenant: string, window: TimeSpan, filter: LogFilter) =>
+      [...keys.portalr.tenant(tenant), "logs", "list", window, filter] as const,
+    /** A log record's line, which is asked for, one record at a time. */
+    logLine: (tenant: string, id: string) =>
+      [...keys.portalr.tenant(tenant), "logs", "line", id] as const,
+    /** A trace, and, apart, the same with one span's withheld attributes, which are asked for. */
+    trace: (tenant: string, trace: string, span: string | null) =>
+      [...keys.portalr.tenant(tenant), "traces", "detail", trace, span] as const,
     /** The deployment's tenants, as the signed-in person, `user`, reads them: an operator's. */
     tenants: (user: string) => ["portalr", "deployment", "tenants", user] as const,
     /** Deep links into the tools for a trace, which only an operator, `user`, reads. */
@@ -170,6 +185,24 @@ export const refusedOutright = (error: unknown) =>
 
 /** A long read is tried again once, unless the server refused it outright. */
 const once = (count: number, error: unknown) => !refusedOutright(error) && count < 1;
+
+/** What narrows a tenant's traces: a thread's, or a run's. */
+export interface TraceFilter {
+  readonly session?: string | undefined;
+  readonly run?: string | undefined;
+}
+
+/** What narrows a tenant's logs: a thread's, or a run's. */
+export interface LogFilter {
+  readonly thread?: string | undefined;
+  readonly run?: string | undefined;
+}
+
+/** The most log records one read asks for. */
+export const LOGS_LIMIT = 1000;
+
+/** The most traces one read asks for. */
+export const TRACES_LIMIT = 100;
 
 /** The query options of every read, over the given clients. */
 export function createQueries(api: Api) {
@@ -425,6 +458,22 @@ export function createQueries(api: Api) {
             ),
           getNextPageParam: (page) => (page.length < AUDIT_PAGE ? undefined : page[0]?.seq),
         }),
+      /**
+       * The deployment's audit log, from its end back, a page at a time, for an operator, `user`
+       * (`grantr:grant_operator`): who was made an operator, and who stopped being one.
+       */
+      deploymentAudit: (user: string) =>
+        infiniteQueryOptions({
+          queryKey: keys.grantr.deploymentAudit(user),
+          initialPageParam: null as number | null,
+          queryFn: ({ pageParam }) =>
+            body(
+              api.grantr.GET("/grantr/v1/audit", {
+                params: { query: { last: AUDIT_PAGE, before_seq: pageParam } },
+              }),
+            ),
+          getNextPageParam: (page) => (page.length < AUDIT_PAGE ? undefined : page[0]?.seq),
+        }),
       /** The tenant's keys, by public id and principal, never their secrets (`grantr:issue_key`). */
       keyring: (tenant: string) =>
         queryOptions({
@@ -497,6 +546,122 @@ export function createQueries(api: Api) {
           staleTime: 10 * 60_000,
           retry: once,
         }),
+      /**
+       * The tenant's spend per day over a window, from its LiteLLM team, and each named
+       * workspace's, from its tag (portalr ADR-0028).
+       */
+      usage: (tenant: string, window: TimeSpan, workspaces: readonly string[] = []) =>
+        queryOptions({
+          queryKey: keys.portalr.usage(tenant, window, workspaces),
+          queryFn: () =>
+            body(
+              api.portalr.GET("/portalr/v1/usage", {
+                ...named(tenant),
+                params: {
+                  query: { start: window.start, end: window.end, workspaces: [...workspaces] },
+                },
+              }),
+            ),
+          // Summing a window reads LiteLLM at length: kept a while, and tried again once.
+          staleTime: 10 * 60_000,
+          retry: once,
+        }),
+      /**
+       * The tenant's newest traces in a window, up to `TRACES_LIMIT`, those of a thread or a run
+       * if the filter names one, from Tempo (portalr ADR-0030).
+       */
+      traces: (tenant: string, window: TimeSpan, filter: TraceFilter = {}) =>
+        queryOptions({
+          queryKey: keys.portalr.traces(tenant, window, filter),
+          queryFn: () =>
+            body(
+              api.portalr.GET("/portalr/v1/traces", {
+                ...named(tenant),
+                params: {
+                  query: {
+                    start: window.start,
+                    end: window.end,
+                    limit: TRACES_LIMIT,
+                    ...(filter.session && { session: filter.session }),
+                    ...(filter.run && { run: filter.run }),
+                  },
+                },
+              }),
+            ),
+          staleTime: 30_000,
+        }),
+      /**
+       * The tenant's newest log records in a window of a day at most, up to `LOGS_LIMIT`, those
+       * of a thread or a run if the filter names one, from Loki, without their lines
+       * (portalr ADR-0031).
+       */
+      logs: (tenant: string, window: TimeSpan, filter: LogFilter = {}) =>
+        queryOptions({
+          queryKey: keys.portalr.logs(tenant, window, filter),
+          queryFn: () =>
+            body(
+              api.portalr.GET("/portalr/v1/logs", {
+                ...named(tenant),
+                params: {
+                  query: {
+                    start: window.start,
+                    end: window.end,
+                    limit: LOGS_LIMIT,
+                    ...(filter.thread && { thread: filter.thread }),
+                    ...(filter.run && { run: filter.run }),
+                  },
+                },
+              }),
+            ),
+          staleTime: 30_000,
+        }),
+      /**
+       * One log record by its id, with its line: asked for, read once, and let go: it isn't kept,
+       * nor read again as the window regains focus, nor tried again if refused.
+       */
+      logLine: (tenant: string, id: string) =>
+        queryOptions({
+          queryKey: keys.portalr.logLine(tenant, id),
+          queryFn: () =>
+            body(
+              api.portalr.GET("/portalr/v1/logs/{record_id}", {
+                ...named(tenant),
+                params: { path: { record_id: id } },
+              }),
+            ),
+          staleTime: 0,
+          gcTime: 0,
+          retry: false,
+          refetchOnWindowFocus: false,
+        }),
+      /**
+       * A trace by its id, whole however it is written: null if it isn't the tenant's, or isn't
+       * there. Only its attributes known to be safe are in it. With `span`, one span's others are
+       * too, which is a read of its own, for that span alone, and is not kept.
+       */
+      trace: (tenant: string, trace: string, span: string | null = null) => {
+        const whole = wholeTrace(trace);
+        return queryOptions({
+          queryKey: keys.portalr.trace(tenant, whole, span),
+          queryFn: () =>
+            body(
+              api.portalr.GET("/portalr/v1/traces/{trace_id}", {
+                ...named(tenant),
+                params: {
+                  path: { trace_id: whole },
+                  query: span === null ? {} : { content: true, span },
+                },
+              }),
+            ),
+          // A trace is written once it ends: what is read of it stays good for a while. What a
+          // span withheld is read when asked, shown, and let go: it isn't kept in the page's cache.
+          staleTime: span === null ? 5 * 60_000 : 0,
+          gcTime: span === null ? 5 * 60_000 : 0,
+          // A span's withheld attributes are read once, when it asks: not again as the window
+          // regains focus, and, if refused, not tried three times before it says so.
+          ...(span !== null && { retry: false, refetchOnWindowFocus: false }),
+        });
+      },
       /** An operator's deep links into Langfuse and Grafana for a trace. */
       links: (user: string, trace: string) =>
         queryOptions({

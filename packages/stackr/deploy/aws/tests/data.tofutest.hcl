@@ -117,6 +117,82 @@ run "data_refuses_a_short_auth_token" {
   expect_failures = [var.valkey_auth_token]
 }
 
+run "data_expires_clickhouse_backups_by_prefix_in_the_backups_bucket_alone" {
+  command = plan
+  module {
+    source = "./modules/data"
+  }
+
+  assert {
+    condition = (
+      { for rule in aws_s3_bucket_lifecycle_configuration.this["backups"].rule : rule.id => rule.expiration[0].days if rule.id == "expire-clickhouse" || rule.id == "expire-drill" }
+      == { "expire-clickhouse" = 14, "expire-drill" = 7 }
+      && alltrue([for rule in aws_s3_bucket_lifecycle_configuration.this["backups"].rule : rule.noncurrent_version_expiration[0].noncurrent_days == 7 if startswith(rule.id, "expire-")])
+    )
+    error_message = "ClickHouse's backups are kept 14 days and the drill's 7, each with its overwritten versions gone after 7 days."
+  }
+  assert {
+    condition = (
+      { for rule in aws_s3_bucket_lifecycle_configuration.this["backups"].rule : rule.id => rule.filter[0].prefix if startswith(rule.id, "expire-") || startswith(rule.id, "markers-") }
+      == { "expire-clickhouse" = "clickhouse/", "expire-drill" = "drill/", "markers-clickhouse" = "clickhouse/", "markers-drill" = "drill/" }
+      && alltrue([for rule in aws_s3_bucket_lifecycle_configuration.this["backups"].rule : rule.expiration[0].expired_object_delete_marker if startswith(rule.id, "markers-")])
+    )
+    error_message = "Each rule is for one prefix, and a delete marker left by ClickHouse's lock files expires."
+  }
+  assert {
+    condition     = alltrue([for role, lifecycle in aws_s3_bucket_lifecycle_configuration.this : length(lifecycle.rule) == 1 if role != "backups"])
+    error_message = "No other bucket has a rule but the tidy one."
+  }
+}
+
+run "data_keeps_clickhouse_backups_as_long_as_it_is_told_and_the_drills_for_seven" {
+  command = plan
+  module {
+    source = "./modules/data"
+  }
+  variables {
+    clickhouse_backup_retention_days = 30
+  }
+
+  assert {
+    condition     = { for rule in aws_s3_bucket_lifecycle_configuration.this["backups"].rule : rule.id => rule.expiration[0].days if rule.id == "expire-clickhouse" || rule.id == "expire-drill" } == { "expire-clickhouse" = 30, "expire-drill" = 7 }
+    error_message = "The retention is the variable's, and the drill's stays 7."
+  }
+}
+
+run "data_refuses_a_retention_under_two_days" {
+  command = plan
+  module {
+    source = "./modules/data"
+  }
+  variables {
+    clickhouse_backup_retention_days = 1
+  }
+  expect_failures = [var.clickhouse_backup_retention_days]
+}
+
+run "data_refuses_a_retention_over_a_year" {
+  command = plan
+  module {
+    source = "./modules/data"
+  }
+  variables {
+    clickhouse_backup_retention_days = 366
+  }
+  expect_failures = [var.clickhouse_backup_retention_days]
+}
+
+run "data_refuses_a_retention_that_is_not_whole_days" {
+  command = plan
+  module {
+    source = "./modules/data"
+  }
+  variables {
+    clickhouse_backup_retention_days = 14.5
+  }
+  expect_failures = [var.clickhouse_backup_retention_days]
+}
+
 run "data_reaches_nothing" {
   command = plan
   module {

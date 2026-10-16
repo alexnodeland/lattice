@@ -7,6 +7,7 @@
 
 export { Account } from "./account";
 export { AccountMenu, type Appearance } from "./account-menu";
+export { AnsiText, type Run, runs } from "./ansi";
 export { AppShell } from "./app-shell";
 export { useAppearance } from "./appearance";
 export {
@@ -14,7 +15,9 @@ export {
   type Data,
   Diff,
   json,
+  LONGEST_TITLE,
   markdown,
+  plainTitle,
   type Renderer,
   type Renderers,
   rendererFor,
@@ -49,8 +52,10 @@ export { type CheckboxChoice, CheckboxGroup } from "./checkbox";
 export { ConfirmDialog } from "./confirm-dialog";
 export { Dialog } from "./dialog";
 export { EmptyState } from "./empty-state";
+export { failureSaid } from "./failure";
 export { Icon } from "./icon";
 export { type Column, ItemTable } from "./item-table";
+export { type LineReveal, LogList } from "./log-list";
 export { Markdown } from "./markdown";
 export { Lockup, Mark, type Ui } from "./marks";
 export { Menu, type MenuItem } from "./menu";
@@ -58,6 +63,7 @@ export { ago, Moment } from "./moment";
 export { PageHeader } from "./page-header";
 export { Plain } from "./plain";
 export { Row, RowLink, Rows } from "./rows";
+export { RuleRunStatus, RunList, type RunParts } from "./run-list";
 export { SectionTitle } from "./section-title";
 export { type Segment, SegmentedFilter } from "./segmented-filter";
 export { SelectField } from "./select-field";
@@ -71,3 +77,5 @@ export { TabLink, TabNav } from "./tab-nav";
 export { Table } from "./table";
 export { TextField } from "./text-field";
 export { TextLink } from "./text-link";
+export { duration, type Reveal, type Standing, TraceView } from "./trace-view";
+export { type Block, type Level, Tracker } from "./tracker";

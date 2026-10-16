@@ -1,13 +1,14 @@
 """The router: REST endpoints and the WebSocket stream, over one command handler."""
 
 from collections.abc import Awaitable, Callable
-from typing import Annotated, Any, Final
+from typing import Annotated, Final
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response, WebSocket
 from opentelemetry import trace
 from pydantic import BaseModel, ConfigDict
 from starlette.requests import HTTPConnection
 
+from lattice_core.refusals import Refused, refusals
 from reflexr.core import (
     Actor,
     AnyEvent,
@@ -50,51 +51,16 @@ STATUS_CODES: dict[str, int] = {
 }
 """The HTTP status for each rejection ``type``."""
 
+REFUSALS: Final = refusals(400, 401, 403, 404, 409, 422)
+"""The refused responses every route documents: a malformed request, no or a wrong identity, a
+missing thing, a conflict, and a request that does not validate."""
+
 
 Count = Annotated[int, Query(ge=0, le=MAX_COUNT)]
 """A ``seq`` or a count in a query: as many as storage holds, which the document states."""
 
 PathId = Annotated[str, Path(min_length=1)]
 """An id in a path, which is never empty: ``.../runs/`` would be the list of runs."""
-
-
-# RejectionDetail, FieldError, Refused and REFUSALS are shared verbatim with artifactr's
-# src/artifactr/fastapi/router.py; change both.
-class RejectionDetail(BaseModel):
-    """A rejection, as REST sends it: its ``type``, its ``message`` and its typed details."""
-
-    model_config = ConfigDict(extra="allow")
-
-    type: str
-    message: str
-
-
-class FieldError(BaseModel):
-    """One problem FastAPI found with a request's parameters or body."""
-
-    model_config = ConfigDict(extra="allow")
-
-    loc: list[str | int]
-    msg: str
-    type: str
-
-
-class Refused(BaseModel):
-    """The body of a refused request (artifactr ADR-0063, reflexr ADR-0061).
-
-    ``detail`` is the rejection, the message of a resolver's refusal, or the problems FastAPI
-    found with the request.
-    """
-
-    detail: RejectionDetail | str | list[FieldError]
-
-
-REFUSALS: Final[dict[int | str, dict[str, Any]]] = {
-    status: {"model": Refused, "description": "Refused"}
-    for status in (400, 401, 403, 404, 409, 422)
-}
-"""The refused responses every route documents, each described in words of its own, since
-FastAPI's default is Python's phrase for the status, which changes between versions."""
 
 
 class Unauthorized(Exception):

@@ -26,15 +26,17 @@ mock_provider "aws" {
 }
 
 variables {
-  name                                 = "stackr"
-  subnet_id                            = "subnet-a"
-  private_ip                           = "10.40.128.10"
-  vpc_id                               = "vpc-mocked"
-  namespace_id                         = "ns-mocked"
-  clickhouse_password_secret_arn       = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/clickhouse-AbCdEf"
-  clickhouse_admin_password_secret_arn = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/clickhouse-admin-AbCdEf"
-  lattice_commit                       = "0123456789abcdef0123456789abcdef01234567"
-  ami_id                               = "ami-0123456789abcdef0"
+  name                                  = "stackr"
+  subnet_id                             = "subnet-a"
+  private_ip                            = "10.40.128.10"
+  vpc_id                                = "vpc-mocked"
+  namespace_id                          = "ns-mocked"
+  clickhouse_password_secret_arn        = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/clickhouse-AbCdEf"
+  clickhouse_admin_password_secret_arn  = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/clickhouse-admin-AbCdEf"
+  clickhouse_backup_password_secret_arn = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/clickhouse-backup-AbCdEf"
+  backups_bucket                        = { name = "stackr-backups-0123456789", arn = "arn:aws:s3:::stackr-backups-0123456789" }
+  lattice_commit                        = "0123456789abcdef0123456789abcdef01234567"
+  ami_id                                = "ami-0123456789abcdef0"
 }
 
 run "state_host_imdsv2_encrypted_disks_and_daily_snapshots" {
@@ -91,9 +93,57 @@ run "state_host_reaches_out_only_over_http_and_https" {
     condition = toset(jsondecode(aws_iam_role_policy.secret.policy).Statement[0].Resource) == toset([
       "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/clickhouse-AbCdEf",
       "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/clickhouse-admin-AbCdEf",
+      "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/clickhouse-backup-AbCdEf",
     ])
-    error_message = "The state host may read ClickHouse's two passwords, and no other secret."
+    error_message = "The state host may read ClickHouse's three passwords, and no other secret."
   }
+}
+
+run "state_host_writes_and_reads_two_prefixes_of_the_backups_bucket_and_deletes_only_locks" {
+  command = plan
+  module {
+    source = "./modules/state-host"
+  }
+
+  assert {
+    condition = jsondecode(aws_iam_role_policy.backups.policy).Statement == [
+      {
+        Effect   = "Allow"
+        Action   = ["s3:PutObject", "s3:GetObject", "s3:AbortMultipartUpload"]
+        Resource = ["arn:aws:s3:::stackr-backups-0123456789/clickhouse/*", "arn:aws:s3:::stackr-backups-0123456789/drill/*"]
+      },
+      {
+        Effect   = "Allow"
+        Action   = "s3:DeleteObject"
+        Resource = ["arn:aws:s3:::stackr-backups-0123456789/clickhouse/????-??-??T??-??-??Z/.lock", "arn:aws:s3:::stackr-backups-0123456789/drill/drill-??????????-?????/.lock"]
+      },
+      {
+        Effect   = "Allow"
+        Action   = "s3:ListBucket"
+        Resource = "arn:aws:s3:::stackr-backups-0123456789"
+      },
+    ]
+    error_message = "The role writes and reads clickhouse/ and drill/ of the backups bucket, lists the bucket (without a prefix condition, so a missing key is a 404 and not a 403), and deletes nothing but ClickHouse's own lock files, at the exact paths of a backup's and a drill's: it can't delete a backup."
+  }
+  assert {
+    condition     = !strcontains(aws_iam_role_policy.backups.policy, "\"*\"") && !strcontains(aws_iam_role_policy.backups.policy, "s3:*")
+    error_message = "No wildcard action or resource beyond the prefixes."
+  }
+  assert {
+    condition     = aws_instance.this.metadata_options[0].http_put_response_hop_limit == 1
+    error_message = "The backups don't raise IMDS's hop limit: the host hands ClickHouse its credentials per run, and its containers still can't reach the role."
+  }
+}
+
+run "state_host_refuses_an_object_where_a_bucket_is_wanted" {
+  command = plan
+  module {
+    source = "./modules/state-host"
+  }
+  variables {
+    backups_bucket = { name = "stackr-backups-0123456789", arn = "arn:aws:s3:::stackr-backups-0123456789/clickhouse" }
+  }
+  expect_failures = [var.backups_bucket]
 }
 
 run "state_host_names_its_three_services_at_its_fixed_address" {

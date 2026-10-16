@@ -21,7 +21,8 @@ type Resource = GrantrApi.components["schemas"]["Resource"];
 
 /**
  * Every action a tenant's screens in admin ask grantr about, on the tenant, in one read per
- * screen: Access's, and reading the audit log, which puts Audit on the rail.
+ * screen: Access's, reading the audit log, which puts Audit on the rail, and reading rule runs,
+ * which puts Runs there.
  */
 export const TENANT_ACTIONS = [
   "grantr:add_member",
@@ -35,6 +36,8 @@ export const TENANT_ACTIONS = [
   "grantr:delete_tenant",
   "grantr:read_audit",
   "portalr:read_telemetry",
+  "portalr:read_spend",
+  "reflexr:read_runs",
 ] as const;
 
 /** Each part of Access, and the action its read takes. */
@@ -96,6 +99,24 @@ export function whom(grantee: Grantee): string {
       return `${grantee.rule} (rule in ${grantee.workspace})`;
     default:
       return who(grantee);
+  }
+}
+
+/**
+ * Whom a grant is to, in a sentence: a person by their id alone, and anyone else named for what
+ * they are, as in "Make bob admin of acme?" or "Make the group ops admin of acme?". A person and
+ * a service principal may share an id, so the second is never taken for the first.
+ */
+export function whomIn(grantee: Grantee): string {
+  switch (grantee.kind) {
+    case "group":
+      return `the group ${grantee.id}`;
+    case "service_principal":
+      return `the service principal ${grantee.id}`;
+    case "rule":
+      return `the rule ${grantee.rule} in ${grantee.workspace}`;
+    case "user":
+      return grantee.id;
   }
 }
 

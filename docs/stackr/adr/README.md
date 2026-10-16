@@ -35,9 +35,11 @@ Each record captures one decision: the context that forced it, the options consi
 | [0029](0029-the-aws-modules-and-tier-1.md) | The AWS modules, and tier 1 | Accepted, amended by [0034](0034-the-stack-on-aws.md) |
 | [0030](0030-the-incident-experiment-and-its-postmortem.md) | The incident experiment, and its postmortem | Accepted |
 | [0031](0031-clickhouses-admin-apart-from-langfuse.md) | ClickHouse's admin, apart from Langfuse | Accepted |
-| [0032](0032-the-edge-the-services-and-the-state-host.md) | The edge, the services, and the state host | Accepted, amended by [0034](0034-the-stack-on-aws.md) |
+| [0032](0032-the-edge-the-services-and-the-state-host.md) | The edge, the services, and the state host | Accepted, amended by [0034](0034-the-stack-on-aws.md) and [0037](0037-the-state-hosts-clickhouse-backups.md) |
 | [0033](0033-the-combined-system-proved-in-ci.md) | The combined system, proved in CI | Accepted |
 | [0034](0034-the-stack-on-aws.md) | The stack on AWS | Accepted, amended by [0035](0035-the-thin-images.md) |
 | [0035](0035-the-thin-images.md) | The thin images | Accepted |
+| [0036](0036-tier-2-against-floci.md) | Tier 2, against Floci | Accepted, amended by [0037](0037-the-state-hosts-clickhouse-backups.md) |
+| [0037](0037-the-state-hosts-clickhouse-backups.md) | The state host's ClickHouse backups | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, test } from "vitest";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { type ArtifactrStream, artifactr, type Workspace } from "./artifactr";
 import type * as v1 from "./generated/artifactr.v1";
 import { Stream, type StreamOptions } from "./stream";
@@ -234,6 +234,21 @@ test("a store the server refuses stops, and doesn't reconnect", async () => {
   server.drop(4403);
   await until(stream, (s) => s.status === "closed");
   expect(server.hellos).toHaveLength(1);
+});
+
+test("a command unanswered when the server refuses the store for good settles closed, and so does one sent after", async () => {
+  open();
+  await until(stream, (s) => s.status === "live");
+  server.answer("silent");
+  const unanswered = stream.send({ type: "stop_run", run_id: "run_1" } as never, "cmd-1");
+  await vi.waitFor(() => expect(server.commands).toHaveLength(1));
+  server.drop(4401);
+  await expect(unanswered).resolves.toEqual({ outcome: "closed" });
+  await until(stream, (s) => s.status === "closed");
+  await expect(stream.send({ type: "stop_run", run_id: "run_1" } as never)).resolves.toEqual({
+    outcome: "closed",
+  });
+  expect(server.commands).toHaveLength(1);
 });
 
 test("after the server refuses the token, a reconnect with a fresh one goes live", async () => {

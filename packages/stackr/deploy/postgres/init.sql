@@ -58,6 +58,7 @@ WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'litellm') \gexec
 \getenv app_db_name APP_DB_NAME
 \getenv app_db_password APP_DB_PASSWORD
 \getenv app_db_creates_roles APP_DB_CREATES_ROLES
+\getenv app_db_schema APP_DB_SCHEMA
 
 \if :{?grafana_password}
 -- Grafana's users and alert state, on PostgreSQL rather than its task's disk.
@@ -102,6 +103,19 @@ GRANT :"app_db_name" TO CURRENT_USER;
 SELECT 'CREATE DATABASE ' || quote_ident(:'app_db_name') || ' OWNER ' || quote_ident(:'app_db_name')
 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = :'app_db_name') \gexec
 ALTER DATABASE :"app_db_name" SET timezone TO 'UTC';
+-- The owner's search_path is the application's schema, in its database, as the role's own: the
+-- application asks for it as it connects too, but a proxy that drops what a client asks for at
+-- its start, as Floci's RDS does, would leave the owner migrating into another schema.
+-- Without APP_DB_SCHEMA, the owner keeps the server's default, and loses one set before.
+\if :{?app_db_schema}
+SELECT :'app_db_schema' = '' AS schema_empty \gset
+\if :schema_empty
+DO $$ BEGIN RAISE EXCEPTION 'APP_DB_SCHEMA is empty: name the application''s schema, or leave it unset'; END $$;
+\endif
+ALTER ROLE :"app_db_name" IN DATABASE :"app_db_name" SET search_path TO :"app_db_schema";
+\else
+ALTER ROLE :"app_db_name" IN DATABASE :"app_db_name" RESET search_path;
+\endif
 \endif
 \endif
 

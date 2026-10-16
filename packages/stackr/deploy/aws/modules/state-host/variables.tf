@@ -48,6 +48,26 @@ variable "clickhouse_admin_password_secret_arn" {
   }
 }
 
+variable "clickhouse_backup_password_secret_arn" {
+  description = "The secret holding the password of ClickHouse's `backup` user, which the instance reads each time it starts its services."
+  type        = string
+
+  validation {
+    condition     = can(regex("^arn:[^:]+:secretsmanager:[^:]+:[0-9]{12}:secret:[^:]+$", var.clickhouse_backup_password_secret_arn))
+    error_message = "A whole secret's ARN: the instance reads it whole, without a JSON key."
+  }
+}
+
+variable "backups_bucket" {
+  description = "The backups bucket (data's), whose clickhouse/ and drill/ prefixes the instance's role may write and read: ClickHouse's backups and the restore drill's (ADR-0037)."
+  type        = object({ name = string, arn = string })
+
+  validation {
+    condition     = can(regex("^arn:[^:]+:s3:::[^/]+$", var.backups_bucket.arn))
+    error_message = "A bucket's ARN, not an object's."
+  }
+}
+
 variable "lattice_commit" {
   description = "The commit of lattice the instance checks out, by its full SHA, which can't move as a tag can: deploy/aws/state-host is its Compose."
   type        = string

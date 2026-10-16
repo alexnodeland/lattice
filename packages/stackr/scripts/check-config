@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Static checks that no service's own validator covers. Run by scripts/validate.
+"""Static checks that no service's own validator covers. Run by scripts/validate, but `gotrue`.
 
-Usage: scripts/check-config {dashboards,supabase,litellm,aws}
+Usage: scripts/check-config {dashboards,supabase,litellm,aws,gotrue}
 
 dashboards: every dashboard under deploy/grafana/dashboards is valid JSON, has
 a unique uid and a title, and refers only to the data sources Grafana is
@@ -21,6 +21,14 @@ exists, guardrails use integrations that need no licence and valid modes,
 every `os.environ/` reference is set on the litellm service in compose.yaml,
 and no key is written into the file.
 
+gotrue: GoTrue's image in compose.yaml and in the AWS stack module
+(deploy/aws/modules/stack/locals.tf) is the version the Supabase CLI pinned in
+versions.env runs. The CLI's image pins are in its own repository, so this one
+reads them over the network, so `make validate` stays offline, and CI runs it
+(moon run stackr:gotrue) on a pull request whose own diff changes versions.env,
+compose.yaml or locals.tf, and on none other. It tries twice, and a CLI
+Dockerfile it can't read is a failure, never a pass.
+
 aws: the AWS recipe's state host runs ClickHouse, Prometheus and
 prom-label-proxy from a Compose file of its own (deploy/aws/state-host), since
 Compose needs every variable of a file it reads. Its services are compose.yaml's
@@ -35,12 +43,15 @@ Dockerfile builds is on its service's image, as compose.yaml pins it.
 
 from __future__ import annotations
 
+import http.client
 import json
 import re
 import subprocess
 import sys
+import time
 import tomllib
-from collections.abc import Iterator
+import urllib.request
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any
 
@@ -243,6 +254,21 @@ NAMESPACE = "stackr.internal"
 # What the state host's services must keep from compose.yaml's: only their ports and their data's
 # paths on the host differ.
 STATE_HOST_KEYS = ("image", "user", "command", "entrypoint", "healthcheck")
+STATE_HOST_EXTRA = {
+    "clickhouse": {
+        "environment": {"CLICKHOUSE_BACKUP_PASSWORD", "CLICKHOUSE_BACKUP_URL"},
+        "mounts": {
+            "/etc/clickhouse-server/users.d/backup-user.xml",
+            "/etc/clickhouse-server/config.d/backups.xml",
+        },
+    },
+    "prometheus": {"environment": set(), "mounts": {"/etc/prometheus/rules/alerts.yml"}},
+}
+"""What the state host adds to a service of compose.yaml's, and nothing more (ADR-0037): the
+`backup` user and the `backups` named collection for ClickHouse, and the backups' alert rules for
+Prometheus."""
+STATE_HOST_RULE_FILES = ["/etc/prometheus/rules/*.yml"]
+"""The rule files the state host's Prometheus reads, which the single host's doesn't."""
 EDGE = ROOT / "deploy" / "aws" / "modules" / "edge" / "variables.tf"
 STACK = ROOT / "deploy" / "aws" / "modules" / "stack" / "locals.tf"
 HOST_OVERLAY = ROOT / "deploy" / "host" / "compose.prod.yaml"
@@ -266,11 +292,23 @@ def check_aws() -> list[str]:
         for key in STATE_HOST_KEYS:
             if service.get(key) != stack[name].get(key):
                 problems.append(f"{where}: its {key} isn't compose.yaml's")
-        if set(service.get("environment", {})) != set(stack[name].get("environment", {})):
-            problems.append(f"{where}: its environment's settings aren't compose.yaml's")
-        if volume_targets(service) != volume_targets(stack[name]):
-            problems.append(f"{where}: its volumes aren't mounted where compose.yaml's are")
+        extra = STATE_HOST_EXTRA.get(name, {"environment": set(), "mounts": set()})
+        added = {key: sorted(values) or "nothing" for key, values in extra.items()}
+        if (
+            set(service.get("environment", {}))
+            != set(stack[name].get("environment", {})) | extra["environment"]
+        ):
+            problems.append(
+                f"{where}: its environment's settings aren't compose.yaml's,"
+                f" with {added['environment']} more"
+            )
+        if volume_targets(service) != volume_targets(stack[name]) | extra["mounts"]:
+            problems.append(
+                f"{where}: its volumes aren't mounted where compose.yaml's are,"
+                f" with {added['mounts']} more"
+            )
     expected = yaml.safe_load((ROOT / "deploy" / "prometheus" / "prometheus.yml").read_text())
+    expected["rule_files"] = STATE_HOST_RULE_FILES
     for job in expected["scrape_configs"]:
         for static in job.get("static_configs", []):
             static["targets"] = [
@@ -282,7 +320,7 @@ def check_aws() -> list[str]:
     if yaml.safe_load((STATE_HOST / "prometheus.yml").read_text()) != expected:
         problems.append(
             "deploy/aws/state-host/prometheus.yml isn't deploy/prometheus/prometheus.yml, "
-            f"with the services named in {NAMESPACE}"
+            f"with the services named in {NAMESPACE}, and the rule files {STATE_HOST_RULE_FILES}"
         )
     # The overlay's Compose tags (!override, !reset) aren't YAML that PyYAML reads.
     found = re.search(r"image: (caddy:\S+)", HOST_OVERLAY.read_text())
@@ -310,12 +348,108 @@ def check_aws() -> list[str]:
     return problems
 
 
+CLI_DOCKERFILE = (
+    "https://raw.githubusercontent.com/supabase/cli/v{version}"
+    "/apps/cli-go/pkg/config/templates/Dockerfile"
+)
+"""Where the Supabase CLI, at a version's tag, lists the images it runs."""
+CLI_GOTRUE = re.compile(r"^FROM supabase/gotrue:([^@\s]+)(?:@\S+)? AS gotrue\s*$", re.MULTILINE)
+"""The CLI's GoTrue pin: its tag, whether or not the CLI adds a digest."""
+CLI_VERSION = re.compile(r"^SUPABASE_CLI_VERSION=([0-9][0-9A-Za-z.-]*)\s*$", re.MULTILINE)
+"""The CLI's version, which goes into a URL's path: no `/`, `?` or `#`."""
+STACK_GOTRUE = re.compile(r"^\s*gotrue\s*=\s*\"supabase/gotrue:([^@\"\s]+)", re.MULTILINE)
+"""The AWS module's GoTrue pin, on its `gotrue =` line; compose.yaml's is read as YAML instead."""
+
+
+def fetch_text(url: str, attempts: int = 2, pause: float = 2.0) -> str:
+    """A page's text, read up to `attempts` times; raises OSError when none could be.
+
+    A refused connection, an HTTP error, a body cut short and bytes that aren't text all count as
+    a failed attempt, and get the retry.
+    """
+    request = urllib.request.Request(url, headers={"User-Agent": "stackr-check-config"})
+    last: Exception | None = None
+    for attempt in range(attempts):
+        if attempt:
+            time.sleep(pause)
+        try:
+            with urllib.request.urlopen(request, timeout=20) as response:
+                return response.read().decode()
+        except (OSError, http.client.HTTPException, UnicodeDecodeError) as error:
+            last = error
+    raise OSError(f"{url}: {last}") from last
+
+
+def version_tuple(tag: str) -> tuple[int, ...] | None:
+    """A tag such as v2.197.0 as numbers, or None when it isn't one."""
+    parts = tag.removeprefix("v").split(".")
+    return tuple(int(part) for part in parts) if all(part.isdigit() for part in parts) else None
+
+
+def check_gotrue(root: Path = ROOT, fetch: Callable[[str], str] = fetch_text) -> list[str]:
+    """Check that GoTrue's image is the one the pinned Supabase CLI runs."""
+    versions = CLI_VERSION.search((root / "versions.env").read_text())
+    if versions is None:
+        return ["versions.env has no SUPABASE_CLI_VERSION, or one that isn't a version"]
+    cli = versions[1]
+    compose = yaml.safe_load((root / "compose.yaml").read_text())
+    pins = {
+        "compose.yaml": {
+            service["image"].removeprefix("supabase/gotrue:").split("@")[0]
+            for service in compose["services"].values()
+            if service.get("image", "").startswith("supabase/gotrue:")
+        },
+        "deploy/aws/modules/stack/locals.tf": set(
+            STACK_GOTRUE.findall((root / "deploy/aws/modules/stack/locals.tf").read_text())
+        ),
+    }
+    problems = [f"{where} doesn't pin supabase/gotrue" for where, tags in pins.items() if not tags]
+    url = CLI_DOCKERFILE.format(version=cli)
+    try:
+        dockerfile = fetch(url)
+    except OSError as error:
+        return [
+            *problems,
+            f"can't read the Supabase CLI {cli}'s image pins, so can't check: {error}",
+        ]
+    found = CLI_GOTRUE.search(dockerfile)
+    if found is None:
+        return [
+            *problems,
+            f"{url} has no `FROM supabase/gotrue:… AS gotrue`: the file may have moved",
+        ]
+    wanted = found[1]
+    for where, tags in pins.items():
+        for tag in sorted(tags - {wanted}):
+            ours, theirs = version_tuple(tag), version_tuple(wanted)
+            if ours is None or theirs is None:  # a tag such as v2.198.0-rc1: no direction to say
+                advice = (
+                    f"make them one: bump the CLI to one that runs {tag}, or set it to {wanted}"
+                )
+            elif ours > theirs:
+                first = "bump the CLI first (SUPABASE_CLI_VERSION in versions.env)"
+                advice = f"{first} to one that runs {tag}"
+            else:
+                advice = (
+                    f"set its tag to {wanted}, keeping its @sha256 digest pin (Renovate can set"
+                    " both), or bump the CLI back"
+                )
+            problems.append(
+                f"{where} runs supabase/gotrue:{tag}, but the Supabase CLI {cli} runs {wanted}: "
+                + advice
+            )
+    if not problems:
+        print(f"ok: GoTrue is {wanted} in compose.yaml and the AWS module, as Supabase CLI {cli}")
+    return problems
+
+
 def main() -> int:
     checks = {
         "dashboards": check_dashboards,
         "supabase": check_supabase,
         "litellm": check_litellm,
         "aws": check_aws,
+        "gotrue": check_gotrue,
     }
     if len(sys.argv) != 2 or sys.argv[1] not in checks:
         print(f"usage: scripts/check-config {{{','.join(checks)}}}", file=sys.stderr)

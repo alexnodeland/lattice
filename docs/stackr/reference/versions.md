@@ -5,7 +5,7 @@ stackr pins every version it depends on, in the file that uses it:
 | What | Pinned in | Updated |
 |---|---|---|
 | Every service's image | `compose.yaml`, by tag, and by digest where a registry publishes only `latest` | By Renovate, with CI's smoke tests run on each update |
-| The Supabase CLI, which pins Supabase's own images | `versions.env` | By hand |
+| The Supabase CLI, which pins Supabase's own images | `versions.env` | By hand. GoTrue's image in `compose.yaml` follows the version it runs ([Validation](../guides/validation.md)) |
 | The development tools: linters, prek, Copier, Zensical | lattice's `uv.lock` | By Renovate |
 | The GitHub Actions | lattice's `.github/workflows/` | By Renovate |
 

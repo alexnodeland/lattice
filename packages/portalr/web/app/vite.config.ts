@@ -1,3 +1,4 @@
+import { notices, readPolicy } from "@portalr/notices";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
@@ -23,7 +24,13 @@ const application = process.env.PORTALR_APP_URL ?? "http://localhost:8000";
 export default defineConfig({
   base: "/portalr/app/",
   // Each route is a chunk of its own, loaded when it is first visited.
-  plugins: [tanstackRouter({ ...ROUTES, autoCodeSplitting: true }), react(), tailwindcss()],
+  plugins: [
+    tanstackRouter({ ...ROUTES, autoCodeSplitting: true }),
+    react(),
+    tailwindcss(),
+    // The licences of the packages bundled, beside the UI (portalr ADR-0033).
+    notices({ ui: "app", policy: readPolicy(new URL("../notices/policy.json", import.meta.url)) }),
+  ],
   // ui's public files, such as the script that sets the scheme before the first paint.
   publicDir: "../ui/public",
   build: { outDir: "../../src/portalr/static/app", emptyOutDir: true },

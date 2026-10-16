@@ -407,12 +407,12 @@ A notice is committed directly, without `Runner.send`, so it starts no turn. A n
 - [x] Phase 1: inbound adapter, in relayr ([relayr RFC-0001](../../relayr/rfcs/0001-v0.1-implementation-plan.md)); its followers start from `on_open`, which lattice RFC-0001 made for this, not from `authorize` ([relayr ADR-0016](../../relayr/adr/0016-followers-start-on-open.md))
 - [x] Phase 2: outbound adapter and loop control, in relayr; messages are idempotent by id in artifactr, so there is no read-back, and the run behind each write is recorded before it ([relayr ADR-0019](../../relayr/adr/0019-runs-act-once-through-derived-ids-and-keyed-edits.md), [ADR-0021](../../relayr/adr/0021-chains-continue-across-the-bridge.md))
 - [x] Phase 3: template option, example and smoke test ([ADR-0021](../adr/0021-the-bridge-in-the-template.md))
-- [x] Phase 4: telemetry links and tags, in relayr ([relayr ADR-0023](../../relayr/adr/0023-traces-linked-across-the-bridge.md), [ADR-0024](../../relayr/adr/0024-langfuse-sessions-tagged-with-each-other.md)); LiteLLM's metadata waits on [lattice #86](https://github.com/alexnodeland/lattice/issues/86)
+- [x] Phase 4: telemetry links and tags, in relayr ([relayr ADR-0023](../../relayr/adr/0023-traces-linked-across-the-bridge.md), [ADR-0024](../../relayr/adr/0024-langfuse-sessions-tagged-with-each-other.md)); LiteLLM's metadata waited on [lattice #86](https://github.com/alexnodeland/lattice/issues/86): done in [lattice ADR-0022](../../adr/0022-litellm-requests-carry-the-propagated-trace-tags.md)
 - [x] Phase 5: rules from chat, in relayr ([relayr ADR-0028](../../relayr/adr/0028-rules-from-chat.md)) and the template ([ADR-0024](../adr/0024-rules-from-chat-in-the-template.md))
 - [x] Phase 6: evaluation, in relayr ([relayr ADR-0031](../../relayr/adr/0031-proposal-outcomes-and-the-measures.md)) and the template ([ADR-0030](../adr/0030-the-incident-experiment-and-its-postmortem.md))
 - [x] Phase 7: docs, ADRs, and the combined system proved in CI: its CI in the Template job, and end to end on the stack in the Smoke job's rows with an application ([ADR-0033](../adr/0033-the-combined-system-proved-in-ci.md))
 
-Carried past v0.1: LiteLLM's metadata, which waits on [lattice #86](https://github.com/alexnodeland/lattice/issues/86), and the [unresolved questions](#unresolved-questions).
+Carried past v0.1: LiteLLM's metadata, which waited on [lattice #86](https://github.com/alexnodeland/lattice/issues/86) and is done in [lattice ADR-0022](../../adr/0022-litellm-requests-carry-the-propagated-trace-tags.md), and the [unresolved questions](#unresolved-questions).
 
 [a-adr-0032]: https://github.com/alexnodeland/artifactr/blob/main/docs/adr/0032-libraries-and-the-stackr-template.md
 [a-adr-0033]: https://github.com/alexnodeland/artifactr/blob/main/docs/adr/0033-trace-links-on-runs-and-revisions.md

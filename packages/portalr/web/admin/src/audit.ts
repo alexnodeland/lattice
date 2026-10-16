@@ -26,6 +26,8 @@ export function said(event: AuditEvent): string {
   switch (event.type) {
     case "tenant_created":
       return `created the tenant, owned by ${who({ kind: "user", id: event.owner })}`;
+    case "deployment_tenant_created":
+      return `created the tenant ${event.tenant}, owned by ${who({ kind: "user", id: event.owner })}`;
     case "tenant_deleted":
       return "deleted the tenant";
     case "member_added":
@@ -79,6 +81,7 @@ const LABELS: Record<AuditType, string> = {
   restricted: "Restrictions",
   unrestricted: "Restrictions lifted",
   tenant_created: "Tenant created",
+  deployment_tenant_created: "Tenant created (deployment)",
   tenant_deleted: "Tenant deleted",
 };
 

@@ -4,7 +4,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useActionState, useId, useState } from "react";
 import {
-  byKind,
+  byKindThenName,
   KIND,
   opening,
   peopleIn,
@@ -66,7 +66,12 @@ function Members() {
           {
             key: "member",
             label: "Member",
-            cell: (member) => (member.kind === "user" ? names(member.id) : member.id),
+            cell: (member) =>
+              member.kind === "user" ? (
+                <span title={member.id}>{names(member.id)}</span>
+              ) : (
+                member.id
+              ),
           },
           {
             key: "kind",
@@ -74,7 +79,7 @@ function Members() {
             cell: (member) => <span className="first-letter:uppercase">{KIND[member.kind]}</span>,
           },
         ]}
-        items={[...members].sort(byKind)}
+        items={[...members].sort(byKindThenName(names))}
         keyOf={(member) => `${member.kind}:${member.id}`}
         actions={
           removes

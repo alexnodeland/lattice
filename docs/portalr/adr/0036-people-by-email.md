@@ -1,4 +1,4 @@
-# ADR-0035: People by email, not by id
+# ADR-0036: People by email, not by id
 
 **Status:** Accepted
 **Date:** 2026-10-16
@@ -13,18 +13,19 @@ With real Supabase, a person's grantr id is their auth user's UUID. Admin's Memb
 
 - **The email comes from the application's auth service, through a `people` hook,** `portalr_router(people=)`, as `invite=` is Supabase Auth's admin API. `SupabasePeople` reads `GET /auth/v1/admin/users/{id}` with the project's secret key, which stays in the application. Without a hook, there is no people route, `config.json` says `people: false`, and the UIs show short ids.
 - **`GET /portalr/v1/people?id=...` answers the emails of people the caller may see:**
-  - **A member of the tenant `X-Tenant` names sees the emails of that tenant's other members.** The caller and every id are checked against grantr's memberships *before* Supabase is asked: an id that is not a member of the tenant is left out without a call, so the route can't be used to find who has an account.
-  - **An operator** (`portalr:read_deployment`) **sees anyone's**, with no tenant, so the deployment's own views can name owners.
+  - **An operator** (`portalr:read_deployment`) **sees anyone's**, with or without a tenant, including a former member's in a tenant's Audit, so the deployment's own views can name owners.
+  - **Any other member of the tenant `X-Tenant` names sees the emails of that tenant's other members.** The caller and every id are checked against grantr's memberships, all at once, *before* the cache or Supabase is asked: an id that is not a member of the tenant is left out without a call, so the route can't be used to find who has an account, and a cached email is never given to someone who may not see it.
   - **A key sees no one:** only a person sees people. A caller bound to another tenant's key, or a non-member who is not an operator, is refused (403).
   - **At most 100 ids** (422 beyond, FastAPI's, naming `id`), at least one.
 - **The same answer for an id that is unknown, not allowed, or without an email:** it is left out. The answer is `{"people": {id: email}}`, `Cache-Control: no-store`.
 - **Fail closed.** A Supabase that is down, slow or answers badly leaves the ids out; the route still answers 200. The UIs show a person with no email by a short id, the first eight characters of a long id such as a UUID (`3f2a91c4…`), never as an error. A service principal is shown by its id.
-- **Bounded reads.** `SupabasePeople` reads at most eight users at once, each within three seconds and all of a call within eight, so one request can't hold the application for long. A read that fails or times out is not kept.
-- **A short, bounded, in-memory cache** on the server: an email for five minutes, an id with no user or no email for one, at most 2,048 ids, the oldest dropped first. Nothing is written to disk. In the browser, TanStack Query keeps the answer five minutes in memory, for one set of ids, and does not read it again as the window regains focus; it is not persisted.
+- **The hook is not trusted:** the route answers only the ids it allowed, and drops an empty email.
+- **Bounded reads.** `SupabasePeople` reads at most eight users at once, one call at most four of them, so a call for a hundred ids leaves the rest to others; each read within three seconds and all of a call within eight. Calls for the same id at once share one read. Ids are matched without regard to case.
+- **A short, bounded, in-memory cache** on the server: an email for five minutes, an id with no user or no email for one minute, and an id whose read failed (Supabase down, slow, a 5xx, a 429, or one that refuses our key) for five seconds, or what its `Retry-After` says up to a minute, so a failing Supabase is not asked again by every request. At most 2,048 ids; the oldest kept goes first. Nothing is written to disk. In the browser, TanStack Query keeps the answer five minutes in memory, for one set of ids, and does not read it again as the window regains focus; it is not persisted. While a new set of ids is read, a screen shows the last set's emails, but only the same tenant's: opening another tenant shows short ids until its answer arrives.
 - **Where emails are, and where they never are.**
   - **Never:** an address, a request's URL (the ids are in it, the emails are not), a log, a span attribute, an error message, `localStorage` or `sessionStorage`, or a stream's or store's state. The chat's messages keep the actors as the server sent them; the author's email is looked up when a message is drawn.
   - The ids in a request's URL are user ids, which grantr and the audit log carry already; the secret key is only on the call to Supabase.
-- **Where the UIs show people by email:** admin's Members (list, remove dialog), Groups (members, the member picker, the confirmation of whom a change takes out), Grants (to whom, the form's choices, the revoke dialog, what a grant done says), the tenant's Audit and the deployment's Audit; the app's Share dialog (who holds a role, who may be offered it, the revoke dialog) and a thread's chat (an author who posted without a name of their own). A name a person posted under is shown as it was. The Audit filter still takes an id, since the address holds ids only.
+- **Where the UIs show people by email:** admin's Members (list, remove dialog), Groups (members, the member picker, the confirmation of whom a change takes out), Grants (to whom, the form's choices, the revoke dialog, what a grant done says), the tenant's Audit and the deployment's Audit; the app's Share dialog (who holds a role, who may be offered it, the revoke dialog) and a thread's chat (an author who posted without a name of their own). A name a person posted under is shown as it was. People are listed in the order of what is shown of them, so a list is ordered by short id until the emails arrive and once more after; a short id has its full id as a `title` where it is a row's own text. The Audit filter still takes an id, since the address holds ids only.
 - **The test application names everyone `<id>@portalr.test` but `ghost`,** so a scenario can show an id that Auth does not know.
 
 ## Options considered
@@ -43,4 +44,5 @@ With real Supabase, a person's grantr id is their auth user's UUID. Admin's Memb
 - Harder: the application wires another hook with the project's secret key, and that key's reach is the same as the invite's.
 - Harder: a member of a tenant sees the email of every other member of it, as a member of any team sees the people in it. An owner who does not want that cannot hide a member from the others.
 - Harder: an email in the cache outlives its user's deletion by up to five minutes.
+- To do: the application template wires `SupabasePeople` when it mounts portalr (stackr's Phase 7); until then an application passes the hook itself.
 - To revisit: a batched lookup, if Supabase offers one; a tenant-level setting for who sees emails.

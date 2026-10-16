@@ -5,8 +5,9 @@ library's own routes; portalr adds only reading the stack's tools for one tenant
 and, for operators, the deployment's tenants and deep links (lattice RFC-0002).
 """
 
+import asyncio
 import re
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from importlib.resources import files
 from pathlib import Path
 from typing import Annotated, Any, Final
@@ -398,19 +399,20 @@ async def _visible(
 ) -> list[str]:
     """The ids whose emails the caller may see: no Supabase call is made for any other.
 
-    A member of the tenant sees the tenant's other members, and an operator anyone, with no
-    tenant. Only a person sees a person: a service principal's key sees no one.
+    An operator sees anyone's, with or without a tenant. Any other person who is a member of the
+    tenant sees its members'. A key sees no one: only a person sees people.
     """
     if not isinstance(who.subject, User):
         raise _refusal("forbidden", "only a person sees other people")
     tenant = tenant or who.tenant
     if tenant is not None and who.tenant is not None and who.tenant != tenant:
         raise _refusal("forbidden", "this caller's key is for another tenant")
-    if tenant is not None and await grants.member(tenant, who.subject.id) is not None:
-        return [each for each in ids if await grants.member(tenant, each) is not None]
     if await _operates(grants, who):
         return ids
-    raise _refusal("forbidden", "the caller may not see people here")
+    if tenant is None or await grants.member(tenant, who.subject.id) is None:
+        raise _refusal("forbidden", "the caller may not see people here")
+    members = await asyncio.gather(*(grants.member(tenant, each) for each in ids))
+    return [each for each, member in zip(ids, members, strict=True) if member is not None]
 
 
 def _naming(router: APIRouter, grants: Grants, people: People, current: Any) -> None:
@@ -423,14 +425,15 @@ def _naming(router: APIRouter, grants: Grants, people: People, current: Any) -> 
     ) -> Names:
         """The emails of people, by user id: of the tenant ``X-Tenant`` names, for its members.
 
-        A member of the tenant sees its other members' emails; an operator sees anyone's, with no
-        tenant. An id the caller may not see, with no user or with no email, is left out, alike,
-        and Supabase is asked only about the ids the caller may see. At most 100 ids. The answer
-        is personal data and is not to be kept, so it is ``no-store``.
+        An operator sees anyone's email, with or without a tenant; a member of the tenant sees
+        its other members'. An id the caller may not see, with no user or with no email, is left
+        out, alike, and Supabase is asked only about the ids the caller may see. At most 100 ids.
+        The answer is personal data and is not to be kept, so it is ``no-store``.
         """
         response.headers["Cache-Control"] = "no-store"
         visible = await _visible(grants, who, x_tenant, list(dict.fromkeys(id)))
-        return Names(people=dict(await people(visible)) if visible else {})
+        got: Mapping[str, str] = await people(visible) if visible else {}
+        return Names(people={each: email for each in visible if (email := got.get(each))})
 
 
 def _refused(error: GrantrError) -> HTTPException:

@@ -29,7 +29,7 @@ export {
 } from "./landing";
 export type { LogRecord, Logs } from "./logs";
 export { useMe } from "./me";
-export { type Names, namesOf, shortId, usePeople } from "./people";
+export { keepWithin, type Names, namesOf, shortId, usePeople } from "./people";
 export {
   type AuditFilter,
   createQueries,

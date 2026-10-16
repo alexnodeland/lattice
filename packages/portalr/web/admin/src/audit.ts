@@ -4,7 +4,7 @@
  */
 
 import { type AuditFilter, type GrantrApi, type Names, shortId } from "@portalr/client";
-import { peopleIn, possessive, where, who, whom } from "./access";
+import { type Named, peopleIn, possessive, where, who, whom } from "./access";
 
 type Subject = GrantrApi.components["schemas"]["Subject"];
 type AuditEvent = GrantrApi.components["schemas"]["AuditEvent"];
@@ -22,10 +22,7 @@ export function actor(by: Subject | null, names: Names = shortId): string {
 /** The ids of the people an entry names: who made it, and whom it is about. */
 export function peopleOf(entry: AuditEntry): string[] {
   const { by, event } = entry;
-  const named: { readonly kind: string; readonly id?: string }[] = [];
-  if (by !== null) {
-    named.push(by);
-  }
+  const named: Named[] = by === null ? [] : [by];
   switch (event.type) {
     case "tenant_created":
       named.push({ kind: "user", id: event.owner });
@@ -41,7 +38,18 @@ export function peopleOf(entry: AuditEntry): string[] {
     case "revoked":
       named.push(event.grant.to);
       break;
+    case "tenant_deleted":
+    case "group_deleted":
+    case "role_defined":
+    case "role_deleted":
+    case "key_issued":
+    case "key_revoked":
+    case "restricted":
+    case "unrestricted":
+      break;
     default:
+      // Every type is read above: a new type of grantr's fails to typecheck here.
+      event satisfies never;
   }
   return peopleIn(named);
 }

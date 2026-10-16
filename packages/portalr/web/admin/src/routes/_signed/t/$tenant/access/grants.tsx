@@ -15,7 +15,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { type FormEvent, useId, useState } from "react";
 import {
   allowedNow,
-  byKind,
+  byKindThenName,
   fromKey,
   keyOf,
   opening,
@@ -128,16 +128,16 @@ function Grants() {
     ...catalog.roles.filter((role) => owns || role.name !== "owner"),
     ...(custom ?? []).map((role) => ({ name: role.name, kinds: catalog.custom_kinds })),
   ];
-  const listed = [
-    ...[...(members ?? [])].sort(byKind),
-    ...Object.keys(groups ?? {})
-      .sort()
-      .map((id) => ({ kind: "group", id })),
-  ];
   const names = useNames(tenant, [
     ...peopleIn(granted.map((grant) => grant.to)),
     ...peopleIn(members ?? []),
   ]);
+  const listed = [
+    ...[...(members ?? [])].sort(byKindThenName(names)),
+    ...Object.keys(groups ?? {})
+      .sort()
+      .map((id) => ({ kind: "group", id })),
+  ];
   return (
     <div className="flex flex-col gap-6">
       {places.length === 0 && (

@@ -20,6 +20,7 @@ import type { Context } from "./context";
 
 type Member = GrantrApi.components["schemas"]["Member"];
 type Grantee = GrantrApi.components["schemas"]["Grantee"];
+type Subject = GrantrApi.components["schemas"]["Subject"];
 type Resource = GrantrApi.components["schemas"]["Resource"];
 
 /**
@@ -93,9 +94,26 @@ export const KIND: Record<Member["kind"], string> = {
 export const who = (member: Member, names: Names = shortId) =>
   `${member.kind === "user" ? names(member.id) : member.id} (${KIND[member.kind]})`;
 
-/** The ids of the people among some members: the ones whose emails a screen asks for. */
-export const peopleIn = (members: Iterable<{ readonly kind: string; readonly id?: string }>) =>
-  [...members].flatMap((member) => (member.kind === "user" && member.id ? [member.id] : []));
+/** Anyone grantr names: a member, a grantee, or the maker of a change. */
+export type Named = Member | Grantee | Subject;
+
+/** The ids of the people among some of them: the ones whose emails a screen asks for. */
+export const peopleIn = (named: Iterable<Named>) =>
+  [...named].flatMap((one) => (one.kind === "user" ? [one.id] : []));
+
+/**
+ * Members in the order Access lists them, as they are named: people first by what is shown of them,
+ * their email where known, then service principals, each by id. A person is ordered by their short
+ * id until their email arrives, so the order changes once.
+ */
+export const byKindThenName = (names: Names) => (a: Member, b: Member) => {
+  const shown = (member: Member) => (member.kind === "user" ? names(member.id) : member.id);
+  return (
+    Number(a.kind !== "user") - Number(b.kind !== "user") ||
+    shown(a).localeCompare(shown(b)) ||
+    a.id.localeCompare(b.id)
+  );
+};
 
 /** Members in the order Access lists them: people first, then service principals, each by id. */
 export const byKind = (a: Member, b: Member) =>

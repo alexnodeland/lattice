@@ -1,6 +1,7 @@
 """Supabase Auth's users, read for their emails: kept briefly, bounded, and never in an error."""
 
 import asyncio
+from collections.abc import Mapping
 from typing import Any
 
 import httpx
@@ -22,8 +23,8 @@ class Clock:
 class Auth:
     """Supabase Auth's admin users: an email by id, or none, or a script for a read."""
 
-    def __init__(self, emails: dict[str, str | None]) -> None:
-        self.emails = emails
+    def __init__(self, emails: Mapping[str, str | None]) -> None:
+        self.emails = dict(emails)
         self.requests: list[httpx.Request] = []
         self.script: dict[str, httpx.Response | Exception] = {}
         self.running = 0
@@ -113,13 +114,82 @@ async def test_emails_are_kept_for_a_while_and_read_again_after() -> None:
     assert await people(["u1"]) == {"u1": "ada@new.com"}
 
 
-async def test_a_failed_read_is_not_kept() -> None:
+async def test_a_failed_read_is_left_alone_for_a_few_seconds_and_then_read_again() -> None:
+    clock = Clock()
     auth = Auth({"u1": "ada@acme.com"})
     auth.script["u1"] = httpx.ConnectError("down")
-    people = auth.people()
+    people = auth.people(clock, failed_for=5)
     assert await people(["u1"]) == {}
     del auth.script["u1"]
+    assert await people(["u1"]) == {}, "not asked again at once"
+    assert auth.asked == ["u1"]
+    clock.now += 6
     assert await people(["u1"]) == {"u1": "ada@acme.com"}
+
+
+@pytest.mark.parametrize("status", [401, 403, 429, 500, 502, 503])
+async def test_a_limited_or_failing_supabase_is_not_asked_again_by_every_request(
+    status: int,
+) -> None:
+    clock = Clock()
+    auth = Auth({"u1": "ada@acme.com"})
+    auth.script["u1"] = httpx.Response(status, json={})
+    people = auth.people(clock, failed_for=5)
+    for _ in range(3):
+        assert await people(["u1"]) == {}
+    assert auth.asked == ["u1"], "one read for three requests"
+    clock.now += 6
+    del auth.script["u1"]
+    assert await people(["u1"]) == {"u1": "ada@acme.com"}
+
+
+async def test_retry_after_is_honoured_within_a_minute() -> None:
+    clock = Clock()
+    auth = Auth({"u1": "ada@acme.com", "u2": "bo@acme.com", "u3": "cy@acme.com"})
+    auth.script["u1"] = httpx.Response(429, headers={"retry-after": "30"}, json={})
+    auth.script["u2"] = httpx.Response(429, headers={"retry-after": "9999"}, json={})
+    auth.script["u3"] = httpx.Response(429, headers={"retry-after": "soon"}, json={})
+    people = auth.people(clock, failed_for=5)
+    await people(["u1", "u2", "u3"])
+    for scripted in ("u1", "u2", "u3"):
+        del auth.script[scripted]
+    clock.now += 6
+    assert await people(["u1", "u2", "u3"]) == {"u3": "cy@acme.com"}, "u3 had no usable header"
+    clock.now += 25
+    assert await people(["u1", "u2", "u3"]) == {"u1": "ada@acme.com", "u3": "cy@acme.com"}
+    clock.now += 31
+    assert set(await people(["u1", "u2", "u3"])) == {"u1", "u2", "u3"}, "a minute at most"
+
+
+async def test_an_id_is_matched_without_regard_to_case() -> None:
+    auth = Auth({})
+    auth.script["abc-def"] = httpx.Response(200, json={"id": "ABC-DEF", "email": "ada@acme.com"})
+    assert await auth.people()(["abc-def"]) == {"abc-def": "ada@acme.com"}
+
+
+async def test_calls_for_the_same_id_at_once_share_one_read() -> None:
+    auth = Auth({"u1": "ada@acme.com"})
+    auth.pause = 0.05
+    people = auth.people()
+    first, second = await asyncio.gather(people(["u1"]), people(["u1"]))
+    assert first == second == {"u1": "ada@acme.com"}
+    assert auth.asked == ["u1"]
+
+
+async def test_one_big_call_leaves_the_rest_of_the_reads_to_others() -> None:
+    auth = Auth({f"u{i}": f"u{i}@x.io" for i in range(30)} | {"small": "small@x.io"})
+    auth.pause = 0.05
+    people = auth.people(concurrency=8, per_call=4)
+    big = asyncio.create_task(people([f"u{i}" for i in range(30)]))
+    await asyncio.sleep(0.02)
+    assert auth.running == 4, "a call uses its share of the reads, not all"
+    started = asyncio.get_running_loop().time()
+    assert await people(["small"]) == {"small": "small@x.io"}
+    assert asyncio.get_running_loop().time() - started < 0.2, (
+        "and the next call is not kept waiting"
+    )
+    assert len(await big) == 30
+    assert auth.most <= 8
 
 
 async def test_the_cache_holds_at_most_its_size_and_drops_the_oldest() -> None:
@@ -167,7 +237,7 @@ async def test_all_the_reads_together_are_cut_off_at_the_deadline() -> None:
     assert set(found) <= set(auth.emails)
 
 
-async def test_an_email_is_in_no_error_the_hook_raises() -> None:
+async def test_a_failed_read_is_an_absence_not_an_exception() -> None:
     auth = Auth({"u1": "ada@acme.com"})
     auth.script["u1"] = httpx.ConnectError("down ada@acme.com")
-    assert await auth.people()(["u1"]) == {}, "a failure is an absence, not an exception"
+    assert await auth.people()(["u1"]) == {}

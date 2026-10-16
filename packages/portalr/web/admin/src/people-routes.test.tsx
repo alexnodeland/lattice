@@ -2,7 +2,7 @@
  * People by email, in the screens that show them: Members, Groups, Grants and Audit. The server
  * names those the reader may see; an id it leaves out, or a server that fails, shows as a short
  * id, never as an error, and no email reaches an address, a storage or a request (portalr
- * ADR-0034).
+ * ADR-0036).
  */
 
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
@@ -19,6 +19,8 @@ const EMAILS: Record<string, string> = { [ADA]: "ada@acme.test", [BEN]: "ben@acm
 const asked: { readonly ids: string[]; readonly tenant: string | null }[] = [];
 /** Every request's URL, to hold none to an email. */
 const urls: string[] = [];
+/** Held until released: globex's answer, so a test can look at what shows meanwhile. */
+let globex: { readonly promise: Promise<void> } | null = null;
 /** Whether the server fails every read of people. */
 let failing = false;
 
@@ -31,12 +33,19 @@ async function serve(request: Request, path: string): Promise<Response | undefin
   if (path === "/portalr/v1/people") {
     const ids = new URL(request.url).searchParams.getAll("id");
     asked.push({ ids, tenant: request.headers.get("x-tenant") });
+    if (request.headers.get("x-tenant") === "globex") {
+      await globex?.promise;
+      return Response.json({ people: { [ADA]: "ada@globex.test" } });
+    }
     if (failing) {
       return Response.json({ detail: "down" }, { status: 502 });
     }
     return Response.json({
       people: Object.fromEntries(ids.filter((id) => id in EMAILS).map((id) => [id, EMAILS[id]])),
     });
+  }
+  if (path === "/grantr/v1/tenants/globex/members") {
+    return Response.json([user(ADA)]);
   }
   if (path === "/grantr/v1/tenants/acme/members") {
     return Response.json([
@@ -131,6 +140,7 @@ afterEach(() => {
   asked.length = 0;
   urls.length = 0;
   failing = false;
+  globex = null;
   vi.unstubAllGlobals();
 });
 
@@ -252,4 +262,26 @@ test("the deployment's audit log, for an operator, names people in no tenant", a
     .toBeVisible();
   await expect.element(log.getByRole("cell", { name: "ada@acme.test (person)" })).toBeVisible();
   expect(asked.at(-1)?.tenant).toBeNull();
+});
+
+test("another tenant opened on the same screen is not shown the first tenant's emails", async () => {
+  let release: () => void = () => undefined;
+  globex = {
+    promise: new Promise<void>((resolve) => {
+      release = resolve;
+    }),
+  };
+  const { screen, router } = await opened("/t/acme/access/members", TENANT_ACTIONS, serve, [
+    "acme",
+    "globex",
+  ]);
+  await expect.element(screen.getByRole("rowheader", { name: "ada@acme.test" })).toBeVisible();
+  await router.navigate({ to: "/t/$tenant/access/members", params: { tenant: "globex" } });
+  // globex has not answered: the same person is their short id, not acme's email for them.
+  const rows = screen.getByRole("table", { name: "Members" }).getByRole("rowheader");
+  await expect.element(rows.first()).toHaveTextContent("3f2a91c4…");
+  expect(rows.elements().map((row) => row.textContent)).toEqual(["3f2a91c4…"]);
+  expect(document.body.textContent).not.toContain("ada@acme.test");
+  release();
+  await expect.element(screen.getByRole("rowheader", { name: "ada@globex.test" })).toBeVisible();
 });

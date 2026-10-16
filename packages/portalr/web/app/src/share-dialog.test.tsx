@@ -118,3 +118,32 @@ test("the revoke dialog names a person as the list does", async () => {
     .element(screen.getByRole("alertdialog", { name: "Revoke erin@acme.test's editor role?" }))
     .toBeVisible();
 });
+
+test("a name arriving does not close an open revoke confirmation", async () => {
+  const screen = await render(<Opened />);
+  await screen.getByRole("button", { name: "Thread actions" }).click();
+  await screen.getByRole("button", { name: "Revoke" }).click();
+  const confirmation = screen.getByRole("alertdialog", { name: "Revoke erin's editor role?" });
+  await expect.element(confirmation).toBeVisible();
+  // The email arrives while the confirmation is open: the row is the same row.
+  await screen.rerender(<Opened names={named} />);
+  await expect
+    .element(screen.getByRole("alertdialog", { name: "Revoke erin@acme.test's editor role?" }))
+    .toBeVisible();
+});
+
+test("people are offered in the order of what is shown", async () => {
+  const screen = await render(
+    <Opened
+      people={[VERA, GONE, "zed"]}
+      names={namesOf({ [VERA]: "zoe@acme.test", zed: "adam@acme.test" })}
+    />,
+  );
+  await screen.getByRole("button", { name: "Thread actions" }).click();
+  const options = screen.getByRole("combobox", { name: "Person" }).getByRole("option");
+  expect(options.elements().map((option) => option.textContent)).toEqual([
+    "adam@acme.test",
+    "c0ffee00…",
+    "zoe@acme.test",
+  ]);
+});

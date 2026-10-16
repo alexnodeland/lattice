@@ -38,7 +38,7 @@ function Audit() {
     useSuspenseInfiniteQuery(queries.grantr.deploymentAudit(user));
   // Each page is oldest first, and each is older than the last: the newest are on top.
   const entries = data.pages.flatMap((page) => [...page].reverse());
-  // An operator is shown anyone by email, in no tenant (portalr ADR-0035).
+  // An operator is shown anyone by email, in no tenant (portalr ADR-0036).
   const names = usePeople(queries, config.people, null, entries.flatMap(peopleOf));
   return (
     <div className="flex flex-col gap-6">

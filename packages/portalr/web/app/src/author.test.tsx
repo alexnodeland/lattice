@@ -1,4 +1,4 @@
-import { type ArtifactrV1, namesOf } from "@portalr/client";
+import { type Artifactr, type ArtifactrV1, namesOf } from "@portalr/client";
 import { Message, Messages } from "@portalr/ui";
 import { expect, test } from "vitest";
 import { render } from "vitest-browser-react";
@@ -52,19 +52,19 @@ test("a thread draws resolved and unresolved authors side by side, and the actor
     { kind: "user", id: ME },
     { kind: "agent", thread_id: "thr_1" },
   ];
-  const messages = actors.map((actor, index) => ({
+  const messages: Artifactr.Message[] = actors.map((actor, index) => ({
     id: `m${index}`,
+    seq: index + 1,
     actor,
-    text: `message ${index}`,
+    content: `message ${index}`,
+    kind: "message",
+    runId: null,
+    feedback: [],
   }));
   const screen = await render(
     <Messages>
       {messages.map((message) => (
-        <Message
-          key={message.id}
-          message={message as never}
-          author={author(message.actor, ME, names)}
-        />
+        <Message key={message.id} message={message} author={author(message.actor, ME, names)} />
       ))}
     </Messages>,
   );

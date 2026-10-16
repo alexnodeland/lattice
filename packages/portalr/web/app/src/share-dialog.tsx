@@ -2,7 +2,7 @@
  * Sharing a thread: who holds a role on it, each with Revoke, asked first (portalr ADR-0021), and a
  * role granted to a person, as viewer or editor (portalr ADR-0022). grantr names people by id; the
  * dialog shows their email where the server names them, and a short id where it does not
- * (portalr ADR-0034).
+ * (portalr ADR-0036).
  */
 
 import { type Answer, type GrantrApi, type Names, refusal, shortId } from "@portalr/client";
@@ -34,6 +34,10 @@ function named(to: Grantee, names: Names): string {
       return to satisfies never;
   }
 }
+
+/** Who a grantee is, by id alone: a row's key must not change when a name arrives. */
+const identity = (to: Grantee): string =>
+  to.kind === "rule" ? `rule:${to.workspace}:${to.rule}` : `${to.kind}:${to.id}`;
 
 export function ShareDialog({
   open,
@@ -89,11 +93,16 @@ export function ShareDialog({
         <ul aria-label="People with access" className="flex flex-col gap-2">
           {grants.map((each) => (
             <li
-              key={`${each.to.kind}:${named(each.to, names)}:${each.role}`}
+              key={`${identity(each.to)}:${each.role}`}
               className="flex flex-wrap items-center justify-between gap-2"
             >
               <span>
-                {named(each.to, names)} <span className="text-muted">{each.role}</span>
+                {each.to.kind === "user" ? (
+                  <span title={each.to.id}>{named(each.to, names)}</span>
+                ) : (
+                  named(each.to, names)
+                )}{" "}
+                <span className="text-muted">{each.role}</span>
               </span>
               {canRevoke && (
                 <ConfirmDialog
@@ -126,7 +135,9 @@ export function ShareDialog({
             ref={person}
             label="Person"
             name="person"
-            options={people.map((each) => ({ value: each, label: names(each) }))}
+            options={[...people]
+              .sort((a, b) => names(a).localeCompare(names(b)) || a.localeCompare(b))
+              .map((each) => ({ value: each, label: names(each) }))}
           />
           <SelectField
             label="Role"

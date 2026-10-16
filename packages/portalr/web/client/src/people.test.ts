@@ -1,7 +1,7 @@
 import { QueryClient } from "@tanstack/react-query";
 import type { Server } from "bun";
 import { afterAll, beforeAll, expect, test } from "vitest";
-import { namesOf, shortId } from "./people";
+import { keepWithin, namesOf, shortId } from "./people";
 import { createQueries, keys, PEOPLE_MAX, Refused } from "./queries";
 import { createApi } from "./rest";
 
@@ -102,4 +102,16 @@ test("the read is kept for a few minutes in memory, once for one set of ids, and
   expect(options.gcTime).toBe(5 * 60_000);
   expect(options.refetchOnWindowFocus).toBe(false);
   expect(keys.portalr.people(null, ["a1"])).not.toEqual(keys.portalr.people("acme", ["a1"]));
+});
+
+test("while the next set of ids is read, only the same tenant's emails are kept", () => {
+  const previous = { a1: "a1@acme.test" };
+  const queryOf = (tenant: string | null) => ({
+    queryKey: keys.portalr.people(tenant, ["a1"]),
+  });
+  expect(keepWithin("acme")(previous, queryOf("acme"))).toBe(previous);
+  expect(keepWithin("globex")(previous, queryOf("acme"))).toBeUndefined();
+  expect(keepWithin("acme")(previous, queryOf(null))).toBeUndefined();
+  expect(keepWithin(null)(previous, queryOf(null))).toBe(previous);
+  expect(keepWithin("acme")(previous, undefined)).toBeUndefined();
 });

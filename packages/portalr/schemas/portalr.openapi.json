@@ -2365,7 +2365,7 @@
     },
     "/portalr/v1/people": {
       "get": {
-        "description": "The emails of people, by user id: of the tenant ``X-Tenant`` names, for its members.\n\nA member of the tenant sees its other members' emails; an operator sees anyone's, with no\ntenant. An id the caller may not see, with no user or with no email, is left out, alike,\nand Supabase is asked only about the ids the caller may see. At most 100 ids. The answer\nis personal data and is not to be kept, so it is ``no-store``.",
+        "description": "The emails of people, by user id: of the tenant ``X-Tenant`` names, for its members.\n\nAn operator sees anyone's email, with or without a tenant; a member of the tenant sees\nits other members'. An id the caller may not see, with no user or with no email, is left\nout, alike, and Supabase is asked only about the ids the caller may see. At most 100 ids.\nThe answer is personal data and is not to be kept, so it is ``no-store``.",
         "operationId": "names_portalr_v1_people_get",
         "parameters": [
           {

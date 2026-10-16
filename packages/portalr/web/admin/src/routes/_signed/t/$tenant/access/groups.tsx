@@ -5,7 +5,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import {
   allowedNow,
-  byKind,
+  byKindThenName,
   counted,
   fromKey,
   keyOf,
@@ -59,13 +59,10 @@ function Groups() {
   const { data: groups } = useSuspenseQuery(queries.grantr.groups(tenant));
   const [changing, setChanging] = useState<Changing | null>(null);
   const [said, setSaid] = useState<Said>(null);
+  const names = useNames(tenant, Object.values(groups).flatMap(peopleIn));
   const listed = Object.entries(groups)
-    .map(([name, members]) => ({ name, members: [...members].sort(byKind) }))
+    .map(([name, members]) => ({ name, members: [...members].sort(byKindThenName(names)) }))
     .sort((a, b) => a.name.localeCompare(b.name));
-  const names = useNames(
-    tenant,
-    listed.flatMap((group) => peopleIn(group.members)),
-  );
 
   /** Grantr's groups now, rather than as last read: a change starts from them. */
   const fresh = () => queryClient.fetchQuery({ ...queries.grantr.groups(tenant), staleTime: 0 });
@@ -190,7 +187,7 @@ function FromMembers({
     <DefineSet
       {...define}
       picking={{
-        choices: [...members].sort(byKind).map((member) => ({
+        choices: [...members].sort(byKindThenName(names)).map((member) => ({
           value: keyOf(member),
           label: who(member, names),
         })),

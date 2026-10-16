@@ -191,10 +191,10 @@ export interface paths {
          * Names
          * @description The emails of people, by user id: of the tenant ``X-Tenant`` names, for its members.
          *
-         *     A member of the tenant sees its other members' emails; an operator sees anyone's, with no
-         *     tenant. An id the caller may not see, with no user or with no email, is left out, alike,
-         *     and Supabase is asked only about the ids the caller may see. At most 100 ids. The answer
-         *     is personal data and is not to be kept, so it is ``no-store``.
+         *     An operator sees anyone's email, with or without a tenant; a member of the tenant sees
+         *     its other members'. An id the caller may not see, with no user or with no email, is left
+         *     out, alike, and Supabase is asked only about the ids the caller may see. At most 100 ids.
+         *     The answer is personal data and is not to be kept, so it is ``no-store``.
          */
         get: operations["names_portalr_v1_people_get"];
         put?: never;

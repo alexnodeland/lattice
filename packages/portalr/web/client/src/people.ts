@@ -1,5 +1,5 @@
 /**
- * People by email, not by the id grantr knows them by (portalr ADR-0034).
+ * People by email, not by the id grantr knows them by (portalr ADR-0036).
  *
  * With real Supabase a person's id is their auth user's UUID. The server names the ones the
  * reader may see, so a screen asks for the ids it shows and calls what comes back a `Names`:
@@ -7,7 +7,7 @@
  * query cache's memory alone, and never in the address, a store, the stream or a log.
  */
 
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import type { createQueries } from "./queries";
 
 /** Names a person: their email where it is known, otherwise a short form of their id. */
@@ -29,6 +29,16 @@ export function namesOf(emails: Readonly<Record<string, string>> | undefined): N
 }
 
 /**
+ * What to show while a new set of ids is read: the last set's emails, so a name does not flicker
+ * to a short id as a list changes, but only the same tenant's (or the deployment's): a tenant's
+ * emails are gone the moment another is opened.
+ */
+export const keepWithin =
+  (tenant: string | null) =>
+  <D>(previous: D | undefined, query: { readonly queryKey: readonly unknown[] } | undefined) =>
+    query?.queryKey[1] === (tenant ?? "~deployment") ? previous : undefined;
+
+/**
  * The names of `ids` in `tenant`, as the server lets the reader see them: read once for the set,
  * kept in memory for a few minutes, and never a reason for a screen to fail. Until they come, and
  * wherever the server names no one, a person is their short id. `enabled` is `config.people`.
@@ -43,7 +53,7 @@ export function usePeople(
   const { data } = useQuery({
     ...queries.portalr.people(tenant, unique),
     enabled: enabled && unique.length > 0,
-    placeholderData: keepPreviousData,
+    placeholderData: keepWithin(tenant),
   });
   return namesOf(data);
 }

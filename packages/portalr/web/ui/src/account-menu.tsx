@@ -40,7 +40,7 @@ export function AccountMenu({
       >
         <span
           aria-hidden="true"
-          className="grid size-7 shrink-0 place-items-center rounded-full bg-wash font-bold text-accent text-xs"
+          className="grid size-7 shrink-0 place-items-center rounded-full bg-wash font-semibold text-accent text-xs"
         >
           {initials(name)}
         </span>

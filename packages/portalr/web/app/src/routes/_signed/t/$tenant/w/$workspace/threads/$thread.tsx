@@ -9,6 +9,7 @@ import {
   workspaceOf,
 } from "@portalr/client";
 import {
+  Alert,
   Composer,
   Message,
   Messages,
@@ -169,7 +170,7 @@ function Chat() {
     return (
       <>
         <PageHeader title={thread.title || "Untitled"} crumb={crumb} />
-        <p role="alert">This isn't available to you any more.</p>
+        <Alert tone="error">This isn't available to you any more.</Alert>
       </>
     );
   }
@@ -196,7 +197,9 @@ function Chat() {
           (allowed.has("grantr:grant") || allowed.has("grantr:restrict")) && (
             <CatchBoundary
               getResetKey={() => id}
-              errorComponent={() => <p role="alert">Who has access to it couldn't be read.</p>}
+              errorComponent={() => (
+                <Alert tone="error">Who has access to it couldn't be read.</Alert>
+              )}
             >
               <Suspense fallback={null}>
                 <Access tenant={tenant} workspace={workspace} thread={id} allowed={allowed} />

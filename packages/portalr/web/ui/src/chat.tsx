@@ -15,6 +15,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { Alert } from "./alert";
 import { Button } from "./button";
 import { cn } from "./cn";
 import { Icon } from "./icon";
@@ -51,7 +52,7 @@ function useSending() {
 
 /** Why a command wasn't done, announced. */
 function Unsent({ reason }: { reason: string | null }) {
-  return reason && <p role="alert">{reason}</p>;
+  return reason && <Alert tone="error">{reason}</Alert>;
 }
 
 /** A button that sends one command, waits while it is in flight, and says why one wasn't done. */

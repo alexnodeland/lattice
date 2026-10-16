@@ -106,11 +106,13 @@ test("an action that fails keeps the dialog open, and says why", async () => {
     .toHaveTextContent("The rule wasn't archived: it changed since you opened it.");
 });
 
-test("a trigger with a name shows its words and is named in full", async () => {
+test("a trigger shows its words alone, and is named in full by what it acts on", async () => {
   const screen = await render(
     <ConfirmDialog
       label="Revoke"
-      name="Revoke viewer from bob on workspace notes"
+      about="viewer from bob"
+      look="danger-soft"
+      size="sm"
       title="Revoke viewer from bob?"
       confirm="Revoke"
       onConfirm={async () => undefined}
@@ -118,8 +120,37 @@ test("a trigger with a name shows its words and is named in full", async () => {
       bob loses what viewer holds there.
     </ConfirmDialog>,
   );
-  const trigger = screen.getByRole("button", { name: "Revoke viewer from bob on workspace notes" });
-  await expect.element(trigger).toHaveTextContent("Revoke");
+  const trigger = screen.getByRole("button", { name: "Revoke viewer from bob" });
+  await expect.element(trigger).toBeVisible();
+  // What it acts on is read aloud and not shown: a row of them says "Revoke", and no more.
+  const aloud = trigger.element().querySelector(".sr-only");
+  expect(aloud?.textContent).toBe(" viewer from bob");
+  expect(getComputedStyle(aloud as Element).position).toBe("absolute");
+  expect(getComputedStyle(trigger.element()).color).toBe(token("danger"));
+});
+
+test("the way out has words of its own where Cancel would stand beside another", async () => {
+  const screen = await render(
+    <ConfirmDialog
+      label="Cancel"
+      about="run run_1"
+      dismiss="Keep running"
+      title="Cancel this run?"
+      confirm="Cancel run"
+      onConfirm={async () => undefined}
+    >
+      It stops.
+    </ConfirmDialog>,
+  );
+  await screen.getByRole("button", { name: "Cancel run run_1" }).click();
+  const dialog = screen.getByRole("alertdialog", { name: "Cancel this run?" });
+  await expect.element(dialog.getByRole("button", { name: "Keep running" })).toHaveFocus();
+  await expect.element(dialog.getByRole("button", { name: "Cancel run" })).toBeVisible();
+  await expect
+    .element(dialog.getByRole("button", { name: "Cancel", exact: true }))
+    .not.toBeInTheDocument();
+  await userEvent.keyboard("{Escape}");
+  await expect.element(dialog).not.toBeInTheDocument();
 });
 
 test("it can ask for a reason, which goes to the action, trimmed, and is asked for again each time", async () => {

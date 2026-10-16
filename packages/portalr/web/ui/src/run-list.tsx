@@ -6,6 +6,7 @@
 
 import type { Reflexr } from "@portalr/client";
 import type { ReactNode } from "react";
+import { Num } from "./num";
 import { StatusBadge, type Tone } from "./status-badge";
 import { Table } from "./table";
 
@@ -13,7 +14,7 @@ import { Table } from "./table";
 const RULE_RUN: Record<Reflexr.Run["status"], readonly [Tone, string]> = {
   pending: ["queued", "Queued"],
   running: ["working", "Running"],
-  retrying: ["queued", "Retrying"],
+  retrying: ["retrying", "Retrying"],
   succeeded: ["done", "Succeeded"],
   dead_lettered: ["failed", "Dead-lettered"],
   cancelled: ["stopped", "Cancelled"],
@@ -79,7 +80,11 @@ export function RunList({
               <tr key={run.key} aria-label={run.name}>
                 <td>{run.status}</td>
                 <td>{run.title}</td>
-                {attempts && <td className="text-muted tabular-nums">{run.attempts}</td>}
+                {attempts && (
+                  <td className="text-muted">
+                    <Num>{String(run.attempts ?? "")}</Num>
+                  </td>
+                )}
                 {feedback && <td>{run.feedback}</td>}
                 <td>
                   <span className="flex flex-wrap justify-end gap-2">{run.actions}</span>

@@ -1,5 +1,6 @@
 import { outline, said, type Trace, wholeTrace } from "@portalr/client";
 import {
+  Alert,
   EmptyState,
   PageHeader,
   type Reveal,
@@ -123,7 +124,7 @@ function Body({ trace }: { trace: string }) {
         <>
           {header}
           <EmptyState title="Tempo isn't answering">
-            <p role="alert">{reading.reason}</p>
+            <Alert tone="error">{reading.reason}</Alert>
           </EmptyState>
         </>
       );

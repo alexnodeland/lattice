@@ -13,6 +13,7 @@ tasks:
     inputs:
       - '**/*'
       - '/scripts/api'
+      - '/scripts/compose-project.sh'
       - '/schemathesis.toml'
       - '/package.json'
       - '/bun.lock'

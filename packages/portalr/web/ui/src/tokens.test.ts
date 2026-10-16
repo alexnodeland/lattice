@@ -169,18 +169,6 @@ test("a chart's series are told apart, to a reader who sees every colour and to 
   }
 });
 
-test("the two violets differ in lightness, and so do not rest on hue", () => {
-  expect(Math.abs(luminance(token("chart-1")) - luminance(token("chart-2")))).toBeGreaterThan(0.05);
-});
-
-test("the accent is clear of the danger colour, the status colours' red, to every reader", () => {
-  const accent = token("chart-3");
-  expect(distance(accent, token("danger"))).toBeGreaterThanOrEqual(APART);
-  for (const deficiency of DEFICIENCIES) {
-    expect(distance(accent, token("danger"), deficiency), deficiency).toBeGreaterThanOrEqual(APART);
-  }
-});
-
 test("colour-blind mode swaps the series for others that stand out from the surface and the paper", () => {
   const screen = cvd();
   const swapped = inks(screen);
@@ -256,4 +244,31 @@ test("by default a series is solid and a line unbroken; colour-blind mode hatche
   const hatched = getComputedStyle(document.body).getPropertyValue("--chart-hatched").trim();
   expect(Number(hatched)).toBeGreaterThan(0);
   expect(probe(cvd())).toEqual([hatched, "none", "6 4", "2 3", "0", "0", "45deg"]);
+});
+
+test("the danger colour is the status red: one red for a failed run and a destructive action", () => {
+  expect(token("danger")).toBe(token("status-failed"));
+});
+
+test("the status colours stand out from the surface and the paper, as marks", () => {
+  for (const status of ["status-failed", "status-warn"]) {
+    for (const ground of GROUNDS) {
+      expect(
+        contrast(token(status), token(ground)),
+        `${status} on ${ground}`,
+      ).toBeGreaterThanOrEqual(3);
+    }
+  }
+});
+
+test("red and gold differ in lightness, and not in hue alone", () => {
+  expect(luminance(token("status-warn")) - luminance(token("status-failed"))).toBeGreaterThan(0.1);
+});
+
+test("the status colours are told apart from each other and from the chart accent, to every reader", () => {
+  const colours = [token("status-failed"), token("status-warn"), token("chart-3")];
+  expect(closest(colours)).toBeGreaterThanOrEqual(APART);
+  for (const deficiency of DEFICIENCIES) {
+    expect(closest(colours, deficiency), deficiency).toBeGreaterThanOrEqual(APART);
+  }
 });

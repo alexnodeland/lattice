@@ -7,9 +7,9 @@ import type { TimeSpan } from "@portalr/client";
 
 /** The windows Traces offers, in hours, the first its default. */
 export const RANGES = [
-  { hours: 1, label: "The last hour" },
-  { hours: 24, label: "The last 24 hours" },
-  { hours: 168, label: "The last 7 days" },
+  { hours: 1, label: "1 hour" },
+  { hours: 24, label: "24 hours" },
+  { hours: 168, label: "7 days" },
 ] as const;
 
 type Hours = (typeof RANGES)[number]["hours"];

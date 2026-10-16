@@ -1,4 +1,5 @@
 import { expect, type Page } from "@playwright/test";
+import { choose, optionsOf } from "@portalr/ui/testing/bdd";
 import { account } from "./app";
 import { started, Then, When } from "./fixtures";
 import { password, signIn } from "./people";
@@ -77,8 +78,8 @@ When("they open its sharing", async ({ page }) => {
 When("they share it with {string} as {word}", async ({ page }, person: string, role: string) => {
   await act(page, "Share…");
   const sharing = dialog(page);
-  await sharing.getByRole("combobox", { name: "Person" }).selectOption(person);
-  await sharing.getByRole("combobox", { name: "Role" }).selectOption(role);
+  await choose(page, sharing.getByRole("combobox", { name: "Person" }), person);
+  await choose(page, sharing.getByRole("combobox", { name: "Role" }), role);
   await sharing.getByRole("button", { name: "Share", exact: true }).click();
 });
 
@@ -89,9 +90,9 @@ Then("{string} holds {word} on it", async ({ page }, person: string, role: strin
 Then(
   "they're offered {string}, and not {string}",
   async ({ page }, offered: string, not: string) => {
-    const people = dialog(page).getByRole("combobox", { name: "Person" });
-    await expect(people.getByRole("option", { name: offered, exact: true })).toHaveCount(1);
-    await expect(people.getByRole("option", { name: not, exact: true })).toHaveCount(0);
+    const people = await optionsOf(page, dialog(page).getByRole("combobox", { name: "Person" }));
+    expect(people).toContain(offered);
+    expect(people).not.toContain(not);
   },
 );
 

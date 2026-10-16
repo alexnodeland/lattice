@@ -1,9 +1,11 @@
 import type { ToolIds } from "@portalr/client";
 import {
+  Alert,
   Button,
   Card,
   EmptyState,
   PageHeader,
+  Reading,
   SectionTitle,
   SelectField,
   TextField,
@@ -57,10 +59,10 @@ function Body({ ids, ignored }: { ids: Required<ToolIds>; ignored: Ignored[] }) 
       {HEADER}
       <Notice />
       {ignored.map((each) => (
-        <p key={each.label} role="status" className="text-muted text-sm">
+        <Alert key={each.label} tone="warn">
           “{each.value}” isn't {each.label === "Tenant" ? "a tenant id" : "an id"} portalr takes, so
           it was ignored ({each.label}).
-        </p>
+        </Alert>
       ))}
       <Ask ids={ids} />
       {asked(ids) ? (
@@ -155,14 +157,14 @@ function Links({ ids }: { ids: Required<ToolIds> }) {
   const links = useQuery(queries.portalr.toolLinks(user, ids));
   const heading = useId();
   if (links.isPending) {
-    return <p role="status">Making the links…</p>;
+    return <Reading>Making the links…</Reading>;
   }
   if (links.isError) {
     return (
-      <p role="alert">
+      <Alert tone="error">
         The links couldn't be made:{" "}
         {links.error instanceof Error ? links.error.message : "an error"}.
-      </p>
+      </Alert>
     );
   }
   const readers = config.readers;

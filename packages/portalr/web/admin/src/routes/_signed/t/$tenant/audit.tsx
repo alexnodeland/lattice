@@ -1,5 +1,6 @@
 import type { AuditFilter } from "@portalr/client";
 import {
+  Alert,
   Button,
   Card,
   EmptyState,
@@ -77,10 +78,10 @@ function Audit() {
         {entries.length === 1 ? "1 change shown" : `${entries.length} changes shown`}
       </p>
       {isFetchNextPageError && (
-        <p role="alert">
+        <Alert tone="error">
           The changes before these couldn't be read:{" "}
           {error instanceof Error ? error.message : String(error)}
-        </p>
+        </Alert>
       )}
       {hasNextPage && (
         <Button
@@ -124,7 +125,7 @@ function Filter({ filter }: { filter: AuditFilter }) {
           label="Made by"
           name="actor_kind"
           value={kind}
-          onChange={(event) => setKind(event.target.value)}
+          onValueChange={setKind}
           options={MAKERS}
         />
         {(kind === "user" || kind === "service_principal" || kind === "rule") && (

@@ -1,5 +1,6 @@
 import { orThrow, refusal } from "@portalr/client";
 import {
+  Alert,
   Button,
   Card,
   ConfirmDialog,
@@ -165,7 +166,7 @@ function Issue({
           Issue
         </Button>
       </form>
-      {refused && <p role="alert">{refused}</p>}
+      {refused && <Alert tone="error">{refused}</Alert>}
       {issued && (
         <div role="status" className="flex flex-col gap-2">
           <p>
@@ -180,7 +181,7 @@ function Issue({
             className="font-mono"
           />
           {copied === false && (
-            <p role="alert">It couldn't be copied here: select it, and copy it yourself.</p>
+            <Alert tone="error">It couldn't be copied here: select it, and copy it yourself.</Alert>
           )}
           <div className="flex flex-wrap gap-2">
             <Button

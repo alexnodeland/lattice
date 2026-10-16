@@ -1,5 +1,6 @@
 import type { PortalrApi, TimeSpan } from "@portalr/client";
 import {
+  Alert,
   BarChart,
   EmptyState,
   formatMoment,
@@ -41,7 +42,7 @@ function Drawn({
     case "unavailable":
       return (
         <EmptyState title="Prometheus isn't answering">
-          <p role="alert">{reading.reason}</p>
+          <Alert tone="error">{reading.reason}</Alert>
         </EmptyState>
       );
     case "ok":

@@ -1,5 +1,6 @@
 import type { PortalrApi } from "@portalr/client";
 import {
+  Alert,
   BarChart,
   DonutChart,
   EmptyState,
@@ -109,7 +110,7 @@ function Feedback() {
       <>
         {HEADER}
         <EmptyState title="Langfuse isn't answering">
-          <p role="alert">{reading.reason}</p>
+          <Alert tone="error">{reading.reason}</Alert>
         </EmptyState>
       </>
     );
@@ -120,13 +121,15 @@ function Feedback() {
       {HEADER}
       <Filter tenant={tenant} shown={shown} />
       {!summary.complete && (
-        <p role="status" className="flex flex-wrap items-center gap-2 text-muted text-sm">
-          <StatusBadge tone="stopped">Partial</StatusBadge>
-          The read stopped at one of its bounds: some days, scores and comments may be missing. A
-          shorter window, or one workspace, may read them all.
-          {unknownDays(summary) > 0 &&
-            " The shaded days weren't reached: they're unknown, not empty."}
-        </p>
+        <Alert tone="warn">
+          <span className="flex flex-wrap items-center gap-2">
+            <StatusBadge tone="stopped">Partial</StatusBadge>
+            Some days, scores and comments may be missing. A shorter window, or one workspace, may
+            read them all.
+            {unknownDays(summary) > 0 &&
+              " The shaded days weren't reached: they're unknown, not empty."}
+          </span>
+        </Alert>
       )}
       <Charts summary={summary} everywhere={workspace === undefined} />
       <Comments comments={summary.comments} />

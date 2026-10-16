@@ -1,5 +1,6 @@
 import { type createQueries, LOGS_LIMIT, type PortalrApi, type TimeSpan } from "@portalr/client";
 import {
+  Alert,
   Button,
   Card,
   EmptyState,
@@ -177,7 +178,7 @@ function Records({
     case "unavailable":
       return (
         <EmptyState title="Loki isn't answering">
-          <p role="alert">{reading.reason}</p>
+          <Alert tone="error">{reading.reason}</Alert>
         </EmptyState>
       );
     case "ok":

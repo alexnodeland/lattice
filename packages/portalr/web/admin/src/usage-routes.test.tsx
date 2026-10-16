@@ -183,7 +183,7 @@ test("without artifactr's list, the spend is read whole, and says so", async () 
 test("a partial read says so, with a badge", async () => {
   shape = "partial";
   const { screen } = await open("/t/acme/usage");
-  await expect.element(screen.getByText(/The days it didn't reach/)).toBeVisible();
+  await expect.element(screen.getByText(/days it didn't reach/)).toBeVisible();
   // The four days never reached are no blocks and no bars, not nothing spent.
   const tracker = screen.getByRole("figure", { name: /against its share of the budget/ });
   await tracker.getByText("Show the figures").click();

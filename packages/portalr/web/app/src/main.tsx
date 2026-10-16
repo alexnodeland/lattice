@@ -8,7 +8,7 @@ import {
   readConfig,
   Signed,
 } from "@portalr/client";
-import { Plain } from "@portalr/ui";
+import { Alert, Plain } from "@portalr/ui";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { createRouter, RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";
@@ -61,10 +61,10 @@ try {
 } catch (error) {
   root.render(
     <Plain home={<a href={import.meta.env.BASE_URL} />} title="portalr can't start">
-      <p role="alert">
+      <Alert tone="error">
         The deployment's settings couldn't be read:{" "}
         {error instanceof Error ? error.message : String(error)}.
-      </p>
+      </Alert>
     </Plain>,
   );
 }

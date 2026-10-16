@@ -1,10 +1,12 @@
 import type { Snapshot } from "@portalr/client";
 import { allowedIn, type Reflexr, workspaceOf } from "@portalr/client";
 import {
+  Alert,
   ConfirmDialog,
   EmptyState,
   Moment,
   PageHeader,
+  Reading,
   RuleRunStatus,
   RunList,
   type RunParts,
@@ -199,12 +201,12 @@ function Connection({ status }: { status: Snapshot<unknown>["status"] }) {
       return null;
     case "closed":
       return (
-        <p role="alert">
+        <Alert tone="error">
           The connection to this workspace ended. Reload the page to connect again.
-        </p>
+        </Alert>
       );
     case "replaying":
-      return <p role="status">Reading the workspace's runs…</p>;
+      return <Reading>Reading the workspace's runs…</Reading>;
     case "connecting":
       // Mounted for as long as it connects, so its wait starts over with each connecting.
       return <Connecting />;
@@ -219,12 +221,12 @@ function Connecting() {
     return () => clearTimeout(timer);
   }, []);
   return slow ? (
-    <p role="alert">
+    <Alert tone="error">
       The workspace's runs can't be reached: reflexr may be down. It keeps trying, and they appear
       once it answers.
-    </p>
+    </Alert>
   ) : (
-    <p role="status">Reading the workspace's runs…</p>
+    <Reading>Reading the workspace's runs…</Reading>
   );
 }
 

@@ -19,6 +19,7 @@ import {
   stale,
   streamUrl,
 } from "@portalr/client";
+import { Alert, Reading } from "@portalr/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   createContext,
@@ -147,14 +148,14 @@ export function Connection({
 }) {
   if (snapshot.status === "closed") {
     return (
-      <p role="alert">
+      <Alert tone="error">
         The connection to this workspace ended{snapshot.error ? `: ${snapshot.error}` : ""}. Reload
         the page to connect again.
-      </p>
+      </Alert>
     );
   }
   if (snapshot.status !== "live") {
-    return <p role="status">Reading {waiting}…</p>;
+    return <Reading>Reading {waiting}…</Reading>;
   }
   return null;
 }

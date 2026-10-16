@@ -1,5 +1,6 @@
 import type { PortalrApi } from "@portalr/client";
 import {
+  Alert,
   BarChart,
   DonutChart,
   EmptyState,
@@ -103,7 +104,7 @@ function UsagePage() {
       <>
         {HEADER}
         <EmptyState title="LiteLLM isn't answering">
-          <p role="alert">{reading.reason}</p>
+          <Alert tone="error">{reading.reason}</Alert>
         </EmptyState>
       </>
     );
@@ -114,12 +115,13 @@ function UsagePage() {
       {HEADER}
       <Filter shown={shown} />
       {!usage.complete && (
-        <p role="status" className="flex flex-wrap items-center gap-2 text-muted text-sm">
-          <StatusBadge tone="stopped">Partial</StatusBadge>
-          The read stopped at one of its bounds. The days it didn't reach, and the last it read,
-          which may be part-read, are left out, not shown as nothing spent, and the sums are of what
-          it read. A shorter window may read it all.
-        </p>
+        <Alert tone="warn">
+          <span className="flex flex-wrap items-center gap-2">
+            <StatusBadge tone="stopped">Partial</StatusBadge>
+            The read stopped short, so the days it didn't reach are left out, not shown as nothing
+            spent, and the sums are of what it read. A shorter window may read it all.
+          </span>
+        </Alert>
       )}
       <Spent usage={usage} />
       <Workspaces

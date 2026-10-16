@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { Alert } from "./alert";
 import { Button, type ButtonSize, type ButtonVariant } from "./button";
 import { actions, backdrop, description, title as heading, popup } from "./dialog";
 import { TextField } from "./text-field";
@@ -188,7 +189,7 @@ export function ConfirmDialog({
                 {reason.length} of {MOST_REASON} characters
               </p>
             )}
-            {failed && <p role="alert">{failed}</p>}
+            {failed && <Alert tone="error">{failed}</Alert>}
             <div className={actions}>
               <AlertDialog.Close ref={cancel} render={<Button variant="secondary" />}>
                 {dismiss}

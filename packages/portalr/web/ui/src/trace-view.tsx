@@ -23,10 +23,12 @@ import {
   Wrench,
 } from "lucide-react";
 import { type KeyboardEvent, type ReactNode, useId, useMemo, useRef, useState } from "react";
+import { Alert } from "./alert";
 import { Button } from "./button";
 import { cn } from "./cn";
 import { Icon } from "./icon";
 import { Num } from "./num";
+import { Reading } from "./skeleton";
 import { StatusBadge } from "./status-badge";
 
 /** What each kind of span is called, and the mark beside it. */
@@ -212,9 +214,7 @@ export function TraceView({ outline, reveal }: { outline: Outline; reveal: Revea
           </span>
         </div>
         {!outline.complete && (
-          <p role="status" className="text-muted text-sm">
-            This trace has more spans than are shown: these are its first.
-          </p>
+          <Alert tone="warn">This trace has more spans than are shown: these are its first.</Alert>
         )}
         <div
           ref={scroller}
@@ -417,17 +417,9 @@ function WithheldNow({ row, reveal }: { row: Row; reveal: Reveal }) {
         </>
       );
     case "reading":
-      return (
-        <p role="status" className="text-muted text-sm">
-          Reading…
-        </p>
-      );
+      return <Reading>Reading…</Reading>;
     case "failed":
-      return (
-        <p role="alert" className="text-sm">
-          What this span withheld couldn't be read.
-        </p>
-      );
+      return <Alert tone="error">What this span withheld couldn't be read.</Alert>;
     case "read": {
       const parts = reveal.parts(row);
       return parts.length === 0 ? (

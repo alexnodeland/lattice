@@ -1,5 +1,13 @@
 import { type GrantrApi, orThrow, refusal } from "@portalr/client";
-import { Button, Card, ConfirmDialog, ItemTable, SectionTitle, TextField } from "@portalr/ui";
+import {
+  Alert,
+  Button,
+  Card,
+  ConfirmDialog,
+  ItemTable,
+  SectionTitle,
+  TextField,
+} from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useActionState, useId, useState } from "react";
@@ -83,7 +91,7 @@ function Members() {
               value={email}
               onValueChange={(value) => setEmail(String(value))}
             />
-            {invited && <p role={invited.refused ? "alert" : "status"}>{invited.said}</p>}
+            {invited && <Alert tone={invited.refused ? "error" : "info"}>{invited.said}</Alert>}
             <Button type="submit" disabled={inviting} className="self-start">
               Invite
             </Button>
@@ -93,7 +101,7 @@ function Members() {
           <SectionTitle id={principalId}>Add a service principal</SectionTitle>
           <form className="flex flex-col gap-3" action={make}>
             <TextField label="Name" name="principal" autoComplete="off" required />
-            {made && <p role={made.refused ? "alert" : "status"}>{made.said}</p>}
+            {made && <Alert tone={made.refused ? "error" : "info"}>{made.said}</Alert>}
             <Button type="submit" disabled={making} className="self-start">
               Add
             </Button>

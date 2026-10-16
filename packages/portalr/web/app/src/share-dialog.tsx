@@ -4,7 +4,7 @@
  */
 
 import { type Answer, type GrantrApi, refusal } from "@portalr/client";
-import { Button, ConfirmDialog, Dialog, SelectField } from "@portalr/ui";
+import { Alert, Button, ConfirmDialog, Dialog, Row, Rows, SelectField } from "@portalr/ui";
 import { type RefObject, useActionState, useRef } from "react";
 
 type Grant = GrantrApi.components["schemas"]["Grant"];
@@ -80,17 +80,15 @@ export function ShareDialog({
       ) : grants.length === 0 ? (
         <p>No one holds a role on it yet.</p>
       ) : (
-        <ul aria-label="People with access" className="flex flex-col gap-2">
+        <Rows label="People with access">
           {grants.map((each) => (
-            <li
-              key={`${each.to.kind}:${named(each.to)}:${each.role}`}
-              className="flex flex-wrap items-center justify-between gap-2"
-            >
+            <Row key={`${each.to.kind}:${named(each.to)}:${each.role}`}>
               <span>
                 {named(each.to)} <span className="text-muted">{each.role}</span>
               </span>
               {canRevoke && (
                 <ConfirmDialog
+                  className="ml-auto"
                   label="Revoke"
                   about={`${named(each.to)} as ${each.role}`}
                   look="danger-soft"
@@ -108,9 +106,9 @@ export function ShareDialog({
                   they no longer see it.
                 </ConfirmDialog>
               )}
-            </li>
+            </Row>
           ))}
-        </ul>
+        </Rows>
       )}
       {people.length === 0 ? (
         <p>
@@ -130,7 +128,7 @@ export function ShareDialog({
             name="role"
             options={ROLES.map((role) => ({ value: role, label: role }))}
           />
-          {refused && <p role="alert">{refused}</p>}
+          {refused && <Alert tone="error">{refused}</Alert>}
           <Button type="submit" disabled={granting} className="self-start">
             Share
           </Button>

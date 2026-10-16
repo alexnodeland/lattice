@@ -1,5 +1,5 @@
 import { orThrow } from "@portalr/client";
-import { Button, ConfirmDialog, ItemTable } from "@portalr/ui";
+import { Alert, Button, ConfirmDialog, ItemTable } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
@@ -101,7 +101,7 @@ function Roles() {
           body: `A custom role holds some of a workspace admin's actions, granted on ${catalog.custom_kinds.join(", ")}.`,
         }}
       />
-      {said && <p role={said.refused ? "alert" : "status"}>{said.said}</p>}
+      {said && <Alert tone={said.refused ? "error" : "info"}>{said.said}</Alert>}
       <DefineSet
         key={changing?.name ?? "new"}
         words={WORDS}

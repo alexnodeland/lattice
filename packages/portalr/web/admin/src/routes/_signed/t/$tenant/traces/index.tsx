@@ -1,5 +1,6 @@
 import { TRACES_LIMIT } from "@portalr/client";
 import {
+  Alert,
   Button,
   Card,
   duration,
@@ -94,7 +95,7 @@ function Traces() {
       <>
         {HEADER}
         <EmptyState title="Tempo isn't answering">
-          <p role="alert">{reading.reason}</p>
+          <Alert tone="error">{reading.reason}</Alert>
         </EmptyState>
       </>
     );
@@ -107,10 +108,10 @@ function Traces() {
       {/* Keyed by what the address holds, so the form's own fields start from it again when it changes. */}
       <Filter key={JSON.stringify(shown)} shown={shown} />
       {traces.length >= TRACES_LIMIT && (
-        <p role="status" className="text-muted text-sm">
+        <Alert tone="warn">
           The newest {TRACES_LIMIT} are shown. A shorter window, or a thread or a run, finds the
           rest.
-        </p>
+        </Alert>
       )}
       <ItemTable
         caption="Traces"

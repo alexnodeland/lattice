@@ -1,5 +1,6 @@
 import { type Answer, type GrantrApi, orThrow, refusal } from "@portalr/client";
 import {
+  Alert,
   Button,
   Card,
   type Column,
@@ -415,7 +416,7 @@ function Granting({
             ]}
           />
         )}
-        {answered && <p role={answered.refused ? "alert" : "status"}>{answered.said}</p>}
+        {answered && <Alert tone={answered.refused ? "error" : "info"}>{answered.said}</Alert>}
         {confirmed ? (
           <ConfirmDialog
             label="Grant"

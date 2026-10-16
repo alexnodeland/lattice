@@ -23,8 +23,8 @@
 - **Every write an attempt makes checks it,** in the transaction that makes the write:
   - the executor's completion, which records `run_succeeded`, `run_retrying` or `run_dead_lettered`
   - `Workspace.checkpoint_run(run_id, *, attempt, epoch, step, state)`, which `Reaction.checkpoint` calls with its run's attempt and epoch; the epoch is the fence, and the attempt names it on the span and in the error
-- **The epoch is on the spans** as `reflexr.attempt.epoch`, beside `reflexr.attempt`, on `invoke_workflow` and `reflexr.checkpoint_run`.
-- **A graph resumed from a checkpoint prefixes its restored node runs' ids with the epoch,** not the attempt number, which a retry repeats.
+- **The epoch is on the spans** as `reflexr.run.epoch`, beside `reflexr.attempt`, on `invoke_workflow` and `reflexr.checkpoint_run`.
+- **A graph resumed from a checkpoint prefixes its restored node runs' ids with the epoch,** not the attempt number, which a retry repeats. A checkpoint saved with the earlier `a{attempt}:` ids still resumes: they are nested under the new prefix, as `e1:a1:…`.
 - **The lease keeper checks it too.** An attempt whose run is running another attempt is stopped at its next renewal, as a cancelled one is, even if its executor took the lease back.
 - **No column, and no migration.** A run is stored as the JSON of its model ([ADR-0030](0030-sql-storage.md)), so the epoch is a field of the body, and a run stored before it reads as epoch 0. Every transaction locks its workspace's row before it reads ([ADR-0030](0030-sql-storage.md)), so comparing the epoch and saving the run in one transaction is as safe as a conditional `UPDATE`.
 

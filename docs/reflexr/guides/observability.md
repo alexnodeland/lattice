@@ -77,9 +77,9 @@ telemetry = configure_telemetry(artifactr.otel.telemetry(), service_name="app")
 | `reflexr.retry_run`, `reflexr.skip_run`, `reflexr.cancel_run` | Someone operates a run | `reflexr.run.id`, `reflexr.rule` |
 | `reflexr.replay_rule` | A rule is replayed | `reflexr.rule` |
 | `reflexr.evaluate` | The reactor evaluates a workspace's new envelopes; a check that finds none records nothing | `reflexr.evaluation.rules` (the rules that evaluated), `reflexr.evaluation.firings` |
-| `invoke_workflow {rule}` | A run attempt | `gen_ai.operation.name`, `gen_ai.workflow.name`, `reflexr.rule`, `reflexr.scope`, `reflexr.run.id`, `reflexr.attempt`, `reflexr.attempt.epoch` |
+| `invoke_workflow {rule}` | A run attempt | `gen_ai.operation.name`, `gen_ai.workflow.name`, `reflexr.rule`, `reflexr.scope`, `reflexr.run.id`, `reflexr.attempt`, `reflexr.run.epoch` |
 | `execute_step {node}` | A graph action runs a step | `reflexr.run.id` |
-| `reflexr.checkpoint_run` | A graph run saves its progress after a step | `reflexr.run.id`, `reflexr.attempt`, `reflexr.attempt.epoch` |
+| `reflexr.checkpoint_run` | A graph run saves its progress after a step | `reflexr.run.id`, `reflexr.attempt`, `reflexr.run.epoch` |
 | `reflexr.schedule {name}` | A schedule's ticks are due in a workspace | `reflexr.schedule`, `reflexr.event.count` |
 | `reflexr.stream` | A WebSocket connection, for as long as it is open. A server span | `reflexr.stream.close_code` |
 
@@ -146,7 +146,7 @@ reflexr's metrics are declared in a registry, `reflexr.telemetry.METRICS`, with 
 
 `reflexr.evaluation.lag` is how far each enabled rule was behind the head of the log each time the reactor checked the workspace: the first thing to watch when rules fall behind. `reflexr.evaluation.duration` times the evaluations that found new envelopes. A [disabled](reactor.md#disabling-a-rule) rule is left out, since it is behind by choice. `reflexr.runs` counts runs reaching each status, and its `reflexr.actor.kind` tells the reactor's transitions from an operator's retries and skips. A run that is retrying or dead-lettered after an attempt that failed with a reason also carries `reflexr.run.reason`, so dashboards can break failures down by cause: `timeout`, `abandoned`, `invalid_params` and `unknown_action` from the reactor, `guardrail_blocked` from the [LLM gateway](gateway.md), or the code an action gives when it raises `RunFailure(message, reason=..., permanent=...)` ([ADR-0036](../adr/0036-typed-run-failures.md)). Reasons are stable codes, so they are safe as a metric attribute; the message is for people, and stays on the run and its facts. The histograms advise bucket boundaries suited to them: a millisecond to ten seconds for evaluation, and fifty milliseconds to ten minutes for run attempts. Each `Metric` also names its Prometheus series (`prometheus_name`), which is what dashboards are tested against.
 
-Run, firing, event, chain and scope values are never metric attributes; they are in the traces. Rule names are, since code bounds them. A [stored rule](rules.md#stored-rules) is recorded as its namespace, such as `chat:*`, which configuration bounds, and its lag as the most any rule of that namespace is behind; each one's detail is in its traces and its status. Tenant and workspace are recorded on every metric, which suits most deployments. With many workspaces, keep less detail ([ADR-0029](../adr/0029-metric-detail-through-sdk-views.md)):
+Run, firing, event, chain and scope values, and a run's attempt and epoch, are never metric attributes; they are in the traces. Rule names are, since code bounds them. A [stored rule](rules.md#stored-rules) is recorded as its namespace, such as `chat:*`, which configuration bounds, and its lag as the most any rule of that namespace is behind; each one's detail is in its traces and its status. Tenant and workspace are recorded on every metric, which suits most deployments. With many workspaces, keep less detail ([ADR-0029](../adr/0029-metric-detail-through-sdk-views.md)):
 
 ```python
 telemetry = configure_telemetry(service_name="oncall", metrics_detail="tenant")  # or "none"

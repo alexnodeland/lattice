@@ -6,7 +6,7 @@
 
 ## Context
 
-[RFC-0002](../rfcs/0002-observability-feedback-and-evaluation.md) ships Grafana dashboards in `deploy/grafana/dashboards/`, tested against the metric registry, and publishes them with each release for stackr to provision by version ([ADR-0021](0021-contributor-compose-and-dev-containers.md)). The registry already names each metric's Prometheus series ([ADR-0029](0029-metric-detail-through-sdk-views.md)). How the dashboards are written, what the test checks, and how they are published were left open. artifactr answered the same questions ([artifactr ADR-0041](https://github.com/alexnodeland/artifactr/blob/main/docs/adr/0041-dashboards-generated-tested-and-released.md)), and the siblings' dashboards sit side by side in stackr's Grafana.
+[RFC-0002](../rfcs/0002-observability-feedback-and-evaluation.md) ships Grafana dashboards in `deploy/grafana/dashboards/`, tested against the metric registry, and publishes them with each release for stackr to provision by version ([ADR-0021](0021-contributor-compose-and-dev-containers.md)). The registry already names each metric's Prometheus series ([ADR-0029](0029-metric-detail-through-sdk-views.md)). How the dashboards are written, what the test checks, and how they are published were left open. artifactr answered the same questions ([artifactr ADR-0041](../../artifactr/adr/0041-dashboards-generated-tested-and-released.md)), and the siblings' dashboards sit side by side in stackr's Grafana.
 
 Grafana's dashboard JSON is long and repetitive, and hand edits to it drift: a panel's data source, units or template variables end up differing between dashboards. Running the dashboards against stackr's Prometheus and Grafana also showed two things that metric names alone would not:
 

@@ -83,7 +83,7 @@ async def _policies(engine: AsyncEngine) -> list[tuple[Any, ...]]:
 @pytest.mark.postgres
 async def test_migrations_keep_tenants_apart_on_postgresql(postgres: AsyncEngine) -> None:
     await migrate(postgres)
-    assert len(await _policies(postgres)) == len(TENANT_COLUMNS) + len(DEPLOYMENT_READS)
+    assert len(await _policies(postgres)) == len(TENANT_COLUMNS) + len(DEPLOYMENT_READS) + 1
     async with postgres.begin() as connection:
         await connection.run_sync(lambda c: command.downgrade(_alembic_config(c), "0002"))
     assert await _policies(postgres) == []

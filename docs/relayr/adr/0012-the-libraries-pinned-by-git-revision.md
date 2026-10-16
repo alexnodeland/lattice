@@ -21,4 +21,4 @@ relayr depends on artifactr (distributed as `artifactr-ai`) and reflexr. The fam
 - Revisit when the libraries are published, which would replace the revisions with version ranges.
 
 [a-23]: https://github.com/alexnodeland/artifactr/issues/23
-[s-adr-0013]: https://github.com/alexnodeland/stackr/blob/main/docs/adr/0013-how-the-template-pins-the-libraries.md
+[s-adr-0013]: ../../stackr/adr/0013-how-the-template-pins-the-libraries.md

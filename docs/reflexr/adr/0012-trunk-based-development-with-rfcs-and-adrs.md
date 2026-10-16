@@ -64,6 +64,6 @@ Trunk-based development keeps integration cheap, which matters most when several
 
 ## Action items
 
-1. [x] Document the workflow in [CONTRIBUTING.md](https://github.com/alexnodeland/reflexr/blob/main/CONTRIBUTING.md).
+1. [x] Document the workflow in [CONTRIBUTING.md](https://github.com/alexnodeland/lattice/blob/main/CONTRIBUTING.md).
 2. [x] Add RFC and ADR templates.
 3. [x] Enforce Conventional Commits with a `commit-msg` hook, and generate the changelog with git-cliff.

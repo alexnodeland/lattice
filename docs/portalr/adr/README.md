@@ -40,6 +40,7 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0032](0032-runs-in-admin.md) | Runs in admin, with Retry, Skip and Cancel | Accepted |
 | [0033](0033-third-party-notices-for-the-bundled-javascript.md) | Third-party notices for the JavaScript the UIs bundle | Accepted |
 | [0034](0034-tenants-and-the-deployments-audit.md) | Tenants in admin, created by email, and the deployment's audit log | Accepted |
+| [0035](0035-tools-and-the-record-of-opening-them.md) | Tools, links into Langfuse and Grafana, and the record of making them | Accepted |
 | [0036](0036-the-chart-theme-and-colour-blind-mode.md) | The chart theme: violet-led series, patterns only where marks touch, and a hook for colour-blind mode | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

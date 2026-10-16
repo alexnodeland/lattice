@@ -1,6 +1,6 @@
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/alexnodeland/lattice/main/docs/grantr/assets/brand/banner-dark.svg">
-  <img alt="grantr: identity and access for artifactr and reflexr." src="https://raw.githubusercontent.com/alexnodeland/lattice/main/docs/grantr/assets/brand/banner-light.svg" width="100%">
+  <img alt="grantr: identity and access for artifactr, reflexr and portalr." src="https://raw.githubusercontent.com/alexnodeland/lattice/main/docs/grantr/assets/brand/banner-light.svg" width="100%">
 </picture>
 
 <p>
@@ -12,7 +12,7 @@
   <a href="https://github.com/alexnodeland/lattice/blob/main/packages/grantr/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-6B5300"></a>
 </p>
 
-**grantr** is the identity and access package for [artifactr](https://lattice.alexnodeland.com/artifactr/) and [reflexr](https://lattice.alexnodeland.com/reflexr/): tenants, their members, groups, roles and service principals, and the grants that bind them to tenants, workspaces, threads, artifacts and rules. The libraries ask it, through their own hooks, before every command and read. It imports neither library, and neither imports it.
+**grantr** is the identity and access package for [artifactr](https://lattice.alexnodeland.com/artifactr/), [reflexr](https://lattice.alexnodeland.com/reflexr/) and [portalr](https://lattice.alexnodeland.com/portalr/): tenants, their members, groups, roles and service principals, and the grants that bind them to tenants, workspaces, threads, artifacts and rules. The libraries ask it, through their own hooks, before every command and read. It imports neither library, and neither imports it.
 
 > **Status:** v0.1's scope is built: the model, built-in and custom roles, groups, service principals and keys, checks, the libraries' hooks, restricted threads and artifacts, the audit log, in-memory and SQL storage with row-level security (the `sql`, `sqlite` and `postgres` extras), the admin router (the `fastapi` extra) and telemetry. stackr's template wires it in by default, so each library asks it before every command and read.
 

@@ -8,7 +8,7 @@
 
 RFC-0001 phase 6 asks for a documentation site in the family's style, built in strict mode in CI. The project's documentation already exists as Markdown under `docs/`: the architecture, the ADRs and the RFCs. It is evergreen and read on GitHub as well as on a site, so the site has to use it as it is, not copies. The site is to be published at `https://evalr.alexnodeland.com`, and the repository's GitHub Pages settings already serve that domain from a workflow.
 
-artifactr built its site first, and recorded the choice of tools in [its ADR-0023](https://github.com/alexnodeland/artifactr/blob/main/docs/adr/0023-documentation-site.md) and the choice to publish from `main` in [its ADR-0026](https://github.com/alexnodeland/artifactr/blob/main/docs/adr/0026-publishing-the-documentation-site.md). The four projects of the family (artifactr, reflexr, evalr, stackr) share a brand: one grid, one stroke, one typeface, and a hue for each. A reader moving between their sites should find the same structure, the same navigation and the same conventions.
+artifactr built its site first, and recorded the choice of tools in [its ADR-0023](../../artifactr/adr/0023-documentation-site.md) and the choice to publish from `main` in [its ADR-0026](../../artifactr/adr/0026-publishing-the-documentation-site.md). The four projects of the family (artifactr, reflexr, evalr, stackr) share a brand: one grid, one stroke, one typeface, and a hue for each. A reader moving between their sites should find the same structure, the same navigation and the same conventions.
 
 The site needs:
 

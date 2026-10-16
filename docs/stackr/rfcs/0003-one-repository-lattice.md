@@ -451,11 +451,11 @@ Phase 1 rehearsed the move from fresh clones, and an independent review checked 
 [a-69]: https://github.com/alexnodeland/artifactr/pull/69
 [a-70]: https://github.com/alexnodeland/artifactr/pull/70
 [a-71]: https://github.com/alexnodeland/artifactr/pull/71
-[a-adr-0011]: https://github.com/alexnodeland/artifactr/blob/main/docs/adr/0011-workspace-scoped-artifacts-and-tenant-handles.md
-[a-adr-0050]: https://github.com/alexnodeland/artifactr/blob/main/docs/adr/0050-one-docs-build.md
+[a-adr-0011]: ../../artifactr/adr/0011-workspace-scoped-artifacts-and-tenant-handles.md
+[a-adr-0050]: ../../artifactr/adr/0050-one-docs-build.md
 [e-27]: https://github.com/alexnodeland/evalr/pull/27
 [e-34]: https://github.com/alexnodeland/evalr/pull/34
-[e-adr-0013]: https://github.com/alexnodeland/evalr/blob/main/docs/adr/0013-docstrings-in-markdown-and-one-docs-build.md
+[e-adr-0013]: ../../evalr/adr/0013-docstrings-in-markdown-and-one-docs-build.md
 [r-55]: https://github.com/alexnodeland/reflexr/pull/55
 [r-70]: https://github.com/alexnodeland/reflexr/pull/70
 [r-73]: https://github.com/alexnodeland/reflexr/pull/73
@@ -465,8 +465,8 @@ Phase 1 rehearsed the move from fresh clones, and an independent review checked 
 [r-81]: https://github.com/alexnodeland/reflexr/pull/81
 [r-85]: https://github.com/alexnodeland/reflexr/pull/85
 [r-90]: https://github.com/alexnodeland/reflexr/pull/90
-[r-adr-0003]: https://github.com/alexnodeland/reflexr/blob/main/docs/adr/0003-independent-sibling-of-artifactr.md
-[r-adr-0046]: https://github.com/alexnodeland/reflexr/blob/main/docs/adr/0046-one-docs-build.md
+[r-adr-0003]: ../../reflexr/adr/0003-independent-sibling-of-artifactr.md
+[r-adr-0046]: ../../reflexr/adr/0046-one-docs-build.md
 [s-36]: https://github.com/alexnodeland/stackr/pull/36
 [s-38]: https://github.com/alexnodeland/stackr/pull/38
 [s-40]: https://github.com/alexnodeland/stackr/pull/40

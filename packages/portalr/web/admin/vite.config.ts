@@ -1,3 +1,4 @@
+import { notices, readPolicy } from "@portalr/notices";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
@@ -64,6 +65,11 @@ export default defineConfig({
     react(),
     tailwindcss(),
     lean(/[\\/]node_modules[\\/](recharts|d3-[a-z]+)[\\/]/),
+    // The licences of the packages bundled, beside the UI (portalr ADR-0033).
+    notices({
+      ui: "admin",
+      policy: readPolicy(new URL("../notices/policy.json", import.meta.url)),
+    }),
   ],
   // ui's public files, such as the script that sets the scheme before the first paint.
   publicDir: "../ui/public",

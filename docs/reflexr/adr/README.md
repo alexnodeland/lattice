@@ -66,6 +66,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0062](0062-row-level-security-under-the-scoping.md) | Row-level security under the scoping | Accepted |
 | [0063](0063-a-stored-rules-history.md) | A stored rule's history, read by its name | Accepted |
 | [0064](0064-the-protocol-schema-names-reflexrs-own-events.md) | The protocol schema names reflexr's own events | Accepted |
-| [0065](0065-an-access-token-redacted-from-span-urls.md) | An access token redacted from the spans' URLs | Accepted |
+| [0065](0065-an-access-token-redacted-from-span-urls.md) | An access token redacted from the spans' URLs | Accepted, amended by [lattice ADR-0018](../../adr/0018-lattice-core-what-the-libraries-share.md) |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

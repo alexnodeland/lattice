@@ -1,6 +1,6 @@
 # ADR-0065: An access token redacted from the spans' URLs
 
-**Status:** Accepted
+**Status:** Accepted, amended by [lattice ADR-0018](../../adr/0018-lattice-core-what-the-libraries-share.md)
 **Date:** 2026-10-13
 **Deciders:** Alex Nodeland
 **Amends:** [lattice RFC-0002](../../rfcs/0002-portalr-the-portal.md)'s "The token stays out of logs": the spans' half moves from the template to the libraries

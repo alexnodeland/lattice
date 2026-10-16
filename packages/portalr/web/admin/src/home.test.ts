@@ -1,10 +1,9 @@
 import { expect, test } from "vitest";
-import { figure } from "./format";
+import { dollars, figure } from "./format";
 import {
   budget,
   counted,
   deploymentSpendSaid,
-  dollars,
   duration,
   failuresSaid,
   feedbackSaid,
@@ -118,10 +117,11 @@ test("failed turns are the last point's count, of the day before it", () => {
         { time: 2, value: 3.0000001 },
       ],
     }),
-  ).toEqual({ figure: "3", line: "in the last day" });
-  expect(failuresSaid({ status: "ok", data: [] })).toEqual({
+  ).toMatchObject({ figure: "3", line: "agent turns in the last day" });
+  expect(failuresSaid({ status: "ok", data: [{ time: 1, value: 1 }] }).note).toMatch(/rules' runs/);
+  expect(failuresSaid({ status: "ok", data: [] })).toMatchObject({
     figure: "0",
-    line: "in the last day",
+    line: "agent turns in the last day",
   });
   expect(failuresSaid({ status: "unavailable", reason: "down" }).badge?.tone).toBe("failed");
 });

@@ -48,6 +48,22 @@ jobs:
           token: ${{ steps.app.outputs.token }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+      # Every released package needs a full commit sha in the outputs, which the jobs below check
+      # out: a checkout given no ref uses this push's commit, which they must not build from. So
+      # this fails the workflow without one. The release exists by now, so running the workflow
+      # again finds it made, builds nothing, and leaves a tagged release with no wheels: they
+      # would then be built by hand from the tag.
+      # RELEASES holds every output, each release's notes too, and an environment variable on
+      # Linux is capped near 128 KB: past that this step can't start, and the workflow fails.
+      - name: Require a commit for every released package
+        env:
+          RELEASES: ${{ toJSON(steps.release.outputs) }}
+          RELEASED: ${{ steps.release.outputs.paths_released || '[]' }}
+        run: |
+          jq --exit-status --argjson paths "$RELEASED" \
+            '. as $outputs | [$paths[] | ($outputs[. + "--sha"] // "") | test("^[0-9a-f]{40}$")] | all' \
+            <<<"$RELEASES" >/dev/null ||
+            { echo "release-please gave a released package no commit: $RELEASED" >&2; exit 1; }
       # The released packages that ship a wheel: all of them but stackr.
       - id: wheels
         env:
@@ -71,8 +87,13 @@ jobs:
     env:
       TAG: ${{ fromJSON(needs.release-please.outputs.releases)[format('{0}--tag_name', matrix.path)] }}
     steps:
+      # The commit release-please tagged for this package, not the push that ran the workflow: they
+      # differ when release-please creates the release on a later push than the one that merged its
+      # pull request. The toolchain action and portalr's check_wheel.py below come from that
+      # commit too. The attestation names the workflow's own commit, the push: see #206.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ fromJSON(needs.release-please.outputs.releases)[format('{0}--sha', matrix.path)] }}
           persist-credentials: false
       - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
         with:
@@ -166,7 +187,7 @@ jobs:
         with:
           ref: ${{ fromJSON(needs.release-please.outputs.releases)['packages/stackr--sha'] }}
           persist-credentials: false
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: stackr-images-*
           path: archives
@@ -206,7 +227,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: stackr-reference-*
           path: references

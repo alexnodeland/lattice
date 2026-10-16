@@ -31,11 +31,13 @@ const button =
 
 /**
  * The frame of every signed-in screen. One header holds the mark, the switcher, the navigation
- * and the account, each rendered once: from 1024 pixels it is a rail on the surface that stays as
- * the page scrolls; narrower, it is a bar of the mark, the switcher and the account, and Menu opens
- * the navigation in a drawer. The drawer is a Base UI dialog that keeps the focus, closes on
- * Escape, on Close, on following a link or on widening past the rail's width, and gives the focus
- * back to Menu. `ui` chooses the mark: `admin`'s opens to the other side.
+ * and the account: from 1024 pixels it is a rail on the surface that stays as the page scrolls;
+ * narrower, it is a bar of the mark, the switcher and the account, and Menu opens a drawer that
+ * holds the switcher, the navigation and the account too, whose name is shown. While the drawer
+ * is open, then, each is there twice, behind it and in it. The drawer is a Base UI dialog that
+ * keeps the focus, closes on Escape, on Close, on following a link or on widening past the
+ * rail's width, and gives the focus back to Menu. `ui` chooses the mark: `admin`'s opens to the
+ * other side. A page with no navigation of its own leaves `nav` out.
  */
 export function AppShell({
   ui = "app",
@@ -49,8 +51,8 @@ export function AppShell({
   /** The link home, such as the router's, that the mark renders as. */
   home: ReactElement;
   switcher: ReactNode;
-  /** The navigation, a `SideNav`. */
-  nav: ReactNode;
+  /** The navigation, a `SideNav`; none, for a page that has no areas to go between. */
+  nav?: ReactNode;
   account: ReactNode;
   children: ReactNode;
 }) {
@@ -101,7 +103,11 @@ export function AppShell({
                   Close
                 </Dialog.Close>
               </div>
-              {nav}
+              <div className="px-1">{switcher}</div>
+              <div className="flex-1 overflow-y-auto">{nav}</div>
+              <div data-drawer="" className="border-line border-t pt-3">
+                {account}
+              </div>
             </Dialog.Popup>
           </Dialog.Portal>
         </Dialog.Root>
@@ -112,7 +118,11 @@ export function AppShell({
           </Home>
         </div>
         <div className="ml-1 min-w-0 flex-1 lg:ml-0 lg:flex-none">{switcher}</div>
-        <div className="hidden flex-1 overflow-y-auto lg:block">{nav}</div>
+        {nav ? (
+          <div className="hidden flex-1 overflow-y-auto lg:block">{nav}</div>
+        ) : (
+          <div className="hidden lg:block lg:flex-1" />
+        )}
         <div className="lg:border-line lg:border-t lg:pt-3">{account}</div>
       </header>
       <main

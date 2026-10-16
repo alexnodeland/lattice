@@ -13,8 +13,10 @@ on:
 
 permissions: {}
 
+# A push to main cancels the run of the push before it, never the night's: a tier-2 run cancelled
+# mid-apply would leave its Floci to its own cleanup.
 concurrency:
-  group: nightly-${{ github.ref }}
+  group: nightly-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
 jobs:
@@ -139,6 +141,28 @@ jobs:
           echo "first: $first, second: $second"
           # Two digests, each a digest: two empty answers would match too.
           [[ $first =~ ^sha256:[0-9a-f]{64}$ && $second =~ ^sha256:[0-9a-f]{64}$ && $first == "$second" ]]
+
+  # stackr's AWS recipe, tier 2 (stackr ADR-0036), against Floci on arm64: every night, and when
+  # run by hand, but not on each push to main, which CI ran it for when the recipe changed.
+  aws-tier2:
+    name: AWS (tier 2)
+    if: github.event_name != 'push'
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
+      - run: proto trust .prototools && proto install tofu
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.terraform.d/plugin-cache
+          key: opentofu-providers-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('packages/stackr/deploy/aws/**/.terraform.lock.hcl') }}
+      - run: moon run stackr:aws-tier2
 
   # Every lockfile git doesn't ignore: uv.lock and bun.lock.
   osv:

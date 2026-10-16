@@ -7,7 +7,7 @@
 
 import type { GrantrApi, PortalrApi, TimeSpan } from "@portalr/client";
 import type { Tone } from "@portalr/ui";
-import { figure, numbers } from "./format";
+import { dollars, figure, numbers } from "./format";
 
 type Schemas = PortalrApi.components["schemas"];
 
@@ -29,16 +29,14 @@ interface Badge {
 export interface Said {
   readonly figure: string | null;
   readonly line: string;
+  /** A fuller word on what the line counts, shown small beneath it. */
+  readonly note?: string;
   readonly badge?: Badge;
 }
 
 /** A count of something, with its noun as one or many. */
 export const counted = (count: number, one: string, many = `${one}s`) =>
   `${numbers.format(count)} ${count === 1 ? one : many}`;
-
-/** An amount of money, as LiteLLM counts spend: in US dollars. */
-export const dollars = (amount: number) =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(amount);
 
 /** A card's words for a tool that didn't answer, or that the application runs without. */
 export function unread(tool: string, reading: Unread): Said {
@@ -107,13 +105,20 @@ export function feedbackSaid(reading: ScoresReading): Said {
   };
 }
 
-/** Failed turns over the window: the last point, which counts the failures in the step before it. */
+/**
+ * Failed turns over the window: the last point, which counts the failures in the step before it.
+ * They are artifactr's agent turns, not reflexr's rule runs.
+ */
 export function failuresSaid(reading: PointsReading): Said {
   if (reading.status !== "ok") {
     return unread("Prometheus", reading);
   }
   const last = reading.data.at(-1)?.value ?? 0;
-  return { figure: figure(Math.round(last)), line: "in the last day" };
+  return {
+    figure: figure(Math.round(last)),
+    line: "agent turns in the last day",
+    note: "Not rules' runs: a rule's run that fails isn't counted here.",
+  };
 }
 
 /** How far through its budget a tenant's spend is: under, near (80% or more), over it, or none. */

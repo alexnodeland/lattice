@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+# The state host's restore drill for ClickHouse (ADR-0037), the half of ADR-0027's drill that
+# applies here: prove the latest backup restores, with a row written just before, and report the
+# result as a metric, however the drill ends.
+#
+# 1. The latest backup, clickhouse/<UTC time>, is under DRILL_MAX_AGE_HOURS (36) old. Names that
+#    aren't a timestamp are ignored, and so are those dated more than an hour ahead: the drill
+#    still drills the real latest, and fails at the end, saying so, if there were any.
+# 2. A sentinel row goes into stackr_drill.sentinel, which is then backed up as drill/<sentinel>.
+# 3. The latest backup is restored beside Langfuse's database, as restore_drill, and must have
+#    rows in every table where the live one has them; the drill's own backup is restored as
+#    restore_sentinel, and must have the sentinel. Both are dropped first and after.
+#
+# What bounds a backup written by a compromised host, since the drill takes the latest by its name:
+# a name dated in the future fails the drill (without hiding the real latest), and one that isn't
+# a whole, restorable backup of Langfuse's tables fails the restore. The result goes to the state host's Prometheus as
+# stackr.restore_drill.success, 1 or 0, from an exit trap, so a drill that fails part way, or can't
+# reach the bucket, still says so. stackr-state-restore-drill.timer runs it weekly, after Sunday's
+# backup; run it by hand with `sudo systemctl start stackr-state-restore-drill`.
+
+set -euo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/lib"
+
+status=1 holding=0
+finish() {
+  # Only the run that holds the lock owns the restore databases: one that gave up waiting for it
+  # must not drop another drill's.
+  if ((holding)); then
+    clickhouse "DROP DATABASE IF EXISTS restore_drill SYNC" >/dev/null 2>&1 || true
+    clickhouse "DROP DATABASE IF EXISTS restore_sentinel SYNC" >/dev/null 2>&1 || true
+  fi
+  report stackr-state-restore-drill stackr.restore_drill.success $((status == 0)) || true
+  log "restore-drill: reported $((status == 0))"
+}
+trap finish EXIT
+
+lock
+holding=1
+max_age=$((${DRILL_MAX_AGE_HOURS:-36} * 3600))
+now=$(date +%s)
+# A fixed width, so the role's policy can name a drill's lock file exactly.
+sentinel=$(printf 'drill-%s-%05d' "$now" "$RANDOM")
+
+# --- 1. a fresh backup ---------------------------------------------------------------------
+
+credentials
+# Names compare as the text they are, so the cutoff (an hour ahead) is a name too, and whatever
+# year a made-up name claims is only a string past it. The count comes first: an empty latest
+# would otherwise be skipped by read, as tab is whitespace.
+stamp='^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}-[0-9]{2}-[0-9]{2}Z$'
+cutoff="formatDateTime(toDateTime($((now + 3600)), 'UTC'), '%Y-%m-%dT%H-%i-%SZ', 'UTC')"
+names=$(clickhouse "SELECT countIf(name > $cutoff), max(if(name <= $cutoff, name, ''))
+  FROM (SELECT extract(_path, '([^/]+)/\\\\.backup\$') AS name
+    FROM s3(backups, filename = 'clickhouse/*/.backup', format = 'RawBLOB', $(s3_credentials)))
+  WHERE match(name, '$stamp')") ||
+  fail "ClickHouse can't read the bucket"
+IFS=$'\t' read -r future latest <<<"$names"
+((future == 0)) || log "FAIL: $future backups are dated more than an hour in the future; this drill goes on with the latest before that"
+[[ -n $latest ]] || fail "ClickHouse has no backup"
+taken=$(clickhouse "SELECT toUnixTimestamp(parseDateTimeBestEffort(replaceRegexpOne('$latest',
+  '^([0-9]{4}-[0-9]{2}-[0-9]{2})T([0-9]{2})-([0-9]{2})-([0-9]{2})Z\$', '\\\\1 \\\\2:\\\\3:\\\\4'), 'UTC'))") ||
+  fail "reading when $latest was taken"
+((now - taken < max_age)) || fail "ClickHouse's latest backup, $latest, is older than $((max_age / 3600)) hours"
+log "ok: the latest backup is fresh"
+
+# --- 2. the sentinel -----------------------------------------------------------------------
+
+clickhouse "INSERT INTO stackr_drill.sentinel (id) VALUES ('$sentinel')"
+credentials
+clickhouse "BACKUP DATABASE stackr_drill TO $(s3 "drill/$sentinel") FORMAT Null"
+
+# --- 3. the restores -----------------------------------------------------------------------
+
+used=$(clickhouse "SELECT sum(bytes_on_disk) FROM system.parts WHERE database = 'default' AND active")
+free=$(clickhouse "SELECT free_space FROM system.disks WHERE name = 'default'")
+((free > used + used / 5)) || fail "ClickHouse has no room to restore: $free bytes free, $used used"
+tables_with_rows() {
+  clickhouse "SELECT name FROM system.tables WHERE database = '$1' AND total_rows > 0" | sort
+}
+clickhouse "DROP DATABASE IF EXISTS restore_drill SYNC"
+clickhouse "DROP DATABASE IF EXISTS restore_sentinel SYNC"
+credentials
+clickhouse "RESTORE DATABASE default AS restore_drill FROM $(s3 "clickhouse/$latest") FORMAT Null"
+live_rows=$(tables_with_rows default) || fail "listing Langfuse's tables"
+restored_rows=$(tables_with_rows restore_drill) || fail "listing the restored tables"
+missing=$(comm -23 <(printf '%s\n' "$live_rows") <(printf '%s\n' "$restored_rows"))
+[[ -z $missing ]] || fail "ClickHouse's restore of $latest has no rows in: $missing"
+credentials
+clickhouse "RESTORE DATABASE stackr_drill AS restore_sentinel FROM $(s3 "drill/$sentinel") FORMAT Null"
+[[ $(clickhouse "SELECT count() FROM restore_sentinel.sentinel WHERE id = '$sentinel'") == 1 ]] ||
+  fail "ClickHouse's drill backup lacks the sentinel"
+log "ok: ClickHouse's latest backup, $latest, restores with rows in every table, and the sentinel's does"
+((future == 0)) || fail "$future of ClickHouse's backups are dated in the future: a made-up name, or a clock that was wrong"
+status=0

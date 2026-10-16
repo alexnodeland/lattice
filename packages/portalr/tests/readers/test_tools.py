@@ -1,10 +1,14 @@
 """Loki, Prometheus, Langfuse, LiteLLM and Grafana, each against a stand-in for its API."""
 
+import asyncio
 import json as jsonlib
+import re
 from datetime import UTC, datetime, timedelta
 from urllib.parse import parse_qs, urlparse
 
 import httpx
+import pytest
+from pydantic import ValidationError
 
 from portalr.readers import (
     Grafana,
@@ -21,6 +25,9 @@ from portalr.readers import (
     Window,
 )
 from portalr.readers.langfuse import Scores, workspace_of
+from portalr.readers.loki import _identify
+from portalr.readers.prometheus import promql
+from portalr.readers.query import nanoseconds
 from portalr.tenant import allowed
 from tests.tools import Tool, fails, json
 
@@ -30,41 +37,172 @@ END = START + timedelta(hours=1)
 AT = "2026-10-12T00:00:00Z"
 
 
-async def test_loki_reads_the_tenants_logs_newest_first() -> None:
+ME = {"tenant_id": "acme"}
+
+
+def stream(labels: dict[str, str], *values: list[str | dict[str, str]]) -> dict[str, object]:
+    return {"stream": {**ME, **labels}, "values": list(values)}
+
+
+async def test_loki_reads_the_tenants_logs_newest_first_without_their_lines() -> None:
     answer = {
         "data": {
             "result": [
-                {
-                    "stream": {"service_name": "docplan"},
-                    "values": [["1", "first"], ["3", "third", {"tenant_id": "acme"}]],
-                },
-                {"stream": {"service_name": "oncall"}, "values": [["2", "second"]]},
+                stream({"service_name": "docplan"}, ["1", "first"], ["3", "third", {"x": "y"}]),
+                stream(
+                    {
+                        "service_name": "oncall",
+                        "detected_level": "error",
+                        "artifactr_thread_id": "thr_1",
+                        "reflexr_run_id": "run_9",
+                        "extra_thing": "x",
+                        "email": "a@b.c",
+                    },
+                    ["2", "second line"],
+                ),
             ]
         }
     }
     tool = Tool({"/loki/api/v1/query_range": json(answer)})
     logs = await Loki("http://loki", tool.client()).logs(
-        ACME, LogQuery(start=START, end=END, limit=2)
+        ACME, LogQuery(start=START, end=END, limit=4)
     )
     assert isinstance(logs, Ok)
-    assert [(line.time_ns, line.line, line.labels["service_name"]) for line in logs.data] == [
-        (3, "third", "docplan"),
-        (2, "second", "oncall"),
+    assert [(record.time_ns, record.service, record.length) for record in logs.data.records] == [
+        (3, "docplan", 5),
+        (2, "oncall", 11),
+        (1, "docplan", 5),
     ]
+    second = logs.data.records[1]
+    # What is known to be safe is shown; the rest is named, and the line isn't there at all.
+    assert (second.level, second.thread, second.run) == ("error", "thr_1", "run_9")
+    assert second.withheld == ("email", "extra_thing")
+    assert "email" not in second.labels
+    assert "extra_thing" not in second.labels
+    assert second.line is None
+    assert "second line" not in logs.model_dump_json()
+    assert logs.data.complete
     params = tool.last.url.params
     assert params["query"] == '{service_name=~".+"} | tenant_id = "acme"'
-    assert (params["direction"], params["limit"]) == ("backward", "2")
+    assert (params["direction"], params["limit"]) == ("backward", "4")
     assert params["start"] == str(int(START.timestamp()) * 1_000_000_000)
 
 
-async def test_loki_down_or_absent_is_unavailable() -> None:
+async def test_a_record_that_isnt_the_tenants_is_never_shown_whatever_loki_says() -> None:
+    answer = {
+        "data": {
+            "result": [
+                stream({"service_name": "a"}, ["3", "mine"]),
+                {
+                    "stream": {"tenant_id": "globex", "service_name": "b"},
+                    "values": [["2", "theirs"]],
+                },
+                {"stream": {"service_name": "c"}, "values": [["1", "nobody's"]]},
+            ]
+        }
+    }
+    tool = Tool({"/loki/api/v1/query_range": json(answer)})
+    logs = await Loki("http://loki", tool.client()).logs(ACME, LogQuery(start=START, end=END))
+    assert isinstance(logs, Ok)
+    assert [record.time_ns for record in logs.data.records] == [3]
+    assert "theirs" not in logs.model_dump_json()
+
+
+async def test_a_read_that_filled_its_limit_says_it_may_have_more() -> None:
+    answer = {"data": {"result": [stream({}, ["1", "a"], ["2", "b"])]}}
+    tool = Tool({"/loki/api/v1/query_range": json(answer)})
+    logs = await Loki("http://loki", tool.client()).logs(
+        ACME, LogQuery(start=START, end=END, limit=2)
+    )
+    assert isinstance(logs, Ok)
+    assert not logs.data.complete
+    more = await Loki("http://loki", tool.client()).logs(
+        ACME, LogQuery(start=START, end=END, limit=3)
+    )
+    assert isinstance(more, Ok)
+    assert more.data.complete
+
+
+def test_a_window_is_a_day_at_most() -> None:
+    assert LogQuery(start=START, end=START + timedelta(hours=24)).end
+    with pytest.raises(ValidationError, match="at most 24 hours"):
+        LogQuery(start=START, end=START + timedelta(hours=24, seconds=1))
+
+
+async def test_a_record_is_read_by_its_id_with_its_line_and_by_no_other() -> None:
+    labels = {"service_name": "docplan", "artifactr_run_id": "run_1", "email": "a@b.c"}
+    answer = {
+        "data": {
+            "result": [
+                stream(labels, ["5", "this one"]),
+                stream({"service_name": "other"}, ["5", "the same instant"]),
+            ]
+        }
+    }
+    tool = Tool({"/loki/api/v1/query_range": json(answer)})
+    loki = Loki("http://loki", tool.client())
+    listed = await loki.logs(ACME, LogQuery(start=START, end=END))
+    assert isinstance(listed, Ok)
+    first, second = sorted(listed.data.records, key=lambda record: record.service or "")
+    assert first.id != second.id
+    assert re.fullmatch(r"5-[0-9a-f]{16}-0", first.id)
+    # `first` is docplan's, which has the email label to withhold.
+    one = await loki.record(ACME, first.id)
+    assert isinstance(one, Ok)
+    assert one.data is not None
+    assert (one.data.line, one.data.withheld) == ("this one", ("email",))
+    # It looked at that instant alone, for the tenant alone.
+    params = tool.last.url.params
+    assert (params["start"], params["end"]) == ("5", "6")
+    assert params["query"] == '{service_name=~".+"} | tenant_id = "acme"'
+    # An id that names no record, another's digest, or no id at all, is none.
+    stream_digest = first.id.split("-")[1]
+    for record_id in (
+        f"5-{'0' * 16}-0",
+        f"5-{stream_digest}-1",
+        f"6-{stream_digest}-0",
+        f"{2**63}-{stream_digest}-0",
+        "5",
+        "x-y",
+        "",
+        "5-ABC",
+        f"\u0665-{stream_digest}-0",
+    ):
+        assert await loki.record(ACME, record_id) == Ok(data=None), record_id
+
+
+async def test_another_tenants_record_is_not_found_by_its_id() -> None:
+    theirs = {"stream": {"tenant_id": "globex", "service_name": "b"}, "values": [["5", "theirs"]]}
+    tool = Tool({"/loki/api/v1/query_range": json({"data": {"result": [theirs]}})})
+    loki = Loki("http://loki", tool.client())
+    mine = Loki(
+        "http://loki", Tool({"/loki/api/v1/query_range": json({"data": {"result": []}})}).client()
+    )
+    # The id a record of globex's has, asked for as acme: Loki, here wrong, answers it anyway.
+    globex_id = _identify([(5, "theirs", {"tenant_id": "globex", "service_name": "b"})])[0][0].id
+    assert await loki.record(ACME, globex_id) == Ok(data=None)
+    assert await mine.record(ACME, globex_id) == Ok(data=None)
+
+
+async def test_loki_down_slow_or_absent_is_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
     query = LogQuery(start=START, end=END)
     down = Loki("http://loki", Tool({"/loki/api/v1/query_range": json({}, status=503)}).client())
     assert await down.logs(ACME, query) == Unavailable(reason="loki answered 503")
+    assert await down.record(ACME, "5-" + "a" * 16 + "-0") == Unavailable(
+        reason="loki answered 503"
+    )
     absent = Loki("http://loki", Tool().client())
     assert await absent.logs(ACME, query) == Unavailable(
         reason="loki has no query API at that address"
     )
+    monkeypatch.setattr("portalr.readers.loki.DEADLINE", 0.05)
+
+    async def slow(request: httpx.Request) -> httpx.Response:
+        await asyncio.sleep(1)
+        return httpx.Response(200, json={})
+
+    waiting = Loki("http://loki", httpx.AsyncClient(transport=httpx.MockTransport(slow)))
+    assert await waiting.logs(ACME, query) == Unavailable(reason="loki didn't answer in time")
 
 
 async def test_prometheus_reads_a_metric_through_the_proxy_with_the_tenant() -> None:
@@ -280,3 +418,104 @@ def test_a_trace_names_one_workspace_or_none() -> None:
     assert workspace_of(["tenant:acme"]) is None
     assert workspace_of(["workspace:notes", "workspace:plans"]) is None
     assert workspace_of(["workspace:notes", "workspace:notes"]) == "notes"
+
+
+async def test_a_quantile_of_nothing_is_a_gap_not_a_number() -> None:
+    answer = {
+        "data": {
+            "result": [{"metric": {}, "values": [[1, "NaN"], [2, "0.5"], [3, "+Inf"], [4, "2"]]}]
+        }
+    }
+    tool = Tool({"/api/v1/query_range": json(answer)})
+    read = await Prometheus("http://proxy", tool.client()).series(
+        ACME, MetricQuery(start=START, end=END, metric="turn_latency")
+    )
+    assert isinstance(read, Ok)
+    assert [(point.time, point.value) for point in read.data] == [(2, 0.5), (4, 2.0)]
+
+
+def test_an_id_holds_nothing_of_the_line() -> None:
+    """Changing only the line leaves the id as it was: no guess at a line can be confirmed by it."""
+    labels = {"service_name": "docplan", "artifactr_run_id": "run_1", "email": "a@b.c"}
+    ids = {
+        _identify([(5, line, labels)])[0][0].id
+        for line in ("alice@example.com said launch on Tuesday", "something else", "")
+    }
+    assert len(ids) == 1
+    # Nor does a label that isn't shown, such as an email: it is in neither id nor read.
+    assert _identify([(5, "x", {**labels, "email": "other"})])[0][0].id in ids
+    # Records of one stream at one instant are told apart by their place, in the order given.
+    same = _identify([(5, "a", labels), (5, "b", labels), (6, "a", labels)])
+    assert [each.id.rsplit("-", 1)[1] for each, _ in same] == ["0", "1", "0"]
+    assert [line for _, line in same] == ["a", "b", "a"]
+
+
+def test_a_label_value_that_is_not_plain_is_withheld_not_shown() -> None:
+    labels = {
+        "service_name": "x" * 129,
+        "scope_name": "ok scope",
+        "artifactr_thread_id": "has spaces and, perhaps, an email a@b.c",
+        "artifactr_run_id": "run_1",
+        "severity_text": "WARN",
+        "detected_level": "launch on tuesday",
+        "severity_number": "13",
+        "span_id": "\u0663",
+        "trace_id": "abc123",
+    }
+    ((record, _),) = _identify([(1, "line", labels)])
+    assert (record.service, record.thread, record.run) == (None, None, "run_1")
+    assert record.level == "warn"
+    assert record.labels == {
+        "scope_name": "ok scope",
+        "artifactr_run_id": "run_1",
+        "severity_text": "warn",
+        "severity_number": "13",
+        "trace_id": "abc123",
+    }
+    assert record.withheld == ("artifactr_thread_id", "detected_level", "service_name", "span_id")
+    # A level that is not a known one is none.
+    ((odd, _),) = _identify([(1, "line", {"severity_text": "weird"})])
+    assert odd.level is None
+    # A name that is a property of a plain object is not a level.
+    ((proto, _),) = _identify([(1, "line", {"detected_level": "constructor"})])
+    assert proto.level is None
+
+
+def test_a_rate_looks_back_a_step_at_least() -> None:
+    assert "[300s]" in promql(ACME, "turn_latency", 60)
+    assert "[300s]" in promql(ACME, "turn_latency", 300)
+    assert "[900s]" in promql(ACME, "turn_latency", 900)
+    assert "[7200s]" in promql(ACME, "turn_latency", 7200)
+    assert "[7200s]" in promql(ACME, "failed_turns", 7200)
+
+
+def test_a_metric_window_is_at_most_as_many_steps_as_prometheus_gives() -> None:
+    assert MetricQuery(
+        start=START, end=START + timedelta(seconds=15 * 11_000), metric="turn_latency"
+    )
+    with pytest.raises(ValidationError, match="at most 11000 steps"):
+        MetricQuery(start=START, end=START + timedelta(days=30), metric="turn_latency", step=15)
+
+
+def test_a_time_is_whole_nanoseconds_without_a_float() -> None:
+    moment = datetime(2026, 10, 12, 0, 0, 0, 123456, tzinfo=UTC)
+    assert nanoseconds(moment) == 1_791_763_200_123_456_000
+    assert nanoseconds(START) == 1_791_763_200_000_000_000
+    with pytest.raises(ValidationError, match="2199 or earlier"):
+        Window(start=START, end=datetime(2262, 4, 12, tzinfo=UTC))
+
+
+def test_an_id_holds_nothing_of_a_withheld_value_of_a_safe_label() -> None:
+    """A value the gate withholds, under a name that is safe, is in neither the read nor the id."""
+    base = {"service_name": "docplan", "scope_name": "a, b!", "detected_level": "from the line"}
+    other = {"service_name": "docplan", "scope_name": "x" * 200, "detected_level": "also a line"}
+    ((first, _),) = _identify([(5, "x", base)])
+    ((second, _),) = _identify([(5, "x", other)])
+    assert first.id == second.id
+    assert first.withheld == ("detected_level", "scope_name")
+    # Nor does their order tell: places are counted by what is shown.
+    placed = _identify(
+        [(5, "a", {**base, "scope_name": "z!"}), (5, "b", {**base, "scope_name": "a!"})]
+    )
+    assert [each.id.rsplit("-", 1)[1] for each, _ in placed] == ["0", "1"]
+    assert [line for _, line in placed] == ["a", "b"]

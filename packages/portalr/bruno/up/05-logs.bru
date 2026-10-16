@@ -19,7 +19,9 @@ tests {
   test("acme's logs, read from Loki, and only theirs", function () {
     expect(res.status).to.equal(200);
     expect(res.body.status).to.equal("ok");
-    expect(res.body.data.length).to.be.greaterThan(0);
-    res.body.data.forEach((line) => expect(line.line).not.to.contain("globex"));
+    expect(res.body.data.records.length).to.be.greaterThan(0);
+    // No line is in the read: each is asked for by its id, one at a time.
+    res.body.data.records.forEach((record) => expect(record.line).to.equal(null));
+    expect(JSON.stringify(res.body)).not.to.contain("globex's record");
   });
 }

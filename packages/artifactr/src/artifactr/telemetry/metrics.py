@@ -41,12 +41,10 @@ from artifactr.telemetry.attributes import (
     TURN_TRIGGER,
     WORKSPACE_ID,
 )
+from lattice_core.otel.contribution import MetricsDetail
 
 Instrument = Literal["counter", "histogram", "up_down_counter"]
 """The kind of OpenTelemetry instrument a metric is recorded with."""
-
-MetricsDetail = Literal["workspace", "tenant", "none"]
-"""How much tenancy detail metrics keep: tenant and workspace, the tenant only, or neither."""
 
 SCOPE: Final = "artifactr"
 """The instrumentation scope of artifactr's own spans and metrics."""

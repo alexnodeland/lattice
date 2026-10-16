@@ -9,6 +9,7 @@ from typing import Any
 
 import httpx2
 import pytest
+from langfuse import propagate_attributes
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
@@ -107,6 +108,29 @@ async def settle(
     return ws
 
 
+async def test_the_bounded_trace_tags_langfuse_propagates_reach_the_proxy_once_each() -> None:
+    proxy = FakeProxy()
+    gateway = LiteLLMGateway(tags=("oncall",))
+    # The reactor runs a rule in the caller's context, so tags propagated around it reach the
+    # run, as a RunContext's, such as relayr's, do.
+    with propagate_attributes(
+        tags=["tenant:acme", "thread:th_1", "rule:app:review", "kind:incident"]
+    ):
+        ws = await settle(review(proxy.model(), gateway), UserActor(id="ada"))
+    [done] = await ws.runs()
+    assert done.status == "succeeded"
+    [(body, _)] = proxy.requests
+    assert body["metadata"]["tags"] == [
+        "reflexr",
+        "tenant:acme",
+        "workspace:prod",
+        "tenant-workspace:acme/prod",
+        "rule:app:review",
+        "oncall",
+        "kind:incident",
+    ], "thread: tags stay in Langfuse"
+
+
 async def test_each_request_carries_the_tenant_chain_trace_key_and_guardrails() -> None:
     proxy = FakeProxy()
     spans = InMemorySpanExporter()
@@ -125,7 +149,14 @@ async def test_each_request_carries_the_tenant_chain_trace_key_and_guardrails() 
         "scope": "[]",
         "run_id": done.id,
         "session_id": done.correlation_id,
-        "tags": ["reflexr", "tenant:acme", "workspace:prod", "rule:app:review", "oncall"],
+        "tags": [
+            "reflexr",
+            "tenant:acme",
+            "workspace:prod",
+            "tenant-workspace:acme/prod",
+            "rule:app:review",
+            "oncall",
+        ],
         "trace_user_id": "ada",
         "existing_trace_id": done.trace_ids[-1],
     }

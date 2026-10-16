@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # Runs one of the stack's one-off tasks to its end, for OpenTofu's local-exec (one-offs.tf), with
 # the AWS CLI where OpenTofu runs: AWS's, or Floci's through AWS_ENDPOINT_URL. Fails when ECS
-# can't place the task, or the task fails, with its exit code and where its logs are. A task that
+# can't place the task, or the task fails, with its exit code and the end of its log. A task that
 # can't start for want of its secrets or image (ResourceInitializationError), as when IAM hasn't
 # yet propagated a new role's policy, is run again, a few times.
 #
-# Environment: CLUSTER, TASK_DEFINITION, SUBNETS and SECURITY_GROUPS (comma-separated), AWS_REGION,
-# and the credentials the provider uses.
+# Environment: CLUSTER, TASK_DEFINITION, SUBNETS and SECURITY_GROUPS (comma-separated), LOG_GROUP
+# and LOG_STREAM_PREFIX (where its container logs), AWS_REGION, and the credentials the provider
+# uses.
 
 set -euo pipefail
 attempts=4
@@ -51,6 +52,8 @@ for attempt in $(seq 1 "$attempts"); do
     sleep $((attempt * 15))
     continue
   fi
-  echo "run-task: $task ended with $code ($reason); its logs are in CloudWatch Logs" >&2
+  echo "run-task: $task ended with $code ($reason); the end of its log:" >&2
+  aws logs get-log-events --log-group-name "$LOG_GROUP" --log-stream-name "$LOG_STREAM_PREFIX/${task##*/}" \
+    --limit 30 --query 'events[].[message]' --output text >&2 || true
   exit 1
 done

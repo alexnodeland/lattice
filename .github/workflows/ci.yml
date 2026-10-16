@@ -473,7 +473,9 @@ jobs:
             -subj /CN=backups -addext subjectAltName=DNS:backups \
             -keyout /tmp/stackr-backups/private.key -out /tmp/stackr-backups/public.crt
           chmod 644 /tmp/stackr-backups/private.key
+      # Fails before the job's 30 minutes, so the Logs step below runs and shows where it stood.
       - run: uv run --no-project python scripts/affected.py smoke
+        timeout-minutes: 15
       # An application from the template, beside the whole stack (stackr ADR-0011).
       - if: matrix.app
         run: uv run --no-project python scripts/affected.py smoke-app
@@ -501,6 +503,7 @@ jobs:
           docker ps -a
           files=()
           if [[ $STACKR_RECIPE == host ]]; then files=(-f compose.yaml -f deploy/host/compose.prod.yaml); fi
+          docker compose "${files[@]}" --profile '*' ps --all
           docker compose "${files[@]}" --profile '*' logs --no-color --tail=200
           if docker inspect backups >/dev/null 2>&1; then docker logs --tail=200 backups; fi
       - name: Stop the stack

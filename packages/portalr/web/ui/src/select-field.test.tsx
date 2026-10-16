@@ -4,6 +4,10 @@ import { render } from "vitest-browser-react";
 import { SelectField } from "./select-field";
 import { choose } from "./test/select";
 
+/** Two animation frames: Base UI settles its highlight, and what an Enter then takes, a frame after the key. */
+const settled = () =>
+  new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done())));
+
 const OPTIONS = [
   { value: "viewer", label: "Viewer" },
   { value: "editor", label: "Editor" },
@@ -54,6 +58,7 @@ test("the keyboard opens it, moves through the choices, chooses one, and Escape 
   await expect
     .element(page.getByRole("option", { name: "Editor" }))
     .toHaveAttribute("data-highlighted");
+  await settled();
   await userEvent.keyboard("{Enter}");
   await expect.element(role).toHaveTextContent("Editor");
   await userEvent.keyboard("{Enter}");
@@ -70,11 +75,13 @@ test("typing the first letters of a choice finds it: the highlight follows the l
   );
   await screen.getByRole("combobox", { name: "Role" }).click();
   await expect.element(page.getByRole("listbox")).toBeVisible();
+  await expect.poll(() => document.activeElement?.getAttribute("role")).toBe("option");
   await userEvent.keyboard("ox");
   // The highlight moves a moment after the letters, not with them, so Enter waits for it.
   await expect
     .element(page.getByRole("option", { name: "Oxide" }))
     .toHaveAttribute("data-highlighted");
+  await settled();
   await userEvent.keyboard("{Enter}");
   await expect.element(screen.getByRole("combobox", { name: "Role" })).toHaveTextContent("Oxide");
 });

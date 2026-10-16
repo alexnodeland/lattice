@@ -1,4 +1,5 @@
-import { choose } from "@portalr/ui/testing";
+import { type Names, namesOf } from "@portalr/client";
+import { choose, optionsOf } from "@portalr/ui/testing";
 import { useRef, useState } from "react";
 import { expect, test, vi } from "vitest";
 import { render } from "vitest-browser-react";
@@ -13,11 +14,13 @@ function Opened({
   onRevoke = vi.fn(async () => done),
   grants = [erin],
   people = ["bob", "vera"],
+  names,
 }: {
   onGrant?: (person: string, role: Role) => Promise<never>;
   onRevoke?: () => Promise<never>;
   grants?: readonly (typeof erin)[] | null;
   people?: readonly string[];
+  names?: Names;
 }) {
   const [open, setOpen] = useState(false);
   const back = useRef<HTMLButtonElement>(null);
@@ -31,6 +34,7 @@ function Opened({
         onOpenChange={setOpen}
         grants={grants}
         people={people}
+        {...(names && { names })}
         canRevoke
         onGrant={onGrant}
         onRevoke={onRevoke}
@@ -86,4 +90,65 @@ test("each empty state says why", async () => {
     .toBeVisible();
   await expect.element(dialog.getByText(/There's no one else to share it with/)).toBeVisible();
   await expect.element(dialog.getByRole("form")).not.toBeInTheDocument();
+});
+
+const VERA = "3f2a91c4-1111-4222-8333-444455556666";
+const GONE = "c0ffee00-1111-4222-8333-444455556666";
+const named: Names = namesOf({ [VERA]: "vera@acme.test", erin: "erin@acme.test" });
+
+test("people are offered and listed by their email, a short id where the server names none", async () => {
+  const screen = await render(<Opened people={[VERA, GONE]} names={named} grants={[erin]} />);
+  await screen.getByRole("button", { name: "Thread actions" }).click();
+  const people = await optionsOf(screen, "Person");
+  expect(people).toContain("vera@acme.test");
+  expect(people).toContain("c0ffee00…");
+  const holders = screen.getByRole("list", { name: "People with access" });
+  await expect.element(holders).toBeVisible();
+  expect(holders.element().textContent).toContain("erin@acme.test editor");
+});
+
+test("what is sent for a person is their id, not their email", async () => {
+  const onGrant = vi.fn(async () => done);
+  const screen = await render(<Opened people={[VERA]} names={named} onGrant={onGrant} />);
+  await screen.getByRole("button", { name: "Thread actions" }).click();
+  await screen.getByRole("button", { name: "Share", exact: true }).click();
+  await vi.waitFor(() => expect(onGrant).toHaveBeenCalledWith(VERA, "viewer"));
+});
+
+test("the revoke dialog names a person as the list does", async () => {
+  const screen = await render(<Opened names={named} />);
+  await screen.getByRole("button", { name: "Thread actions" }).click();
+  await screen.getByRole("button", { name: "Revoke erin@acme.test as editor" }).click();
+  await expect
+    .element(screen.getByRole("alertdialog", { name: "Revoke erin@acme.test's editor role?" }))
+    .toBeVisible();
+});
+
+test("a name arriving does not close an open revoke confirmation", async () => {
+  const screen = await render(<Opened />);
+  await screen.getByRole("button", { name: "Thread actions" }).click();
+  await screen.getByRole("button", { name: "Revoke erin as editor" }).click();
+  const confirmation = screen.getByRole("alertdialog", { name: "Revoke erin's editor role?" });
+  await expect.element(confirmation).toBeVisible();
+  // The email arrives while the confirmation is open: the row is the same row.
+  await screen.rerender(<Opened names={named} />);
+  await expect
+    .element(screen.getByRole("alertdialog", { name: "Revoke erin@acme.test's editor role?" }))
+    .toBeVisible();
+});
+
+test("people are offered in the order of what is shown", async () => {
+  const screen = await render(
+    <Opened
+      people={[VERA, GONE, "zed"]}
+      names={namesOf({ [VERA]: "zoe@acme.test", zed: "adam@acme.test" })}
+    />,
+  );
+  await screen.getByRole("button", { name: "Thread actions" }).click();
+  const options = await optionsOf(screen, "Person");
+  expect(options.filter((option) => option?.includes("@") || option?.endsWith("…"))).toEqual([
+    "adam@acme.test",
+    "c0ffee00…",
+    "zoe@acme.test",
+  ]);
 });

@@ -63,6 +63,8 @@ The packages' own tasks:
 | `lattice:docs` | Build the documentation site in strict mode, and check that its lists rendered |
 | `lattice:docs-serve` | Serve the documentation site with live reload at <http://localhost:8000> |
 
+`app:bdd` and `admin:bdd` each start a compose project of their own, named with a random token (`portalr-bdd-<token>`, `portalr-admin-bdd-<token>`), so runs at once, such as ones in other worktrees, don't share a stack, and each removes what it started when it ends, on a signal too. A run killed outright (`SIGKILL`, a lost terminal) leaves its project behind. List the projects with `docker compose ls -a`, which only lists, and remove one by its exact name, from `packages/portalr/web/app` or `packages/portalr/web/admin`: `COMPOSE_FILE=../../compose.yaml COMPOSE_PROFILES=app,bdd COMPOSE_PROJECT_NAME=<exact name> docker compose down --volumes --rmi local`.
+
 stackr keeps its Makefile for the stack: run `make` in `packages/stackr` to list its commands (`make env`, `make up`, `make validate`, `make smoke` and the rest). Its checks are moon tasks too: `stackr:validate`, and `stackr:reference`, which checks the documentation's reference pages against the files they describe.
 
 ### Testing SQL storage on PostgreSQL

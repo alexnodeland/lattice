@@ -40,6 +40,9 @@ from grantr.core import PRINCIPAL_ID
 from grantr.fastapi import Caller, Unauthorized, grantr_router
 from grantr.sql import SqlStorage, migrate
 from grantr.testing import matrix
+{%- if use_portal %}
+from portalr.actions import ACTIONS as PORTALR_ACTIONS
+{%- endif %}
 {%- if use_reflexr %}
 from reflexr import core as reflexr
 from reflexr.workspace import ACTIONS as REFLEXR_ACTIONS
@@ -79,8 +82,18 @@ CODE_RULES: Final = frozenset(rule.name for rule in RULES)
 """The rules defined in code, here and in relayr, whose runs act as the application."""
 
 {% endif -%}
-CATALOGS: Final = [{% if use_artifactr %}ARTIFACTR_ACTIONS{% endif %}{% if libraries == 'both' %}, {% endif %}{% if use_reflexr %}REFLEXR_ACTIONS{% endif %}]
-"""The libraries' catalogs, which grantr's roles are made of."""
+CATALOGS: Final = [
+{%- if use_artifactr %}
+    ARTIFACTR_ACTIONS,
+{%- endif %}
+{%- if use_reflexr %}
+    REFLEXR_ACTIONS,
+{%- endif %}
+{%- if use_portal %}
+    PORTALR_ACTIONS,
+{%- endif %}
+]
+"""The libraries' catalogs{% if use_portal %}, and portalr's{% endif %}, which grantr's roles are made of."""
 
 
 class Refused(Exception):
@@ -160,7 +173,7 @@ class Access:
 
     def mount(self, app: FastAPI) -> None:
         """Add grantr's admin API to the application."""
-        router = grantr_router(self.grants, resolve_actor=self._caller)
+        router = grantr_router(self.grants, resolve_actor=self.caller)
         app.include_router(router, prefix=f"{PREFIX}/v1")
 
     async def identify(self, connection: HTTPConnection) -> Person | tuple[str, ServicePrincipal]:
@@ -281,8 +294,11 @@ class Access:
                 return Agent()
 {%- endif %}
 
-    async def _caller(self, connection: HTTPConnection) -> Caller:
-        """The caller of grantr's admin API: a person, or a key bound to its tenant."""
+    async def caller(self, connection: HTTPConnection) -> Caller:
+        """The caller of grantr's admin API{% if use_portal %} and portalr's{% endif %}.
+
+        A person, or a key bound to its tenant.
+        """
         try:
             who = await self.identify(connection)
         except Unauthenticated as error:

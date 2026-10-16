@@ -4,7 +4,8 @@
 Usage: scripts/check-template [--keep DIR]
 
 Renders every variant of the template (artifactr, reflexr or both, with and without evals, with
-grantr or no access control, both without relayr's bridge, and both hosted on a single host) from
+grantr or no access control, with portalr, which grantr needs, or without it, both without
+relayr's bridge, and both hosted on a single host) from
 this checkout, working tree included, under the name in NAME, and checks each one:
 
 - every Jinja expression was rendered: nothing is left of `{{ ... }}` or `{% ... %}`, apart
@@ -31,20 +32,48 @@ import tempfile
 import tomllib
 import warnings
 from pathlib import Path
+from typing import NamedTuple
 
 from copier import run_copy
 
 ROOT = Path(__file__).resolve().parent.parent
 LATTICE = ROOT.parent.parent
 """lattice's root, whose copier.yml points Copier at the template."""
+
+
+class Variant(NamedTuple):
+    """One way to render the template."""
+
+    libraries: str
+    evals: bool
+    access: str
+    bridge: bool  # whether relayr bridges both libraries
+    hosting: str
+    portal: bool  # portalr, which only grantr's access can have
+
+    @property
+    def name(self) -> str:
+        """The directory it is rendered into."""
+        return (
+            f"{self.libraries}{'-evals' if self.evals else ''}"
+            f"{'' if self.access == 'grantr' else '-open'}"
+            f"{'-unbridged' if self.libraries == 'both' and not self.bridge else ''}"
+            f"{'' if self.hosting == 'none' else f'-{self.hosting}'}"
+            f"{'-noportal' if self.access == 'grantr' and not self.portal else ''}"
+        )
+
+
 VARIANTS = [
-    (libraries, evals, access, libraries == "both", "none")
+    Variant(libraries, evals, access, libraries == "both", "none", access == "grantr")
     for libraries, evals, access in itertools.product(
         ["artifactr", "reflexr", "both"], [True, False], ["grantr", "none"]
     )
-] + [("both", True, "grantr", False, "none"), ("both", True, "grantr", True, "host")]
-"""Every variant: its libraries, evals, access, whether relayr bridges both libraries, and where
-it is hosted."""
+] + [
+    Variant("both", True, "grantr", False, "none", True),
+    Variant("both", True, "grantr", True, "host", True),
+    Variant("both", True, "grantr", True, "none", False),
+]
+"""Every variant of the template."""
 LEFTOVER = re.compile(r"(?<!\$)\{\{|\{%|%\}")
 TEXT = {".py", ".toml", ".yaml", ".yml", ".md", ".json", ".sh", ".example", ""}
 ANSWERS = ".copier-answers.yml"
@@ -55,6 +84,7 @@ DIRECTORIES = {
     "evalr": "evalr",
     "grantr": "grantr",
     "relayr-ai": "relayr",
+    "portalr": "portalr",
 }
 """Each library's distribution, and its directory in lattice's packages/."""
 NAME = "Acme Template Check At Max Len"
@@ -63,9 +93,7 @@ accepts, and its package sorts before `conftest`, so line lengths and import ord
 checked at their limits."""
 
 
-def render(
-    libraries: str, evals: bool, access: str, bridge: bool, hosting: str, destination: Path
-) -> str:
+def render(variant: Variant, destination: Path) -> str:
     """Render one variant, as `copier copy --defaults --vcs-ref HEAD` does; return its commit."""
     with warnings.catch_warnings():
         # A checkout with uncommitted changes renders them, from a commit Copier makes, with a
@@ -74,14 +102,7 @@ def render(
         worker = run_copy(
             str(LATTICE),
             destination,
-            data={
-                "project_name": NAME,
-                "libraries": libraries,
-                "evals": evals,
-                "access": access,
-                "bridge": bridge,
-                "hosting": hosting,
-            },
+            data={"project_name": NAME, **variant._asdict()},
             defaults=True,
             vcs_ref="HEAD",
             quiet=True,
@@ -89,17 +110,16 @@ def render(
     return str(worker.template.commit_hash)
 
 
-def expected_sources(
-    libraries: str, evals: bool, access: str, bridge: bool, commit: str
-) -> dict[str, dict[str, str]]:
+def expected_sources(variant: Variant, commit: str) -> dict[str, dict[str, str]]:
     """The `[tool.uv.sources]` a variant needs: each library it uses, from its directory of
     lattice's packages/, at the commit it was rendered from."""
     used = {
-        "artifactr-ai": libraries in {"artifactr", "both"},
-        "reflexr": libraries in {"reflexr", "both"},
-        "evalr": evals,
-        "grantr": access == "grantr",
-        "relayr-ai": bridge,
+        "artifactr-ai": variant.libraries in {"artifactr", "both"},
+        "reflexr": variant.libraries in {"reflexr", "both"},
+        "evalr": variant.evals,
+        "grantr": variant.access == "grantr",
+        "relayr-ai": variant.bridge,
+        "portalr": variant.access == "grantr" and variant.portal,
     }
     return {
         name: {"git": REPOSITORY, "subdirectory": f"packages/{DIRECTORIES[name]}", "rev": commit}
@@ -128,9 +148,27 @@ def run(label: str, command: list[str], cwd: Path, env: dict[str, str] | None = 
     return [f"{label}:\n{done.stdout}{done.stderr}".rstrip()]
 
 
+def check_bun(app: Path) -> list[str]:
+    """Check that the image builds portalr's UIs with the Bun that lattice itself uses."""
+    dockerfile = (app / "Dockerfile").read_text()
+    found = re.search(
+        r"^FROM oven/bun:([0-9.]+)@sha256:[0-9a-f]{64} AS portal-ui$", dockerfile, re.M
+    )
+    if found is None:
+        return ["Dockerfile: the portal-ui stage isn't FROM oven/bun:<version>@sha256:<digest>"]
+    wanted = re.search(r'^bun = "([0-9.]+)"$', (LATTICE / ".prototools").read_text(), re.M)
+    if wanted is None or wanted[1] != found[1]:
+        return [
+            f"Dockerfile: Bun is {found[1]}, and lattice's .prototools says {wanted and wanted[1]}"
+        ]
+    return []
+
+
 def check(app: Path, sources: dict[str, dict[str, str]]) -> list[str]:
     """Check one rendered application, which needs these sources; return the problems found."""
     problems = check_sources(app, sources)
+    if (app / "scripts" / "build-portal-ui.sh").exists():
+        problems += check_bun(app)
     files = [p for p in app.rglob("*") if p.is_file() and ".git" not in p.parts]
     for path in files:
         if path.suffix in TEXT or path.name.startswith("."):
@@ -151,7 +189,9 @@ def check(app: Path, sources: dict[str, dict[str, str]]) -> list[str]:
     host = app / "deploy" / "host" / "compose.prod.yaml"
     if host.exists():
         overlay = ["docker", "compose", "-f", "compose.yaml", "-f", str(host), *compose[2:]]
-        problems += run("compose, on a single host", overlay, app, {"APP_IMAGE": "app:checked"})
+        # The overlay asks for the image to run, and the domain the edge serves.
+        needs = {"APP_IMAGE": "app:checked", "STACKR_DOMAIN": "example.com"}
+        problems += run("compose, on a single host", overlay, app, needs)
     return problems
 
 
@@ -162,15 +202,11 @@ def main() -> int:
     failures = 0
     with tempfile.TemporaryDirectory() as scratch:
         base = args.keep or Path(scratch)
-        for libraries, evals, access, bridge, hosting in VARIANTS:
-            name = (
-                f"{libraries}{'-evals' if evals else ''}{'' if access == 'grantr' else '-open'}"
-                f"{'-unbridged' if libraries == 'both' and not bridge else ''}"
-                f"{'' if hosting == 'none' else f'-{hosting}'}"
-            )
+        for variant in VARIANTS:
+            name = variant.name
             app = base / name
-            commit = render(libraries, evals, access, bridge, hosting, app)
-            problems = check(app, expected_sources(libraries, evals, access, bridge, commit))
+            commit = render(variant, app)
+            problems = check(app, expected_sources(variant, commit))
             for problem in problems:
                 print(f"FAIL: {name}: {problem}", file=sys.stderr)
             if problems:

@@ -128,7 +128,9 @@ async function shown(width: number, colourBlind = false) {
     document.fonts.load('1em "Schibsted Grotesk"'),
     document.fonts.load('600 1em "Schibsted Grotesk"'),
   ]);
-  // The drawings measure their labels once the faces are in, so they are drawn again.
+  // The drawings measure their labels once the faces are in, and draw again: wait for both.
+  await document.fonts.ready;
+  await new Promise((settled) => requestAnimationFrame(() => requestAnimationFrame(settled)));
   await expect.poll(() => document.querySelectorAll("svg text").length).toBeGreaterThan(20);
 }
 

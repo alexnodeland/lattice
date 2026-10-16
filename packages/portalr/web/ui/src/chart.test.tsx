@@ -7,6 +7,9 @@ import { formatDay } from "./chart-theme";
 const days = { key: "day", name: "Day" };
 
 /** What the chart's text says, in the drawing. */
+/** A series name long enough that no chart gives it room whole. */
+const LONG = "an evaluation of the answers with a very long name that no chart has room for";
+
 const texts = () => [...document.querySelectorAll("svg text")].map((text) => text.textContent);
 
 /** The page asks for colour-blind mode, as it would on its root. */
@@ -165,7 +168,7 @@ test("a tooltip is on the menus' surface, with each series' mark, name and align
     .poll(() => document.querySelector(".recharts-tooltip-wrapper .shadow-lg"))
     .not.toBeNull();
   const card = document.querySelector(".recharts-tooltip-wrapper .shadow-lg") as HTMLElement;
-  expect(card.textContent).toBe("Oct 13Spend$30.00");
+  expect(card.textContent).toBe("2026-10-13Spend$30.00");
   // The menus' surface: a border, a raised shadow and the surface's colour.
   expect(getComputedStyle(card).borderTopWidth).toBe("1px");
   expect(card.querySelector("svg")).not.toBeNull();
@@ -284,15 +287,15 @@ test("a line keeps its sign, a line ending at 0 is named, and labels don't overl
   expect(bottom - middle).toBeGreaterThanOrEqual(11.99);
 });
 
-test("labels stay inside the plot, and a long name is cut, and given whole as a title", async () => {
+test("labels stay inside the plot, a name that fits is whole, and one too long is cut, and given whole as a title", async () => {
   await page.viewport(1024, 768);
   const screen = await render(
     <LineChart
       label="All at the floor"
       index={days}
       series={[
-        { key: "a", name: "an evaluation with a long name" },
-        { key: "b", name: "b" },
+        { key: "a", name: LONG },
+        { key: "b", name: "accuracy · accuracy" },
         { key: "c", name: "c" },
       ]}
       data={[{ day: "2026-10-12", a: 0, b: 0, c: 0 }]}
@@ -301,11 +304,19 @@ test("labels stay inside the plot, and a long name is cut, and given whole as a 
   );
   await expect.element(screen.getByRole("figure", { name: "All at the floor" })).toBeVisible();
   await expect.poll(() => document.querySelectorAll("svg text title").length).toBe(1);
-  expect(document.querySelector("svg text title")?.textContent).toBe(
-    "an evaluation with a long name",
+  expect(document.querySelector("svg text title")?.textContent).toBe(LONG);
+  const written = [...document.querySelectorAll("svg text")].map(
+    (text) => text.lastChild?.textContent,
   );
-  const labels = [...document.querySelectorAll("svg text")].filter((text) =>
-    ["an evaluation…", "b", "c"].includes(text.lastChild?.textContent ?? ""),
+  // A name of 19 characters has room to spare at this width, so it is whole; the long one is cut.
+  expect(written).toContain("accuracy · accuracy");
+  expect(written.some((text) => text?.endsWith("…") && LONG.startsWith(text.slice(0, 8)))).toBe(
+    true,
+  );
+  const labels = [...document.querySelectorAll("svg text")].filter(
+    (text) =>
+      ["accuracy · accuracy", "c"].includes(text.lastChild?.textContent ?? "") ||
+      text.lastChild?.textContent?.endsWith("…"),
   );
   expect(labels).toHaveLength(3);
   const floor = Math.max(
@@ -384,7 +395,7 @@ test("on a phone, each direct label is whole and inside the drawing", async () =
   await expect.poll(() => texts().includes("Thumbs down")).toBe(true);
   const svg = document.querySelector(".recharts-surface")?.getBoundingClientRect();
   const labels = [...document.querySelectorAll("svg text")].filter((text) =>
-    ["Thumbs down", "95th percenti…", "Spend"].includes(text.lastChild?.textContent ?? ""),
+    ["Thumbs down", "95th percentile", "Spend"].includes(text.lastChild?.textContent ?? ""),
   );
   expect(labels).toHaveLength(3);
   for (const label of labels) {

@@ -32,8 +32,16 @@ export const dash = (at: number) => `var(--chart-dash-${slot(at)})`;
 /** A mark that touches another, which a pattern tells apart: the hatch its fill takes, at full. */
 export const ADJACENT = { "--chart-hatch": "var(--chart-hatched)" } as CSSProperties;
 
-/** The room a chart keeps round its drawing, in px; its right is for direct labels, when it has any. */
-export const MARGIN = { top: 12, right: 8, bottom: 0, left: 4 } as const;
+/** The room a chart keeps round its drawing, in px. */
+export interface Margin {
+  readonly top: number;
+  readonly right: number;
+  readonly bottom: number;
+  readonly left: number;
+}
+
+/** A chart's margin by default; its right grows for direct labels, when it has any. */
+export const MARGIN: Margin = { top: 12, right: 8, bottom: 0, left: 4 };
 
 /** The gridlines: very light, and horizontal only. */
 export const GRID = { stroke: "var(--chart-grid)", vertical: false } as const;
@@ -199,26 +207,31 @@ export const formatDay = (day: string) => DAY.format(new Date(`${day}T00:00:00Z`
 export const formatMoment = (moment: string, withDay: boolean) =>
   withDay ? `${formatDay(moment.slice(0, 10))} ${moment.slice(11)}` : moment.slice(11);
 
-/** The longest a direct label is, in characters: a longer name is cut, and given whole as a title. */
-export const LONGEST_LABEL = 14;
-
-/** A series' name as its direct label: cut to `LONGEST_LABEL`, with an ellipsis. */
-export const cut = (name: string) =>
-  name.length > LONGEST_LABEL ? `${name.slice(0, LONGEST_LABEL - 1)}…` : name;
+/** The most of a chart's width its direct labels may take: a longer name is cut, and given whole as a title. */
+const MOST_OF_WIDTH = 0.3;
 
 /** The gap between a plot and its direct labels, in px. */
 const LABEL_GAP = 8;
 
+/** A chart's direct labels: the room they take to its right, and each name as it is written there. */
+export interface Labels {
+  readonly room: number;
+  /** A name as its direct label: whole, or cut with an ellipsis to the most the chart allows. */
+  readonly fit: (name: string) => string;
+}
+
 /**
- * The room a chart keeps to its right for its direct labels: the widest of `names`, as they are
- * written, measured at the font of what `ref` holds, once its faces have loaded and again if they
- * change, and a gap. Until the first measure, it is a guess of 7px a character.
+ * The direct labels of a chart holding `ref`: each of `names` written whole where it fits within
+ * `MOST_OF_WIDTH` of the chart's width, else cut to fit, measured with a canvas at the chart's own
+ * font, once its faces have loaded and again as the chart is resized; and the room the widest
+ * takes, and a gap. Until the first measure, it is a guess of 7px a character.
  */
-export function useLabelRoom(ref: RefObject<HTMLElement | null>, names: readonly string[]) {
+export function useLabels(ref: RefObject<HTMLElement | null>, names: readonly string[]): Labels {
   const key = names.join("\n");
-  const [room, setRoom] = useState(
-    () => LABEL_GAP + 7 * Math.max(0, ...names.map((n) => n.length)),
-  );
+  const [labels, setLabels] = useState<Labels>(() => ({
+    room: LABEL_GAP + 7 * Math.max(0, ...names.map((name) => name.length)),
+    fit: (name) => name,
+  }));
   useLayoutEffect(() => {
     const element = ref.current;
     const context = document.createElement("canvas").getContext("2d");
@@ -227,11 +240,23 @@ export function useLabelRoom(ref: RefObject<HTMLElement | null>, names: readonly
     }
     const measure = () => {
       context.font = getComputedStyle(element).font;
-      const widest = Math.max(...key.split("\n").map((name) => context.measureText(name).width));
-      setRoom(LABEL_GAP + Math.ceil(widest));
+      const width = (text: string) => context.measureText(text).width;
+      const most = element.clientWidth * MOST_OF_WIDTH;
+      const fit = (name: string) => {
+        let kept = name;
+        while (kept.length > 1 && width(kept === name ? kept : `${kept}…`) > most) {
+          kept = kept.slice(0, -1);
+        }
+        return kept === name ? name : `${kept}…`;
+      };
+      const widest = Math.max(...key.split("\n").map((name) => width(fit(name))));
+      setLabels({ room: LABEL_GAP + Math.ceil(widest), fit });
     };
     measure();
     void document.fonts.ready.then(measure);
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
   }, [ref, key]);
-  return room;
+  return labels;
 }

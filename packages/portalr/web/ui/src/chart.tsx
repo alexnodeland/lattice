@@ -32,21 +32,22 @@ import {
 import {
   ADJACENT,
   AXIS,
-  cut,
   dash,
   fill,
   formatNumber,
   GRID,
   Hatch,
   ink,
+  type Labels,
   Legend,
   MARGIN,
   MAX_SERIES,
+  type Margin,
   Marker,
   Swatch,
   TooltipCard,
   TooltipRow,
-  useLabelRoom,
+  useLabels,
 } from "./chart-theme";
 import { type Column, ItemTable } from "./item-table";
 import { Num } from "./num";
@@ -104,11 +105,11 @@ function Figure({
   /** The room to keep to the plot's left, for what is written there. */
   left?: number;
   /** The drawing, given the margin to draw it in. */
-  children: (margin: { top: number; right: number; bottom: number; left: number }) => ReactNode;
+  children: (margin: Margin, labels: Labels) => ReactNode;
 }) {
   const caption = useId();
   const plot = useRef<HTMLDivElement>(null);
-  const right = useLabelRoom(plot, labelled ? series.map((one) => cut(one.name)) : []);
+  const labels = useLabels(plot, labelled ? series.map((one) => one.name) : []);
   const columns: [Column<Datum>, ...Column<Datum>[]] = [
     { key: "~index", label: index.name, cell: (row) => row[index.key] },
     ...series.map((one) => ({
@@ -137,7 +138,7 @@ function Figure({
         }))}
       />
       <div ref={plot} className="h-64 w-full text-muted text-xs" aria-hidden="true">
-        {children({ ...MARGIN, left, right: labelled ? right : MARGIN.right })}
+        {children({ ...MARGIN, left, right: labelled ? labels.room : MARGIN.right }, labels)}
       </div>
       <details className="text-sm">
         <summary className="cursor-pointer text-muted">Show the figures</summary>
@@ -160,20 +161,17 @@ function ChartTooltip({
   label,
   series,
   shown,
-  tick,
   line = false,
 }: Pick<TooltipContentProps<number, string>, "active" | "payload" | "label"> & {
   series: readonly Series[];
   shown: (value: number) => string;
-  /** The index as the axis writes it, where the tooltip gives its own. */
-  tick?: ((index: string) => string) | undefined;
   line?: boolean;
 }) {
   if (!active || payload.length === 0) {
     return null;
   }
   return (
-    <TooltipCard title={tick && typeof label === "string" ? tick(label) : label}>
+    <TooltipCard title={label}>
       {payload.map((item) => {
         const at = series.findIndex((one) => one.key === item.dataKey);
         return (
@@ -269,10 +267,13 @@ const LABEL_GAP = 12;
 function DirectLabels({
   data,
   series,
+  fit,
   bar = false,
 }: {
   data: readonly Datum[];
   series: readonly Series[];
+  /** A name as it is written: whole, or cut. */
+  fit: (name: string) => string;
   bar?: boolean;
 }) {
   const scale = useYAxisScale();
@@ -319,8 +320,8 @@ function DirectLabels({
           fill="var(--muted)"
           textAnchor="start"
         >
-          {cut(label.name) !== label.name && <title>{label.name}</title>}
-          {cut(label.name)}
+          {fit(label.name) !== label.name && <title>{label.name}</title>}
+          {fit(label.name)}
         </text>
       ))}
     </g>
@@ -400,9 +401,14 @@ export function BarChart({
   const shown = diverging ? (value: number) => format(Math.abs(value)) : format;
   // Both halves reach as far, to a number that halves evenly, so the baseline is the middle and a
   // tick's distance from it is a count.
-  const reach = evenReach(
-    Math.max(0, ...rows.flatMap((row) => drawn.map((one) => Math.abs(Number(row[one.key] ?? 0))))),
-  );
+  const reach = diverging
+    ? evenReach(
+        Math.max(
+          0,
+          ...rows.flatMap((row) => drawn.map((one) => Math.abs(Number(row[one.key] ?? 0)))),
+        ),
+      )
+    : 0;
   return (
     <Figure
       label={label}
@@ -414,7 +420,7 @@ export function BarChart({
       labelled={drawn.length > 1 && !diverging}
       left={diverging ? CAPTION_ROOM : MARGIN.left}
     >
-      {(margin) => (
+      {(margin, labels) => (
         <ResponsiveContainer>
           <RechartsBarChart
             data={[...rows]}
@@ -439,9 +445,7 @@ export function BarChart({
             {diverging && <ReferenceLine y={0} stroke="var(--edge)" />}
             <Tooltip
               cursor={{ fill: "var(--wash)" }}
-              content={(props) => (
-                <ChartTooltip {...props} series={drawn} shown={shown} tick={tick} />
-              )}
+              content={(props) => <ChartTooltip {...props} series={drawn} shown={shown} />}
             />
             {drawn.map((one, at) => (
               <Bar
@@ -455,7 +459,9 @@ export function BarChart({
               />
             ))}
             {diverging && below && drawn[0] && <Halves above={drawn[0].name} below={below.name} />}
-            {drawn.length > 1 && !diverging && <DirectLabels data={rows} series={drawn} bar />}
+            {drawn.length > 1 && !diverging && (
+              <DirectLabels data={rows} series={drawn} fit={labels.fit} bar />
+            )}
           </RechartsBarChart>
         </ResponsiveContainer>
       )}
@@ -497,16 +503,14 @@ export function LineChart({
       line
       labelled={drawn.length > 1}
     >
-      {(margin) => (
+      {(margin, labels) => (
         <ResponsiveContainer>
           <RechartsLineChart data={[...data]} margin={margin}>
             <Axes index={index.key} shown={format} domain={domain} tick={tick} whole={false} />
             <Unknown data={data} index={index.key} rows={unknown} />
             <Tooltip
               cursor={{ stroke: "var(--edge)" }}
-              content={(props) => (
-                <ChartTooltip {...props} series={drawn} shown={format} tick={tick} line />
-              )}
+              content={(props) => <ChartTooltip {...props} series={drawn} shown={format} line />}
             />
             {drawn.map((one, at) => (
               <Line
@@ -528,7 +532,7 @@ export function LineChart({
                 isAnimationActive={false}
               />
             ))}
-            {drawn.length > 1 && <DirectLabels data={data} series={drawn} />}
+            {drawn.length > 1 && <DirectLabels data={data} series={drawn} fit={labels.fit} />}
           </RechartsLineChart>
         </ResponsiveContainer>
       )}

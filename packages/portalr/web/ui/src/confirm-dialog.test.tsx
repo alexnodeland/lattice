@@ -283,3 +283,39 @@ test("a dialog taken away with its trigger while open sends focus where the call
     .click();
   await expect.element(screen.getByRole("heading", { name: "The runs" })).toHaveFocus();
 });
+
+test("a trigger can be disabled until what it acts on is filled in, and focus can go elsewhere when it closes", async () => {
+  function Form() {
+    const [filled, setFilled] = useState(false);
+    const field = useRef<HTMLInputElement>(null);
+    return (
+      <>
+        <input
+          ref={field}
+          aria-label="Name"
+          onChange={(event) => setFilled(event.target.value !== "")}
+        />
+        <ConfirmDialog
+          label="Create"
+          title="Create it?"
+          confirm="Create it"
+          calm
+          disabled={!filled}
+          finalFocus={field}
+          onConfirm={async () => setFilled(false)}
+        >
+          It is made.
+        </ConfirmDialog>
+      </>
+    );
+  }
+  const screen = await render(<Form />);
+  const trigger = screen.getByRole("button", { name: "Create", exact: true });
+  await expect.element(trigger).toBeDisabled();
+  await screen.getByRole("textbox", { name: "Name" }).fill("x");
+  await expect.element(trigger).toBeEnabled();
+  await trigger.click();
+  await screen.getByRole("alertdialog").getByRole("button", { name: "Create it" }).click();
+  await expect.element(screen.getByRole("alertdialog")).not.toBeInTheDocument();
+  await expect.element(screen.getByRole("textbox", { name: "Name" })).toHaveFocus();
+});

@@ -35,6 +35,8 @@ export function ConfirmDialog({
   typed,
   asking,
   calm = false,
+  disabled = false,
+  finalFocus,
   returnTo,
   onOpenChange,
   onConfirm,
@@ -57,6 +59,10 @@ export function ConfirmDialog({
   asking?: string;
   /** Whether the action is one that loses nothing, so it isn't in the danger colour. */
   calm?: boolean;
+  /** Where focus goes when it closes, if not back to the trigger, such as a trigger that is then disabled. */
+  finalFocus?: RefObject<HTMLElement | null>;
+  /** Whether the trigger can't be used yet, as when what it acts on isn't filled in. */
+  disabled?: boolean;
   /**
    * Where focus goes if the dialog is taken away while it is open, along with its trigger, as when
    * what it acts on changes so that it no longer applies. Otherwise focus returns to the trigger.
@@ -122,13 +128,18 @@ export function ConfirmDialog({
       }}
     >
       <AlertDialog.Trigger
+        disabled={disabled}
         render={<Button variant="secondary" aria-label={name} className={className ?? ""} />}
       >
         {label}
       </AlertDialog.Trigger>
       <AlertDialog.Portal>
         <AlertDialog.Backdrop className={backdrop} />
-        <AlertDialog.Popup className={popup} initialFocus={typed === undefined ? cancel : true}>
+        <AlertDialog.Popup
+          className={popup}
+          initialFocus={typed === undefined ? cancel : true}
+          {...(finalFocus && { finalFocus })}
+        >
           <AlertDialog.Title className={heading}>{title}</AlertDialog.Title>
           <AlertDialog.Description render={<div />} className={description}>
             {children}

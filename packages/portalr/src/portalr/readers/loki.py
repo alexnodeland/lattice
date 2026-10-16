@@ -10,6 +10,7 @@ and every other label, naming them. One record's line is read apart, by its id, 
 
 import asyncio
 import hashlib
+import json
 import re
 from dataclasses import dataclass, field
 from datetime import timedelta
@@ -95,8 +96,12 @@ MOST_SAME_INSTANT: Final = 1000
 """The most records a read for one nanosecond looks through, to find the one asked for."""
 
 RECORD_ID: Final = r"^[0-9]{1,19}-[0-9a-f]{16}-[0-9]{1,3}$"
-"""A record's id: its time in nanoseconds, a digest of its stream's safe labels, and its place
-among the records of that stream at that instant. Nothing in it comes from the line."""
+"""A record's id: its time in nanoseconds, a digest of its stream's shown labels, and its place
+among the records of that stream at that instant. Nothing in it comes from the line, or from a
+label a read withholds.
+
+A thread or run filter doesn't shift places: the stream a record is in is the same however it was
+found. Only a limit that cuts an instant's records can (portalr ADR-0031)."""
 
 _RECORD_ID: Final = re.compile(r"^([0-9]{1,19})-([0-9a-f]{16})-([0-9]{1,3})$")
 
@@ -270,10 +275,22 @@ class Loki:
         return Ok(data=asked and asked[0].model_copy(update={"line": asked[1]}))
 
 
-def _stream(labels: dict[str, str]) -> str:
-    """A stream's identity for an id: a digest of its safe labels, which a read shows anyway."""
-    safe = "\x1f".join(f"{name}={labels[name]}" for name in sorted(labels) if name in SAFE_LABELS)
-    return hashlib.sha256(safe.encode()).hexdigest()[:16]
+def _shown(labels: dict[str, str]) -> dict[str, str]:
+    """The labels a read shows: those whose name is safe and whose value passes the gate."""
+    return {
+        name: value
+        for name, raw in labels.items()
+        if name in SAFE_LABELS and (value := _safe(name, raw)) is not None
+    }
+
+
+def _stream(shown: dict[str, str]) -> str:
+    """A stream's identity for an id: a digest of the labels a read shows, and nothing else.
+
+    A value the gate withholds is not in it, so an id can't be used to test a guess at one.
+    """
+    pairs = json.dumps(sorted(shown.items()), ensure_ascii=True)
+    return hashlib.sha256(pairs.encode()).hexdigest()[:16]
 
 
 def _identify(
@@ -281,19 +298,23 @@ def _identify(
 ) -> list[tuple[LogRecord, str]]:
     """Each record, with its id, and its line.
 
-    An id is made of what a read shows, and nothing of the line, so that holding an id and
-    guessing a line can't confirm the guess: the time, the digest of the stream's safe labels, and
-    the record's place among those of that stream at that instant. Places are counted in the order
-    Loki gave the records, after ordering them by their labels, so they hold while Loki gives a
-    window's records in the same order, and a read of one nanosecond is a window of its own.
+    An id is made of what a read shows, and nothing of the line or of a label that is withheld,
+    so that holding an id and guessing a line, or a withheld value, can't confirm the guess: the
+    time, the digest of the stream's shown labels, and the record's place among those of that
+    stream at that instant. Places are counted in the order Loki gave the records, after
+    ordering them by their shown labels, so they hold while Loki gives a window's records in the
+    same order, and a read of one nanosecond is a window of its own.
     """
     places: dict[tuple[int, str], int] = {}
     made: list[tuple[LogRecord, str]] = []
-    for time_ns, line, labels in sorted(found, key=lambda each: (each[0], sorted(each[2].items()))):
-        stream = _stream(labels)
+    gated = [(time_ns, line, labels, _shown(labels)) for time_ns, line, labels in found]
+    for time_ns, line, labels, shown in sorted(
+        gated, key=lambda each: (each[0], sorted(each[3].items()))
+    ):
+        stream = _stream(shown)
         place = places.get((time_ns, stream), 0)
         places[time_ns, stream] = place + 1
-        made.append((_record(f"{time_ns}-{stream}-{place}", time_ns, line, labels), line))
+        made.append((_record(f"{time_ns}-{stream}-{place}", time_ns, line, labels, shown), line))
     return made
 
 
@@ -308,17 +329,14 @@ def _safe(name: str, value: str) -> str | None:
     return value if NAME.fullmatch(value) else None
 
 
-def _record(record_id: str, time_ns: int, line: str, labels: dict[str, str]) -> LogRecord:
+def _record(
+    record_id: str, time_ns: int, line: str, labels: dict[str, str], shown: dict[str, str]
+) -> LogRecord:
     """A record as a read shows it: its safe labels, the names of the rest, its line's length.
 
     A label is safe if its name is, and its value is short and plain: an id, a known level, a
     name. One that isn't is withheld with the rest. The line is added apart, for one record.
     """
-    shown = {
-        name: value
-        for name, raw in labels.items()
-        if name in SAFE_LABELS and (value := _safe(name, raw)) is not None
-    }
     level = next(
         (shown[name] for name in ("detected_level", "severity_text") if name in shown), None
     )

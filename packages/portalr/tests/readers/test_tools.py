@@ -503,3 +503,19 @@ def test_a_time_is_whole_nanoseconds_without_a_float() -> None:
     assert nanoseconds(START) == 1_791_763_200_000_000_000
     with pytest.raises(ValidationError, match="2199 or earlier"):
         Window(start=START, end=datetime(2262, 4, 12, tzinfo=UTC))
+
+
+def test_an_id_holds_nothing_of_a_withheld_value_of_a_safe_label() -> None:
+    """A value the gate withholds, under a name that is safe, is in neither the read nor the id."""
+    base = {"service_name": "docplan", "scope_name": "a, b!", "detected_level": "from the line"}
+    other = {"service_name": "docplan", "scope_name": "x" * 200, "detected_level": "also a line"}
+    ((first, _),) = _identify([(5, "x", base)])
+    ((second, _),) = _identify([(5, "x", other)])
+    assert first.id == second.id
+    assert first.withheld == ("detected_level", "scope_name")
+    # Nor does their order tell: places are counted by what is shown.
+    placed = _identify(
+        [(5, "a", {**base, "scope_name": "z!"}), (5, "b", {**base, "scope_name": "a!"})]
+    )
+    assert [each.id.rsplit("-", 1)[1] for each, _ in placed] == ["0", "1"]
+    assert [line for _, line in placed] == ["a", "b"]

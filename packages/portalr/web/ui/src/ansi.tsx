@@ -28,27 +28,33 @@ const char = (code: number) => String.fromCharCode(code);
 const ESC = char(0x1b);
 const BEL = char(0x07);
 const ST = char(0x9c);
+const CSI = char(0x9b);
+const OSC = char(0x9d);
 
 /** A range of characters, by their codes, for a pattern's class. */
 const range = (from: number, to: number) => `\\u{${from.toString(16)}}-\\u{${to.toString(16)}}`;
 
 /**
  * Either an escape sequence, in one of its forms, or a run of text with none in it. The
- * sequences are bounded, so a hostile line is read in time that grows with its length alone.
- * In order: a CSI sequence (`ESC [`, parameters, intermediates, a final byte), an OSC string (a
+ * sequences are matched in one pass without backtracking, so a hostile line is read in time that
+ * grows with its length alone; an OSC string's body is bounded, and what is past its bound is text.
+ * In order: a CSI sequence (`ESC [` or the C1 form, parameters, intermediates, a final byte), an OSC string (a
  * title, a link, the clipboard) to its bell or its terminator, a device control string and its
  * kin to its terminator, any other escape of a few characters, and, last, plain text.
  */
 const TOKEN = new RegExp(
   [
-    `${ESC}\\[([${range(0x30, 0x3f)}]{0,64})[${range(0x20, 0x2f)}]{0,8}[${range(0x40, 0x7e)}]`,
-    `${ESC}\\][^${BEL}${ESC}${ST}]{0,2048}(?:${BEL}|${ST}|${ESC}\\\\)?`,
+    `(?:${ESC}\\[|${CSI})[${range(0x30, 0x3f)}]*[${range(0x20, 0x2f)}]{0,8}[${range(0x40, 0x7e)}]`,
+    `(?:${ESC}\\]|${OSC})[^${BEL}${ESC}${ST}]{0,2048}(?:${BEL}|${ST}|${ESC}\\\\)?`,
     `${ESC}[PX^_][^${ESC}]{0,2048}(?:${ESC}\\\\)?`,
     `${ESC}[${range(0x20, 0x2f)}]{0,8}[${range(0x30, 0x7e)}]?`,
-    `[^${ESC}]+`,
+    `[^${ESC}${CSI}${OSC}]+`,
   ].join("|"),
   "gu",
 );
+
+/** What an escape sequence begins with: an escape, or the C1 forms of CSI and OSC. */
+const INTRODUCERS: ReadonlySet<string> = new Set([ESC, CSI, OSC]);
 
 /** A control or format character other than a newline and a tab, in a run of text. */
 const CONTROL = new RegExp(
@@ -58,17 +64,21 @@ const CONTROL = new RegExp(
     range(0x7f, 0x9f),
     // Format controls: zero-width and direction marks, line and paragraph separators, embeddings
     // and overrides, isolates, invisible operators, the Arabic letter mark and the byte order mark.
+    range(0x00ad, 0x00ad),
     range(0x061c, 0x061c),
+    range(0x180e, 0x180e),
     range(0x200b, 0x200f),
     range(0x2028, 0x202e),
     range(0x2060, 0x2069),
     range(0xfeff, 0xfeff),
+    // Tag characters, which spell text that is not seen.
+    range(0xe0000, 0xe007f),
   ].join("")}]`,
   "gu",
 );
 
-/** What sets colours and weight: parameters of digits, and the separators between them. */
-const SGR = /^[0-9;:]*$/u;
+/** What sets colours and weight: `ESC [`, digits and their separators, and `m`, and nothing more. */
+const SGR = new RegExp(`^${ESC}\\[([0-9;:]*)m$`, "u");
 
 /** The line's text in runs, each with the colour and the weight in force where it begins. */
 export function runs(line: string): Run[] {
@@ -78,8 +88,7 @@ export function runs(line: string): Run[] {
   let start = 0;
   for (const each of line.matchAll(TOKEN)) {
     const token = each[0];
-    const params = each[1];
-    if (!token.startsWith(ESC)) {
+    if (!INTRODUCERS.has(token.charAt(0))) {
       const text = token.replace(CONTROL, "");
       if (text !== "") {
         found.push({ start, text, colour, bold });
@@ -88,12 +97,8 @@ export function runs(line: string): Run[] {
       continue;
     }
     // Only a colour-setting sequence, `ESC [ ... m`, changes how the text that follows looks.
-    if (
-      params === undefined ||
-      !SGR.test(params) ||
-      !token.endsWith("m") ||
-      !token.startsWith(`${ESC}[`)
-    ) {
+    const params = SGR.exec(token)?.[1];
+    if (params === undefined) {
       continue;
     }
     // Parameters are groups split by `;`, and a group's own parts by `:`. A colour with its parts

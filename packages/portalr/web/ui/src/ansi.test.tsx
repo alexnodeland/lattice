@@ -47,6 +47,11 @@ test("every other escape is stripped: movement, clearing, titles, links, backgro
     `a${ESC}[`, // a sequence that never ends
     `a${ESC}[38:2::255:0:0mb`, // a true colour with its parts after colons
     `a${ESC}]0;a title\u009cb`, // a title ended by the C1 string terminator
+    `a\u009b2Jb`, // a C1 control sequence introducer
+    `a\u009d0;title\u0007b`, // a C1 operating system command
+    `a${ESC}[${"1;".repeat(100)}mb`, // more than a few dozen parameters
+    `a${ESC}[1 mb`, // an intermediate byte before the final m: not a colour
+    `a\u00adb\u180ec\u{e0041}d`, // a soft hyphen, a Mongolian vowel separator and a tag letter
     "a\u202eb\u202ac\u2066d\u2069e\u200ef\u200fg\u061ch\u2028i\u2029j\u200bk\ufeffl", // direction and format
   ];
   expect(hostile.map((line) => text(line))).toEqual([
@@ -68,6 +73,11 @@ test("every other escape is stripped: movement, clearing, titles, links, backgro
     "a",
     "ab",
     "ab",
+    "ab",
+    "ab",
+    "ab",
+    "ab",
+    "abcd",
     "abcdefghijkl",
   ]);
   // None of them coloured what follows, but for the colours the palette has.

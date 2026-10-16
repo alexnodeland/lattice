@@ -14,6 +14,7 @@ const reads: { path: string; query: URLSearchParams; tenant: string | null }[] =
 let loki: "ok" | "unconfigured" | "unavailable" | "empty" = "ok";
 let prometheus: "ok" | "unconfigured" | "unavailable" | "empty" = "ok";
 let incomplete = false;
+let shifted = false;
 
 const ESC = "\u001b";
 const A = `1792113515633147000-${"a".repeat(16)}-0`;
@@ -76,7 +77,10 @@ async function portalr(request: Request, path: string): Promise<Response | undef
       return Response.json({ status: "ok", data: { records, complete: !incomplete } });
     }
     const id = path.split("/").at(-1) ?? "";
-    return Response.json({ status: "ok", data: record(id, { line: LINE }) });
+    return Response.json({
+      status: "ok",
+      data: record(id, { line: LINE, length: shifted ? 31 : 30 }),
+    });
   }
   return undefined;
 }
@@ -100,6 +104,7 @@ afterEach(() => {
   loki = "ok";
   prometheus = "ok";
   incomplete = false;
+  shifted = false;
   vi.unstubAllGlobals();
 });
 
@@ -293,4 +298,12 @@ test("another tenant's page starts with nothing asked, and reads no record of th
   await expect.element(screen.getByText(/launch on Tuesday/)).not.toBeInTheDocument();
   // No read was made for globex of a record that acme's page asked for.
   expect(lines().filter((read) => read.tenant === "globex")).toEqual([]);
+});
+
+test("a line that isn't the length its record said is not shown", async () => {
+  shifted = true;
+  const { screen } = await open("/t/acme/logs");
+  await screen.getByRole("button", { name: "Show this line" }).click();
+  await expect.element(screen.getByText("The read returned no such record.")).toBeVisible();
+  await expect.element(screen.getByText(/launch on Tuesday/)).not.toBeInTheDocument();
 });

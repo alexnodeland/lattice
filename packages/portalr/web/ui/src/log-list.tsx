@@ -52,8 +52,14 @@ const time = (ns: number) => {
   return `${at.toLocaleTimeString(undefined, { hourCycle: "h23" })}.${String(at.getMilliseconds()).padStart(3, "0")}`;
 };
 
-/** A record's day and time: `10/15/2026, 09:12:03.512`. */
-const moment = (ns: number) => `${new Date(ns / 1_000_000).toLocaleDateString()}, ${time(ns)}`;
+/** A record's day and time, and the reader's zone: `10/15/2026, 09:12:03.512 PDT`. */
+const moment = (ns: number) => {
+  const at = new Date(ns / 1_000_000);
+  const zone = new Intl.DateTimeFormat(undefined, { timeZoneName: "short" })
+    .formatToParts(at)
+    .find((part) => part.type === "timeZoneName")?.value;
+  return `${at.toLocaleDateString()}, ${time(ns)}${zone ? ` ${zone}` : ""}`;
+};
 
 /** Log records as a list and a record's details; `complete` says whether these are all. */
 export function LogList({
@@ -240,8 +246,7 @@ function Details({ record, reveal }: { record: LogRecord; reveal: LineReveal }) 
       </section>
       {record.withheld.length > 0 && (
         <p className="break-words text-muted text-xs">
-          Labels kept out, as they aren't known to be safe to show:{" "}
-          <span className="font-mono">{record.withheld.join(", ")}</span>
+          Labels kept out: <span className="font-mono">{record.withheld.join(", ")}</span>
         </p>
       )}
       <section aria-labelledby={`${base}-labels`} className="flex flex-col gap-1">

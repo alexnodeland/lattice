@@ -10,7 +10,7 @@ export type Reading =
   | PortalrApi.components["schemas"]["Unavailable"]
   | PortalrApi.components["schemas"]["Unconfigured"];
 
-const TIME = { key: "time", name: "Time" } as const;
+const TIME = { key: "time", name: "Time (UTC)" } as const;
 
 type Point = Points["data"][number];
 

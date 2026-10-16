@@ -119,7 +119,13 @@ function Body({ shown }: { shown: Required<Shown> }) {
     },
     line(id) {
       const read = reads[asked.indexOf(id)]?.data;
-      return read?.status === "ok" ? (read.data?.line ?? null) : null;
+      const listed =
+        logs.data.status === "ok" ? logs.data.data.records.find((r) => r.id === id) : undefined;
+      // An id names a record by its place among a stream's at one instant, which can shift: a line
+      // that isn't the length the list said is not this record's, and is not shown.
+      return read?.status === "ok" && read.data?.length === listed?.length
+        ? (read.data?.line ?? null)
+        : null;
     },
     ask: (id) => setAsked((before) => (before.includes(id) ? before : [...before, id])),
   };

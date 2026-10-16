@@ -304,6 +304,7 @@ class AccessMachine(RuleBasedStateMachine):
 
     @invariant()
     def the_tenant_has_an_owner_grant(self) -> None:
+        # The weak form: that a member holds owner, through a group or not, fails until #253.
         assert any((g.role, g.on) == ("owner", TENANT) for g in self.model.grants)
 
     @invariant()

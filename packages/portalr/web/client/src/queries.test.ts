@@ -516,3 +516,15 @@ test("a logs read names its window, its limit and its filter; a line is its own 
   expect(line.queryKey).toEqual(keys.portalr.logLine("acme", id));
   expect(keys.portalr.logLine("acme", id)).not.toEqual(keys.portalr.logLine("globex", id));
 });
+
+test("the deployment's audit log is read a page back at a time, naming no tenant", async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  await client.fetchInfiniteQuery(queries.grantr.deploymentAudit("ops"));
+  const first = seen.at(-1);
+  expect(first?.url.pathname).toBe("/grantr/v1/audit");
+  expect(first?.url.searchParams.get("last")).toBe(String(AUDIT_PAGE));
+  expect(first?.url.searchParams.has("before_seq")).toBe(false);
+  expect(first?.headers.get("x-tenant")).toBeNull();
+  // One operator's cache entry is not another's.
+  expect(keys.grantr.deploymentAudit("ops")).not.toEqual(keys.grantr.deploymentAudit("ops2"));
+});

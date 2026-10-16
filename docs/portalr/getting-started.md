@@ -22,23 +22,32 @@ portalr reads and writes through the packages you already run, so it needs their
 
 ## Install
 
-portalr needs Python 3.12 or newer. Its wheel carries the two built UIs, which Vite builds into it, so install the wheel, not the source: a release attaches it, and you can build it from a checkout of [lattice](https://github.com/alexnodeland/lattice).
-
-=== "A release's wheel"
-
-    ```bash
-    gh release download portalr-v<version> --repo alexnodeland/lattice --pattern '*.whl'
-    uv add ./portalr-<version>-py3-none-any.whl
-    ```
+portalr needs Python 3.12 or newer. Its wheel carries the two built UIs, which Vite builds into it, so install the wheel, not the source. portalr and the two packages it requires, `grantr[fastapi]` and `lattice-core-ai`, are not on PyPI, so install all three from [lattice](https://github.com/alexnodeland/lattice).
 
 === "From a checkout"
 
+    From a checkout of lattice, with [Bun](https://bun.sh) and [moon](https://moonrepo.dev) installed (`proto use` installs them):
+
     ```bash
-    git clone https://github.com/alexnodeland/lattice && cd lattice
+    git clone https://github.com/alexnodeland/lattice
+    cd lattice
     bun install --frozen-lockfile
-    moon run portalr:build    # builds both UIs, then the wheel, into packages/portalr/dist/
-    uv add packages/portalr/dist/portalr-*.whl
+    moon run portalr:build        # both UIs, then the wheel: packages/portalr/dist/portalr-<version>-py3-none-any.whl
     ```
+
+    Then, in your application's project, with `LATTICE` set to the checkout's path:
+
+    ```bash
+    uv add "lattice-core-ai @ $LATTICE/packages/lattice-core" \
+           "grantr[fastapi] @ $LATTICE/packages/grantr" \
+           $LATTICE/packages/portalr/dist/portalr-*.whl
+    ```
+
+    The built wheel holds `portalr/static/app/` and `portalr/static/admin/`; `moon run portalr:build` and that install were run to write this page.
+
+=== "Once released"
+
+    Once released, a release of lattice attaches portalr's wheel, and grantr's and lattice-core's, to its GitHub release; download them from the repository's [releases](https://github.com/alexnodeland/lattice/releases) and `uv add` the three wheels. portalr has no release yet.
 
 !!! warning "A git install has no UIs"
 
@@ -94,24 +103,55 @@ app.include_router(
 )
 ```
 
-`resolve_actor` here trusts an `x-user` header, which is fine for a test and for nothing else. A real one verifies the access token Supabase Auth issued, from the `Authorization: Bearer` header, or from the `access_token` query on a WebSocket, which a browser opens without headers:
+`resolve_actor` here trusts an `x-user` header, which is fine for a test and for nothing else. A real one verifies the access token Supabase Auth issued, from the `Authorization: Bearer` header, or from the `access_token` query on a WebSocket, which a browser opens without headers. Supabase now signs tokens with an asymmetric key (ES256 by default) that it publishes at a JWKS URL, so you verify against that, as [stackr's template](../stackr/guides/template.md) does in its `auth.py` (its `AUTH_JWKS_URL` setting):
 
-```python title="Illustrative"
+```python
+import asyncio
+import os
+
 import jwt
 
-async def resolve_actor(connection: HTTPConnection) -> Caller:
-    scheme, _, token = connection.headers.get("authorization", "").partition(" ")
-    if scheme.lower() != "bearer" or not token:
-        raise Unauthorized("sign in")
-    try:
-        claims = jwt.decode(
-            token, SUPABASE_JWT_SECRET, algorithms=["HS256"],
-            audience="authenticated", options={"require": ["exp", "sub", "aud"]},
-        )
-    except jwt.InvalidTokenError as error:
-        raise Unauthorized("the access token is not valid") from error
-    return Caller(User(id=claims["sub"]))
+
+def token_resolver(keys: jwt.PyJWKClient, audience: str = "authenticated"):
+    """A ``resolve_actor`` that verifies Supabase's access tokens against its published keys."""
+
+    async def resolve_actor(connection: HTTPConnection) -> Caller:
+        scheme, _, token = connection.headers.get("authorization", "").partition(" ")
+        if scheme.lower() != "bearer" and connection.scope["type"] == "websocket":
+            token, scheme = connection.query_params.get("access_token", ""), "bearer"
+        if scheme.lower() != "bearer" or not token:
+            raise Unauthorized("sign in")
+        try:
+            # Fetching a key may call out to Supabase, so it runs in a thread.
+            key = await asyncio.to_thread(keys.get_signing_key_from_jwt, token)
+            claims = jwt.decode(
+                token,
+                key,
+                algorithms=["ES256"],
+                audience=audience,
+                options={"require": ["exp", "sub", "aud"]},
+            )
+        except jwt.PyJWTError as error:
+            raise Unauthorized("the access token is not valid") from error
+        return Caller(User(id=claims["sub"]))
+
+    return resolve_actor
+
+
+# In your application: the key set, fetched once and cached.
+keys = jwt.PyJWKClient(
+    os.environ.get("AUTH_JWKS_URL", "https://project.supabase.co/auth/v1/.well-known/jwks.json"),
+    cache_keys=True,
+    lifespan=300,
+)
+resolve_actor = token_resolver(keys)
 ```
+
+A test of this guide signs a token with a generated key and checks that this function accepts it, and refuses an expired one, one for another audience, and one signed by another key.
+
+!!! note "A project on the legacy JWT secret"
+
+    A Supabase project that still signs with the legacy shared secret issues HS256 tokens: verify those with `algorithms=["HS256"]` and the secret (`SUPABASE_JWT_SECRET`, in the project's settings) in place of `key`. The template accepts either or both. Prefer moving the project to asymmetric keys.
 
 A person's grantr id is their Supabase user's `sub`, an opaque UUID. grantr holds no names, so admin shows people by that id ([issue #169](https://github.com/alexnodeland/lattice/issues/169) is the plan to show emails).
 
@@ -135,7 +175,7 @@ The UIs read this first. It is public, so it holds no secret:
 |---|---|
 | `supabase.url` | Your Supabase project's URL, or a path on your own origin that leads to it |
 | `supabase.key` | Its publishable key |
-| `surfaces` | Where you mounted each router: `artifactr` (default `/artifactr/v1`), `reflexr` (`/reflexr/v1`), `grantr` (`""`: its paths carry `/grantr/v1` themselves) and `portalr` (`/portalr/v1`). Pass `Surfaces(...)` in `Site` if you mounted them elsewhere |
+| `surfaces` | Where you mounted each router: `artifactr` (default `/artifactr/v1`), `reflexr` (default `/reflexr/v1`), `grantr` (default `""`: its paths carry `/grantr/v1` themselves) and `portalr` (default `/portalr/v1`). Pass `Surfaces(...)` in `Site` if you mounted them elsewhere |
 | `readers` | Which tools are configured, by name: `tempo`, `loki`, `prometheus`, `langfuse`, `litellm` and `grafana`, each true or false |
 
 ```python

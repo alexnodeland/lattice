@@ -31,11 +31,11 @@ Every surface in lattice is an API, a WebSocket or an MCP server, so an applicat
 
 ## Documentation
 
-portalr's documentation is its section of lattice's site, at **<https://lattice.alexnodeland.com/portalr/>**, built from [`docs/portalr/`](https://github.com/alexnodeland/lattice/tree/main/docs/portalr). 
+portalr's documentation is its section of lattice's site, at **<https://lattice.alexnodeland.com/portalr/>**, built from [`docs/portalr/`](https://github.com/alexnodeland/lattice/tree/main/docs/portalr).
 
 - [Getting started](https://lattice.alexnodeland.com/portalr/getting-started/): install the wheel, mount the router, sign in.
 - [Guides](https://lattice.alexnodeland.com/portalr/guides/app/): the app, the admin UI, an operator's runbook, and what portalr keeps from view.
-- [Architecture decision records](https://lattice.alexnodeland.com/portalr/adr/): why each part will be the way it is.
+- [Architecture decision records](https://lattice.alexnodeland.com/portalr/adr/): why each part is the way it is.
 - [RFCs](https://lattice.alexnodeland.com/portalr/rfcs/): the v0.1 plan, its phases and what each waits on.
 - [lattice RFC-0002](https://lattice.alexnodeland.com/rfcs/0002-portalr-the-portal/): the design portalr builds.
 - [Brand](https://lattice.alexnodeland.com/portalr/assets/brand/): the marks and their colours.

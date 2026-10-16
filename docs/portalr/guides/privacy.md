@@ -4,7 +4,7 @@ portalr shows people what an agent did, and an agent's work holds what people an
 
 ## Every read is the tenant's own
 
-Each read of a tenant's data names the tenant, grantr checks that the caller may read it, and every query is built with the tenant first. portalr's `readers` module is the only code that talks to Tempo, Loki, Prometheus, Langfuse and LiteLLM. A test builds every query each reader can send and fails if one lacks its tenant, and the acceptance tests read two tenants' data as each and find neither sees the other's ([ADR-0006](../adr/0006-shared-stores-every-read-filtered.md)). A record or trace that mentions another tenant is not shown: the tenant is decided over every item before anything else is done with it.
+Each read of a tenant's data names the tenant, grantr checks that the caller may read it, and every query is built with the tenant first. portalr's `readers` module is the only code that talks to Tempo, Loki, Prometheus, Langfuse and LiteLLM. A test (`packages/portalr/tests/readers/test_queries.py`) builds every query each reader can send and fails if one lacks its tenant, and the acceptance tests read two tenants' data as each and find neither sees the other's ([ADR-0006](../adr/0006-shared-stores-every-read-filtered.md)). A record or trace that mentions another tenant is not shown: the tenant is decided over every item before anything else is done with it.
 
 ## Traces
 
@@ -36,7 +36,15 @@ A rule's run shows its status, attempts, retries and the **code** of why it last
 
 ## Emails and names
 
-grantr holds no names, and portalr shows people by their grantr id, which with Supabase is the account's UUID. Emails appear in two places only: the box where you type an invitation or an owner, and Supabase Auth. portalr sends an email to Supabase to invite or find someone, and does not log it, echo it in an answer, store it, or keep it in the browser once it is used. **Showing people by email** in Members and Share (a server read of GoTrue's admin API) is planned ([issue #169](https://github.com/alexnodeland/lattice/issues/169)) and is not built, so until it lands the UIs show ids.
+grantr holds no names, and portalr shows people by their grantr id, which with Supabase is the account's UUID. The claim to rely on is a narrow one: **portalr never logs, stores, echoes or returns an email it is given for an invitation or an owner.** It sends it to Supabase Auth to invite or find someone, answers with the user id, and the page forgets it once it is used.
+
+Emails do exist elsewhere, and portalr does not hide them:
+
+- The sign-in page has an Email field, and Supabase Auth holds the accounts.
+- The browser's session, in `localStorage` under `portalr`, holds the signed-in user's `email`, and the access token carries an `email` claim, which is sent with every request. Your `resolve_actor` and any logging of requests are yours.
+- People type emails, and anything else, into messages, comments, prompts and log lines. What those hold is the content the other sections withhold by default.
+
+**Showing people by email** in Members and Share (a server read of GoTrue's admin API) is planned ([issue #169](https://github.com/alexnodeland/lattice/issues/169)) and is not built, so until it lands the UIs show ids.
 
 ## The browser
 

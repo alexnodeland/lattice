@@ -37,7 +37,7 @@ Every surface in lattice is an API, a WebSocket or an MCP server, so an applicat
 - **Every read filtered by tenant,** in one module, over the stack's shared stores ([ADR-0006](adr/0006-shared-stores-every-read-filtered.md)).
 - **Permissions asked, never guessed.** The UIs ask grantr what the user may do, and the server checks each command again.
 
-[RFC-0001](rfcs/0001-v0.1-implementation-plan.md#phases) built these in eight phases after the foundation, and says what each waited on in grantr and the other packages.
+[RFC-0001](rfcs/0001-v0.1-implementation-plan.md#phases) builds these in eight phases after the foundation, and says what each waited on in grantr and the other packages. Phases 1 to 6 and 8 are done; phase 7, the template and acceptance, is not.
 
 ## Where to go next
 
@@ -49,7 +49,7 @@ Every surface in lattice is an API, a WebSocket or an MCP server, so an applicat
 | Run the deployment | [An operator's runbook](guides/operators.md) |
 | Know what is withheld and why | [What portalr keeps from view](guides/privacy.md) |
 | See how it is built | The [architecture](architecture.md) |
-| Understand why each part will be the way it is | The [decision records](adr/README.md) |
+| Understand why each part is the way it is | The [decision records](adr/README.md) |
 | See the plan, its phases and what each waits on | [RFC-0001](rfcs/0001-v0.1-implementation-plan.md), and the [RFCs](rfcs/README.md) |
 | Read the design portalr builds | [lattice RFC-0002](../rfcs/0002-portalr-the-portal.md) |
 | Use the marks and their colours | The [brand page](assets/brand/README.md) |

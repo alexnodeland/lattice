@@ -6,7 +6,7 @@ Every area shows only where grantr allows its read, and every read names its ten
 
 !!! info "What each area needs"
 
-    `portalr:read_telemetry` for Feedback, Traces, Logs and Health; `portalr:read_spend` for Usage; for Access and Audit, the grantr actions their changes take (the page says which); `reflexr:read_runs` and each action's grant for Runs. A tenant's `owner` and `admin` hold all of them.
+    `portalr:read_telemetry` for Feedback, Traces, Logs and Health; `portalr:read_spend` for Usage; for Access, the grantr action each part's changes take (`grantr:add_member`, `grantr:manage_groups`, `grantr:issue_key`, `grantr:define_role`, `grantr:grant`); `grantr:read_audit` for Audit; `reflexr:read_runs` for Runs, and `reflexr:retry_run`, `reflexr:skip_run` and `reflexr:cancel_run` for its buttons. grantr's built-in `owner` role holds every one of these, and `admin` holds them too: it lacks only deleting the tenant. A test of these guides holds that against grantr's catalog.
 
 ## Home
 
@@ -24,7 +24,7 @@ Where grantr's model is used: each part shows where its read is allowed, as a ta
 | Roles | The built-in roles, and custom ones you define from the catalog's actions |
 | Grants | Who holds which role on the tenant, a workspace or an item, given and revoked |
 
-People are shown by their grantr id, which is their Supabase user's UUID. An invitation is not logged with the email, and the admin UI keeps no list of emails.
+People are shown by their grantr id, which is their Supabase user's UUID. portalr does not log, return or keep the email you invite; the admin UI keeps no list of emails ([Privacy](privacy.md#emails-and-names) says what it does not cover).
 
 ## Audit
 
@@ -56,7 +56,7 @@ A workspace's rule runs, live from reflexr's stream, for the workspace you pick.
 
 Each run offers **Retry**, **Skip** or **Cancel** as its state allows and grantr allows in that workspace. Each asks first, says what it does and what it can't undo, and takes an optional reason for Skip and Cancel. A command is sent once: the dialog can't be dismissed while it is under way, and a lost connection resends it under the same id, so the server carries it out once. A run lists **what people did to it**: who, when, why, from the log's own events. Only a run's reason code is shown, never its error message, which may hold what a person or a model said ([ADR-0032](../adr/0032-runs-in-admin.md)).
 
-If reflexr can't be reached, the page says so after ten seconds, and keeps trying.
+If reflexr can't be reached, the page says so after ten seconds of connecting (`PATIENCE` in `web/admin/src/runs.ts`), and keeps trying.
 
 ## What is not built
 

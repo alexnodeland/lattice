@@ -1,9 +1,15 @@
 """CI runs the scenarios of each UI one after another (lattice ADR-0002, portalr issue 172).
 
-Each UI's scenarios bring a compose stack up and down, and Chromium on Linux drops its requests
-with ``net::ERR_NETWORK_CHANGED`` when the host's network interfaces change, which a stack coming
-down in the next project does. So a task that starts a stack runs in one project at a time, and
-this holds every such task to ``ONE_AT_A_TIME``, so that a new one can't be added without it.
+Issue 172, a scenario's first sign-in sometimes never rendering its Email field, was diagnosed as
+``net::ERR_NETWORK_CHANGED``: each UI's scenarios bring a compose stack up and down, Chromium on
+Linux drops its requests when the host's network interfaces change, and the other project's stack
+coming down changes them. PR 168 made CI run such a task in one project at a time, which is
+``ONE_AT_A_TIME``. This test is a regression guard and not the fix: it holds every moon task that
+runs ``scripts/bdd`` to that set.
+
+Its limit: it matches the literal ``scripts/bdd`` (``STACK_SCRIPTS``). A task that starts a stack
+another way, such as stackr's ``scripts/smoke``, or something under ``examples/``, is not caught,
+and must be added to ``STACK_SCRIPTS`` as it is added.
 """
 
 import runpy

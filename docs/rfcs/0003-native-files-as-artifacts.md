@@ -314,7 +314,7 @@ Level 1 is the pilot's. Level 2 is the desktop phase's. Level 3 only attaches th
 | Question | Where the answer is |
 |---|---|
 | Who | The revision's actor, as artifactr records it (`user`, `agent`, `external_agent`, `system`), never the name in the file |
-| How | `provenance.source`: `upload`, `save`, `commands` or `sync` |
+| How | `provenance.source`: `upload`, `save`, `commands` or `sync`. A check-in under the person's lease is a `save`, though its bytes arrive by upload; `upload` is a new file, or a replacement made without the lease |
 | Made from | The previous version, and `provenance.base`, the digest of the content it was made from |
 | What | `content.sha256` |
 | By which build | `provenance.app`, `app_version` and `build` |
@@ -462,6 +462,7 @@ Recommended, for the maintainer to decide.
 - **The agent's handle** in comments, and whether a comment can address a particular agent when an application has several.
 - **The bridge's identity** (D14): committing as the person keeps attribution, but needs a person's token on a device, which grantr's service principals don't cover yet.
 - **The name** of the package. `artifactr-files`, with `wordcraft` as an adapter module, avoids the apps' trademark; `artifactr-craft` was the working name.
+- **The brand licence.** WordCraft's `NOTICE` puts the ArtCraft name and logos under `LICENSE-brand.txt`, which the spike didn't read. Whether serving the browser build as released is allowed, or its marks must be removed, is unverified, and affects D15.
 - **Upstream's supply chain.** Checksums only, no signatures, SBOM or attestations, and a very young organization whose repositories gathered tens of thousands of stars in days. Whether to wait for signed releases before phase 4, or build the CLI from a pinned source commit in CI instead of taking the binary.
 - **Quotas.** A per-workspace or per-tenant limit on blob bytes, beyond the per-blob limit, and where it is enforced.
 - **Text extraction** for search across native files, which the text blob makes possible and nothing here builds.

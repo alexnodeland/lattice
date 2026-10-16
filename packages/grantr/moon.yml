@@ -1,4 +1,4 @@
-# grantr: identity and access for artifactr and reflexr. It imports neither, nor any sibling but
+# grantr: identity and access for artifactr, reflexr and portalr. It imports neither, nor any sibling but
 # lattice-core.
 language: 'python'
 layer: 'library'

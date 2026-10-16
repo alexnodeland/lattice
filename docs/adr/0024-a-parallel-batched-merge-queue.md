@@ -1,6 +1,6 @@
 # ADR-0024: A parallel, batched merge queue
 
-**Status:** Accepted
+**Status:** Accepted, amended 2026-10-16 (see Amendment)
 **Date:** 2026-10-16
 **Deciders:** Alex Nodeland
 
@@ -23,3 +23,11 @@ ADR-0016's queue was serial and in place, because the ruleset required branches 
 - Harder: a pull request's green `CI` no longer proves its own head on the latest `main`; the batch's does. A failure in a batch can be a neighbour's, and a failed batch costs reruns.
 - Rollback: the ruleset and `.mergify.yml` change independently, and reverting only `.mergify.yml` is safe with the up-to-date requirement on or off. To go back to the serial queue, revert the pull request that made this change, and turn the ruleset's "Require branches to be up to date before merging" back on; the second is the user's. The `Title` workflow's skip is harmless without batches.
 - Not tested before it merged: only Mergify can make a batch. The first two pull requests queued after it are its test.
+
+## Amendment (2026-10-16)
+
+The maximum was to be raised after a week of queue statistics; it is raised now, on the evidence in hand. The CI flake that made a failed batch likely is fixed (#256), and under the strict policy the fourth pull request in a queue still waited 45 to 75 minutes.
+
+- **Three checks at once** (`max_parallel_checks: 3`) and **batches of one to five** (`batch_size: {min: 1, max: 5}`). The minimum and `batch_max_wait_time` (thirty seconds) are unchanged.
+- **`batch_max_failure_resolution_attempts` stays 3.** A failed batch is split into `max_parallel_checks` parts, so five pull requests split in three parts (two, two, one) leave a failing part of at most two, and one more split isolates the culprit: ceil(log3(5)) = 2 splits, within the cap of 3.
+- The Decision above is otherwise unchanged; the numbers it gives for checks and batch size are superseded by these.

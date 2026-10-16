@@ -35,6 +35,11 @@ def query(*arguments: str) -> dict[str, Any]:
     return json.loads(done.stdout)
 
 
+def batches(task: str, targets: list[str]) -> list[list[str]]:
+    """How a task's targets run: each alone if it is in ONE_AT_A_TIME, otherwise all at once."""
+    return [[target] for target in targets] if task in ONE_AT_A_TIME else [targets]
+
+
 def main() -> int:
     """Run the task in the affected projects and their dependents; nothing if there are none."""
     task = sys.argv[1]
@@ -58,8 +63,10 @@ def main() -> int:
         return 0
     sys.stdout.write(f"affected: {' '.join(targets)}\n")
     sys.stdout.flush()
-    batches = [[target] for target in targets] if task in ONE_AT_A_TIME else [targets]
-    codes = [subprocess.run(["moon", "run", *batch], check=False).returncode for batch in batches]
+    codes = [
+        subprocess.run(["moon", "run", *batch], check=False).returncode
+        for batch in batches(task, targets)
+    ]
     return max(codes)
 
 

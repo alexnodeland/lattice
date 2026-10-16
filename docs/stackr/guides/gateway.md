@@ -69,6 +69,20 @@ It reaches the gateway, and prints its address, where the stack publishes it: at
 
 It is safe to run again: the team is looked up by its id and kept as it is, and a key is created only for a new alias, since a key's secret can't be read back after it is shown. To change an existing team's budget, use the admin UI or the proxy's `/team/update` API. Tenant names are lowercase letters, digits and dashes.
 
+### The portal's key
+
+portalr's admin shows each tenant's spend and budget from the gateway. That is a read of a team's info, the list of teams, and the daily activity of a team and of the workspaces' tags, which the master key opens, and so does everything else; the master key must never reach an application. `make portal-key` makes the application a key of its own:
+
+```bash
+make portal-key      # prints PORTAL_LITELLM_KEY=sk-...
+```
+
+It creates a user, `portalr`, whose role is the proxy's view-only admin, and a key, `portal-spend-read`, that belongs to it and is limited with `allowed_routes` to `/team/info`, `/team/list`, `/team/daily/activity` and `/tag/daily/activity`. Both parts are needed: a key with no user can't read a team it is not in, and the role alone would let the key read other keys and the spend logs. On the pinned LiteLLM (v1.103.0) the key reads those four routes and is refused every other one: chat, creating or updating keys and teams, and reading keys or spend logs. Like a tenant's key, it is shown once and the command is safe to run again. Put it in the application's `.env` as `PORTAL_LITELLM_KEY`, which holds secrets: keep the file mode 0600.
+
+The key's value can't be read back. If it is lost, `make portal-key ARGS=--rotate` deletes `portal-spend-read` by its alias and makes another; the lost one stops working. The two steps are not atomic: between them, and until the new key is in the application's `.env` and the application restarted, the portal's spend reads fail with `unavailable`. Without `--rotate`, when the key exists, the command says so, and with `--quiet` it exits with status 3 and prints nothing, so a script can't take an empty value for a key.
+
+**A leaked key reads every tenant's spend and teams.** The routes are not scoped to one tenant: `/team/list` returns every team, and `/team/info` any team's, with their budgets, members and spend. It can't call a model or change anything, but treat it like any secret: keep it out of images and logs, and rotate it when it may have leaked.
+
 ## Calling it
 
 It is the OpenAI API, so any OpenAI SDK works, with `base_url` set to the gateway and the tenant's key as the API key:

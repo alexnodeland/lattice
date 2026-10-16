@@ -23,7 +23,7 @@ The host recipe ([RFC-0004](../rfcs/0004-hosting-recipes.md), [ADR-0026](../adr/
 - **Only Caddy publishes on a public interface,** on 80 and 443, at `STACKR_EDGE_BIND`, with certificates from Let's Encrypt. It is `127.0.0.1` unless chosen, as `STACKR_BIND` is, so a run of the recipe on a workstation opens nothing; `bootstrap` sets `0.0.0.0` on the host users reach. The overlay removes the ports nothing outside the host needs, and pins Grafana's, Langfuse's, LiteLLM's and MinIO's to `127.0.0.1`, for SSH tunnels, whatever `STACKR_BIND` says. `make smoke` checks both.
 - **Docker 28.0 or later.** Before it, machines on the same link could reach ports published on `127.0.0.1`; `bootstrap` refuses an older one.
 - **ufw lets in only SSH, HTTP and HTTPS,** SSH on the ports `sshd` listens on. Docker writes its own iptables rules for published ports, which ufw doesn't see, so a port published on every interface would bypass it: that is why nothing but Caddy may bind one.
-- **GoTrue's admin API isn't public.** Caddy refuses `/admin/*` at `auth.<domain>`; the application's admin commands reach GoTrue on the stack's network, at `AUTH_ADMIN_URL`.
+- **GoTrue's admin API isn't public.** Caddy refuses `/admin/*` at `auth.<domain>`, and on the application's host (`app.<domain>`, where the portal signs in) passes only `/auth/v1/token`, `/auth/v1/user` and `/auth/v1/logout` to GoTrue, answering 404 to anything else under `/auth/v1` and to any path with an `admin` segment; the application's admin commands reach GoTrue on the stack's network, at `AUTH_ADMIN_URL`.
 - **No local Supabase,** whose keys are well known: the host runs on the `postgres` adapter, with GoTrue and generated secrets.
 
 ### Local Supabase

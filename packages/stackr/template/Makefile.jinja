@@ -14,7 +14,7 @@ unexport DOCKER_DEFAULT_PLATFORM
 # Local commands read .env, when there is one.
 ENV_FILE := $(if $(wildcard .env),--env-file .env)
 
-.PHONY: help install env fmt lint typecheck test check serve {% if evals %}evals evals-langfuse {% endif %}{% if access == 'grantr' %}tenant operator migrate-tenants db-roles access-matrix {% endif %}up down logs clean
+.PHONY: help install env fmt lint typecheck test check serve {% if evals %}evals evals-langfuse {% endif %}{% if access == 'grantr' %}tenant operator migrate-tenants db-roles access-matrix {% endif %}{% if use_portal %}portal-ui {% endif %}up down logs clean
 
 help: ## List the available commands
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -72,6 +72,12 @@ db-roles: ## Create the role DATABASE_URL connects as, with DATABASE_ADMIN_URL, 
 
 access-matrix: ## Write every role against every action to access.md, to review and commit
 	$(UV) run python -m {{ package_name }}.access > access.md
+{%- endif %}
+
+{%- if use_portal %}
+
+portal-ui: ## Build portalr's UIs, from the commit uv.lock pins it at, into .portal-ui; then set PORTAL_UI_DIR to it
+	scripts/build-portal-ui.sh .portal-ui
 {%- endif %}
 
 up: ## Build and start the application in the app profile, beside stackr's stack

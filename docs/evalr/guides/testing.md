@@ -59,7 +59,7 @@ async def test_the_judge_reads_the_rating() -> None:
     assert verdict.value == Helpfulness(rating=4, resolved=True, reason="It refunded the charge")
 ```
 
-To test training, give GEPA a scripted reflection model too (`DummyLM([{"new_instruction": "..."}] * 20)`), and a small budget such as `Gepa(reflection_lm=..., max_metric_calls=12)`. evalr's [GEPA tests](https://github.com/alexnodeland/lattice/blob/main/packages/evalr/tests/dspy/scripted.py) script a judge whose answers depend on its instructions, so a test can show training makes it agree with people.
+To test training, give GEPA a scripted reflection model too, answering in JSON as GEPA's instruction proposer asks (`DummyLM([{"new_instruction": "..."}] * 20, adapter=JSONAdapter())`, with `JSONAdapter` from `dspy.adapters`), and a small budget such as `Gepa(reflection_lm=..., max_metric_calls=12)`. evalr's [GEPA tests](https://github.com/alexnodeland/lattice/blob/main/packages/evalr/tests/dspy/scripted.py) script a judge whose answers depend on its instructions, so a test can show training makes it agree with people.
 
 ## Decision evaluators without TypeSafe's API
 

@@ -1178,7 +1178,7 @@ test = [
 requires-dist = [
     { name = "annotated-types", specifier = ">=0.6.0" },
     { name = "datasets", marker = "extra == 'hf'", specifier = ">=5.0" },
-    { name = "dspy", marker = "extra == 'dspy'", specifier = ">=3.4" },
+    { name = "dspy", marker = "extra == 'dspy'", specifier = ">=3.4.1" },
     { name = "evalr", extras = ["dspy", "jev", "langfuse", "hf"], marker = "extra == 'all'" },
     { name = "huggingface-hub", marker = "extra == 'hf'", specifier = ">=0.25.0" },
     { name = "langfuse", marker = "extra == 'langfuse'", specifier = ">=4.15" },

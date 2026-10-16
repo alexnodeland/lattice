@@ -164,7 +164,7 @@ test("asking for others is another page, and each ask is a read of its own", asy
   // what was asked before is read again, since each ask is recorded and nothing is kept.
   await screen.getByRole("button", { name: "Get links" }).click();
   await screen.getByRole("textbox", { name: "Trace id" }).fill("t1");
-  await screen.getByRole("combobox", { name: "Tenant" }).selectOptions("No tenant");
+  await choose(screen, "Tenant", "No tenant");
   await screen.getByRole("button", { name: "Get links" }).click();
   await expect.poll(() => asks.length).toBe(3);
   expect(Object.fromEntries(asks[2] ?? [])).toEqual({ trace_id: "t1" });

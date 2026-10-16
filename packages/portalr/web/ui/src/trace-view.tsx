@@ -26,6 +26,7 @@ import { type KeyboardEvent, type ReactNode, useId, useMemo, useRef, useState } 
 import { Button } from "./button";
 import { cn } from "./cn";
 import { Icon } from "./icon";
+import { Num } from "./num";
 import { StatusBadge } from "./status-badge";
 
 /** What each kind of span is called, and the mark beside it. */
@@ -299,8 +300,8 @@ export function TraceView({ outline, reveal }: { outline: Outline; reveal: Revea
                     )}
                   </div>
                   <Bar row={row} total={outline.duration} />
-                  <span aria-hidden="true" className="text-right text-muted text-xs tabular-nums">
-                    {duration(row.duration)}
+                  <span aria-hidden="true" className="text-right text-muted text-xs">
+                    <Num>{duration(row.duration)}</Num>
                   </span>
                 </div>
               );

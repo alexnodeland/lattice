@@ -51,6 +51,8 @@
   --ansi-5: light-dark(#a3187a, #f08ad0);
   --ansi-6: light-dark(#0b6a7a, #5fd3e6);
   --ansi-7: light-dark(#5e5470, #f1eef6);
+  /* How wide a page's content is, at most: a wide screen centres it, and has no dead gutter at its right. */
+  --page-width: 75rem;
   /*
    * A table row's least height: every row of every table is this tall, whatever its cells hold,
    * so a row with a small action matches one without. Admin's compact density changes this alone.

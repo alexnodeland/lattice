@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { Button } from "./button";
 import { Lockup, type Ui } from "./marks";
 import { TextField } from "./text-field";
+import { TYPE } from "./type";
 
 interface Attempt {
   readonly email: string;
@@ -32,7 +33,7 @@ export function SignIn({
     <main id="main" className="grid min-h-dvh place-items-center bg-paper px-4 py-10 text-fg">
       <div className="flex w-full max-w-sm flex-col gap-2 rounded-xl border border-line bg-surface p-8">
         <Lockup ui={ui} className="mb-6 h-9" />
-        <h1 className="font-bold text-2xl tracking-tight">Sign in</h1>
+        <h1 className={TYPE.page}>Sign in</h1>
         <p className="mb-4 text-muted text-sm">with your email and password</p>
         <form className="flex flex-col gap-4" action={signIn}>
           <TextField

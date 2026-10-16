@@ -60,6 +60,7 @@ export { Markdown } from "./markdown";
 export { Lockup, Mark, type Ui } from "./marks";
 export { Menu, type MenuItem } from "./menu";
 export { ago, Moment } from "./moment";
+export { Num } from "./num";
 export { PageHeader } from "./page-header";
 export { Plain } from "./plain";
 export { Row, RowLink, Rows } from "./rows";

@@ -110,6 +110,44 @@ jobs:
       - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
       - run: uv run --no-project python scripts/affected.py image
 
+  # GoTrue's image follows the Supabase CLI's (stackr ADR-0026, issue 132). It reads the CLI's own
+  # pins from GitHub, so it runs only when the pull request's own diff changes versions.env,
+  # compose.yaml or the AWS stack's locals.tf, none other, a change to stackr or a library included.
+  # The job always starts, to compare the diff, and counts as passed when it has nothing to check.
+  # It fails, after one retry, when it can't read the CLI's pins, and a Renovate bump of GoTrue
+  # ahead of the CLI fails it: bump the CLI first. CI runs on pull requests alone, and a push to
+  # main is a merged pull request that ran it, so nothing runs it there.
+  gotrue:
+    name: GoTrue follows the Supabase CLI
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: changed
+        shell: bash
+        run: |
+          # The diff on its own line, so a git failure fails the step: nothing is skipped by it.
+          files=$(git diff --name-only "$MOON_BASE...$MOON_HEAD")
+          echo "Comparing $MOON_HEAD with $MOON_BASE: $(grep -c . <<<"$files" || true) files changed"
+          if grep -qxF -e packages/stackr/versions.env -e packages/stackr/compose.yaml \
+            -e packages/stackr/deploy/aws/modules/stack/locals.tf <<<"$files"; then
+            echo "changed=true" >>"$GITHUB_OUTPUT"
+            echo "the check's files changed"
+          else
+            echo "none of versions.env, compose.yaml or locals.tf changed: nothing to check"
+          fi
+      - if: steps.changed.outputs.changed == 'true'
+        uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
+      - if: steps.changed.outputs.changed == 'true'
+        run: uv sync --locked --all-packages --all-groups
+      - if: steps.changed.outputs.changed == 'true'
+        run: moon run stackr:gotrue
+
   # stackr's thin images (RFC-0004, stackr ADR-0035), built natively for each architecture the AWS
   # recipe runs on, Fargate's arm64 and the runners' amd64, and each checked as it starts.
   # Nothing is published: the release does that.
@@ -543,7 +581,7 @@ jobs:
   ci:
     name: CI
     if: always()
-    needs: [check, tests, images, thin-images, release-images, release-images-publish, acceptance, aws, aws-tier2-affected, aws-tier2, template, smoke, dependency-review, osv]
+    needs: [check, tests, images, thin-images, gotrue, release-images, release-images-publish, acceptance, aws, aws-tier2-affected, aws-tier2, template, smoke, dependency-review, osv]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions: {}

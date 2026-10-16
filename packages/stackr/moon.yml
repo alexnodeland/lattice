@@ -110,6 +110,22 @@ tasks:
     options:
       cache: false
 
+  # Online, so not one of check's dependencies: `make validate` stays offline. CI runs it, on its
+  # own test of the pull request's diff, when versions.env, compose.yaml or locals.tf change
+  # (stackr ADR-0026); these inputs are what moon hashes, and the script and PyYAML are among them.
+  gotrue:
+    description: "Check that GoTrue's image is the one the pinned Supabase CLI runs, reading the CLI's pins from GitHub"
+    command: 'uv run scripts/check-config gotrue'
+    inputs:
+      - 'scripts/check-config'
+      - 'versions.env'
+      - 'compose.yaml'
+      - 'deploy/aws/modules/stack/locals.tf'
+      - '/pyproject.toml'
+      - '/uv.lock'
+    options:
+      cache: false
+
   check:
     description: "Run the project's checks, as CI does"
     command: 'noop'

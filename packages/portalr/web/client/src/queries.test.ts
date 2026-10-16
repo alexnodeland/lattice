@@ -3,7 +3,7 @@ import type { Server } from "bun";
 import { afterAll, beforeAll, expect, test } from "vitest";
 import type * as v1 from "./generated/artifactr.v1";
 import type * as reflexrV1 from "./generated/reflexr.v1";
-import { AUDIT_PAGE, createQueries, keys, Refused, stale } from "./queries";
+import { AUDIT_PAGE, createQueries, keys, LOGS_LIMIT, Refused, stale } from "./queries";
 import { createApi, readConfig } from "./rest";
 
 interface Seen {
@@ -143,6 +143,17 @@ test("every read has its own path", async () => {
       "/portalr/v1/traces",
     ],
     [queries.portalr.trace("acme", "c029eec9"), `/portalr/v1/traces/${"0".repeat(24)}c029eec9`],
+    [
+      queries.portalr.logs("acme", {
+        start: "2026-10-14T00:00:00Z",
+        end: "2026-10-14T01:00:00Z",
+      }),
+      "/portalr/v1/logs",
+    ],
+    [
+      queries.portalr.logLine("acme", `1-${"a".repeat(16)}`),
+      `/portalr/v1/logs/1-${"a".repeat(16)}`,
+    ],
     [queries.portalr.links("ops", "t1"), "/portalr/v1/deployment/links"],
     [queries.grantr.grants("acme", "ws_1"), "/grantr/v1/tenants/acme/grants"],
     [queries.grantr.restrictions("acme", "ws_1"), "/grantr/v1/tenants/acme/restrictions"],
@@ -473,4 +484,35 @@ test("a traces read names its window, its limit and its filter; a trace read, wh
   expect([asked.retry, asked.refetchOnWindowFocus]).toEqual([false, false]);
   expect(queries.portalr.trace("acme", whole).retry).toBeUndefined();
   expect(queries.portalr.trace("acme", whole).gcTime).toBeGreaterThan(0);
+});
+
+test("a logs read names its window, its limit and its filter; a line is its own read, kept no longer than it is shown", async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const window = { start: "2026-10-14T00:00:00Z", end: "2026-10-14T01:00:00Z" };
+  await client.fetchQuery(queries.portalr.logs("acme", window, { thread: "thr_1", run: "run_2" }));
+  const list = seen.at(-1);
+  expect(Object.fromEntries(list?.url.searchParams ?? [])).toEqual({
+    start: window.start,
+    end: window.end,
+    limit: String(LOGS_LIMIT),
+    thread: "thr_1",
+    run: "run_2",
+  });
+  expect(list?.headers.get("x-tenant")).toBe("acme");
+  await client.fetchQuery(queries.portalr.logs("acme", window));
+  expect(seen.at(-1)?.url.searchParams.has("thread")).toBe(false);
+  expect(keys.portalr.logs("acme", window, { run: "run_2" })).not.toEqual(
+    keys.portalr.logs("acme", window, {}),
+  );
+  // A line is read once, for one record, and let go as soon as nothing shows it.
+  const id = `5-${"b".repeat(16)}`;
+  const line = queries.portalr.logLine("acme", id);
+  expect([line.gcTime, line.staleTime, line.retry, line.refetchOnWindowFocus]).toEqual([
+    0,
+    0,
+    false,
+    false,
+  ]);
+  expect(line.queryKey).toEqual(keys.portalr.logLine("acme", id));
+  expect(keys.portalr.logLine("acme", id)).not.toEqual(keys.portalr.logLine("globex", id));
 });

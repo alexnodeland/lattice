@@ -39,6 +39,18 @@
   --chart-1: light-dark(#0096d6, #1a9fd6);
   --chart-2: light-dark(#e4007c, #ea3a8c);
   --chart-3: light-dark(#6b2fa0, #9b6ad2);
+  /*
+   * A log line's eight ANSI colours, as text: 4.5:1 or more on the paper and the surface in each
+   * scheme, which a token test holds. A line may only choose among these (portalr ADR-0031).
+   */
+  --ansi-0: light-dark(#1c1d26, #bdb2cc);
+  --ansi-1: light-dark(#b3261e, #ff8a80);
+  --ansi-2: light-dark(#1b6e3c, #7fd99a);
+  --ansi-3: light-dark(#7a5b00, #e8c25a);
+  --ansi-4: light-dark(#1c5fb8, #82b1ff);
+  --ansi-5: light-dark(#a3187a, #f08ad0);
+  --ansi-6: light-dark(#0b6a7a, #5fd3e6);
+  --ansi-7: light-dark(#5e5470, #f1eef6);
   /* Behind a drawer or a dialog. */
   --scrim: light-dark(rgb(28 29 38 / 45%), rgb(0 0 0 / 60%));
 }

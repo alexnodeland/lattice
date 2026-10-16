@@ -6,6 +6,7 @@ can read another's series; Grafana keeps its direct data source (lattice RFC-000
 names the tenant itself too, so a reader pointed at Prometheus directly is still filtered.
 """
 
+import math
 from dataclasses import dataclass, field
 from typing import Annotated, Final, Literal
 
@@ -111,9 +112,11 @@ class Prometheus:
         )
         if answer is None or isinstance(answer, Unavailable):
             return answer or Unavailable(reason="prometheus has no query API at that address")
+        # A quantile of nothing is NaN, which is no value: its point is a gap, not a number.
         points = [
             Point(time=time, value=float(value))
             for series in answer.data.result
             for time, value in series.values
+            if math.isfinite(float(value))
         ]
         return Ok(data=points)

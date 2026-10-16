@@ -337,9 +337,13 @@
         "title": "Links",
         "type": "object"
       },
-      "LogLine": {
-        "description": "One log record.",
+      "LogRecord": {
+        "description": "One log record, without its line unless that was asked for.",
         "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
           "labels": {
             "additionalProperties": {
               "type": "string"
@@ -347,21 +351,111 @@
             "title": "Labels",
             "type": "object"
           },
+          "length": {
+            "title": "Length",
+            "type": "integer"
+          },
+          "level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level"
+          },
           "line": {
-            "title": "Line",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line"
+          },
+          "run": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run"
+          },
+          "service": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service"
+          },
+          "thread": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thread"
           },
           "time_ns": {
             "title": "Time Ns",
             "type": "integer"
+          },
+          "withheld": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Withheld",
+            "type": "array"
           }
         },
         "required": [
+          "id",
           "time_ns",
-          "line",
+          "level",
+          "service",
+          "thread",
+          "run",
+          "length",
           "labels"
         ],
-        "title": "LogLine",
+        "title": "LogRecord",
+        "type": "object"
+      },
+      "Logs": {
+        "description": "A window's records, newest first, and whether they are all of them.",
+        "properties": {
+          "complete": {
+            "title": "Complete",
+            "type": "boolean"
+          },
+          "records": {
+            "items": {
+              "$ref": "#/components/schemas/LogRecord"
+            },
+            "title": "Records",
+            "type": "array"
+          }
+        },
+        "required": [
+          "records",
+          "complete"
+        ],
+        "title": "Logs",
         "type": "object"
       },
       "Mean": {
@@ -437,6 +531,24 @@
         "title": "Ok[Feedback]",
         "type": "object"
       },
+      "Ok_Logs_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Logs"
+          },
+          "status": {
+            "const": "ok",
+            "default": "ok",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "Ok[Logs]",
+        "type": "object"
+      },
       "Ok_Scores_": {
         "properties": {
           "data": {
@@ -453,6 +565,31 @@
           "data"
         ],
         "title": "Ok[Scores]",
+        "type": "object"
+      },
+      "Ok_Union_LogRecord__NoneType__": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LogRecord"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "const": "ok",
+            "default": "ok",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "Ok[Union[LogRecord, NoneType]]",
         "type": "object"
       },
       "Ok_Union_Spend__NoneType__": {
@@ -521,28 +658,6 @@
           "data"
         ],
         "title": "Ok[Usage]",
-        "type": "object"
-      },
-      "Ok_list_LogLine__": {
-        "properties": {
-          "data": {
-            "items": {
-              "$ref": "#/components/schemas/LogLine"
-            },
-            "title": "Data",
-            "type": "array"
-          },
-          "status": {
-            "const": "ok",
-            "default": "ok",
-            "title": "Status",
-            "type": "string"
-          }
-        },
-        "required": [
-          "data"
-        ],
-        "title": "Ok[list[LogLine]]",
         "type": "object"
       },
       "Ok_list_Point__": {
@@ -1700,7 +1815,7 @@
     },
     "/portalr/v1/logs": {
       "get": {
-        "description": "The tenant's logs, a thread's or a run's, from Loki.",
+        "description": "The tenant's logs, a thread's or a run's, from Loki, without their lines.\n\nA record has its time, level, service, thread, run and its line's length, and the labels\nknown to be safe; the line and the other labels are withheld, and named.",
         "operationId": "logs_portalr_v1_logs_get",
         "parameters": [
           {
@@ -1791,7 +1906,7 @@
                 "schema": {
                   "discriminator": {
                     "mapping": {
-                      "ok": "#/components/schemas/Ok_list_LogLine__",
+                      "ok": "#/components/schemas/Ok_Logs_",
                       "unavailable": "#/components/schemas/Unavailable",
                       "unconfigured": "#/components/schemas/Unconfigured"
                     },
@@ -1799,7 +1914,7 @@
                   },
                   "oneOf": [
                     {
-                      "$ref": "#/components/schemas/Ok_list_LogLine__"
+                      "$ref": "#/components/schemas/Ok_Logs_"
                     },
                     {
                       "$ref": "#/components/schemas/Unavailable"
@@ -1856,6 +1971,111 @@
           }
         },
         "summary": "Logs"
+      }
+    },
+    "/portalr/v1/logs/{record_id}": {
+      "get": {
+        "description": "One of the tenant's log records by its id, with its line: asked for, and not kept.",
+        "operationId": "log_line_portalr_v1_logs__record_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "title": "Record Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/TenantId"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "discriminator": {
+                    "mapping": {
+                      "ok": "#/components/schemas/Ok_Union_LogRecord__NoneType__",
+                      "unavailable": "#/components/schemas/Unavailable",
+                      "unconfigured": "#/components/schemas/Unconfigured"
+                    },
+                    "propertyName": "status"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Ok_Union_LogRecord__NoneType__"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Unavailable"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Unconfigured"
+                    }
+                  ],
+                  "title": "Response Log Line Portalr V1 Logs  Record Id  Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          }
+        },
+        "summary": "Log Line"
       }
     },
     "/portalr/v1/metrics": {

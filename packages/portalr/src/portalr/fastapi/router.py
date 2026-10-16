@@ -33,8 +33,9 @@ from portalr.invites import Invite, InviteFailed
 from portalr.readers import (
     Feedback,
     FeedbackQuery,
-    LogLine,
     LogQuery,
+    LogRecord,
+    Logs,
     MetricQuery,
     Ok,
     Point,
@@ -230,12 +231,26 @@ def portalr_router(
             response.headers["Cache-Control"] = "no-store"
         return await readers.tempo.trace(tenant, trace_id, reveal=span if content else None)
 
-    @api.get("/v1/logs", response_model=reading(list[LogLine]))
+    @api.get("/v1/logs", response_model=reading(Logs))
     async def logs(
         query: Annotated[LogQuery, Query()], tenant: Tenant = telemetry
-    ) -> Ok[list[LogLine]] | Unavailable | Unconfigured:
-        """The tenant's logs, a thread's or a run's, from Loki."""
+    ) -> Ok[Logs] | Unavailable | Unconfigured:
+        """The tenant's logs, a thread's or a run's, from Loki, without their lines.
+
+        A record has its time, level, service, thread, run and its line's length, and the labels
+        known to be safe; the line and the other labels are withheld, and named.
+        """
         return await readers.loki.logs(tenant, query) if readers.loki else Unconfigured()
+
+    @api.get("/v1/logs/{record_id}", response_model=reading(LogRecord | None))
+    async def log_line(
+        record_id: str, response: Response, tenant: Tenant = telemetry
+    ) -> Ok[LogRecord | None] | Unavailable | Unconfigured:
+        """One of the tenant's log records by its id, with its line: asked for, and not kept."""
+        if not readers.loki:
+            return Unconfigured()
+        response.headers["Cache-Control"] = "no-store"
+        return await readers.loki.record(tenant, record_id)
 
     @api.get("/v1/metrics", response_model=reading(list[Point]))
     async def metrics(

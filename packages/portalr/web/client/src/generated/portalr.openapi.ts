@@ -117,9 +117,32 @@ export interface paths {
         };
         /**
          * Logs
-         * @description The tenant's logs, a thread's or a run's, from Loki.
+         * @description The tenant's logs, a thread's or a run's, from Loki, without their lines.
+         *
+         *     A record has its time, level, service, thread, run and its line's length, and the labels
+         *     known to be safe; the line and the other labels are withheld, and named.
          */
         get: operations["logs_portalr_v1_logs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portalr/v1/logs/{record_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Log Line
+         * @description One of the tenant's log records by its id, with its line: asked for, and not kept.
+         */
+        get: operations["log_line_portalr_v1_logs__record_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -389,18 +412,45 @@ export interface components {
             langfuse_trace?: string | null;
         };
         /**
-         * LogLine
-         * @description One log record.
+         * LogRecord
+         * @description One log record, without its line unless that was asked for.
          */
-        LogLine: {
+        LogRecord: {
+            /** Id */
+            id: string;
             /** Labels */
             labels: {
                 [key: string]: string;
             };
+            /** Length */
+            length: number;
+            /** Level */
+            level: string | null;
             /** Line */
-            line: string;
+            line?: string | null;
+            /** Run */
+            run: string | null;
+            /** Service */
+            service: string | null;
+            /** Thread */
+            thread: string | null;
             /** Time Ns */
             time_ns: number;
+            /**
+             * Withheld
+             * @default []
+             */
+            withheld: string[];
+        };
+        /**
+         * Logs
+         * @description A window's records, newest first, and whether they are all of them.
+         */
+        Logs: {
+            /** Complete */
+            complete: boolean;
+            /** Records */
+            records: components["schemas"]["LogRecord"][];
         };
         /**
          * Mean
@@ -436,9 +486,27 @@ export interface components {
              */
             status: "ok";
         };
+        /** Ok[Logs] */
+        Ok_Logs_: {
+            data: components["schemas"]["Logs"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "ok";
+        };
         /** Ok[Scores] */
         Ok_Scores_: {
             data: components["schemas"]["Scores"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "ok";
+        };
+        /** Ok[Union[LogRecord, NoneType]] */
+        Ok_Union_LogRecord__NoneType__: {
+            data: components["schemas"]["LogRecord"] | null;
             /**
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
@@ -466,16 +534,6 @@ export interface components {
         /** Ok[Usage] */
         Ok_Usage_: {
             data: components["schemas"]["Usage"];
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            status: "ok";
-        };
-        /** Ok[list[LogLine]] */
-        Ok_list_LogLine__: {
-            /** Data */
-            data: components["schemas"]["LogLine"][];
             /**
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
@@ -1095,7 +1153,67 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Ok_list_LogLine__"] | components["schemas"]["Unavailable"] | components["schemas"]["Unconfigured"];
+                    "application/json": components["schemas"]["Ok_Logs_"] | components["schemas"]["Unavailable"] | components["schemas"]["Unconfigured"];
+                };
+            };
+            /** @description Refused */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+        };
+    };
+    log_line_portalr_v1_logs__record_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Tenant"?: components["schemas"]["TenantId"] | null;
+            };
+            path: {
+                record_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Ok_Union_LogRecord__NoneType__"] | components["schemas"]["Unavailable"] | components["schemas"]["Unconfigured"];
                 };
             };
             /** @description Refused */

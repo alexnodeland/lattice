@@ -1,6 +1,6 @@
 # ADR-0007: An append-only audit log
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0033](0033-a-tenants-creation-in-the-deployments-log.md)
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 

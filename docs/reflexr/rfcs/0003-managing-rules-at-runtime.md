@@ -411,7 +411,7 @@ Each phase is a series of small pull requests to `main`.
 [issue-57]: https://github.com/alexnodeland/reflexr/issues/57
 [issue-72]: https://github.com/alexnodeland/reflexr/issues/72
 [s-37]: https://github.com/alexnodeland/stackr/issues/37
-[s-rfc-0002]: https://github.com/alexnodeland/stackr/blob/main/docs/rfcs/0002-the-combined-system.md
+[s-rfc-0002]: ../../stackr/rfcs/0002-the-combined-system.md
 
 ## Amendment (2026-10-12): `allow` is folded into `authorize`
 

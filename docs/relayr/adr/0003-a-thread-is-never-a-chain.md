@@ -29,5 +29,5 @@ A thread is a conversation that can run for weeks. A chain is one causal story i
 - Easier: a chain's measures mean the same for bridged events as for any other source.
 - Harder: nothing measures a thread together with the chains it started; that is an open question for evalr.
 
-[r-adr-0024]: https://github.com/alexnodeland/reflexr/blob/main/docs/adr/0024-causal-chains-and-operator-actions.md
-[rfc-0002]: https://github.com/alexnodeland/stackr/blob/main/docs/rfcs/0002-the-combined-system.md#d3-chains-and-threads
+[r-adr-0024]: ../../reflexr/adr/0024-causal-chains-and-operator-actions.md
+[rfc-0002]: ../../stackr/rfcs/0002-the-combined-system.md#d3-chains-and-threads

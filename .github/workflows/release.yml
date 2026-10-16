@@ -1,12 +1,31 @@
 # Releases (stackr's RFC-0003, Releases and versioning). release-please keeps one release pull
 # request open for the packages with unreleased changes. Merging it tags each one
-# <package>-v<version>, updates its CHANGELOG.md and creates its GitHub release. Each released
-# package that ships a wheel is then built alone, as it is published, and its wheel and sdist are
-# attached to its release with a build-provenance attestation. Publishing to PyPI is a later job
-# here. A stackr release also publishes the AWS recipe's thin images to GHCR (stackr ADR-0035):
-# built natively for amd64 and arm64 from the release's commit, then pushed as one multi-arch
-# image per version and attested, by the one job that may write packages; the images' references
-# are then added to the release's notes. CI runs the same scripts, against a registry of its own.
+# <package>-v<version>, updates its CHANGELOG.md and creates its GitHub release. A plan job then
+# decides what to build (scripts/release_plan.py, tested): each released package that ships a
+# wheel is built alone, as it is published, and its wheel and sdist are attached to its release
+# with a build-provenance attestation, and are published to PyPI once the repository turns that on.
+# A stackr release also publishes the AWS recipe's thin images to GHCR (stackr ADR-0035): built
+# natively for amd64 and arm64 from the release's commit, then pushed as one multi-arch image per
+# version and attested, by the one job that may write packages; the images' references are then
+# added to the release's notes. CI runs the same scripts, against a registry of its own.
+#
+# A release is built from the commit it was tagged at, and attested as built there: actions/attest
+# records the workflow's own commit, so when release-please tags a commit other than this run's
+# (a release created on a later push than the one that merged its pull request) the plan refuses
+# before anything is built, and says how to run the workflow again on the tag (#206).
+#
+# PyPI (ADR-0023): a release run never publishes. It attests and attaches the wheels, and lists, in
+# its summary, the dispatches that publish them: one `gh workflow run release.yml --ref <tag>
+# -f tag=<tag> -f mode=publish` for each package, in dependency order. Each dispatch publishes
+# that package through trusted publishing, in a job gated by the `pypi` environment, whose required
+# reviewers are the approval (so: one approval a package, one at a time), and only where the
+# repository variable PYPI_PUBLISH is `true`. A dispatch fails unless PyPI serves the packages of
+# this repository that the package requires. The workflow can also be run by hand and by default
+# it WRITES NOTHING: mode `rehearse` builds and checks, on a branch (every wheel at its head) or on
+# a tag (that release, again): it attaches nothing to a release, attests nothing, pushes no image,
+# rewrites no release notes and publishes nothing (the run keeps the built files as artifacts).
+# Mode `publish`, on a tag, attaches, attests and pushes as a release run does, for that tag alone,
+# and publishes it.
 #
 # release-please acts as lattice's GitHub App, with a token minted for each run and narrowed to
 # what it needs, so that its pull request's CI and Title checks run, which they never do for the
@@ -18,22 +37,35 @@ name: Release
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "A release to build again, such as portalr-v0.1.0: run on that tag. Empty to rehearse at the branch's head."
+        required: false
+        default: ""
+      mode:
+        description: "rehearse (build and check; publish nothing), or publish (a tag's release, to PyPI)"
+        required: false
+        default: rehearse
+        type: choice
+        options: [rehearse, publish]
 
 permissions: {}
 
 concurrency:
-  group: release
+  group: release-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   release-please:
     name: Release pull request
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions: {}
     outputs:
-      packages: ${{ steps.wheels.outputs.packages }}
-      releases: ${{ toJSON(steps.release.outputs) }}
+      released: ${{ steps.release.outputs.paths_released || '[]' }}
+      releases: ${{ steps.keep.outputs.releases }}
     steps:
       - id: app
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
@@ -48,34 +80,109 @@ jobs:
           token: ${{ steps.app.outputs.token }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
-      # Every released package needs a full commit sha in the outputs, which the jobs below check
-      # out: a checkout given no ref uses this push's commit, which they must not build from. So
-      # this fails the workflow without one. The release exists by now, so running the workflow
-      # again finds it made, builds nothing, and leaves a tagged release with no wheels: they
-      # would then be built by hand from the tag.
-      # RELEASES holds every output, each release's notes too, and an environment variable on
-      # Linux is capped near 128 KB: past that this step can't start, and the workflow fails.
-      - name: Require a commit for every released package
+      # Only what the plan reads of release-please's outputs: each release's tag and commit. The
+      # outputs hold every release's notes too, which the jobs after this one must not carry.
+      # RELEASES holds all of them, and an environment variable on Linux is capped near 128 KB:
+      # past that this step can't start, and the workflow fails.
+      - id: keep
         env:
           RELEASES: ${{ toJSON(steps.release.outputs) }}
-          RELEASED: ${{ steps.release.outputs.paths_released || '[]' }}
         run: |
-          jq --exit-status --argjson paths "$RELEASED" \
-            '. as $outputs | [$paths[] | ($outputs[. + "--sha"] // "") | test("^[0-9a-f]{40}$")] | all' \
-            <<<"$RELEASES" >/dev/null ||
-            { echo "release-please gave a released package no commit: $RELEASED" >&2; exit 1; }
-      # The released packages that ship a wheel: all of them but stackr.
-      - id: wheels
-        env:
-          RELEASED: ${{ steps.release.outputs.paths_released || '[]' }}
-        run: echo "packages=$(jq --compact-output 'map(select(. != "packages/stackr"))' <<<"$RELEASED")" >> "$GITHUB_OUTPUT"
+          releases=$(jq --compact-output \
+            'with_entries(select(.key | test("--(tag_name|sha)$")))' <<<"$RELEASES")
+          echo "releases=$releases" >>"$GITHUB_OUTPUT"
 
-  build:
-    name: Build (${{ matrix.path }})
+  # What to build, from where, and whether to publish, for this run (scripts/release_plan.py): a
+  # release-please release, a release built again on its tag, or a rehearsal. It refuses a release
+  # whose tagged commit is not this run's, a tag whose version is not its pyproject's, and a
+  # released package without a full commit.
+  plan:
+    name: Plan
     needs: release-please
-    if: needs.release-please.outputs.packages != '[]'
+    if: ${{ !cancelled() && contains(fromJSON('["success", "skipped"]'), needs.release-please.result) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      packages: ${{ steps.plan.outputs.packages }}
+      ordered: ${{ steps.plan.outputs.ordered }}
+      releases: ${{ steps.plan.outputs.releases }}
+      stackr: ${{ steps.plan.outputs.stackr }}
+      write: ${{ steps.plan.outputs.write }}
+      publish: ${{ steps.plan.outputs.publish }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          SHA: ${{ github.sha }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+          INPUT_MODE: ${{ inputs.mode }}
+          PATHS_RELEASED: ${{ needs.release-please.outputs.released }}
+          RELEASES: ${{ needs.release-please.outputs.releases }}
+          PYPI_PUBLISH: ${{ vars.PYPI_PUBLISH }}
+        run: python3 scripts/release_plan.py
+
+  # Builds and checks each wheel, and writes nothing: its permissions are read-only, so a
+  # rehearsal, which never reaches the jobs below, cannot write whatever else changes. It uploads
+  # the files to the run (not to a release) for the jobs after it.
+  build:
+    name: Build (${{ matrix.package.path }})
+    needs: plan
+    if: needs.plan.outputs.packages != '[]'
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJSON(needs.plan.outputs.packages) }}
+    steps:
+      # The commit the release was tagged at. The plan has refused any run whose commit is not
+      # this workflow's own, so the attestation, which names the workflow's commit, names this one
+      # too (#206). The toolchain action and portalr's check_wheel.py below come from it as well.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ fromJSON(needs.plan.outputs.releases)[format('{0}--sha', matrix.package.path)] }}
+          persist-credentials: false
+      - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
+        with:
+          cache: false # a publishing job restores no cache
+      # portalr's wheel carries its two UIs, which Vite builds into its source first.
+      - name: Build portalr's UIs
+        if: matrix.package.path == 'packages/portalr'
+        run: |
+          bun install --frozen-lockfile
+          moon run app:build admin:build
+      - name: Build the package alone, as it is published
+        working-directory: ${{ matrix.package.path }}
+        run: uv build --no-sources --out-dir dist
+      - name: Check portalr's wheel carries its UIs
+        if: matrix.package.path == 'packages/portalr'
+        working-directory: ${{ matrix.package.path }}
+        run: uv run --no-project python scripts/check_wheel.py
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist-${{ matrix.package.slug }}
+          path: ${{ matrix.package.path }}/dist/*
+          retention-days: 7
+          if-no-files-found: error
+          overwrite: true
+
+  # Attests each wheel and sdist, and attaches them to their release: only in a run that writes
+  # (a release, or mode publish on a tag). The files are the build job's, byte for byte.
+  attach:
+    name: Attest and attach (${{ matrix.package.path }})
+    needs: [plan, build]
+    if: ${{ !cancelled() && needs.build.result == 'success' && needs.plan.outputs.write == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       attestations: write
       contents: write
@@ -83,49 +190,127 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        path: ${{ fromJSON(needs.release-please.outputs.packages) }}
+        package: ${{ fromJSON(needs.plan.outputs.packages) }}
     env:
-      TAG: ${{ fromJSON(needs.release-please.outputs.releases)[format('{0}--tag_name', matrix.path)] }}
+      TAG: ${{ fromJSON(needs.plan.outputs.releases)[format('{0}--tag_name', matrix.package.path)] }}
     steps:
-      # The commit release-please tagged for this package, not the push that ran the workflow: they
-      # differ when release-please creates the release on a later push than the one that merged its
-      # pull request. The toolchain action and portalr's check_wheel.py below come from that
-      # commit too. The attestation names the workflow's own commit, the push: see #206.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ fromJSON(needs.release-please.outputs.releases)[format('{0}--sha', matrix.path)] }}
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist-${{ matrix.package.slug }}
+          path: dist
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: dist/*
+      - name: Attach the wheel and sdist to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: scripts/attach-assets "$TAG" dist/*
+
+  # What PyPI would be given, checked before anyone is asked to approve it, and in a rehearsal all
+  # there is to a publish: the files are well formed (twine), carry the attestations the attach
+  # job made, and are named and versioned as their packages say; PyPI's own copy of any of them is
+  # the same file; and the order they would be published in.
+  pypi-check:
+    name: PyPI, checked
+    needs: [plan, build, attach]
+    # Where the run writes, the files were attached and attested first: a cancelled attach is not that.
+    if: ${{ !cancelled() && needs.build.result == 'success' && (needs.plan.outputs.write != 'true' && needs.attach.result != 'failure' || needs.attach.result == 'success') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      attestations: read
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
           persist-credentials: false
       - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
         with:
           cache: false # a publishing job restores no cache
-      # portalr's wheel carries its two UIs, which Vite builds into its source first.
-      - name: Build portalr's UIs
-        if: matrix.path == 'packages/portalr'
-        run: |
-          bun install --frozen-lockfile
-          moon run app:build admin:build
-      - name: Build the package alone, as it is published
-        working-directory: ${{ matrix.path }}
-        run: uv build --no-sources --out-dir dist
-      - name: Check portalr's wheel carries its UIs
-        if: matrix.path == 'packages/portalr'
-        working-directory: ${{ matrix.path }}
-        run: uv run --no-project python scripts/check_wheel.py
-      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          subject-path: ${{ matrix.path }}/dist/*
-      - name: Attach the wheel and sdist to the release
-        working-directory: ${{ matrix.path }}
+          pattern: dist-*
+          path: dist
+          merge-multiple: true
+      # twine's dependencies are those of the day this was written, not the day it runs.
+      - name: The files are well formed
+        run: uvx --exclude-newer 2026-10-01 --from twine==6.2.0 twine check --strict dist/*
+      - name: The files carry the attestations the build made
+        if: needs.plan.outputs.write == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "$TAG" dist/*
+        run: scripts/verify-attestation dist/*
+      - name: The order, and what PyPI has
+        env:
+          PUBLISH: ${{ needs.plan.outputs.publish }}
+          ORDERED: ${{ needs.plan.outputs.ordered }}
+        run: |
+          if [[ $PUBLISH == true ]]; then
+            echo "This run publishes these, one at a time, each after the ones before it:"
+          else
+            echo "This run publishes nothing. A release run with PYPI_PUBLISH set would, in this order:"
+          fi
+          jq --raw-output 'to_entries[] | "  \(.key + 1). \(.value.name) \(.value.version) (stage \(.value.stage))"' <<<"$ORDERED"
+          python3 scripts/pypi.py report dist
+
+  # Publishes the wheels, one package at a time, in the order their requirements need: a matrix
+  # that runs one leg at once, in plan order, and stops at the first failure (fail-fast), so a
+  # later package never goes out after an earlier one failed. Each leg also checks that PyPI serves
+  # every package before it in this release, before it publishes its own. The `pypi` environment's
+  # required reviewers approve each leg. The environment should allow deployments from tags only
+  # (`*-v*`), and only maintainers may create such tags: see ADR-0023.
+  pypi-publish:
+    name: PyPI, ${{ matrix.package.name }}
+    needs: [plan, pypi-check]
+    if: ${{ !cancelled() && needs.pypi-check.result == 'success' && needs.plan.outputs.publish == 'true' && needs.plan.outputs.ordered != '[]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: pypi
+    permissions:
+      attestations: read
+      contents: read
+      id-token: write
+    strategy:
+      max-parallel: 1
+      fail-fast: true
+      matrix:
+        package: ${{ fromJSON(needs.plan.outputs.ordered) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist-${{ matrix.package.slug }}
+          path: dist
+      - name: The files are the attested ones
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/verify-attestation dist/*
+      - name: PyPI serves the packages of this repository that this one requires
+        env:
+          REQUIRES: ${{ join(matrix.package.requires, ' ') }}
+        run: |
+          read -ra requires <<<"$REQUIRES"
+          python3 scripts/pypi.py require "${requires[@]}"
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          packages-dir: dist
+          skip-existing: true
+      # The next package requires this one: it is published once PyPI serves these files.
+      - name: Wait until PyPI serves the files
+        run: python3 scripts/pypi.py wait dist
 
   # Each architecture's thin images, on a runner of that architecture, from the release's commit,
   # saved as OCI archives: nothing here can write to the registry.
   image:
     name: Images (${{ matrix.arch }})
-    needs: release-please
-    if: fromJSON(needs.release-please.outputs.releases)['packages/stackr--release_created'] == 'true'
+    needs: plan
+    if: needs.plan.outputs.stackr == 'true'
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     permissions:
@@ -140,11 +325,11 @@ jobs:
     outputs:
       images: ${{ steps.images.outputs.images }}
     env:
-      VERSION: ${{ fromJSON(needs.release-please.outputs.releases)['packages/stackr--version'] }}
+      STACKR_TAG: ${{ fromJSON(needs.plan.outputs.releases)['packages/stackr--tag_name'] }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ fromJSON(needs.release-please.outputs.releases)['packages/stackr--sha'] }}
+          ref: ${{ fromJSON(needs.plan.outputs.releases)['packages/stackr--sha'] }}
           persist-credentials: false
       - id: images
         run: |
@@ -153,7 +338,7 @@ jobs:
       - name: Build each image as an OCI archive
         env:
           ARCH: ${{ matrix.arch }}
-        run: packages/stackr/deploy/image-archive "$ARCH" "$VERSION" archives
+        run: packages/stackr/deploy/image-archive "$ARCH" "${STACKR_TAG#stackr-v}" archives
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: stackr-images-${{ matrix.arch }}
@@ -167,8 +352,8 @@ jobs:
   # within the archives' seven days publishes the same images again.
   publish-images:
     name: Publish (${{ matrix.image }})
-    needs: [release-please, image]
-    if: fromJSON(needs.release-please.outputs.releases)['packages/stackr--release_created'] == 'true'
+    needs: [plan, image]
+    if: needs.plan.outputs.stackr == 'true' && needs.plan.outputs.write == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
@@ -181,11 +366,11 @@ jobs:
         image: ${{ fromJSON(needs.image.outputs.images) }}
     env:
       REPOSITORY: ghcr.io/alexnodeland/stackr-${{ matrix.image }}
-      VERSION: ${{ fromJSON(needs.release-please.outputs.releases)['packages/stackr--version'] }}
+      STACKR_TAG: ${{ fromJSON(needs.plan.outputs.releases)['packages/stackr--tag_name'] }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ fromJSON(needs.release-please.outputs.releases)['packages/stackr--sha'] }}
+          ref: ${{ fromJSON(needs.plan.outputs.releases)['packages/stackr--sha'] }}
           persist-credentials: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
@@ -201,7 +386,7 @@ jobs:
           ACTOR: ${{ github.actor }}
         run: |
           printf '%s' "$GH_TOKEN" | docker login ghcr.io --username "$ACTOR" --password-stdin
-          reference=$(packages/stackr/deploy/publish-image "$IMAGE" "$VERSION" "$REPOSITORY" archives)
+          reference=$(packages/stackr/deploy/publish-image "$IMAGE" "${STACKR_TAG#stackr-v}" "$REPOSITORY" archives)
           echo "digest=${reference##*@}" >>"$GITHUB_OUTPUT"
           echo "- \`$reference\`" | tee "$IMAGE.md" >>"$GITHUB_STEP_SUMMARY"
       - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
@@ -220,8 +405,8 @@ jobs:
   # a job of its own, which may write the release and nothing in the registry.
   release-notes:
     name: Images in the release's notes
-    needs: [release-please, publish-images]
-    if: fromJSON(needs.release-please.outputs.releases)['packages/stackr--release_created'] == 'true'
+    needs: [plan, publish-images]
+    if: needs.plan.outputs.stackr == 'true' && needs.plan.outputs.write == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -236,7 +421,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          TAG: ${{ fromJSON(needs.release-please.outputs.releases)['packages/stackr--tag_name'] }}
+          TAG: ${{ fromJSON(needs.plan.outputs.releases)['packages/stackr--tag_name'] }}
         run: |
           # The notes as release-please wrote them, without a section this job added before: run
           # again, it replaces its own. Never edited from an empty read.

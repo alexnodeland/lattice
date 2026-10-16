@@ -31,5 +31,5 @@ A rule drafted in a thread is a `rule` artifact: a reflexr `Rule` as JSON, revie
 - Harder: relayr has to notice changes made in reflexr and propose them back.
 - This is phase 5's work, and waits on reflexr's runtime rule management.
 
-[r-rfc-0003]: https://github.com/alexnodeland/reflexr/blob/main/docs/rfcs/0003-managing-rules-at-runtime.md
-[rfc-0002]: https://github.com/alexnodeland/stackr/blob/main/docs/rfcs/0002-the-combined-system.md#d5-where-a-rules-source-of-truth-lives
+[r-rfc-0003]: ../../reflexr/rfcs/0003-managing-rules-at-runtime.md
+[rfc-0002]: ../../stackr/rfcs/0002-the-combined-system.md#d5-where-a-rules-source-of-truth-lives

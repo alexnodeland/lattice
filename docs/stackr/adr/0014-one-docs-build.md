@@ -10,7 +10,7 @@ Amends [ADR-0012](0012-documentation-site.md): where the site is built, and what
 
 ADR-0012 wrote the build's steps three times, in `make docs`, CI's Docs job and `docs.yml`, and ran it in two places: CI's Docs job on every pull request and push, and `docs.yml` on every push to `main`, so each push to `main` built the site twice. `make docs` left out the changelog, so it built a different site from either workflow. And `scripts/docs-reference --check` ran four times: in `make validate`, in `make docs`, and in each workflow.
 
-evalr had the same arrangement, and changed it in [its ADR-0013](https://github.com/alexnodeland/evalr/blob/main/docs/adr/0013-docstrings-in-markdown-and-one-docs-build.md). stackr follows it, so the family's sites are built the same way.
+evalr had the same arrangement, and changed it in [its ADR-0013](../../evalr/adr/0013-docstrings-in-markdown-and-one-docs-build.md). stackr follows it, so the family's sites are built the same way.
 
 ## Decision
 

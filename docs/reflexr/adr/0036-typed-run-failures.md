@@ -6,7 +6,7 @@
 
 ## Context
 
-RFC-0002 wants a guardrail block to fail a run with a `guardrail_blocked` reason, which the rule's retry policy treats as permanent: retrying the same input would be blocked again. The workspace layer must not know about LiteLLM ([ADR-0025](0025-ports-and-adapters.md)), so the mechanism has to be general. artifactr made the same change for its runs ([artifactr ADR-0042](https://github.com/alexnodeland/artifactr/blob/main/docs/adr/0042-typed-run-failures.md)); reflexr's runs are retried, so it adds permanence.
+RFC-0002 wants a guardrail block to fail a run with a `guardrail_blocked` reason, which the rule's retry policy treats as permanent: retrying the same input would be blocked again. The workspace layer must not know about LiteLLM ([ADR-0025](0025-ports-and-adapters.md)), so the mechanism has to be general. artifactr made the same change for its runs ([artifactr ADR-0042](../../artifactr/adr/0042-typed-run-failures.md)); reflexr's runs are retried, so it adds permanence.
 
 ## Decision
 

@@ -8,7 +8,7 @@
 
 Clients retry commands they never heard back about, and agents retry tool calls. [ADR-0044](0044-surfaces.md) sent every command through one handler, `reflexr.workspace.execute`, which raised rejections, and let only REST and the WebSocket deduplicate by `command_id`: the router remembered their results itself, and MCP tools took no `command_id`. An MCP client retrying `give_feedback`, `retry_run` or a refiring `replay_rule` did it twice.
 
-artifactr made the same choice for its surfaces in its [ADR-0048](https://github.com/alexnodeland/artifactr/blob/main/docs/adr/0048-surfaces-over-the-runner.md): one entry point, `Runner.execute(workspace, command, *, command_id) -> CommandResult`, which remembers results in a `CommandResults` port for every surface. This record makes reflexr's the same, superseding three parts of ADR-0044: its first decision's one handler, `reflexr.workspace.execute`; its decision that command ids deduplicate per participant over REST and the WebSocket; and its deliberate difference that command ids are REST's and the WebSocket's.
+artifactr made the same choice for its surfaces in its [ADR-0048](../../artifactr/adr/0048-surfaces-over-the-runner.md): one entry point, `Runner.execute(workspace, command, *, command_id) -> CommandResult`, which remembers results in a `CommandResults` port for every surface. This record makes reflexr's the same, superseding three parts of ADR-0044: its first decision's one handler, `reflexr.workspace.execute`; its decision that command ids deduplicate per participant over REST and the WebSocket; and its deliberate difference that command ids are REST's and the WebSocket's.
 
 ## Decision
 

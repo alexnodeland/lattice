@@ -6,7 +6,7 @@
 
 ## Context
 
-People's judgements of workflows (whether a triage was right, whether a rule should have fired, whether an incident was handled well) are the raw material for evaluation, as they are in artifactr ([artifactr ADR-0028](https://github.com/alexnodeland/artifactr/blob/main/docs/adr/0028-typed-feedback-as-events.md)). They need to be typed, scoped to what they are about, and usable both in reflexr's log and in Langfuse.
+People's judgements of workflows (whether a triage was right, whether a rule should have fired, whether an incident was handled well) are the raw material for evaluation, as they are in artifactr ([artifactr ADR-0028](../../artifactr/adr/0028-typed-feedback-as-events.md)). They need to be typed, scoped to what they are about, and usable both in reflexr's log and in Langfuse.
 
 ## Decision
 

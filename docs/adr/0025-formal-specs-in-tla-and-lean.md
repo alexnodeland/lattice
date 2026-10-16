@@ -21,7 +21,7 @@ The pilot is artifactr's thread claim: [`docs/artifactr/spec/`](../artifactr/spe
 - **A spec is a small-scope claim, not a proof.** Each configuration sets explicit bounds (two or three processes, two or three messages, one fault), and its README says what they mean. A property that holds is reported as holding at those bounds. A property TLC finds violated is a finding: an issue is filed for each real bug, and the fix is its own pull request, which adds the property to a CI configuration.
 - **Drift is caught by names.** Each property is named after the invariant it checks (`I1_...` for I1), and the spec's header table ties it to a test of the package. `scripts/check_spec.py`, which lattice's tests run, fails when a property in the table is undefined, missing from the README, or names a test that doesn't exist; when a configuration checks a property not in the table; or when the package's tests hold an invariant (`test_i3_...`) that no row names, or the spec doesn't say it leaves out. The pull request and ADR templates ask whether a protocol change changed its spec.
 - **CI runs TLC only where it matters.** Each package with a spec has a `spec` task, whose inputs are its spec and its source, and CI's `Specs` job runs it in each affected project ([ADR-0002](0002-ci-runs-every-affected-project-and-its-dependents.md)), at the small bounds, within ten minutes ([ADR-0007](0007-a-timeout-on-every-test-and-every-job.md)). The aggregate `CI` check needs it, as it needs every other job. Nightly runs the `spec` and `spec-deep` tasks of every package, at deeper bounds.
-- **TLC is the official release's `tla2tools.jar`, by exact version, checked by its SHA-256** before every run (`scripts/tlc`). It is 1.7.4: its release notes publish the jar's SHA-1, which the downloaded jar matched before its SHA-256 was recorded. A new version is pinned the same way, after it has been out for two weeks. TLC runs in GitHub Actions; nothing needs installing to work on the rest of lattice.
+- **TLC is the official release's `tla2tools.jar`, by exact version, checked by its SHA-256** before every run (`scripts/tlc`). It is 1.7.4, the latest stable release; 1.8.0 is a prerelease. Its release notes publish the jar's SHA-1, which the downloaded jar matched before its SHA-256 was recorded. A new version is pinned the same way, from a stable release. TLC runs in GitHub Actions; nothing needs installing to work on the rest of lattice.
 
 ## Options considered
 
@@ -70,7 +70,7 @@ A model checker earns its cost where the reviews kept finding bugs: concurrency,
 - Easier: an ADR can cite exactly which property a decision preserves.
 - Harder: a protocol change carries a spec change, and its author needs to read TLA+.
 - Harder: CI depends on a Java runtime and a jar from GitHub's release storage, in one job.
-- Revisit: when a package's pure logic needs a proof, set up Lean in its own record; when TLC 1.8 has been out for two weeks, consider moving to it.
+- Revisit: when a package's pure logic needs a proof, set up Lean in its own record; when TLC 1.8 is a stable release, consider moving to it.
 
 ## Action items
 

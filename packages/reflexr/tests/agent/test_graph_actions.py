@@ -896,3 +896,52 @@ async def test_a_checkpoint_that_no_longer_validates_starts_over(
             {"reflexr.checkpoint.reason": "invalid", "reflexr.checkpoint.error": error}
         ]
     provider.shutdown()
+
+
+STACK = [
+    {"fork_id": "outer", "node_run_id": "a1:n1", "thread_index": 0},  # saved by an `a` build
+    {"fork_id": "inner", "node_run_id": "n2", "thread_index": 1},
+]
+"""A frontier task's fork stack, with an id from before the epoch prefix and a bare one."""
+
+
+async def test_a_checkpoint_with_ids_from_before_the_epoch_resumes(clock: FakeClock) -> None:
+    deps = Flaky()
+    it = await setup(GraphAction(runbook, inputs=service), deps, clock)
+    await it.reactor.evaluate()
+    [pending] = await it.workspace.runs()
+    checkpoint = saved_before_mitigate(task={"fork_stack": STACK})
+    async with it.storage.transaction(ACME) as transaction:
+        await transaction.save_runs([pending.model_copy(update={"checkpoint": checkpoint})])
+    await it.reactor.settle()
+    [done] = await it.workspace.runs()
+    assert done.status == "succeeded"
+    assert deps.ran == ["mitigate", "report"]  # mitigate ran once, diagnose not again
+
+
+async def test_a_cancelled_and_retried_run_restores_new_ids(
+    clock: FakeClock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    restored: list[tuple[int, list[str]]] = []
+    requests = GraphAction._requests
+
+    def recording(action: GraphAction[Any, Any, Any, Any], saved: Any, epoch: int) -> Any:
+        made = requests(action, saved, epoch)
+        restored.append((epoch, [item.node_run_id for r in made for item in r.fork_stack]))
+        return made
+
+    monkeypatch.setattr(GraphAction, "_requests", recording)
+    deps = Flaky(fail_once={"mitigate"})
+    it = await setup(GraphAction(runbook, inputs=service), deps, clock)
+    await it.reactor.evaluate()
+    [pending] = await it.workspace.runs()
+    checkpoint = saved_before_mitigate(task={"fork_stack": STACK})
+    async with it.storage.transaction(ACME) as transaction:
+        await transaction.save_runs([pending.model_copy(update={"checkpoint": checkpoint})])
+    await it.reactor.settle()  # attempt 1 resumes, and mitigate fails
+    await it.workspace.cancel_run(pending.id)
+    await it.workspace.retry_run(pending.id)  # a fresh budget: attempt 1 again
+    await it.reactor.settle()
+    [done] = await it.workspace.runs()
+    assert (done.status, done.attempts, done.epoch) == ("succeeded", 1, 2)
+    assert restored == [(1, ["e1:a1:n1", "e1:n2"]), (2, ["e2:a1:n1", "e2:n2"])]

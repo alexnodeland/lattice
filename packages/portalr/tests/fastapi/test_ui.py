@@ -66,6 +66,7 @@ async def test_config_names_supabase_the_surfaces_and_the_tools(client: httpx.As
         "readers": dict.fromkeys(
             ("tempo", "loki", "prometheus", "langfuse", "litellm", "grafana"), True
         ),
+        "people": False,
     }
 
 

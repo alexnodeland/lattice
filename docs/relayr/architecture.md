@@ -35,6 +35,7 @@ graph LR
 | `relayr.vikunja` | `VikunjaTracker` and `vikunja()`, the port over Vikunja's API. The `vikunja` extra | `relayr.trackers`, httpx, pydantic |
 | `relayr.telemetry` | The `relayr` scope's attributes, the counters' registry, and `Telemetry`, through the OpenTelemetry API | the OpenTelemetry API |
 | `relayr.otel` | `telemetry()`, relayr's contribution to the libraries' `configure_telemetry`, a lattice-core `Contribution` ([lattice ADR-0020](../adr/0020-the-telemetry-contract-needs-no-extra.md)), and `metric_views`. The `otel` extra | `relayr.telemetry`, `lattice_core.otel.contribution`, the OpenTelemetry SDK |
+| `relayr.ui` | `ui:form_submitted` and `ui:app_submitted`, `UI_EVENTS`, `UI_PROJECTIONS` and `UI_PUBLISHERS`, from artifactr's forms ([ADR-0038](adr/0038-one-event-for-both-ways-of-asking.md)). The `forms` extra | `relayr.events`, artifactr (with `artifactr.ui`), reflexr, pydantic |
 | `relayr.langfuse` | `bridged_run` and `bridged_turns`, the libraries' Langfuse contexts with relayr's tags. The `langfuse` extra | `relayr.events`, `relayr.ledger`, `relayr.outbound`, artifactr, reflexr, Langfuse |
 
 `tests/test_layering.py` holds each package to its column, and checks that every name relayr imports from artifactr or reflexr is in its module's `__all__`.

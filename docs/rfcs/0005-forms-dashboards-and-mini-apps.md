@@ -1,6 +1,6 @@
 # RFC-0005: Forms, dashboards and mini apps in the chat
 
-**Status:** Draft, amended by [lattice ADR-0026](../adr/0026-a-distribution-needs-a-reason-integrations-are-extras.md) and [lattice ADR-0027](../adr/0027-integrations-switched-per-workspace-through-one-port.md)
+**Status:** Draft, amended by [lattice ADR-0026](../adr/0026-a-distribution-needs-a-reason-integrations-are-extras.md), [lattice ADR-0027](../adr/0027-integrations-switched-per-workspace-through-one-port.md) and on 2026-10-17 (see [Amendment](#amendment-2026-10-17-the-extra-the-module-and-relayrs-bridging))
 **Author:** Alex Nodeland
 **Created:** 2026-10-17
 **Discussion:** [#334](https://github.com/alexnodeland/lattice/pull/334)
@@ -13,7 +13,7 @@
 
 ## Summary
 
-A new package, `artifactr-ui`, lets an agent put interactive UI in the chat: forms richer than `ask_user`, dashboards, and sandboxed mini apps. Forms and dashboards are data, a JSON Schema 2020-12 subset with UI hints and a panel list, which portalr renders with its own components. Only a mini app is HTML, and it runs in a sandboxed frame on a cookie-less origin of its own, with no network. Whatever a person does in any of them is one artifactr command, as that person, so it lands in the workspace's log and relayr carries it to reflexr. A form is asked two ways: `ask_form` pauses the run until it is answered, and a form artifact takes submissions without a run waiting. relayr bridges `deferred_answered`, which it leaves out today. The shapes are borrowed from MCP Apps (SEP-1865), so `artifactr.mcp` can later serve the same UI to other hosts as `ui://` resources. This is in lattice's series because it adds a package and changes artifactr, relayr, portalr and stackr. It is built after v0.1.
+A new package, `artifactr-ui`, lets an agent put interactive UI in the chat: forms richer than `ask_user`, dashboards, and sandboxed mini apps. Forms and dashboards are data, a JSON Schema 2020-12 subset with UI hints and a panel list, which portalr renders with its own components. Only a mini app is HTML, and it runs in a sandboxed frame on a cookie-less origin of its own, with no network. Whatever a person does in any of them is one artifactr command, as that person, so it lands in the workspace's log and relayr carries it to reflexr. A form is asked two ways: `ask_form` pauses the run until it is answered, and a form artifact takes submissions without a run waiting. relayr bridges `deferred_answered`, which it leaves out today. The shapes are borrowed from MCP Apps (SEP-1865), so `artifactr.mcp` can later serve the same UI to other hosts as `ui://` resources. This is in lattice's series because it adds a package and changes artifactr, relayr, portalr and stackr. It is built after v0.1. *Amended 2026-10-17 ([Amendment](#amendment-2026-10-17-the-extra-the-module-and-relayrs-bridging)): the package is `artifactr.ui`, behind `artifactr-ai[forms]`, and its `[relayr]` extra is `relayr.ui`, behind `relayr-ai[forms]`.*
 
 ## Motivation
 
@@ -63,7 +63,7 @@ graph LR
 - **Its PyPI name is `artifactr-ui-ai`,** with the suffix artifactr's and `artifactr-files-ai`'s carry, imported as `artifactr_ui`. `artifactr-ui`, `artifactr-ui-ai` and `artifactr-forms-ai` were free on PyPI on 2026-10-16. It is a release-please component of its own, first released as 0.1.0 ([lattice ADR-0006](../adr/0006-release-please-first-versions-pre-1-0-bumps-and-what-releases.md)).
 - **Its wire schema is committed,** as `packages/artifactr-ui/schemas/artifactr_ui.v1.json`, drift-tested as artifactr's is, and added to `SCHEMAS` in portalr's `web/client/scripts/generate.ts`, which writes `client/src/generated/artifactr_ui.v1.ts`. portalr's Python doesn't depend on it, as it doesn't depend on artifactr.
 
-> **Amended (2026-10-17) by [lattice ADR-0026](../adr/0026-a-distribution-needs-a-reason-integrations-are-extras.md):** forms and dashboards are not a distribution of their own. They are an extra of `artifactr-ai`, in the artifactr distribution, with their code a subpackage of `artifactr` that the rest of it never imports, and an application turns them on per workspace through the shared Integrations switch. `artifactr-ui-ai`, its release-please component and its first release as 0.1.0 are dropped; the extra's name and import path are settled where it is built. What else this section says holds, read with artifactr's extra for the package.
+> **Amended (2026-10-17) by [lattice ADR-0026](../adr/0026-a-distribution-needs-a-reason-integrations-are-extras.md):** forms and dashboards are not a distribution of their own. They are an extra of `artifactr-ai`, in the artifactr distribution, with their code a subpackage of `artifactr` that the rest of it never imports, and an application turns them on per workspace through the shared Integrations switch. `artifactr-ui-ai`, its release-please component and its first release as 0.1.0 are dropped; the extra's name and import path are settled where it is built: `artifactr.ui`, behind `artifactr-ai[forms]`, and relayr's `relayr.ui`, behind `relayr-ai[forms]` (see [Amendment](#amendment-2026-10-17-the-extra-the-module-and-relayrs-bridging)). What else this section says holds, read with artifactr's extra for the package.
 
 ```python
 from artifactr_ui import UI_TYPES, ui_checks
@@ -241,7 +241,7 @@ Decided by the owner on 2026-10-17:
 
 | # | Question | Decided | Instead of |
 |---|---|---|---|
-| O1 | Packaging | A new distribution, `artifactr-ui-ai`, imported as `artifactr_ui` | `artifactr-forms-ai`; tools beside `ask_user` in artifactr's agent layer |
+| O1 | Packaging | A new distribution, `artifactr-ui-ai`, imported as `artifactr_ui` *Amended 2026-10-17 ([Amendment](#amendment-2026-10-17-the-extra-the-module-and-relayrs-bridging)): it is `artifactr.ui`, behind `artifactr-ai[forms]`.* | `artifactr-forms-ai`; tools beside `ask_user` in artifactr's agent layer |
 | O2 | Phase 1 | Forms and dashboards together | Forms alone first |
 | O3 | Rendering | portalr's own components for forms and dashboards; sandboxed HTML for mini apps only | Sandboxed HTML for everything, as MCP Apps renders it |
 | O4 | Schema | A JSON Schema 2020-12 subset with separate UI hints | A form language of our own; full JSON Schema through a generic renderer |
@@ -299,15 +299,17 @@ Each is a phase 1 or phase 2 exit criterion, settled and recorded in an ADR.
 ## Tracking
 
 - [ ] Sign-off on U1 to U4
-- [ ] artifactr: `Workspaces(checks=...)` and `DeferredAnswered.tool_name`, with an ADR
-- [ ] relayr: `artifactr:deferred_answered` in `BRIDGED`, and projections per deferred tool name
-- [ ] artifactr-ui: the package, schema subset and validator, types, toolset, checks, `[relayr]` extra, committed schema
+- [x] artifactr: `Workspaces(checks=...)` and `DeferredAnswered.tool_name`, with an ADR
+- [x] relayr: `artifactr:deferred_answered` in `BRIDGED`, and projections per deferred tool name
+- [x] artifactr-ui: the package, schema subset and validator, types, toolset, checks, `[relayr]` extra, committed schema
 - [ ] portalr: `SchemaForm`, `TextArea`, `DashboardView`, the renderers and `ask_form` in the chat; `generate.ts`
-- [ ] stackr: the template's `ui` question
-- [ ] Phase 1's unverified items settled, in an ADR
+- [x] stackr: the template's `ui` question
+- [x] Phase 1's unverified items settled, in an ADR
 - [ ] Mini apps: the proxy, `apps.<host>`, `AppFrame`, the bridge, the kill switch
 - [ ] The MCP export
-- [ ] Docs: the package's guide and ADRs, and the architecture
+- [x] Docs: the package's guide and ADRs, and the architecture
+
+*Amended 2026-10-17 ([Amendment](#amendment-2026-10-17-the-extra-the-module-and-relayrs-bridging)): the items above that name the package are met in `artifactr.ui` and `relayr.ui`.*
 
 ## Evidence
 
@@ -333,6 +335,16 @@ Gathered on 2026-10-16 and 2026-10-17. lattice was read at `origin/main`; the we
 | The follower publishes every envelope, projected ones included, as `SourceActor(name="artifactr")` | `relayr/inbound/followers.py` | Verified |
 | A message posted while paused answers every open question; only `InvalidState` is caught | `artifactr/agent/runner.py` `_reply` | Verified |
 | `artifactr-ui-ai` was free on PyPI | PyPI, 2026-10-16 | Verified |
+
+## Amendment (2026-10-17): the extra, the module and relayr's bridging
+
+[lattice ADR-0026](../adr/0026-a-distribution-needs-a-reason-integrations-are-extras.md) made forms and dashboards an extra of `artifactr-ai`, in place of O1, and left the extra's name and import path to where they are built. They are settled so:
+
+- **The extra is `forms`,** `artifactr-ai[forms]`, and the code is `artifactr.ui` ([artifactr ADR-0074](../artifactr/adr/0074-forms-and-dashboards-in-artifactr-ui-behind-the-forms-extra.md)).
+- **The `[relayr]` extra is relayr's `relayr.ui`,** behind `relayr-ai[forms]` ([relayr ADR-0038](../relayr/adr/0038-one-event-for-both-ways-of-asking.md)), since artifactr can't depend on relayr.
+- **The wire schema** is `packages/artifactr/schemas/artifactr_ui.v1.json`, regenerated by `moon run artifactr:schema`, and the tests and the vectors portalr reads are artifactr's, in `tests/ui/`.
+- **Where this RFC names `artifactr-ui`, `artifactr-ui-ai` or `artifactr_ui`,** read `artifactr.ui`, and `relayr.ui` for its `[relayr]` extra and `artifactr_ui.relayr`. The design is otherwise unchanged.
+- **Its decisions** are artifactr's ADR-0074 to ADR-0080 and relayr's ADR-0038, and its guide is [artifactr's](../artifactr/guides/forms-and-dashboards.md).
 
 [a-adr-0002]: ../artifactr/adr/0002-single-write-path.md
 [a-adr-0003]: ../artifactr/adr/0003-artifact-types-as-pydantic-subclasses.md

@@ -30,6 +30,7 @@ An application can mount artifactr and reflexr side by side, on one database and
 - **Evaluation (built).** Proposal outcomes become feedback on the runs that proposed them, with measures of acceptance, rewrites and rules from chat that stay live, in the `evals` extra.
 - **Task trackers (phase 1 built).** A rule's run files, comments on and moves items in Plane's Community edition or Vikunja, each once however often it is retried, behind the `plane` and `vikunja` extras ([lattice RFC-0004](https://lattice.alexnodeland.com/rfcs/0004-relayr-and-task-trackers/)).
 - **A ledger of its own (built)**, in memory or in SQL, behind the `sql`, `sqlite` and `postgres` extras.
+- **Forms for rules (built).** With the `forms` extra, `relayr.ui` bridges an answer to artifactr's `ask_form`, and a submission to a form, both as `ui:form_submitted`, so a rule is written once for both ways of asking.
 
 ## Documentation
 

@@ -63,7 +63,7 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     "fastapi": ({"relayr.trackers", "relayr.fastapi"}, {"fastapi", "lattice_core.refusals"}),
     "plane": ({"relayr.trackers", "relayr.plane"}, {"httpx", "pydantic"}),
     "vikunja": ({"relayr.trackers", "relayr.vikunja"}, {"httpx", "pydantic"}),
-    # The forms extra's: only it imports artifactr.ui (ADR-0036).
+    # The forms extra's: only it imports artifactr.ui (ADR-0038).
     "ui": ({"relayr.events", "relayr.ui"}, {*LIBRARIES, "pydantic"}),
     "rules": (
         {"relayr.events", "relayr.outbound", "relayr.rules"},

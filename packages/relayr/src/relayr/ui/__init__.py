@@ -18,7 +18,7 @@ An answer to ``ask_form`` and a ``submission`` to a form both become ``ui:form_s
 rule is written once for both ways of asking; a submission to an app becomes
 ``ui:app_submitted``. A submission's ``artifact_changed`` and ``artifact_archived`` become
 nothing. ``ui:`` is reserved to the follower's publisher, so no client publishes a submission
-itself (ADR-0036).
+itself (ADR-0038).
 """
 
 from collections.abc import Mapping

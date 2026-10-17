@@ -73,7 +73,7 @@ Option A trades a little latency on resume for durability and a single code path
 
 ## Amendment (2026-10-17): an answer names its tool, and may be refused
 
-[lattice RFC-0005](../../rfcs/0005-forms-dashboards-and-mini-apps.md) adds forms, which a run asks with `ask_form`, a deferred tool of `artifactr.ui`'s whose answer is the form's values.
+[lattice RFC-0005](../../rfcs/0005-forms-dashboards-and-mini-apps.md) adds forms, which a run asks with `ask_form`, a deferred tool of `artifactr.ui`'s ([ADR-0074](0074-forms-and-dashboards-in-artifactr-ui-behind-the-forms-extra.md)) whose answer is the form's values.
 
 - **An answer names its tool.** `deferred_answered` carries `tool_name`, copied from the request by the rule that records the answer, so a consumer of the log, such as relayr's follower, tells an `ask_form` answer from an `ask_user` reply or an approval without keeping `run_paused` to join them. It is `null` only on answers recorded before it was. It is a new optional field, so the protocol stays `artifactr.v1`.
 - **An answer may be refused by the application.** Core still checks only that the run is paused, the request exists and is unanswered, and its kind matches. The application's check of `answer_deferred` may refuse the answer itself, before it commits ([ADR-0073](0073-checks-that-refuse-a-command-before-it-commits.md)), as `artifactr.ui`'s refuses values that don't fit the form, with a field's error. A refused answer leaves the request open and the run paused, so the person can answer again.

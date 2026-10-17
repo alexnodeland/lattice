@@ -7,7 +7,7 @@
 
 ## Context
 
-[lattice RFC-0005](../../rfcs/0005-forms-dashboards-and-mini-apps.md) puts forms in the chat, in `artifactr.ui`, a layer nothing else in artifactr imports. A form is answered two ways: an `answer_deferred` to a paused run's `ask_form`, or a `create_artifact` of a `submission`. Both must be refused when the values don't fit the form's schema, the form is closed, or the submission was made against an older version of it, and the refusal must reach the person, under the field it is about.
+[lattice RFC-0005](../../rfcs/0005-forms-dashboards-and-mini-apps.md) puts forms in the chat, in `artifactr.ui` behind the `forms` extra ([ADR-0074](0074-forms-and-dashboards-in-artifactr-ui-behind-the-forms-extra.md)), a layer nothing else in artifactr imports. A form is answered two ways: an `answer_deferred` to a paused run's `ask_form`, or a `create_artifact` of a `submission`. Both must be refused when the values don't fit the form's schema, the form is closed, or the submission was made against an older version of it, and the refusal must reach the person, under the field it is about.
 
 Nothing in artifactr can refuse them:
 
@@ -23,7 +23,7 @@ The RFC recommends one additive hook on `Workspaces`, which `artifactr.ui` fills
 - **A check runs in `Workspace.commit`,** after `authorize` allows the command and core's own checks of what it names pass (the target's access and the type allowlist), and before its transaction. A command refused before it is never checked, so a check never hears a command from an actor who may not send it.
 - **A check is given the committing handle,** so it reads the workspace as the command's actor, `workspace.actor`, through the same `authorize` and `hidden` as any read: a submitter who may not read the form is refused as one who may not see it. The RFC wrote the check as `(workspace, actor, command)`; a handle already carries its actor, so the actor is not passed twice.
 - **A check refuses with a `Rejection`,** usually `ValidationFailed`, whose `errors` name the fields as Pydantic does, or `InvalidState`. A refusal is counted and traced as a rejection, as core's are, and reaches the client typed: a `validation_failed` result over the WebSocket, 422 over REST. Anything else a check raises fails the command as an error, as the rest of the write path's errors do.
-- **A command is checked under its own type.** A `propose_change` is checked under `"propose_change"`, whatever change it wraps, and the change is not checked again under its own type. A check of `create_artifact` that matters for proposals too is registered under both.
+- **A command is checked under its own type.** A `propose_change` is checked under `"propose_change"`, whatever change it wraps, and the change is not checked again under its own type. A check of `create_artifact` that matters for proposals too is registered under both. Accepting a proposal is a `respond_to_proposal`, checked under that type, and core then applies the proposed change, rebased onto the head, with the reviewer's own `changes` on top: a check that must hold when a change lands, not only when it is proposed, is registered under `"respond_to_proposal"` too, reads the proposal, and checks the change against what is current. `artifactr.ui`'s checks do ([ADR-0075](0075-forms-refused-at-the-boundary-through-the-checks.md)).
 - **Facts are not checked.** `Workspace.record` is the runner's and the capability's, recording what a run did, not what a person asks; a check is for commands.
 - **A check is not a lock.** It reads before the transaction and holds nothing, so what it read may change before the command commits: a form closed between the check and the commit takes one late submission. Whoever needs more puts the invariant in core's rules, or reads the result with it in mind.
 
@@ -80,4 +80,4 @@ A hook by command type costs a dictionary lookup per commit and keeps core as it
 ## Action items
 
 1. [x] `Workspaces(checks=...)` and `Check`, with tests on every storage: a refusal, an error, a read as the actor, `propose_change` under its own type, and facts unchecked.
-2. [ ] `artifactr.ui`'s `ui_checks()` fills it (lattice RFC-0005, phase 1).
+2. [x] `artifactr.ui`'s `ui_checks()` fills it (lattice RFC-0005, phase 1).

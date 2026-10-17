@@ -43,5 +43,6 @@ ADR-0001 to ADR-0007 record the decisions D1 to D7 of [stackr RFC-0002](../../st
 | [0035](0035-what-phase-1-settled-of-the-trackers-unknowns.md) | What phase 1 settled of the trackers' unknowns | Accepted, amended by 0037 |
 | [0036](0036-reading-a-tracker-back.md) | Reading a tracker back | Accepted |
 | [0037](0037-what-a-live-plane-settled.md) | What a live Plane settled | Accepted |
+| [0038](0038-one-event-for-both-ways-of-asking.md) | One event for both ways of asking | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

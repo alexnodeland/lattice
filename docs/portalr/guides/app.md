@@ -10,7 +10,7 @@ Everything below is inside a workspace, `/t/<tenant>/w/<workspace>`, whose artif
 
 ### Integrations that are off
 
-A workspace's admins can turn its integrations on or off in [admin](admin.md#integrations), such as diagrams, forms or Mermaid. The app reads which are on when a workspace opens, and again when the window is focused after a few minutes. Markdown draws its add-ons by them: today Mermaid, whose diagrams show as their source either way. An action that needs an integration that is off is refused with **Not available in this workspace.**, which also makes the app read them again. If they can't be read, each is what it is by default: mini apps and Mermaid off, the rest on. The server checks every action, whatever the page shows ([ADR-0045](../adr/0045-integrations-in-admin-and-the-apps-read-of-them.md)).
+A tenant's owners and admins turn its integrations on or off, on the tenant or in one of its workspaces, in [admin](admin.md#integrations), such as diagrams, forms or Mermaid. The app reads which are on when a workspace opens, and again when the window is focused after a few minutes. Markdown draws its add-ons by them: math, which is on by default and shows as its source where it is off, and Mermaid, whose diagrams show as their source either way. An action that needs an integration that is off is refused with **Not available in this workspace.**, which also makes the app read them again. If they can't be read, each is what it is by default: mini apps and Mermaid off, the rest on. The server checks every action, whatever the page shows ([ADR-0045](../adr/0045-integrations-in-admin-and-the-apps-read-of-them.md)).
 
 ## Threads
 

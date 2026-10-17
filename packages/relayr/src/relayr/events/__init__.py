@@ -3,7 +3,8 @@
 artifactr's events reach reflexr as types in the `artifactr` namespace, such as
 `artifactr:message_posted`, under [`ArtifactrEvent`][relayr.events.ArtifactrEvent]. Give
 [`BRIDGED`][relayr.events.BRIDGED] to reflexr's `Workspaces(events=...)` with the application's
-own types, and register projections for the application's `app_event`s and artifact kinds:
+own types, and register projections for the application's `app_event`s, artifact kinds and
+deferred tools:
 
 ```python
 projections = Projections(app_events={"deploy": deployed}, artifacts={"timeline": timeline})
@@ -17,6 +18,7 @@ from relayr.events.types import (
     ArtifactChanged,
     ArtifactCreated,
     ArtifactrEvent,
+    DeferredAnswered,
     FeedbackGiven,
     MessagePosted,
     ProposalCreated,
@@ -30,6 +32,7 @@ __all__ = [
     "ArtifactChanged",
     "ArtifactCreated",
     "ArtifactrEvent",
+    "DeferredAnswered",
     "FeedbackGiven",
     "MessagePosted",
     "Projection",

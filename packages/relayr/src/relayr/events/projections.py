@@ -1,10 +1,10 @@
 """Projections: which artifactr envelopes become reflexr events, and as what.
 
-The default set is RFC-0002's: messages, artifacts, proposals, ended turns and feedback.
-Everything else stays in artifactr: thread and focus changes, run starts and pauses, tool calls
-and deferred answers. An application adds its own with
-[`Projections`][relayr.events.Projections]: a function per `app_event` name, and per artifact
-kind, which publishes the application's types, in its own namespace.
+The default set is RFC-0002's, messages, artifacts, proposals, ended turns and feedback, and
+lattice RFC-0005's answers to paused turns. Everything else stays in artifactr: thread and focus
+changes, run starts and pauses, and tool calls. An application adds its own with
+[`Projections`][relayr.events.Projections]: a function per `app_event` name, per artifact kind,
+and per deferred tool's name, which publishes the application's types, in its own namespace.
 
 An envelope becomes at most one event, so the event's id can be the envelope's.
 """
@@ -20,6 +20,7 @@ from relayr.events.types import (
     ArtifactChanged,
     ArtifactCreated,
     ArtifactrEvent,
+    DeferredAnswered,
     FeedbackGiven,
     MessagePosted,
     ProposalCreated,
@@ -111,6 +112,16 @@ def _default_set(envelope: a.Envelope) -> ArtifactrEvent | None:
                 target=event.target,
                 value=event.value,
             )
+        case a.DeferredAnswered() as event:
+            return DeferredAnswered(
+                author=envelope.actor,
+                thread_id=event.thread_id,
+                turn_id=event.run_id,
+                tool_call_id=event.tool_call_id,
+                tool_name=event.tool_name,
+                answer=event.answer,
+                approved=event.approved,
+            )
         case _:
             return None
 
@@ -124,6 +135,8 @@ class Projections:
         artifacts: A projection per artifact kind, for its `artifact_created`,
             `artifact_changed` and `artifact_archived`, in place of the default set's events.
             Proposals on the kind are bridged as the default set's.
+        deferred: A projection per deferred tool's name, for the `deferred_answered` of a
+            request to that tool, in place of the default set's `artifactr:deferred_answered`.
     """
 
     def __init__(
@@ -131,9 +144,11 @@ class Projections:
         *,
         app_events: Mapping[str, Projection] | None = None,
         artifacts: Mapping[str, Projection] | None = None,
+        deferred: Mapping[str, Projection] | None = None,
     ) -> None:
         self._app_events = MappingProxyType(dict(app_events or {}))
         self._artifacts = MappingProxyType(dict(artifacts or {}))
+        self._deferred = MappingProxyType(dict(deferred or {}))
 
     def project(self, envelope: a.Envelope) -> Event | None:
         """Return the event an envelope becomes, or None if it stays in artifactr.
@@ -150,6 +165,8 @@ class Projections:
                 | a.ArtifactArchived(kind=kind)
             ) if kind in self._artifacts:
                 projection = self._artifacts[kind]
+            case a.DeferredAnswered(tool_name=str() as tool_name) if tool_name in self._deferred:
+                projection = self._deferred[tool_name]
             case _:
                 projection = _default_set
         return None if projection is None else projection(envelope)

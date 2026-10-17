@@ -88,7 +88,7 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 
 | Component | Renders | Sends |
 |---|---|---|
-| `Messages`, `Message`, `Streaming` | A thread's messages, oldest first, and what a run is streaming | Thumbs on a message |
+| `Messages`, `Message`, `Streaming` | A thread's messages, oldest first, and what a run is streaming | Thumbs on a message; a message copied as the Markdown it was written in ([ADR-0043](adr/0043-markdowns-basics.md)) |
 | `Composer` | A message being written | The message |
 | `ToolCall` | A tool a run called, and how it returned | Nothing |
 | `Request` | What a paused run waits on: a call to approve, or a question | An approval, a denial or an answer |
@@ -98,9 +98,10 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 | `Diff` | What a revision changed, as `client`'s `changes` cut it | Nothing |
 | `Thumbs` | The reader's thumbs on a message, an artifact or a run, and why | Thumbs, then a comment ([ADR-0018](adr/0018-the-runs-area-and-feedback.md)) |
 | `CommandButton` | One action, waiting while its command is in flight | The command |
-| `Markdown` | Markdown through Streamdown: no raw HTML, links to the web, mail, the page and the application alone, images from this origin alone | Nothing |
+| `Markdown` | Markdown through Streamdown: no raw HTML, links to the web, mail, the page and the application alone, images from this origin alone; GitHub's callouts as alerts, footnotes of each message's own, and code blocks with their language, Wrap and Copy ([ADR-0043](adr/0043-markdowns-basics.md)) | Nothing |
+| `AddonsProvider` | Which of Markdown's add-ons the Markdown inside may draw; one that isn't drawn shows its source, with a quiet line. Mermaid is off, and parked ([ADR-0042](adr/0042-mermaid-cant-draw-under-the-policy.md)) | Nothing |
 
-`ui` imports `client`'s types alone, which a root test holds it to.
+`ui` imports `client`'s types alone, which a root test holds it to. `Markdown` is held to the UIs' Content-Security-Policy too: `ui`'s `csp` tests build a page of it as the UIs are built, serve it with the policy a portalr test holds to the router's, and fail on any violation in Chromium ([ADR-0043](adr/0043-markdowns-basics.md)).
 
 ## admin
 

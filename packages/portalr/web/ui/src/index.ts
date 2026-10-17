@@ -7,6 +7,7 @@
 
 export { Account } from "./account";
 export { AccountMenu, type Appearance } from "./account-menu";
+export { type Addons, AddonsProvider } from "./addons";
 export { Alert, type AlertTone } from "./alert";
 export { AnsiText, type Run, runs } from "./ansi";
 export { AppShell } from "./app-shell";

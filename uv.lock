@@ -250,6 +250,9 @@ files = [
     { name = "anyio" },
     { name = "mcp" },
 ]
+forms = [
+    { name = "pydantic-core" },
+]
 langfuse = [
     { name = "evalr", extra = ["langfuse"] },
     { name = "langfuse" },
@@ -339,11 +342,12 @@ requires-dist = [
     { name = "opentelemetry-sdk", marker = "extra == 'otel'", specifier = ">=1.45" },
     { name = "pydantic", specifier = ">=2.13" },
     { name = "pydantic-ai-slim", specifier = ">=2.51" },
+    { name = "pydantic-core", marker = "extra == 'forms'", specifier = ">=2.46.0" },
     { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'sql'", specifier = ">=2.1" },
     { name = "starlette", marker = "extra == 'fastapi'", specifier = ">=0.46.0" },
     { name = "starlette", marker = "extra == 'mcp'", specifier = ">=0.27" },
 ]
-provides-extras = ["sql", "sqlite", "postgres", "fastapi", "mcp", "otel", "langfuse", "litellm", "evals", "files"]
+provides-extras = ["sql", "sqlite", "postgres", "fastapi", "mcp", "otel", "langfuse", "litellm", "evals", "files", "forms"]
 
 [package.metadata.requires-dev]
 dev = [

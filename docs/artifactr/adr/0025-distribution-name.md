@@ -34,4 +34,4 @@ Other free names (`pyartifactr`, `artifactr-sdk`, `artifactr-kit`) were consider
 ## Action items
 
 1. [x] Rename the distribution, point the example's dependency at it, and update the install docs.
-2. [ ] Publish `artifactr-ai` to PyPI when the maintainer decides to.
+2. [x] Publish `artifactr-ai` to PyPI when the maintainer decides to. *Published from 0.2.0, on 2026-10-17 ([lattice ADR-0023](../../adr/0023-publishing-to-pypi-from-the-release-workflow.md)).*

@@ -27,4 +27,4 @@ RFC-0003 weighed the alternatives to moving: staying in a repository of its own,
 - Easier: a change to artifactr and evalr, or to artifactr and docplan, lands in one pull request, tested together, and no pin moves in lockstep.
 - Easier: every change checks artifactr's wheel as a user installs it.
 - Harder: artifactr's third-party dependencies resolve with every sibling's, in one lock ([lattice ADR-0008](../../adr/0008-one-resolution-litellm-held-at-1-83-0.md)).
-- Until artifactr is on PyPI ([lattice#7](https://github.com/alexnodeland/lattice/issues/7)), it installs from its tag, in lattice's `packages/artifactr`.
+- Until artifactr is on PyPI ([lattice#7](https://github.com/alexnodeland/lattice/issues/7)), it installs from its tag, in lattice's `packages/artifactr`. *artifactr-ai has been on PyPI since 2026-10-17, from 0.2.0 ([lattice ADR-0023](../../adr/0023-publishing-to-pypi-from-the-release-workflow.md)).*

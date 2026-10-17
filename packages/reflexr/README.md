@@ -16,7 +16,7 @@
 
 It is the sibling of [artifactr](https://lattice.alexnodeland.com/artifactr/): artifactr is for live chats in which people and agents edit shared artifacts, and reflexr is for workflows that events start. The two share their conventions (tenants and workspaces, envelopes, actors, storage, the protocol's shape), and neither imports the other.
 
-> **Status:** pre-release. v0.1 is built, as planned in [RFC-0001](https://lattice.alexnodeland.com/reflexr/rfcs/0001-v0.1-implementation-plan/), and not yet released; the API may change before the first release. Work from before the rebuild is on the [`archive/pre-rebuild`](https://github.com/alexnodeland/reflexr/tree/archive/pre-rebuild) branch of reflexr's old repository.
+> **Status:** alpha, on PyPI. v0.1 is built, as planned in [RFC-0001](https://lattice.alexnodeland.com/reflexr/rfcs/0001-v0.1-implementation-plan/), and released; the API may change before 1.0. Work from before the rebuild is on the [`archive/pre-rebuild`](https://github.com/alexnodeland/reflexr/tree/archive/pre-rebuild) branch of reflexr's old repository.
 
 ## Why
 
@@ -24,13 +24,13 @@ Most LLM applications start with a person typing. Many useful workflows start wi
 
 ## Install
 
-Python 3.12 or newer. Until reflexr is on PyPI, install it from its directory in [lattice](https://github.com/alexnodeland/lattice), the repository every package lives in:
+Python 3.12 or newer. reflexr is on PyPI:
 
 ```bash
-uv add "reflexr[fastapi] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/reflexr"
+uv add "reflexr[fastapi]"
 ```
 
-Extras: `fastapi` (publishing, REST and the WebSocket stream), `mcp` (external agents), `postgres` or `sqlite` (SQL storage with a driver), `sql` (SQL storage without one), `otel` (OpenTelemetry in one call), `langfuse` (traces and scores in Langfuse), `litellm` (the LLM gateway) and `evals` (evaluation with [evalr](https://lattice.alexnodeland.com/evalr/)). The `evals` and `langfuse` extras need evalr, which is not on PyPI either: uv takes it from the same commit of lattice, and with pip you install it from lattice too.
+Extras: `fastapi` (publishing, REST and the WebSocket stream), `mcp` (external agents), `postgres` or `sqlite` (SQL storage with a driver), `sql` (SQL storage without one), `otel` (OpenTelemetry in one call), `langfuse` (traces and scores in Langfuse), `litellm` (the LLM gateway) and `evals` (evaluation with [evalr](https://lattice.alexnodeland.com/evalr/)). The `evals` and `langfuse` extras install evalr, from PyPI.
 
 ## Example
 

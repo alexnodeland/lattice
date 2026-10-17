@@ -14,7 +14,7 @@
 
 **artifactr** is a Python library for chat applications in which people and agents work on the same documents, plans and specs, with every change versioned, attributed and fed back into the agent's context.
 
-> **Status:** alpha. [0.1.0](https://github.com/alexnodeland/artifactr/releases/tag/v0.1.0) is the first release and delivers [RFC-0001](https://lattice.alexnodeland.com/artifactr/rfcs/0001-v0.1-implementation-plan/), the v0.1 plan. The API may still change before 1.0.
+> **Status:** alpha, on PyPI. [0.1.0](https://github.com/alexnodeland/artifactr/releases/tag/v0.1.0), from its original repository, was the first release and delivers [RFC-0001](https://lattice.alexnodeland.com/artifactr/rfcs/0001-v0.1-implementation-plan/), the v0.1 plan. The API may still change before 1.0.
 
 ## Why
 
@@ -22,10 +22,10 @@ In most chat applications the conversation is the only channel. artifactr adds a
 
 ## Install
 
-Python 3.12 or newer. artifactr is distributed as **`artifactr-ai`** and imported as `artifactr` (the name `artifactr` on PyPI is an unrelated project). Until it is on PyPI, install it from its directory in [lattice](https://github.com/alexnodeland/lattice), the repository every package lives in:
+Python 3.12 or newer. artifactr is on PyPI as **`artifactr-ai`**, and imported as `artifactr` (the name `artifactr` on PyPI is an unrelated project):
 
 ```bash
-uv add "artifactr-ai[fastapi] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/artifactr"
+uv add "artifactr-ai[fastapi]"
 ```
 
 Extras: `fastapi` (WebSocket and REST), `mcp` (external agents), `postgres` or `sqlite` (SQL storage with a driver), and `sql` (SQL storage without one).

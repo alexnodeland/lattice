@@ -155,19 +155,18 @@ The `evals` extra connects artifactr to [evalr](../../evalr/index.md), the eval 
 | To judge live turns as they end | `OnlineEvaluator`, in `Runner(evaluators=[...])` |
 | Drop-off, the rewrite rate and task completion | `thread_sessions`, `artifact_histories`, `TaskCompletion` |
 
-evalr is not on PyPI yet. In lattice, artifactr's development environment takes it from the workspace. An application installs both from lattice: uv brings evalr from the same commit as artifactr, and pip, which reads only the version ranges, needs evalr named as well:
+The `evals` extra installs evalr, from PyPI:
 
 === "uv"
 
     ```bash
-    uv add "artifactr-ai[evals] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/artifactr"
+    uv add "artifactr-ai[evals]"
     ```
 
 === "pip"
 
     ```bash
-    pip install "evalr @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/evalr" \
-      "artifactr-ai[evals] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/artifactr"
+    pip install "artifactr-ai[evals]"
     ```
 
 [docplan](../reference-implementation.md#evaluate-it), the reference implementation, runs the whole loop on one feedback type, in [`evals.py`](https://github.com/alexnodeland/lattice/blob/main/examples/docplan/src/docplan/evals.py): people's feedback becomes a dataset, a function judge is calibrated against it, the server judges its turns online, an experiment replays them, and the measures come from the log. Its tests run the loop offline, with scripted models.

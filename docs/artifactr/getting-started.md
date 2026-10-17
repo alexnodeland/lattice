@@ -4,18 +4,18 @@ This page builds a small application: a launch plan that a person and an agent w
 
 ## Install
 
-artifactr needs Python 3.12 or newer. It is distributed as `artifactr-ai` and imported as `artifactr`. Until it is published to PyPI, install it from its directory in [lattice](https://github.com/alexnodeland/lattice), the repository every package lives in:
+artifactr needs Python 3.12 or newer. It is on PyPI as `artifactr-ai`, and imported as `artifactr`:
 
 === "uv"
 
     ```bash
-    uv add "artifactr-ai @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/artifactr"
+    uv add artifactr-ai
     ```
 
 === "pip"
 
     ```bash
-    pip install "artifactr-ai @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/artifactr"
+    pip install artifactr-ai
     ```
 
 !!! warning "`artifactr-ai`, not `artifactr`"
@@ -26,25 +26,23 @@ The core install covers artifact types, workspaces with in-memory storage, and t
 
 | Extra | Adds | Install |
 |---|---|---|
-| `fastapi` | The WebSocket thread protocol and REST endpoints, as a FastAPI router | `"artifactr-ai[fastapi] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/artifactr"` |
-| `mcp` | An MCP server for external agents | `"artifactr-ai[mcp] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/artifactr"` |
-| `postgres` | [SQL storage](guides/storage.md#sql-storage) on PostgreSQL, with asyncpg | `"artifactr-ai[postgres] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/artifactr"` |
-| `sqlite` | SQL storage on SQLite, with aiosqlite | `"artifactr-ai[sqlite] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/artifactr"` |
-| `sql` | SQL storage without a driver, if you bring your own | `"artifactr-ai[sql] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/artifactr"` |
-| `evals` | [Evaluation with evalr](guides/evaluation.md#evaluating-with-evalr): datasets of people's feedback from the log, turns replayed as experiments, live turns judged as they end, and end-to-end measures. It needs evalr, installed as the note below says | `"artifactr-ai[evals] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/artifactr"` |
-| `langfuse` | [Langfuse](guides/observability.md#langfuse): whole traces, each turn's session and user, and feedback as scores | `"artifactr-ai[langfuse] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/artifactr"` |
-| `litellm` | [The LLM gateway](guides/gateway.md): models over a LiteLLM proxy, with tenancy, keys and guardrails per request | `"artifactr-ai[litellm] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/artifactr"` |
-| `otel` | [`configure_telemetry`](guides/observability.md): the OpenTelemetry SDK, OTLP export and instrumentation in one call | `"artifactr-ai[otel] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/artifactr"` |
+| `fastapi` | The WebSocket thread protocol and REST endpoints, as a FastAPI router | `"artifactr-ai[fastapi]"` |
+| `mcp` | An MCP server for external agents | `"artifactr-ai[mcp]"` |
+| `postgres` | [SQL storage](guides/storage.md#sql-storage) on PostgreSQL, with asyncpg | `"artifactr-ai[postgres]"` |
+| `sqlite` | SQL storage on SQLite, with aiosqlite | `"artifactr-ai[sqlite]"` |
+| `sql` | SQL storage without a driver, if you bring your own | `"artifactr-ai[sql]"` |
+| `evals` | [Evaluation with evalr](guides/evaluation.md#evaluating-with-evalr): datasets of people's feedback from the log, turns replayed as experiments, live turns judged as they end, and end-to-end measures | `"artifactr-ai[evals]"` |
+| `langfuse` | [Langfuse](guides/observability.md#langfuse): whole traces, each turn's session and user, and feedback as scores | `"artifactr-ai[langfuse]"` |
+| `litellm` | [The LLM gateway](guides/gateway.md): models over a LiteLLM proxy, with tenancy, keys and guardrails per request | `"artifactr-ai[litellm]"` |
+| `otel` | [`configure_telemetry`](guides/observability.md): the OpenTelemetry SDK, OTLP export and instrumentation in one call | `"artifactr-ai[otel]"` |
 
 Combine extras with commas, as in `artifactr-ai[fastapi,postgres]`. You also need the pydantic-ai extra for your model provider, such as `pydantic-ai-slim[anthropic]` or `pydantic-ai-slim[openai]`, and its API key in the environment.
 
-!!! note "lattice-core comes from PyPI"
+artifactr requires [lattice-core](../lattice-core/index.md), on PyPI as `lattice-core-ai`, and its `evals` and `langfuse` extras require [evalr](../evalr/index.md), also on PyPI, so both install with it.
 
-    artifactr requires [lattice-core](../lattice-core/index.md), which is on PyPI as `lattice-core-ai`, so pip installs it from there; uv takes it from the same commit of lattice as artifactr. A commit of lattice can need a lattice-core newer than PyPI's; with pip, add `"lattice-core-ai @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/lattice-core"` then.
+!!! note "Unreleased changes"
 
-!!! note "evalr comes from lattice too"
-
-    The `evals` and `langfuse` extras depend on [evalr](../evalr/index.md), which is not on PyPI yet either. uv installs it from the same commit of lattice as artifactr. pip reads only the version ranges, so with pip, install evalr from lattice as well: `pip install "evalr @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/evalr" "artifactr-ai[langfuse] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/artifactr"`.
+    To use a change on `main` before its release, install artifactr from [lattice](https://github.com/alexnodeland/lattice), the repository every package lives in: `uv add "artifactr-ai @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/artifactr"`. uv takes lattice-core and evalr from the same commit. pip reads only their version ranges and takes them from PyPI, which can be older than the commit needs; with pip, name them from lattice as well, as in `"evalr @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/evalr"`.
 
 ## 1. Define an artifact type
 

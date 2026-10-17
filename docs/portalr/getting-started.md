@@ -4,7 +4,7 @@ This page gets portalr's two UIs, `app` and `admin`, running inside an applicati
 
 !!! note "What is built"
 
-    Every area of both UIs described in these guides is built and tested. [stackr's template](../stackr/guides/template.md) asks a `portal` question and mounts portalr for you ([stackr ADR-0038](../stackr/adr/0038-portalr-in-the-template.md)); this page is for an application that mounts it itself, and says what the template does for you. The template passes `people=` and `invite=` when it has the gateway's address and its secret key, and stackr's smoke test runs a few scenarios against a generated application ([ADR-0040](adr/0040-scenarios-against-a-generated-application-and-size-budgets.md)). Not built yet: magic links and other sign-in providers (a password signs in); and a control for colour-blind mode, whose hook is built. portalr is not on PyPI.
+    Every area of both UIs described in these guides is built and tested. [stackr's template](../stackr/guides/template.md) asks a `portal` question and mounts portalr for you ([stackr ADR-0038](../stackr/adr/0038-portalr-in-the-template.md)); this page is for an application that mounts it itself, and says what the template does for you. The template passes `people=` and `invite=` when it has the gateway's address and its secret key, and stackr's smoke test runs a few scenarios against a generated application ([ADR-0040](adr/0040-scenarios-against-a-generated-application-and-size-budgets.md)). Not built yet: magic links and other sign-in providers (a password signs in); and a control for colour-blind mode, whose hook is built.
 
 ## What you need
 
@@ -22,11 +22,19 @@ portalr reads and writes through the packages you already run, so it needs their
 
 ## Install
 
-portalr needs Python 3.12 or newer. Its wheel carries the two built UIs, which Vite builds into it, so install the wheel, not the source. Of the two packages it requires, `lattice-core-ai` is on PyPI; portalr and `grantr[fastapi]` are not, so install those two from [lattice](https://github.com/alexnodeland/lattice).
+portalr needs Python 3.12 or newer. Its wheel carries the two built UIs, which Vite builds into it, so install the wheel, not the source. It is on PyPI, as are the two packages it requires, `grantr[fastapi]` and `lattice-core-ai`.
+
+=== "From PyPI"
+
+    ```bash
+    uv add portalr
+    ```
+
+    Each package's GitHub [release](https://github.com/alexnodeland/lattice/releases) has the same wheel and sdist attached, with their provenance attested ([ADR-0023](../adr/0023-publishing-to-pypi-from-the-release-workflow.md)).
 
 === "From a checkout"
 
-    From a checkout of lattice, with [Bun](https://bun.sh) and [moon](https://moonrepo.dev) installed (`proto use` installs them):
+    For a change on `main` before its release, build the wheel from a checkout of lattice, with [Bun](https://bun.sh) and [moon](https://moonrepo.dev) installed (`proto use` installs them):
 
     ```bash
     git clone https://github.com/alexnodeland/lattice
@@ -46,10 +54,6 @@ portalr needs Python 3.12 or newer. Its wheel carries the two built UIs, which V
     `lattice-core-ai` comes from the checkout too, so that it is the one the checkout's grantr and portalr were written against; PyPI's can be older.
 
     The built wheel holds `portalr/static/app/` and `portalr/static/admin/`; `moon run portalr:build` and that install were run to write this page.
-
-=== "Once released"
-
-    Once released, each package's GitHub release has its wheel and sdist attached, and is published to PyPI by dispatch ([ADR-0023](../adr/0023-publishing-to-pypi-from-the-release-workflow.md)). Until then, download portalr's and grantr's wheels from the repository's [releases](https://github.com/alexnodeland/lattice/releases) and `uv add` the two; uv takes `lattice-core-ai` from PyPI. portalr has no release yet.
 
 !!! warning "A git install has no UIs"
 

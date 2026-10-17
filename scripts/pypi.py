@@ -1,8 +1,8 @@
 """What PyPI serves of the files a release publishes, read from its simple index.
 
 Usage:
-  scripts/pypi.py report DIR            what PyPI has of each file in DIR, by name and hash
-  scripts/pypi.py wait DIR              wait until PyPI serves every file in DIR, with its hash
+  scripts/pypi.py report DIR            what PyPI has of each wheel and sdist in DIR, by hash
+  scripts/pypi.py wait DIR              wait until PyPI serves each wheel and sdist in DIR
   scripts/pypi.py require NAME==VERSION...   fail unless PyPI serves each (the packages a
                                         release's earlier stages published, before a later one)
 
@@ -11,6 +11,10 @@ index (PEP 691's JSON), which is what installers read, not the JSON API, which c
 or be cached as missing: a file is served when an installer would find it. A file PyPI has with
 another hash than ours is an error: PyPI keeps a version for ever, so a release run that finds one
 must not go on as though it had published.
+
+A distribution is a wheel or an sdist. Nothing else in DIR is one: the publishing action writes
+each file's attestation next to it (``<file>.publish.attestation``), which PyPI keeps as the
+file's provenance and never serves as a file of its own.
 """
 
 import hashlib
@@ -25,6 +29,8 @@ from pathlib import Path
 from typing import Any
 
 INDEX = "https://pypi.org/simple"
+DISTRIBUTIONS = (".whl", ".tar.gz")
+"""The files PyPI serves: a wheel or an sdist."""
 Fetch = Callable[[str], bytes | None]
 """Gets a URL's body, or None where it is not found."""
 
@@ -97,6 +103,18 @@ def served(distribution: str, get: Fetch = fetch) -> dict[str, str] | None:
     return {found["filename"]: found["hashes"].get("sha256", "") for found in files}
 
 
+def distributions(directory: Path) -> list[Path]:
+    """The wheels and sdists in a directory, by name.
+
+    Raises:
+        ValueError: If it has none: there is nothing to look for, which is not the same as found.
+    """
+    found = sorted(path for path in directory.iterdir() if path.name.endswith(DISTRIBUTIONS))
+    if not found:
+        raise ValueError(f"{directory} has no wheel or sdist")
+    return found
+
+
 def digest(path: Path) -> str:
     """A file's sha256."""
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -111,9 +129,9 @@ def state(path: Path, get: Fetch = fetch) -> str:
 
 
 def report(directory: Path, get: Fetch = fetch) -> list[str]:
-    """One line for each file in a directory: ``absent``, ``same`` or ``different`` on PyPI."""
+    """One line for each distribution in a directory: ``absent``, ``same`` or ``different``."""
     lines: list[str] = []
-    for path in sorted(directory.iterdir()):
+    for path in distributions(directory):
         found = state(path, get)
         lines.append(f"{path.name}: {found}")
     return lines
@@ -134,13 +152,13 @@ def wait(
     sleep: Callable[[float], None] = time.sleep,
     interval: float = 10,
 ) -> None:
-    """Wait until PyPI serves each file in a directory, with its hash.
+    """Wait until PyPI serves each distribution in a directory, with its hash.
 
     Raises:
         TimeoutError: If it doesn't within ``attempts`` tries.
         ValueError: If PyPI serves a file of that name with another hash.
     """
-    pending = sorted(directory.iterdir())
+    pending = distributions(directory)
     for attempt in range(attempts):
         states = {path: unreachable_is_absent(path, get) for path in pending}
         different = [path.name for path, found in states.items() if found == "different"]
@@ -175,6 +193,9 @@ def main(
             lines = report(Path(rest[0]), get)
         except OSError as error:
             sys.stderr.write(f"pypi: PyPI could not be read: {error}\n")
+            return 1
+        except ValueError as error:
+            sys.stderr.write(f"pypi: {error}\n")
             return 1
         sys.stdout.write("".join(f"{line}\n" for line in lines))
         different = [line for line in lines if line.endswith(": different")]

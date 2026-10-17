@@ -89,6 +89,24 @@ class Forbidden(Rejection):
     code: ClassVar[str] = "forbidden"
 
 
+class NotEnabled(Rejection):
+    """An integration the command needs is off in this workspace (ADR-0081).
+
+    It speaks of the workspace, never of the actor's grants, so it is not :class:`Forbidden`.
+    """
+
+    code: ClassVar[str] = "not_enabled"
+
+    def __init__(self, integration: str) -> None:
+        super().__init__(f"{integration} is not available in this workspace")
+        self.integration = integration
+
+    @override
+    def details(self) -> dict[str, JsonValue]:
+        """Return the integration that is off."""
+        return {"integration": self.integration}
+
+
 class InvalidState(Rejection):
     """The command does not apply to the current state, such as answering a finished run."""
 

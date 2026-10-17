@@ -144,6 +144,8 @@ The ways a command can fail. See [Rejections](../guides/workspaces.md#rejections
 
 ::: artifactr.core.Forbidden
 
+::: artifactr.core.NotEnabled
+
 ::: artifactr.core.InvalidState
 
 ::: artifactr.core.UnsupportedProtocol

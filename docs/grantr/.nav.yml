@@ -41,6 +41,11 @@ nav:
   - adr/0027-the-application-installs-the-rules-people-accept.md
   - adr/0028-a-principals-id-cant-pass-for-the-libraries-actors.md
   - adr/0029-a-stored-rule-acts-as-itself-in-its-own-workspace.md
+  - adr/0030-the-audit-log-read-by-type-and-actor.md
+  - adr/0031-the-catalog-read.md
+  - adr/0032-the-audit-log-read-newest-first.md
+  - adr/0033-a-tenants-creation-in-the-deployments-log.md
+  - adr/0034-integrations-switched-per-tenant-and-workspace-in-grantrs-table-audited.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

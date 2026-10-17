@@ -58,7 +58,12 @@ def test_an_editor_adds_the_commands_it_names_that_the_catalogs_have() -> None:
 def test_rule_management_is_the_workspace_admins_alone() -> None:
     assert "reflexr:install_rule" in _role("admin")
     assert "reflexr:install_rule" not in _role("editor")
-    assert _role("admin") & GRANTR_ACTIONS == {"grantr:grant", "grantr:revoke", "grantr:restrict"}
+    assert _role("admin") & GRANTR_ACTIONS == {
+        "grantr:grant",
+        "grantr:revoke",
+        "grantr:restrict",
+        "grantr:manage_integrations",
+    }
 
 
 def test_the_tenant_roles_cover_every_catalog_but_the_operators_actions() -> None:

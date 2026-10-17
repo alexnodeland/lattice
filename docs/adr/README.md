@@ -32,5 +32,6 @@ Outside its own series, a record is named with its package, as in "reflexr ADR-0
 | [0024](0024-a-parallel-batched-merge-queue.md) | A parallel, batched merge queue | Accepted |
 | [0025](0025-formal-specs-in-tla-and-lean.md) | Formal specs in TLA+ and Lean | Accepted |
 | [0026](0026-a-distribution-needs-a-reason-integrations-are-extras.md) | A distribution needs a reason; integrations are extras | Accepted |
+| [0027](0027-integrations-switched-per-workspace-through-one-port.md) | Integrations switched per workspace, through one port | Accepted |
 
 To add a record, copy [`template.md`](template.md) to the next number and add a row above. Each package's series uses the same template.

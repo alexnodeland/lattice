@@ -110,6 +110,20 @@ class RoleRow(Base):
     actions: Mapped[list[str]] = mapped_column(JSON)
 
 
+class IntegrationRow(Base):
+    """An integration's setting on a tenant, with an empty workspace, or in one of its workspaces.
+
+    The setting, whether it is on, who set it and when, is JSON, as an audit entry's body is.
+    """
+
+    __tablename__ = "grantr_integrations"
+
+    tenant_id: Mapped[str] = mapped_column(primary_key=True)
+    workspace: Mapped[str] = mapped_column(primary_key=True)
+    key: Mapped[str] = mapped_column(primary_key=True)
+    setting: Mapped[dict[str, Any]] = mapped_column(JSON)
+
+
 class KeyRow(Base):
     """A service principal's key: its id, and its secret's digest, never the secret."""
 

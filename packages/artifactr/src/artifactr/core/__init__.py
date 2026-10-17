@@ -49,6 +49,7 @@ from artifactr.core.commands import (
 from artifactr.core.errors import (
     Forbidden,
     InvalidState,
+    NotEnabled,
     NotFound,
     PatchFailed,
     Rejection,
@@ -237,6 +238,7 @@ __all__ = [
     "MessagePosted",
     "MessageTarget",
     "Needs",
+    "NotEnabled",
     "NotFound",
     "NotLoaded",
     "Note",

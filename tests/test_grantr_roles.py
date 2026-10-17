@@ -34,6 +34,17 @@ def test_portalrs_admin_reads_are_named_as_portalr_will_name_them() -> None:
     } == TENANT_ADMIN_READS | DEPLOYMENT_READS
 
 
+def test_tenant_and_workspace_admins_switch_integrations_and_no_one_else_does() -> None:
+    catalog = Catalog.of(ARTIFACTR, REFLEXR)
+    holders = {
+        (level, name)
+        for (level, name), actions in catalog.built_in.items()
+        if "grantr:manage_integrations" in actions
+    }
+    assert holders == {("tenant", "owner"), ("tenant", "admin"), ("workspace", "admin")}
+    assert "grantr:manage_integrations" in catalog.view().custom_actions, "a custom role may"
+
+
 def test_relayrs_bridge_holds_what_it_does_as_the_application() -> None:
     application = Catalog.of(ARTIFACTR, REFLEXR).role("application", "deployment", {})
     assert application is not None

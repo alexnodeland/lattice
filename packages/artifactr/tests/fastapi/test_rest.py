@@ -4,9 +4,11 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 
+from artifactr.workspace import integration_gate
 from lattice_core.refusals import Refused, RejectionDetail
 from tests.agent.conftest import Script, call, say
 from tests.fastapi.conftest import build, command, wait_for
+from tests.workspace.gating import NOTES, Switch, key_of
 
 BASE = "/v1/workspaces/w1"
 
@@ -43,6 +45,32 @@ def test_rejections_map_to_status_codes(client: TestClient) -> None:
         f"{BASE}/commands", json=command("c5", type="create_artifact", kind="x", data={})
     )
     assert unknown.status_code == 404
+
+
+def test_an_integration_switched_off_is_a_conflict_and_reads_still_work() -> None:
+    switch = Switch()
+    app, _ = build(Script(), gate=integration_gate(switch, key_of))
+    with TestClient(app) as client:
+        create = command("c1", type="create_artifact", artifact_id="n1", kind="note", data={})
+        assert client.post(f"{BASE}/commands", json=create).status_code == 200
+        switch.off.add(("tenant", "w1", NOTES))
+        edit = command(
+            "c2",
+            type="edit_artifact",
+            artifact_id="n1",
+            base_version=1,
+            patch={"kind": "json_patch", "ops": [{"op": "add", "path": "/title", "value": "x"}]},
+        )
+        refused = client.post(f"{BASE}/commands", json=edit)
+        assert refused.status_code == 409
+        assert refused.json()["rejection"] == {
+            "type": "not_enabled",
+            "message": "notes is not available in this workspace",
+            "integration": "notes",
+        }
+        assert client.get(f"{BASE}/artifacts/n1").json()["version"] == 1
+        archive = command("c3", type="archive_artifact", artifact_id="n1", base_version=1)
+        assert client.post(f"{BASE}/commands", json=archive).status_code == 200
 
 
 def test_authentication_and_authorization(client: TestClient) -> None:

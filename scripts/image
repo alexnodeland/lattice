@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# A reference implementation's image, docplan's or oncall's: built from lattice's root, started on
+# PostgreSQL from its library's compose.yaml (which COMPOSE_FILE names), and stopped. It runs as a
+# compose project of its own, on ports the system picks, so it never shares the library's own
+# project, whose PostgreSQL `pg-up` starts, nor another run's.
+#
+# Usage, from the example's directory, as its `image` task: scripts/image SERVICE
+#   SERVICE  the reference implementation's compose service, docplan or oncall
+set -euo pipefail
+service=${1:?usage: scripts/image SERVICE}
+root=$(cd ../.. && pwd)
+# shellcheck source=compose-project.sh
+source "$root/scripts/compose-project.sh"
+project=$(unique_project "$service-image")
+export COMPOSE_PROJECT_NAME=$project
+
+stop() {
+  local status=$?
+  if ((status != 0)); then
+    docker compose logs --no-color --tail=200 "$service" || true
+  fi
+  docker compose down --volumes --rmi local
+}
+trap stop EXIT
+docker compose up --detach --build --wait --quiet-pull "$service"

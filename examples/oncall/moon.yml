@@ -7,15 +7,17 @@ dependsOn:
 tasks:
   image:
     description: "Build oncall's image from lattice's root, and start it on PostgreSQL"
-    script: >-
-      (docker compose up --detach --build --wait oncall
-      || (docker compose logs oncall; docker compose down --volumes; exit 1))
-      && docker compose down --volumes
+    command: '$workspaceRoot/scripts/image oncall'
     env:
       COMPOSE_FILE: '../../packages/reflexr/compose.yaml'
       COMPOSE_PROFILES: 'app'
+      # Ports the system picks, so it runs beside `pg-up`, `app-up` and other runs.
+      ONCALL_PORT: '0'
+      REFLEXR_PG_PORT: '0'
     inputs:
       - 'Dockerfile'
+      - '/scripts/image'
+      - '/scripts/compose-project.sh'
       - 'Dockerfile.dockerignore'
       - 'README.md'
       - 'pyproject.toml'
@@ -34,5 +36,3 @@ tasks:
       - '/packages/lattice-core/README.md'
       - '/packages/lattice-core/LICENSE'
       - '/packages/lattice-core/src/**/*'
-    options:
-      mutex: 'reference-app'

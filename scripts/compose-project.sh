@@ -1,6 +1,7 @@
 # shellcheck shell=bash
-# Sourced by the scripts that run a compose project of their own (scripts/api, portalr's and the
-# client's `api`, and the web packages' `bdd`), so each run names it the same way.
+# Sourced by the scripts that run a compose project of their own (scripts/api, scripts/image,
+# portalr's and the client's `api`, and the web packages' `bdd`), so each run names it the same
+# way.
 #
 # A fixed name would be shared by every run at once, in other worktrees, say, and the one that
 # stopped would take the others' containers and volumes with it. So a run's project is named with

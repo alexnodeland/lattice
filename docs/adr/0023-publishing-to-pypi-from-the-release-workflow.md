@@ -1,6 +1,6 @@
 # ADR-0023: Publishing to PyPI from the release workflow
 
-**Status:** Accepted, amended 2026-10-16 and twice on 2026-10-17 (see the amendments)
+**Status:** Accepted, amended 2026-10-16 and three times on 2026-10-17 (see the amendments)
 **Date:** 2026-10-16
 **Deciders:** Alex Nodeland
 
@@ -62,7 +62,7 @@ To rehearse: run `gh workflow run release.yml --ref main` (rehearse is the defau
 
 ## Amendment (2026-10-16)
 
-The user changed the rollout the same day: **the first release is staged.** `lattice-core-ai` 0.1.0 is released and published alone; then every package's floor is raised from `lattice-core-ai>=0.1.0.dev0` to `>=0.1.0` (#213); then the rest are released. A version on PyPI is kept for ever, so a wheel published with a `dev0` floor would carry it for good, and an installer could pair it with a development build of `lattice-core-ai`. Staging means no published wheel ever carries one.
+The user changed the rollout the same day: **the first release is staged.** `lattice-core-ai` 0.1.0 is released and published alone; then every package's floor is raised from `lattice-core-ai>=0.1.0.dev0` to `>=0.1.0` (#213); then the rest are released. A version on PyPI is kept for ever, so a wheel published with a `dev0` floor would carry it for good, and an installer could pair it with a development build of `lattice-core-ai`. Staging means no published wheel ever carries one. *Since the [2026-10-17 amendment on sibling floors](#amendment-2026-10-17-the-sibling-floors-ship-as-dev0), this holds of the floors on `lattice-core-ai` only.*
 
 - **Two releases, not one.** The first releases `lattice-core-ai` 0.1.0 (tag `lattice-core-v0.1.0`; the tag takes the `package-name` in `release-please-config.json`, not the distribution's name). The second releases the other six wheels and stackr, at the versions release pull request #19 gives them: `evalr`, `reflexr`, `grantr`, `relayr-ai` and `portalr` at 0.1.0, `artifactr-ai` at 0.2.0 (its manifest entry, 0.1.0, stands), and stackr at 0.1.0. stackr's 0.1 does not wait for the manual apply on real AWS that [stackr RFC-0004](../stackr/rfcs/0004-hosting-recipes.md) gates it on; that apply comes after.
 - **The floors are raised between them, and cannot be raised earlier.** uv resolves `lattice-core-ai>=0.1.0` against the workspace's own `lattice-core-ai`, and `0.1.0.dev0` is older than `0.1.0`, so the floors pull request fails to lock until the first release has set `packages/lattice-core/pyproject.toml` to 0.1.0 on `main`. It has to merge before the second release pull request does, so that the second release's wheels are built with it.
@@ -101,3 +101,17 @@ PyPI refused the second pending trusted publisher: with owner `alexnodeland`, re
 - **A missing environment is not a gate.** GitHub creates an environment a job names and the repository doesn't have, with no protection rules. So all seven are created, with their reviewers and tag restriction, before `PYPI_PUBLISH` is set ([What the maintainer does, once](#what-the-maintainer-does-once)); a package added later gets its environment, and its pending publisher, before its first dispatch.
 - **Not chosen: one environment, publishers added in turn.** The restriction applies only while a publisher is pending: once a project exists, its publisher is no longer pending, and the next package's could then be added (it seems; not tried). That would make adding each publisher wait on the publishing before it, and step 1's "all seven can be added at once" would no longer hold.
 - **The publisher already pending on PyPI, with environment `pypi`, is removed** and added again with its package's own environment. Until it is, a run in an environment named `pypi`, which GitHub creates unprotected if it is missing, could still create that project. A `pypi` environment on GitHub then gates nothing and can be deleted.
+
+### Amendment (2026-10-17): the sibling floors ship as dev0
+
+The user decided that the second release ships with the libraries' floors on one another as they are, and that they are raised in the packages' next patch releases. The [Amendment (2026-10-16)](#amendment-2026-10-16) raised only the floors on `lattice-core-ai` (#213, step 5, in #318), so "no published wheel ever carries one" is true of those alone. The libraries' floors on one another are still `>=0.1.0.dev0`:
+
+- `artifactr-ai` and `reflexr` require `evalr` in their `evals` extra and `evalr[langfuse]` in their `langfuse` extra.
+- `relayr-ai` requires `reflexr`, `reflexr[langfuse]` in its `langfuse` extra, and `evalr` and `evalr[langfuse]` in its `evals` and `langfuse` extras.
+- `portalr` requires `grantr[fastapi]`.
+
+As with lattice-core, uv can't lock `>=0.1.0` against a workspace member still at `0.1.0.dev0`, so a floor can rise only once its sibling's own release pull request has merged. Raising them in between the second release's merges, sibling by sibling, was possible; the user chose not to interleave them.
+
+- **The second release's wheels carry them, for good.** A published version is kept for ever, so `artifactr-ai` 0.2.0, `reflexr` 0.1.0, `relayr-ai` 0.1.0 and `portalr` 0.1.0 keep these floors.
+- **A `dev0` floor lets pip take a pre-release for that requirement.** pip allows pre-releases for a requirement whose specifier names one, such as `>=0.1.0.dev0`: if a development build of `evalr` newer than 0.1.0 were ever on PyPI, pip could pick it for `artifactr-ai[evals]`, with no flag from the user. uv (0.12.12, the pinned version) prefers final releases by default, whatever the specifier says, and takes a pre-release only when no final release fits; its `--prerelease allow` opens every requirement to pre-releases, and with it an install was seen to take `httpx` 1.0.dev6. lattice publishes no development builds, so no such `evalr`, `reflexr` or `grantr` exists today.
+- **They rise to `>=0.1.0` in a follow-up,** once the second release has put each sibling at 0.1.0 on `main`, and ship with the next releases of the packages that carry them: `artifactr-ai` 0.2.1, and `reflexr`, `relayr-ai` and `portalr` 0.1.1, if nothing in between bumps a minor version (`bump-minor-pre-major` makes a `feat` before then a 0.3.0 or 0.2.0). The follow-up is a `fix(deps)`, so that it releases those packages on its own.

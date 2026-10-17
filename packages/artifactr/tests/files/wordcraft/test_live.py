@@ -7,9 +7,10 @@ results there as a Markdown matrix (lattice RFC-0003, phase 2).
 """
 
 import os
-import subprocess
+import re
 import zipfile
 from io import BytesIO
+from pathlib import Path
 
 import pytest
 
@@ -18,16 +19,31 @@ from artifactr.files.wordcraft import STAMPED, Subprocess
 from tests.files.corpus.features import read
 from tests.files.corpus.make import FEATURES, HERE
 
-pytestmark = pytest.mark.wordcraft
+# Two calls a test, each within its deadline, well inside the test's own timeout: a test the
+# timeout ends would end the session before the conftest writes the matrix.
+pytestmark = [pytest.mark.wordcraft, pytest.mark.timeout(120)]
+DEADLINE = 20
 
-DEADLINE = 30
+PIN = Path(__file__).parents[5] / "scripts" / "wordcraft.sha256"
+VERSION = re.findall(r"wordcraft-web-(\S+)\.zip", PIN.read_text())[0]
+"""The version scripts/wordcraft pins, which the CLI must be."""
+
+UNSUPPORTED: frozenset[str] = frozenset()
+"""The features the pinned WordCraft is known not to keep, which the matrix says, and which
+Nightly expects to fail: a feature that fails outside them, or passes inside them, turns it
+red. WordCraft 0.7.0 keeps every one."""
+
+
+def features() -> list[object]:
+    return [
+        pytest.param(f, marks=pytest.mark.xfail(strict=True) if f in UNSUPPORTED else ())
+        for f in sorted(FEATURES)
+    ]
 
 
 @pytest.fixture(scope="module")
 def wordcraft() -> Subprocess:
-    cli = os.environ["ARTIFACTR_TEST_WORDCRAFT"]
-    version = subprocess.run([cli, "--version"], check=True, capture_output=True, text=True)
-    return Subprocess(cli, version=version.stdout.split()[-1])
+    return Subprocess(os.environ["ARTIFACTR_TEST_WORDCRAFT"], version=VERSION)
 
 
 def parts(content: bytes) -> dict[str, bytes]:
@@ -35,14 +51,14 @@ def parts(content: bytes) -> dict[str, bytes]:
         return {name: archive.read(name) for name in archive.namelist() if name not in STAMPED}
 
 
-@pytest.mark.parametrize("feature", sorted(FEATURES))
+@pytest.mark.parametrize("feature", features())
 async def test_an_open_and_a_save_keep_the_feature(wordcraft: Subprocess, feature: str) -> None:
     source = (HERE / f"{feature}.docx").read_bytes()
     saved = await wordcraft.apply(source, [], deadline=DEADLINE)
     assert read(feature, saved.content) == read(feature, source)
 
 
-@pytest.mark.parametrize("feature", sorted(FEATURES))
+@pytest.mark.parametrize("feature", features())
 async def test_saving_twice_is_a_fixpoint(wordcraft: Subprocess, feature: str) -> None:
     source = (HERE / f"{feature}.docx").read_bytes()
     once = await wordcraft.apply(source, [], deadline=DEADLINE)

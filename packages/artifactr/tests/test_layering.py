@@ -102,7 +102,7 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     # MCP client the files extra brings. tests/files/test_layering.py holds its own layers.
     "files": (
         {"artifactr.core", "artifactr.workspace", "artifactr.files"},
-        {"pydantic", "sqlalchemy", "alembic", "lattice_core.sql", "mcp"},
+        {"pydantic", "sqlalchemy", "alembic", "lattice_core.sql", "mcp", "anyio"},
     ),
 }
 

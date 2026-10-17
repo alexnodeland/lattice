@@ -1,7 +1,9 @@
 """What the adapter reads from a `.docx` itself: the fingerprint, and the outline."""
 
 import io
+import warnings
 import zipfile
+from collections.abc import Callable
 
 import pytest
 from hypothesis import given
@@ -44,10 +46,49 @@ def test_any_other_part_changes_it(parts: dict[str, bytes], name: str, data: byt
     ) == same
 
 
-def test_a_parts_name_and_its_bytes_are_told_apart() -> None:
-    assert fingerprint(docx({"ab": b"c"}), limit=LIMIT) != fingerprint(
-        docx({"a": b"bc"}), limit=LIMIT
-    )
+@pytest.mark.parametrize(
+    ("one", "other"),
+    [
+        ({"ab": b"c"}, {"a": b"bc"}),
+        ({"a": b"P\x001:bQ"}, {"a": b"P", "b": b"Q"}),
+    ],
+)
+def test_parts_names_and_bytes_are_told_apart(
+    one: dict[str, bytes], other: dict[str, bytes]
+) -> None:
+    assert fingerprint(docx(one), limit=LIMIT) != fingerprint(docx(other), limit=LIMIT)
+
+
+def corrupt() -> bytes:
+    """A zip whose part's deflate stream is garbage."""
+    content = bytearray(docx({"word/document.xml": b"<w:document/>" * 50}))
+    start = content.index(b"word/document.xml") + len("word/document.xml")
+    content[start : start + 20] = b"\xff" * 20
+    return bytes(content)
+
+
+def encrypted() -> bytes:
+    """A zip whose part says it is encrypted."""
+    content = bytearray(docx({"word/document.xml": b"<w:document/>"}))
+    for header in (b"PK\x03\x04", b"PK\x01\x02"):
+        at = content.index(header) + (6 if header == b"PK\x03\x04" else 8)
+        content[at] |= 1
+    return bytes(content)
+
+
+def duplicated() -> bytes:
+    buffer = io.BytesIO()
+    with warnings.catch_warnings(action="ignore"), zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr("word/document.xml", b"one")
+        archive.writestr("word/document.xml", b"two")
+    return buffer.getvalue()
+
+
+@pytest.mark.parametrize("made", [corrupt, encrypted, duplicated])
+def test_a_zip_that_isnt_whole_or_plain_is_refused(made: Callable[[], bytes]) -> None:
+    with pytest.raises(AppFailed, match=r"not a \.docx") as refused:
+        fingerprint(made(), limit=LIMIT)
+    assert refused.value.failure == "refused"
 
 
 def test_bytes_that_arent_a_zip_are_refused() -> None:

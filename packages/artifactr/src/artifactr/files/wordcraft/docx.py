@@ -9,6 +9,7 @@ import hashlib
 import io
 import re
 import zipfile
+import zlib
 from collections.abc import Sequence
 from typing import Final
 
@@ -29,26 +30,32 @@ CHUNK: Final = 1 << 16
 def fingerprint(content: bytes, *, limit: int) -> str:
     """The digest of a `.docx`'s parts, by name, without the parts each save stamps.
 
-    Each part is read as it inflates, so a zip bomb is refused once it passes `limit`.
+    Each part is hashed on its own, and the fingerprint is the digest of the parts' names and
+    digests, so no two different files share one. Each part is read as it inflates, so a zip
+    bomb is refused once it passes `limit`.
 
     Raises:
-        AppFailed: `refused` if the bytes aren't a zip, and `too_large` if its parts, inflated,
-            pass `limit` bytes.
+        AppFailed: `refused` if the bytes aren't a zip, or name a part twice, and `too_large` if
+            its parts, inflated, pass `limit` bytes.
     """
     digest = hashlib.sha256()
     inflated = 0
     try:
         with zipfile.ZipFile(io.BytesIO(content)) as archive:
-            for name in sorted(set(archive.namelist()) - STAMPED):
-                digest.update(f"{len(name)}:{name}".encode())
-                with archive.open(name) as part:
-                    while chunk := part.read(CHUNK):
+            names = archive.namelist()
+            if len(set(names)) != len(names):
+                raise AppFailed("refused", "not a .docx: it names a part twice")
+            for name in sorted(set(names) - STAMPED):
+                part = hashlib.sha256()
+                with archive.open(name) as stream:
+                    while chunk := stream.read(CHUNK):
                         inflated += len(chunk)
                         if inflated > limit:
                             raise AppFailed("too_large", f"its parts inflate past {limit} bytes")
-                        digest.update(chunk)
-                digest.update(b"\0")
-    except (zipfile.BadZipFile, zipfile.LargeZipFile, EOFError, NotImplementedError) as error:
+                        part.update(chunk)
+                digest.update(f"{len(name)}:{name}".encode() + part.digest())
+    except (zipfile.BadZipFile, zlib.error, EOFError, NotImplementedError, RuntimeError) as error:
+        # A corrupt deflate stream is zlib's error, and an encrypted part zipfile's RuntimeError.
         raise AppFailed("refused", f"not a .docx: {error}") from None
     return digest.hexdigest()
 

@@ -30,7 +30,7 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     # An app's adapter knows the port, and its app's own channel: WordCraft's is MCP.
     "wordcraft": (
         {"artifactr.files.manifest", "artifactr.files.app", "artifactr.files.wordcraft"},
-        {"pydantic", "mcp"},
+        {"pydantic", "mcp", "anyio"},
     ),
     "native": (
         {

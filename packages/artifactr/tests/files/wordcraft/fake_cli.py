@@ -11,7 +11,8 @@ does, and `--mode` makes it misbehave as a test needs:
 - `textual`: renders a page as text, not a PNG.
 - `garbled`: answers a failed batch with text that isn't its usual list.
 
-Run as `python -I fake_cli.py --mode MODE mcp ...`.
+Run as `python -I fake_cli.py --mode MODE mcp ...`, with `FAKE_PIDS` naming a file it adds its
+process id to.
 """
 
 import argparse
@@ -47,7 +48,10 @@ def main() -> None:
     parser.add_argument("--automation-read-root", type=Path)
     parser.add_argument("--automation-write-root", type=Path)
     args = parser.parse_args()
+    with Path(os.environ["FAKE_PIDS"]).open("a") as pids:
+        pids.write(f"{os.getpid()}\n")
     sys.stderr.write(f"fake wordcraft-cli: files confined to {args.automation_read_root}\n")
+    sys.stderr.flush()
     serve(args.mode, args.automation_read_root.resolve(), args.automation_write_root.resolve())
 
 

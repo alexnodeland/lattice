@@ -247,6 +247,7 @@ fastapi = [
     { name = "starlette" },
 ]
 files = [
+    { name = "anyio" },
     { name = "mcp" },
 ]
 langfuse = [
@@ -317,6 +318,7 @@ test = [
 requires-dist = [
     { name = "aiosqlite", marker = "extra == 'sqlite'", specifier = ">=0.22" },
     { name = "alembic", marker = "extra == 'sql'", specifier = ">=1.20" },
+    { name = "anyio", marker = "extra == 'files'", specifier = ">=4.9" },
     { name = "artifactr-ai", extras = ["sql"], marker = "extra == 'postgres'" },
     { name = "artifactr-ai", extras = ["sql"], marker = "extra == 'sqlite'" },
     { name = "asyncpg", marker = "extra == 'postgres'", specifier = ">=0.31" },

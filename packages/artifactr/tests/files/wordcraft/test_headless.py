@@ -4,6 +4,7 @@
 calls against WordCraft itself.
 """
 
+import os
 import stat
 import sys
 import tempfile
@@ -25,11 +26,14 @@ Spawn = Callable[..., Subprocess]
 def spawn(tmp_path: Path) -> Spawn:
     """Make the adapter over the stand-in, misbehaving as `mode` says."""
 
-    def spawn(mode: str = "", *, build: str | None = None, limit: int = 1 << 20) -> Subprocess:
+    def spawn(mode: str = "", *, limit: int = 1 << 20) -> Subprocess:
         cli = tmp_path / f"wordcraft-cli{mode}"
-        cli.write_text(f'#!/bin/sh\nexec "{sys.executable}" -I "{FAKE}" --mode "{mode}" "$@"\n')
+        cli.write_text(
+            f'#!/bin/sh\nexport FAKE_PIDS="{tmp_path / "pids"}"\n'
+            f'exec "{sys.executable}" -I "{FAKE}" --mode "{mode}" "$@"\n'
+        )
         cli.chmod(cli.stat().st_mode | stat.S_IXUSR)
-        return Subprocess(cli, version="0.7.0", build=build, limit=limit)
+        return Subprocess(cli, version="0.7.0", limit=limit)
 
     return spawn
 
@@ -39,8 +43,8 @@ def command(name: str, **args: str) -> AppCommand:
 
 
 def test_it_is_an_app_that_people_check_out_and_in(spawn: Spawn) -> None:
-    app: App = spawn(build="sha256:abc")
-    assert (app.name, app.version, app.build) == ("wordcraft", "0.7.0", "sha256:abc")
+    app: App = spawn()
+    assert (app.name, app.version, app.build) == ("wordcraft", "0.7.0", None)
     assert (app.talk, app.integration) == ("save", "files:wordcraft")
 
 
@@ -126,14 +130,19 @@ async def test_a_cli_of_another_version_is_refused(spawn: Spawn) -> None:
     assert refused.value.failure == "refused"
 
 
-async def test_a_call_past_its_deadline_times_out(spawn: Spawn) -> None:
+async def test_a_call_past_its_deadline_times_out_and_ends_the_cli(
+    spawn: Spawn, tmp_path: Path
+) -> None:
     with pytest.raises(AppFailed, match="more than 2s") as late:
         await spawn("hang").apply(None, [], deadline=2)
     assert late.value.failure == "timeout"
+    (pid,) = (tmp_path / "pids").read_text().split()
+    with pytest.raises(ProcessLookupError):
+        os.kill(int(pid), 0)
 
 
 async def test_a_cli_that_exits_mid_call_crashed_and_says_what_it_printed(spawn: Spawn) -> None:
-    with pytest.raises(AppFailed, match="fake wordcraft-cli: files confined") as crashed:
+    with pytest.raises(AppFailed, match=r"MCPError.*it printed: fake wordcraft-cli") as crashed:
         await spawn("exit").apply(None, [], deadline=20)
     assert crashed.value.failure == "crashed"
 

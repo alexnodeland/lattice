@@ -49,8 +49,8 @@ litellm = ["lattice-core-ai[litellm]>=0.1.0"]
 evals = ["evalr>=0.1.0"]
 # Native files (lattice RFC-0003): artifactr.files, with its SQL stores in the sql extra. The
 # extra names the integration, and carries the apps' adapters' dependencies: WordCraft's speaks
-# MCP on stdio (lattice ADR-0026).
-files = ["mcp>=2.2"]
+# MCP on stdio, under anyio's deadlines (lattice ADR-0026).
+files = ["mcp>=2.2", "anyio>=4.9"]
 
 [project.urls]
 Homepage = "https://lattice.alexnodeland.com/artifactr/"

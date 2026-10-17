@@ -102,8 +102,9 @@ tasks:
   fidelity:
     description: "Run the WordCraft fidelity report and the adapter's live tests, on the pinned CLI"
     script: >-
-      ARTIFACTR_TEST_WORDCRAFT="$($workspaceRoot/scripts/wordcraft cli)"
-      uv run pytest -m wordcraft -p no:cacheprovider tests/files/wordcraft
+      cli=$($workspaceRoot/scripts/wordcraft cli)
+      && ARTIFACTR_TEST_WORDCRAFT=$cli uv run pytest -m wordcraft -p no:cacheprovider
+      tests/files/wordcraft
     options:
       cache: false
       runInCI: false

@@ -6,6 +6,7 @@ import os
 import shutil
 import stat
 import subprocess
+import tarfile
 import zipfile
 from pathlib import Path
 
@@ -21,7 +22,7 @@ sleep 0.3
 cat "$FAKE_DOWNLOAD" >"$out"
 """
 UNAME = """#!/usr/bin/env bash
-[[ $1 == -s ]] && echo Darwin || echo arm64
+[[ $1 == -s ]] && echo "${FAKE_SYSTEM:-Darwin}" || echo "${FAKE_MACHINE:-arm64}"
 """
 
 
@@ -35,6 +36,18 @@ def archive(*names: str) -> bytes:
     return buffer.getvalue()
 
 
+def tarball(*names: str) -> bytes:
+    buffer = io.BytesIO()
+    with tarfile.open(fileobj=buffer, mode="w:gz") as made:
+        for name in names:
+            info = tarfile.TarInfo(name)
+            info.mode, info.size = 0o755, 10
+            made.addfile(info, io.BytesIO(b"#!/bin/sh\n"))
+    return buffer.getvalue()
+
+
+LINUX = tarball("wordcraft-9.9.9-linux-x86_64/bin/wordcraft-cli")
+EMPTY = tarball("wordcraft-9.9.9-linux-aarch64/README.md")
 CLI = archive("wordcraft-cli-9.9.9-macos-universal/wordcraft-cli")
 WEB = archive("wordcraft-web-9.9.9/index.html", "wordcraft-web-9.9.9/x_bg.wasm")
 
@@ -46,7 +59,8 @@ def scripts(tmp_path: Path) -> Path:
     folder.mkdir()
     shutil.copy(ROOT / "scripts" / "wordcraft", folder / "wordcraft")
     (folder / "wordcraft.sha256").write_text(
-        f"{hashlib.sha256(b'linux').hexdigest()}  wordcraft-9.9.9-linux-x86_64.tar.gz\n"
+        f"{hashlib.sha256(EMPTY).hexdigest()}  wordcraft-9.9.9-linux-aarch64.tar.gz\n"
+        f"{hashlib.sha256(LINUX).hexdigest()}  wordcraft-9.9.9-linux-x86_64.tar.gz\n"
         f"{hashlib.sha256(CLI).hexdigest()}  wordcraft-cli-9.9.9-macos-universal.zip\n"
         f"{hashlib.sha256(WEB).hexdigest()}  wordcraft-web-9.9.9.zip\n"
     )
@@ -58,7 +72,9 @@ def scripts(tmp_path: Path) -> Path:
     return folder
 
 
-def wordcraft(scripts: Path, what: str, download: bytes) -> subprocess.Popen[str]:
+def wordcraft(
+    scripts: Path, what: str, download: bytes, *, machine: tuple[str, str] = ("Darwin", "arm64")
+) -> subprocess.Popen[str]:
     root = scripts.parent
     fetched = root / f"download-{hashlib.sha256(download).hexdigest()}"
     fetched.write_bytes(download)
@@ -67,6 +83,8 @@ def wordcraft(scripts: Path, what: str, download: bytes) -> subprocess.Popen[str
         "PATH": f"{root / 'bin'}:{os.environ['PATH']}",
         "WORDCRAFT_CACHE": str(root / "cache"),
         "FAKE_DOWNLOAD": str(fetched),
+        "FAKE_SYSTEM": machine[0],
+        "FAKE_MACHINE": machine[1],
     }
     return subprocess.Popen(
         [str(scripts / "wordcraft"), what],
@@ -110,6 +128,21 @@ def test_runs_at_once_on_a_cold_cache_each_find_the_whole_cli(scripts: Path) -> 
     assert (cache / hashlib.sha256(CLI).hexdigest()).is_symlink()
     unpacked = [p for p in cache.iterdir() if p.name.startswith("unpacking.")]
     assert len(unpacked) == 1, "one run's unpacking is kept, and the others' go"
+
+
+def test_on_linux_the_cli_is_the_tarballs(scripts: Path) -> None:
+    run = wordcraft(scripts, "cli", LINUX, machine=("Linux", "x86_64"))
+    code, out, _ = run.wait(timeout=30), *run.communicate()
+    assert code == 0
+    assert out.strip().endswith("wordcraft-9.9.9-linux-x86_64/bin/wordcraft-cli")
+
+
+def test_an_asset_without_what_was_asked_for_fails(scripts: Path) -> None:
+    run = wordcraft(scripts, "cli", EMPTY, machine=("Linux", "aarch64"))
+    code, out, err = run.wait(timeout=30), *run.communicate()
+    assert code == 1
+    assert "wordcraft-9.9.9-linux-aarch64.tar.gz holds no cli" in err
+    assert out == ""
 
 
 def test_the_browser_build_is_its_directory(scripts: Path) -> None:

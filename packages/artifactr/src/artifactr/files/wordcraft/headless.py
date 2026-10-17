@@ -5,13 +5,13 @@ root and its write root and nothing else, opens the bytes it was given, runs wha
 and ends the process and the directory with the call. No document stays open between calls.
 """
 
-import asyncio
 import base64
 import tempfile
 from collections.abc import Awaitable, Callable, Sequence
 from pathlib import Path
-from typing import Final
+from typing import Final, cast
 
+import anyio
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from mcp.types import CallToolResult, ImageContent, TextContent
@@ -20,12 +20,11 @@ from pydantic import BaseModel, JsonValue, TypeAdapter, ValidationError
 from artifactr.files.app import AppCommand, AppFailed, Applied, CommandSpec, Inspection, Talk
 from artifactr.files.wordcraft.docx import Block, fingerprint, outline
 
-MiB: Final = 1 << 20
-FOUND: Final = 10
+_FOUND: Final = 10
 """How many commands `commands` returns at most."""
 
-SOURCE: Final = "source.docx"
-SAVED: Final = "saved.docx"
+_SOURCE: Final = "source.docx"
+_SAVED: Final = "saved.docx"
 
 
 class _Text(BaseModel):
@@ -67,7 +66,6 @@ class Subprocess:
         version: The WordCraft version it must be, which provenance records: a call to a CLI of
             another version is refused.
         author: Who the CLI says tracked changes, comments and saves are by.
-        build: The digest of the image the CLI runs in, if it runs in one.
         limit: The most bytes a file may hold, saved or inflated: 256 MiB by default.
         lookup: How long, in seconds, finding commands may take: 10 by default.
     """
@@ -76,6 +74,8 @@ class Subprocess:
     talk: Talk = "save"
     """WordCraft's browser build opens and saves files only: people check files out and in."""
     integration: str = "files:wordcraft"
+    build: str | None = None
+    """It runs on this machine, in no image."""
 
     def __init__(
         self,
@@ -83,12 +83,10 @@ class Subprocess:
         *,
         version: str,
         author: str = "lattice",
-        build: str | None = None,
-        limit: int = 256 * MiB,
+        limit: int = 256 << 20,
         lookup: float = 10.0,
     ) -> None:
         self.version: str = version
-        self.build: str | None = build
         self._cli = str(cli)
         self._author = author
         self._limit = limit
@@ -152,9 +150,11 @@ class Subprocess:
                 ],
                 cwd=root,
             )
-            with (root / "stderr").open("w+") as errlog:
+            with (root / "stderr").open("w+", errors="replace") as errlog:
                 try:
-                    async with asyncio.timeout(deadline):
+                    # anyio's deadline, not asyncio's: stdio_client ends the CLI in a shielded
+                    # scope, which only anyio's cancellation leaves to finish.
+                    with anyio.fail_after(deadline):
                         async with (
                             stdio_client(server, errlog=errlog) as (read, write),
                             ClientSession(read, write) as session,
@@ -166,10 +166,13 @@ class Subprocess:
                     raise AppFailed("timeout", late) from None
                 except Exception as error:
                     # The CLI is a separate process reading hostile bytes: whatever ends it, or
-                    # its replies, mid-call is a crash, told with the end of what it printed.
+                    # its replies, mid-call is a crash, told with what ended it and the end of
+                    # what it printed.
                     errlog.seek(0)
                     printed = errlog.read()[-500:].strip()
-                    raise AppFailed("crashed", printed or repr(error)) from error
+                    raise AppFailed(
+                        "crashed", f"{_innermost(error)!r}; it printed: {printed}"
+                    ) from error
         if isinstance(outcome, AppFailed):
             raise outcome
         return outcome
@@ -177,7 +180,11 @@ class Subprocess:
     async def _attempt[T](
         self, document: "_Document", work: Callable[["_Document"], Awaitable[T]]
     ) -> T | AppFailed:
-        """The work's result, or how the CLI refused it, kept to raise once the CLI has ended."""
+        """The work's result, or how the CLI refused it, kept to raise once the CLI has ended.
+
+        What the body of `stdio_client` and `ClientSession` raises comes out of their task
+        groups wrapped in an `ExceptionGroup`, so a refusal is returned through them instead.
+        """
         try:
             started = await document.session.initialize()
             if (running := started.server_info.version) != self.version:
@@ -200,7 +207,7 @@ class _Document:
         if source is None:
             await self._tool("new_document", template="blank")
             return
-        path = self._in / SOURCE
+        path = self._in / _SOURCE
         path.write_bytes(source)
         await self._tool("open_document", path=str(path))
 
@@ -208,12 +215,12 @@ class _Document:
         steps: list[JsonValue] = [
             {"command": command.name, "params": command.args} for command in commands
         ]
-        reply = await self._call("batch", {"commands": steps})
+        reply = await self.session.call_tool("batch", {"commands": steps})
         if reply.is_error:
             raise AppFailed("refused", _failed_step(_text(reply)))
 
     async def save(self) -> bytes:
-        path = self._out / SAVED
+        path = self._out / _SAVED
         await self._tool("save_document", path=str(path))
         if path.stat().st_size > self._limit:
             raise AppFailed("too_large", f"the saved file is larger than {self._limit} bytes")
@@ -233,7 +240,7 @@ class _Document:
         )
 
     async def render(self, page: int, scale: float) -> bytes:
-        reply = await self._call("render_page", {"page": page, "scale": scale})
+        reply = await self.session.call_tool("render_page", {"page": page, "scale": scale})
         if reply.is_error:
             raise AppFailed("refused", _text(reply))
         for content in reply.content:
@@ -249,22 +256,26 @@ class _Document:
                 signature=f"{command.id} {command.params}",
                 description=f"{command.label} ({command.location})",
             )
-            for command in found[:FOUND]
+            for command in found[:_FOUND]
         ]
 
     async def _tool(self, name: str, **arguments: JsonValue) -> str:
         """Call a tool, and return its reply's text; refuse with it if the tool failed."""
-        reply = await self._call(name, arguments)
+        reply = await self.session.call_tool(name, arguments)
         if reply.is_error:
             raise AppFailed("refused", _text(reply))
         return _text(reply)
 
-    async def _call(self, name: str, arguments: dict[str, JsonValue]) -> CallToolResult:
-        return await self.session.call_tool(name, arguments)
-
 
 def _text(reply: CallToolResult) -> str:
     return "".join(c.text for c in reply.content if isinstance(c, TextContent))
+
+
+def _innermost(error: BaseException) -> BaseException:
+    """The first error an exception group holds, however deeply, or the error itself."""
+    if isinstance(error, BaseExceptionGroup):
+        return _innermost(cast(BaseExceptionGroup[BaseException], error).exceptions[0])
+    return error
 
 
 def _failed_step(text: str) -> str:

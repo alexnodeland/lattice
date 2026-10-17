@@ -43,6 +43,9 @@ SIGNATURE: Final = "x-plane-signature"
 """The header Plane signs a webhook in: HMAC-SHA256, hex, over `json.dumps` of its payload, which
 is the body it sends."""
 
+INTEGRATION: Final = "tracker:plane"
+"""Plane's key among the application's integrations (`relayr.integrations`)."""
+
 PER_PAGE: Final = 1000
 """Plane's largest page."""
 

@@ -4,10 +4,12 @@ Install `relayr-ai[plane]`, and connect each workspace through one shared client
 
 ```python
 http = httpx.AsyncClient()
-trackers = Trackers(ledger, connect=plane(http), credentials=..., bindings=...)
+trackers = Trackers(
+    ledger, connect=plane(http), integration=INTEGRATION, credentials=..., bindings=...
+)
 ```
 """
 
-from relayr.plane.tracker import PlaneTracker, plane
+from relayr.plane.tracker import INTEGRATION, PlaneTracker, plane
 
-__all__ = ["PlaneTracker", "plane"]
+__all__ = ["INTEGRATION", "PlaneTracker", "plane"]

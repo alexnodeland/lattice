@@ -10,6 +10,7 @@ Community edition in `relayr.plane` and Vikunja in `relayr.vikunja`, and one in 
 trackers = Trackers(
     ledger,
     connect=plane(http),
+    integration=relayr.plane.INTEGRATION,
     credentials=tenant_credentials,
     bindings={WorkspaceKey("acme", "ops"): TrackerBinding(project=OPS, labels=("lattice",))},
     allowlists={"ops:dead-letters": Allowlist(trackers=True)},

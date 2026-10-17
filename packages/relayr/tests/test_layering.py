@@ -47,8 +47,10 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     ),
     # The tracker connector (lattice RFC-0004): the port, the core and the fake; and `http`, which
     # only the adapters import, on httpx.
+    # Whether an integration runs in a workspace: a protocol, to move to a shared home.
+    "integrations": ({"relayr.integrations"}, set()),
     "trackers": (
-        {"relayr.ledger", "relayr.outbound", "relayr.trackers"},
+        {"relayr.integrations", "relayr.ledger", "relayr.outbound", "relayr.trackers"},
         {*LIBRARIES, "pydantic", "pydantic_ai", "httpx"},
     ),
     "plane": ({"relayr.trackers", "relayr.plane"}, {"httpx", "pydantic"}),

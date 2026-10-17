@@ -17,6 +17,7 @@ from typing import Any, Final
 from pydantic import BaseModel, ConfigDict, JsonValue
 
 from reflexr.workspace import Reaction, RunFailure
+from relayr.integrations import Enabled, always
 from relayr.ledger import Clock, Ledger, TrackedKind, WorkspaceKey, utc_now
 from relayr.outbound.actions import NotAllowed
 from relayr.outbound.allowlist import Allowlist, Allowlists
@@ -116,6 +117,10 @@ class Trackers:
             nothing.
         allowlists: Each rule's allowlist, as [`Outbound`][relayr.outbound.Outbound] takes them.
             A rule writes to its tracker only if its allowlist's `trackers` is set.
+        integration: The tracker's key among the application's integrations:
+            `relayr.plane.INTEGRATION` or `relayr.vikunja.INTEGRATION`.
+        enabled: Whether the integration runs in a workspace, asked before anything is done
+            there. By default it runs everywhere.
         clock: Returns the current time, which credentials expire by.
 
     Raises:
@@ -130,9 +135,13 @@ class Trackers:
         credentials: Credentials,
         bindings: Mapping[WorkspaceKey, TrackerBinding],
         allowlists: Mapping[str, Allowlist] | None = None,
+        integration: str,
+        enabled: Enabled = always,
         clock: Clock = utc_now,
     ) -> None:
         self._ledger = ledger
+        self._integration = integration
+        self._enabled = enabled
         self._connections = _Connections(connect, credentials, clock)
         self._bindings = dict(bindings)
         self._allowlists = Allowlists(allowlists)
@@ -151,6 +160,7 @@ class Trackers:
                 self._connections,
                 self._bindings.get(key),
                 self._allowlists.of(reaction.run.rule),
+                (self._integration, self._enabled),
             )
             self._acting[reaction] = actions
         return actions
@@ -159,7 +169,9 @@ class Trackers:
 class TrackerActions:
     """What one attempt of a run does in its workspace's tracker. Get it with `Trackers.acting`.
 
-    Every method needs the rule's allowlist to allow trackers, and the workspace to be bound.
+    Every method needs the rule's allowlist to allow trackers, the workspace to be bound, and the
+    integration to be enabled there; otherwise it is `NotAllowed`, before the ledger or the
+    tracker is touched.
     Each fails the attempt, to be retried, when the tracker is unavailable or rate-limited;
     raises [`TrackerRefused`][relayr.trackers.TrackerRefused] when it refuses a write as invalid
     or about something missing; and fails the run for good when it refuses the tenant's key.
@@ -172,8 +184,10 @@ class TrackerActions:
         connections: "_Connections",
         binding: TrackerBinding | None,
         allowlist: Allowlist,
+        integration: tuple[str, Enabled],
     ) -> None:
         self._reaction = reaction
+        self._integration, self._enabled = integration
         self._ledger = ledger
         self._connections = connections
         self._key = WorkspaceKey(reaction.workspace.tenant_id, reaction.workspace.workspace_id)
@@ -204,7 +218,7 @@ class TrackerActions:
                 recorded its item, so the attempt is retried. A write the tracker refused
                 releases the key's claim, so the rule may file by it again at once.
         """
-        binding = self._bound()
+        binding = await self._bound()
         key = key or self._derive("item", canonical(draft.model_dump(mode="json")))
         tracked = await self._ledger.tracked(self._key, "item", key)
         if tracked is not None and tracked.deleted:
@@ -228,7 +242,7 @@ class TrackerActions:
             key: What the comment is posted by; by default derived from the run, the item and
                 the text.
         """
-        self._bound()
+        await self._bound()
         key = key or self._derive("comment", item.id, canonical(body))
         tracked = await self._ledger.tracked(self._key, "comment", key)
         if tracked is not None and tracked.ref is not None:
@@ -253,7 +267,7 @@ class TrackerActions:
             RunFailure: For good, if the item wasn't filed by lattice, which has no key for it.
             TrackerRefused: If the item was deleted, or the tracker refuses the change.
         """
-        self._bound()
+        await self._bound()
         if item.key is None:
             raise RunFailure(
                 f"{self._rule} changes only the items it filed, by their keys",
@@ -286,12 +300,12 @@ class TrackerActions:
 
     async def read(self, item: ItemRef) -> Item | None:
         """Return an item's snapshot, archived or not, or None if it was deleted."""
-        self._bound()
+        await self._bound()
         return await self._call(lambda tracker: tracker.item(item))
 
     async def filed(self, key: ItemKey) -> ItemRef | None:
         """Return the item a key filed, or None if it filed none, or a person deleted it."""
-        self._bound()
+        await self._bound()
         tracked = await self._ledger.tracked(self._key, "item", key)
         if tracked is None or tracked.ref is None or tracked.deleted:
             return None
@@ -299,7 +313,7 @@ class TrackerActions:
 
     async def link(self, item: ItemRef) -> str:
         """Return the item's address in the tracker's web app."""
-        self._bound()
+        await self._bound()
         tracker = await self._connections.get(self._key)
         return tracker.link(item)
 
@@ -309,12 +323,19 @@ class TrackerActions:
     def _rule(self) -> str:
         return self._reaction.run.rule
 
-    def _bound(self) -> TrackerBinding:
-        """The workspace's binding, if the rule may write to it."""
+    async def _bound(self) -> TrackerBinding:
+        """The workspace's binding, if the rule may write to it and the integration runs there.
+
+        The one place every write and read checks first, before the ledger or the tracker:
+        the rule's allowlist, the workspace's binding, and whether the integration is enabled
+        in the workspace.
+        """
         if not self._allowlist.trackers:
             raise NotAllowed(f"{self._rule} may not write to its tracker")
         if self._binding is None:
             raise NotAllowed(f"workspace {self._key.workspace_id} has no tracker project")
+        if not await self._enabled(*self._key, self._integration):
+            raise NotAllowed(f"{self._integration} is off in workspace {self._key.workspace_id}")
         return self._binding
 
     @asynccontextmanager

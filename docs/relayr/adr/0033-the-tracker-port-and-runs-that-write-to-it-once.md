@@ -20,6 +20,8 @@ RFC-0004 has rules' runs file and update work items in a task tracker. Neither P
 - **Edits are keyed:** `update` reads the item, sends only the fields that differ, and records the values it sends on the item's key first, for the reading side to tell relayr's changes from people's.
 - **Each lattice workspace has its own adapter,** made by `connect(credentials, source)` from its tenant's credentials and its source, `lattice:<tenant>/<workspace>`, which is Plane's `external_source`. Credentials are asked for at most every five minutes, and again at once when the tracker refuses the key; the request is then made once more.
 
+- **Each tracker is an integration, enabled per workspace at one seam.** `Trackers` takes the tracker's key (`tracker:plane`, `tracker:vikunja`) and an `Enabled`, `(tenant_id, workspace_id, key) -> bool`, from `relayr.integrations`, which every action and tool asks before it touches the ledger or the tracker; switched off is `NotAllowed`. Without one, it runs everywhere. lattice's shared store of integrations' switches, per deployment, tenant and workspace, audited and set from portalr's admin, is built apart and will implement the protocol; `relayr.integrations` holds nothing else, so it can move there.
+
 ### Where it departs from the RFC
 
 - **One table, not three.** The RFC's migration adds `relayr_tracker_items`, `relayr_tracker_followers` and `relayr_tracker_dead_letters`. The two others hold phase 2's followers, so they come with them: a table nothing writes, behind ledger methods nothing calls, would be untested schema.

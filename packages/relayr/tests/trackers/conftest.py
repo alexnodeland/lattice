@@ -9,6 +9,7 @@ import pytest
 import reflexr
 import reflexr.core
 import reflexr.workspace as r
+from relayr.integrations import Enabled, always
 from relayr.ledger import Ledger, WorkspaceKey
 from relayr.outbound import Allowlist
 from relayr.trackers import FakeTracker, TrackerBinding, TrackerCredentials, Trackers
@@ -83,6 +84,7 @@ def connector(
     *,
     allowlists: Mapping[str, Allowlist] = ALLOWED,
     bindings: Mapping[WorkspaceKey, TrackerBinding] | None = None,
+    enabled: Enabled = always,
 ) -> Trackers:
     return Trackers(
         ledger,
@@ -90,6 +92,8 @@ def connector(
         credentials=tenant,
         bindings={KEY: BINDING} if bindings is None else bindings,
         allowlists=allowlists,
+        integration="tracker:fake",
+        enabled=enabled,
         clock=clock,
     )
 

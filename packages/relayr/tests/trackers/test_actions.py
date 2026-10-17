@@ -296,6 +296,35 @@ async def test_a_rule_writes_only_if_its_allowlist_says(
         connector(ledger, tracker, tenant, clock, allowlists={"reflexr:*": Allowlist()})
 
 
+async def test_an_integration_switched_off_touches_neither_tracker_nor_ledger(
+    runs: Runs, ledger: Ledger, tracker: FakeTracker, tenant: Tenant, clock: FakeClock
+) -> None:
+    asked: list[tuple[str, str, str]] = []
+
+    async def enabled(tenant_id: str, workspace_id: str, key: str, /) -> bool:
+        asked.append((tenant_id, workspace_id, key))
+        return workspace_id != "ops"
+
+    off = connector(ledger, tracker, tenant, clock, enabled=enabled)
+    item = ItemRef(project=PROJECT, id="1", number=1, name="OPS-1", key=KEYED)
+    tracker.fail(Unavailable("asked"))  # any request would raise this, not NotAllowed
+    acting = off.acting(await runs.reaction())
+    for call in (
+        acting.ensure_item(DRAFT, key=KEYED),
+        acting.comment(item, "<p>No.</p>", key="note"),
+        acting.set_state(item, "done"),
+        acting.read(item),
+        acting.filed(KEYED),
+        acting.link(item),
+    ):
+        with pytest.raises(NotAllowed, match="tracker:fake is off in workspace ops"):
+            await call
+    assert asked == [("acme", "ops", "tracker:fake")] * 6
+    assert (tracker.created, tenant.asked) == (0, []), "nothing written, no credentials asked"
+    assert await ledger.tracked(KEY, "item", KEYED) is None, "the ledger untouched"
+    assert await ledger.tracked(KEY, "comment", "note") is None
+
+
 async def test_a_link_is_the_trackers(runs: Runs) -> None:
     acting = runs.trackers.acting(await runs.reaction())
     item = await filed(acting)

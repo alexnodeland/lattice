@@ -11,7 +11,7 @@ import httpx
 
 from relayr.ledger import WorkspaceKey
 from relayr.outbound import Allowlist
-from relayr.plane import plane
+from relayr.plane import INTEGRATION, plane
 from relayr.trackers import TrackerBinding, TrackerCredentials, Trackers
 
 http = httpx.AsyncClient()  # shared by every workspace's adapter; close it at shutdown
@@ -24,6 +24,7 @@ async def credentials(tenant: str) -> TrackerCredentials:
 trackers = Trackers(
     ledger,
     connect=plane(http),
+    integration=INTEGRATION,  # "tracker:plane"
     credentials=credentials,
     bindings={WorkspaceKey("acme", "ops"): TrackerBinding(project=OPS, labels=("lattice",))},
     allowlists={"ops:dead-letters": Allowlist(trackers=True)},
@@ -35,6 +36,20 @@ trackers = Trackers(
 - **A binding** is the one project a workspace files into, with what its items have unless the rule says otherwise: a `state`, a `priority` and `labels`. A workspace with no binding files nothing.
 
 Each tenant has its own tracker workspace (a Plane workspace, or a Vikunja top-level project) and its own tracker user, whose key reaches only that tenant's work.
+
+## Switching it per workspace
+
+Each tracker is an integration of its own, by its key: `tracker:plane` or `tracker:vikunja`. Give `Trackers` an `enabled`, an async callable `(tenant_id, workspace_id, key) -> bool` ([`relayr.integrations.Enabled`](../reference.md)), and every action and tool asks it first; one switched off is `NotAllowed`, before the ledger or the tracker is touched. Without one, the tracker runs in every bound workspace.
+
+```python
+async def enabled(tenant_id: str, workspace_id: str, key: str, /) -> bool:
+    return await settings_store.enabled(tenant_id, workspace_id, key)
+
+
+trackers = Trackers(ledger, connect=plane(http), integration=INTEGRATION, enabled=enabled, ...)
+```
+
+lattice's shared store of integrations' switches, per deployment, tenant and workspace, audited, with portalr's admin page to set them, will implement this protocol; until then the application gives its own.
 
 ## From a function action
 

@@ -41,6 +41,9 @@ from relayr.trackers.signatures import signed
 SIGNATURE: Final = "x-vikunja-signature"
 """The header Vikunja signs a webhook in: HMAC-SHA256, hex, over the bytes it sends."""
 
+INTEGRATION: Final = "tracker:vikunja"
+"""Vikunja's key among the application's integrations (`relayr.integrations`)."""
+
 PER_PAGE: Final = 50
 """Vikunja's default and largest page."""
 

@@ -149,7 +149,7 @@ Every command gets exactly one result.
 }
 ```
 
-`outcome.type` is `applied` (`artifact_id`, `version`), `proposed` (`proposal_id`), `resolved` (`proposal_id`, `decision`, `version?`) or `recorded` (`run_id?`: the run a `post_message` or `answer_deferred` started or resumed, or `null` when it steered the thread's active run, will be taken by the turn that run hands the thread over to as it ends, left a paused run's requests unanswered, or was a notice). `rejection.type` is one of `version_conflict`, `validation_failed`, `patch_failed`, `not_found`, `forbidden` or `invalid_state`; every rejection has a `message` and its typed details.
+`outcome.type` is `applied` (`artifact_id`, `version`), `proposed` (`proposal_id`), `resolved` (`proposal_id`, `decision`, `version?`) or `recorded` (`run_id?`: the run a `post_message` or `answer_deferred` started or resumed, or `null` when it steered the thread's active run, will be taken by the turn that run hands the thread over to as it ends, left a paused run's requests unanswered, or was a notice). `rejection.type` is one of `version_conflict`, `validation_failed`, `patch_failed`, `not_found`, `forbidden`, `not_enabled` (`integration`: the integration switched off in the workspace, [ADR-0081](adr/0081-a-gate-before-access-integrations-switched-off-answer-not-enabled.md)) or `invalid_state`; every rejection has a `message` and its typed details.
 
 ### `replay_complete`
 
@@ -247,7 +247,7 @@ REST mirrors the commands and exposes reads; `artifactr.fastapi.artifactr_router
 
 Authentication is the host's: `resolve_actor(request)` returns the tenant and actor, or raises `Unauthorized` (401). The `authorize(tenant, workspace, actor, access)` hook of the application's `Workspaces` is asked for every request: for opening the workspace, then for each action the request takes ([ADR-0056](adr/0056-access-asked-in-every-workspace-method.md)). Listing workspaces asks `artifactr:read_workspaces` with no workspace, then `artifactr:open` in each workspace, and leaves out those refused ([ADR-0058](adr/0058-a-tenants-workspaces-listed-by-what-each-actor-may-open.md)). A refusal is 403, whose `detail` is the `forbidden` rejection, as for every other rejection a read raises; over the WebSocket, a command it refuses has a `forbidden` result.
 
-Rejections map to HTTP status codes (`artifactr.fastapi.STATUS_CODES`): `version_conflict` and `invalid_state` → 409, `validation_failed` and `patch_failed` → 422, `not_found` → 404, `forbidden` → 403. `watch_run` over REST is rejected as `invalid_state`. A NUL character in any string, an id, a name or a command's text, is `validation_failed` on every surface and every storage, before `authorize` hears it ([ADR-0061](adr/0061-a-nul-character-is-refused-at-the-boundary.md)).
+Rejections map to HTTP status codes (`artifactr.fastapi.STATUS_CODES`): `version_conflict`, `invalid_state` and `not_enabled` → 409, `validation_failed` and `patch_failed` → 422, `not_found` → 404, `forbidden` → 403. `watch_run` over REST is rejected as `invalid_state`. A NUL character in any string, an id, a name or a command's text, is `validation_failed` on every surface and every storage, before `authorize` hears it ([ADR-0061](adr/0061-a-nul-character-is-refused-at-the-boundary.md)).
 
 ## MCP mapping
 

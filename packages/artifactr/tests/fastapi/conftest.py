@@ -16,7 +16,7 @@ from starlette.requests import HTTPConnection
 from artifactr.agent import ArtifactWorkspace, Runner, Session
 from artifactr.core import Actor, Forbidden, TenantId, UserActor, WorkspaceId
 from artifactr.fastapi import Unauthorized, artifactr_router
-from artifactr.workspace import Access, Hidden, InMemoryStorage, Workspaces
+from artifactr.workspace import Access, Gate, Hidden, InMemoryStorage, Workspaces
 from tests.agent.conftest import Script
 from tests.artifact_types import Checklist, Note
 
@@ -74,6 +74,7 @@ def build(
     latch: Latch | None = None,
     hidden: Hidden | None = None,
     hidden_refresh: timedelta = timedelta(seconds=30),
+    gate: Gate | None = None,
     **options: Any,
 ) -> tuple[FastAPI, Runner[Latch]]:
     agent: Agent[Session[Latch], Any] = Agent(
@@ -89,6 +90,7 @@ def build(
         authorize=authorize,
         hidden=hidden,
         hidden_refresh=hidden_refresh,
+        gate=gate,
     )
     app = FastAPI()
     router = artifactr_router(workspaces, runner, resolve_actor=resolve_actor, **options)

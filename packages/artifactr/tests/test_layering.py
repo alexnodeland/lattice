@@ -41,7 +41,7 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     ),
     "workspace": (
         {"artifactr.core", "artifactr.telemetry", "artifactr.workspace"},
-        {"pydantic", "lattice_core.text", *OTEL_API},
+        {"pydantic", "lattice_core.integrations", "lattice_core.text", *OTEL_API},
     ),
     "agent": (INNER, {"pydantic", "pydantic_ai", *OTEL_API}),
     "sql": (

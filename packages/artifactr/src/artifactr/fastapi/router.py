@@ -36,6 +36,7 @@ ResolveActor = Callable[[HTTPConnection], Awaitable[tuple[TenantId, Actor]]]
 STATUS_CODES: dict[str, int] = {
     "version_conflict": 409,
     "invalid_state": 409,
+    "not_enabled": 409,
     "validation_failed": 422,
     "patch_failed": 422,
     "not_found": 404,

@@ -112,7 +112,7 @@ curl -X POST localhost:8000/v1/workspaces/launch/commands \
 
 A message's outcome names the run it started or resumed, which `GET /workspaces/{workspace_id}/runs/{run_id}` reads; `run_id` is `null` when the message steered the thread's active run instead, or was a notice.
 
-A rejection answers with its status code (`STATUS_CODES`): 409 for `version_conflict` and `invalid_state`, 422 for `validation_failed` and `patch_failed`, 404 for `not_found` and 403 for `forbidden`. The body is still a `command_result`, with `ok: false` and the rejection's details.
+A rejection answers with its status code (`STATUS_CODES`): 409 for `version_conflict`, `invalid_state` and `not_enabled`, 422 for `validation_failed` and `patch_failed`, 404 for `not_found` and 403 for `forbidden`. The body is still a `command_result`, with `ok: false` and the rejection's details.
 
 `command_id` is chosen by the client and doubles as an idempotency key: the runner remembers the most recent results, keyed by tenant, workspace, sender and `command_id`, and answers a repeated id with the original result instead of running the command twice. Retry a command that timed out with the same id. The memory is the runner's, so REST, the WebSocket and [MCP](mcp.md#retries) share it. By default it holds the 10,000 most recent results in the process; pass the runner another `CommandResults` to change that:
 

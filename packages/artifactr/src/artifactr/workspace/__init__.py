@@ -6,6 +6,7 @@ hook hides, and every write runs core's rules in one
 storage transaction.
 """
 
+from artifactr.workspace.gate import KeyOf, integration_gate
 from artifactr.workspace.memory import InMemoryStorage
 from artifactr.workspace.storage import HistoryChunk, Scope, Storage, Transaction, seal
 from artifactr.workspace.workspace import (
@@ -15,6 +16,7 @@ from artifactr.workspace.workspace import (
     ArtifactBusy,
     ArtifactLease,
     Authorize,
+    Gate,
     Hidden,
     OnOpen,
     ThreadBusy,
@@ -29,9 +31,11 @@ __all__ = [
     "ArtifactBusy",
     "ArtifactLease",
     "Authorize",
+    "Gate",
     "Hidden",
     "HistoryChunk",
     "InMemoryStorage",
+    "KeyOf",
     "OnOpen",
     "Scope",
     "Storage",
@@ -39,5 +43,6 @@ __all__ = [
     "Transaction",
     "Workspace",
     "Workspaces",
+    "integration_gate",
     "seal",
 ]

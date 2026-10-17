@@ -196,6 +196,21 @@ does, and the log drops the envelopes about one. An open subscription asks again
 its ``threads`` and ``artifacts``.
 """
 
+Gate = Callable[
+    ["Workspace", Command, Versioned[Artifact] | CreateArtifact | None], Awaitable[None]
+]
+"""Refuses a command while an integration it needs is off in the workspace (ADR-0081).
+
+:class:`Workspaces` holds it, and :meth:`Workspace.commit` calls it once the command's targets
+pass ``hidden`` and before ``authorize`` hears the command, so a refusal says nothing about the
+actor's grants, and nothing about a hidden artifact. It is given the committing handle, the
+command, and what the command changes: the artifact an edit, an archive or an answer to a
+proposal is about, as storage holds it, or the :class:`~artifactr.core.CreateArtifact` that
+makes one, a proposal's among them. It is ``None`` for a command on no artifact, or on one
+that doesn't exist. It refuses with :class:`~artifactr.core.NotEnabled`; anything else it raises
+fails the command as an error. Reads and facts are never gated.
+"""
+
 OnOpen = Callable[[TenantId, WorkspaceId], Awaitable[None]]
 """Called each time :meth:`Workspaces.open` opens a workspace, after ``authorize`` allows it.
 
@@ -259,6 +274,8 @@ class Workspaces:
         on_open: Called each time a workspace is opened, once ``authorize`` allows it.
         hidden: The threads and artifacts an actor may not see, which every read leaves out;
             hides nothing if omitted.
+        gate: Refuses a command while an integration it needs is off, before ``authorize``
+            hears it; gates nothing if omitted.
         hidden_refresh: How often an open subscription asks ``hidden`` again.
         tracer_provider: Where commit spans go. Defaults to the global tracer provider.
         meter_provider: Where artifactr's metrics go. Defaults to the global meter provider.
@@ -272,6 +289,7 @@ class Workspaces:
         authorize: Authorize | None = None,
         on_open: OnOpen | None = None,
         hidden: Hidden | None = None,
+        gate: Gate | None = None,
         hidden_refresh: timedelta = timedelta(seconds=30),
         tracer_provider: TracerProvider | None = None,
         meter_provider: MeterProvider | None = None,
@@ -281,6 +299,7 @@ class Workspaces:
             kinds=None if types is None else frozenset(t.kind for t in types),
             authorize=authorize,
             hidden=hidden,
+            gate=gate,
             hidden_refresh=hidden_refresh.total_seconds(),
             telemetry=Telemetry(tracer_provider=tracer_provider, meter_provider=meter_provider),
         )
@@ -349,6 +368,7 @@ class _Context:
     kinds: frozenset[str] | None
     authorize: Authorize | None
     hidden: Hidden | None
+    gate: Gate | None
     hidden_refresh: float
     telemetry: Telemetry
 
@@ -531,8 +551,10 @@ class Workspace:
         ) as span:
             try:
                 _check_text(command, cursor, claim)
-                await self.check(_access(command))
-                command = await self._check_target(command)
+                command, asked = await self._unhidden(command)
+                await self._gate(command)
+                for access in asked:
+                    await self._authorize(access)
                 self._check_kind(command)
                 outcome = await self._transact(
                     command,
@@ -675,21 +697,27 @@ class Workspace:
             return result.outcome
         return result.outcome.model_copy(update={"seq": envelopes[-1].seq})
 
-    async def _check_target(self, command: Command) -> Command:
-        """Ask about what a command acts on beyond what it names, and keep what it can't see.
+    async def _unhidden(self, command: Command) -> tuple[Command, list[Access]]:
+        """Refuse a command about what its actor can't see, and return what to ask ``authorize``.
 
-        Answering a proposal acts on its artifact, and answering a paused run, or giving
-        feedback on a turn, on its run's thread, so each is asked about that item too: refused,
-        or missing, as the proposal or run itself, if the item is hidden. A focus may name no
-        hidden artifact, and keeps those the actor can't see, which it can't have chosen to drop.
+        A command names a thread or artifact, as missing if it is hidden. It may act on more:
+        answering a proposal acts on its artifact, and answering a paused run, or giving
+        feedback on a turn, on its run's thread, so each is asked about that item too, missing
+        as the proposal or run itself if the item is hidden. A focus may name no hidden
+        artifact, and keeps those the actor can't see, which it can't have chosen to drop.
         """
-        action = f"artifactr:{command.type}"
+        access = _access(command)
+        if access.thread_id is not None or access.artifact_id is not None:
+            _not_hidden(access, await self.hidden())
+        asked = [access]
         match command:
             case RespondToProposal(proposal_id=proposal_id):
                 proposal = await self._storage.proposal(self._scope, proposal_id)
                 if proposal is not None:
-                    access = Access(action=action, artifact_id=proposal.artifact_id)
-                    await self._ask_about(access, NotFound("proposal", proposal_id))
+                    about = Access(action=access.action, artifact_id=proposal.artifact_id)
+                    asked.append(
+                        await self._unhidden_item(about, NotFound("proposal", proposal_id))
+                    )
             case (
                 AnswerDeferred(run_id=run_id)
                 | GiveFeedback(target=TurnTarget(run_id=run_id))
@@ -697,12 +725,12 @@ class Workspace:
             ):
                 run = await self._storage.run(self._scope, run_id)
                 if run is not None:
-                    access = Access(action=action, thread_id=run.thread_id)
-                    await self._ask_about(access, NotFound("run", run_id))
+                    about = Access(action=access.action, thread_id=run.thread_id)
+                    asked.append(await self._unhidden_item(about, NotFound("run", run_id)))
             case SetFocus(thread_id=thread_id, artifact_ids=artifact_ids):
                 hidden = await self.hidden()
                 for artifact_id in artifact_ids:
-                    _not_hidden(Access(action=action, artifact_id=artifact_id), hidden)
+                    _not_hidden(Access(action=access.action, artifact_id=artifact_id), hidden)
                 thread = await self._storage.thread(self._scope, thread_id)
                 kept = (
                     ()
@@ -710,18 +738,39 @@ class Workspace:
                     else tuple(a for a in thread.focus if a in hidden.artifacts)
                 )
                 if kept:
-                    return command.model_copy(update={"artifact_ids": (*artifact_ids, *kept)})
+                    command = command.model_copy(update={"artifact_ids": (*artifact_ids, *kept)})
             case _:
                 pass
-        return command
+        return command, asked
 
-    async def _ask_about(self, access: Access, missing: NotFound) -> None:
-        """Ask about an item a command acts on: ``missing`` if it is hidden."""
+    async def _unhidden_item(self, access: Access, missing: NotFound) -> Access:
+        """Return an item a command acts on, to ask ``authorize`` about: ``missing`` if hidden."""
         try:
             _not_hidden(access, await self.hidden())
         except NotFound:
             raise missing from None
-        await self._authorize(access)
+        return access
+
+    async def _gate(self, command: Command) -> None:
+        """Ask the gate about a command, with what it changes, if there is a gate."""
+        gate = self._context.gate
+        if gate is not None:
+            await gate(self, command, await self._changes(command))
+
+    async def _changes(self, command: Command) -> Versioned[Artifact] | CreateArtifact | None:
+        """What a command changes, as the gate hears it, read without asking ``authorize``."""
+        match command:
+            case CreateArtifact():
+                return command
+            case EditArtifact(artifact_id=artifact_id) | ArchiveArtifact(artifact_id=artifact_id):
+                return await self._storage.artifact(self._scope, artifact_id)
+            case ProposeChange(change=change):
+                return await self._changes(change)
+            case RespondToProposal(proposal_id=proposal_id):
+                proposal = await self._storage.proposal(self._scope, proposal_id)
+                return None if proposal is None else await self._changes(proposal.change)
+            case _:
+                return None
 
     def _check_kind(self, command: Command) -> None:
         if self._kinds is None:

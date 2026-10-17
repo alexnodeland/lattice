@@ -17,15 +17,15 @@
 # PyPI (ADR-0023): a release run never publishes. It attests and attaches the wheels, and lists, in
 # its summary, the dispatches that publish them: one `gh workflow run release.yml --ref <tag>
 # -f tag=<tag> -f mode=publish` for each package, in dependency order. Each dispatch publishes
-# that package through trusted publishing, in a job gated by the `pypi` environment, whose required
-# reviewers are the approval (so: one approval a package, one at a time), and only where the
-# repository variable PYPI_PUBLISH is `true`. A dispatch fails unless PyPI serves the packages of
-# this repository that the package requires. The workflow can also be run by hand and by default
-# it WRITES NOTHING: mode `rehearse` builds and checks, on a branch (every wheel at its head) or on
-# a tag (that release, again): it attaches nothing to a release, attests nothing, pushes no image,
-# rewrites no release notes and publishes nothing (the run keeps the built files as artifacts).
-# Mode `publish`, on a tag, attaches, attests and pushes as a release run does, for that tag alone,
-# and publishes it.
+# that package through trusted publishing, in a job gated by the package's own environment,
+# `pypi-<distribution>`, whose required reviewers are the approval (so: one approval a package,
+# one at a time), and only where the repository variable PYPI_PUBLISH is `true`. A dispatch fails
+# unless PyPI serves the packages of this repository that the package requires. The workflow can
+# also be run by hand and by default it WRITES NOTHING: mode `rehearse` builds and checks, on a
+# branch (every wheel at its head) or on a tag (that release, again): it attaches nothing to a
+# release, attests nothing, pushes no image, rewrites no release notes and publishes nothing (the
+# run keeps the built files as artifacts). Mode `publish`, on a tag, attaches, attests and pushes
+# as a release run does, for that tag alone, and publishes it.
 #
 # release-please acts as lattice's GitHub App, with a token minted for each run and narrowed to
 # what it needs, so that its pull request's CI and Title checks run, which they never do for the
@@ -260,16 +260,19 @@ jobs:
   # Publishes the wheels, one package at a time, in the order their requirements need: a matrix
   # that runs one leg at once, in plan order, and stops at the first failure (fail-fast), so a
   # later package never goes out after an earlier one failed. Each leg also checks that PyPI serves
-  # every package before it in this release, before it publishes its own. The `pypi` environment's
-  # required reviewers approve each leg. The environment should allow deployments from tags only
-  # (`*-v*`), and only maintainers may create such tags: see ADR-0023.
+  # every package before it in this release, before it publishes its own. Each leg runs in its
+  # package's own environment, `pypi-<distribution>`, since PyPI lets one pending publisher's
+  # configuration (owner, repository, workflow, environment) stand for one project only, and the
+  # environment is the field that differs; its required reviewers approve the leg. Each should
+  # allow deployments from tags only (`*-v*`), and only maintainers may create such tags: see
+  # ADR-0023.
   pypi-publish:
     name: PyPI, ${{ matrix.package.name }}
     needs: [plan, pypi-check]
     if: ${{ !cancelled() && needs.pypi-check.result == 'success' && needs.plan.outputs.publish == 'true' && needs.plan.outputs.ordered != '[]' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    environment: pypi
+    environment: pypi-${{ matrix.package.name }}
     permissions:
       attestations: read
       contents: read

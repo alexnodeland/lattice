@@ -409,7 +409,7 @@ def test_pypi_publishes_one_package_at_a_time_and_stops_at_the_first_failure() -
     job = JOBS["pypi-publish"]
     assert job["strategy"]["max-parallel"] == 1
     assert job["strategy"]["fail-fast"] is True
-    assert job["environment"] == "pypi"
+    assert job["environment"] == "pypi-${{ matrix.package.name }}", "one environment a package"
     assert "needs.plan.outputs.ordered" in job["strategy"]["matrix"]["package"]
 
 

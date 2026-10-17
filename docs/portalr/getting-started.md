@@ -49,7 +49,7 @@ portalr needs Python 3.12 or newer. Its wheel carries the two built UIs, which V
 
 === "Once released"
 
-    Once released, each package's GitHub release has its wheel and sdist attached, and is published to PyPI once the repository turns that on ([ADR-0023](../adr/0023-publishing-to-pypi-from-the-release-workflow.md)). Until then, download portalr's and grantr's wheels from the repository's [releases](https://github.com/alexnodeland/lattice/releases) and `uv add` the two; uv takes `lattice-core-ai` from PyPI. portalr has no release yet.
+    Once released, each package's GitHub release has its wheel and sdist attached, and is published to PyPI by dispatch ([ADR-0023](../adr/0023-publishing-to-pypi-from-the-release-workflow.md)). Until then, download portalr's and grantr's wheels from the repository's [releases](https://github.com/alexnodeland/lattice/releases) and `uv add` the two; uv takes `lattice-core-ai` from PyPI. portalr has no release yet.
 
 !!! warning "A git install has no UIs"
 

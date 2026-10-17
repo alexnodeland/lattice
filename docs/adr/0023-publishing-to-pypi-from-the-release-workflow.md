@@ -104,14 +104,14 @@ PyPI refused the second pending trusted publisher: with owner `alexnodeland`, re
 
 ### Amendment (2026-10-17): the sibling floors ship as dev0
 
-The user decided that the second release ships with its floors on its siblings as they are, and that they are raised in 0.1.1. The [Amendment (2026-10-16)](#amendment-2026-10-16) raised only the floors on `lattice-core-ai` (#213, step 5), so "no published wheel ever carries one" is true of those alone. The libraries' floors on one another are still `>=0.1.0.dev0`:
+The user decided that the second release ships with the libraries' floors on one another as they are, and that they are raised in the packages' next patch releases. The [Amendment (2026-10-16)](#amendment-2026-10-16) raised only the floors on `lattice-core-ai` (#213, step 5, in #318), so "no published wheel ever carries one" is true of those alone. The libraries' floors on one another are still `>=0.1.0.dev0`:
 
-- `artifactr-ai` and `reflexr` require `evalr>=0.1.0.dev0`, in their `evals` and `langfuse` extras.
-- `relayr-ai` requires `reflexr>=0.1.0.dev0`, and `evalr>=0.1.0.dev0` in its `evals` and `langfuse` extras.
-- `portalr` requires `grantr[fastapi]>=0.1.0.dev0`.
+- `artifactr-ai` and `reflexr` require `evalr` in their `evals` extra and `evalr[langfuse]` in their `langfuse` extra.
+- `relayr-ai` requires `reflexr`, `reflexr[langfuse]` in its `langfuse` extra, and `evalr` and `evalr[langfuse]` in its `evals` and `langfuse` extras.
+- `portalr` requires `grantr[fastapi]`.
 
-They can't be raised before the second release: as with lattice-core, uv can't lock `>=0.1.0` against a workspace member still at `0.1.0.dev0`, and the members reach 0.1.0 only as their own release pull requests merge.
+As with lattice-core, uv can't lock `>=0.1.0` against a workspace member still at `0.1.0.dev0`, so a floor can rise only once its sibling's own release pull request has merged. Raising them in between the second release's merges, sibling by sibling, was possible; the user chose not to interleave them.
 
-- **The first release's wheels carry them, for good.** A published version is kept for ever, so `artifactr-ai` 0.2.0, `reflexr` 0.1.0, `relayr-ai` 0.1.0 and `portalr` 0.1.0 keep these floors.
-- **A `dev0` floor lets an installer take a pre-release for that requirement.** A specifier that names a pre-release, such as `>=0.1.0.dev0`, opts its requirement into pre-releases, in pip and, by default, in uv: if a development build of `evalr` were ever on PyPI, an installer could pick it for `artifactr-ai[evals]`, with no flag from the user. Every other requirement still takes only final releases, unless the user asks for pre-releases everywhere, as uv's `--prerelease allow` does: with it, an install was seen to take `httpx` 1.0.dev6. lattice publishes no development builds, so no such `evalr`, `reflexr` or `grantr` exists today.
-- **They rise to `>=0.1.0` in a follow-up,** once the second release has put each sibling at 0.1.0 on `main`, and ship with the next patch releases of the packages that carry them: `artifactr-ai` 0.2.1, and `reflexr`, `relayr-ai` and `portalr` 0.1.1.
+- **The second release's wheels carry them, for good.** A published version is kept for ever, so `artifactr-ai` 0.2.0, `reflexr` 0.1.0, `relayr-ai` 0.1.0 and `portalr` 0.1.0 keep these floors.
+- **A `dev0` floor lets pip take a pre-release for that requirement.** pip allows pre-releases for a requirement whose specifier names one, such as `>=0.1.0.dev0`: if a development build of `evalr` newer than 0.1.0 were ever on PyPI, pip could pick it for `artifactr-ai[evals]`, with no flag from the user. uv (0.12.12, the pinned version) prefers final releases by default, whatever the specifier says, and takes a pre-release only when no final release fits; its `--prerelease allow` opens every requirement to pre-releases, and with it an install was seen to take `httpx` 1.0.dev6. lattice publishes no development builds, so no such `evalr`, `reflexr` or `grantr` exists today.
+- **They rise to `>=0.1.0` in a follow-up,** once the second release has put each sibling at 0.1.0 on `main`, and ship with the next releases of the packages that carry them: `artifactr-ai` 0.2.1, and `reflexr`, `relayr-ai` and `portalr` 0.1.1, if nothing in between bumps a minor version (`bump-minor-pre-major` makes a `feat` before then a 0.3.0 or 0.2.0). The follow-up is a `fix(deps)`, so that it releases those packages on its own.

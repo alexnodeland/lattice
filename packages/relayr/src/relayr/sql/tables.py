@@ -40,7 +40,9 @@ class UtcDateTime(TypeDecorator[datetime]):
 
     @override
     def process_result_value(self, value: datetime | None, dialect: Dialect) -> datetime | None:
-        return None if value is None else value.replace(tzinfo=UTC)
+        if value is None:
+            return None
+        return value.astimezone(UTC) if value.tzinfo else value.replace(tzinfo=UTC)
 
 
 class FollowerRow(Base):

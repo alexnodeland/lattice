@@ -60,9 +60,31 @@ async def test_a_new_binding_over_existing_items_publishes_nothing(app: Followin
     await seeded(app)
     assert await app.poll()
     assert await app.events() == [], "nothing changed since"
-    app.tracker.edit(first, ItemFields(title="After"))
+    for title in ("After", "Again"):
+        app.clock.advance(SECOND)
+        app.tracker.edit(first, ItemFields(title=title))
+        assert await app.poll()
+    assert changes(await app.events()) == [
+        ("changed", first.id, "title", "After"),
+        ("changed", first.id, "title", "Again"),
+    ], "its old comment stays old"
+
+
+async def test_a_value_relayr_recorded_before_the_binding_was_read_is_consumed(
+    app: Following,
+) -> None:
+    item = await app.filed("dead-letter/a")
+    await (await app.acting()).set_state(item, "done")
+    await seeded(app)
+    app.tracker.edit(item, ItemFields(state="todo"), by="ada")
     assert await app.poll()
-    assert changes(await app.events()) == [("changed", first.id, "title", "After")]
+    app.clock.advance(SECOND)
+    app.tracker.edit(item, ItemFields(state="done"), by="ada")
+    assert await app.poll()
+    assert changes(await app.events()) == [
+        ("changed", item.id, "state", "todo"),
+        ("changed", item.id, "state", "done"),
+    ]
 
 
 async def test_a_binding_since_a_time_publishes_what_changed_since_as_created(

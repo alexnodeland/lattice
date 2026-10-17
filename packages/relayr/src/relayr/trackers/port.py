@@ -10,7 +10,7 @@ from collections.abc import Mapping
 from datetime import datetime
 from typing import Literal, Protocol
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
 type ProjectId = str
 """A project in the tracker, by the tracker's own id."""
@@ -109,7 +109,7 @@ class Item(BaseModel):
     assignees: tuple[str, ...]
     """The tracker's ids for the people it is assigned to, sorted."""
 
-    updated_at: datetime
+    updated_at: AwareDatetime
     updated_by: str | None = None
     """The tracker's id for whoever changed it last, if the tracker says."""
 
@@ -126,7 +126,7 @@ class Comment(BaseModel):
     author: str | None
     """The tracker's id for whoever wrote it, if the tracker says."""
 
-    created_at: datetime
+    created_at: AwareDatetime
     key: CommentKey | None = None
     """The key lattice posted it by, or None if lattice didn't."""
 

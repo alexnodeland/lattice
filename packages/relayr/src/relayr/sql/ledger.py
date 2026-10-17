@@ -61,7 +61,8 @@ def _tracked(workspace: WorkspaceKey, kind: TrackedKind, key: str) -> ColumnElem
 
 
 def _in(
-    workspace: WorkspaceKey, model: type[SnapshotRow | TrackerDeadLetterRow]
+    workspace: WorkspaceKey,
+    model: type[SnapshotRow | TrackerDeadLetterRow | TrackerFollowerRow],
 ) -> ColumnElement[bool]:
     return (model.tenant_id == workspace.tenant_id) & (model.workspace_id == workspace.workspace_id)
 
@@ -439,11 +440,7 @@ class SqlLedger:
         async with self._session(workspace.tenant_id) as session, session.begin():
             await session.execute(
                 update(TrackerFollowerRow)
-                .where(
-                    TrackerFollowerRow.tenant_id == workspace.tenant_id,
-                    TrackerFollowerRow.workspace_id == workspace.workspace_id,
-                    TrackerFollowerRow.holder == holder,
-                )
+                .where(_in(workspace, TrackerFollowerRow), TrackerFollowerRow.holder == holder)
                 .values(holder=None, expires_at=None)
             )
 
@@ -507,26 +504,24 @@ class SqlLedger:
     ) -> None:
         """Save items' snapshots, in place of those before, in one transaction.
 
-        The rows missing are added together, skipping any another transaction adds meanwhile;
-        then every row is locked and changed.
+        Each is inserted, or updated in place where its row is there, so relayr's writes to the
+        item, which the row keeps too, are left as they are.
         """
-        wanted = {snapshot.item_id: snapshot for snapshot in snapshots}
+        rows: list[dict[str, object]] = [
+            {**workspace._asdict(), **snapshot.model_dump(), "writes": []} for snapshot in snapshots
+        ]
         async with self._session(workspace.tenant_id) as session, session.begin():
-            for chunk in _chunks(wanted):
-                blanks: list[dict[str, object]] = [
-                    {**workspace._asdict(), "item_id": item_id, "writes": []} for item_id in chunk
-                ]
+            for at in range(0, len(rows), CHUNK):
+                insert = self._insert(SnapshotRow).values(rows[at : at + CHUNK])
                 await session.execute(
-                    self._insert(SnapshotRow).values(blanks).on_conflict_do_nothing()
+                    insert.on_conflict_do_update(
+                        index_elements=["tenant_id", "workspace_id", "item_id"],
+                        set_={
+                            "item": insert.excluded.item,
+                            "comments_after": insert.excluded.comments_after,
+                        },
+                    )
                 )
-                query = (
-                    select(SnapshotRow)
-                    .where(_in(workspace, SnapshotRow), SnapshotRow.item_id.in_(chunk))
-                    .with_for_update()
-                )
-                for row in await session.scalars(query):
-                    snapshot = wanted[row.item_id]
-                    row.item, row.comments_after = snapshot.item, snapshot.comments_after
 
     @awaited_to_the_end
     async def forget_snapshots(

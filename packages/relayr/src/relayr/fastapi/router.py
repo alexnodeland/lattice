@@ -1,10 +1,11 @@
 """The trackers' webhooks: a nudge that makes a bound project's follower poll now.
 
 A webhook carries nothing relayr uses: the follower reads the change itself (lattice RFC-0004).
-The route is unauthenticated, so it gives nothing away. A body over `MAX_BODY` is refused
-before it is read, and a signature is checked against the tenant's secret the followers already
-hold, so a flood of requests reaches neither the secrets nor the tracker. An unknown tenant and
-a bad signature are the same 401.
+The route is unauthenticated, so it gives nothing away. A body over `MAX_BODY` is refused once
+it says so, or once that much is read; a signature is checked against the tenant's secret the
+followers already hold, before anything else is asked, so a flood of requests reaches neither
+the secrets nor the tracker. An unknown tenant, a switched-off workspace and a bad signature are
+the same 401.
 """
 
 from typing import Annotated, Final
@@ -47,8 +48,9 @@ def tracker_router(followers: TrackerFollowers) -> APIRouter:
 
 
 async def _read(request: Request) -> bytes | None:
-    """The request's body, or None once it is larger than `MAX_BODY`, unread past that."""
-    if int(request.headers.get("content-length") or 0) > MAX_BODY:
+    """The request's body, or None if it says or proves larger than `MAX_BODY`, unread past it."""
+    declared = request.headers.get("content-length", "")
+    if declared.isdigit() and int(declared) > MAX_BODY:
         return None
     body = bytearray()
     async for chunk in request.stream():

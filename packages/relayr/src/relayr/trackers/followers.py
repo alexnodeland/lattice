@@ -29,7 +29,7 @@ import random
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Final, TypedDict
+from typing import Final, TypedDict, get_args
 
 from opentelemetry import context as otel_context
 from opentelemetry.metrics import MeterProvider
@@ -82,14 +82,7 @@ one already read."""
 DEBOUNCE: Final = timedelta(seconds=2)
 """How soon after a poll began a nudge makes another."""
 
-FIELDS: Final[tuple[Field, ...]] = (
-    "title",
-    "description",
-    "state",
-    "priority",
-    "labels",
-    "assignees",
-)
+FIELDS: Final[tuple[Field, ...]] = get_args(Field.__value__)
 """The fields of an item a change is read on."""
 
 
@@ -195,20 +188,17 @@ class TrackerFollowers:
 
         Returns whether the webhook was verified.
         """
-        bound = [
-            workspace
-            for workspace in self._trackers.bindings
-            if workspace.tenant_id == tenant_id and await self._trackers.enabled(workspace)
-        ]
+        bound = [w for w in self._trackers.bindings if w.tenant_id == tenant_id]
         connections = (self._trackers.connected(workspace) for workspace in bound)
         connection = next((c for c in connections if c is not None), None)
         nudged = None
         if tracker == self._tracker and connection is not None:
-            nudged = connection.nudge(headers, body)
-        if nudged is None:
+            nudged = connection.nudge(headers, body)  # verified before anything is asked
+        on = [] if nudged is None else [w for w in bound if await self._trackers.enabled(w)]
+        if nudged is None or not on:
             self._telemetry.count(NUDGES_REFUSED, {})
             return False
-        for workspace in bound:
+        for workspace in on:
             woken = self._held.get(workspace)
             if woken is not None and self._trackers.bindings[workspace].project == nudged.project:
                 woken.set()
@@ -281,8 +271,12 @@ class TrackerFollowers:
         loop = asyncio.get_running_loop()
         due = max(began + self._interval.total_seconds(), loop.time() + pause)
         while (left := due - loop.time()) > 0 and not (woken.is_set() and pause <= 0):
-            with contextlib.suppress(TimeoutError):
-                await asyncio.wait_for(woken.wait(), min(self._ttl.total_seconds() / 3, left))
+            step = min(self._ttl.total_seconds() / 3, left)
+            if pause > 0:  # a nudge doesn't cut a rate limit's pause short
+                await asyncio.sleep(step)
+            else:
+                with contextlib.suppress(TimeoutError):
+                    await asyncio.wait_for(woken.wait(), step)
             if not await self._may(workspace):
                 return False
         if woken.is_set():
@@ -303,7 +297,7 @@ class TrackerFollowers:
             with self._telemetry.tracer.start_as_current_span(
                 "relayr.trackers.poll", attributes=workspace_attributes(*workspace)
             ):
-                published = await _Reading(
+                found = await _Reading(
                     workspace=workspace,
                     binding=self._trackers.bindings[workspace],
                     tracker=tracker,
@@ -329,8 +323,8 @@ class TrackerFollowers:
         except TrackerError as error:
             logger.warning("reading the tracker of %s/%s failed: %r", *workspace, error)
             return 0.0
-        if not nudged and published:
-            self._telemetry.count(UNNUDGED, workspace_attributes(*workspace), published)
+        if not nudged and found:
+            self._telemetry.count(UNNUDGED, workspace_attributes(*workspace), found)
         return 0.0
 
 
@@ -351,13 +345,16 @@ class _Reading:
     telemetry: Telemetry
     now: datetime
     sweep_every: timedelta
-    published: int = 0
+    found: int = 0
+    """The changes it published that reflexr didn't have, but removals, which no webhook
+    announces."""
+
     saved: list[Snapshot] = field(default_factory=list[Snapshot])
     echoed: dict[str, dict[str, JsonValue]] = field(default_factory=dict[str, dict[str, JsonValue]])
     """Each item's fields read back as relayr wrote them, by the item's key."""
 
     async def read(self) -> int:
-        """Read the project, publish what changed, and return how many events it published.
+        """Read the project, publish what changed, and return how many changes were new.
 
         It reads the whole project when the binding is new or its sweep is due, and otherwise
         what changed since a while before its cursor. It stops at the first item whose comments
@@ -365,7 +362,7 @@ class _Reading:
         """
         tenant, project = self.workspace.tenant_id, self.binding.project
         if not self.budget.take(tenant):
-            return 0
+            return self.found
         following = await self.ledger.tracker_following(self.workspace)
         if following is not None and following.project != project:
             await self.ledger.forget_snapshots(self.workspace)
@@ -401,7 +398,7 @@ class _Reading:
                 swept_at=self.now if swept or following is None else following.swept_at,
             ),
         )
-        return self.published
+        return self.found
 
     async def _item(self, item: Item, snapshot: Snapshot | None, *, seeding: bool) -> bool:
         """Publish what changed on an item; False, doing nothing, if the budget is out.
@@ -415,7 +412,10 @@ class _Reading:
         key = item.ref.key
         tracked = None if key is None else await self.ledger.tracked(self.workspace, "item", key)
         chain = None if tracked is None else tracked.correlation_id
+        written = {} if tracked is None else tracked.written
+        echoed = {f: new[f] for f in FIELDS if f in written and written[f] == new[f]}
         if snapshot is None and seeding:
+            self._echoed(key, echoed)
             since = self.binding.since
             if since is not None and item.updated_at >= since and tracked is None:
                 await self._publish(self._created(item), chain)
@@ -425,25 +425,28 @@ class _Reading:
         moved = snapshot is None or snapshot.item["updated_at"] != new["updated_at"]
         if moved and not self.budget.take(self.workspace.tenant_id):
             return False
-        written = {} if tracked is None else tracked.written
-        echoed = {f: new[f] for f in FIELDS if f in written and written[f] == new[f]}
-        if key is not None and echoed:
-            self.echoed[key] = echoed
+        self._echoed(key, echoed)
         if snapshot is None:
             if tracked is None:
                 await self._publish(self._created(item), chain)
         else:
-            await self._changed(item, snapshot.item, echoed, chain)
+            await self._changed(item, snapshot.item, new, echoed, chain)
         after = None if snapshot is None else snapshot.comments_after
         if moved:
             after = await self._comments(item, after, chain)
         self.saved.append(Snapshot(item_id=item.ref.id, item=new, comments_after=after))
         return True
 
+    def _echoed(self, key: str | None, echoed: dict[str, JsonValue]) -> None:
+        """Keep the fields read back as relayr wrote them, to consume once the item is saved."""
+        if key is not None and echoed:
+            self.echoed[key] = echoed
+
     async def _changed(
         self,
         item: Item,
         old: Mapping[str, JsonValue],
+        new: Mapping[str, JsonValue],
         echoed: Mapping[str, JsonValue],
         chain: str | None,
     ) -> None:
@@ -451,7 +454,6 @@ class _Reading:
 
         Its `actor` is the item's last updater, unless relayr wrote to the item since.
         """
-        new = item.model_dump(mode="json")
         changed: list[Field] = [name for name in FIELDS if old[name] != new[name]]
         actor = None if echoed.keys() & set(changed) else item.updated_by
         at = item.updated_at.isoformat()
@@ -478,7 +480,8 @@ class _Reading:
                     author=comment.author,
                 )
                 await self._publish((commented, self._id("comment", comment.ref.id)), chain)
-        return max((comment.created_at for comment in comments), default=after)
+        latest = max((comment.created_at for comment in comments), default=None)
+        return after if latest is None or (after is not None and after > latest) else latest
 
     async def _removed(self, gone: Mapping[str, Snapshot]) -> bool:
         """Publish the items no longer listed, and forget them; False if the budget ran out.
@@ -522,12 +525,14 @@ class _Reading:
         if projected is None:
             return
         try:
-            await self.target.publish(projected, id=published_id, correlation_id=chain)
+            published = await self.target.publish(projected, id=published_id, correlation_id=chain)
         except NotFound:
+            # The chain is gone, or the type is one reflexr refuses, which raises again.
             if chain is None:
                 raise
-            await self.target.publish(projected, id=published_id)
-        self.published += 1
+            published = await self.target.publish(projected, id=published_id)
+        if not published.duplicate and not isinstance(event, ItemRemoved):
+            self.found += 1
 
     async def _dead_letter(self, event: TrackerEvent, published_id: str, error: Exception) -> None:
         logger.warning(

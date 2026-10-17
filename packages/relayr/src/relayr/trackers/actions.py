@@ -16,7 +16,7 @@ from types import MappingProxyType
 from typing import Any, Final
 
 from opentelemetry.metrics import MeterProvider
-from pydantic import BaseModel, ConfigDict, JsonValue
+from pydantic import AwareDatetime, BaseModel, ConfigDict, JsonValue
 
 from reflexr.workspace import Reaction, RunFailure
 from relayr.integrations import Enabled, always
@@ -92,7 +92,7 @@ class TrackerBinding(BaseModel):
     labels: tuple[str, ...] = ()
     """Labels every item filed has, beside the rule's."""
 
-    since: datetime | None = None
+    since: AwareDatetime | None = None
     """When its follower first reads the project, the items changed since are published as
     created; by default none is, and only what changes after is published."""
 

@@ -162,7 +162,7 @@ reflexr.Rule(
 - **Your own events.** `TrackerFollowers(projections={workspace: project})` maps a workspace's `tracker:` events to the application's, or to None; the event keeps the derived id. One that raises is dead-lettered, once per id, in `relayr_tracker_dead_letters` on SQL; a type reflexr refuses stops the follower until its workspace is next opened.
 - **Untrusted text.** Titles, descriptions and comments are written by whoever can reach the tracker, and reach rules and their agents as chat messages do. Give agents' requests the gateway's `prompt-injection` guardrail.
 
-The route is unauthenticated, and gives nothing away: a body over 1 MB is refused before it is read, a signature is checked with the secret the tenant's followers already hold, and an unknown tenant and a bad signature are the same 401, counted in `relayr.trackers.nudges_refused`. A nudge that reaches a replica not holding the binding's lease waits for the holder's next poll.
+The route is unauthenticated, and gives nothing away: a body over 1 MB is refused before more of it is read, a signature is checked first, with the secret the tenant's followers already hold, and an unknown tenant and a bad signature are the same 401, counted in `relayr.trackers.nudges_refused`. A nudge that reaches a replica not holding the binding's lease waits for the holder's next poll.
 
 ## Allowlists
 

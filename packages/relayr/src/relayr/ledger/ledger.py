@@ -104,7 +104,7 @@ class TrackerFollowing(BaseModel):
     """The `updated_at` and id of the last item it read, or None if the project had none."""
 
     swept_at: datetime
-    """When it last read the whole project, by the ledger's clock."""
+    """When it last read the whole project, by the follower's clock."""
 
 
 class Snapshot(BaseModel):

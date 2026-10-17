@@ -59,7 +59,8 @@ UNNUDGED: Final = Metric(
 NUDGES_REFUSED: Final = Metric(
     name="relayr.trackers.nudges_refused",
     unit="{request}",
-    description="Webhooks refused, for an unknown tenant or a signature that didn't verify",
+    description="Webhooks refused: an unknown tenant or tracker, a signature that didn't verify, "
+    "or a switched-off workspace",
     attributes=frozenset(),
 )
 

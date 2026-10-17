@@ -151,10 +151,14 @@ async def test_a_change_no_nudge_announced_is_counted(
 ) -> None:
     app = following(ledger, clock, meter_provider=MeterProvider(metric_readers=[reader]))
     assert await app.poll()
-    app.tracker.add(PROJECT, "One")
+    one = app.tracker.add(PROJECT, "One")
     app.tracker.add(PROJECT, "Two")
+    app.tracker.reply(one, "<p>A comment.</p>")
     assert await app.poll()
-    assert counted(reader, UNNUDGED.name) == [({**_tenancy()}, 2)]
+    clock.advance(timedelta(seconds=1))
+    app.tracker.edit(one, ItemFields(title="Renamed"))  # its comment is read again
+    assert await app.poll()
+    assert counted(reader, UNNUDGED.name) == [({**_tenancy()}, 4)], "each change once"
 
 
 def _tenancy() -> dict[str, str]:
@@ -216,6 +220,28 @@ async def test_a_rate_limited_follower_waits_as_the_tracker_asks(
     await app.followers.watch(*KEY)
     await until(lambda: _seeded(ledger))
     assert loop.time() - began >= 0.05
+    await app.followers.aclose()
+
+
+async def test_a_nudge_doesnt_cut_a_rate_limits_pause_short(
+    ledger: Ledger, clock: FakeClock
+) -> None:
+    asked: list[str] = []
+
+    async def enabled(tenant_id: str, workspace_id: str, key: str, /) -> bool:
+        asked.append(workspace_id)
+        return True
+
+    app = following(ledger, clock, enabled=enabled, interval=QUICK, lease_ttl=TTL)
+    assert await app.poll()
+    app.tracker.fail(RateLimited(0.2))
+    await app.followers.watch(*KEY)
+    await asyncio.sleep(0.02)
+    before = len(asked)
+    for _ in range(10):
+        assert await app.followers.nudge(TENANT, "fake", *nudge())
+        await asyncio.sleep(0.01)
+    assert len(asked) - before < 40, "it waits, renewing its lease, rather than spinning"
     await app.followers.aclose()
 
 

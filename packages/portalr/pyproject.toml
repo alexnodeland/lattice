@@ -35,7 +35,7 @@ classifiers = [
 ]
 dependencies = [
     "grantr[fastapi]>=0.1.0.dev0",
-    "lattice-core-ai>=0.1.0.dev0",
+    "lattice-core-ai>=0.1.0",
     "fastapi>=0.141",
     "httpx>=0.28",
     "pydantic>=2.13",

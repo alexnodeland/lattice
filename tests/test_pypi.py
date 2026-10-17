@@ -95,6 +95,28 @@ def test_wait_refuses_a_file_pypi_serves_with_another_hash(tmp_path: Path) -> No
         pypi.wait(directory, other, attempts=2, sleep=lambda _: None)
 
 
+def test_only_wheels_and_sdists_are_looked_for_not_the_attestations_published_beside_them(
+    tmp_path: Path,
+) -> None:
+    wheel, sdist = "evalr-0.1.0-py3-none-any.whl", "evalr-0.1.0.tar.gz"
+    directory = built(tmp_path, wheel)
+    built(tmp_path, sdist, b"sdist")
+    built(tmp_path, f"{wheel}.publish.attestation", b"{}")
+    built(tmp_path, f"{sdist}.publish.attestation", b"{}")
+    get = index(evalr={wheel: sha(b"wheel"), sdist: sha(b"sdist")})
+    assert pypi.report(directory, get) == [f"{wheel}: same", f"{sdist}: same"]
+    pypi.wait(directory, get, attempts=1, sleep=lambda _: None)
+
+
+def test_a_directory_without_a_wheel_or_sdist_is_refused_not_found_served(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    directory = built(tmp_path, "evalr-0.1.0-py3-none-any.whl.publish.attestation", b"{}")
+    for command in ("report", "wait"):
+        assert pypi.main([command, str(directory)], index()) == 1
+        assert "has no wheel or sdist" in capsys.readouterr().err
+
+
 def test_require_names_what_an_earlier_stage_has_not_published() -> None:
     get = index(**{"lattice-core-ai": {"lattice_core_ai-0.1.0-py3-none-any.whl": "x"}})
     assert pypi.require(["lattice-core-ai==0.1.0"], get) == []

@@ -1,6 +1,6 @@
 # ADR-0036: Tier 2, against Floci
 
-**Status:** Accepted, amended by [ADR-0037](0037-the-state-hosts-clickhouse-backups.md)
+**Status:** Accepted, amended by [ADR-0037](0037-the-state-hosts-clickhouse-backups.md), and 2026-10-17 (see the [Amendment](#amendment-2026-10-17-the-manual-apply-comes-after-v01))
 **Date:** 2026-10-13
 **Deciders:** Alex Nodeland
 
@@ -101,3 +101,7 @@ The single host's smoke covers the first two on Compose, and the manual apply on
 - Easier: a change to the recipe or an image is applied, run and smoked before it merges, on the architecture Fargate runs, and nothing it creates outlives the run, except the images it pulls.
 - Harder: a tier-2 run takes about ten minutes on an arm64 runner, and runs on a change to `uv.lock` too. Floci's gaps are this ADR's to keep: each new Floci release is a chance to lift one.
 - Next: what isn't smoked yet, above; the template's `hosting: aws`, the rest of RFC-0004's phase 4; and the manual apply on real AWS that gates stackr's v0.1.
+
+## Amendment (2026-10-17): the manual apply comes after v0.1
+
+[lattice ADR-0023's amendment](../../adr/0023-publishing-to-pypi-from-the-release-workflow.md#amendment-2026-10-16) releases stackr's 0.1.0 without waiting for the manual apply on real AWS, and [RFC-0004's amendment](../rfcs/0004-hosting-recipes.md#amendment-2026-10-17-the-manual-apply-comes-after-v01) records it: the apply is a stated limit of v0.1, not its gate. What this ADR leaves to the apply (the cannot-test list) is still checked there, and only there, after the release. Where it says the apply comes before stackr's v0.1, or calls it a gate, this supersedes it.

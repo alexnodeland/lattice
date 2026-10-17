@@ -461,21 +461,31 @@ class Workspace:
         | GiveFeedback,
         *,
         cursor: tuple[str, int] | None = None,
+        claim: tuple[ThreadId, str] | None = None,
     ) -> Recorded: ...
 
-    async def commit(self, command: Command, *, cursor: tuple[str, int] | None = None) -> Outcome:
+    async def commit(
+        self,
+        command: Command,
+        *,
+        cursor: tuple[str, int] | None = None,
+        claim: tuple[ThreadId, str] | None = None,
+    ) -> Outcome:
         """Submit a command.
 
         Args:
             command: The command.
             cursor: A named cursor, ``(name, seq)``, to save in the same transaction, as with
                 :meth:`save_cursor`: it moves only if the command is applied.
+            claim: A thread's claim, ``(thread_id, holder)``, that fences the command: it is
+                applied only while ``holder`` has the thread (:meth:`claim_thread`).
 
         Returns:
             What the command did, with the ``seq`` of the last event it appended.
 
         Raises:
-            Rejection: If the command cannot be applied.
+            Rejection: If the command cannot be applied; ThreadBusy, a rejection too, if
+                ``claim`` is given and its holder no longer has the thread.
         """
         attributes = command_attributes(
             command,
@@ -491,12 +501,15 @@ class Workspace:
             set_status_on_exception=False,
         ) as span:
             try:
-                _check_text(command, cursor)
+                _check_text(command, cursor, claim)
                 await self.check(_access(command))
                 command = await self._check_target(command)
                 self._check_kind(command)
                 outcome = await self._transact(
-                    command, lambda state: commit(command, state, actor=self._actor), cursor=cursor
+                    command,
+                    lambda state: commit(command, state, actor=self._actor),
+                    cursor=cursor,
+                    claim=claim,
                 )
             except Rejection as rejection:
                 span.set_attributes({OUTCOME: "rejected", REJECTION: rejection.code})
@@ -531,6 +544,7 @@ class Workspace:
         *,
         history: bytes | None = None,
         cursor: tuple[str, int] | None = None,
+        claim: tuple[ThreadId, str] | None = None,
     ) -> Recorded:
         """Record a fact about an agent run, or an application event.
 
@@ -540,14 +554,20 @@ class Workspace:
                 same transaction, typically with ``RunPaused`` or ``RunEnded``.
             cursor: A named cursor, ``(name, seq)``, to save in the same transaction, as with
                 :meth:`save_cursor`: it moves only if the fact is recorded.
+            claim: A thread's claim, ``(thread_id, holder)``, that fences the fact: it is
+                recorded only while ``holder`` has the thread (:meth:`claim_thread`).
+
+        Raises:
+            ThreadBusy: If ``claim`` is given and its holder no longer has the thread.
         """
-        _check_text(fact, cursor)
+        _check_text(fact, cursor, claim)
         await self.check(Access(action="artifactr:record", thread_id=fact.thread_id))
         outcome = await self._transact(
             fact,
             lambda state: record(fact, state, actor=self._actor),
             history=(fact.thread_id, history) if history is not None and fact.thread_id else None,
             cursor=cursor,
+            claim=claim,
         )
         return cast("Recorded", outcome)
 
@@ -603,8 +623,13 @@ class Workspace:
         *,
         history: tuple[ThreadId, bytes] | None = None,
         cursor: tuple[str, int] | None = None,
+        claim: tuple[ThreadId, str] | None = None,
     ) -> Outcome:
         async with self._storage.transaction(self._scope) as transaction:
+            if claim is not None and not await transaction.holds_lease(
+                _thread_key(claim[0]), claim[1]
+            ):
+                raise ThreadBusy(f"thread {claim[0]} is held by another claim now")
             state = State()
             while missing := needs(item, actor=self._actor, state=state):
                 state = _merge(state, await transaction.load(missing))
@@ -970,7 +995,8 @@ class Workspace:
         """Hold a thread exclusively, renewing the claim until the block exits.
 
         One run is active per thread. The claim is a lease in storage, so it holds across
-        processes and lapses by itself if the holder dies.
+        processes and lapses by itself if the holder dies. A call cancelled, or failing, as it
+        claims releases the lease, which storage may have granted all the same.
 
         Yields:
             An event set once the claim is lost: it lapsed, a whole ``ttl`` after its last
@@ -984,9 +1010,17 @@ class Workspace:
         """
         _check_text(thread_id, holder)
         await self.check(Access(action="artifactr:claim_thread", thread_id=thread_id))
-        key = f"thread:{thread_id}"
+        key = _thread_key(thread_id)
         lapses = asyncio.get_running_loop().time() + ttl.total_seconds()
-        if not await self._storage.acquire_lease(self._scope, key, holder, ttl):
+        try:
+            acquired = await self._storage.acquire_lease(self._scope, key, holder, ttl)
+        except BaseException:
+            # A call cut short may still have taken the lease (Storage): no task would release it.
+            # A release that fails too leaves it to lapse; the caller hears the first error.
+            with contextlib.suppress(Exception):
+                await self._storage.release_lease(self._scope, key, holder)
+            raise
+        if not acquired:
             raise ThreadBusy(f"thread {thread_id} is busy with another run")
         lost = asyncio.Event()
         renewal = asyncio.create_task(self._renew(key, holder, ttl, lapses, lost))
@@ -1028,6 +1062,11 @@ class Workspace:
                     lapse = loop.call_at(renewing + ttl.total_seconds(), _lose, key, lost)
             finally:
                 lapse.cancel()
+
+
+def _thread_key(thread_id: ThreadId) -> str:
+    """The key of a thread's claim, as a lease."""
+    return f"thread:{thread_id}"
 
 
 def _lose(key: str, lost: asyncio.Event) -> None:

@@ -17,7 +17,7 @@ What is copied, word for word but for the package's name:
 
 ## Decision
 
-- **A small package, `lattice-core`,** holds what the packages share and must keep identical. Its distribution is `lattice-core-ai`, since the name `lattice-core` on PyPI is an unrelated project, and it is imported as `lattice_core`. It is a package of lattice like the others: in the uv workspace and moon, tested at 100% coverage, released by release-please, and built for PyPI. Nothing is published yet.
+- **A small package, `lattice-core`,** holds what the packages share and must keep identical. Its distribution is `lattice-core-ai`, since the name `lattice-core` on PyPI is an unrelated project, and it is imported as `lattice_core`. It is a package of lattice like the others: in the uv workspace and moon, tested at 100% coverage, released by release-please, and built for PyPI. Nothing is published yet. *lattice-core-ai 0.1.0 has been on PyPI since 2026-10-17 ([ADR-0023](0023-publishing-to-pypi-from-the-release-workflow.md#amendment-2026-10-16)).*
 - **Who imports whom.** artifactr, reflexr and grantr import none of one another. relayr is the bridge, and imports artifactr and reflexr. Any package may depend on lattice-core, which imports no lattice package: a test holds its shipped code to the standard library, pydantic, and what its extras declare.
 - **Only infrastructure, and only what is truly the same.** Code moves in when two or more packages have it word for word, but for their names. Code that only looks alike stays where it is, such as the LiteLLM gateways' guardrail policies, the storages and the migrations. Nothing about a package's domain belongs in it: review enforces that, as the test can't.
 - **Each package keeps its public API** by re-exporting what it made public, so an application never imports lattice-core. A package raises its own errors around lattice-core's helpers, which raise none of theirs, and its docstrings name no package.
@@ -41,4 +41,4 @@ What is copied, word for word but for the package's name:
 
 - Easier: a fix to shared infrastructure is made once, and reaches every package.
 - Harder: a library's release can need lattice-core's first; its lower bound says which.
-- Harder: a pip user, until the packages are on PyPI, installs lattice-core-ai from lattice as well; uv takes it from the same commit as the library.
+- Harder: a pip user, until the packages are on PyPI, installs lattice-core-ai from lattice as well; uv takes it from the same commit as the library. *lattice-core-ai is on PyPI since 2026-10-17, so pip takes it from there.*

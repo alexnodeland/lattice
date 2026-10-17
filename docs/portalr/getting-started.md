@@ -22,7 +22,7 @@ portalr reads and writes through the packages you already run, so it needs their
 
 ## Install
 
-portalr needs Python 3.12 or newer. Its wheel carries the two built UIs, which Vite builds into it, so install the wheel, not the source. portalr and the two packages it requires, `grantr[fastapi]` and `lattice-core-ai`, are not on PyPI, so install all three from [lattice](https://github.com/alexnodeland/lattice).
+portalr needs Python 3.12 or newer. Its wheel carries the two built UIs, which Vite builds into it, so install the wheel, not the source. Of the two packages it requires, `lattice-core-ai` is on PyPI; portalr and `grantr[fastapi]` are not, so install those two from [lattice](https://github.com/alexnodeland/lattice).
 
 === "From a checkout"
 
@@ -43,11 +43,13 @@ portalr needs Python 3.12 or newer. Its wheel carries the two built UIs, which V
            $LATTICE/packages/portalr/dist/portalr-*.whl
     ```
 
+    `lattice-core-ai` comes from the checkout too, so that it is the one the checkout's grantr and portalr were written against; PyPI's can be older.
+
     The built wheel holds `portalr/static/app/` and `portalr/static/admin/`; `moon run portalr:build` and that install were run to write this page.
 
 === "Once released"
 
-    Once released, each package's GitHub release has its wheel and sdist attached, and is published to PyPI once the repository turns that on ([ADR-0023](../adr/0023-publishing-to-pypi-from-the-release-workflow.md)). Until then, download portalr's, grantr's and lattice-core's wheels from the repository's [releases](https://github.com/alexnodeland/lattice/releases) and `uv add` the three. portalr has no release yet.
+    Once released, each package's GitHub release has its wheel and sdist attached, and is published to PyPI once the repository turns that on ([ADR-0023](../adr/0023-publishing-to-pypi-from-the-release-workflow.md)). Until then, download portalr's and grantr's wheels from the repository's [releases](https://github.com/alexnodeland/lattice/releases) and `uv add` the two; uv takes `lattice-core-ai` from PyPI. portalr has no release yet.
 
 !!! warning "A git install has no UIs"
 

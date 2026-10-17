@@ -34,4 +34,4 @@ Only infrastructure that is the same in two or more packages, word for word but 
 
 ## Installing it
 
-You don't install it yourself: the packages that need it require it. Its distribution is `lattice-core-ai`, since the name `lattice-core` on PyPI is an unrelated project, and it is imported as `lattice_core`. Until the packages are on PyPI, uv installs it from the same commit of lattice as the package that needs it.
+You don't install it yourself: the packages that need it require it. Its distribution is `lattice-core-ai`, since the name `lattice-core` on PyPI is an unrelated project, and it is imported as `lattice_core`. It is on PyPI, from 0.1.0. A package installed from lattice with uv takes it from the same commit; pip takes it from PyPI.

@@ -37,6 +37,8 @@ evals = ["evalr>=0.1.0"]
 plane = ["httpx>=0.28"]
 vikunja = ["httpx>=0.28"]
 fastapi = ["lattice-core-ai>=0.1.0", "fastapi>=0.141", "starlette>=0.46.0"]
+# ui:form_submitted from artifactr's forms (relayr.ui), for an application that has them.
+forms = ["artifactr-ai[forms]>=0.2.0"]
 langfuse = [
     "langfuse>=4.15,<5",
     "artifactr-ai[langfuse]>=0.2.0",

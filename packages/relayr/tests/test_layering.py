@@ -63,6 +63,8 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     "fastapi": ({"relayr.trackers", "relayr.fastapi"}, {"fastapi", "lattice_core.refusals"}),
     "plane": ({"relayr.trackers", "relayr.plane"}, {"httpx", "pydantic"}),
     "vikunja": ({"relayr.trackers", "relayr.vikunja"}, {"httpx", "pydantic"}),
+    # The forms extra's: only it imports artifactr.ui (ADR-0036).
+    "ui": ({"relayr.events", "relayr.ui"}, {*LIBRARIES, "pydantic"}),
     "rules": (
         {"relayr.events", "relayr.outbound", "relayr.rules"},
         {*LIBRARIES, "pydantic", "pydantic_ai"},
@@ -108,3 +110,13 @@ def test_layer_imports_only_what_it_may(layer: str) -> None:
 def test_every_package_is_a_layer() -> None:
     packages = {path.name for path in SRC.iterdir() if (path / "__init__.py").exists()}
     assert packages == set(LAYERS)
+
+
+def test_only_the_forms_extra_imports_artifactr_ui() -> None:
+    importers = sorted(
+        str(path.relative_to(SRC))
+        for path in SRC.rglob("*.py")
+        if not path.is_relative_to(SRC / "ui")
+        and any(_within(module, {"artifactr.ui"}) for module, _ in _imports(path))
+    )
+    assert importers == []

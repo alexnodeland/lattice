@@ -5,6 +5,7 @@ nav:
 - Guides:
   - Roles and grants: guides/roles-and-grants.md
   - Restricted threads and artifacts: guides/restricted-items.md
+  - Integrations, switched per workspace: guides/integrations.md
   - Service principals and keys: guides/keys.md
   - Row-level security: guides/row-level-security.md
   - The permission matrix: guides/matrix.md

@@ -387,9 +387,9 @@ Each is settled in phase 0's ADR or carried as an exit criterion.
 ## Tracking
 
 - [ ] Phase 0: the spike and its ADR
-- [ ] RFC-0003, RFC-0004 and RFC-0005 amended to name the shared `Integrations` port
+- [x] RFC-0003, RFC-0004 and RFC-0005 amended to name the shared `Integrations` port
 - [ ] Sign-off on U1 to U6
-- [ ] lattice-core and grantr: `Integrations`, its adapter, audit and action
+- [x] lattice-core and grantr: `Integrations`, its adapter, audit and action ([lattice ADR-0027](../adr/0027-integrations-switched-per-workspace-through-one-port.md))
 - [ ] artifactr: `Workspaces(gate=...)`, `NotEnabled`, the watch commands, presence frames and `PresenceChannel`, with ADRs
 - [ ] artifactr-files: the collector's kinds
 - [ ] artifactr-excalidraw: the package, its type, patches, checks, toolset, converter and router

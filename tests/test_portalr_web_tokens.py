@@ -1,4 +1,4 @@
-"""portalr's web sources hold no colour literal: a colour is a token, and tokens live in tokens.css."""
+"""portalr's web sources hold no colour literal: a colour is a token, kept in tokens.css."""
 
 import re
 from pathlib import Path

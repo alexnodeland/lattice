@@ -14,7 +14,7 @@
       "entry": ["bdd/steps/*.ts"]
     },
     "packages/portalr/web/ui": {
-      "entry": ["csp/main.tsx"]
+      "entry": ["csp/main.tsx", "csp/vite.config.ts"]
     }
   }
 }

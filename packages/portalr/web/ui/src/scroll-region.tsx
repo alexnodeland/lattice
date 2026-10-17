@@ -1,6 +1,10 @@
 import type { ReactNode } from "react";
 import { cn } from "./cn";
 
+/** A scrolling region's look: a tab stop, with the focus ring the kit's controls have. */
+export const SCROLLS =
+  "overflow-x-auto outline-offset-2 focus-visible:outline-2 focus-visible:outline-focus";
+
 /**
  * What scrolls sideways when it is wider than the page, such as a table or a block of code: a tab
  * stop, so a keyboard can scroll it as a pointer can, and a named region, so a reader can find it
@@ -15,14 +19,7 @@ export function ScrollRegion({
   children: ReactNode;
 }) {
   return (
-    <section
-      {...naming}
-      tabIndex={0}
-      className={cn(
-        "overflow-x-auto outline-offset-2 focus-visible:outline-2 focus-visible:outline-focus",
-        className,
-      )}
-    >
+    <section {...naming} tabIndex={0} className={cn(SCROLLS, className)}>
       {children}
     </section>
   );

@@ -17,6 +17,12 @@
       "licence": "MIT AND ISC",
       "kind": "text",
       "reason": "Its modules re-export the d3 packages, which are bundled and noticed as entries of their own; it ships no licence file for its shim, and Recharts needs it. Its source is named in its entry."
+    },
+    {
+      "package": "remark-math",
+      "licence": "MIT",
+      "kind": "text",
+      "reason": "It declares MIT in its package.json and its readme, and ships no licence file; remarkjs/remark-math, its repository, which its entry names, holds the licence. Markdown's math needs it (portalr ADR-0044)."
     }
   ]
 }

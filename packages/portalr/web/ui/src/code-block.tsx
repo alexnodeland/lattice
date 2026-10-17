@@ -13,6 +13,8 @@ type Props = {
   language: string;
   /** One quiet line under the code, such as why an add-on's block shows as its source. */
   note?: ReactNode;
+  /** The code as drawn, highlighted; by default, the code as it is. */
+  children?: ReactNode;
 };
 
 /**
@@ -20,7 +22,7 @@ type Props = {
  * in a region that scrolls sideways and takes the focus, so a keyboard can scroll it too
  * (portalr ADR-0043).
  */
-export function CodeBlock({ code, language, note }: Props) {
+export function CodeBlock({ code, language, note, children }: Props) {
   const [wrapped, setWrapped] = useState(false);
   const named = language ? `${language} code` : "Code";
   const what = language ? `the ${language} code` : "the code";
@@ -49,7 +51,7 @@ export function CodeBlock({ code, language, note }: Props) {
             wrapped ? "whitespace-pre-wrap break-words" : "whitespace-pre",
           )}
         >
-          <code>{code}</code>
+          <code>{children ?? code}</code>
         </pre>
       </ScrollRegion>
       {note && <p className="border-line border-t px-3 py-1.5 text-muted text-xs">{note}</p>}

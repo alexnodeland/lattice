@@ -841,6 +841,8 @@ smoke_scenarios() {
     return 1
   fi
   portal_people=("$alice" "$bob")
+  # The people and their passwords are those web/app/bdd/steps/people.ts signs in as:
+  # `<person>@portalr.test`, `<person>-password`.
   # alice owns acme, bob is a member, and bob edits its workspace notes, which makes it a
   # resource of grantr's, so that the owner is offered it.
   if ! app_admin tenant acme "$alice" ||

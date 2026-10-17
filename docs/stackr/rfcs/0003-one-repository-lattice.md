@@ -8,7 +8,7 @@
 
 - [reflexr ADR-0003][r-adr-0003] keeps the libraries independent, with no shared kernel. lattice keeps that rule and enforces it with checks instead of repository walls.
 - [ADR-0013](../adr/0013-how-the-template-pins-the-libraries.md) pins the template's libraries by git revision, with evalr as a special case. In lattice, one revision pins them all.
-- [ADR-0014](../adr/0014-one-docs-build.md), with [evalr ADR-0013][e-adr-0013], [artifactr ADR-0050][a-adr-0050] and [reflexr ADR-0046][r-adr-0046], is the "one docs build" arrangement that lattice site keeps.
+- [ADR-0014](../adr/0014-one-docs-build.md), with [evalr ADR-0013][e-adr-0013], [artifactr ADR-0050][a-adr-0050] and [reflexr ADR-0046][r-adr-0046], is the "one docs build" arrangement that lattice's site keeps.
 
 ## Summary
 
@@ -42,7 +42,7 @@ Now is the cheapest time to move. Three of the seven repositories hold almost no
 | The libraries stay independent (reflexr ADR-0003) | The existing layering tests, plus deptry over each package's shipped code ([The uv workspace](#the-uv-workspace)) |
 | Each package keeps its gates | Its own tests and 100% coverage gate, under one shared lint, type and quality configuration |
 | History is kept | Each established repository, and relayr's branch, is imported with its history, rewritten into its subdirectory ([Migration](#migration)) |
-| ADRs and RFCs keep their numbers | Each package's ADRs and RFCs move with its docs. Family-level RFCs start a new series |
+| ADRs and RFCs keep their numbers | Each package's ADRs and RFCs move with its docs. Lattice-level RFCs start a new series |
 
 ### Layout
 
@@ -75,7 +75,7 @@ lattice/
 - **portalr is one directory.** The console service and the web tiers share a version, a tag and a changelog. The service is the `pyproject.toml` at portalr's root, and the Bun packages sit under `web/`, so no Python project is nested in another. The rest of portalr's design is for the portal RFC.
 - **The reference implementations move to `examples/`.** In lattice, docplan and oncall would be uv workspace members inside another member, and uv 0.12.12 refuses that ("Project is contained in non-workspace project"; [uv #13298][uv-13298] and [uv #16640][uv-16640], both open). Each becomes its own moon project with its own 100% gate.
 - **The docs live at the root** (see [Docs](#docs)), so a package's pages, ADRs included, leave its directory.
-- **Family documents** go in `docs/`: `architecture.md` says how the packages relate and which imports are allowed, `rfcs/` starts lattice's RFC series, and `adr/` holds family decisions. stackr's RFC-0001 to RFC-0003 keep their numbers in stackr's section. In family documents, an ADR or RFC is always named with its package, as in "reflexr ADR-0003".
+- **Lattice documents** go in `docs/`: `architecture.md` says how the packages relate and which imports are allowed, `rfcs/` starts lattice's RFC series, and `adr/` holds lattice decisions. stackr's RFC-0001 to RFC-0003 keep their numbers in stackr's section. In lattice documents, an ADR or RFC is always named with its package, as in "reflexr ADR-0003".
 
 ### Standalone packages
 
@@ -184,7 +184,7 @@ The workflows:
 | `release.yml` | release-please, the builds and their attestations |
 | `codeql.yml`, `scorecard.yml` | CodeQL and Scorecard. They arrive in phase 6; the other workflows come with the setup commit |
 
-**prek hooks**, at the root: the hygiene hooks, with `(^|/)CHANGELOG\.md$` excluded from the whitespace fixes and `uv.lock` and `bun.lock` from the large-file check. stackr's `check-json`, `check-executables-have-shebangs` and `detect-private-key` become family-wide. Then `conventional-pre-commit`, ruff, Biome, yamllint and shellcheck (scoped as today), actionlint, zizmor, and the type checker, as the libraries' hooks run pyright today.
+**prek hooks**, at the root: the hygiene hooks, with `(^|/)CHANGELOG\.md$` excluded from the whitespace fixes and `uv.lock` and `bun.lock` from the large-file check. stackr's `check-json`, `check-executables-have-shebangs` and `detect-private-key` become lattice-wide. Then `conventional-pre-commit`, ruff, Biome, yamllint and shellcheck (scoped as today), actionlint, zizmor, and the type checker, as the libraries' hooks run pyright today.
 
 ### Working with agents
 
@@ -194,7 +194,7 @@ Agents do much of lattice's work, so lattice sets them up once, for every packag
 |---|---|
 | Instructions | `AGENTS.md` only, with no `CLAUDE.md`: one at the root and one per package. Claude Code reads `AGENTS.md` where a directory has no `CLAUDE.md`, and loads a package's file when it opens a file there. They hold only what the code and docs can't tell an agent, and link to `docs/architecture.md` and the ADRs rather than copying them. `.claude/rules/` holds rules scoped by a `paths:` glob, which load only with a matching file, for migrations, schemas, ADRs, workflows and `.feature` files. A test checks that every path, moon task and ADR number these files mention exists, and holds each file to a line budget |
 | Packaging | lattice's skills, subagents and hooks form one repo-local plugin, `lattice`, in `tools/claude/`, listed in `.claude-plugin/marketplace.json`. `.claude/settings.json` declares the marketplace and enables the plugin (`extraKnownMarketplaces`, `enabledPlugins`) and sets the permissions. Each skill is a short `SKILL.md`, the reference files it points to, which Claude reads only when needed, and a `claude plugin eval` suite (`evals/<case>/prompt.md` with its graders). Package-specific skills live in `packages/<name>/.claude/skills/` |
-| Family skills | issue (start work from one), rfc, adr, pr, review, release, migration, schema-change, adapter (ports and adapters, with the contract suite), cross-package, docs, bdd and retro |
+| Lattice's skills | issue (start work from one), rfc, adr, pr, review, release, migration, schema-change, adapter (ports and adapters, with the contract suite), cross-package, docs, bdd and retro |
 | Hooks | One set, in the plugin's `hooks/hooks.json`; packages differ only through their moon tasks. `PreToolUse` blocks the never-list below. `PostToolUse` formats an edited file and returns lint findings to Claude as `additionalContext`. At `Stop`, Claude can't finish until `moon run :check --affected` passes, guarded by `stop_hook_active`; then a `type: "prompt"` hook, a model acting as judge, checks that the work names its issue and updates the ADRs, RFCs and docs it should. prek and CI run the same moon tasks, so the three layers can't disagree |
 | The never-list | Force pushes, pushes to `main`, `--no-verify`, admin merges and bare `git stash`. Suppressions: `# ty: ignore`, `# type: ignore`, `noqa`, `biome-ignore` and `@ts-expect-error`. Edits to generated files (schemas, OpenAPI documents, lockfiles, CHANGELOGs) and to Accepted ADRs. Attribution trailers. Reads of `.env` files |
 | Subagents | `reviewer` (the simplicity and idiom review, and lattice's rules) and `security-reviewer`, both read-only through their `tools` lists, since plugin subagents ignore `permissionMode`. Editing agents run with `isolation: worktree` |
@@ -388,7 +388,7 @@ In lattice, this list becomes a tracking issue with a sub-issue per phase (phase
 - [x] Sign-off on the decisions (2026-09-30)
 - [x] Phase 1: rehearsal (2026-09-30)
 - [x] Phase 2: the day (2026-09-30)
-- [x] Phase 3: package ADRs and lattice architecture (2026-09-30)
+- [x] Phase 3: package ADRs and lattice's architecture (2026-09-30)
   - lattice's architecture and ADRs ([#30](https://github.com/alexnodeland/lattice/pull/30)), each package's ADRs for the move ([#36](https://github.com/alexnodeland/lattice/pull/36)), lattice's brand and site styling ([#34](https://github.com/alexnodeland/lattice/pull/34)), every package's docs describing lattice ([#32](https://github.com/alexnodeland/lattice/pull/32)), and their follow-ups ([#33](https://github.com/alexnodeland/lattice/issues/33)).
 - [x] Phase 4: the template in lattice (2026-10-12)
   - Pinning by the rendered commit, path sources in the Template job, Template and Smoke run on a library's change, and `bump-libraries` retired ([#51](https://github.com/alexnodeland/lattice/pull/51), [ADR-0018](../adr/0018-the-template-pins-the-libraries-at-its-own-commit.md)). Path sources are editable, since the libraries' own evalr source is. The Smoke job's application builds in Docker, where a path to the checkout doesn't exist, so it installs from GitHub at the pull request's merge commit instead.
@@ -405,7 +405,7 @@ In lattice, this list becomes a tracking issue with a sub-issue per phase (phase
 
 ### What the rehearsal settled
 
-Phase 1 rehearsed the move from fresh clones, and an independent review checked the result. The design above stands as accepted. Where the rehearsal found it wrong or silent, lattice does what follows instead. Phase 3's [family ADRs](../../adr/README.md) record the decisions, as each item links, and [`docs/architecture.md`](../../architecture.md) describes the smaller details.
+Phase 1 rehearsed the move from fresh clones, and an independent review checked the result. The design above stands as accepted. Where the rehearsal found it wrong or silent, lattice does what follows instead. Phase 3's [lattice ADRs](../../adr/README.md) record the decisions, as each item links, and [`docs/architecture.md`](../../architecture.md) describes the smaller details.
 
 - **The import.**
   - The first message rule starts with `(?<![\w/])`, not `\b`. Two messages already said `alexnodeland/evalr#17`, which `\b` would have rewritten a second time.

@@ -424,10 +424,23 @@ def test_the_template_names_people_as_the_guides_say() -> None:
 
 
 def test_the_size_budgets_are_the_adrs() -> None:
-    """ADR-0040 names the budgets' three measures and both UIs."""
+    """ADR-0040 states the ceilings in size-budget.json, and sizes they are a little above."""
     budgets = json.loads((ROOT / "packages" / "portalr" / "size-budget.json").read_text())
     adr = text("adr/0040-scenarios-against-a-generated-application-and-size-budgets.md")
     assert sorted(budgets) == ["admin", "app"]
-    for measure in ("initial", "total", "largest"):
+    measures = ("initial", "total", "largest")
+    for measure in measures:
         assert f"`{measure}`" in adr, measure
-        assert all(measure in budget for budget in budgets.values())
+    sizes = re.search(r"Sizes at the time: (.+?)\. Ceilings: (.+?)\.", adr)
+    assert sizes, "the ADR states the sizes and the ceilings"
+    for ui in budgets:
+        stated = {}
+        for label, line in zip(("sizes", "ceilings"), sizes.groups(), strict=True):
+            found = re.search(rf"{ui} (\d+) / (\d+) / (\d+) kB", line)
+            assert found, f"{ui}'s {label}"
+            stated[label] = [int(n) * 1000 for n in found.groups()]
+        for measure, size, ceiling in zip(
+            measures, stated["sizes"], stated["ceilings"], strict=True
+        ):
+            assert budgets[ui][measure] == ceiling, (ui, measure)
+            assert size <= ceiling <= size * 1.25, (ui, measure)

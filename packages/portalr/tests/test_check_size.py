@@ -71,6 +71,21 @@ def test_an_index_naming_a_file_that_is_not_built_stops_the_check(tmp_path: Path
         check_size.measure("app", static)
 
 
+def test_a_ui_that_is_not_built_stops_the_check_with_a_message(tmp_path: Path) -> None:
+    with pytest.raises(SystemExit, match=r"app isn't built: .*index.html is missing"):
+        check_size.measure("app", tmp_path)
+
+
+def test_a_ui_without_a_budget_stops_the_check_with_a_message(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    budget = tmp_path / "budget.json"
+    budget.write_text(json.dumps({"app": {}}))
+    monkeypatch.setattr(check_size, "BUDGET", budget)
+    with pytest.raises(SystemExit, match=r"no budget for admin"):
+        check_size.main()
+
+
 def test_a_measure_over_its_budget_or_without_one_is_a_problem() -> None:
     measured = {"initial": 100, "total": 300, "largest": 50}
     assert check_size.problems("app", measured, {"initial": 100, "total": 300, "largest": 50}) == []

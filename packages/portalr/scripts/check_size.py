@@ -38,12 +38,15 @@ def gzipped(path: Path) -> int:
 def measure(ui: str, static: Path | None = None) -> dict[str, int]:
     """The three measures of a built UI, in `static` (default: the package's own)."""
     root = (static or STATIC) / ui
+    index = root / "index.html"
+    if not index.is_file():
+        raise SystemExit(f"check_size: {ui} isn't built: {index} is missing (run its build first)")
     files = [p for p in root.rglob("*") if p.suffix in {".js", ".css"}]
     sizes = {p: gzipped(p) for p in files}
     prefix = f"/portalr/{ui}/"
     loaded = {
         root / name.removeprefix(prefix)
-        for name in LOADED.findall((root / "index.html").read_text())
+        for name in LOADED.findall(index.read_text())
         if name.startswith(prefix)
     }
     if missing := [p for p in loaded if p not in sizes]:
@@ -60,13 +63,13 @@ def measure(ui: str, static: Path | None = None) -> dict[str, int]:
 def problems(ui: str, measured: dict[str, int], budget: dict[str, int]) -> list[str]:
     """What is over budget, or has none."""
     found: list[str] = []
-    for measure_ in MEASURES:
-        if measure_ not in budget:
-            found.append(f"{ui} has no {measure_} budget in size-budget.json")
-        elif measured[measure_] > budget[measure_]:
+    for name in MEASURES:
+        if name not in budget:
+            found.append(f"{ui} has no {name} budget in size-budget.json")
+        elif measured[name] > budget[name]:
             found.append(
-                f"{ui}'s {measure_} is {measured[measure_]:,} bytes gzipped, over its budget of "
-                f"{budget[measure_]:,}"
+                f"{ui}'s {name} is {measured[name]:,} bytes gzipped, over its budget of "
+                f"{budget[name]:,}"
             )
     return found
 
@@ -74,6 +77,8 @@ def problems(ui: str, measured: dict[str, int], budget: dict[str, int]) -> list[
 def main() -> int:
     """Print each UI's sizes against its budget; return 1 if any is over."""
     budgets = json.loads(BUDGET.read_text())
+    if absent := [ui for ui in UIS if ui not in budgets]:
+        raise SystemExit(f"check_size: size-budget.json has no budget for {', '.join(absent)}")
     failed: list[str] = []
     for ui in UIS:
         measured = measure(ui)

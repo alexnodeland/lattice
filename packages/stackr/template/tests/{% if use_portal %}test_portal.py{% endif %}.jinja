@@ -176,6 +176,18 @@ def test_people_are_named_by_email_where_invitations_would_be_made() -> None:
     assert len(clients) == 1
 
 
+def test_the_secrets_are_not_in_the_settings_repr() -> None:
+    held = replace(
+        with_portal(litellm_key="sk-spend-read"),
+        auth=AuthSettings(
+            jwt_secret="jwt-secret-value", service_role_key="sb_secret_for_the_tests"
+        ),
+    )
+    shown = repr(held)
+    for secret in ("sk-spend-read", "jwt-secret-value", "sb_secret_for_the_tests"):
+        assert secret not in shown
+
+
 def test_the_page_says_whether_people_are_named(script: Script, ui: Path) -> None:
     named = replace(
         with_portal(ui_dir=str(ui), auth_url="http://supabase-kong:8000"),

@@ -44,7 +44,7 @@
 - **A lockup ends 8 units below its descender.** lattice's lockup ends 8 units below the baseline, which clips relayr's `y`. "portalr" and "grantr" descend too, so their lockups are taller by the descender.
 - **portalr's tokens become `ui`'s CSS custom properties,** in `packages/portalr/web/ui/src/tokens.css`, light and dark, which Tailwind's `@theme` takes as its theme. The inks keep the package's name, `--portalr-cyan`, `--portalr-magenta`, `--portalr-yellow` and `--portalr-violet`, and grantr's gold will be `--grantr-gold`. The roles are brand-neutral: `--paper`, `--surface`, `--fg`, `--muted`, `--line`, `--accent` (the violet), `--on-accent` and `--focus`, so `admin` can show a grantr screen in grantr's colours by setting `--accent` alone.
 - **The focus ring is violet on light backgrounds and cyan on dark.** Cyan on portalr's paper is 2.73:1, under WCAG's 3:1 for a focus indicator; the violet is 7.60:1.
-- **lattice sheet shows eight marks,** and the brand page states both. This amends ADR-0001's reservations: the inks were reserved there, and the marks and working colours are recorded here.
+- **The family sheet shows eight marks,** and the brand page states both. This amends ADR-0001's reservations: the inks were reserved there, and the marks and working colours are recorded here.
 
 ## Options considered
 
@@ -68,5 +68,5 @@
 
 ## Action items
 
-1. [x] The brand files, lattice sheet and the brand pages.
+1. [x] The brand files, the family sheet and the brand pages.
 2. [x] portalr's `ui` tokens, and its first primitives on them.

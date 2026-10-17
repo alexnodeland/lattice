@@ -72,4 +72,4 @@ Python-Markdown, which the site uses, needs four spaces to nest a list and a bla
 1. [x] Build the site, the brand and the branded README (RFC-0001 phase 7).
 2. [x] Build the site in strict mode in CI.
 3. [x] Publish the site ([ADR-0033](0033-publishing-the-documentation-site.md)).
-4. [ ] Adopt lattice system in evalr's and stackr's repositories.
+4. [ ] Adopt lattice's system in evalr's and stackr's repositories.

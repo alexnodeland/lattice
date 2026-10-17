@@ -61,7 +61,7 @@ Emails do exist elsewhere, and portalr does not hide them:
 - The browser's session, in `localStorage` under `portalr`, holds the signed-in user's `email`, and the access token carries an `email` claim, which is sent with every request. Your `resolve_actor` and any logging of requests are yours.
 - People type emails, and anything else, into messages, comments, prompts and log lines. What those hold is the content the other sections withhold by default.
 
-Without the `people` hook there is no people route, and the UIs show a short id for everyone. stackr's template passes it whenever the application has the gateway's address and its secret key, the same two that invitations need (stackr ADR-0038); a single host's overlay has neither, so there the UIs show short ids.
+Without the `people` hook there is no people route, and the UIs show a short id for everyone. stackr's template passes it whenever the application has the gateway's address and its secret key, the same two that invitations need (stackr ADR-0038); a single host's overlay sets `PORTAL_AUTH_URL` empty, so there the UIs show short ids.
 
 ## The browser
 

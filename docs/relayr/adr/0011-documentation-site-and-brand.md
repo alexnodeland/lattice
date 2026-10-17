@@ -43,7 +43,7 @@ artifactr and reflexr keep their extension because their docstrings already use 
 - Easier: the site is built, checked and published exactly as the siblings' are, and a docstring reads the same in an editor and on the site.
 - Easier: relayr reads as lattice's fifth member, and as the one between artifactr and reflexr.
 - Harder: magenta is the ink artifactr and reflexr share and the colour that marks interaction on their sites, so relayr's mark is lattice's closest to its neighbours in colour, and its working colour is the nearest to reflexr's red. Its shape carries the difference.
-- Harder: lattice pages in the siblings' repositories (reflexr's brand page and its family sheet) list four marks, and need relayr added there.
+- Harder: the brand pages in the siblings' repositories (reflexr's brand page and its family sheet) list four marks, and need relayr added there.
 
 [a-adr-0050]: ../../artifactr/adr/0050-one-docs-build.md
 [e-adr-0013]: ../../evalr/adr/0013-docstrings-in-markdown-and-one-docs-build.md

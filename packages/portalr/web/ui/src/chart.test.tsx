@@ -1,5 +1,5 @@
 import { expect, onTestFinished, test } from "vitest";
-import { page, userEvent } from "vitest/browser";
+import { commands, page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { BarChart, DonutChart, LineChart } from "./chart";
 import { formatDay } from "./chart-theme";
@@ -452,4 +452,37 @@ test("labels of the widest letters still fit the drawing, as measured, not as gu
   )) {
     expect(label.getBoundingClientRect().right).toBeLessThanOrEqual((svg?.right ?? 0) + 0.5);
   }
+});
+
+test("under forced colours a chart keeps its series apart: its fills are the author's, and every series past the first is hatched, with stripes the base does not share", async () => {
+  onTestFinished(() => commands.forcedColors(false));
+  await page.viewport(900, 700);
+  await render(
+    <BarChart
+      label="Thumbs"
+      index={days}
+      series={[
+        { key: "up", name: "Thumbs up" },
+        { key: "down", name: "Thumbs down" },
+      ]}
+      data={[{ day: "2026-10-12", up: 3, down: 1 }]}
+      diverging
+    />,
+  );
+  await expect.poll(() => document.querySelectorAll(".recharts-bar-rectangle path").length).toBe(2);
+  const fills = () =>
+    [...document.querySelectorAll(".recharts-bar-rectangle path")].map(
+      (bar) => getComputedStyle(bar).fill,
+    );
+  const stripe = () => getComputedStyle(document.querySelector("pattern line") as Element);
+  const base = () => getComputedStyle(document.querySelector("pattern rect") as Element);
+  await commands.forcedColors(true);
+  // The browser leaves an SVG's paints as the page drew them (Chromium forces text and
+  // backgrounds, not fills), so what tells the series apart under forced colours is the hatch,
+  // which the tokens turn on.
+  const [up, down] = fills();
+  expect(up).toMatch(/^rgb\(/);
+  expect(down).toMatch(/^url\(/);
+  expect(Number(stripe().strokeOpacity)).toBeGreaterThan(0);
+  expect(stripe().stroke).not.toBe(base().fill);
 });

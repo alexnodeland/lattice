@@ -1,6 +1,6 @@
 # ADR-0043: Markdown's basics: code blocks, callouts, footnotes per message, copying, an add-ons seam, and tests under the policy
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0044](0044-highlighting-and-math-on-demand.md) (math joins the add-ons)
 **Date:** 2026-10-17
 **Deciders:** Alex Nodeland
 **Amends:** [ADR-0015](0015-the-chat-components-and-streamdown.md), for how Streamdown's code and callouts render

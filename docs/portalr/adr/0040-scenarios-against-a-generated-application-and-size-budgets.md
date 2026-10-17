@@ -1,6 +1,6 @@
 # ADR-0040: Scenarios against a generated application, and size budgets
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0044](0044-highlighting-and-math-on-demand.md) (an add-on's chunks have a budget of their own)
 **Date:** 2026-10-16
 **Deciders:** Alex Nodeland
 

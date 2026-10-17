@@ -192,6 +192,44 @@ test("colour-blind mode's series are told apart even to a reader with a deficien
   }
 });
 
+/** Highlighting's colours, which `tokens.css` sets for its theme (portalr ADR-0044). */
+const CODE = [
+  "code-foreground",
+  "code-token-keyword",
+  "code-token-link",
+  "code-token-string",
+  "code-token-string-expression",
+  "code-token-function",
+  "code-token-constant",
+  "code-token-parameter",
+  "code-token-punctuation",
+  "code-token-comment",
+] as const;
+
+test("code's colours read as text on the paper and the surface, by default and in colour-blind mode", () => {
+  for (const within of [document.body, cvd()]) {
+    for (const colour of CODE) {
+      for (const surface of ["paper", "surface"]) {
+        expect(
+          contrast(token(colour, within), token(surface, within)),
+          `${colour} on ${surface}${within === document.body ? "" : ", colour-blind"}`,
+        ).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  }
+});
+
+test("colour-blind mode's code inks, keywords, strings and the rest, are told apart by every reader", () => {
+  const screen = cvd();
+  const inked = ["code-token-keyword", "code-token-string", "code-token-function"].map((colour) =>
+    token(colour, screen),
+  );
+  expect(closest(inked)).toBeGreaterThanOrEqual(APART);
+  for (const deficiency of DEFICIENCIES) {
+    expect(closest(inked, deficiency), deficiency).toBeGreaterThanOrEqual(APART);
+  }
+});
+
 test("CIEDE2000 gives Sharma, Wu and Dalal's published values", () => {
   expect(deltaE2000([50, 2.6772, -79.7751], [50, 0, -82.7485])).toBeCloseTo(2.0425, 3);
   expect(deltaE2000([50, 2.5, 0], [73, 25, -18])).toBeCloseTo(27.1492, 3);

@@ -18,7 +18,7 @@ A workspace's threads, and a new one. A **thread** is a conversation, and its pa
 - the thread's **proposals**, each with its rationale and how it was resolved, to accept or reject;
 - a composer, only where grantr allows the person to post.
 
-Markdown renders through Streamdown, with no raw HTML; links go to the web, mail, the page and the application only, and images only from the app's own origin. GitHub's callouts (`> [!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`, `[!CAUTION]`) show as notes with their word, and a block of code names its language and has **Wrap** and **Copy**. **Copy** under a message copies it as the Markdown it was written in. A Mermaid diagram shows as its source: diagrams aren't drawn yet.
+Markdown renders through Streamdown, with no raw HTML; links go to the web, mail, the page and the application only, and images only from the app's own origin. GitHub's callouts (`> [!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`, `[!CAUTION]`) show as notes with their word, and a block of code names its language, is highlighted in the common languages, and has **Wrap** and **Copy**. Math between `$$` shows as math, within a line or on lines of its own; a single `$` is a price. **Copy** under a message copies it as the Markdown it was written in. A Mermaid diagram shows as its source: diagrams aren't drawn yet.
 
 ### Restricting and sharing a thread
 

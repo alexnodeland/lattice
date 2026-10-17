@@ -84,6 +84,10 @@ lattice-core-ai = { workspace = true }
 requires = ["uv_build>=0.12,<0.13"]
 build-backend = "uv_build"
 
+# Vite's manifests, which the size check reads, aren't the UIs' and aren't served (portalr ADR-0044).
+[tool.uv.build-backend]
+wheel-exclude = ["static/*/.vite"]
+
 # ─── dependencies ─────────────────────────────────────────────────────────────
 
 # deptry can't tell from the workspace's editable install which module lattice-core-ai provides.

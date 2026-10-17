@@ -33,6 +33,7 @@ export default defineConfig({
   ],
   // ui's public files, such as the script that sets the scheme before the first paint.
   publicDir: "../ui/public",
-  build: { outDir: "../../src/portalr/static/app", emptyOutDir: true },
+  // The manifest says which chunk each import is, which the size check reads (portalr ADR-0044).
+  build: { outDir: "../../src/portalr/static/app", emptyOutDir: true, manifest: true },
   server: { proxy: { "^/(?!portalr/app/)": application } },
 });

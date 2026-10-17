@@ -36,6 +36,13 @@ async function shown(width: number, mode?: "colour-blind" | "forced-colours") {
     document.fonts.load('1em "Fragment Mono"'),
   ]);
   await document.fonts.ready;
+  // The add-ons load as the gallery asks for them: math, and the grammars of its code.
+  await expect.poll(() => document.querySelectorAll("math").length).toBe(2);
+  for (const language of ["ts", "python"]) {
+    await expect
+      .poll(() => document.querySelector(`[aria-label="${language} code"] span`))
+      .not.toBeNull();
+  }
   await new Promise((settled) => requestAnimationFrame(() => requestAnimationFrame(settled)));
 }
 

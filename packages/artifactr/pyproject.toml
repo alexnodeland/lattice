@@ -1,6 +1,6 @@
 [project]
 name = "artifactr-ai"
-version = "0.1.0"
+version = "0.2.0"
 description = "Build chat applications where people and agents collaborate through shared, versioned artifacts."
 readme = "README.md"
 license = "MIT"

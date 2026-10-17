@@ -52,15 +52,11 @@ class Scene:
         command = a.RespondToProposal(proposal_id=proposal.id, decision=decision, changes=changes)
         await self.alice.commit(command)
 
-        async def scored() -> bool:
-            bridged = any(
-                isinstance(e.event, ProposalResolved) and e.event.proposal_id == proposal.id
-                for e in await self.stack.bridged()
-            )
-            await self.app.reactor.settle()
-            return bridged
+        def resolved(so_far: list[reflexr.Envelope]) -> bool:
+            event = so_far[-1].event
+            return isinstance(event, ProposalResolved) and event.proposal_id == proposal.id
 
-        await until(scored)
+        await self.stack.until_bridged(resolved)
         await self.app.reactor.settle()
 
     async def rates(self) -> dict[str, ProposalRates]:

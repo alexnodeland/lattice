@@ -16,6 +16,7 @@ export { type Feedback, type Thumb, thumbs } from "./feedback";
 export type * as ArtifactrApi from "./generated/artifactr.openapi";
 export type * as ArtifactrV1 from "./generated/artifactr.v1";
 export type * as GrantrApi from "./generated/grantr.openapi";
+export { INTEGRATIONS } from "./generated/integrations";
 export type * as PortalrApi from "./generated/portalr.openapi";
 export type * as ReflexrApi from "./generated/reflexr.openapi";
 export type * as ReflexrRulesV1 from "./generated/reflexr.rules.v1";

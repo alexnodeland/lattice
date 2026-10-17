@@ -10,7 +10,7 @@ import { Switch } from "./switch";
  * at this level, or a ceiling no setting here lifts, the tenant's off or the deployment's not
  * installing it (grantr ADR-0034).
  */
-export type Source = "default" | "inherited" | "set" | "tenant-off" | "not-installed";
+export type IntegrationSource = "default" | "inherited" | "set" | "tenant-off" | "not-installed";
 
 /** One integration at a level, as the list shows it. */
 export interface IntegrationRow {
@@ -21,12 +21,12 @@ export interface IntegrationRow {
   readonly description: string;
   /** Whether it is on at this level. */
   readonly on: boolean;
-  readonly source: Source;
+  readonly source: IntegrationSource;
   /** Who set it at this level, as people read them, and when; null where this level hasn't. */
   readonly changed: { readonly by: string; readonly at: string } | null;
 }
 
-const SOURCE: Record<Source, string> = {
+const SOURCE: Record<IntegrationSource, string> = {
   default: "Default",
   inherited: "Inherited from the tenant",
   set: "Set here",
@@ -34,8 +34,12 @@ const SOURCE: Record<Source, string> = {
   "not-installed": "Not installed in this deployment",
 };
 
-/** Why a switch can't be turned here, where it can't: a ceiling above it. */
-const CEILING: Partial<Record<Source, string>> = {
+/**
+ * Why a switch can't be turned here, where it can't: a ceiling above it. grantr would take a
+ * setting under one, which stays off until the ceiling lifts; the list doesn't offer it, since it
+ * would change nothing a member sees (portalr ADR-0045).
+ */
+const CEILING: Partial<Record<IntegrationSource, string>> = {
   "tenant-off": "The tenant turned it off, so no workspace can turn it on.",
   "not-installed": "This deployment doesn't install it, so it is off everywhere.",
 };
@@ -76,7 +80,7 @@ export function IntegrationList({
         {
           key: "integration",
           label: "Integration",
-          width: "40%",
+          width: "36%",
           cell: (row) => (
             <span className="flex flex-col gap-0.5 whitespace-normal font-normal">
               <span className="font-semibold">{row.name}</span>
@@ -88,12 +92,15 @@ export function IntegrationList({
         {
           key: "state",
           label: "State",
-          width: "30%",
-          cell: (row) => <State row={row} saving={saving.has(row.key)} onSwitch={onSwitch} />,
+          width: "28%",
+          cell: (row) => (
+            <State row={row} level={level} saving={saving.has(row.key)} onSwitch={onSwitch} />
+          ),
         },
         {
           key: "changed",
           label: "Changed here",
+          width: "18%",
           cell: (row) => (
             <span className="flex flex-col gap-0.5 text-sm">
               {row.changed ? (
@@ -133,12 +140,17 @@ export function IntegrationList({
 }
 
 /** An integration's switch, and its state in words, which describe it. */
+/** What a tenant's own off means: the ceiling every workspace is under. */
+const TENANT_OFF = "Off in every workspace; none can turn it on.";
+
 function State({
   row,
+  level,
   saving,
   onSwitch,
 }: {
   row: IntegrationRow;
+  level: "tenant" | "workspace";
   saving: boolean;
   onSwitch: (key: string, on: boolean) => void;
 }) {
@@ -160,6 +172,9 @@ function State({
         </StatusBadge>
         <span className="text-xs">{SOURCE[row.source]}</span>
         {ceiling && <span className="text-muted text-xs">{ceiling}</span>}
+        {level === "tenant" && row.source === "set" && !row.on && (
+          <span className="text-muted text-xs">{TENANT_OFF}</span>
+        )}
       </span>
     </span>
   );

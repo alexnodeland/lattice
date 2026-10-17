@@ -1,7 +1,7 @@
 /**
  * The integrations list's look, pinned by screenshots (portalr ADR-0019, ADR-0045): every state a
  * switch can be in, on by default, inherited, set here, off by the tenant's ceiling, not
- * installed, and saving, wide and narrow, in each scheme, in colour-blind mode, and under forced
+ * installed, and saving, on and off, and the tenant's own off, wide and narrow, in each scheme, in colour-blind mode, and under forced
  * colours. Like the gallery's, the baselines are Linux's, made in CI.
  */
 
@@ -10,11 +10,19 @@ import { commands, page } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { IntegrationList } from "./integration-list";
 import { dark } from "./test/colours";
-import { ROWS, SAVING } from "./test/integrations";
+import { ROWS, SAVING, TENANT_ROWS } from "./test/integrations";
 
 function Integrations() {
   return (
-    <div data-testid="integrations" className="bg-paper p-4 text-fg">
+    <div data-testid="integrations" className="flex flex-col gap-6 bg-paper p-4 text-fg">
+      <IntegrationList
+        caption="Integrations on the tenant"
+        level="tenant"
+        rows={TENANT_ROWS}
+        saving={new Set()}
+        onSwitch={() => undefined}
+        onInherit={() => undefined}
+      />
       <IntegrationList
         caption="Integrations in notes"
         level="workspace"

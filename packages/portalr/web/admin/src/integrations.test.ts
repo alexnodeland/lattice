@@ -1,13 +1,10 @@
+import { INTEGRATIONS } from "@portalr/client";
 import { expect, test } from "vitest";
 import { levelOf, namedOf, rowsOf, settersOf, sourceOf } from "./integrations";
 
 const ALICE = { on: true, by: { kind: "user", id: "alice" }, at: "2026-10-17T09:00:00Z" } as const;
 const OFF = { ...ALICE, on: false };
-const RULE = {
-  on: false,
-  by: { kind: "rule", rule: "ops:quiet", workspace: "notes" },
-  at: ALICE.at,
-} as const;
+const CI = { on: false, by: { kind: "service_principal", id: "ci" }, at: ALICE.at } as const;
 
 const state = (change: object = {}) => ({
   key: "markdown:mermaid",
@@ -50,7 +47,7 @@ test("an integration is named by its sentence's start, or by its key", () => {
 });
 
 test("a row says who set it at its level, as people read them, and asks only for people", () => {
-  const states = [state({ tenant: RULE, workspace: ALICE, enabled: true })];
+  const states = [state({ tenant: CI, workspace: ALICE, enabled: true })];
   const names = (id: string) => (id === "alice" ? "alice@acme.test" : id);
   expect(rowsOf(states, true, names)).toEqual([
     {
@@ -62,7 +59,16 @@ test("a row says who set it at its level, as people read them, and asks only for
       changed: { by: "alice@acme.test (person)", at: ALICE.at },
     },
   ]);
-  expect(rowsOf(states, false, names)[0]?.changed?.by).toBe("ops:quiet (rule in notes)");
+  expect(rowsOf(states, false, names)[0]?.changed?.by).toBe("ci (service principal)");
   expect(settersOf(states, true)).toEqual(["alice"]);
   expect(settersOf(states, false)).toEqual([]);
+});
+
+test("every integration of lattice's registry is named by its sentence's start", () => {
+  for (const known of INTEGRATIONS) {
+    const { name, description } = namedOf(state(known));
+    expect(name, known.key).not.toBe(known.key);
+    // Its sentence's first letter is capitalized, and otherwise as written.
+    expect(`${name}: ${description}`.toLowerCase()).toBe(known.description.toLowerCase());
+  }
 });

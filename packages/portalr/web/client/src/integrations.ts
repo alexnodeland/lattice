@@ -12,7 +12,10 @@ import { type createQueries, keys } from "./queries";
 /** One of lattice's integrations, by its key, such as `markdown:mermaid`. */
 export type IntegrationKey = (typeof INTEGRATIONS)[number]["key"];
 
-const DEFAULTS = new Map<string, boolean>(INTEGRATIONS.map((known) => [known.key, known.default]));
+/** The integrations on where no one has set them. */
+const ON_BY_DEFAULT: ReadonlySet<string> = new Set(
+  INTEGRATIONS.filter((known) => known.default).map((known) => known.key),
+);
 
 /**
  * Whether each integration is on, as grantr answered, or before it answers, or where it can't be
@@ -21,7 +24,7 @@ const DEFAULTS = new Map<string, boolean>(INTEGRATIONS.map((known) => [known.key
 export const enabledFrom =
   (flags: Readonly<Record<string, boolean>> | undefined) =>
   (key: IntegrationKey): boolean =>
-    flags?.[key] ?? DEFAULTS.get(key) ?? false;
+    flags?.[key] ?? ON_BY_DEFAULT.has(key);
 
 /**
  * Whether each integration is on in a workspace, read once and kept, as `enabledIntegrations`

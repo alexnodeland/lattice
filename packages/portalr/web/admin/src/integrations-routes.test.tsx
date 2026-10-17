@@ -211,7 +211,7 @@ test("who set one links to the audit log's switched integrations, where it may b
   ]);
   await screen
     .getByRole("row", { name: "Forms" })
-    .getByRole("link", { name: "See the audit log" })
+    .getByRole("link", { name: "See the audit log for Forms" })
     .click();
   await expect.poll(() => router.state.location.pathname).toBe("/t/acme/audit");
   expect(router.state.location.search).toEqual(

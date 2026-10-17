@@ -165,7 +165,7 @@ function Settings({ tenant, workspace }: { tenant: string; workspace: string | u
                 />
               }
             >
-              See the audit log
+              See the audit log<span className="sr-only"> for {row.name}</span>
             </TextLink>
           )
         }

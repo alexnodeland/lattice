@@ -3,7 +3,7 @@ import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { IntegrationList } from "./integration-list";
 import { axeViolations } from "./test/axe";
-import { ROWS, SAVING } from "./test/integrations";
+import { ROWS, SAVING, TENANT_ROWS } from "./test/integrations";
 
 /** The list, wide, so it is a table, with spies for what it hands its caller. */
 async function shown(saving: ReadonlySet<string> = new Set(), width = 1024) {
@@ -81,11 +81,15 @@ test("a switch turned by keyboard hands its new state over, and Back to inherite
     .not.toBeInTheDocument();
 });
 
-test("one saving is disabled and says so, and the others can still be turned", async () => {
+test("those saving are disabled, on or off, and say so, and the others can still be turned", async () => {
   const { screen } = await shown(SAVING);
   const math = screen.getByRole("switch", { name: "Math" });
   await expect.element(math).toBeDisabled();
+  await expect.element(math).not.toBeChecked();
   await expect.element(math).toHaveAccessibleDescription("Saving… Set here");
+  const dashboards = screen.getByRole("switch", { name: "Dashboards" });
+  await expect.element(dashboards).toBeDisabled();
+  await expect.element(dashboards).toBeChecked();
   await expect
     .element(screen.getByRole("button", { name: "Back to inherited for Math" }))
     .toBeDisabled();
@@ -126,4 +130,27 @@ test.each([
   const { screen } = await shown(SAVING, width);
   await expect.element(screen.getByText("Math").first()).toBeInTheDocument();
   expect(await axeViolations(screen.container)).toEqual([]);
+});
+
+test("on the tenant, its own off says it is the ceiling every workspace is under", async () => {
+  await page.viewport(1024, 900);
+  onTestFinished(() => page.viewport(414, 896));
+  const screen = await render(
+    <IntegrationList
+      caption="Integrations on the tenant"
+      level="tenant"
+      rows={TENANT_ROWS}
+      saving={new Set()}
+      onSwitch={() => undefined}
+      onInherit={() => undefined}
+    />,
+  );
+  const diagrams = screen.getByRole("switch", { name: "Diagrams" });
+  await expect.element(diagrams).toBeEnabled();
+  await expect
+    .element(diagrams)
+    .toHaveAccessibleDescription("Off Set here Off in every workspace; none can turn it on.");
+  await expect
+    .element(screen.getByRole("switch", { name: "Forms" }))
+    .toHaveAccessibleDescription("On Default");
 });

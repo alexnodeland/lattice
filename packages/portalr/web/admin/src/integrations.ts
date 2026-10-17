@@ -5,7 +5,7 @@
  */
 
 import type { GrantrApi, Names } from "@portalr/client";
-import type { IntegrationRow, Source } from "@portalr/ui";
+import type { IntegrationRow, IntegrationSource } from "@portalr/ui";
 import { actor } from "./audit";
 import { nameOf } from "./runs";
 
@@ -24,7 +24,7 @@ export const levelOf = (search: Record<string, unknown>): Level => ({
  * installed, then, in a workspace, the tenant's off; then a setting at this level; then, in a
  * workspace, the tenant's; then the default (grantr ADR-0034).
  */
-export function sourceOf(state: IntegrationState, workspace: boolean): Source {
+export function sourceOf(state: IntegrationState, workspace: boolean): IntegrationSource {
   if (!state.installed) {
     return "not-installed";
   }

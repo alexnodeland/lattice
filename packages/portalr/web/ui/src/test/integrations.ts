@@ -53,7 +53,35 @@ export const ROWS: readonly IntegrationRow[] = [
     source: "set",
     changed: ALICE,
   },
+  {
+    key: "ui:dashboards",
+    name: "Dashboards",
+    description: "The agent shows figures and charts as a dashboard in the chat.",
+    on: true,
+    source: "set",
+    changed: ALICE,
+  },
 ];
 
-/** The integration whose change is in flight. */
-export const SAVING: ReadonlySet<string> = new Set(["markdown:math"]);
+/** The integrations whose change is in flight: one off, and one on. */
+export const SAVING: ReadonlySet<string> = new Set(["markdown:math", "ui:dashboards"]);
+
+/** The tenant's own: an off set there, the ceiling every workspace is under, and a default. */
+export const TENANT_ROWS: readonly IntegrationRow[] = [
+  {
+    key: "excalidraw",
+    name: "Diagrams",
+    description: "Excalidraw drawings that people and agents draw on together.",
+    on: false,
+    source: "set",
+    changed: ALICE,
+  },
+  {
+    key: "ui:forms",
+    name: "Forms",
+    description: "The agent asks with a form, and people fill it in the chat.",
+    on: true,
+    source: "default",
+    changed: null,
+  },
+];

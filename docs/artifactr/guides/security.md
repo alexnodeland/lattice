@@ -52,6 +52,10 @@ An application that restricts some threads or artifacts to some of a workspace's
 
 Without a hook, nothing is hidden. grantr's `Grants.hooks(subject_of).hidden` is one.
 
+### Integrations switched off
+
+An application whose artifact types belong to an integration, such as diagrams or native files, gives `Workspaces` a `gate`, usually `integration_gate(integrations, key_of)` on lattice-core's `Integrations` port ([ADR-0081](../adr/0081-a-gate-before-access-integrations-switched-off-answer-not-enabled.md)). While an integration is off in a workspace, making, changing and accepting a proposal about one of its artifacts is refused with `not_enabled`, 409 over REST, on every surface; archiving and rejecting a proposal pass, and reads are kept. A command is checked in this order: a NUL character, the workspace's membership, what it names and implies against `hidden`, the gate, then `authorize`. So a hidden artifact is missing whether its integration is on or off, and "not available in this workspace" says nothing about a person's grants.
+
 ## Keeping agents in bounds
 
 - **Write policies.** Give sensitive types `write_policy = "propose"`, or put a thread in suggest mode, and every agent change waits for a person. This covers external agents over MCP as well as the built-in agent.

@@ -1,6 +1,7 @@
 """The admin API, and the two reads UIs ask.
 
-Tenants, members, groups, roles, grants, keys and the audit log; and ``/me`` and ``/checks``.
+Tenants, members, groups, roles, grants, keys, integrations and the audit log; and ``/me``,
+``/checks``, and which integrations are on in a workspace.
 """
 
 from collections.abc import Awaitable, Callable
@@ -22,6 +23,7 @@ from grantr.core import (
     Grantee,
     GrantrError,
     Group,
+    IntegrationState,
     Invalid,
     Member,
     Membership,
@@ -130,6 +132,13 @@ class Restriction(BaseModel):
 
     on: Resource
     restricted: bool = True
+
+
+class IntegrationSwitch(BaseModel):
+    """An integration's new setting, on the tenant or in a workspace, as its path names."""
+
+    on: bool | None
+    """On, off, or ``null`` to unset it, so it inherits the level above."""
 
 
 class NewKey(BaseModel):
@@ -503,6 +512,55 @@ def grantr_router(grants: Grants, *, resolve_actor: ResolveActor) -> APIRouter:
         return await _or_http(
             grants.restrict(tenant, body.on, restricted=body.restricted, by=by(tenant, who))
         )
+
+    @router.get("/tenants/{tenant}/integrations")
+    async def tenant_integrations(
+        tenant: TenantId, who: Caller = current
+    ) -> list[IntegrationState]:
+        """Every integration as it is set on a tenant, and whether it is on where unset."""
+        return await _or_http(grants.integrations(tenant, by=by(tenant, who)))
+
+    @router.put("/tenants/{tenant}/integrations/{key}")
+    async def set_tenant_integration(
+        tenant: TenantId, key: str, body: IntegrationSwitch, who: Caller = current
+    ) -> IntegrationState:
+        """Turn an integration on or off on a tenant, or unset it with null.
+
+        Setting what is set already changes nothing, and records nothing.
+        """
+        return await _or_http(grants.set_integration(tenant, key, body.on, by=by(tenant, who)))
+
+    # A workspace's id may hold a slash, as a path does. Each route below ends in segments of
+    # its own, and a key holds no slash, so a path matches one of them, however the id reads.
+    @router.get("/tenants/{tenant}/workspaces/{workspace:path}/integrations")
+    async def workspace_integrations(
+        tenant: TenantId, workspace: WorkspaceId, who: Caller = current
+    ) -> list[IntegrationState]:
+        """Every integration as it is set in a workspace and on its tenant, and whether it is on."""
+        return await _or_http(grants.integrations(tenant, workspace=workspace, by=by(tenant, who)))
+
+    @router.put("/tenants/{tenant}/workspaces/{workspace:path}/integrations/{key}")
+    async def set_workspace_integration(
+        tenant: TenantId,
+        workspace: WorkspaceId,
+        key: str,
+        body: IntegrationSwitch,
+        who: Caller = current,
+    ) -> IntegrationState:
+        """Turn an integration on or off in a workspace, or unset it with null.
+
+        Setting what is set already changes nothing, and records nothing.
+        """
+        return await _or_http(
+            grants.set_integration(tenant, key, body.on, workspace=workspace, by=by(tenant, who))
+        )
+
+    @router.get("/tenants/{tenant}/workspaces/{workspace:path}/enabled-integrations")
+    async def enabled_integrations(
+        tenant: TenantId, workspace: WorkspaceId, who: Caller = current
+    ) -> dict[str, bool]:
+        """Whether each integration is on in a workspace, by key, for whoever can open it."""
+        return await _or_http(grants.integrations_enabled(tenant, workspace, by=by(tenant, who)))
 
     @router.get("/tenants/{tenant}/keys")
     async def list_keys(tenant: TenantId, who: Caller = current) -> list[KeyView]:

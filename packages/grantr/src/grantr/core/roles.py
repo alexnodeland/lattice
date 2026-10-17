@@ -34,11 +34,13 @@ GRANTR_ACTIONS: Final = frozenset(
         "issue_key",
         "revoke_key",
         "restrict",
+        "manage_integrations",
         "read_audit",
         "grant_operator",
     )
 )
-"""grantr's own catalog: the actions that change access, and read its audit log."""
+"""grantr's own catalog: the actions that change access and switch integrations, and read its
+audit log."""
 
 OPERATOR: Final = frozenset({"grantr:create_tenant", "grantr:grant_operator"})
 """grantr's actions the deployment's operators hold, and no one else."""
@@ -46,8 +48,14 @@ OPERATOR: Final = frozenset({"grantr:create_tenant", "grantr:grant_operator"})
 RESTRICT: Final = "grantr:restrict"
 """Restricting a thread or artifact: whoever may, sees every restricted item where they may."""
 
-WORKSPACE_GRANTS: Final = frozenset({"grantr:grant", "grantr:revoke", "grantr:restrict"})
-"""grantr's actions a workspace's admins hold within it."""
+MANAGE_INTEGRATIONS: Final = "grantr:manage_integrations"
+"""Switching integrations on or off, on the tenant or in a workspace, and reading how they are."""
+
+WORKSPACE_GRANTS: Final = frozenset(
+    {"grantr:grant", "grantr:revoke", "grantr:restrict", MANAGE_INTEGRATIONS}
+)
+"""grantr's actions a workspace's admins hold within it: granting, restricting, and switching its
+integrations."""
 
 FEEDBACK: Final = frozenset({"artifactr:give_feedback", "reflexr:give_feedback"})
 """The commands a viewer may send: feedback on what they read."""

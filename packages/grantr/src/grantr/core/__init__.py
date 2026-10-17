@@ -12,6 +12,7 @@ from grantr.core.audit import (
     Granted,
     GroupDefined,
     GroupDeleted,
+    IntegrationSet,
     KeyIssued,
     KeyRevoked,
     MemberAdded,
@@ -27,6 +28,7 @@ from grantr.core.audit import (
 from grantr.core.errors import Forbidden, GrantrError, Invalid
 from grantr.core.grants import Grant, Membership, Visibility, memberships
 from grantr.core.ids import PRINCIPAL_ID, TENANT_ID, PrincipalId, TenantId, UserId, WorkspaceId
+from grantr.core.integrations import IntegrationSetting, IntegrationState, effective
 from grantr.core.keys import Key, issue, key_id, verify
 from grantr.core.resources import (
     DEPLOYMENT,
@@ -87,6 +89,9 @@ __all__ = [
     "Group",
     "GroupDefined",
     "GroupDeleted",
+    "IntegrationSet",
+    "IntegrationSetting",
+    "IntegrationState",
     "Invalid",
     "Key",
     "KeyIssued",
@@ -116,6 +121,7 @@ __all__ = [
     "UserId",
     "Visibility",
     "WorkspaceId",
+    "effective",
     "issue",
     "key_id",
     "memberships",

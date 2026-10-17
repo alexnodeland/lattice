@@ -28,6 +28,14 @@ Tenant-scoped handles. See [Workspaces, commits and the log](../guides/workspace
 
 ::: artifactr.workspace.OnOpen
 
+::: artifactr.workspace.Gate
+
+::: artifactr.workspace.Changes
+
+::: artifactr.workspace.integration_gate
+
+::: artifactr.workspace.KeyOf
+
 ## Storage
 
 The storage protocol, and the in-memory implementation. See [Storage](../guides/storage.md).

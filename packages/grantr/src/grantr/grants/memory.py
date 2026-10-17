@@ -18,6 +18,7 @@ from grantr.core import (
     Grant,
     Grantee,
     Group,
+    IntegrationSetting,
     Key,
     ListableKind,
     Member,
@@ -55,6 +56,10 @@ class _Data:
         default_factory=dict[tuple[TenantId, Resource], bool]
     )
     """Every thread and artifact ever restricted, and whether it is now."""
+    integrations: dict[tuple[TenantId, WorkspaceId | None, str], IntegrationSetting] = field(
+        default_factory=dict[tuple[TenantId, WorkspaceId | None, str], IntegrationSetting]
+    )
+    """Each integration's setting, by tenant, workspace (None for the tenant's) and key."""
     log: tuple[AuditEntry, ...] = ()
 
 
@@ -122,6 +127,15 @@ class _Reads:
     async def is_restricted(self, tenant: TenantId, on: Resource) -> bool:
         return self._data.items.get((tenant, on), False)
 
+    async def integrations(
+        self, tenant: TenantId, workspace: WorkspaceId | None = None
+    ) -> dict[str, IntegrationSetting]:
+        return {
+            key: setting
+            for (t, w, key), setting in self._data.integrations.items()
+            if (t, w) == (tenant, workspace)
+        }
+
     async def groups(self, tenant: TenantId) -> dict[str, frozenset[Member]]:
         return {
             group.id: members for (t, group), members in self._data.groups.items() if t == tenant
@@ -161,6 +175,9 @@ class _Transaction(_Reads):
             roles={key: role for key, role in data.roles.items() if key[0] != tenant},
             keys={key_id: key for key_id, key in data.keys.items() if key.tenant != tenant},
             items={key: flag for key, flag in data.items.items() if key[0] != tenant},
+            integrations={
+                key: setting for key, setting in data.integrations.items() if key[0] != tenant
+            },
         )
 
     async def add_grant(self, grant: Grant) -> None:
@@ -209,6 +226,20 @@ class _Transaction(_Reads):
 
     async def set_restricted(self, tenant: TenantId, on: Resource, restricted: bool) -> None:
         self._data = replace(self._data, items={**self._data.items, (tenant, on): restricted})
+
+    async def set_integration(
+        self,
+        tenant: TenantId,
+        workspace: WorkspaceId | None,
+        key: str,
+        setting: IntegrationSetting | None,
+    ) -> None:
+        integrations = dict(self._data.integrations)
+        if setting is None:
+            integrations.pop((tenant, workspace, key), None)
+        else:
+            integrations[tenant, workspace, key] = setting
+        self._data = replace(self._data, integrations=integrations)
 
     async def add_key(self, key: Key) -> None:
         self._data = replace(self._data, keys={**self._data.keys, key.id: key})

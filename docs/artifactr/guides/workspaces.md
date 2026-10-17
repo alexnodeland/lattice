@@ -134,6 +134,7 @@ A command that cannot apply raises a `Rejection` and changes nothing. Each has a
 | `PatchFailed` | `patch_failed` | The patch does not apply, such as an anchor that is missing or ambiguous |
 | `NotFound` | `not_found` | Something the command names does not exist, or its type is not allowed (`entity`, `id`) |
 | `Forbidden` | `forbidden` | The actor may not do this, such as answering its own proposal |
+| `NotEnabled` | `not_enabled` | An integration the command needs is off in this workspace (`integration`) |
 | `InvalidState` | `invalid_state` | The command does not fit the current state, such as editing an archived artifact |
 
 ## Proposals

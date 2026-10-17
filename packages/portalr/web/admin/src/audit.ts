@@ -47,6 +47,7 @@ export function peopleOf(entry: AuditEntry): string[] {
     case "key_revoked":
     case "restricted":
     case "unrestricted":
+    case "integration_set":
       break;
     default:
       // Every type is read above: a new type of grantr's fails to typecheck here.
@@ -91,6 +92,12 @@ export function said(event: AuditEvent, names: Names = shortId): string {
       return `restricted ${where(event.on)}`;
     case "unrestricted":
       return `lifted the restriction on ${where(event.on)}`;
+    case "integration_set": {
+      const place = event.workspace === null ? "the tenant" : `workspace ${event.workspace}`;
+      return event.on === null
+        ? `set ${event.key} back to inherited in ${place}`
+        : `turned ${event.key} ${event.on ? "on" : "off"} in ${place}`;
+    }
     default: {
       // Every type is read above: a new type of grantr's fails to typecheck here.
       const unread: never = event;
@@ -117,6 +124,7 @@ const LABELS: Record<AuditType, string> = {
   key_revoked: "Keys revoked",
   restricted: "Restrictions",
   unrestricted: "Restrictions lifted",
+  integration_set: "Integrations switched",
   tenant_created: "Tenant created",
   deployment_tenant_created: "Tenant created (deployment)",
   tenant_deleted: "Tenant deleted",

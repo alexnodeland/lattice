@@ -29,6 +29,7 @@ from grantr.core import (
     Grant,
     Grantee,
     Group,
+    IntegrationSetting,
     Key,
     ListableKind,
     Member,
@@ -48,6 +49,7 @@ from grantr.sql.tables import (
     GrantRow,
     GroupMemberRow,
     GroupRow,
+    IntegrationRow,
     KeyRow,
     ResourceRow,
     RoleRow,
@@ -272,6 +274,17 @@ class _Reads:
         return row is not None and row.restricted
 
     @awaited_to_the_end
+    async def integrations(
+        self, tenant: TenantId, workspace: WorkspaceId | None = None
+    ) -> dict[str, IntegrationSetting]:
+        rows = await self._session.scalars(
+            select(IntegrationRow).where(
+                IntegrationRow.tenant_id == tenant, IntegrationRow.workspace == (workspace or "")
+            )
+        )
+        return {row.key: IntegrationSetting.model_validate(row.setting) for row in rows}
+
+    @awaited_to_the_end
     async def keys(self, tenant: TenantId) -> list[Key]:
         rows = await self._session.scalars(select(KeyRow).where(KeyRow.tenant_id == tenant))
         return [_stored_key(row) for row in rows]
@@ -313,7 +326,15 @@ class _Transaction(_Reads):
 
     @awaited_to_the_end
     async def delete_tenant(self, tenant: TenantId) -> None:
-        for model in (GrantRow, GroupRow, GroupMemberRow, RoleRow, KeyRow, ResourceRow):
+        for model in (
+            GrantRow,
+            GroupRow,
+            GroupMemberRow,
+            RoleRow,
+            KeyRow,
+            ResourceRow,
+            IntegrationRow,
+        ):
             await self._session.execute(delete(model).where(model.tenant_id == tenant))
         await self._session.execute(
             update(TenantRow).where(TenantRow.id == tenant).values(live=False)
@@ -418,6 +439,33 @@ class _Transaction(_Reads):
                 resource_workspace=workspace,
                 resource_id=id,
                 restricted=restricted,
+            )
+        )
+        await self._session.flush()
+
+    @awaited_to_the_end
+    async def set_integration(
+        self,
+        tenant: TenantId,
+        workspace: WorkspaceId | None,
+        key: str,
+        setting: IntegrationSetting | None,
+    ) -> None:
+        if setting is None:
+            await self._session.execute(
+                delete(IntegrationRow).where(
+                    IntegrationRow.tenant_id == tenant,
+                    IntegrationRow.workspace == (workspace or ""),
+                    IntegrationRow.key == key,
+                )
+            )
+            return
+        await self._session.merge(
+            IntegrationRow(
+                tenant_id=tenant,
+                workspace=workspace or "",
+                key=key,
+                setting=setting.model_dump(mode="json"),
             )
         )
         await self._session.flush()
@@ -634,6 +682,12 @@ class SqlStorage:
     async def is_restricted(self, tenant: TenantId, on: Resource) -> bool:
         """Whether a thread or artifact is restricted."""
         return await self._read(tenant, lambda reads: reads.is_restricted(tenant, on))
+
+    async def integrations(
+        self, tenant: TenantId, workspace: WorkspaceId | None = None
+    ) -> dict[str, IntegrationSetting]:
+        """The integrations set on a tenant, with None, or in one of its workspaces, by key."""
+        return await self._read(tenant, lambda reads: reads.integrations(tenant, workspace))
 
     async def keys(self, tenant: TenantId) -> list[Key]:
         """A tenant's keys."""

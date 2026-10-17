@@ -20,8 +20,9 @@ from artifactr.core import (
     Thread,
     ToolReturned,
 )
-from artifactr.workspace import Workspace
+from artifactr.workspace import InMemoryStorage, Workspace, Workspaces, integration_gate
 from tests.agent.conftest import (
+    ALICE,
     Gate,
     Script,
     call,
@@ -33,6 +34,7 @@ from tests.agent.conftest import (
     types,
 )
 from tests.artifact_types import Note
+from tests.workspace.gating import NOTES, Switch, key_of
 
 
 async def _started(gate: Gate) -> None:
@@ -124,6 +126,19 @@ async def test_a_rejected_tool_call_becomes_a_retry(
     statuses = [event_as(e, ToolReturned).status for e in log if e.event.type == "tool_returned"]
     assert statuses == ["retry", "ok"]
     assert (await ws.get(Note, "n1")).data.text == "Ship Monday"
+
+
+async def test_an_integration_switched_off_refuses_the_agent_as_a_retry(gate: Gate) -> None:
+    switch = Switch()
+    workspaces = Workspaces(InMemoryStorage(), gate=integration_gate(switch, key_of))
+    ws = await workspaces.open("tenant", "ws", actor=ALICE)
+    thread = await ws.create_thread("Launch")
+    await ws.create(Note(text="Ship Friday"), artifact_id="n1")
+    switch.off.add(("tenant", "ws", NOTES))
+    script = Script(call("edit_text", artifact_id="n1", old="Friday", new="Monday"), say("Off."))
+    await make_agent(script).run("move it", deps=Session.start(ws, thread.id, app=gate))
+    assert _retry_text(script.requests[1]).startswith("notes is not available in this workspace")
+    assert (await ws.get(Note, "n1")).data.text == "Ship Friday", "read as before"
 
 
 async def test_a_tool_that_asks_for_a_retry_or_fails_is_recorded(

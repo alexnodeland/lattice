@@ -184,6 +184,21 @@
 }
 
 /*
+ * The system's colours, by role, for a control that keeps its own colours under forced colours
+ * (`forced-color-adjust: none`), so its state still shows where the fills it is told by are
+ * dropped: the page, its text, a chosen thing and its text, and what can't be used. Each is a
+ * system colour, the same keyword in both schemes, so none is a light-dark() pair: the system
+ * chooses it.
+ */
+:root {
+  --system-canvas: Canvas;
+  --system-text: CanvasText;
+  --system-highlight: Highlight;
+  --system-on-highlight: HighlightText;
+  --system-disabled: GrayText;
+}
+
+/*
  * Under forced colours (a high-contrast mode), a hue is not the page's to give: the system's
  * colours replace it. So every pattern, dash and marker shape is on as in colour-blind mode, whether
  * or not it was chosen; the inks themselves are the system's.

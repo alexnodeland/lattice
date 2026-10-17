@@ -39,6 +39,12 @@
   --color-danger-hover: var(--danger-hover);
   --color-wash: var(--wash);
   --color-accent-hover: var(--accent-hover);
+  /* The system's colours, for a control under forced colours (tokens.css). */
+  --color-system-canvas: var(--system-canvas);
+  --color-system-text: var(--system-text);
+  --color-system-highlight: var(--system-highlight);
+  --color-system-on-highlight: var(--system-on-highlight);
+  --color-system-disabled: var(--system-disabled);
   /* The names Streamdown's own classes use, as portalr's roles. */
   --color-foreground: var(--fg);
   --color-background: var(--paper);

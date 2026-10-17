@@ -64,14 +64,14 @@ Langfuse and LiteLLM aren't in that stack, so their reads answer `unavailable` t
 
 ## The app
 
-`web/app` is the people's UI, at `/portalr/app/`. It reads `config.json` first, signs in through Supabase Auth's client, `@supabase/auth-js`, and asks the server through `client`'s queries, each carrying the current token and the tenant its route names ([ADR-0014](adr/0014-the-apps-shell.md)). Commands go over each library's stream, except a stored rule's, which goes over reflexr's REST, for an answer to every one; and each live event on a workspace's streams makes stale the reads it changed ([ADR-0020](adr/0020-the-rules-area.md)).
+`web/app` is the people's UI, at `/portalr/app/`. It reads `config.json` first, signs in through Supabase Auth's client, `@supabase/auth-js`, and asks the server through `client`'s queries, each carrying the current token and the tenant its route names ([ADR-0014](adr/0014-the-apps-shell.md)). Commands go over each library's stream, except a stored rule's, which goes over reflexr's REST, for an answer to every one; and each live event on a workspace's streams makes stale the reads it changed ([ADR-0020](adr/0020-the-rules-area.md)). A workspace's integrations are read once as it opens, from grantr, and kept: they say which of Markdown's add-ons it may draw, each is its registry default where they can't be read, and a command artifactr refuses as `not_enabled` reads them again ([ADR-0045](adr/0045-integrations-in-admin-and-the-apps-read-of-them.md)).
 
 | Route | Shows |
 |---|---|
 | `/sign-in` | An email and a password |
 | `/` | The person's tenants, from grantr's `/me`: none is no access, and one goes straight to it |
 | `/t/$tenant` | The workspaces grantr says they can open there |
-| `/t/$tenant/w/$workspace` | A workspace's threads, and a new one; its artifactr stream is open while any of its routes is |
+| `/t/$tenant/w/$workspace` | A workspace's threads, and a new one; its artifactr stream is open while any of its routes is, and its integrations are read as it opens |
 | `/t/$tenant/w/$workspace/threads/$thread` | A thread's chat: its messages, its runs as they stream, what a paused run waits on, its proposals, and a message to post where grantr allows; and its menu, to restrict and share it ([ADR-0022](adr/0022-restricting-and-sharing-a-thread.md)) |
 | `/t/$tenant/w/$workspace/artifacts` | The workspace's artifacts that aren't archived, each by kind and latest version |
 | `/t/$tenant/w/$workspace/artifacts/$artifact` | An artifact through its kind's renderer, its revisions newest first with what each changed, and its open proposals |
@@ -99,7 +99,7 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 | `Thumbs` | The reader's thumbs on a message, an artifact or a run, and why | Thumbs, then a comment ([ADR-0018](adr/0018-the-runs-area-and-feedback.md)) |
 | `CommandButton` | One action, waiting while its command is in flight | The command |
 | `Markdown` | Markdown through Streamdown: no raw HTML, links to the web, mail, the page and the application alone, images from this origin alone; GitHub's callouts as alerts, footnotes of each message's own, and code blocks with their language, Wrap and Copy ([ADR-0043](adr/0043-markdowns-basics.md)); highlighting in fifteen languages, and math as MathML, each loaded when a message needs it ([ADR-0044](adr/0044-highlighting-and-math-on-demand.md)) | Nothing |
-| `AddonsProvider` | Which of Markdown's add-ons the Markdown inside may draw; one that isn't drawn shows its source, with a quiet line. Math is on; Mermaid is off, and parked ([ADR-0042](adr/0042-mermaid-cant-draw-under-the-policy.md)) | Nothing |
+| `AddonsProvider` | Which of Markdown's add-ons the Markdown inside may draw, which the app gives from a workspace's integrations; one that isn't drawn shows its source, with a quiet line. Math is on by default; Mermaid is off by default, and parked ([ADR-0042](adr/0042-mermaid-cant-draw-under-the-policy.md), [ADR-0045](adr/0045-integrations-in-admin-and-the-apps-read-of-them.md)) | Nothing |
 
 `ui` imports `client`'s types alone, which a root test holds it to. `Markdown` is held to the UIs' Content-Security-Policy too: `ui`'s `csp` tests build a page of it as the UIs are built, serve it with the policy a portalr test holds to the router's, and fail on any violation in Chromium ([ADR-0043](adr/0043-markdowns-basics.md)).
 
@@ -114,6 +114,7 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 | `/t/$tenant` | A tenant someone owns or administers, in admin's frame, with the areas grantr allows |
 | `/t/$tenant/` | Home: members, workspaces, feedback, failed turns and spend, each a card from one read, with its own state |
 | `/t/$tenant/access/members`, `/groups`, `/keys`, `/roles`, `/grants` | Access: members, invited or made as service principals, and removed; groups; keys, a secret shown once, and revoked; roles, built in and custom; and grants, given and revoked. Each part where grantr allows its read, as a table or, on a phone, cards ([ADR-0024](adr/0024-access-members-groups-and-keys.md), [ADR-0025](adr/0025-access-roles-and-grants.md)) |
+| `/t/$tenant/integrations` | Integrations: on the tenant or in a workspace the address chooses, each integration switched on or off, or back to what it inherits, with where its state comes from, the tenant's off and the deployment's not installing as ceilings, and who set it there and when ([ADR-0045](adr/0045-integrations-in-admin-and-the-apps-read-of-them.md)) |
 | `/t/$tenant/audit` | Audit: grantr's log for the tenant, the newest on top, a sentence per change with who made it and when, filtered by type and maker in the address ([ADR-0026](adr/0026-audit.md)) |
 | `/t/$tenant/feedback` | Feedback: people's thumbs per day, each evaluation's mean per day, each workspace's share and thumbs, and what people said, from portalr's summary, in a window and a workspace the address keeps ([ADR-0027](adr/0027-feedback-and-evaluations.md)) |
 | `/t/$tenant/traces`, `/traces/$trace` | Traces: the tenant's newest traces in a window, or a thread's or a run's, and a trace's spans as a tree and a waterfall, with what a span withheld read for that span when asked, from Tempo ([ADR-0030](adr/0030-traces-and-the-trace-view.md)) |
@@ -156,6 +157,7 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 | `Num` | A figure with tabular digits only, so its decimal point keeps its width ([ADR-0036](adr/0036-the-chart-theme-and-colour-blind-mode.md)) |
 | `TraceView` | A trace's spans as an ARIA tree with a waterfall, virtualized, and the chosen span's details; what a span withheld is shown when asked for ([ADR-0030](adr/0030-traces-and-the-trace-view.md)) |
 | `LogList`, `AnsiText` | Log records as a virtualized ARIA listbox with the chosen record's details; a line in the eight palette colours and bold, with every other escape stripped ([ADR-0031](adr/0031-logs-and-health.md)) |
+| `IntegrationList` | A level's integrations as a table, or cards on a phone: each a switch named by it and described by its state in words, a badge whose shape says on or off, where the state comes from, who set it and when, and a way back to what it inherits; a ceiling's switch disabled with its reason ([ADR-0045](adr/0045-integrations-in-admin-and-the-apps-read-of-them.md)) |
 | `RunList`, `RuleRunStatus` | Rule runs as a table, or cards on a phone, with each row's actions, and a run's status as a word and a shape ([ADR-0032](adr/0032-runs-in-admin.md)) |
 | `Tracker` | Tremor's tracker, adapted: a block per day, each in its level's mark, a pattern past the second, the levels in a legend, and the figures as a table ([ADR-0028](adr/0028-usage-and-spend.md)) |
 | `Moment` | A time in the reader's zone, and how long ago on hover ([ADR-0026](adr/0026-audit.md)) |

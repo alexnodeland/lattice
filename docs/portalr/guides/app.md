@@ -8,6 +8,10 @@ After [signing in](../getting-started.md#sign-in), the app lists the tenants the
 
 Everything below is inside a workspace, `/t/<tenant>/w/<workspace>`, whose artifactr and reflexr streams are open while any of its areas is, and close when the person leaves. The streams reconnect from where they were after a drop, and with each refreshed token.
 
+### Integrations that are off
+
+A tenant's owners and admins turn its integrations on or off, on the tenant or in one of its workspaces, in [admin](admin.md#integrations), such as diagrams, forms or Mermaid. The app reads which are on when a workspace opens, and again when the window is focused after a few minutes. Markdown draws its add-ons by them: math, which is on by default and shows as its source where it is off, and Mermaid, whose diagrams show as their source either way. An action that needs an integration that is off is refused with **Not available in this workspace.**, which also makes the app read them again. If they can't be read, each is what it is by default: mini apps and Mermaid off, the rest on. The server checks every action, whatever the page shows ([ADR-0045](../adr/0045-integrations-in-admin-and-the-apps-read-of-them.md)).
+
 ## Threads
 
 A workspace's threads, and a new one. A **thread** is a conversation, and its page is the chat:
@@ -18,7 +22,7 @@ A workspace's threads, and a new one. A **thread** is a conversation, and its pa
 - the thread's **proposals**, each with its rationale and how it was resolved, to accept or reject;
 - a composer, only where grantr allows the person to post.
 
-Markdown renders through Streamdown, with no raw HTML; links go to the web, mail, the page and the application only, and images only from the app's own origin. GitHub's callouts (`> [!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`, `[!CAUTION]`) show as notes with their word, and a block of code names its language, is highlighted in the common languages, and has **Wrap** and **Copy**. Math between `$$` shows as math, within a line or on lines of its own; a single `$` is a price. **Copy** under a message copies it as the Markdown it was written in. A Mermaid diagram shows as its source: diagrams aren't drawn yet.
+Markdown renders through Streamdown, with no raw HTML; links go to the web, mail, the page and the application only, and images only from the app's own origin. GitHub's callouts (`> [!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`, `[!CAUTION]`) show as notes with their word, and a block of code names its language, is highlighted in the common languages, and has **Wrap** and **Copy**. Math between `$$` shows as math, within a line or on lines of its own; a single `$` is a price. **Copy** under a message copies it as the Markdown it was written in. A Mermaid diagram shows as its source: diagrams aren't drawn yet, and where Mermaid is off in the workspace, the line under it says so.
 
 ### Restricting and sharing a thread
 

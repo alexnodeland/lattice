@@ -1,0 +1,47 @@
+[
+  {
+    "key": "tracker:plane",
+    "default": true,
+    "description": "Plane: rules file and change work items in a Plane project."
+  },
+  {
+    "key": "tracker:vikunja",
+    "default": true,
+    "description": "Vikunja: rules file and change tasks in a Vikunja project."
+  },
+  {
+    "key": "files:wordcraft",
+    "default": true,
+    "description": "WordCraft: Word documents kept as native files, edited by people and agents."
+  },
+  {
+    "key": "ui:forms",
+    "default": true,
+    "description": "Forms: the agent asks with a form, and people fill it in the chat."
+  },
+  {
+    "key": "ui:dashboards",
+    "default": true,
+    "description": "Dashboards: the agent shows figures and charts as a dashboard in the chat."
+  },
+  {
+    "key": "ui:mini-apps",
+    "default": false,
+    "description": "Mini apps: small apps the agent writes, run apart from the portal."
+  },
+  {
+    "key": "excalidraw",
+    "default": true,
+    "description": "Diagrams: Excalidraw drawings that people and agents draw on together."
+  },
+  {
+    "key": "markdown:math",
+    "default": true,
+    "description": "Math: formulas in messages and documents, typeset."
+  },
+  {
+    "key": "markdown:mermaid",
+    "default": false,
+    "description": "Mermaid: diagrams written as text in messages, drawn."
+  }
+]

@@ -54,6 +54,7 @@ nav:
   - adr/0042-mermaid-cant-draw-under-the-policy.md
   - adr/0043-markdowns-basics.md
   - adr/0044-highlighting-and-math-on-demand.md
+  - adr/0045-integrations-in-admin-and-the-apps-read-of-them.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

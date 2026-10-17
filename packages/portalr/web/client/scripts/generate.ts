@@ -1,7 +1,8 @@
 /**
  * Writes the client's types from the packages' committed documents: each REST surface's OpenAPI
- * document through openapi-typescript, and each WebSocket protocol's JSON Schema through
- * json-schema-to-typescript. The drift test calls `generate()` and compares; `moon run
+ * document through openapi-typescript, each WebSocket protocol's JSON Schema through
+ * json-schema-to-typescript, and lattice's integrations, as portalr writes them from lattice-core's
+ * registry, as a constant. The drift test calls `generate()` and compares; `moon run
  * client:types` writes. openapi-typescript loads TypeScript 6, this package's own `typescript`
  * (portalr ADR-0010).
  */
@@ -29,6 +30,9 @@ const SCHEMAS = {
   "reflexr.v1.ts": "packages/reflexr/schemas/reflexr.v1.json",
   "reflexr.rules.v1.ts": "packages/reflexr/schemas/reflexr.rules.v1.json",
 } as const;
+
+/** lattice's integrations, each key's default and sentence, in the registry's order (ADR-0045). */
+const INTEGRATIONS = "packages/portalr/schemas/integrations.json";
 
 /** Keywords that describe a value without constraining it. */
 const ANNOTATIONS = new Set([
@@ -69,6 +73,21 @@ export function bareRefs(schema: unknown, at = "#"): unknown {
   );
 }
 
+/** The integrations as a constant, each read as it was declared: a key, a default, a sentence. */
+function integrations(text: string): string {
+  const declared = (JSON.parse(text) as { key: string; default: boolean; description: string }[])
+    .map(
+      ({ key, default: on, description }) =>
+        `  ${JSON.stringify({ key, default: on, description })},\n`,
+    )
+    .join("");
+  return (
+    `${HEADER}// ${INTEGRATIONS}\n\n` +
+    "/** lattice's integrations, in its registry's order: each key, its default, and what it is. */\n" +
+    `export const INTEGRATIONS = [\n${declared}] as const;\n`
+  );
+}
+
 /** Every generated file, by name, as it should read. */
 export async function generate(): Promise<Record<string, string>> {
   const files: Record<string, string> = {};
@@ -86,6 +105,7 @@ export async function generate(): Promise<Record<string, string>> {
     });
     files[name] = `${HEADER}// ${source}\n\n${types}`;
   }
+  files["integrations.ts"] = integrations(await readFile(join(root, INTEGRATIONS), "utf8"));
   return files;
 }
 

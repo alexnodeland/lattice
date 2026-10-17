@@ -4,8 +4,8 @@ import pytest
 from pydantic import ValidationError
 
 from artifactr.core import NotFound, get_artifact_type
-from artifactr_files.manifest import DOCX, OUTLINE_LIMIT, Provenance, WordDocument
-from tests.files_of import blob, digest, document
+from artifactr.files.manifest import DOCX, OUTLINE_LIMIT, Provenance, WordDocument
+from tests.files.files_of import blob, digest, document
 
 
 def test_a_word_document_is_registered_and_proposed_by_agents() -> None:

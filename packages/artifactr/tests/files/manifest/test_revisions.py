@@ -13,9 +13,9 @@ from artifactr.core import (
     UserActor,
     apply_patch,
 )
+from artifactr.files.manifest import REVISED, Provenance, WordDocument, revise
 from artifactr.workspace import InMemoryStorage, Workspaces
-from artifactr_files.manifest import REVISED, Provenance, WordDocument, revise
-from tests.files_of import digest, document
+from tests.files.files_of import digest, document
 
 SEEDS = st.text(min_size=1, max_size=8)
 ALICE = UserActor(id="alice", name="Alice")

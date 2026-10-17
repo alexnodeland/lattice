@@ -3,11 +3,11 @@
 from datetime import timedelta
 
 from artifactr.core import AgentActor, UserActor
+from artifactr.files.checkouts import Checkout
 from artifactr.workspace import Scope
-from artifactr_files.checkouts import Checkout
-from tests.clock import START
-from tests.conftest import Stores
-from tests.files_of import digest
+from tests.files.clock import START
+from tests.files.conftest import Stores
+from tests.files.files_of import digest
 
 ACME = Scope("acme", "w1")
 ALICE = UserActor(id="alice", name="Alice")

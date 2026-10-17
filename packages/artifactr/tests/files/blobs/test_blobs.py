@@ -17,14 +17,14 @@ import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
+from artifactr.files.blobs import DEFAULT_LIMIT, MOST, Blobs, InMemoryBlobs, TooLarge, once
+from artifactr.files.blobs.port import MIB, check_limit
+from artifactr.files.manifest import DOCX, Blob
+from artifactr.files.sql import SqlBlobs, create_schema
 from artifactr.workspace import Scope
-from artifactr_files.blobs import DEFAULT_LIMIT, MOST, Blobs, InMemoryBlobs, TooLarge, once
-from artifactr_files.blobs.port import MIB, check_limit
-from artifactr_files.manifest import DOCX, Blob
-from artifactr_files.sql import SqlBlobs, create_schema
-from tests.clock import FakeClock
-from tests.conftest import Stores
 from tests.databases import SQL_BACKENDS, empty_database
+from tests.files.clock import FakeClock
+from tests.files.conftest import Stores
 
 ACME = Scope("acme", "w1")
 GLOBEX = Scope("globex", "w1")
@@ -105,7 +105,8 @@ async def test_a_store_keeps_to_its_own_limit(tmp_path: Path) -> None:
     await small.put(ACME, "a1", once(b"four"), DOCX)
     with pytest.raises(TooLarge):
         await small.put(ACME, "a1", chunks(b"fo", b"ur", b"!"), DOCX)
-    async with empty_database("sqlite", tmp_path) as engine:
+    async with empty_database("sqlite", tmp_path) as database:
+        engine = database.engine()
         await create_schema(engine)
         with pytest.raises(TooLarge):
             await SqlBlobs(engine, limit=4).put(ACME, "a1", once(b"five!"), DOCX)
@@ -130,7 +131,8 @@ async def test_collection_keeps_what_is_named_or_put_lately(blobs: Blobs, clock:
 
 async def test_collection_deletes_in_batches(tmp_path: Path) -> None:
     clock = FakeClock()
-    async with empty_database("sqlite", tmp_path) as engine:
+    async with empty_database("sqlite", tmp_path) as database:
+        engine = database.engine()
         await create_schema(engine)
         blobs = SqlBlobs(engine, clock=clock)
         for n in range(1_201):
@@ -169,7 +171,8 @@ async def _blobs_on(backend: str, directory: Path, clock: FakeClock) -> AsyncIte
     if backend == "memory":
         yield InMemoryBlobs(clock=clock)
         return
-    async with empty_database(backend, directory) as engine:
+    async with empty_database(backend, directory) as database:
+        engine = database.engine()
         await create_schema(engine)
         yield SqlBlobs(engine, clock=clock)
 

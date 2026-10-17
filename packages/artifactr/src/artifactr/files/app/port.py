@@ -2,7 +2,7 @@
 
 Each call takes the file's bytes and returns new bytes or what was read from them, so no
 document stays open between calls. One adapter per app, since apps' control channels and
-commands differ; [`FakeApp`][artifactr_files.app.FakeApp] stands in for one in tests.
+commands differ; [`FakeApp`][artifactr.files.app.FakeApp] stands in for one in tests.
 """
 
 from collections.abc import Sequence
@@ -11,7 +11,7 @@ from typing import Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
-from artifactr_files.manifest import OUTLINE_LIMIT, Sha256
+from artifactr.files.manifest import OUTLINE_LIMIT, Sha256
 
 Failure = Literal["timeout", "crashed", "too_large", "refused"]
 """How a call can fail: past its deadline, the app crashed, a limit was breached, or the app
@@ -19,7 +19,7 @@ refused the file or a command."""
 
 
 class AppFailed(Exception):
-    """A call to the app failed, in one of the ways [`Failure`][artifactr_files.app.Failure] names.
+    """A call to the app failed, in one of the ways [`Failure`][artifactr.files.app.Failure] names.
 
     Attributes:
         failure: How it failed.
@@ -77,7 +77,7 @@ class App(Protocol):
     """A native application, run headless, that edits one format by its own commands.
 
     Every call is given a deadline, in seconds, and fails with
-    [`AppFailed`][artifactr_files.app.AppFailed] when it can't finish.
+    [`AppFailed`][artifactr.files.app.AppFailed] when it can't finish.
     """
 
     @property

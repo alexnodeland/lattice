@@ -4,9 +4,9 @@ import zlib
 
 import pytest
 
-from artifactr_files.app import App, AppCommand, AppFailed, Failure, FakeApp
-from artifactr_files.app.fake import PAGE
-from artifactr_files.manifest import OUTLINE_LIMIT
+from artifactr.files.app import App, AppCommand, AppFailed, Failure, FakeApp
+from artifactr.files.app.fake import PAGE
+from artifactr.files.manifest import OUTLINE_LIMIT
 
 
 def command(name: str, **args: object) -> AppCommand:

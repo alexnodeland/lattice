@@ -14,11 +14,11 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import Session
 
 from artifactr.core import ArtifactId
+from artifactr.files.blobs import DEFAULT_LIMIT, Clock
+from artifactr.files.blobs.port import check_limit, spool, utc_now
+from artifactr.files.manifest import Blob
+from artifactr.files.sql.tables import BlobRow
 from artifactr.workspace import Scope
-from artifactr_files.blobs import DEFAULT_LIMIT, Clock
-from artifactr_files.blobs.port import check_limit, spool, utc_now
-from artifactr_files.manifest import Blob
-from artifactr_files.sql.tables import BlobRow
 from lattice_core.sql.sessions import awaited_to_the_end, lock_row
 from lattice_core.sql.tenancy import TENANT_KEY, TenantSession
 
@@ -27,11 +27,11 @@ BATCH: Final = 500
 
 
 class SqlBlobs:
-    """The [`Blobs`][artifactr_files.blobs.Blobs] port in a SQL database.
+    """The [`Blobs`][artifactr.files.blobs.Blobs] port in a SQL database.
 
-    Create the tables with [`migrate`][artifactr_files.sql.migrate] first. The same code runs on
+    Create the tables with [`migrate`][artifactr.files.sql.migrate] first. The same code runs on
     PostgreSQL and on SQLite, whose engines must come from
-    [`create_sqlite_engine`][artifactr_files.sql.create_sqlite_engine].
+    [`create_sqlite_engine`][artifactr.files.sql.create_sqlite_engine].
 
     Args:
         engine: The database. The store does not dispose of it.

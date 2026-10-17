@@ -1,8 +1,9 @@
-"""The layering in artifactr-files' architecture, enforced.
+"""The layering within the native files' package, `artifactr.files`, enforced.
 
-The package depends inward only: every name it imports from artifactr is in its module's
-`__all__`, and artifactr imports nothing of it (lattice RFC-0003). Within it, the manifest knows
-no other layer, and only the SQL layer knows SQL.
+The package depends inward only: every name it imports from the rest of artifactr is in its
+module's `__all__` (lattice RFC-0003), and `tests/test_layering.py` holds the rest of artifactr to
+importing nothing of it. Within it, the manifest knows no other layer, and only the SQL layer
+knows SQL.
 """
 
 import ast
@@ -12,37 +13,36 @@ from pathlib import Path
 
 import pytest
 
-SRC = Path(__file__).parent.parent / "src" / "artifactr_files"
-ARTIFACTR = Path(importlib.import_module("artifactr").__file__ or "").parent
+SRC = Path(__file__).parents[2] / "src" / "artifactr" / "files"
 
 LIBRARY = {"artifactr.core", "artifactr.workspace"}
-"""What it may import of artifactr: these, and `artifactr` itself, by their `__all__`."""
+"""What it may import of the rest of artifactr: these, by their `__all__`."""
 
 LAYERS: dict[str, tuple[set[str], set[str]]] = {
-    # layer: (artifactr_files packages it may import, third-party modules it may import)
-    "manifest": ({"artifactr_files.manifest"}, {*LIBRARY, "pydantic"}),
-    "blobs": ({"artifactr_files.manifest", "artifactr_files.blobs"}, LIBRARY),
+    # layer: (artifactr.files packages it may import, the others it may import)
+    "manifest": ({"artifactr.files.manifest"}, {*LIBRARY, "pydantic"}),
+    "blobs": ({"artifactr.files.manifest", "artifactr.files.blobs"}, LIBRARY),
     "checkouts": (
-        {"artifactr_files.manifest", "artifactr_files.checkouts"},
+        {"artifactr.files.manifest", "artifactr.files.checkouts"},
         {*LIBRARY, "pydantic"},
     ),
-    "app": ({"artifactr_files.manifest", "artifactr_files.app"}, {"pydantic"}),
-    "files": (
+    "app": ({"artifactr.files.manifest", "artifactr.files.app"}, {"pydantic"}),
+    "native": (
         {
-            "artifactr_files.manifest",
-            "artifactr_files.blobs",
-            "artifactr_files.checkouts",
-            "artifactr_files.app",
-            "artifactr_files.files",
+            "artifactr.files.manifest",
+            "artifactr.files.blobs",
+            "artifactr.files.checkouts",
+            "artifactr.files.app",
+            "artifactr.files.native",
         },
         {*LIBRARY, "pydantic"},
     ),
     "sql": (
         {
-            "artifactr_files.manifest",
-            "artifactr_files.blobs",
-            "artifactr_files.checkouts",
-            "artifactr_files.sql",
+            "artifactr.files.manifest",
+            "artifactr.files.blobs",
+            "artifactr.files.checkouts",
+            "artifactr.files.sql",
         },
         {*LIBRARY, "sqlalchemy", "alembic", "lattice_core.sql"},
     ),
@@ -75,10 +75,10 @@ def test_layer_imports_only_what_it_may(layer: str) -> None:
             where = f"{path.relative_to(SRC)} imports {module}"
             if root in sys.stdlib_module_names:
                 continue
-            if root == "artifactr_files":
+            if _within(module, {"artifactr.files"}):
                 assert _within(module, own), f"{where}: above"
-            else:
-                assert _within(module, third_party), f"{where}: not a dependency of this layer"
+                continue
+            assert _within(module, third_party), f"{where}: not a dependency of this layer"
             if root == "artifactr" and name is not None:
                 exported = importlib.import_module(module).__all__
                 assert name in exported, f"{where}.{name}: not artifactr's public API"
@@ -91,11 +91,4 @@ def test_every_package_is_a_layer() -> None:
 
 def test_the_package_root_imports_only_its_layers() -> None:
     for module, _ in _imports(SRC / "__init__.py"):
-        assert module == "importlib.metadata" or _within(
-            module, {f"artifactr_files.{layer}" for layer in LAYERS}
-        ), module
-
-
-def test_artifactr_imports_nothing_of_it() -> None:
-    for path in ARTIFACTR.rglob("*.py"):
-        assert not any(m.startswith("artifactr_files") for m, _ in _imports(path)), path
+        assert _within(module, {f"artifactr.files.{layer}" for layer in LAYERS}), module

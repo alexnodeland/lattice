@@ -10,28 +10,18 @@ from pathlib import Path
 
 import pytest
 
-from artifactr_files.blobs import Blobs, InMemoryBlobs
-from artifactr_files.checkouts import Checkouts, InMemoryCheckouts
-from artifactr_files.sql import SqlBlobs, SqlCheckouts, create_schema
-from tests.clock import FakeClock
+from artifactr.files.blobs import Blobs, InMemoryBlobs
+from artifactr.files.checkouts import Checkouts, InMemoryCheckouts
+from artifactr.files.sql import SqlBlobs, SqlCheckouts, create_schema, migrate
 from tests.databases import (
-    POSTGRES_URL,
     ROW_LEVEL_SECURITY,
     SQL_BACKENDS,
     empty_database,
     row_level_security,
 )
+from tests.files.clock import FakeClock
 
 BACKENDS = ["memory", *SQL_BACKENDS, ROW_LEVEL_SECURITY]
-
-
-def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    """Leave out the PostgreSQL tests unless a database is configured; the summary counts them."""
-    if POSTGRES_URL:
-        return
-    postgres = [item for item in items if item.get_closest_marker("postgres")]
-    config.hook.pytest_deselected(items=postgres)
-    items[:] = [item for item in items if item not in postgres]
 
 
 @dataclass(frozen=True)
@@ -55,12 +45,13 @@ async def stores(
         yield Stores(InMemoryBlobs(clock=clock), InMemoryCheckouts())
         return
     if request.param == "postgres-rls":
-        async with row_level_security() as (_, application):
+        async with row_level_security(migrate) as (_, application):
             yield Stores(
                 SqlBlobs(application, clock=clock, row_level_security=True),
                 SqlCheckouts(application, row_level_security=True),
             )
         return
-    async with empty_database(request.param, tmp_path) as engine:
+    async with empty_database(request.param, tmp_path) as database:
+        engine = database.engine()
         await create_schema(engine)
         yield Stores(SqlBlobs(engine, clock=clock), SqlCheckouts(engine))

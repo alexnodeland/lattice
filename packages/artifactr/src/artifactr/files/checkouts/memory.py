@@ -1,11 +1,11 @@
 """Check-outs in memory, for tests, examples and single-process prototypes."""
 
+from artifactr.files.checkouts.record import Checkout
 from artifactr.workspace import Scope
-from artifactr_files.checkouts.record import Checkout
 
 
 class InMemoryCheckouts:
-    """The whole [`Checkouts`][artifactr_files.checkouts.Checkouts] port in memory."""
+    """The whole [`Checkouts`][artifactr.files.checkouts.Checkouts] port in memory."""
 
     def __init__(self) -> None:
         self._checkouts: dict[tuple[Scope, str], Checkout] = {}

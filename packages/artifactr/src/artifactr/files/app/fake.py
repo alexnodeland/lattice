@@ -15,7 +15,7 @@ from typing import Final
 
 from pydantic import BaseModel, JsonValue, ValidationError
 
-from artifactr_files.app.port import (
+from artifactr.files.app.port import (
     AppCommand,
     AppFailed,
     Applied,
@@ -23,7 +23,7 @@ from artifactr_files.app.port import (
     Failure,
     Inspection,
 )
-from artifactr_files.manifest import OUTLINE_LIMIT
+from artifactr.files.manifest import OUTLINE_LIMIT
 
 PAGE: Final = 3
 """How many paragraphs a page of a fake file holds."""
@@ -53,7 +53,7 @@ class _File(BaseModel):
 
 
 class FakeApp:
-    """A fake [`App`][artifactr_files.app.App], for tests: it reads and writes its own JSON files.
+    """A fake [`App`][artifactr.files.app.App], for tests: it reads and writes its own JSON files.
 
     Args:
         fails: How every call fails, to test what happens when the app does; None for never.

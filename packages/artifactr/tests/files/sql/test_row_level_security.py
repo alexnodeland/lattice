@@ -15,14 +15,14 @@ from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 
 from artifactr.core import UserActor
+from artifactr.files.blobs import once
+from artifactr.files.checkouts import Checkout
+from artifactr.files.manifest import DOCX
+from artifactr.files.sql import SqlBlobs, SqlCheckouts, migrate
 from artifactr.workspace import Scope
-from artifactr_files.blobs import once
-from artifactr_files.checkouts import Checkout
-from artifactr_files.manifest import DOCX
-from artifactr_files.sql import SqlBlobs, SqlCheckouts, migrate
 from lattice_core.sql.tenancy import TENANT_KEY, TenantSession
 from tests.databases import empty_database, row_level_security
-from tests.files_of import digest
+from tests.files.files_of import digest
 
 TABLES = ("artifactr_files_blobs", "artifactr_files_checkouts")
 
@@ -30,7 +30,7 @@ TABLES = ("artifactr_files_blobs", "artifactr_files_checkouts")
 @pytest.fixture
 async def engines() -> AsyncIterator[tuple[AsyncEngine, AsyncEngine]]:
     """The owner's engine and the application's, with a blob and a check-out in each tenant."""
-    async with row_level_security() as (owner, application):
+    async with row_level_security(migrate) as (owner, application):
         blobs = SqlBlobs(application, row_level_security=True)
         checkouts = SqlCheckouts(application, row_level_security=True)
         for tenant in ("acme", "globex"):
@@ -87,7 +87,8 @@ async def test_a_tenant_writes_only_its_rows(engines: tuple[AsyncEngine, AsyncEn
 
 
 async def test_sqlite_takes_the_option_and_has_nothing_to_set(tmp_path: Path) -> None:
-    async with empty_database("sqlite", tmp_path) as engine:
+    async with empty_database("sqlite", tmp_path) as database:
+        engine = database.engine()
         await migrate(engine, application_role="application")  # nothing to grant
         blobs = SqlBlobs(engine, row_level_security=True)
         put = await blobs.put(Scope("acme", "w1"), "a1", once(b"acme's"), DOCX)

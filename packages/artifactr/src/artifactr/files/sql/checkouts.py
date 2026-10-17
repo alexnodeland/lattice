@@ -3,15 +3,15 @@
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import Session
 
+from artifactr.files.checkouts import Checkout
+from artifactr.files.sql.tables import CheckoutRow
 from artifactr.workspace import Scope
-from artifactr_files.checkouts import Checkout
-from artifactr_files.sql.tables import CheckoutRow
 from lattice_core.sql.sessions import awaited_to_the_end
 from lattice_core.sql.tenancy import TENANT_KEY, TenantSession
 
 
 class SqlCheckouts:
-    """The [`Checkouts`][artifactr_files.checkouts.Checkouts] port in a SQL database.
+    """The [`Checkouts`][artifactr.files.checkouts.Checkouts] port in a SQL database.
 
     Args:
         engine: The database. The store does not dispose of it.

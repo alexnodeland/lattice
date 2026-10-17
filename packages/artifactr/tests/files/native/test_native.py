@@ -30,6 +30,12 @@ from artifactr.core import (
     WorkspaceId,
     acting_for,
 )
+from artifactr.files.app import AppCommand, AppFailed, FakeApp
+from artifactr.files.blobs import once
+from artifactr.files.checkouts import Checkout, InMemoryCheckouts
+from artifactr.files.manifest import DOCX, Blob, WordDocument
+from artifactr.files.native import ContentUnavailable, NativeFiles
+from artifactr.files.native.files import digests
 from artifactr.workspace import (
     Access,
     ArtifactBusy,
@@ -38,14 +44,8 @@ from artifactr.workspace import (
     Workspace,
     Workspaces,
 )
-from artifactr_files.app import AppCommand, AppFailed, FakeApp
-from artifactr_files.blobs import once
-from artifactr_files.checkouts import Checkout, InMemoryCheckouts
-from artifactr_files.files import ContentUnavailable, NativeFiles
-from artifactr_files.files.native import digests
-from artifactr_files.manifest import DOCX, Blob, WordDocument
-from tests.clock import FakeClock
-from tests.conftest import Stores
+from tests.files.clock import FakeClock
+from tests.files.conftest import Stores
 
 ALICE = UserActor(id="alice", name="Alice")
 BOB = UserActor(id="bob", name="Bob")

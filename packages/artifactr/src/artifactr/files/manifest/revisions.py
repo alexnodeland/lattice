@@ -9,7 +9,7 @@ rather than replacing what came after.
 from typing import Final
 
 from artifactr.core import ArtifactId, EditArtifact, JsonPatch, ThreadId
-from artifactr_files.manifest.types import NativeFile
+from artifactr.files.manifest.types import NativeFile
 
 REVISED: Final = ("content", "provenance", "fingerprint", "text", "review", "outline", "pages")
 """What a revision replaces: everything in the manifest but the file's name."""

@@ -1,4 +1,4 @@
-"""artifactr-files' tables, as SQLAlchemy declarative models.
+"""The native files' tables, as SQLAlchemy declarative models.
 
 Table names start with `artifactr_files_`, so they share a database with the application's own
 tables and the libraries'. Every key starts with the tenant and the workspace, as artifactr's do.
@@ -11,17 +11,17 @@ from sqlalchemy import JSON, BigInteger, DateTime, Dialect, LargeBinary, MetaDat
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 VERSION_TABLE: Final = "artifactr_files_alembic_version"
-"""Where Alembic records artifactr-files' schema version, apart from the application's own."""
+"""Where Alembic records the native files' schema version, apart from the application's own."""
 
 
 class Base(DeclarativeBase):
-    """The declarative base of artifactr-files' tables."""
+    """The declarative base of the native files' tables."""
 
     metadata = MetaData(naming_convention={"pk": "pk_%(table_name)s"})
 
 
 metadata = Base.metadata
-"""The schema the migrations build, and that [`create_schema`][artifactr_files.sql.create_schema]
+"""The schema the migrations build, and that [`create_schema`][artifactr.files.sql.create_schema]
 creates."""
 
 

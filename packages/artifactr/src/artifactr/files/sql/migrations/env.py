@@ -1,12 +1,12 @@
-"""Alembic's environment for artifactr-files' migrations.
+"""Alembic's environment for the native files' migrations.
 
-`artifactr_files.sql.migrate` runs it on a connection it has already opened, inside the
+`artifactr.files.sql.migrate` runs it on a connection it has already opened, inside the
 transaction it commits, so the migrations are atomic wherever the database's DDL is.
 """
 
 from alembic import context
 
-from artifactr_files.sql.tables import VERSION_TABLE, metadata
+from artifactr.files.sql.tables import VERSION_TABLE, metadata
 
 context.configure(
     connection=context.config.attributes["connection"],

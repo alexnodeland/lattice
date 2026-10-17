@@ -97,6 +97,13 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         {*INNER, "artifactr.evals"},
         {"evalr", "pydantic", "pydantic_ai", *OTEL_API},
     ),
+    # Native files, the files extra (lattice RFC-0003 and ADR-0026): built on the public API of
+    # core and the workspace, with its SQL stores in the sql extra. tests/files/test_layering.py
+    # holds its own layers.
+    "files": (
+        {"artifactr.core", "artifactr.workspace", "artifactr.files"},
+        {"pydantic", "sqlalchemy", "alembic", "lattice_core.sql"},
+    ),
 }
 
 

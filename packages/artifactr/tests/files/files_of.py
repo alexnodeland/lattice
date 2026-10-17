@@ -2,7 +2,7 @@
 
 import hashlib
 
-from artifactr_files.manifest import DOCX, Blob, Provenance, WordDocument
+from artifactr.files.manifest import DOCX, Blob, Provenance, WordDocument
 
 
 def digest(seed: str) -> str:

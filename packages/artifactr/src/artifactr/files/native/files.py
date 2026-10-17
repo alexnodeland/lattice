@@ -30,12 +30,12 @@ from artifactr.core import (
     create_artifact,
     new_artifact_id,
 )
+from artifactr.files.app import App, AppCommand, Inspection
+from artifactr.files.blobs import Blobs, Clock, once
+from artifactr.files.blobs.port import utc_now
+from artifactr.files.checkouts import Checkout, Checkouts, holder_of
+from artifactr.files.manifest import Blob, NativeFile, Provenance, revise
 from artifactr.workspace import ArtifactBusy, Scope, Workspace
-from artifactr_files.app import App, AppCommand, Inspection
-from artifactr_files.blobs import Blobs, Clock, once
-from artifactr_files.blobs.port import utc_now
-from artifactr_files.checkouts import Checkout, Checkouts, holder_of
-from artifactr_files.manifest import Blob, NativeFile, Provenance, revise
 
 TEXT: Final = "text/plain; charset=utf-8"
 JSON: Final = "application/json"

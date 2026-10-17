@@ -13,11 +13,11 @@ import pytest
 from sqlalchemy import Connection
 from sqlalchemy.dialects import postgresql
 
-from artifactr_files.sql.schema import _on_postgresql
-from artifactr_files.sql.tables import metadata
+from artifactr.files.sql.schema import _on_postgresql
+from artifactr.files.sql.tables import metadata
 
 MIGRATION = (
-    Path(__file__).parents[2] / "src/artifactr_files/sql/migrations/versions/0001_initial.py"
+    Path(__file__).parents[3] / "src/artifactr/files/sql/migrations/versions/0001_initial.py"
 )
 
 

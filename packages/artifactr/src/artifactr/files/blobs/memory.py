@@ -4,15 +4,15 @@ from collections.abc import AsyncIterable, Set
 from datetime import datetime
 
 from artifactr.core import ArtifactId
+from artifactr.files.blobs.port import DEFAULT_LIMIT, Clock, check_limit, spool, utc_now
+from artifactr.files.manifest import Blob
 from artifactr.workspace import Scope
-from artifactr_files.blobs.port import DEFAULT_LIMIT, Clock, check_limit, spool, utc_now
-from artifactr_files.manifest import Blob
 
 type _Key = tuple[str, str, ArtifactId, str]
 
 
 class InMemoryBlobs:
-    """The whole [`Blobs`][artifactr_files.blobs.Blobs] port in memory: nothing outlives it.
+    """The whole [`Blobs`][artifactr.files.blobs.Blobs] port in memory: nothing outlives it.
 
     Args:
         clock: Returns the current time, which a put is stamped with.

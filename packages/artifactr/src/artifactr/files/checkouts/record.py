@@ -12,8 +12,8 @@ from typing import Protocol
 from pydantic import BaseModel, ConfigDict, Field
 
 from artifactr.core import Actor, ArtifactId
+from artifactr.files.manifest import Sha256
 from artifactr.workspace import Scope
-from artifactr_files.manifest import Sha256
 
 
 class Checkout(BaseModel):

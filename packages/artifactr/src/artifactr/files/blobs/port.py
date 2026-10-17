@@ -13,8 +13,8 @@ from datetime import UTC, datetime
 from typing import Final, Protocol
 
 from artifactr.core import ArtifactId
+from artifactr.files.manifest import Blob
 from artifactr.workspace import Scope
-from artifactr_files.manifest import Blob
 
 MIB: Final = 1024 * 1024
 
@@ -55,7 +55,7 @@ class Blobs(Protocol):
 
         The digest and size are computed as the bytes arrive, never taken from a client. Putting
         bytes the artifact already has stores nothing new, and marks them as put now, so that
-        [`collect`][artifactr_files.blobs.Blobs.collect] keeps them for the commit that follows.
+        [`collect`][artifactr.files.blobs.Blobs.collect] keeps them for the commit that follows.
 
         Raises:
             TooLarge: If the bytes are larger than the store's limit.

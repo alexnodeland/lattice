@@ -11,9 +11,9 @@ from alembic.migration import MigrationContext
 from sqlalchemy import Connection, inspect, text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from artifactr_files.sql import create_schema, migrate
-from artifactr_files.sql.schema import _alembic_config
-from artifactr_files.sql.tables import VERSION_TABLE, metadata
+from artifactr.files.sql import create_schema, migrate
+from artifactr.files.sql.schema import _alembic_config
+from artifactr.files.sql.tables import VERSION_TABLE, metadata
 from tests.databases import empty_database
 
 
@@ -70,7 +70,8 @@ STORAGE = text(
 
 @pytest.fixture
 async def postgres(tmp_path: Path) -> AsyncIterator[AsyncEngine]:
-    async with empty_database("postgres", tmp_path) as engine:
+    async with empty_database("postgres", tmp_path) as database:
+        engine = database.engine()
         yield engine
 
 
@@ -96,7 +97,8 @@ async def test_create_schema_asks_postgresql_what_the_migrations_do(
     postgres: AsyncEngine, tmp_path: Path
 ) -> None:
     await migrate(postgres)
-    async with empty_database("postgres", tmp_path) as other:
+    async with empty_database("postgres", tmp_path) as database:
+        other = database.engine()
         await create_schema(other)
         migrated, created = await _postgresql(postgres), await _postgresql(other)
         assert migrated[1:] == created[1:]

@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# Fetches WordCraft at the release wordcraft.sha256, beside this script, pins, and prints a path
+# (lattice RFC-0003).
+#
+# Usage: scripts/wordcraft cli    the wordcraft-cli for this machine (Linux x86_64 or aarch64, or macOS)
+#        scripts/wordcraft web    the browser build's directory, unmodified
+#
+# Each asset is the storytold/wordcraft release's, with the SHA-256 the pin records, which is the
+# release's own SHA256SUMS.txt line; upstream signs nothing, so the checksum is the pin (RFC-0003's
+# D8). An asset is downloaded once into WORDCRAFT_CACHE: to a temporary file of the run's own,
+# checked, then renamed into place, so runs at once never see each other's partial download, and
+# bytes that aren't the pin's are never unpacked. Each is unpacked once, into a directory that a
+# link named by its checksum points to.
+
+set -euo pipefail
+
+PIN="$(dirname "${BASH_SOURCE[0]}")/wordcraft.sha256"
+readonly PIN
+what=${1:?usage: scripts/wordcraft cli|web}
+
+case "$what:$(uname -s):$(uname -m)" in
+  cli:Linux:x86_64) pattern='linux-x86_64.tar.gz' ;;
+  cli:Linux:aarch64 | cli:Linux:arm64) pattern='linux-aarch64.tar.gz' ;;
+  cli:Darwin:*) pattern='cli-.*-macos-universal.zip' ;;
+  web:*) pattern='web-.*\.zip' ;;
+  *) echo "wordcraft: no $what for $(uname -s) $(uname -m)" >&2; exit 2 ;;
+esac
+read -r SHA256 NAME < <(grep -E "  wordcraft-.*$pattern\$" "$PIN")
+VERSION=$(sed -E 's/^wordcraft-(cli-|web-)?([0-9][^-]*)-?.*$/\2/; s/\.zip$//; s/\.tar\.gz$//' <<<"$NAME")
+readonly SHA256 NAME VERSION
+readonly URL="https://github.com/storytold/wordcraft/releases/download/v$VERSION/$NAME"
+
+cache=${WORDCRAFT_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/lattice-wordcraft}
+asset="$cache/$NAME"
+unpacked="$cache/$SHA256"
+mkdir -p "$cache"
+part=""
+trap 'rm -rf ${part:+"$part"}' EXIT
+
+verified() {
+  local sum
+  if command -v sha256sum >/dev/null; then sum=$(sha256sum "$1"); else sum=$(shasum -a 256 "$1"); fi
+  if [[ ${sum%% *} != "$SHA256" ]]; then
+    echo "wordcraft: $1 is not $NAME (sha256 ${sum%% *}); remove it to download it again" >&2
+    return 1
+  fi
+}
+
+if [[ ! -f $asset ]]; then
+  part=$(mktemp "$asset.XXXXXX")
+  curl --fail --silent --show-error --location --retry 5 --retry-all-errors --output "$part" "$URL"
+  verified "$part"
+  mv -f "$part" "$asset"
+  part=""
+fi
+if [[ ! -e $unpacked ]]; then
+  verified "$asset"
+  part=$(mktemp -d "$cache/unpacking.XXXXXX")
+  case $NAME in
+    *.zip) unzip -q "$asset" -d "$part" ;;
+    *.tar.gz) tar -xzf "$asset" -C "$part" ;;
+  esac
+  # A link is made whole or not at all, and only by the first run: the others' unpacking goes.
+  if ln -sn "$(basename "$part")" "$unpacked" 2>/dev/null; then part=""; fi
+fi
+
+case $what in
+  cli) find "$unpacked/" -type f -name wordcraft-cli -perm -u+x | head -n 1 ;;
+  web) dirname "$(find "$unpacked/" -type f -name index.html | head -n 1)" ;;
+esac

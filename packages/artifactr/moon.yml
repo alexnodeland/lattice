@@ -96,6 +96,18 @@ tasks:
       cache: false
       runInCI: false
 
+  # WordCraft's fidelity report (lattice RFC-0003, phase 2): the pinned CLI opens and saves each
+  # corpus file, feature by feature, and the adapter runs live. Nightly runs it and publishes the
+  # matrix; it downloads the release scripts/wordcraft pins, once.
+  fidelity:
+    description: "Run the WordCraft fidelity report and the adapter's live tests, on the pinned CLI"
+    script: >-
+      ARTIFACTR_TEST_WORDCRAFT="$($workspaceRoot/scripts/wordcraft cli)"
+      uv run pytest -m wordcraft -p no:cacheprovider tests/files/wordcraft
+    options:
+      cache: false
+      runInCI: false
+
   test-pg:
     description: 'Run the tests on PostgreSQL as well as SQLite (after pg-up)'
     command: 'uv run pytest --cov --cov-report=term-missing'

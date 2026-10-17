@@ -22,6 +22,7 @@ from artifactr.files.app.port import (
     CommandSpec,
     Failure,
     Inspection,
+    Talk,
 )
 from artifactr.files.manifest import OUTLINE_LIMIT
 
@@ -62,6 +63,8 @@ class FakeApp:
     name: str = "fake"
     version: str = "1.0"
     build: str | None = None
+    talk: Talk = "save"
+    integration: str = "files:fake"
 
     def __init__(self, *, fails: Failure | None = None) -> None:
         self.fails: Failure | None = fails

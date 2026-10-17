@@ -86,6 +86,27 @@ jobs:
       - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
       - run: moon run :image
 
+  # WordCraft's fidelity (lattice RFC-0003, phase 2): the pinned CLI opens and saves each corpus
+  # file, and the matrix of what it kept, feature by feature, is the run's summary.
+  wordcraft:
+    name: WordCraft fidelity
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
+      - run: uv sync --locked --all-packages --all-groups --all-extras
+      - run: moon run artifactr:fidelity
+        env:
+          WORDCRAFT_MATRIX: ${{ github.workspace }}/fidelity.md
+      - name: The matrix
+        if: always()
+        run: if [[ -f fidelity.md ]]; then cat fidelity.md >>"$GITHUB_STEP_SUMMARY"; fi
+
   # TLC over the formal specs (ADR-0025): the pull request's configurations, and the deeper ones.
   specs:
     name: Specs

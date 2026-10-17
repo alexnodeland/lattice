@@ -246,6 +246,9 @@ fastapi = [
     { name = "fastapi" },
     { name = "starlette" },
 ]
+files = [
+    { name = "mcp" },
+]
 langfuse = [
     { name = "evalr", extra = ["langfuse"] },
     { name = "langfuse" },
@@ -328,6 +331,7 @@ requires-dist = [
     { name = "lattice-core-ai", extras = ["litellm"], marker = "extra == 'litellm'", editable = "packages/lattice-core" },
     { name = "lattice-core-ai", extras = ["otel"], marker = "extra == 'otel'", editable = "packages/lattice-core" },
     { name = "lattice-core-ai", extras = ["sql"], marker = "extra == 'sql'", editable = "packages/lattice-core" },
+    { name = "mcp", marker = "extra == 'files'", specifier = ">=2.2" },
     { name = "mcp", marker = "extra == 'mcp'", specifier = ">=2.2" },
     { name = "opentelemetry-api", specifier = ">=1.28" },
     { name = "opentelemetry-sdk", marker = "extra == 'otel'", specifier = ">=1.45" },

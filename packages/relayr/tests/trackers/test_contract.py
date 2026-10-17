@@ -1,7 +1,7 @@
 """The tracker port's contract, which every adapter keeps (lattice RFC-0004).
 
-It runs against the fake; against Vikunja's recorded exchanges, or a live Vikunja; and against
-Plane's API as its source reads (`tests/trackers/harnesses.py` says how each is made).
+It runs against the fake, and against Vikunja's and Plane's recorded exchanges, or a live Vikunja
+or Plane (`tests/trackers/harnesses.py` says how each is made).
 """
 
 from collections.abc import AsyncIterator
@@ -26,7 +26,7 @@ async def _made(request: pytest.FixtureRequest) -> AsyncIterator[Harness]:
         case "fake":
             context = fake()
         case "plane":
-            context = plane()
+            context = plane(request.node.originalname)
         case _:
             context = vikunja(request.node.originalname)
     async with context as made:

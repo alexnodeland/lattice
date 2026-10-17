@@ -1,0 +1,8 @@
+{
+ "exchanges": [],
+ "setup": {
+  "identifier": "OPS301C",
+  "project": "dd2175e0-7ff9-49c5-9ad6-49d27c9e1e09",
+  "workspace": "acme"
+ }
+}

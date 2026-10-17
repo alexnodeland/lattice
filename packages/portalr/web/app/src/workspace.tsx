@@ -126,7 +126,11 @@ export function WorkspaceAddons({
 }) {
   const enabled = useEnabled(queries, tenant, workspace);
   return (
-    <AddonsProvider value={{ math: enabled("markdown:math"), mermaid: enabled("markdown:mermaid") }}>{children}</AddonsProvider>
+    <AddonsProvider
+      value={{ math: enabled("markdown:math"), mermaid: enabled("markdown:mermaid") }}
+    >
+      {children}
+    </AddonsProvider>
   );
 }
 

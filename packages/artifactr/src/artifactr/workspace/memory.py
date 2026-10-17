@@ -312,6 +312,11 @@ class InMemoryStorage:
         if key in leases and leases[key][0] == holder:
             del leases[key]
 
+    async def lease(self, scope: Scope, key: str) -> tuple[str, datetime] | None:
+        """Return who holds a lease and when it expires, or None if no one holds it now."""
+        current = self._data(scope).leases.get(key)
+        return current if current is not None and current[1] > self._clock() else None
+
     async def cursor(self, scope: Scope, name: str) -> int:
         """Return how far a named consumer of the log has got: the ``seq`` saved, or 0."""
         return self._data(scope).cursors.get(name, 0)

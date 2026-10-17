@@ -526,6 +526,22 @@ class SqlStorage:
             )
 
     @awaited_to_the_end
+    async def lease(self, scope: Scope, key: str) -> tuple[str, datetime] | None:
+        """Return who holds a lease and when it expires, or None if no one holds it now."""
+        # Normalized to UTC, because SQLite compares timestamps as text.
+        now = self._clock().astimezone(UTC)
+        async with self._session(scope.tenant_id) as session:
+            found = (
+                await session.execute(
+                    select(LeaseRow.holder, LeaseRow.expires_at).where(
+                        *_lease(scope, key), LeaseRow.expires_at > now
+                    )
+                )
+            ).one_or_none()
+        # SQLite returns the expiry without its zone, which is UTC.
+        return None if found is None else (found.holder, found.expires_at.replace(tzinfo=UTC))
+
+    @awaited_to_the_end
     async def cursor(self, scope: Scope, name: str) -> int:
         """Return how far a named consumer of the log has got: the ``seq`` saved, or 0."""
         async with self._session(scope.tenant_id) as session:

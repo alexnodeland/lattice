@@ -7,7 +7,7 @@ Each record captures one decision: the context that forced it, the options consi
 | [0001](0001-python-library-with-sans-io-core.md) | Python library with a sans-IO core | Accepted |
 | [0002](0002-single-write-path.md) | One write path: commands through `Workspace.commit` | Accepted |
 | [0003](0003-artifact-types-as-pydantic-subclasses.md) | Artifact types are Pydantic subclasses with library-defined patch kinds | Accepted |
-| [0004](0004-optimistic-concurrency-and-revisions.md) | Optimistic concurrency and append-only revisions | Accepted |
+| [0004](0004-optimistic-concurrency-and-revisions.md) | Optimistic concurrency and append-only revisions | Accepted, narrowed by [ADR-0071](0071-a-lease-on-an-artifact.md) |
 | [0005](0005-one-event-log-per-workspace.md) | One durable event log per workspace | Accepted, amended by 0021 |
 | [0006](0006-agent-integration-as-pydantic-ai-capability.md) | Agent integration as a pydantic-ai capability | Accepted, amended by 0017 |
 | [0007](0007-caller-owned-live-output.md) | Live output is owned by the caller, not the log | Accepted |
@@ -74,5 +74,7 @@ Each record captures one decision: the context that forced it, the options consi
 | [0068](0068-an-access-token-redacted-from-span-urls.md) | An access token redacted from the spans' URLs | Accepted, amended by [lattice ADR-0018](../../adr/0018-lattice-core-what-the-libraries-share.md) |
 | [0069](0069-a-claim-fences-the-writes-that-consume.md) | A claim fences the writes that consume | Accepted |
 | [0070](0070-a-runner-looks-again-for-what-a-dead-holder-was-asked.md) | A runner looks again for what a dead holder was asked | Accepted |
+| [0071](0071-a-lease-on-an-artifact.md) | A lease on an artifact | Accepted |
+| [0072](0072-native-files-are-manifests-over-json-patch.md) | Native files are manifests over JSON Patch | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

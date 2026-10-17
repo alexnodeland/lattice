@@ -792,15 +792,15 @@ async def test_i3_a_send_cancelled_as_its_ask_is_saved_is_handed_over(
 
 
 async def _left_by_a_dead_holder(
-    runners: MakeRunner,
-) -> tuple[_Clock, Workspace, Thread, Script]:
+    runners: MakeRunner, storage: Storage
+) -> tuple[Workspace, Thread, Script]:
     """A thread whose holder's process died as its run began, with its claim still in storage.
 
     The first process claims the thread for a message and is held for good before its run
-    starts: it stands for one that died. Its message is asked for, and taken by no one.
+    starts: it stands for one that died. Its message is asked for, and taken by no one. Its
+    claim is renewed on the loop's clock, a third of the default ``claim_ttl`` on, which no
+    test waits for: moving the storage's clock on lapses it.
     """
-    clock = _Clock()
-    storage = InMemoryStorage(clock=clock)
     ws = await Workspaces(storage).open(SCOPE.tenant_id, SCOPE.workspace_id, actor=ALICE)
     thread = await ws.create_thread("Launch")
     script = Script(*[say("ok")] * 2)
@@ -808,7 +808,7 @@ async def _left_by_a_dead_holder(
     dying = runners(make_agent(script), turn_context=_held_at_its_start(dead))
     started(await dying.send(ws, thread.id, "Plan the launch"))
     await _entered(dead)
-    return clock, ws, thread, script
+    return ws, thread, script
 
 
 def _taking() -> Gate:
@@ -821,7 +821,8 @@ def _taking() -> Gate:
 async def test_i3_a_message_asked_while_its_holder_dies_is_taken_once_its_claim_lapses(
     runners: MakeRunner,
 ) -> None:
-    clock, ws, thread, script = await _left_by_a_dead_holder(runners)
+    clock = _Clock()
+    ws, thread, script = await _left_by_a_dead_holder(runners, InMemoryStorage(clock=clock))
     taking = _taking()
     living = runners(
         make_agent(script),
@@ -839,12 +840,26 @@ async def test_i3_a_message_asked_while_its_holder_dies_is_taken_once_its_claim_
 async def test_i3_a_runner_that_starts_takes_what_a_dead_holder_was_asked(
     runners: MakeRunner,
 ) -> None:
-    clock, ws, _, script = await _left_by_a_dead_holder(runners)
+    clock = _Clock()
+    ws, _, script = await _left_by_a_dead_holder(runners, InMemoryStorage(clock=clock))
     clock.now += timedelta(minutes=1)  # the dead claim lapses as the process starts again
     restarted = runners(make_agent(script))
     [run] = await restarted.recover(ws)
     await run.wait()
     assert script.conversation() == ["Plan the launch"]
+
+
+async def test_i3_a_runner_closed_as_it_looks_again_stops_looking(runners: MakeRunner) -> None:
+    storage = InMemoryStorage(clock=_Clock())
+    ws, thread, script = await _left_by_a_dead_holder(runners, storage)
+    living = runners(make_agent(script), claim_ttl=timedelta(milliseconds=50))
+    sent = await living.send(ws.as_actor(BOB), thread.id, "Also book the big room")
+    assert sent.run is None, "the dead process's claim refuses the message"
+    looking = hold(storage, "cursor")  # the look's first read, once it has waited
+    await _entered(looking)
+    await living.aclose()
+    looks = [t for t in asyncio.all_tasks() if "Runner._take_again" in repr(t.get_coro())]
+    assert not looks, "closing the runner ended the look it was taking"
 
 
 async def test_i3_a_sweep_that_fails_on_one_thread_takes_the_others(

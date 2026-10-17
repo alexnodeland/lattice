@@ -102,9 +102,11 @@ from artifactr.core import (
     RunId,
     StopRun,
     SystemActor,
+    TenantId,
     ThreadId,
     UserActor,
     ValidationFailed,
+    WorkspaceId,
     acting_for,
     new_id,
     new_message_id,
@@ -140,6 +142,10 @@ type TurnOutcome = Literal["completed", "paused", "failed", "stopped"]
 
 _RUNNER: Final = SystemActor(name="runner")
 """Who the Runner's own work acts as: holding threads, keeping its cursors, planning turns."""
+
+type _ThreadKey = tuple[TenantId, WorkspaceId, ThreadId]
+"""A thread, wherever it is: thread ids are unique only within a workspace."""
+
 
 _ABANDONED = "the run was abandoned: its claim lapsed"
 """The error recorded for a run whose claim lapsed before it ended, whether its process stopped
@@ -264,7 +270,8 @@ class Runner[AppDepsT]:
         self._claim_ttl = claim_ttl
         self._runs: dict[RunId, RunHandle] = {}
         self._handovers: set[asyncio.Task[None]] = set()
-        self._retakes: dict[tuple[str, str, ThreadId], asyncio.Task[None]] = {}
+        self._looks: set[asyncio.Task[None]] = set()
+        self._waiting: set[_ThreadKey] = set()
         self._closed = False
         self._telemetry = Telemetry(tracer_provider=tracer_provider, meter_provider=meter_provider)
 
@@ -363,8 +370,10 @@ class Runner[AppDepsT]:
         Call it for each workspace as the application starts. A process that died holding a
         thread, or between an ask and its claim, left what was asked for no one to take
         (ADR-0070). A thread whose dead holder's claim has not lapsed yet is looked at again
-        once it could have. It acts as the Runner, as a hand-over does; a thread whose turn
-        fails to start is logged, and the others are still taken. Returns the runs it started.
+        once it could have. It acts as the Runner, as a hand-over does, and asks nothing of the
+        handle's actor; a thread hidden from the Runner is not swept. A thread whose turn fails
+        to start is logged, and the others are still taken. A closed runner takes none. Returns
+        the runs it started.
         """
         runner = _runner(workspace)
         taken = [await self._take_or_log(runner, thread.id) for thread in await runner.threads()]
@@ -400,7 +409,7 @@ class Runner[AppDepsT]:
         self._closed = True
         tasks: list[asyncio.Task[Any]] = [handle.task for handle in self._runs.values()]
         tasks += self._handovers
-        tasks += self._retakes.values()
+        tasks += self._looks
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
@@ -737,23 +746,26 @@ class Runner[AppDepsT]:
     def _retake(self, workspace: Workspace, thread_id: ThreadId) -> None:
         """Look at a thread again once the claim that refused this claimant could have lapsed.
 
-        A claim lapses at most ``claim_ttl`` after its last renewal, which came before the
-        refusal, so a ``claim_ttl`` on a dead holder's claim has lapsed. A live holder's has
-        not: the claimant is refused again, and waits again, until what was asked is taken. A
-        thread has one wait at a time in this process.
+        A ``claim_ttl`` on, a claim that refused this claimant has lapsed if its holder was dead
+        by then. Otherwise the look is refused, as by a live holder or one with a longer
+        ``claim_ttl``, and waits again, until what was asked is taken. A thread has one wait at
+        a time in this process; :meth:`aclose` cancels every look.
         """
         key = (workspace.tenant_id, workspace.workspace_id, thread_id)
-        if self._closed or key in self._retakes:
+        if self._closed or key in self._waiting:
             return
-        self._retakes[key] = asyncio.create_task(
+        self._waiting.add(key)
+        look = asyncio.create_task(
             self._take_again(workspace, thread_id, key), context=contextvars.Context()
         )
+        self._looks.add(look)
+        look.add_done_callback(self._looks.discard)
 
-    async def _take_again(
-        self, workspace: Workspace, thread_id: ThreadId, key: tuple[str, str, ThreadId]
-    ) -> None:
-        await asyncio.sleep(self._claim_ttl.total_seconds())
-        del self._retakes[key]  # a refusal from here on waits again
+    async def _take_again(self, workspace: Workspace, thread_id: ThreadId, key: _ThreadKey) -> None:
+        try:
+            await asyncio.sleep(self._claim_ttl.total_seconds())
+        finally:
+            self._waiting.discard(key)  # a refusal from here on waits again
         await self._take_or_log(workspace, thread_id)
 
     async def _take_or_log(self, workspace: Workspace, thread_id: ThreadId) -> RunHandle | None:

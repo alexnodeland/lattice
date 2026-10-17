@@ -3,12 +3,13 @@
 Every command is made by a subject, checked with grantr's own actions, bounded by what that
 subject holds, and recorded in the audit log in the same transaction as the change. Checks
 deny by default: an unknown action, a principal with no grant that applies, and a store that
-can't be read are each a refusal.
+can't be read are each a refusal. So is an integration: one the deployment doesn't install, or
+whose settings can't be read, is off.
 """
 
 import logging
 import time
-from collections.abc import AsyncGenerator, Awaitable, Callable, Iterable
+from collections.abc import AsyncGenerator, Awaitable, Callable, Collection, Iterable, Mapping
 from contextlib import asynccontextmanager
 from datetime import timedelta
 from typing import Final, NamedTuple, Protocol
@@ -37,6 +38,9 @@ from grantr.core import (
     Group,
     GroupDefined,
     GroupDeleted,
+    IntegrationSet,
+    IntegrationSetting,
+    IntegrationState,
     Invalid,
     Key,
     KeyIssued,
@@ -70,9 +74,10 @@ from grantr.core import (
     verify,
 )
 from grantr.core.grants import held
-from grantr.core.roles import RESTRICT, RULE_ROLE
+from grantr.core.roles import MANAGE_INTEGRATIONS, RESTRICT, RULE_ROLE
 from grantr.grants.storage import Reads, Storage, Transaction
 from grantr.telemetry import SLOW_CHECK, Reason, Telemetry
+from lattice_core.integrations import KNOWN, Integration
 
 logger = logging.getLogger(__name__)
 
@@ -144,6 +149,13 @@ class Grants:
         slow_check: How long a check takes before it is recorded as a span.
         application: The application's own service principal, which :meth:`bootstrap` grants
             the ``application`` role.
+        integrations: The integrations a tenant's admins switch, by key: lattice's,
+            :data:`~lattice_core.integrations.KNOWN`, if omitted.
+        installed: The keys of those the deployment installs; every one if omitted. One it
+            doesn't install is off everywhere, whatever is set.
+
+    Raises:
+        ValueError: If it installs an integration that ``integrations`` doesn't declare.
     """
 
     def __init__(
@@ -155,8 +167,14 @@ class Grants:
         meter_provider: MeterProvider | None = None,
         slow_check: timedelta = SLOW_CHECK,
         application: ServicePrincipal | None = None,
+        integrations: Mapping[str, Integration] = KNOWN,
+        installed: Collection[str] | None = None,
     ) -> None:
+        if installed is not None and (unknown := sorted(set(installed) - set(integrations))):
+            raise ValueError(f"installs integrations it doesn't declare: {', '.join(unknown)}")
         self._storage = storage
+        self._integrations = integrations
+        self._installed = frozenset(integrations if installed is None else installed)
         self._catalog = Catalog.of(*catalogs)
         self._application = application
         self._telemetry = Telemetry(
@@ -788,6 +806,114 @@ class Grants:
             await self._bounded(tx, tenant, by, await tx.grants(tenant, removed.principal))
             return await record(tenant, by, KeyRevoked(principal=removed.principal, key=key))
 
+    # ─── integrations ────────────────────────────────────────────────────────
+
+    async def is_enabled(self, tenant_id: str, workspace_id: str, key: str, /) -> bool:
+        """Whether an integration is on in a tenant's workspace: the application's port.
+
+        It checks no one, as :meth:`hidden` doesn't: the package that asks it is about to act
+        for a caller it checks itself. A key the deployment doesn't install, or that it doesn't
+        know, is off, and so is every key while the store can't be read. ``Grants`` is
+        lattice-core's ``Integrations``, and a bound ``is_enabled`` is relayr's ``Enabled``.
+        An id that names no tenant, or an empty one that names no workspace, has everything off.
+        """
+        if key not in self._installed or not TENANT_ID.fullmatch(tenant_id) or not workspace_id:
+            return False
+        try:
+            own, theirs = await self._settings(self._storage, tenant_id, workspace_id)
+        except Exception:
+            logger.warning("%s is off: the store can't be read", key, exc_info=True)
+            return False
+        return self._state(key, own, theirs).enabled
+
+    async def enabled(
+        self, tenant: TenantId, workspace: WorkspaceId, *, by: Subject
+    ) -> dict[str, bool]:
+        """Whether each integration is on in a workspace, by key: for whoever can open it.
+
+        Raises:
+            Invalid: If the workspace's id is empty.
+            Forbidden: If ``by`` can't open the workspace: it holds no library's ``open`` there.
+        """
+        held = await self._held(self._storage, tenant, by, _level(workspace))
+        if not any(action.endswith(":open") for action in held):
+            raise Forbidden("opening the workspace is refused")
+        own, theirs = await self._settings(self._storage, tenant, workspace)
+        return {key: self._state(key, own, theirs).enabled for key in self._integrations}
+
+    async def integrations(
+        self, tenant: TenantId, *, workspace: WorkspaceId | None = None, by: Subject
+    ) -> list[IntegrationState]:
+        """Every integration as it is set on the tenant, or in a workspace, in the registry's order.
+
+        Raises:
+            Invalid: If the workspace's id is empty.
+            Forbidden: If ``by`` may not: ``grantr:manage_integrations`` on the tenant, or on the
+                workspace.
+        """
+        await self._require(self._storage, tenant, by, MANAGE_INTEGRATIONS, _level(workspace))
+        own, theirs = await self._settings(self._storage, tenant, workspace)
+        return [self._state(key, own, theirs) for key in self._integrations]
+
+    async def set_integration(
+        self,
+        tenant: TenantId,
+        key: str,
+        on: bool | None,
+        *,
+        workspace: WorkspaceId | None = None,
+        by: Subject,
+    ) -> IntegrationState:
+        """Turn an integration on or off on the tenant or in a workspace, or unset it with None.
+
+        An unset level inherits the one above. Only a change is recorded: setting what is set
+        already, or unsetting what isn't, writes and records nothing, and returns the state as it
+        is. An integration the deployment doesn't install may be set, and stays off.
+
+        Raises:
+            Invalid: If no integration has the key, or the workspace's id is empty.
+            Forbidden: If ``by`` may not: ``grantr:manage_integrations`` on the tenant, or on the
+                workspace.
+        """
+        if key not in self._integrations:
+            raise Invalid(f"there is no integration {key}")
+        level = _level(workspace)
+        async with self._change(tenant) as (tx, record):
+            await self._require(tx, tenant, by, MANAGE_INTEGRATIONS, level)
+            own, theirs = await self._settings(tx, tenant, workspace)
+            stored = (own if workspace is None else theirs).get(key)
+            if on == (None if stored is None else stored.on):
+                return self._state(key, own, theirs)
+            event = IntegrationSet(workspace=workspace, key=key, on=on)
+            entry = await record(tenant, by, event)
+            setting = None if on is None else IntegrationSetting(on=on, by=by, at=entry.at)
+            await tx.set_integration(tenant, workspace, key, setting)
+            return self._state(key, *await self._settings(tx, tenant, workspace))
+
+    async def _settings(
+        self, reads: Reads, tenant: TenantId, workspace: WorkspaceId | None
+    ) -> tuple[dict[str, IntegrationSetting], dict[str, IntegrationSetting]]:
+        """The integrations set on the tenant, and in the workspace: none there for None."""
+        own = await reads.integrations(tenant)
+        return own, {} if workspace is None else await reads.integrations(tenant, workspace)
+
+    def _state(
+        self,
+        key: str,
+        own: Mapping[str, IntegrationSetting],
+        theirs: Mapping[str, IntegrationSetting],
+    ) -> IntegrationState:
+        """An integration's state, from the tenant's settings and a workspace's."""
+        integration = self._integrations[key]
+        return IntegrationState.of(
+            key,
+            description=integration.description,
+            default=integration.default,
+            installed=key in self._installed,
+            tenant=own.get(key),
+            workspace=theirs.get(key),
+        )
+
     @asynccontextmanager
     async def _change(self, tenant: TenantId | None) -> AsyncGenerator[tuple[Transaction, Record]]:
         """A transaction, and how to record its audit entries, which are logged once it commits."""
@@ -971,6 +1097,13 @@ class Grants:
 def _application(principal: ServicePrincipal) -> Grant:
     """The grant of the ``application`` role to a service principal."""
     return Grant(tenant=None, role=APPLICATION, on=DEPLOYMENT, to=principal)
+
+
+def _level(workspace: WorkspaceId | None) -> Resource:
+    """Where an integration is set: the tenant, with None, or a workspace."""
+    if workspace == "":
+        raise Invalid("a workspace's id isn't empty")
+    return TENANT if workspace is None else Resource(kind="workspace", workspace=workspace)
 
 
 def _tenant_id(tenant: TenantId) -> None:

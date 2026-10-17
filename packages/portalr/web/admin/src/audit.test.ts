@@ -58,6 +58,18 @@ test("each type of change reads as a sentence", () => {
       { type: "unrestricted", on: { kind: "thread", workspace: "notes", id: "t_1" } },
       "lifted the restriction on thread t_1 in notes",
     ],
+    [
+      { type: "integration_set", workspace: null, key: "excalidraw", on: false },
+      "turned excalidraw off in the tenant",
+    ],
+    [
+      { type: "integration_set", workspace: "notes", key: "ui:mini-apps", on: true },
+      "turned ui:mini-apps on in workspace notes",
+    ],
+    [
+      { type: "integration_set", workspace: "notes", key: "ui:mini-apps", on: null },
+      "set ui:mini-apps back to inherited in workspace notes",
+    ],
   ];
   for (const [event, sentence] of cases) {
     expect(said(event)).toBe(sentence);
@@ -65,7 +77,7 @@ test("each type of change reads as a sentence", () => {
 });
 
 test("the filter offers every type, and reads one back from the address", () => {
-  expect(TYPES).toHaveLength(15);
+  expect(TYPES).toHaveLength(16);
   expect(TYPES.find((type) => type.value === "tenant_created")?.label).toBe("Tenant created");
   expect(filterOf({ type: "granted" })).toEqual({ type: "granted" });
   expect(filterOf({ type: "nonsense" })).toEqual({});

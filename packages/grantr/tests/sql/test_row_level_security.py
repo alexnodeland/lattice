@@ -110,6 +110,47 @@ async def test_a_tenant_moves_no_row_to_another(
             await session.execute(MOVE_GRANTS)
 
 
+INTEGRATIONS = text("SELECT tenant_id, workspace, key FROM grantr_integrations ORDER BY tenant_id")
+ANOTHERS_INTEGRATION = text(
+    "INSERT INTO grantr_integrations (tenant_id, workspace, key, setting)"
+    " VALUES ('globex', 'w1', 'ui:forms', CAST(:setting AS json))"
+)
+
+
+@pytest.mark.postgres
+async def test_a_tenant_neither_reads_nor_writes_anothers_integrations(
+    engines: tuple[AsyncEngine, AsyncEngine],
+) -> None:
+    owner, application = engines
+    storage = SqlStorage(application, row_level_security=True, across_tenants=owner)
+    grants = Grants(storage, catalogs=[ARTIFACTR])
+    for tenant in ("acme", "globex"):
+        await grants.set_integration(tenant, "excalidraw", False, by=User(id=f"{tenant}-owner"))
+    async with _session(application, "acme") as session:
+        assert [tuple(row) for row in await session.execute(INTEGRATIONS)] == [
+            ("acme", "", "excalidraw")
+        ]
+        connection = await session.connection()
+        for statement in (
+            "UPDATE grantr_integrations SET key = 'x'",
+            "DELETE FROM grantr_integrations",
+        ):
+            changed = await connection.execute(text(f"{statement} WHERE tenant_id = 'globex'"))
+            assert changed.rowcount == 0
+    setting = json.dumps(
+        {"on": True, "by": {"kind": "user", "id": "x"}, "at": "2026-10-17T00:00:00Z"}
+    )
+    with pytest.raises(ProgrammingError, match="row-level security"):
+        async with _session(application, "acme") as session:
+            await session.execute(ANOTHERS_INTEGRATION, {"setting": setting})
+    async with owner.connect() as connection:
+        assert [tuple(row) for row in await connection.execute(INTEGRATIONS)] == [
+            ("acme", "", "excalidraw"),
+            ("globex", "", "excalidraw"),
+        ], "globex's setting is as it was, and only it"
+    assert not await grants.is_enabled("globex", "w1", "excalidraw")
+
+
 @pytest.mark.postgres
 async def test_a_tenant_writes_only_its_rows(engines: tuple[AsyncEngine, AsyncEngine]) -> None:
     _, application = engines

@@ -255,6 +255,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/grantr/v1/tenants/{tenant}/integrations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Integrations
+         * @description Every integration as it is set on a tenant, or in a workspace, and whether it is on.
+         */
+        get: operations["list_integrations_grantr_v1_tenants__tenant__integrations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/grantr/v1/tenants/{tenant}/integrations/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Integration
+         * @description Turn an integration on or off, on a tenant or in a workspace, or unset it with null.
+         *
+         *     Setting what is set already changes nothing, and records nothing.
+         */
+        put: operations["set_integration_grantr_v1_tenants__tenant__integrations__key__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/grantr/v1/tenants/{tenant}/keys": {
         parameters: {
             query?: never;
@@ -451,6 +493,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/grantr/v1/tenants/{tenant}/workspaces/{workspace}/integrations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Workspace Integrations
+         * @description Whether each integration is on in a workspace, by key, for whoever can open it.
+         */
+        get: operations["workspace_integrations_grantr_v1_tenants__tenant__workspaces__workspace__integrations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -482,9 +544,9 @@ export interface components {
             seq: number;
             tenant: components["schemas"]["TenantId"] | null;
         };
-        AuditEvent: components["schemas"]["TenantCreated"] | components["schemas"]["DeploymentTenantCreated"] | components["schemas"]["TenantDeleted"] | components["schemas"]["MemberAdded"] | components["schemas"]["MemberRemoved"] | components["schemas"]["GroupDefined"] | components["schemas"]["GroupDeleted"] | components["schemas"]["RoleDefined"] | components["schemas"]["RoleDeleted"] | components["schemas"]["Granted"] | components["schemas"]["Revoked"] | components["schemas"]["KeyIssued"] | components["schemas"]["KeyRevoked"] | components["schemas"]["Restricted"] | components["schemas"]["Unrestricted"];
+        AuditEvent: components["schemas"]["TenantCreated"] | components["schemas"]["DeploymentTenantCreated"] | components["schemas"]["TenantDeleted"] | components["schemas"]["MemberAdded"] | components["schemas"]["MemberRemoved"] | components["schemas"]["GroupDefined"] | components["schemas"]["GroupDeleted"] | components["schemas"]["RoleDefined"] | components["schemas"]["RoleDeleted"] | components["schemas"]["Granted"] | components["schemas"]["Revoked"] | components["schemas"]["KeyIssued"] | components["schemas"]["KeyRevoked"] | components["schemas"]["Restricted"] | components["schemas"]["Unrestricted"] | components["schemas"]["IntegrationSet"];
         /** @enum {string} */
-        AuditType: "tenant_created" | "deployment_tenant_created" | "tenant_deleted" | "member_added" | "member_removed" | "group_defined" | "group_deleted" | "role_defined" | "role_deleted" | "granted" | "revoked" | "key_issued" | "key_revoked" | "restricted" | "unrestricted";
+        AuditType: "tenant_created" | "deployment_tenant_created" | "tenant_deleted" | "member_added" | "member_removed" | "group_defined" | "group_deleted" | "role_defined" | "role_deleted" | "granted" | "revoked" | "key_issued" | "key_revoked" | "restricted" | "unrestricted" | "integration_set";
         /**
          * BuiltInRole
          * @description A built-in role a tenant's admins grant, and the kinds of resource it may be granted on.
@@ -624,6 +686,63 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /**
+         * IntegrationSet
+         * @description An integration was turned on or off, on the tenant or in a workspace, or unset.
+         */
+        IntegrationSet: {
+            /** Key */
+            key: string;
+            /** On */
+            on: boolean | null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "integration_set";
+            workspace: components["schemas"]["WorkspaceId"] | null;
+        };
+        /**
+         * IntegrationSetting
+         * @description One level's explicit setting of an integration: on or off, who set it, and when.
+         */
+        IntegrationSetting: {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            by: components["schemas"]["Subject"];
+            /** On */
+            on: boolean;
+        };
+        /**
+         * IntegrationState
+         * @description An integration as an admin reads it: what it is, each level's setting, and the outcome.
+         */
+        IntegrationState: {
+            /** Default */
+            default: boolean;
+            /** Description */
+            description: string;
+            /** Enabled */
+            enabled: boolean;
+            /** Installed */
+            installed: boolean;
+            /** Key */
+            key: string;
+            tenant: components["schemas"]["IntegrationSetting"] | null;
+            workspace: components["schemas"]["IntegrationSetting"] | null;
+        };
+        /**
+         * IntegrationSwitch
+         * @description An integration's new setting, on the tenant or in a workspace.
+         */
+        IntegrationSwitch: {
+            /** On */
+            on: boolean | null;
+            workspace?: components["schemas"]["WorkspaceId"] | null;
         };
         /**
          * IssuedKey
@@ -1425,6 +1544,75 @@ export interface operations {
             };
         };
     };
+    list_integrations_grantr_v1_tenants__tenant__integrations_get: {
+        parameters: {
+            query?: {
+                workspace?: components["schemas"]["WorkspaceId"] | null;
+            };
+            header?: never;
+            path: {
+                tenant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationState"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_integration_grantr_v1_tenants__tenant__integrations__key__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant: string;
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IntegrationSwitch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_keys_grantr_v1_tenants__tenant__keys_get: {
         parameters: {
             query?: never;
@@ -1842,6 +2030,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuditEntry"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    workspace_integrations_grantr_v1_tenants__tenant__workspaces__workspace__integrations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant: string;
+                workspace: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: boolean;
+                    };
                 };
             };
             /** @description Validation Error */

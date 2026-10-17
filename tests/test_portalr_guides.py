@@ -236,6 +236,11 @@ def test_the_stacks_spend_key_and_sign_in_are_what_the_runbook_says() -> None:
     assert len(allowed) == 3
     for method, path in allowed:
         assert f"`{method} {path}`" in runbook, (method, path)
+    # The reason a single host's invitations give, which the template's portal writes.
+    template = ROOT / "packages" / "stackr" / "template" / "src" / "{{ package_name }}"
+    (portal,) = template.glob("*portal.py*.jinja")
+    (reason,) = re.findall(r'InviteFailed\("(invitations need [^"]+)"\)', portal.read_text())
+    assert f'"{reason}"' in runbook
 
 
 def test_reflexr_unreachable_is_said_after_the_ten_seconds_the_guide_names() -> None:

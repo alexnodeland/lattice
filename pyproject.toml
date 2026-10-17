@@ -75,6 +75,7 @@ convention = "google"
 "**/tests/**" = ["D", "ARG"]
 # pydantic-ai hides a tool's RunContext from the model, so tool docstrings don't document it.
 "packages/artifactr/src/artifactr/agent/tools.py" = ["D417"]
+"packages/artifactr/src/artifactr/files/tools/tools.py" = ["D417"]
 "packages/reflexr/src/reflexr/agent/tools.py" = ["D417"]
 "packages/relayr/src/relayr/outbound/tools.py" = ["D417"]
 "packages/relayr/src/relayr/trackers/tools.py" = ["D417"]

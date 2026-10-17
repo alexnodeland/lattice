@@ -11,7 +11,8 @@
 | `checkouts` | `Checkout`, the record behind a person's lease, the `Checkouts` port, and `InMemoryCheckouts` | `manifest`, artifactr, pydantic |
 | `app` | The `App` port and `FakeApp` | `manifest`, pydantic |
 | `wordcraft` | WordCraft's adapter, `Subprocess`, and the `.docx` fingerprint and outline | `manifest`, `app`, pydantic, `mcp`, `anyio` |
-| `native` | `NativeFiles`: uploads, check-out and check-in, agents' edits, reads and collection | every layer above, artifactr |
+| `native` | `NativeFiles`: uploads, check-out and check-in, agents' edits, reads, renders and collection, behind the app's switch | `manifest`, `blobs`, `checkouts`, `app`, artifactr, `lattice_core.integrations` |
+| `tools` | `native_file_tools`, the agent's toolset | `app`, `native`, artifactr and its agent, pydantic-ai |
 | `sql` | `SqlBlobs`, `SqlCheckouts`, their tables and migrations | `manifest`, `blobs`, `checkouts`, SQLAlchemy, Alembic, `lattice_core.sql` |
 
 ## A write
@@ -45,6 +46,12 @@ Collection runs per workspace. It reads every revision of a native file, archive
 WordCraft's adapter, `Subprocess`, spawns `wordcraft-cli mcp` for every call, in an empty directory that is the CLI's read root and write root, and maps the call onto its tools: open or a blank document, one `batch`, a save, and the text, structure, comments and tracked changes read back. The fingerprint is read from the bytes in Python, the digest of the archive's parts' names and digests without `docProps/core.xml`, which every save stamps, inflating each part against a limit. Its talk level is `save`, since WordCraft's browser build only opens and saves files, and its switch is `files:wordcraft`. It is not a sandbox; the worker that runs hostile files is phase 3 of lattice RFC-0003 ([ADR-0005](adr/0005-wordcraft-headless-pinned-by-checksum.md)).
 
 WordCraft is pinned by the checksums of one release, in `scripts/wordcraft.sha256`, which `scripts/wordcraft` checks before it unpacks anything. Nightly's fidelity report opens and saves each file of a generated corpus, one per feature, with that release, and publishes which features it kept and whether saving twice is a fixpoint.
+
+## The switch and the agent's tools
+
+Each app is an integration of its own, named by its `integration` key, such as `files:wordcraft`, which lattice-core's registry declares. `NativeFiles` asks its `Integrations` before each upload, check-out, extension, check-in and edit, and refuses with `NotEnabled` while the app is off in the workspace; reads go on. `NativeFiles.key_of` is the `key_of` of artifactr's `integration_gate`, so the same switch refuses an edit of a native file on any surface ([ADR-0006](adr/0006-the-agents-tools-behind-each-apps-switch.md)).
+
+`native_file_tools` gives the agent the file's words and review, a page at a time, the app's commands, an edit by a batch of them, and, if the application turns it on, a rendered page. The toolset is offered only while the app is on, read once a step. A file a person has checked out is answered with who has it and until when, and the agent plans again after the check-in.
 
 ## What it adds to the log
 

@@ -335,7 +335,7 @@ Decided by the owner on 2026-10-16:
 - [x] artifactr-files: blobs, check-outs, migrations and row-level security
 - [x] artifactr-files: the WordCraft adapter, the corpus and the nightly fidelity report
 - [ ] artifactr-files and stackr: the worker, its image, the recipe and the release pin check
-- [ ] artifactr-files: `NativeFileTools`
+- [x] artifactr-files: `NativeFileTools`, as `native_file_tools`
 - [ ] portalr and artifactr-files: the renderer, `files_router`, check-out and check-in
 - [ ] The streamed session spike and its recommendation
 - [x] Docs: the package's section and guide

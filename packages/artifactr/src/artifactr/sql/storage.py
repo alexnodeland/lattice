@@ -188,6 +188,13 @@ class _Transaction:
         cursor = await lock_row(self._session, CursorRow, key, new)
         cursor.seq = max(cursor.seq, seq)
 
+    @awaited_to_the_end
+    async def holds_lease(self, key: str, holder: str) -> bool:
+        # Locked, so acquire_lease's update waits for this transaction to end.
+        row = (self._scope.tenant_id, self._scope.workspace_id, key)
+        lease = await self._session.get(LeaseRow, row, with_for_update=True)
+        return lease is not None and lease.holder == holder
+
     def finish(self) -> int:
         """Add the history appended in this transaction at the log's final head; return it."""
         head = self._workspace.head_seq

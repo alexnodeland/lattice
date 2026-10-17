@@ -178,6 +178,7 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
                 message_ids=session.message_ids,
             ),
             cursor=delivered.at(taken),
+            claim=delivered.claim,
         )
         watch_after = (started.seq if session.watch_after is None else session.watch_after) or 0
         thread = await workspace.thread(session.thread_id)

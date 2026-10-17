@@ -71,8 +71,7 @@ STORAGE = text(
 @pytest.fixture
 async def postgres(tmp_path: Path) -> AsyncIterator[AsyncEngine]:
     async with empty_database("postgres", tmp_path) as database:
-        engine = database.engine()
-        yield engine
+        yield database.engine()
 
 
 async def _postgresql(engine: AsyncEngine) -> tuple[list[Any], list[Any], bytes | None]:

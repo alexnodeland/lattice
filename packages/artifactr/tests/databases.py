@@ -7,11 +7,12 @@ schema, dropped afterwards.
 
 import os
 import uuid
-from collections.abc import AsyncGenerator, Awaitable, Callable
+from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import timedelta
 from pathlib import Path
+from typing import Protocol
 
 import pytest
 from sqlalchemy import URL, make_url
@@ -91,13 +92,21 @@ async def empty_database(backend: str, directory: Path) -> AsyncGenerator[Databa
         await admin.dispose()
 
 
+class Migrate(Protocol):
+    """Upgrades a database to a chain's latest schema, granting a role its tables."""
+
+    async def __call__(
+        self, engine: AsyncEngine, /, *, application_role: str | None = None
+    ) -> None: ...
+
+
 def _engine(url: str | URL, schema: str) -> AsyncEngine:
     return create_async_engine(url, connect_args={"server_settings": {"search_path": schema}})
 
 
 @asynccontextmanager
 async def row_level_security(
-    migrations: Callable[..., Awaitable[None]] = migrate,
+    migrations: Migrate = migrate,
 ) -> AsyncGenerator[tuple[AsyncEngine, AsyncEngine]]:
     """Yield the owner's engine on a migrated schema, and the engine of a role that isn't.
 

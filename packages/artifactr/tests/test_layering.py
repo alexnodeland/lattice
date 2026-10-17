@@ -144,6 +144,12 @@ def test_every_package_is_a_layer() -> None:
     assert packages == set(LAYERS)
 
 
+def test_the_package_root_imports_only_the_inner_layers() -> None:
+    for name in _imports(SRC / "__init__.py"):
+        if name.split(".")[0] not in sys.stdlib_module_names:
+            assert _within(name, INNER), name
+
+
 PUBLIC = {"artifactr", *(f"artifactr.{package}" for package in LAYERS)}
 
 

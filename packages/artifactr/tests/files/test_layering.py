@@ -79,6 +79,8 @@ def test_layer_imports_only_what_it_may(layer: str) -> None:
                 assert _within(module, own), f"{where}: above"
                 continue
             assert _within(module, third_party), f"{where}: not a dependency of this layer"
+            if root == "artifactr":
+                assert module in LIBRARY, f"{where}: not a public module"
             if root == "artifactr" and name is not None:
                 exported = importlib.import_module(module).__all__
                 assert name in exported, f"{where}.{name}: not artifactr's public API"

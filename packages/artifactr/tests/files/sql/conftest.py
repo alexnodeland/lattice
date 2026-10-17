@@ -13,5 +13,4 @@ from tests.databases import SQL_BACKENDS, empty_database
 async def engine(request: pytest.FixtureRequest, tmp_path: Path) -> AsyncIterator[AsyncEngine]:
     """An engine on an empty database, with no tables."""
     async with empty_database(request.param, tmp_path) as database:
-        engine = database.engine()
-        yield engine
+        yield database.engine()

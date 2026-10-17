@@ -50,7 +50,7 @@ await grants.revoke("acme", "viewer", on=Resource(kind="workspace", workspace="m
 
 - **Only members are granted roles.** `add_member` makes a user or service principal a member; `remove_member` takes its grants, its places in groups and its keys with it.
 - **No one gives more than they hold** ([ADR-0010](../adr/0010-commands-bounded-by-what-their-maker-holds.md)). Granting a role on a resource needs `grantr:grant` there, and every action the role holds there.
-- **A tenant keeps an owner.** grantr refuses to take its last `owner` grant, whether by `revoke`, by `remove_member` or by `delete_group` on the group that holds it.
+- **A tenant keeps an owner.** grantr refuses a change that would leave no member holding `owner`, by a grant of their own or through a group's: a `revoke`, a `remove_member`, a `delete_group`, or a `define_group` that empties the group holding it. An owner grant to an empty group makes no one an owner ([ADR-0014](../adr/0014-an-operator-enters-a-tenant-by-granting-themselves.md)'s amendment). Over the admin API, the refusal is the `invalid` one, as for any `Invalid`.
 
 ## Groups
 

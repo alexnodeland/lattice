@@ -187,6 +187,38 @@ async def test_an_expired_lease_can_be_taken(storage_factory: StorageFactory) ->
     assert await storage.acquire_lease(SCOPE, "k", "b", timedelta(seconds=30))
 
 
+async def test_a_transaction_asks_who_holds_a_lease_expired_or_not(
+    storage_factory: StorageFactory,
+) -> None:
+    now = datetime(2026, 10, 16, tzinfo=UTC)
+    storage = storage_factory(lambda: now)
+    async with storage.transaction(SCOPE) as tx:
+        assert not await tx.holds_lease("k", "a"), "no one has it"
+    assert await storage.acquire_lease(SCOPE, "k", "a", timedelta(seconds=30))
+    now += timedelta(minutes=1)  # expired, and no one took it
+    async with storage.transaction(SCOPE) as tx:
+        assert await tx.holds_lease("k", "a")
+        assert not await tx.holds_lease("k", "b")
+    assert await storage.acquire_lease(SCOPE, "k", "b", timedelta(seconds=30))
+    async with storage.transaction(SCOPE) as tx:
+        assert not await tx.holds_lease("k", "a"), "another holder took it"
+
+
+async def test_a_lease_a_transaction_asked_about_is_taken_only_once_it_ends(
+    storage_factory: StorageFactory,
+) -> None:
+    now = datetime(2026, 10, 16, tzinfo=UTC)
+    storage = storage_factory(lambda: now)
+    assert await storage.acquire_lease(SCOPE, "k", "a", timedelta(seconds=30))
+    now += timedelta(minutes=1)
+    async with storage.transaction(SCOPE) as tx:
+        assert await tx.holds_lease("k", "a")
+        taking = asyncio.create_task(storage.acquire_lease(SCOPE, "k", "b", timedelta(seconds=30)))
+        await asyncio.sleep(0.2)
+        assert not taking.done(), "the lease is not taken under the transaction's answer"
+    assert await taking
+
+
 async def test_a_transaction_saves_a_cursor_as_it_commits(storage: Storage) -> None:
     async with storage.transaction(SCOPE) as tx:
         await tx.save_cursor("consumed", 4)

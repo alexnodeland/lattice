@@ -1,6 +1,6 @@
 # ADR-0023: Publishing to PyPI from the release workflow
 
-**Status:** Accepted, amended 2026-10-16 and four times on 2026-10-17 (see the amendments)
+**Status:** Accepted, amended 2026-10-16 and four times on 2026-10-17 (see the amendments), and by [ADR-0026](0026-a-distribution-needs-a-reason-integrations-are-extras.md)
 **Date:** 2026-10-16
 **Deciders:** Alex Nodeland
 
@@ -127,3 +127,7 @@ As with lattice-core, uv can't lock `>=0.1.0` against a workspace member still a
 - **Its release pull request stays unqueued.** release-please opens `chore(main): release artifactr-files 0.1.0` at the first push with a `feat` of it. It is queued only once its `artifactr-ai` floor names the artifactr release that has `Workspace.lease_artifact`, which it needs: until that release is on `main`, uv can't lock the floor, and a wheel published with the older floor would install against an artifactr without the lease.
 - **What stands between it and PyPI** is what stands between any package and PyPI: a release run never publishes; a dispatch publishes only with `PYPI_PUBLISH` set, and only if PyPI has a trusted publisher for `artifactr-files-ai`, which no one has added. Its `pypi-artifactr-files-ai` environment, with the maintainer as its reviewer and the `*-v*` tag restriction, and its pending publisher are added before its first dispatch, as the [amendment on environments](#amendment-2026-10-17-one-environment-a-package) says of a package added later. Until then, a dispatch would create that environment unprotected, so the publisher, not the environment, is what refuses it.
 - **The lists above** (seven distributions, seven environments, the order ending in relayr-ai and portalr) are the first release's, and are left as they were written. The order is now: `lattice-core-ai` and `evalr`; then `artifactr-ai`, `reflexr` and `grantr`; then `relayr-ai` and `artifactr-files-ai`; then `portalr`.
+
+#### The package was folded into artifactr
+
+*2026-10-17.* Before its first release, `artifactr-files-ai` became artifactr's `files` extra, `artifactr-ai[files]` ([ADR-0026](0026-a-distribution-needs-a-reason-integrations-are-extras.md)). It leaves `release-please-config.json`, the manifest and `STAGES`, and the amendment above no longer applies to anything: its release pull request, [#354](https://github.com/alexnodeland/lattice/pull/354), was never queued and is to be closed unmerged, since release-please no longer tends it, and no `pypi-artifactr-files-ai` environment or pending publisher was added, so there is nothing to remove from GitHub or PyPI. The order is again the first release's with artifactr-files left out: `lattice-core-ai` and `evalr`; then `artifactr-ai`, `reflexr` and `grantr`; then `relayr-ai`; then `portalr`.

@@ -52,3 +52,7 @@ Option A changes nothing in artifactr and keeps the log small; what it costs, ke
 ## Action items
 
 1. [x] The types, the patch with its test, and the blob store, in `artifactr-files-ai`'s phase 1.
+
+## Note (2026-10-17): the package is artifactr's `files` extra
+
+`artifactr-files-ai`, named above, was never released: before its first release it became artifactr's `files` extra, `artifactr-ai[files]`, imported as `artifactr.files` ([lattice ADR-0026](../../adr/0026-a-distribution-needs-a-reason-integrations-are-extras.md)). The decision above is unchanged; the rest of artifactr still imports nothing of it.

@@ -167,7 +167,7 @@ Clients that send commands over the wire write patches directly, as in `{"kind":
 
 ## Native files
 
-A file in a native format, such as a Word document, is not a type's fields: it is megabytes that only its own application reads and writes faithfully. The [`artifactr-files-ai`](../../artifactr-files/index.md) package gives artifactr types for such files. Each is a manifest that names the file's bytes by their SHA-256 in a blob store, and each revision is an ordinary JSON Patch that first tests the digest it was made from, so accepting a proposal made against an old version fails with `PatchFailed` rather than replacing what came after ([ADR-0072](../adr/0072-native-files-are-manifests-over-json-patch.md)).
+A file in a native format, such as a Word document, is not a type's fields: it is megabytes that only its own application reads and writes faithfully. The [`files` extra](../files/index.md), `artifactr-ai[files]`, gives artifactr types for such files, in `artifactr.files`. Each is a manifest that names the file's bytes by their SHA-256 in a blob store, and each revision is an ordinary JSON Patch that first tests the digest it was made from, so accepting a proposal made against an old version fails with `PatchFailed` rather than replacing what came after ([ADR-0072](../adr/0072-native-files-are-manifests-over-json-patch.md)).
 
 Such a file has one writer at a time. A person's check-out and an agent's edit each hold a lease on the artifact, `Workspace.lease_artifact`, and another holder is refused with `ArtifactBusy` ([ADR-0071](../adr/0071-a-lease-on-an-artifact.md)). The lease is advisory: a write that ignores it is still guarded by its base version and the test.
 

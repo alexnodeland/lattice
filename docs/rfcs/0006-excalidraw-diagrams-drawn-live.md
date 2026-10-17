@@ -1,6 +1,6 @@
 # RFC-0006: Excalidraw diagrams, drawn live by people and agents
 
-**Status:** Draft
+**Status:** Draft, amended by [lattice ADR-0026](../adr/0026-a-distribution-needs-a-reason-integrations-are-extras.md)
 **Author:** Alex Nodeland
 **Created:** 2026-10-17
 **Discussion:** [#356](https://github.com/alexnodeland/lattice/pull/356)
@@ -59,6 +59,8 @@ There are two lanes. **The durable lane** is artifactr's: a commit is an `edit_a
 - **It is not a `NativeFile`.** A manifest over a blob would lose element-level patches and make every edit a check-out.
 - **Its PyPI name is `artifactr-excalidraw-ai`,** imported as `artifactr_excalidraw`. Both it and `artifactr-excalidraw` were free on PyPI on 2026-10-17. A release-please component of its own, first released as 0.1.0.
 - **Its wire schema is committed,** as `schemas/artifactr_excalidraw.v1.json`, drift-tested, and added to portalr's `generate.ts`, as RFC-0005's is.
+
+> **Amended (2026-10-17) by [lattice ADR-0026](../adr/0026-a-distribution-needs-a-reason-integrations-are-extras.md):** diagrams are not a distribution of their own. O2 is decided as an extra of `artifactr-ai`, in the artifactr distribution, with their code a subpackage of `artifactr` that the rest of it never imports, turned on per workspace by the shared Integrations switch this RFC proposes. `artifactr-excalidraw-ai` and its release-please component are dropped; the extra's name and import path are settled where it is built. `artifactr-files` is now artifactr's `files` extra, `artifactr.files`, so `Blobs` and `Blob` come from there, within the same distribution. What else this section says holds.
 
 ### The artifact (O1)
 

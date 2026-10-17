@@ -12,6 +12,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import timedelta
 from pathlib import Path
+from typing import Protocol
 
 import pytest
 from sqlalchemy import URL, make_url
@@ -91,16 +92,27 @@ async def empty_database(backend: str, directory: Path) -> AsyncGenerator[Databa
         await admin.dispose()
 
 
+class Migrate(Protocol):
+    """Upgrades a database to a chain's latest schema, granting a role its tables."""
+
+    async def __call__(
+        self, engine: AsyncEngine, /, *, application_role: str | None = None
+    ) -> None: ...
+
+
 def _engine(url: str | URL, schema: str) -> AsyncEngine:
     return create_async_engine(url, connect_args={"server_settings": {"search_path": schema}})
 
 
 @asynccontextmanager
-async def row_level_security() -> AsyncGenerator[tuple[AsyncEngine, AsyncEngine]]:
+async def row_level_security(
+    migrations: Migrate = migrate,
+) -> AsyncGenerator[tuple[AsyncEngine, AsyncEngine]]:
     """Yield the owner's engine on a migrated schema, and the engine of a role that isn't.
 
     The owner, which the migrations run as, bypasses the policies; the other role, which the
     migrations grant the tables, is held by them. Both are disposed of, and the schema dropped.
+    The migrations are the storage's unless a test gives others, such as the native files'.
     """
     assert POSTGRES_URL, "PostgreSQL tests are deselected without a database"
     schema = f"test_{uuid.uuid4().hex}"
@@ -113,7 +125,7 @@ async def row_level_security() -> AsyncGenerator[tuple[AsyncEngine, AsyncEngine]
             " EXCEPTION WHEN duplicate_object OR unique_violation THEN NULL; END $$"
         )
     owner = _engine(POSTGRES_URL, schema)
-    await migrate(owner, application_role=APPLICATION_ROLE)
+    await migrations(owner, application_role=APPLICATION_ROLE)
     url = make_url(POSTGRES_URL).set(username=APPLICATION_ROLE, password="application")
     application = _engine(url, schema)
     try:

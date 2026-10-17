@@ -47,6 +47,10 @@ langfuse = [
 ]
 litellm = ["lattice-core-ai[litellm]>=0.1.0"]
 evals = ["evalr>=0.1.0"]
+# Native files (lattice RFC-0003): artifactr.files, on artifactr's own dependencies today, with
+# its SQL stores in the sql extra. The extra names the integration, and carries the apps'
+# adapters' dependencies as later phases add them (lattice ADR-0026).
+files = []
 
 [project.urls]
 Homepage = "https://lattice.alexnodeland.com/artifactr/"

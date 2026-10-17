@@ -40,6 +40,30 @@ Finer rules come from the library itself:
 - **Run facts belong to the agent.** Only a thread's own agent, or the system, may record facts about that thread's runs; clients cannot forge `run_started` or `tool_returned`.
 - **Attribution cannot be borrowed.** A handle acts as the actor it was opened for. The agent's handle is derived from yours with `as_actor`, and only your code chooses the actor.
 
+### Checking what a command carries
+
+`authorize` decides who may send a command, not what it carries. To refuse a command for its content, such as an answer that doesn't fit a form, give `Workspaces` checks by command type ([ADR-0073](../adr/0073-checks-that-refuse-a-command-before-it-commits.md)):
+
+```python
+from artifactr.core import Command, CreateArtifact, ValidationFailed
+from artifactr.workspace import Workspace, Workspaces
+
+
+async def briefs_have_titles(workspace: Workspace, command: Command) -> None:
+    if isinstance(command, CreateArtifact) and command.kind == "brief":
+        if not command.data.get("title"):
+            raise ValidationFailed("a brief needs a title", [])
+
+
+workspaces = Workspaces(storage, checks={"create_artifact": briefs_have_titles})
+```
+
+- **A check runs in `commit`,** once `authorize` allows the command, and before its transaction. A command an actor may not send never reaches it.
+- **It reads as the command's actor:** the handle it is given is the committing one, so it sees what the actor may see, and no more.
+- **It refuses with a rejection,** such as `ValidationFailed`, whose errors name the fields, or `InvalidState`; the client gets it typed, as core's own (422 or 409 over REST). Anything else it raises fails the command as an error.
+- **A command is checked under its own type:** a `propose_change` under `"propose_change"`, whatever it wraps. Facts, which `record` writes for runs, are not checked.
+- **A check is not a lock.** What it read may change before the command commits.
+
 ### Restricted threads and artifacts
 
 An application that restricts some threads or artifacts to some of a workspace's members gives `Workspaces` a `hidden(tenant_id, workspace_id, actor)` hook, which returns what the actor may not see there: an `artifactr.core.Visibility`, or any object with its `threads` and `artifacts` sets ([ADR-0062](../adr/0062-restricted-items-left-out-of-every-read.md)). Every read leaves them out:

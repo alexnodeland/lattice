@@ -13,7 +13,7 @@ Each record captures one decision: the context that forced it, the options consi
 | [0007](0007-caller-owned-live-output.md) | Live output is owned by the caller, not the log | Accepted |
 | [0008](0008-agent-perception-and-steering.md) | Agent perception: change notes, fresh rendering, steering | Accepted; its steering amended by 0055 |
 | [0009](0009-write-policies-and-non-blocking-proposals.md) | Write policies and non-blocking proposals | Accepted |
-| [0010](0010-pausing-with-deferred-tools.md) | Pausing with pydantic-ai deferred tools | Accepted |
+| [0010](0010-pausing-with-deferred-tools.md) | Pausing with pydantic-ai deferred tools | Accepted; its answers amended by 0073, and an amendment |
 | [0011](0011-workspace-scoped-artifacts-and-tenant-handles.md) | Workspace-scoped artifacts and tenant-scoped handles | Accepted |
 | [0012](0012-surfaces-websocket-rest-mcp.md) | Surfaces: WebSocket thread protocol, REST commands, MCP | Superseded by 0048 |
 | [0013](0013-library-with-reference-implementation.md) | A library with adapters and a reference implementation | Accepted |
@@ -76,5 +76,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0070](0070-a-runner-looks-again-for-what-a-dead-holder-was-asked.md) | A runner looks again for what a dead holder was asked | Accepted |
 | [0071](0071-a-lease-on-an-artifact.md) | A lease on an artifact | Accepted |
 | [0072](0072-native-files-are-manifests-over-json-patch.md) | Native files are manifests over JSON Patch | Accepted |
+| [0073](0073-checks-that-refuse-a-command-before-it-commits.md) | Checks that refuse a command before it commits | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

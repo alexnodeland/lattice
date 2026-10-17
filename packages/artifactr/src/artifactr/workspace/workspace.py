@@ -4,7 +4,7 @@ Every read and write goes through a :class:`Workspace`, each of whose methods as
 ``authorize`` hook first, with the action it takes (ADR-0056). Every write goes through
 :meth:`Workspace.commit` or :meth:`Workspace.record`, which run core's rules inside one storage
 transaction (ADR-0002, ADR-0018); a command passes the application's ``checks`` of its type first
-(ADR-0071). Each commit is traced as an ``artifactr.commit {type}`` span, and what commits and facts
+(ADR-0073). Each commit is traced as an ``artifactr.commit {type}`` span, and what commits and facts
 do is counted in artifactr's metrics. Every envelope records the W3C trace context of the span it
 was committed in, and every revision that span's trace (ADR-0033).
 """
@@ -215,7 +215,7 @@ workspace as the command's actor, ``workspace.actor``. A ``propose_change`` is c
 :class:`~artifactr.core.Rejection`, such as :class:`~artifactr.core.ValidationFailed` or
 :class:`~artifactr.core.InvalidState`; anything else it raises fails the command as an error.
 It reads before the commit and holds nothing, so what it read may change before the command
-commits. Facts are recorded unchecked: they are the runner's, not people's (ADR-0071).
+commits. Facts are recorded unchecked: they are the runner's, not people's (ADR-0073).
 """
 
 

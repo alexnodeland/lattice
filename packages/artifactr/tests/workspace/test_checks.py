@@ -1,4 +1,4 @@
-"""The application's checks of commands, before they commit (ADR-0071)."""
+"""The application's checks of commands, before they commit (ADR-0073)."""
 
 import pytest
 

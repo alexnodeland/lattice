@@ -20,21 +20,24 @@ export type AlertTone = keyof typeof TONE;
 /**
  * Something to tell the reader in the page, not a toast: a note, a warning, or what went wrong,
  * with a shape beside its words (portalr ADR-0039). Keep it to a sentence or two, and say what to
- * do. It is a live region, so a change to it is read aloud as the tone says.
+ * do. It is a live region, so a change to it is read aloud as the tone says; one that is part
+ * of what a page reads, such as a callout in a message, is `live={false}`, a note instead.
  */
 export function Alert({
   tone = "info",
+  live = true,
   className,
   children,
 }: {
   tone?: AlertTone;
+  live?: boolean;
   className?: string;
   children: ReactNode;
 }) {
   const { role, icon, edge } = TONE[tone];
   return (
     <div
-      role={role}
+      role={live ? role : "note"}
       className={cn(
         "flex items-start gap-2 rounded-md border border-line border-l-4 bg-surface px-3 py-2 text-fg text-sm",
         edge,

@@ -284,6 +284,10 @@ class PlaneTracker:
         """Return the work item's page: `<base>/<workspace>/browse/<PROJECT>-<number>/`."""
         return f"{self._web}/browse/{ref.name}/"
 
+    def holds(self, state: State) -> State:
+        """Every state: each is a state group of Plane's."""
+        return state
+
     # ─── how ──────────────────────────────────────────────────────────────────
 
     def _own(self, key: str | None, source: str | None) -> str | None:

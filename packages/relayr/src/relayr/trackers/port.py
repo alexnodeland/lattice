@@ -262,3 +262,10 @@ class Tracker(Protocol):
     def link(self, ref: ItemRef) -> str:
         """Return the item's address in the tracker's web app."""
         ...
+
+    def holds(self, state: State) -> State:
+        """Return the state an item set to `state` reads back as.
+
+        Plane holds every state; Vikunja's `done` flag holds two of the five.
+        """
+        ...

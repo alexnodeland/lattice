@@ -4319,6 +4319,10 @@ dependencies = [
 evals = [
     { name = "evalr" },
 ]
+fastapi = [
+    { name = "fastapi" },
+    { name = "starlette" },
+]
 langfuse = [
     { name = "artifactr-ai", extra = ["langfuse"] },
     { name = "evalr", extra = ["langfuse"] },
@@ -4357,6 +4361,7 @@ vikunja = [
 dev = [
     { name = "aiosqlite" },
     { name = "asyncpg" },
+    { name = "fastapi" },
     { name = "httpx" },
     { name = "hypothesis" },
     { name = "pyright" },
@@ -4373,6 +4378,7 @@ lint = [
 test = [
     { name = "aiosqlite" },
     { name = "asyncpg" },
+    { name = "fastapi" },
     { name = "httpx" },
     { name = "hypothesis" },
     { name = "pytest" },
@@ -4390,6 +4396,7 @@ requires-dist = [
     { name = "asyncpg", marker = "extra == 'postgres'", specifier = ">=0.31" },
     { name = "evalr", marker = "extra == 'evals'", editable = "packages/evalr" },
     { name = "evalr", extras = ["langfuse"], marker = "extra == 'langfuse'", editable = "packages/evalr" },
+    { name = "fastapi", marker = "extra == 'fastapi'", specifier = ">=0.141" },
     { name = "httpx", marker = "extra == 'plane'", specifier = ">=0.28" },
     { name = "httpx", marker = "extra == 'vikunja'", specifier = ">=0.28" },
     { name = "langfuse", marker = "extra == 'langfuse'", specifier = ">=4.15,<5" },
@@ -4404,13 +4411,15 @@ requires-dist = [
     { name = "relayr-ai", extras = ["sql"], marker = "extra == 'postgres'" },
     { name = "relayr-ai", extras = ["sql"], marker = "extra == 'sqlite'" },
     { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'sql'", specifier = ">=2.1" },
+    { name = "starlette", marker = "extra == 'fastapi'", specifier = ">=0.46.0" },
 ]
-provides-extras = ["sql", "sqlite", "postgres", "otel", "evals", "plane", "vikunja", "langfuse"]
+provides-extras = ["sql", "sqlite", "postgres", "otel", "evals", "plane", "vikunja", "fastapi", "langfuse"]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "aiosqlite", specifier = ">=0.22" },
     { name = "asyncpg", specifier = ">=0.31" },
+    { name = "fastapi", specifier = ">=0.141" },
     { name = "httpx", specifier = ">=0.28" },
     { name = "hypothesis", specifier = ">=6.168" },
     { name = "pyright", specifier = ">=1.1.414" },
@@ -4427,6 +4436,7 @@ lint = [
 test = [
     { name = "aiosqlite", specifier = ">=0.22" },
     { name = "asyncpg", specifier = ">=0.31" },
+    { name = "fastapi", specifier = ">=0.141" },
     { name = "httpx", specifier = ">=0.28" },
     { name = "hypothesis", specifier = ">=6.168" },
     { name = "pytest", specifier = ">=9.1" },

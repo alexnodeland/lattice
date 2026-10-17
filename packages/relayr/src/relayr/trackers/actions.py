@@ -12,8 +12,10 @@ import weakref
 from collections.abc import AsyncGenerator, Awaitable, Callable, Mapping
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
+from types import MappingProxyType
 from typing import Any, Final
 
+from opentelemetry.metrics import MeterProvider
 from pydantic import BaseModel, ConfigDict, JsonValue
 
 from reflexr.workspace import Reaction, RunFailure
@@ -22,6 +24,8 @@ from relayr.ledger import Clock, Ledger, TrackedKind, WorkspaceKey, utc_now
 from relayr.outbound.actions import NotAllowed
 from relayr.outbound.allowlist import Allowlist, Allowlists
 from relayr.outbound.ids import Derivation, canonical
+from relayr.telemetry import TRACKER_LOOPS, Telemetry, workspace_attributes
+from relayr.trackers.budget import Budget
 from relayr.trackers.port import (
     CommentKey,
     CommentRef,
@@ -58,6 +62,13 @@ CREDENTIALS_TTL: Final = timedelta(minutes=5)
 """How long a tenant's credentials are used before they are asked for again; a key the tracker
 refuses asks again at once."""
 
+LOOP_CAP: Final = 20
+"""How many writes relayr makes to one item within `LOOP_WINDOW`: the next fails its run for
+good, as `tracker_loop`. It backs the echo filter, for what the filter can't see."""
+
+LOOP_WINDOW: Final = timedelta(hours=1)
+"""What `LOOP_CAP` is per."""
+
 type Connect = Callable[[TrackerCredentials, str], Tracker]
 """Makes a lattice workspace's adapter from its tenant's credentials and its source: `plane(http)`,
 `vikunja(http)`, or the fake's `connect`."""
@@ -67,7 +78,7 @@ type Credentials = Callable[[str], Awaitable[TrackerCredentials]]
 
 
 class TrackerBinding(BaseModel):
-    """The tracker project a workspace's runs file into, and what its items have by default."""
+    """The tracker project a workspace's runs file into, and whose changes its follower reads."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -80,6 +91,10 @@ class TrackerBinding(BaseModel):
 
     labels: tuple[str, ...] = ()
     """Labels every item filed has, beside the rule's."""
+
+    since: datetime | None = None
+    """When its follower first reads the project, the items changed since are published as
+    created; by default none is, and only what changes after is published."""
 
 
 class Deleted(BaseModel):
@@ -121,7 +136,12 @@ class Trackers:
             `relayr.plane.INTEGRATION` or `relayr.vikunja.INTEGRATION`.
         enabled: Whether the integration runs in a workspace, asked before anything is done
             there. By default it runs everywhere.
-        clock: Returns the current time, which credentials expire by.
+        budget: How many requests a minute each tenant's key may make from this process, all
+            told: runs' writes spend it first, and the followers' polls take what is left.
+            Plane allows 60 by default.
+        clock: Returns the current time, which credentials expire and the budget is measured by.
+        meter_provider: Where the count of writes refused by the cap on loops goes. Defaults to
+            the global provider.
 
     Raises:
         ValueError: If a key of ``allowlists`` is neither a rule's name nor a whole namespace's.
@@ -137,14 +157,18 @@ class Trackers:
         allowlists: Mapping[str, Allowlist] | None = None,
         integration: str,
         enabled: Enabled = always,
+        budget: int = 40,
         clock: Clock = utc_now,
+        meter_provider: MeterProvider | None = None,
     ) -> None:
         self._ledger = ledger
         self._integration = integration
         self._enabled = enabled
         self._connections = _Connections(connect, credentials, clock)
-        self._bindings = dict(bindings)
+        self._bindings = MappingProxyType(dict(bindings))
         self._allowlists = Allowlists(allowlists)
+        self._budget = Budget(budget, clock)
+        self._telemetry = Telemetry(meter_provider=meter_provider)
         self._acting: weakref.WeakKeyDictionary[Reaction[Any], TrackerActions] = (
             weakref.WeakKeyDictionary()
         )
@@ -155,15 +179,60 @@ class Trackers:
         if actions is None:
             key = WorkspaceKey(reaction.workspace.tenant_id, reaction.workspace.workspace_id)
             actions = TrackerActions(
-                reaction,
-                self._ledger,
-                self._connections,
-                self._bindings.get(key),
-                self._allowlists.of(reaction.run.rule),
-                (self._integration, self._enabled),
+                reaction, self, self._bindings.get(key), self._allowlists.of(reaction.run.rule)
             )
             self._acting[reaction] = actions
         return actions
+
+    # ─── what the followers and the webhooks' router read ─────────────────────
+
+    @property
+    def ledger(self) -> Ledger:
+        """Where keys are claimed, and what the followers read is kept."""
+        return self._ledger
+
+    @property
+    def integration(self) -> str:
+        """The tracker's key among the application's integrations, such as `tracker:plane`."""
+        return self._integration
+
+    @property
+    def bindings(self) -> Mapping[WorkspaceKey, TrackerBinding]:
+        """The tracker project each bound workspace files into and reads."""
+        return self._bindings
+
+    @property
+    def budget(self) -> Budget:
+        """The requests each tenant's key may make from this process a minute."""
+        return self._budget
+
+    async def enabled(self, workspace: WorkspaceKey) -> bool:
+        """Whether the integration runs in a workspace: asked before anything is done there."""
+        return await self._enabled(*workspace, self._integration)
+
+    async def connection(self, workspace: WorkspaceKey, *, fresh: bool = False) -> Tracker:
+        """A workspace's adapter; with its tenant's credentials asked for again if `fresh`."""
+        return await self._connections.get(workspace, fresh=fresh)
+
+    def connected(self, workspace: WorkspaceKey) -> Tracker | None:
+        """A workspace's adapter if one was made, without asking for credentials."""
+        return self._connections.made(workspace)
+
+    async def capped(self, workspace: WorkspaceKey, item_id: str) -> None:
+        """Count a write about to be made to an item, and refuse it past the cap on loops.
+
+        Raises:
+            RunFailure: For good, as `tracker_loop`, past `LOOP_CAP` writes to the item within
+                `LOOP_WINDOW`.
+        """
+        made = await self._ledger.record_tracker_write(workspace, item_id, within=LOOP_WINDOW)
+        if made > LOOP_CAP:
+            self._telemetry.count(TRACKER_LOOPS, workspace_attributes(*workspace))
+            raise RunFailure(
+                f"relayr wrote to item {item_id} {LOOP_CAP} times within {LOOP_WINDOW}",
+                reason="tracker_loop",
+                permanent=True,
+            )
 
 
 class TrackerActions:
@@ -180,16 +249,13 @@ class TrackerActions:
     def __init__(
         self,
         reaction: Reaction[Any],
-        ledger: Ledger,
-        connections: "_Connections",
+        trackers: Trackers,
         binding: TrackerBinding | None,
         allowlist: Allowlist,
-        integration: tuple[str, Enabled],
     ) -> None:
         self._reaction = reaction
-        self._integration, self._enabled = integration
-        self._ledger = ledger
-        self._connections = connections
+        self._trackers = trackers
+        self._ledger = trackers.ledger
         self._key = WorkspaceKey(reaction.workspace.tenant_id, reaction.workspace.workspace_id)
         self._binding = binding
         self._allowlist = allowlist
@@ -248,6 +314,7 @@ class TrackerActions:
         if tracked is not None and tracked.ref is not None:
             return CommentRef.model_validate(tracked.ref)
         async with self._claimed("comment", key):
+            await self._trackers.capped(self._key, item.id)
             ref = await self._call(lambda tracker: tracker.comment(item, key, body))
             kept = await self._ledger.record_tracked(self._key, "comment", key, _json(ref))
         return CommentRef.model_validate(kept or _json(ref))
@@ -279,9 +346,10 @@ class TrackerActions:
         if current is None:
             await self._ledger.mark_tracked_deleted(self._key, key)
             raise TrackerRefused(NotFound(f"item {item.name} was deleted"))
-        changed = _differing(current, fields)
+        changed = _differing(current, fields, await self._trackers.connection(self._key))
         if not changed:
             return
+        await self._trackers.capped(self._key, item.id)
         tracked = await self._ledger.tracked(self._key, "item", key)
         before = {} if tracked is None else tracked.written
         await self._ledger.record_written(self._key, key, changed)
@@ -314,7 +382,7 @@ class TrackerActions:
     async def link(self, item: ItemRef) -> str:
         """Return the item's address in the tracker's web app."""
         await self._bound()
-        tracker = await self._connections.get(self._key)
+        tracker = await self._trackers.connection(self._key)
         return tracker.link(item)
 
     # ─── how ──────────────────────────────────────────────────────────────────
@@ -334,8 +402,9 @@ class TrackerActions:
             raise NotAllowed(f"{self._rule} may not write to its tracker")
         if self._binding is None:
             raise NotAllowed(f"workspace {self._key.workspace_id} has no tracker project")
-        if not await self._enabled(*self._key, self._integration):
-            raise NotAllowed(f"{self._integration} is off in workspace {self._key.workspace_id}")
+        if not await self._trackers.enabled(self._key):
+            integration = self._trackers.integration
+            raise NotAllowed(f"{integration} is off in workspace {self._key.workspace_id}")
         return self._binding
 
     @asynccontextmanager
@@ -371,7 +440,9 @@ class TrackerActions:
         """Claim a key, then find the item it filed, or create one, and record it.
 
         An item found was filed by an attempt that stopped before it recorded it, perhaps before
-        it labelled it, as Vikunja labels after it creates; its labels are made the draft's.
+        it labelled it, as Vikunja labels after it creates; its labels are made the draft's. The
+        values filed are recorded first, as the tracker will hold them, so the follower takes the
+        item, however far along it reads it, for relayr's own.
         """
         filed = ItemDraft(
             title=draft.title,
@@ -381,7 +452,9 @@ class TrackerActions:
             labels=tuple(dict.fromkeys((*binding.labels, *draft.labels))),
         )
         project = binding.project
+        tracker = await self._trackers.connection(self._key)
         async with self._claimed("item", key):
+            await self._ledger.record_written(self._key, key, _filed(filed, tracker))
             found = await self._call(lambda tracker: tracker.find(project, key))
             ref = found or await self._call(lambda tracker: tracker.create(project, key, filed))
             kept = await self._ledger.record_tracked(self._key, "item", key, _json(ref))
@@ -397,7 +470,8 @@ class TrackerActions:
         tracker refuses its key.
         """
         for fresh in (False, True):
-            tracker = await self._connections.get(self._key, fresh=fresh)
+            tracker = await self._trackers.connection(self._key, fresh=fresh)
+            self._trackers.budget.spend(self._key.tenant_id)
             try:
                 return await request(tracker)
             except Unauthorized:
@@ -423,6 +497,11 @@ class _Connections:
         self._asked: dict[str, tuple[TrackerCredentials, datetime]] = {}
         self._made: dict[WorkspaceKey, tuple[TrackerCredentials, Tracker]] = {}
 
+    def made(self, workspace: WorkspaceKey) -> Tracker | None:
+        """A workspace's adapter, if one was made."""
+        made = self._made.get(workspace)
+        return None if made is None else made[1]
+
     async def get(self, workspace: WorkspaceKey, *, fresh: bool = False) -> Tracker:
         """A workspace's adapter; with its tenant's credentials asked for again if `fresh`."""
         credentials = await self._of(workspace.tenant_id, fresh=fresh)
@@ -446,10 +525,23 @@ def _json(model: BaseModel) -> dict[str, JsonValue]:
     return model.model_dump(mode="json")
 
 
-def _differing(current: Item, fields: ItemFields) -> dict[str, JsonValue]:
-    """The fields whose values differ from an item's, as JSON; labels as a sorted set."""
-    wanted = fields.model_dump(mode="json", exclude_none=True)
-    if "labels" in wanted:
-        wanted["labels"] = sorted(set(fields.labels or ()))
+def _held(fields: ItemFields, tracker: Tracker) -> dict[str, JsonValue]:
+    """Fields' values as JSON, as the tracker will hold them: labels as a sorted set."""
+    held = fields.model_dump(mode="json", exclude_none=True)
+    if fields.labels is not None:
+        held["labels"] = sorted(set(fields.labels))
+    if fields.state is not None:
+        held["state"] = tracker.holds(fields.state)
+    return held
+
+
+def _filed(draft: ItemDraft, tracker: Tracker) -> dict[str, JsonValue]:
+    """The values an item is filed with, as the tracker will hold them."""
+    return _held(ItemFields.model_validate(draft.model_dump()), tracker)
+
+
+def _differing(current: Item, fields: ItemFields, tracker: Tracker) -> dict[str, JsonValue]:
+    """The fields whose values, as the tracker will hold them, differ from an item's."""
+    wanted = _held(fields, tracker)
     held = current.model_dump(mode="json", include=set(wanted))
     return {name: value for name, value in wanted.items() if held[name] != value}

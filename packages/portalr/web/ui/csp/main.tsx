@@ -19,13 +19,10 @@ declare global {
 
 const root = createRoot(document.getElementById("root") as HTMLElement);
 
-window.show = (text, { streaming = false, addons = { mermaid: false } } = {}) => {
+window.show = (text, { streaming = false, addons } = {}) => {
+  const markdown = <Markdown streaming={streaming}>{text}</Markdown>;
   flushSync(() =>
-    root.render(
-      <AddonsProvider value={addons}>
-        <Markdown streaming={streaming}>{text}</Markdown>
-      </AddonsProvider>,
-    ),
+    root.render(addons ? <AddonsProvider value={addons}>{markdown}</AddonsProvider> : markdown),
   );
 };
 

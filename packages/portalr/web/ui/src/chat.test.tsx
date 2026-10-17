@@ -88,10 +88,9 @@ test("each message can be copied as the Markdown it was written in, never as wha
       <Message message={message({ content })} author="Agent" />
     </Messages>,
   );
-  const copy = screen.getByRole("button", { name: "Copy as Markdown" });
-  await copy.click();
+  await screen.getByRole("button", { name: "Copy as Markdown" }).click();
   expect(written).toHaveBeenCalledWith(content);
-  await expect.element(copy).toHaveTextContent("Copied");
+  await expect.element(screen.getByRole("button", { name: "Copied as Markdown" })).toBeVisible();
 });
 
 test("a notice is set apart from messages", async () => {

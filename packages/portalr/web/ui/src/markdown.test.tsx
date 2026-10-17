@@ -150,7 +150,7 @@ test("a fenced block names its language, scrolls in a region a keyboard reaches,
   expect(region.element().tabIndex).toBe(0);
   const pre = region.element().querySelector("pre") as Element;
   expect(getComputedStyle(pre).whiteSpace).toBe("pre");
-  const wrap = screen.getByRole("button", { name: "Wrap" });
+  const wrap = screen.getByRole("button", { name: "Wrap the ts code" });
   await wrap.click();
   await expect.element(wrap).toHaveAttribute("aria-pressed", "true");
   expect(getComputedStyle(pre).whiteSpace).toBe("pre-wrap");
@@ -162,7 +162,8 @@ test("Copy copies a block's code as it was written, and says so politely", async
   const screen = await render(<Markdown>{"```py\nprint('<b>hi</b>')\n```"}</Markdown>);
   await screen.getByRole("button", { name: "Copy the py code" }).click();
   expect(written).toHaveBeenCalledWith("print('<b>hi</b>')");
-  await expect.element(screen.getByRole("status")).toHaveTextContent("Copied");
+  await expect.element(screen.getByRole("button", { name: "Copied the py code" })).toBeVisible();
+  await expect.element(screen.getByRole("status")).toHaveTextContent("Copied the py code");
 });
 
 test("where there's no clipboard, Copy says it couldn't", async () => {
@@ -170,7 +171,8 @@ test("where there's no clipboard, Copy says it couldn't", async () => {
   onTestFinished(() => written.mockRestore());
   const screen = await render(<Markdown>{"```\nplain\n```"}</Markdown>);
   await screen.getByRole("button", { name: "Copy the code" }).click();
-  await expect.element(screen.getByRole("status")).toHaveTextContent("Couldn't copy");
+  await expect.element(screen.getByRole("status")).toHaveTextContent("Couldn't copy the code");
+  await expect.element(screen.getByRole("region", { name: "Code" })).toHaveTextContent("plain");
 });
 
 test("a diagram shows as its source with one quiet line, whether diagrams are off or on", async () => {
@@ -270,7 +272,10 @@ test("every element, together, has nothing axe finds wrong", async () => {
   expect(await axeViolations(screen.container)).toEqual([]);
 });
 
-test("streamed a character at a time, it never shows a half-written mark or a stray link", async () => {
+// About 1,400 renders, each awaited: the time is the renders', not a wait.
+test("streamed a character at a time, it never shows a half-written mark or a stray link", {
+  timeout: 60_000,
+}, async () => {
   const screen = await render(<Markdown streaming>{""}</Markdown>);
   for (let end = 1; end <= GALLERY.length; end += 1) {
     await screen.rerender(<Markdown streaming>{GALLERY.slice(0, end)}</Markdown>);

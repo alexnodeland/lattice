@@ -18,7 +18,9 @@ afterAll(() => browser.close());
 
 /** A page on the harness, and what it has reported: each violation of the policy, and each error. */
 async function opened(): Promise<{ page: Page; reported: () => Promise<string[]> }> {
-  const page = await browser.newPage();
+  // The clipboard is the page's to write, so Copy copies, as it does for a person.
+  const context = await browser.newContext({ permissions: ["clipboard-read", "clipboard-write"] });
+  const page = await context.newPage();
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(`error: ${error.message}`));
   page.on("console", (message) => {
@@ -58,7 +60,7 @@ test("the harness sees a violation: an inline style, and a style element, each r
   const seen = await reported();
   expect(seen.some((line) => line.startsWith("style-src-attr:"))).toBe(true);
   expect(seen.some((line) => line.startsWith("style-src-elem:"))).toBe(true);
-  await page.close();
+  await page.context().close();
 });
 
 test("every element renders under the policy", async () => {
@@ -69,7 +71,7 @@ test("every element renders under the policy", async () => {
   );
   expect(await page.getByRole("note").count()).toBe(5);
   expect(await reported()).toEqual([]);
-  await page.close();
+  await page.context().close();
 });
 
 test("every element, streamed a character at a time, renders under the policy", async () => {
@@ -77,19 +79,23 @@ test("every element, streamed a character at a time, renders under the policy", 
   await page.evaluate((text) => window.stream(text), GALLERY);
   expect(await page.getByRole("note").count()).toBe(5);
   expect(await reported()).toEqual([]);
-  await page.close();
+  await page.context().close();
 });
 
 test("a block's controls work under the policy: Wrap, and Copy", async () => {
   const { page, reported } = await opened();
   await page.evaluate((text) => window.show(text), GALLERY);
-  await page.getByRole("button", { name: "Wrap" }).first().click();
+  await page.getByRole("button", { name: "Wrap the ts code" }).click();
   await page.getByRole("button", { name: "Copy the ts code" }).click();
   await expect(
-    page.getByRole("button", { name: "Wrap" }).first().getAttribute("aria-pressed"),
+    page.getByRole("button", { name: "Wrap the ts code" }).getAttribute("aria-pressed"),
   ).resolves.toBe("true");
+  await page.getByRole("button", { name: "Copied the ts code" }).waitFor();
+  await expect(page.evaluate(() => navigator.clipboard.readText())).resolves.toContain(
+    "export function greet",
+  );
   expect(await reported()).toEqual([]);
-  await page.close();
+  await page.context().close();
 });
 
 test("a diagram, with diagrams off or on, shows as its source under the policy", async () => {
@@ -103,7 +109,7 @@ test("a diagram, with diagrams off or on, shows as its source under the policy",
     expect(await page.getByRole("region", { name: "mermaid code" }).count()).toBe(1);
   }
   expect(await reported()).toEqual([]);
-  await page.close();
+  await page.context().close();
 });
 
 test.each(HOSTILE)(
@@ -114,6 +120,6 @@ test.each(HOSTILE)(
     await page.evaluate((hostile) => window.stream(hostile), text);
     expect(await page.locator("#root script, #root iframe, #root img").count()).toBe(0);
     expect(await reported()).toEqual([]);
-    await page.close();
+    await page.context().close();
   },
 );

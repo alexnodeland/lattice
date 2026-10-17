@@ -16,8 +16,6 @@ fileGroups:
     - 'scripts/**/*'
     - 'tests/**/*'
     - 'schemas/**/*'
-    # The policy ui's CSP tests serve, which a test holds to the router's.
-    - 'web/ui/csp/policy.txt'
     - 'pyproject.toml'
     - 'README.md'
     - 'LICENSE'
@@ -32,7 +30,8 @@ tasks:
     options:
       mergeInputs: 'replace'
   test:
-    inputs: ['@group(python)']
+    # And the policy ui's CSP tests serve, which a test holds to the router's.
+    inputs: ['@group(python)', 'web/ui/csp/policy.txt']
     options:
       mergeInputs: 'replace'
   # The wheel carries the two UIs, which Vite builds into src/portalr/static/.

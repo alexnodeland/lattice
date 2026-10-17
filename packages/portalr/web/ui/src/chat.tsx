@@ -163,7 +163,7 @@ export function Message({ message, author, thumbs = null, onThumbs }: MessagePro
       </span>
       <Markdown>{message.content}</Markdown>
       <div className="flex flex-wrap items-start gap-1">
-        <CopyButton text={message.content} label="Copy as Markdown" />
+        <CopyButton text={message.content} what="as Markdown" />
         {onThumbs && <Thumbs given={thumbs} onThumbs={onThumbs} />}
       </div>
     </li>

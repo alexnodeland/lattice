@@ -13,8 +13,6 @@ type Props = {
   language: string;
   /** One quiet line under the code, such as why an add-on's block shows as its source. */
   note?: ReactNode;
-  /** The code as drawn, such as highlighted; by default, the code as it is. */
-  children?: ReactNode;
 };
 
 /**
@@ -22,34 +20,36 @@ type Props = {
  * in a region that scrolls sideways and takes the focus, so a keyboard can scroll it too
  * (portalr ADR-0043).
  */
-export function CodeBlock({ code, language, note, children }: Props) {
+export function CodeBlock({ code, language, note }: Props) {
   const [wrapped, setWrapped] = useState(false);
-  const named = language || "Code";
+  const named = language ? `${language} code` : "Code";
+  const what = language ? `the ${language} code` : "the code";
   return (
     <div className="flex min-w-0 flex-col rounded-md border border-line bg-paper">
       <div className="flex items-center justify-between gap-2 border-line border-b py-1 pr-1 pl-3">
-        <span className="font-mono text-muted text-xs">{named}</span>
+        <span className="font-mono text-muted text-xs">{language || "Code"}</span>
         <span className="flex gap-1">
           <Button
             variant="ghost"
             size="sm"
+            aria-label={`Wrap ${what}`}
             aria-pressed={wrapped}
             onClick={() => setWrapped(!wrapped)}
           >
             <Icon icon={WrapText} className="size-3.5" />
             Wrap
           </Button>
-          <CopyButton text={code} label={`Copy the ${language ? `${language} ` : ""}code`} />
+          <CopyButton text={code} what={what} />
         </span>
       </div>
-      <ScrollRegion aria-label={`${named} code`} className="outline-offset-[-2px]">
+      <ScrollRegion aria-label={named} className="outline-offset-[-2px]">
         <pre
           className={cn(
             "m-0 px-3 py-2 font-mono text-fg text-sm [font-variant-ligatures:none]",
             wrapped ? "whitespace-pre-wrap break-words" : "whitespace-pre",
           )}
         >
-          <code>{children ?? code}</code>
+          <code>{code}</code>
         </pre>
       </ScrollRegion>
       {note && <p className="border-line border-t px-3 py-1.5 text-muted text-xs">{note}</p>}

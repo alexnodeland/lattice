@@ -8,37 +8,40 @@ const SHOWN_MS = 2000;
 
 /**
  * Copy `text` as it is: a small button whose words say it (`Copy`, then `Copied` or `Couldn't
- * copy`), named in full for assistive technology by `label`, with what happened said politely. Where
- * the page has no clipboard, as outside a secure context, it says it couldn't.
+ * copy`), named in full with `what` (`Copy the ts code`), so its name always holds its words, with
+ * what happened said politely each time. Where the page has no clipboard, as outside a secure
+ * context, it says it couldn't.
  */
-export function CopyButton({ text, label }: { text: string; label: string }) {
-  const [copied, setCopied] = useState<boolean | null>(null);
+export function CopyButton({ text, what }: { text: string; what: string }) {
+  // Each copy is a new object, so a second within the time is said again, and shown for the time.
+  const [copy, setCopy] = useState<{ readonly said: string } | null>(null);
   useEffect(() => {
-    if (copied === null) {
+    if (copy === null) {
       return;
     }
-    const again = setTimeout(() => setCopied(null), SHOWN_MS);
+    const again = setTimeout(() => setCopy(null), SHOWN_MS);
     return () => clearTimeout(again);
-  }, [copied]);
-  const said = copied === null ? "" : copied ? "Copied" : "Couldn't copy";
+  }, [copy]);
+  const said = copy?.said ?? "Copy";
   return (
     <>
       <Button
         variant="ghost"
         size="sm"
-        aria-label={label}
+        aria-label={`${said} ${what}`}
         onClick={() => {
+          // From a promise, so a page with no `navigator.clipboard` at all is caught as well.
           Promise.resolve()
             .then(() => navigator.clipboard.writeText(text))
-            .then(() => setCopied(true))
-            .catch(() => setCopied(false));
+            .then(() => setCopy({ said: "Copied" }))
+            .catch(() => setCopy({ said: "Couldn't copy" }));
         }}
       >
-        <Icon icon={copied ? Check : Copy} className="size-3.5" />
-        {said || "Copy"}
+        <Icon icon={copy?.said === "Copied" ? Check : Copy} className="size-3.5" />
+        {said}
       </Button>
       <span role="status" className="sr-only">
-        {said}
+        {copy && `${copy.said} ${what}`}
       </span>
     </>
   );

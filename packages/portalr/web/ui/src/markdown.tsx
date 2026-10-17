@@ -100,7 +100,7 @@ const CALLOUT: Record<Callout, { readonly tone: AlertTone; readonly word: string
 };
 
 /** The add-on whose fences each language is, which shows a fence as its source while it can't draw. */
-const ADDON_OF: Readonly<Partial<Record<string, keyof Addons>>> = { mermaid: "mermaid" };
+const ADDON_OF: ReadonlyMap<string, keyof Addons> = new Map([["mermaid", "mermaid"]]);
 
 /** The quiet line under an add-on's fence that shows as its source: off, or on but not drawn yet. */
 const UNDRAWN: Record<keyof Addons, Record<"off" | "on", string>> = {
@@ -117,7 +117,7 @@ const LANGUAGE = /(?:^|\s)language-(\S+)/;
 function Fenced({ className, children }: { className?: string | undefined; children?: ReactNode }) {
   const addons = useAddons();
   const language = LANGUAGE.exec(className ?? "")?.[1] ?? "";
-  const addon = ADDON_OF[language];
+  const addon = ADDON_OF.get(language);
   // Markdown closes a block's code with a line end, which isn't the code's.
   const code = typeof children === "string" ? children.replace(/\n$/, "") : "";
   return (

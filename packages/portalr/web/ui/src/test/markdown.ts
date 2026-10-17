@@ -69,4 +69,6 @@ export const HOSTILE = [
   "> [!NOTE]\n> <img src=x onerror=alert(1)>",
   '```mermaid\nflowchart LR\n  A["<img src=x onerror=alert(1)>"] --> B\n  click A "javascript:alert(1)"\n```',
   "[^x]\n\n[^x]: <script>alert(1)</script>",
+  // A language named for what every object has, which a lookup by name must not find.
+  "```constructor\nx\n```\n\n```__proto__\ny\n```\n\n```toString\nz\n```",
 ] as const;

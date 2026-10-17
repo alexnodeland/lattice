@@ -61,6 +61,8 @@ telemetry = configure_telemetry(reflexr.otel.telemetry(), service_name="app")
 
 `artifactr.otel.telemetry()` is artifactr's contribution, and `configure_telemetry` always adds it. Each contribution brings its library's metric views, a span filter for its traces, and the instrumentations it advises. `configure_telemetry` installs every library's views, instruments what any of them advises, and, with Langfuse, keeps a span that any of them keeps. reflexr's `configure_telemetry` takes artifactr's contribution the same way, so either library's will do. An application can contribute its own metric views too, with a `Contribution`.
 
+A second `configure_telemetry` while the first handle is not shut down would build a second set of providers beside the first, patch the instrumented libraries again and add a second handler to the root logger, so it warns, with a `RuntimeWarning` that names the live handle's service. Configure once, with every contribution, or shut the first handle down before configuring again.
+
 ### Configuring the SDK yourself
 
 `configure_telemetry` is a convenience; artifactr only ever records through the OpenTelemetry API, so any SDK configuration works. `Workspaces`, `Runner` and `artifactr_router` use the global providers, or the ones you pass as `tracer_provider=` and `meter_provider=`. Add pydantic-ai's capability yourself, `Instrumentation(settings=InstrumentationSettings(tracer_provider=..., meter_provider=...))`, and every library's `metric_views(detail)` to your `MeterProvider` to limit metric detail. Keep a parent-based sampler, the SDK's default, so that polling stays untraced (see [Polling](#polling)). Never call `Agent.instrument_all()` from a library; it instruments every agent in the process.

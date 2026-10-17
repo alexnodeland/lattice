@@ -10,6 +10,7 @@ import importlib.util
 import logging
 import os
 import re
+import warnings
 from collections.abc import Callable, Collection, Mapping, MutableMapping, Sequence
 from types import TracebackType
 from typing import TYPE_CHECKING, Any, Final, Literal, Self, cast
@@ -80,6 +81,10 @@ _EXCLUDED_ASGI_SPANS: list[Literal["receive", "send"]] = ["receive", "send"]
 _SKIP_SQLALCHEMY_VERSION_CHECK = True
 """The SQLAlchemy instrumentation declares support below 2.1, which the libraries require, but
 works with 2.1 (the tests check), so its version check is skipped."""
+
+
+_LIVE: dict["TelemetryHandle", str] = {}
+"""Each handle ``configure_telemetry`` returned that is not shut down yet, and its service."""
 
 
 def installed() -> set[Instrumented]:
@@ -235,6 +240,7 @@ class TelemetryHandle:
         if self._shut_down:
             return
         self._shut_down = True
+        _LIVE.pop(self, None)
         cleanups, self._cleanups = self._cleanups, []
         # Each cleanup runs once, even when an engine re-instrumented SQLAlchemy.
         for cleanup in dict.fromkeys(reversed(cleanups)):
@@ -280,9 +286,10 @@ def configure_telemetry(
     """Set up OpenTelemetry for an application: providers, OTLP export and instrumentation.
 
     Call it once per process, with every contribution: a second call builds a second set of
-    providers beside the first. A library's own ``configure_telemetry`` passes the application's
-    contributions first and its own last, so an application's contribution of the same name
-    wins. It sets up:
+    providers beside the first, patches the instrumented libraries again and adds a second
+    handler to the root logger, so it warns while a handle it returned is not shut down. A
+    library's own ``configure_telemetry`` passes the application's contributions first and its
+    own last, so an application's contribution of the same name wins. It sets up:
 
     - tracer, meter and logger providers, with ``service.name``, ``service.version`` and
       ``deployment.environment.name`` on their resource
@@ -330,7 +337,18 @@ def configure_telemetry(
 
     Returns:
         A handle that shuts it all down.
+
+    Warns:
+        RuntimeWarning: If a handle it returned before is not shut down yet.
     """
+    if _LIVE:
+        live = ", ".join(repr(name) for name in _LIVE.values())
+        warnings.warn(
+            f"configure_telemetry is called while the telemetry it set up for {live} is live: "
+            "configure once, with every contribution, or shut the first handle down",
+            RuntimeWarning,
+            stacklevel=2,
+        )
     chosen = _one_per_name(contributions)
     attributes = {
         "service.name": service_name,
@@ -391,7 +409,7 @@ def configure_telemetry(
     advised: set[Instrumented] = {
         name for name in installed() if any(name in each.instrument for each in chosen)
     }
-    return TelemetryHandle(
+    handle = TelemetryHandle(
         tracer_provider=tracer_provider,
         meter_provider=meter_provider,
         logger_provider=logger_provider,
@@ -406,6 +424,8 @@ def configure_telemetry(
         log_handler=log_handler,
         langfuse=client,
     )
+    _LIVE[handle] = service_name
+    return handle
 
 
 def _one_per_name(

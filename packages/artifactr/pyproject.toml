@@ -43,10 +43,10 @@ langfuse = [
     "langfuse>=4.15,<5",
     # The score mapping and ports that artifactr.scores' mirror builds on, and evalr.langfuse's
     # score adapters, which send the mirror's scores to Langfuse.
-    "evalr[langfuse]>=0.1.0.dev0",
+    "evalr[langfuse]>=0.1.0",
 ]
 litellm = ["lattice-core-ai[litellm]>=0.1.0"]
-evals = ["evalr>=0.1.0.dev0"]
+evals = ["evalr>=0.1.0"]
 
 [project.urls]
 Homepage = "https://lattice.alexnodeland.com/artifactr/"

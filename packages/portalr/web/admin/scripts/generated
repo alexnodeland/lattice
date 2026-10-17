@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# admin's scenarios for a generated application (portalr ADR-0040): the few that hold for one,
+# in bdd/generated/. The application is already running, started by stackr's smoke test, which
+# names it in PORTALR_APP_URL and has made the people they sign in as. This starts and stops
+# nothing, so Chromium's requests are not in flight while a container's network comes or goes
+# (lattice ADR-0002).
+#
+# Usage, from the app's directory, after `bun install` and `moon run ui:chromium`:
+#   PORTALR_APP_URL=http://127.0.0.1:8800 scripts/generated
+set -euo pipefail
+: "${PORTALR_APP_URL:?PORTALR_APP_URL names the running application}"
+export PORTALR_FEATURES='bdd/generated/*.feature'
+bun x --bun --no-install bddgen
+bun x --bun --no-install playwright test

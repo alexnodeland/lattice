@@ -1,6 +1,6 @@
 # ADR-0055: Turns from the log
 
-**Status:** Accepted; its batching amended by [ADR-0057](0057-a-turn-acts-for-one-author.md)
+**Status:** Accepted; its batching amended by [ADR-0057](0057-a-turn-acts-for-one-author.md), its claim by [ADR-0069](0069-a-claim-fences-the-writes-that-consume.md) and the amendment below
 **Date:** 2026-09-30
 **Deciders:** Alex Nodeland
 
@@ -154,3 +154,13 @@ And it still misses the stretch between the agent's run ending and its end being
 ## Amendment (2026-10-12): one author per turn
 
 A turn takes messages only up to the first from another author ([ADR-0057](0057-a-turn-acts-for-one-author.md)). The watcher stops at that message before marking it delivered, so I1 and I2 hold: the message stays untaken, and the run's hand-over starts the next turn with it. A resumed run acts for whoever answered it last, and takes the log only up to just before the first message from someone else.
+
+## Amendment (2026-10-16): what TLC found in the claim
+
+TLC, checking the thread claim's spec ([`docs/artifactr/spec/`](../spec/README.md), [lattice ADR-0025](../../adr/0025-formal-specs-in-tla-and-lean.md)), found three ways the code broke I1 and I3, each fixed with the property that found it now checked in CI:
+
+- **A claim that lapsed under a live holder let two runs take one prompt** ([lattice #249](https://github.com/alexnodeland/lattice/issues/249)): `I1_ConsumedAtMostOnce` and `I3_OneActiveRun`. [ADR-0069](0069-a-claim-fences-the-writes-that-consume.md) fences `run_started` and the reply's answers by the claim, in their transactions, so they no longer rest on the holder finding its claim lost in time. The one exception above stands, and is still the only one a lapse makes.
+- **A claim granted to a call that was cancelled was never released** ([lattice #250](https://github.com/alexnodeland/lattice/issues/250)): `I3_ClaimHasATask`. SQL storage runs `acquire_lease` to its end and raises the cancellation after it, which `claim_thread` raised before its `try`. Now `claim_thread` releases a claim whose acquiring call failed or was cancelled, before it raises, as the storage protocol says such a call may have taken effect.
+- **A send cancelled between its ask and its claim handed nothing over** ([lattice #251](https://github.com/alexnodeland/lattice/issues/251)): `I3_NoStrandedAsk`. `_take`'s reads, and `_ask`'s save, came before the `try` that hands over. Now `_take` saves the ask and reads inside it, so a call cancelled anywhere from its ask on hands the thread over. One that failed there hands over what was asked after it read, as I4 says, and it has read nothing yet.
+
+A message asked while the thread's holder dies still waits for the thread's next command ([lattice #252](https://github.com/alexnodeland/lattice/issues/252)), and a crash gives a dead run's steering to the model again ([lattice #257](https://github.com/alexnodeland/lattice/issues/257)); both are left for a decision.

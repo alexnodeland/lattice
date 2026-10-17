@@ -10,7 +10,7 @@ With access asked in every workspace method ([ADR-0056](0056-access-asked-in-eve
 
 The `Runner` also took every message not yet taken into one turn ([ADR-0055](0055-turns-from-the-log.md)): the first as the prompt, the rest through the run's watcher, or all of them beside a resumed run's answers. Once a turn is checked as the person it acts for, that would let one person's message ride on another's rights: a viewer's message steering an editor's run.
 
-[lattice RFC-0001](../../rfcs/0001-grantr-identity-and-access.md) decides that a turn acts for the user whose message started it (D4). In the work codebase this family grew beside, one agent tool checked a thread's owner instead of the user acting, so a viewer inherited the owner's writes.
+[lattice RFC-0001](../../rfcs/0001-grantr-identity-and-access.md) decides that a turn acts for the user whose message started it (D4). In the work codebase lattice grew beside, one agent tool checked a thread's owner instead of the user acting, so a viewer inherited the owner's writes.
 
 ## Decision
 

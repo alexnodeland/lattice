@@ -35,7 +35,7 @@ Other questions were new: how the two libraries share one application, how feedb
 ### Around the application
 
 - **Evals:** `evals/` holds starter experiments with evalr, whose evaluators' verdicts are the application's own feedback types: the notes agent's replies, and the triage rule replayed against the triage agent with reflexr's `replay_task`. They run offline with a scripted model and an in-memory tracker, or in Langfuse with the gateway's model.
-- **Quality gates, as in the family:** uv, ruff, pyright in strict mode with no inline suppressions, pytest with warnings as errors and 100% branch coverage, pre-commit with Conventional Commits, and CI that runs them and builds the image. Tests need no network: tokens are signed in the test, and the model is scripted.
+- **Quality gates, as in lattice:** uv, ruff, pyright in strict mode with no inline suppressions, pytest with warnings as errors and 100% branch coverage, pre-commit with Conventional Commits, and CI that runs them and builds the image. Tests need no network: tokens are signed in the test, and the model is scripted.
 - **The `app` profile is the application's own Compose file.** Its service joins the `stackr` network and local Supabase's, where the stack's addresses are fixed; `.env` holds the addresses this machine uses, for `make serve`, and `STACK_DATABASE_URL` names another database for the profile. The image is built in two stages, the first with git for the libraries' sources.
 
 ### Validation

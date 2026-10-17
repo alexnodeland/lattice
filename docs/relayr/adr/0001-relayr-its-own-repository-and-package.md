@@ -15,7 +15,7 @@ artifactr and reflexr are independent siblings: neither imports the other, and t
 - **The bridge is a new sibling repository and package, relayr**, depending on artifactr and reflexr through their public APIs only.
 - **It holds** the two adapters, the bridged event types, and the ledger with its in-memory and SQL adapters; later, the `rule` artifact type and the install rule, the proposal-outcome evaluator, and the telemetry links and tags.
 - **stackr's template wires it in** through a `bridge` question in its `both` variant, pinned by revision like the libraries.
-- **The name is relayr**: it relays events and commands between the two libraries, and fits the family's names. `bridgr` and `linkr` were considered; "link" already means trace and span links in this design.
+- **The name is relayr**: it relays events and commands between the two libraries, and fits lattice's names. `bridgr` and `linkr` were considered; "link" already means trace and span links in this design.
 
 ## Options considered
 

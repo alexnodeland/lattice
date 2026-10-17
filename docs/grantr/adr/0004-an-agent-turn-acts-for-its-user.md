@@ -8,7 +8,7 @@ Records decision D4 of [lattice RFC-0001][rfc], identity and access.
 
 ## Context
 
-A thread's agent writes on behalf of whoever is chatting. If it were checked with its own grants, a viewer could make it edit; in the work codebase this family grew beside, a tool that checked a thread's owner instead of the user acting let a viewer inherit the owner's writes.
+A thread's agent writes on behalf of whoever is chatting. If it were checked with its own grants, a viewer could make it edit; in the work codebase lattice grew beside, a tool that checked a thread's owner instead of the user acting let a viewer inherit the owner's writes.
 
 ## Decision
 

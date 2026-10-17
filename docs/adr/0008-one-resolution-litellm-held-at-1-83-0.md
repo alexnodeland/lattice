@@ -6,7 +6,7 @@
 
 ## Context
 
-[RFC-0003](../stackr/rfcs/0003-one-repository-lattice.md#the-uv-workspace) gives the family one `uv.lock`, so every package must agree on every third-party range, and said they did. The rehearsal found they resolve together at one cost. evalr's `[dspy]` extra brings DSPy, and DSPy brings litellm. Every litellm after 1.83.0 pins `openai<3`, while the libraries' extras bring `pydantic-ai-slim[openai]`, which needs `openai>=3.19`. In one resolution, uv settles on litellm 1.83.0.
+[RFC-0003](../stackr/rfcs/0003-one-repository-lattice.md#the-uv-workspace) gives lattice one `uv.lock`, so every package must agree on every third-party range, and said they did. The rehearsal found they resolve together at one cost. evalr's `[dspy]` extra brings DSPy, and DSPy brings litellm. Every litellm after 1.83.0 pins `openai<3`, while the libraries' extras bring `pydantic-ai-slim[openai]`, which needs `openai>=3.19`. In one resolution, uv settles on litellm 1.83.0.
 
 That version has 13 advisories, all in litellm's proxy server. lattice never runs it: it installs litellm only as DSPy's SDK, through evalr's `[dspy]` extra and docplan's. stackr's gateway runs LiteLLM's own image, pinned in its `compose.yaml`, not this package. osv-scanner reports two more things that don't apply: diskcache 5.6.3, which DSPy uses, unpickles what its cache directory holds, and no fixed version exists; and a package on PyPI named `oncall`, unrelated to lattice's example, matches its name.
 

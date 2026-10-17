@@ -241,3 +241,9 @@ async def test_a_failed_read_is_an_absence_not_an_exception() -> None:
     auth = Auth({"u1": "ada@acme.com"})
     auth.script["u1"] = httpx.ConnectError("down ada@acme.com")
     assert await auth.people()(["u1"]) == {}
+
+
+def test_the_secret_key_is_not_in_its_repr() -> None:
+    assert "sb_secret_key" not in repr(
+        SupabasePeople(url="http://auth", secret_key="sb_secret_key")
+    )

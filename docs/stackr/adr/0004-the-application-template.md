@@ -18,7 +18,7 @@ Doing that by hand is where applications diverge and where mistakes hide.
 
 ## Decision
 
-- stackr includes a **Copier template** that generates an application using artifactr, reflexr or both, wired to the stack, with a dev container, CI and the family's quality gates.
+- stackr includes a **Copier template** that generates an application using artifactr, reflexr or both, wired to the stack, with a dev container, CI and lattice's quality gates.
 - **`copier update`** brings later template improvements into generated applications.
 - The template is tested in CI by generating an application and running its checks and the stack's smoke test.
 

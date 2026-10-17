@@ -416,3 +416,39 @@ def test_every_decision_record_is_in_the_navigation() -> None:
     nav = text(".nav.yml")
     records = sorted(path.name for path in (DOCS / "adr").glob("0*.md"))
     assert [name for name in records if f"adr/{name}" not in nav] == []
+
+
+def test_the_template_names_people_as_the_guides_say() -> None:
+    """stackr's template passes ``people=`` with what invitations need; the guides say so."""
+    template = ROOT / "packages" / "stackr" / "template" / "src" / "{{ package_name }}"
+    portal = (template / "{% if use_portal %}portal.py{% endif %}.jinja").read_text()
+    assert "people=people(self._settings, self._clients)" in portal
+    assert "url, key = settings.portal.auth_url, settings.auth.service_role_key" in portal
+    assert 'SupabasePeople(url=url.rstrip("/"), secret_key=key, client=client)' in portal
+    assert "doesn't pass yet" not in text("guides/privacy.md")
+    assert "passes it whenever the application has the gateway's address" in text(
+        "guides/privacy.md"
+    )
+
+
+def test_the_size_budgets_are_the_adrs() -> None:
+    """ADR-0040 states the ceilings in size-budget.json, and sizes they are a little above."""
+    budgets = json.loads((ROOT / "packages" / "portalr" / "size-budget.json").read_text())
+    adr = text("adr/0040-scenarios-against-a-generated-application-and-size-budgets.md")
+    assert sorted(budgets) == ["admin", "app"]
+    measures = ("initial", "total", "largest")
+    for measure in measures:
+        assert f"`{measure}`" in adr, measure
+    sizes = re.search(r"Sizes at the time: (.+?)\. Ceilings: (.+?)\.", adr)
+    assert sizes, "the ADR states the sizes and the ceilings"
+    for ui in budgets:
+        stated = {}
+        for label, line in zip(("sizes", "ceilings"), sizes.groups(), strict=True):
+            found = re.search(rf"{ui} (\d+) / (\d+) / (\d+) kB", line)
+            assert found, f"{ui}'s {label}"
+            stated[label] = [int(n) * 1000 for n in found.groups()]
+        for measure, size, ceiling in zip(
+            measures, stated["sizes"], stated["ceilings"], strict=True
+        ):
+            assert budgets[ui][measure] == ceiling, (ui, measure)
+            assert size <= ceiling <= size * 1.25, (ui, measure)

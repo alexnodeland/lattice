@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# Model-checks a TLA+ spec with TLC, once for each configuration (lattice ADR-0025).
+#
+# Usage: scripts/tlc SPEC.tla CONFIG.cfg...   (each configuration beside the spec)
+#
+# TLC is tla2tools.jar from the tlaplus/tlaplus release that tlc.sha256, beside this script, names,
+# with the SHA-256 it records. The jar is downloaded once into TLC_CACHE: to a temporary file of
+# the run's own, checked, then renamed into place, so runs at once never see each other's partial
+# download, and a jar with other bytes never runs. It needs Java 11 or later, which CI sets up.
+# A violated property, or a run that can't finish, fails it.
+
+set -euo pipefail
+
+read -r SHA256 NAME <"$(dirname "${BASH_SOURCE[0]}")/tlc.sha256"
+VERSION=${NAME#tla2tools-}
+VERSION=${VERSION%.jar}
+readonly SHA256 NAME VERSION
+readonly URL="https://github.com/tlaplus/tlaplus/releases/download/v$VERSION/tla2tools.jar"
+
+spec=$(realpath "${1:?usage: scripts/tlc SPEC.tla CONFIG.cfg...}")
+shift
+[[ $# -gt 0 ]] || { echo "tlc: name at least one configuration" >&2; exit 2; }
+
+cache=${TLC_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/lattice-tlc}
+jar="$cache/$NAME"
+mkdir -p "$cache"
+scratch=$(mktemp -d)
+part=""
+trap 'rm -rf "$scratch" ${part:+"$part"}' EXIT
+
+verified() {
+  local sum
+  if command -v sha256sum >/dev/null; then sum=$(sha256sum "$1"); else sum=$(shasum -a 256 "$1"); fi
+  if [[ ${sum%% *} != "$SHA256" ]]; then
+    echo "tlc: $1 is not $NAME (sha256 ${sum%% *}); remove it to download it again" >&2
+    return 1
+  fi
+}
+
+if [[ ! -f $jar ]]; then
+  part=$(mktemp "$jar.XXXXXX")
+  curl --fail --silent --show-error --location --retry 5 --retry-all-errors --output "$part" "$URL"
+  verified "$part"
+  mv -f "$part" "$jar"
+  part=""
+fi
+verified "$jar"
+
+# TLC's states go to the run's own directory, never beside the spec.
+cd "$(dirname "$spec")"
+for config in "$@"; do
+  echo "tlc: $(basename "$spec") with $config"
+  java -XX:+UseParallelGC -cp "$jar" tlc2.TLC -workers auto -cleanup \
+    -metadir "$scratch/${config%.cfg}" -config "$config" "$(basename "$spec")"
+done

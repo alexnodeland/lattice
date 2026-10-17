@@ -2,7 +2,10 @@
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from datetime import timedelta
 from typing import Any
+
+from opentelemetry.metrics import MeterProvider
 
 import reflexr
 import reflexr.workspace as r
@@ -41,7 +44,12 @@ class Following:
     workspaces: r.Workspaces
     trackers: Trackers
     followers: TrackerFollowers
+    actions: Mapping[str, r.Action[Trackers]]
     reactions: int = field(default=0)
+
+    def reactor(self) -> r.Reactor[Trackers]:
+        """A reactor that runs the rules' actions, with the connector as their dependency."""
+        return r.Reactor(self.workspaces, actions=self.actions, deps=self.trackers)
 
     async def poll(self, workspace: WorkspaceKey = KEY) -> bool:
         return await self.followers.poll(*workspace)
@@ -61,9 +69,9 @@ class Following:
         self.reactions += 1
         handle = await self.workspaces.open(*workspace, actor=reflexr.SourceActor(name="ci"))
         await handle.publish(Deployed(service=f"svc-{self.reactions}"))
-        await r.Reactor(self.workspaces, actions={"file": _idle}, deps=None).evaluate()
+        await self.reactor().evaluate()
         run = max(await handle.runs(), key=lambda run: run.fired_seq)
-        reaction = r.Reaction(workspace=handle, run=run, rule=FILE, events=(), deps=None)
+        reaction = r.Reaction(workspace=handle, run=run, rule=FILE, events=(), deps=self.trackers)
         return self.trackers.acting(reaction)
 
     async def filed(self, key: str, title: str = "A run failed") -> ItemRef:
@@ -72,7 +80,7 @@ class Following:
         return item
 
 
-async def _idle(reaction: r.Reaction[None]) -> None:
+async def _idle(reaction: r.Reaction[Trackers]) -> None:
     """The rule's action, which these tests never run: they act through its reactions."""
 
 
@@ -86,13 +94,16 @@ def following(
     budget: int = 40,
     projections: Mapping[WorkspaceKey, TrackerProjection] | None = None,
     rules: Rules = (),
+    actions: Mapping[str, r.Action[Trackers]] | None = None,
     events: Sequence[type[reflexr.Event]] = (),
     holder: str = "p1",
     allowlists: Mapping[str, Allowlist] = ALLOWED,
     tenant: Tenant | None = None,
     storage: r.InMemoryStorage | None = None,
     max_depth: int = 8,
-    **options: Any,
+    interval: timedelta = timedelta(seconds=30),
+    lease_ttl: timedelta = timedelta(seconds=30),
+    meter_provider: MeterProvider | None = None,
 ) -> Following:
     """A process that follows the bound workspace, its storage shared if given."""
     tracker = tracker or FakeTracker(clock=clock)
@@ -118,9 +129,19 @@ def following(
         clock=clock,
     )
     followers = TrackerFollowers(
-        trackers, workspaces, projections=projections, holder=holder, clock=clock, **options
+        trackers,
+        workspaces,
+        projections=projections,
+        holder=holder,
+        interval=interval,
+        lease_ttl=lease_ttl,
+        clock=clock,
+        meter_provider=meter_provider,
     )
-    return Following(tracker, ledger, clock, tenant, storage, workspaces, trackers, followers)
+    every = {"file": _idle, **(actions or {})}
+    return Following(
+        tracker, ledger, clock, tenant, storage, workspaces, trackers, followers, every
+    )
 
 
 def changes(events: Sequence[TrackerEvent]) -> list[tuple[Any, ...]]:
@@ -138,3 +159,11 @@ def changes(events: Sequence[TrackerEvent]) -> list[tuple[Any, ...]]:
             case _:
                 found.append(("created", event.item_id, said["title"]))
     return found
+
+
+class Elsewhere(reflexr.Event, abstract=True, event_namespace="elsewhere"):
+    """A namespace reflexr's workspaces here don't accept."""
+
+
+class Odd(Elsewhere, name="odd"):
+    """An event a projection may return, which reflexr refuses."""

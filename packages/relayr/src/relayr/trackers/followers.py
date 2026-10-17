@@ -284,7 +284,8 @@ class TrackerFollowers:
                 await asyncio.wait_for(woken.wait(), min(self._ttl.total_seconds() / 3, left))
             if not await self._may(workspace):
                 return False
-        await asyncio.sleep(max(0.0, began + DEBOUNCE.total_seconds() - loop.time()))
+        if woken.is_set():
+            await asyncio.sleep(max(0.0, began + DEBOUNCE.total_seconds() - loop.time()))
         return await self._may(workspace)
 
     async def _poll(
@@ -387,12 +388,10 @@ class _Reading:
             swept = await self._removed({i: s for i, s in snapshots.items() if i not in listed})
         else:
             swept = False
-        if whole:
-            cursor = page.next
-        elif read:
+        # The ledger keeps the furthest cursor: one read behind it, or none, moves nothing.
+        cursor = page.next if whole else None
+        if not whole and read:
             cursor = Cursor(updated_at=read[-1].updated_at, id=read[-1].ref.id)
-        else:
-            cursor = None if following is None else _cursor(following)
         await self.ledger.save_tracker_following(
             self.workspace,
             TrackerFollowing(
@@ -598,8 +597,3 @@ those until then are old, and published by no one."""
 def _back(cursor: tuple[datetime, str] | None) -> Cursor | None:
     """Where a poll reads from: a while before the cursor."""
     return None if cursor is None else Cursor(updated_at=cursor[0] - LOOK_BACK, id=cursor[1])
-
-
-def _cursor(following: TrackerFollowing) -> Cursor | None:
-    cursor = following.cursor
-    return None if cursor is None else Cursor(updated_at=cursor[0], id=cursor[1])

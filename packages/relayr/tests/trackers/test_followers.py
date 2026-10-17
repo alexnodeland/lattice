@@ -33,7 +33,7 @@ from relayr.trackers.events import (
 )
 from tests.clock import START, FakeClock
 from tests.trackers.conftest import BINDING, KEY, PROJECT, TENANT
-from tests.trackers.following import Following, changes, following
+from tests.trackers.following import Following, Odd, changes, following
 
 SECOND = timedelta(seconds=1)
 
@@ -257,6 +257,23 @@ async def test_the_sweep_publishes_what_left_the_list(app: Following) -> None:
     assert len(await app.events()) == 3
 
 
+async def test_removals_the_budget_has_no_request_for_wait_for_the_next_sweep(
+    ledger: Ledger, clock: FakeClock
+) -> None:
+    app = following(ledger, clock, budget=2)
+    first, second = await app.filed("dead-letter/a"), await app.filed("dead-letter/b")
+    clock.advance(timedelta(minutes=1))
+    await seeded(app)
+    app.tracker.delete(first)
+    app.tracker.delete(second)
+    clock.advance(timedelta(days=1))
+    assert await app.poll()  # the list, and one lookup
+    assert changes(await app.events()) == [("removed", first.id, True)]
+    clock.advance(timedelta(minutes=1))
+    assert await app.poll()  # still sweeping
+    assert changes(await app.events())[1:] == [("removed", second.id, True)]
+
+
 async def test_another_project_bound_starts_over(ledger: Ledger, clock: FakeClock) -> None:
     app = following(ledger, clock)
     app.tracker.add(PROJECT, "Ops")
@@ -356,6 +373,21 @@ async def test_an_item_lattice_did_not_file_starts_a_chain_of_its_own(app: Follo
     assert item.key is None
 
 
+async def test_a_chain_reflexr_no_longer_has_leaves_the_event_to_start_its_own(
+    ledger: Ledger, clock: FakeClock
+) -> None:
+    app = following(ledger, clock)
+    await seeded(app)
+    item = await app.filed("dead-letter/a")
+    assert await app.poll()
+    app.clock.advance(SECOND)
+    app.tracker.edit(item, ItemFields(title="Renamed"))
+    emptied = following(ledger, clock, tracker=app.tracker)  # reflexr's log, lost
+    assert await emptied.poll()
+    [changed] = await emptied.published()
+    assert changed.correlation_id == changed.id
+
+
 # ─── dead letters and projections ─────────────────────────────────────────────
 
 
@@ -402,12 +434,6 @@ async def test_a_projection_returning_reflexrs_own_event_dead_letters_it(
 
 
 async def test_a_type_reflexr_refuses_stops_the_follower(ledger: Ledger, clock: FakeClock) -> None:
-    class Unregistered(reflexr.Event, abstract=True, event_namespace="elsewhere"):
-        pass
-
-    class Odd(Unregistered, name="odd"):
-        pass
-
     app = following(ledger, clock, projections={KEY: lambda event: Odd()})
     await seeded(app)
     app.tracker.add(PROJECT, "Filed")

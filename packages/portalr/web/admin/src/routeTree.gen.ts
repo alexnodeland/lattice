@@ -16,6 +16,7 @@ import { Route as SignedTTenantIndexRouteImport } from './routes/_signed/t/$tena
 import { Route as SignedTTenantAccessRouteImport } from './routes/_signed/t/$tenant/access'
 import { Route as SignedTTenantAuditRouteImport } from './routes/_signed/t/$tenant/audit'
 import { Route as SignedTTenantFeedbackRouteImport } from './routes/_signed/t/$tenant/feedback'
+import { Route as SignedTTenantIntegrationsRouteImport } from './routes/_signed/t/$tenant/integrations'
 import { Route as SignedTTenantLogsRouteImport } from './routes/_signed/t/$tenant/logs'
 import { Route as SignedTTenantRunsRouteImport } from './routes/_signed/t/$tenant/runs'
 import { Route as SignedTTenantUsageRouteImport } from './routes/_signed/t/$tenant/usage'
@@ -92,6 +93,12 @@ const SignedTTenantFeedbackRoute = SignedTTenantFeedbackRouteImport.update({
   path: '/feedback',
   getParentRoute: () => SignedTTenantRoute,
 } as any)
+const SignedTTenantIntegrationsRoute =
+  SignedTTenantIntegrationsRouteImport.update({
+    id: '/integrations',
+    path: '/integrations',
+    getParentRoute: () => SignedTTenantRoute,
+  } as any)
 const SignedTTenantLogsRoute = SignedTTenantLogsRouteImport.update({
   id: '/logs',
   path: '/logs',
@@ -167,6 +174,7 @@ export interface FileRoutesByFullPath {
   '/t/$tenant/access': typeof SignedTTenantAccessRouteWithChildren
   '/t/$tenant/audit': typeof SignedTTenantAuditRoute
   '/t/$tenant/feedback': typeof SignedTTenantFeedbackRoute
+  '/t/$tenant/integrations': typeof SignedTTenantIntegrationsRoute
   '/t/$tenant/logs': typeof SignedTTenantLogsRoute
   '/t/$tenant/runs': typeof SignedTTenantRunsRoute
   '/t/$tenant/usage': typeof SignedTTenantUsageRoute
@@ -189,6 +197,7 @@ export interface FileRoutesByTo {
   '/deployment': typeof SignedDeploymentIndexRoute
   '/t/$tenant/audit': typeof SignedTTenantAuditRoute
   '/t/$tenant/feedback': typeof SignedTTenantFeedbackRoute
+  '/t/$tenant/integrations': typeof SignedTTenantIntegrationsRoute
   '/t/$tenant/logs': typeof SignedTTenantLogsRoute
   '/t/$tenant/runs': typeof SignedTTenantRunsRoute
   '/t/$tenant/usage': typeof SignedTTenantUsageRoute
@@ -216,6 +225,7 @@ export interface FileRoutesById {
   '/_signed/t/$tenant/access': typeof SignedTTenantAccessRouteWithChildren
   '/_signed/t/$tenant/audit': typeof SignedTTenantAuditRoute
   '/_signed/t/$tenant/feedback': typeof SignedTTenantFeedbackRoute
+  '/_signed/t/$tenant/integrations': typeof SignedTTenantIntegrationsRoute
   '/_signed/t/$tenant/logs': typeof SignedTTenantLogsRoute
   '/_signed/t/$tenant/runs': typeof SignedTTenantRunsRoute
   '/_signed/t/$tenant/usage': typeof SignedTTenantUsageRoute
@@ -243,6 +253,7 @@ export interface FileRouteTypes {
     | '/t/$tenant/access'
     | '/t/$tenant/audit'
     | '/t/$tenant/feedback'
+    | '/t/$tenant/integrations'
     | '/t/$tenant/logs'
     | '/t/$tenant/runs'
     | '/t/$tenant/usage'
@@ -265,6 +276,7 @@ export interface FileRouteTypes {
     | '/deployment'
     | '/t/$tenant/audit'
     | '/t/$tenant/feedback'
+    | '/t/$tenant/integrations'
     | '/t/$tenant/logs'
     | '/t/$tenant/runs'
     | '/t/$tenant/usage'
@@ -291,6 +303,7 @@ export interface FileRouteTypes {
     | '/_signed/t/$tenant/access'
     | '/_signed/t/$tenant/audit'
     | '/_signed/t/$tenant/feedback'
+    | '/_signed/t/$tenant/integrations'
     | '/_signed/t/$tenant/logs'
     | '/_signed/t/$tenant/runs'
     | '/_signed/t/$tenant/usage'
@@ -401,6 +414,13 @@ declare module '@tanstack/react-router' {
       path: '/feedback'
       fullPath: '/t/$tenant/feedback'
       preLoaderRoute: typeof SignedTTenantFeedbackRouteImport
+      parentRoute: typeof SignedTTenantRoute
+    }
+    '/_signed/t/$tenant/integrations': {
+      id: '/_signed/t/$tenant/integrations'
+      path: '/integrations'
+      fullPath: '/t/$tenant/integrations'
+      preLoaderRoute: typeof SignedTTenantIntegrationsRouteImport
       parentRoute: typeof SignedTTenantRoute
     }
     '/_signed/t/$tenant/logs': {
@@ -525,6 +545,7 @@ interface SignedTTenantRouteChildren {
   SignedTTenantAccessRoute: typeof SignedTTenantAccessRouteWithChildren
   SignedTTenantAuditRoute: typeof SignedTTenantAuditRoute
   SignedTTenantFeedbackRoute: typeof SignedTTenantFeedbackRoute
+  SignedTTenantIntegrationsRoute: typeof SignedTTenantIntegrationsRoute
   SignedTTenantLogsRoute: typeof SignedTTenantLogsRoute
   SignedTTenantRunsRoute: typeof SignedTTenantRunsRoute
   SignedTTenantUsageRoute: typeof SignedTTenantUsageRoute
@@ -537,6 +558,7 @@ const SignedTTenantRouteChildren: SignedTTenantRouteChildren = {
   SignedTTenantAccessRoute: SignedTTenantAccessRouteWithChildren,
   SignedTTenantAuditRoute: SignedTTenantAuditRoute,
   SignedTTenantFeedbackRoute: SignedTTenantFeedbackRoute,
+  SignedTTenantIntegrationsRoute: SignedTTenantIntegrationsRoute,
   SignedTTenantLogsRoute: SignedTTenantLogsRoute,
   SignedTTenantRunsRoute: SignedTTenantRunsRoute,
   SignedTTenantUsageRoute: SignedTTenantUsageRoute,

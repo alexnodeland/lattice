@@ -24,7 +24,7 @@ export type Shown = {
 };
 
 /** A workspace's name as grantr and artifactr take one: any text but NUL, up to 256 characters. */
-const nameOf = (value: unknown): string | undefined => {
+export const nameOf = (value: unknown): string | undefined => {
   const read = typeof value === "string" ? value : "";
   return read !== "" && read.length <= 256 && !read.includes("\0") ? read : undefined;
 };

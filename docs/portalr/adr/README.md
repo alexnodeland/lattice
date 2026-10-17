@@ -48,7 +48,8 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0040](0040-scenarios-against-a-generated-application-and-size-budgets.md) | Scenarios against a generated application, and size budgets | Accepted, amended by 0044 |
 | [0041](0041-first-party-webassembly-in-the-apps-policy.md) | First-party WebAssembly in the app's policy | Accepted |
 | [0042](0042-mermaid-cant-draw-under-the-policy.md) | Mermaid can't draw in the page under the policy, so it is parked | Accepted |
-| [0043](0043-markdowns-basics.md) | Markdown's basics: code blocks, callouts, footnotes per message, copying, an add-ons seam, and tests under the policy | Accepted, amended by 0044 |
+| [0043](0043-markdowns-basics.md) | Markdown's basics: code blocks, callouts, footnotes per message, copying, an add-ons seam, and tests under the policy | Accepted, amended by 0044 and 0045 |
 | [0044](0044-highlighting-and-math-on-demand.md) | Highlighting and math, loaded on demand, each with a size budget of its own | Accepted |
+| [0045](0045-integrations-in-admin-and-the-apps-read-of-them.md) | Integrations in admin, and the app's read of them: each its default where unread, and read again on `not_enabled` | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

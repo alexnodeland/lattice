@@ -70,6 +70,10 @@ test("each type of change reads as a sentence", () => {
       { type: "integration_set", workspace: "notes", key: "ui:mini-apps", on: null },
       "set ui:mini-apps back to inherited in workspace notes",
     ],
+    [
+      { type: "integration_set", workspace: null, key: "ui:mini-apps", on: null },
+      "set ui:mini-apps back to the default in the tenant",
+    ],
   ];
   for (const [event, sentence] of cases) {
     expect(said(event)).toBe(sentence);

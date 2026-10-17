@@ -111,6 +111,7 @@ export class Stream<State, Frame, Command, R extends Result, Hello> {
   #timer: ReturnType<typeof setTimeout> | null = null;
   readonly #listeners = new Set<() => void>();
   readonly #live = new Set<(envelope: Extract<Frame, Envelope>) => void>();
+  readonly #refused = new Set<(result: R) => void>();
   readonly #pending = new Map<string, Pending<Command, R>>();
 
   /** A store, closed until `open`; `state` is what a tail read over REST built, if any. */
@@ -141,6 +142,16 @@ export class Stream<State, Frame, Command, R extends Result, Hello> {
   readonly onLiveEvent = (listener: (envelope: Extract<Frame, Envelope>) => void): (() => void) => {
     this.#live.add(listener);
     return () => this.#live.delete(listener);
+  };
+
+  /**
+   * Calls `listener` with the server's answer to each command of this store's that it refused,
+   * until the returned function is called: a refusal that says something changed, such as an
+   * integration turned off, can make a read stale, whichever screen sent the command.
+   */
+  readonly onRefused = (listener: (result: R) => void): (() => void) => {
+    this.#refused.add(listener);
+    return () => this.#refused.delete(listener);
   };
 
   /** Connects, and keeps reconnecting after drops, until `close`. */
@@ -321,7 +332,13 @@ export class Stream<State, Frame, Command, R extends Result, Hello> {
       pending.sent > 1 &&
       this.protocol.creates(pending.command) &&
       result.rejection?.type === "invalid_state";
-    pending.settle({ outcome: result.ok || madeEarlier ? "done" : "refused", result });
+    const done = result.ok || madeEarlier;
+    pending.settle({ outcome: done ? "done" : "refused", result });
+    if (!done) {
+      for (const listener of this.#refused) {
+        listener(result);
+      }
+    }
   }
 
   #update(change: Partial<Snapshot<State>>): void {

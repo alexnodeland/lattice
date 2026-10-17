@@ -20,6 +20,7 @@ import type * as reflexrV1 from "./generated/reflexr.v1";
 import { reasons } from "./reasons";
 import * as reflexr from "./reflexr";
 import { type Api, named } from "./rest";
+import type { Result } from "./stream";
 import { wholeTrace } from "./traces";
 
 type Check = Grantr["schemas"]["Check"];
@@ -105,6 +106,17 @@ export const keys = {
     /** A tenant's audit log, as a filter keeps it: a change to access there adds to it. */
     audit: (tenant: string, filter: AuditFilter) =>
       [...keys.grantr.tenant(tenant), "audit", filter] as const,
+    /**
+     * Everything read of a tenant's integrations, which a setting anywhere in it makes stale: a
+     * tenant's setting changes what each of its workspaces gets.
+     */
+    integrations: (tenant: string) => [...keys.grantr.tenant(tenant), "integrations"] as const,
+    /** Each integration as it is set on the tenant, or with a workspace named, in that workspace. */
+    integrationStates: (tenant: string, ws?: string) =>
+      [...keys.grantr.integrations(tenant), "states", ws ?? "~tenant"] as const,
+    /** Whether each integration is on in a workspace, as its members read it. */
+    enabledIntegrations: (tenant: string, ws: string) =>
+      [...keys.grantr.integrations(tenant), "enabled", ws] as const,
   },
   portalr: {
     tenant: (tenant: string) => ["portalr", tenant] as const,
@@ -494,6 +506,50 @@ export function createQueries(api: Api) {
             ),
           getNextPageParam: (page) => (page.length < AUDIT_PAGE ? undefined : page[0]?.seq),
         }),
+      /**
+       * Each integration as it is set on the tenant, or with a workspace named, in that workspace and
+       * on its tenant, in the registry's order, and whether it is on: for those who may switch
+       * them there (`grantr:manage_integrations`, grantr ADR-0034).
+       */
+      integrations: (tenant: string, ws?: string) =>
+        queryOptions({
+          queryKey: keys.grantr.integrationStates(tenant, ws),
+          queryFn: () =>
+            body(
+              ws === undefined
+                ? api.grantr.GET("/grantr/v1/tenants/{tenant}/integrations", {
+                    ...named(tenant),
+                    params: { path: { tenant } },
+                  })
+                : api.grantr.GET(
+                    "/grantr/v1/tenants/{tenant}/workspaces/{workspace}/integrations",
+                    {
+                      ...named(tenant),
+                      params: { path: { tenant, workspace: ws } },
+                    },
+                  ),
+            ),
+        }),
+      /**
+       * Whether each integration is on in a workspace, by key, for anyone who can open it. It is
+       * read once and kept five minutes: after that, the window regaining focus or the network
+       * coming back reads it again, as TanStack Query does, and a command refused as
+       * `not_enabled` makes it stale at once (`stale.refusal`, portalr ADR-0045). A failed read
+       * isn't tried again: each integration is its default until the next read.
+       */
+      enabledIntegrations: (tenant: string, ws: string) =>
+        queryOptions({
+          queryKey: keys.grantr.enabledIntegrations(tenant, ws),
+          queryFn: () =>
+            body(
+              api.grantr.GET(
+                "/grantr/v1/tenants/{tenant}/workspaces/{workspace}/enabled-integrations",
+                { ...named(tenant), params: { path: { tenant, workspace: ws } } },
+              ),
+            ),
+          staleTime: 5 * 60_000,
+          retry: false,
+        }),
       /** The tenant's keys, by public id and principal, never their secrets (`grantr:issue_key`). */
       keyring: (tenant: string) =>
         queryOptions({
@@ -849,5 +905,15 @@ export const stale = {
       default:
         return event satisfies never;
     }
+  },
+
+  /**
+   * A command artifactr refused as `not_enabled` makes the workspace's integrations stale: the
+   * server says one is off that the page thought on, so it reads them again (portalr ADR-0045).
+   */
+  refusal(tenant: string, ws: string, result: Result) {
+    return result.rejection?.type === "not_enabled"
+      ? [keys.grantr.enabledIntegrations(tenant, ws)]
+      : [];
   },
 };

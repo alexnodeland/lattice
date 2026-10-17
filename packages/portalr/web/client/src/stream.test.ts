@@ -209,6 +209,21 @@ test("a refusal the first time is a refusal", async () => {
   expect(settled.outcome).toBe("refused");
 });
 
+test("a refusal is heard, with the server's answer, and a command carried out isn't", async () => {
+  open();
+  await until(stream, (s) => s.status === "live");
+  const heard: unknown[] = [];
+  const stop = stream.onRefused((result) => heard.push(result.rejection?.type));
+  server.answer({ ok: true });
+  await stream.send({ type: "post_message", thread_id: "thr_1", content: "Hi" }, "c_4");
+  server.answer({ rejection: "not_enabled" });
+  await stream.send({ type: "create_thread", thread_id: "thr_8", title: "Plan" }, "c_5");
+  stop();
+  server.answer({ rejection: "forbidden" });
+  await stream.send({ type: "create_thread", thread_id: "thr_7", title: "Plan" }, "c_6");
+  expect(heard).toEqual(["not_enabled"]);
+});
+
 test("closing settles every unanswered command, and refuses new ones", async () => {
   open();
   await until(stream, (s) => s.status === "live");

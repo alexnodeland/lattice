@@ -13,7 +13,7 @@ from artifactr.fastapi import stream
 from artifactr.workspace import integration_gate
 from tests.agent.conftest import Script, call, say
 from tests.fastapi.conftest import Latch, build, command, hello, wait_for
-from tests.workspace.test_gate import NOTES, Switch, key_of
+from tests.workspace.gating import NOTES, Switch, key_of
 
 STREAM = "/v1/workspaces/w1/stream"
 

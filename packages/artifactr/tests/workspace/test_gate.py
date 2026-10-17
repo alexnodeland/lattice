@@ -5,19 +5,16 @@ one; checklists by none. Bob is the actor; Alice fills the workspace while it is
 behaviour runs over every storage.
 """
 
-import asyncio
+import itertools
 from collections.abc import Mapping
 
 import pytest
-from hypothesis import given, settings
-from hypothesis import strategies as st
 from pydantic import JsonValue
 
 from artifactr.core import (
     Actor,
     AppEvent,
     ArchiveArtifact,
-    Artifact,
     Command,
     CreateArtifact,
     CreateThread,
@@ -29,43 +26,25 @@ from artifactr.core import (
     RespondToProposal,
     TenantId,
     UserActor,
-    Versioned,
+    ValidationFailed,
     Visibility,
     WorkspaceId,
     create_artifact,
 )
 from artifactr.workspace import (
     Access,
+    Changes,
     Gate,
-    InMemoryStorage,
     Storage,
     Workspace,
     Workspaces,
     integration_gate,
 )
 from tests.artifact_types import Checklist, Note
+from tests.workspace.gating import NOTES, Switch, key_of
 
 ALICE = UserActor(id="alice", name="Alice")
 BOB = UserActor(id="bob", name="Bob")
-NOTES = "notes"
-
-
-class Switch:
-    """An ``Integrations`` that is on unless a tenant's workspace has a key switched off."""
-
-    def __init__(self) -> None:
-        self.off: set[tuple[TenantId, WorkspaceId, str]] = set()
-        self.calls: list[str] = []
-        """What it was asked, in order, with what Bob's hooks were asked."""
-
-    async def is_enabled(self, tenant_id: str, workspace_id: str, key: str, /) -> bool:
-        self.calls.append(f"is_enabled {key}")
-        return (tenant_id, workspace_id, key) not in self.off
-
-
-def key_of(kind: str, data: Mapping[str, JsonValue]) -> str | None:
-    """Notes are the ``notes`` integration's; nothing else is any integration's."""
-    return NOTES if kind == "note" else None
 
 
 class Bob:
@@ -94,7 +73,7 @@ class Bob:
         self,
         workspace: Workspace,
         command: Command,
-        changes: Versioned[Artifact] | CreateArtifact | None,
+        changes: Changes,
     ) -> None:
         self.calls.append(f"gate {command.type}")
         await self.gate(workspace, command, changes)
@@ -222,21 +201,26 @@ async def test_an_edit_of_a_missing_artifact_is_missing(ws: Workspace, switch: S
 async def test_the_gate_hears_what_the_command_changes(storage: Storage, bob: Bob) -> None:
     heard: list[tuple[str, str | None]] = []
 
-    async def gate(
-        workspace: Workspace, command: Command, changes: Versioned[Artifact] | CreateArtifact | None
-    ) -> None:
+    async def gate(workspace: Workspace, command: Command, changes: Changes) -> None:
         heard.append((command.type, None if changes is None else changes.kind))
 
     ws = await _fill(_workspaces(storage, bob, gate))
+    await ws.as_actor(ALICE).commit(
+        ProposeChange(proposal_id="p2", change=ArchiveArtifact(artifact_id="c1", base_version=1))
+    )
     heard.clear()
+    await ws.commit(RespondToProposal(proposal_id="p2", decision="reject"))
     await ws.commit(_accept())
+    await ws.commit(ArchiveArtifact(artifact_id="n1", base_version=2))
     await ws.create(Checklist(), artifact_id="c2")
     await ws.commit(CreateThread())
     assert heard == [
+        ("respond_to_proposal", None),
         ("respond_to_proposal", "note"),
+        ("archive_artifact", None),
         ("create_artifact", "checklist"),
         ("create_thread", None),
-    ]
+    ], "what changes no data is not read"
 
 
 async def test_key_of_reads_the_data_as_json(storage: Storage, switch: Switch) -> None:
@@ -249,9 +233,20 @@ async def test_key_of_reads_the_data_as_json(storage: Storage, switch: Switch) -
     ws = await Workspaces(storage, gate=integration_gate(switch, by_title)).open(
         "acme", "w1", actor=ALICE
     )
-    await ws.create(Note(text="Ship", title="Plan"), artifact_id="n1")
-    await ws.commit((await ws.get(Note, "n1")).edit_text("Ship", "Send"))
-    assert read == [{"text": "Ship", "title": "Plan"}, {"text": "Ship", "title": "Plan"}]
+    await ws.commit(CreateArtifact(artifact_id="n1", kind="note", data={}))
+    await ws.commit((await ws.get(Note, "n1")).edit(lambda note: setattr(note, "text", "Ship")))
+    assert read == [{"text": "", "title": ""}] * 2, "a create's defaults, as an edit's"
+
+
+async def test_a_create_that_is_not_its_type_is_refused_by_core(
+    ws: Workspace, switch: Switch
+) -> None:
+    _off(switch)
+    with pytest.raises(ValidationFailed):
+        await ws.commit(CreateArtifact(kind="note", data={"text": 5}))
+    with pytest.raises(NotFound):
+        await ws.commit(CreateArtifact(kind="sketch", data={}))
+    assert "is_enabled notes" not in switch.calls
 
 
 # ─── the order: hidden, then the gate, then authorize ────────────────────────
@@ -378,11 +373,10 @@ async def _command(ws: Workspace, name: str) -> Command:
             return RespondToProposal(proposal_id="p1", decision="reject")
 
 
-async def _outcome(name: str, *, on: bool, hidden: bool, authorized: bool) -> str:
+async def _outcome(storage: Storage, name: str, *, on: bool, hidden: bool, authorized: bool) -> str:
     switch = Switch()
     bob = Bob(switch)
-    workspaces = _workspaces(InMemoryStorage(), bob)
-    ws = await _fill(workspaces)
+    ws = await _fill(_workspaces(storage, bob))
     command = await _command(ws, name)
     if not on:
         _off(switch)
@@ -395,22 +389,20 @@ async def _outcome(name: str, *, on: bool, hidden: bool, authorized: bool) -> st
     return "applied"
 
 
-@settings(max_examples=100, deadline=None)
-@given(
-    name=st.sampled_from(sorted(GATED)),
-    on=st.booleans(),
-    hidden=st.booleans(),
-    authorized=st.booleans(),
+@pytest.mark.parametrize(
+    ("name", "on", "hidden", "authorized"),
+    list(itertools.product(sorted(GATED), (True, False), (True, False), (True, False))),
 )
-def test_missing_beats_off_beats_forbidden(
-    name: str, on: bool, hidden: bool, authorized: bool
+async def test_missing_beats_off_beats_forbidden(
+    storage: Storage, name: str, on: bool, hidden: bool, authorized: bool
 ) -> None:
     if hidden:
-        expected: str = "not_found"
+        expected = "not_found"
     elif GATED[name] and not on:
         expected = "not_enabled"
     elif not authorized:
         expected = "forbidden"
     else:
         expected = "applied"
-    assert asyncio.run(_outcome(name, on=on, hidden=hidden, authorized=authorized)) == expected
+    outcome = await _outcome(storage, name, on=on, hidden=hidden, authorized=authorized)
+    assert outcome == expected

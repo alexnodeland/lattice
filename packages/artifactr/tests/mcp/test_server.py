@@ -21,7 +21,7 @@ from artifactr.mcp import ArtifactrMcp, McpContext, artifact_uri
 from artifactr.workspace import Access, InMemoryStorage, Workspace, Workspaces, integration_gate
 from tests.agent.conftest import Gate, Script, make_agent, say
 from tests.artifact_types import Checklist, Note
-from tests.workspace.test_gate import NOTES, Switch, key_of
+from tests.workspace.gating import NOTES, Switch, key_of
 
 CLAUDE = ExternalAgentActor(client_id="claude-code", name="Claude Code")
 REVIEWER = ExternalAgentActor(client_id="reviewer")

@@ -30,6 +30,8 @@ Tenant-scoped handles. See [Workspaces, commits and the log](../guides/workspace
 
 ::: artifactr.workspace.Gate
 
+::: artifactr.workspace.Changes
+
 ::: artifactr.workspace.integration_gate
 
 ::: artifactr.workspace.KeyOf

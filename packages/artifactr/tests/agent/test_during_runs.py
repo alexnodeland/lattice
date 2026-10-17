@@ -34,7 +34,7 @@ from tests.agent.conftest import (
     types,
 )
 from tests.artifact_types import Note
-from tests.workspace.test_gate import NOTES, Switch, key_of
+from tests.workspace.gating import NOTES, Switch, key_of
 
 
 async def _started(gate: Gate) -> None:

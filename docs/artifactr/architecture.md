@@ -400,6 +400,7 @@ class Transaction(Protocol):
     ) -> list[Envelope]: ...  # assigns seq
     async def append_history(self, thread_id: ThreadId, messages: bytes) -> None: ...
     async def save_cursor(self, name: str, seq: int) -> None: ...  # with the transaction
+    async def holds_lease(self, key: str, holder: str) -> bool: ...  # kept until it ends
 
 
 class Storage(Protocol):

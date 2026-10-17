@@ -37,6 +37,7 @@ The key trade-offs between the options, and why the decision wins.
 - What becomes easier.
 - What becomes harder.
 - What we will need to revisit.
+- For a protocol with a formal spec (`docs/<package>/spec/`): the properties this keeps, and how the spec changed with it (lattice ADR-0025).
 
 ## Action items
 

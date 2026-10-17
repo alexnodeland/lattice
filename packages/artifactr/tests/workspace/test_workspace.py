@@ -26,6 +26,7 @@ from artifactr.core import (
     InvalidState,
     MarkdownArtifact,
     NotFound,
+    PostMessage,
     ProposeChange,
     Proposed,
     Recorded,
@@ -50,7 +51,7 @@ from artifactr.workspace import (
 )
 from tests.artifact_types import Checklist, Counter, Item, Note
 from tests.leases import Partitioned
-from tests.workspace.conftest import ALICE
+from tests.workspace.conftest import ALICE, StorageFactory
 
 AGENT = AgentActor(thread_id="thr_1", run_id="run_1")
 
@@ -446,6 +447,47 @@ async def test_a_thread_is_claimed_by_one_run_at_a_time(ws: Workspace) -> None:
         with pytest.raises(ThreadBusy):
             async with ws.claim_thread(thread.id, holder="run_2"):
                 pass
+    async with ws.claim_thread(thread.id, holder="run_2"):
+        pass
+
+
+async def test_a_write_fenced_by_a_claim_is_refused_once_another_holder_has_the_thread(
+    storage_factory: StorageFactory,
+) -> None:
+    now = datetime(2026, 10, 16, tzinfo=UTC)
+    ws = await Workspaces(storage_factory(lambda: now)).open("tenant_a", "ws_1", actor=ALICE)
+    thread = await ws.create_thread()
+    fence = (thread.id, "run_1")
+    ttl = timedelta(minutes=1)
+    async with ws.claim_thread(thread.id, holder="run_1", ttl=ttl):
+        await ws.commit(PostMessage(thread_id=thread.id, content="Held"), claim=fence)
+        now += ttl  # it lapses in storage, before its holder's own timer finds it lost
+        async with ws.claim_thread(thread.id, holder="run_2", ttl=ttl):
+            head = await ws.head_seq()
+            with pytest.raises(ThreadBusy):
+                await ws.commit(PostMessage(thread_id=thread.id, content="Late"), claim=fence)
+            agent = ws.as_actor(AgentActor(thread_id=thread.id, run_id="run_1"))
+            with pytest.raises(ThreadBusy):
+                await agent.record(RunStarted(run_id="run_1", thread_id=thread.id), claim=fence)
+            assert await ws.head_seq() == head, "nothing is written"
+
+
+async def test_a_claim_cancelled_as_storage_grants_it_is_released(
+    storage: Storage, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ws = await Workspaces(storage).open("tenant_a", "ws_1", actor=ALICE)
+    thread = await ws.create_thread()
+    acquire = storage.acquire_lease
+
+    async def granted_then_cancelled(*args: Any) -> bool:
+        await acquire(*args)
+        raise asyncio.CancelledError  # as SQL storage raises once its call has run to its end
+
+    monkeypatch.setattr(storage, "acquire_lease", granted_then_cancelled)
+    with pytest.raises(asyncio.CancelledError):
+        async with ws.claim_thread(thread.id, holder="run_1"):
+            pytest.fail("a cancelled claim is not held")
+    monkeypatch.setattr(storage, "acquire_lease", acquire)
     async with ws.claim_thread(thread.id, holder="run_2"):
         pass
 

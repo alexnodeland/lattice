@@ -12,13 +12,16 @@
   however it was committed.
 - I7, the upgrade point, is in ``test_upgrade.py``.
 
-Each test holds one storage call at a :class:`Gate`, patched onto the storage it runs on.
+Each test holds one storage call at a :class:`Gate`, patched onto the storage it runs on. The
+last section is what the TLA+ spec in docs/artifactr/spec found, each trace run against the code:
+#249's tests and #252's run in memory alone, with a storage clock moved on; #252's fails, a strict
+``xfail``, until it is decided.
 """
 
 import asyncio
 import contextlib
 from collections.abc import AsyncGenerator, AsyncIterator
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, cast
 
@@ -26,15 +29,27 @@ import pytest
 from pydantic_ai import Agent, DeferredToolRequests, FunctionToolset, ModelResponse, RunContext
 
 from artifactr.agent import ArtifactWorkspace, Session, function_model
+from artifactr.agent.runner import _reply
 from artifactr.core import (
+    AgentActor,
     AnswerDeferred,
     DeferredAnswered,
+    DeferredRequest,
     PostMessage,
+    RunPaused,
+    RunStarted,
     Thread,
     UserActor,
 )
 from artifactr.sql import SqlStorage, create_schema
-from artifactr.workspace import InMemoryStorage, Scope, Storage, Workspace, Workspaces
+from artifactr.workspace import (
+    InMemoryStorage,
+    Scope,
+    Storage,
+    ThreadBusy,
+    Workspace,
+    Workspaces,
+)
 from tests.agent.conftest import (
     ALICE,
     Gate,
@@ -483,6 +498,19 @@ async def test_i4_two_processes_whose_plans_fail_now_and_then_consume_each_messa
     assert sorted(recorder.prompts) == sorted([*(f"m{index}" for index in range(12)), "last"])
 
 
+async def test_i4_a_send_that_fails_before_it_reads_hands_nothing_over(
+    storage: Storage, ws: Workspace, thread: Thread, runners: MakeRunner
+) -> None:
+    script = Script(say("ok"))
+    runner = runners(make_agent(script))
+    hold(storage, "save_cursor", raises=RuntimeError("storage is down")).release.set()
+    with pytest.raises(RuntimeError, match="storage is down"):
+        await runner.send(ws, thread.id, "Plan the launch")
+    assert not runner._handovers, "a failure that read nothing hands nothing over"
+    await settled(thread.id, runner)
+    assert not script.requests, "its message waits for the thread's next command, as I4 says"
+
+
 async def test_i4_a_cancelled_error_no_one_asked_for_is_a_failure_and_never_spins(
     storage: Storage,
     ws: Workspace,
@@ -615,3 +643,177 @@ async def test_i6_a_reply_that_an_answer_beat_is_the_resumed_runs_prompt(
     assert (await ws.run(paused.run_id)).status == "completed"
     assert script.answers() == ["Monday"]
     assert script.conversation()[-1] == "Tuesday, and book the room"
+
+
+# ─── found by the TLA+ spec (docs/artifactr/spec), not yet fixed ─────────────
+#
+# Each test is the spec's trace for one issue, against the code, and fails until the issue is
+# fixed: strict, so a fix that makes it pass removes its mark.
+
+
+class _Clock:
+    """The storage's clock, which a test moves on, as another process's clock may be."""
+
+    def __init__(self) -> None:
+        self.now = datetime(2026, 10, 16, tzinfo=UTC)
+
+    def __call__(self) -> datetime:
+        return self.now
+
+
+def _held_at_its_start(gate: Gate) -> Any:
+    """A turn context that holds each turn at ``gate`` as it begins, before run_started."""
+
+    @contextlib.asynccontextmanager
+    async def begins(session: Session[Any]) -> AsyncGenerator[None]:
+        await gate.wait()
+        yield
+
+    return begins
+
+
+async def _two_holders_after_a_lapse(runners: MakeRunner) -> tuple[list[str], int]:
+    """The prompts two processes' runs were given, and the runs started, after a lapse (#249).
+
+    The first process plans a run for the message, and is held before its run records its
+    start. The storage's clock passes the claim's TTL, as across a stall or a skewed clock, so
+    the second process's claim is granted, and it plans from the same `taken`. The first run's
+    start is fenced by its claim, which it no longer has, so it fails before it starts.
+    """
+    clock = _Clock()
+    storage = InMemoryStorage(clock=clock)
+    ws = await Workspaces(storage).open(SCOPE.tenant_id, SCOPE.workspace_id, actor=ALICE)
+    thread = await ws.create_thread("Launch")
+    recorder = Recorder()
+
+    def agent() -> Agent[Session[Any], str]:
+        return Agent(
+            function_model(recorder.respond),
+            deps_type=Session[Any],
+            capabilities=[ArtifactWorkspace(types=[Note, Checklist])],
+        )
+
+    starting = Gate()
+    here = runners(agent(), turn_context=_held_at_its_start(starting))
+    there = runners(agent())
+    first = started(await here.send(ws, thread.id, "Plan the launch"))
+    await _entered(starting)
+    clock.now += timedelta(minutes=1)
+    second = await there.ask(ws, thread.id)
+    assert second is not None, "the lapsed claim was granted again"
+    await second.wait()
+    starting.release.set()
+    with pytest.raises(ThreadBusy):
+        await first.wait()
+    await settled(thread.id, here, there)
+    return recorder.prompts, len(await ws.runs(thread_id=thread.id))
+
+
+async def test_i1_a_claim_that_lapses_as_its_run_starts_lets_no_second_run_take_its_prompt(
+    runners: MakeRunner,
+) -> None:
+    prompts, _ = await _two_holders_after_a_lapse(runners)
+    assert prompts == ["Plan the launch"]
+
+
+async def test_i3_a_claim_that_lapses_as_its_run_starts_leaves_one_run(
+    runners: MakeRunner,
+) -> None:
+    _, runs = await _two_holders_after_a_lapse(runners)
+    assert runs == 1
+
+
+async def test_i1_a_reply_whose_claim_another_holder_took_answers_nothing(
+    ws: Workspace, thread: Thread
+) -> None:
+    agent = ws.as_actor(AgentActor(thread_id=thread.id, run_id="run_1"))
+    await agent.record(RunStarted(run_id="run_1", thread_id=thread.id))
+    question = DeferredRequest(tool_call_id="q1", tool_name="ask_user", kind="question")
+    await agent.record(RunPaused(run_id="run_1", thread_id=thread.id, requests=(question,)))
+    await ws.post_message(thread.id, "Tuesday")
+    [reply] = await ws.read(threads={thread.id}, last=1)
+    run = await ws.run("run_1")
+    async with ws.claim_thread(thread.id, holder="claim_2"):
+        with pytest.raises(ThreadBusy):  # not refused as answered, which would plan again
+            await _reply(
+                ws,
+                run,
+                reply,
+                cursor=(f"artifactr.runner/{thread.id}/taken", reply.seq),
+                claim=(thread.id, "claim_1"),
+            )
+    assert not (await ws.run("run_1")).answers, "the request is left to the new holder"
+
+
+async def test_i3_a_claim_granted_as_its_send_is_cancelled_is_released(
+    storage: Storage, ws: Workspace, thread: Thread, runners: MakeRunner
+) -> None:
+    script = Script(*[say("ok")] * 2)
+    runner = runners(make_agent(script))
+    # The lease is taken, and the call cancelled after, as SQL storage runs its calls to the end.
+    claiming = hold(storage, "acquire_lease", after=True)
+    sending = asyncio.create_task(runner.send(ws, thread.id, "Plan the launch"))
+    await _entered(claiming)
+    sending.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await sending
+    await settled(thread.id, runner)
+    assert script.requests, "its hand-over took the message"
+
+
+async def test_i3_a_send_cancelled_between_its_ask_and_its_claim_is_handed_over(
+    storage: Storage, ws: Workspace, thread: Thread, runners: MakeRunner
+) -> None:
+    script = Script(*[say("ok")] * 2)
+    runner = runners(make_agent(script))
+    reading = hold(storage, "cursor")  # _take's first read, once the ask is saved
+    sending = asyncio.create_task(runner.send(ws, thread.id, "Plan the launch"))
+    await _entered(reading)
+    sending.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await sending
+    await settled(thread.id, runner)
+    assert script.requests, "handed over, not left for the next command"
+
+
+async def test_i3_a_send_cancelled_as_its_ask_is_saved_is_handed_over(
+    storage: Storage, ws: Workspace, thread: Thread, runners: MakeRunner
+) -> None:
+    script = Script(*[say("ok")] * 2)
+    runner = runners(make_agent(script))
+    # The ask is saved, and the call cancelled after, as storage runs its calls to the end.
+    asking = hold(storage, "save_cursor", after=True)
+    sending = asyncio.create_task(runner.send(ws, thread.id, "Plan the launch"))
+    await _entered(asking)
+    sending.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await sending
+    await settled(thread.id, runner)
+    assert script.requests, "handed over, not left for the next command"
+
+
+@pytest.mark.xfail(
+    strict=True,
+    raises=AssertionError,
+    reason="#252: what a dead holder was asked waits for a command",
+)
+async def test_i3_a_message_asked_while_its_holder_dies_is_taken_once_its_claim_lapses(
+    runners: MakeRunner,
+) -> None:
+    clock = _Clock()
+    storage = InMemoryStorage(clock=clock)
+    ws = await Workspaces(storage).open(SCOPE.tenant_id, SCOPE.workspace_id, actor=ALICE)
+    thread = await ws.create_thread("Launch")
+    script = Script(*[say("ok")] * 3)
+    # The first process holds the thread, and stops for good: it stands for one that died.
+    dead = Gate()
+    dying = runners(make_agent(script), turn_context=_held_at_its_start(dead))
+    living = runners(make_agent(script))
+    started(await dying.send(ws, thread.id, "Plan the launch"))
+    await _entered(dead)
+    sent = await living.send(ws.as_actor(BOB), thread.id, "Also book the big room")
+    if sent.run is not None:  # not the failure the mark expects
+        pytest.fail("the dead process's claim did not refuse the message")
+    clock.now += timedelta(minutes=1)  # the dead claim lapses
+    await settled(thread.id, living)
+    assert script.requests, "the message is taken once the dead claim lapses"

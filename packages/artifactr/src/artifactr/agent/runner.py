@@ -425,40 +425,56 @@ class Runner[AppDepsT]:
         refuses this claim sees it when it releases the thread, and hands the thread over.
         ``runner`` is a handle acting as the Runner, as every handle from here on is.
         """
-        await runner.save_cursor(_asked(thread_id), seq or 0)
-        return await self._take(runner, thread_id, trace.get_current_span().get_span_context())
+        caller = trace.get_current_span().get_span_context()
+        return await self._take(runner, thread_id, caller, ask=seq or 0)
 
     async def _take(
-        self, workspace: Workspace, thread_id: ThreadId, caller: SpanContext | None
+        self,
+        workspace: Workspace,
+        thread_id: ThreadId,
+        caller: SpanContext | None,
+        *,
+        ask: int | None = None,
     ) -> RunHandle | None:
         """Start the turn the thread was asked for and no run has taken, if it is free.
 
-        A claimant that starts nothing looks again once it has released the thread, since a
-        command it refused meanwhile relies on it. Each round starts a turn, finds nothing
-        asked, finds the thread busy, or records what it found as taken, so it ends. One that
-        is cancelled or fails holding the thread hands it over as it propagates, as a run does.
-        The turn links to ``caller``, or else to where the message or answer it carries out
-        was committed.
+        With ``ask``, it first saves that the log up to that ``seq`` asks for a turn. A claimant
+        that starts nothing looks again once it has released the thread, since a command it
+        refused meanwhile relies on it. Each round starts a turn, finds nothing asked, finds the
+        thread busy, or records what it found as taken, so it ends. One that is cancelled from
+        its ask on hands the thread over as it propagates, as a run does: storage may have saved
+        the ask of a call cut short. One that fails hands over only once it has read the
+        cursors, with what it read, so a failure that persists never hands over without end. The
+        turn links to ``caller``, or else to where the message or answer it carries out was
+        committed.
         """
-        while not self._closed:
-            taken = await _taken_seq(workspace, thread_id)
-            asked = await workspace.cursor(_asked(thread_id))
-            if asked <= taken:
-                return None
-            try:
+        read: tuple[int, int] | None = None  # the cursors, taken and asked, as it last read them
+        try:
+            if ask is not None:
+                await workspace.save_cursor(_asked(thread_id), ask)
+            while not self._closed:
+                read = (
+                    await _taken_seq(workspace, thread_id),
+                    await workspace.cursor(_asked(thread_id)),
+                )
+                taken, asked = read
+                if asked <= taken:
+                    return None
                 handle = await self._start(workspace, thread_id, caller)
-            except ThreadBusy:
-                return None  # its holder hands the thread over as it releases it
-            except (asyncio.CancelledError, Exception):  # the claim is released
-                # A CancelledError raised while no one cancels the claimant, as a storage call's
-                # own cancellation can be, is a failure like any other.
-                claimant = asyncio.current_task()
-                assert claimant is not None, "a claimant is a task"
-                cancelled = claimant.cancelling() > 0
+                if handle is not None:
+                    return handle
+        except ThreadBusy:
+            return None  # its holder hands the thread over as it releases it
+        except (asyncio.CancelledError, Exception):  # any claim is released
+            # A CancelledError raised while no one cancels the claimant, as a storage call's
+            # own cancellation can be, is a failure like any other.
+            claimant = asyncio.current_task()
+            assert claimant is not None, "a claimant is a task"
+            cancelled = claimant.cancelling() > 0
+            if cancelled or read is not None:  # cancelled, it hands over whatever it read
+                taken, asked = read or (0, 0)
                 self._hand_over(workspace, thread_id, taken=taken, asked=asked, cancelled=cancelled)
-                raise
-            if handle is not None:
-                return handle
+            raise
         return None
 
     async def _start(
@@ -470,13 +486,14 @@ class Runner[AppDepsT]:
             ThreadBusy: If another holder has the thread.
         """
         # Each claim has a holder of its own, so a run resuming cannot renew the claim its
-        # pausing segment still holds.
+        # pausing segment still holds. The writes that consume messages are fenced by it.
+        claim = (thread_id, new_id("claim"))
         async with contextlib.AsyncExitStack() as stack:
             lost = await stack.enter_async_context(
-                workspace.claim_thread(thread_id, holder=new_id("claim"), ttl=self._claim_ttl)
+                workspace.claim_thread(thread_id, holder=claim[1], ttl=self._claim_ttl)
             )
             await _abandon(workspace, thread_id)
-            turn = None if self._closed else await self._plan(workspace, thread_id)
+            turn = None if self._closed else await self._plan(workspace, claim)
             if turn is None or self._closed:
                 return None
             session = Session[AppDepsT].start(
@@ -491,13 +508,14 @@ class Runner[AppDepsT]:
                 message_ids=turn.message_ids,
             )
             session.delivered.seq, session.delivered.cursor = turn.taken, _taken(thread_id)
-            claim = stack.pop_all()  # the run's task holds the claim from here
+            session.delivered.claim = claim
+            held = stack.pop_all()  # the run's task holds the claim from here
         if caller is None:  # a hand-over: the turn links to what it carries out
             caller = parse_traceparent(turn.traceparent) or INVALID_SPAN_CONTEXT
         # Started eagerly, the task holds the claim before anything can cancel it, so a run
         # stopped at once still releases the thread.
         task = asyncio.Task(
-            self._run(claim, lost, session, turn, caller),
+            self._run(held, lost, session, turn, caller),
             loop=asyncio.get_running_loop(),
             eager_start=True,
         )
@@ -506,14 +524,16 @@ class Runner[AppDepsT]:
         task.add_done_callback(lambda _: self._finished(handle))
         return handle
 
-    async def _plan(self, workspace: Workspace, thread_id: ThreadId) -> "_Turn | None":
+    async def _plan(self, workspace: Workspace, claim: tuple[ThreadId, str]) -> "_Turn | None":
         """Decide, holding the thread, which turn carries out the oldest message not taken.
 
         With a paused run, that message is its reply: it answers the questions and declines the
         approvals left, and the run resumes. A paused run whose requests are all answered
         resumes, with the messages not taken as its prompt. Otherwise the oldest message starts
-        a run. The turn's watcher follows from there, so later messages reach it too.
+        a run. The turn's watcher follows from there, so later messages reach it too. ``claim``
+        is the thread's, ``(thread_id, holder)``, which fences the reply's answers.
         """
+        thread_id = claim[0]
         taken = await _taken_seq(workspace, thread_id)
         asked = await workspace.cursor(_asked(thread_id))
         if asked <= taken:
@@ -534,22 +554,22 @@ class Runner[AppDepsT]:
                 answers = [e for e in log if isinstance(e.event, DeferredAnswered)]
                 by = answers[-1] if answers else next(iter(untaken), None)
                 turn = _resume(run, taken, asked, through, untaken, by)
-                return await self._allowed(workspace, thread_id, turn)
+                return await self._allowed(workspace, claim, turn)
             if untaken:
                 reply = untaken[0]
                 replier = workspace.as_actor(reply.actor)
                 try:
                     replied = await _reply(
-                        replier, run, reply, cursor=(_taken(thread_id), reply.seq)
+                        replier, run, reply, cursor=(_taken(thread_id), reply.seq), claim=claim
                     )
                 except Forbidden as refused:  # its author may not answer: the next message may
                     await self._refused(workspace, thread_id, reply.seq, refused)
-                    return await self._plan(workspace, thread_id)
+                    return await self._plan(workspace, claim)
                 if not replied:
-                    return await self._plan(workspace, thread_id)  # answers came first
+                    return await self._plan(workspace, claim)  # answers came first
                 run = await workspace.run(run.id)
                 turn = _resume(run, taken, asked, reply.seq, [], reply)
-                return await self._allowed(workspace, thread_id, turn)
+                return await self._allowed(workspace, claim, turn)
         elif untaken:
             first = untaken[0]
             assert isinstance(first.event, MessagePosted)
@@ -565,12 +585,12 @@ class Runner[AppDepsT]:
                 traceparent=first.traceparent,
                 message_ids=(first.event.message_id,),
             )
-            return await self._allowed(workspace, thread_id, turn)
+            return await self._allowed(workspace, claim, turn)
         await workspace.save_cursor(_taken(thread_id), through)  # no message in it to carry out
         return None
 
     async def _allowed(
-        self, workspace: Workspace, thread_id: ThreadId, turn: "_Turn"
+        self, workspace: Workspace, claim: tuple[ThreadId, str], turn: "_Turn"
     ) -> "_Turn | None":
         """The turn, if ``authorize`` lets its agent start it, acting for its author; else the next.
 
@@ -579,6 +599,7 @@ class Runner[AppDepsT]:
         it, ends a paused run it would have resumed as failed, and plans the next turn. Each
         refusal takes more of the log, or ends the run, so planning again ends.
         """
+        thread_id = claim[0]
         agent = AgentActor(
             thread_id=thread_id,
             run_id=turn.run_id,
@@ -598,7 +619,7 @@ class Runner[AppDepsT]:
                 )
                 await workspace.record(ended)
             await self._refused(workspace, thread_id, turn.watch_after, refused)
-            return await self._plan(workspace, thread_id)
+            return await self._plan(workspace, claim)
         return turn
 
     @staticmethod
@@ -675,9 +696,9 @@ class Runner[AppDepsT]:
         A claimant whose task was cancelled, or a run that was stopped, hands over whatever was
         asked and not taken, since a command it refused may have asked before it read. One that
         failed and took nothing, even with a CancelledError no one asked for, hands over only
-        what was asked after it read, so a failure that persists makes one turn per new command.
-        Neither can spin: only :meth:`aclose` cancels a hand-over, and it closes the runner
-        first.
+        what was asked after it read, so a failure that persists makes one turn per new command;
+        a claimant that failed before it read hands nothing over. Neither can spin: only
+        :meth:`aclose` cancels a hand-over, and it closes the runner first.
         """
         try:
             took = await _taken_seq(workspace, thread_id) > taken
@@ -907,12 +928,21 @@ def _resume(
 
 
 async def _reply(
-    workspace: Workspace, run: Run, message: Envelope, *, cursor: tuple[str, int]
+    workspace: Workspace,
+    run: Run,
+    message: Envelope,
+    *,
+    cursor: tuple[str, int],
+    claim: tuple[ThreadId, str],
 ) -> bool:
     """Answer a paused run's open questions with a message, and decline its open approvals.
 
-    Each answer takes the message, in its own transaction. A request refused, as when another
-    answer came first, is left as it was answered. Returns whether the message answered any.
+    Each answer takes the message, in its own transaction, fenced by the thread's ``claim``. A
+    request refused, as when another answer came first, is left as it was answered. Returns
+    whether the message answered any.
+
+    Raises:
+        ThreadBusy: If the claim was lost to another holder, which plans the thread's turn.
     """
     assert isinstance(message.event, MessagePosted)
     content = message.event.content
@@ -927,9 +957,13 @@ async def _reply(
             answer=content,
             approved=False if declined else None,
         )
-        with contextlib.suppress(InvalidState):
-            await workspace.commit(answer, cursor=cursor)
-            answered = True
+        try:
+            await workspace.commit(answer, cursor=cursor, claim=claim)
+        except ThreadBusy:
+            raise  # an InvalidState too, but the claim's: its new holder plans the turn
+        except InvalidState:
+            continue  # answered first
+        answered = True
     return answered
 
 

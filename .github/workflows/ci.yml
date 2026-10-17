@@ -509,6 +509,15 @@ jobs:
       - run: uv sync --locked --all-packages --all-groups --all-extras
       - name: Read versions.env
         run: grep -E '^[A-Z_]+=' packages/stackr/versions.env >> "$GITHUB_ENV"
+      # The scenarios' packages and Chromium, installed before the Supabase CLI's step, whose
+      # action puts an older Bun first on the PATH, one that can't read bun.lock, and before the
+      # stack's containers come up, never while they do: Chromium fails its requests in flight
+      # when a network interface comes or goes (lattice ADR-0002, #172), and the smoke test
+      # starts nothing while it runs.
+      - if: env.SMOKE_SCENARIOS == 'true'
+        run: bun install --frozen-lockfile
+      - if: env.SMOKE_SCENARIOS == 'true'
+        run: moon run ui:chromium
       - uses: supabase/setup-cli@45a513f8c64c0bc8e0e3dfe572b5c95be85f6359 # v3.0.1
         if: matrix.database == 'supabase' && matrix.profiles != 'observability'
         with:
@@ -522,14 +531,6 @@ jobs:
             -subj /CN=backups -addext subjectAltName=DNS:backups \
             -keyout /tmp/stackr-backups/private.key -out /tmp/stackr-backups/public.crt
           chmod 644 /tmp/stackr-backups/private.key
-      # The scenarios' Chromium and their dependencies are installed before the stack's
-      # containers come up, never while they do: Chromium fails its requests in flight when a
-      # network interface comes or goes (lattice ADR-0002, #172), and the smoke test starts
-      # nothing while it runs.
-      - if: env.SMOKE_SCENARIOS == 'true'
-        run: bun install --frozen-lockfile
-      - if: env.SMOKE_SCENARIOS == 'true'
-        run: moon run ui:chromium
       # Fails before the job's 30 minutes, so the Logs step below runs and shows where it stood.
       - run: uv run --no-project python scripts/affected.py smoke
         timeout-minutes: 15

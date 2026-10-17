@@ -3,16 +3,15 @@
 **Status:** Accepted
 **Date:** 2026-10-17
 **Deciders:** Alex Nodeland
-
-**Amends:** [ADR-0023](0023-publishing-to-pypi-from-the-release-workflow.md)'s amendment "a package added unreleased", and supersedes [native files ADR-0001](../artifactr/files/adr/0001-a-separate-distribution.md).
+**Amends:** [ADR-0023](0023-publishing-to-pypi-from-the-release-workflow.md)'s amendment "a package added unreleased", and the packaging of [RFC-0003](../rfcs/0003-native-files-as-artifacts.md), [RFC-0005](../rfcs/0005-forms-dashboards-and-mini-apps.md) and [RFC-0006](../rfcs/0006-excalidraw-diagrams-drawn-live.md); supersedes [native files ADR-0001](../artifactr/files/adr/0001-a-separate-distribution.md).
 
 ## Context
 
 Three RFCs proposed a distribution each for an integration of artifactr: [RFC-0003](../rfcs/0003-native-files-as-artifacts.md) `artifactr-files-ai` for native files, [RFC-0005](../rfcs/0005-forms-dashboards-and-mini-apps.md) `artifactr-ui-ai` for forms and dashboards, and [RFC-0006](../rfcs/0006-excalidraw-diagrams-drawn-live.md) `artifactr-excalidraw-ai` for diagrams. RFC-0003's was built (#346) and never released. Each said why it was apart from artifactr: it is a domain built on artifactr, not an adapter for one of its ports ([artifactr ADR-0034](../artifactr/adr/0034-ports-and-adapters-for-integrations.md)), and it keeps its tables and dependencies out of applications that don't use it.
 
-A distribution in lattice costs more than its code. The first release ([ADR-0023](0023-publishing-to-pypi-from-the-release-workflow.md) and its amendments) showed the price of each:
+A distribution in lattice costs more than its code. The first release ([ADR-0023](0023-publishing-to-pypi-from-the-release-workflow.md) and its amendments) showed most of the price of each, and PyPI's limits the rest:
 
-- **A pending publisher on PyPI,** of which an account may have three at a time, and each in a GitHub environment of its own, `pypi-<distribution>`, with its reviewers and tag restriction, since PyPI keeps one pending configuration to one project name.
+- **A pending publisher on PyPI,** of which PyPI lets an account hold three at a time until each project's first upload, and each in a GitHub environment of its own, `pypi-<distribution>`, with its reviewers and tag restriction, since PyPI keeps one pending configuration to one project name.
 - **A release pull request of its own,** whose line in `.release-please-manifest.json` sits next to the others', so each release that merges puts its neighbours' release pull requests in conflict with `main` until release-please opens them again.
 - **A place in the publishing order,** `STAGES` in `scripts/release_plan.py`, after everything it requires, and a dispatch per release in that order.
 - **Floors raised by hand** on the packages it requires, which uv can lock only once their own releases are on `main`, so a new floor waits on its sibling's release pull request.
@@ -50,12 +49,20 @@ An integration that ships with artifactr and is used with artifactr pays all of 
 | Complexity | High: a package's configuration, release and docs, each time |
 | Release ceremony | All of the context's, for each |
 | Install size | The base wheel is unchanged |
+| Coupling | A floor on the package, raised by hand at each release that the integration needs |
 
 **Pros:** the package's wheel and its migration chain are untouched by an integration.
 **Cons:** the ceremony above, for code with no consumers of its own; three integrations alone would use every pending publisher an account may hold at once.
 
 ### Option C: Integrations in the package, with no extra
 
+| Dimension | Assessment |
+|---|---|
+| Complexity | Lowest: a subpackage alone |
+| Release ceremony | None added |
+| Install size | Every install carries every integration's dependencies |
+
+**Pros:** nothing to choose at install.
 **Cons:** an install says nothing of what it uses, and an integration that adds dependencies would make every application carry them.
 
 ## Trade-off analysis
@@ -73,7 +80,8 @@ The ceremony is paid per distribution, and it buys independence that an integrat
 ## Action items
 
 1. [x] Fold `artifactr-files` into artifactr as the `files` extra, `artifactr.files`, and take it out of release-please, `STAGES`, CI, Nightly and moon.
-2. [x] Amend RFC-0003, RFC-0005 and RFC-0006 to name the extras, with dated notes.
-3. [ ] Build forms and dashboards (RFC-0005) and diagrams (RFC-0006) as extras of `artifactr-ai`.
-4. [ ] The shared Integrations switch, which turns an integration on per workspace.
-5. [ ] Decide lockstep versioning after the v0.2 round.
+2. [ ] Close [#354](https://github.com/alexnodeland/lattice/pull/354), `artifactr-files`' release pull request, unmerged.
+3. [x] Amend RFC-0003, RFC-0005 and RFC-0006 to name the extras, with dated notes.
+4. [ ] Build forms and dashboards (RFC-0005) and diagrams (RFC-0006) as extras of `artifactr-ai`.
+5. [ ] The shared Integrations switch, which turns an integration on per workspace.
+6. [ ] Decide lockstep versioning after the v0.2 round.

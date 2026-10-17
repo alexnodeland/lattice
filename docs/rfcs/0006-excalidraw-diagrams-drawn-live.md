@@ -3,7 +3,7 @@
 **Status:** Draft
 **Author:** Alex Nodeland
 **Created:** 2026-10-17
-**Discussion:** pending
+**Discussion:** [#356](https://github.com/alexnodeland/lattice/pull/356)
 **Siblings:**
 
 - [artifactr ADR-0003][a-adr-0003] asks that collections an agent edits be id-keyed mappings. An Excalidraw scene already is one, so a diagram is an ordinary JSON artifact.

@@ -71,7 +71,7 @@ A key no registry declares is `Invalid`. Each real change is one `integration_se
 | `GET`, `PUT /tenants/{tenant}/workspaces/{workspace}/integrations[/{key}]` | `grantr:manage_integrations` on the workspace |
 | `GET /tenants/{tenant}/workspaces/{workspace}/enabled-integrations` | Any `open` on the workspace |
 
-A `PUT`'s body is `{"on": true}`, `{"on": false}`, or `{"on": null}` to inherit. portalr's admin has a page for it, Integrations, under each tenant.
+A `PUT`'s body is `{"on": true}`, `{"on": false}`, or `{"on": null}` to inherit. portalr's admin has a page for it, Integrations, under each tenant, for its owners and admins: it shows where each state comes from, and who set it and when ([portalr's admin guide](../../portalr/guides/admin.md)).
 
 ## Asking
 

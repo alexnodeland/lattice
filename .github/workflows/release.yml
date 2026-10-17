@@ -261,10 +261,11 @@ jobs:
   # that runs one leg at once, in plan order, and stops at the first failure (fail-fast), so a
   # later package never goes out after an earlier one failed. Each leg also checks that PyPI serves
   # every package before it in this release, before it publishes its own. Each leg runs in its
-  # package's own environment, `pypi-<distribution>`, since PyPI gives a pending trusted publisher's
-  # environment to one project only; that environment's required reviewers approve the leg. Each
-  # should allow deployments from tags only (`*-v*`), and only maintainers may create such tags:
-  # see ADR-0023.
+  # package's own environment, `pypi-<distribution>`, since PyPI lets one pending publisher's
+  # configuration (owner, repository, workflow, environment) stand for one project only, and the
+  # environment is the field that differs; its required reviewers approve the leg. Each should
+  # allow deployments from tags only (`*-v*`), and only maintainers may create such tags: see
+  # ADR-0023.
   pypi-publish:
     name: PyPI, ${{ matrix.package.name }}
     needs: [plan, pypi-check]

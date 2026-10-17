@@ -159,8 +159,8 @@ def again(tag: str, path: str) -> str:
         )
     return (
         f"  {command}\n    (it attaches and attests the wheels; it publishes to PyPI as well "
-        "only if the PYPI_PUBLISH variable is true, and then after the approval of its "
-        "`pypi-<distribution>` environment)"
+        "only if the PYPI_PUBLISH variable is true, and then after the approval of the "
+        "package's `pypi-<distribution>` environment)"
     )
 
 

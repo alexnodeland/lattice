@@ -35,8 +35,10 @@ nav:
       - adr/0020-the-telemetry-contract-needs-no-extra.md
       - adr/0021-the-refusal-schema-needs-no-extra.md
       - adr/0022-litellm-requests-carry-the-propagated-trace-tags.md
+      - adr/0023-publishing-to-pypi-from-the-release-workflow.md
       - adr/0024-a-parallel-batched-merge-queue.md
       - adr/0025-formal-specs-in-tla-and-lean.md
+      - adr/0026-a-distribution-needs-a-reason-integrations-are-extras.md
       - Template: adr/template.md
   - Brand: assets/brand/README.md
   - artifactr: artifactr

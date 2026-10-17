@@ -123,10 +123,17 @@ test("Tab while it is open closes it, choosing nothing, and moves on", async () 
   const role = screen.getByRole("combobox", { name: "Role" });
   await role.click();
   await expect.element(page.getByRole("listbox")).toBeVisible();
+  // The list takes the focus a frame after it is seen. A Tab before then leaves the trigger, and
+  // the focus, arriving late, comes back into a list that stays open.
+  await expect.poll(() => document.activeElement?.getAttribute("role")).toBe("option");
   await userEvent.keyboard("{ArrowDown}");
+  await expect
+    .element(page.getByRole("option", { name: "Editor" }))
+    .toHaveAttribute("data-highlighted");
   await userEvent.tab();
   await expect.element(page.getByRole("listbox")).not.toBeInTheDocument();
   await expect.element(role).toHaveTextContent("Viewer");
+  await expect.element(screen.getByRole("button", { name: "Next" })).toHaveFocus();
 });
 
 test("a required select left on its empty choice makes its form invalid, and one chosen makes it valid", async () => {

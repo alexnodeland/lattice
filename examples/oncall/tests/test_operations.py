@@ -98,8 +98,14 @@ def test_main_shuts_telemetry_down(
     monkeypatch: pytest.MonkeyPatch, telemetry: TelemetryHandle
 ) -> None:
     shut: list[bool] = []
+    shut_down = telemetry.shutdown
+
+    def shutdown() -> None:
+        shut.append(True)
+        shut_down()  # for real, so no handle outlives the test
+
     monkeypatch.setattr(oncall.app, "telemetry_from_environment", lambda: telemetry)
-    monkeypatch.setattr(telemetry, "shutdown", lambda: shut.append(True))
+    monkeypatch.setattr(telemetry, "shutdown", shutdown)
     monkeypatch.setattr(uvicorn, "run", lambda app, **kwargs: None)
     oncall.app.main()
     assert shut == [True]

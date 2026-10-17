@@ -1,6 +1,6 @@
 # ADR-0010: Pausing with pydantic-ai deferred tools
 
-**Status:** Accepted
+**Status:** Accepted; its answers amended by [ADR-0073](0073-checks-that-refuse-a-command-before-it-commits.md) and the amendment below
 **Date:** 2026-09-28
 **Deciders:** Alex Nodeland
 
@@ -70,3 +70,11 @@ Option A trades a little latency on resume for durability and a single code path
 1. [ ] Record `run_paused` from `DeferredToolRequests` in the capability.
 2. [ ] Implement the `answer` command and resumption in the workspace and adapters.
 3. [ ] Test a pause and resume across a simulated restart.
+
+## Amendment (2026-10-17): an answer names its tool, and may be refused
+
+[lattice RFC-0005](../../rfcs/0005-forms-dashboards-and-mini-apps.md) adds forms, which a run asks with `ask_form`, a deferred tool of `artifactr.ui`'s whose answer is the form's values.
+
+- **An answer names its tool.** `deferred_answered` carries `tool_name`, copied from the request by the rule that records the answer, so a consumer of the log, such as relayr's follower, tells an `ask_form` answer from an `ask_user` reply or an approval without keeping `run_paused` to join them. It is `null` only on answers recorded before it was. It is a new optional field, so the protocol stays `artifactr.v1`.
+- **An answer may be refused by the application.** Core still checks only that the run is paused, the request exists and is unanswered, and its kind matches. The application's check of `answer_deferred` may refuse the answer itself, before it commits ([ADR-0073](0073-checks-that-refuse-a-command-before-it-commits.md)), as `artifactr.ui`'s refuses values that don't fit the form, with a field's error. A refused answer leaves the request open and the run paused, so the person can answer again.
+- **A chat message doesn't answer a form.** A message posted while a run is paused answers its questions and declines its approvals, but leaves a form open: only the form's own answer answers it ([ADR-0055](0055-turns-from-the-log.md)'s amendment of the same day).

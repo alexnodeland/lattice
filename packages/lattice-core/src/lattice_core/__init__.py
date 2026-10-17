@@ -6,6 +6,8 @@ package (lattice ADR-0018).
 
 - :mod:`lattice_core.schema`: JSON Schema helpers for Pydantic models, such as
   :func:`~lattice_core.schema.tag_required`.
+- :mod:`lattice_core.integrations`: the registry of integrations, and the port that says whether
+  one is on in a workspace.
 - :mod:`lattice_core.tags`: the tags that file a model request's spend under its tenant and
   workspace.
 - :mod:`lattice_core.text`: checks on text before it is stored, such as

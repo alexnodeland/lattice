@@ -9,6 +9,13 @@ The reference is generated from lattice-core's docstrings and type annotations. 
       show_root_heading: false
       show_root_toc_entry: false
 
+## lattice_core.integrations
+
+::: lattice_core.integrations
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+
 ## lattice_core.tags
 
 ::: lattice_core.tags

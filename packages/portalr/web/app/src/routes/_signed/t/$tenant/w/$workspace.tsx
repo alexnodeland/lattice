@@ -2,16 +2,22 @@ import { Account, AppShell, NavLink, SideNav, Switcher } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, Outlet, useMatchRoute, useNavigate } from "@tanstack/react-router";
 import { FileText, MessageSquare, Play, Workflow, Zap } from "lucide-react";
-import { useWorkspace, WorkspaceStreams } from "../../../../../workspace";
+import { useWorkspace, WorkspaceAddons, WorkspaceStreams } from "../../../../../workspace";
 
 /**
- * A workspace: its streams, open while any of its areas is, and its frame, ui's AppShell, with
- * the way between its areas, between workspaces and tenants, and the account.
+ * A workspace: its streams, open while any of its areas is, its integrations, read as it opens,
+ * and its frame, ui's AppShell, with the way between its areas, between workspaces and tenants,
+ * and the account. Integrations that can't be read are their defaults, never a failed page.
  */
 export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace")({
   head: ({ params }) => ({ meta: [{ title: `${params.workspace} · ${params.tenant} · portalr` }] }),
-  loader: ({ context }) =>
-    context.queryClient.ensureQueryData(context.queries.grantr.memberships(context.user)),
+  loader: ({ context, params }) =>
+    Promise.all([
+      context.queryClient.ensureQueryData(context.queries.grantr.memberships(context.user)),
+      context.queryClient.prefetchQuery(
+        context.queries.grantr.enabledIntegrations(params.tenant, params.workspace),
+      ),
+    ]),
   component: Workspace,
 });
 
@@ -51,7 +57,9 @@ function Workspace() {
         nav={<Areas tenant={tenant} workspace={workspace} />}
         account={<Account signed={signed} />}
       >
-        <Outlet />
+        <WorkspaceAddons queries={queries} tenant={tenant} workspace={workspace}>
+          <Outlet />
+        </WorkspaceAddons>
       </AppShell>
     </WorkspaceStreams>
   );

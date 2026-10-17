@@ -2,6 +2,7 @@
 
 from typing import Annotated, Any, override
 
+from dspy.adapters import JSONAdapter
 from dspy.utils import DummyLM
 from pydantic import BaseModel, Field
 
@@ -43,8 +44,11 @@ class InstructionAware(DummyLM):
 
 
 def reflection_lm() -> DummyLM:
-    """Proposes the instruction that makes InstructionAware judge well."""
-    return DummyLM([{"new_instruction": f"```\n{MARKER}\n```"}] * 20)
+    """Proposes the instruction that makes InstructionAware judge well.
+
+    It answers in JSON, as GEPA's instruction proposer asks it to (``JSONAdapter``).
+    """
+    return DummyLM([{"new_instruction": MARKER}] * 20, adapter=JSONAdapter())
 
 
 def pluses(name: str, counts: list[int]) -> Dataset[Reply, Score]:

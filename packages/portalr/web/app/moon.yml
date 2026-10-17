@@ -1,6 +1,8 @@
 # The people's UI: sign in, pick a tenant and a workspace, and work.
 language: 'typescript'
 layer: 'application'
+# Its tests run in Chromium, which CI keeps apart from other tests' containers (lattice ADR-0002).
+tags: ['browser']
 dependsOn:
   - 'client'
   - 'notices'

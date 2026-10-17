@@ -12,15 +12,15 @@
   <a href="https://github.com/alexnodeland/lattice/blob/main/packages/portalr/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-6B2FA0"></a>
 </p>
 
-**portalr** is the planned portal into an application built on lattice: an `app` UI for the people who use it, to chat with its agents and see their artifacts, proposals, rules and runs, and an `admin` UI for those who run it, to manage access and see feedback, evaluations, usage and spend. Both will be static single-page apps in React, sharing a typed `client` and a `ui` kit, and served by a router the application mounts beside the libraries'.
+**portalr** is the portal into an application built on lattice: an `app` UI for the people who use it, to chat with its agents and see their artifacts, proposals, rules and runs, and an `admin` UI for those who run it, to manage access and see feedback, evaluations, usage and spend. Both are static single-page apps in React, sharing a typed `client` and a `ui` kit, and served by a router the application mounts beside the libraries'.
 
-> **Status:** in progress, not yet usable. Built so far: its decisions and [v0.1 plan](https://lattice.alexnodeland.com/portalr/rfcs/0001-v0.1-implementation-plan/), the Bun workspace, its mark with `ui`'s tokens and first primitives, the typed `client`, and the router with its readers, tested against the stack's tools for two tenants, and the app's sign-in and its tenant and workspace pickers ([architecture](https://lattice.alexnodeland.com/portalr/architecture/)). The app's areas and the admin UI come with the plan's later phases.
+> **Status:** built, and not yet released. The router, the app's areas and the admin UI, including the operators' tenants and tools and people shown by email, are built and tested, and stackr's template mounts it ([guides](https://lattice.alexnodeland.com/portalr/getting-started/), [architecture](https://lattice.alexnodeland.com/portalr/architecture/)). Not built yet: the scenarios against a generated application and the acceptance steps (phase 7b of the [plan](https://lattice.alexnodeland.com/portalr/rfcs/0001-v0.1-implementation-plan/)), magic links, and a control for colour-blind mode. It is not on PyPI: install its wheel.
 
 ## Why
 
 Every surface in lattice is an API, a WebSocket or an MCP server, so an application built on it has to build its own UI before anyone can use it, and running one is blind without an admin UI. [lattice RFC-0002](https://lattice.alexnodeland.com/rfcs/0002-portalr-the-portal/) designs that UI once, and portalr is where it is built.
 
-## What it will do
+## What it does
 
 - **The browser calls each package's own routes.** A chat goes to artifactr's WebSocket, a rule to reflexr's REST, a grant to grantr's API, on one origin with one token. Nothing proxies them, so nothing re-declares their types ([ADR-0001](https://lattice.alexnodeland.com/portalr/adr/0001-a-router-the-application-mounts/)).
 - **Two static apps on Vite, in React 19 and TanStack,** with no server rendering and no Node server ([ADR-0002](https://lattice.alexnodeland.com/portalr/adr/0002-react-and-tanstack-as-two-static-single-page-apps/)).
@@ -31,9 +31,11 @@ Every surface in lattice is an API, a WebSocket or an MCP server, so an applicat
 
 ## Documentation
 
-portalr's documentation is its section of lattice's site, at **<https://lattice.alexnodeland.com/portalr/>**, built from [`docs/portalr/`](https://github.com/alexnodeland/lattice/tree/main/docs/portalr). Its guides and architecture come with the phases that build what they describe.
+portalr's documentation is its section of lattice's site, at **<https://lattice.alexnodeland.com/portalr/>**, built from [`docs/portalr/`](https://github.com/alexnodeland/lattice/tree/main/docs/portalr).
 
-- [Architecture decision records](https://lattice.alexnodeland.com/portalr/adr/): why each part will be the way it is.
+- [Getting started](https://lattice.alexnodeland.com/portalr/getting-started/): install the wheel, mount the router, sign in.
+- [Guides](https://lattice.alexnodeland.com/portalr/guides/app/): the app, the admin UI, an operator's runbook, and what portalr keeps from view.
+- [Architecture decision records](https://lattice.alexnodeland.com/portalr/adr/): why each part is the way it is.
 - [RFCs](https://lattice.alexnodeland.com/portalr/rfcs/): the v0.1 plan, its phases and what each waits on.
 - [lattice RFC-0002](https://lattice.alexnodeland.com/rfcs/0002-portalr-the-portal/): the design portalr builds.
 - [Brand](https://lattice.alexnodeland.com/portalr/assets/brand/): the marks and their colours.

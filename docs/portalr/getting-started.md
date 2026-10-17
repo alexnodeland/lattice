@@ -4,7 +4,7 @@ This page gets portalr's two UIs, `app` and `admin`, running inside an applicati
 
 !!! note "What is built"
 
-    Every area of both UIs described in these guides is built and tested. Not built yet: the application template's question for portalr (phase 7 of the [plan](rfcs/0001-v0.1-implementation-plan.md)), so a generated application doesn't mount it for you; magic links and other sign-in providers (a password signs in); showing people by email ([issue #169](https://github.com/alexnodeland/lattice/issues/169)); and a colour-blind palette toggle. portalr is not on PyPI.
+    Every area of both UIs described in these guides is built and tested. [stackr's template](../stackr/guides/template.md) asks a `portal` question and mounts portalr for you ([stackr ADR-0038](../stackr/adr/0038-portalr-in-the-template.md)); this page is for an application that mounts it itself, and says what the template does for you. Not built yet: the UIs' scenarios against a generated application and the Acceptance job's portalr steps (phase 7b of the [plan](rfcs/0001-v0.1-implementation-plan.md)); the template passing `people=`, so a generated application shows people by a short id, not by email; magic links and other sign-in providers (a password signs in); and a control for colour-blind mode, whose hook is built. portalr is not on PyPI.
 
 ## What you need
 
@@ -15,10 +15,10 @@ portalr reads and writes through the packages you already run, so it needs their
 | [grantr](../grantr/index.md) | Who may see and do what. Every read and command is checked by it, and the UIs ask it what to show |
 | [artifactr](../artifactr/index.md)'s router | The app's workspaces, threads, artifacts and proposals |
 | [reflexr](../reflexr/index.md)'s router | The app's rules and runs, and admin's Runs |
-| [Supabase Auth](../stackr/guides/supabase.md) | Signing in, and inviting people |
+| [Supabase Auth](../stackr/guides/supabase.md) | Signing in, inviting people, and naming them by email |
 | Any of Tempo, Loki, Prometheus, Langfuse, LiteLLM and Grafana | Admin's traces, logs and health, feedback, spend, and the operators' links. Each is optional: a tool you don't run is "not configured", and only its own area says so |
 
-[stackr](../stackr/index.md)'s stack runs all of them, and its template generates an application that mounts the libraries.
+[stackr](../stackr/index.md)'s stack runs all of them, and its template generates an application that mounts the libraries, and portalr beside them when its `portal` question is answered yes, which is the default with grantr.
 
 ## Install
 
@@ -47,7 +47,7 @@ portalr needs Python 3.12 or newer. Its wheel carries the two built UIs, which V
 
 === "Once released"
 
-    Once released, a release of lattice attaches portalr's wheel, and grantr's and lattice-core's, to its GitHub release; download them from the repository's [releases](https://github.com/alexnodeland/lattice/releases) and `uv add` the three wheels. portalr has no release yet.
+    Once released, each package's GitHub release has its wheel and sdist attached, and is published to PyPI once the repository turns that on ([ADR-0023](../adr/0023-publishing-to-pypi-from-the-release-workflow.md)). Until then, download portalr's, grantr's and lattice-core's wheels from the repository's [releases](https://github.com/alexnodeland/lattice/releases) and `uv add` the three. portalr has no release yet.
 
 !!! warning "A git install has no UIs"
 
@@ -64,6 +64,7 @@ portalr needs Python 3.12 or newer. Its wheel carries the two built UIs, which V
 | `readers` | The tools your stack runs, each optional |
 | `invite` | Supabase Auth's admin API, as a function from an email to a user id. Without it, there is no invitation route and no way to create a tenant from admin |
 | `site` | Your Supabase project's URL and *publishable* key, and where you mounted each router |
+| `people` | Optional. Names people by email: a function from user ids to the emails it can find, such as `portalr.people.SupabasePeople(url=, secret_key=)` over Supabase Auth's admin API. Without it, there is no people route, and the UIs show people by a short id |
 
 ```python
 from fastapi import FastAPI
@@ -90,6 +91,11 @@ async def invite(email: str) -> str:
     return email.partition("@")[0]
 
 
+async def people(ids):
+    """A stand-in for ``SupabasePeople``: everyone's email is their id at example.com."""
+    return {each: f"{each}@example.com" for each in ids}
+
+
 app = FastAPI()
 app.include_router(
     portalr_router(
@@ -98,6 +104,7 @@ app.include_router(
         readers=Readers(),
         invite=invite,
         site=Site(supabase_url="https://project.supabase.co", supabase_key="sb_publishable_x"),
+        people=people,
     ),
     prefix="/portalr",
 )
@@ -153,9 +160,9 @@ A test of this guide signs a token with a generated key and checks that this fun
 
     A Supabase project that still signs with the legacy shared secret issues HS256 tokens: verify those with `algorithms=["HS256"]` and the secret (`SUPABASE_JWT_SECRET`, in the project's settings) in place of `key`. The template accepts either or both. Prefer moving the project to asymmetric keys.
 
-A person's grantr id is their Supabase user's `sub`, an opaque UUID. grantr holds no names, so admin shows people by that id ([issue #169](https://github.com/alexnodeland/lattice/issues/169) is the plan to show emails).
+A person's grantr id is their Supabase user's `sub`, an opaque UUID, and grantr holds no names. With `people`, the UIs show people by email, which they ask of `GET /portalr/v1/people` for the people the caller may see ([ADR-0038](adr/0038-people-by-email.md); [what portalr keeps from view](guides/privacy.md#emails-and-names) says who sees whose). Without it, or for an id it can't name, they show the first eight characters of a long id, such as `3f2a91c4…`.
 
-`Site` refuses a secret key: `config.json` is public, and a secret (`sb_secret_…` or a `service_role` JWT) bypasses row security. The `invite` function is the one place the secret key lives, in your application.
+`Site` refuses a secret key: `config.json` is public, and a secret (`sb_secret_…` or a `service_role` JWT) bypasses row security. The `invite` and `people` functions are the only places the secret key lives, in your application.
 
 ## What the router serves
 
@@ -163,7 +170,7 @@ A person's grantr id is their Supabase user's `sub`, an opaque UUID. grantr hold
 |---|---|
 | `/portalr/app/` and `/portalr/admin/` | The built UIs: hashed assets cached for good, the index for every client-side route, with a strict Content-Security-Policy |
 | `GET /portalr/config.json` | What the UIs need to know about your deployment, below |
-| `/portalr/v1/…` | portalr's own reads and its two commands: [the admin guide](guides/admin.md) and [the operators' runbook](guides/operators.md) say what each is for |
+| `/portalr/v1/…` | portalr's own reads, its two commands, and, with `people`, the emails of people: [the admin guide](guides/admin.md) and [the operators' runbook](guides/operators.md) say what each is for |
 
 The UIs call the other routers directly, on the same origin and with the same token: a chat goes to artifactr's WebSocket, a rule to reflexr's REST, a grant to grantr's API. Nothing proxies them.
 
@@ -177,14 +184,16 @@ The UIs read this first. It is public, so it holds no secret:
 | `supabase.key` | Its publishable key |
 | `surfaces` | Where you mounted each router: `artifactr` (default `/artifactr/v1`), `reflexr` (default `/reflexr/v1`), `grantr` (default `""`: its paths carry `/grantr/v1` themselves) and `portalr` (default `/portalr/v1`). Pass `Surfaces(...)` in `Site` if you mounted them elsewhere |
 | `readers` | Which tools are configured, by name: `tempo`, `loki`, `prometheus`, `langfuse`, `litellm` and `grafana`, each true or false |
+| `people` | Whether the router names people by email: true where `people` was passed |
 
 ```python
 from httpx import ASGITransport, AsyncClient
 
 async with AsyncClient(transport=ASGITransport(app=app), base_url="http://app") as client:
     config = (await client.get("/portalr/config.json")).json()
-    assert sorted(config) == ["readers", "supabase", "surfaces"]
+    assert sorted(config) == ["people", "readers", "supabase", "surfaces"]
     assert config["readers"]["tempo"] is False
+    assert config["people"] is True
 ```
 
 ## Name portalr's actions to grantr

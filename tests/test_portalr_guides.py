@@ -4,11 +4,15 @@ The getting-started page's Python blocks run in order, in one coroutine, so that
 sees what an earlier one made; a block titled "Illustrative" needs a sign-in and is left out. The
 rest of what the guides state, which is the code's to say, is held here: the keys of
 ``config.json``, the actions of portalr's catalog, the limits and the lists a reader withholds by,
-the fields of the record an operator's links leave, and that every route of both UIs is in the
-architecture page and every guide is in the section's navigation.
+the fields of the record an operator's links leave, who sees whose email and how long it is kept,
+the look the UIs' tokens give (a compact admin, status colours, colour-blind mode as a hook that
+nothing sets yet), the stack's spend key and sign-in allow-list, and that every route of both UIs
+is in the architecture page and every guide is in the section's navigation.
 """
 
 import asyncio
+import dataclasses
+import inspect
 import json
 import logging
 import re
@@ -32,7 +36,10 @@ from grantr.core.roles import Catalog
 from grantr.fastapi import Caller, Unauthorized
 from portalr.access import record_links
 from portalr.actions import ACTIONS
+from portalr.fastapi import portalr_router
+from portalr.fastapi.router import MAX_PEOPLE
 from portalr.fastapi.site import Surfaces
+from portalr.people import SupabasePeople
 from portalr.readers import LogQuery, Readers
 from portalr.readers import loki as loki_reader
 from portalr.readers import tempo as tempo_reader
@@ -43,6 +50,7 @@ from reflexr.workspace import ACTIONS as REFLEXR
 
 ROOT = Path(__file__).parent.parent
 DOCS = ROOT / "docs" / "portalr"
+WEB = ROOT / "packages" / "portalr" / "web"
 BLOCK = re.compile(r"```(\w+)([^\n]*)\n(.*?)```", flags=re.DOTALL)
 GUIDES = ("app", "admin", "operators", "privacy")
 
@@ -77,7 +85,9 @@ def table_rows(page: str, heading: str) -> dict[str, str]:
     for line in section.splitlines()[1:]:
         if line.startswith("#") and rows:
             break
-        if line.startswith("| ") and not line.startswith(("| Key", "| Action", "|---")):
+        if line.startswith("| ") and not line.startswith(
+            ("| Key", "| Action", "| Argument", "|---")
+        ):
             first, *rest = [cell.strip() for cell in line.strip("|").split("|")]
             rows[first.strip("`")] = " ".join(rest)
     return rows
@@ -85,11 +95,24 @@ def table_rows(page: str, heading: str) -> dict[str, str]:
 
 def test_config_json_is_what_the_page_says() -> None:
     rows = table_rows("getting-started.md", "### `config.json`")
-    assert list(rows) == ["supabase.url", "supabase.key", "surfaces", "readers"]
+    assert list(rows) == ["supabase.url", "supabase.key", "surfaces", "readers", "people"]
     for field, default in Surfaces().model_dump().items():
         assert f"`{field}` (default `{default or chr(34) * 2}`" in rows["surfaces"], field
     for tool in Readers().configured():
         assert f"`{tool}`" in rows["readers"], tool
+
+
+def test_the_routers_arguments_are_those_the_page_names() -> None:
+    rows = table_rows("getting-started.md", "## Mount the router")
+    keyword = [
+        name
+        for name, parameter in inspect.signature(portalr_router).parameters.items()
+        if parameter.kind is inspect.Parameter.KEYWORD_ONLY
+    ]
+    # Every argument but ``ui``, which only a test passes, in the order the router takes them.
+    assert list(rows) == [name for name in keyword if name != "ui"]
+    assert "SupabasePeople(url=, secret_key=)" in rows["people"]
+    assert {"url", "secret_key"} <= set(inspect.signature(SupabasePeople).parameters)
 
 
 def test_the_actions_are_those_the_page_names() -> None:
@@ -125,6 +148,94 @@ def test_the_limits_the_guides_state_are_the_codes() -> None:
     # The levels a record may be shown at.
     for level in LEVELS:
         assert f"`{level}`" in privacy, level
+
+
+def test_who_sees_whose_email_and_for_how_long_is_the_codes() -> None:
+    privacy = text("guides/privacy.md")
+    assert f"at most {MAX_PEOPLE} ids" in privacy
+    defaults = {each.name: each.default for each in dataclasses.fields(SupabasePeople)}
+    assert defaults["size"] == 2048
+    assert "at most 2,048 ids" in privacy
+    assert (defaults["found_for"], defaults["missing_for"], defaults["failed_for"]) == (300, 60, 5)
+    assert "an email for five minutes, an id with no email for one minute" in privacy
+    assert "a failed read for five seconds" in privacy
+    people = (ROOT / "packages" / "portalr" / "src" / "portalr" / "people.py").read_text()
+    assert "_MOST_RETRY_AFTER: Final = 60.0" in people
+    assert "up to a minute" in privacy
+    # The browser's cache, and the short id a person is shown by without an email.
+    client = (WEB / "client" / "src" / "people.ts").read_text()
+    assert "const SHORT = 8;" in client
+    assert "first eight characters" in text("getting-started.md")
+    assert "first eight characters" in text("guides/admin.md")
+    queries = (WEB / "client" / "src" / "queries.ts").read_text()
+    people_query = queries.split("people: (tenant: string | null, ids: readonly string[]) =>\n")[2]
+    assert "staleTime: 5 * 60_000,\n          gcTime: 5 * 60_000," in people_query
+    assert "query cache's memory for five minutes" in privacy
+    openapi = json.loads(
+        (ROOT / "packages" / "portalr" / "schemas" / "portalr.openapi.json").read_text()
+    )
+    assert "/portalr/v1/people" in openapi["paths"]
+
+
+def test_the_deployment_audit_shows_tenant_creations_as_the_runbook_says() -> None:
+    audit = (WEB / "admin" / "src" / "audit.ts").read_text()
+    assert 'case "deployment_tenant_created":' in audit
+    assert "created the tenant ${event.tenant}, owned by" in audit
+    runbook = text("guides/operators.md")
+    assert "`deployment_tenant_created`" in runbook
+    assert '"created the tenant acme, owned by …"' in runbook
+
+
+def test_the_look_the_guides_describe_is_the_kits() -> None:
+    tokens = (WEB / "ui" / "src" / "tokens.css").read_text()
+    shell = (WEB / "ui" / "src" / "app-shell.tsx").read_text()
+    admin = text("guides/admin.md")
+    # Admin is compact, and the app is not: 2.25rem and 2.75rem rows, at 16px to the rem.
+    assert 'data-density={ui === "admin" ? "compact" : undefined}' in shell
+    assert re.search(r"\[data-density=\"compact\"\] \{\n  --row-height: 2\.25rem;", tokens)
+    assert "  --row-height: 2.75rem;" in tokens
+    assert "rows are 36px high, where the app's are 44px" in admin
+    # Status colours: a red and a gold, with a shape and a word.
+    assert "--status-failed:" in tokens
+    assert "--status-warn:" in tokens
+    run_list = (WEB / "ui" / "src" / "run-list.tsx").read_text()
+    assert 'dead_lettered: ["failed", "Dead-lettered"]' in run_list
+    assert 'retrying: ["retrying", "Retrying"]' in run_list
+    home = (WEB / "admin" / "src" / "home.ts").read_text()
+    assert "max * 0.8" in home
+    assert 'word: "Near budget"' in home
+    assert 'word: "Over budget"' in home
+    assert "**Near budget** at 80% of it and **Over budget** past it" in admin
+    assert "Show the figures" in (WEB / "ui" / "src" / "chart.tsx").read_text()
+    assert "**Show the figures**" in admin
+
+
+def test_colour_blind_mode_is_a_hook_that_nothing_sets_yet() -> None:
+    """When a control sets ``data-cvd``, this fails: say so in the guides, and drop their TODO."""
+    assert "[data-cvd] {" in (WEB / "ui" / "src" / "tokens.css").read_text()
+    setters = [
+        str(path.relative_to(WEB))
+        for path in [*WEB.glob("*/src/**/*.ts"), *WEB.glob("*/src/**/*.tsx")]
+        if ".test." not in path.name
+        and re.search(r"data-cvd=|dataset\.cvd|setAttribute\(\"data-cvd\"", path.read_text())
+    ]
+    assert setters == [], "a control sets colour-blind mode: update the guides"
+    for guide in ("guides/admin.md", "guides/app.md"):
+        assert "control for colour-blind mode" in text(guide), guide
+        assert "nothing in the ui sets it yet" in text(guide).lower(), guide
+
+
+def test_the_stacks_spend_key_and_sign_in_are_what_the_runbook_says() -> None:
+    runbook = text("guides/operators.md")
+    script = (ROOT / "packages" / "stackr" / "scripts" / "create-portal-key").read_text()
+    (listed,) = re.findall(r"^ROUTES = (\[.*\])$", script, flags=re.MULTILINE)
+    routes = json.loads(listed)
+    assert ", ".join(f"`{route}`" for route in routes[:-1]) + f" and `{routes[-1]}`" in runbook
+    caddy = (ROOT / "packages" / "stackr" / "deploy" / "host" / "Caddyfile").read_text()
+    allowed = re.findall(r"method (\w+)\n\s+path (/auth/v1/\w+)", caddy)
+    assert len(allowed) == 3
+    for method, path in allowed:
+        assert f"`{method} {path}`" in runbook, (method, path)
 
 
 def test_reflexr_unreachable_is_said_after_the_ten_seconds_the_guide_names() -> None:

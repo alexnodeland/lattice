@@ -45,6 +45,10 @@ nav:
   - adr/0033-third-party-notices-for-the-bundled-javascript.md
   - adr/0034-tenants-and-the-deployments-audit.md
   - adr/0035-tools-and-the-record-of-opening-them.md
+  - adr/0036-the-chart-theme-and-colour-blind-mode.md
+  - adr/0037-form-controls-and-row-actions.md
+  - adr/0038-people-by-email.md
+  - adr/0039-elevation-status-colour-states-and-density.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

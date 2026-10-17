@@ -18,9 +18,9 @@ The portal into an application built on lattice: an `app` UI for the people who 
 
 !!! note "Built, and not yet released"
 
-    Built and tested: the router and its readers, the app's areas (threads and chat, artifacts, proposals, runs, rules, restricting and sharing a thread), and the admin UI (home, access, audit, feedback, usage, traces, logs and health, runs, and the operators' tenants, deployment audit and tools). Each has a scenario in a browser against a test application. The [guides](getting-started.md) describe what is built, and [the architecture](architecture.md) how.
+    Built and tested: the router and its readers, the app's areas (threads and chat, artifacts, proposals, runs, rules, restricting and sharing a thread), the admin UI (home, access, audit, feedback, usage, traces, logs and health, runs, and the operators' tenants, deployment audit and tools), people shown by email, and the `portal` question of [stackr's template](../stackr/guides/template.md), which mounts it in a generated application. Each area has a scenario in a browser against a test application. The [guides](getting-started.md) describe what is built, and [the architecture](architecture.md) how.
 
-    Not built yet: the application template's question for portalr, and its acceptance tests, in phase 7 of the [plan](rfcs/0001-v0.1-implementation-plan.md), so a generated application doesn't mount it for you; magic links and other sign-in providers; showing people by email, not their Supabase id ([issue #169](https://github.com/alexnodeland/lattice/issues/169)); and a colour-blind palette toggle. It is not on PyPI: install its wheel ([Getting started](getting-started.md#install)).
+    Not built yet: the UIs' scenarios against a generated application and the Acceptance job's portalr steps (phase 7b of the [plan](rfcs/0001-v0.1-implementation-plan.md)); the template naming people by email; magic links and other sign-in providers; and a control for colour-blind mode, whose hook is built. It is not on PyPI: install its wheel ([Getting started](getting-started.md#install)).
 
 ## Why: lattice has no face
 
@@ -37,7 +37,7 @@ Every surface in lattice is an API, a WebSocket or an MCP server, so an applicat
 - **Every read filtered by tenant,** in one module, over the stack's shared stores ([ADR-0006](adr/0006-shared-stores-every-read-filtered.md)).
 - **Permissions asked, never guessed.** The UIs ask grantr what the user may do, and the server checks each command again.
 
-[RFC-0001](rfcs/0001-v0.1-implementation-plan.md#phases) builds these in eight phases after the foundation, and says what each waited on in grantr and the other packages. Phases 1 to 6 and 8 are done; phase 7, the template and acceptance, is not.
+[RFC-0001](rfcs/0001-v0.1-implementation-plan.md#phases) builds these in eight phases after the foundation, and says what each waited on in grantr and the other packages. Phases 1 to 6 and 8 are done. Of phase 7, the template's portal is done, and the scenarios against a generated application and the acceptance steps are not.
 
 ## Where to go next
 

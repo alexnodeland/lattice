@@ -36,7 +36,24 @@ A rule's run shows its status, attempts, retries and the **code** of why it last
 
 ## Emails and names
 
-grantr holds no names, and portalr shows people by their grantr id, which with Supabase is the account's UUID. The claim to rely on is a narrow one: **portalr never logs, stores, echoes or returns an email it is given for an invitation or an owner.** It sends it to Supabase Auth to invite or find someone, answers with the user id, and the page forgets it once it is used.
+grantr holds no names: a person is their grantr id, which with Supabase is the account's UUID. Two claims hold, and they are separate ([ADR-0038](../adr/0038-people-by-email.md)).
+
+**An email given for an invitation or an owner is never logged, stored, echoed or returned.** portalr sends it to Supabase Auth to invite or find someone, answers with the user id, and the page forgets it once it is used.
+
+**Emails are shown only where the application names people, and only to those who may see them.** With the router's `people` hook (`SupabasePeople`, over Supabase Auth's admin API with the secret key), the UIs ask `GET /portalr/v1/people?id=...` for the ids they show, and the answer holds only:
+
+| Caller | Sees the emails of |
+|---|---|
+| An operator (`portalr:read_deployment`) | Anyone, a former member of a tenant too |
+| A member of the tenant `X-Tenant` names | That tenant's members |
+| A key, or a person who is neither | No one: refused (403) |
+
+The caller and every id are checked against grantr's memberships before the cache or Supabase is asked, so an id that isn't a member is left out without a call, and the route can't tell whether someone has an account. An id that is unknown, not allowed or without an email is left out the same way, and shown as a short id. A call asks after at most 100 ids, and its answer is `no-store`. **A member of a tenant sees the email of every other member of it**, and an owner can't hide one from the others.
+
+Where those emails are kept:
+
+- **On the server**, in memory, in a cache of at most 2,048 ids: an email for five minutes, an id with no email for one minute, and a failed read for five seconds, or what Supabase's `Retry-After` asks, up to a minute. Nothing is written to disk, and an email outlives its user's deletion by up to five minutes.
+- **In the browser**, in the query cache's memory for five minutes, and never persisted: not in an address, `localStorage`, `sessionStorage`, a stream's state, a log or a span. A request's URL holds the ids, never the emails.
 
 Emails do exist elsewhere, and portalr does not hide them:
 
@@ -44,7 +61,7 @@ Emails do exist elsewhere, and portalr does not hide them:
 - The browser's session, in `localStorage` under `portalr`, holds the signed-in user's `email`, and the access token carries an `email` claim, which is sent with every request. Your `resolve_actor` and any logging of requests are yours.
 - People type emails, and anything else, into messages, comments, prompts and log lines. What those hold is the content the other sections withhold by default.
 
-**Showing people by email** in Members and Share (a server read of GoTrue's admin API) is planned ([issue #169](https://github.com/alexnodeland/lattice/issues/169)) and is not built, so until it lands the UIs show ids.
+Without the `people` hook, which stackr's template doesn't pass yet, there is no people route, and the UIs show a short id for everyone.
 
 ## The browser
 

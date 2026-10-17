@@ -1,15 +1,25 @@
 """CI runs the scenarios of each UI one after another (lattice ADR-0002, portalr issue 172).
 
 Issue 172, a scenario's first sign-in sometimes never rendering its Email field, was diagnosed as
-``net::ERR_NETWORK_CHANGED``: each UI's scenarios bring a compose stack up and down, Chromium on
-Linux drops its requests when the host's network interfaces change, and the other project's stack
-coming down changes them. PR 168 made CI run such a task in one project at a time, which is
-``ONE_AT_A_TIME``. This test is a regression guard and not the fix: it holds every moon task that
-runs ``scripts/bdd`` to that set.
+``net::ERR_NETWORK_CHANGED``: Chromium on Linux fails every request it has in flight, even one to
+127.0.0.1, when a network interface comes or goes, so the sign-in page's script chunks fail and
+its route never renders. A compose stack coming up or down adds and removes a bridge and its
+veths. PR 168 made CI run such a task in one project at a time, which is ``ONE_AT_A_TIME``, so
+one UI's stack no longer comes down while the other's Chromium loads.
 
-Its limit: it matches the literal ``scripts/bdd`` (``STACK_SCRIPTS``). A task that starts a stack
-another way, such as stackr's ``scripts/smoke``, or something under ``examples/``, is not caught,
-and must be added to ``STACK_SCRIPTS`` as it is added.
+Issue 254, the browser unit tests failing to start, has the same mechanism, from other projects'
+containers, and PR 256 addresses it for those tests. Neither change covers the interface changes
+that the scenarios' own compose stack, or other Docker activity in the Acceptance job, can still
+make, so issue 172 is not fixed, and stays open.
+
+This test is a regression guard and not the fix: it holds every moon task that runs
+``scripts/bdd`` to ``ONE_AT_A_TIME``. Its limit: it matches the literal ``scripts/bdd``
+(``STACK_SCRIPTS``). A task that starts a stack another way, such as stackr's ``scripts/smoke``,
+or something under ``examples/``, is not caught, and must be added to ``STACK_SCRIPTS`` as it is
+added.
+
+TODO(#172): keep the scenarios' Chromium from seeing the interface changes of their own stack and
+of the job's other containers; a guard on how CI batches tasks can't.
 """
 
 import runpy

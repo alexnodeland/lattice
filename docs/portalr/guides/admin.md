@@ -2,7 +2,7 @@
 
 Admin, at `/portalr/admin/`, is the UI for a tenant's **owners and admins**: who has access, what changed, what people thought of the agent, what it costs, and what it did. An editor or a viewer who opens it is told there is no access. Operators have areas of their own, in [the runbook](operators.md).
 
-Every area shows only where grantr allows its read, and every read names its tenant. Each area's page opens with its own state: a tool that is down or isn't configured fails that area's cards alone, and says so ([ADR-0023](../adr/0023-admins-shell-and-home.md)).
+Every area shows only where grantr allows its read, and every read names its tenant. Each area's page opens with its own state: a tool that is down or isn't configured fails that area's cards alone, and says so in a notice, a shape beside its words ([ADR-0023](../adr/0023-admins-shell-and-home.md), [ADR-0039](../adr/0039-elevation-status-colour-states-and-density.md)). Admin is compact: a table's rows are 36px high, where the app's are 44px. A chart's figures are also a table, under **Show the figures**, for a keyboard or a screen reader.
 
 !!! info "What each area needs"
 
@@ -10,7 +10,7 @@ Every area shows only where grantr allows its read, and every read names its ten
 
 ## Home
 
-Cards for the tenant: members, workspaces, feedback, failed turns and spend. Each is read on its own, and a card whose tool is unavailable or unconfigured says why and leaves the others.
+Cards for the tenant: members, workspaces, feedback, failed turns and spend. Each is read on its own, and a card whose tool is unavailable or unconfigured says why and leaves the others. The spend card says **Near budget** at 80% of it and **Over budget** past it, each a word, a shape and a colour: gold, then red.
 
 ## Access
 
@@ -24,7 +24,7 @@ Where grantr's model is used: each part shows where its read is allowed, as a ta
 | Roles | The built-in roles, and custom ones you define from the catalog's actions |
 | Grants | Who holds which role on the tenant, a workspace or an item, given and revoked |
 
-People are shown by their grantr id, which is their Supabase user's UUID. portalr does not log, return or keep the email you invite; the admin UI keeps no list of emails ([Privacy](privacy.md#emails-and-names) says what it does not cover).
+People are shown by email where the application passes `people` to the router ([Getting started](../getting-started.md#mount-the-router)): in Members and its remove dialog, Groups, Grants, and Audit. Without it, or for someone it can't name, a person is the first eight characters of their id, such as `3f2a91c4…`; a service principal is its id. Audit's filter by who made a change still takes an id, since the address holds ids only. The email you invite is sent to Supabase Auth and not logged, returned or kept; [Privacy](privacy.md#emails-and-names) says who sees whose email, and for how long it is held.
 
 ## Audit
 
@@ -36,7 +36,7 @@ People's thumbs per day, each evaluation's mean per day, each workspace's share 
 
 ## Usage
 
-Spend per day against the tenant's LiteLLM budget, each day against its share of it where there is a budget, and each workspace's part from its `tenant-workspace:` tag, in a window of at most 91 days. A budget that is near or over is said as a word and a shape of its own, not a warning colour.
+Spend per day against the tenant's LiteLLM budget, each day against its share of it where there is a budget, and each workspace's part from its `tenant-workspace:` tag, in a window of at most 91 days. A day near its share (80% or more) or over it is a level of the tracker, named in its legend, and the one over is hatched, so colour is never the only cue.
 
 ## Traces
 
@@ -54,12 +54,11 @@ Spans show structure, timings and tokens. **What was said in a span, its prompt 
 
 A workspace's rule runs, live from reflexr's stream, for the workspace you pick. The default is **Needs attention**: the *dead-lettered* runs (rules' runs that failed every attempt; not the workspace's list of events a rule couldn't evaluate, and not the bridge's) and the *retrying*. **Every state** shows all.
 
-Each run offers **Retry**, **Skip** or **Cancel** as its state allows and grantr allows in that workspace. Each asks first, says what it does and what it can't undo, and takes an optional reason for Skip and Cancel. A command is sent once: the dialog can't be dismissed while it is under way, and a lost connection resends it under the same id, so the server carries it out once. A run lists **what people did to it**: who, when, why, from the log's own events. Only a run's reason code is shown, never its error message, which may hold what a person or a model said ([ADR-0032](../adr/0032-runs-in-admin.md)).
+A failed or dead-lettered run is edged in red and a retrying one in gold, each with a shape and a word of its own. Each run offers **Retry**, **Skip** or **Cancel** as its state allows and grantr allows in that workspace. Each asks first, says what it does and what it can't undo, and takes an optional reason for Skip and Cancel. A command is sent once: the dialog can't be dismissed while it is under way, and a lost connection resends it under the same id, so the server carries it out once. A run lists **what people did to it**: who, when, why, from the log's own events. Only a run's reason code is shown, never its error message, which may hold what a person or a model said ([ADR-0032](../adr/0032-runs-in-admin.md)).
 
 If reflexr can't be reached, the page says so after ten seconds of connecting (`PATIENCE` in `web/admin/src/runs.ts`), and keeps trying.
 
 ## What is not built
 
-- **Names:** people are ids, not emails ([issue #169](https://github.com/alexnodeland/lattice/issues/169)).
-- **Colour-blind palette toggle:** a later polish change.
+- **A control for colour-blind mode.** The mode is built as a hook: `data-cvd` on the page's root changes the charts' series to a palette and patterns that hold for protanopia, deuteranopia and tritanopia ([ADR-0036](../adr/0036-the-chart-theme-and-colour-blind-mode.md)). Nothing in the UI sets it yet.
 - **Deleting a tenant, or granting an operator,** from admin: those are grantr's, from its API or `make operator`.

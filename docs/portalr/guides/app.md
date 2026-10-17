@@ -22,7 +22,7 @@ Markdown renders through Streamdown, with no raw HTML; links go to the web, mail
 
 ### Restricting and sharing a thread
 
-A thread's menu, "Thread actions", holds **Share…** and **Restrict** (or **Lift restriction**), shown only where grantr allows them on that thread. A restricted thread is hidden from everyone who doesn't hold a role on it. **Share…** lists who holds a role on the thread, each with Revoke where grantr allows it, and shares it with a person as a viewer or an editor. If a thread is restricted while someone has it open, their page says "This isn't available to you any more" in place of the chat.
+A thread's menu, "Thread actions", holds **Share…** and **Restrict** (or **Lift restriction**), shown only where grantr allows them on that thread. A restricted thread is hidden from everyone who doesn't hold a role on it. **Share…** lists who holds a role on the thread, each with Revoke where grantr allows it, and shares it with a person as a viewer or an editor. People are shown by email where the application names them ([Getting started](../getting-started.md#mount-the-router)), and otherwise by a short id; so is a message's author in the chat, unless they posted under a name of their own. If a thread is restricted while someone has it open, their page says "This isn't available to you any more" in place of the chat.
 
 ## Artifacts
 
@@ -57,6 +57,5 @@ Where grantr allows, a **stored rule** can be installed from reflexr's JSON, edi
 
 ## What is not here
 
-- **No other sign-in than a password** yet: magic links and your own providers wait for the template (phase 7).
-- **Names:** people appear by grantr id in a Share dialog, since grantr holds no names ([issue #169](https://github.com/alexnodeland/lattice/issues/169)).
-- **Colour:** status is a word and a shape, never colour alone. A palette toggle for colour-blind readers is a later polish change, not built.
+- **No other sign-in than a password** yet: magic links and your own providers are planned for phase 7 ([ADR-0014](../adr/0014-the-apps-shell.md)), and the template's portal, the first part of it, doesn't bring them.
+- **A control for colour-blind mode.** Status is a word and a shape as well as a colour, so colour is never the only cue, and the charts' colour-blind mode is built as a hook (`data-cvd`, [ADR-0036](../adr/0036-the-chart-theme-and-colour-blind-mode.md)), but nothing in the UI sets it yet.

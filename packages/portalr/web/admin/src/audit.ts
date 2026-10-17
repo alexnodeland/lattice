@@ -94,9 +94,13 @@ export function said(event: AuditEvent, names: Names = shortId): string {
       return `lifted the restriction on ${where(event.on)}`;
     case "integration_set": {
       const place = event.workspace === null ? "the tenant" : `workspace ${event.workspace}`;
-      return event.on === null
-        ? `set ${event.key} back to inherited in ${place}`
-        : `turned ${event.key} ${event.on ? "on" : "off"} in ${place}`;
+      if (event.on !== null) {
+        return `turned ${event.key} ${event.on ? "on" : "off"} in ${place}`;
+      }
+      // Unset, a workspace inherits the tenant's setting, and the tenant its default.
+      return event.workspace === null
+        ? `set ${event.key} back to the default in the tenant`
+        : `set ${event.key} back to inherited in ${place}`;
     }
     default: {
       // Every type is read above: a new type of grantr's fails to typecheck here.

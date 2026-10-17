@@ -58,6 +58,7 @@ export { Dialog } from "./dialog";
 export { EmptyState } from "./empty-state";
 export { failureSaid } from "./failure";
 export { Icon } from "./icon";
+export { IntegrationList, type IntegrationRow, type IntegrationSource } from "./integration-list";
 export { type Column, ItemTable } from "./item-table";
 export { type LineReveal, LogList } from "./log-list";
 export { Markdown } from "./markdown";

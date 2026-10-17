@@ -2,13 +2,16 @@
  * A workspace's streams, open while the workspace's routes are: artifactr's, whose store holds
  * its threads, messages, artifacts, proposals and turns, and reflexr's, whose store holds its
  * rules and runs. The routes under it read either store, and where its connection is; and what
- * either log says changed, once live, makes stale the reads it changed (`client`'s `stale`).
+ * either log says changed, once live, makes stale the reads it changed (`client`'s `stale`), as
+ * does a command artifactr refuses as `not_enabled`, which makes the workspace's integrations
+ * stale. Those integrations say which add-ons the Markdown inside may draw (portalr ADR-0045).
  */
 
 import {
   type Artifactr,
   type ArtifactrStream,
   artifactr,
+  type createQueries,
   type Reflexr,
   type ReflexrStream,
   reflexr,
@@ -18,8 +21,9 @@ import {
   type Surfaces,
   stale,
   streamUrl,
+  useEnabled,
 } from "@portalr/client";
-import { Alert, Reading } from "@portalr/ui";
+import { AddonsProvider, Alert, Reading } from "@portalr/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   createContext,
@@ -77,6 +81,7 @@ export function WorkspaceStreams({
       streams.reflexr.onLiveEvent((envelope) =>
         invalidate(stale.reflexr(tenant, workspace, envelope)),
       ),
+      streams.artifactr.onRefused((result) => invalidate(stale.refusal(tenant, workspace, result))),
     ];
     return () => {
       for (const stop of unhear) {
@@ -102,6 +107,31 @@ export function WorkspaceStreams({
     };
   }, [streams, signed]);
   return <Current value={streams}>{children}</Current>;
+}
+
+/**
+ * The add-ons the Markdown inside may draw, from the workspace's integrations: each its default
+ * until they are read, and where they can't be, so Mermaid stays off.
+ */
+export function WorkspaceAddons({
+  queries,
+  tenant,
+  workspace,
+  children,
+}: {
+  queries: ReturnType<typeof createQueries>;
+  tenant: string;
+  workspace: string;
+  children: ReactNode;
+}) {
+  const enabled = useEnabled(queries, tenant, workspace);
+  return (
+    <AddonsProvider
+      value={{ math: enabled("markdown:math"), mermaid: enabled("markdown:mermaid") }}
+    >
+      {children}
+    </AddonsProvider>
+  );
 }
 
 function useStreams(): Streams {

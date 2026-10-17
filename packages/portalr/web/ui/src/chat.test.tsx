@@ -374,6 +374,18 @@ test("an answer that wasn't sent can be given again", async () => {
   await expect.element(screen.getByRole("button", { name: "Approve" })).toBeEnabled();
 });
 
+test("a command refused as an integration off here says it isn't available", async () => {
+  const off = vi.fn(async () => ({
+    outcome: "refused" as const,
+    result: { rejection: { type: "not_enabled", integration: "excalidraw" } },
+  }));
+  const screen = await render(<ProposalCard proposal={proposal()} onRespond={off} />);
+  await screen.getByRole("button", { name: "Accept" }).click();
+  await expect
+    .element(screen.getByRole("alert"))
+    .toHaveTextContent("Not available in this workspace.");
+});
+
 test("a refused response to a proposal says so, and can be given again", async () => {
   const screen = await render(<ProposalCard proposal={proposal()} onRespond={sent("refused")} />);
   await screen.getByRole("button", { name: "Accept" }).click();

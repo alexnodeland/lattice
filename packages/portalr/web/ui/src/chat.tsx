@@ -26,13 +26,27 @@ import { TextField } from "./text-field";
 
 const card = "flex flex-col gap-2 rounded-lg border border-line bg-surface p-4 text-sm";
 
-/** How a command a part handed its caller ended, as `client`'s stream settles it. */
-export type Sent = Promise<{ readonly outcome: "done" | "refused" | "closed" }>;
+/**
+ * How a command a part handed its caller ended, as `client`'s stream settles it, with the
+ * server's answer where there was one, whose rejection says why it was refused.
+ */
+export type Sent = Promise<{
+  readonly outcome: "done" | "refused" | "closed";
+  readonly result?: { readonly rejection?: { readonly [key: string]: unknown } | null };
+}>;
 
 const UNSENT = {
   refused: "That wasn't done: the server refused it.",
   closed: "That wasn't sent: the connection closed.",
+  // An integration it needs is off here: said of the workspace, never of the reader's grants.
+  not_enabled: "Not available in this workspace.",
 } as const;
+
+type Rejection = NonNullable<Awaited<Sent>["result"]>["rejection"];
+
+/** Why a command wasn't done, as people read it. */
+const unsentSaid = (outcome: "refused" | "closed", rejection: Rejection) =>
+  outcome === "refused" && rejection?.type === "not_enabled" ? UNSENT.not_enabled : UNSENT[outcome];
 
 /** A command in flight: whether it is, and why the last one wasn't done. */
 function useSending() {
@@ -41,10 +55,10 @@ function useSending() {
   async function send(command: () => Sent): Promise<boolean> {
     setPending(true);
     setUnsent(null);
-    const { outcome } = await command();
+    const { outcome, result } = await command();
     setPending(false);
     if (outcome !== "done") {
-      setUnsent(UNSENT[outcome]);
+      setUnsent(unsentSaid(outcome, result?.rejection));
     }
     return outcome === "done";
   }

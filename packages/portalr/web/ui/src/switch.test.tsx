@@ -1,4 +1,5 @@
-import { expect, test } from "vitest";
+import { expect, onTestFinished, test } from "vitest";
+import { commands } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { Switch } from "./switch";
 import { token } from "./test/colours";
@@ -25,4 +26,58 @@ test("a caller's classes merge with the switch's", async () => {
   expect(track.classList).toContain("bg-surface");
   expect(track.classList).not.toContain("bg-paper");
   expect(track.classList).toContain("rounded-full");
+});
+
+test("under forced colours a switch keeps the system's colours, on and off apart", async () => {
+  onTestFinished(() => commands.forcedColors(false));
+  const screen = await render(
+    <div>
+      <Switch aria-label="On" defaultChecked />
+      <Switch aria-label="Off" />
+    </div>,
+  );
+  await commands.forcedColors(true);
+  const fills = (name: string) => {
+    const track = screen.getByRole("switch", { name }).element();
+    const thumb = track.firstElementChild as Element;
+    expect(getComputedStyle(track).forcedColorAdjust, name).toBe("none");
+    return [getComputedStyle(track).backgroundColor, getComputedStyle(thumb).backgroundColor];
+  };
+  const [onTrack, onThumb] = fills("On");
+  const [offTrack, offThumb] = fills("Off");
+  expect(onThumb).not.toBe(onTrack);
+  expect(offThumb).not.toBe(offTrack);
+  expect(onTrack).not.toBe(offTrack);
+});
+
+test("under forced colours a disabled switch is grey, on and off apart, and apart from an enabled one", async () => {
+  onTestFinished(() => commands.forcedColors(false));
+  const screen = await render(
+    <div>
+      <Switch aria-label="Enabled on" defaultChecked />
+      <Switch aria-label="Disabled on" defaultChecked disabled />
+      <Switch aria-label="Disabled off" disabled />
+    </div>,
+  );
+  await commands.forcedColors(true);
+  const fills = (name: string) => {
+    const track = screen.getByRole("switch", { name }).element();
+    const thumb = track.firstElementChild as Element;
+    return {
+      track: getComputedStyle(track).backgroundColor,
+      edge: getComputedStyle(track).borderTopColor,
+      thumb: getComputedStyle(thumb).backgroundColor,
+    };
+  };
+  const enabled = fills("Enabled on");
+  const on = fills("Disabled on");
+  const off = fills("Disabled off");
+  // Disabled and on: a grey track, which neither an enabled one's nor a disabled off one's is.
+  expect(on.track).not.toBe(enabled.track);
+  expect(on.track).not.toBe(off.track);
+  expect(on.thumb).not.toBe(on.track);
+  // Disabled and off: a grey frame and thumb, on the page.
+  expect(off.thumb).toBe(on.track);
+  expect(off.edge).toBe(on.track);
+  expect(off.thumb).not.toBe(off.track);
 });

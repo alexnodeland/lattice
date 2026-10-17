@@ -7,6 +7,7 @@ import {
   House,
   KeyRound,
   ListChecks,
+  Puzzle,
   ScrollText,
   Terminal,
   ThumbsUp,
@@ -29,7 +30,7 @@ export const Route = createFileRoute("/_signed/t/$tenant")({
     if (!administered(memberships).includes(params.tenant)) {
       throw notFound();
     }
-    // What its rail shows: Access, where grantr allows one of its parts.
+    // What its rail shows: Access, where grantr allows one of its parts, and the other areas.
     await allowedNow(context, params.tenant);
   },
   // Entering it, or switching to another tenant on it, makes it the choice.
@@ -78,6 +79,14 @@ function Tenant() {
           {anyPart(allowed) && (
             <NavLink icon={KeyRound} render={<Link to="/t/$tenant/access" params={{ tenant }} />}>
               Access
+            </NavLink>
+          )}
+          {allowed.has("grantr:manage_integrations") && (
+            <NavLink
+              icon={Puzzle}
+              render={<Link to="/t/$tenant/integrations" params={{ tenant }} />}
+            >
+              Integrations
             </NavLink>
           )}
           {allowed.has("grantr:read_audit") && (

@@ -15,9 +15,10 @@ from sqlalchemy.dialects import postgresql
 
 from relayr.sql.schema import _row_level_security
 
-MIGRATION = (
-    Path(__file__).parents[2] / "src/relayr/sql/migrations/versions/0004_row_level_security.py"
-)
+VERSIONS = Path(__file__).parents[2] / "src/relayr/sql/migrations/versions"
+MIGRATION = VERSIONS / "0004_row_level_security.py"
+TRACKER_ITEMS = VERSIONS / "0005_tracker_items.py"
+"""The migrations that create policies: 0004 for the tables before it, and 0005 for its own."""
 
 POLICIES = 3
 """How many policies the migration creates: one per table it names, frozen in it."""
@@ -39,22 +40,31 @@ class Recorder:
         self.calls.append((str(statement), parameters))
 
 
-def _migration(recorder: Recorder, monkeypatch: pytest.MonkeyPatch) -> ModuleType:
-    spec = importlib.util.spec_from_file_location("migration_rls", MIGRATION)
+def _migration(
+    recorder: Recorder, monkeypatch: pytest.MonkeyPatch, path: Path = MIGRATION
+) -> ModuleType:
+    spec = importlib.util.spec_from_file_location(f"migration_{path.stem}", path)
     assert spec is not None
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    op = SimpleNamespace(get_bind=lambda: recorder, execute=recorder.execute)
+    op = SimpleNamespace(
+        get_bind=lambda: recorder,
+        execute=recorder.execute,
+        create_table=lambda *_, **__: None,
+        drop_table=lambda *_, **__: None,
+        f=str,
+    )
     monkeypatch.setattr(module, "op", op)
     return module
 
 
-def test_create_schema_creates_the_policies_the_migration_does(
+def test_create_schema_creates_the_policies_the_migrations_do(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     migrated = Recorder()
     _migration(migrated, monkeypatch).upgrade()
+    _migration(migrated, monkeypatch, TRACKER_ITEMS).upgrade()
     created = Recorder()
     _row_level_security(cast("Connection", created))
     assert sorted(created.statements) == sorted(migrated.statements)
@@ -72,3 +82,16 @@ def test_the_migration_creates_and_drops_the_policies(monkeypatch: pytest.Monkey
     dropped = [s for s in recorder.statements if s.startswith("DROP POLICY")]
     disabled = [s for s in recorder.statements if s.endswith("DISABLE ROW LEVEL SECURITY")]
     assert (len(dropped), len(disabled)) == (POLICIES, len(migration.TABLES))
+
+
+def test_the_tracker_items_migration_keeps_its_table_to_its_tenant(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    recorder = Recorder()
+    _migration(recorder, monkeypatch, TRACKER_ITEMS).upgrade()
+    assert recorder.statements == [
+        "ALTER TABLE relayr_tracker_items ENABLE ROW LEVEL SECURITY",
+        "CREATE POLICY relayr_tracker_items_tenant ON relayr_tracker_items"
+        " USING (tenant_id = current_setting('lattice.tenant_id', true))"
+        " WITH CHECK (tenant_id = current_setting('lattice.tenant_id', true))",
+    ]

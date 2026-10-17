@@ -261,11 +261,11 @@ Not in scope: two-way sync of artifacts, Plane's Commercial edition and its v2 w
 ## Tracking
 
 - [ ] Sign-off on T1 to T7
-- [ ] relayr: the port, core, fake and contract test; the ledger's new methods, its contract test, and the migration with row-level security
-- [ ] relayr: the Plane and Vikunja adapters, with recorded fixtures
-- [ ] relayr: `TrackerActions`, `TrackerCapability` and `Allowlist.trackers`
+- [x] relayr: the port, core, fake and contract test; the ledger's new methods, its contract test, and the migration with row-level security ([relayr ADR-0033](../relayr/adr/0033-the-tracker-port-and-runs-that-write-to-it-once.md): the items table only, the followers' two with phase 2)
+- [ ] relayr: the Plane and Vikunja adapters, with recorded fixtures (both built; Vikunja's fixtures recorded, Plane's derived from its source until a Plane runs)
+- [x] relayr: `TrackerActions`, `TrackerCapability` and `Allowlist.trackers` ([relayr ADR-0034](../relayr/adr/0034-an-allowlist-for-the-tracker.md))
 - [ ] stackr: the two recipes, the checklist and `make tracker-check`; the template's `tracker` question and example rule
-- [ ] The unverified items settled, in an ADR
+- [ ] The unverified items settled, in an ADR (Vikunja's and Plane's from its source in [relayr ADR-0035](../relayr/adr/0035-what-phase-1-settled-of-the-trackers-unknowns.md); a live Plane's remain)
 - [ ] relayr: followers and their resume, `tracker:*` events and projections, nudges, the sweep and the budget
 - [ ] portalr: "filed as" and tracker links
 - [ ] Docs: relayr's guide and ADRs, stackr's tracker guide

@@ -34,6 +34,8 @@ sqlite = ["relayr-ai[sql]", "aiosqlite>=0.22"]
 postgres = ["relayr-ai[sql]", "asyncpg>=0.31"]
 otel = ["lattice-core-ai>=0.1.0", "opentelemetry-sdk>=1.45"]
 evals = ["evalr>=0.1.0"]
+plane = ["httpx>=0.28"]
+vikunja = ["httpx>=0.28"]
 langfuse = [
     "langfuse>=4.15,<5",
     "artifactr-ai[langfuse]>=0.2.0",
@@ -57,6 +59,8 @@ test = [
     "pytest-timeout>=2.4",
     "aiosqlite>=0.22",
     "asyncpg>=0.31",
+    "httpx>=0.28",
+    "hypothesis>=6.168",
 ]
 lint = ["ruff>=0.16", "pyright>=1.1.414"]
 dev = [

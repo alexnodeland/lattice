@@ -5,9 +5,9 @@ the libraries'.
 """
 
 from datetime import datetime
-from typing import Final
+from typing import Any, Final
 
-from sqlalchemy import BigInteger, DateTime, Index, MetaData
+from sqlalchemy import JSON, BigInteger, DateTime, Index, MetaData
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 VERSION_TABLE: Final = "relayr_alembic_version"
@@ -75,3 +75,30 @@ class DeadLetterRow(Base):
     envelope_id: Mapped[str]
     event_type: Mapped[str]
     error: Mapped[str]
+
+
+class TrackedRow(Base):
+    """A key a run writes to its workspace's tracker by: its claim, and what the write made."""
+
+    __tablename__ = "relayr_tracker_items"
+
+    tenant_id: Mapped[str] = mapped_column(primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(primary_key=True)
+    kind: Mapped[str] = mapped_column(primary_key=True)
+    """What the key names: an `item` or a `comment`."""
+
+    key: Mapped[str] = mapped_column(primary_key=True)
+    correlation_id: Mapped[str]
+    """The chain of the run that claimed the key first."""
+
+    claimed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    """When the key was last claimed, which a claim with no record goes stale by."""
+
+    ref: Mapped[dict[str, Any] | None] = mapped_column(JSON(none_as_null=True))
+    """The item or comment the key made, once recorded."""
+
+    deleted: Mapped[bool]
+    """Whether the item was found deleted."""
+
+    written: Mapped[dict[str, Any]] = mapped_column(JSON)
+    """The value relayr last set on each of the item's fields."""

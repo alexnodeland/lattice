@@ -15,11 +15,7 @@ write, the ledger records the run behind it, by the ids the follower finds it by
 continues the run's causal chain when it bridges the write back into reflexr.
 """
 
-import hashlib
-import json
-import re
 import weakref
-from collections import Counter
 from collections.abc import Awaitable, Callable, Mapping
 from typing import Any, Final
 
@@ -32,7 +28,8 @@ from reflexr.core import RuleName
 from reflexr.workspace import Reaction, RunFailure
 from relayr.events import ArtifactrEvent
 from relayr.ledger import Cause, CauseKind, Ledger, WorkspaceKey
-from relayr.outbound.allowlist import Allowlist
+from relayr.outbound.allowlist import Allowlist, Allowlists
+from relayr.outbound.ids import Derivation, canonical
 
 RULES: Final = "reflexr:"
 """The prefix of a rule's actor's `client_id` in artifactr: `reflexr:<rule>`."""
@@ -106,13 +103,7 @@ class Outbound:
     ) -> None:
         self._artifactr = artifactr
         self._ledger = ledger
-        self._allowlists = dict(allowlists or {})
-        for key in self._allowlists:
-            if not _KEY.fullmatch(key) or key.startswith("reflexr:"):
-                raise ValueError(
-                    f"an allowlist's key is a rule's name, as 'chat:deploys', or a whole "
-                    f"namespace's, as 'chat:*', and not reflexr's: not {key!r}"
-                )
+        self._allowlists = Allowlists(allowlists)
         self._runner = runner
         self._acting: weakref.WeakKeyDictionary[Reaction[Any], RunActions] = (
             weakref.WeakKeyDictionary()
@@ -122,12 +113,7 @@ class Outbound:
         """Return what an attempt of a run may do in artifactr; the same for the whole attempt."""
         actions = self._acting.get(reaction)
         if actions is None:
-            rule = reaction.run.rule
-            namespace = f"{rule.partition(':')[0]}:*"
-            if rule in self._allowlists:
-                allowlist = self._allowlists[rule]
-            else:
-                allowlist = self._allowlists.get(namespace, Allowlist())
+            allowlist = self._allowlists.of(reaction.run.rule)
             actions = RunActions(reaction, self._artifactr, self._ledger, allowlist, self._runner)
             self._acting[reaction] = actions
         return actions
@@ -156,7 +142,7 @@ class RunActions:
         self._runner = runner
         self._actor = rule_actor(reaction.run.rule)
         self._workspace: artifactr.Workspace | None = None
-        self._made: Counter[tuple[int, str, str]] = Counter()
+        self._derive = Derivation(reaction).derive
         self._threads = dict.fromkeys(
             envelope.event.thread_id
             for envelope in reaction.events
@@ -181,7 +167,7 @@ class RunActions:
             Refused: If artifactr finds the artifact invalid.
         """
         thread = self._where(thread_id)
-        made = self._derive("create", artifact.kind, _canonical(artifact.to_json()))
+        made = self._derive("create", artifact.kind, canonical(artifact.to_json()))
         artifact_id, proposal_id = f"art_{made}", f"prp_{made}"
         create = a.create_artifact(artifact, artifact_id=artifact_id, thread_id=thread)
         create = create.model_copy(update={"proposal_id": proposal_id})
@@ -303,7 +289,7 @@ class RunActions:
             The notice's message id, derived from the run, the thread and the text.
         """
         thread = self._thread(thread_id)
-        message_id = f"msg_{self._derive('notice', thread, _canonical(content))}"
+        message_id = f"msg_{self._derive('notice', thread, canonical(content))}"
         notice = a.PostMessage(
             thread_id=thread, content=content, message_id=message_id, kind="notice"
         )
@@ -335,7 +321,7 @@ class RunActions:
         if not self._allowlist.turns or runner is None:
             raise NotAllowed(f"{self._rule} may not start turns; post a notice")
         thread = self._thread(thread_id)
-        message_id = f"msg_{self._derive('send', thread, _canonical(content))}"
+        message_id = f"msg_{self._derive('send', thread, canonical(content))}"
         workspace = await self._open()
         await self._caused(("message", message_id))
         try:
@@ -362,19 +348,6 @@ class RunActions:
     @property
     def _rule(self) -> RuleName:
         return self._reaction.run.rule
-
-    def _derive(self, op: str, *key: str) -> str:
-        """The digest a write's ids are made from, the same on every attempt that makes it.
-
-        It is made of the run, its segment, what the write is, and how many such writes the
-        attempt made before it.
-        """
-        run = self._reaction.run
-        what = "\x00".join(key)
-        made = (run.checkpoints, op, what)
-        seed = f"{run.id}\x00{run.checkpoints}\x00{op}\x00{what}\x00{self._made[made]}"
-        self._made[made] += 1
-        return hashlib.sha256(seed.encode()).hexdigest()[:16]
 
     def _thread(self, thread_id: a.ThreadId | None) -> a.ThreadId:
         """The thread a message goes to: the one named, or the chain's first."""
@@ -459,12 +432,6 @@ def _holds(data: dict[str, JsonValue], path: str, value: JsonValue) -> bool:
     return True
 
 
-def _canonical(value: JsonValue) -> str:
-    """A digest of JSON data, the same for equal data."""
-    text = json.dumps(value, sort_keys=True, separators=(",", ":"))
-    return hashlib.sha256(text.encode()).hexdigest()
-
-
 async def _exists(read: Awaitable[object]) -> bool:
     try:
         await read
@@ -481,9 +448,6 @@ async def _used(_: artifactr.Workspace) -> bool:
     """
     return True
 
-
-_KEY: Final = re.compile(r"[a-z][a-z0-9_]*:(\*|[a-z0-9][a-z0-9._-]*)")
-"""An allowlist's key: a rule's name, as reflexr names rules, or a whole namespace's."""
 
 _RETRIED: Final = frozenset({"validation_failed", "patch_failed", "not_found"})
 """The refusals a run can do otherwise about: an agent's model is told, and may retry."""

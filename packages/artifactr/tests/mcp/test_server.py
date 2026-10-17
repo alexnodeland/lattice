@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 from collections.abc import AsyncIterator
+from contextlib import aclosing
 from typing import Any, assert_type, override
 
 import pytest
@@ -17,9 +18,10 @@ from starlette.requests import Request
 from artifactr.agent import Runner
 from artifactr.core import Actor, ExternalAgentActor, TenantId, UserActor, Visibility, WorkspaceId
 from artifactr.mcp import ArtifactrMcp, McpContext, artifact_uri
-from artifactr.workspace import Access, InMemoryStorage, Workspace, Workspaces
+from artifactr.workspace import Access, InMemoryStorage, Workspace, Workspaces, integration_gate
 from tests.agent.conftest import Gate, Script, make_agent, say
 from tests.artifact_types import Checklist, Note
+from tests.workspace.test_gate import NOTES, Switch, key_of
 
 CLAUDE = ExternalAgentActor(client_id="claude-code", name="Claude Code")
 REVIEWER = ExternalAgentActor(client_id="reviewer")
@@ -157,6 +159,26 @@ async def test_artifact_tools(mcp: ArtifactrMcp) -> None:
         assert (await _call(client, "create_artifact", kind="spreadsheet", data={}))[0] is True
         assert (await _call(client, "read_artifact", artifact_id="nope"))[0] is True
         assert (await _call(client, "archive_artifact", artifact_id="nope"))[0] is True
+
+
+async def test_an_integration_switched_off_refuses_its_tools_but_not_reads(
+    storage: InMemoryStorage, identity: Identity, bus: RecordingBus, gate: Gate
+) -> None:
+    switch = Switch()
+    workspaces = Workspaces(storage, types=[Note], gate=integration_gate(switch, key_of))
+    ws = await workspaces.open("tenant", "w1", actor=ALICE)
+    await ws.create(Note(text="Ship Friday"), artifact_id="n1")
+    switch.off.add(("tenant", "w1", NOTES))
+    runner = Runner(make_agent(Script()), app=gate)
+    server = ArtifactrMcp(workspaces, runner, resolve=identity.resolve, bus=bus)
+    async with aclosing(server), Client(server.server) as client:
+        refused = "notes is not available in this workspace"
+        create = await _call(client, "create_artifact", kind="note", data={})
+        edit = await _call(client, "edit_text", artifact_id="n1", old="Friday", new="Monday")
+        for error, text in (create, edit):
+            assert error
+            assert text.endswith(f": {refused}")
+        assert (await _call(client, "read_artifact", artifact_id="n1"))[0] is False
 
 
 async def test_agents_read_the_log_from_its_end_and_backwards(

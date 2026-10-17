@@ -10,8 +10,10 @@ from starlette.websockets import WebSocketDisconnect
 
 from artifactr.core import Actor, TenantId, Visibility, WorkspaceId
 from artifactr.fastapi import stream
+from artifactr.workspace import integration_gate
 from tests.agent.conftest import Script, call, say
 from tests.fastapi.conftest import Latch, build, command, hello, wait_for
+from tests.workspace.test_gate import NOTES, Switch, key_of
 
 STREAM = "/v1/workspaces/w1/stream"
 
@@ -178,6 +180,18 @@ def test_commands_invalid_frames_and_rejections(client: TestClient) -> None:
         ws.send_json(command("c2", type="watch_run", run_id="r9"))
         rejected = ws.receive_json()
         assert (rejected["ok"], rejected["rejection"]["type"]) == (False, "not_found")
+
+
+def test_a_command_an_integration_switched_off_refuses() -> None:
+    switch = Switch()
+    switch.off.add(("tenant", "w1", NOTES))
+    app, _ = build(Script(), gate=integration_gate(switch, key_of))
+    with TestClient(app) as client, client.websocket_connect(STREAM) as ws:
+        ws.send_json(hello())
+        _receive_until(ws, "replay_complete")
+        ws.send_json(command("c1", type="create_artifact", kind="note", data={}))
+        rejected = ws.receive_json()
+        assert (rejected["ok"], rejected["rejection"]["integration"]) == (False, NOTES)
 
 
 def test_a_notice_arrives_as_a_notice(client: TestClient) -> None:

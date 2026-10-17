@@ -76,5 +76,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0070](0070-a-runner-looks-again-for-what-a-dead-holder-was-asked.md) | A runner looks again for what a dead holder was asked | Accepted |
 | [0071](0071-a-lease-on-an-artifact.md) | A lease on an artifact | Accepted |
 | [0072](0072-native-files-are-manifests-over-json-patch.md) | Native files are manifests over JSON Patch | Accepted |
+| [0081](0081-a-gate-before-access-integrations-switched-off-answer-not-enabled.md) | A gate before access: integrations switched off answer NotEnabled | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

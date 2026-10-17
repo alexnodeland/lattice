@@ -1,6 +1,6 @@
 # ADR-0021: Chains continue across the bridge
 
-**Status:** Accepted, amended by [ADR-0025](0025-counters-and-how-long-causes-are-kept.md) and [ADR-0026](0026-a-retried-send-asks-again-and-turns-traced-by-their-messages.md)
+**Status:** Accepted, amended by [ADR-0025](0025-counters-and-how-long-causes-are-kept.md), [ADR-0026](0026-a-retried-send-asks-again-and-turns-traced-by-their-messages.md) and the amendment below
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 **Amends:** [ADR-0015](0015-cursors-leases-and-dead-letters-in-the-ledger.md): the ledger also keeps the run behind each write, and a chain continued past the depth limit is dead-lettered
@@ -34,5 +34,9 @@ A rule's write in artifactr is bridged back into reflexr like any other envelope
 - Harder: two runs of one rule that edit the same artifact at the same version race for one cause; the first run to record it keeps it. Its depth differs by at most the runs' difference, so loops still end.
 - Harder: `relayr_causes` grows by a row or two per write, and nothing removes them; phase 4 gives the causes a time to live. A proposed edit retried after a version conflict records a cause for each version it tried, and a later run of the same rule whose edit makes one of those versions continues the earlier run's chain.
 - Harder: the follower reads back through a thread, 100 envelopes at a time by default (`read_back`), to find the message a rule's turn carries out.
+
+## Amendment (2026-10-17): an answer to a rule's paused turn
+
+[lattice RFC-0005](../../rfcs/0005-forms-dashboards-and-mini-apps.md) bridges `deferred_answered` ([ADR-0018](0018-bridged-events-their-fields-ids-and-projections.md)'s amendment). Its envelope names the turn it answers as its run, but a person wrote it, so the follower doesn't continue the turn's chain one step deeper by it, as it does for the turn's own events. Failing the write's own cause, an answer to a turn acting for a rule joins that turn's chain with no causation, found by the turn's id in the ledger, as an answer to a rule's proposal joins the proposal's: a person's answer is a new cause.
 
 [rfc-0002-loops]: ../../stackr/rfcs/0002-the-combined-system.md#loop-control

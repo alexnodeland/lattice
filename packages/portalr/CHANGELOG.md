@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/alexnodeland/lattice/compare/portalr-v0.1.0...portalr-v0.1.1) (2026-10-17)
+
+
+### Bug Fixes
+
+* **deps:** raise the floors on sibling packages to their released versions ([#333](https://github.com/alexnodeland/lattice/issues/333)) ([54ff956](https://github.com/alexnodeland/lattice/commit/54ff9566b418ab8bcbdb797385c2dc0b6e0a10e5))
+
 ## 0.1.0 (2026-10-17)
 
 

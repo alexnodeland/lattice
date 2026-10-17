@@ -18,7 +18,9 @@ from relayr.sql.schema import _row_level_security
 VERSIONS = Path(__file__).parents[2] / "src/relayr/sql/migrations/versions"
 MIGRATION = VERSIONS / "0004_row_level_security.py"
 TRACKER_ITEMS = VERSIONS / "0005_tracker_items.py"
-"""The migrations that create policies: 0004 for the tables before it, and 0005 for its own."""
+TRACKER_FOLLOWERS = VERSIONS / "0006_tracker_followers.py"
+"""The migrations that create policies: 0004 for the tables before it, and 0005 and 0006 for their
+own."""
 
 POLICIES = 3
 """How many policies the migration creates: one per table it names, frozen in it."""
@@ -65,6 +67,7 @@ def test_create_schema_creates_the_policies_the_migrations_do(
     migrated = Recorder()
     _migration(migrated, monkeypatch).upgrade()
     _migration(migrated, monkeypatch, TRACKER_ITEMS).upgrade()
+    _migration(migrated, monkeypatch, TRACKER_FOLLOWERS).upgrade()
     created = Recorder()
     _row_level_security(cast("Connection", created))
     assert sorted(created.statements) == sorted(migrated.statements)
@@ -94,4 +97,22 @@ def test_the_tracker_items_migration_keeps_its_table_to_its_tenant(
         "CREATE POLICY relayr_tracker_items_tenant ON relayr_tracker_items"
         " USING (tenant_id = current_setting('lattice.tenant_id', true))"
         " WITH CHECK (tenant_id = current_setting('lattice.tenant_id', true))",
+    ]
+
+
+def test_the_tracker_followers_migration_keeps_its_tables_to_their_tenant(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    recorder = Recorder()
+    _migration(recorder, monkeypatch, TRACKER_FOLLOWERS).upgrade()
+    tables = ("relayr_tracker_followers", "relayr_tracker_snapshots", "relayr_tracker_dead_letters")
+    assert recorder.statements == [
+        statement
+        for table in tables
+        for statement in (
+            f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY",
+            f"CREATE POLICY {table}_tenant ON {table}"
+            " USING (tenant_id = current_setting('lattice.tenant_id', true))"
+            " WITH CHECK (tenant_id = current_setting('lattice.tenant_id', true))",
+        )
     ]

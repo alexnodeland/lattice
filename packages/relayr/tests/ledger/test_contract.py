@@ -1,10 +1,19 @@
-"""The ledger's contract, which every adapter passes: leases, cursors, dead letters, causes and
-tracker keys."""
+"""The ledger's contract, which every adapter passes: leases, cursors, dead letters, causes,
+tracker keys, and what the tracker followers read."""
 
 from datetime import timedelta
 
-from relayr.ledger import Cause, DeadLetter, Ledger, Tracked, WorkspaceKey
-from tests.clock import FakeClock
+from relayr.ledger import (
+    Cause,
+    DeadLetter,
+    Ledger,
+    Snapshot,
+    Tracked,
+    TrackerDeadLetter,
+    TrackerFollowing,
+    WorkspaceKey,
+)
+from tests.clock import START, FakeClock
 
 PROD = WorkspaceKey("acme", "prod")
 STAGING = WorkspaceKey("acme", "staging")
@@ -186,3 +195,128 @@ async def test_a_deleted_item_stays_deleted(ledger: Ledger) -> None:
     await ledger.mark_tracked_deleted(PROD, "k")
     tracked = await ledger.tracked(PROD, "item", "k")
     assert tracked == Tracked(correlation_id="evt_1", ref=REF, deleted=True)
+
+
+async def test_written_values_are_consumed_only_while_they_hold(ledger: Ledger) -> None:
+    await ledger.consume_written(PROD, "k", {"state": "done"})  # a key never claimed
+    await ledger.claim_tracked(PROD, "item", "k", "evt_1", stale_after=STALE)
+    await ledger.record_written(PROD, "k", {"state": "done", "priority": "high", "title": "T"})
+    await ledger.consume_written(PROD, "k", {"state": "done", "priority": "low"})
+    tracked = await ledger.tracked(PROD, "item", "k")
+    assert tracked is not None
+    assert tracked.written == {"priority": "high", "title": "T"}, "a newer value is kept"
+
+
+async def test_writes_to_an_item_are_counted_within_a_window(
+    ledger: Ledger, clock: FakeClock
+) -> None:
+    hour = timedelta(hours=1)
+    assert await ledger.record_tracker_write(PROD, "7", within=hour) == 1
+    clock.advance(timedelta(minutes=40))
+    assert await ledger.record_tracker_write(PROD, "7", within=hour) == 2
+    assert await ledger.record_tracker_write(PROD, "8", within=hour) == 1, "each item its own"
+    assert await ledger.record_tracker_write(STAGING, "7", within=hour) == 1
+    clock.advance(timedelta(minutes=30))
+    assert await ledger.record_tracker_write(PROD, "7", within=hour) == 2, "the first lapsed"
+    assert await ledger.snapshots(PROD) == {}, "a write is no snapshot"
+
+
+async def test_a_tracker_lease_is_apart_from_the_followers(
+    ledger: Ledger, clock: FakeClock
+) -> None:
+    assert await ledger.acquire_lease(PROD, "a", TTL)
+    assert await ledger.acquire_tracker_lease(PROD, "b", TTL), "the artifactr follower's is apart"
+    assert not await ledger.acquire_tracker_lease(PROD, "a", TTL)
+    assert await ledger.acquire_tracker_lease(PROD, "b", TTL), "its holder renews it"
+    assert await ledger.acquire_tracker_lease(OTHER, "a", TTL)
+    await ledger.release_tracker_lease(PROD, "a")
+    assert not await ledger.acquire_tracker_lease(PROD, "a", TTL), "only its holder releases it"
+    await ledger.release_tracker_lease(PROD, "b")
+    assert await ledger.acquire_tracker_lease(PROD, "a", TTL)
+    clock.advance(TTL)
+    assert await ledger.acquire_tracker_lease(PROD, "b", TTL), "it lapses unless renewed"
+    await ledger.release_tracker_lease(STAGING, "a")  # a workspace the ledger doesn't know
+    assert await ledger.followed() == [PROD], "a tracker lease follows no artifactr workspace"
+
+
+def following(
+    project: str = "ops", cursor: tuple[int, str] | None = None, swept: int = 0
+) -> TrackerFollowing:
+    at = None if cursor is None else (START + timedelta(seconds=cursor[0]), cursor[1])
+    return TrackerFollowing(project=project, cursor=at, swept_at=START + timedelta(seconds=swept))
+
+
+async def test_how_far_a_tracker_follower_read_only_moves_forward(ledger: Ledger) -> None:
+    assert await ledger.tracker_following(PROD) is None
+    await ledger.acquire_tracker_lease(PROD, "a", TTL)
+    assert await ledger.tracker_following(PROD) is None, "a lease reads nothing"
+    await ledger.save_tracker_following(PROD, following())
+    assert await ledger.tracker_following(PROD) == following(), "an empty project has no cursor"
+    await ledger.save_tracker_following(PROD, following(cursor=(5, "b"), swept=10))
+    await ledger.save_tracker_following(PROD, following(cursor=(5, "a"), swept=3))
+    await ledger.save_tracker_following(PROD, following(swept=4))
+    assert await ledger.tracker_following(PROD) == following(cursor=(5, "b"), swept=10)
+    await ledger.save_tracker_following(PROD, following(cursor=(6, "a"), swept=11))
+    assert await ledger.tracker_following(PROD) == following(cursor=(6, "a"), swept=11)
+    await ledger.save_tracker_following(PROD, following("dev", swept=1))
+    assert await ledger.tracker_following(PROD) == following("dev", swept=1), "another project"
+    assert await ledger.tracker_following(STAGING) is None
+    assert await ledger.tracker_following(OTHER) is None
+
+
+def snapshot(item_id: str, title: str = "T", comments: int | None = None) -> Snapshot:
+    after = None if comments is None else START + timedelta(seconds=comments)
+    return Snapshot(item_id=item_id, item={"title": title}, comments_after=after)
+
+
+async def test_snapshots_replace_those_before_and_are_forgotten(ledger: Ledger) -> None:
+    assert await ledger.snapshots(PROD) == {}
+    await ledger.record_tracker_write(PROD, "2", within=TTL)
+    await ledger.save_snapshots(PROD, [snapshot("1"), snapshot("2", comments=1)])
+    await ledger.save_snapshots(PROD, [snapshot("2", "U", comments=2), snapshot("3")])
+    await ledger.save_snapshots(STAGING, [snapshot("1", "S")])
+    await ledger.save_snapshots(PROD, [])
+    assert await ledger.snapshots(PROD) == {
+        "1": snapshot("1"),
+        "2": snapshot("2", "U", comments=2),
+        "3": snapshot("3"),
+    }
+    assert await ledger.snapshots(PROD, ["2", "4"]) == {"2": snapshot("2", "U", comments=2)}
+    assert await ledger.snapshots(PROD, []) == {}
+    assert await ledger.record_tracker_write(PROD, "2", within=TTL) == 2, "a snapshot keeps writes"
+    await ledger.forget_snapshots(PROD, ["2", "4"])
+    assert await ledger.snapshots(PROD) == {"1": snapshot("1"), "3": snapshot("3")}
+    assert await ledger.record_tracker_write(PROD, "2", within=TTL) == 1, "and forgets them"
+    await ledger.forget_snapshots(PROD)
+    assert await ledger.snapshots(PROD) == {}
+    assert await ledger.snapshots(STAGING) == {"1": snapshot("1", "S")}
+
+
+async def test_a_bound_project_of_many_items_is_saved_whole(ledger: Ledger) -> None:
+    many = [snapshot(f"item-{n:04}") for n in range(1200)]
+    await ledger.save_snapshots(PROD, many)
+    assert len(await ledger.snapshots(PROD)) == 1200
+    wanted = [s.item_id for s in many[::2]]
+    assert sorted(await ledger.snapshots(PROD, wanted)) == wanted
+    await ledger.forget_snapshots(PROD, wanted)
+    assert len(await ledger.snapshots(PROD)) == 600
+
+
+def tracker_letter(event_id: str, error: str = "ValueError: no") -> TrackerDeadLetter:
+    return TrackerDeadLetter(
+        event_id=event_id, event_type="tracker:item_changed", item_id="7", error=error
+    )
+
+
+async def test_tracker_dead_letters_are_kept_once_per_event_id(ledger: Ledger) -> None:
+    await ledger.tracker_dead_letter(PROD, tracker_letter("trk_b"))
+    await ledger.tracker_dead_letter(PROD, tracker_letter("trk_a"))
+    await ledger.tracker_dead_letter(PROD, tracker_letter("trk_b", "ValueError: again"))
+    await ledger.tracker_dead_letter(STAGING, tracker_letter("trk_c"))
+    assert await ledger.tracker_dead_letters(PROD) == [
+        tracker_letter("trk_a"),
+        tracker_letter("trk_b"),
+    ]
+    assert await ledger.tracker_dead_letters(STAGING) == [tracker_letter("trk_c")]
+    assert await ledger.tracker_dead_letters(OTHER) == []
+    assert await ledger.dead_letters(PROD) == [], "apart from the artifactr follower's"

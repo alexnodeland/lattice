@@ -4,10 +4,10 @@ Table names start with `relayr_`, so they share a database with the application'
 the libraries'.
 """
 
-from datetime import datetime
-from typing import Any, Final
+from datetime import UTC, datetime
+from typing import Any, Final, override
 
-from sqlalchemy import JSON, BigInteger, DateTime, Index, MetaData
+from sqlalchemy import JSON, BigInteger, DateTime, Dialect, Index, MetaData, TypeDecorator
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 VERSION_TABLE: Final = "relayr_alembic_version"
@@ -22,6 +22,25 @@ class Base(DeclarativeBase):
 
 metadata = Base.metadata
 """The schema the migrations build, and that [`create_schema`][relayr.sql.create_schema] creates."""
+
+
+class UtcDateTime(TypeDecorator[datetime]):
+    """A point in time, stored and read back in UTC.
+
+    SQLite keeps timestamps as text without their zone and compares them as text, so every value
+    is converted to UTC before it is stored, and reads attach UTC.
+    """
+
+    impl = DateTime(timezone=True)
+    cache_ok = True
+
+    @override
+    def process_bind_param(self, value: datetime | None, dialect: Dialect) -> datetime | None:
+        return None if value is None else value.astimezone(UTC)
+
+    @override
+    def process_result_value(self, value: datetime | None, dialect: Dialect) -> datetime | None:
+        return None if value is None else value.replace(tzinfo=UTC)
 
 
 class FollowerRow(Base):
@@ -102,3 +121,62 @@ class TrackedRow(Base):
 
     written: Mapped[dict[str, Any]] = mapped_column(JSON)
     """The value relayr last set on each of the item's fields."""
+
+
+class TrackerFollowerRow(Base):
+    """A workspace's tracker follower: its lease, and how far it has read its bound project."""
+
+    __tablename__ = "relayr_tracker_followers"
+
+    tenant_id: Mapped[str] = mapped_column(primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(primary_key=True)
+    project: Mapped[str | None]
+    """The tracker project it reads, once it has read it."""
+
+    cursor_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    """The `updated_at` of the last item it read."""
+
+    cursor_id: Mapped[str | None]
+    """The tracker's id for the last item it read."""
+
+    swept_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    """When it last read the whole project."""
+
+    holder: Mapped[str | None]
+    """Who holds the lease, if anyone does."""
+
+    expires_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    """When the lease lapses unless it is renewed."""
+
+
+class SnapshotRow(Base):
+    """An item of a bound project: its last snapshot, and relayr's recent writes to it."""
+
+    __tablename__ = "relayr_tracker_snapshots"
+
+    tenant_id: Mapped[str] = mapped_column(primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(primary_key=True)
+    item_id: Mapped[str] = mapped_column(primary_key=True)
+    """The tracker's id for the item."""
+
+    item: Mapped[dict[str, Any] | None] = mapped_column(JSON(none_as_null=True))
+    """The item as the follower last read it; None until it has."""
+
+    comments_after: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    """The comments created before this were read."""
+
+    writes: Mapped[list[str]] = mapped_column(JSON)
+    """When relayr wrote to the item within the last while, in UTC, as ISO 8601."""
+
+
+class TrackerDeadLetterRow(Base):
+    """A change in a tracker the follower could not publish."""
+
+    __tablename__ = "relayr_tracker_dead_letters"
+
+    tenant_id: Mapped[str] = mapped_column(primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(primary_key=True)
+    event_id: Mapped[str] = mapped_column(primary_key=True)
+    event_type: Mapped[str]
+    item_id: Mapped[str]
+    error: Mapped[str]

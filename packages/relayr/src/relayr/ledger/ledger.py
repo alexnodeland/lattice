@@ -4,7 +4,10 @@ For each followed workspace it keeps a cursor, the lease that lets one follower 
 it, and the envelopes the follower could not bridge. For the outbound adapter it keeps what
 caused each of its writes in artifactr: the reflexr run, so the follower continues its chain.
 For the tracker connector it keeps each key a run writes to the tracker by: the claim made before
-the write, the item or comment it made, and the values relayr last set on an item.
+the write, the item or comment it made, and the values relayr last set on an item. And for each
+workspace bound to a tracker project it keeps what its tracker follower read: its lease and
+cursor, the last snapshot of every item, relayr's recent writes to each, and the changes it could
+not publish.
 Every adapter passes the one contract test, `tests/ledger/test_contract.py`.
 """
 
@@ -87,6 +90,54 @@ class Tracked(BaseModel):
 
     written: dict[str, JsonValue] = {}
     """The value relayr last set on each of the item's fields, recorded before the write."""
+
+
+class TrackerFollowing(BaseModel):
+    """How far a workspace's tracker follower has read its bound project."""
+
+    model_config = ConfigDict(frozen=True)
+
+    project: str
+    """The tracker project it reads: another one starts over."""
+
+    cursor: tuple[datetime, str] | None = None
+    """The `updated_at` and id of the last item it read, or None if the project had none."""
+
+    swept_at: datetime
+    """When it last read the whole project, by the ledger's clock."""
+
+
+class Snapshot(BaseModel):
+    """An item of a bound project as the tracker follower last read it."""
+
+    model_config = ConfigDict(frozen=True)
+
+    item_id: str
+    """The tracker's id for the item."""
+
+    item: dict[str, JsonValue]
+    """The item, as the tracker port reads it."""
+
+    comments_after: datetime | None = None
+    """The comments created before this were read; None if none were."""
+
+
+class TrackerDeadLetter(BaseModel):
+    """A change in a tracker the follower could not publish, and why."""
+
+    model_config = ConfigDict(frozen=True)
+
+    event_id: str
+    """The id the change's event was derived to have."""
+
+    event_type: str
+    """The event's type, such as `tracker:item_changed`."""
+
+    item_id: str
+    """The tracker's id for the item that changed."""
+
+    error: str
+    """What went wrong: the exception's type and message."""
 
 
 class Ledger(Protocol):
@@ -185,4 +236,75 @@ class Ledger(Protocol):
         self, workspace: WorkspaceKey, key: str, fields: Collection[str]
     ) -> None:
         """Forget the values recorded for an item's fields."""
+        ...
+
+    async def consume_written(
+        self, workspace: WorkspaceKey, key: str, values: Mapping[str, JsonValue]
+    ) -> None:
+        """Forget the values recorded for an item's fields that still hold the ones given.
+
+        A field recorded since with another value keeps it.
+        """
+        ...
+
+    async def record_tracker_write(
+        self, workspace: WorkspaceKey, item_id: str, *, within: timedelta
+    ) -> int:
+        """Record a write relayr is about to make to an item, by the tracker's id for it.
+
+        Returns how many it recorded within `within`, by the ledger's clock, this one included.
+        """
+        ...
+
+    async def acquire_tracker_lease(
+        self, workspace: WorkspaceKey, holder: str, ttl: timedelta
+    ) -> bool:
+        """Take or renew the workspace's tracker lease for `ttl`; False if another holder has it.
+
+        It is the tracker follower's, apart from the artifactr follower's lease.
+        """
+        ...
+
+    async def release_tracker_lease(self, workspace: WorkspaceKey, holder: str) -> None:
+        """Release the workspace's tracker lease, if `holder` has it."""
+        ...
+
+    async def tracker_following(self, workspace: WorkspaceKey) -> TrackerFollowing | None:
+        """Return how far the workspace's tracker follower has read, or None if it never has."""
+        ...
+
+    async def save_tracker_following(
+        self, workspace: WorkspaceKey, following: TrackerFollowing
+    ) -> None:
+        """Save how far the workspace's tracker follower has read.
+
+        Within one project its cursor and its sweep only move forward; another project replaces
+        them.
+        """
+        ...
+
+    async def snapshots(
+        self, workspace: WorkspaceKey, item_ids: Collection[str] | None = None
+    ) -> dict[str, Snapshot]:
+        """Return the snapshots of the items given, or of every item, by their ids."""
+        ...
+
+    async def save_snapshots(
+        self, workspace: WorkspaceKey, snapshots: Collection[Snapshot]
+    ) -> None:
+        """Save items' snapshots, in place of those before."""
+        ...
+
+    async def forget_snapshots(
+        self, workspace: WorkspaceKey, item_ids: Collection[str] | None = None
+    ) -> None:
+        """Forget the items given, or every item: their snapshots and relayr's writes to them."""
+        ...
+
+    async def tracker_dead_letter(self, workspace: WorkspaceKey, letter: TrackerDeadLetter) -> None:
+        """Record a change the follower could not publish; once per event id, the first kept."""
+        ...
+
+    async def tracker_dead_letters(self, workspace: WorkspaceKey) -> list[TrackerDeadLetter]:
+        """Return the workspace's tracker dead letters, by event id."""
         ...

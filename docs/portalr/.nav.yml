@@ -50,6 +50,7 @@ nav:
   - adr/0038-people-by-email.md
   - adr/0039-elevation-status-colour-states-and-density.md
   - adr/0040-scenarios-against-a-generated-application-and-size-budgets.md
+  - adr/0041-first-party-webassembly-in-the-apps-policy.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

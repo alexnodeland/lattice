@@ -60,10 +60,11 @@ tasks:
       - 'src/artifactr/core/rules.py'
 
   schema:
-    description: "Regenerate the protocol JSON Schema, and the REST surface's OpenAPI document"
+    description: "Regenerate the protocol JSON Schema, and the REST surfaces' OpenAPI documents"
     script: >-
       uv run python -m artifactr.core.schema > schemas/artifactr.v1.json
       && uv run python -m artifactr.fastapi.openapi > schemas/artifactr.openapi.json
+      && uv run python -m artifactr.files.fastapi.openapi > schemas/artifactr-files.openapi.json
     options:
       cache: false
       runInCI: false
@@ -97,14 +98,15 @@ tasks:
       runInCI: false
 
   # WordCraft's fidelity report (lattice RFC-0003, phase 2): the pinned CLI opens and saves each
-  # corpus file, feature by feature, and the adapter runs live. Nightly runs it and publishes the
-  # matrix; it downloads the release scripts/wordcraft pins, once.
+  # corpus file, feature by feature, and the adapter runs live, as does the check-out pilot over
+  # HTTP with the browser build served. Nightly runs it and publishes the matrix; it downloads the
+  # release scripts/wordcraft pins, once.
   fidelity:
     description: "Run the WordCraft fidelity report and the adapter's live tests, on the pinned CLI"
     script: >-
-      cli=$($workspaceRoot/scripts/wordcraft cli)
-      && ARTIFACTR_TEST_WORDCRAFT=$cli uv run pytest -m wordcraft -p no:cacheprovider
-      tests/files/wordcraft
+      cli=$($workspaceRoot/scripts/wordcraft cli) && web=$($workspaceRoot/scripts/wordcraft web)
+      && ARTIFACTR_TEST_WORDCRAFT=$cli ARTIFACTR_TEST_WORDCRAFT_WEB=$web
+      uv run pytest -m wordcraft -p no:cacheprovider tests/files
     options:
       cache: false
       runInCI: false

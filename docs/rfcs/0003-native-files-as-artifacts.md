@@ -338,7 +338,8 @@ Decided by the owner on 2026-10-16:
 - [x] artifactr-files: the WordCraft adapter, the corpus and the nightly fidelity report
 - [ ] artifactr-files and stackr: the worker, its image, the recipe and the release pin check
 - [x] artifactr-files: `NativeFileTools`, as `native_file_tools`
-- [ ] portalr and artifactr-files: the renderer, `files_router`, check-out and check-in
+- [x] artifactr-files: `files_router`, check-out and check-in over HTTP, and the hosted editor's policy
+- [ ] portalr: the renderer, previews, diffs, check-out and check-in screens
 - [ ] The streamed session spike and its recommendation
 - [x] Docs: the package's section and guide
 

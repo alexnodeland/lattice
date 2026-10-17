@@ -13,6 +13,7 @@
 | `wordcraft` | WordCraft's adapter, `Subprocess`, and the `.docx` fingerprint and outline | `manifest`, `app`, pydantic, `mcp`, `anyio` |
 | `native` | `NativeFiles`: uploads, check-out and check-in, agents' edits, reads, renders and collection, behind the app's switch | `manifest`, `blobs`, `checkouts`, `app`, artifactr, `lattice_core.integrations` |
 | `tools` | `native_file_tools`, the agent's toolset | `app`, `native`, artifactr and its agent, pydantic-ai |
+| `fastapi` | `files_router`, people's check-out and check-in over HTTP, and `editor_app`, the app's browser build on an origin of its own | every layer but `sql` and `tools`, artifactr and its router, FastAPI |
 | `sql` | `SqlBlobs`, `SqlCheckouts`, their tables and migrations | `manifest`, `blobs`, `checkouts`, SQLAlchemy, Alembic, `lattice_core.sql` |
 
 ## A write
@@ -52,6 +53,10 @@ WordCraft is pinned by the checksums of one release, in `scripts/wordcraft.sha25
 Each app is an integration of its own, named by its `integration` key, such as `files:wordcraft`, which lattice-core's registry declares. `NativeFiles` asks its `Integrations` before each upload, check-out, extension, check-in and edit, and refuses with `NotEnabled` while the app is off in the workspace; reads go on. `NativeFiles.key_of` is the `key_of` of artifactr's `integration_gate`, so the same switch refuses an edit of a native file on any surface ([ADR-0006](adr/0006-the-agents-tools-behind-each-apps-switch.md)).
 
 `native_file_tools` gives the agent the file's words and review, a page at a time, the app's commands, an edit by a batch of them, and, if the application turns it on, a rendered page. The toolset is offered only while the app is on, read once a step. A file a person has checked out is answered with who has it and until when, and the agent plans again after the check-in.
+
+## People: check-out and check-in over HTTP
+
+WordCraft's browser build only opens and saves files, so a person checks a file out, downloads it, edits it in the build, saves it and uploads it. `files_router`, beside artifactr's router and with its `resolve_actor`, has the routes: a file's status and lease, check-out, extension, check-in, and a version's bytes or pages. Each names an artifact and a version, or a check-out, and resolves it through the workspace, as the actor, before any bytes move. `editor_app` serves the build as released on an origin of its own, under a policy that runs its own code only and reaches no other origin ([ADR-0007](adr/0007-check-out-over-http-and-the-editor-on-its-own-origin.md)).
 
 ## What it adds to the log
 

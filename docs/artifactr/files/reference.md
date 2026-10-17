@@ -51,6 +51,13 @@ The reference is generated from `artifactr.files`' docstrings and type annotatio
       show_root_heading: false
       show_root_toc_entry: false
 
+## artifactr.files.fastapi
+
+::: artifactr.files.fastapi
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+
 ## artifactr.files.sql
 
 ::: artifactr.files.sql

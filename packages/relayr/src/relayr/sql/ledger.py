@@ -8,9 +8,11 @@ cancellation is raised after it. SQLAlchemy takes a statement cancelled part-way
 connection, which on SQLite can keep the database's write lock, or the pool's one connection.
 """
 
+from collections.abc import Collection, Mapping
 from datetime import UTC, timedelta
 from typing import Final
 
+from pydantic import JsonValue
 from sqlalchemy import ColumnElement, delete, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
@@ -18,13 +20,31 @@ from sqlalchemy.orm import Session
 
 from lattice_core.sql.sessions import awaited_to_the_end, lock_row
 from lattice_core.sql.tenancy import TENANT_KEY, TenantSession
-from relayr.ledger import Cause, CauseKind, Clock, DeadLetter, WorkspaceKey, utc_now
-from relayr.sql.tables import CauseRow, DeadLetterRow, FollowerRow
+from relayr.ledger import (
+    Cause,
+    CauseKind,
+    Clock,
+    DeadLetter,
+    Tracked,
+    TrackedKind,
+    WorkspaceKey,
+    utc_now,
+)
+from relayr.sql.tables import CauseRow, DeadLetterRow, FollowerRow, TrackedRow
 
 
 def _follower(workspace: WorkspaceKey) -> ColumnElement[bool]:
     return (FollowerRow.tenant_id == workspace.tenant_id) & (
         FollowerRow.workspace_id == workspace.workspace_id
+    )
+
+
+def _tracked(workspace: WorkspaceKey, kind: TrackedKind, key: str) -> ColumnElement[bool]:
+    return (
+        (TrackedRow.tenant_id == workspace.tenant_id)
+        & (TrackedRow.workspace_id == workspace.workspace_id)
+        & (TrackedRow.kind == kind)
+        & (TrackedRow.key == key)
     )
 
 
@@ -87,14 +107,16 @@ class SqlLedger:
         """A session in a tenant."""
         return self._sessions(info={TENANT_KEY: tenant_id})
 
-    async def _insert_once(self, row: CauseRow | DeadLetterRow) -> None:
-        """Insert a row, unless one with its key is there: the first is kept."""
+    async def _insert_once(self, row: CauseRow | DeadLetterRow | TrackedRow) -> bool:
+        """Insert a row, unless one with its key is there: the first is kept. True if inserted."""
         async with self._session(row.tenant_id) as session:
             session.add(row)
             try:
                 await session.commit()
             except IntegrityError:
                 await session.rollback()
+                return False
+            return True
 
     @awaited_to_the_end
     async def acquire_lease(self, workspace: WorkspaceKey, holder: str, ttl: timedelta) -> bool:
@@ -224,3 +246,105 @@ class SqlLedger:
         async with self._across() as session:
             rows = await session.execute(query)
             return [WorkspaceKey(*row) for row in rows]
+
+    @awaited_to_the_end
+    async def claim_tracked(
+        self,
+        workspace: WorkspaceKey,
+        kind: TrackedKind,
+        key: str,
+        correlation_id: str,
+        *,
+        stale_after: timedelta,
+    ) -> bool:
+        """Claim a key before writing by it: True if the claim is the caller's.
+
+        A new key is inserted, once; a stale claim is taken again by one update, which a
+        concurrent claim can't also make.
+        """
+        # Normalized to UTC, because SQLite compares timestamps as text.
+        now = self._clock().astimezone(UTC)
+        row = TrackedRow(
+            **workspace._asdict(),
+            kind=kind,
+            key=key,
+            correlation_id=correlation_id,
+            claimed_at=now,
+            deleted=False,
+            written={},
+        )
+        if await self._insert_once(row):
+            return True
+        async with self._session(workspace.tenant_id) as session, session.begin():
+            taken = await session.scalar(
+                update(TrackedRow)
+                .where(
+                    _tracked(workspace, kind, key),
+                    TrackedRow.ref.is_(None),
+                    TrackedRow.claimed_at <= now - stale_after,
+                )
+                .values(claimed_at=now)
+                .returning(TrackedRow.key)
+                .execution_options(synchronize_session=False)
+            )
+            return taken is not None
+
+    @awaited_to_the_end
+    async def tracked(self, workspace: WorkspaceKey, kind: TrackedKind, key: str) -> Tracked | None:
+        """Return a key's claim and record, or None if it was never claimed."""
+        async with self._session(workspace.tenant_id) as session:
+            row = await session.get(TrackedRow, (*workspace, kind, key))
+        if row is None:
+            return None
+        return Tracked(
+            correlation_id=row.correlation_id,
+            ref=row.ref,
+            deleted=row.deleted,
+            written=row.written,
+        )
+
+    @awaited_to_the_end
+    async def record_tracked(
+        self, workspace: WorkspaceKey, kind: TrackedKind, key: str, ref: dict[str, JsonValue]
+    ) -> dict[str, JsonValue] | None:
+        """Record what a claimed key made, the first kept, and return the record kept."""
+        async with self._session(workspace.tenant_id) as session, session.begin():
+            await session.execute(
+                update(TrackedRow)
+                .where(_tracked(workspace, kind, key), TrackedRow.ref.is_(None))
+                .values(ref=ref)
+            )
+            return await session.scalar(
+                select(TrackedRow.ref).where(_tracked(workspace, kind, key))
+            )
+
+    @awaited_to_the_end
+    async def mark_tracked_deleted(self, workspace: WorkspaceKey, key: str) -> None:
+        """Mark an item's key deleted, so it files nothing again."""
+        async with self._session(workspace.tenant_id) as session, session.begin():
+            await session.execute(
+                update(TrackedRow).where(_tracked(workspace, "item", key)).values(deleted=True)
+            )
+
+    @awaited_to_the_end
+    async def record_written(
+        self, workspace: WorkspaceKey, key: str, fields: Mapping[str, JsonValue]
+    ) -> None:
+        """Record the values relayr is about to set on an item's fields, by its key.
+
+        The item's row is locked while it changes, so concurrent writes keep each other's.
+        """
+        async with self._session(workspace.tenant_id) as session, session.begin():
+            row = await session.get(TrackedRow, (*workspace, "item", key), with_for_update=True)
+            if row is not None:
+                row.written = row.written | dict(fields)
+
+    @awaited_to_the_end
+    async def forget_written(
+        self, workspace: WorkspaceKey, key: str, fields: Collection[str]
+    ) -> None:
+        """Forget the values recorded for an item's fields."""
+        async with self._session(workspace.tenant_id) as session, session.begin():
+            row = await session.get(TrackedRow, (*workspace, "item", key), with_for_update=True)
+            if row is not None:
+                row.written = {f: v for f, v in row.written.items() if f not in fields}

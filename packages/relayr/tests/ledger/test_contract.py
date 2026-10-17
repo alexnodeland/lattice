@@ -1,8 +1,9 @@
-"""The ledger's contract, which every adapter passes: leases, cursors and dead letters."""
+"""The ledger's contract, which every adapter passes: leases, cursors, dead letters, causes and
+tracker keys."""
 
 from datetime import timedelta
 
-from relayr.ledger import Cause, DeadLetter, Ledger, WorkspaceKey
+from relayr.ledger import Cause, DeadLetter, Ledger, Tracked, WorkspaceKey
 from tests.clock import FakeClock
 
 PROD = WorkspaceKey("acme", "prod")
@@ -110,3 +111,65 @@ async def test_causes_are_forgotten_once_older_than_a_time(
     assert await ledger.cause(PROD, "message", "old") is None
     assert await ledger.cause(PROD, "message", "new") == CAUSE
     assert await ledger.cause(STAGING, "message", "old") == CAUSE, "only that workspace's"
+
+
+STALE = timedelta(seconds=30)
+REF = {"project": "ops", "id": "7", "number": 7, "key": "dead-letter/run_1"}
+
+
+async def test_a_key_is_claimed_once_until_its_claim_goes_stale(
+    ledger: Ledger, clock: FakeClock
+) -> None:
+    assert await ledger.tracked(PROD, "item", "k") is None
+    assert await ledger.claim_tracked(PROD, "item", "k", "evt_1", stale_after=STALE)
+    assert not await ledger.claim_tracked(PROD, "item", "k", "evt_2", stale_after=STALE)
+    assert await ledger.claim_tracked(PROD, "comment", "k", "evt_2", stale_after=STALE)
+    assert await ledger.claim_tracked(STAGING, "item", "k", "evt_2", stale_after=STALE)
+    clock.advance(STALE - timedelta(seconds=1))
+    assert not await ledger.claim_tracked(PROD, "item", "k", "evt_2", stale_after=STALE)
+    clock.advance(timedelta(seconds=1))
+    assert await ledger.claim_tracked(PROD, "item", "k", "evt_2", stale_after=STALE)
+    assert not await ledger.claim_tracked(PROD, "item", "k", "evt_3", stale_after=STALE), (
+        "a claim taken again is fresh"
+    )
+    assert await ledger.tracked(PROD, "item", "k") == Tracked(correlation_id="evt_1")
+    assert await ledger.followed() == [], "a tracker key follows no workspace"
+
+
+async def test_a_recorded_key_is_never_claimed_again(ledger: Ledger, clock: FakeClock) -> None:
+    await ledger.claim_tracked(PROD, "item", "k", "evt_1", stale_after=STALE)
+    assert await ledger.record_tracked(PROD, "item", "k", REF) == REF
+    other = REF | {"id": "8"}
+    assert await ledger.record_tracked(PROD, "item", "k", other) == REF, "the first is kept"
+    clock.advance(STALE * 10)
+    assert not await ledger.claim_tracked(PROD, "item", "k", "evt_2", stale_after=STALE)
+    assert await ledger.tracked(PROD, "item", "k") == Tracked(correlation_id="evt_1", ref=REF)
+    assert await ledger.tracked(PROD, "comment", "k") is None
+
+
+async def test_a_key_never_claimed_records_nothing(ledger: Ledger) -> None:
+    assert await ledger.record_tracked(PROD, "item", "k", REF) is None
+    await ledger.mark_tracked_deleted(PROD, "k")
+    await ledger.record_written(PROD, "k", {"state": "done"})
+    await ledger.forget_written(PROD, "k", ["state"])
+    assert await ledger.tracked(PROD, "item", "k") is None
+
+
+async def test_an_item_keeps_the_values_relayr_last_set(ledger: Ledger) -> None:
+    await ledger.claim_tracked(PROD, "item", "k", "evt_1", stale_after=STALE)
+    await ledger.claim_tracked(PROD, "comment", "k", "evt_1", stale_after=STALE)
+    await ledger.record_written(PROD, "k", {"state": "todo", "priority": "high"})
+    await ledger.record_written(PROD, "k", {"state": "done", "labels": ["lattice"]})
+    await ledger.forget_written(PROD, "k", ["priority", "title"])
+    tracked = await ledger.tracked(PROD, "item", "k")
+    assert tracked is not None
+    assert tracked.written == {"state": "done", "labels": ["lattice"]}
+    assert await ledger.tracked(PROD, "comment", "k") == Tracked(correlation_id="evt_1")
+
+
+async def test_a_deleted_item_stays_deleted(ledger: Ledger) -> None:
+    await ledger.claim_tracked(PROD, "item", "k", "evt_1", stale_after=STALE)
+    await ledger.record_tracked(PROD, "item", "k", REF)
+    await ledger.mark_tracked_deleted(PROD, "k")
+    tracked = await ledger.tracked(PROD, "item", "k")
+    assert tracked == Tracked(correlation_id="evt_1", ref=REF, deleted=True)

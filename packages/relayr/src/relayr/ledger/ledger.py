@@ -3,14 +3,16 @@
 For each followed workspace it keeps a cursor, the lease that lets one follower at a time follow
 it, and the envelopes the follower could not bridge. For the outbound adapter it keeps what
 caused each of its writes in artifactr: the reflexr run, so the follower continues its chain.
+For the tracker connector it keeps each key a run writes to the tracker by: the claim made before
+the write, the item or comment it made, and the values relayr last set on an item.
 Every adapter passes the one contract test, `tests/ledger/test_contract.py`.
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Collection, Mapping
 from datetime import UTC, datetime, timedelta
 from typing import Literal, NamedTuple, Protocol
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, JsonValue
 
 Clock = Callable[[], datetime]
 """Returns the current time, which leases expire by; injectable so tests control it."""
@@ -64,8 +66,31 @@ class Cause(BaseModel):
     """The depth of the run's own events: one deeper than what made its rule fire."""
 
 
+type TrackedKind = Literal["item", "comment"]
+"""What a tracker key names: an item a run files, or a comment it posts."""
+
+
+class Tracked(BaseModel):
+    """A key a run writes to its workspace's tracker by, and what the write made."""
+
+    model_config = ConfigDict(frozen=True)
+
+    correlation_id: str
+    """The chain of the run that claimed the key first."""
+
+    ref: dict[str, JsonValue] | None = None
+    """The item or comment the key made, as the tracker port names it; None while it is only
+    claimed."""
+
+    deleted: bool = False
+    """Whether the item was found deleted: its key files nothing again."""
+
+    written: dict[str, JsonValue] = {}
+    """The value relayr last set on each of the item's fields, recorded before the write."""
+
+
 class Ledger(Protocol):
-    """Where followers keep their cursors, leases and dead letters."""
+    """Where followers keep their cursors, leases and dead letters, and runs their tracker keys."""
 
     async def acquire_lease(self, workspace: WorkspaceKey, holder: str, ttl: timedelta) -> bool:
         """Take or renew the workspace's lease for `ttl`. Return False if another holder has it."""
@@ -110,4 +135,50 @@ class Ledger(Protocol):
 
         These are the workspaces to follow again when the application starts.
         """
+        ...
+
+    async def claim_tracked(
+        self,
+        workspace: WorkspaceKey,
+        kind: TrackedKind,
+        key: str,
+        correlation_id: str,
+        *,
+        stale_after: timedelta,
+    ) -> bool:
+        """Claim a key before writing by it: True if the claim is the caller's.
+
+        A new key is claimed with `correlation_id`. A key claimed longer ago than `stale_after`
+        that has no record is claimed again, keeping its first correlation id. A key with a
+        record, or claimed more recently, is not the caller's.
+        """
+        ...
+
+    async def tracked(self, workspace: WorkspaceKey, kind: TrackedKind, key: str) -> Tracked | None:
+        """Return a key's claim and record, or None if it was never claimed."""
+        ...
+
+    async def record_tracked(
+        self, workspace: WorkspaceKey, kind: TrackedKind, key: str, ref: dict[str, JsonValue]
+    ) -> dict[str, JsonValue] | None:
+        """Record what a claimed key made, the first kept, and return the record kept.
+
+        Returns None, recording nothing, if the key was never claimed.
+        """
+        ...
+
+    async def mark_tracked_deleted(self, workspace: WorkspaceKey, key: str) -> None:
+        """Mark an item's key deleted, so it files nothing again."""
+        ...
+
+    async def record_written(
+        self, workspace: WorkspaceKey, key: str, fields: Mapping[str, JsonValue]
+    ) -> None:
+        """Record the values relayr is about to set on an item's fields, by its key."""
+        ...
+
+    async def forget_written(
+        self, workspace: WorkspaceKey, key: str, fields: Collection[str]
+    ) -> None:
+        """Forget the values recorded for an item's fields."""
         ...

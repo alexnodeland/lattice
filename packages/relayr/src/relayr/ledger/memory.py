@@ -1,9 +1,21 @@
 """The ledger in memory: for tests, and for an application whose followers may start over."""
 
-from dataclasses import dataclass
+from collections.abc import Collection, Mapping
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
-from relayr.ledger.ledger import Cause, CauseKind, Clock, DeadLetter, WorkspaceKey, utc_now
+from pydantic import JsonValue
+
+from relayr.ledger.ledger import (
+    Cause,
+    CauseKind,
+    Clock,
+    DeadLetter,
+    Tracked,
+    TrackedKind,
+    WorkspaceKey,
+    utc_now,
+)
 
 
 @dataclass
@@ -11,6 +23,15 @@ class _Followed:
     seq: int = 0
     holder: str | None = None
     expires_at: datetime | None = None
+
+
+@dataclass
+class _Tracked:
+    correlation_id: str
+    claimed_at: datetime
+    ref: dict[str, JsonValue] | None = None
+    deleted: bool = False
+    written: dict[str, JsonValue] = field(default_factory=dict[str, JsonValue])
 
 
 class InMemoryLedger:
@@ -25,6 +46,7 @@ class InMemoryLedger:
         self._followed: dict[WorkspaceKey, _Followed] = {}
         self._dead_letters: dict[WorkspaceKey, dict[int, DeadLetter]] = {}
         self._causes: dict[tuple[WorkspaceKey, CauseKind, str], tuple[Cause, datetime]] = {}
+        self._tracked: dict[tuple[WorkspaceKey, TrackedKind, str], _Tracked] = {}
 
     async def acquire_lease(self, workspace: WorkspaceKey, holder: str, ttl: timedelta) -> bool:
         """Take or renew the workspace's lease for `ttl`. Return False if another holder has it."""
@@ -84,3 +106,67 @@ class InMemoryLedger:
     async def followed(self) -> list[WorkspaceKey]:
         """Return every workspace a follower has held a lease on or saved a cursor for, in order."""
         return sorted(self._followed)
+
+    async def claim_tracked(
+        self,
+        workspace: WorkspaceKey,
+        kind: TrackedKind,
+        key: str,
+        correlation_id: str,
+        *,
+        stale_after: timedelta,
+    ) -> bool:
+        """Claim a key before writing by it: True if the claim is the caller's."""
+        now = self._clock()
+        found = self._tracked.get((workspace, kind, key))
+        if found is None:
+            self._tracked[workspace, kind, key] = _Tracked(correlation_id, now)
+            return True
+        if found.ref is not None or found.claimed_at > now - stale_after:
+            return False
+        found.claimed_at = now
+        return True
+
+    async def tracked(self, workspace: WorkspaceKey, kind: TrackedKind, key: str) -> Tracked | None:
+        """Return a key's claim and record, or None if it was never claimed."""
+        found = self._tracked.get((workspace, kind, key))
+        if found is None:
+            return None
+        return Tracked(
+            correlation_id=found.correlation_id,
+            ref=found.ref,
+            deleted=found.deleted,
+            written=found.written,
+        )
+
+    async def record_tracked(
+        self, workspace: WorkspaceKey, kind: TrackedKind, key: str, ref: dict[str, JsonValue]
+    ) -> dict[str, JsonValue] | None:
+        """Record what a claimed key made, the first kept, and return the record kept."""
+        found = self._tracked.get((workspace, kind, key))
+        if found is None:
+            return None
+        found.ref = found.ref or ref
+        return found.ref
+
+    async def mark_tracked_deleted(self, workspace: WorkspaceKey, key: str) -> None:
+        """Mark an item's key deleted, so it files nothing again."""
+        found = self._tracked.get((workspace, "item", key))
+        if found is not None:
+            found.deleted = True
+
+    async def record_written(
+        self, workspace: WorkspaceKey, key: str, fields: Mapping[str, JsonValue]
+    ) -> None:
+        """Record the values relayr is about to set on an item's fields, by its key."""
+        found = self._tracked.get((workspace, "item", key))
+        if found is not None:
+            found.written = found.written | dict(fields)
+
+    async def forget_written(
+        self, workspace: WorkspaceKey, key: str, fields: Collection[str]
+    ) -> None:
+        """Forget the values recorded for an item's fields."""
+        found = self._tracked.get((workspace, "item", key))
+        if found is not None:
+            found.written = {f: v for f, v in found.written.items() if f not in fields}

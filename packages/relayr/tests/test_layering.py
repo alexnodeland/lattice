@@ -19,7 +19,10 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     # layer: (relayr packages it may import, third-party modules it may import)
     "events": ({"relayr.events"}, {*LIBRARIES, "pydantic"}),
     "ledger": ({"relayr.ledger"}, {"pydantic"}),
-    "sql": ({"relayr.ledger", "relayr.sql"}, {"sqlalchemy", "alembic", "lattice_core.sql"}),
+    "sql": (
+        {"relayr.ledger", "relayr.sql"},
+        {"pydantic", "sqlalchemy", "alembic", "lattice_core.sql"},
+    ),
     "inbound": (
         {"relayr.events", "relayr.ledger", "relayr.outbound", "relayr.telemetry", "relayr.inbound"},
         {*LIBRARIES, "opentelemetry"},

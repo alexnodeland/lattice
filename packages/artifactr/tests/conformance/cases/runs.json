@@ -52,6 +52,7 @@
             "run_id": "run_p",
             "thread_id": "thr_1",
             "tool_call_id": "call_q",
+            "tool_name": "ask_user",
             "answer": "Monday",
             "approved": null
           }
@@ -115,6 +116,14 @@
         "outcome": {
           "type": "recorded"
         },
+        "events": [
+          {
+            "type": "deferred_answered",
+            "tool_call_id": "call_a",
+            "tool_name": "delete_note",
+            "approved": true
+          }
+        ],
         "runs": [
           {
             "answers": {

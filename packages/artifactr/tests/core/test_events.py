@@ -9,6 +9,7 @@ from artifactr.core import (
     WORKSPACE_SCOPED,
     AppEvent,
     ArtifactChanged,
+    DeferredAnswered,
     Envelope,
     Event,
     KnownEvent,
@@ -41,6 +42,13 @@ def test_unknown_event_types_round_trip() -> None:
     assert isinstance(event, UnknownEvent)
     assert event.type == "artifact_forked"
     assert EVENTS.dump_python(event) == raw
+
+
+def test_an_answer_recorded_before_it_named_its_tool_reads_without_one() -> None:
+    raw = {"type": "deferred_answered", "run_id": "r1", "thread_id": "t1", "tool_call_id": "c1"}
+    event = EVENTS.validate_python(raw)
+    assert isinstance(event, DeferredAnswered)
+    assert event.tool_name is None
 
 
 def test_values_without_a_string_type_are_unknown() -> None:

@@ -32,7 +32,7 @@ from artifactr.core import (
     WritePolicy,
     new_id,
 )
-from artifactr.workspace import InMemoryStorage, Workspace, Workspaces
+from artifactr.workspace import Check, InMemoryStorage, Workspace, Workspaces
 
 __version__ = version("artifactr-ai")
 
@@ -43,6 +43,7 @@ __all__ = [
     "Artifact",
     "ArtifactDraft",
     "ArtifactWorkspace",
+    "Check",
     "EvaluatorActor",
     "ExternalAgentActor",
     "Feedback",

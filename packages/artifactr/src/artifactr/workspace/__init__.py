@@ -2,8 +2,8 @@
 
 Open a :class:`Workspace` with :meth:`Workspaces.open`; every read and write goes through it,
 each asks the application's ``authorize`` hook, every read leaves out what its ``hidden``
-hook hides, and every write runs core's rules in one
-storage transaction.
+hook hides, every command passes the application's ``checks``, and every write runs core's rules
+in one storage transaction.
 """
 
 from artifactr.workspace.memory import InMemoryStorage
@@ -15,6 +15,7 @@ from artifactr.workspace.workspace import (
     ArtifactBusy,
     ArtifactLease,
     Authorize,
+    Check,
     Hidden,
     OnOpen,
     ThreadBusy,
@@ -29,6 +30,7 @@ __all__ = [
     "ArtifactBusy",
     "ArtifactLease",
     "Authorize",
+    "Check",
     "Hidden",
     "HistoryChunk",
     "InMemoryStorage",

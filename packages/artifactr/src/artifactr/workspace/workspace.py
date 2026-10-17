@@ -1,12 +1,12 @@
 """Workspaces: tenant-scoped handles over artifacts, threads and the log (ADR-0011).
 
-Every read and write goes through a :class:`Workspace`, each of whose methods asks the
-application's ``authorize`` hook first, with the action it takes (ADR-0056). Every write goes
-through :meth:`Workspace.commit` or :meth:`Workspace.record`, which run core's rules inside one
-storage transaction (ADR-0002, ADR-0018). Each commit is traced as an ``artifactr.commit {type}``
-span, and what commits and facts do is counted in artifactr's metrics. Every envelope records
-the W3C trace context of the span it was committed in, and every revision that span's trace
-(ADR-0033).
+Every read and write goes through a :class:`Workspace`, each of whose methods asks the application's
+``authorize`` hook first, with the action it takes (ADR-0056). Every write goes through
+:meth:`Workspace.commit` or :meth:`Workspace.record`, which run core's rules inside one storage
+transaction (ADR-0002, ADR-0018); a command passes the application's ``checks`` of its type first
+(ADR-0071). Each commit is traced as an ``artifactr.commit {type}`` span, and what commits and facts
+do is counted in artifactr's metrics. Every envelope records the W3C trace context of the span it
+was committed in, and every revision that span's trace (ADR-0033).
 """
 
 import asyncio
@@ -22,6 +22,7 @@ from collections.abc import (
     Callable,
     Collection,
     Iterable,
+    Mapping,
     Sequence,
 )
 from datetime import datetime, timedelta
@@ -203,6 +204,20 @@ It starts a workspace's background work, such as a feedback mirror, so it must b
 a permission check has no side effects.
 """
 
+Check = Callable[["Workspace", Command], Awaitable[None]]
+"""Refuses a command before it commits, for what the application knows and core doesn't.
+
+:class:`Workspaces` holds them by command ``type``, and :meth:`Workspace.commit` calls the one
+for a command's type once ``authorize`` allows the command and core's own checks of what it
+names pass, and before its transaction, with the committing handle: so a check reads the
+workspace as the command's actor, ``workspace.actor``. A ``propose_change`` is checked under
+``"propose_change"``, whatever change it wraps. A check refuses with a
+:class:`~artifactr.core.Rejection`, such as :class:`~artifactr.core.ValidationFailed` or
+:class:`~artifactr.core.InvalidState`; anything else it raises fails the command as an error.
+It reads before the commit and holds nothing, so what it read may change before the command
+commits. Facts are recorded unchecked: they are the runner's, not people's (ADR-0071).
+"""
+
 
 _OPEN: Final = Access(action="artifactr:open")
 
@@ -254,6 +269,8 @@ class Workspaces:
         types: The artifact types this application accepts. Others are rejected even if they
             are registered, so clients cannot create arbitrary types. ``None`` accepts every
             registered type.
+        checks: The application's checks of commands, by command ``type``, each called before
+            a command of that type commits; none if omitted.
         authorize: Whether an actor may take an action, asked by every handle in each of its
             methods; allows everything if omitted.
         on_open: Called each time a workspace is opened, once ``authorize`` allows it.
@@ -269,6 +286,7 @@ class Workspaces:
         storage: Storage,
         *,
         types: Iterable[type[Artifact]] | None = None,
+        checks: Mapping[str, Check] | None = None,
         authorize: Authorize | None = None,
         on_open: OnOpen | None = None,
         hidden: Hidden | None = None,
@@ -279,6 +297,7 @@ class Workspaces:
         self._context = _Context(
             storage=storage,
             kinds=None if types is None else frozenset(t.kind for t in types),
+            checks=dict(checks or {}),
             authorize=authorize,
             hidden=hidden,
             hidden_refresh=hidden_refresh.total_seconds(),
@@ -347,6 +366,7 @@ class _Context:
 
     storage: Storage
     kinds: frozenset[str] | None
+    checks: Mapping[str, Check]
     authorize: Authorize | None
     hidden: Hidden | None
     hidden_refresh: float
@@ -534,6 +554,8 @@ class Workspace:
                 await self.check(_access(command))
                 command = await self._check_target(command)
                 self._check_kind(command)
+                if (check := self._context.checks.get(command.type)) is not None:
+                    await check(self, command)
                 outcome = await self._transact(
                     command,
                     lambda state: commit(command, state, actor=self._actor),

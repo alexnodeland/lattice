@@ -4,7 +4,7 @@
 
 ## What lattice is
 
-lattice is one repository: nine packages, two reference implementations, and one set of tools that checks, releases and documents them. It holds the packages, and changes nothing about what they are downstream. Each keeps its name, `pyproject.toml`, version, dependencies, extras, tests, 100% coverage gate, ADRs, RFCs, changelog and releases, and each installs on its own.
+lattice is one repository: eight packages, two reference implementations, and one set of tools that checks, releases and documents them. It holds the packages, and changes nothing about what they are downstream. Each keeps its name, `pyproject.toml`, version, dependencies, extras, tests, 100% coverage gate, ADRs, RFCs, changelog and releases, and each installs on its own.
 
 ### Goals
 
@@ -23,7 +23,6 @@ lattice is one repository: nine packages, two reference implementations, and one
 lattice/
 ├── packages/
 │   ├── artifactr/       artifactr-ai: src/, tests/, schemas/ (its JSON Schema and OpenAPI document), bruno/ (its collection), deploy/ (its dashboards), scripts/, compose.yaml, compose.stackr.yaml, moon.yml, pyproject.toml, README.md, CHANGELOG.md, LICENSE
-│   ├── artifactr-files/ artifactr-files-ai: src/, tests/, compose.yaml, moon.yml, pyproject.toml, README.md, CHANGELOG.md, LICENSE
 │   ├── reflexr/         the same shape
 │   ├── evalr/
 │   ├── relayr/          relayr-ai
@@ -61,14 +60,13 @@ lattice/
 
 ## The projects
 
-moon knows sixteen projects: the fifteen below, and `lattice`, the root, which holds the site and lattice's own tests and scripts.
+moon knows fifteen projects: the fourteen below, and `lattice`, the root, which holds the site and lattice's own tests and scripts.
 
 | Project | Path | What it is | Kind | Depends on |
 |---|---|---|---|---|
 | lattice-core | `packages/lattice-core` | What the libraries share and must keep identical; distributed as `lattice-core-ai` ([ADR-0018](adr/0018-lattice-core-what-the-libraries-share.md)) | Library | |
 | evalr | `packages/evalr` | Typed evaluation of agent systems | Library | |
 | artifactr | `packages/artifactr` | Chat applications where people and agents share versioned artifacts; distributed as `artifactr-ai` | Library | evalr, lattice-core |
-| artifactr-files | `packages/artifactr-files` | Native files as artifactr artifacts; distributed as `artifactr-files-ai` ([lattice RFC-0003](rfcs/0003-native-files-as-artifacts.md)) | Library | artifactr, lattice-core |
 | reflexr | `packages/reflexr` | Rules over event streams that run LLM workflows | Library | evalr, lattice-core |
 | relayr | `packages/relayr` | The bridge between artifactr and reflexr; distributed as `relayr-ai` | Library | artifactr, reflexr |
 | grantr | `packages/grantr` | Identity and access for artifactr and reflexr, in stackr's template ([its plan](grantr/rfcs/0001-v0.1-implementation-plan.md)) | Library | |
@@ -84,7 +82,6 @@ moon knows sixteen projects: the fifteen below, and `lattice`, the root, which h
 ```mermaid
 graph TD
     relayr --> artifactr
-    artifactr-files --> artifactr
     relayr --> reflexr
     docplan --> artifactr
     docplan --> evalr

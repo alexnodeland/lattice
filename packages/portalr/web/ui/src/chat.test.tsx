@@ -1,5 +1,5 @@
 import type { Artifactr, ArtifactrV1 } from "@portalr/client";
-import { expect, test, vi } from "vitest";
+import { expect, onTestFinished, test, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import {
@@ -71,11 +71,26 @@ test("without thumbs given, neither is pressed; without a handler, there are non
       <Message message={message({ id: "msg_2" })} author="Alice" />
     </Messages>,
   );
-  const buttons = screen.getByRole("button").elements();
-  expect(buttons).toHaveLength(2);
-  for (const button of buttons) {
+  const thumbs = screen.getByRole("group", { name: "Feedback" }).getByRole("button").elements();
+  expect(thumbs).toHaveLength(2);
+  expect(screen.getByRole("group", { name: "Feedback" }).elements()).toHaveLength(1);
+  for (const button of thumbs) {
     expect(button.getAttribute("aria-pressed")).toBe("false");
   }
+});
+
+test("each message can be copied as the Markdown it was written in, never as what shows", async () => {
+  const written = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
+  onTestFinished(() => written.mockRestore());
+  const content = "# Plan\n\n- **one**\n\n```ts\nlet x = 1;\n```";
+  const screen = await render(
+    <Messages>
+      <Message message={message({ content })} author="Agent" />
+    </Messages>,
+  );
+  await screen.getByRole("button", { name: "Copy as Markdown" }).click();
+  expect(written).toHaveBeenCalledWith(content);
+  await expect.element(screen.getByRole("button", { name: "Copied as Markdown" })).toBeVisible();
 });
 
 test("a notice is set apart from messages", async () => {

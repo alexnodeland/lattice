@@ -1,6 +1,6 @@
 # RFC-0003: Native files as artifacts
 
-**Status:** Draft, amended by [portalr ADR-0041](../portalr/adr/0041-first-party-webassembly-in-the-apps-policy.md)
+**Status:** Draft, amended by [portalr ADR-0041](../portalr/adr/0041-first-party-webassembly-in-the-apps-policy.md) and [lattice ADR-0026](../adr/0026-a-distribution-needs-a-reason-integrations-are-extras.md)
 **Author:** Alex Nodeland
 **Created:** 2026-10-16
 **Discussion:** [#248](https://github.com/alexnodeland/lattice/pull/248)
@@ -53,6 +53,8 @@ An agent's edit and a person's check-in end the same way: the package puts the b
 - **It depends inward only.** It imports only names in `__all__` of `artifactr`, `artifactr.core` and `artifactr.workspace`, plus `lattice_core.sql.tenancy`; artifactr imports nothing of it. Its `tests/test_layering.py` holds it there, as relayr's does.
 - **It lives in the monorepo,** so CI runs its tests on every change to artifactr (lattice ADR-0002). Its `artifactr-ai` requirement is a lower bound, raised by hand.
 - **Its PyPI name is `artifactr-files-ai`,** with the suffix artifactr's own distribution has; it is imported as `artifactr_files`. Both `artifactr-files` and `artifactr-files-ai` were free on PyPI on 2026-10-16.
+
+> **Amended (2026-10-17) by [lattice ADR-0026](../adr/0026-a-distribution-needs-a-reason-integrations-are-extras.md):** the package is not a distribution of its own. Before its first release, `artifactr-files` became artifactr's `files` extra, `artifactr-ai[files]`, imported as `artifactr.files`, with its docs a section of artifactr's ([native files](../artifactr/files/index.md)), and an application turns it on per workspace through the shared Integrations switch. D5 below is decided the other way: an extra of artifactr. What else this section says holds: it depends inward only, on the public API of `artifactr.core` and `artifactr.workspace`, and the rest of artifactr imports nothing of it; its tables keep their own Alembic chain and version table. Its `artifactr-ai` floor is gone, and `packages/artifactr-files/` and `artifactr_files` in this RFC now mean `artifactr.files` in `packages/artifactr/`, where the layer once named `artifactr_files.files` is `artifactr.files.native`.
 
 ### The artifact
 

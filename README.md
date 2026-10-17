@@ -106,7 +106,7 @@ sequenceDiagram
 | **[stackr](packages/stackr)** | The stack the libraries run on (Supabase or PostgreSQL, LiteLLM, OpenTelemetry, Grafana, Langfuse), an application template, and hosting recipes | ✅ template · 🚧 [hosting recipes](docs/stackr/rfcs/0004-hosting-recipes.md) |
 
 > [!NOTE]
-> **Alpha.** artifactr's [0.1.0](https://github.com/alexnodeland/artifactr/releases/tag/v0.1.0) was released from its original repository; lattice keeps its tag, `artifactr-v0.1.0`. The others release once lattice reaches v0.1. None is on PyPI yet. APIs may still change before 1.0.
+> **Alpha.** artifactr's [0.1.0](https://github.com/alexnodeland/artifactr/releases/tag/v0.1.0) was released from its original repository; lattice keeps its tag, `artifactr-v0.1.0`. The others release once lattice reaches v0.1. Of the packages, only `lattice-core-ai` is on PyPI so far. APIs may still change before 1.0.
 
 ## 🚀 Start an application
 

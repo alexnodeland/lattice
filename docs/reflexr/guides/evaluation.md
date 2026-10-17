@@ -196,8 +196,7 @@ Score configs give Langfuse each score's type, range and categories, so its UI o
 === "pip"
 
     ```bash
-    pip install "lattice-core-ai @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/lattice-core" \
-      "evalr @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/evalr" \
+    pip install "evalr @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/evalr" \
       "reflexr[evals] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/reflexr"
     ```
 

@@ -506,7 +506,7 @@ What reflexr and artifactr shared verbatim is in [lattice-core](../lattice-core/
 
 ## Dependencies
 
-Python 3.12+. Runtime: `pydantic` and `lattice-core-ai` (core, and workspace's NUL check; [lattice-core](../lattice-core/index.md), from lattice until published); `opentelemetry-api` (telemetry and workspace); `cronsim` (schedules); `pydantic-ai-slim` and `pydantic-graph` (agent). Extras: `sql` (`sqlalchemy[asyncio]` and `alembic`), `postgres` (`sql` and asyncpg) and `sqlite` (`sql` and aiosqlite), `fastapi`, `mcp`, `otel` (lattice-core's, with the OpenTelemetry SDK, OTLP exporters and instrumentations), `langfuse` (with evalr, for the score mirror and its Langfuse adapters), `litellm` (lattice-core's, with pydantic-ai's OpenAI-compatible models) and `evals` (evalr). Tooling: uv, ruff, pyright in strict mode, pytest, and Zensical with mkdocstrings for the documentation site.
+Python 3.12+. Runtime: `pydantic` and `lattice-core-ai` (core, and workspace's NUL check; [lattice-core](../lattice-core/index.md), on PyPI); `opentelemetry-api` (telemetry and workspace); `cronsim` (schedules); `pydantic-ai-slim` and `pydantic-graph` (agent). Extras: `sql` (`sqlalchemy[asyncio]` and `alembic`), `postgres` (`sql` and asyncpg) and `sqlite` (`sql` and aiosqlite), `fastapi`, `mcp`, `otel` (lattice-core's, with the OpenTelemetry SDK, OTLP exporters and instrumentations), `langfuse` (with evalr, for the score mirror and its Langfuse adapters), `litellm` (lattice-core's, with pydantic-ai's OpenAI-compatible models) and `evals` (evalr). Tooling: uv, ruff, pyright in strict mode, pytest, and Zensical with mkdocstrings for the documentation site.
 
 ## Testing
 

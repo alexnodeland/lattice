@@ -11,13 +11,13 @@ import { useWorkspace, WorkspaceAddons, WorkspaceStreams } from "../../../../../
  */
 export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace")({
   head: ({ params }) => ({ meta: [{ title: `${params.workspace} · ${params.tenant} · portalr` }] }),
-  loader: ({ context, params }) =>
-    Promise.all([
-      context.queryClient.ensureQueryData(context.queries.grantr.memberships(context.user)),
-      context.queryClient.prefetchQuery(
-        context.queries.grantr.enabledIntegrations(params.tenant, params.workspace),
-      ),
-    ]),
+  loader: ({ context, params }) => {
+    // Started, not waited on: the page opens on each integration's default while grantr answers.
+    void context.queryClient.prefetchQuery(
+      context.queries.grantr.enabledIntegrations(params.tenant, params.workspace),
+    );
+    return context.queryClient.ensureQueryData(context.queries.grantr.memberships(context.user));
+  },
   component: Workspace,
 });
 

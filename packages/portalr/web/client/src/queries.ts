@@ -534,7 +534,8 @@ export function createQueries(api: Api) {
        * Whether each integration is on in a workspace, by key, for anyone who can open it. It is
        * read once and kept five minutes: after that, the window regaining focus or the network
        * coming back reads it again, as TanStack Query does, and a command refused as
-       * `not_enabled` makes it stale at once (`stale.refusal`, portalr ADR-0045).
+       * `not_enabled` makes it stale at once (`stale.refusal`, portalr ADR-0045). A failed read
+       * isn't tried again: each integration is its default until the next read.
        */
       enabledIntegrations: (tenant: string, ws: string) =>
         queryOptions({
@@ -547,6 +548,7 @@ export function createQueries(api: Api) {
               ),
             ),
           staleTime: 5 * 60_000,
+          retry: false,
         }),
       /** The tenant's keys, by public id and principal, never their secrets (`grantr:issue_key`). */
       keyring: (tenant: string) =>

@@ -1,6 +1,6 @@
 # RFC-0005: Forms, dashboards and mini apps in the chat
 
-**Status:** Draft
+**Status:** Draft, amended by [lattice ADR-0026](../adr/0026-a-distribution-needs-a-reason-integrations-are-extras.md)
 **Author:** Alex Nodeland
 **Created:** 2026-10-17
 **Discussion:** [#334](https://github.com/alexnodeland/lattice/pull/334)
@@ -60,6 +60,8 @@ graph LR
 - **It depends inward only.** It imports names in `__all__` of `artifactr`, `artifactr.core`, `artifactr.agent` and `artifactr.workspace`; its `[relayr]` extra imports `relayr`. Nothing imports it. Its `tests/test_layering.py` holds that, as relayr's does.
 - **Its PyPI name is `artifactr-ui-ai`,** with the suffix artifactr's and `artifactr-files-ai`'s carry, imported as `artifactr_ui`. `artifactr-ui`, `artifactr-ui-ai` and `artifactr-forms-ai` were free on PyPI on 2026-10-16. It is a release-please component of its own, first released as 0.1.0 ([lattice ADR-0006](../adr/0006-release-please-first-versions-pre-1-0-bumps-and-what-releases.md)).
 - **Its wire schema is committed,** as `packages/artifactr-ui/schemas/artifactr_ui.v1.json`, drift-tested as artifactr's is, and added to `SCHEMAS` in portalr's `web/client/scripts/generate.ts`, which writes `client/src/generated/artifactr_ui.v1.ts`. portalr's Python doesn't depend on it, as it doesn't depend on artifactr.
+
+> **Amended (2026-10-17) by [lattice ADR-0026](../adr/0026-a-distribution-needs-a-reason-integrations-are-extras.md):** forms and dashboards are not a distribution of their own. They are an extra of `artifactr-ai`, in the artifactr distribution, with their code a subpackage of `artifactr` that the rest of it never imports, and an application turns them on per workspace through the shared Integrations switch. `artifactr-ui-ai`, its release-please component and its first release as 0.1.0 are dropped; the extra's name and import path are settled where it is built. What else this section says holds, read with artifactr's extra for the package.
 
 ```python
 from artifactr_ui import UI_TYPES, ui_checks

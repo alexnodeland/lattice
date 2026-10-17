@@ -69,6 +69,8 @@ export default defineConfig({
           include: ["csp/**/*.test.ts"],
           environment: "node",
           globalSetup: ["./csp/serve.ts"],
+          // A test renders a page, and some stream a message into it a character at a time.
+          testTimeout: 60_000,
         },
       },
     ],

@@ -107,6 +107,20 @@ def test_logs_are_exported_until_shutdown(captured: Captured) -> None:
     assert len(root.handlers) == len(before) - 1
 
 
+def test_configuring_again_while_a_handle_is_live_warns_naming_its_service(
+    handle: TelemetryHandle,
+) -> None:
+    def again() -> TelemetryHandle:
+        options = Captured().options()
+        return configure_telemetry(DEMO, service_name="oncall", instrument=(), **options)
+
+    with pytest.warns(RuntimeWarning, match="set up for 'docplan' is live"), again():
+        pass
+    handle.shutdown()
+    with again():
+        pass  # the first is shut down: no warning, which the tests' filter would make an error
+
+
 def test_a_record_logged_in_a_tenants_span_carries_its_tenant(captured: Captured) -> None:
     handle = configure_telemetry(DEMO, service_name="docplan", instrument=(), **captured.options())
     tracer = handle.tracer_provider.get_tracer("test")

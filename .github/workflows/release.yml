@@ -1,5 +1,5 @@
-# Releases (stackr's RFC-0003, Releases and versioning). release-please keeps one release pull
-# request open for the packages with unreleased changes. Merging it tags each one
+# Releases (stackr's RFC-0003, Releases and versioning). release-please keeps a release pull
+# request open for each package with unreleased changes (ADR-0023). Merging one tags its package
 # <package>-v<version>, updates its CHANGELOG.md and creates its GitHub release. A plan job then
 # decides what to build (scripts/release_plan.py, tested): each released package that ships a
 # wheel is built alone, as it is published, and its wheel and sdist are attached to its release

@@ -77,5 +77,12 @@ Each record captures one decision: the context that forced it, the options consi
 | [0071](0071-a-lease-on-an-artifact.md) | A lease on an artifact | Accepted |
 | [0072](0072-native-files-are-manifests-over-json-patch.md) | Native files are manifests over JSON Patch | Accepted |
 | [0073](0073-checks-that-refuse-a-command-before-it-commits.md) | Checks that refuse a command before it commits | Accepted |
+| [0074](0074-forms-and-dashboards-in-artifactr-ui-behind-the-forms-extra.md) | Forms and dashboards in `artifactr.ui`, behind the `forms` extra | Accepted |
+| [0075](0075-forms-refused-at-the-boundary-through-the-checks.md) | Forms refused at the boundary, through the checks | Accepted |
+| [0076](0076-the-form-schema-an-allow-list-compiled-to-pydantic.md) | The form schema, an allow-list compiled to Pydantic | Accepted |
+| [0077](0077-formats-and-sizes-checked-by-artifactrs-own-code.md) | Formats and sizes, checked by artifactr's own code | Accepted |
+| [0078](0078-the-agents-toolset-for-forms-and-no-apps-yet.md) | The agent's toolset for forms, and no apps yet | Accepted |
+| [0079](0079-forms-unverified-items-settled.md) | Forms' unverified items, settled | Accepted |
+| [0080](0080-integrations-on-or-off-per-workspace.md) | Integrations on or off per workspace | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

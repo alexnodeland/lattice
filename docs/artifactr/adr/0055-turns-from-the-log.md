@@ -174,7 +174,7 @@ The two findings left for a decision above are decided.
 
 ## Amendment (2026-10-17): a message doesn't answer a form
 
-[lattice RFC-0005](../../rfcs/0005-forms-dashboards-and-mini-apps.md) adds `ask_form`, a deferred tool of the `artifactr-ui` package whose answer is the form's values, which the application's check holds to the form's schema ([ADR-0073](0073-checks-that-refuse-a-command-before-it-commits.md)). Free text from the chat is not a form's values, so:
+[lattice RFC-0005](../../rfcs/0005-forms-dashboards-and-mini-apps.md) adds `ask_form`, a deferred tool of `artifactr.ui`'s ([ADR-0074](0074-forms-and-dashboards-in-artifactr-ui-behind-the-forms-extra.md)) whose answer is the form's values, which the application's check holds to the form's schema ([ADR-0073](0073-checks-that-refuse-a-command-before-it-commits.md)). Free text from the chat is not a form's values, so:
 
 - **I6 has an exception: a form.** In a paused thread, the oldest message not taken is the reply to the questions and approvals open, never to a form. `_reply` skips a request whose `tool_name` is `ask_form`, one constant in the runner, named as RFC-0005's.
 - **A form left open keeps the run paused.** A reply that answers the questions beside a form takes its message, in the answers' transactions, as I2 says, and the run resumes only once every request is answered: the form's by its own answer.

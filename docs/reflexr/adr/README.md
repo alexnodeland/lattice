@@ -35,7 +35,7 @@ Each record captures one decision: the context that forced it, the options consi
 | [0029](0029-metric-detail-through-sdk-views.md) | Metric detail through SDK views, and the OpenTelemetry and Langfuse adapters | Accepted; its score adapters superseded by 0045 |
 | [0030](0030-sql-storage.md) | SQL storage with one dialect-neutral implementation | Accepted |
 | [0031](0031-the-reference-implementations-events-and-rules.md) | The reference implementation's events and rules | Accepted, amended by 0051 |
-| [0032](0032-documentation-site.md) | The documentation site, and a brand shared by the family | Accepted, amended by 0046 and 0049 |
+| [0032](0032-documentation-site.md) | The documentation site, and a brand shared by lattice | Accepted, amended by 0046 and 0049 |
 | [0033](0033-publishing-the-documentation-site.md) | Publishing the documentation site from main | Accepted, amended by 0046 and 0049 |
 | [0036](0036-typed-run-failures.md) | Typed run failures | Accepted |
 | [0037](0037-joining-stackrs-network.md) | Joining stackr's network when it runs | Accepted; its override superseded by lattice ADR-0009 |
@@ -50,7 +50,7 @@ Each record captures one decision: the context that forced it, the options consi
 | [0046](0046-one-docs-build.md) | One docs build | Accepted, amended by 0049 |
 | [0047](0047-commands-carried-out-once-per-id.md) | Commands carried out once per id | Accepted |
 | [0048](0048-reflexr-in-lattice.md) | reflexr in lattice | Accepted |
-| [0049](0049-one-site-for-the-family.md) | One site for the family | Accepted |
+| [0049](0049-one-site-for-the-family.md) | One site for lattice | Accepted |
 | [0050](0050-dashboards-from-the-checkout.md) | Dashboards from the checkout | Accepted |
 | [0051](0051-qualified-rule-names.md) | Qualified rule names | Accepted |
 | [0052](0052-typed-action-parameters.md) | Typed action parameters | Accepted |

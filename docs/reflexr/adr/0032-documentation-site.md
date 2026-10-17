@@ -1,4 +1,4 @@
-# ADR-0032: The documentation site, and a brand shared by the family
+# ADR-0032: The documentation site, and a brand shared by lattice
 
 **Status:** Accepted, amended by [ADR-0046](0046-one-docs-build.md) and [ADR-0049](0049-one-site-for-the-family.md)
 **Date:** 2026-09-28
@@ -19,7 +19,7 @@ The site needs:
 
 artifactr answered the same questions in its [ADR-0023](../../artifactr/adr/0023-documentation-site.md): a spike showed that Zensical, the successor that Material for MkDocs' authors are building, renders mkdocstrings' reference, Mermaid and strict link checks well enough to start on, and found two limits (links inside included snippets are not checked, and Sphinx roles render literally). reflexr is artifactr's sibling ([ADR-0003](0003-independent-sibling-of-artifactr.md)), and a reader moving between the two sites should find the same structure and the same tools behind it.
 
-The brand is the other half of the phase. evalr and stackr ([ADR-0020](0020-evalr-shared-eval-kit.md), [ADR-0023](0023-libraries-and-the-stackr-template.md)) will need identities too, so reflexr's is the first chance to turn artifactr's single brand into a system the family shares, rather than four brands that happen to look alike.
+The brand is the other half of the phase. evalr and stackr ([ADR-0020](0020-evalr-shared-eval-kit.md), [ADR-0023](0023-libraries-and-the-stackr-template.md)) will need identities too, so reflexr's is the first chance to turn artifactr's single brand into a system lattice shares, rather than four brands that happen to look alike.
 
 ## Decision
 
@@ -27,7 +27,7 @@ The brand is the other half of the phase. evalr and stackr ([ADR-0020](0020-eval
 - **A Griffe extension converts Sphinx roles** when the docstrings are loaded (`scripts/griffe_sphinx_roles.py`), including the titled form, which reflexr's docstrings use and artifactr's do not. Each role is resolved in the scope of the object whose docstring contains it; one that cannot be resolved, or that names an internal module, becomes inline code. The script is held to the library's gates: pyright strict and the test that forbids inline suppressions both cover `scripts/`.
 - **The build is strict everywhere.** `make docs` and CI's Docs job run `zensical build --strict --clean`, so a broken link, anchor or cross-reference fails the build.
 - **The guides follow the code.** Every guide is written for a developer adopting the library, from the code and the design documents, and every snippet was run against the API when it was written. Where the architecture and the code have drifted, the guides describe the code.
-- **One brand system for the family**, stated in [`docs/assets/brand/README.md`](../assets/brand/README.md): artifactr's typefaces, 64-unit grid, stroke and diagonal, and print-proofing logic, with each library printing in two of the three process inks (artifactr cyan and magenta, reflexr magenta and yellow, evalr cyan and yellow) whose overprint is its working colour, and stackr in key. reflexr's mark is artifactr's caret turned a quarter: a chevron whose point is where the rule fires. The files are hand-authored SVGs with outlined text, and the lockups and banners follow artifactr's layout to the unit.
+- **One brand system for lattice**, stated in [`docs/assets/brand/README.md`](../assets/brand/README.md): artifactr's typefaces, 64-unit grid, stroke and diagonal, and print-proofing logic, with each library printing in two of the three process inks (artifactr cyan and magenta, reflexr magenta and yellow, evalr cyan and yellow) whose overprint is its working colour, and stackr in key. reflexr's mark is artifactr's caret turned a quarter: a chevron whose point is where the rule fires. The files are hand-authored SVGs with outlined text, and the lockups and banners follow artifactr's layout to the unit.
 
 ## Options considered
 
@@ -39,7 +39,7 @@ The brand is the other half of the phase. evalr and stackr ([ADR-0020](0020-eval
 | MkDocs 1.6 with Material for MkDocs | Nearly: the same configuration | mkdocstrings-python | Yes | Maintenance only |
 | Sphinx with MyST | No | autodoc, which reads Sphinx roles natively | Yes (`-W`) | Active |
 
-artifactr's ADR-0023 weighed these in full. For reflexr the deciding factor is the family: one toolchain means one set of conventions for contributors, one way to fix a rendering problem, and the option of a shared theme later.
+artifactr's ADR-0023 weighed these in full. For reflexr the deciding factor is lattice: one toolchain means one set of conventions for contributors, one way to fix a rendering problem, and the option of a shared theme later.
 
 ### The brand
 
@@ -72,4 +72,4 @@ Python-Markdown, which the site uses, needs four spaces to nest a list and a bla
 1. [x] Build the site, the brand and the branded README (RFC-0001 phase 7).
 2. [x] Build the site in strict mode in CI.
 3. [x] Publish the site ([ADR-0033](0033-publishing-the-documentation-site.md)).
-4. [ ] Adopt the family system in evalr's and stackr's repositories.
+4. [ ] Adopt lattice system in evalr's and stackr's repositories.

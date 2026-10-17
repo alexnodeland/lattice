@@ -9,7 +9,7 @@
 [RFC-0003](../stackr/rfcs/0003-one-repository-lattice.md#releases-and-versioning) replaced git-cliff with release-please in manifest mode: one release pull request for every package with unreleased changes, tags `<package>-v<version>`, each package's `CHANGELOG.md`, and `uv.lock` updated with the versions. Its `bootstrap-sha` is the import, so it never reads the history before lattice. Four things were left open, which the setup and the first release pull request ([#19](https://github.com/alexnodeland/lattice/pull/19)) settled:
 
 - **The versions in the manifest.** artifactr alone has been released, as 0.1.0, whose tag the import renamed `artifactr-v0.1.0`. The other packages' `pyproject.toml` say `0.1.0.dev0`, which release-please reads as 0.1.0, so a pyproject version can't stand for "never released".
-- **Breaking changes before 1.0.** The family marks them with `!`, and has bumped the minor version for them while below 1.0. release-please's default would release 1.0.0.
+- **Breaking changes before 1.0.** lattice marks them with `!`, and has bumped the minor version for them while below 1.0. release-please's default would release 1.0.0.
 - **The history before the import.** git-cliff wrote each changelog up to the import, and release-please reads nothing before it.
 - **What cuts a release.** release-please's default changelog sections count `docs` as releasable, so #19 would have released all five packages, with the move's `docs:` commits as their only notes.
 
@@ -26,7 +26,7 @@
 | Setting | Chosen | Otherwise |
 |---|---|---|
 | An unreleased package's version in the manifest | `0.0.0`, so its first release is 0.1.0 | Its pyproject's, read as 0.1.0: a first release of 0.1.1 or 0.2.0, as if 0.1.0 were out |
-| A breaking change before 1.0 | A minor bump, as the family always has | 1.0.0 |
+| A breaking change before 1.0 | A minor bump, as lattice always has | 1.0.0 |
 | The history before the import | Kept, under "Before lattice" | Only what release-please releases, from the import on |
 | Releasable types | `feat`, `fix`, `perf`, `revert`, and breaking changes | These, and `docs` |
 

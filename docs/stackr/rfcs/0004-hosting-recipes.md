@@ -31,7 +31,7 @@ An application generated from the template runs beside the stack on a laptop. No
 - **Configuration is mounted from the checkout.** Every service reads its files from `deploy/<service>/`, and Grafana reads the libraries' dashboards from `packages/<library>/`. A container platform has no checkout to mount.
 - **Row-level security needs two roles.** An application with it migrates as the owner and works as a role that owns nothing, which `db-roles` creates before it first starts ([ADR-0022](../adr/0022-row-level-security-in-the-template.md)).
 
-The applications built on the family are ready to be used by people other than their authors. They need somewhere to run that the maintainer can stand behind, on a VM with an S3-compatible bucket off the host for its backups, or in one AWS account, with no other hosted service to sign up for.
+The applications built on lattice are ready to be used by people other than their authors. They need somewhere to run that the maintainer can stand behind, on a VM with an S3-compatible bucket off the host for its backups, or in one AWS account, with no other hosted service to sign up for.
 
 ## Design
 
@@ -351,7 +351,7 @@ Phase 2 and phase 3 are independent after the spike. Phase 4 needs 3.
 
 ## Alternatives
 
-- **Kubernetes first,** with Helm, as ADR-0001 planned. It suits clusters this family doesn't run yet, and its first step on AWS would still need the VPC, RDS and S3 that OpenTofu creates here.
+- **Kubernetes first,** with Helm, as ADR-0001 planned. It suits clusters lattice doesn't run yet, and its first step on AWS would still need the VPC, RDS and S3 that OpenTofu creates here.
 - **Supabase's self-hosting Compose file.** Every Supabase service, kept in step with Supabase's releases by stackr, when only Auth is used. See H2.
 - **Hosted services:** hosted Supabase, Langfuse Cloud, Grafana Cloud, ClickHouse Cloud. Each is a port's alternative adapter already, and stays one, but none is part of a recipe that needs no other account.
 - **LocalStack** in place of Floci. Its emulation of ECS, RDS and ELB is in its paid plans, which need an account.

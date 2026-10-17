@@ -1,6 +1,6 @@
 # Architecture decision records
 
-Each record captures one decision about the family as a whole: the context that forced it, the options considered, and the consequences we accepted. Records are immutable once accepted; a changed decision gets a new record that amends or supersedes the old one. A decision about one package is recorded in that package's own series, in `docs/<package>/adr/`. The proposal that made lattice is [stackr RFC-0003](../stackr/rfcs/0003-one-repository-lattice.md), and these records begin with what its move decided that the RFC's design didn't.
+Each record captures one decision about lattice as a whole: the context that forced it, the options considered, and the consequences we accepted. Records are immutable once accepted; a changed decision gets a new record that amends or supersedes the old one. A decision about one package is recorded in that package's own series, in `docs/<package>/adr/`. The proposal that made lattice is [stackr RFC-0003](../stackr/rfcs/0003-one-repository-lattice.md), and these records begin with what its move decided that the RFC's design didn't.
 
 Outside its own series, a record is named with its package, as in "reflexr ADR-0003", and these as "lattice ADR-0002".
 

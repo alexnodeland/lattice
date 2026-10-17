@@ -28,7 +28,7 @@ Phase 6's timeouts landed on the day, in their own pull request ([#4](https://gi
 
 ## Trade-off analysis
 
-A timeout can fail a test that would have passed slowly, which is why RFC-0003 kept it for phase 6. Nothing in the family takes more than a few seconds, and a hung job already failed the pull request and everything queued behind it. Landing the timeouts alone, in their own pull request, kept phase 6's rule that each such change is judged on its own.
+A timeout can fail a test that would have passed slowly, which is why RFC-0003 kept it for phase 6. Nothing in lattice takes more than a few seconds, and a hung job already failed the pull request and everything queued behind it. Landing the timeouts alone, in their own pull request, kept phase 6's rule that each such change is judged on its own.
 
 ## Consequences
 

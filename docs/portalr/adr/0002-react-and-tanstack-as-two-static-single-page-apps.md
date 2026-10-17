@@ -8,7 +8,7 @@ Records decision P2 of [lattice RFC-0002][rfc-0002], portalr, the portal.
 
 ## Context
 
-portalr has two UIs: `app`, for the people who use an application, and `admin`, for those who run it. Both are behind a sign-in, with no pages to index, and the data lives in the Python application. The family has been Python only, so this is its first frontend stack, and it is chosen once for both UIs.
+portalr has two UIs: `app`, for the people who use an application, and `admin`, for those who run it. Both are behind a sign-in, with no pages to index, and the data lives in the Python application. lattice has been Python only, so this is its first frontend stack, and it is chosen once for both UIs.
 
 ## Decision
 
@@ -27,6 +27,6 @@ portalr has two UIs: `app`, for the people who use an application, and `admin`, 
 ## Consequences
 
 - Easier: portalr's wheel carries the built UIs, and an application serves them from its own origin, so there is no CORS or CSRF to configure.
-- Harder: a second language in the family, with its own toolchain, lockfile, linters and tests.
+- Harder: a second language in lattice, with its own toolchain, lockfile, linters and tests.
 
 [rfc-0002]: ../../rfcs/0002-portalr-the-portal.md#decisions

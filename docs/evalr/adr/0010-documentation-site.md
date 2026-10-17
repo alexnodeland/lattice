@@ -6,9 +6,9 @@
 
 ## Context
 
-RFC-0001 phase 6 asks for a documentation site in the family's style, built in strict mode in CI. The project's documentation already exists as Markdown under `docs/`: the architecture, the ADRs and the RFCs. It is evergreen and read on GitHub as well as on a site, so the site has to use it as it is, not copies. The site is to be published at `https://evalr.alexnodeland.com`, and the repository's GitHub Pages settings already serve that domain from a workflow.
+RFC-0001 phase 6 asks for a documentation site in lattice's style, built in strict mode in CI. The project's documentation already exists as Markdown under `docs/`: the architecture, the ADRs and the RFCs. It is evergreen and read on GitHub as well as on a site, so the site has to use it as it is, not copies. The site is to be published at `https://evalr.alexnodeland.com`, and the repository's GitHub Pages settings already serve that domain from a workflow.
 
-artifactr built its site first, and recorded the choice of tools in [its ADR-0023](../../artifactr/adr/0023-documentation-site.md) and the choice to publish from `main` in [its ADR-0026](../../artifactr/adr/0026-publishing-the-documentation-site.md). The four projects of the family (artifactr, reflexr, evalr, stackr) share a brand: one grid, one stroke, one typeface, and a hue for each. A reader moving between their sites should find the same structure, the same navigation and the same conventions.
+artifactr built its site first, and recorded the choice of tools in [its ADR-0023](../../artifactr/adr/0023-documentation-site.md) and the choice to publish from `main` in [its ADR-0026](../../artifactr/adr/0026-publishing-the-documentation-site.md). The four projects of lattice (artifactr, reflexr, evalr, stackr) share a brand: one grid, one stroke, one typeface, and a hue for each. A reader moving between their sites should find the same structure, the same navigation and the same conventions.
 
 The site needs:
 
@@ -23,7 +23,7 @@ Two things differ from artifactr. evalr's docstrings use no Sphinx cross-referen
 ## Decision
 
 - **The site is built as artifactr's is**, with the same tools, configuration and structure: Zensical from `mkdocs.yml` with `docs_dir: docs` and its modern theme variant; mkdocstrings-python for the API reference, one page per package, grouped by concept, covering exactly each package's `__all__`, with `griffe-pydantic` listing the fields of Pydantic models; `pymdownx.snippets` including the root files from pages under `docs/project/`; and the same navigation: home, getting started, concepts, guides, reference, design (the architecture, every ADR and RFC) and project.
-- **The brand is the family's**, in evalr's green: the brand files in `docs/assets/brand/` and one stylesheet, `docs/assets/stylesheets/brand.css`, with the palette, logo, favicon and typefaces applied through theme settings. The README carries the banner.
+- **The brand is lattice's**, in evalr's green: the brand files in `docs/assets/brand/` and one stylesheet, `docs/assets/stylesheets/brand.css`, with the palette, logo, favicon and typefaces applied through theme settings. The README carries the banner.
 - **A small Griffe extension rewrites reStructuredText idioms** when the docstrings are loaded (`scripts/griffe_sphinx_roles.py`, artifactr's extension extended): a paragraph's closing `::` becomes a colon, so the indented block after it renders as code, and any Sphinx role becomes a cross-reference, or inline code where it cannot be resolved. The library's docstrings are unchanged.
 - **The build is strict everywhere.** `make docs` and CI's Docs job run `zensical build --strict --clean`, so a broken link or anchor fails the build.
 - **Every example is checked by running it** before it is published, offline: evalr's in-memory adapters, DSPy's `DummyLM`, a fake of TypeSafe's API on its SDK's transport, and fakes of Langfuse and the Hub stand in for the services. The pages show the code as an application would write it.
@@ -34,7 +34,7 @@ Two things differ from artifactr. evalr's docstrings use no Sphinx cross-referen
 
 ### Tools
 
-| Option | Matches the family | API reference | Strict build | Direction |
+| Option | Matches lattice | API reference | Strict build | Direction |
 |---|---|---|---|---|
 | **Zensical with mkdocstrings, as artifactr (chosen)** | Yes | mkdocstrings-python | Yes | The successor its authors are developing; pre-1.0 |
 | MkDocs 1.6 with Material for MkDocs | Nearly: the same configuration | mkdocstrings-python | Yes | Maintenance only |
@@ -50,7 +50,7 @@ Two things differ from artifactr. evalr's docstrings use no Sphinx cross-referen
 
 ## Trade-off analysis
 
-artifactr's ADR-0023 weighed the tools on their own merits and chose Zensical; nothing about evalr changes that weighing, and one thing adds to it: the family is read as a whole, and a second toolchain would mean two ways to configure, brand and check the same kind of site. The risks artifactr accepted (a pre-1.0 tool; links inside included snippets are not checked) are accepted here for the same reasons, with the same mitigations: the version is pinned in `uv.lock`, the fallback to Material for MkDocs is one line of configuration, and the included root files keep reference-style links that each including page redefines.
+artifactr's ADR-0023 weighed the tools on their own merits and chose Zensical; nothing about evalr changes that weighing, and one thing adds to it: lattice is read as a whole, and a second toolchain would mean two ways to configure, brand and check the same kind of site. The risks artifactr accepted (a pre-1.0 tool; links inside included snippets are not checked) are accepted here for the same reasons, with the same mitigations: the version is pinned in `uv.lock`, the fallback to Material for MkDocs is one line of configuration, and the included root files keep reference-style links that each including page redefines.
 
 The Griffe extension grows by two regular expressions rather than editing four docstrings for one renderer: the docstrings read naturally in an editor and in `help()`, and the site renders them as intended.
 

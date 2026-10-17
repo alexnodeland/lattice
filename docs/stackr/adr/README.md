@@ -20,7 +20,7 @@ Each record captures one decision: the context that forced it, the options consi
 | [0014](0014-one-docs-build.md) | One docs build | Accepted, amended by [0017](0017-one-site-for-the-family.md) |
 | [0015](0015-telemetry-mirrors-shutdown-and-namespaces-in-the-template.md) | Telemetry, mirrors, shutdown and namespaces in the template | Accepted; how mirrors start amended |
 | [0016](0016-stackr-in-lattice.md) | stackr in lattice | Accepted, amended by [0018](0018-the-template-pins-the-libraries-at-its-own-commit.md) |
-| [0017](0017-one-site-for-the-family.md) | One site for the family | Accepted |
+| [0017](0017-one-site-for-the-family.md) | One site for lattice | Accepted |
 | [0018](0018-the-template-pins-the-libraries-at-its-own-commit.md) | The template pins the libraries at its own commit | Accepted |
 | [0019](0019-access-with-grantr-in-the-template.md) | Access with grantr in the template | Accepted |
 | [0020](0020-one-tenant-attribute-and-prom-label-proxy.md) | One tenant attribute, and prom-label-proxy | Accepted |

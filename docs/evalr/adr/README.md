@@ -18,6 +18,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0012](0012-langfuse-score-adapters-in-evalr.md) | Langfuse score adapters in evalr | Accepted |
 | [0013](0013-docstrings-in-markdown-and-one-docs-build.md) | Docstrings in Markdown, and one docs build | Accepted, amended by 0015 |
 | [0014](0014-evalr-in-lattice.md) | evalr in lattice | Accepted |
-| [0015](0015-one-site-for-the-family.md) | One site for the family | Accepted |
+| [0015](0015-one-site-for-the-family.md) | One site for lattice | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

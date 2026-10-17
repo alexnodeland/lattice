@@ -8,7 +8,7 @@ Amends [ADR-0004](0004-trunk-based-development-with-rfcs-and-adrs.md), how the c
 
 ## Context
 
-evalr was a repository of its own, with its own lock, CI, hooks and changelog, and artifactr and reflexr each pinned it by git revision, in lockstep, since uv can't lock two revisions of one package. On 2026-09-30 it moved, with its history, into lattice, the family's one repository, as [stackr RFC-0003](../../stackr/rfcs/0003-one-repository-lattice.md) designed. Downstream, evalr stays what it was: its name, version, dependencies, extras, tests and gates. What changed is where it is built, checked and released, and how its dependents get it.
+evalr was a repository of its own, with its own lock, CI, hooks and changelog, and artifactr and reflexr each pinned it by git revision, in lockstep, since uv can't lock two revisions of one package. On 2026-09-30 it moved, with its history, into lattice, the packages' one repository, as [stackr RFC-0003](../../stackr/rfcs/0003-one-repository-lattice.md) designed. Downstream, evalr stays what it was: its name, version, dependencies, extras, tests and gates. What changed is where it is built, checked and released, and how its dependents get it.
 
 ## Decision
 

@@ -52,7 +52,7 @@ portalr's admin lists it with the others, with no change of its own.
 
 ## Switching
 
-Switching needs `grantr:manage_integrations` at its level, which a tenant's `owner` and `admin` hold on the tenant and a workspace's `admin` holds on the workspace:
+Switching, and reading how each level is set, needs `grantr:manage_integrations` at its level, which a tenant's `owner` and `admin` hold on the tenant and a workspace's `admin` holds on the workspace:
 
 ```python
 await grants.set_integration("acme", "ui:forms", False, by=ALICE)  # the tenant
@@ -67,20 +67,22 @@ A key no registry declares is `Invalid`. Each real change is one `integration_se
 
 | Route | Needs |
 |---|---|
-| `GET`, `PUT /tenants/{tenant}/integrations[/{key}]` | `grantr:manage_integrations` on the tenant |
-| `GET`, `PUT /tenants/{tenant}/workspaces/{workspace}/integrations[/{key}]` | `grantr:manage_integrations` on the workspace |
+| `GET /tenants/{tenant}/integrations`, `PUT /tenants/{tenant}/integrations/{key}` | `grantr:manage_integrations` on the tenant |
+| `GET /tenants/{tenant}/workspaces/{workspace}/integrations`, `PUT /tenants/{tenant}/workspaces/{workspace}/integrations/{key}` | `grantr:manage_integrations` on the workspace |
 | `GET /tenants/{tenant}/workspaces/{workspace}/enabled-integrations` | Any `open` on the workspace |
 
 A `PUT`'s body is `{"on": true}`, `{"on": false}`, or `{"on": null}` to inherit. portalr's admin has a page for it, Integrations, under each tenant, for its owners and admins: it shows where each state comes from, and who set it and when ([portalr's admin guide](../../portalr/guides/admin.md)).
 
 ## Asking
 
-`Grants` is the port: `await grants.is_enabled(tenant_id, workspace_id, key)` checks no one, and answers off for a key it doesn't know and for a store it can't read. Each call reads the tenant's settings and the workspace's; an application that asks often caches.
+`Grants` is the port: `await grants.is_enabled(tenant_id, workspace_id, key)` checks no one, and answers off for a key it doesn't know or doesn't install, and for a store it can't read. Each call reads the tenant's settings and the workspace's; an application that asks often caches.
 
 **artifactr** refuses what an integration governs while it is off, through `Workspaces(gate=...)`. The gate runs after the command's target is resolved, so a hidden artifact is still `NotFound`, and before `authorize`, so off is `NotEnabled`, never `Forbidden` ([artifactr ADR-0081](../../artifactr/adr/0081-a-gate-before-access-integrations-switched-off-answer-not-enabled.md)). `integration_gate` builds one from the port and a map from an artifact's kind and data to its key:
 
 ```python
 from artifactr.workspace import Workspaces, integration_gate
+
+hooks = grants.hooks(subject_of)
 
 KEYS = {"word_document": "files:wordcraft", "excalidraw_diagram": "excalidraw"}
 
@@ -92,7 +94,7 @@ workspaces = Workspaces(
 )
 ```
 
-While one is off, creating, editing, proposing and accepting are refused on every surface, REST (409, `not_enabled`), MCP, the WebSocket and the agent's runs. Reads, archiving and rejecting a proposal still work, so what exists stays readable.
+While one is off, creating, editing, proposing and accepting are refused for every command, on every surface, REST (409, `not_enabled`), MCP, the WebSocket and the agent's runs. Reads, archiving and rejecting a proposal still work, so what exists stays readable.
 
 **relayr's trackers** take the bound method as their `enabled`, which has the port's arguments: `Trackers(..., enabled=grants.is_enabled)`.
 

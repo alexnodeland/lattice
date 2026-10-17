@@ -22,7 +22,7 @@ relayr gains a tracker connector: reflexr's runs file and update work items in a
 
 ## Design
 
-> **Amended (2026-10-17) by [lattice ADR-0027](../adr/0027-integrations-switched-per-workspace-through-one-port.md):** Each tracker is an integration, `tracker:plane` and `tracker:vikunja`, and relayr's `Enabled` takes the port's bound `is_enabled`. The switch is the shared `Integrations` port in lattice-core, `is_enabled(tenant_id, workspace_id, key)`, answered by grantr per deployment, tenant and workspace, audited, and set from portalr's admin; artifactr refuses what it governs through `Workspaces(gate=...)`, as `NotEnabled`.
+> **Amended (2026-10-17) by [lattice ADR-0027](../adr/0027-integrations-switched-per-workspace-through-one-port.md):** Each tracker is an integration, `tracker:plane` and `tracker:vikunja`, and relayr's `Enabled` takes the port's bound `is_enabled`. The switch is the shared `Integrations` port in lattice-core, `is_enabled(tenant_id, workspace_id, key)`, answered by grantr per deployment, tenant and workspace, audited, and set from portalr's admin.
 
 ### Overview
 

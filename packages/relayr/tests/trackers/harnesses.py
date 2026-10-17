@@ -27,7 +27,7 @@ from typing import Any
 import httpx
 
 from relayr.plane import PlaneTracker
-from relayr.trackers import FakeTracker, ItemRef, Tracker, TrackerCredentials
+from relayr.trackers import FakeTracker, ItemFields, ItemRef, Tracker, TrackerCredentials
 from relayr.trackers.fake import SIGNATURE
 from relayr.vikunja import VikunjaTracker
 from tests.clock import FakeClock
@@ -60,6 +60,9 @@ class Harness:
 
     reply: Callable[[ItemRef, str], Awaitable[None]]
     """Comment on an item, as a person does."""
+
+    rename: Callable[[ItemRef, str], Awaitable[None]]
+    """Retitle an item, as a person does."""
 
     delete: Callable[[ItemRef], Awaitable[None]]
     archive: Callable[[ItemRef], None] | None
@@ -94,6 +97,9 @@ async def fake() -> AsyncIterator[Harness]:
     async def reply(ref: ItemRef, body: str) -> None:
         tracker.reply(ref, body)
 
+    async def rename(ref: ItemRef, title: str) -> None:
+        tracker.edit(ref, ItemFields(title=title))
+
     async def delete(ref: ItemRef) -> None:
         tracker.delete(ref)
 
@@ -105,6 +111,7 @@ async def fake() -> AsyncIterator[Harness]:
         link=lambda ref: f"https://fake.test/ops/{ref.number}",
         add=add,
         reply=reply,
+        rename=rename,
         delete=delete,
         archive=tracker.archive,
         tick=tick,
@@ -145,6 +152,9 @@ async def plane(test: str) -> AsyncIterator[Harness]:
                 f"{api}/{ref.id}/comments/", json={"comment_html": body}, headers=headers
             )
 
+        async def rename(ref: ItemRef, title: str) -> None:
+            await client.patch(f"{api}/{ref.id}/", json={"name": title}, headers=headers)
+
         async def delete(ref: ItemRef) -> None:
             await client.delete(f"{api}/{ref.id}/", headers=headers)
 
@@ -164,6 +174,7 @@ async def plane(test: str) -> AsyncIterator[Harness]:
             link=lambda ref: f"{base}/{workspace}/browse/{ref.name}/",
             add=add,
             reply=reply,
+            rename=rename,
             delete=delete,
             archive=archive,
         )
@@ -207,6 +218,12 @@ async def vikunja(test: str) -> AsyncIterator[Harness]:
                 f"{api}/tasks/{ref.id}/comments", json={"comment": body}, headers=headers
             )
 
+        async def rename(ref: ItemRef, title: str) -> None:
+            task = (await client.get(f"{api}/tasks/{ref.id}", headers=headers)).json()
+            await client.post(
+                f"{api}/tasks/{ref.id}", json={**task, "title": title}, headers=headers
+            )
+
         async def delete(ref: ItemRef) -> None:
             await client.delete(f"{api}/tasks/{ref.id}", headers=headers)
 
@@ -218,6 +235,7 @@ async def vikunja(test: str) -> AsyncIterator[Harness]:
             link=lambda ref: f"{base}/tasks/{ref.id}",
             add=add,
             reply=reply,
+            rename=rename,
             delete=delete,
             archive=None,
             tick=tick,

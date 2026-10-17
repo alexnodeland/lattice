@@ -1,14 +1,32 @@
-"""The tracker port's contract, which every adapter keeps (lattice RFC-0004).
+"""The tracker port's contract, which every adapter keeps (lattice RFC-0004), and a follower's
+reading of each tracker.
 
 It runs against the fake, and against Vikunja's and Plane's recorded exchanges, or a live Vikunja
 or Plane (`tests/trackers/harnesses.py` says how each is made).
 """
 
 from collections.abc import AsyncIterator
+from datetime import timedelta
 
 import pytest
 
-from relayr.trackers import CommentRef, Item, ItemDraft, ItemFields, ItemRef, NotFound
+import reflexr
+import reflexr.workspace as r
+from relayr.ledger import InMemoryLedger, WorkspaceKey
+from relayr.trackers import (
+    CommentRef,
+    Item,
+    ItemDraft,
+    ItemFields,
+    ItemRef,
+    NotFound,
+    TrackerBinding,
+    TrackerCredentials,
+    TrackerFollowers,
+    Trackers,
+)
+from relayr.trackers.events import PUBLISHERS, TRACKED, TrackerEvent
+from tests.clock import FakeClock
 from tests.trackers.harnesses import Harness, fake, plane, vikunja
 
 KEY = "dead-letter/run_1"
@@ -178,3 +196,58 @@ async def test_a_nudge_is_a_signed_webhooks_project(harness: Harness) -> None:
     assert nudge.project == harness.delivered
     assert harness.tracker.nudge(headers, body + b" ") is None, "the bytes it signed, only"
     assert harness.tracker.nudge({}, body) is None
+
+
+async def test_a_state_reads_back_as_the_tracker_holds_it(harness: Harness) -> None:
+    tracker = harness.tracker
+    ref = await tracker.create(harness.project, KEY, DRAFT.model_copy(update={"state": "started"}))
+    assert (await read(harness, ref)).state == tracker.holds("started")
+    await harness.tick()
+    await tracker.update(ref, ItemFields(state="cancelled"))
+    assert (await read(harness, ref)).state == tracker.holds("cancelled")
+
+
+# ─── a follower's reading ─────────────────────────────────────────────────────
+
+WORKSPACE = WorkspaceKey("acme", "ops")
+
+
+async def test_a_follower_reads_what_a_person_does_once(harness: Harness) -> None:
+    clock = FakeClock()
+    workspaces = r.Workspaces(
+        r.InMemoryStorage(clock=clock), events=TRACKED, publishers=PUBLISHERS, clock=clock
+    )
+    trackers = Trackers(
+        InMemoryLedger(clock=clock),
+        connect=lambda _credentials, _source: harness.tracker,
+        credentials=_credentials,
+        bindings={WORKSPACE: TrackerBinding(project=harness.project)},
+        integration="tracker:contract",
+        budget=1000,
+        clock=clock,
+    )
+    followers = TrackerFollowers(trackers, workspaces, clock=clock)
+    theirs = await harness.add("Filed by hand")
+    ours = await harness.tracker.create(harness.project, KEY, DRAFT)
+    assert await followers.poll(*WORKSPACE)
+    await harness.tick()
+    await harness.rename(theirs, "Renamed")
+    await harness.reply(theirs, "<p>Mine.</p>")
+    await harness.tracker.comment(ours, "ours", "<p>Ours.</p>")
+    await harness.tick()
+    assert await followers.poll(*WORKSPACE)
+    assert await followers.poll(*WORKSPACE)
+    await harness.delete(theirs)
+    clock.advance(timedelta(days=1))
+    assert await followers.poll(*WORKSPACE)
+    log = await (await workspaces.open(*WORKSPACE, actor=reflexr.SystemActor())).read()
+    said = [e.event.model_dump() for e in log if isinstance(e.event, TrackerEvent)]
+    assert [(e["item_id"], e.get("field"), e.get("new"), e.get("body")) for e in said] == [
+        (theirs.id, "title", "Renamed", None),
+        (theirs.id, None, None, "<p>Mine.</p>"),
+        (theirs.id, None, None, None),
+    ], "a person's change, their comment, and the item they deleted: not lattice's comment"
+
+
+async def _credentials(tenant: str) -> TrackerCredentials:
+    return TrackerCredentials(base_url="https://unused.test", api_key="", webhook_secret="")

@@ -8,12 +8,12 @@
 
 - [artifactr ADR-0003][a-adr-0003] asks that collections an agent edits be id-keyed mappings. An Excalidraw scene already is one, so a diagram is an ordinary JSON artifact.
 - [artifactr ADR-0004][a-adr-0004] makes every edit name its base version and rejects locks. This RFC keeps both: [artifactr ADR-0071][a-adr-0071]'s lease stays a tool for opaque native files only.
-- [lattice RFC-0003](0003-native-files-as-artifacts.md) gives this its `Blobs` port and its sandboxed worker. Its refusal of `'wasm-unsafe-eval'` on portalr's origin is reversed by [portalr ADR-0041][p-adr-0041].
+- [lattice RFC-0003](0003-native-files-as-artifacts.md) gives this its `Blobs` port and its sandboxed worker. Its refusal of `'wasm-unsafe-eval'` on portalr's origin is amended by [portalr ADR-0041][p-adr-0041], for first-party, pinned WebAssembly only.
 - [lattice RFC-0005](0005-forms-dashboards-and-mini-apps.md) proposes the check hook this extends, and keeps mini apps on their own origin, with no WebAssembly.
 
 ## Summary
 
-A new package, `artifactr-excalidraw-ai`, makes an Excalidraw diagram an artifact that people and agents draw on together, live. A diagram is plain JSON, `elements: {id: element}`, and every edit is a JSON Patch scoped to the elements it touches, each guarded by a `test` of that element's `version`. Concurrent edits to different shapes never collide, and nothing is locked. People draw on Excalidraw's canvas inside portalr's app, on its own origin, with its session and its WebSocket. They see each other's and the agents' cursors, selections and strokes as they happen, through new presence frames that are never stored. Their finished strokes commit as coalesced revisions, which every canvas merges with Excalidraw's own `reconcileElements`. Agents draw from Mermaid or from shape skeletons, which a headless worker converts, and propose by default. Images go to `Blobs`. A diagram's text alternative is computed from its elements, for the agent and for assistive technology alike. Every surface consults one shared `Integrations` port before access, so a workspace's admin can turn diagrams off and existing ones stay readable. This RFC changes artifactr, portalr, relayr, grantr, lattice-core and stackr as well as adding a package, so it is in lattice's series.
+A new package, `artifactr-excalidraw-ai`, makes an Excalidraw diagram an artifact that people and agents draw on together, live. A diagram is plain JSON, `elements: {id: element}`, and every edit is a JSON Patch scoped to the elements it touches, each guarded by a `test` of that element's `version`. Concurrent edits to different shapes never conflict after a cheap rebase, and nothing is locked. People draw on Excalidraw's canvas inside portalr's app, on its own origin, with its session and its WebSocket. They see each other's and the agents' cursors, selections and strokes as they happen, through new presence frames that are never stored. Their finished strokes commit as coalesced revisions, which every canvas merges with Excalidraw's own `reconcileElements`. Agents draw from Mermaid or from shape skeletons, which a headless worker converts, and propose by default. Images go to `Blobs`. A diagram's text alternative is computed from its elements, for the agent and for assistive technology alike. Every surface consults one shared `Integrations` port before access, so a workspace's admin can turn diagrams off and existing ones stay readable. This RFC changes artifactr, artifactr-files, portalr, grantr, lattice-core and stackr as well as adding a package, so it is in lattice's series.
 
 ## Motivation
 
@@ -91,8 +91,9 @@ class Diagram(Artifact):             # "excalidraw_diagram"
 - **Permissive by design.** Only `id`, `type`, `version`, `versionNonce`, `isDeleted`, `index` and `updated` are validated; every other field is kept as written. Excalidraw's unreleased `main` already changes every arrow binding to `FixedPointBinding{elementId, fixedPoint, mode}`; a stored scene survives that, and the client's `restoreElements` migrates it on load. It is committed back only when someone edits it.
 - **A key is its element's id.** The package's check refuses an element stored under another key.
 - **Limits,** to be measured in phase 0: 5,000 elements and 1 MiB of data a diagram, since every revision stores its full data ([ADR-0004][a-adr-0004]) and relayr bridges it.
-- **Tombstones are kept for a day.** A deleted element stays, with `isDeleted: true` and its version bumped, as Excalidraw keeps them. Removing it at once would let a client that was mid-edit resurrect it with an `add`. A commit may `remove` tombstones whose `updated` is more than 24 hours old, and the canvas's commits do.
+- **Tombstones are kept for a day.** A deleted element stays, with `isDeleted: true` and its version bumped, as Excalidraw keeps them. Removing it at once would let a client that was mid-edit resurrect it with an `add`. Purging is one server-side step, never the canvas's: a sweep, run as the application's actor, removes tombstones whose deleting revision is more than 24 hours old, aged by the revision's time on the server, never by the client's `updated`. A canvas treats a merged `remove` as final and drops the element locally rather than reconciling it back.
 - **Bytes never enter the log.** `files` names `Blob`s, never data URLs.
+- **No core change for the data (O1).** artifactr's data model, patch kinds and commit rules are untouched. What artifactr gains, the watch commands, presence frames and the gate, is O5's and O9's, at its transport and workspace layers.
 
 ### Edits: element-scoped JSON Patch with version tests
 
@@ -107,7 +108,7 @@ Every writer, person or agent, sends the same shape, which the package builds fr
 ]
 ```
 
-- **A stale direct edit fails on `base_version`,** as `VersionConflict`. Its writer rebases: it already has the newer revisions, so it re-diffs against the head, keeps only the elements it changed, and resends with a new `command_id`. This is cheap because ids are stable.
+- **A stale direct edit fails on `base_version`,** as `VersionConflict`, since artifactr checks the version of the whole artifact. Its writer rebases: it already has the newer revisions, so it runs `reconcileElements(local, head)` and diffs the result against the head. Where its local element won, it sends it with `version` one above the head's and a new nonce; where the head's won, it drops its change. An empty diff is not sent, since an edit that changes nothing is `PatchFailed`. It resends with a new `command_id`. This is cheap because ids are stable.
 - **The tests matter when a proposal is accepted.** Acceptance re-applies the stored patch to the head and checks no version, so a proposal whose tested element moved since fails whole, as `PatchFailed`. One that touched other elements applies. The agent therefore splits unrelated edits into separate proposals.
 - **An element's version only grows.** The package's check refuses a `replace` whose element's `version` is not greater than the head's, on every surface. Excalidraw's reconciliation depends on it.
 - **A new element is an `add`.** JSON Patch's `add` replaces a member that exists, so the check refuses an `add` of an id the head already has.
@@ -130,7 +131,7 @@ class UnwatchArtifact(BaseModel):
     artifact_id: ArtifactId
 ```
 
-The server answers `command_result` with the caller's rights on it (`view` or `edit`). It then sends the presence of everyone already there.
+The server answers `command_result` with a new outcome, `Watching`, carrying the caller's rights on it (`view` or `edit`), where `WatchRun` answers `Recorded`. It then sends the presence of everyone already there.
 
 **2. Presence, client to server.** `ClientFrame` grows from `Hello | CommandFrame` to include a third frame:
 
@@ -147,14 +148,14 @@ class Presence(BaseModel):
 
 `editing` is the elements a person is changing right now: the arrow mid-drag, the text mid-typing. Each is a full element, so a peer draws it as it is. A frame is at most 64 KB.
 
-**3. Presence, server to client.** `ServerFrame` gains `PeerPresence`, the same fields plus `peer` (an opaque id per connection) and `actor` (the principal, stamped by the server, never taken from the client), and `PeerLeft`. portalr maps each peer to Excalidraw's `Collaborator` (`pointer`, `selectedElementIds`, `username`, `color`) through `updateScene({collaborators})`, and draws `editing` as an overlay of the peer's elements.
+**3. Presence, server to client.** `ServerFrame` gains `PeerPresence`, the same fields plus `peer` (an opaque id per connection) and `actor` (the principal, stamped by the server, never taken from the client), and `PeerLeft`. portalr maps each peer to Excalidraw's `Collaborator` (`pointer`, `selectedElementIds`, `username`, `color`) through `updateScene({collaborators})`, and draws `editing` as an overlay of the peer's elements. A peer's last `editing` stays drawn until the local head reaches the version that peer committed, so a stroke doesn't flicker out between pointer-up and the revision's arrival.
 
-**4. Agents are peers too, with no new frame.** An agent's tool emits the run's existing live frames: a `Draft` with `kind: "excalidraw_diagram"` and the `artifact_id`, holding the elements it is about to propose, as the worker returns them. The canvas already watches the runs of its workspace's threads, and shows the agent as a collaborator named after it, with the elements drawn as a labelled ghost until the proposal lands.
+**4. Agents are peers too, with no new frame.** An agent's tool emits the run's existing live frames: a `Draft` with `kind: "excalidraw_diagram"` and the `artifact_id`, holding the elements it is about to propose, as the worker returns them. The canvas already watches the runs of its workspace's threads, and shows the agent as a collaborator named after it, with the elements drawn as a labelled ghost until the proposal lands. Live frames share the connection's event queue, so the toolset emits at most one `Draft` a second per diagram, capped at 256 KB. An agent's ghost shows on connections whose `hello` covers its thread.
 
 **5. From live to durable.** The canvas commits its own changes as `edit_artifact`, as the person:
 
 - **Cadence.** On pointer-up, and after one second idle while there are unsaved changes, at most one commit a second per person and diagram; a flush when the tab is hidden or closed; a badge while anything is unsaved. Phase 0 measures the revision volume this makes and may lengthen it.
-- **Ordering.** The server orders commits. A commit's `base_version` is the head the canvas last merged. A `VersionConflict` is rebased as above, at most three times, and then waits for the next event.
+- **Ordering.** The server orders commits, and the transport runs each frame as its own task, so a canvas keeps one `edit_artifact` in flight per diagram. A commit's `base_version` is the head the canvas last merged. A `VersionConflict` is rebased as above, at most three times; after that the edit stays local under the unsaved badge and is retried on the next event, so nothing is lost. Phase 0 measures the conflict rate on a busy diagram. After a reconnect, a commit whose result never came is resent with its original `command_id`, which the server deduplicates.
 - **Merging.** A foreign revision is merged with `reconcileElements(local, remote, appState)` and applied with `updateScene({elements, captureUpdate: CaptureUpdateAction.NEVER})`, so it never enters the local undo stack. In 0.18.1, reconcile keeps a local element that is being edited, resized or created, or that has a higher `version`, or the same version and a lower `versionNonce`, and takes the remote one otherwise. It then orders by fractional index and repairs invalid indices itself.
 - **Echoes.** `command_result` carries `Applied.version`, so the canvas knows which revisions are its own and doesn't re-merge them. The event can arrive before the result. That is harmless, because merging one's own revision is idempotent: the local elements' versions are equal or higher, so reconcile keeps them.
 - **Attribution.** A revision's actor is whoever committed it, as everywhere. Presence carries the server's stamp of the actor. "Last changed by" per element is derived from revisions, never stored in the element.
@@ -175,9 +176,9 @@ class Presence(BaseModel):
 | `edit_artifact` | The integration on; `artifactr:edit_artifact`; the package's checks | As today, and `NotEnabled` |
 | Receiving a peer's presence | The same watch | |
 
-Rights are read when the watch is accepted, and again every 30 seconds and on any grant, restriction or integration event in the workspace's log. A watcher who loses read is sent `PeerLeft` for everyone and an `error`, and its watch ends.
+Rights are read when the watch is accepted, and again every 30 seconds, which bounds how long a lost grant or a turned-off integration takes to end a watch, since both live in grantr, not in the log. A restriction in the workspace's log ends it at once. A watcher who loses read is sent `PeerLeft` for everyone and an `error`, and its watch ends.
 
-**Replicas.** Presence goes through a new port, `PresenceChannel`, keyed by tenant, workspace and artifact, as `LiveChannel` is keyed by run. Its default is in-process, like `FanoutChannel`, so a deployment with one application process, stackr's default, needs nothing. A deployment with several processes adds the PostgreSQL adapter, over `LISTEN`/`NOTIFY` on the database it already runs, so no new infrastructure is needed. Commits from another process already arrive within the SQL storage's `poll_interval`, 0.5 s by default.
+**Replicas.** Presence goes through a new port, `PresenceChannel`, keyed by tenant, workspace and artifact, as `LiveChannel` is keyed by run. Its default is in-process, like `FanoutChannel`, so a deployment with one application process, stackr's default, needs nothing. A deployment with several processes adds the PostgreSQL adapter, over `LISTEN`/`NOTIFY` on the database it already runs, so no new infrastructure is needed. A notification's payload is at most 8,000 bytes by default, so a larger frame is written to a short-lived table and only its reference is notified. Commits from another process already arrive within the SQL storage's `poll_interval`, 0.5 s by default.
 
 **The protocol stays `artifactr.v1`.** The new frames are additive. A server sends presence only to a connection that asked with `watch_artifact`, so an existing client never sees one. The committed schema and portalr's generated types are regenerated.
 
@@ -219,7 +220,7 @@ class Converter(Protocol):
 
 - **`fileId` is the image's SHA-256.** The canvas passes `generateIdForFile`, computing the digest with SubtleCrypto. It uploads the bytes to `diagrams_router` before the commit that names them: put first, as RFC-0003 does. The server recomputes the digest and refuses a mismatch.
 - **The canvas loads an image** from the router, by artifact and digest after resolving the artifact through the access hook, and hands Excalidraw a `data:` URL, which `img-src` already allows.
-- **Collection must learn diagrams.** `digests()` finds any `{sha256, size, media_type}` at any depth, so it finds a diagram's `files`. But `NativeFiles.collect` scans only `NativeFile` artifacts, so today it would delete a diagram's images. The collector takes the kinds to scan, and the application passes both.
+- **Collection must learn diagrams.** `digests()` finds any `{sha256, size, media_type}` at any depth, so it finds a diagram's `files`. But `NativeFiles.collect` scans only `NativeFile` artifacts, so today it would delete a diagram's images. The collector takes the kinds to scan, and the application passes both. Scanning every revision of a diagram is costly, so the package indexes the digests each revision names when it is written, and the collector reads that index for diagrams.
 
 ### Feedback, relayr and reflexr
 
@@ -229,7 +230,7 @@ class Converter(Protocol):
 
 ### One `Integrations` port, shared (O9)
 
-The same port is used by native files (RFC-0003), trackers (RFC-0004), forms and mini apps (RFC-0005), rich Markdown, and this. It is built once, by whichever lands first, and this section is its proposal. If another RFC's ADR settles it first, this RFC follows that ADR.
+The same port is proposed for native files (RFC-0003), trackers (RFC-0004), forms and mini apps (RFC-0005), rich Markdown, and this; those RFCs don't name it yet and are amended to. It is built once, by whichever lands first, and this section is its proposal. If another RFC's ADR settles it first, this RFC follows that ADR.
 
 ```python
 class Integrations(Protocol):                     # lattice_core.integrations
@@ -240,7 +241,7 @@ class Integrations(Protocol):                     # lattice_core.integrations
 
 - **Effective is deployment and tenant and workspace.** The deployment installs an integration in its configuration, as stackr's template question does. A tenant's admin and a workspace's admin each turn it on or off for their level in portalr's admin. An unset level inherits the one above.
 - **The protocol lives in lattice-core;** the adapter, its table, row-level security and audit live in grantr. Admin already writes through grantr's API, and grantr's log records who turned what on or off ([grantr ADR-0007][g-adr-0007]). Turning a workspace's integration on or off needs a new action, `grantr:manage_integrations`, held by workspace and tenant admins. It is the one addition to the catalog this RFC asks for.
-- **Checked before access.** artifactr's `Workspaces` gains a gate, `gate=`, run before `authorize`: `(workspace, actor, command) -> None`, raising a new typed rejection, `NotEnabled(integration)`. Off answers "not available in this workspace", never `Forbidden`, so it tells nothing about a person's grants. RFC-0005's `checks=` still run after `authorize`. This is a second hook, at a different stage, not a change to that one.
+- **Checked before access.** artifactr's `Workspaces` gains a gate, `gate=`, run before `authorize`: `(workspace, actor, command) -> None`, raising a new typed rejection, `NotEnabled(integration)`. Off answers "not available in this workspace", never `Forbidden`, so it tells nothing about a person's grants. The order is: the workspace's membership, as today; then the command's target resolved, answering `NotFound` if it is hidden, so `NotEnabled` never reveals that a hidden diagram exists; then the gate; then `authorize`; then RFC-0005's `checks=`. This is a second hook, at a different stage, not a change to that one.
 - **What off means for diagrams:**
 
 | Surface | Off |
@@ -265,7 +266,7 @@ class Integrations(Protocol):                     # lattice_core.integrations
 
 **The policy** gains `'wasm-unsafe-eval'` in `script-src`, across `app` (O4); admin's is unchanged, as [portalr ADR-0041][p-adr-0041] records with its guardrails. In 0.18.1, the WebAssembly is two modules, harfbuzz and woff2, inlined as base64 in one 743 kB (gzip) chunk. Only font subsetting reaches that chunk, through two dynamic imports, for SVG export with embedded fonts. Nothing in the static graph of `index.js` imports it. So plain editing likely never compiles WebAssembly, and phase 0 confirms it in Chromium under today's policy. Subsetting runs in a module worker (`new Worker(url, {type: "module"})`, same origin, so `worker-src` falls back to `'self'`) and falls back to the main thread if the worker fails. `connect-src` stays `'self'`.
 
-**A budget of its own.** `size-budget.json` gains a `canvas` entry, and `check_size.py` measures the chunks reachable only through the canvas's dynamic import under it, leaving them out of `app`'s `total` and `largest`. `app`'s `initial` is unchanged, since the canvas is lazy. Two ceilings: `canvas.total` for editing, and `canvas.export` for the subsetting chunk. The package's own chunks are about 330 kB gzip without the subsetting chunk and 1.06 MB with it. Its dependencies (React aside, `roughjs`, `jotai`, Radix, `pako` and others) are external to the package and come on top; phase 0 measures the built total and sets the ceilings 10% above it. Fonts are not counted, as today: 0.18.1 ships 13 MB of them, 12 MB of which is Xiaolai, its CJK face, split by Unicode range and loaded only when used. Excalidraw and its dependencies are in the generated third-party notices and held to their licence allow-list ([portalr ADR-0033][p-adr-0033]). Its fonts' licences sit beside them in the wheel, as the kit's typefaces' do ([portalr ADR-0019][p-adr-0019]); which faces ship is an unresolved question.
+**A budget of its own.** `size-budget.json` gains a `canvas` entry, and `check_size.py` measures the chunks reachable only through the canvas's dynamic import under it, read from Vite's build manifest (`build.manifest`), since today it only globs files and reads `index.html`, leaving them out of `app`'s `total` and `largest`. `app`'s `initial` is unchanged, since the canvas is lazy. Two ceilings: `canvas.total` for editing, and `canvas.export` for the subsetting chunk. The package's own chunks are about 330 kB gzip without the subsetting chunk and 1.06 MB with it. Its dependencies (React aside, `roughjs`, `jotai`, Radix, `pako` and others) are external to the package and come on top; phase 0 measures the built total and sets the ceilings 10% above it. Fonts are not counted, as today: 0.18.1 ships 13 MB of them, 12 MB of which is Xiaolai, its CJK face, split by Unicode range and loaded only when used. Excalidraw and its dependencies are in the generated third-party notices and held to their licence allow-list ([portalr ADR-0033][p-adr-0033]). Its fonts' licences sit beside them in the wheel, as the kit's typefaces' do ([portalr ADR-0019][p-adr-0019]); which faces ship is an unresolved question.
 
 ### Accessibility
 
@@ -295,7 +296,7 @@ A canvas has no document semantics, and Excalidraw's screen-reader support cover
 | Package | Changes | Breaking |
 |---|---|---|
 | artifactr-excalidraw | New | |
-| artifactr | `WatchArtifact`, `UnwatchArtifact`, `Presence`, `PeerPresence`, `PeerLeft`; `PresenceChannel` with in-process and PostgreSQL adapters; `Workspaces(gate=...)` and `NotEnabled`; RFC-0005's `checks=` if not yet built | No: each is additive |
+| artifactr | `WatchArtifact`, `UnwatchArtifact`, the `Watching` outcome, `Presence`, `PeerPresence`, `PeerLeft`; `PresenceChannel` with in-process and PostgreSQL adapters; `Workspaces(gate=...)` and `NotEnabled`; RFC-0005's `checks=` if not yet built | No: each is additive |
 | artifactr-files | The collector takes the kinds to scan | No |
 | lattice-core | The `Integrations` protocol | No |
 | grantr | The `Integrations` adapter, its table and audit, `grantr:manage_integrations` | No |
@@ -323,12 +324,12 @@ Decided by the owner on 2026-10-17:
 | O1 | What a diagram is | An ordinary JSON artifact, `elements: {id: element}`, edited by JSON Patch scoped to elements with `test /elements/<id>/version`; no lease, no core change; leases stay for opaque native files | A `NativeFile` over a `.excalidraw` blob, checked out under a lease |
 | O2 | Packaging | A new distribution, `artifactr-excalidraw-ai`, depending on `artifactr-files` for `Blobs` only | An extension of `artifactr-files` or `artifactr-ui`; an artifactr extra |
 | O3 | Where the canvas runs | Directly in portalr's `app`, on its origin | A third UI, `canvas`, with its own policy (the brainstorm's recommendation); an origin of its own |
-| O4 | The policy | `'wasm-unsafe-eval'` app-wide, for first-party pinned WebAssembly only, with [ADR-0041][p-adr-0041]'s guardrails; reverses RFC-0003's refusal; the spike still settles whether editing needs it | Holding RFC-0003's line, with the canvas on a separate origin |
+| O4 | The policy | `'wasm-unsafe-eval'` app-wide, for first-party pinned WebAssembly only, with [ADR-0041][p-adr-0041]'s guardrails; amends RFC-0003's refusal; the spike still settles whether editing needs it | Holding RFC-0003's line, with the canvas on a separate origin |
 | O5 | Live collaboration | Full, from the first release: presence and live sync between people and agents | Coalesced commits first, presence later (the brainstorm's recommendation) |
 | O6 | Agents' edits | Proposals by default, with a switch per application to apply | Every edit applied; every edit proposed, always |
 | O7 | Conversion and export | A headless worker, so agents and rules work with no browser open | In the browser only |
 | O8 | Outside services | None: no excalidraw.com, excalidraw-room or external infrastructure | Their relay, their storage, their MCP server |
-| O9 | Turning it off | Per workspace, from portalr's admin, through one `Integrations` port shared by every integration; checked before grants; off hides tools and refuses writes everywhere, and keeps diagrams readable | A flag per integration; template configuration; a grant |
+| O9 | Turning it off | Deployment and tenant and workspace, audited, switched per workspace from portalr's admin, through one `Integrations` port shared by every integration; checked before grants; off hides tools and refuses writes everywhere, and keeps diagrams readable | A flag per integration; template configuration; a grant |
 
 Recommended, for the maintainer to decide:
 
@@ -343,7 +344,7 @@ Recommended, for the maintainer to decide:
 
 ## Drawbacks
 
-- **A heavy dependency on a moving target.** About 1 MB gzip of the package's own JavaScript before its dependencies, and 13 MB of fonts. Excalidraw's `main` carries an unreleased breaking rework: `excalidrawAPI` becomes `onExcalidrawAPI`, `restore()` is no longer exported, and arrow bindings change. Upgrading from 0.18.1 will be a migration of its own.
+- **A heavy dependency on a moving target.** About 330 kB gzip of the package's own JavaScript to edit, 1.06 MB with export, before its dependencies, and 13 MB of fonts. Excalidraw's `main` carries an unreleased breaking rework: `excalidrawAPI` becomes `onExcalidrawAPI`, `restore()` is no longer exported, and arrow bindings change. Upgrading from 0.18.1 will be a migration of its own.
 - **Revision volume.** Live drawing makes many revisions, each holding the whole scene. An hour of drawing by three people can be thousands of revisions. The cadence and the size limits bound it; nothing compacts it.
 - **`'wasm-unsafe-eval'` for everyone** in `app`, to serve a feature some workspaces turn off. ADR-0041's guardrails narrow it, but a policy is now looser than it was.
 - **The canvas can't meet portalr's accessibility bar.** The description, the list and the agent are equivalents, not the same experience.
@@ -377,12 +378,14 @@ Each is settled in phase 0's ADR or carried as an exit criterion.
 - Excalidraw's own collaboration sends a pointer about every 33 ms, and excalidraw-room keeps tombstones for 24 hours.
 - `customData` survives `restoreElements`. Not relied on: attribution comes from revisions.
 - jsdom and resvg render 0.18.1's scenes faithfully enough for previews.
-- PostgreSQL `LISTEN`/`NOTIFY` carries 10 peers at 20 Hz across processes within the latency budget.
+- Vite rebuilds 0.18.1's `new URL("./subset-worker.chunk.js", import.meta.url)` worker from inside `node_modules`, perhaps needing `optimizeDeps.exclude`; the worker script gets `app`'s policy from its own response header.
+- PostgreSQL `LISTEN`/`NOTIFY`, with its 8,000-byte payload, carries 10 peers at 20 Hz across processes within the latency budget.
 - pydantic-ai 2.55's `FilteredToolset` filters per run with the run's dependencies. It exists; its use here was not run.
 
 ## Tracking
 
 - [ ] Phase 0: the spike and its ADR
+- [ ] RFC-0003, RFC-0004 and RFC-0005 amended to name the shared `Integrations` port
 - [ ] Sign-off on U1 to U6
 - [ ] lattice-core and grantr: `Integrations`, its adapter, audit and action
 - [ ] artifactr: `Workspaces(gate=...)`, `NotEnabled`, the watch commands, presence frames and `PresenceChannel`, with ADRs
@@ -416,7 +419,7 @@ Gathered on 2026-10-17. lattice was read at `origin/main` (`c61165b3`). The `@ex
 | 0.18.1 is MIT; exports `reconcileElements`, `restoreElements`, `exportToSvg`, `convertToExcalidrawElements`, `CaptureUpdateAction` (`IMMEDIATELY`, `NEVER`, `EVENTUALLY`) | its `package.json`, `types/excalidraw/index.d.ts`, `store.d.ts` | Verified |
 | Props `generateIdForFile`, `validateEmbeddable`, `viewModeEnabled`, `isCollaborating`, `onPointerUpdate`, `UIOptions`; `Collaborator` has `pointer`, `selectedElementIds`, `username`, `color` | `types/excalidraw/types.d.ts` | Verified |
 | An element has `version`, `versionNonce`, `index` (fractional), `updated`, `customData` | `types/excalidraw/element/types.d.ts` | Verified |
-| Reconcile keeps local if edited, resized or new, a higher version, or an equal version with a lower nonce; then orders by fractional index and repairs indices | `dist/prod/index.js` | Verified, read from the minified bundle |
+| Reconcile keeps local if edited, resized or new, a higher version, or an equal version with a lower nonce; then orders by fractional index and repairs indices | `dist/prod/index.js`, the minified `reconcileElements` and its keep-local predicate | Verified, read from the bundle |
 | WebAssembly is two base64 modules in `chunk-EIO257PC.js` (743 kB gzip), reached only through the subsetting chunks' dynamic imports; `index.js` doesn't import it | `dist/prod/` | Verified |
 | `index.js` 155 kB and `chunk-K2UTITRG.js` 152 kB gzip; CSS 23 kB; dependencies external | `dist/prod/`, `package.json` | Verified |
 | Subsetting runs in a module worker and falls back to the main thread | `chunk-K2UTITRG.js` | Verified |

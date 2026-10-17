@@ -19,7 +19,7 @@
 - **`bump-minor-pre-major` is on,** so a breaking change bumps the minor version before 1.0.
 - **Each changelog keeps its history under "Before lattice".** The setup ran git-cliff once more, in each package's rewritten history; what no release carries is headed "Before lattice", with no compare link. release-please inserts each release above it. git-cliff and every `cliff.toml` then retired.
 - **Only `feat`, `fix`, `perf` and `revert` cut a release** ([#21](https://github.com/alexnodeland/lattice/pull/21)), as do breaking changes of any type, in the sections Features, Bug Fixes, Performance Improvements and Reverts. `docs`, `refactor`, `test`, `build`, `ci`, `style` and `chore` are hidden sections: release-please can't list a type in the notes without letting it release, so they appear in no release notes, and stay in the history and the pull requests.
-- **The release pull request stays open until the maintainer wants a release.** Merging it tags and releases what it lists.
+- **The release pull request stays open until the maintainer wants a release.** Merging it tags and releases what it lists. *Amended by [ADR-0023](0023-publishing-to-pypi-from-the-release-workflow.md#amendment-2026-10-17-one-release-pull-request-a-package) (2026-10-17): each package has its own release pull request, and merging one releases that package.*
 
 ## Options considered
 

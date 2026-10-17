@@ -405,6 +405,31 @@ def test_a_job_that_writes_runs_only_where_the_plan_says_so(job: str, gate: str)
     assert gate in str(JOBS[job]["if"])
 
 
+def direct_needs(job: str) -> list[str]:
+    """The jobs a job names in its ``needs``."""
+    named = JOBS[job].get("needs") or []
+    return [named] if isinstance(named, str) else named
+
+
+def needs_of(job: str) -> set[str]:
+    """Every job a job comes after, directly or not."""
+    return set(direct_needs(job)).union(*(needs_of(need) for need in direct_needs(job)))
+
+
+@pytest.mark.parametrize("job", sorted(name for name in JOBS if "release-please" in needs_of(name)))
+def test_a_job_after_release_please_runs_on_a_dispatch_too(job: str) -> None:
+    gate = str(JOBS[job].get("if", ""))
+    assert gate.startswith("${{ !cancelled() && "), (
+        "release-please is skipped on a dispatch; without a status function, so is this job"
+    )
+    succeeded = [need for need in direct_needs(job) if f"needs.{need}.result == 'success'" in gate]
+    held = set(succeeded).union(*(needs_of(need) for need in succeeded))
+    unheld = [need for need in direct_needs(job) if need not in held]
+    assert all(f"needs.{need}.result" in gate for need in unheld), (
+        "each need must succeed, come before one that must, or have its result checked"
+    )
+
+
 def test_pypi_publishes_one_package_at_a_time_and_stops_at_the_first_failure() -> None:
     job = JOBS["pypi-publish"]
     assert job["strategy"]["max-parallel"] == 1

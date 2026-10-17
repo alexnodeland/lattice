@@ -6,9 +6,11 @@ restart and a redelivery.
 
 import asyncio
 import logging
+from collections.abc import Collection, Mapping
 from datetime import timedelta
 
 import pytest
+from pydantic import JsonValue
 
 import artifactr
 import artifactr.core as a
@@ -18,7 +20,16 @@ import reflexr.workspace as r
 from reflexr.core import Tick
 from relayr.events import BRIDGED, ArtifactCreated, MessagePosted, Projections
 from relayr.inbound import FOLLOWER, SOURCE
-from relayr.ledger import Cause, CauseKind, DeadLetter, InMemoryLedger, Ledger, WorkspaceKey
+from relayr.ledger import (
+    Cause,
+    CauseKind,
+    DeadLetter,
+    InMemoryLedger,
+    Ledger,
+    Tracked,
+    TrackedKind,
+    WorkspaceKey,
+)
 from tests.app_types import Note
 from tests.clock import START, FakeClock
 from tests.stack import ALICE, KEY, TENANT, TTL, WORKSPACE, Access, Stack, at, bridged, post, until
@@ -61,6 +72,43 @@ class Forgetful:
 
     async def followed(self) -> list[WorkspaceKey]:
         return await self._ledger.followed()
+
+    async def claim_tracked(
+        self,
+        workspace: WorkspaceKey,
+        kind: TrackedKind,
+        key: str,
+        correlation_id: str,
+        *,
+        stale_after: timedelta,
+    ) -> bool:
+        return await self._ledger.claim_tracked(
+            workspace, kind, key, correlation_id, stale_after=stale_after
+        )
+
+    async def tracked(self, workspace: WorkspaceKey, kind: TrackedKind, key: str) -> Tracked | None:
+        return await self._ledger.tracked(workspace, kind, key)
+
+    async def record_tracked(
+        self, workspace: WorkspaceKey, kind: TrackedKind, key: str, ref: dict[str, JsonValue]
+    ) -> dict[str, JsonValue] | None:
+        return await self._ledger.record_tracked(workspace, kind, key, ref)
+
+    async def release_tracked(self, workspace: WorkspaceKey, kind: TrackedKind, key: str) -> None:
+        await self._ledger.release_tracked(workspace, kind, key)
+
+    async def mark_tracked_deleted(self, workspace: WorkspaceKey, key: str) -> None:
+        await self._ledger.mark_tracked_deleted(workspace, key)
+
+    async def record_written(
+        self, workspace: WorkspaceKey, key: str, fields: Mapping[str, JsonValue]
+    ) -> None:
+        await self._ledger.record_written(workspace, key, fields)
+
+    async def forget_written(
+        self, workspace: WorkspaceKey, key: str, fields: Collection[str]
+    ) -> None:
+        await self._ledger.forget_written(workspace, key, fields)
 
 
 async def test_a_message_fires_a_rule_exactly_once_across_a_restart_and_a_redelivery(

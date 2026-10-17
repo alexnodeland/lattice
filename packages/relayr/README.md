@@ -28,6 +28,7 @@ An application can mount artifactr and reflexr side by side, on one database and
 - **Chains and sessions kept apart, and linked (built).** A thread is never a causal chain, and a chain never joins a thread's session or model history; traces are linked, and Langfuse sessions tagged, across the two ([ADR-0003](https://lattice.alexnodeland.com/relayr/adr/0003-a-thread-is-never-a-chain/), [ADR-0004](https://lattice.alexnodeland.com/relayr/adr/0004-sessions-linked-not-continued/)).
 - **Rules from chat (built).** A rule drafted in a thread is a `rule` artifact, reviewed as a proposal, and goes live in reflexr's stored rules only when a person who may install rules accepts it, with provenance recorded both ways. A rule changed in reflexr directly is proposed back to its artifact ([ADR-0005](https://lattice.alexnodeland.com/relayr/adr/0005-where-a-rules-source-of-truth-lives/)).
 - **Evaluation (built).** Proposal outcomes become feedback on the runs that proposed them, with measures of acceptance, rewrites and rules from chat that stay live, in the `evals` extra.
+- **Task trackers (phase 1 built).** A rule's run files, comments on and moves items in Plane's Community edition or Vikunja, each once however often it is retried, behind the `plane` and `vikunja` extras ([lattice RFC-0004](https://lattice.alexnodeland.com/rfcs/0004-relayr-and-task-trackers/)).
 - **A ledger of its own (built)**, in memory or in SQL, behind the `sql`, `sqlite` and `postgres` extras.
 
 ## Documentation

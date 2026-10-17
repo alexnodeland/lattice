@@ -1,6 +1,8 @@
-# The contributor stack: PostgreSQL for relayr's SQL tests, and nothing else.
+# The contributor stack: PostgreSQL for relayr's SQL tests and, under the `trackers` profile,
+# Vikunja for the tracker contract test, live (lattice RFC-0004).
 #
-#   docker compose up -d --wait              (moon run relayr:pg-up)
+#   docker compose up -d --wait                               (moon run relayr:pg-up)
+#   docker compose --profile trackers up -d --wait vikunja    (moon run relayr:vikunja-up)
 
 name: relayr
 
@@ -15,4 +17,45 @@ services:
       test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres"]
       interval: 2s
       timeout: 5s
+      retries: 30
+
+  vikunja-db:
+    image: postgres:17@sha256:2d2b8998d31037bf721cfdf764d76ba74171b4fab3431b7f72c27c56ddbdf9e3
+    profiles: [trackers]
+    environment:
+      POSTGRES_USER: vikunja
+      POSTGRES_PASSWORD: vikunja
+      POSTGRES_DB: vikunja
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U vikunja"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  # Registration is open, and its rate limit raised, so each live run registers its own user.
+  vikunja:
+    image: vikunja/vikunja:2.7.0@sha256:e2204a1c1c6a81e833c2b3a5442be182ca2335b54c2e7e37578cc3fe12a27cfc
+    profiles: [trackers]
+    depends_on:
+      vikunja-db:
+        condition: service_healthy
+    environment:
+      VIKUNJA_SERVICE_SECRET: relayr-contributor-stack-only
+      VIKUNJA_SERVICE_PUBLICURL: http://localhost:${RELAYR_VIKUNJA_PORT:-54333}/
+      VIKUNJA_SERVICE_ENABLEREGISTRATION: "true"
+      VIKUNJA_RATELIMIT_NOAUTHLIMIT: "1000"
+      VIKUNJA_DATABASE_TYPE: postgres
+      VIKUNJA_DATABASE_HOST: vikunja-db
+      VIKUNJA_DATABASE_USER: vikunja
+      VIKUNJA_DATABASE_PASSWORD: vikunja
+      VIKUNJA_DATABASE_DATABASE: vikunja
+      VIKUNJA_FILES_BASEPATH: /tmp/files
+      VIKUNJA_WEBHOOKS_ENABLED: "true"
+    ports:
+      - "127.0.0.1:${RELAYR_VIKUNJA_PORT:-54333}:3456"
+    healthcheck:
+      # Each check runs Vikunja's migrations first, so it checks every 10 s, not every 2.
+      test: ["CMD", "/app/vikunja/vikunja", "healthcheck"]
+      interval: 10s
+      timeout: 10s
       retries: 30

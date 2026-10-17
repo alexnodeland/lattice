@@ -19,7 +19,10 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     # layer: (relayr packages it may import, third-party modules it may import)
     "events": ({"relayr.events"}, {*LIBRARIES, "pydantic"}),
     "ledger": ({"relayr.ledger"}, {"pydantic"}),
-    "sql": ({"relayr.ledger", "relayr.sql"}, {"sqlalchemy", "alembic", "lattice_core.sql"}),
+    "sql": (
+        {"relayr.ledger", "relayr.sql"},
+        {"pydantic", "sqlalchemy", "alembic", "lattice_core.sql"},
+    ),
     "inbound": (
         {"relayr.events", "relayr.ledger", "relayr.outbound", "relayr.telemetry", "relayr.inbound"},
         {*LIBRARIES, "opentelemetry"},
@@ -42,6 +45,16 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         {"relayr.events", "relayr.ledger", "relayr.outbound", "relayr.rules", "relayr.evals"},
         LIBRARIES,
     ),
+    # The tracker connector (lattice RFC-0004): the port, the core and the fake; and `http`, which
+    # only the adapters import, on httpx.
+    # Whether an integration runs in a workspace: a protocol, to move to a shared home.
+    "integrations": ({"relayr.integrations"}, set()),
+    "trackers": (
+        {"relayr.integrations", "relayr.ledger", "relayr.outbound", "relayr.trackers"},
+        {*LIBRARIES, "pydantic", "pydantic_ai", "httpx"},
+    ),
+    "plane": ({"relayr.trackers", "relayr.plane"}, {"httpx", "pydantic"}),
+    "vikunja": ({"relayr.trackers", "relayr.vikunja"}, {"httpx", "pydantic"}),
     "rules": (
         {"relayr.events", "relayr.outbound", "relayr.rules"},
         {*LIBRARIES, "pydantic", "pydantic_ai"},

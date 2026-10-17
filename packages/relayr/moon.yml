@@ -17,8 +17,8 @@ tasks:
       runInCI: false
 
   pg-down:
-    description: 'Stop PostgreSQL'
-    command: 'docker compose down'
+    description: 'Stop the contributor stack: PostgreSQL, and Vikunja if it runs'
+    command: 'docker compose --profile trackers down'
     options:
       cache: false
       runInCI: false
@@ -32,6 +32,23 @@ tasks:
     command: 'uv run pytest --cov --cov-report=term-missing'
     env:
       RELAYR_TEST_POSTGRES_URL: 'postgresql+asyncpg://postgres:relayr@localhost:54332/postgres'
+    options:
+      cache: false
+      runInCI: false
+
+  vikunja-up:
+    description: 'Start Vikunja for the tracker contract test, live, from compose.yaml, on port 54333'
+    command: 'docker compose --profile trackers up -d --wait vikunja'
+    options:
+      cache: false
+      runInCI: false
+
+  # With RELAYR_RECORD=1 as well, the live exchanges replace tests/trackers/fixtures/vikunja.
+  test-vikunja:
+    description: 'Run the tracker contract test against Vikunja, live (after vikunja-up)'
+    command: 'uv run pytest tests/trackers/test_contract.py'
+    env:
+      RELAYR_TEST_VIKUNJA_URL: 'http://localhost:54333'
     options:
       cache: false
       runInCI: false

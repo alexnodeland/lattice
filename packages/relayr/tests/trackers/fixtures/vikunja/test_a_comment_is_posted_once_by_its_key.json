@@ -1,0 +1,434 @@
+{
+ "exchanges": [
+  {
+   "body": {
+    "description": "<p>It failed.</p><p>lattice-key: lattice:acme/ops/dead-letter/run_1</p>",
+    "done": false,
+    "priority": 3,
+    "title": "A run failed"
+   },
+   "headers": {},
+   "method": "PUT",
+   "path": "/api/v1/projects/37/tasks",
+   "query": [],
+   "response": {
+    "assignees": [],
+    "attachments": null,
+    "bucket_id": 0,
+    "cover_image_attachment_id": 0,
+    "created": "2026-10-17T19:03:29.283125838Z",
+    "created_by": {
+     "created": "2026-10-17T19:03:27Z",
+     "id": 5,
+     "name": "",
+     "updated": "2026-10-17T19:03:27Z",
+     "username": "relayr-1b66c26a"
+    },
+    "description": "<p>It failed.</p><p>lattice-key: lattice:acme/ops/dead-letter/run_1</p>",
+    "done": false,
+    "done_at": "0001-01-01T00:00:00Z",
+    "due_date": "0001-01-01T00:00:00Z",
+    "end_date": "0001-01-01T00:00:00Z",
+    "hex_color": "",
+    "id": 30,
+    "identifier": "OPS3A01-1",
+    "index": 1,
+    "is_favorite": false,
+    "labels": null,
+    "percent_done": 0,
+    "position": 0,
+    "priority": 3,
+    "project_id": 37,
+    "reactions": null,
+    "related_tasks": null,
+    "reminders": null,
+    "repeat_after": 0,
+    "repeat_mode": 0,
+    "start_date": "0001-01-01T00:00:00Z",
+    "title": "A run failed",
+    "updated": "2026-10-17T19:03:29.283127671Z"
+   },
+   "status": 201
+  },
+  {
+   "body": null,
+   "headers": {
+    "x-pagination-total-pages": "1"
+   },
+   "method": "GET",
+   "path": "/api/v1/labels",
+   "query": [
+    [
+     "s",
+     "lattice"
+    ]
+   ],
+   "response": [
+    {
+     "created": "2026-10-17T19:03:27Z",
+     "created_by": {
+      "created": "2026-10-17T19:03:27Z",
+      "id": 5,
+      "name": "",
+      "updated": "2026-10-17T19:03:27Z",
+      "username": "relayr-1b66c26a"
+     },
+     "description": "",
+     "hex_color": "",
+     "id": 12,
+     "title": "lattice",
+     "updated": "2026-10-17T19:03:27Z"
+    }
+   ],
+   "status": 200
+  },
+  {
+   "body": {
+    "label_id": 12
+   },
+   "headers": {},
+   "method": "PUT",
+   "path": "/api/v1/tasks/30/labels",
+   "query": [],
+   "response": {
+    "created": "2026-10-17T19:03:29.292190088Z",
+    "label_id": 12
+   },
+   "status": 201
+  },
+  {
+   "body": null,
+   "headers": {
+    "x-pagination-total-pages": "1"
+   },
+   "method": "GET",
+   "path": "/api/v1/labels",
+   "query": [
+    [
+     "s",
+     "run-failed"
+    ]
+   ],
+   "response": [
+    {
+     "created": "2026-10-17T19:03:27Z",
+     "created_by": {
+      "created": "2026-10-17T19:03:27Z",
+      "id": 5,
+      "name": "",
+      "updated": "2026-10-17T19:03:27Z",
+      "username": "relayr-1b66c26a"
+     },
+     "description": "",
+     "hex_color": "",
+     "id": 13,
+     "title": "run-failed",
+     "updated": "2026-10-17T19:03:27Z"
+    }
+   ],
+   "status": 200
+  },
+  {
+   "body": {
+    "label_id": 13
+   },
+   "headers": {},
+   "method": "PUT",
+   "path": "/api/v1/tasks/30/labels",
+   "query": [],
+   "response": {
+    "created": "2026-10-17T19:03:29.299024463Z",
+    "label_id": 13
+   },
+   "status": 201
+  },
+  {
+   "body": null,
+   "headers": {
+    "x-pagination-total-pages": "0"
+   },
+   "method": "GET",
+   "path": "/api/v1/tasks/30/comments",
+   "query": [
+    [
+     "page",
+     "1"
+    ],
+    [
+     "per_page",
+     "50"
+    ]
+   ],
+   "response": [],
+   "status": 200
+  },
+  {
+   "body": {
+    "comment": "<p>Retried 3 times.</p><p>lattice-key: lattice:acme/ops/first</p>"
+   },
+   "headers": {},
+   "method": "PUT",
+   "path": "/api/v1/tasks/30/comments",
+   "query": [],
+   "response": {
+    "author": {
+     "created": "2026-10-17T19:03:27Z",
+     "id": 5,
+     "name": "",
+     "updated": "2026-10-17T19:03:27Z",
+     "username": "relayr-1b66c26a"
+    },
+    "comment": "<p>Retried 3 times.</p><p>lattice-key: lattice:acme/ops/first</p>",
+    "created": "2026-10-17T19:03:29.305309255Z",
+    "id": 11,
+    "reactions": null,
+    "updated": "2026-10-17T19:03:29.305310838Z"
+   },
+   "status": 201
+  },
+  {
+   "body": null,
+   "headers": {
+    "x-pagination-total-pages": "1"
+   },
+   "method": "GET",
+   "path": "/api/v1/tasks/30/comments",
+   "query": [
+    [
+     "page",
+     "1"
+    ],
+    [
+     "per_page",
+     "50"
+    ]
+   ],
+   "response": [
+    {
+     "author": {
+      "created": "2026-10-17T19:03:27Z",
+      "id": 5,
+      "name": "",
+      "updated": "2026-10-17T19:03:27Z",
+      "username": "relayr-1b66c26a"
+     },
+     "comment": "<p>Retried 3 times.</p><p>lattice-key: lattice:acme/ops/first</p>",
+     "created": "2026-10-17T19:03:29Z",
+     "id": 11,
+     "reactions": null,
+     "updated": "2026-10-17T19:03:29Z"
+    }
+   ],
+   "status": 200
+  },
+  {
+   "body": null,
+   "headers": {
+    "x-pagination-total-pages": "1"
+   },
+   "method": "GET",
+   "path": "/api/v1/tasks/30/comments",
+   "query": [
+    [
+     "page",
+     "1"
+    ],
+    [
+     "per_page",
+     "50"
+    ]
+   ],
+   "response": [
+    {
+     "author": {
+      "created": "2026-10-17T19:03:27Z",
+      "id": 5,
+      "name": "",
+      "updated": "2026-10-17T19:03:27Z",
+      "username": "relayr-1b66c26a"
+     },
+     "comment": "<p>Retried 3 times.</p><p>lattice-key: lattice:acme/ops/first</p>",
+     "created": "2026-10-17T19:03:29Z",
+     "id": 11,
+     "reactions": null,
+     "updated": "2026-10-17T19:03:29Z"
+    }
+   ],
+   "status": 200
+  },
+  {
+   "body": {
+    "comment": "<p>Retried 4 times.</p><p>lattice-key: lattice:acme/ops/second</p>"
+   },
+   "headers": {},
+   "method": "PUT",
+   "path": "/api/v1/tasks/30/comments",
+   "query": [],
+   "response": {
+    "author": {
+     "created": "2026-10-17T19:03:27Z",
+     "id": 5,
+     "name": "",
+     "updated": "2026-10-17T19:03:27Z",
+     "username": "relayr-1b66c26a"
+    },
+    "comment": "<p>Retried 4 times.</p><p>lattice-key: lattice:acme/ops/second</p>",
+    "created": "2026-10-17T19:03:29.311801171Z",
+    "id": 12,
+    "reactions": null,
+    "updated": "2026-10-17T19:03:29.311803046Z"
+   },
+   "status": 201
+  },
+  {
+   "body": null,
+   "headers": {
+    "x-pagination-total-pages": "1"
+   },
+   "method": "GET",
+   "path": "/api/v1/tasks/30/comments",
+   "query": [
+    [
+     "page",
+     "1"
+    ],
+    [
+     "per_page",
+     "50"
+    ]
+   ],
+   "response": [
+    {
+     "author": {
+      "created": "2026-10-17T19:03:27Z",
+      "id": 5,
+      "name": "",
+      "updated": "2026-10-17T19:03:27Z",
+      "username": "relayr-1b66c26a"
+     },
+     "comment": "<p>Retried 4 times.</p><p>lattice-key: lattice:acme/ops/second</p>",
+     "created": "2026-10-17T19:03:29Z",
+     "id": 12,
+     "reactions": null,
+     "updated": "2026-10-17T19:03:29Z"
+    },
+    {
+     "author": {
+      "created": "2026-10-17T19:03:27Z",
+      "id": 5,
+      "name": "",
+      "updated": "2026-10-17T19:03:27Z",
+      "username": "relayr-1b66c26a"
+     },
+     "comment": "<p>Retried 3 times.</p><p>lattice-key: lattice:acme/ops/first</p>",
+     "created": "2026-10-17T19:03:29Z",
+     "id": 11,
+     "reactions": null,
+     "updated": "2026-10-17T19:03:29Z"
+    }
+   ],
+   "status": 200
+  },
+  {
+   "body": null,
+   "headers": {
+    "x-pagination-total-pages": "1"
+   },
+   "method": "GET",
+   "path": "/api/v1/tasks/30/comments",
+   "query": [
+    [
+     "page",
+     "1"
+    ],
+    [
+     "per_page",
+     "50"
+    ]
+   ],
+   "response": [
+    {
+     "author": {
+      "created": "2026-10-17T19:03:27Z",
+      "id": 5,
+      "name": "",
+      "updated": "2026-10-17T19:03:27Z",
+      "username": "relayr-1b66c26a"
+     },
+     "comment": "<p>Retried 4 times.</p><p>lattice-key: lattice:acme/ops/second</p>",
+     "created": "2026-10-17T19:03:29Z",
+     "id": 12,
+     "reactions": null,
+     "updated": "2026-10-17T19:03:29Z"
+    },
+    {
+     "author": {
+      "created": "2026-10-17T19:03:27Z",
+      "id": 5,
+      "name": "",
+      "updated": "2026-10-17T19:03:27Z",
+      "username": "relayr-1b66c26a"
+     },
+     "comment": "<p>Retried 3 times.</p><p>lattice-key: lattice:acme/ops/first</p>",
+     "created": "2026-10-17T19:03:29Z",
+     "id": 11,
+     "reactions": null,
+     "updated": "2026-10-17T19:03:29Z"
+    }
+   ],
+   "status": 200
+  },
+  {
+   "body": null,
+   "headers": {
+    "x-pagination-total-pages": "1"
+   },
+   "method": "GET",
+   "path": "/api/v1/tasks/30/comments",
+   "query": [
+    [
+     "page",
+     "1"
+    ],
+    [
+     "per_page",
+     "50"
+    ]
+   ],
+   "response": [
+    {
+     "author": {
+      "created": "2026-10-17T19:03:27Z",
+      "id": 5,
+      "name": "",
+      "updated": "2026-10-17T19:03:27Z",
+      "username": "relayr-1b66c26a"
+     },
+     "comment": "<p>Retried 4 times.</p><p>lattice-key: lattice:acme/ops/second</p>",
+     "created": "2026-10-17T19:03:29Z",
+     "id": 12,
+     "reactions": null,
+     "updated": "2026-10-17T19:03:29Z"
+    },
+    {
+     "author": {
+      "created": "2026-10-17T19:03:27Z",
+      "id": 5,
+      "name": "",
+      "updated": "2026-10-17T19:03:27Z",
+      "username": "relayr-1b66c26a"
+     },
+     "comment": "<p>Retried 3 times.</p><p>lattice-key: lattice:acme/ops/first</p>",
+     "created": "2026-10-17T19:03:29Z",
+     "id": 11,
+     "reactions": null,
+     "updated": "2026-10-17T19:03:29Z"
+    }
+   ],
+   "status": 200
+  }
+ ],
+ "setup": {
+  "project": 37
+ }
+}

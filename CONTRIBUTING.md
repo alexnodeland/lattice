@@ -50,6 +50,7 @@ The packages' own tasks:
 | `artifactr:dashboards`, `reflexr:dashboards` | Regenerate the Grafana dashboards in `deploy/grafana/dashboards/` (a test fails if they drift) |
 | `artifactr:pg-up`, `reflexr:pg-up`, `grantr:pg-up`, `relayr:pg-up`, `artifactr-files:pg-up` | Start PostgreSQL for the SQL tests, from the package's `compose.yaml` |
 | `artifactr:test-pg`, `reflexr:test-pg`, `grantr:test-pg`, `relayr:test-pg`, `artifactr-files:test-pg` | Run the tests on PostgreSQL as well as SQLite |
+| `relayr:vikunja-up`, `relayr:test-vikunja` | Start Vikunja on port 54333, from relayr's `compose.yaml`, and run the tracker contract test against it, live; with `RELAYR_RECORD=1`, its recorded exchanges are made again |
 | `artifactr:app-up`, `reflexr:app-up` | Build and start the reference implementation on PostgreSQL, at <http://localhost:8000> |
 | `artifactr:pg-down`, `reflexr:pg-down`, `grantr:pg-down`, `relayr:pg-down`, `artifactr-files:pg-down` | Stop the package's contributor stack |
 | `artifactr:api`, `reflexr:api` | Start the reference implementation on PostgreSQL, run the package's Bruno collection and Schemathesis against it, and stop it, as CI's Acceptance job does. It needs Docker |

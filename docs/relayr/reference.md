@@ -44,6 +44,34 @@ The reference is generated from relayr's docstrings and type annotations. It doc
       show_root_heading: false
       show_root_toc_entry: false
 
+## relayr.trackers
+
+::: relayr.trackers
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+
+## relayr.integrations
+
+::: relayr.integrations
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+
+## relayr.plane
+
+::: relayr.plane
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+
+## relayr.vikunja
+
+::: relayr.vikunja
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+
 ## relayr.rules
 
 ::: relayr.rules

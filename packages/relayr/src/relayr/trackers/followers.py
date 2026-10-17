@@ -173,8 +173,9 @@ class TrackerFollowers:
     async def poll(self, tenant_id: str, workspace_id: str) -> bool:
         """Read a bound workspace's project once, now, as its follower does each interval.
 
-        Returns whether it read: not if the workspace is unbound, its integration is off, or
-        another process holds its lease. A tracker's failure is logged, and read past.
+        It takes the workspace's lease, and leaves it held until it lapses. Returns whether it
+        read: not if the workspace is unbound, its integration is off, or another process holds
+        its lease. A tracker's failure is logged, and read past.
         """
         workspace = WorkspaceKey(tenant_id, workspace_id)
         if workspace not in self._trackers.bindings or not await self._may(workspace):

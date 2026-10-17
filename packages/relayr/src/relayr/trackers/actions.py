@@ -179,7 +179,11 @@ class Trackers:
         if actions is None:
             key = WorkspaceKey(reaction.workspace.tenant_id, reaction.workspace.workspace_id)
             actions = TrackerActions(
-                reaction, self, self._bindings.get(key), self._allowlists.of(reaction.run.rule)
+                reaction,
+                self,
+                self._bindings.get(key),
+                self._allowlists.of(reaction.run.rule),
+                self._telemetry,
             )
             self._acting[reaction] = actions
         return actions
@@ -218,22 +222,6 @@ class Trackers:
         """A workspace's adapter if one was made, without asking for credentials."""
         return self._connections.made(workspace)
 
-    async def capped(self, workspace: WorkspaceKey, item_id: str) -> None:
-        """Count a write about to be made to an item, and refuse it past the cap on loops.
-
-        Raises:
-            RunFailure: For good, as `tracker_loop`, past `LOOP_CAP` writes to the item within
-                `LOOP_WINDOW`.
-        """
-        made = await self._ledger.record_tracker_write(workspace, item_id, within=LOOP_WINDOW)
-        if made > LOOP_CAP:
-            self._telemetry.count(TRACKER_LOOPS, workspace_attributes(*workspace))
-            raise RunFailure(
-                f"relayr wrote to item {item_id} {LOOP_CAP} times within {LOOP_WINDOW}",
-                reason="tracker_loop",
-                permanent=True,
-            )
-
 
 class TrackerActions:
     """What one attempt of a run does in its workspace's tracker. Get it with `Trackers.acting`.
@@ -252,9 +240,11 @@ class TrackerActions:
         trackers: Trackers,
         binding: TrackerBinding | None,
         allowlist: Allowlist,
+        telemetry: Telemetry,
     ) -> None:
         self._reaction = reaction
         self._trackers = trackers
+        self._telemetry = telemetry
         self._ledger = trackers.ledger
         self._key = WorkspaceKey(reaction.workspace.tenant_id, reaction.workspace.workspace_id)
         self._binding = binding
@@ -314,7 +304,7 @@ class TrackerActions:
         if tracked is not None and tracked.ref is not None:
             return CommentRef.model_validate(tracked.ref)
         async with self._claimed("comment", key):
-            await self._trackers.capped(self._key, item.id)
+            await self._capped(item.id)
             ref = await self._call(lambda tracker: tracker.comment(item, key, body))
             kept = await self._ledger.record_tracked(self._key, "comment", key, _json(ref))
         return CommentRef.model_validate(kept or _json(ref))
@@ -349,7 +339,7 @@ class TrackerActions:
         changed = _differing(current, fields, await self._trackers.connection(self._key))
         if not changed:
             return
-        await self._trackers.capped(self._key, item.id)
+        await self._capped(item.id)
         tracked = await self._ledger.tracked(self._key, "item", key)
         before = {} if tracked is None else tracked.written
         await self._ledger.record_written(self._key, key, changed)
@@ -406,6 +396,22 @@ class TrackerActions:
             integration = self._trackers.integration
             raise NotAllowed(f"{integration} is off in workspace {self._key.workspace_id}")
         return self._binding
+
+    async def _capped(self, item_id: str) -> None:
+        """Count a write about to be made to an item, and refuse it past the cap on loops.
+
+        Raises:
+            RunFailure: For good, as `tracker_loop`, past `LOOP_CAP` writes to the item within
+                `LOOP_WINDOW`.
+        """
+        made = await self._ledger.record_tracker_write(self._key, item_id, within=LOOP_WINDOW)
+        if made > LOOP_CAP:
+            self._telemetry.count(TRACKER_LOOPS, workspace_attributes(*self._key))
+            raise RunFailure(
+                f"relayr wrote to item {item_id} {LOOP_CAP} times within {LOOP_WINDOW}",
+                reason="tracker_loop",
+                permanent=True,
+            )
 
     @asynccontextmanager
     async def _claimed(self, kind: TrackedKind, key: str) -> AsyncGenerator[None]:

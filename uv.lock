@@ -4321,6 +4321,7 @@ evals = [
 ]
 fastapi = [
     { name = "fastapi" },
+    { name = "lattice-core-ai" },
     { name = "starlette" },
 ]
 langfuse = [
@@ -4400,6 +4401,7 @@ requires-dist = [
     { name = "httpx", marker = "extra == 'plane'", specifier = ">=0.28" },
     { name = "httpx", marker = "extra == 'vikunja'", specifier = ">=0.28" },
     { name = "langfuse", marker = "extra == 'langfuse'", specifier = ">=4.15,<5" },
+    { name = "lattice-core-ai", marker = "extra == 'fastapi'", editable = "packages/lattice-core" },
     { name = "lattice-core-ai", marker = "extra == 'otel'", editable = "packages/lattice-core" },
     { name = "lattice-core-ai", extras = ["sql"], marker = "extra == 'sql'", editable = "packages/lattice-core" },
     { name = "opentelemetry-api", specifier = ">=1.45" },

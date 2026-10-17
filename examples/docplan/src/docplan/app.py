@@ -126,6 +126,7 @@ def create_app(
             if judging is not None:  # finish judging before the database closes
                 stack.push_async_callback(judging.drain)
             stack.push_async_callback(runner.aclose)  # stop the runs still going, then judge
+            await _recover(workspaces, runner)  # what a process that died was asked
             await stack.enter_async_context(mcp.lifespan())  # MCP stops first
             yield
 
@@ -176,6 +177,15 @@ def telemetry_from_environment() -> TelemetryHandle | None:
         environment=os.environ.get("DOCPLAN_ENVIRONMENT", "development"),
         langfuse=langfuse,
     )
+
+
+async def _recover(workspaces: Workspaces, runner: Runner[None]) -> None:
+    """Take each turn the tenant's threads were asked for and no run has taken (ADR-0070)."""
+    after = None
+    while page := await workspaces.list(TENANT, actor=SystemActor(), after=after):
+        for workspace_id in page:
+            await runner.recover(await workspaces.open(TENANT, workspace_id, actor=SystemActor()))
+        after = page[-1]
 
 
 async def _cancel(task: "asyncio.Task[None]") -> None:

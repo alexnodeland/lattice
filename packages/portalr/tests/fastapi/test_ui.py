@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import httpx
 
 from portalr.fastapi import Site
@@ -79,3 +81,11 @@ async def test_a_path_with_a_nul_gets_the_index(client: httpx.AsyncClient) -> No
     response = await client.get("/app/a%00b")
     assert response.status_code == 200
     assert response.text.startswith("<!doctype html>")
+
+
+def test_the_markdown_csp_tests_serve_the_routers_own_policy() -> None:
+    # ui's CSP tests serve its Markdown with this policy (web/ui/csp): the router's, for an
+    # application with Supabase on a path of its own origin, so `connect-src` is `'self'` alone.
+    harness = Path(__file__).parents[2] / "web" / "ui" / "csp" / "policy.txt"
+    site = Site(supabase_url="/", supabase_key="sb_publishable_x")
+    assert harness.read_text().strip() == policy(site)

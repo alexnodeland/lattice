@@ -51,3 +51,9 @@ async def test_a_person_with_an_account_is_found_without_an_email() -> None:
 async def test_a_failed_invitation_says_why(tool: Tool, message: str) -> None:
     with pytest.raises(InviteFailed, match=message):
         await supabase(tool)("dan@acme.com")
+
+
+def test_the_secret_key_is_not_in_its_repr() -> None:
+    assert "sb_secret_key" not in repr(
+        SupabaseInvite(url="http://auth", secret_key="sb_secret_key")
+    )

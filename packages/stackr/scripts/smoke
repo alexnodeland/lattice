@@ -660,6 +660,10 @@ cleanup_app() {
   if [[ -n ${app_user:-} ]]; then
     auth_delete_user "$app_user" || true
   fi
+  local person
+  for person in ${portal_people[@]+"${portal_people[@]}"}; do
+    auth_delete_user "$person" || true
+  done
   # The application's tables, in its own schema on local Supabase's PostgreSQL, and its role:
   # two statements, so a schema that can't be dropped still lets the role go.
   local statement
@@ -814,13 +818,67 @@ smoke_portal_sign_in() {
   return $failed
 }
 
+# The portal's own scenarios, in Chromium, against the application that is running (portalr
+# ADR-0040): app's and admin's few for a generated application, with the people they sign in as
+# made here. The browser reaches the application on this machine and signs in at local
+# Supabase, so this runs on that adapter only. Nothing here starts or stops a container, and
+# nothing else runs while Chromium does: it fails its requests in flight when a network
+# interface comes or goes, as a container's does (lattice ADR-0002, #172).
+smoke_scenarios() {
+  if [[ $auth != supabase ]]; then
+    log "app: the portal's scenarios run on local Supabase only: supabase-js reaches Supabase Auth at <url>/auth/v1, which GoTrue alone does not serve"
+    return 0
+  fi
+  if [[ ${SMOKE_SCENARIOS:-} != true ]]; then
+    log "app: the portal's scenarios are skipped: SMOKE_SCENARIOS=true runs them (they need \`bun install\` and \`moon run ui:chromium\`; CI does)"
+    return 0
+  fi
+  log "app: the portal's scenarios, in a browser"
+  local alice bob token ui
+  if ! alice=$(auth_create_user '{"email": "alice@portalr.test", "password": "alice-password"') ||
+    ! bob=$(auth_create_user '{"email": "bob@portalr.test", "password": "bob-password"'); then
+    log "FAIL: app: making the people the scenarios sign in as"
+    return 1
+  fi
+  portal_people=("$alice" "$bob")
+  # The people and their passwords are those web/app/bdd/steps/people.ts signs in as:
+  # `<person>@portalr.test`, `<person>-password`.
+  # alice owns acme, bob is a member, and bob edits its workspace notes, which makes it a
+  # resource of grantr's, so that the owner is offered it.
+  if ! app_admin tenant acme "$alice" ||
+    ! token=$(auth_sign_in '{"email": "alice@portalr.test", "password": "alice-password"') ||
+    ! APP_TENANT=acme app_token=$token app_json "/grantr/v1/tenants/acme/members" \
+      "{\"member\": {\"kind\": \"user\", \"id\": \"$bob\"}}" ||
+    ! APP_TENANT=acme app_token=$token app_json "/grantr/v1/tenants/acme/grants" \
+      "{\"role\": \"editor\", \"on\": {\"kind\": \"workspace\", \"workspace\": \"notes\"}, \"to\": {\"kind\": \"user\", \"id\": \"$bob\"}}"; then
+    log "FAIL: app: making acme, for the scenarios"
+    return 1
+  fi
+  for ui in app admin; do
+    if (cd "../portalr/web/$ui" && PORTALR_APP_URL=http://127.0.0.1:$app_port scripts/generated); then
+      log "ok: $ui's scenarios pass against the application"
+    else
+      log "FAIL: $ui's scenarios against the application"
+      status=1
+    fi
+  done
+}
+
 smoke_app() {
   local adapter=${STACKR_DATABASE:-$(setting STACKR_DATABASE)} issuer jwks admin=""
+  # The Supabase project the portal's UIs sign in to, as the browser reaches it, and its key.
+  local portal_url=$app_url portal_publishable=sb_publishable_smoke
   if [[ $adapter == supabase ]]; then
     auth=supabase
     supabase_status || { log "FAIL: app: local Supabase's status"; return 1; }
     issuer=$supabase_api/auth/v1
     jwks=""
+    # The scenarios' browser signs in at local Supabase, on this machine; the application names
+    # people by email, and invites, with its secret key, which stays in its environment (the
+    # .env is written mode 0600, never an argument) and is not what the browser is given.
+    portal_url=$supabase_api
+    portal_publishable=$supabase_publishable
+    admin="AUTH_SERVICE_ROLE_KEY=$supabase_secret"
   else
     auth=gotrue
     gotrue_ready || { log "FAIL: app: on $adapter, it needs GoTrue, the auth profile"; return 1; }
@@ -879,8 +937,8 @@ $admin
 LITELLM_API_KEY=$app_key
 LITELLM_MOCK_RESPONSE="stackr smoke ok"
 APP_IMAGE=$app_name:local
-PORTAL_SUPABASE_URL=$app_url
-PORTAL_SUPABASE_KEY=sb_publishable_smoke
+PORTAL_SUPABASE_URL=$portal_url
+PORTAL_SUPABASE_KEY=$portal_publishable
 PORTAL_LITELLM_KEY=$portal_key
 ${domain:+STACKR_DOMAIN=$domain}
 ENV
@@ -962,7 +1020,7 @@ ENV
       status=1
     fi
   done
-  if probe -s "$app_url/portalr/config.json" | jq -e --arg url "$app_url" '.supabase.url == $url' >/dev/null; then
+  if probe -s "$app_url/portalr/config.json" | jq -e --arg url "$portal_url" '.supabase.url == $url' >/dev/null; then
     log "ok: the portal's config.json names the Supabase project"
   else
     log "FAIL: the portal's config.json doesn't name the Supabase project"
@@ -1081,6 +1139,7 @@ ENV
   app_json "/reflexr/v1/workspaces/$run_id/events" \
     "{\"event\": {\"type\": \"$app_package:alert.fired\", \"service\": \"smoke-rule\", \"summary\": \"Smoke\"}}"
   eventually "the rule told its thread of the alert" t1_has_notice "chat:smoke-alerts: An alert fired."
+  smoke_scenarios
 }
 
 # Whatever the checks left behind: the application, and the edge's CA.

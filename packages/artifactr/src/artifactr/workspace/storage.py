@@ -96,6 +96,16 @@ class Transaction(Protocol):
         """
         ...
 
+    async def holds_lease(self, key: str, holder: str) -> bool:
+        """Whether ``holder`` has the lease ``key``, expired or not, until the transaction ends.
+
+        A write fenced by a claim asks it first: :meth:`Storage.acquire_lease` for another
+        holder must not take the lease between the answer and the commit. SQL storage locks the
+        lease's row; in-memory storage's ``acquire_lease`` waits for the workspace's lock, which
+        the transaction holds.
+        """
+        ...
+
 
 class Storage(Protocol):
     """Persistence for workspaces. Every method is scoped to one tenant's workspace.

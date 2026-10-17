@@ -1,0 +1,4 @@
+{
+  "app": { "initial": 200000, "total": 470000, "largest": 160000 },
+  "admin": { "initial": 225000, "total": 670000, "largest": 160000 }
+}

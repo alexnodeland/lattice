@@ -12,11 +12,11 @@
 
 ## Summary
 
-portalr is the portal into an application built on the family: an `app` UI for the people who use it, to chat with its agents and see their artifacts, proposals, rules and runs, and an `admin` UI for those who run it, to manage access and see feedback, evaluations, usage and spend. Both are static single-page apps in React, sharing a typed `client` and a `ui` kit. portalr's Python side is a router the application mounts beside the libraries': it serves the two UIs, and adds the few routes no library has. The browser calls artifactr's, reflexr's and grantr's own routes, on one origin, with one token.
+portalr is the portal into an application built on lattice: an `app` UI for the people who use it, to chat with its agents and see their artifacts, proposals, rules and runs, and an `admin` UI for those who run it, to manage access and see feedback, evaluations, usage and spend. Both are static single-page apps in React, sharing a typed `client` and a `ui` kit. portalr's Python side is a router the application mounts beside the libraries': it serves the two UIs, and adds the few routes no library has. The browser calls artifactr's, reflexr's and grantr's own routes, on one origin, with one token.
 
 ## Motivation
 
-- **The family has no face.** Every surface is an API, a WebSocket or an MCP server. docplan has a terminal client, and the template generates none, so an application built on the family has to build its own UI before anyone can use it.
+- **lattice has no face.** Every surface is an API, a WebSocket or an MCP server. docplan has a terminal client, and the template generates none, so an application built on lattice has to build its own UI before anyone can use it.
 - **Running one is blind without tools.** Granting access, reviewing proposals across workspaces, seeing what users thought of the agent, and seeing what each tenant spends all need an admin UI, and grantr's model is only usable through one.
 - **The work codebase shows what not to build.** It grew two frontends, each with its own backend in front of the chat service:
   - **Types copied by hand.** Each backend re-declared the chat service's types, three copies in all, and they drifted: fixes for proxy parity and envelope mismatches recur in its history.
@@ -251,7 +251,7 @@ The maintainer decided these on 2026-10-12.
 
 ## Drawbacks
 
-- **A second language,** with its own toolchain, lockfile, linters and tests, in a family that has been Python only.
+- **A second language,** with its own toolchain, lockfile, linters and tests, in lattice, which has been Python only.
 - **The UIs depend on every package's API** directly. A breaking change in artifactr's protocol breaks the app until `client` is regenerated, which the drift test makes loud but not free.
 - **Isolation rests on portalr's readers.** The stores are shared, so a reader that forgets the tenant leaks another tenant's traces or logs. One module, a `Tenant` made only after grantr allows the read, prom-label-proxy for metrics, and the tests over every query make that hard, not impossible. Splitting the stores (P6's alternative) remains the stronger fix, and the readers' interface doesn't change if it is ever made.
 - **Langfuse's scores** may have to be read through their traces and checked, which costs more calls than a filtered list.

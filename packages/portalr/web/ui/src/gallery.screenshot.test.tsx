@@ -48,6 +48,8 @@ function Gallery() {
         <AccountMenu
           name="Alex Nodeland"
           appearance="system"
+          colourBlind={false}
+          onColourBlind={() => undefined}
           onAppearance={() => undefined}
           onSignOut={() => undefined}
         />
@@ -190,6 +192,8 @@ function AdminGallery() {
         <AccountMenu
           name="Alex Nodeland"
           appearance="system"
+          colourBlind={false}
+          onColourBlind={() => undefined}
           onAppearance={() => undefined}
           onSignOut={() => undefined}
         />

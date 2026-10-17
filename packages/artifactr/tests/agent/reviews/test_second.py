@@ -100,11 +100,11 @@ def _spin_guard(monkeypatch: pytest.MonkeyPatch, limit: int = 50) -> list[int]:
     plans = [0]
     original = Runner._plan
 
-    async def counting(self: Runner[Any], workspace: Workspace, thread_id: str) -> Any:
+    async def counting(self: Runner[Any], workspace: Workspace, claim: tuple[str, str]) -> Any:
         plans[0] += 1
         if plans[0] > limit:
             raise RuntimeError(f"planned {plans[0]} times without end")
-        return await original(self, workspace, thread_id)
+        return await original(self, workspace, claim)
 
     monkeypatch.setattr(Runner, "_plan", counting)
     return plans

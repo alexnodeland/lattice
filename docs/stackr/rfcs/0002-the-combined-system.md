@@ -296,7 +296,7 @@ The maintainer decided these on 2026-09-29. Each option table below marks the ch
 | Only in the product repository | Fastest start | Other applications can't reuse it, and the template can't generate it |
 | An extra in one library | No new package | Ruled out by reflexr ADR-0003: neither library imports the other |
 
-The name is **relayr**: it relays events and commands between the two libraries, and fits the family's names. `bridgr` and `linkr` were considered; "link" already means trace and span links in this design.
+The name is **relayr**: it relays events and commands between the two libraries, and fits lattice's names. `bridgr` and `linkr` were considered; "link" already means trace and span links in this design.
 
 ### D2: the outbound actor
 

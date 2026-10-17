@@ -1,6 +1,6 @@
-# On pushes to main and every night: every project's checks, whatever changed, the reference
-# implementations' images, osv-scanner over the lockfiles, and a check of the links in the
-# Markdown. CI runs on pull requests only, so this is what runs on main.
+# On pushes to main and every night: every project's checks, whatever changed, the formal specs at
+# their deeper bounds, the reference implementations' images, osv-scanner over the lockfiles, and a
+# check of the links in the Markdown. CI runs on pull requests only, so this is what runs on main.
 
 name: Nightly
 
@@ -85,6 +85,24 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
       - run: moon run :image
+
+  # TLC over the formal specs (ADR-0025): the pull request's configurations, and the deeper ones.
+  specs:
+    name: Specs
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: "21"
+      - run: moon run :spec :spec-deep
 
   # stackr's thin images, on both architectures, as CI builds them when they change.
   thin-images:

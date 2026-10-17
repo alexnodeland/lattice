@@ -33,7 +33,7 @@ Making every `check` depend on its dependencies' (`^:check`) would make the task
 
 ## Trade-off analysis
 
-Running everything on every pull request would be correct and simple, but a change to one package would wait for all of them, and the family is growing. moon already knows which projects a change touches and what depends on what; the script joins the two answers, and leaves the task graph as narrow as a contributor's own runs need.
+Running everything on every pull request would be correct and simple, but a change to one package would wait for all of them, and lattice is growing. moon already knows which projects a change touches and what depends on what; the script joins the two answers, and leaves the task graph as narrow as a contributor's own runs need.
 
 ## Consequences
 

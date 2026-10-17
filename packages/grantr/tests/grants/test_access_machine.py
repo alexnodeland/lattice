@@ -5,8 +5,8 @@ deleting a group, granting or revoking a role. The model predicts whether grantr
 or refuses it, and with which error, in the order the command checks: the maker's own action
 first (ADR-0010), then what the command names, then the bound (no one grants or revokes more
 than they hold, ADR-0010, but for giving up one's own grant and an operator granting
-themselves, ADR-0014), then the tenant's last owner grant (ADR-0014). After every step the store
-holds the model's grants and groups, the tenant has an owner grant, and the tenant's audit log
+themselves, ADR-0014), then the tenant's last owner (ADR-0014, as amended). After every step
+the store holds the model's grants and groups, a member holds owner, and the tenant's audit log
 replays to the same access (ADR-0007, ADR-0013); a check answers as the model holds, and writes
 nothing (ADR-0015).
 
@@ -15,8 +15,8 @@ each built-in role holds from the catalog, as the specification's data.
 """
 
 import asyncio
-from collections.abc import Coroutine, Iterable
-from dataclasses import dataclass, field
+from collections.abc import Callable, Coroutine, Iterable
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 import pytest
@@ -110,14 +110,20 @@ class Access:
         """Whether a change to these grants gives or takes more than ``by`` holds."""
         return any(not actions(g) <= self.held(by, g.on) for g in grants)
 
-    def last_owner(self, losing: Iterable[Grant]) -> bool:
-        """Whether a change would take every grant of ``owner`` on the tenant.
+    def owners(self) -> frozenset[Grantee]:
+        """The members who hold ``owner`` on the tenant, by a grant of their own or a group's."""
+        found: set[Grantee] = set()
+        for g in self.grants:
+            if (g.role, g.on) == ("owner", TENANT):
+                own = frozenset((g.to,))
+                found |= self.groups.get(g.to.id, frozenset()) if isinstance(g.to, Group) else own
+        return frozenset(found)
 
-        As ADR-0014 words it and grantr has it: a group's grant counts whoever is in the group,
-        which is #253.
-        """
-        owners = frozenset(g for g in self.grants if (g.role, g.on) == ("owner", TENANT))
-        return bool(owners) and owners <= frozenset(losing)
+    def leaves_no_owner(self, change: Callable[["Access"], None]) -> bool:
+        """Whether a change leaves no member holding ``owner``, where one did (ADR-0014)."""
+        after = replace(self, groups=dict(self.groups))
+        change(after)
+        return bool(self.owners()) and not after.owners()
 
     def to(self, grantee: Grantee) -> list[Grant]:
         return [g for g in self.grants if g.to == grantee]
@@ -132,8 +138,11 @@ class Access:
         self.take(self.to(member))
         self.groups = {g: members - frozenset((member,)) for g, members in self.groups.items()}
 
+    def regroup(self, group: str, members: frozenset[Member]) -> None:
+        self.groups[group] = members
+
     def delete_group(self, group: str) -> None:
-        del self.groups[group]
+        self.groups.pop(group, None)
         self.take(self.to(Group(id=group)))
 
     @classmethod
@@ -236,7 +245,7 @@ class AccessMachine(RuleBasedStateMachine):
             (self.model.lacks(by, "grantr:remove_member", TENANT), Forbidden),
             (member not in self.model.members(), Invalid),
             (self.model.unbounded(by, own), Forbidden),
-            (self.model.last_owner(own), Invalid),
+            (self.model.leaves_no_owner(lambda after: after.remove_member(member)), Invalid),
         )
         if self.step(refusal, self.grants.remove_member(ACME, member, by=by)):
             self.model.remove_member(member)
@@ -252,9 +261,10 @@ class AccessMachine(RuleBasedStateMachine):
             (self.model.lacks(by, "grantr:manage_groups", TENANT), Forbidden),
             (not set(members) <= set(self.model.members()), Invalid),
             (self.model.unbounded(by, carried), Forbidden),
+            (self.model.leaves_no_owner(lambda after: after.regroup(TEAM.id, members)), Invalid),
         )
         if self.step(refusal, self.grants.define_group(ACME, TEAM, members, by=by)):
-            self.model.groups[TEAM.id] = members
+            self.model.regroup(TEAM.id, members)
 
     @rule(by=users)
     def delete_group(self, by: User) -> None:
@@ -263,7 +273,7 @@ class AccessMachine(RuleBasedStateMachine):
             (self.model.lacks(by, "grantr:manage_groups", TENANT), Forbidden),
             (TEAM.id not in self.model.groups, Invalid),
             (self.model.unbounded(by, carried), Forbidden),
-            (self.model.last_owner(carried), Invalid),
+            (self.model.leaves_no_owner(lambda after: after.delete_group(TEAM.id)), Invalid),
         )
         if self.step(refusal, self.grants.delete_group(ACME, TEAM, by=by)):
             self.model.delete_group(TEAM.id)
@@ -293,7 +303,7 @@ class AccessMachine(RuleBasedStateMachine):
             (not own and self.model.lacks(by, "grantr:revoke", grant.on), Forbidden),
             (grant not in self.model.grants, Invalid),
             (not own and self.model.unbounded(by, [grant]), Forbidden),
-            (self.model.last_owner([grant]), Invalid),
+            (self.model.leaves_no_owner(lambda after: after.take([grant])), Invalid),
         )
         command = self.grants.revoke(ACME, grant.role, on=grant.on, to=grant.to, by=by)
         if self.step(refusal, command):
@@ -315,9 +325,10 @@ class AccessMachine(RuleBasedStateMachine):
         assert unchanged, "a check writes nothing"
 
     @invariant()
-    def the_tenant_has_an_owner_grant(self) -> None:
-        # TODO(#253): strengthen to "a member holds owner", through a group or not.
-        assert any((g.role, g.on) == ("owner", TENANT) for g in self.model.grants)
+    def a_member_holds_owner(self) -> None:
+        owners = self.model.owners()
+        assert owners, "a member holds owner, through a group or not"
+        assert set(owners) <= set(self.model.members())
 
     @invariant()
     def the_store_and_its_audit_log_hold_the_models_access(self) -> None:

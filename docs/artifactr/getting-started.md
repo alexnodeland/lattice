@@ -15,8 +15,7 @@ artifactr needs Python 3.12 or newer. It is distributed as `artifactr-ai` and im
 === "pip"
 
     ```bash
-    pip install "lattice-core-ai @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/lattice-core" \
-      "artifactr-ai @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/artifactr"
+    pip install "artifactr-ai @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/artifactr"
     ```
 
 !!! warning "`artifactr-ai`, not `artifactr`"
@@ -39,13 +38,13 @@ The core install covers artifact types, workspaces with in-memory storage, and t
 
 Combine extras with commas, as in `artifactr-ai[fastapi,postgres]`. You also need the pydantic-ai extra for your model provider, such as `pydantic-ai-slim[anthropic]` or `pydantic-ai-slim[openai]`, and its API key in the environment.
 
-!!! note "lattice-core comes from lattice too"
+!!! note "lattice-core comes from PyPI"
 
-    artifactr requires [lattice-core](../lattice-core/index.md), which isn't on PyPI either, so pip installs it from lattice as above; uv takes it from the same commit.
+    artifactr requires [lattice-core](../lattice-core/index.md), which is on PyPI as `lattice-core-ai`, so pip installs it from there; uv takes it from the same commit of lattice as artifactr. A commit of lattice can need a lattice-core newer than PyPI's; with pip, add `"lattice-core-ai @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/lattice-core"` then.
 
 !!! note "evalr comes from lattice too"
 
-    The `evals` and `langfuse` extras depend on [evalr](../evalr/index.md), which is not on PyPI yet either. uv installs it from the same commit of lattice as artifactr. pip reads only the version ranges, so with pip, install evalr from lattice as well: `pip install "lattice-core-ai @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/lattice-core" "evalr @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/evalr" "artifactr-ai[langfuse] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/artifactr"`.
+    The `evals` and `langfuse` extras depend on [evalr](../evalr/index.md), which is not on PyPI yet either. uv installs it from the same commit of lattice as artifactr. pip reads only the version ranges, so with pip, install evalr from lattice as well: `pip install "evalr @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/evalr" "artifactr-ai[langfuse] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/artifactr"`.
 
 ## 1. Define an artifact type
 

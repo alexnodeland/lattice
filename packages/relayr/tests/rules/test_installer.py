@@ -27,7 +27,7 @@ from relayr.rules import (
 )
 from tests.app_types import Deployed, Note
 from tests.rules.drafts import STORED, NotifyParams, draft
-from tests.stack import ALICE, KEY, Actions, Process, Stack, notices, until
+from tests.stack import ALICE, KEY, Actions, Process, Stack, notices
 
 DRAFTER = a.ExternalAgentActor(client_id="drafter")
 BOB = a.UserActor(id="bob")
@@ -63,11 +63,7 @@ class Chat:
 
     async def bridged(self, found: Callable[[reflexr.Event], bool]) -> None:
         """Wait for a bridged event, then for the reactor to act on it."""
-
-        async def done() -> bool:
-            return any(found(e.event) for e in await self.stack.bridged())
-
-        await until(done)
+        await self.stack.until_bridged(lambda so_far: found(so_far[-1].event))
         await self.app.reactor.settle()
 
     async def drafted(self, rule: RuleDraft | None = None) -> tuple[a.ArtifactId, str]:
@@ -546,12 +542,18 @@ async def test_an_install_however_far_back_is_still_relayrs(ledger: Ledger, stac
     artifact_id, proposal_id = await chat_.drafted()
     await chat_.resolve(proposal_id)
     operator = await chat_.automation()
-    other = draft("chat:other").rule
-    await operator.install_rule(other)
-    for version in range(2, 1_003):  # more installs since than any window of the log's tail
-        await operator.update_rule(other, expected_version=version - 1, provenance={"n": version})
-    # The drift rule passes over each, in order: one run a round, since they share a scope.
-    await chat_.app.reactor.settle(max_rounds=2_000)
+    # 1,040 installs since: more than any window of the log's tail, as relayr once read the
+    # latest 1,000. They are spread over 40 rules, since the drift rule runs one at a time for
+    # each rule but side by side for different ones: 26 rounds of 40 runs, not 1,040 of one.
+    others = [draft(f"chat:other-{n}").rule for n in range(40)]
+    for other in others:
+        await operator.install_rule(other)
+    for version in range(2, 27):
+        for other in others:
+            await operator.update_rule(
+                other, expected_version=version - 1, provenance={"n": version}
+            )
+    await chat_.app.reactor.settle()
 
     await operator.replay_rule(RULES_FROM_CHAT.name, mode="refire")
     await settled(chat_)

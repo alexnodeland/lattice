@@ -1,7 +1,7 @@
 Feature: The portal of a generated application
   A person signs in to an application the template generated, with Supabase Auth, and works in
   it: the agent answers through the gateway. stackr's smoke test runs these against the
-  application it starts, with alice the owner of acme and a thread already in its workspace
+  application it starts, with alice the owner of acme and bob an editor of its workspace
   "notes" (portalr ADR-0040).
 
   Scenario: Signing in, a thread, and the agent's answer

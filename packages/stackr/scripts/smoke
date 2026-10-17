@@ -841,13 +841,14 @@ smoke_scenarios() {
     return 1
   fi
   portal_people=("$alice" "$bob")
-  # alice owns acme, bob is a member, and acme's workspace notes has a thread.
+  # alice owns acme, bob is a member, and bob edits its workspace notes, which makes it a
+  # resource of grantr's, so that the owner is offered it.
   if ! app_admin tenant acme "$alice" ||
     ! token=$(auth_sign_in '{"email": "alice@portalr.test", "password": "alice-password"') ||
     ! APP_TENANT=acme app_token=$token app_json "/grantr/v1/tenants/acme/members" \
       "{\"member\": {\"kind\": \"user\", \"id\": \"$bob\"}}" ||
-    ! APP_TENANT=acme app_token=$token app_json "/artifactr/v1/workspaces/notes/commands" \
-      '{"type": "command", "command_id": "s1", "command": {"type": "create_thread", "thread_id": "seed"}}'; then
+    ! APP_TENANT=acme app_token=$token app_json "/grantr/v1/tenants/acme/grants" \
+      "{\"role\": \"editor\", \"on\": {\"kind\": \"workspace\", \"workspace\": \"notes\"}, \"to\": {\"kind\": \"user\", \"id\": \"$bob\"}}"; then
     log "FAIL: app: making acme, for the scenarios"
     return 1
   fi

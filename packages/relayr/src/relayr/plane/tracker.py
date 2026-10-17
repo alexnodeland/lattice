@@ -28,6 +28,7 @@ from relayr.trackers import (
     ItemFields,
     ItemKey,
     ItemRef,
+    NotFound,
     Nudge,
     Page,
     Priority,
@@ -180,14 +181,7 @@ class PlaneTracker:
         An item lattice filed is read by its external ids, which find it archived too; any other
         by its id, which doesn't.
         """
-        if ref.key is not None:
-            issue = await self._external(ref.project, ref.key)
-        else:
-            response = await self._api.request(
-                "GET", f"/projects/{ref.project}/work-items/{ref.id}/", answered=(404,)
-            )
-            found = response.status_code != 404
-            issue = _Issue.model_validate_json(response.content) if found else None
+        issue = await self._issue(ref)
         return None if issue is None else await self._item(issue)
 
     async def update(self, ref: ItemRef, fields: ItemFields) -> None:
@@ -213,7 +207,13 @@ class PlaneTracker:
             raise
 
     async def comment(self, ref: ItemRef, key: CommentKey, body: str) -> CommentRef:
-        """Post a comment with the key as its external id; a used key returns its comment."""
+        """Post a comment with the key as its external id; a used key returns its comment.
+
+        The item is read first: Plane deletes a work item softly, and posts a comment on a
+        deleted one with a 201, unseen.
+        """
+        if await self._issue(ref) is None:
+            raise NotFound(f"work item {ref.name} was deleted")
         sent = {"comment_html": body, **self._pair(key)}
         response = await self._api.request(
             "POST",
@@ -296,6 +296,16 @@ class PlaneTracker:
     def _pair(self, key: str) -> dict[str, str]:
         """Plane's external ids for a key."""
         return {"external_id": key, "external_source": self._source}
+
+    async def _issue(self, ref: ItemRef) -> _Issue | None:
+        """A work item by its external ids if lattice filed it, archived or not; else by its id."""
+        if ref.key is not None:
+            return await self._external(ref.project, ref.key)
+        response = await self._api.request(
+            "GET", f"/projects/{ref.project}/work-items/{ref.id}/", answered=(404,)
+        )
+        found = response.status_code != 404
+        return _Issue.model_validate_json(response.content) if found else None
 
     async def _external(self, project: ProjectId, key: ItemKey) -> _Issue | None:
         response = await self._api.request(

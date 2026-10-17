@@ -1,8 +1,9 @@
-"""Plane Community edition's public API, as its v1.4.2 source reads, for the contract test.
+"""Plane Community edition's public API, as its v1.4.2 source reads and a live v1.4.2 answered.
 
-No Plane runs on a pull request (it is 13 services and 4 to 8 GB), and none was run to record
-one, so this answers as `apps/api/plane/` at v1.4.2 does, path by path; the responses carry the
-serializers' fields. What it follows, and where:
+The contract test replays a live Plane's recorded exchanges (`tests/trackers/fixtures/plane/`);
+this stand-in serves the adapter's own tests, which need answers no recording has, such as many
+pages or a state made since it looked. It answers as `apps/api/plane/` at v1.4.2 does, path by
+path; the responses carry the serializers' fields. What it follows, and where:
 
 - Routes under `api/v1/workspaces/<slug>/`, `work-items` and their trailing slashes
   (`api/urls/work_item.py`, `label.py`, `state.py`, `project.py`); `X-Api-Key`, a missing one 401
@@ -192,8 +193,8 @@ class PlaneApi:
                 return self._patch(self.issues[issue_id], body)
             case "GET", ["work-items", issue_id, "comments"] if issue_id in self.issues:
                 return self._list(self.comments[issue_id][::-1], params)
-            case "POST", ["work-items", issue_id, "comments"] if issue_id in self.issues:
-                # A comment on a deleted item is a 404 here; what Plane answers is unverified.
+            case "POST", ["work-items", issue_id, "comments"] if issue_id in self.comments:
+                # Plane deletes softly, and posts a comment on a deleted item with a 201.
                 return self._comment(issue_id, body)
             case _:
                 return httpx.Response(404, json=NOT_FOUND)
@@ -306,7 +307,9 @@ class PlaneApi:
             body.get("external_id"),
             body.get("external_source"),
         )
-        # Whether a comment moves its work item's `updated_at` is unverified, so it doesn't here.
+        # Plane's worker moves the item's `updated_at`, not its `updated_by`, after a comment.
+        if issue_id in self.issues:
+            self.issues[issue_id]["updated_at"] = self._tick()
         self.comments[issue_id].append(comment)
         return httpx.Response(201, json=comment)
 

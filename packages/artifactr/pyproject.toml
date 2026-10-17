@@ -24,6 +24,8 @@ classifiers = [
 dependencies = [
     "lattice-core-ai>=0.1.0",
     "pydantic>=2.13",
+    # Pydantic's own core, which pydantic requires: artifactr.ui raises its custom errors.
+    "pydantic-core>=2.46.0",
     "jsonpatch>=1.33",
     "jsonpointer>=1.9",
     "pydantic-ai-slim>=2.51",
@@ -47,6 +49,9 @@ langfuse = [
 ]
 litellm = ["lattice-core-ai[litellm]>=0.1.0"]
 evals = ["evalr>=0.1.0"]
+# Forms and dashboards in the chat, artifactr.ui (ADR-0074): Pydantic alone, so nothing yet, but
+# the name an application installs it by, which a dependency it ever needs joins.
+forms = []
 
 [project.urls]
 Homepage = "https://lattice.alexnodeland.com/artifactr/"

@@ -1,0 +1,1363 @@
+{
+  "$defs": {
+    "App": {
+      "additionalProperties": false,
+      "description": "A mini app: one HTML file an agent wrote, its text fallback, and its state.\n\nDefined in phase 1 and offered to no agent: portalr shows its title and summary, and runs\nnothing. A person changes only its ``state``.",
+      "properties": {
+        "html": {
+          "title": "Html",
+          "type": "string"
+        },
+        "state": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "State",
+          "type": "object"
+        },
+        "summary": {
+          "maxLength": 2000,
+          "title": "Summary",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "summary",
+        "html"
+      ],
+      "title": "App",
+      "type": "object"
+    },
+    "ArrayProperty": {
+      "additionalProperties": false,
+      "description": "Some of its items' choices, as checkboxes.",
+      "properties": {
+        "default": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Default"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "items": {
+          "$ref": "#/$defs/Choices"
+        },
+        "maxItems": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Maxitems"
+        },
+        "minItems": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Minitems"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        },
+        "type": {
+          "const": "array",
+          "title": "Type",
+          "type": "string"
+        },
+        "uniqueItems": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Uniqueitems"
+        }
+      },
+      "required": [
+        "type",
+        "items"
+      ],
+      "title": "ArrayProperty",
+      "type": "object"
+    },
+    "ArtifactId": {
+      "type": "string"
+    },
+    "BooleanProperty": {
+      "additionalProperties": false,
+      "description": "A yes or no, as a switch unless its hint asks for a checkbox.",
+      "properties": {
+        "default": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Default"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        },
+        "type": {
+          "const": "boolean",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "BooleanProperty",
+      "type": "object"
+    },
+    "ChartPanel": {
+      "additionalProperties": false,
+      "description": "A bar or line chart: rows indexed by ``index``, and up to :data:`MAX_SERIES` series.",
+      "properties": {
+        "index": {
+          "$ref": "#/$defs/Key"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "rows": {
+          "items": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object"
+          },
+          "title": "Rows",
+          "type": "array"
+        },
+        "series": {
+          "items": {
+            "$ref": "#/$defs/Key"
+          },
+          "maxItems": 3,
+          "minItems": 1,
+          "title": "Series",
+          "type": "array"
+        },
+        "type": {
+          "enum": [
+            "bar",
+            "line"
+          ],
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "label",
+        "index",
+        "series",
+        "rows"
+      ],
+      "title": "ChartPanel",
+      "type": "object"
+    },
+    "Choice": {
+      "additionalProperties": false,
+      "description": "A labelled choice: the value it submits, and the words shown for it.",
+      "properties": {
+        "const": {
+          "title": "Const",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "const",
+        "title"
+      ],
+      "title": "Choice",
+      "type": "object"
+    },
+    "ChoiceProperty": {
+      "additionalProperties": false,
+      "description": "A property that takes one of its choices: segments up to five, else a select.",
+      "properties": {
+        "default": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Default"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "enum": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 64,
+              "minItems": 1,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Enum"
+        },
+        "oneOf": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/Choice"
+              },
+              "maxItems": 64,
+              "minItems": 1,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Oneof"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        },
+        "type": {
+          "const": "string",
+          "default": "string",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "ChoiceProperty",
+      "type": "object"
+    },
+    "Choices": {
+      "additionalProperties": false,
+      "description": "A choice among strings: an ``enum``, or ``oneOf`` labelled choices; ``type`` is implied.",
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "enum": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 64,
+              "minItems": 1,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Enum"
+        },
+        "oneOf": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/Choice"
+              },
+              "maxItems": 64,
+              "minItems": 1,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Oneof"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        },
+        "type": {
+          "const": "string",
+          "default": "string",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "Choices",
+      "type": "object"
+    },
+    "Dashboard": {
+      "additionalProperties": false,
+      "description": "A snapshot of figures in panels, which the agent writes, true ``as_of`` a moment.\n\nEach update is a new version; a dashboard is at most :data:`MAX_DASHBOARD_BYTES`.",
+      "properties": {
+        "as_of": {
+          "format": "date-time",
+          "title": "As Of",
+          "type": "string"
+        },
+        "panels": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "bar": "#/$defs/ChartPanel",
+                "donut": "#/$defs/DonutPanel",
+                "form": "#/$defs/FormPanel",
+                "line": "#/$defs/ChartPanel",
+                "stat": "#/$defs/StatPanel",
+                "table": "#/$defs/TablePanel",
+                "text": "#/$defs/TextPanel"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/StatPanel"
+              },
+              {
+                "$ref": "#/$defs/ChartPanel"
+              },
+              {
+                "$ref": "#/$defs/DonutPanel"
+              },
+              {
+                "$ref": "#/$defs/TablePanel"
+              },
+              {
+                "$ref": "#/$defs/TextPanel"
+              },
+              {
+                "$ref": "#/$defs/FormPanel"
+              }
+            ]
+          },
+          "title": "Panels",
+          "type": "array"
+        },
+        "title": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "as_of"
+      ],
+      "title": "Dashboard",
+      "type": "object"
+    },
+    "DonutPanel": {
+      "additionalProperties": false,
+      "description": "A whole in parts: the largest three in the chart's inks, the rest folded into \"Other\".",
+      "properties": {
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "parts": {
+          "items": {
+            "$ref": "#/$defs/Part"
+          },
+          "minItems": 1,
+          "title": "Parts",
+          "type": "array"
+        },
+        "type": {
+          "const": "donut",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "label",
+        "parts"
+      ],
+      "title": "DonutPanel",
+      "type": "object"
+    },
+    "FieldHints": {
+      "additionalProperties": false,
+      "description": "How one property is shown: its widget, a placeholder and help, all plain text.",
+      "properties": {
+        "help": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Help"
+        },
+        "placeholder": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Placeholder"
+        },
+        "widget": {
+          "anyOf": [
+            {
+              "enum": [
+                "textarea",
+                "select",
+                "checkbox"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Widget"
+        }
+      },
+      "required": [],
+      "title": "FieldHints",
+      "type": "object"
+    },
+    "Form": {
+      "additionalProperties": false,
+      "description": "A form that takes submissions without a run waiting.\n\nIt is for a poll, a sign-up, or a form that outlives its run. A submission names the version\nit was made against; an edit of the form makes a new one, so a submission made against an\nearlier one is refused as changed. Only its author, or whom the application's ``is_admin``\nallows, changes its ``schema`` or ``closed``.",
+      "properties": {
+        "closed": {
+          "default": false,
+          "title": "Closed",
+          "type": "boolean"
+        },
+        "schema": {
+          "$ref": "#/$defs/FormSchema"
+        },
+        "submissions": {
+          "default": "once",
+          "enum": [
+            "once",
+            "per_person",
+            "many"
+          ],
+          "title": "Submissions",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "ui": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UiHints"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "title",
+        "schema"
+      ],
+      "title": "Form",
+      "type": "object"
+    },
+    "FormPanel": {
+      "additionalProperties": false,
+      "description": "A form artifact, by its id, shown to submit in place: a form with no fields is a button.",
+      "properties": {
+        "form_id": {
+          "$ref": "#/$defs/ArtifactId"
+        },
+        "type": {
+          "const": "form",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "form_id"
+      ],
+      "title": "FormPanel",
+      "type": "object"
+    },
+    "FormRequest": {
+      "additionalProperties": false,
+      "description": "What ``ask_form`` asks: the arguments its paused request carries, as portalr reads them.\n\nThe request's ``args`` hold these as the model called the tool; the tool checked them before\nthe run paused, and the answer is checked against ``schema``.",
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/FormSchema"
+        },
+        "title": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "ui": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UiHints"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "title",
+        "schema"
+      ],
+      "title": "FormRequest",
+      "type": "object"
+    },
+    "FormSchema": {
+      "additionalProperties": false,
+      "description": "A form: a JSON Schema 2020-12 object in the subset, compiled once to check values.\n\nValidating one refuses, by name, every keyword outside the subset, a property the subset\ndoesn't hold, more than :data:`MAX_PROPERTIES` properties, a name outside the pattern, a\n``required`` name that isn't a property, a ``default`` its property doesn't take, and bounds\nno value meets. ``additionalProperties`` is false, written or not. A form with no\nproperties is a button. Its size counts towards its form's, :data:`MAX_SCHEMA_BYTES`.",
+      "properties": {
+        "additionalProperties": {
+          "const": false,
+          "default": false,
+          "title": "Additionalproperties",
+          "type": "boolean"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "properties": {
+          "additionalProperties": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/StringProperty"
+              },
+              {
+                "$ref": "#/$defs/ChoiceProperty"
+              },
+              {
+                "$ref": "#/$defs/NumberProperty"
+              },
+              {
+                "$ref": "#/$defs/BooleanProperty"
+              },
+              {
+                "$ref": "#/$defs/ArrayProperty"
+              }
+            ]
+          },
+          "default": {},
+          "maxProperties": 50,
+          "title": "Properties",
+          "type": "object"
+        },
+        "required": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Required",
+          "type": "array"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        },
+        "type": {
+          "const": "object",
+          "default": "object",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "additionalProperties"
+      ],
+      "title": "FormSchema",
+      "type": "object"
+    },
+    "JsonValue": {},
+    "Key": {
+      "additionalProperties": false,
+      "description": "A key in a chart's rows or a table's, and the name it is shown by.",
+      "properties": {
+        "key": {
+          "minLength": 1,
+          "title": "Key",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "name"
+      ],
+      "title": "Key",
+      "type": "object"
+    },
+    "NumberProperty": {
+      "additionalProperties": false,
+      "description": "A number, or with ``type: \"integer\"`` a whole one.",
+      "properties": {
+        "default": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Default"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "exclusiveMaximum": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Exclusivemaximum"
+        },
+        "exclusiveMinimum": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Exclusiveminimum"
+        },
+        "maximum": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Maximum"
+        },
+        "minimum": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Minimum"
+        },
+        "multipleOf": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Multipleof"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        },
+        "type": {
+          "enum": [
+            "number",
+            "integer"
+          ],
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "NumberProperty",
+      "type": "object"
+    },
+    "Part": {
+      "additionalProperties": false,
+      "description": "One part of a whole, in a donut.",
+      "properties": {
+        "key": {
+          "minLength": 1,
+          "title": "Key",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Value"
+        }
+      },
+      "required": [
+        "key",
+        "name",
+        "value"
+      ],
+      "title": "Part",
+      "type": "object"
+    },
+    "Section": {
+      "additionalProperties": false,
+      "description": "A titled group of properties, by name.",
+      "properties": {
+        "properties": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Properties",
+          "type": "array"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "properties"
+      ],
+      "title": "Section",
+      "type": "object"
+    },
+    "StatPanel": {
+      "additionalProperties": false,
+      "description": "One figure: its label, its value, its unit, and how much it changed.",
+      "properties": {
+        "change": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Change"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "type": {
+          "const": "stat",
+          "title": "Type",
+          "type": "string"
+        },
+        "unit": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Unit"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Value"
+        }
+      },
+      "required": [
+        "type",
+        "label",
+        "value"
+      ],
+      "title": "StatPanel",
+      "type": "object"
+    },
+    "StringProperty": {
+      "additionalProperties": false,
+      "description": "A string, on one line unless its hint asks for a text area.",
+      "properties": {
+        "default": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Default"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "format": {
+          "anyOf": [
+            {
+              "enum": [
+                "date",
+                "date-time",
+                "email",
+                "uri"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Format"
+        },
+        "maxLength": {
+          "anyOf": [
+            {
+              "maximum": 10000,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Maxlength"
+        },
+        "minLength": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Minlength"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        },
+        "type": {
+          "const": "string",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "StringProperty",
+      "type": "object"
+    },
+    "Submission": {
+      "additionalProperties": false,
+      "description": "The values a person sent to a form, or to an app, against the version they saw.\n\nIt answers one of the two, ``form_id`` or ``app_id``. A ``many`` form's and an app's carry\nthe ``nonce`` their id is derived from. People never edit one.",
+      "properties": {
+        "app_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ArtifactId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "form_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ArtifactId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "nonce": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Nonce"
+        },
+        "values": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Values",
+          "type": "object"
+        },
+        "version": {
+          "minimum": 1,
+          "title": "Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "version",
+        "values"
+      ],
+      "title": "Submission",
+      "type": "object"
+    },
+    "TablePanel": {
+      "additionalProperties": false,
+      "description": "A table: its columns, and up to :data:`MAX_TABLE_ROWS` rows keyed by them.",
+      "properties": {
+        "columns": {
+          "items": {
+            "$ref": "#/$defs/Key"
+          },
+          "minItems": 1,
+          "title": "Columns",
+          "type": "array"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "rows": {
+          "items": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object"
+          },
+          "maxItems": 500,
+          "title": "Rows",
+          "type": "array"
+        },
+        "type": {
+          "const": "table",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "label",
+        "columns",
+        "rows"
+      ],
+      "title": "TablePanel",
+      "type": "object"
+    },
+    "TextPanel": {
+      "additionalProperties": false,
+      "description": "Markdown, which portalr renders without raw HTML.",
+      "properties": {
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "type": {
+          "const": "text",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "text"
+      ],
+      "title": "TextPanel",
+      "type": "object"
+    },
+    "UiHints": {
+      "additionalProperties": false,
+      "description": "How a form is shown, and nothing else.\n\nA hint names a component of the kit, or carries plain text: none carries a colour, a\nclass, HTML or a URL. ``fields`` hints each property by name, ``order`` and ``sections``\narrange them, and ``submit_label`` names the form's button.",
+      "properties": {
+        "fields": {
+          "additionalProperties": {
+            "$ref": "#/$defs/FieldHints"
+          },
+          "default": {},
+          "title": "Fields",
+          "type": "object"
+        },
+        "order": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Order"
+        },
+        "sections": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/Section"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sections"
+        },
+        "submit_label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Submit Label"
+        }
+      },
+      "required": [],
+      "title": "UiHints",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The data of artifactr.ui's artifact kinds, by kind; `ask_form`: the `args` of a paused request whose `tool_name` is `ask_form`; and `refusal_reason`: the `reason` an `invalid_state` refusal carries; and `integration_key`: the `key` an `off` refusal carries beside it.",
+  "properties": {
+    "app": {
+      "$ref": "#/$defs/App"
+    },
+    "ask_form": {
+      "$ref": "#/$defs/FormRequest"
+    },
+    "dashboard": {
+      "$ref": "#/$defs/Dashboard"
+    },
+    "form": {
+      "$ref": "#/$defs/Form"
+    },
+    "integration_key": {
+      "enum": [
+        "ui:forms",
+        "ui:dashboards",
+        "ui:mini-apps"
+      ],
+      "title": "Integration Key",
+      "type": "string"
+    },
+    "refusal_reason": {
+      "enum": [
+        "changed",
+        "closed",
+        "off"
+      ],
+      "title": "Refusal Reason",
+      "type": "string"
+    },
+    "submission": {
+      "$ref": "#/$defs/Submission"
+    }
+  },
+  "title": "artifactr.ui.v1",
+  "type": "object"
+}

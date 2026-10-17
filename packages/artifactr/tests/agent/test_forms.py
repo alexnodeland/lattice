@@ -19,7 +19,7 @@ def _form_tools() -> FunctionToolset[Session[Gate]]:
 
     @tools.tool_plain
     async def ask_form(title: str, schema: dict[str, Any]) -> str:
-        """Ask the people in this thread to fill in a form, as artifactr-ui's tool does."""
+        """Ask the people in this thread to fill in a form, as artifactr.ui's tool does."""
         raise CallDeferred(metadata={"kind": "question"})
 
     return tools

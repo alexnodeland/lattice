@@ -150,7 +150,7 @@ type _ThreadKey = tuple[TenantId, WorkspaceId, ThreadId]
 
 
 _FORM: Final = "ask_form"
-"""The tool whose requests a message doesn't answer: artifactr-ui's form (lattice RFC-0005).
+"""The tool whose requests a message doesn't answer: artifactr.ui's form (lattice RFC-0005).
 
 A form is answered with its values, which the application's check holds to the form's schema,
 so free text from the chat never answers one: the run waits for the form's own answer.
@@ -482,12 +482,11 @@ class Runner[AppDepsT]:
         refused meanwhile relies on it. Each round starts a turn, finds nothing asked, finds the
         thread busy, or records what it found as taken; one that does none of these, as when a
         paused run waits for a form, ends the claimant unless the cursors moved meanwhile. So it
-        ends. One that is cancelled from
-        its ask on hands the thread over as it propagates, as a run does: storage may have saved
-        the ask of a call cut short. One that fails hands over only once it has read the
-        cursors, with what it read, so a failure that persists never hands over without end. The
-        turn links to ``caller``, or else to where the message or answer it carries out was
-        committed.
+        ends. One that is cancelled from its ask on hands the thread over as it propagates, as a
+        run does: storage may have saved the ask of a call cut short. One that fails hands over
+        only once it has read the cursors, with what it read, so a failure that persists never
+        hands over without end. The turn links to ``caller``, or else to where the message or
+        answer it carries out was committed.
         """
         read: tuple[int, int] | None = None  # the cursors, taken and asked, as it last read them
         try:

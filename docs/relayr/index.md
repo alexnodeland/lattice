@@ -18,7 +18,7 @@ The bridge between artifactr and reflexr: events from chats and artifacts become
 
 !!! note "Built: the v0.1 plan"
 
-    Everything below is built: both adapters, telemetry across the bridge, rules from chat, and evaluation, with stackr's template wiring it all into an application ([v0.1 plan](rfcs/0001-v0.1-implementation-plan.md)). It is distributed as `relayr-ai`, since the name `relayr` on PyPI is an unrelated project, and imported as `relayr`.
+    Everything below is built: both adapters, telemetry across the bridge, rules from chat, and evaluation, with stackr's template wiring it all into an application ([v0.1 plan](rfcs/0001-v0.1-implementation-plan.md)). It is on PyPI as `relayr-ai`, since the name `relayr` on PyPI is an unrelated project, and imported as `relayr`: `uv add relayr-ai`.
 
 ## Why: one bridge, built once
 

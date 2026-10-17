@@ -15,7 +15,7 @@ lattice is one repository: eight packages, two reference implementations, and on
 
 ### Non-goals (for now)
 
-- Publishing to PyPI ([#7](https://github.com/alexnodeland/lattice/issues/7)). Until then, a package installs from its tag, in a subdirectory of lattice ([Releases](#releases)).
+- Publishing to PyPI ([#7](https://github.com/alexnodeland/lattice/issues/7)). *Every library has been on PyPI since 2026-10-17 ([Releases](#releases)).*
 
 ## Layout
 
@@ -109,7 +109,7 @@ The root `pyproject.toml` is a virtual project (`package = false`) whose members
 | | Where it lives |
 |---|---|
 | The lock | One `uv.lock`, one resolution for every package, extra and group. `uv sync --all-packages --all-groups --all-extras` installs them all into one `.venv`, and CI adds `--locked` |
-| A sibling | A range in `[project]`, such as `evalr>=0.1.0.dev0`, and `{ workspace = true }` in `[tool.uv.sources]`, which only development sees. A built wheel carries the range and no path |
+| A sibling | A range in `[project]`, such as `evalr>=0.1.0`, and `{ workspace = true }` in `[tool.uv.sources]`, which only development sees. A built wheel carries the range and no path |
 | ruff | One configuration, at the root; stackr extends it for its scripts |
 | pyright | Per package; the root's covers `scripts/` and `tests/`. It stays until ty can replace it ([ADR-0013](adr/0013-pyright-stays-until-ty-can-replace-it.md)) |
 | pytest and coverage | Per project, since neither tool reads a parent directory's configuration |
@@ -218,7 +218,7 @@ prek runs the hooks in `.pre-commit-config.yaml`, and `make install` installs th
 - **release-please keeps a release pull request open for each package** with unreleased changes ([ADR-0023's amendment](adr/0023-publishing-to-pypi-from-the-release-workflow.md#amendment-2026-10-17-one-release-pull-request-a-package)). Only features, fixes, performance changes, reverts and breaking changes cut a release; a package never released starts at 0.1.0; and a breaking change bumps the minor version before 1.0 ([ADR-0006](adr/0006-release-please-first-versions-pre-1-0-bumps-and-what-releases.md)).
 - **Merging one releases its package:** it tags `<package>-v<version>`, updates the package's version, in its `pyproject.toml` and in `uv.lock`, and its `CHANGELOG.md`, and creates the package's GitHub release. Each changelog keeps what came before lattice under "Before lattice".
 - **`release.yml` then builds each released package that ships a wheel**, alone and as it is published (`uv build --no-sources`), attests its provenance, and attaches the wheel and sdist to its release. stackr is tagged and released, and ships no wheel.
-- **PyPI is by dispatch on each release's tag**, one package a dispatch, with the maintainer's approval ([ADR-0023](adr/0023-publishing-to-pypi-from-the-release-workflow.md)). The first release is staged: `lattice-core-ai` first, then the others, the steps in [its amendment](adr/0023-publishing-to-pypi-from-the-release-workflow.md#the-staged-first-release-step-by-step). Until a package is on PyPI, it installs from its tag, in its subdirectory, such as `git+https://github.com/alexnodeland/lattice@artifactr-v0.1.0#subdirectory=packages/artifactr`. uv takes the package's workspace siblings from the same repository and commit.
+- **PyPI is by dispatch on each release's tag**, one package a dispatch, with the maintainer's approval ([ADR-0023](adr/0023-publishing-to-pypi-from-the-release-workflow.md)). The first release was staged: `lattice-core-ai` first, then the others, the steps in [its amendment](adr/0023-publishing-to-pypi-from-the-release-workflow.md#the-staged-first-release-step-by-step). Every library has been on PyPI since 2026-10-17. A change on `main` before its release installs from lattice, in its package's subdirectory, such as `git+https://github.com/alexnodeland/lattice#subdirectory=packages/artifactr`; uv takes the package's workspace siblings from the same repository and commit. portalr's UIs are built into its wheel, not kept in git, so its wheel is built in a checkout ([portalr's getting started](portalr/getting-started.md#install)).
 - **Copier sees no template release.** The tags are prefixed, and none parses as a version, so `uvx copier copy gh:alexnodeland/lattice` takes `HEAD`. The root `copier.yml` includes stackr's and points `_subdirectory` at its template.
 
 ## The docs site

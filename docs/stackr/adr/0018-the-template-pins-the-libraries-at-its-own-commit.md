@@ -42,4 +42,4 @@ The rendered commit is the one choice in which an application gets exactly what 
 - Easier: there are no pins to move, and an application can't run template code on libraries it wasn't checked with.
 - Harder: a library-only pull request now runs the Template and Smoke jobs, which are the longest.
 - Harder: `make smoke-app` fails locally unless `HEAD` is pushed and the working tree clean: Copier renders uncommitted changes from a commit of its own, which GitHub doesn't have. An application's `_commit` is `git describe --tags` of the nearest package tag, such as `evalr-v0.2.0-1-gf4e1841`, which updates read correctly but people may find confusing.
-- Revisit: published releases of the libraries, which would replace the git sources with version ranges.
+- Revisit: published releases of the libraries, which would replace the git sources with version ranges. *Every library has been on PyPI since 2026-10-17 ([lattice ADR-0023](../../adr/0023-publishing-to-pypi-from-the-release-workflow.md)); the template has not changed yet.*

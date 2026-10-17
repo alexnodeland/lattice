@@ -130,7 +130,7 @@ The file holds the judge's name and version, its types' names, whether it reason
   "reasoning": false,
   "program": {"...": "DSPy's state: instructions, demonstrations, fields"},
   "training": {"optimizer": "gepa", "base_version": "4212cabdd66e", "...": "..."},
-  "dependencies": {"dspy": "3.4.1", "evalr": "0.1.0.dev0"}
+  "dependencies": {"dspy": "3.4.1", "evalr": "0.1.0"}
 }
 ```
 

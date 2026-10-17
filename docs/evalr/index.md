@@ -16,9 +16,9 @@ A Python library for typed evaluation of agent systems: judges that give typed v
 
 </div>
 
-!!! note "Pre-release"
+!!! note "Alpha"
 
-    evalr v0.1 is built, as planned in [RFC-0001](rfcs/0001-v0.1-implementation-plan.md), and not yet released: install it from GitHub. The API may still change before 1.0.
+    evalr v0.1 is built, as planned in [RFC-0001](rfcs/0001-v0.1-implementation-plan.md), and released: 0.1.0 is on PyPI ([Getting started](getting-started.md#install)). The API may still change before 1.0.
 
 ## Why: judges you can check
 

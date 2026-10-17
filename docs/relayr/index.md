@@ -34,6 +34,7 @@ An application can mount [artifactr](../artifactr/index.md) and [reflexr](../ref
 - **Chains and sessions kept apart, and linked (built).** A thread is never a causal chain, and a chain never joins a thread's session or model history; traces are linked, and Langfuse sessions tagged, across the two ([ADR-0003](adr/0003-a-thread-is-never-a-chain.md), [ADR-0004](adr/0004-sessions-linked-not-continued.md)).
 - **Rules from chat (built).** A rule drafted in a thread is a `rule` artifact, reviewed as a proposal, and goes live in reflexr's stored rules only when a person who may install rules accepts it, with provenance recorded both ways. A rule changed in reflexr directly is proposed back to its artifact ([ADR-0005](adr/0005-where-a-rules-source-of-truth-lives.md), [the guide](guides/rules.md)).
 - **Evaluation (built).** Proposal outcomes become feedback on the runs that proposed them, with measures of acceptance, rewrites and rules from chat that stay live ([the guide](guides/evaluation.md)).
+- **Task trackers (phase 1 built).** A rule's run files, comments on and moves items in Plane's Community edition or Vikunja, each once however often the run is retried, by a key the ledger claims before anything is sent ([lattice RFC-0004](../rfcs/0004-relayr-and-task-trackers.md), [the guide](guides/trackers.md)). Changes people make in the tracker come back as events in its phase 2.
 - **A ledger of its own (built)**, in memory or in SQL, behind the `sql`, `sqlite` and `postgres` extras.
 
 [RFC-0001](rfcs/0001-v0.1-implementation-plan.md#phases) built these in phases after the foundation, and records what each waited on in the libraries.
@@ -47,6 +48,7 @@ An application can mount [artifactr](../artifactr/index.md) and [reflexr](../ref
 | Follow a story across the bridge in Tempo and Langfuse | [Tracing across the bridge](guides/telemetry.md) |
 | Turn rules drafted in chat into stored rules | [Rules from chat](guides/rules.md) |
 | Measure how people receive what rules propose | [Evaluating the bridge's rules](guides/evaluation.md) |
+| File work in Plane or Vikunja from rules | [Filing work in a task tracker](guides/trackers.md) |
 | Run all of it in an application | [stackr's template](../stackr/guides/template.md), with its `bridge` question |
 | See how it works | The [architecture](architecture.md), and the [API reference](reference.md) |
 | Understand why each part is the way it is | The [decision records](adr/README.md) |

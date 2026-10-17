@@ -154,3 +154,20 @@
   --chart-marker-corner-3: 0;
   --chart-marker-turn-3: 45deg;
 }
+
+/*
+ * Under forced colours (a high-contrast mode), a hue is not the page's to give: the system's
+ * colours replace it. So every pattern, dash and marker shape is on as in colour-blind mode, whether
+ * or not it was chosen; the inks themselves are the system's.
+ */
+@media (forced-colors: active) {
+  :root {
+    --chart-hatch: var(--chart-hatched);
+    --chart-dash-2: 6 4;
+    --chart-dash-3: 2 3;
+    --chart-marker-size: 8px;
+    --chart-marker-corner-2: 0;
+    --chart-marker-corner-3: 0;
+    --chart-marker-turn-3: 45deg;
+  }
+}

@@ -55,7 +55,10 @@ Where grantr allows, a **stored rule** can be installed from reflexr's JSON, edi
 
     A person can ask the agent for a rule in a thread; it arrives as a proposal like any other change ([stackr's template](../../stackr/guides/template.md) enables it). The Rules area is where it is then read and managed.
 
+## Colour-blind mode
+
+**Colour-blind mode** is a switch in the account menu, under **Colour**, in this UI and in admin. It is a setting of this browser: it is kept in the browser's local storage as the scheme is, so it is not shared with the person's other browsers or devices, and it is applied before the page first paints, so it never flashes on after the page. With it on, the charts' series take a blue, an orange or yellow and a purple that stay apart to people who see no red, no green or no blue, and every series past the first is hatched, dashed in a line and marked with a shape of its own, so no series relies on its hue ([ADR-0036](../adr/0036-the-chart-theme-and-colour-blind-mode.md)). The status colours are the same in both modes: they hold their contrast to every reader, and each status is a word and a shape too. In a high-contrast mode (forced colours) the patterns are on whatever was chosen.
+
 ## What is not here
 
 - **No other sign-in than a password** yet: magic links and your own providers are planned for phase 7 ([ADR-0014](../adr/0014-the-apps-shell.md)), and the template's portal, the first part of it, doesn't bring them.
-- **A control for colour-blind mode.** Status is a word and a shape as well as a colour, so colour is never the only cue, and the charts' colour-blind mode is built as a hook (`data-cvd`, [ADR-0036](../adr/0036-the-chart-theme-and-colour-blind-mode.md)), but nothing in the UI sets it yet.

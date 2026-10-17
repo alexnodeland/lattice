@@ -210,19 +210,25 @@ def test_the_look_the_guides_describe_is_the_kits() -> None:
     assert "**Show the figures**" in admin
 
 
-def test_colour_blind_mode_is_a_hook_that_nothing_sets_yet() -> None:
-    """When a control sets ``data-cvd``, this fails: say so in the guides, and drop their TODO."""
-    assert "[data-cvd] {" in (WEB / "ui" / "src" / "tokens.css").read_text()
-    setters = [
-        str(path.relative_to(WEB))
-        for path in [*WEB.glob("*/src/**/*.ts"), *WEB.glob("*/src/**/*.tsx")]
-        if ".test." not in path.name
-        and re.search(r"data-cvd=|dataset\.cvd|setAttribute\(\"data-cvd\"", path.read_text())
-    ]
-    assert setters == [], "a control sets colour-blind mode: update the guides"
+def test_colour_blind_mode_is_a_setting_of_the_browser_in_the_account_menu() -> None:
+    """The guides say where the setting lives, and the code is where they say."""
+    ui = WEB / "ui"
+    assert "[data-cvd] {" in (ui / "src" / "tokens.css").read_text()
+    hook = (ui / "src" / "colour-blind.ts").read_text()
+    assert 'const KEY = "portalr-colour-blind"' in hook
+    assert "dataset.cvd" in hook
+    assert "localStorage" in hook
+    assert "portalr-colour-blind" in (ui / "public" / "scheme.js").read_text()
+    menu = (ui / "src" / "account-menu.tsx").read_text()
+    assert "Colour-blind mode" in menu
+    assert "Menu.CheckboxItem" in menu
     for guide in ("guides/admin.md", "guides/app.md"):
-        assert "control for colour-blind mode" in text(guide), guide
-        assert "nothing in the ui sets it yet" in text(guide).lower(), guide
+        assert "**Colour-blind mode** is a switch in the account menu" in text(guide), guide
+        assert "setting of this browser" in text(guide), guide
+        assert "local storage" in text(guide), guide
+        assert "control for colour-blind mode" not in text(guide), guide
+        assert "nothing in the ui sets it" not in text(guide).lower(), guide
+    assert "colour-blind mode" not in text("index.md").lower().split("not built yet")[-1]
 
 
 def test_the_stacks_spend_key_and_sign_in_are_what_the_runbook_says() -> None:

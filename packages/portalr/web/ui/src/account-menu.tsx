@@ -18,18 +18,23 @@ function initials(name: string): string {
   return `${words[0]?.[0] ?? ""}${words.length > 1 ? (words.at(-1)?.[0] ?? "") : ""}`.toUpperCase();
 }
 
-/** Who is signed in, signing out, and their scheme. */
+/** Who is signed in, signing out, their scheme, and colour-blind mode. */
 export function AccountMenu({
   name,
   email,
   appearance,
   onAppearance,
+  colourBlind,
+  onColourBlind,
   onSignOut,
 }: {
   name: string;
   email?: string;
   appearance: Appearance;
   onAppearance: (appearance: Appearance) => void;
+  /** Whether colour-blind mode is on: the charts' palette and patterns that hold for every reader. */
+  colourBlind: boolean;
+  onColourBlind: (on: boolean) => void;
   onSignOut: () => void;
 }) {
   return (
@@ -77,6 +82,20 @@ export function AccountMenu({
                   </Menu.RadioItem>
                 ))}
               </Menu.RadioGroup>
+            </Menu.Group>
+            <Menu.Separator className={separator} />
+            <Menu.Group>
+              <Menu.GroupLabel className={groupLabel}>Colour</Menu.GroupLabel>
+              <Menu.CheckboxItem
+                checked={colourBlind}
+                onCheckedChange={(on) => onColourBlind(on)}
+                className={item}
+              >
+                Colour-blind mode
+                <Menu.CheckboxItemIndicator className="text-accent">
+                  <Icon icon={Check} />
+                </Menu.CheckboxItemIndicator>
+              </Menu.CheckboxItem>
             </Menu.Group>
           </Menu.Popup>
         </Menu.Positioner>

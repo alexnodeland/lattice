@@ -48,7 +48,7 @@ The "$60 . 40" is not a monospace decimal point, as the audit took it to be. It 
 | `--chart-dash-1` to `--chart-dash-3` | none | none, `6 4`, then `2 3` |
 | `--chart-marker-*` | A circle of 5px | 8px: a circle, a square, then a diamond |
 
-A mark that touches another sets `--chart-hatch: var(--chart-hatched)` of its own, which agrees with the mode's, so no chart knows which mode it is drawn in. The colour-blind palette is held by the same tests, in the same bounds, so its claim is simulated rather than asserted; it rests on hue surviving and on the patterns being always on, not on hue alone. A control for the mode, and its place in the account menu, come later.
+A mark that touches another sets `--chart-hatch: var(--chart-hatched)` of its own, which agrees with the mode's, so no chart knows which mode it is drawn in. The colour-blind palette is held by the same tests, in the same bounds, so its claim is simulated rather than asserted; it rests on hue surviving and on the patterns being always on, not on hue alone. A control for the mode, and its place in the account menu, came later (see the amendment below).
 
 ## Options considered
 
@@ -73,3 +73,14 @@ A mark that touches another sets `--chart-hatch: var(--chart-hatched)` of its ow
 - Easier: a series' contrast and separation fail a test in the scheme and the mode that break them.
 - Harder: a chart that wants its own mark must add it to the theme, not to itself.
 - To revisit: the control for `data-cvd`, and the status colours' tokens, in their own changes; `StatCard`, `TraceView` and `RunList`'s figures, with `Num`.
+
+## Amendment, 2026-10-16: the control
+
+The control this record deferred is built.
+
+- **A switch in the account menu,** under **Colour**, which both UIs share (`Account`): a checkbox menu item, so its role is `menuitemcheckbox` and its state is announced as checked or not, and it is reached and toggled by the keyboard as the menu's other items are.
+- **A setting of the browser,** kept as the scheme is: `portalr-colour-blind` in `localStorage`, `"on"` or absent, read and written inside `try`, so without storage the choice lasts as long as the page. It is not kept on the server, so it is not shared between a person's browsers.
+- **Applied before the first paint.** `scheme.js`, the script the UIs already load for the scheme, also sets `data-cvd` on the root, so the mode never flashes on after the page. The hook is unchanged: `data-cvd`, with any value, on the root.
+- **Forced colours.** Under `forced-colors: active` every pattern, dash and marker shape is on as in the mode, whether it was chosen or not, since the system's colours replace the author's hues; the palette is then the system's.
+- **Status colours** stay identical in the mode, as decided in ADR-0039: they hold their floors to every reader on their own, and each is a shape and a word.
+- The tests hold the palette, wired to `[data-cvd]`, to 3:1 on the paper and the surface and 20 or more apart under each simulated deficiency (existing), the storage and the pre-paint script (new), the menu item's role, state and key (new), forced colours (new), and the screenshots of charts and statuses with the mode on and off.

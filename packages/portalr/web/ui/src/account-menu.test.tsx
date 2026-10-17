@@ -1,4 +1,5 @@
 import { expect, test, vi } from "vitest";
+import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { AccountMenu } from "./account-menu";
 import { viewport } from "./test/viewport";
@@ -8,6 +9,8 @@ test("the account menu is named for who is signed in", async () => {
     <AccountMenu
       name="Alex Nodeland"
       appearance="system"
+      colourBlind={false}
+      onColourBlind={vi.fn()}
       onAppearance={vi.fn()}
       onSignOut={vi.fn()}
     />,
@@ -25,6 +28,8 @@ test("it holds the scheme, chosen among three, and signing out", async () => {
       name="Alex Nodeland"
       email="alex@acme.test"
       appearance="system"
+      colourBlind={false}
+      onColourBlind={vi.fn()}
       onAppearance={onAppearance}
       onSignOut={onSignOut}
     />,
@@ -44,7 +49,12 @@ test("it holds the scheme, chosen among three, and signing out", async () => {
 
 test("below the rail's width the name is hidden, but not in the drawer", async () => {
   await viewport(390);
-  const props = { name: "alice@portalr.test", appearance: "system" as const };
+  const props = {
+    name: "alice@portalr.test",
+    appearance: "system" as const,
+    colourBlind: false,
+    onColourBlind: vi.fn(),
+  };
   const screen = await render(
     <>
       <div id="bar">
@@ -59,4 +69,62 @@ test("below the rail's width the name is hidden, but not in the drawer", async (
   // What a button shows, as a person reads it: a hidden name isn't in it.
   expect((bar as HTMLElement).innerText).not.toContain("alice@portalr.test");
   expect((drawer as HTMLElement).innerText).toContain("alice@portalr.test");
+});
+
+test("colour-blind mode is a switch in the menu: a checkbox item that says whether it is on", async () => {
+  const onColourBlind = vi.fn();
+  const screen = await render(
+    <AccountMenu
+      name="Alex Nodeland"
+      appearance="system"
+      onAppearance={vi.fn()}
+      colourBlind={false}
+      onColourBlind={onColourBlind}
+      onSignOut={vi.fn()}
+    />,
+  );
+  await screen.getByRole("button", { name: "Account: Alex Nodeland" }).click();
+  const item = screen.getByRole("menuitemcheckbox", { name: "Colour-blind mode" });
+  await expect.element(item).toHaveAttribute("aria-checked", "false");
+  await item.click();
+  expect(onColourBlind).toHaveBeenCalledExactlyOnceWith(true);
+});
+
+test("when it is on, the item says so, and a click turns it off", async () => {
+  const onColourBlind = vi.fn();
+  const screen = await render(
+    <AccountMenu
+      name="Alex Nodeland"
+      appearance="dark"
+      onAppearance={vi.fn()}
+      colourBlind
+      onColourBlind={onColourBlind}
+      onSignOut={vi.fn()}
+    />,
+  );
+  await screen.getByRole("button", { name: "Account: Alex Nodeland" }).click();
+  const item = screen.getByRole("menuitemcheckbox", { name: "Colour-blind mode" });
+  await expect.element(item).toHaveAttribute("aria-checked", "true");
+  await item.click();
+  expect(onColourBlind).toHaveBeenCalledExactlyOnceWith(false);
+});
+
+test("the keyboard reaches it and a key toggles it", async () => {
+  const onColourBlind = vi.fn();
+  const screen = await render(
+    <AccountMenu
+      name="Alex Nodeland"
+      appearance="system"
+      onAppearance={vi.fn()}
+      colourBlind={false}
+      onColourBlind={onColourBlind}
+      onSignOut={vi.fn()}
+    />,
+  );
+  await screen.getByRole("button", { name: "Account: Alex Nodeland" }).click();
+  const item = screen.getByRole("menuitemcheckbox", { name: "Colour-blind mode" });
+  await item.element().focus();
+  await expect.element(item).toHaveFocus();
+  await userEvent.keyboard(" ");
+  expect(onColourBlind).toHaveBeenCalledExactlyOnceWith(true);
 });

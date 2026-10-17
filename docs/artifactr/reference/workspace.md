@@ -16,6 +16,10 @@ Tenant-scoped handles. See [Workspaces, commits and the log](../guides/workspace
 
 ::: artifactr.workspace.ThreadBusy
 
+::: artifactr.workspace.ArtifactLease
+
+::: artifactr.workspace.ArtifactBusy
+
 ::: artifactr.workspace.Authorize
 
 ::: artifactr.workspace.Access

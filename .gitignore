@@ -27,6 +27,8 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+# A checkout that ignores case (macOS's, by default) would take MANIFEST for a manifest/ package.
+!manifest/
 
 # PyInstaller
 #  Usually these files are written by a python script from a template

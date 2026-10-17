@@ -241,6 +241,14 @@ class Storage(Protocol):
         """Release a lease if ``holder`` has it."""
         ...
 
+    async def lease(self, scope: Scope, key: str) -> tuple[str, datetime] | None:
+        """Return who holds a lease and when it expires, or None if no one holds it now.
+
+        A lease whose expiry has passed, by the storage's clock, is held by no one, as
+        :meth:`acquire_lease` judges it (ADR-0071).
+        """
+        ...
+
     async def cursor(self, scope: Scope, name: str) -> int:
         """Return how far a named consumer of the log has got: the ``seq`` saved, or 0."""
         ...

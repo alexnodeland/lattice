@@ -97,6 +97,7 @@ sequenceDiagram
 | Package | What it is | Status |
 |---|---|---|
 | **[artifactr](packages/artifactr)** | Chat applications where people and agents collaborate through shared, versioned artifacts | ✅ v0.1 · 📦 [PyPI](https://pypi.org/project/artifactr-ai/) |
+| **[artifactr-files](packages/artifactr-files)** | Native files as artifacts: a manifest over a Word document's bytes, edits by the file's own app, and one writer at a time | 🚧 [phase 1 of RFC-0003](docs/rfcs/0003-native-files-as-artifacts.md) · unreleased |
 | **[reflexr](packages/reflexr)** | Rules over event streams that run LLM workflows: pydantic-ai agents, pydantic-graph graphs and functions | ✅ v0.1 · 📦 [PyPI](https://pypi.org/project/reflexr/) |
 | **[evalr](packages/evalr)** | Typed evaluation of agent systems: judges that give typed verdicts, trained on people's feedback and measured against it | ✅ v0.1 · 📦 [PyPI](https://pypi.org/project/evalr/) |
 | **[relayr](packages/relayr)** | The bridge between artifactr and reflexr: chat events become events for rules, and runs act back in the chat. Rules can be drafted in chat. | ✅ v0.1 · 📦 [PyPI](https://pypi.org/project/relayr-ai/) |

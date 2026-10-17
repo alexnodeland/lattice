@@ -149,6 +149,13 @@ AS_MISSING: dict[str, tuple[Call, str, str]] = {
         RESTRICTED,
         "a_none",
     ),
+    "lease_artifact": (
+        lambda ws, a: ws.lease_artifact(a, holder="h", ttl=timedelta(seconds=5)),
+        RESTRICTED,
+        "a_none",
+    ),
+    "artifact_lease": (lambda ws, a: ws.artifact_lease(a), RESTRICTED, "a_none"),
+    "release_artifact": (lambda ws, a: ws.release_artifact(a, holder="h"), RESTRICTED, "a_none"),
 }
 """A read, or a command, of a hidden item, and of one that doesn't exist, with the id each
 names: each answers alike, naming nothing but the id it was given."""

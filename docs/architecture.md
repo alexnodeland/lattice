@@ -71,7 +71,7 @@ moon knows sixteen projects: the fifteen below, and `lattice`, the root, which h
 | artifactr-files | `packages/artifactr-files` | Native files as artifactr artifacts; distributed as `artifactr-files-ai` ([lattice RFC-0003](rfcs/0003-native-files-as-artifacts.md)) | Library | artifactr, lattice-core |
 | reflexr | `packages/reflexr` | Rules over event streams that run LLM workflows | Library | evalr, lattice-core |
 | relayr | `packages/relayr` | The bridge between artifactr and reflexr; distributed as `relayr-ai` | Library | artifactr, reflexr |
-| grantr | `packages/grantr` | Identity and access for artifactr and reflexr, in stackr's template ([its plan](grantr/rfcs/0001-v0.1-implementation-plan.md)) | Library | |
+| grantr | `packages/grantr` | Identity and access for artifactr and reflexr, in stackr's template ([its plan](grantr/rfcs/0001-v0.1-implementation-plan.md)) | Library | lattice-core |
 | stackr | `packages/stackr` | The stack the libraries run on, and the application template | Tool (shell), ships no wheel | artifactr, reflexr, evalr, grantr |
 | portalr | `packages/portalr` | The portal: the router that serves the app and admin UIs, and reads the stack's tools for one tenant ([its architecture](portalr/architecture.md)) | Library | grantr, lattice-core |
 | client | `packages/portalr/web/client` | `@portalr/client`, the only code in the UIs that talks to the server | Library (TypeScript) | |

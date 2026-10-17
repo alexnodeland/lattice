@@ -39,11 +39,11 @@ class AuthSettings:
     """
 
     jwks_url: str | None = None
-    jwt_secret: str | None = None
+    jwt_secret: str | None = field(default=None, repr=False)
     audience: str = "authenticated"
     issuer: str | None = None
 {%- if access == 'grantr' %}
-    service_role_key: str | None = None
+    service_role_key: str | None = field(default=None, repr=False)
     admin_url: str | None = None
 {%- else %}
     tenant_claim: str = "app_metadata.tenant_id"
@@ -113,7 +113,7 @@ class PortalSettings:
     loki_url: str | None = None
     prometheus_url: str | None = None
     langfuse_project: str | None = None
-    litellm_key: str | None = None
+    litellm_key: str | None = field(default=None, repr=False)
     grafana_url: str | None = None
     required: bool = False
 

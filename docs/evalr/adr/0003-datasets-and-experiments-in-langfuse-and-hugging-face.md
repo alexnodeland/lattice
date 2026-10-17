@@ -6,7 +6,7 @@
 
 ## Context
 
-Datasets seeded by people's feedback must be versioned, shareable and visible next to the traces they came from. Experiments must score new agents, prompts and models reproducibly. Langfuse is the family's observability backend ([artifactr ADR-0027](../../artifactr/adr/0027-opentelemetry-observability-with-langfuse.md)), with datasets and experiments of its own. Hugging Face hosts public and private datasets with revisions.
+Datasets seeded by people's feedback must be versioned, shareable and visible next to the traces they came from. Experiments must score new agents, prompts and models reproducibly. Langfuse is lattice's observability backend ([artifactr ADR-0027](../../artifactr/adr/0027-opentelemetry-observability-with-langfuse.md)), with datasets and experiments of its own. Hugging Face hosts public and private datasets with revisions.
 
 ## Decision
 

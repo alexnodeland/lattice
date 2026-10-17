@@ -233,7 +233,7 @@ pydantic-ai lets any class use a namespace, and refuses only duplicate kinds. De
 
 | Option | `alert.fired` in `oncall` | Unambiguous | Notes |
 |---|---|---|---|
-| **`:` (decided)** | `oncall:alert.fired` | Yes | The family already writes owners this way: RFC-0002's `reflexr:<rule>` client ids, and its `thread:` and `chain:` tags |
+| **`:` (decided)** | `oncall:alert.fired` | Yes | lattice already writes owners this way: RFC-0002's `reflexr:<rule>` client ids, and its `thread:` and `chain:` tags |
 | `/` | `oncall/alert.fired` | Yes | Reads as a path and suggests nesting. It would need escaping if an endpoint ever took a type in its path |
 | `.` | `oncall.alert.fired` | No | pydantic-ai's join. But local names already use dots (`service.error`), so only the registry could say where a namespace ends |
 | A separate `namespace` field | `"namespace": "oncall"` beside `"type": "alert.fired"` | Yes | Every filter becomes a list of pairs, and `namespace` becomes a reserved field on every event |

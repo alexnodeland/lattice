@@ -66,7 +66,7 @@ class SupabasePeople:
     """
 
     url: str
-    secret_key: str
+    secret_key: str = field(repr=False)
     client: httpx.AsyncClient = field(default_factory=httpx.AsyncClient)
     found_for: float = 300.0
     missing_for: float = 60.0

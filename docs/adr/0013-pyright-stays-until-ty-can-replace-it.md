@@ -6,7 +6,7 @@
 
 ## Context
 
-[RFC-0003](../stackr/rfcs/0003-one-repository-lattice.md#ci-and-tooling) replaces pyright with ty in phase 6: one configuration at the root, every rule an error (`all = "error"`), and `respect-type-ignore-comments = false`. Its adoption pull request was to run both checkers once and report what pyright strict catches that ty doesn't, and the family would decide then whether any gap needs a stopgap ([What ty misses](../stackr/rfcs/0003-one-repository-lattice.md#unresolved-questions)).
+[RFC-0003](../stackr/rfcs/0003-one-repository-lattice.md#ci-and-tooling) replaces pyright with ty in phase 6: one configuration at the root, every rule an error (`all = "error"`), and `respect-type-ignore-comments = false`. Its adoption pull request was to run both checkers once and report what pyright strict catches that ty doesn't, and lattice would decide then whether any gap needs a stopgap ([What ty misses](../stackr/rfcs/0003-one-repository-lattice.md#unresolved-questions)).
 
 That pull request, [#58](https://github.com/alexnodeland/lattice/pull/58), ran ty 0.0.86 over every project:
 

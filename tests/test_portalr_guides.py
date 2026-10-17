@@ -408,3 +408,26 @@ def test_every_decision_record_is_in_the_navigation() -> None:
     nav = text(".nav.yml")
     records = sorted(path.name for path in (DOCS / "adr").glob("0*.md"))
     assert [name for name in records if f"adr/{name}" not in nav] == []
+
+
+def test_the_template_names_people_as_the_guides_say() -> None:
+    """stackr's template passes ``people=`` with what invitations need; the guides say so."""
+    template = ROOT / "packages" / "stackr" / "template" / "src" / "{{ package_name }}"
+    portal = (template / "{% if use_portal %}portal.py{% endif %}.jinja").read_text()
+    assert "people=people(self._settings, self._clients)" in portal
+    assert "url, key = settings.portal.auth_url, settings.auth.service_role_key" in portal
+    assert 'SupabasePeople(url=url.rstrip("/"), secret_key=key, client=client)' in portal
+    assert "doesn't pass yet" not in text("guides/privacy.md")
+    assert "passes it whenever the application has the gateway's address" in text(
+        "guides/privacy.md"
+    )
+
+
+def test_the_size_budgets_are_the_adrs() -> None:
+    """ADR-0040 names the budgets' three measures and both UIs."""
+    budgets = json.loads((ROOT / "packages" / "portalr" / "size-budget.json").read_text())
+    adr = text("adr/0040-scenarios-against-a-generated-application-and-size-budgets.md")
+    assert sorted(budgets) == ["admin", "app"]
+    for measure in ("initial", "total", "largest"):
+        assert f"`{measure}`" in adr, measure
+        assert all(measure in budget for budget in budgets.values())

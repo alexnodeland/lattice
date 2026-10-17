@@ -480,6 +480,9 @@ jobs:
       PROFILES: ${{ matrix.profiles }}
       STACKR_DATABASE: ${{ matrix.database }}
       STACKR_RECIPE: ${{ matrix.recipe || 'local' }}
+      # The portal's own scenarios, in Chromium, against the application, on local Supabase
+      # (portalr ADR-0040).
+      SMOKE_SCENARIOS: ${{ matrix.app && matrix.database == 'supabase' && 'true' || '' }}
       # The single host's settings, which its bootstrap would write to .env; empty elsewhere.
       STACKR_DOMAIN: ${{ matrix.recipe == 'host' && 'stackr.test' || '' }}
       CADDY_TLS: ${{ matrix.recipe == 'host' && 'tls internal' || '' }}
@@ -519,6 +522,14 @@ jobs:
             -subj /CN=backups -addext subjectAltName=DNS:backups \
             -keyout /tmp/stackr-backups/private.key -out /tmp/stackr-backups/public.crt
           chmod 644 /tmp/stackr-backups/private.key
+      # The scenarios' Chromium and their dependencies are installed before the stack's
+      # containers come up, never while they do: Chromium fails its requests in flight when a
+      # network interface comes or goes (lattice ADR-0002, #172), and the smoke test starts
+      # nothing while it runs.
+      - if: env.SMOKE_SCENARIOS == 'true'
+        run: bun install --frozen-lockfile
+      - if: env.SMOKE_SCENARIOS == 'true'
+        run: moon run ui:chromium
       # Fails before the job's 30 minutes, so the Logs step below runs and shows where it stood.
       - run: uv run --no-project python scripts/affected.py smoke
         timeout-minutes: 15
@@ -542,6 +553,14 @@ jobs:
           "${mc[@]}" mb --insecure "backups/$BACKUP_S3_BUCKET"
           make backup restore-drill
           make smoke PROFILES=drill
+      # Playwright's traces of the portal's failed scenarios, to step through what they saw.
+      - name: Upload the scenarios' traces
+        if: failure() && hashFiles('packages/portalr/web/*/test-results/**') != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: smoke-bdd-traces
+          path: packages/portalr/web/*/test-results/
+          retention-days: 7
       - name: Logs
         if: failure() && hashFiles('packages/stackr/.env') != ''
         working-directory: packages/stackr

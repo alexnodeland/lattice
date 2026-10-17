@@ -10,8 +10,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from portalr.invites import InviteFailed, SupabaseInvite
+from portalr.people import SupabasePeople
 
-from {{ package_name }}.portal import invitations, readers
+from {{ package_name }}.portal import invitations, people, readers
 from {{ package_name }}.settings import AuthSettings, PortalSettings, Settings
 
 from conftest import TENANT, Script, app, bearer, settings, token
@@ -158,6 +159,35 @@ def test_invitations_go_to_supabase_auth_with_the_secret_key() -> None:
     assert isinstance(invite, SupabaseInvite)
     assert invite.url == "http://supabase-kong:8000"
     assert len(clients) == 1
+
+
+def test_people_are_named_by_email_where_invitations_would_be_made() -> None:
+    clients: list[httpx.AsyncClient] = []
+    assert people(with_portal(), clients) is None
+    assert people(with_portal(auth_url="http://supabase-kong:8000"), clients) is None
+    assert clients == []
+    named = replace(
+        with_portal(auth_url="http://supabase-kong:8000/"),
+        auth=AuthSettings(service_role_key="sb_secret_for_the_tests"),
+    )
+    naming = people(named, clients)
+    assert isinstance(naming, SupabasePeople)
+    assert naming.url == "http://supabase-kong:8000"
+    assert len(clients) == 1
+
+
+def test_the_page_says_whether_people_are_named(script: Script, ui: Path) -> None:
+    named = replace(
+        with_portal(ui_dir=str(ui), auth_url="http://supabase-kong:8000"),
+        auth=AuthSettings(
+            jwt_secret=settings().auth.jwt_secret, service_role_key="sb_secret_for_the_tests"
+        ),
+    )
+    for given, expected in ((with_portal(ui_dir=str(ui)), False), (named, True)):
+        with TestClient(app(script, given)) as client:
+            config = client.get("/portalr/config.json")
+            assert config.json()["people"] is expected
+            assert "sb_secret_for_the_tests" not in config.text
 
 
 def test_the_portal_is_read_from_the_environment() -> None:

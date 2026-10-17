@@ -34,6 +34,10 @@ When("they open Access's {word}", async ({ page }, part: string) => {
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Access");
 });
 
+Then("the members include {string}", async ({ page }, who: string) => {
+  await expect(item(page, "Members", who)).toHaveCount(1);
+});
+
 When("they invite someone new", async ({ page, made }) => {
   const person = fresh(made, "invitee");
   await page.getByRole("textbox", { name: "Email" }).fill(`${person}@portalr.test`);

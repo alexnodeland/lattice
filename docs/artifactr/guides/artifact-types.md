@@ -165,6 +165,12 @@ Agents do not write JSON Patch themselves. Give them domain tools (`add_task`, `
 
 Clients that send commands over the wire write patches directly, as in `{"kind": "json_patch", "ops": [{"op": "replace", "path": "/goal", "value": "Ship v2"}]}`. The [thread protocol](../protocol.md#event-durable) describes both forms.
 
+## Native files
+
+A file in a native format, such as a Word document, is not a type's fields: it is megabytes that only its own application reads and writes faithfully. The [`artifactr-files-ai`](../../artifactr-files/index.md) package gives artifactr types for such files. Each is a manifest that names the file's bytes by their SHA-256 in a blob store, and each revision is an ordinary JSON Patch that first tests the digest it was made from, so accepting a proposal made against an old version fails with `PatchFailed` rather than replacing what came after ([ADR-0072](../adr/0072-native-files-are-manifests-over-json-patch.md)).
+
+Such a file has one writer at a time. A person's check-out and an agent's edit each hold a lease on the artifact, `Workspace.lease_artifact`, and another holder is refused with `ArtifactBusy` ([ADR-0071](../adr/0071-a-lease-on-an-artifact.md)). The lease is advisory: a write that ignores it is still guarded by its base version and the test.
+
 ## Validation
 
 Every change is validated: the patch is applied to the current data, and the result must validate against the type. A change that does not is rejected with `ValidationFailed`, whose `errors` are Pydantic's errors as JSON, so clients and the agent can see exactly what was wrong. Validators, constraints and coercion on your model all apply. If validation normalizes the data (coercing `"3"` to `3`, say), the revision records a patch that produces exactly what was stored.

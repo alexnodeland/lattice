@@ -187,6 +187,22 @@ async def test_an_expired_lease_can_be_taken(storage_factory: StorageFactory) ->
     assert await storage.acquire_lease(SCOPE, "k", "b", timedelta(seconds=30))
 
 
+async def test_a_lease_is_read_until_it_expires_or_is_released(
+    storage_factory: StorageFactory,
+) -> None:
+    now = datetime(2026, 9, 28, tzinfo=UTC)
+    storage = storage_factory(lambda: now)
+    assert await storage.lease(SCOPE, "k") is None, "no one has it"
+    assert await storage.acquire_lease(SCOPE, "k", "a", timedelta(seconds=30))
+    assert await storage.lease(SCOPE, "k") == ("a", now + timedelta(seconds=30))
+    assert await storage.lease(Scope("t2", SCOPE.workspace_id), "k") is None, "its tenant's"
+    now += timedelta(seconds=30)
+    assert await storage.lease(SCOPE, "k") is None, "expired at its expiry, as it can be taken"
+    assert await storage.acquire_lease(SCOPE, "k", "b", timedelta(seconds=30))
+    await storage.release_lease(SCOPE, "k", "b")
+    assert await storage.lease(SCOPE, "k") is None
+
+
 async def test_a_transaction_asks_who_holds_a_lease_expired_or_not(
     storage_factory: StorageFactory,
 ) -> None:

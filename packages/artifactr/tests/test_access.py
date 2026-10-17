@@ -155,6 +155,15 @@ METHODS: dict[str, tuple[Call, str]] = {
     "cursor": (lambda ws: ws.cursor("c"), "artifactr:read_cursors"),
     "save_cursor": (lambda ws: ws.save_cursor("c", 1), "artifactr:save_cursor"),
     "claim_thread": (_claim, "artifactr:claim_thread"),
+    "lease_artifact": (
+        lambda ws: ws.lease_artifact(ARTIFACT, holder="h", ttl=timedelta(seconds=5)),
+        "artifactr:edit_artifact",
+    ),
+    "artifact_lease": (lambda ws: ws.artifact_lease(ARTIFACT), "artifactr:read_artifacts"),
+    "release_artifact": (
+        lambda ws: ws.release_artifact(ARTIFACT, holder="h"),
+        "artifactr:edit_artifact",
+    ),
 }
 """Each public ``Workspace`` method, a call of it, and the one action it asks for."""
 

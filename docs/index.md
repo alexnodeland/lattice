@@ -20,6 +20,7 @@ Libraries for applications in which people and agents work together, and the sta
 | Package | What it is |
 |---|---|
 | [artifactr](artifactr/index.md) | Chat applications where people and agents collaborate through shared, versioned artifacts |
+| [artifactr-files](artifactr-files/index.md) | Native files as artifactr artifacts: a manifest over the file's bytes, edits by the file's own app, and one writer at a time |
 | [reflexr](reflexr/index.md) | Rules over event streams that run LLM workflows: pydantic-ai agents, pydantic-graph graphs and functions |
 | [evalr](evalr/index.md) | Typed evaluation of agent systems: judges that give typed verdicts, trained on people's feedback and measured against it |
 | [relayr](relayr/index.md) | The bridge between artifactr and reflexr: events from chats and artifacts become events for rules, and runs act back in the chat |

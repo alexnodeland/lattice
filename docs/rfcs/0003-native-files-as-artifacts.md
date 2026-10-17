@@ -328,15 +328,15 @@ Decided by the owner on 2026-10-16:
 
 ## Tracking
 
-- [ ] artifactr: the lease on `Workspace` and `Storage`, `ArtifactBusy`, its ADR, and the ADR on native files as JSON Patch
-- [ ] artifactr-files: the package, its `pyproject.toml`, a `moon.yml` that depends on artifactr and lattice-core, and its entry in `release-please-config.json` and the manifest
-- [ ] artifactr-files: blobs, check-outs, migrations and row-level security
+- [x] artifactr: the lease on `Workspace` and `Storage`, `ArtifactBusy`, its ADR, and the ADR on native files as JSON Patch
+- [x] artifactr-files: the package, its `pyproject.toml`, a `moon.yml` that depends on artifactr and lattice-core, and its entry in `release-please-config.json` and the manifest
+- [x] artifactr-files: blobs, check-outs, migrations and row-level security
 - [ ] artifactr-files: the WordCraft adapter, the corpus and the nightly fidelity report
 - [ ] artifactr-files and stackr: the worker, its image, the recipe and the release pin check
 - [ ] artifactr-files: `NativeFileTools`
 - [ ] portalr and artifactr-files: the renderer, `files_router`, check-out and check-in
 - [ ] The streamed session spike and its recommendation
-- [ ] Docs: the package's section and guide
+- [x] Docs: the package's section and guide
 
 ## Evidence
 

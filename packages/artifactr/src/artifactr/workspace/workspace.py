@@ -24,7 +24,7 @@ from collections.abc import (
     Iterable,
     Sequence,
 )
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Final, Literal, cast, overload
 
 from opentelemetry.metrics import MeterProvider
@@ -215,6 +215,35 @@ _WORKSPACES_PAGE: Final = 500
 
 class ThreadBusy(InvalidState):
     """Another run holds the thread."""
+
+
+@dataclasses.dataclass(frozen=True)
+class ArtifactLease:
+    """A lease on an artifact: who holds it, and until when (ADR-0071)."""
+
+    artifact_id: ArtifactId
+    holder: str
+    expires_at: datetime
+
+
+class ArtifactBusy(InvalidState):
+    """Another holder has the artifact's lease (ADR-0071).
+
+    Attributes:
+        lease: The lease that refused it, so a caller can say who has the artifact, or None if
+            it ended between the refusal and the read: then the artifact may be free already.
+    """
+
+    def __init__(self, artifact_id: ArtifactId, lease: ArtifactLease | None) -> None:
+        if lease is None:
+            message = f"artifact {artifact_id} is busy, and its lease ended before it was read"
+        else:
+            message = (
+                f"artifact {artifact_id} is held by {lease.holder} until "
+                f"{lease.expires_at.isoformat()}"
+            )
+        super().__init__(message)
+        self.lease = lease
 
 
 class Workspaces:
@@ -986,6 +1015,71 @@ class Workspace:
         await self.check(Access(action="artifactr:save_cursor"))
         await self._storage.save_cursor(self._scope, name, seq)
 
+    # ─── leases ───────────────────────────────────────────────────────────────
+
+    async def lease_artifact(
+        self, artifact_id: ArtifactId, *, holder: str, ttl: timedelta
+    ) -> ArtifactLease:
+        """Take or renew an artifact's lease, which one holder has at a time (ADR-0071).
+
+        The same holder taking it again renews it, for ``ttl`` from now. Another holder may take
+        it once it has expired. Nothing renews it in the background. The lease is advisory: core
+        doesn't know it, so no command is refused for it, and a holder's writes are guarded by
+        their base version and a JSON Patch ``test``, as anyone's are. It asks
+        ``artifactr:edit_artifact`` about the artifact.
+
+        A call cut short may still have taken or renewed the lease, as with
+        :meth:`claim_thread`; a holder that took it for the first time releases it.
+
+        Raises:
+            NotFound: If there is no such artifact, or it is hidden from the actor.
+            ArtifactBusy: If another holder has it.
+            ValidationFailed: If ``ttl`` is not positive.
+        """
+        _check_text(artifact_id, holder)
+        if ttl <= timedelta(0):
+            raise ValidationFailed("a lease's ttl must be positive", [])
+        key = await self._leasable("artifactr:edit_artifact", artifact_id)
+        if not await self._storage.acquire_lease(self._scope, key, holder, ttl):
+            raise ArtifactBusy(artifact_id, await self._artifact_lease(artifact_id, key))
+        lease = await self._artifact_lease(artifact_id, key)
+        if lease is None or lease.holder != holder:
+            raise ArtifactBusy(artifact_id, lease)  # it lapsed at once, and may have been taken
+        return lease
+
+    async def artifact_lease(self, artifact_id: ArtifactId) -> ArtifactLease | None:
+        """Return an artifact's lease, or None if no one holds it now.
+
+        It is a read, which asks ``artifactr:read_artifacts``: viewers see who has the artifact.
+
+        Raises:
+            NotFound: If there is no such artifact, or it is hidden from the actor.
+        """
+        _check_text(artifact_id)
+        key = await self._leasable("artifactr:read_artifacts", artifact_id)
+        return await self._artifact_lease(artifact_id, key)
+
+    async def release_artifact(self, artifact_id: ArtifactId, *, holder: str) -> None:
+        """Release an artifact's lease if ``holder`` has it. It asks ``artifactr:edit_artifact``.
+
+        Raises:
+            NotFound: If there is no such artifact, or it is hidden from the actor.
+        """
+        _check_text(artifact_id, holder)
+        key = await self._leasable("artifactr:edit_artifact", artifact_id)
+        await self._storage.release_lease(self._scope, key, holder)
+
+    async def _leasable(self, action: str, artifact_id: ArtifactId) -> str:
+        """Ask about a lease on an artifact, which must exist; return the lease's key."""
+        await self.check(Access(action=action, artifact_id=artifact_id))
+        if await self._storage.artifact(self._scope, artifact_id) is None:
+            raise NotFound("artifact", artifact_id)
+        return _artifact_key(artifact_id)
+
+    async def _artifact_lease(self, artifact_id: ArtifactId, key: str) -> ArtifactLease | None:
+        found = await self._storage.lease(self._scope, key)
+        return None if found is None else ArtifactLease(artifact_id, *found)
+
     # ─── runs ─────────────────────────────────────────────────────────────────
 
     @contextlib.asynccontextmanager
@@ -1067,6 +1161,11 @@ class Workspace:
 def _thread_key(thread_id: ThreadId) -> str:
     """The key of a thread's claim, as a lease."""
     return f"thread:{thread_id}"
+
+
+def _artifact_key(artifact_id: ArtifactId) -> str:
+    """The key of an artifact's lease."""
+    return f"artifact:{artifact_id}"
 
 
 def _lose(key: str, lost: asyncio.Event) -> None:

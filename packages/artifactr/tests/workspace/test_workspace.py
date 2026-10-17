@@ -675,6 +675,11 @@ NUL_CALLS: dict[str, NulCall] = {
     "cursor": lambda w, ws: ws.cursor(NUL),
     "save_cursor": lambda w, ws: ws.save_cursor(NUL, 1),
     "claim_thread": _claim_with_nul,
+    "lease_artifact: id": lambda w, ws: ws.lease_artifact(NUL, holder="h", ttl=timedelta(1)),
+    "lease_artifact: holder": lambda w, ws: ws.lease_artifact("a1", holder=NUL, ttl=timedelta(1)),
+    "artifact_lease": lambda w, ws: ws.artifact_lease(NUL),
+    "release_artifact: id": lambda w, ws: ws.release_artifact(NUL, holder="h"),
+    "release_artifact: holder": lambda w, ws: ws.release_artifact("a1", holder=NUL),
 }
 """Each way a string reaches a workspace, with a NUL character in it (ADR-0061), named by the
 method it reaches, and what it is when a method takes more than one."""

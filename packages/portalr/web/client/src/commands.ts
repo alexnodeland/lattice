@@ -22,6 +22,7 @@ type Member = Grantr["schemas"]["Member"];
 type IssuedKey = Grantr["schemas"]["IssuedKey"];
 type Invited = Portalr["schemas"]["Invited"];
 type CreatedTenant = Portalr["schemas"]["CreatedTenant"];
+type IntegrationState = Grantr["schemas"]["IntegrationState"];
 
 /** A command's answer: carried out, with what the server answered, or refused, with each reason. */
 export type Answer<R = Result> = { readonly outcome: "done"; readonly result: R } | Refusal;
@@ -188,6 +189,31 @@ export function createCommands(api: Api, unsigned: () => void = () => {}) {
             ...inTenant(tenant, {}),
             body: { principal },
           }),
+        ),
+      /**
+       * Turn an integration on or off on the tenant, or with a workspace named, in that workspace;
+       * or, with null, unset it there, so it inherits again (grantr ADR-0034). The answer is the
+       * integration's state after.
+       */
+      setIntegration: (
+        tenant: string,
+        key: string,
+        on: boolean | null,
+        workspace?: string,
+      ): Promise<Answer<IntegrationState>> =>
+        answer(
+          workspace === undefined
+            ? api.grantr.PUT("/grantr/v1/tenants/{tenant}/integrations/{key}", {
+                ...inTenant(tenant, { key }),
+                body: { on },
+              })
+            : api.grantr.PUT(
+                "/grantr/v1/tenants/{tenant}/workspaces/{workspace}/integrations/{key}",
+                {
+                  ...inTenant(tenant, { workspace, key }),
+                  body: { on },
+                },
+              ),
         ),
       /** Revoke a key, by its public id. */
       revokeKey: (tenant: string, key: string): Promise<Answer<AuditEntry>> =>

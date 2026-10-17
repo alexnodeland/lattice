@@ -3,7 +3,7 @@
 **Status:** Draft
 **Author:** Alex Nodeland
 **Created:** 2026-10-17
-**Discussion:** pending
+**Discussion:** [#334](https://github.com/alexnodeland/lattice/pull/334)
 **Siblings:**
 
 - [artifactr ADR-0010][a-adr-0010] is the pause this builds on: a deferred tool, its requests recorded in `run_paused`, an answer from any surface, and one run across the pause.
@@ -101,7 +101,7 @@ A form is a `FormSchema`: a JSON Schema 2020-12 object with a separate `ui` obje
 | `dashboard` | `title`, `panels`, `as_of` | The default |
 | `app` | `title`, `summary` (its text fallback), `html`, `state` | The default; no review gate (Decision O6) |
 
-- **A submission's id is derived,** so the policy is held by artifactr's refusal of an id that exists ([artifactr ADR-0045][a-adr-0045]'s pattern): `sub_` and a digest of the form's id with nothing more for `once`, with the person's principal for `per_person`, and with the client's `submission_id` for `many`, so a retried submit is one artifact. The check below refuses a submission whose id isn't its derivation.
+- **A submission's id is derived,** so the policy is held by artifactr's refusal of an id that exists (the pattern of [artifactr ADR-0045][a-adr-0045] and [relayr ADR-0019][r-adr-0019]): `sub_` and a digest of the form's id with nothing more for `once`, with the person's principal for `per_person`, and with a `nonce` the client makes once per submit and stores in the submission's data for `many`, so a retried submit is one artifact and the check can recompute the id. The check below refuses a submission whose id isn't its derivation.
 - **A submission names the version it was made against.** A form edited since is "changed": the check refuses it, and portalr shows "This form changed" with the new one.
 - **Submissions are as visible as their thread,** or their workspace ([grantr ADR-0003][g-adr-0003]). A form asking for anything sensitive belongs in a restricted thread ([artifactr ADR-0062][a-adr-0062]).
 
@@ -116,11 +116,13 @@ A form is a `FormSchema`: a JSON Schema 2020-12 object with a separate `ui` obje
 
 ### Checks: refusing at the boundary
 
-Core may not import a schema validator, and an answer or a new artifact is recorded as given today: `_answer` checks only that the run is paused and the request unanswered. The package refuses a bad submission before it is recorded, through one additive hook in artifactr.
+Core may not import a schema validator, and an answer or a new artifact is recorded as given today: `_answer` checks that the run is paused, the request exists and is unanswered, and its kind matches, and nothing about the answer itself. The package refuses a bad submission before it is recorded, through one additive hook in artifactr.
 
 - **`Workspaces(checks=...)`:** a mapping from a command type to an async check, `(workspace, actor, command) -> None`, run after `authorize` and before the commit. It may read the workspace as the actor and raise `ValidationFailed` or `InvalidState`. A check that raises anything else fails the command, as a hook's error does.
 - **`ui_checks()`** checks `answer_deferred` on a request whose `tool_name` is `ask_form`, against the schema in its `args`; and `create_artifact` of kind `submission`, by reading the form at its head as the submitter: the form exists and the submitter may read it, it isn't closed, the version is the head's, the values are valid, and the id is its derivation.
 - **A refusal is typed and goes back to the person.** portalr shows a field's refusal under the field, through `FormField`, and moves the focus to the first. A second answer to the same request is `InvalidState`, as today, and portalr shows "Already answered", with who answered.
+- **Edits are checked too.** A person's `edit_artifact` on a `submission` is refused, so no one rewrites another's values; a form's `closed` and `schema` change only by its author or a workspace admin; and a person's edit of an `app` is allowed under `/state` only, so the `html` that runs is always an agent's.
+- **A chat message doesn't answer an `ask_form`.** Today the runner's `_reply` turns a message posted while a run is paused into an answer to every open question, and catches only `InvalidState`. It skips requests whose tool is `ask_form`, so the run stays paused until the form is sent, and the check's `ValidationFailed` never reaches the planner.
 - **A check is not a lock.** A form closed between the check and the commit takes one late submission; whoever reads submissions keeps the form's `closed` in mind.
 
 ### Who submits, and attribution
@@ -131,17 +133,17 @@ Core may not import a schema validator, and an answer or a new artifact is recor
 
 ### relayr
 
-- **`deferred_answered` is bridged,** as `artifactr:deferred_answered` in `BRIDGED`, with `turn_id`, `tool_call_id`, `tool_name`, `answer`, `approved` and the author, its id the envelope's ([relayr ADR-0018][r-adr-0018]). An answer joins the asking run's chain without causation, as a person's answer to a proposal does ([relayr ADR-0021][r-adr-0021]). `run_paused` stays unbridged: a rule reacts to what a person did, not to a run waiting.
+- **`deferred_answered` is bridged,** as `artifactr:deferred_answered` in `BRIDGED`, with `turn_id` (from the event's `run_id`, since a person's envelope has none), `tool_call_id`, `tool_name`, `answer`, `approved` and the author, its id the envelope's ([relayr ADR-0018][r-adr-0018]). When a rule's run asked, the follower maps the run through the ledger, and the answer joins that run's chain without causation, as a person's answer to a proposal does ([relayr ADR-0021][r-adr-0021]); an answer to a chat turn starts no chain. `run_paused` stays unbridged: a rule reacts to what a person did, not to a run waiting.
 - **artifactr's `DeferredAnswered` gains `tool_name`,** additively, copied from the request by `_answer`. Without it the bridged event can't tell an `ask_form` answer from an `ask_user` reply or an approval, and the follower would have to keep `run_paused` to join them.
 - **`Projections` gains a mapping per deferred tool name,** beside its mappings per artifact kind and `app_event` name, amending relayr ADR-0018. A mapped answer replaces `artifactr:deferred_answered` for that tool, as a kind's mapping replaces its artifact events.
-- **The `[relayr]` extra ships `UI_PROJECTIONS`:** `ask_form` answers and `submission` artifacts both become `ui:form_submitted`, and a submission to an app `ui:app_submitted`, under `UiEvent(Event, abstract=True, event_namespace="ui")`, with `UI_EVENTS` for reflexr's `Workspaces(events=...)`. A rule is written once for both ways of asking:
+- **The `[relayr]` extra ships `UI_PROJECTIONS`:** `ask_form` answers and `submission` artifacts both become `ui:form_submitted`, and a submission to an app `ui:app_submitted`, under `UiEvent(Event, abstract=True, event_namespace="ui")`, with `UI_EVENTS` for reflexr's `Workspaces(events=...)`. A kind's mapping sees its `artifact_changed` and `artifact_archived` as well, and returns None for a submission's. A rule is written once for both ways of asking:
 
 | Event | From | Carries |
 |---|---|---|
 | `ui:form_submitted` | An `ask_form` answer, or a `submission` to a form | `values`, `author`, `thread_id`, and `form_id` and `version`, or `turn_id` and `tool_call_id` |
 | `ui:app_submitted` | A `submission` to an app | `values`, `author`, `thread_id`, `app_id`, `version` |
 
-- **`ui:` is reserved** to the publisher relayr's follower publishes as, through reflexr's `publishers=` ([reflexr ADR-0057][x-adr-0057]), so no client can publish a form's submission itself. Which actor a projected event carries is to be verified in phase 1 (below).
+- **`ui:` is reserved** to the publisher relayr's follower publishes as, through reflexr's `publishers=` ([reflexr ADR-0057][x-adr-0057]), so no client can publish a form's submission itself. The follower publishes every envelope, projected ones included, as `SourceActor(name="artifactr")`, so the entry is `publishers={"ui": [SourceActor(name="artifactr")]}`.
 
 ### The component catalogue
 
@@ -152,8 +154,8 @@ Every renderer is in `@portalr/ui`, built from the kit's components and tokens. 
 | `string` | One line | `textarea` | `TextField`; a `TextArea` the kit gains on `FormField` |
 | `string`, `format` `date` or `date-time` | Date | | `TextField` with the browser's date input |
 | `string`, `format` `email` or `uri` | One line | | `TextField` of that input type |
-| Choices, up to five | Segments | `select`, `radio` | `SegmentedFilter` |
-| Choices, more than five | Select | `radio` | `SelectField` |
+| Choices, up to five, required or with a default | Segments | `select` | `SegmentedFilter` |
+| Other choices | Select | | `SelectField` |
 | Array of choices | Checkboxes | | `CheckboxGroup` |
 | `boolean` | Switch | `checkbox` | `Switch` |
 | `number`, `integer` | Number | | `TextField`, `inputmode` numeric |
@@ -175,11 +177,11 @@ Dashboard panels, each a component that exists today:
 
 A mini app is one HTML file, written by the agent, run for anyone who opens the thread. There is no review gate (Decision O6): the sandbox and the policy carry the whole weight, so each layer assumes the one before it failed.
 
-- **An origin of its own: `apps.<host>`.** stackr's edge serves a static sandbox proxy there, the same release's build, with no cookies set or read for that name and nothing else served from it, as RFC-0003's editor is served. portalr's CSP gains `frame-src` for that origin alone, from `Site`, and `frame-ancestors 'none'` stays on portalr's own pages.
+- **An origin of its own: `apps.<host>`.** stackr's edge serves a static sandbox proxy there, the same release's build, with no cookies set or read for that name and nothing else served from it, as RFC-0003's editor is served. `apps.<host>` is the same site as portalr, so portalr and the edge set host-only cookies alone, never with `Domain=`, and portalr's session stays in `localStorage`, which another origin can't read. portalr's CSP gains `frame-src` for that origin alone, from `Site`, and `frame-ancestors 'none'` stays on portalr's own pages.
 - **Two frames, as MCP Apps requires of web hosts.** The outer frame is the proxy, on `apps.<host>`, with `sandbox="allow-scripts allow-same-origin"`, which is safe only because the origin holds nothing. It loads the app into an inner frame with `sandbox="allow-scripts"` and nothing more: an opaque origin, no forms, popups, modals, downloads or top navigation.
-- **No network.** The inner document's policy is `default-src 'none'`, with inline script and style, `data:` images and fonts, and `connect-src 'none'`, `form-action 'none'` and `base-uri 'none'`. The package refuses an app whose HTML names an external URL, as a first filter; the policy is the guard. Phase 2's exit includes a test that `fetch`, `WebSocket`, `EventSource`, an image or CSS beacon, `<a ping>`, prefetch and WebRTC all fail.
+- **No network.** The proxy is served with `default-src 'none'` and its own script's hash, and prepends a `<meta>` policy to the app's HTML; an inner `srcdoc` frame inherits the proxy's policy as well, and policies only add restrictions, so the app can't loosen either. The inner document's policy is `default-src 'none'`, with inline script and style, `data:` images and fonts, and `connect-src 'none'`, `form-action 'none'` and `base-uri 'none'`. The package refuses an app whose HTML names an external URL, as a first filter; the policy is the guard. Phase 2's exit includes a test that `fetch`, `WebSocket`, `EventSource`, an image or CSS beacon, `<a ping>`, prefetch and WebRTC all fail.
 - **Limits:** the HTML at most 256 KB, `state` at most 64 KB, one file, a bridge message at most 64 KB, and 60 bridge calls a minute per frame, after which the host stops answering it.
-- **The bridge is MCP Apps' methods,** JSON-RPC over `postMessage`: `ui/initialize`, `tools/call`, `ui/open-link`, `ui/notifications/size-changed`, and `ui/notifications/host-context-changed` from the host. The host checks `event.source` and the origin of every message and drops anything else. `tools/call` reaches three tools only, each marked `visibility: ["app"]`: `get_state`, `set_state` (a JSON Patch on the app's own `state`, an `edit_artifact` as the viewer, versioned) and `submit` (a `submission` to the app). An app reaches no other artifact, thread or tool.
+- **The bridge is MCP Apps' methods,** JSON-RPC over `postMessage`: `ui/initialize`, `tools/call`, `ui/open-link`, `ui/notifications/size-changed`, and `ui/notifications/host-context-changed` from the host. The host checks `event.source` and the origin of every message and drops anything else. `tools/call` reaches three tools only, each marked `visibility: ["app"]`: `get_state`, `set_state` (a JSON Patch on the app's own `state`, an `edit_artifact` as the viewer, versioned) and `submit` (a `submission` to the app). An app reaches no other artifact, thread or tool. `set_state` is coalesced to at most one version every five seconds, and refused for a viewer who may not edit the artifact.
 - **A submission is confirmed by the person.** The host shows what will be sent, as text, in its own dialog outside the frame, before it sends. A link is opened only after the host's own confirmation, with the full URL shown.
 - **Labelled by the host, outside the frame:** "Made by the agent. Runs sandboxed and can't reach the network", with the run and version that made it, and a border the app can't draw over. The `summary` is always beside it.
 - **A kill switch at three levels.** The deployment's setting turns apps off everywhere, the tenant's for one tenant, and archiving an app's artifact for one app. Off, the chat shows the label and the summary, and nothing runs. The toolset offers `make_app` only when apps are on.
@@ -202,16 +204,16 @@ Forms and dashboards are held to portalr's standard because they are portalr's c
 ### MCP Apps, now and later
 
 - **Borrowed now:** the bridge's method names and its host context, `visibility` on tools, a declared policy per app, and the two-frame proxy. portalr speaks them over its own `postMessage` host, not over MCP, and depends on neither `@modelcontextprotocol/ext-apps` nor `@mcp-ui/client` in phase 2: the bridge is a few hundred lines, and the spec is young.
-- **Exported later:** `artifactr_ui.mcp`, behind `[mcp]`, serves form, dashboard and app artifacts from `artifactr.mcp` as `ui://` resources of type `text/html;profile=mcp-app`, through the `mcp` SDK's `mcp.server.apps`. A form or dashboard is served as a small generated page; an app as its own HTML with its policy in `_meta.ui.csp`. A submission from Claude or VS Code lands as the same command. `ArtifactrMcp` builds its `MCPServer` itself today, so it needs an `extensions=` argument first.
+- **Exported later:** `artifactr_ui.mcp`, behind `[mcp]`, serves form, dashboard and app artifacts from `artifactr.mcp` as `ui://` resources of type `text/html;profile=mcp-app`, through the `mcp` SDK's `mcp.server.apps`. A form or dashboard is served as a small generated page; an app as its own HTML with its policy in `_meta.ui.csp`. A submission from an external host lands as the same command. `ArtifactrMcp` builds its `MCPServer` itself today, so it needs an `extensions=` argument first.
 
 ### What changes in each package
 
 | Package | Changes | Breaking |
 |---|---|---|
 | artifactr-ui | New | |
-| artifactr | `Workspaces(checks=...)`; `DeferredAnswered.tool_name`; `ArtifactrMcp(extensions=...)` in phase 3 | No: each is additive |
-| artifactr's ADRs | New: the checks hook. Amended: ADR-0010 (an answer may be refused by the application's check) | |
-| relayr | `DeferredAnswered` in `BRIDGED`; `Projections` per deferred tool name | No |
+| artifactr | `Workspaces(checks=...)`; `DeferredAnswered.tool_name`; `_reply` skips `ask_form` requests; `ArtifactrMcp(extensions=...)` in phase 3 | No: each is additive |
+| artifactr's ADRs | New: the checks hook. Amended: ADR-0010 (an answer may be refused by the application's check) and ADR-0055 (a message doesn't answer a form) | |
+| relayr | `DeferredAnswered` in `BRIDGED`, its run mapped to a chain through the ledger; `Projections` per deferred tool name | No |
 | relayr's ADRs | Amended: ADR-0006 and ADR-0018 (a ninth bridged type, and a third kind of mapping) | |
 | reflexr | Nothing: `events=` and `publishers=` exist | |
 | grantr | Nothing in phase 1; a respondent's action only if the unresolved question below says so | |
@@ -226,7 +228,7 @@ Built after v0.1, which artifactr, reflexr, evalr and grantr have reached.
 | Phase | Deliverable | Exit criteria |
 |---|---|---|
 | 1. Forms and dashboards | The package: schema subset and validator, the four types (`app` defined, not offered), `ask_form`, `create_form`, `show_dashboard`, the checks; artifactr's hook and `tool_name`; relayr's bridged type and projections; portalr's `SchemaForm`, `DashboardView`, renderers and `TextArea`; the template's `ui` question | A `bdd` scenario asks a form, has it refused with a field's error, answers it and resumes; a rule fires once on `ui:form_submitted` from each way of asking; a retried submit is one artifact and one event; a stale tab gets "This form changed" and "Already answered"; a poll in a shared thread takes one submission per person; a two-tenant test reads nothing across tenants; the kit's tests pass in both schemes and colour-blind mode; and each item of [Unverified](#unverified) is settled in an ADR |
-| 2. Mini apps | `make_app`; the proxy, the policy and `apps.<host>` in stackr; `AppFrame` and the bridge host; the label, the limits and the kill switch | Every network path listed above fails from the frame in Chromium; a forged or foreign `postMessage` is dropped; an app reaches no artifact but its own; a submission needs the person's confirmation; the kill switch stops a running app at each level; portalr's own pages still refuse framing |
+| 2. Mini apps | `make_app`; the proxy, the policy and `apps.<host>` in stackr; `AppFrame` and the bridge host; the label, the limits and the kill switch | Every network path listed above fails from the frame in Chromium; a forged or foreign `postMessage` is dropped; an app reaches no artifact but its own; a submission needs the person's confirmation; a person's edit of an app's `html` is refused; the kill switch stops a running app at each level; portalr's own pages still refuse framing |
 | 3. MCP export | `artifactr.mcp`'s `extensions=`; `artifactr_ui.mcp` | A form and a dashboard render in one external host, and its submission lands as the same command and event |
 
 ## Decisions
@@ -271,13 +273,13 @@ Recommended, for the maintainer to decide:
 - **remote-dom,** host components driven by a script in a worker. Native looks, but it still runs a model's code, and adds a protocol of its own.
 - **A generic schema-form library** (rjsf) over full JSON Schema. Covers more, renders less like the kit, and opens keywords no model needs.
 - **Apps in `srcdoc` on portalr's origin.** One origin less, and RFC-0003's lesson: a sandbox mistake there reaches portalr's cookies.
-- **An origin per tenant or per app,** as Claude's `*.claudemcpcontent.com`. Stronger isolation between apps, at the cost of wildcard DNS and certificates; nothing an app could take from another is on `apps.<host>`.
+- **An origin per tenant or per app,** as some hosts give each app a hashed subdomain of its own. Stronger isolation between apps, at the cost of wildcard DNS and certificates; nothing an app could take from another is on `apps.<host>`.
 - **An extra of artifactr,** or tools beside `ask_user` (O1). Fewer packages, and artifactr's dependencies and docs grow for everyone.
 - **AG-UI, Adaptive Cards or Slack's Block Kit** as the format. Block Kit's lesson, data and limits rather than code, is taken; neither format is what models already write.
 
 ## Unresolved questions
 
-- **Should a viewer be able to submit?** Today both commands are an editor's, so a thread shared read-only shows a form its reader can't send. A `artifactr_ui:submit` action, held by a respondent role, would answer it, at the cost of a check of its own in grantr's catalog.
+- **Should a viewer be able to submit?** Today both commands are an editor's, so a thread shared read-only shows a form its reader can't send. A `artifactr_ui:submit` action, held by a respondent role, would answer it, at the cost of an action of its own in grantr's catalog.
 - **A deadline for `ask_form`,** as a reflexr schedule that answers "expired", never a timer in memory.
 - **Live dashboard panels,** over portalr's readers as the viewer, once a snapshot proves too stale.
 
@@ -286,7 +288,7 @@ Recommended, for the maintainer to decide:
 Each is a phase 1 or phase 2 exit criterion, settled and recorded in an ADR.
 
 - **pydantic-ai keeps a 32 KB schema** in a `CallDeferred` call's arguments through `run_paused`, storage and resume, unchanged.
-- **Which actor a projected `ui:` event carries,** and that reserving `ui:` to it refuses every client. relayr ADR-0006 says `SourceActor("artifactr")` for bridged types only.
+- **Reserving `ui:`** to the follower's actor refuses every client's attempt to publish one.
 - **The browser's behaviour:** a `sandbox="allow-scripts"` frame inside the proxy, under portalr's `frame-src`, blocks every network path listed above in Chromium, and the inherited and declared policies combine as intended.
 - **`mcp.server.apps`** in the `mcp` SDK serves `text/html;profile=mcp-app` resources with `_meta.ui`, and one external host renders them.
 
@@ -324,6 +326,8 @@ Gathered on 2026-10-16 and 2026-10-17. lattice was read at `origin/main`; the we
 | MCP Apps is stable since 2026-01-26 as `io.modelcontextprotocol/ui`; `ui://`, `text/html;profile=mcp-app`, `_meta.ui`, the two-frame proxy for web hosts, and the bridge's methods | `modelcontextprotocol/ext-apps`, `specification/2026-01-26/apps.mdx` | Verified |
 | MCP-UI 6.0.0 moved onto MCP Apps; `@mcp-ui/client` 7.1.1; `@modelcontextprotocol/ext-apps` 2.0.3, its licence metadata inconsistent | Its changelog; npm | Verified |
 | The `mcp` SDK 2.3.0 has `mcp.server.apps` | Its documentation | Verified; behaviour unverified |
+| The follower publishes every envelope, projected ones included, as `SourceActor(name="artifactr")` | `relayr/inbound/followers.py` | Verified |
+| A message posted while paused answers every open question; only `InvalidState` is caught | `artifactr/agent/runner.py` `_reply` | Verified |
 | `artifactr-ui-ai` was free on PyPI | PyPI, 2026-10-16 | Verified |
 
 [a-adr-0002]: ../artifactr/adr/0002-single-write-path.md
@@ -343,5 +347,6 @@ Gathered on 2026-10-16 and 2026-10-17. lattice was read at `origin/main`; the we
 [p-adr-0036]: ../portalr/adr/0036-the-chart-theme-and-colour-blind-mode.md
 [p-adr-0037]: ../portalr/adr/0037-form-controls-and-row-actions.md
 [r-adr-0018]: ../relayr/adr/0018-bridged-events-their-fields-ids-and-projections.md
+[r-adr-0019]: ../relayr/adr/0019-runs-act-once-through-derived-ids-and-keyed-edits.md
 [r-adr-0021]: ../relayr/adr/0021-chains-continue-across-the-bridge.md
 [x-adr-0057]: ../reflexr/adr/0057-reserved-publishers.md

@@ -37,6 +37,7 @@ nav:
       - adr/0022-litellm-requests-carry-the-propagated-trace-tags.md
       - adr/0024-a-parallel-batched-merge-queue.md
       - adr/0025-formal-specs-in-tla-and-lean.md
+      - adr/0027-integrations-switched-per-workspace-through-one-port.md
       - Template: adr/template.md
   - Brand: assets/brand/README.md
   - artifactr: artifactr

@@ -12,12 +12,14 @@ import { createContext, type ReactNode, useContext } from "react";
 
 /** Each add-on, and whether it is on. */
 export type Addons = {
+  /** Math, `$$…$$` and `math` fences, drawn as MathML (portalr ADR-0044). */
+  readonly math: boolean;
   /** Mermaid's diagrams: parked, since Mermaid can't draw under the CSP (portalr ADR-0042). */
   readonly mermaid: boolean;
 };
 
-/** Until the Integrations port says otherwise: diagrams off. */
-const DEFAULT_ADDONS: Addons = { mermaid: false };
+/** Until the Integrations port says otherwise: math on, and diagrams off. */
+const DEFAULT_ADDONS: Addons = { math: true, mermaid: false };
 
 const Context = createContext<Addons>(DEFAULT_ADDONS);
 

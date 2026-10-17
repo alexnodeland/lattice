@@ -1,13 +1,13 @@
 /**
- * Build the CSP tests' page as app and admin are built, and serve it with portalr's
- * Content-Security-Policy, which `policy.txt` holds and a portalr test holds to the router's own.
+ * Build the CSP tests' page, and serve it with portalr's Content-Security-Policy, which
+ * `policy.txt` holds and a portalr test holds to the router's own.
  */
 
+import { execFile } from "node:child_process";
 import { readFile, rm } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import tailwindcss from "@tailwindcss/vite";
-import react from "@vitejs/plugin-react";
-import { build, type InlineConfig, preview } from "vite";
+import { promisify } from "node:util";
+import { preview } from "vite";
 import type { TestProject } from "vitest/node";
 
 declare module "vitest" {
@@ -17,23 +17,23 @@ declare module "vitest" {
   }
 }
 
-const root = fileURLToPath(new URL(".", import.meta.url));
+const ui = fileURLToPath(new URL("..", import.meta.url));
 const outDir = fileURLToPath(new URL("../node_modules/.csp", import.meta.url));
 
 export default async function serve(project: TestProject) {
+  // A build of its own, in a process of its own: a production build in this one would share it
+  // with the server that transforms the component tests as they run.
+  await promisify(execFile)(
+    "bun",
+    ["x", "--bun", "--no-install", "vite", "build", "--config", "csp/vite.config.ts"],
+    { cwd: ui },
+  );
   const policy = (await readFile(new URL("policy.txt", import.meta.url), "utf8")).trim();
-  const config: InlineConfig = {
-    configFile: false,
-    root,
-    // Its one chunk is larger than Vite's warning: it is never shipped, so only errors are said.
-    logLevel: "error",
-    plugins: [react(), tailwindcss()],
-    publicDir: "../public",
-    build: { outDir, emptyOutDir: true },
-  };
-  await build(config);
   const server = await preview({
-    ...config,
+    configFile: false,
+    root: fileURLToPath(new URL(".", import.meta.url)),
+    logLevel: "error",
+    build: { outDir },
     preview: {
       host: "127.0.0.1",
       port: 0,

@@ -43,9 +43,21 @@ export function greet(name: string): string {
 }
 \`\`\`
 
+\`\`\`python
+def ship(change: str) -> bool:
+    """Queue a green change."""
+    return change.startswith("feat")  # or a fix
+\`\`\`
+
 \`\`\`
 plain text, in no language
 \`\`\`
+
+The energy is $$E = mc^2$$, within a line, and on lines of its own:
+
+$$
+\\sum_{i=1}^{n} i = \\frac{n(n+1)}{2}
+$$
 
 \`\`\`mermaid
 flowchart LR
@@ -69,6 +81,11 @@ export const HOSTILE = [
   "> [!NOTE]\n> <img src=x onerror=alert(1)>",
   '```mermaid\nflowchart LR\n  A["<img src=x onerror=alert(1)>"] --> B\n  click A "javascript:alert(1)"\n```',
   "[^x]\n\n[^x]: <script>alert(1)</script>",
+  "$$\n\\href{javascript:alert(1)}{click}\n$$",
+  "$$\\url{javascript:alert(1)}$$ and $$\\htmlStyle{color:red}{x}$$",
+  "$$\n\\includegraphics{https://tracker.example/x.png}\n$$",
+  "$$\n\\fcolorbox{red}{blue}{x} \\pmb{y}\n$$",
+  "$$\n\\def\\x{\\x}\\x\n$$",
   // A language named for what every object has, which a lookup by name must not find.
   "```constructor\nx\n```\n\n```__proto__\ny\n```\n\n```toString\nz\n```",
 ] as const;

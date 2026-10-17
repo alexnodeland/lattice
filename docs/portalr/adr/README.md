@@ -45,9 +45,10 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0037](0037-form-controls-and-row-actions.md) | Form controls and row actions: a Base UI select, form fields, segmented windows, button variants and sizes | Accepted |
 | [0038](0038-people-by-email.md) | People by email, not by id | Accepted |
 | [0039](0039-elevation-status-colour-states-and-density.md) | Elevation, status colours, alerts and placeholders, and admin's compact density | Accepted |
-| [0040](0040-scenarios-against-a-generated-application-and-size-budgets.md) | Scenarios against a generated application, and size budgets | Accepted |
+| [0040](0040-scenarios-against-a-generated-application-and-size-budgets.md) | Scenarios against a generated application, and size budgets | Accepted, amended by 0044 |
 | [0041](0041-first-party-webassembly-in-the-apps-policy.md) | First-party WebAssembly in the app's policy | Accepted |
 | [0042](0042-mermaid-cant-draw-under-the-policy.md) | Mermaid can't draw in the page under the policy, so it is parked | Accepted |
-| [0043](0043-markdowns-basics.md) | Markdown's basics: code blocks, callouts, footnotes per message, copying, an add-ons seam, and tests under the policy | Accepted |
+| [0043](0043-markdowns-basics.md) | Markdown's basics: code blocks, callouts, footnotes per message, copying, an add-ons seam, and tests under the policy | Accepted, amended by 0044 |
+| [0044](0044-highlighting-and-math-on-demand.md) | Highlighting and math, loaded on demand, each with a size budget of its own | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

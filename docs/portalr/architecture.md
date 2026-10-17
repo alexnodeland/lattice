@@ -98,8 +98,8 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 | `Diff` | What a revision changed, as `client`'s `changes` cut it | Nothing |
 | `Thumbs` | The reader's thumbs on a message, an artifact or a run, and why | Thumbs, then a comment ([ADR-0018](adr/0018-the-runs-area-and-feedback.md)) |
 | `CommandButton` | One action, waiting while its command is in flight | The command |
-| `Markdown` | Markdown through Streamdown: no raw HTML, links to the web, mail, the page and the application alone, images from this origin alone; GitHub's callouts as alerts, footnotes of each message's own, and code blocks with their language, Wrap and Copy ([ADR-0043](adr/0043-markdowns-basics.md)) | Nothing |
-| `AddonsProvider` | Which of Markdown's add-ons the Markdown inside may draw; one that isn't drawn shows its source, with a quiet line. Mermaid is off, and parked ([ADR-0042](adr/0042-mermaid-cant-draw-under-the-policy.md)) | Nothing |
+| `Markdown` | Markdown through Streamdown: no raw HTML, links to the web, mail, the page and the application alone, images from this origin alone; GitHub's callouts as alerts, footnotes of each message's own, and code blocks with their language, Wrap and Copy ([ADR-0043](adr/0043-markdowns-basics.md)); highlighting in fifteen languages, and math as MathML, each loaded when a message needs it ([ADR-0044](adr/0044-highlighting-and-math-on-demand.md)) | Nothing |
+| `AddonsProvider` | Which of Markdown's add-ons the Markdown inside may draw; one that isn't drawn shows its source, with a quiet line. Math is on; Mermaid is off, and parked ([ADR-0042](adr/0042-mermaid-cant-draw-under-the-policy.md)) | Nothing |
 
 `ui` imports `client`'s types alone, which a root test holds it to. `Markdown` is held to the UIs' Content-Security-Policy too: `ui`'s `csp` tests build a page of it as the UIs are built, serve it with the policy a portalr test holds to the router's, and fail on any violation in Chromium ([ADR-0043](adr/0043-markdowns-basics.md)).
 

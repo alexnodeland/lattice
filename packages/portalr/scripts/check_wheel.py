@@ -90,6 +90,10 @@ def main() -> int:
             for ui in UIS
             if (name := f"portalr/static/{ui}/{NOTICES}") in names
         }
+    if manifests := sorted(n for n in names if "/.vite/" in n and not n.endswith("/")):
+        # Vite's manifest is the size check's, and not the UI's to serve (portalr ADR-0044).
+        sys.stderr.write(f"check_wheel: {wheel.name} carries {', '.join(manifests)}\n")
+        return 1
     if missing := [ui for ui in UIS if f"portalr/static/{ui}/index.html" not in names]:
         sys.stderr.write(f"check_wheel: {wheel.name} lacks the {', '.join(missing)} UI\n")
         return 1

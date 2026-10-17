@@ -186,7 +186,7 @@ test("a diagram shows as its source with one quiet line, whether diagrams are of
     .toBeVisible();
   expect(off.container.querySelector("svg:not([aria-hidden=true])")).toBeNull();
   const on = await render(
-    <AddonsProvider value={{ mermaid: true }}>
+    <AddonsProvider value={{ math: true, mermaid: true }}>
       <Markdown>{fence}</Markdown>
     </AddonsProvider>,
   );
@@ -286,4 +286,114 @@ test("streamed a character at a time, it never shows a half-written mark or a st
   }
   await screen.rerender(<Markdown>{GALLERY}</Markdown>);
   await expect.element(screen.getByRole("note").first()).toBeVisible();
+});
+
+test("a block in a language ui highlights is drawn in code's colours, which tokens.css sets", async () => {
+  const screen = await render(
+    <Markdown>{"```ts\nconst answer: number = 42; // why\n```"}</Markdown>,
+  );
+  const region = screen.getByRole("region", { name: "ts code" }).element();
+  await expect.poll(() => region.querySelectorAll("span").length).toBeGreaterThan(3);
+  const keyword = [...region.querySelectorAll("span")].find((span) => span.textContent === "const");
+  expect(keyword && getComputedStyle(keyword).color).toBe(token("code-token-keyword"));
+  const comment = [...region.querySelectorAll("span")].find((span) =>
+    span.textContent?.includes("why"),
+  );
+  expect(comment && getComputedStyle(comment).fontStyle).toBe("italic");
+  expect(comment && getComputedStyle(comment).color).toBe(token("code-token-comment"));
+  expect(region.textContent).toBe("const answer: number = 42; // why");
+});
+
+test("a block in a language ui doesn't highlight, or in none, is shown as it is", async () => {
+  const screen = await render(
+    <Markdown>{"```brainfuck\n+[-->-[>>+>-----<<]<--<---]>-.\n```"}</Markdown>,
+  );
+  const region = screen.getByRole("region", { name: "brainfuck code" }).element();
+  // No grammar loads for it, so what shows first is what stays.
+  expect(region.querySelector("span")).toBeNull();
+});
+
+test("a block still streaming is highlighted a whole line at a time; the line arriving is as it is", async () => {
+  const screen = await render(<Markdown streaming>{"```py\ndef f():\n    retu"}</Markdown>);
+  const region = screen.getByRole("region", { name: "py code" }).element();
+  await expect.poll(() => region.querySelectorAll("span").length).toBeGreaterThan(1);
+  const spans = [...region.querySelectorAll("span")].map((span) => span.textContent).join("");
+  expect(spans).toBe("def f():");
+  expect(region.textContent).toBe("def f():\n    retu");
+  await screen.rerender(<Markdown streaming>{"```py\ndef f():\n    return 1\n```"}</Markdown>);
+  await expect
+    .poll(() => [...region.querySelectorAll("span")].map((span) => span.textContent).join(""))
+    .toBe("def f():    return 1");
+});
+
+test("math, within a line or on lines of its own, is drawn as MathML", async () => {
+  const screen = await render(
+    <Markdown>
+      {"Energy is $$E = mc^2$$ here.\n\n$$\n\\frac{a}{b}\n$$\n\n```math\nx^2\n```"}
+    </Markdown>,
+  );
+  await expect.poll(() => screen.container.querySelectorAll("math").length).toBe(3);
+  const [inline, block, fenced] = [...screen.container.querySelectorAll("math")];
+  expect(inline?.getAttribute("display")).toBeNull();
+  expect(block?.getAttribute("display")).toBe("block");
+  expect(fenced?.getAttribute("display")).toBe("block");
+  await expect.element(screen.getByRole("region", { name: "Formula" }).first()).toBeVisible();
+  expect(screen.container.textContent).not.toContain("$$");
+});
+
+test("a single dollar is a price, never math", async () => {
+  const screen = await render(<Markdown>{"It costs $5, or $10 with $$x$$"}</Markdown>);
+  await expect.poll(() => screen.container.querySelectorAll("math").length).toBe(1);
+  expect(screen.container.querySelector("math")?.textContent).toContain("x");
+  await expect.element(screen.getByText(/It costs \$5, or \$10/)).toBeVisible();
+});
+
+test("with math off, a formula is its source: a block with its quiet line, and $$ within a line", async () => {
+  const screen = await render(
+    <AddonsProvider value={{ math: false, mermaid: false }}>
+      <Markdown>{"Energy is $$E = mc^2$$.\n\n$$\n\\frac{a}{b}\n$$"}</Markdown>
+    </AddonsProvider>,
+  );
+  await expect
+    .element(screen.getByText("Math is off here: this is the formula's source."))
+    .toBeVisible();
+  await expect
+    .element(screen.getByRole("region", { name: "math code" }))
+    .toHaveTextContent("\\frac{a}{b}");
+  await expect.element(screen.getByText("$$E = mc^2$$")).toBeVisible();
+  expect(screen.container.querySelector("math")).toBeNull();
+});
+
+test("TeX that isn't a formula is its source, with a quiet line, once it has all arrived", async () => {
+  const text = "$$\n\\frac{a}{\n$$";
+  // The formula beside it shows math has loaded; still streaming, no line says this one failed.
+  const streaming = await render(<Markdown streaming>{`$$x$$\n\n${text}`}</Markdown>);
+  await expect.poll(() => streaming.container.querySelectorAll("math").length).toBe(1);
+  expect(streaming.container.textContent).not.toContain("couldn't be drawn");
+  const screen = await render(<Markdown>{text}</Markdown>);
+  await expect
+    .element(screen.getByText("This formula couldn't be drawn: this is its source."))
+    .toBeVisible();
+});
+
+test.each([
+  "\\href{javascript:alert(1)}{click}",
+  "\\url{javascript:alert(1)}",
+  "\\htmlStyle{color:red}{x}",
+  "\\htmlClass{x}{y}",
+  "\\includegraphics{https://tracker.example/x.png}",
+  "\\fcolorbox{red}{blue}{x}",
+  "\\pmb{x}",
+])("hostile TeX is drawn as math that links, loads and styles nothing: %s", async (tex) => {
+  const screen = await render(<Markdown>{`$$\n${tex}\n$$`}</Markdown>);
+  await expect.poll(() => screen.container.querySelector("math")).not.toBeNull();
+  expect(screen.container.querySelector("[href], img, [style], script")).toBeNull();
+});
+
+test("TeX that expands without end is refused, and shown as its source", async () => {
+  const screen = await render(<Markdown>{"$$\n\\def\\x{\\x}\\x\n$$"}</Markdown>);
+  await expect
+    .element(screen.getByText("This formula couldn't be drawn: this is its source."))
+    .toBeVisible();
+  expect(screen.container.querySelector("math")).toBeNull();
 });

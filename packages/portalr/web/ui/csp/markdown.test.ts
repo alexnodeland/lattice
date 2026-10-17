@@ -102,12 +102,27 @@ test("a diagram, with diagrams off or on, shows as its source under the policy",
   const { page, reported } = await opened();
   const fence = "```mermaid\nflowchart LR\n  A --> B\n```";
   for (const mermaid of [false, true]) {
-    await page.evaluate(([text, on]) => window.show(text, { addons: { mermaid: on } }), [
-      fence,
-      mermaid,
-    ] as const);
+    await page.evaluate(
+      ([text, on]) => window.show(text, { addons: { math: true, mermaid: on } }),
+      [fence, mermaid] as const,
+    );
     expect(await page.getByRole("region", { name: "mermaid code" }).count()).toBe(1);
   }
+  expect(await reported()).toEqual([]);
+  await page.context().close();
+});
+
+test("math, drawn and off, and highlighted code, render under the policy", async () => {
+  const { page, reported } = await opened();
+  await page.evaluate((text) => window.show(text), GALLERY);
+  await page.locator("math").first().waitFor();
+  await page.locator('[aria-label="python code"] span').first().waitFor();
+  expect(await page.locator("math").count()).toBe(2);
+  await page.evaluate(
+    (text) => window.show(text, { addons: { math: false, mermaid: false } }),
+    GALLERY,
+  );
+  await page.getByText("Math is off here: this is the formula's source.").waitFor();
   expect(await reported()).toEqual([]);
   await page.context().close();
 });

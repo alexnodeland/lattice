@@ -84,6 +84,23 @@
   --ansi-5: light-dark(#a3187a, #f08ad0);
   --ansi-6: light-dark(#0b6a7a, #5fd3e6);
   --ansi-7: light-dark(#5e5470, #f1eef6);
+  /*
+   * Code's colours, which highlighting's theme names (`--code-token-keyword` and the rest), each
+   * text on the paper a block sits on: the working colour for keywords, a log line's colours for the
+   * rest, the quiet ink for comments, which are italic too. Each is 4.5:1 or more on the paper and
+   * the surface, which a token test holds (portalr ADR-0044).
+   */
+  --code-foreground: var(--fg);
+  --code-background: transparent;
+  --code-token-keyword: var(--accent);
+  --code-token-link: var(--accent);
+  --code-token-string: var(--ansi-2);
+  --code-token-string-expression: var(--ansi-5);
+  --code-token-function: var(--ansi-4);
+  --code-token-constant: var(--ansi-3);
+  --code-token-parameter: var(--ansi-6);
+  --code-token-punctuation: var(--fg);
+  --code-token-comment: var(--muted);
   /* How wide a page's content is, at most: a wide screen centres it, and has no dead gutter at its right. */
   --page-width: 75rem;
   /*
@@ -140,7 +157,7 @@
  * saturation set so that each holds 3:1 on the paper and the surface in each scheme and the three
  * stay 20 or more apart, to CIEDE2000, under each deficiency, and turns
  * every pattern on: each series past the first is hatched, dashed in a line, and has a marker of
- * its own shape, so no series relies on its hue. The account menu's "Colour-blind friendly charts" sets it, per browser (portalr ADR-0036).
+ * its own shape, so no series relies on its hue; and it draws code in three inks. The account menu's "Colour-blind friendly charts" sets it, per browser (portalr ADR-0036).
  */
 [data-cvd] {
   --chart-1: light-dark(#0a85ff, #0ac6ff);
@@ -153,6 +170,17 @@
   --chart-marker-corner-2: 0;
   --chart-marker-corner-3: 0;
   --chart-marker-turn-3: 45deg;
+  /*
+   * Code in three inks: keywords a blue, strings an orange, and the rest the text's own, 20 or more
+   * apart under each deficiency; comments keep the quiet ink, and their italics.
+   */
+  --code-token-keyword: light-dark(#0a5fb4, #78b8ff);
+  --code-token-link: var(--code-token-keyword);
+  --code-token-string: light-dark(#a64400, #ff9a5c);
+  --code-token-string-expression: var(--code-token-string);
+  --code-token-function: var(--fg);
+  --code-token-constant: var(--fg);
+  --code-token-parameter: var(--fg);
 }
 
 /*

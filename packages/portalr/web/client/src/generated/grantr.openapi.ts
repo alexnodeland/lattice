@@ -263,10 +263,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List Integrations
-         * @description Every integration as it is set on a tenant, or in a workspace, and whether it is on.
+         * Tenant Integrations
+         * @description Every integration as it is set on a tenant, and whether it is on where unset.
          */
-        get: operations["list_integrations_grantr_v1_tenants__tenant__integrations_get"];
+        get: operations["tenant_integrations_grantr_v1_tenants__tenant__integrations_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -284,12 +284,12 @@ export interface paths {
         };
         get?: never;
         /**
-         * Set Integration
-         * @description Turn an integration on or off, on a tenant or in a workspace, or unset it with null.
+         * Set Tenant Integration
+         * @description Turn an integration on or off on a tenant, or unset it with null.
          *
          *     Setting what is set already changes nothing, and records nothing.
          */
-        put: operations["set_integration_grantr_v1_tenants__tenant__integrations__key__put"];
+        put: operations["set_tenant_integration_grantr_v1_tenants__tenant__integrations__key__put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -493,6 +493,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/grantr/v1/tenants/{tenant}/workspaces/{workspace}/enabled-integrations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Enabled Integrations
+         * @description Whether each integration is on in a workspace, by key, for whoever can open it.
+         */
+        get: operations["enabled_integrations_grantr_v1_tenants__tenant__workspaces__workspace__enabled_integrations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/grantr/v1/tenants/{tenant}/workspaces/{workspace}/integrations": {
         parameters: {
             query?: never;
@@ -502,10 +522,32 @@ export interface paths {
         };
         /**
          * Workspace Integrations
-         * @description Whether each integration is on in a workspace, by key, for whoever can open it.
+         * @description Every integration as it is set in a workspace and on its tenant, and whether it is on.
          */
         get: operations["workspace_integrations_grantr_v1_tenants__tenant__workspaces__workspace__integrations_get"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/grantr/v1/tenants/{tenant}/workspaces/{workspace}/integrations/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Workspace Integration
+         * @description Turn an integration on or off in a workspace, or unset it with null.
+         *
+         *     Setting what is set already changes nothing, and records nothing.
+         */
+        put: operations["set_workspace_integration_grantr_v1_tenants__tenant__workspaces__workspace__integrations__key__put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -737,12 +779,11 @@ export interface components {
         };
         /**
          * IntegrationSwitch
-         * @description An integration's new setting, on the tenant or in a workspace.
+         * @description An integration's new setting, on the tenant or in a workspace, as its path names.
          */
         IntegrationSwitch: {
             /** On */
             on: boolean | null;
-            workspace?: components["schemas"]["WorkspaceId"] | null;
         };
         /**
          * IssuedKey
@@ -1544,11 +1585,9 @@ export interface operations {
             };
         };
     };
-    list_integrations_grantr_v1_tenants__tenant__integrations_get: {
+    tenant_integrations_grantr_v1_tenants__tenant__integrations_get: {
         parameters: {
-            query?: {
-                workspace?: components["schemas"]["WorkspaceId"] | null;
-            };
+            query?: never;
             header?: never;
             path: {
                 tenant: string;
@@ -1577,7 +1616,7 @@ export interface operations {
             };
         };
     };
-    set_integration_grantr_v1_tenants__tenant__integrations__key__put: {
+    set_tenant_integration_grantr_v1_tenants__tenant__integrations__key__put: {
         parameters: {
             query?: never;
             header?: never;
@@ -2043,7 +2082,7 @@ export interface operations {
             };
         };
     };
-    workspace_integrations_grantr_v1_tenants__tenant__workspaces__workspace__integrations_get: {
+    enabled_integrations_grantr_v1_tenants__tenant__workspaces__workspace__enabled_integrations_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -2064,6 +2103,75 @@ export interface operations {
                     "application/json": {
                         [key: string]: boolean;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    workspace_integrations_grantr_v1_tenants__tenant__workspaces__workspace__integrations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant: string;
+                workspace: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationState"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_workspace_integration_grantr_v1_tenants__tenant__workspaces__workspace__integrations__key__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant: string;
+                workspace: string;
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IntegrationSwitch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationState"];
                 };
             };
             /** @description Validation Error */

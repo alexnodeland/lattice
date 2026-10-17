@@ -196,19 +196,24 @@ does, and the log drops the envelopes about one. An open subscription asks again
 its ``threads`` and ``artifacts``.
 """
 
-Gate = Callable[
-    ["Workspace", Command, Versioned[Artifact] | CreateArtifact | None], Awaitable[None]
-]
+Changes = Versioned[Artifact] | CreateArtifact | None
+"""The data a command makes or changes, as a :data:`Gate` hears it (ADR-0081).
+
+It is the artifact an edit, or an accepted proposal, changes, as storage holds it; or the
+:class:`~artifactr.core.CreateArtifact` that makes one, a proposal's among them. It is ``None``
+for a command that changes no artifact's data, such as an archive or a rejected proposal, and
+for one on an artifact that doesn't exist.
+"""
+
+Gate = Callable[["Workspace", Command, Changes], Awaitable[None]]
 """Refuses a command while an integration it needs is off in the workspace (ADR-0081).
 
 :class:`Workspaces` holds it, and :meth:`Workspace.commit` calls it once the command's targets
 pass ``hidden`` and before ``authorize`` hears the command, so a refusal says nothing about the
 actor's grants, and nothing about a hidden artifact. It is given the committing handle, the
-command, and what the command changes: the artifact an edit, an archive or an answer to a
-proposal is about, as storage holds it, or the :class:`~artifactr.core.CreateArtifact` that
-makes one, a proposal's among them. It is ``None`` for a command on no artifact, or on one
-that doesn't exist. It refuses with :class:`~artifactr.core.NotEnabled`; anything else it raises
-fails the command as an error. Reads and facts are never gated.
+command, and the :data:`Changes` it makes, read without asking ``authorize``. It refuses with
+:class:`~artifactr.core.NotEnabled`; anything else it raises fails the command as an error.
+Reads and facts are never gated.
 """
 
 OnOpen = Callable[[TenantId, WorkspaceId], Awaitable[None]]
@@ -551,8 +556,9 @@ class Workspace:
         ) as span:
             try:
                 _check_text(command, cursor, claim)
-                command, asked = await self._unhidden(command)
-                await self._gate(command)
+                answered = await self._answered(command)
+                command, asked = await self._unhidden(command, answered)
+                await self._gate(command, answered)
                 for access in asked:
                     await self._authorize(access)
                 self._check_kind(command)
@@ -697,7 +703,15 @@ class Workspace:
             return result.outcome
         return result.outcome.model_copy(update={"seq": envelopes[-1].seq})
 
-    async def _unhidden(self, command: Command) -> tuple[Command, list[Access]]:
+    async def _answered(self, command: Command) -> Proposal | None:
+        """The proposal a command answers, read without asking ``authorize``, or None."""
+        if isinstance(command, RespondToProposal):
+            return await self._storage.proposal(self._scope, command.proposal_id)
+        return None
+
+    async def _unhidden(
+        self, command: Command, answered: Proposal | None
+    ) -> tuple[Command, list[Access]]:
         """Refuse a command about what its actor can't see, and return what to ask ``authorize``.
 
         A command names a thread or artifact, as missing if it is hidden. It may act on more:
@@ -711,13 +725,9 @@ class Workspace:
             _not_hidden(access, await self.hidden())
         asked = [access]
         match command:
-            case RespondToProposal(proposal_id=proposal_id):
-                proposal = await self._storage.proposal(self._scope, proposal_id)
-                if proposal is not None:
-                    about = Access(action=access.action, artifact_id=proposal.artifact_id)
-                    asked.append(
-                        await self._unhidden_item(about, NotFound("proposal", proposal_id))
-                    )
+            case RespondToProposal(proposal_id=proposal_id) if answered is not None:
+                about = Access(action=access.action, artifact_id=answered.artifact_id)
+                asked.append(await self._unhidden_item(about, NotFound("proposal", proposal_id)))
             case (
                 AnswerDeferred(run_id=run_id)
                 | GiveFeedback(target=TurnTarget(run_id=run_id))
@@ -751,24 +761,29 @@ class Workspace:
             raise missing from None
         return access
 
-    async def _gate(self, command: Command) -> None:
+    async def _gate(self, command: Command, answered: Proposal | None) -> None:
         """Ask the gate about a command, with what it changes, if there is a gate."""
         gate = self._context.gate
         if gate is not None:
-            await gate(self, command, await self._changes(command))
+            await gate(self, command, await self._changes(command, answered))
 
-    async def _changes(self, command: Command) -> Versioned[Artifact] | CreateArtifact | None:
-        """What a command changes, as the gate hears it, read without asking ``authorize``."""
+    async def _changes(self, command: Command, answered: Proposal | None) -> Changes:
+        """The data a command makes or changes, read only for a command that changes some.
+
+        Accepting a proposal carries its change out, with the reviewer's own ``changes`` on
+        top, so accepting a proposed archive changes the artifact as an edit does.
+        """
         match command:
             case CreateArtifact():
                 return command
-            case EditArtifact(artifact_id=artifact_id) | ArchiveArtifact(artifact_id=artifact_id):
+            case EditArtifact(artifact_id=artifact_id):
                 return await self._storage.artifact(self._scope, artifact_id)
             case ProposeChange(change=change):
-                return await self._changes(change)
-            case RespondToProposal(proposal_id=proposal_id):
-                proposal = await self._storage.proposal(self._scope, proposal_id)
-                return None if proposal is None else await self._changes(proposal.change)
+                return await self._changes(change, None)
+            case RespondToProposal(decision="accept") if answered is not None:
+                if isinstance(answered.change, CreateArtifact):
+                    return answered.change
+                return await self._storage.artifact(self._scope, answered.artifact_id)
             case _:
                 return None
 

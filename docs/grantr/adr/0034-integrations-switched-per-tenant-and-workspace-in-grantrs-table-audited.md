@@ -20,19 +20,21 @@ The RFC put the adapter, its table, its row-level security and its audit in gran
   | Read | Requires | Answers |
   |---|---|---|
   | `integrations(tenant, workspace=None, by=...)` | `grantr:manage_integrations` on the tenant, or on the workspace | An `IntegrationState` per integration, in the registry's order: its key, description and default, whether it is installed, the tenant's and the workspace's `IntegrationSetting` (on or off, by whom, when), and whether it is on. On the tenant, `enabled` is what a workspace that sets nothing gets |
-  | `enabled(tenant, workspace, by=...)` | Any library's `open` on the workspace, as `workspaces()` counts them | Each key's answer, for the client that hides what is off |
+  | `integrations_enabled(tenant, workspace, by=...)` | Any library's `open` on the workspace, as `workspaces()` counts them | Each key's answer, for the client that hides what is off |
 
 - **`set_integration(tenant, key, on, workspace=None, by=...)` is a command** like every other: checked first, then one transaction with its audit entry, a new event, `IntegrationSet` (`integration_set`: `workspace`, `None` for the tenant; `key`; `on`, `None` for unset). `on=None` unsets the level, which inherits the one above again. A key the registry doesn't declare, or an empty workspace id, is `Invalid`. A key the deployment doesn't install may be set, and stays off until it is installed. The setting's time is its audit entry's, so the two agree.
 - **Only a change is recorded.** Setting a level to what it is set to already, or unsetting what isn't set, writes and records nothing, and returns the state as it is: a `PUT` that is repeated is idempotent, and the log holds one entry per real change, which replay to the stored settings. A property test runs random sequences of settings, repeats and resets, at both levels, in two tenants, and holds the log to exactly that.
-- **The settings are a table of their own,** `grantr_integrations` (migration 0006): the tenant, the workspace (`""` for the tenant's own setting, as the other tables avoid nulls in their keys), the key, and the setting as JSON, as an audit entry's body is. Its primary key, `(tenant_id, workspace, key)`, is the read's index. `is_enabled` reads the tenant's rows and the workspace's, two reads by that key's prefix. Deleting a tenant deletes its settings, and a tenant made again with its id starts with none.
+- **The settings are a table of their own,** `grantr_integrations` (migration 0006): the tenant, the workspace (`""` for the tenant's own setting, as the other tables avoid nulls in their keys), the key, and the setting as JSON, as an audit entry's body is. Its primary key, `(tenant_id, workspace, key)`, is the read's index. Each `is_enabled` costs two indexed reads of the store, the tenant's rows and the workspace's, each by that key's prefix, on every call: nothing caches them. Deleting a tenant deletes its settings, and a tenant made again with its id starts with none.
 - **Row-level security holds on it as on every table** ([ADR-0026](0026-row-level-security-under-the-scoping.md)): migration 0006 enables it and creates `grantr_integrations_tenant`, the same policy, so a transaction reads, changes and adds only its own tenant's settings. A two-tenant test shows a transaction in one tenant neither reads nor writes the other's. The deployment has no settings.
 - **The admin API has three routes:**
 
   | Path | Requires |
   |---|---|
-  | `GET /tenants/{tenant}/integrations`, `?workspace=` for a workspace | `grantr:manage_integrations` there |
-  | `PUT /tenants/{tenant}/integrations/{key}`, with `on`, required (true, false, or null to unset), and `workspace` (null for the tenant) | `grantr:manage_integrations` there |
-  | `GET /tenants/{tenant}/workspaces/{workspace}/integrations` | Any library's `open` on the workspace; a workspace's id may hold a `/` |
+  | `GET /tenants/{tenant}/integrations`; `PUT /tenants/{tenant}/integrations/{key}` | `grantr:manage_integrations` on the tenant |
+  | `GET /tenants/{tenant}/workspaces/{workspace}/integrations`; `PUT /tenants/{tenant}/workspaces/{workspace}/integrations/{key}` | `grantr:manage_integrations` on the workspace |
+  | `GET /tenants/{tenant}/workspaces/{workspace}/enabled-integrations` | Any library's `open` on the workspace |
+
+  The path names the level, and a `PUT`'s body is `{"on": ...}`: true, false, or null to unset, and required. A workspace's id may hold a `/`; each route ends in segments of its own and a key holds no slash, so a path matches one route however its workspace's id reads, and a test names workspaces `team/integrations` and `team/enabled-integrations`.
 
 - **An external provider only narrows.** The port answers yes or no, so a feature-flag service (issue #361) fits as an `Integrations` of the application's that asks grantr's `is_enabled` first and then the provider, and is on only where both are. It can turn off what grantr's settings leave on, and never turn on what they leave off; its decisions are not in grantr's audit log. lattice builds none.
 
@@ -54,6 +56,6 @@ The RFC put the adapter, its table, its row-level security and its audit in gran
 
 - Easier: every integration asks one port, and grantr answers it from the deployment's installation and the tenant's and workspace's settings, with who set each in the audit log. portalr's admin reads and switches them through grantr's API, and its client hides what is off in a workspace.
 - Easier: an application declares its own integrations in the registry it passes, and switches them as lattice's.
-- Harder: each integration's command reads two rows' prefixes before it acts. They are small and indexed; a cache, if one is needed, belongs to the application's `Integrations`.
+- Harder: every `is_enabled` is two indexed reads of the store, before each command and model request of an integration's. A cache, if one is needed, belongs to the application's `Integrations`.
 - Harder: the registry is configuration, not data: a key removed from it leaves its settings stored and unread, and a key renamed is a new integration.
 - To revisit: whether the deployment's installation should be readable through the API, for the admin page to say why an integration is off; `installed` in each state says it already.

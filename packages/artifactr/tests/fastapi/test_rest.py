@@ -8,7 +8,7 @@ from artifactr.workspace import integration_gate
 from lattice_core.refusals import Refused, RejectionDetail
 from tests.agent.conftest import Script, call, say
 from tests.fastapi.conftest import build, command, wait_for
-from tests.workspace.test_gate import NOTES, Switch, key_of
+from tests.workspace.gating import NOTES, Switch, key_of
 
 BASE = "/v1/workspaces/w1"
 
@@ -54,9 +54,8 @@ def test_an_integration_switched_off_is_a_conflict_and_reads_still_work() -> Non
         create = command("c1", type="create_artifact", artifact_id="n1", kind="note", data={})
         assert client.post(f"{BASE}/commands", json=create).status_code == 200
         switch.off.add(("tenant", "w1", NOTES))
-        archive = command("c2", type="archive_artifact", artifact_id="n1", base_version=1)
         edit = command(
-            "c3",
+            "c2",
             type="edit_artifact",
             artifact_id="n1",
             base_version=1,
@@ -70,6 +69,7 @@ def test_an_integration_switched_off_is_a_conflict_and_reads_still_work() -> Non
             "integration": "notes",
         }
         assert client.get(f"{BASE}/artifacts/n1").json()["version"] == 1
+        archive = command("c3", type="archive_artifact", artifact_id="n1", base_version=1)
         assert client.post(f"{BASE}/commands", json=archive).status_code == 200
 
 

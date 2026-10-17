@@ -4,8 +4,8 @@ Each step sets an integration on a tenant or in a workspace, on, off or unset, b
 subject, in one of two tenants. The model predicts whether grantr refuses it, and records each
 real change; a setting that is set already, or an unsetting of what isn't, changes nothing.
 After every step each tenant's audit log holds one ``integration_set`` entry per real change in
-it, in order, naming who and where; replaying them gives the store's settings; and each
-workspace's answer is the one the model's levels give (ADR-0034).
+it, in order, naming who and where; replaying them gives the store's settings; and
+``is_enabled`` is wired to the stored levels (ADR-0034).
 """
 
 import asyncio
@@ -156,7 +156,7 @@ class IntegrationsMachine(RuleBasedStateMachine):
             }
 
     @invariant()
-    def each_workspace_answers_as_its_levels_say(self) -> None:
+    def is_enabled_is_wired_to_the_stored_levels(self) -> None:
         for tenant, workspace, key in (
             (t, w, k) for t in TENANTS for w in ("w1", "w2") for k in KEYS
         ):

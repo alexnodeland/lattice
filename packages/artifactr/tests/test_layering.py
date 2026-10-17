@@ -97,6 +97,13 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         {*INNER, "artifactr.evals"},
         {"evalr", "pydantic", "pydantic_ai", *OTEL_API},
     ),
+    # Native files, the files extra (lattice RFC-0003 and ADR-0026): built on the public API of
+    # core and the workspace, with its SQL stores in the sql extra. tests/files/test_layering.py
+    # holds its own layers.
+    "files": (
+        {"artifactr.core", "artifactr.workspace", "artifactr.files"},
+        {"pydantic", "sqlalchemy", "alembic", "lattice_core.sql"},
+    ),
 }
 
 
@@ -135,6 +142,12 @@ def test_layer_imports_only_what_it_may(layer: str) -> None:
 def test_every_package_is_a_layer() -> None:
     packages = {path.name for path in SRC.iterdir() if (path / "__init__.py").exists()}
     assert packages == set(LAYERS)
+
+
+def test_the_package_root_imports_only_the_inner_layers() -> None:
+    for name in _imports(SRC / "__init__.py"):
+        if name.split(".")[0] not in sys.stdlib_module_names:
+            assert _within(name, INNER), name
 
 
 PUBLIC = {"artifactr", *(f"artifactr.{package}" for package in LAYERS)}

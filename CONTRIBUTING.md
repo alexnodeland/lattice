@@ -15,7 +15,7 @@ make check          # every project's checks, as CI runs them
 
 ## Commands
 
-moon runs every task, from any directory: `moon run <project>:<task>`, or `moon run :<task>` for every project that has it. It runs only what a change affects, and caches the rest. `moon project <project>` lists a project's tasks. The projects are the packages (`artifactr`, `artifactr-files`, `reflexr`, `evalr`, `relayr`, `grantr`, `stackr`, `portalr`), portalr's web packages (`client`, `ui`, `app`, `admin`), the reference implementations (`docplan`, `oncall`), and `lattice`, the root.
+moon runs every task, from any directory: `moon run <project>:<task>`, or `moon run :<task>` for every project that has it. It runs only what a change affects, and caches the rest. `moon project <project>` lists a project's tasks. The projects are the packages (`artifactr`, `reflexr`, `evalr`, `relayr`, `grantr`, `stackr`, `portalr`), portalr's web packages (`client`, `ui`, `app`, `admin`), the reference implementations (`docplan`, `oncall`), and `lattice`, the root.
 
 Every Python project has these:
 
@@ -48,11 +48,11 @@ The packages' own tasks:
 | `grantr:schema` | Regenerate the admin API's OpenAPI document from the router (a test fails if it drifts) |
 | `portalr:schema` | Regenerate portalr's router's OpenAPI document (a test fails if it drifts) |
 | `artifactr:dashboards`, `reflexr:dashboards` | Regenerate the Grafana dashboards in `deploy/grafana/dashboards/` (a test fails if they drift) |
-| `artifactr:pg-up`, `reflexr:pg-up`, `grantr:pg-up`, `relayr:pg-up`, `artifactr-files:pg-up` | Start PostgreSQL for the SQL tests, from the package's `compose.yaml` |
-| `artifactr:test-pg`, `reflexr:test-pg`, `grantr:test-pg`, `relayr:test-pg`, `artifactr-files:test-pg` | Run the tests on PostgreSQL as well as SQLite |
+| `artifactr:pg-up`, `reflexr:pg-up`, `grantr:pg-up`, `relayr:pg-up` | Start PostgreSQL for the SQL tests, from the package's `compose.yaml` |
+| `artifactr:test-pg`, `reflexr:test-pg`, `grantr:test-pg`, `relayr:test-pg` | Run the tests on PostgreSQL as well as SQLite |
 | `relayr:vikunja-up`, `relayr:test-vikunja` | Start Vikunja on port 54333, from relayr's `compose.yaml`, and run the tracker contract test against it, live; with `RELAYR_RECORD=1`, its recorded exchanges are made again |
 | `artifactr:app-up`, `reflexr:app-up` | Build and start the reference implementation on PostgreSQL, at <http://localhost:8000> |
-| `artifactr:pg-down`, `reflexr:pg-down`, `grantr:pg-down`, `relayr:pg-down`, `artifactr-files:pg-down` | Stop the package's contributor stack |
+| `artifactr:pg-down`, `reflexr:pg-down`, `grantr:pg-down`, `relayr:pg-down` | Stop the package's contributor stack |
 | `artifactr:api`, `reflexr:api` | Start the reference implementation on PostgreSQL, run the package's Bruno collection and Schemathesis against it, and stop it, as CI's Acceptance job does. It needs Docker |
 | `docplan:image`, `oncall:image` | Build the reference implementation's image from the root, start it on PostgreSQL, as a compose project of its own, and stop it, as CI's Images job does |
 | `portalr:api` | Start portalr's test application beside Tempo, Loki, Prometheus and prom-label-proxy, seed two tenants, run its Bruno collection with the tools up and down and Schemathesis, and stop it, as CI's Acceptance job does. It needs Docker |
@@ -70,10 +70,10 @@ stackr keeps its Makefile for the stack: run `make` in `packages/stackr` to list
 
 ### Testing SQL storage on PostgreSQL
 
-artifactr's, reflexr's and grantr's storage tests, relayr's ledger tests, and artifactr-files' blob and check-out tests, run against in-memory storage, SQLite and PostgreSQL. SQLite needs nothing extra, and it alone reaches the coverage gate. The PostgreSQL tests run only when `ARTIFACTR_TEST_POSTGRES_URL`, `REFLEXR_TEST_POSTGRES_URL`, `GRANTR_TEST_POSTGRES_URL`, `RELAYR_TEST_POSTGRES_URL` or `ARTIFACTR_FILES_TEST_POSTGRES_URL` is set (otherwise pytest reports them as deselected), and CI always runs them.
+artifactr's, reflexr's and grantr's storage tests, and relayr's ledger tests, run against in-memory storage, SQLite and PostgreSQL. SQLite needs nothing extra, and it alone reaches the coverage gate. The PostgreSQL tests run only when `ARTIFACTR_TEST_POSTGRES_URL`, `REFLEXR_TEST_POSTGRES_URL`, `GRANTR_TEST_POSTGRES_URL` or `RELAYR_TEST_POSTGRES_URL` is set (otherwise pytest reports them as deselected), and CI always runs them.
 
 ```bash
-moon run artifactr:pg-up        # postgres:17 on localhost:54329 (reflexr's is on 54330, grantr's on 54331, relayr's on 54332, artifactr-files' on 54333)
+moon run artifactr:pg-up        # postgres:17 on localhost:54329 (reflexr's is on 54330, grantr's on 54331, relayr's on 54332)
 moon run artifactr:test-pg      # the whole suite, with the PostgreSQL tests included
 moon run artifactr:pg-down
 ```

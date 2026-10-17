@@ -13,6 +13,7 @@
 | `artifactr.fastapi`, `artifactr.mcp` | Implemented |
 | `artifactr.otel`, `artifactr.langfuse`, `artifactr.litellm` | Implemented: the OpenTelemetry SDK, Langfuse and LiteLLM adapters |
 | `artifactr.evals` | Implemented: datasets from the log, experiments, online evaluation and the end-to-end measures, over evalr |
+| `artifactr.files` | Phase 1 of [lattice RFC-0003](../rfcs/0003-native-files-as-artifacts.md): native files' types, blobs, check-outs and the app port, unreleased ([its section](files/index.md)) |
 | `examples/docplan` | Implemented: server, terminal client and tests; observed, rated and routed when configured |
 
 ## What artifactr is
@@ -90,6 +91,7 @@ The inner layers (core, telemetry, workspace, agent) form a hexagon of ports and
 | `artifactr.evals` (extra) | agent, evalr | Adapter for `TurnEvaluator`, and for evalr's `FeedbackSource` and experiment `Task` | Datasets from the log, experiments that replay turns, online evaluation of turns with verdicts recorded as feedback, and the end-to-end measures ([ADR-0044](adr/0044-the-evalr-adapter.md)). |
 | `artifactr.fastapi` (extra) | agent, FastAPI | Driving adapter | The thread protocol over WebSocket, and REST commands. |
 | `artifactr.mcp` (extra) | agent, mcp, lattice-core's `logs` | Driving adapter | Artifacts as MCP resources, commands and reads as MCP tools. |
+| `artifactr.files` (extra) | the public API of core and workspace; its `sql` layer SQLAlchemy 2 async, Alembic and lattice-core's `sql` | A domain built on artifactr, with ports of its own: `Blobs`, `Checkouts` and `App` | Native files as artifacts: manifests over a blob store, check-outs and agents' edits under one lease, and its own tables and migrations ([its architecture](files/architecture.md), [lattice ADR-0026](../adr/0026-a-distribution-needs-a-reason-integrations-are-extras.md)). |
 
 ### `artifactr.core`: sans-IO
 

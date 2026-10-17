@@ -5,7 +5,6 @@
 projects:
   lattice: '.'
   artifactr: 'packages/artifactr'
-  artifactr-files: 'packages/artifactr-files'
   reflexr: 'packages/reflexr'
   evalr: 'packages/evalr'
   lattice-core: 'packages/lattice-core'

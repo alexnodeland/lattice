@@ -18,6 +18,7 @@ from grantr.sql.schema import _row_level_security
 VERSIONS = Path(__file__).parents[2] / "src/grantr/sql/migrations/versions"
 MIGRATION = VERSIONS / "0003_row_level_security.py"
 CREATION = VERSIONS / "0005_tenant_creation_in_the_deployment_log.py"
+INTEGRATIONS = VERSIONS / "0006_integrations.py"
 
 POLICIES = 10
 """How many policies the migration creates: one per table it names, frozen in it."""
@@ -37,6 +38,12 @@ class Recorder:
     def execute(self, statement: object, parameters: object = None) -> None:
         self.calls.append((str(statement), parameters))
 
+    def create_table(self, name: str, *columns: object) -> None:
+        self.calls.append((f"CREATE TABLE {name}", columns))
+
+    def drop_table(self, name: str) -> None:
+        self.calls.append((f"DROP TABLE {name}", None))
+
 
 def _migration(
     recorder: Recorder, monkeypatch: pytest.MonkeyPatch, path: Path = MIGRATION
@@ -46,7 +53,13 @@ def _migration(
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    op = SimpleNamespace(get_bind=lambda: recorder, execute=recorder.execute)
+    op = SimpleNamespace(
+        get_bind=lambda: recorder,
+        execute=recorder.execute,
+        create_table=recorder.create_table,
+        drop_table=recorder.drop_table,
+        f=str,
+    )
     monkeypatch.setattr(module, "op", op)
     return module
 
@@ -55,11 +68,12 @@ def test_create_schema_creates_the_policies_the_migration_does(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     migrated = Recorder()
-    _migration(migrated, monkeypatch).upgrade()
-    _migration(migrated, monkeypatch, CREATION).upgrade()
+    for path in (MIGRATION, CREATION, INTEGRATIONS):
+        _migration(migrated, monkeypatch, path).upgrade()
     created = Recorder()
     _row_level_security(cast("Connection", created))
-    assert sorted(created.statements) == sorted(migrated.statements)
+    policies = [s for s in migrated.statements if not s.startswith("CREATE TABLE")]
+    assert sorted(created.statements) == sorted(policies)
 
 
 def test_the_migration_creates_and_drops_the_policies(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -103,3 +117,29 @@ def test_the_creation_migration_does_nothing_off_postgresql(
     migration.upgrade()
     migration.downgrade()
     assert recorder.calls == []
+
+
+def test_the_integrations_migration_keeps_its_table_to_its_tenant(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    recorder = Recorder()
+    migration = _migration(recorder, monkeypatch, INTEGRATIONS)
+    migration.upgrade()
+    assert recorder.statements == [
+        "CREATE TABLE grantr_integrations",
+        "ALTER TABLE grantr_integrations ENABLE ROW LEVEL SECURITY",
+        "CREATE POLICY grantr_integrations_tenant ON grantr_integrations"
+        " USING (tenant_id = current_setting('lattice.tenant_id', true))"
+        " WITH CHECK (tenant_id = current_setting('lattice.tenant_id', true))",
+    ]
+    recorder.calls.clear()
+    migration.downgrade()
+    assert recorder.statements == ["DROP TABLE grantr_integrations"], "its policy goes with it"
+
+
+def test_the_integrations_migration_makes_only_the_table_off_postgresql(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    recorder = Recorder(SimpleNamespace(name="sqlite"))
+    _migration(recorder, monkeypatch, INTEGRATIONS).upgrade()
+    assert recorder.statements == ["CREATE TABLE grantr_integrations"]

@@ -1,4 +1,7 @@
-"""The storage port: where tenants, grants, groups, custom roles, keys and the audit log live.
+"""The storage port: where access, the settings of integrations, and the audit log live.
+
+It holds tenants, grants, groups, custom roles and keys, and which integrations each tenant and
+workspace turned on or off.
 
 grantr ships an in-memory implementation, :class:`~grantr.grants.InMemoryStorage`; the SQL one
 comes with grantr's ``sql`` extra. The contract test in the test tree shows what an
@@ -20,6 +23,7 @@ from grantr.core import (
     Grant,
     Grantee,
     Group,
+    IntegrationSetting,
     Key,
     ListableKind,
     Member,
@@ -101,6 +105,12 @@ class Reads(Protocol):
         """Whether a thread or artifact is restricted."""
         ...
 
+    async def integrations(
+        self, tenant: TenantId, workspace: WorkspaceId | None = None
+    ) -> dict[str, IntegrationSetting]:
+        """The integrations set on a tenant, with None, or in one of its workspaces, by key."""
+        ...
+
 
 class Transaction(Reads, Protocol):
     """One atomic change to access, serialized with every other in its tenant.
@@ -146,6 +156,16 @@ class Transaction(Reads, Protocol):
 
     async def set_restricted(self, tenant: TenantId, on: Resource, restricted: bool) -> None:
         """Restrict a thread or artifact, or lift its restriction."""
+        ...
+
+    async def set_integration(
+        self,
+        tenant: TenantId,
+        workspace: WorkspaceId | None,
+        key: str,
+        setting: IntegrationSetting | None,
+    ) -> None:
+        """Set an integration on a tenant, with None, or in a workspace; unset it with None."""
         ...
 
     async def add_key(self, key: Key) -> None:

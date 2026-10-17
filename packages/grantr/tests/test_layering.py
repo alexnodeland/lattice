@@ -1,7 +1,8 @@
 """The layering in grantr's architecture, enforced.
 
-The core has no I/O and imports only pydantic; grants imports the core. grantr imports neither
-artifactr nor reflexr, nor any sibling: the libraries' types reach it structurally.
+The core has no I/O and imports only pydantic; grants imports the core, and lattice-core's
+registry of integrations. grantr imports neither artifactr nor reflexr, nor any sibling but
+lattice-core: the libraries' types reach it structurally.
 """
 
 import ast
@@ -18,7 +19,10 @@ OTEL_API = {"opentelemetry.metrics", "opentelemetry.trace"}
 LAYERS: dict[str, tuple[set[str], set[str]]] = {
     # layer: (grantr packages it may import, third-party modules it may import)
     "core": ({"grantr.core"}, {"pydantic"}),
-    "grants": ({"grantr.core", "grantr.grants", "grantr.telemetry"}, OTEL_API),
+    "grants": (
+        {"grantr.core", "grantr.grants", "grantr.telemetry"},
+        {*OTEL_API, "lattice_core.integrations"},
+    ),
     "telemetry": ({"grantr.core", "grantr.telemetry"}, {"opentelemetry", *OTEL_API}),
     "testing": ({"grantr.core", "grantr.testing"}, set()),
     "fastapi": (

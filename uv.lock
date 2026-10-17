@@ -1541,6 +1541,7 @@ name = "grantr"
 version = "0.1.0"
 source = { editable = "packages/grantr" }
 dependencies = [
+    { name = "lattice-core-ai" },
     { name = "opentelemetry-api" },
     { name = "pydantic" },
 ]
@@ -1606,6 +1607,7 @@ requires-dist = [
     { name = "fastapi", marker = "extra == 'fastapi'", specifier = ">=0.141" },
     { name = "grantr", extras = ["sql"], marker = "extra == 'postgres'" },
     { name = "grantr", extras = ["sql"], marker = "extra == 'sqlite'" },
+    { name = "lattice-core-ai", editable = "packages/lattice-core" },
     { name = "lattice-core-ai", extras = ["sql"], marker = "extra == 'sql'", editable = "packages/lattice-core" },
     { name = "opentelemetry-api", specifier = ">=1.28" },
     { name = "pydantic", specifier = ">=2.13" },

@@ -39,5 +39,6 @@ ADR-0001 to ADR-0009 record the decisions D1 to D9 of [lattice RFC-0001](../../r
 | [0031](0031-the-catalog-read.md) | The catalog, read | Accepted |
 | [0032](0032-the-audit-log-read-newest-first.md) | The audit log, read from its end | Accepted |
 | [0033](0033-a-tenants-creation-in-the-deployments-log.md) | A tenant's creation, in the deployment's log | Accepted |
+| [0034](0034-integrations-switched-per-tenant-and-workspace-in-grantrs-table-audited.md) | Integrations switched per tenant and workspace, in grantr's table, audited | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

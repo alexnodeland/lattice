@@ -25,6 +25,9 @@ from grantr.core import (
     Group,
     GroupDefined,
     GroupDeleted,
+    IntegrationSet,
+    IntegrationSetting,
+    IntegrationState,
     Invalid,
     KeyIssued,
     KeyRevoked,
@@ -50,6 +53,7 @@ from grantr.core import (
 )
 from grantr.core.roles import RESTRICT
 from grantr.grants import Grants, Storage
+from lattice_core.integrations import KNOWN, Integration, registry
 from tests.catalogs import ARTIFACTR, REFLEXR
 from tests.grants.conftest import ALICE, NOW, ROOT
 
@@ -909,6 +913,213 @@ async def test_an_operator_lists_the_tenants(grants: Grants) -> None:
         await grants.tenants(by=ALICE)
     with pytest.raises(Invalid, match="isn't empty"):
         await grants.create_tenant("", owner=CAROL.id, by=ROOT)
+
+
+# ─── integrations ────────────────────────────────────────────────────────────
+
+
+async def _workspace_admin(grants: Grants) -> None:
+    """Bob, w1's admin, and Carol, w1's editor."""
+    await _members(grants, BOB, CAROL)
+    await grants.grant("acme", "admin", on=WS, to=BOB, by=ALICE)
+    await grants.grant("acme", "editor", on=WS, to=CAROL, by=ALICE)
+
+
+async def test_an_integration_is_on_where_every_level_leaves_it_on(grants: Grants) -> None:
+    await _workspace_admin(grants)
+    assert await grants.is_enabled("acme", "w1", "excalidraw"), "on by default"
+    assert not await grants.is_enabled("acme", "w1", "ui:mini-apps"), "off by default"
+
+    await grants.set_integration("acme", "ui:mini-apps", True, workspace="w1", by=BOB)
+    assert await grants.is_enabled("acme", "w1", "ui:mini-apps"), "a workspace turns it on"
+    assert not await grants.is_enabled("acme", "w2", "ui:mini-apps"), "in that workspace only"
+
+    await grants.set_integration("acme", "ui:mini-apps", False, by=ALICE)
+    assert not await grants.is_enabled("acme", "w1", "ui:mini-apps"), (
+        "the tenant's off is a ceiling"
+    )
+    await grants.set_integration("acme", "ui:mini-apps", True, by=ALICE)
+    assert await grants.is_enabled("acme", "w2", "ui:mini-apps"), "w2 inherits the tenant's on"
+    await grants.set_integration("acme", "ui:mini-apps", False, workspace="w2", by=ALICE)
+    assert not await grants.is_enabled("acme", "w2", "ui:mini-apps"), "under an open ceiling"
+
+    await grants.set_integration("acme", "ui:mini-apps", None, by=ALICE)
+    await grants.set_integration("acme", "ui:mini-apps", None, workspace="w2", by=ALICE)
+    assert await grants.is_enabled("acme", "w1", "ui:mini-apps"), "w1's own on is back"
+    assert not await grants.is_enabled("acme", "w2", "ui:mini-apps"), "w2 is at the default"
+    assert not await grants.is_enabled("acme", "w1", "tracker:jira"), "a key it doesn't know"
+    assert not await grants.is_enabled("acme", "", "excalidraw"), "no workspace"
+    for tenant in ("", "a~b"):
+        assert not await grants.is_enabled(tenant, "w1", "excalidraw"), "no tenant"
+    assert not await grants.is_enabled("globex", "w1", "ui:mini-apps"), "acme's are acme's"
+
+
+async def test_what_the_deployment_doesnt_install_is_off_everywhere(storage: Storage) -> None:
+    grants = Grants(storage, catalogs=[ARTIFACTR], installed=["excalidraw", "tracker:plane"])
+    await grants.provision_tenant("acme", owner=ALICE.id)
+    await grants.set_integration("acme", "ui:mini-apps", True, by=ALICE)
+    await grants.set_integration("acme", "ui:mini-apps", True, workspace="w1", by=ALICE)
+    assert not await grants.is_enabled("acme", "w1", "ui:mini-apps"), "set, but not installed"
+    assert await grants.is_enabled("acme", "w1", "excalidraw")
+    states = {state.key: state for state in await grants.integrations("acme", by=ALICE)}
+    assert (states["ui:mini-apps"].installed, states["ui:mini-apps"].enabled) == (False, False)
+    assert states["excalidraw"].installed
+    with pytest.raises(ValueError, match="doesn't declare: tracker:jira"):
+        Grants(storage, installed=["excalidraw", "tracker:jira"])
+
+
+async def test_an_admin_reads_every_integration_at_their_level(grants: Grants) -> None:
+    await _workspace_admin(grants)
+    await grants.set_integration("acme", "excalidraw", False, workspace="w1", by=BOB)
+    await grants.set_integration("acme", "markdown:mermaid", True, by=ALICE)
+
+    on_the_tenant = await grants.integrations("acme", by=ALICE)
+    assert [state.key for state in on_the_tenant] == list(KNOWN), "in the registry's order"
+    mermaid = IntegrationSetting(on=True, by=ALICE, at=NOW)
+    assert on_the_tenant[list(KNOWN).index("markdown:mermaid")] == IntegrationState(
+        key="markdown:mermaid",
+        description=KNOWN["markdown:mermaid"].description,
+        default=False,
+        installed=True,
+        tenant=mermaid,
+        workspace=None,
+        enabled=True,
+    )
+    in_w1 = {
+        state.key: state for state in await grants.integrations("acme", workspace="w1", by=BOB)
+    }
+    assert in_w1["excalidraw"].workspace == IntegrationSetting(on=False, by=BOB, at=NOW)
+    assert (in_w1["excalidraw"].tenant, in_w1["excalidraw"].enabled) == (None, False)
+    assert (in_w1["markdown:mermaid"].tenant, in_w1["markdown:mermaid"].enabled) == (mermaid, True)
+    on_w2 = {
+        state.key: state for state in await grants.integrations("acme", workspace="w2", by=ALICE)
+    }
+    assert on_w2["excalidraw"].enabled, "w1's setting is w1's"
+
+
+async def test_who_switches_an_integration_and_where(grants: Grants) -> None:
+    await _workspace_admin(grants)
+    await grants.set_integration("acme", "excalidraw", False, workspace="w1", by=BOB)
+    with pytest.raises(Forbidden, match="grantr:manage_integrations on the tenant"):
+        await grants.set_integration("acme", "excalidraw", False, by=BOB)
+    with pytest.raises(Forbidden, match="grantr:manage_integrations on the tenant"):
+        await grants.integrations("acme", by=BOB)
+    with pytest.raises(Forbidden, match="grantr:manage_integrations on the workspace"):
+        await grants.set_integration("acme", "excalidraw", False, workspace="w2", by=BOB)
+    with pytest.raises(Forbidden, match="grantr:manage_integrations on the workspace"):
+        await grants.integrations("acme", workspace="w1", by=CAROL)
+    with pytest.raises(Forbidden, match="grantr:manage_integrations on the workspace"):
+        await grants.set_integration("acme", "excalidraw", True, workspace="w1", by=Agent())
+    with pytest.raises(Invalid, match="there is no integration tracker:jira"):
+        await grants.set_integration("acme", "tracker:jira", True, by=ALICE)
+    with pytest.raises(Invalid, match="a workspace's id isn't empty"):
+        await grants.set_integration("acme", "excalidraw", True, workspace="", by=ALICE)
+    with pytest.raises(Invalid, match="a workspace's id isn't empty"):
+        await grants.integrations("acme", workspace="", by=ALICE)
+
+    switcher = Role(name="switcher", actions=frozenset({"grantr:manage_integrations"}))
+    await grants.define_role("acme", switcher, by=ALICE)
+    await grants.grant("acme", "switcher", on=OTHER, to=CAROL, by=ALICE)
+    state = await grants.set_integration("acme", "excalidraw", False, workspace="w2", by=CAROL)
+    assert state.workspace == IntegrationSetting(on=False, by=CAROL, at=NOW)
+
+
+async def test_each_real_change_to_an_integration_is_recorded_once(grants: Grants) -> None:
+    await _workspace_admin(grants)
+    before = await grants.audit("acme", by=ALICE)
+    changes: list[tuple[str | None, bool | None]] = [
+        (None, False),
+        (None, False),
+        ("w1", True),
+        ("w1", True),
+        ("w1", None),
+        ("w1", None),
+        (None, None),
+    ]
+    for workspace, on in changes:
+        state = await grants.set_integration("acme", "ui:forms", on, workspace=workspace, by=ALICE)
+        level = state.tenant if workspace is None else state.workspace
+        assert level == (None if on is None else IntegrationSetting(on=on, by=ALICE, at=NOW))
+    entries = (await grants.audit("acme", by=ALICE))[len(before) :]
+    assert [entry.event for entry in entries] == [
+        IntegrationSet(workspace=None, key="ui:forms", on=False),
+        IntegrationSet(workspace="w1", key="ui:forms", on=True),
+        IntegrationSet(workspace="w1", key="ui:forms", on=None),
+        IntegrationSet(workspace=None, key="ui:forms", on=None),
+    ], "a repeated setting records nothing"
+    assert all((entry.by, entry.at, entry.tenant) == (ALICE, NOW, "acme") for entry in entries)
+    kept = AuditFilter(types=frozenset({"integration_set"}))
+    assert await grants.audit("acme", by=ALICE, keep=kept) == entries
+
+
+async def test_whoever_can_open_a_workspace_reads_what_is_on_in_it(
+    grants: Grants, storage: Storage
+) -> None:
+    await _members(grants, BOB, CAROL)
+    await grants.grant("acme", "viewer", on=WS, to=BOB, by=ALICE)
+    await grants.grant("acme", "viewer", on=THREAD, to=CAROL, by=ALICE)
+    await grants.set_integration("acme", "excalidraw", False, workspace="w1", by=ALICE)
+    enabled = await grants.enabled("acme", "w1", by=BOB)
+    assert list(enabled) == list(KNOWN)
+    assert enabled == {
+        key: key not in ("excalidraw", "ui:mini-apps", "markdown:mermaid") for key in KNOWN
+    }
+    assert await grants.enabled("acme", "w2", by=ALICE) == {
+        key: integration.default for key, integration in KNOWN.items()
+    }
+    with pytest.raises(Invalid, match="a workspace's id isn't empty"):
+        await grants.enabled("acme", "", by=ALICE)
+    for refused in (CAROL, Agent(), ServicePrincipal(id="ci")):
+        with pytest.raises(Forbidden, match="opening the workspace is refused"):
+            await grants.enabled("acme", "w1", by=refused)
+    with pytest.raises(Forbidden, match="opening the workspace is refused"):
+        # With no library's catalog, there is no open to hold.
+        await Grants(storage).enabled("acme", "w1", by=ALICE)
+
+
+async def test_an_application_switches_its_own_integrations(storage: Storage) -> None:
+    own = registry(Integration("acme:reports", default=False, description="Reports, weekly."))
+    grants = Grants(storage, catalogs=[ARTIFACTR], integrations=own)
+    await grants.provision_tenant("acme", owner=ALICE.id)
+    assert [state.key for state in await grants.integrations("acme", by=ALICE)] == ["acme:reports"]
+    await grants.set_integration("acme", "acme:reports", True, by=ALICE)
+    assert await grants.is_enabled("acme", "w1", "acme:reports")
+    assert not await grants.is_enabled("acme", "w1", "excalidraw"), "not in its registry"
+    with pytest.raises(Invalid, match="there is no integration excalidraw"):
+        await grants.set_integration("acme", "excalidraw", True, by=ALICE)
+
+
+async def test_integrations_go_with_their_tenant(grants: Grants) -> None:
+    await grants.create_tenant("globex", owner=CAROL.id, by=ROOT)
+    for tenant, by in (("acme", ALICE), ("globex", CAROL)):
+        await grants.set_integration(tenant, "excalidraw", False, by=by)
+        await grants.set_integration(tenant, "ui:forms", False, workspace="w1", by=by)
+    await grants.set_integration("globex", "excalidraw", None, by=CAROL)
+    assert not await grants.is_enabled("acme", "w2", "excalidraw"), "globex's change is globex's"
+    await grants.delete_tenant("globex", by=CAROL)
+    await grants.create_tenant("globex", owner=CAROL.id, by=ROOT)
+    assert all(state.tenant is None for state in await grants.integrations("globex", by=CAROL))
+    in_w1 = await grants.integrations("globex", workspace="w1", by=CAROL)
+    assert all(state.workspace is None for state in in_w1)
+    assert not await grants.is_enabled("acme", "w1", "ui:forms"), "acme keeps its own"
+
+
+async def test_a_storage_sets_and_unsets_an_integration(storage: Storage) -> None:
+    on = IntegrationSetting(on=True, by=ALICE, at=NOW)
+    off = IntegrationSetting(on=False, by=RulePrincipal(workspace="w1", rule="r"), at=NOW)
+    async with storage.transaction("acme") as tx:
+        await tx.create_tenant("acme")
+        await tx.set_integration("acme", None, "excalidraw", on)
+        await tx.set_integration("acme", "w1", "excalidraw", off)
+        await tx.set_integration("acme", "w1", "ui:forms", on)
+        assert await tx.integrations("acme", "w1") == {"excalidraw": off, "ui:forms": on}
+    async with storage.transaction("acme") as tx:
+        await tx.set_integration("acme", "w1", "excalidraw", on)
+        await tx.set_integration("acme", "w1", "ui:forms", None)
+        await tx.set_integration("acme", "w2", "ui:forms", None)
+    assert await storage.integrations("acme") == {"excalidraw": on}
+    assert await storage.integrations("acme", "w1") == {"excalidraw": on}
+    assert await storage.integrations("acme", "w2") == {}
 
 
 # ─── the application and the deployment's own tools ─────────────────────────

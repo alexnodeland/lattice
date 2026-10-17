@@ -313,3 +313,72 @@ async def test_anyone_signed_in_reads_the_catalog(client: httpx.AsyncClient) -> 
     assert "artifactr:open" in catalog["custom_actions"]
     assert catalog["custom_kinds"] == ["workspace", "thread", "artifact", "rule"]
     assert (await client.get("/catalog")).status_code == 401
+
+
+async def test_admins_switch_integrations_and_members_read_them(client: httpx.AsyncClient) -> None:
+    await client.post("/tenants/acme/members", json={"member": BOB}, headers=AS_ALICE)
+    viewer = {"role": "viewer", "on": {"kind": "workspace", "workspace": "team/notes"}, "to": BOB}
+    await client.post("/tenants/acme/grants", json=viewer, headers=AS_ALICE)
+
+    off = await client.put(
+        "/tenants/acme/integrations/excalidraw", json={"on": False}, headers=AS_ALICE
+    )
+    assert off.status_code == 200
+    assert off.json()["tenant"] == {
+        "on": False,
+        "by": ALICE.model_dump(),
+        "at": off.json()["tenant"]["at"],
+    }
+    assert off.json()["enabled"] is False
+    on = await client.put(
+        "/tenants/acme/integrations/ui%3Amini-apps",
+        json={"on": True, "workspace": "team/notes"},
+        headers=AS_ALICE,
+    )
+    assert (on.json()["key"], on.json()["enabled"]) == ("ui:mini-apps", True)
+    unset = await client.put(
+        "/tenants/acme/integrations/excalidraw", json={"on": None}, headers=AS_ALICE
+    )
+    assert (unset.json()["tenant"], unset.json()["enabled"]) == (None, True)
+
+    listed = await client.get("/tenants/acme/integrations", headers=AS_ALICE)
+    assert [state["key"] for state in listed.json()][:2] == ["tracker:plane", "tracker:vikunja"]
+    in_notes = await client.get(
+        "/tenants/acme/integrations", params={"workspace": "team/notes"}, headers=AS_ALICE
+    )
+    [mini_apps] = [state for state in in_notes.json() if state["key"] == "ui:mini-apps"]
+    assert mini_apps["workspace"]["on"] is True
+
+    enabled = await client.get("/tenants/acme/workspaces/team/notes/integrations", headers=AS_BOB)
+    assert enabled.status_code == 200
+    assert enabled.json()["ui:mini-apps"] is True
+    assert enabled.json()["excalidraw"] is True
+
+    refused = await client.put(
+        "/tenants/acme/integrations/ui:forms", json={"on": False}, headers=AS_BOB
+    )
+    assert refused.status_code == 403
+    assert refused.json()["detail"]["message"] == (
+        "grantr:manage_integrations on the tenant is refused"
+    )
+    elsewhere = await client.get("/tenants/acme/workspaces/w2/integrations", headers=AS_BOB)
+    assert elsewhere.status_code == 403
+    unknown = await client.put(
+        "/tenants/acme/integrations/tracker:jira", json={"on": True}, headers=AS_ALICE
+    )
+    assert unknown.json()["detail"] == {
+        "type": "invalid",
+        "message": "there is no integration tracker:jira",
+    }
+    assert (
+        await client.put("/tenants/acme/integrations/ui:forms", json={}, headers=AS_ALICE)
+    ).status_code == 422, "on is required: null unsets it"
+
+    audit = await client.get(
+        "/tenants/acme/audit", params={"type": "integration_set"}, headers=AS_ALICE
+    )
+    assert [entry["event"] for entry in audit.json()] == [
+        {"type": "integration_set", "workspace": None, "key": "excalidraw", "on": False},
+        {"type": "integration_set", "workspace": "team/notes", "key": "ui:mini-apps", "on": True},
+        {"type": "integration_set", "workspace": None, "key": "excalidraw", "on": None},
+    ]

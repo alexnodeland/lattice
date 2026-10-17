@@ -1,4 +1,4 @@
-"""The audit log's events: every change to access, typed.
+"""The audit log's events: every change to access, and to which integrations are on, typed.
 
 grantr appends one entry per change, in the same transaction as the change, with a sequence
 number, the time, the tenant and who made it. Refusals aren't recorded. A key's secret, and its
@@ -14,7 +14,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from grantr.core.grants import Grant
-from grantr.core.ids import TenantId, UserId
+from grantr.core.ids import TenantId, UserId, WorkspaceId
 from grantr.core.resources import Resource
 from grantr.core.roles import Role
 from grantr.core.subjects import Member, ServicePrincipal, Subject
@@ -164,6 +164,20 @@ class Unrestricted(BaseModel):
     on: Resource
 
 
+class IntegrationSet(BaseModel):
+    """An integration was turned on or off, on the tenant or in a workspace, or unset."""
+
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["integration_set"] = "integration_set"
+    workspace: WorkspaceId | None
+    """The workspace it was set in; ``None`` for the tenant."""
+
+    key: str
+    on: bool | None
+    """Its new setting; ``None`` for unset, which inherits the level above."""
+
+
 type AuditEvent = Annotated[
     TenantCreated
     | DeploymentTenantCreated
@@ -179,10 +193,11 @@ type AuditEvent = Annotated[
     | KeyIssued
     | KeyRevoked
     | Restricted
-    | Unrestricted,
+    | Unrestricted
+    | IntegrationSet,
     Field(discriminator="type"),
 ]
-"""A change to access."""
+"""A change to access, or to an integration's setting."""
 
 
 class AuditEntry(BaseModel):
@@ -219,6 +234,7 @@ type AuditType = Literal[
     "key_revoked",
     "restricted",
     "unrestricted",
+    "integration_set",
 ]
 """An audit event's ``type``: what a read of the log may keep."""
 

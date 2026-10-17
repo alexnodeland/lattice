@@ -34,7 +34,7 @@ tasks:
     description: "Model-check the thread claim's TLA+ spec with TLC, at a pull request's bounds"
     command: >-
       $workspaceRoot/scripts/tlc $workspaceRoot/docs/artifactr/spec/ThreadClaim.tla
-      ThreadClaim.cfg ThreadClaimLapse.cfg ThreadClaimLive.cfg
+      ThreadClaim.cfg ThreadClaimLapse.cfg ThreadClaimLive.cfg ThreadClaimRecovery.cfg
     inputs:
       - '/docs/artifactr/spec/**/*'
       - '/scripts/tlc'

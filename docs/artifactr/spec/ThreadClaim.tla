@@ -25,9 +25,10 @@
 \* Not modelled: I7, the upgrade point, a migration's property that test_upgrade.py holds. Also
 \* left out: authorization and one author per turn (ADR-0057), so every message is one author's;
 \* the agent's own messages; Runner.aclose, and cancelling a Runner.drain, the only ways to
-\* cancel a hand-over; a hand-over that raises, which _take_over logs and drops, leaving what was
-\* asked to the next command; and a process's concurrent tasks: each process here is one task at
-\* a time, and a crash ends it.
+\* cancel a hand-over; a hand-over or a look again that raises, which the runner logs and drops,
+\* leaving what was asked to the next command; and a process's concurrent tasks: each process here
+\* is one task at a time, and a crash ends it, beside a refused claimant's look, which waits in
+\* the background; and a process that starts again sweeps the thread before anything else.
 EXTENDS Naturals, Sequences, FiniteSets
 
 CONSTANTS
@@ -69,12 +70,13 @@ VARIABLES
     nxt,      \* what it does once it has released the thread: "loop", "handover" or "return"
     snap,     \* the cursors, and whether it was cancelled, that its hand-over compares with
     askVal,   \* what it will save as asked
-    owe       \* its caller's call: "call" while it runs, "owed" once it raised or its process
+    owe,      \* its caller's call: "call" while it runs, "owed" once it raised or its process
               \* died, "no" once it returned or there was none
+    looking   \* whether a claimant it refused is to look at the thread again (Runner._retake)
 
 shared == <<log, asked, taken, runs>>
 audit  == <<count, effects, crashes, faults, failed, lapsed>>
-local  == <<pc, lost, rd, plan, dlv, nxt, snap, askVal, owe>>
+local  == <<pc, lost, rd, plan, dlv, nxt, snap, askVal, owe, looking>>
 vars   == <<shared, lease, audit, local>>
 
 Free == [owner |-> "none", ttl |-> 0]
@@ -114,7 +116,7 @@ Init ==
     /\ rd = [p \in Procs |-> NoSnap] /\ plan = [p \in Procs |-> NoPlan]
     /\ dlv = [p \in Procs |-> 0] /\ nxt = [p \in Procs |-> "loop"]
     /\ snap = [p \in Procs |-> NoSnap] /\ askVal = [p \in Procs |-> 0]
-    /\ owe = [p \in Procs |-> "no"]
+    /\ owe = [p \in Procs |-> "no"] /\ looking = [p \in Procs |-> FALSE]
 
 \* A cancellation (c) or a failure, within the behaviour's budget.
 Fault(c) == /\ faults < MaxFaults /\ faults' = faults + 1 /\ failed' = (failed \/ ~c)
@@ -136,7 +138,7 @@ Send(p) ==
     /\ log' = Append(log, "sent")
     /\ askVal' = [askVal EXCEPT ![p] = Len(log')] /\ owe' = [owe EXCEPT ![p] = "call"]
     /\ Step(p, "asking")
-    /\ UNCHANGED <<asked, taken, runs, lease, audit, lost, rd, plan, dlv, nxt, snap>>
+    /\ UNCHANGED <<asked, taken, runs, lease, audit, lost, rd, plan, dlv, nxt, snap, looking>>
 
 \* Workspace.commit, without the runner: a message, or a notice. It asks for nothing.
 Direct(kind) ==
@@ -151,21 +153,21 @@ Answer(p) ==
     /\ runs' = [runs EXCEPT ![PausedRun].open = @ - 1]
     /\ owe' = [owe EXCEPT ![p] = "call"]
     /\ Step(p, "head")
-    /\ UNCHANGED <<asked, taken, lease, audit, lost, rd, plan, dlv, nxt, snap, askVal>>
+    /\ UNCHANGED <<asked, taken, lease, audit, lost, rd, plan, dlv, nxt, snap, askVal, looking>>
 
 \* Runner.ask: a caller whose call raised, or whose process died, asks again (ADR-0064).
 Retry(p) ==
     /\ Retries /\ pc[p] = "idle" /\ owe[p] # "no"
     /\ owe' = [owe EXCEPT ![p] = "call"]
     /\ Step(p, "head")
-    /\ UNCHANGED <<shared, lease, audit, lost, rd, plan, dlv, nxt, snap, askVal>>
+    /\ UNCHANGED <<shared, lease, audit, lost, rd, plan, dlv, nxt, snap, askVal, looking>>
 
 \* Runner.resume and Runner.ask: read the log's head, to ask for it.
 ReadHead(p) ==
     /\ pc[p] = "head"
     /\ askVal' = [askVal EXCEPT ![p] = Len(log)]
     /\ Step(p, "asking")
-    /\ UNCHANGED <<shared, lease, audit, lost, rd, plan, dlv, nxt, snap, owe>>
+    /\ UNCHANGED <<shared, lease, audit, lost, rd, plan, dlv, nxt, snap, owe, looking>>
 
 \* Runner._take: save the ask. It has read nothing yet.
 SaveAsk(p) ==
@@ -173,7 +175,8 @@ SaveAsk(p) ==
     /\ asked' = Max(asked, askVal[p])
     /\ rd' = [rd EXCEPT ![p] = NoSnap]
     /\ Step(p, "reading")
-    /\ UNCHANGED <<log, taken, runs, lease, audit, lost, plan, dlv, nxt, snap, askVal, owe>>
+    /\ UNCHANGED <<log, taken, runs, lease, audit, lost, plan, dlv, nxt, snap, askVal, owe,
+                   looking>>
 
 -----------------------------------------------------------------------------
 \* Runner._take, _start and _plan: a claimant.
@@ -185,7 +188,7 @@ ReadCursors(p) ==
     /\ IF asked <= taken
           THEN Step(p, "idle") /\ Returned(p)
           ELSE Step(p, "claiming") /\ UNCHANGED owe
-    /\ UNCHANGED <<shared, lease, audit, lost, plan, dlv, nxt, snap, askVal>>
+    /\ UNCHANGED <<shared, lease, audit, lost, plan, dlv, nxt, snap, askVal, looking>>
 
 \* Workspace.claim_thread: acquire the lease, under a holder of the claim's own.
 Acquire(p) ==
@@ -193,13 +196,26 @@ Acquire(p) ==
     /\ lease' = [owner |-> p, ttl |-> TTL]
     /\ lost' = [lost EXCEPT ![p] = FALSE]
     /\ Step(p, "abandoning")
-    /\ UNCHANGED <<shared, audit, rd, plan, dlv, nxt, snap, askVal, owe>>
+    /\ UNCHANGED <<shared, audit, rd, plan, dlv, nxt, snap, askVal, owe, looking>>
 
-\* ThreadBusy: _take returns, and leaves the thread to its holder's hand-over.
+\* ThreadBusy: _take returns, leaving the thread to its holder's hand-over, and Runner._retake
+\* has the process look again once the claim could have lapsed, should its holder have died.
 Refused(p) ==
     /\ pc[p] = "claiming" /\ ~Acquirable
     /\ Step(p, "idle") /\ Returned(p)
-    /\ UNCHANGED <<shared, lease, audit, lost, rd, plan, dlv, nxt, snap, askVal>>
+    /\ looking' = [looking EXCEPT ![p] = TRUE]
+    /\ UNCHANGED <<shared, lease, audit, lost, rd, plan, dlv, nxt, snap, askVal, looking>>
+
+\* Runner._take_again: a claim_ttl after the refusal, a holder that lives has renewed its claim or
+\* released it, and one that died has let it lapse. A look refused again, by a live holder, is
+\* left out as a stutter: this step waits until the claim can be taken, or what was asked is
+\* taken, and then reads again. The process is one task, so it looks while it is idle.
+LookAgain(p) ==
+    /\ looking[p] /\ pc[p] = "idle" /\ (Acquirable \/ asked <= taken)
+    /\ looking' = [looking EXCEPT ![p] = FALSE]
+    /\ rd' = [rd EXCEPT ![p] = NoSnap]
+    /\ Step(p, "reading")
+    /\ UNCHANGED <<shared, lease, audit, lost, plan, dlv, nxt, snap, askVal, owe, looking>>
 
 \* _abandon: each run still running is recorded as failed, "abandoned".
 Abandon(p) ==
@@ -207,7 +223,8 @@ Abandon(p) ==
     /\ runs' = [r \in DOMAIN runs |->
                   IF runs[r].st = "running" THEN [runs[r] EXCEPT !.st = "failed"] ELSE runs[r]]
     /\ Step(p, "planning")
-    /\ UNCHANGED <<log, asked, taken, lease, audit, lost, rd, plan, dlv, nxt, snap, askVal, owe>>
+    /\ UNCHANGED <<log, asked, taken, lease, audit, lost, rd, plan, dlv, nxt, snap, askVal, owe,
+                   looking>>
 
 \* _plan: decide, holding the thread, which turn takes the oldest message not taken. Assumed
 \* atomic: _plan reads the cursors, the head, the paused runs and the log in separate awaits,
@@ -222,10 +239,10 @@ Plan(p) ==
                 tt |-> taken, ta |-> asked, done |-> FALSE]
            \* A turn is planned, and the caller's call returns its run.
            start(t, next) == /\ plan' = [plan EXCEPT ![p] = t] /\ Step(p, next)
-                             /\ Returned(p) /\ UNCHANGED <<taken, nxt>>
+                             /\ Returned(p) /\ UNCHANGED <<taken, nxt, looking>>
            \* Nothing is planned: release the thread, and look again.
            again == /\ Step(p, "releasing") /\ nxt' = [nxt EXCEPT ![p] = "loop"]
-                    /\ UNCHANGED <<plan, owe>>
+                    /\ UNCHANGED <<plan, owe, looking>>
        IN \/ /\ asked <= taken                                \* what was asked is taken
              /\ again /\ UNCHANGED taken
           \/ /\ asked > taken /\ Paused # {} /\ runs[PausedRun].open = 0
@@ -238,7 +255,7 @@ Plan(p) ==
              /\ Paused # {} => runs[PausedRun].open > 0
              /\ taken' = Max(taken, head)                    \* in a write of its own
              /\ again
-    /\ UNCHANGED <<log, asked, runs, lease, audit, lost, rd, dlv, snap, askVal>>
+    /\ UNCHANGED <<log, asked, runs, lease, audit, lost, rd, dlv, snap, askVal, looking>>
 
 \* An answer the plan's reply would commit now.
 Answering(p) ==
@@ -268,14 +285,14 @@ Reply(p) ==
                         ELSE Step(p, "planning") /\ UNCHANGED plan
                   /\ UNCHANGED <<log, runs, taken, count, effects>>
     /\ UNCHANGED <<asked, lease, crashes, faults, failed, lapsed, lost, rd, dlv, nxt, snap, askVal,
-                   owe>>
+                   owe, looking>>
 
 \* The answer's fence refuses it: another claimant has the thread. ThreadBusy propagates from
 \* _plan, the claim is released, and _take returns, leaving the thread to that claimant.
 ReplyFenced(p) ==
     /\ pc[p] = "replying" /\ Answering(p) /\ lease.owner # p
     /\ Step(p, "releasing") /\ nxt' = [nxt EXCEPT ![p] = "return"]
-    /\ UNCHANGED <<shared, lease, audit, lost, rd, plan, dlv, snap, askVal, owe>>
+    /\ UNCHANGED <<shared, lease, audit, lost, rd, plan, dlv, snap, askVal, owe, looking>>
 
 -----------------------------------------------------------------------------
 \* A run: Capability.wrap_run's start, its watcher, and its end.
@@ -301,7 +318,7 @@ RunStart(p) ==
           /\ dlv' = [dlv EXCEPT ![p] = t.hi]
     /\ Step(p, "running")
     /\ UNCHANGED <<log, asked, lease, crashes, faults, failed, lapsed, lost, rd, nxt, snap, askVal,
-                   owe>>
+                   owe, looking>>
 
 \* Core refuses the resume's run_started: the run fails before it starts.
 StartRefused(p) ==
@@ -310,7 +327,7 @@ StartRefused(p) ==
     /\ failed' = TRUE
     /\ Step(p, "releasing") /\ nxt' = [nxt EXCEPT ![p] = "handover"]
     /\ UNCHANGED <<shared, lease, count, effects, crashes, faults, lapsed, lost, rd, plan, dlv,
-                   askVal, owe>>
+                   askVal, owe, looking>>
 
 \* The fence refuses run_started: another claimant took the claim. The run fails before it starts,
 \* and hands over with what its plan read.
@@ -318,7 +335,7 @@ StartFenced(p) ==
     /\ pc[p] = "starting" /\ lease.owner # p
     /\ snap' = [snap EXCEPT ![p] = [t |-> plan[p].tt, a |-> plan[p].ta, c |-> FALSE]]
     /\ Step(p, "releasing") /\ nxt' = [nxt EXCEPT ![p] = "handover"]
-    /\ UNCHANGED <<shared, lease, audit, lost, rd, plan, dlv, askVal, owe>>
+    /\ UNCHANGED <<shared, lease, audit, lost, rd, plan, dlv, askVal, owe, looking>>
 
 \* The watcher gives the run the log's next entry; the run records it only at its end.
 Deliver(p) ==
@@ -326,7 +343,7 @@ Deliver(p) ==
     /\ dlv' = [dlv EXCEPT ![p] = @ + 1]
     /\ effects' = IF Msg(dlv[p] + 1) THEN Bump(effects, {dlv[p] + 1}) ELSE effects
     /\ UNCHANGED <<shared, lease, count, crashes, faults, failed, lapsed, pc, lost, rd, plan, nxt,
-                   snap, askVal, owe>>
+                   snap, askVal, owe, looking>>
 
 \* The run's end, recorded with the taken cursor in one write. An end that the run's abandonment
 \* came before is refused, and dropped (capability.py's _record).
@@ -342,7 +359,8 @@ End(p, outcome) ==
           /\ count' = IF recorded THEN Bump(count, Range(t.hi, dlv[p])) ELSE count
           /\ snap' = [snap EXCEPT ![p] = [t |-> t.tt, a |-> t.ta, c |-> outcome = "stopped"]]
     /\ Step(p, "releasing") /\ nxt' = [nxt EXCEPT ![p] = "handover"]
-    /\ UNCHANGED <<log, asked, lease, effects, crashes, lapsed, lost, rd, plan, dlv, askVal, owe>>
+    /\ UNCHANGED <<log, asked, lease, effects, crashes, lapsed, lost, rd, plan, dlv, askVal, owe,
+                   looking>>
 
 \* The agent's run completes, or pauses on questions.
 Finish(p, outcome) ==
@@ -368,7 +386,7 @@ Interrupt(p, c) ==
     /\ pc[p] \in {"head", "asking"} /\ Cancellable(p, c) /\ Fault(c)
     /\ Step(p, "idle")
     /\ UNCHANGED <<shared, lease, count, effects, crashes, lapsed, lost, rd, plan, dlv, nxt, snap,
-                   askVal, owe>>
+                   askVal, owe, looking>>
 
 \* In _take, from its ask to its claim, a cancellation hands over as it propagates, and so does a
 \* failure once _take has read the cursors, with what it read; rd is NoSnap until it has. Both
@@ -382,9 +400,9 @@ InterruptTaking(p, c, saved) ==
        IN IF c \/ read # NoSnap
              THEN /\ snap' = [snap EXCEPT ![p] = [read EXCEPT !.c = c]]
                   /\ Step(p, "handing") /\ nxt' = [nxt EXCEPT ![p] = "handover"]
-             ELSE Step(p, "idle") /\ UNCHANGED <<snap, nxt>>
+             ELSE Step(p, "idle") /\ UNCHANGED <<snap, nxt, looking>>
     /\ UNCHANGED <<log, taken, runs, lease, count, effects, crashes, lapsed, lost, rd, plan, dlv,
-                   askVal, owe>>
+                   askVal, owe, looking>>
 
 \* A claimant fails, or is cancelled, at its claim or holding it: _take hands over as the error
 \* propagates, with what it read.
@@ -395,7 +413,7 @@ FailClaimant(p, c) ==
     /\ IF pc[p] = "claiming" THEN Step(p, "handing") ELSE Step(p, "releasing")
     /\ nxt' = [nxt EXCEPT ![p] = "handover"]
     /\ UNCHANGED <<shared, lease, count, effects, crashes, lapsed, lost, rd, plan, dlv, askVal,
-                   owe>>
+                   owe, looking>>
 
 \* The same at the claim, once the storage granted it: SQL storage runs acquire_lease to its end
 \* and raises the cancellation after it. claim_thread releases the claim before it raises, as no
@@ -406,7 +424,7 @@ ClaimedAsInterrupted(p, c) ==
     /\ lost' = [lost EXCEPT ![p] = FALSE]
     /\ snap' = [snap EXCEPT ![p] = [t |-> rd[p].t, a |-> rd[p].a, c |-> c]]
     /\ Step(p, "releasing") /\ nxt' = [nxt EXCEPT ![p] = "handover"]
-    /\ UNCHANGED <<shared, count, effects, crashes, lapsed, rd, plan, dlv, askVal, owe>>
+    /\ UNCHANGED <<shared, count, effects, crashes, lapsed, rd, plan, dlv, askVal, owe, looking>>
 
 \* The run's task fails, or is stopped, before run_started is recorded: it consumed nothing, and
 \* hands over with what its plan read. Once its claim is lost, it is cancelled.
@@ -416,7 +434,7 @@ FailStart(p, c) ==
     /\ snap' = [snap EXCEPT ![p] = [t |-> plan[p].tt, a |-> plan[p].ta, c |-> c]]
     /\ Step(p, "releasing") /\ nxt' = [nxt EXCEPT ![p] = "handover"]
     /\ UNCHANGED <<shared, lease, count, effects, crashes, lapsed, lost, rd, plan, dlv, askVal,
-                   owe>>
+                   owe, looking>>
 
 \* A cancellation at the release: the release takes effect, both storages running it to its end,
 \* and the cancellation is raised after it, so the hand-over proceeds.
@@ -427,21 +445,28 @@ ReleaseInterrupted(p) ==
                                       THEN [@ EXCEPT !.c = TRUE]
                                       ELSE [t |-> rd[p].t, a |-> rd[p].a, c |-> TRUE]]
     /\ Step(p, "handing") /\ nxt' = [nxt EXCEPT ![p] = "handover"]
-    /\ UNCHANGED <<shared, count, effects, crashes, lapsed, lost, rd, plan, dlv, askVal, owe>>
+    /\ UNCHANGED <<shared, count, effects, crashes, lapsed, lost, rd, plan, dlv, askVal, owe,
+                   looking>>
 
-\* The process dies: its claim stays in storage until it lapses, and nothing is handed over.
+\* The process dies: its claim stays in storage until it lapses, nothing is handed over, and its
+\* look, and its caller's call, die with it.
 Crash(p) ==
     /\ pc[p] # "dead" /\ crashes < MaxCrashes
     /\ crashes' = crashes + 1
+    /\ owe' = [owe EXCEPT ![p] = IF @ = "call" THEN "owed" ELSE @]
+    /\ looking' = [looking EXCEPT ![p] = FALSE]
     /\ Step(p, "dead")
     /\ UNCHANGED <<shared, lease, count, effects, faults, failed, lapsed, lost, rd, plan, dlv, nxt,
-                   snap, askVal, owe>>
+                   snap, askVal, looking>>
 
+\* The process starts again with nothing in memory, and Runner.recover sweeps the thread: it reads
+\* the cursors, and takes what was asked and not taken.
 Restart(p) ==
     /\ pc[p] = "dead"
     /\ lost' = [lost EXCEPT ![p] = FALSE]
-    /\ Step(p, "idle")
-    /\ UNCHANGED <<shared, lease, audit, rd, plan, dlv, nxt, snap, askVal, owe>>
+    /\ rd' = [rd EXCEPT ![p] = NoSnap]
+    /\ Step(p, "reading")
+    /\ UNCHANGED <<shared, lease, audit, plan, dlv, nxt, snap, askVal, owe, looking>>
 
 -----------------------------------------------------------------------------
 \* The release, and the hand-over.
@@ -452,7 +477,7 @@ Release(p) ==
     /\ lease' = IF Mine(p) THEN Free ELSE lease
     /\ Step(p, CASE nxt[p] = "loop" -> "reading" [] nxt[p] = "handover" -> "handing"
                   [] OTHER -> "idle")
-    /\ UNCHANGED <<shared, audit, lost, rd, plan, dlv, nxt, snap, askVal, owe>>
+    /\ UNCHANGED <<shared, audit, lost, rd, plan, dlv, nxt, snap, askVal, owe, looking>>
 
 \* Runner._take_over: take the next turn if the claimant was cancelled, if a turn took something
 \* since it read, or if more was asked since.
@@ -460,7 +485,7 @@ HandOver(p) ==
     /\ pc[p] = "handing"
     /\ Step(p, IF snap[p].c \/ taken > snap[p].t \/ asked > snap[p].a THEN "reading" ELSE "idle")
     /\ owe' = [owe EXCEPT ![p] = IF @ = "call" THEN "owed" ELSE @]   \* the call raised
-    /\ UNCHANGED <<shared, lease, audit, lost, rd, plan, dlv, nxt, snap, askVal>>
+    /\ UNCHANGED <<shared, lease, audit, lost, rd, plan, dlv, nxt, snap, askVal, looking>>
 
 -----------------------------------------------------------------------------
 \* The clock, and Workspace._renew. A holder that does not stall renews before its TTL runs out.
@@ -481,7 +506,7 @@ Renew(p) ==
 Lapse(p) ==
     /\ pc[p] \in Holding /\ ~lost[p] /\ (lease.owner # p \/ lease.ttl = 0)
     /\ lost' = [lost EXCEPT ![p] = TRUE]
-    /\ UNCHANGED <<shared, lease, audit, pc, rd, plan, dlv, nxt, snap, askVal, owe>>
+    /\ UNCHANGED <<shared, lease, audit, pc, rd, plan, dlv, nxt, snap, askVal, owe, looking>>
 
 \* With nothing more to do, the system stays as it is: no deadlock.
 Done == (\A p \in Procs : pc[p] \in {"idle", "dead"}) /\ UNCHANGED vars
@@ -489,7 +514,7 @@ Done == (\A p \in Procs : pc[p] \in {"idle", "dead"}) /\ UNCHANGED vars
 Next ==
     \/ \E p \in Procs :
         \/ Send(p) \/ Answer(p) \/ Retry(p) \/ ReadHead(p) \/ SaveAsk(p)
-        \/ ReadCursors(p) \/ Acquire(p) \/ Refused(p) \/ Abandon(p) \/ Plan(p)
+        \/ ReadCursors(p) \/ Acquire(p) \/ Refused(p) \/ LookAgain(p) \/ Abandon(p) \/ Plan(p)
         \/ Reply(p) \/ ReplyFenced(p) \/ RunStart(p) \/ StartRefused(p) \/ StartFenced(p)
         \/ Deliver(p) \/ Finish(p, "completed") \/ Finish(p, "paused") \/ Stop(p) \/ Fail(p)
         \/ \E c \in BOOLEAN : \/ Interrupt(p, c)
@@ -508,7 +533,8 @@ Next ==
 Fairness ==
     /\ \A p \in Procs :
         /\ WF_vars(ReadHead(p)) /\ WF_vars(SaveAsk(p)) /\ WF_vars(ReadCursors(p))
-        /\ WF_vars(Acquire(p) \/ Refused(p)) /\ WF_vars(Abandon(p)) /\ WF_vars(Plan(p))
+        /\ WF_vars(Acquire(p) \/ Refused(p)) /\ WF_vars(LookAgain(p))
+        /\ WF_vars(Abandon(p)) /\ WF_vars(Plan(p))
         /\ WF_vars(Reply(p) \/ ReplyFenced(p))
         /\ WF_vars(RunStart(p) \/ StartRefused(p) \/ StartFenced(p))
         /\ WF_vars(Finish(p, "completed"))
@@ -535,7 +561,7 @@ TypeOK ==
     /\ lease.owner \in Procs \cup {"none"} /\ lease.ttl \in 0..TTL
     /\ pc \in [Procs -> Holding \cup {"idle", "head", "asking", "reading", "claiming", "handing",
                                       "dead"}]
-    /\ owe \in [Procs -> {"no", "call", "owed"}]
+    /\ owe \in [Procs -> {"no", "call", "owed"}] /\ looking \in [Procs -> BOOLEAN]
 
 \* I1. A message is recorded as consumed at most once: by the one write that consumes it.
 I1_ConsumedAtMostOnce == \A i \in DOMAIN count : count[i] <= 1

@@ -1,4 +1,5 @@
 import { expect, onTestFinished, test } from "vitest";
+import { commands } from "vitest/browser";
 import { contrast, dark, deltaE2000, distance, luminance, token } from "./test/colours";
 
 test("the working colour is the scheme's violet", () => {
@@ -271,4 +272,41 @@ test("the status colours are told apart from each other and from the chart accen
   for (const deficiency of DEFICIENCIES) {
     expect(closest(colours, deficiency), deficiency).toBeGreaterThanOrEqual(APART);
   }
+});
+
+test("colour-blind mode leaves the status colours as they are, whose floors the base tokens hold", () => {
+  const screen = cvd();
+  for (const status of ["status-failed", "status-warn", "danger"]) {
+    expect(token(status, screen), status).toBe(token(status));
+  }
+});
+
+test("under forced colours every pattern is on, as in colour-blind mode, whatever was chosen", async () => {
+  onTestFinished(() => commands.forcedColors(false));
+  const read = (name: string) => getComputedStyle(document.body).getPropertyValue(name).trim();
+  expect(read("--chart-dash-2")).toBe("none");
+  await commands.forcedColors(true);
+  expect(read("--chart-dash-2")).toBe("6 4");
+  expect(read("--chart-dash-3")).toBe("2 3");
+  expect(Number(read("--chart-hatch"))).toBeGreaterThan(0);
+  expect(read("--chart-marker-turn-3")).toBe("45deg");
+});
+
+test("forced colours turn on exactly the patterns colour-blind mode does: the two sets are equal", async () => {
+  onTestFinished(() => commands.forcedColors(false));
+  const patterns = [
+    "--chart-hatch",
+    "--chart-dash-2",
+    "--chart-dash-3",
+    "--chart-marker-size",
+    "--chart-marker-corner-2",
+    "--chart-marker-corner-3",
+    "--chart-marker-turn-3",
+  ];
+  const read = (within: Element) =>
+    patterns.map((name) => getComputedStyle(within).getPropertyValue(name).trim());
+  const mode = read(cvd());
+  expect(mode.every((value) => value !== "")).toBe(true);
+  await commands.forcedColors(true);
+  expect(read(document.body)).toEqual(mode);
 });

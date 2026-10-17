@@ -6,6 +6,7 @@ libraries' workspaces, the followers, the outbound adapter and a reactor, as an 
 
 import asyncio
 from collections.abc import Awaitable, Callable, Mapping, Sequence
+from contextlib import aclosing
 from dataclasses import dataclass, field
 from datetime import timedelta
 
@@ -31,6 +32,8 @@ TENANT, WORKSPACE = "acme", "prod"
 KEY = WorkspaceKey(TENANT, WORKSPACE)
 ALICE = a.UserActor(id="alice")
 TTL = timedelta(milliseconds=60)
+PATIENCE = 30.0
+"""How many seconds a test waits for what it awaits: long enough for a loaded CI runner."""
 
 GREET = reflexr.Rule(
     name="app:greet",
@@ -81,9 +84,33 @@ class Stack:
 
     async def bridged(self) -> list[reflexr.Envelope]:
         """The bridged envelopes in reflexr's log, read past the followers."""
+        workspace = await self.reader()
+        return [e for e in await workspace.read() if _is_bridged(e)]
+
+    async def until_bridged(self, found: Callable[[list[reflexr.Envelope]], bool]) -> None:
+        """Wait until the bridged envelopes so far are what `found` awaits.
+
+        It follows reflexr's log, so it wakes as each envelope commits rather than polling, and
+        fails once `PATIENCE` runs out.
+        """
+        workspace = await self.reader()
+        so_far: list[reflexr.Envelope] = []
+        try:
+            async with asyncio.timeout(PATIENCE), aclosing(workspace.subscribe()) as envelopes:
+                async for envelope in envelopes:
+                    if _is_bridged(envelope):
+                        so_far.append(envelope)
+                        if found(so_far):
+                            return
+        except TimeoutError:
+            pytest.fail(
+                f"{len(so_far)} envelopes were bridged in {PATIENCE:.0f} s, not those awaited"
+            )
+
+    async def reader(self) -> r.Workspace:
+        """reflexr's workspace, opened past the followers."""
         reader = r.Workspaces(self.reflexr_storage)
-        workspace = await reader.open(TENANT, WORKSPACE, actor=reflexr.SystemActor())
-        return [e for e in await workspace.read() if e.event_type.startswith("artifactr:")]
+        return await reader.open(TENANT, WORKSPACE, actor=reflexr.SystemActor())
 
     async def log(self) -> list[a.Envelope]:
         """artifactr's log, read past the followers."""
@@ -163,18 +190,26 @@ class Stack:
 
 
 async def until(check: Callable[[], Awaitable[bool]]) -> None:
-    for _ in range(300):
-        if await check():
-            return
+    """Wait until `check` holds, looking every 10 ms; fail once `PATIENCE` runs out.
+
+    It is for what the libraries announce no event for, such as a follower's cursor or lease.
+    """
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + PATIENCE
+    while not await check():
+        if loop.time() >= deadline:
+            name = getattr(check, "__name__", repr(check))
+            pytest.fail(f"{name} didn't hold within {PATIENCE:.0f} s")
         await asyncio.sleep(0.01)
-    pytest.fail("it never happened")
 
 
 async def bridged(stack: Stack, count: int) -> None:
-    async def done() -> bool:
-        return len(await stack.bridged()) >= count
+    """Wait until at least `count` envelopes are bridged."""
+    await stack.until_bridged(lambda so_far: len(so_far) >= count)
 
-    await until(done)
+
+def _is_bridged(envelope: reflexr.Envelope) -> bool:
+    return envelope.event_type.startswith("artifactr:")
 
 
 def notices(log: list[a.Envelope]) -> list[tuple[a.Actor, str]]:

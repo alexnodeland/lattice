@@ -1,10 +1,10 @@
 {
-  "packages/artifactr": "0.1.0",
-  "packages/reflexr": "0.0.0",
-  "packages/evalr": "0.0.0",
-  "packages/lattice-core": "0.0.0",
+  "packages/artifactr": "0.2.0",
+  "packages/reflexr": "0.1.0",
+  "packages/evalr": "0.1.0",
+  "packages/lattice-core": "0.1.0",
   "packages/stackr": "0.1.0",
-  "packages/relayr": "0.0.0",
-  "packages/grantr": "0.0.0",
-  "packages/portalr": "0.0.0"
+  "packages/relayr": "0.1.0",
+  "packages/grantr": "0.1.0",
+  "packages/portalr": "0.1.0"
 }

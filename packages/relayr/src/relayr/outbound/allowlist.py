@@ -1,4 +1,4 @@
-"""Allowlists: what each rule may do in artifactr.
+"""Allowlists: what each rule may do in artifactr, and whether it may write to its tracker.
 
 artifactr checks a rule's writes to artifacts and proposals against their write policies and
 the thread's mode, but not threads, messages or where a rule acts. A rule's allowlist is the
@@ -15,7 +15,7 @@ from reflexr.core import RuleName
 
 
 class Allowlist(BaseModel):
-    """What a rule may do in artifactr.
+    """What a rule may do in artifactr, and in its workspace's tracker.
 
     The default allows proposals and notices, in the threads of the events that made it fire, and
     nothing more.
@@ -36,6 +36,10 @@ class Allowlist(BaseModel):
 
     turns: bool = False
     """Whether the rule may send messages that start an agent turn, rather than only notices."""
+
+    trackers: bool = False
+    """Whether the rule may file, comment on and change items in its workspace's tracker
+    (lattice RFC-0004)."""
 
 
 _KEY: Final = re.compile(r"[a-z][a-z0-9_]*:(\*|[a-z0-9][a-z0-9._-]*)")

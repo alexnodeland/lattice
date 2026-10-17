@@ -45,6 +45,11 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         {"relayr.events", "relayr.ledger", "relayr.outbound", "relayr.rules", "relayr.evals"},
         LIBRARIES,
     ),
+    # The tracker connector (lattice RFC-0004): the port, the core and the fake.
+    "trackers": (
+        {"relayr.ledger", "relayr.outbound", "relayr.trackers"},
+        {*LIBRARIES, "pydantic", "pydantic_ai"},
+    ),
     "rules": (
         {"relayr.events", "relayr.outbound", "relayr.rules"},
         {*LIBRARIES, "pydantic", "pydantic_ai"},

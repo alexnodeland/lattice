@@ -4446,6 +4446,7 @@ sqlite = [
 dev = [
     { name = "aiosqlite" },
     { name = "asyncpg" },
+    { name = "hypothesis" },
     { name = "pyright" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -4460,6 +4461,7 @@ lint = [
 test = [
     { name = "aiosqlite" },
     { name = "asyncpg" },
+    { name = "hypothesis" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
@@ -4494,6 +4496,7 @@ provides-extras = ["sql", "sqlite", "postgres", "otel", "evals", "langfuse"]
 dev = [
     { name = "aiosqlite", specifier = ">=0.22" },
     { name = "asyncpg", specifier = ">=0.31" },
+    { name = "hypothesis", specifier = ">=6.168" },
     { name = "pyright", specifier = ">=1.1.414" },
     { name = "pytest", specifier = ">=9.1" },
     { name = "pytest-asyncio", specifier = ">=1.4" },
@@ -4508,6 +4511,7 @@ lint = [
 test = [
     { name = "aiosqlite", specifier = ">=0.22" },
     { name = "asyncpg", specifier = ">=0.31" },
+    { name = "hypothesis", specifier = ">=6.168" },
     { name = "pytest", specifier = ">=9.1" },
     { name = "pytest-asyncio", specifier = ">=1.4" },
     { name = "pytest-cov", specifier = ">=7.1" },

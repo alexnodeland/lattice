@@ -5,6 +5,49 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0](https://github.com/alexnodeland/lattice/compare/artifactr-v0.1.0...artifactr-v0.2.0) (2026-10-17)
+
+
+### ⚠ BREAKING CHANGES
+
+* **artifactr:** list a tenant's workspaces, those the caller may open ([#71](https://github.com/alexnodeland/lattice/issues/71))
+* **agent:** the storage protocol's `Transaction` has a new required method, `save_cursor(name, seq)`, which a custom storage must implement: it saves a named cursor in the same transaction as the transaction's other writes. SQL storages also need migration 0005, which records the upgrade point for existing threads.
+
+### Features
+
+* acceptance tests, with Bruno and Schemathesis against docplan and oncall ([#68](https://github.com/alexnodeland/lattice/issues/68)) ([64ad30e](https://github.com/alexnodeland/lattice/commit/64ad30ef509cd324dc5593d8b0051d0094d30958))
+* **artifactr,reflexr:** LiteLLM requests carry the trace tags Langfuse propagates ([#203](https://github.com/alexnodeland/lattice/issues/203)) ([f8423ca](https://github.com/alexnodeland/lattice/commit/f8423ca118385eb81d7a33b0ea405970c7cb05da))
+* **artifactr:** leave restricted threads and artifacts out of every read ([#97](https://github.com/alexnodeland/lattice/issues/97)) ([47131df](https://github.com/alexnodeland/lattice/commit/47131df57905ab11c2397fbeae134a842121ebb9))
+* **artifactr:** list a tenant's workspaces, those the caller may open ([#71](https://github.com/alexnodeland/lattice/issues/71)) ([e9de583](https://github.com/alexnodeland/lattice/commit/e9de5834af5db691b72026abdd37361142601092)), closes [#5](https://github.com/alexnodeland/lattice/issues/5)
+* **artifactr:** run_started names the messages its turn carries out ([#93](https://github.com/alexnodeland/lattice/issues/93)) ([30023de](https://github.com/alexnodeland/lattice/commit/30023de7bd488dc565f18dad82f1df3e6808f238)), closes [#81](https://github.com/alexnodeland/lattice/issues/81)
+* **artifactr:** Runner.ask asks for a thread's next turn ([#92](https://github.com/alexnodeland/lattice/issues/92)) ([efd436a](https://github.com/alexnodeland/lattice/commit/efd436a76fb764cb06bf9ddda248ae6b044b7eb9)), closes [#80](https://github.com/alexnodeland/lattice/issues/80)
+* **artifactr:** take what a dead holder was asked, once its claim lapses or a runner starts ([#309](https://github.com/alexnodeland/lattice/issues/309)) ([1b08304](https://github.com/alexnodeland/lattice/commit/1b08304b315d3788a9656c5be80e557c08fe222b))
+* **grantr:** SQL storage, the admin API, and telemetry ([#60](https://github.com/alexnodeland/lattice/issues/60)) ([d75c4f7](https://github.com/alexnodeland/lattice/commit/d75c4f796ecb0ea2c87a3084a8e6ed1e1d342f11))
+* **lattice-core:** a tenant-workspace tag on every LiteLLM request, so spend reads per tenant's workspace ([#190](https://github.com/alexnodeland/lattice/issues/190)) ([95ffe96](https://github.com/alexnodeland/lattice/commit/95ffe9641ecce3797dcfa6dd2276cdcb08d00920))
+* **lattice-core:** one package for what the libraries share, starting with tag_required and the NUL check ([#175](https://github.com/alexnodeland/lattice/issues/175)) ([e3074fc](https://github.com/alexnodeland/lattice/commit/e3074fc6afd9e362f263dc8964fe386e8fa65efa))
+* **lattice-core:** the OpenTelemetry setup, Langfuse's span filters, the LiteLLM model and the logging guard ([#187](https://github.com/alexnodeland/lattice/issues/187)) ([508d276](https://github.com/alexnodeland/lattice/commit/508d2761b583837e2aeb99880e930a75ed4c32c3))
+* **lattice-core:** the routers' refusal schema, shared by artifactr, reflexr and portalr ([#200](https://github.com/alexnodeland/lattice/issues/200)) ([1b335b1](https://github.com/alexnodeland/lattice/commit/1b335b1320d8d6ec14a185e4911e9c0c94dac221))
+* **lattice-core:** the SQL helpers the libraries' storages share, behind a sql extra ([#186](https://github.com/alexnodeland/lattice/issues/186)) ([9b6a571](https://github.com/alexnodeland/lattice/commit/9b6a57144d9efdfd933d66b80a86a87ce7e10a8c))
+* **portalr:** admin's shell and Home: its own tenant, every tenant for operators, and a card per read ([#160](https://github.com/alexnodeland/lattice/issues/160)) ([6b2436a](https://github.com/alexnodeland/lattice/commit/6b2436a34cc0ba807e879c261ef7a797ad0f0fb3))
+* **reflexr:** row-level security in the SQL adapter, with the scheduler's reads on the owner's engine ([#102](https://github.com/alexnodeland/lattice/issues/102)) ([4cb71dd](https://github.com/alexnodeland/lattice/commit/4cb71dd6565955fce589be41f0e0df030a1bc63f))
+* **relayr:** row-level security in the SQL ledger, with the followers' start on the owner's engine ([#106](https://github.com/alexnodeland/lattice/issues/106)) ([437ae71](https://github.com/alexnodeland/lattice/commit/437ae71cd2432e0268a189d04cf466501967e3a1))
+* **relayr:** the inbound adapter, with followers, the ledger and the bridged types ([#70](https://github.com/alexnodeland/lattice/issues/70)) ([ce51f03](https://github.com/alexnodeland/lattice/commit/ce51f03ca740b903b50c6996ae86b3ab20893c18))
+* **relayr:** traces linked across the bridge, sessions tagged with each other, and counters ([#87](https://github.com/alexnodeland/lattice/issues/87)) ([0a08698](https://github.com/alexnodeland/lattice/commit/0a086984fb73e50486d0f6158285e281976da237))
+* row-level security in grantr's and artifactr's SQL adapters ([#100](https://github.com/alexnodeland/lattice/issues/100)) ([bc0ab8e](https://github.com/alexnodeland/lattice/commit/bc0ab8eb7abeba0fd5923eb4afa1d93ddb3cd11a))
+* **stackr:** one tenant attribute on every signal, and prom-label-proxy for portalr ([#95](https://github.com/alexnodeland/lattice/issues/95)) ([984e309](https://github.com/alexnodeland/lattice/commit/984e3099a5a56a8bb2f6b56b13230850a53ad821))
+
+
+### Bug Fixes
+
+* a caller the resolver refuses is answered 403, or 400, on every route and stream ([#75](https://github.com/alexnodeland/lattice/issues/75)) ([1c0c66d](https://github.com/alexnodeland/lattice/commit/1c0c66da0193129611ba79d81ed1d4bd176d623f))
+* a NUL character in any string is validation_failed, on every storage ([#84](https://github.com/alexnodeland/lattice/issues/84)) ([218d6a6](https://github.com/alexnodeland/lattice/commit/218d6a6fb36c2b0af4f6295664d74dd0bcfefe2f)), closes [#67](https://github.com/alexnodeland/lattice/issues/67)
+* **agent:** take each turn from the log, so a message sent as a run ends is carried out once ([#35](https://github.com/alexnodeland/lattice/issues/35)) ([7f4c2ea](https://github.com/alexnodeland/lattice/commit/7f4c2ea53c2ee9e88bb599f11de14ddaa8363bd1))
+* **artifactr,reflexr:** redact an access token from the spans' URLs, and the template from uvicorn's logs ([#163](https://github.com/alexnodeland/lattice/issues/163)) ([398d258](https://github.com/alexnodeland/lattice/commit/398d258c81e610c291e8433349f937bbe006d124))
+* **artifactr:** wait for the run before the API collection reads it ([#128](https://github.com/alexnodeland/lattice/issues/128)) ([1b05779](https://github.com/alexnodeland/lattice/commit/1b05779c934ccc171c922e53bae2beae6bbda241))
+* the OpenAPI documents describe every refusal, and every tag is required ([#90](https://github.com/alexnodeland/lattice/issues/90)) ([0e09c4b](https://github.com/alexnodeland/lattice/commit/0e09c4bd7a2470b5ff0360a1e29857b5370e8106)), closes [#66](https://github.com/alexnodeland/lattice/issues/66) [#82](https://github.com/alexnodeland/lattice/issues/82)
+* the thread claim and owner bugs that TLC and the stateful tests found ([#271](https://github.com/alexnodeland/lattice/issues/271)) ([907cad9](https://github.com/alexnodeland/lattice/commit/907cad95a5ae8e5e2c9c168085168c3137266227))
+* what ty's trial found: missing [@override](https://github.com/override), context managers' types, and a callable without a name ([#62](https://github.com/alexnodeland/lattice/issues/62)) ([6bca781](https://github.com/alexnodeland/lattice/commit/6bca78150eed3fc1d9e7822206421c4f6df28313))
+
 ## [Before lattice]
 
 ### Features

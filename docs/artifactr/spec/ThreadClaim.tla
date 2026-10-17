@@ -25,9 +25,10 @@
 \* Not modelled: I7, the upgrade point, a migration's property that test_upgrade.py holds. Also
 \* left out: authorization and one author per turn (ADR-0057), so every message is one author's;
 \* the agent's own messages; Runner.aclose, and cancelling a Runner.drain, the only ways to
-\* cancel a hand-over; a hand-over that raises, which _take_over logs and drops, leaving what was
-\* asked to the next command; and a process's concurrent tasks: each process here is one task at
-\* a time, and a crash ends it.
+\* cancel a hand-over; a hand-over or a look again that raises, which the runner logs and drops,
+\* leaving what was asked to the next command; and a process's concurrent tasks: each process here
+\* is one task at a time, and a crash ends it. So a refused claimant's look again is that
+\* process's next step, and a process that starts again sweeps the thread before anything else.
 EXTENDS Naturals, Sequences, FiniteSets
 
 CONSTANTS
@@ -195,11 +196,20 @@ Acquire(p) ==
     /\ Step(p, "abandoning")
     /\ UNCHANGED <<shared, audit, rd, plan, dlv, nxt, snap, askVal, owe>>
 
-\* ThreadBusy: _take returns, and leaves the thread to its holder's hand-over.
+\* ThreadBusy: _take returns, leaving the thread to its holder's hand-over, and looks again once
+\* the claim could have lapsed, should its holder have died.
 Refused(p) ==
     /\ pc[p] = "claiming" /\ ~Acquirable
-    /\ Step(p, "idle") /\ Returned(p)
+    /\ Step(p, "waiting") /\ Returned(p)
     /\ UNCHANGED <<shared, lease, audit, lost, rd, plan, dlv, nxt, snap, askVal>>
+
+\* Runner._take_again: a claim_ttl after the refusal, a holder that lives has renewed its claim or
+\* released it, and one that died has let it lapse. The retry refused again, by a live holder, is
+\* left out as a stutter: this step waits until the claim can be taken, and then reads again.
+LookAgain(p) ==
+    /\ pc[p] = "waiting" /\ Acquirable
+    /\ Step(p, "reading")
+    /\ UNCHANGED <<shared, lease, audit, lost, rd, plan, dlv, nxt, snap, askVal, owe>>
 
 \* _abandon: each run still running is recorded as failed, "abandoned".
 Abandon(p) ==
@@ -437,11 +447,15 @@ Crash(p) ==
     /\ UNCHANGED <<shared, lease, count, effects, faults, failed, lapsed, lost, rd, plan, dlv, nxt,
                    snap, askVal, owe>>
 
+\* The process starts again with nothing in memory, and Runner.recover sweeps the thread: it reads
+\* the cursors, and takes what was asked and not taken.
 Restart(p) ==
     /\ pc[p] = "dead"
     /\ lost' = [lost EXCEPT ![p] = FALSE]
-    /\ Step(p, "idle")
-    /\ UNCHANGED <<shared, lease, audit, rd, plan, dlv, nxt, snap, askVal, owe>>
+    /\ rd' = [rd EXCEPT ![p] = NoSnap]
+    /\ owe' = [owe EXCEPT ![p] = IF @ = "call" THEN "owed" ELSE @]   \* the call died with it
+    /\ Step(p, "reading")
+    /\ UNCHANGED <<shared, lease, audit, plan, dlv, nxt, snap, askVal>>
 
 -----------------------------------------------------------------------------
 \* The release, and the hand-over.
@@ -489,7 +503,7 @@ Done == (\A p \in Procs : pc[p] \in {"idle", "dead"}) /\ UNCHANGED vars
 Next ==
     \/ \E p \in Procs :
         \/ Send(p) \/ Answer(p) \/ Retry(p) \/ ReadHead(p) \/ SaveAsk(p)
-        \/ ReadCursors(p) \/ Acquire(p) \/ Refused(p) \/ Abandon(p) \/ Plan(p)
+        \/ ReadCursors(p) \/ Acquire(p) \/ Refused(p) \/ LookAgain(p) \/ Abandon(p) \/ Plan(p)
         \/ Reply(p) \/ ReplyFenced(p) \/ RunStart(p) \/ StartRefused(p) \/ StartFenced(p)
         \/ Deliver(p) \/ Finish(p, "completed") \/ Finish(p, "paused") \/ Stop(p) \/ Fail(p)
         \/ \E c \in BOOLEAN : \/ Interrupt(p, c)
@@ -508,7 +522,8 @@ Next ==
 Fairness ==
     /\ \A p \in Procs :
         /\ WF_vars(ReadHead(p)) /\ WF_vars(SaveAsk(p)) /\ WF_vars(ReadCursors(p))
-        /\ WF_vars(Acquire(p) \/ Refused(p)) /\ WF_vars(Abandon(p)) /\ WF_vars(Plan(p))
+        /\ WF_vars(Acquire(p) \/ Refused(p)) /\ WF_vars(LookAgain(p))
+        /\ WF_vars(Abandon(p)) /\ WF_vars(Plan(p))
         /\ WF_vars(Reply(p) \/ ReplyFenced(p))
         /\ WF_vars(RunStart(p) \/ StartRefused(p) \/ StartFenced(p))
         /\ WF_vars(Finish(p, "completed"))
@@ -533,8 +548,8 @@ TypeOK ==
                            lo : 0..MaxSeq, hi : 0..MaxSeq, msg : 0..MaxSeq, pause : 0..MaxPauses,
                            tt : 0..MaxSeq, ta : 0..MaxSeq, done : BOOLEAN]]
     /\ lease.owner \in Procs \cup {"none"} /\ lease.ttl \in 0..TTL
-    /\ pc \in [Procs -> Holding \cup {"idle", "head", "asking", "reading", "claiming", "handing",
-                                      "dead"}]
+    /\ pc \in [Procs -> Holding \cup {"idle", "head", "asking", "reading", "claiming", "waiting",
+                                      "handing", "dead"}]
     /\ owe \in [Procs -> {"no", "call", "owed"}]
 
 \* I1. A message is recorded as consumed at most once: by the one write that consumes it.
@@ -564,7 +579,8 @@ I3_ClaimHasATask ==
 \* crashed or failed: one that holds the claim, or will ask, claim or hand over.
 I3_NoStrandedAsk ==
     (crashes = 0 /\ ~failed /\ asked > taken) =>
-        \E p \in Procs : pc[p] \in Holding \cup {"head", "asking", "reading", "claiming", "handing"}
+        \E p \in Procs :
+            pc[p] \in Holding \cup {"head", "asking", "reading", "claiming", "waiting", "handing"}
 
 \* I3. One run is active in a thread: its holder's.
 I3_OneActiveRun == Cardinality({r \in DOMAIN runs : runs[r].st \in {"running", "paused"}}) <= 1

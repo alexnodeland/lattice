@@ -30,7 +30,10 @@ connection can :meth:`Runner.watch` them. An application stops them with :meth:`
 as it shuts down, before its storage closes. A run whose process dies instead stays ``running``
 until its thread is next claimed, and is then recorded as failed, with the reason ``abandoned``.
 A run whose claim lapses while its process lives on is cancelled then; if the thread's next run
-records it as abandoned first, the capability drops what it records afterwards.
+records it as abandoned first, the capability drops what it records afterwards. What a dead
+process was asked is not left for the thread's next command (ADR-0070): a claimant its claim
+refused looks again once that claim could have lapsed, and :meth:`Runner.recover` takes what
+was asked and not taken as an application starts.
 
 Surfaces send each command with the id its client chose to :meth:`Runner.execute`, which
 remembers results in :class:`~artifactr.agent.CommandResults`, so a retried command is carried
@@ -198,7 +201,8 @@ class Sent:
 
     - The thread's run is active, in this process or another, so the message steers it. If
       that run is ending or pausing and takes no more messages, it hands the thread over as it
-      releases it, and the next turn takes the message.
+      releases it, and the next turn takes the message. If its process died, this runner looks
+      again once the run's claim could have lapsed, and takes the message then.
     - Another message or answer took the thread first, and its turn takes this one too, if it
       acts for the same author; otherwise the turn after it does.
     - An answer leaves some of the paused run's requests unanswered, so the run waits for them.
@@ -225,7 +229,8 @@ class Runner[AppDepsT]:
             it lapses, the thread's next run records the run left behind as abandoned, and a run
             of this process whose claim lapsed is cancelled. A claim is renewed every third of
             it, so a run survives one failed renewal, or storage that stalls for about two thirds
-            of it. It must exceed the clock skew between replicas.
+            of it. It must exceed the clock skew between replicas. A claimant that finds its
+            thread claimed looks again this long after, in case the claim's holder died.
         tracer_provider: Where turn spans go. Defaults to the global tracer provider.
         meter_provider: Where turn metrics go. Defaults to the global meter provider.
         turn_context: Entered around each turn, inside its span.
@@ -259,6 +264,7 @@ class Runner[AppDepsT]:
         self._claim_ttl = claim_ttl
         self._runs: dict[RunId, RunHandle] = {}
         self._handovers: set[asyncio.Task[None]] = set()
+        self._retakes: dict[tuple[str, str, ThreadId], asyncio.Task[None]] = {}
         self._closed = False
         self._telemetry = Telemetry(tracer_provider=tracer_provider, meter_provider=meter_provider)
 
@@ -351,6 +357,19 @@ class Runner[AppDepsT]:
         runner = _runner(workspace)
         return await self._ask(runner, run.thread_id, await runner.head_seq())
 
+    async def recover(self, workspace: Workspace) -> list[RunHandle]:
+        """Take each turn the workspace's threads were asked for and no run has taken.
+
+        Call it for each workspace as the application starts. A process that died holding a
+        thread, or between an ask and its claim, left what was asked for no one to take
+        (ADR-0070). A thread whose dead holder's claim has not lapsed yet is looked at again
+        once it could have. It acts as the Runner, as a hand-over does; a thread whose turn
+        fails to start is logged, and the others are still taken. Returns the runs it started.
+        """
+        runner = _runner(workspace)
+        taken = [await self._take_or_log(runner, thread.id) for thread in await runner.threads()]
+        return [handle for handle in taken if handle is not None]
+
     async def stop(self, run_id: RunId) -> bool:
         """Cancel a run of this process. Returns whether there was one to stop.
 
@@ -370,7 +389,8 @@ class Runner[AppDepsT]:
         A run that ends hands its thread over in the background (ADR-0055): it starts the
         thread's next turn if a message or an answer asked for one meanwhile. This waits until
         none is pending, not for the turns they start. :meth:`aclose` cancels them instead; a
-        hand-over it cancels ends this wait, rather than raising here.
+        hand-over it cancels ends this wait, rather than raising here. It does not wait for a
+        claimant that another holder's claim refused to look again, a ``claim_ttl`` on.
         """
         while pending := [handover for handover in self._handovers if not handover.done()]:
             await asyncio.gather(*pending, return_exceptions=True)
@@ -380,6 +400,7 @@ class Runner[AppDepsT]:
         self._closed = True
         tasks: list[asyncio.Task[Any]] = [handle.task for handle in self._runs.values()]
         tasks += self._handovers
+        tasks += self._retakes.values()
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
@@ -464,7 +485,10 @@ class Runner[AppDepsT]:
                 if handle is not None:
                     return handle
         except ThreadBusy:
-            return None  # its holder hands the thread over as it releases it
+            # A holder that lives hands the thread over as it releases it; one that died never
+            # will, so this looks again once its claim could have lapsed.
+            self._retake(workspace, thread_id)
+            return None
         except (asyncio.CancelledError, Exception):  # any claim is released
             # A CancelledError raised while no one cancels the claimant, as a storage call's
             # own cancellation can be, is a failure like any other.
@@ -709,6 +733,36 @@ class Runner[AppDepsT]:
                 "handing thread %s over failed; its next turn carries out what was sent",
                 thread_id,
             )
+
+    def _retake(self, workspace: Workspace, thread_id: ThreadId) -> None:
+        """Look at a thread again once the claim that refused this claimant could have lapsed.
+
+        A claim lapses at most ``claim_ttl`` after its last renewal, which came before the
+        refusal, so a ``claim_ttl`` on a dead holder's claim has lapsed. A live holder's has
+        not: the claimant is refused again, and waits again, until what was asked is taken. A
+        thread has one wait at a time in this process.
+        """
+        key = (workspace.tenant_id, workspace.workspace_id, thread_id)
+        if self._closed or key in self._retakes:
+            return
+        self._retakes[key] = asyncio.create_task(
+            self._take_again(workspace, thread_id, key), context=contextvars.Context()
+        )
+
+    async def _take_again(
+        self, workspace: Workspace, thread_id: ThreadId, key: tuple[str, str, ThreadId]
+    ) -> None:
+        await asyncio.sleep(self._claim_ttl.total_seconds())
+        del self._retakes[key]  # a refusal from here on waits again
+        await self._take_or_log(workspace, thread_id)
+
+    async def _take_or_log(self, workspace: Workspace, thread_id: ThreadId) -> RunHandle | None:
+        """Take the thread's turn as the Runner's own work: no caller hears a failure, so log it."""
+        try:
+            return await self._take(workspace, thread_id, None)
+        except Exception:
+            logger.exception("taking thread %s's turn failed; its next command takes it", thread_id)
+            return None
 
     async def _turn(
         self,

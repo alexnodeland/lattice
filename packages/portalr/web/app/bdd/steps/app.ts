@@ -64,6 +64,14 @@ Then(
   },
 );
 
+Then("they see the workspace {string}", async ({ page }, workspace: string) => {
+  await expect(
+    page
+      .getByRole("list", { name: "Workspaces" })
+      .getByRole("link", { name: workspace, exact: true }),
+  ).toBeVisible();
+});
+
 Then("each links to its areas", async ({ page }) => {
   for (const workspace of ["notes", "plans"]) {
     const areas = page.getByRole("list", { name: `${workspace}'s areas` }).getByRole("link");

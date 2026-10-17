@@ -7,7 +7,7 @@
 
 It is mounted only where the Supabase project the UIs sign in to is named (``PORTAL_SUPABASE_URL``
 and ``PORTAL_SUPABASE_KEY``); a tool is read only where its address is. The Supabase secret key
-stays here, for inviting people, and is never in what the browser is given.
+stays here, for inviting people and naming them by email, and is never in what the browser is given.
 """
 
 import contextlib
@@ -21,6 +21,7 @@ from fastapi import FastAPI
 from grantr import Grants
 from portalr.fastapi import UI, Site, portalr_router
 from portalr.invites import Invite, InviteFailed, SupabaseInvite
+from portalr.people import People, SupabasePeople
 from portalr.readers import Grafana, Langfuse, LiteLLM, Loki, Prometheus, Readers, Tempo
 
 from {{ package_name }}.access import Access
@@ -77,6 +78,22 @@ def invitations(settings: Settings, clients: list[httpx.AsyncClient]) -> Invite:
     client = httpx.AsyncClient()
     clients.append(client)
     return SupabaseInvite(url=url.rstrip("/"), secret_key=key, client=client)
+
+
+def people(settings: Settings, clients: list[httpx.AsyncClient]) -> People | None:
+    """Name people by email, through Supabase Auth's admin API, for the UIs to show.
+
+    It needs what invitations need: the gateway's address and this application's secret key,
+    which stay here (the key is sent to the gateway only, in a header, and neither is logged or
+    given to the browser). Without them there is no people route, and the UIs show a short id.
+    The emails are kept in memory for a few minutes, and are logged nowhere.
+    """
+    url, key = settings.portal.auth_url, settings.auth.service_role_key
+    if not url or not key:
+        return None
+    client = httpx.AsyncClient()
+    clients.append(client)
+    return SupabasePeople(url=url.rstrip("/"), secret_key=key, client=client)
 
 
 class Portal:
@@ -143,6 +160,7 @@ class Portal:
             grants=self.grants,
             readers=readers(self._settings, self._clients),
             invite=invitations(self._settings, self._clients),
+            people=people(self._settings, self._clients),
             site=site,
             ui=Path(portal.ui_dir) if portal.ui_dir else UI,
         )

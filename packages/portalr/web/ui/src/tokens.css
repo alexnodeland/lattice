@@ -140,7 +140,7 @@
  * saturation set so that each holds 3:1 on the paper and the surface in each scheme and the three
  * stay 20 or more apart, to CIEDE2000, under each deficiency, and turns
  * every pattern on: each series past the first is hatched, dashed in a line, and has a marker of
- * its own shape, so no series relies on its hue. A control for it comes later (portalr ADR-0036).
+ * its own shape, so no series relies on its hue. The account menu's "Colour-blind friendly charts" sets it, per browser (portalr ADR-0036).
  */
 [data-cvd] {
   --chart-1: light-dark(#0a85ff, #0ac6ff);
@@ -153,4 +153,21 @@
   --chart-marker-corner-2: 0;
   --chart-marker-corner-3: 0;
   --chart-marker-turn-3: 45deg;
+}
+
+/*
+ * Under forced colours (a high-contrast mode), a hue is not the page's to give: the system's
+ * colours replace it. So every pattern, dash and marker shape is on as in colour-blind mode, whether
+ * or not it was chosen; the inks themselves are the system's.
+ */
+@media (forced-colors: active) {
+  :root {
+    --chart-hatch: var(--chart-hatched);
+    --chart-dash-2: 6 4;
+    --chart-dash-3: 2 3;
+    --chart-marker-size: 8px;
+    --chart-marker-corner-2: 0;
+    --chart-marker-corner-3: 0;
+    --chart-marker-turn-3: 45deg;
+  }
 }

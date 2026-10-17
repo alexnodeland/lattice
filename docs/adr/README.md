@@ -1,6 +1,6 @@
 # Architecture decision records
 
-Each record captures one decision about the family as a whole: the context that forced it, the options considered, and the consequences we accepted. Records are immutable once accepted; a changed decision gets a new record that amends or supersedes the old one. A decision about one package is recorded in that package's own series, in `docs/<package>/adr/`. The proposal that made lattice is [stackr RFC-0003](../stackr/rfcs/0003-one-repository-lattice.md), and these records begin with what its move decided that the RFC's design didn't.
+Each record captures one decision about lattice as a whole: the context that forced it, the options considered, and the consequences we accepted. Records are immutable once accepted; a changed decision gets a new record that amends or supersedes the old one. A decision about one package is recorded in that package's own series, in `docs/<package>/adr/`. The proposal that made lattice is [stackr RFC-0003](../stackr/rfcs/0003-one-repository-lattice.md), and these records begin with what its move decided that the RFC's design didn't.
 
 Outside its own series, a record is named with its package, as in "reflexr ADR-0003", and these as "lattice ADR-0002".
 
@@ -30,5 +30,6 @@ Outside its own series, a record is named with its package, as in "reflexr ADR-0
 | [0022](0022-litellm-requests-carry-the-propagated-trace-tags.md) | LiteLLM requests carry the propagated trace tags | Accepted |
 | [0023](0023-publishing-to-pypi-from-the-release-workflow.md) | Publishing to PyPI from the release workflow | Accepted |
 | [0024](0024-a-parallel-batched-merge-queue.md) | A parallel, batched merge queue | Accepted |
+| [0025](0025-formal-specs-in-tla-and-lean.md) | Formal specs in TLA+ and Lean | Accepted |
 
 To add a record, copy [`template.md`](template.md) to the next number and add a row above. Each package's series uses the same template.

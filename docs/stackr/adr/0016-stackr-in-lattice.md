@@ -8,7 +8,7 @@ Amends [ADR-0003](0003-observability-and-gateway-services.md), how Grafana gets 
 
 ## Context
 
-stackr was a repository of its own. Copier found its template through the `copier.yml` at that repository's root; its CI generated the template's applications and started the stack on every pull request; Grafana provisioned the libraries' dashboards from their releases, by version; and Dependabot kept its images current. On 2026-09-30 it moved, with its history, into lattice, the family's one repository, as [RFC-0003](../rfcs/0003-one-repository-lattice.md) designed. The template's pins of the libraries are RFC-0003's phase 4, and [ADR-0013](0013-how-the-template-pins-the-libraries.md) stands until then.
+stackr was a repository of its own. Copier found its template through the `copier.yml` at that repository's root; its CI generated the template's applications and started the stack on every pull request; Grafana provisioned the libraries' dashboards from their releases, by version; and Dependabot kept its images current. On 2026-09-30 it moved, with its history, into lattice, the packages' one repository, as [RFC-0003](../rfcs/0003-one-repository-lattice.md) designed. The template's pins of the libraries are RFC-0003's phase 4, and [ADR-0013](0013-how-the-template-pins-the-libraries.md) stands until then.
 
 ## Decision
 

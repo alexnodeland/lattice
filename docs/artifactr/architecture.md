@@ -360,6 +360,7 @@ The run holds a thread claim, not a socket: if the connection that started it dr
 - **Optimistic concurrency.** Every edit names the version it was based on. A stale edit is rejected with the changes made since, so the agent retries against fresh state and a UI can rebase or ask the person.
 - **One active run per thread**, enforced by `Workspace.claim_thread`: a storage lease with a time-to-live, renewed while held, that works across replicas and lapses if its holder dies. Concurrency happens across threads. A message sent during a run steers it instead of queueing, and one sent as the run ends is taken by the turn the run hands the thread over to. Each claim has a holder of its own.
 - **A run whose process died, or whose claim lapsed,** is recorded as failed, with the reason `abandoned`, when the `Runner` next claims its thread. A run still going is cancelled when its claim lapses ([ADR-0020](adr/0020-running-agents-in-threads.md), [the agent guide](guides/agent.md#running-the-agent)).
+- **What a dead holder was asked is taken.** A claimant refused as busy looks at the thread again a `claim_ttl` later, until what was asked is taken, and `Runner.recover(workspace)` sweeps a workspace's threads as an application starts ([ADR-0070](adr/0070-a-runner-looks-again-for-what-a-dead-holder-was-asked.md)). Steering the dead run was given is given again: it is delivered at least once ([ADR-0055](adr/0055-turns-from-the-log.md)).
 - **Sequencing.** `seq` is assigned inside the commit transaction, which holds its workspace's lock from the moment it begins (in SQL, the workspace row, locked `FOR UPDATE`). The lock's holder advances the workspace's `head_seq`, giving a gap-free total order per workspace. This serializes commits within one workspace; tokens are not in the log, so commit volume stays modest.
 
 ## Surfaces
@@ -400,6 +401,7 @@ class Transaction(Protocol):
     ) -> list[Envelope]: ...  # assigns seq
     async def append_history(self, thread_id: ThreadId, messages: bytes) -> None: ...
     async def save_cursor(self, name: str, seq: int) -> None: ...  # with the transaction
+    async def holds_lease(self, key: str, holder: str) -> bool: ...  # kept until it ends
 
 
 class Storage(Protocol):
@@ -556,7 +558,7 @@ What artifactr and reflexr shared verbatim is in [lattice-core](../lattice-core/
 | Dependency | Used for | Current major (2026-09) |
 |---|---|---|
 | pydantic | Artifact types, commands, events, JSON Schema | 2.13 |
-| lattice-core-ai | What artifactr shares with lattice's other packages ([lattice-core](../lattice-core/index.md)); from lattice until published | 0.1 |
+| lattice-core-ai | What artifactr shares with lattice's other packages ([lattice-core](../lattice-core/index.md)); on PyPI | 0.1 |
 | jsonpatch | RFC 6902 apply and diff in core | 1.33 |
 | pydantic-ai-slim | Agent runtime: capabilities, toolsets, deferred tools, message history | 2.51 |
 | SQLAlchemy (asyncio) | SQL storage | 2.1 |
@@ -651,7 +653,7 @@ The phases, their exit criteria and their progress are tracked in [RFC-0001](rfc
 | [0050](adr/0050-one-docs-build.md) | One docs build |
 | [0051](adr/0051-notices.md) | Notices: messages that start no turn |
 | [0052](adr/0052-artifactr-in-lattice.md) | artifactr in lattice |
-| [0053](adr/0053-one-site-for-the-family.md) | One site for the family |
+| [0053](adr/0053-one-site-for-the-family.md) | One site for lattice |
 | [0054](adr/0054-dashboards-from-the-checkout.md) | Dashboards from the checkout |
 | [0055](adr/0055-turns-from-the-log.md) | Turns from the log |
 
@@ -660,7 +662,7 @@ The phases, their exit criteria and their progress are tracked in [RFC-0001](rfc
 - **Log retention.** When old envelopes are compacted, `resume` falls back to a snapshot. The snapshot format is not yet specified.
 - **Very hot workspaces.** Assigning `seq` serializes commits per workspace. If that becomes a bottleneck, the log could be sharded by artifact group behind the same per-workspace cursor.
 - **Change-note volume.** With many concurrent chats, notes may need coalescing beyond focus filtering.
-- **Crash recovery for runs.** A run interrupted by a process crash is recorded as abandoned when its thread is next claimed ([Tenancy and concurrency](#tenancy-and-concurrency)), but its turn is lost, and in a thread no one uses again it stays `running`. A message whose process died after posting it and before starting its turn has no run to abandon: it has no turn, and a retry with the same `message_id` is refused ([ADR-0045](adr/0045-a-message-id-is-used-once.md)). pydantic-ai's durable execution integrations (Temporal, DBOS, Prefect) could make such turns resumable.
+- **Crash recovery for runs.** A run interrupted by a process crash is recorded as abandoned when its thread is next claimed ([Tenancy and concurrency](#tenancy-and-concurrency)), but its turn is lost, and in a thread with nothing asked of it, which `Runner.recover` leaves alone, it stays `running`. A message whose process died after posting it and before asking for its turn has no ask to recover: it waits for the thread's next turn, and a retry with the same `message_id` is refused, so the caller asks with `Runner.ask` ([ADR-0045](adr/0045-a-message-id-is-used-once.md), [ADR-0064](adr/0064-asking-for-a-threads-next-turn.md)). pydantic-ai's durable execution integrations (Temporal, DBOS, Prefect) could make such turns resumable.
 - **Pushing log updates across processes.** `SqlStorage` subscriptions learn about commits from other processes by polling. PostgreSQL's `LISTEN/NOTIFY` could wake them at once: an optimisation behind the same `subscribe`, with polling kept for SQLite and as a fallback ([ADR-0021](adr/0021-sql-storage.md)).
 - **Cross-process runs.** Runs are tasks in the process that started them, so `Runner.stop` and `Runner.watch` reach only local runs. A pub/sub channel would make both work across replicas.
 - **Cross-process deduplication.** `InMemoryCommandResults` remembers results in one process, and a retry that arrives while the first attempt is still being carried out runs again. A `CommandResults` over shared storage, with a claim on a command while it runs, would close both gaps ([ADR-0048](adr/0048-surfaces-over-the-runner.md)). Core already refuses a repeated create or message by its id, whichever process it reaches ([ADR-0045](adr/0045-a-message-id-is-used-once.md)), so the gaps matter only for commands whose ids the client leaves out, and for `give_feedback`, which has none.

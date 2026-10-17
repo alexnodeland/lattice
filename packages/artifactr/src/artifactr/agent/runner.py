@@ -6,7 +6,9 @@ comes from:
 - In an idle thread, a message starts a run.
 - In a busy thread, it steers the running agent: the run's watcher delivers it.
 - In a thread whose run is paused on questions, it is the reply: questions are answered with
-  it, approvals are declined with it as the reason, and the run resumes.
+  it, approvals are declined with it as the reason, and the run resumes. A form is answered
+  only by its own answer, so a message posted while one is open waits, not taken, and reaches
+  the run as it resumes, beside the form's values (lattice RFC-0005).
 
 The log decides what each turn carries out (ADR-0055). A thread's messages are taken in order,
 each by one turn: as the prompt of a run, the reply to a paused one, or through the watcher of
@@ -146,6 +148,13 @@ _RUNNER: Final = SystemActor(name="runner")
 type _ThreadKey = tuple[TenantId, WorkspaceId, ThreadId]
 """A thread, wherever it is: thread ids are unique only within a workspace."""
 
+
+_FORM: Final = "ask_form"
+"""The tool whose requests a message doesn't answer: artifactr-ui's form (lattice RFC-0005).
+
+A form is answered with its values, which the application's check holds to the form's schema,
+so free text from the chat never answers one: the run waits for the form's own answer.
+"""
 
 _ABANDONED = "the run was abandoned: its claim lapsed"
 """The error recorded for a run whose claim lapsed before it ended, whether its process stopped
@@ -471,7 +480,9 @@ class Runner[AppDepsT]:
         With ``ask``, it first saves that the log up to that ``seq`` asks for a turn. A claimant
         that starts nothing looks again once it has released the thread, since a command it
         refused meanwhile relies on it. Each round starts a turn, finds nothing asked, finds the
-        thread busy, or records what it found as taken, so it ends. One that is cancelled from
+        thread busy, or records what it found as taken; one that does none of these, as when a
+        paused run waits for a form, ends the claimant unless the cursors moved meanwhile. So it
+        ends. One that is cancelled from
         its ask on hands the thread over as it propagates, as a run does: storage may have saved
         the ask of a call cut short. One that fails hands over only once it has read the
         cursors, with what it read, so a failure that persists never hands over without end. The
@@ -483,12 +494,13 @@ class Runner[AppDepsT]:
             if ask is not None:
                 await workspace.save_cursor(_asked(thread_id), ask)
             while not self._closed:
+                last = read
                 read = (
                     await _taken_seq(workspace, thread_id),
                     await workspace.cursor(_asked(thread_id)),
                 )
                 taken, asked = read
-                if asked <= taken:
+                if asked <= taken or read == last:  # nothing asked, or nothing it can take
                     return None
                 handle = await self._start(workspace, thread_id, caller)
                 if handle is not None:
@@ -561,10 +573,12 @@ class Runner[AppDepsT]:
         """Decide, holding the thread, which turn carries out the oldest message not taken.
 
         With a paused run, that message is its reply: it answers the questions and declines the
-        approvals left, and the run resumes. A paused run whose requests are all answered
-        resumes, with the messages not taken as its prompt. Otherwise the oldest message starts
-        a run. The turn's watcher follows from there, so later messages reach it too. ``claim``
-        is the thread's, ``(thread_id, holder)``, which fences the reply's answers.
+        approvals left, and the run resumes. A form left open keeps it paused, and a message posted
+        while only forms are open answers nothing and is not taken: it waits for the form's answer.
+        A paused run whose requests are all answered resumes, with the messages not taken as its
+        prompt. Otherwise the oldest message starts a run. The turn's watcher follows from there, so
+        later messages reach it too. ``claim`` is the thread's, ``(thread_id, holder)``, which
+        fences the reply's answers.
         """
         thread_id = claim[0]
         taken = await _taken_seq(workspace, thread_id)
@@ -598,9 +612,11 @@ class Runner[AppDepsT]:
                 except Forbidden as refused:  # its author may not answer: the next message may
                     await self._refused(workspace, thread_id, reply.seq, refused)
                     return await self._plan(workspace, claim)
+                run = await workspace.run(run.id)
+                if not run.all_answered:
+                    return None  # a form is open: its answer resumes the run
                 if not replied:
                     return await self._plan(workspace, claim)  # answers came first
-                run = await workspace.run(run.id)
                 turn = _resume(run, taken, asked, reply.seq, [], reply)
                 return await self._allowed(workspace, claim, turn)
         elif untaken:
@@ -1003,9 +1019,9 @@ async def _reply(
 ) -> bool:
     """Answer a paused run's open questions with a message, and decline its open approvals.
 
-    Each answer takes the message, in its own transaction, fenced by the thread's ``claim``. A
-    request refused, as when another answer came first, is left as it was answered. Returns
-    whether the message answered any.
+    A form is left open: only its own answer answers it. Each answer takes the message, in its
+    own transaction, fenced by the thread's ``claim``. A request refused, as when another answer
+    came first, is left as it was answered. Returns whether the message answered any.
 
     Raises:
         ThreadBusy: If the claim was lost to another holder, which plans the thread's turn.
@@ -1014,7 +1030,7 @@ async def _reply(
     content = message.event.content
     answered = False
     for request in run.pending:
-        if request.tool_call_id in run.answers:
+        if request.tool_call_id in run.answers or request.tool_name == _FORM:
             continue
         declined = request.kind == "approval"
         answer = AnswerDeferred(

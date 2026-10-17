@@ -36,5 +36,5 @@ RFC-0006 proposes the shared port, its store in grantr, audited, and a page in p
 
 - Easier: a new integration is one declaration, and its package asks one port; portalr's page lists it with no change.
 - Easier: every switch is in grantr's audit log, beside the grants it sits next to.
-- Harder: every gated command and model request asks the store. `Grants.is_enabled` reads two rows; an application that asks often caches.
+- Harder: every gated command and model request asks the store. `Grants.is_enabled` makes two indexed reads, the tenant's settings and the workspace's; an application that asks often caches.
 - Revisit: when relayr and artifactr's forms adopt the port, their own seams are deprecated; when a narrowing provider is wanted (#361), it wraps the port.

@@ -1,6 +1,6 @@
 # Native files
 
-A native file is an artifact whose data is a manifest over the file's bytes. This guide wires artifactr's `files` extra into an application and walks through what people and agents do with a file. Everything here runs with the fake app; the WordCraft adapter comes in a later phase of [lattice RFC-0003](../../../rfcs/0003-native-files-as-artifacts.md).
+A native file is an artifact whose data is a manifest over the file's bytes. This guide wires artifactr's `files` extra into an application and walks through what people and agents do with a file. Everything here runs with the fake app, and with WordCraft's adapter, [below](#wordcraft), in its place.
 
 ## The types
 
@@ -86,6 +86,21 @@ An agent's edit is a batch of the app's own commands. It holds the lease as `edi
 - **Missing content:** a manifest can name bytes the store doesn't have, since any surface can commit `edit_artifact`. Reads raise `ContentUnavailable`, and edits are refused until the content is replaced.
 
 The lease is advisory: artifactr's core doesn't know of it, so `edit_artifact` over REST or MCP isn't refused while someone holds it. The test and the base version are the guard, so such a write fails, or makes the next check-in stale; it is never silent.
+
+## WordCraft
+
+`Subprocess` is WordCraft's adapter for `.docx`, with the `files` extra. It spawns WordCraft's CLI, `wordcraft-cli mcp`, for every call, in an empty directory that is the only place the CLI may read or write, and the call's process and directory end with it:
+
+```python
+from artifactr.files.wordcraft import Subprocess
+
+app = Subprocess("/opt/wordcraft/bin/wordcraft-cli", version="0.7.0")
+files = NativeFiles(blobs, checkouts, app)
+```
+
+A CLI that isn't `version` is refused, so the version a revision's provenance records is the one that ran. An agent's commands are WordCraft's own, such as `{"name": "text.insert", "args": {"text": "Fees"}}` or `{"name": "para.heading1"}`; `app.commands("comment")` finds them, ten at most, from the 617 it has. A batch stops at the first command that fails, which refuses it whole, naming the command.
+
+The CLI runs as your application's user, with its network: `Subprocess` is for tests and trusted files. The sandboxed worker for hostile ones is phase 3 of [lattice RFC-0003](../../../rfcs/0003-native-files-as-artifacts.md#the-app-port-and-the-worker). To fetch the pinned CLI, the one CI tests, run `scripts/wordcraft cli` in lattice: it downloads WordCraft's release once, checks its SHA-256 against `scripts/wordcraft.sha256`, and prints the CLI's path. `moon run artifactr:fidelity` runs the fidelity report with it.
 
 ## Reading a revision
 

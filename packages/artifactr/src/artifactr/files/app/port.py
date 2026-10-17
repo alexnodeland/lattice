@@ -13,6 +13,11 @@ from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
 from artifactr.files.manifest import OUTLINE_LIMIT, Sha256
 
+Talk = Literal["save", "commands", "polled", "pushed"]
+"""How much the app talks to the host while a person edits in it (lattice RFC-0003): `save`, only
+the bytes when the person saves; `commands`, the host's commands, with replies; `polled`, changes
+the host asks for; `pushed`, changes as they happen."""
+
 Failure = Literal["timeout", "crashed", "too_large", "refused"]
 """How a call can fail: past its deadline, the app crashed, a limit was breached, or the app
 refused the file or a command."""
@@ -93,6 +98,19 @@ class App(Protocol):
     @property
     def build(self) -> str | None:
         """The digest of the image the app runs in, if it runs in one."""
+        ...
+
+    @property
+    def talk(self) -> Talk:
+        """How much the app talks to the host while a person edits in it.
+
+        At `save`, a person checks the file out, edits it in the app and checks it in.
+        """
+        ...
+
+    @property
+    def integration(self) -> str:
+        """The key that switches the app on or off in a workspace, such as `files:wordcraft`."""
         ...
 
     async def apply(

@@ -10,6 +10,7 @@
 | `blobs` | The `Blobs` port, its size limit and digest, and `InMemoryBlobs` | `manifest`, artifactr |
 | `checkouts` | `Checkout`, the record behind a person's lease, the `Checkouts` port, and `InMemoryCheckouts` | `manifest`, artifactr, pydantic |
 | `app` | The `App` port and `FakeApp` | `manifest`, pydantic |
+| `wordcraft` | WordCraft's adapter, `Subprocess`, and the `.docx` fingerprint and outline | `manifest`, `app`, pydantic, `mcp`, `anyio` |
 | `native` | `NativeFiles`: uploads, check-out and check-in, agents' edits, reads and collection | every layer above, artifactr |
 | `sql` | `SqlBlobs`, `SqlCheckouts`, their tables and migrations | `manifest`, `blobs`, `checkouts`, SQLAlchemy, Alembic, `lattice_core.sql` |
 
@@ -39,7 +40,11 @@ Collection runs per workspace. It reads every revision of a native file, archive
 
 ## The app
 
-`App` is four stateless calls, bytes in and bytes out: `apply` a batch of commands, `inspect` a file, `render` a page, and find `commands`. Each takes a deadline in seconds and fails as `AppFailed`, typed `timeout`, `crashed`, `too_large` or `refused`. `FakeApp` reads and writes JSON files of paragraphs and comments, stamps every save as a native app does, and runs on every pull request ([ADR-0004](adr/0004-an-app-is-a-port-of-stateless-calls.md)). The WordCraft adapter, and the sandboxed worker that runs it, are later phases of lattice RFC-0003.
+`App` is four stateless calls, bytes in and bytes out: `apply` a batch of commands, `inspect` a file, `render` a page, and find `commands`. Each takes a deadline in seconds and fails as `AppFailed`, typed `timeout`, `crashed`, `too_large` or `refused`. An app names itself, its version and build, and declares `talk`, how much it talks to the host while a person edits in it, and `integration`, the key that switches it in a workspace. `FakeApp` reads and writes JSON files of paragraphs and comments, stamps every save as a native app does, and runs on every pull request ([ADR-0004](adr/0004-an-app-is-a-port-of-stateless-calls.md)).
+
+WordCraft's adapter, `Subprocess`, spawns `wordcraft-cli mcp` for every call, in an empty directory that is the CLI's read root and write root, and maps the call onto its tools: open or a blank document, one `batch`, a save, and the text, structure, comments and tracked changes read back. The fingerprint is read from the bytes in Python, the digest of the archive's parts' names and digests without `docProps/core.xml`, which every save stamps, inflating each part against a limit. Its talk level is `save`, since WordCraft's browser build only opens and saves files, and its switch is `files:wordcraft`. It is not a sandbox; the worker that runs hostile files is phase 3 of lattice RFC-0003 ([ADR-0005](adr/0005-wordcraft-headless-pinned-by-checksum.md)).
+
+WordCraft is pinned by the checksums of one release, in `scripts/wordcraft.sha256`, which `scripts/wordcraft` checks before it unpacks anything. Nightly's fidelity report opens and saves each file of a generated corpus, one per feature, with that release, and publishes which features it kept and whether saving twice is a fixpoint.
 
 ## What it adds to the log
 

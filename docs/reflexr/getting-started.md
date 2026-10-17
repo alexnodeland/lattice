@@ -4,18 +4,18 @@ This page builds a small incident-response application: a monitoring system publ
 
 ## Install
 
-reflexr needs Python 3.12 or newer. Until it is published to PyPI, install it from its directory in [lattice](https://github.com/alexnodeland/lattice), the repository every package lives in:
+reflexr needs Python 3.12 or newer. It is on PyPI:
 
 === "uv"
 
     ```bash
-    uv add "reflexr @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/reflexr"
+    uv add reflexr
     ```
 
 === "pip"
 
     ```bash
-    pip install "reflexr @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/reflexr"
+    pip install reflexr
     ```
 
 The core install covers event types, rules, workspaces with in-memory storage, the reactor, schedules, and agent and graph actions. The adapters are optional extras:
@@ -32,15 +32,13 @@ The core install covers event types, rules, workspaces with in-memory storage, t
 | `litellm` | Models over a LiteLLM proxy, with tenants' keys and guardrails ([The LLM gateway](guides/gateway.md)) |
 | `evals` | evalr: feedback as datasets, evaluators as rules, replay experiments ([Feedback and evaluation](guides/evaluation.md)) |
 
-Combine extras with commas, as in `"reflexr[fastapi,postgres] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/reflexr"`. You also need the pydantic-ai extra for your model provider, such as `pydantic-ai-slim[anthropic]`, and its API key in the environment.
+Combine extras with commas, as in `"reflexr[fastapi,postgres]"`. You also need the pydantic-ai extra for your model provider, such as `pydantic-ai-slim[anthropic]`, and its API key in the environment.
 
-!!! note "lattice-core comes from PyPI"
+reflexr requires [lattice-core](../lattice-core/index.md), on PyPI as `lattice-core-ai`, and its `evals` and `langfuse` extras require [evalr](../evalr/index.md), also on PyPI, so both install with it.
 
-    reflexr requires [lattice-core](../lattice-core/index.md), which is on PyPI as `lattice-core-ai`, so pip installs it from there; uv takes it from the same commit of lattice as reflexr. A commit of lattice can need a lattice-core newer than PyPI's; with pip, add `"lattice-core-ai @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/lattice-core"` then.
+!!! note "Unreleased changes"
 
-!!! note "evalr comes from lattice too"
-
-    The `evals` and `langfuse` extras depend on [evalr](../evalr/index.md), which is not on PyPI yet either. uv installs it from the same commit of lattice as reflexr. pip reads only the version ranges, so with pip, install evalr from lattice as well: `pip install "evalr @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/evalr" "reflexr[evals] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/reflexr"`.
+    To use a change on `main` before its release, install reflexr from [lattice](https://github.com/alexnodeland/lattice), the repository every package lives in: `uv add "reflexr @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/reflexr"`. uv takes lattice-core and evalr from the same commit. pip reads only their version ranges and takes them from PyPI, which can be older than the commit needs; with pip, name them from lattice as well, as in `"evalr @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/evalr"`.
 
 ## 1. Define event types
 

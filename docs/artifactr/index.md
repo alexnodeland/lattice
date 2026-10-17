@@ -18,7 +18,7 @@ A Python library for chat applications in which people and agents work on the sa
 
 !!! note "Alpha"
 
-    artifactr 0.1.0 is its first release ([release notes](https://github.com/alexnodeland/artifactr/releases/tag/v0.1.0)). Everything described here is built ([RFC-0001](rfcs/0001-v0.1-implementation-plan.md)), and the API may still change before 1.0.
+    artifactr 0.1.0 was its first release, from its original repository ([release notes](https://github.com/alexnodeland/artifactr/releases/tag/v0.1.0)), and it is on PyPI as `artifactr-ai` from 0.2.0 ([Getting started](getting-started.md#install)). Everything described here is built ([RFC-0001](rfcs/0001-v0.1-implementation-plan.md)), and the API may still change before 1.0.
 
 ## Why: the second channel
 

@@ -20,7 +20,7 @@ The two mappings are identical but for their imports. evalr has its own `Score`,
 - The field-to-score mapping and the `Score`, `ScoreSink` and `ScoreConfigStore` ports move into `evalr.core`.
 - The libraries' `[langfuse]` and `[evals]` extras depend on evalr and drop their copies.
 - Mirroring feedback onto traces and sessions (the mirrors, and their Langfuse adapters) stays in each library.
-- Until evalr is on PyPI, the libraries pin it by git revision.
+- Until evalr is on PyPI, the libraries pin it by git revision. *evalr has been on PyPI since 2026-10-17, from 0.1.0, and the libraries' extras require `evalr>=0.1.0` ([lattice ADR-0023](../../adr/0023-publishing-to-pypi-from-the-release-workflow.md#the-sibling-floors-rose)).*
 
 The copies disagreed in the details:
 

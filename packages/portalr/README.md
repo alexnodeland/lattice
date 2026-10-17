@@ -14,7 +14,7 @@
 
 **portalr** is the portal into an application built on lattice: an `app` UI for the people who use it, to chat with its agents and see their artifacts, proposals, rules and runs, and an `admin` UI for those who run it, to manage access and see feedback, evaluations, usage and spend. Both are static single-page apps in React, sharing a typed `client` and a `ui` kit, and served by a router the application mounts beside the libraries'.
 
-> **Status:** built, and not yet released. The router, the app's areas and the admin UI, including the operators' tenants and tools and people shown by email, are built and tested, and stackr's template mounts it ([guides](https://lattice.alexnodeland.com/portalr/getting-started/), [architecture](https://lattice.alexnodeland.com/portalr/architecture/)). Not built yet: the scenarios against a generated application and the acceptance steps (phase 7b of the [plan](https://lattice.alexnodeland.com/portalr/rfcs/0001-v0.1-implementation-plan/)), magic links, and a control for colour-blind mode. It is not on PyPI: install its wheel.
+> **Status:** built, and on PyPI. The router, the app's areas and the admin UI, including the operators' tenants and tools and people shown by email, are built and tested, and stackr's template mounts it ([guides](https://lattice.alexnodeland.com/portalr/getting-started/), [architecture](https://lattice.alexnodeland.com/portalr/architecture/)). Not built yet: magic links and other sign-in providers. Its wheel carries both UIs: `uv add portalr`.
 
 ## Why
 

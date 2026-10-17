@@ -96,17 +96,17 @@ sequenceDiagram
 
 | Package | What it is | Status |
 |---|---|---|
-| **[artifactr](packages/artifactr)** | Chat applications where people and agents collaborate through shared, versioned artifacts | ✅ v0.1 · 🏷️ [0.1.0 released](https://github.com/alexnodeland/artifactr/releases/tag/v0.1.0) |
-| **[reflexr](packages/reflexr)** | Rules over event streams that run LLM workflows: pydantic-ai agents, pydantic-graph graphs and functions | ✅ v0.1 |
-| **[evalr](packages/evalr)** | Typed evaluation of agent systems: judges that give typed verdicts, trained on people's feedback and measured against it | ✅ v0.1 |
-| **[relayr](packages/relayr)** | The bridge between artifactr and reflexr: chat events become events for rules, and runs act back in the chat. Rules can be drafted in chat. | 🚧 [v0.1 in progress](docs/relayr/rfcs/0001-v0.1-implementation-plan.md) |
-| **[grantr](packages/grantr)** | Identity and access: tenants, members, groups, roles, service principals and restricted items, checked before every command and read, with row-level security | ✅ v0.1 |
-| **[portalr](packages/portalr)** | The portal: an app UI to chat with agents and see their artifacts, proposals and runs, and an admin UI for access, feedback, traces and spend | 🚧 [v0.1 in progress](docs/portalr/rfcs/0001-v0.1-implementation-plan.md) |
-| **[lattice-core](packages/lattice-core)** | What the packages share and must keep identical: infrastructure each depends on and re-exports, never imported by an application | 🚧 [moving in](docs/adr/0018-lattice-core-what-the-libraries-share.md) |
-| **[stackr](packages/stackr)** | The stack the libraries run on (Supabase or PostgreSQL, LiteLLM, OpenTelemetry, Grafana, Langfuse), an application template, and hosting recipes | ✅ template · 🚧 [hosting recipes](docs/stackr/rfcs/0004-hosting-recipes.md) |
+| **[artifactr](packages/artifactr)** | Chat applications where people and agents collaborate through shared, versioned artifacts | ✅ v0.1 · 📦 [PyPI](https://pypi.org/project/artifactr-ai/) |
+| **[reflexr](packages/reflexr)** | Rules over event streams that run LLM workflows: pydantic-ai agents, pydantic-graph graphs and functions | ✅ v0.1 · 📦 [PyPI](https://pypi.org/project/reflexr/) |
+| **[evalr](packages/evalr)** | Typed evaluation of agent systems: judges that give typed verdicts, trained on people's feedback and measured against it | ✅ v0.1 · 📦 [PyPI](https://pypi.org/project/evalr/) |
+| **[relayr](packages/relayr)** | The bridge between artifactr and reflexr: chat events become events for rules, and runs act back in the chat. Rules can be drafted in chat. | ✅ v0.1 · 📦 [PyPI](https://pypi.org/project/relayr-ai/) |
+| **[grantr](packages/grantr)** | Identity and access: tenants, members, groups, roles, service principals and restricted items, checked before every command and read, with row-level security | ✅ v0.1 · 📦 [PyPI](https://pypi.org/project/grantr/) |
+| **[portalr](packages/portalr)** | The portal: an app UI to chat with agents and see their artifacts, proposals and runs, and an admin UI for access, feedback, traces and spend | ✅ v0.1 · 📦 [PyPI](https://pypi.org/project/portalr/) |
+| **[lattice-core](packages/lattice-core)** | What the packages share and must keep identical: infrastructure each depends on and re-exports, never imported by an application | 📦 [PyPI](https://pypi.org/project/lattice-core-ai/) |
+| **[stackr](packages/stackr)** | The stack the libraries run on (Supabase or PostgreSQL, LiteLLM, OpenTelemetry, Grafana, Langfuse), an application template, and hosting recipes | ✅ template · 🐳 [images on GHCR](https://github.com/alexnodeland/lattice/releases/tag/stackr-v0.1.0) · 🚧 [hosting recipes](docs/stackr/rfcs/0004-hosting-recipes.md) |
 
 > [!NOTE]
-> **Alpha.** artifactr's [0.1.0](https://github.com/alexnodeland/artifactr/releases/tag/v0.1.0) was released from its original repository; lattice keeps its tag, `artifactr-v0.1.0`. The others release once lattice reaches v0.1. Of the packages, only `lattice-core-ai` is on PyPI so far. APIs may still change before 1.0.
+> **Alpha.** Every library is released and on PyPI: `artifactr-ai`, `reflexr`, `evalr`, `relayr-ai`, `grantr`, `portalr` and `lattice-core-ai`. stackr is released too, and ships its images on GHCR rather than a wheel. artifactr's [0.1.0](https://github.com/alexnodeland/artifactr/releases/tag/v0.1.0) was released from its original repository; lattice keeps its tag, `artifactr-v0.1.0`. APIs may still change before 1.0.
 
 ## 🚀 Start an application
 
@@ -139,20 +139,18 @@ make up                 # beside stackr's stack, at http://127.0.0.1:8800
 
 <br>
 
-Python 3.12 or newer. Until the packages are on PyPI, install one from this repository with [uv](https://docs.astral.sh/uv/). A release is tagged with its package's name, as in `artifactr-v0.1.0`; a package without a release installs from `main`:
+Python 3.12 or newer. Every library is on PyPI. With [uv](https://docs.astral.sh/uv/) (or `pip install`):
 
 ```bash
-uv add "artifactr-ai @ git+https://github.com/alexnodeland/lattice@artifactr-v0.1.0#subdirectory=packages/artifactr"
-uv add "reflexr @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/reflexr"
-uv add "evalr @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/evalr"
-uv add "relayr-ai @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/relayr"
-uv add "grantr @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/grantr"
-uv add "portalr @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/portalr"
+uv add artifactr-ai   # imported as artifactr
+uv add reflexr
+uv add evalr
+uv add relayr-ai      # imported as relayr
+uv add grantr
+uv add portalr        # its wheel carries both UIs
 ```
 
-portalr's wheel carries its two UIs, which Vite builds first, so installed from the repository it has none to serve: build them in a checkout (`bun install && moon run app:build admin:build`), or wait for its release wheel. portalr isn't in the application template yet either.
-
-uv takes each package's own dependencies from lattice, from the same commit: relayr's, artifactr and reflexr, portalr's, grantr, and lattice-core, which artifactr, reflexr, grantr and portalr share. Each package's getting-started page lists its extras, such as artifactr's `fastapi`, `mcp` and `postgres`: [artifactr](https://lattice.alexnodeland.com/artifactr/getting-started/), [reflexr](https://lattice.alexnodeland.com/reflexr/getting-started/), [evalr](https://lattice.alexnodeland.com/evalr/getting-started/), [grantr](https://lattice.alexnodeland.com/grantr/getting-started/).
+Each takes the packages of lattice it requires from PyPI too: relayr's, artifactr and reflexr, portalr's, grantr, and lattice-core, which artifactr, reflexr, grantr and portalr share. For a change on `main` before its release, install from this repository instead, as in `uv add "reflexr @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/reflexr"`; portalr's UIs are built into its wheel, not kept in git, so build its wheel in a checkout ([portalr's getting started](https://lattice.alexnodeland.com/portalr/getting-started/#install)). Each package's getting-started page lists its extras, such as artifactr's `fastapi`, `mcp` and `postgres`: [artifactr](https://lattice.alexnodeland.com/artifactr/getting-started/), [reflexr](https://lattice.alexnodeland.com/reflexr/getting-started/), [evalr](https://lattice.alexnodeland.com/evalr/getting-started/), [grantr](https://lattice.alexnodeland.com/grantr/getting-started/).
 
 </details>
 

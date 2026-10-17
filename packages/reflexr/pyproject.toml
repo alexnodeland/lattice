@@ -36,13 +36,13 @@ sqlite = ["reflexr[sql]", "aiosqlite>=0.22"]
 postgres = ["reflexr[sql]", "asyncpg>=0.31"]
 fastapi = ["fastapi>=0.141", "starlette>=0.46.0"]
 mcp = ["mcp>=2.2", "starlette>=0.27"]
-evals = ["evalr>=0.1.0.dev0"]
+evals = ["evalr>=0.1.0"]
 langfuse = [
     "lattice-core-ai[langfuse]>=0.1.0",
     "langfuse>=4.15,<5",
     # The score mapping and ports that reflexr.scores' mirror builds on, and evalr.langfuse's
     # score adapters, which send the mirror's scores to Langfuse.
-    "evalr[langfuse]>=0.1.0.dev0",
+    "evalr[langfuse]>=0.1.0",
 ]
 litellm = ["lattice-core-ai[litellm]>=0.1.0"]
 # The SDK's setup is lattice-core's; this package imports the SDK for its own views.
@@ -68,7 +68,7 @@ test = [
     "httpx>=0.28",
     "fastapi>=0.141",
     "mcp>=2.2",
-    "evalr>=0.1.0.dev0",
+    "evalr>=0.1.0",
     "jsonschema>=4.26",
 ]
 lint = ["ruff>=0.16", "pyright>=1.1.414"]

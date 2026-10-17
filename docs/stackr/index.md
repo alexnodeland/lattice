@@ -16,9 +16,9 @@ The infrastructure template for applications built on artifactr, reflexr and eva
 
 </div>
 
-!!! note "Pre-release"
+!!! note "Alpha"
 
-    stackr v0.1 is built, as planned in [RFC-0001](rfcs/0001-v0.1-implementation-plan.md), and has no release yet. The site describes `main`.
+    stackr v0.1 is built, as planned in [RFC-0001](rfcs/0001-v0.1-implementation-plan.md), and released as 0.1.0, which ships no wheel: the AWS recipe's images are on GHCR, as `ghcr.io/alexnodeland/stackr-<image>` ([ADR-0035](adr/0035-the-thin-images.md)). The site describes `main`.
 
 ## Why: one stack every application on lattice shares
 

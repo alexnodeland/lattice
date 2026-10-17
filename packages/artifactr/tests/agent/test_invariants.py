@@ -14,12 +14,12 @@
 
 Each test holds one storage call at a :class:`Gate`, patched onto the storage it runs on. The
 last section is what the TLA+ spec in docs/artifactr/spec found, each trace run against the code:
-#249's tests and #252's run in memory alone, with a storage clock moved on; #252's fails, a strict
-``xfail``, until it is decided.
+#249's tests and #252's run in memory alone, with a storage clock moved on.
 """
 
 import asyncio
 import contextlib
+import logging
 from collections.abc import AsyncGenerator, AsyncIterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -645,10 +645,9 @@ async def test_i6_a_reply_that_an_answer_beat_is_the_resumed_runs_prompt(
     assert script.conversation()[-1] == "Tuesday, and book the room"
 
 
-# ─── found by the TLA+ spec (docs/artifactr/spec), not yet fixed ─────────────
+# ─── found by the TLA+ spec (docs/artifactr/spec) ──────────────────────────
 #
-# Each test is the spec's trace for one issue, against the code, and fails until the issue is
-# fixed: strict, so a fix that makes it pass removes its mark.
+# Each test is the spec's trace for one issue, against the code.
 
 
 class _Clock:
@@ -792,28 +791,89 @@ async def test_i3_a_send_cancelled_as_its_ask_is_saved_is_handed_over(
     assert script.requests, "handed over, not left for the next command"
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="#252: what a dead holder was asked waits for a command",
-)
+async def _left_by_a_dead_holder(
+    runners: MakeRunner, storage: Storage
+) -> tuple[Workspace, Thread, Script]:
+    """A thread whose holder's process died as its run began, with its claim still in storage.
+
+    The first process claims the thread for a message and is held for good before its run
+    starts: it stands for one that died. Its message is asked for, and taken by no one. Its
+    claim is renewed on the loop's clock, a third of the default ``claim_ttl`` on, which no
+    test waits for: moving the storage's clock on lapses it.
+    """
+    ws = await Workspaces(storage).open(SCOPE.tenant_id, SCOPE.workspace_id, actor=ALICE)
+    thread = await ws.create_thread("Launch")
+    script = Script(*[say("ok")] * 2)
+    dead = Gate()
+    dying = runners(make_agent(script), turn_context=_held_at_its_start(dead))
+    started(await dying.send(ws, thread.id, "Plan the launch"))
+    await _entered(dead)
+    return ws, thread, script
+
+
+def _taking() -> Gate:
+    """A gate that lets each turn through, and shows when one began."""
+    gate = Gate()
+    gate.release.set()
+    return gate
+
+
 async def test_i3_a_message_asked_while_its_holder_dies_is_taken_once_its_claim_lapses(
     runners: MakeRunner,
 ) -> None:
     clock = _Clock()
-    storage = InMemoryStorage(clock=clock)
-    ws = await Workspaces(storage).open(SCOPE.tenant_id, SCOPE.workspace_id, actor=ALICE)
-    thread = await ws.create_thread("Launch")
-    script = Script(*[say("ok")] * 3)
-    # The first process holds the thread, and stops for good: it stands for one that died.
-    dead = Gate()
-    dying = runners(make_agent(script), turn_context=_held_at_its_start(dead))
-    living = runners(make_agent(script))
-    started(await dying.send(ws, thread.id, "Plan the launch"))
-    await _entered(dead)
+    ws, thread, script = await _left_by_a_dead_holder(runners, InMemoryStorage(clock=clock))
+    taking = _taking()
+    living = runners(
+        make_agent(script),
+        claim_ttl=timedelta(milliseconds=50),
+        turn_context=_held_at_its_start(taking),
+    )
     sent = await living.send(ws.as_actor(BOB), thread.id, "Also book the big room")
-    if sent.run is not None:  # not the failure the mark expects
-        pytest.fail("the dead process's claim did not refuse the message")
+    assert sent.run is None, "the dead process's claim refuses the message"
     clock.now += timedelta(minutes=1)  # the dead claim lapses
+    await _entered(taking)  # the refused claimant looked again
     await settled(thread.id, living)
-    assert script.requests, "the message is taken once the dead claim lapses"
+    assert script.conversation() == ["Plan the launch", "Also book the big room"]
+
+
+async def test_i3_a_runner_that_starts_takes_what_a_dead_holder_was_asked(
+    runners: MakeRunner,
+) -> None:
+    clock = _Clock()
+    ws, _, script = await _left_by_a_dead_holder(runners, InMemoryStorage(clock=clock))
+    clock.now += timedelta(minutes=1)  # the dead claim lapses as the process starts again
+    restarted = runners(make_agent(script))
+    [run] = await restarted.recover(ws)
+    await run.wait()
+    assert script.conversation() == ["Plan the launch"]
+
+
+async def test_i3_a_runner_closed_as_it_looks_again_stops_looking(runners: MakeRunner) -> None:
+    storage = InMemoryStorage(clock=_Clock())
+    ws, thread, script = await _left_by_a_dead_holder(runners, storage)
+    living = runners(make_agent(script), claim_ttl=timedelta(milliseconds=50))
+    sent = await living.send(ws.as_actor(BOB), thread.id, "Also book the big room")
+    assert sent.run is None, "the dead process's claim refuses the message"
+    looking = hold(storage, "cursor")  # the look's first read, once it has waited
+    await _entered(looking)
+    await living.aclose()
+    looks = [t for t in asyncio.all_tasks() if "Runner._take_again" in repr(t.get_coro())]
+    assert not looks, "closing the runner ended the look it was taking"
+
+
+async def test_i3_a_sweep_that_fails_on_one_thread_takes_the_others(
+    storage: Storage, ws: Workspace, runners: MakeRunner, caplog: pytest.LogCaptureFixture
+) -> None:
+    script = Script(say("ok"))
+    failed, taken = await ws.create_thread("Launch"), await ws.create_thread("Budget")
+    for asked in (failed, taken):  # each asked for, by a process that died before it claimed
+        message = await ws.commit(PostMessage(thread_id=asked.id, content=asked.title))
+        await storage.save_cursor(SCOPE, f"artifactr.runner/{asked.id}/asked", message.seq or 0)
+    failing = hold(storage, "cursor", raises=RuntimeError("storage is down"))  # the first's
+    failing.release.set()
+    with caplog.at_level(logging.ERROR, logger="artifactr.agent"):
+        [run] = await runners(make_agent(script)).recover(ws)
+    await run.wait()
+    assert script.conversation() == ["Budget"]
+    assert f"taking thread {failed.id}'s turn failed" in caplog.text

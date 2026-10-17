@@ -1,6 +1,6 @@
 # ADR-0055: Turns from the log
 
-**Status:** Accepted; its batching amended by [ADR-0057](0057-a-turn-acts-for-one-author.md), its claim by [ADR-0069](0069-a-claim-fences-the-writes-that-consume.md) and the amendment below
+**Status:** Accepted; its batching amended by [ADR-0057](0057-a-turn-acts-for-one-author.md), its claim by [ADR-0069](0069-a-claim-fences-the-writes-that-consume.md), its hand-over by [ADR-0070](0070-a-runner-looks-again-for-what-a-dead-holder-was-asked.md), and the amendments below
 **Date:** 2026-09-30
 **Deciders:** Alex Nodeland
 
@@ -164,3 +164,10 @@ TLC, checking the thread claim's spec ([`docs/artifactr/spec/`](../spec/README.m
 - **A send cancelled between its ask and its claim handed nothing over** ([lattice #251](https://github.com/alexnodeland/lattice/issues/251)): `I3_NoStrandedAsk`. `_take`'s reads, and `_ask`'s save, came before the `try` that hands over. Now `_take` saves the ask and reads inside it, so a call cancelled anywhere from its ask on hands the thread over. One that failed there hands over what was asked after it read, as I4 says, and it has read nothing yet.
 
 A message asked while the thread's holder dies still waits for the thread's next command ([lattice #252](https://github.com/alexnodeland/lattice/issues/252)), and a crash gives a dead run's steering to the model again ([lattice #257](https://github.com/alexnodeland/lattice/issues/257)); both are left for a decision.
+
+## Amendment (2026-10-17): a crash, decided
+
+The two findings left for a decision above are decided.
+
+- **What a dead holder was asked is taken** ([lattice #252](https://github.com/alexnodeland/lattice/issues/252)). A claimant that finds the thread claimed no longer does nothing more: it looks again once the claim could have lapsed, and `Runner.recover` sweeps a workspace's threads as an application starts ([ADR-0070](0070-a-runner-looks-again-for-what-a-dead-holder-was-asked.md)). What was asked and not taken is left to a task that will look at it, in the process refused, or in the process that starts again, so a crash no longer strands it; the spec checks this as `AskedIsTaken`, with a crash.
+- **A crash redelivers steering, and that is accepted** ([lattice #257](https://github.com/alexnodeland/lattice/issues/257)). A run's watcher gives the model a message, which is recorded as taken only with the run's end (I2). A process that dies between the two has given the model the message, and whatever the model did with it happened, but the record says it was not taken; the thread's next turn takes it again. Steering is delivered at least once, not exactly once. So the one exception to I1 has a second case: **a process that dies while its run holds the thread** may have its run's steering given again by the thread's next holder, as a claim that lapses while its holder lives may. What a log write consumed, a prompt, a reply's answer, or steering recorded with a run's end, is still consumed once. Recording steering as it is delivered, in a write of its own per message, was not chosen: it adds a write to every steered message for a case that needs a crash mid-run, and the model's effects of a message cannot be undone either way. The options table's "consumes exactly what its last write recorded" is about the record; this is what the model was given.

@@ -159,8 +159,8 @@ def again(tag: str, path: str) -> str:
         )
     return (
         f"  {command}\n    (it attaches and attests the wheels; it publishes to PyPI as well "
-        "only if the PYPI_PUBLISH variable is true, and then after the `pypi` environment's "
-        "approval of each package)"
+        "only if the PYPI_PUBLISH variable is true, and then after the approval of the "
+        "package's `pypi-<distribution>` environment)"
     )
 
 
@@ -394,8 +394,8 @@ def main() -> int:
             handle.write(
                 "### Publish to PyPI\n\nThis run attached and attested the wheels. It published "
                 "nothing. Publish each package by dispatch on its tag, in this order, approving "
-                "the `pypi` environment each time (one approval a package, one at a time):\n\n"
-                + "".join(f"1. `{step}`\n" for step in steps)
+                "each package's `pypi-<distribution>` environment (one approval a package, one "
+                "at a time):\n\n" + "".join(f"1. `{step}`\n" for step in steps)
             )
     return 0
 

@@ -7,6 +7,7 @@
 import { expect, onTestFinished, test } from "vitest";
 import { commands, page } from "vitest/browser";
 import { render } from "vitest-browser-react";
+import { AccountMenu } from "./account-menu";
 import { Alert } from "./alert";
 import { AppShell } from "./app-shell";
 import { Button } from "./button";
@@ -161,4 +162,28 @@ test("a table in the app's density", async () => {
   await render(<Rowed ui="app" />);
   await settled();
   await matches("states-comfortable", page.elementLocator(document.body));
+});
+
+test("the account menu, with colour-blind friendly charts on", async () => {
+  await page.viewport(600, 420);
+  onTestFinished(() => page.viewport(414, 896));
+  const screen = await render(
+    <div className="min-h-screen bg-paper p-4">
+      <AccountMenu
+        name="Alex Nodeland"
+        email="alex@acme.test"
+        appearance="system"
+        onAppearance={() => undefined}
+        colourBlind
+        onColourBlind={() => undefined}
+        onSignOut={() => undefined}
+      />
+    </div>,
+  );
+  await settled();
+  await screen.getByRole("button", { name: "Account: Alex Nodeland" }).click();
+  await expect
+    .element(screen.getByRole("menuitemcheckbox", { name: "Colour-blind friendly charts" }))
+    .toBeVisible();
+  await matches("states-account-menu", page.elementLocator(document.body));
 });

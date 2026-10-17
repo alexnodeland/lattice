@@ -51,6 +51,7 @@ export {
   ToolCall,
 } from "./chat";
 export { type CheckboxChoice, CheckboxGroup } from "./checkbox";
+export { useColourBlind } from "./colour-blind";
 export { ConfirmDialog } from "./confirm-dialog";
 export { Dialog } from "./dialog";
 export { EmptyState } from "./empty-state";

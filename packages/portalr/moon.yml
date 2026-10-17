@@ -75,6 +75,18 @@ tasks:
       - 'app:build'
       - 'admin:build'
 
+  # Each UI's gzip size against the ceilings in size-budget.json (portalr ADR-0040).
+  size:
+    description: "Fail when a built UI is larger than its budget"
+    command: 'uv run --no-project python scripts/check_size.py'
+    inputs:
+      - 'scripts/check_size.py'
+      - 'size-budget.json'
+      - 'src/portalr/static/**/*'
+    deps:
+      - 'app:build'
+      - 'admin:build'
+
   ui-in-wheel:
     description: "Check that the built wheel carries both UIs, and their third-party notices"
     command: 'uv run --no-project python scripts/check_wheel.py'
@@ -99,6 +111,7 @@ tasks:
     inputs: ['@group(python)']
     deps:
       - 'ui-in-wheel'
+      - 'size'
     options:
       mergeInputs: 'replace'
 

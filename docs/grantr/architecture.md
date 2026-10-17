@@ -92,13 +92,13 @@ An admin reads each list with the action of the command that changes it ([ADR-00
 
 ## Integrations
 
-`Grants` answers lattice-core's `Integrations` port, and relayr's `Enabled`, with `is_enabled(tenant_id, workspace_id, key)`: whether an integration is on in a workspace ([ADR-0034](adr/0034-integrations-switched-per-tenant-and-workspace-in-grantrs-table-audited.md), [lattice ADR-0027](../adr/0027-integrations-switched-per-workspace-through-one-port.md)). It checks no one, as `hidden` doesn't.
+`Grants` answers lattice-core's `Integrations` port, and relayr's `Enabled`, with `is_enabled(tenant_id, workspace_id, key)`: whether an integration is on in a workspace, in two indexed reads ([ADR-0034](adr/0034-integrations-switched-per-tenant-and-workspace-in-grantrs-table-audited.md), [lattice ADR-0027](../adr/0027-integrations-switched-per-workspace-through-one-port.md)). It checks no one, as `hidden` doesn't.
 
 - **The registry and the installation are configuration.** `Grants(integrations=...)` takes the integrations a tenant's admins switch, lattice-core's `KNOWN` if omitted, and `installed=...` the keys the deployment installs, every one if omitted.
 - **Three levels decide:** an integration is on in a workspace only if the deployment installs it and the tenant hasn't turned it off; then the workspace's setting decides, or, unset, the tenant's, or, unset too, its default. `grantr.core.effective` is the rule.
 - **A key it doesn't know, or doesn't install, is off,** and so is every key while the store can't be read, with a warning.
 - **`integrations` and `set_integration`** read and change a level's settings with `grantr:manage_integrations` there, which a tenant's owners and admins hold everywhere in it, and a workspace's admin in that workspace. `set_integration` records an `integration_set` entry for a real change only: setting what is set already records nothing.
-- **`enabled`** answers every key for whoever can open the workspace, for the client that hides what is off.
+- **`integrations_enabled`** answers every key for whoever can open the workspace, for the client that hides what is off.
 - **An external provider only narrows,** by wrapping `is_enabled` in an `Integrations` of the application's that is on only where both are. lattice builds none.
 
 ## Keys
@@ -158,8 +158,9 @@ The contract test, `tests/grants/test_contract.py`, runs every behaviour on this
 | `PUT`, `DELETE /operators/{user}` | Grant and revoke the operator role |
 | `GET /audit`, `GET /tenants/{tenant}/audit` | The deployment's and a tenant's audit log, in the window `after_seq < seq < before_seq`, the first `limit` or the last `last`, oldest first, and kept to some types (`type=`, which may repeat) or one subject (`actor_kind=`, `actor=`, and `workspace=` for a rule) |
 | `/tenants/{tenant}/members`, `/groups`, `/roles`, `/grants`, `/revocations`, `/keys`, `/restrictions` | The lists and commands above |
-| `GET /tenants/{tenant}/integrations`, `PUT /tenants/{tenant}/integrations/{key}` | Every integration as it is set on the tenant, or in a workspace with `?workspace=`; and setting one, with `{"on": true, false or null, "workspace": ...}`, `null` to unset. Both with `grantr:manage_integrations` there |
-| `GET /tenants/{tenant}/workspaces/{workspace}/integrations` | Whether each integration is on in the workspace, for whoever can open it |
+| `GET /tenants/{tenant}/integrations`, `PUT /tenants/{tenant}/integrations/{key}` | Every integration as it is set on the tenant, and setting one with `{"on": true, false or null}`, `null` to unset; with `grantr:manage_integrations` on the tenant |
+| `GET /tenants/{tenant}/workspaces/{workspace}/integrations`, `PUT .../integrations/{key}` | The same in a workspace, with `grantr:manage_integrations` on it |
+| `GET /tenants/{tenant}/workspaces/{workspace}/enabled-integrations` | Whether each integration is on in the workspace, for whoever can open it |
 
 Refusals keep the libraries' shapes, `{"type", "message"}`: 401 `unauthorized` without a caller, 403 `forbidden`, 422 `invalid`, and 400 `tenant_required` when a caller in several tenants names none. Its OpenAPI document is committed in `packages/grantr/schemas/grantr.openapi.json`; `moon run grantr:schema` regenerates it, and a test fails when it drifts.
 

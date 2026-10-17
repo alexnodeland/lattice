@@ -276,13 +276,12 @@ class Grants:
 
         It reads the member's grants, and the tenant's custom roles if they name one, once.
         """
-        opens = {action for action in self._catalog.actions if action.endswith(":open")}
         grants = await self._storage.grants(tenant, member)
         custom = await self._custom(self._storage, tenant, grants)
         return [
             workspace.workspace
             for workspace in await self._storage.resources(tenant, "workspace")
-            if workspace.workspace and opens & held(grants, workspace, self._catalog, custom)
+            if workspace.workspace and _opens(held(grants, workspace, self._catalog, custom))
         ]
 
     async def memberships(self, user: UserId) -> list[Membership]:
@@ -820,13 +819,13 @@ class Grants:
         if key not in self._installed or not TENANT_ID.fullmatch(tenant_id) or not workspace_id:
             return False
         try:
-            own, theirs = await self._settings(self._storage, tenant_id, workspace_id)
+            on_tenant, in_workspace = await self._settings(self._storage, tenant_id, workspace_id)
         except Exception:
             logger.warning("%s is off: the store can't be read", key, exc_info=True)
             return False
-        return self._state(key, own, theirs).enabled
+        return self._state(key, on_tenant, in_workspace).enabled
 
-    async def enabled(
+    async def integrations_enabled(
         self, tenant: TenantId, workspace: WorkspaceId, *, by: Subject
     ) -> dict[str, bool]:
         """Whether each integration is on in a workspace, by key: for whoever can open it.
@@ -835,11 +834,12 @@ class Grants:
             Invalid: If the workspace's id is empty.
             Forbidden: If ``by`` can't open the workspace: it holds no library's ``open`` there.
         """
-        held = await self._held(self._storage, tenant, by, _level(workspace))
-        if not any(action.endswith(":open") for action in held):
+        if not _opens(await self._held(self._storage, tenant, by, _level(workspace))):
             raise Forbidden("opening the workspace is refused")
-        own, theirs = await self._settings(self._storage, tenant, workspace)
-        return {key: self._state(key, own, theirs).enabled for key in self._integrations}
+        on_tenant, in_workspace = await self._settings(self._storage, tenant, workspace)
+        return {
+            key: self._state(key, on_tenant, in_workspace).enabled for key in self._integrations
+        }
 
     async def integrations(
         self, tenant: TenantId, *, workspace: WorkspaceId | None = None, by: Subject
@@ -852,8 +852,8 @@ class Grants:
                 workspace.
         """
         await self._require(self._storage, tenant, by, MANAGE_INTEGRATIONS, _level(workspace))
-        own, theirs = await self._settings(self._storage, tenant, workspace)
-        return [self._state(key, own, theirs) for key in self._integrations]
+        on_tenant, in_workspace = await self._settings(self._storage, tenant, workspace)
+        return [self._state(key, on_tenant, in_workspace) for key in self._integrations]
 
     async def set_integration(
         self,
@@ -880,28 +880,34 @@ class Grants:
         level = _level(workspace)
         async with self._change(tenant) as (tx, record):
             await self._require(tx, tenant, by, MANAGE_INTEGRATIONS, level)
-            own, theirs = await self._settings(tx, tenant, workspace)
-            stored = (own if workspace is None else theirs).get(key)
+            on_tenant, in_workspace = await self._settings(tx, tenant, workspace)
+            stored = (on_tenant if workspace is None else in_workspace).get(key)
             if on == (None if stored is None else stored.on):
-                return self._state(key, own, theirs)
+                return self._state(key, on_tenant, in_workspace)
             event = IntegrationSet(workspace=workspace, key=key, on=on)
             entry = await record(tenant, by, event)
             setting = None if on is None else IntegrationSetting(on=on, by=by, at=entry.at)
             await tx.set_integration(tenant, workspace, key, setting)
-            return self._state(key, *await self._settings(tx, tenant, workspace))
+            # A state reads only its own key, so the new setting stands for its level.
+            changed = {} if setting is None else {key: setting}
+            if workspace is None:
+                return self._state(key, changed, in_workspace)
+            return self._state(key, on_tenant, changed)
 
     async def _settings(
         self, reads: Reads, tenant: TenantId, workspace: WorkspaceId | None
     ) -> tuple[dict[str, IntegrationSetting], dict[str, IntegrationSetting]]:
         """The integrations set on the tenant, and in the workspace: none there for None."""
-        own = await reads.integrations(tenant)
-        return own, {} if workspace is None else await reads.integrations(tenant, workspace)
+        on_tenant = await reads.integrations(tenant)
+        if workspace is None:
+            return on_tenant, {}
+        return on_tenant, await reads.integrations(tenant, workspace)
 
     def _state(
         self,
         key: str,
-        own: Mapping[str, IntegrationSetting],
-        theirs: Mapping[str, IntegrationSetting],
+        tenant: Mapping[str, IntegrationSetting],
+        workspace: Mapping[str, IntegrationSetting],
     ) -> IntegrationState:
         """An integration's state, from the tenant's settings and a workspace's."""
         integration = self._integrations[key]
@@ -910,8 +916,8 @@ class Grants:
             description=integration.description,
             default=integration.default,
             installed=key in self._installed,
-            tenant=own.get(key),
-            workspace=theirs.get(key),
+            tenant=tenant.get(key),
+            workspace=workspace.get(key),
         )
 
     @asynccontextmanager
@@ -1097,6 +1103,11 @@ class Grants:
 def _application(principal: ServicePrincipal) -> Grant:
     """The grant of the ``application`` role to a service principal."""
     return Grant(tenant=None, role=APPLICATION, on=DEPLOYMENT, to=principal)
+
+
+def _opens(actions: Iterable[str]) -> bool:
+    """Whether actions open a workspace: any library's ``open`` does."""
+    return any(action.endswith(":open") for action in actions)
 
 
 def _level(workspace: WorkspaceId | None) -> Resource:

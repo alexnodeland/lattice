@@ -1059,22 +1059,22 @@ async def test_whoever_can_open_a_workspace_reads_what_is_on_in_it(
     await grants.grant("acme", "viewer", on=WS, to=BOB, by=ALICE)
     await grants.grant("acme", "viewer", on=THREAD, to=CAROL, by=ALICE)
     await grants.set_integration("acme", "excalidraw", False, workspace="w1", by=ALICE)
-    enabled = await grants.enabled("acme", "w1", by=BOB)
+    enabled = await grants.integrations_enabled("acme", "w1", by=BOB)
     assert list(enabled) == list(KNOWN)
     assert enabled == {
         key: key not in ("excalidraw", "ui:mini-apps", "markdown:mermaid") for key in KNOWN
     }
-    assert await grants.enabled("acme", "w2", by=ALICE) == {
+    assert await grants.integrations_enabled("acme", "w2", by=ALICE) == {
         key: integration.default for key, integration in KNOWN.items()
     }
     with pytest.raises(Invalid, match="a workspace's id isn't empty"):
-        await grants.enabled("acme", "", by=ALICE)
+        await grants.integrations_enabled("acme", "", by=ALICE)
     for refused in (CAROL, Agent(), ServicePrincipal(id="ci")):
         with pytest.raises(Forbidden, match="opening the workspace is refused"):
-            await grants.enabled("acme", "w1", by=refused)
+            await grants.integrations_enabled("acme", "w1", by=refused)
     with pytest.raises(Forbidden, match="opening the workspace is refused"):
         # With no library's catalog, there is no open to hold.
-        await Grants(storage).enabled("acme", "w1", by=ALICE)
+        await Grants(storage).integrations_enabled("acme", "w1", by=ALICE)
 
 
 async def test_an_application_switches_its_own_integrations(storage: Storage) -> None:

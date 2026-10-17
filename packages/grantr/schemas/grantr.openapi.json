@@ -572,7 +572,7 @@
         "type": "object"
       },
       "IntegrationSwitch": {
-        "description": "An integration's new setting, on the tenant or in a workspace.",
+        "description": "An integration's new setting, on the tenant or in a workspace, as its path names.",
         "properties": {
           "on": {
             "anyOf": [
@@ -584,16 +584,6 @@
               }
             ],
             "title": "On"
-          },
-          "workspace": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/WorkspaceId"
-              },
-              {
-                "type": "null"
-              }
-            ]
           }
         },
         "required": [
@@ -2196,8 +2186,8 @@
     },
     "/grantr/v1/tenants/{tenant}/integrations": {
       "get": {
-        "description": "Every integration as it is set on a tenant, or in a workspace, and whether it is on.",
-        "operationId": "list_integrations_grantr_v1_tenants__tenant__integrations_get",
+        "description": "Every integration as it is set on a tenant, and whether it is on where unset.",
+        "operationId": "tenant_integrations_grantr_v1_tenants__tenant__integrations_get",
         "parameters": [
           {
             "in": "path",
@@ -2207,22 +2197,6 @@
               "pattern": "^[^~]+$",
               "title": "Tenant",
               "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "workspace",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "$ref": "#/components/schemas/WorkspaceId"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Workspace"
             }
           }
         ],
@@ -2234,7 +2208,7 @@
                   "items": {
                     "$ref": "#/components/schemas/IntegrationState"
                   },
-                  "title": "Response List Integrations Grantr V1 Tenants  Tenant  Integrations Get",
+                  "title": "Response Tenant Integrations Grantr V1 Tenants  Tenant  Integrations Get",
                   "type": "array"
                 }
               }
@@ -2252,13 +2226,13 @@
             "description": "Validation Error"
           }
         },
-        "summary": "List Integrations"
+        "summary": "Tenant Integrations"
       }
     },
     "/grantr/v1/tenants/{tenant}/integrations/{key}": {
       "put": {
-        "description": "Turn an integration on or off, on a tenant or in a workspace, or unset it with null.\n\nSetting what is set already changes nothing, and records nothing.",
-        "operationId": "set_integration_grantr_v1_tenants__tenant__integrations__key__put",
+        "description": "Turn an integration on or off on a tenant, or unset it with null.\n\nSetting what is set already changes nothing, and records nothing.",
+        "operationId": "set_tenant_integration_grantr_v1_tenants__tenant__integrations__key__put",
         "parameters": [
           {
             "in": "path",
@@ -2312,7 +2286,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Set Integration"
+        "summary": "Set Tenant Integration"
       }
     },
     "/grantr/v1/tenants/{tenant}/keys": {
@@ -2961,10 +2935,10 @@
         "summary": "Define Role"
       }
     },
-    "/grantr/v1/tenants/{tenant}/workspaces/{workspace}/integrations": {
+    "/grantr/v1/tenants/{tenant}/workspaces/{workspace}/enabled-integrations": {
       "get": {
         "description": "Whether each integration is on in a workspace, by key, for whoever can open it.",
-        "operationId": "workspace_integrations_grantr_v1_tenants__tenant__workspaces__workspace__integrations_get",
+        "operationId": "enabled_integrations_grantr_v1_tenants__tenant__workspaces__workspace__enabled_integrations_get",
         "parameters": [
           {
             "in": "path",
@@ -2994,7 +2968,7 @@
                   "additionalProperties": {
                     "type": "boolean"
                   },
-                  "title": "Response Workspace Integrations Grantr V1 Tenants  Tenant  Workspaces  Workspace  Integrations Get",
+                  "title": "Response Enabled Integrations Grantr V1 Tenants  Tenant  Workspaces  Workspace  Enabled Integrations Get",
                   "type": "object"
                 }
               }
@@ -3012,7 +2986,130 @@
             "description": "Validation Error"
           }
         },
+        "summary": "Enabled Integrations"
+      }
+    },
+    "/grantr/v1/tenants/{tenant}/workspaces/{workspace}/integrations": {
+      "get": {
+        "description": "Every integration as it is set in a workspace and on its tenant, and whether it is on.",
+        "operationId": "workspace_integrations_grantr_v1_tenants__tenant__workspaces__workspace__integrations_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "pattern": "^[^~]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "title": "Workspace",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/IntegrationState"
+                  },
+                  "title": "Response Workspace Integrations Grantr V1 Tenants  Tenant  Workspaces  Workspace  Integrations Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
         "summary": "Workspace Integrations"
+      }
+    },
+    "/grantr/v1/tenants/{tenant}/workspaces/{workspace}/integrations/{key}": {
+      "put": {
+        "description": "Turn an integration on or off in a workspace, or unset it with null.\n\nSetting what is set already changes nothing, and records nothing.",
+        "operationId": "set_workspace_integration_grantr_v1_tenants__tenant__workspaces__workspace__integrations__key__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "pattern": "^[^~]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "title": "Workspace",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IntegrationSwitch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntegrationState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Workspace Integration"
       }
     }
   }

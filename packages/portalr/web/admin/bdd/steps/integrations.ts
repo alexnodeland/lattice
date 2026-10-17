@@ -50,3 +50,14 @@ Then(
     await expect(row.first()).toContainText(`${email(person)} (person)`);
   },
 );
+
+When("they set {string} back to inherited", async ({ page }, name: string) => {
+  await page.getByRole("button", { name: `Back to inherited for ${name}` }).click();
+  await expect(page.getByRole("status")).toContainText(`${name} is back to the tenant's`);
+});
+
+Then("{string} is on, by default", async ({ page }, name: string) => {
+  const integration = page.getByRole("switch", { name });
+  await expect(integration).toBeChecked();
+  await expect(integration).toHaveAccessibleDescription("On Default");
+});

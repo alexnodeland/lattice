@@ -223,7 +223,9 @@ def test_colour_blind_mode_is_a_setting_of_the_browser_in_the_account_menu() -> 
     assert "Colour-blind friendly charts" in menu
     assert "Menu.CheckboxItem" in menu
     for guide in ("guides/admin.md", "guides/app.md"):
-        assert "**Colour-blind friendly charts** is a switch in the account menu" in text(guide), guide
+        assert "**Colour-blind friendly charts** is a switch in the account menu" in text(guide), (
+            guide
+        )
         assert "setting of this browser" in text(guide), guide
         assert "local storage" in text(guide), guide
         assert "control for colour-blind mode" not in text(guide), guide

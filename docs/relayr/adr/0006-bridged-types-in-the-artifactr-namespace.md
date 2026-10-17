@@ -1,6 +1,6 @@
 # ADR-0006: Bridged types in the `artifactr` namespace
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0036](0036-reading-a-tracker-back.md)
 **Date:** 2026-09-29
 **Deciders:** Alex Nodeland
 

@@ -29,6 +29,18 @@ async def file_dead_letter(reaction: Reaction[Deps]) -> None:
 ```
 
 Every write is made once, by a key the ledger claims before anything is sent.
+
+What people change in a bound project comes back as `tracker:` events
+(`relayr.trackers.events`), published by
+[`TrackerFollowers`][relayr.trackers.TrackerFollowers], one per bound workspace, which poll the
+project and diff what they find against the ledger; a webhook only makes one poll now
+([`relayr.fastapi.tracker_router`][relayr.fastapi.tracker_router]):
+
+```python
+followers = TrackerFollowers(trackers, automation)
+await followers.resume()  # every bound workspace; `followers.watch` is reflexr's on_open
+app.include_router(tracker_router(followers))
+```
 """
 
 from relayr.trackers.actions import (

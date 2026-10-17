@@ -159,6 +159,10 @@ tasks:
       - '**/*'
       - '/packages/portalr/src/portalr/readers/**/*'
       - '/packages/portalr/scripts/smoke_readers.py'
+      # The portal's scenarios for a generated application, which smoke-app runs.
+      - '/packages/portalr/web/*/bdd/**/*'
+      - '/packages/portalr/web/*/scripts/generated'
+      - '/packages/portalr/web/*/playwright.config.ts'
     options:
       cache: false
       # Streamed, not held until the task ends: a stalled run still shows how far it got.
@@ -167,5 +171,11 @@ tasks:
   smoke-app:
     description: 'Run an application from the template beside the running stack'
     command: 'make smoke-app'
+    # It also runs the portal's scenarios for a generated application, on local Supabase.
+    inputs:
+      - '**/*'
+      - '/packages/portalr/web/*/bdd/**/*'
+      - '/packages/portalr/web/*/scripts/generated'
+      - '/packages/portalr/web/*/playwright.config.ts'
     options:
       cache: false

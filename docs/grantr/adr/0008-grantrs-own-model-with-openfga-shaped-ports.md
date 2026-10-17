@@ -8,7 +8,7 @@ Records decision D8 of [lattice RFC-0001][rfc], identity and access.
 
 ## Context
 
-Authorization engines exist, and each answers checks and some answer list queries. grantr's model has four resource levels (the deployment, a tenant, a workspace, and a thread, artifact or rule) and no relations deeper than that, and the family keeps a core with no I/O behind ports, with in-memory and SQL adapters and one contract test ([artifactr ADR-0034][a-adr-0034]).
+Authorization engines exist, and each answers checks and some answer list queries. grantr's model has four resource levels (the deployment, a tenant, a workspace, and a thread, artifact or rule) and no relations deeper than that, and lattice keeps a core with no I/O behind ports, with in-memory and SQL adapters and one contract test ([artifactr ADR-0034][a-adr-0034]).
 
 ## Decision
 
@@ -29,7 +29,7 @@ Authorization engines exist, and each answers checks and some answer list querie
 ## Consequences
 
 - Easier: grantr runs wherever the libraries do, in memory in tests and on the application's database in production.
-- Harder: the model is the family's to get right, and the contract test is its guard.
+- Harder: the model is lattice's to get right, and the contract test is its guard.
 
 [a-adr-0034]: ../../artifactr/adr/0034-ports-and-adapters-for-integrations.md
 [rfc]: ../../rfcs/0001-grantr-identity-and-access.md#decisions

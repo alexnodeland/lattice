@@ -15,15 +15,15 @@
 
 ## Summary
 
-grantr is identity and access for the family: tenants, their members, groups, roles and service principals, and the grants that bind them to tenants, workspaces, threads and artifacts. artifactr and reflexr already ask one hook whether an actor may use a workspace. This RFC widens that hook so it also hears the action, asks it for every command and every read, and adds a second call that hides the threads and artifacts an actor may not see. grantr answers both from its own model, with in-memory and SQL adapters, an append-only audit log, and an admin API. The template wires it in, and a user's tenants come from grantr's memberships rather than from a claim in the token.
+grantr is identity and access for lattice: tenants, their members, groups, roles and service principals, and the grants that bind them to tenants, workspaces, threads and artifacts. artifactr and reflexr already ask one hook whether an actor may use a workspace. This RFC widens that hook so it also hears the action, asks it for every command and every read, and adds a second call that hides the threads and artifacts an actor may not see. grantr answers both from its own model, with in-memory and SQL adapters, an append-only audit log, and an admin API. The template wires it in, and a user's tenants come from grantr's memberships rather than from a claim in the token.
 
-This is the family's first RFC. It changes artifactr, reflexr and stackr as well as adding grantr, so it lives in `docs/rfcs/` rather than in one package's series. grantr's own RFC-0001 is its implementation plan, derived from this design, as relayr's is from stackr RFC-0002.
+This is lattice's first RFC. It changes artifactr, reflexr and stackr as well as adding grantr, so it lives in `docs/rfcs/` rather than in one package's series. grantr's own RFC-0001 is its implementation plan, derived from this design, as relayr's is from stackr RFC-0002.
 
 ## Motivation
 
 Today, any user of a tenant may do anything in every workspace of that tenant.
 
-- **The hook can't tell actions apart.** `Authorize = Callable[[TenantId, WorkspaceId, Actor], Awaitable[bool]]` is asked when a workspace is opened, and never hears what the actor is about to do. A role such as "viewer" can't be kept from editing. reflexr's security guide tells applications to check commands in their own routes. In the work codebase this family grew beside, that shape left one of several doors open.
+- **The hook can't tell actions apart.** `Authorize = Callable[[TenantId, WorkspaceId, Actor], Awaitable[bool]]` is asked when a workspace is opened, and never hears what the actor is about to do. A role such as "viewer" can't be kept from editing. reflexr's security guide tells applications to check commands in their own routes. In the work codebase lattice grew beside, that shape left one of several doors open.
 - **The template allows everything.** Its only `authorize` is `Mirrors.authorize`, which starts the Langfuse feedback mirror for the workspace and returns `True`. Without Langfuse there is no hook at all.
 - **A user has exactly one tenant,** set by the service role in `app_metadata.tenant_id`. Moving a user, or letting one belong to two tenants, means changing the token.
 - **Nothing stores members, groups or roles.** Neither library has a registry of workspaces, let alone of who belongs to them.
@@ -149,7 +149,7 @@ Rule management (`reflexr:install_rule`, `update_rule`, `archive_rule`, `replay_
 
 ### The ports
 
-grantr follows the family's ports and adapters ([artifactr ADR-0034][a-adr-0034]): a core with no I/O, a storage port with an in-memory adapter and an SQL adapter, and one contract test run against both.
+grantr follows lattice's ports and adapters ([artifactr ADR-0034][a-adr-0034]): a core with no I/O, a storage port with an in-memory adapter and an SQL adapter, and one contract test run against both.
 
 ```python
 class Grants:
@@ -243,7 +243,7 @@ grantr ships the other half, `grantr.testing.matrix(catalogs, roles)`, which pri
 - **Two reads for UIs:** `GET /grantr/v1/me`, the caller's roles in the active tenant and the workspaces they can open (from `resources`), or, without `X-Tenant`, the caller's memberships; and `POST /grantr/v1/checks`, a batch of `{"action": ..., "resource": {"kind": ..., "workspace": ..., "id": ...}}` questions answered with a list of booleans in the same order. A UI asks rather than working out a permission itself; each command is checked again when it arrives. portalr (lattice RFC-0002) uses both.
 - **Its OpenAPI document** is committed in `packages/grantr/schemas/` with a drift test, as stackr RFC-0003 plans, and portalr's client takes its types from it.
 - **No MCP server in v0.1.** Managing access through an agent is a later decision.
-- **Telemetry** follows the family's: spans for checks over a threshold, counters for allowed and refused checks by action, and the audit events.
+- **Telemetry** follows lattice's: spans for checks over a threshold, counters for allowed and refused checks by action, and the audit events.
 
 ### The template
 

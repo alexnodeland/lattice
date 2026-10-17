@@ -8,7 +8,7 @@ Supersedes [ADR-0012](0012-the-libraries-pinned-by-git-revision.md), and [ADR-00
 
 ## Context
 
-ADR-0001 made relayr a sibling repository and package, and ADR-0012 pinned artifactr and reflexr in it by git revision, each pin moving in its own pull request. Its foundation, on a branch, had copies of the siblings' workflows, hooks, Makefile and changelog configuration. On 2026-09-30 that branch moved, with its history, into lattice, the family's one repository, as [stackr RFC-0003](../../stackr/rfcs/0003-one-repository-lattice.md) designed, before relayr's repository had merged anything.
+ADR-0001 made relayr a sibling repository and package, and ADR-0012 pinned artifactr and reflexr in it by git revision, each pin moving in its own pull request. Its foundation, on a branch, had copies of the siblings' workflows, hooks, Makefile and changelog configuration. On 2026-09-30 that branch moved, with its history, into lattice, the packages' one repository, as [stackr RFC-0003](../../stackr/rfcs/0003-one-repository-lattice.md) designed, before relayr's repository had merged anything.
 
 ## Decision
 

@@ -1,4 +1,4 @@
-# ADR-0014: One site for the family
+# ADR-0014: One site for lattice
 
 **Status:** Accepted
 **Date:** 2026-09-30
@@ -8,7 +8,7 @@ Amends [ADR-0011](0011-documentation-site-and-brand.md): where the site is built
 
 ## Context
 
-ADR-0011 set relayr up to build its own site, as its siblings built theirs: from its own `mkdocs.yml` with `make docs`, published from `main` at `relayr.alexnodeland.com`, with cross-references resolved through artifactr's and reflexr's inventories. That site was never published: relayr's foundation was never merged, and its domain had no DNS record. In lattice, [stackr RFC-0003](../../stackr/rfcs/0003-one-repository-lattice.md#docs) makes one site for the family, with a section per package.
+ADR-0011 set relayr up to build its own site, as its siblings built theirs: from its own `mkdocs.yml` with `make docs`, published from `main` at `relayr.alexnodeland.com`, with cross-references resolved through artifactr's and reflexr's inventories. That site was never published: relayr's foundation was never merged, and its domain had no DNS record. In lattice, [stackr RFC-0003](../../stackr/rfcs/0003-one-repository-lattice.md#docs) makes one site for lattice, with a section per package.
 
 ## Decision
 

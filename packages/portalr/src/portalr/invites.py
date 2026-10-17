@@ -57,7 +57,7 @@ class SupabaseInvite:
     """
 
     url: str
-    secret_key: str
+    secret_key: str = field(repr=False)
     client: httpx.AsyncClient = field(default_factory=httpx.AsyncClient)
 
     async def __call__(self, email: str) -> str:

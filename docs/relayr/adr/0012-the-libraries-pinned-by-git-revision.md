@@ -6,7 +6,7 @@
 
 ## Context
 
-relayr depends on artifactr (distributed as `artifactr-ai`) and reflexr. The family installs its libraries from GitHub by commit, not from PyPI, while publishing waits on a decision ([artifactr #23][a-23]), and stackr's template pins artifactr and reflexr only, letting evalr come with them at the commit their own sources pin ([stackr ADR-0013][s-adr-0013]).
+relayr depends on artifactr (distributed as `artifactr-ai`) and reflexr. lattice installs its libraries from GitHub by commit, not from PyPI, while publishing waits on a decision ([artifactr #23][a-23]), and stackr's template pins artifactr and reflexr only, letting evalr come with them at the commit their own sources pin ([stackr ADR-0013][s-adr-0013]).
 
 ## Decision
 

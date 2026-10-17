@@ -45,5 +45,6 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0037](0037-form-controls-and-row-actions.md) | Form controls and row actions: a Base UI select, form fields, segmented windows, button variants and sizes | Accepted |
 | [0038](0038-people-by-email.md) | People by email, not by id | Accepted |
 | [0039](0039-elevation-status-colour-states-and-density.md) | Elevation, status colours, alerts and placeholders, and admin's compact density | Accepted |
+| [0040](0040-scenarios-against-a-generated-application-and-size-budgets.md) | Scenarios against a generated application, and size budgets | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

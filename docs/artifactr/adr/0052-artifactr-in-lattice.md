@@ -8,7 +8,7 @@ Amends [ADR-0014](0014-trunk-based-development-with-rfcs-and-adrs.md), how the c
 
 ## Context
 
-artifactr was a repository of its own, with its own lock, CI, hooks, Makefile and releases. On 2026-09-30 it moved, with its history, into lattice, the family's one repository, as [stackr RFC-0003](../../stackr/rfcs/0003-one-repository-lattice.md) designed. Downstream, artifactr stays what it was: `artifactr-ai`, with its version, dependencies, extras, tests and gates. What changed is where it is built, checked and released, and with it the parts of five records that named its own repository or stackr's.
+artifactr was a repository of its own, with its own lock, CI, hooks, Makefile and releases. On 2026-09-30 it moved, with its history, into lattice, the packages' one repository, as [stackr RFC-0003](../../stackr/rfcs/0003-one-repository-lattice.md) designed. Downstream, artifactr stays what it was: `artifactr-ai`, with its version, dependencies, extras, tests and gates. What changed is where it is built, checked and released, and with it the parts of five records that named its own repository or stackr's.
 
 ## Decision
 

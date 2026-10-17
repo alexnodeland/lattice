@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = ">=3.12"
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'win32'",
@@ -13,6 +13,7 @@ resolution-markers = [
 [manifest]
 members = [
     "artifactr-ai",
+    "artifactr-files-ai",
     "docplan",
     "evalr",
     "grantr",
@@ -363,6 +364,100 @@ test = [
     { name = "httpx", specifier = ">=0.28" },
     { name = "hypothesis", specifier = ">=6.168" },
     { name = "opentelemetry-sdk", specifier = ">=1.28" },
+    { name = "pytest", specifier = ">=9.1" },
+    { name = "pytest-asyncio", specifier = ">=1.4" },
+    { name = "pytest-cov", specifier = ">=7.1" },
+    { name = "pytest-timeout", specifier = ">=2.4" },
+]
+
+[[package]]
+name = "artifactr-files-ai"
+version = "0.1.0.dev0"
+source = { editable = "packages/artifactr-files" }
+dependencies = [
+    { name = "artifactr-ai" },
+    { name = "pydantic" },
+]
+
+[package.optional-dependencies]
+postgres = [
+    { name = "alembic" },
+    { name = "asyncpg" },
+    { name = "lattice-core-ai", extra = ["sql"] },
+    { name = "sqlalchemy", extra = ["asyncio"] },
+]
+sql = [
+    { name = "alembic" },
+    { name = "lattice-core-ai", extra = ["sql"] },
+    { name = "sqlalchemy", extra = ["asyncio"] },
+]
+sqlite = [
+    { name = "aiosqlite" },
+    { name = "alembic" },
+    { name = "lattice-core-ai", extra = ["sql"] },
+    { name = "sqlalchemy", extra = ["asyncio"] },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "aiosqlite" },
+    { name = "asyncpg" },
+    { name = "hypothesis" },
+    { name = "pyright" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-cov" },
+    { name = "pytest-timeout" },
+    { name = "ruff" },
+]
+lint = [
+    { name = "pyright" },
+    { name = "ruff" },
+]
+test = [
+    { name = "aiosqlite" },
+    { name = "asyncpg" },
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-cov" },
+    { name = "pytest-timeout" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aiosqlite", marker = "extra == 'sqlite'", specifier = ">=0.22" },
+    { name = "alembic", marker = "extra == 'sql'", specifier = ">=1.20" },
+    { name = "artifactr-ai", editable = "packages/artifactr" },
+    { name = "artifactr-files-ai", extras = ["sql"], marker = "extra == 'postgres'" },
+    { name = "artifactr-files-ai", extras = ["sql"], marker = "extra == 'sqlite'" },
+    { name = "asyncpg", marker = "extra == 'postgres'", specifier = ">=0.31" },
+    { name = "lattice-core-ai", extras = ["sql"], marker = "extra == 'sql'", editable = "packages/lattice-core" },
+    { name = "pydantic", specifier = ">=2.13" },
+    { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'sql'", specifier = ">=2.1" },
+]
+provides-extras = ["sql", "sqlite", "postgres"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "aiosqlite", specifier = ">=0.22" },
+    { name = "asyncpg", specifier = ">=0.31" },
+    { name = "hypothesis", specifier = ">=6.168" },
+    { name = "pyright", specifier = ">=1.1.414" },
+    { name = "pytest", specifier = ">=9.1" },
+    { name = "pytest-asyncio", specifier = ">=1.4" },
+    { name = "pytest-cov", specifier = ">=7.1" },
+    { name = "pytest-timeout", specifier = ">=2.4" },
+    { name = "ruff", specifier = ">=0.16" },
+]
+lint = [
+    { name = "pyright", specifier = ">=1.1.414" },
+    { name = "ruff", specifier = ">=0.16" },
+]
+test = [
+    { name = "aiosqlite", specifier = ">=0.22" },
+    { name = "asyncpg", specifier = ">=0.31" },
+    { name = "hypothesis", specifier = ">=6.168" },
     { name = "pytest", specifier = ">=9.1" },
     { name = "pytest-asyncio", specifier = ">=1.4" },
     { name = "pytest-cov", specifier = ">=7.1" },

@@ -16,6 +16,7 @@ the projects tagged BROWSER run theirs first, in a `moon run` of their own, and 
 import json
 import subprocess
 import sys
+from collections.abc import Collection
 from typing import Any
 
 # Tasks whose projects run one after another, each its own `moon run`. app's and admin's
@@ -41,6 +42,19 @@ def query(*arguments: str) -> dict[str, Any]:
     return json.loads(done.stdout)
 
 
+def batches(task: str, targets: list[str], browser: Collection[str] = ()) -> list[list[str]]:
+    """How a task's targets run, each batch its own `moon run`, one after another.
+
+    Each alone if the task is in ONE_AT_A_TIME; otherwise those of the projects in `browser`
+    first, and then the rest.
+    """
+    if task in ONE_AT_A_TIME:
+        return [[target] for target in targets]
+    first = [target for target in targets if target.split(":")[0] in browser]
+    rest = [target for target in targets if target not in first]
+    return [batch for batch in (first, rest) if batch]
+
+
 def main() -> int:
     """Run the task in the affected projects and their dependents; nothing if there are none."""
     task = sys.argv[1]
@@ -64,14 +78,11 @@ def main() -> int:
         return 0
     sys.stdout.write(f"affected: {' '.join(targets)}\n")
     sys.stdout.flush()
-    if task in ONE_AT_A_TIME:
-        batches = [[target] for target in targets]
-    else:
-        tags: dict[str, list[str]] = {n: projects[n]["config"].get("tags") or [] for n in affected}
-        browser = [target for target in targets if BROWSER in tags[target.split(":")[0]]]
-        rest = [target for target in targets if target not in browser]
-        batches = [batch for batch in (browser, rest) if batch]
-    codes = [subprocess.run(["moon", "run", *batch], check=False).returncode for batch in batches]
+    browser = {name for name in affected if BROWSER in (projects[name]["config"].get("tags") or [])}
+    codes = [
+        subprocess.run(["moon", "run", *batch], check=False).returncode
+        for batch in batches(task, targets, browser)
+    ]
     return max(codes)
 
 

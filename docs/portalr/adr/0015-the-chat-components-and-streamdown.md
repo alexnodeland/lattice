@@ -1,6 +1,6 @@
 # ADR-0015: The chat's components, and Markdown through Streamdown
 
-**Status:** Accepted, amended by [ADR-0042](0042-markdowns-basics.md)
+**Status:** Accepted, amended by [ADR-0043](0043-markdowns-basics.md)
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 

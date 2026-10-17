@@ -152,7 +152,7 @@ if sent.run is not None:  # None when the thread's run takes the message, or wil
 
 `sent.run` is `None` when the message or answer started no run, which is not a failure:
 
-- the thread's run is already active, in this process or another, so the message steers it; if that run is ending or pausing, it hands the thread over as it releases it, and the next turn takes the message
+- the thread's run is already active, in this process or another, so the message steers it; if that run is ending or pausing, it hands the thread over as it releases it, and the next turn takes the message; if its process died, this runner looks again once the run's claim could have lapsed, and takes the message then
 - another message or answer took the thread first, and its turn takes this one too, or the turn after it does, if this one is from another author
 - an answer leaves some of the paused run's requests unanswered, so the run waits for them
 
@@ -169,6 +169,7 @@ A message in an idle thread, such as one just created, starts a run unless anoth
 | `ask(workspace, thread_id)` | Asks for the thread's next turn, for whatever its log has that no turn has taken, as `send` asks after its message; it does nothing when there is nothing to take |
 | `resume(workspace, run_id)` | Asks for the thread's next turn, which resumes a paused run whose requests are answered; the oldest message not yet taken answers any left open |
 | `stop(run_id)` | Cancels a run in this process; it ends with status `stopped` |
+| `recover(workspace)` | Takes each turn the workspace's threads were asked for and no run has taken, as the application starts, and returns the runs it started |
 | `drain()` | Waits until no run that has ended is still handing its thread over; `aclose()` cancels them instead |
 | `aclose()` | Stops every run in this process, as the application shuts down; see [Serving](serving.md#adding-the-router) |
 | `watch(run_id)` | Yields the run's live output; see [Live output](live-output.md) |
@@ -178,6 +179,8 @@ A message in an idle thread, such as one just created, starts a run unless anoth
 One run is active per thread. The runner claims the thread with a lease in storage, renewed every third of `claim_ttl` while the run lasts, so the rule holds across processes. A renewal that fails is logged and retried, so a run survives one failed renewal, or storage that stalls for about two thirds of `claim_ttl`; keep it above the clock skew between replicas. A message sent while another process holds the claim steers that run instead of starting a second, or is taken by the turn that run hands the thread over to. Each claim has a holder of its own, so a run resuming cannot renew the claim its pausing segment still holds. Runs are asyncio tasks in the process that started them, so `stop` and `watch` reach only local runs.
 
 A process that dies mid-run cannot record how its run ended, so the run stays `running`. Its claim lapses after `claim_ttl`, and the next run to claim the thread first records the one left behind as failed, with the error "the run was abandoned: its claim lapsed" and the reason `abandoned`, attributed to `SystemActor(name="runner")`. A run the runner starts holds its claim until it has recorded its end, so holding the claim means the other run's process is gone, or its claim lapsed. The abandoned turn is not resumed.
+
+What the dead process was asked is not lost ([ADR-0070](../adr/0070-a-runner-looks-again-for-what-a-dead-holder-was-asked.md)). A runner the dead process's claim refused looks at the thread again a `claim_ttl` later, and again while the thread is claimed, until what was asked is taken. A process that died alone leaves no runner refused, so call `runner.recover(workspace)` for each of your workspaces as the application starts: it takes what each thread was asked for and not taken, and looks again at a thread whose dead claim has not lapsed yet. A message the dead run's watcher had given its model was not recorded as taken, so the thread's next turn gives it to the model again: steering is delivered at least once ([ADR-0055](../adr/0055-turns-from-the-log.md)'s amendment of 2026-10-17).
 
 A run whose process lives on loses its claim if no renewal succeeds for a whole `claim_ttl`, even while a renewal hangs, and the runner then cancels it, before another run can claim the thread. If the thread's next run records it as abandoned first, as when its process cannot reach storage to record that it stopped, a tool call it makes is refused, and fails it; the end of a tool already running, and the run's own end, are dropped and logged, so its abandonment is the only end it has.
 

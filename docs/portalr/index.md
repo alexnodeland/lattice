@@ -20,7 +20,7 @@ The portal into an application built on lattice: an `app` UI for the people who 
 
     Built and tested: the router and its readers, the app's areas (threads and chat, artifacts, proposals, runs, rules, restricting and sharing a thread), the admin UI (home, access, audit, feedback, usage, traces, logs and health, runs, and the operators' tenants, deployment audit and tools), people shown by email, and the `portal` question of [stackr's template](../stackr/guides/template.md), which mounts it in a generated application. Each area has a scenario in a browser against a test application, and a few run against an application the template generated ([ADR-0040](adr/0040-scenarios-against-a-generated-application-and-size-budgets.md)), with the UIs' size budgets checked. The [guides](getting-started.md) describe what is built, and [the architecture](architecture.md) how.
 
-    Not built yet: magic links and other sign-in providers; and a control for colour-blind mode, whose hook is built. It is not on PyPI: install its wheel ([Getting started](getting-started.md#install)).
+    Not built yet: magic links and other sign-in providers. It is not on PyPI: install its wheel ([Getting started](getting-started.md#install)).
 
 ## Why: lattice has no face
 

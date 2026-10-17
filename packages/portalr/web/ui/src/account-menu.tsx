@@ -1,5 +1,6 @@
 import { Menu } from "@base-ui/react/menu";
 import { Check, LogOut } from "lucide-react";
+import { useId } from "react";
 import { Icon } from "./icon";
 import { groupLabel, item, popup, separator } from "./menu";
 
@@ -18,20 +19,26 @@ function initials(name: string): string {
   return `${words[0]?.[0] ?? ""}${words.length > 1 ? (words.at(-1)?.[0] ?? "") : ""}`.toUpperCase();
 }
 
-/** Who is signed in, signing out, and their scheme. */
+/** Who is signed in, signing out, their scheme, and colour-blind friendly charts. */
 export function AccountMenu({
   name,
   email,
   appearance,
   onAppearance,
+  colourBlind,
+  onColourBlind,
   onSignOut,
 }: {
   name: string;
   email?: string;
   appearance: Appearance;
   onAppearance: (appearance: Appearance) => void;
+  /** Whether colour-blind friendly charts are on: a palette and patterns that hold for every reader. */
+  colourBlind: boolean;
+  onColourBlind: (on: boolean) => void;
   onSignOut: () => void;
 }) {
+  const hint = useId();
   return (
     <Menu.Root>
       <Menu.Trigger
@@ -77,6 +84,26 @@ export function AccountMenu({
                   </Menu.RadioItem>
                 ))}
               </Menu.RadioGroup>
+            </Menu.Group>
+            <Menu.Separator className={separator} />
+            <Menu.Group>
+              <Menu.GroupLabel className={groupLabel}>Colour</Menu.GroupLabel>
+              <Menu.CheckboxItem
+                checked={colourBlind}
+                aria-describedby={hint}
+                onCheckedChange={(on) => onColourBlind(on)}
+                className={item}
+              >
+                <span className="flex flex-col">
+                  <span>Colour-blind friendly charts</span>
+                  <span aria-hidden="true" id={hint} className="font-normal text-muted text-xs">
+                    Changes chart colours and adds patterns
+                  </span>
+                </span>
+                <Menu.CheckboxItemIndicator className="text-accent">
+                  <Icon icon={Check} />
+                </Menu.CheckboxItemIndicator>
+              </Menu.CheckboxItem>
             </Menu.Group>
           </Menu.Popup>
         </Menu.Positioner>

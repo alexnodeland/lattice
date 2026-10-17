@@ -1,14 +1,13 @@
 import type { ReactNode } from "react";
 import { cn } from "./cn";
+import { ScrollRegion } from "./scroll-region";
 
 /**
  * A table of rows, named by its caption or by a heading beside it, on the surface, scrolling
  * sideways rather than squeezing on a narrow screen: the scroll is a region of the same name the
  * keyboard can reach. Its rows are the caller's `<thead>` and `<tbody>`, whose header cells say
  * what they head with `scope="col"` or `scope="row"`: a column's header is small and muted, and a
- * row's is in the row's own type, between its borders. Biome's rule against a tabindex on a
- * non-interactive element is off for this file alone (biome.json): a scroll container is one the
- * keyboard must reach.
+ * row's is in the row's own type, between its borders.
  */
 export function Table({
   children,
@@ -30,11 +29,11 @@ export function Table({
   const caption = "caption" in naming ? naming.caption : undefined;
   const labelledBy = "labelledBy" in naming ? naming.labelledBy : undefined;
   return (
-    <section
-      aria-label={caption}
-      aria-labelledby={labelledBy}
-      tabIndex={0}
-      className="overflow-x-auto rounded-lg border border-line bg-surface outline-offset-2 focus-visible:outline-2 focus-visible:outline-focus"
+    <ScrollRegion
+      {...("caption" in naming
+        ? { "aria-label": naming.caption }
+        : { "aria-labelledby": naming.labelledBy })}
+      className="rounded-lg border border-line bg-surface"
     >
       <table
         aria-labelledby={labelledBy}
@@ -46,6 +45,6 @@ export function Table({
         {caption !== undefined && <caption className="sr-only">{caption}</caption>}
         {children}
       </table>
-    </section>
+    </ScrollRegion>
   );
 }

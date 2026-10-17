@@ -12,6 +12,9 @@
     },
     "packages/portalr/web/admin": {
       "entry": ["bdd/steps/*.ts"]
+    },
+    "packages/portalr/web/ui": {
+      "entry": ["csp/main.tsx"]
     }
   }
 }

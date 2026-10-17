@@ -1,14 +1,14 @@
 # ADR-0001: A separate distribution
 
-**Status:** Accepted
+**Status:** Superseded by [lattice ADR-0026](../../../adr/0026-a-distribution-needs-a-reason-integrations-are-extras.md)
 **Date:** 2026-10-17
 **Deciders:** Alex Nodeland
 
-Records [lattice RFC-0003](../../rfcs/0003-native-files-as-artifacts.md)'s D5.
+Records [lattice RFC-0003](../../../rfcs/0003-native-files-as-artifacts.md)'s D5.
 
 ## Context
 
-Native files need types, a blob store with its own tables and migrations, a check-out record, an app port and, in later phases, a worker program, a router and a dependency on an external application in alpha. [artifactr ADR-0034](../../artifactr/adr/0034-ports-and-adapters-for-integrations.md) puts each adapter in an extra of the package whose port it implements, but none of this implements an artifactr port: it is a domain built on artifactr.
+Native files need types, a blob store with its own tables and migrations, a check-out record, an app port and, in later phases, a worker program, a router and a dependency on an external application in alpha. [artifactr ADR-0034](../../adr/0034-ports-and-adapters-for-integrations.md) puts each adapter in an extra of the package whose port it implements, but none of this implements an artifactr port: it is a domain built on artifactr.
 
 ## Decision
 
@@ -54,3 +54,11 @@ The package is a domain, not an adapter, and keeping it out of artifactr costs a
 1. [x] The package, its `pyproject.toml`, a `moon.yml` that depends on artifactr and lattice-core, its entries in `release-please-config.json` and the manifest, and its publishing stage.
 2. [ ] Raise the `artifactr-ai` floor to the release with the lease, once it is on `main`.
 3. [ ] The maintainer, before the first dispatch: the `pypi-artifactr-files-ai` environment and the pending trusted publisher on PyPI.
+
+## Superseded (2026-10-17): an extra of artifactr
+
+Before its first release, the maintainer decided that artifactr's integrations, native files among them, are extras of `artifactr-ai`, not distributions of their own, each turned on per workspace by the shared Integrations switch ([lattice ADR-0026](../../../adr/0026-a-distribution-needs-a-reason-integrations-are-extras.md)). The package is now artifactr's `files` extra, `artifactr-ai[files]`, imported as `artifactr.files`; nothing was ever published as `artifactr-files-ai`. The decision above is kept as it was made:
+
+- **What holds:** it depends inward only, on the names in `__all__` of `artifactr.core` and `artifactr.workspace`, and on `lattice_core.sql` in its SQL layer, and the rest of artifactr imports nothing of it. Its tables keep their own Alembic chain and version table, `artifactr_files_alembic_version`, apart from artifactr's storage's.
+- **What changed:** Option B's cons were weighed again. Its tables join no chain of artifactr's, since they keep their own, and they exist only in a database an application migrates for native files. The worker and the router, when later phases build them, ship in artifactr's wheel behind the extra, as artifactr's other adapters do. What a separate distribution cost, a release, a floor raised by hand and a publishing ceremony of its own, was the larger price.
+- **The action items** are void: there is no floor to raise, and no environment or publisher to add.

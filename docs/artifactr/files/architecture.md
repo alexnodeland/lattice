@@ -1,6 +1,6 @@
 # Architecture
 
-artifactr-files gives artifactr artifact types for files in native formats. It depends inward only: it imports the names in `__all__` of `artifactr`, `artifactr.core` and `artifactr.workspace`, and `lattice_core.sql` in its SQL layer, and artifactr imports nothing of it. `tests/test_layering.py` holds it there.
+`artifactr.files`, artifactr's `files` extra, gives artifactr artifact types for files in native formats. It depends inward only: it imports the names in `__all__` of `artifactr.core` and `artifactr.workspace`, and `lattice_core.sql` in its SQL layer, and the rest of artifactr imports nothing of it. `tests/files/test_layering.py` holds its layers, and `tests/test_layering.py` the rest of artifactr.
 
 ## The layers
 
@@ -10,7 +10,7 @@ artifactr-files gives artifactr artifact types for files in native formats. It d
 | `blobs` | The `Blobs` port, its size limit and digest, and `InMemoryBlobs` | `manifest`, artifactr |
 | `checkouts` | `Checkout`, the record behind a person's lease, the `Checkouts` port, and `InMemoryCheckouts` | `manifest`, artifactr, pydantic |
 | `app` | The `App` port and `FakeApp` | `manifest`, pydantic |
-| `files` | `NativeFiles`: uploads, check-out and check-in, agents' edits, reads and collection | every layer above, artifactr |
+| `native` | `NativeFiles`: uploads, check-out and check-in, agents' edits, reads and collection | every layer above, artifactr |
 | `sql` | `SqlBlobs`, `SqlCheckouts`, their tables and migrations | `manifest`, `blobs`, `checkouts`, SQLAlchemy, Alembic, `lattice_core.sql` |
 
 ## A write

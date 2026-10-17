@@ -4,11 +4,11 @@
 **Date:** 2026-10-17
 **Deciders:** Alex Nodeland
 
-Records [lattice RFC-0003](../../rfcs/0003-native-files-as-artifacts.md)'s D2.
+Records [lattice RFC-0003](../../../rfcs/0003-native-files-as-artifacts.md)'s D2.
 
 ## Context
 
-A native file's bytes can't be in its artifact's data, which every revision, event, replay and bridged event carries ([artifactr ADR-0072](../../artifactr/adr/0072-native-files-are-manifests-over-json-patch.md)). They need a store, keyed so that a blob's access is its artifact's, and kept consistent with the log that names them.
+A native file's bytes can't be in its artifact's data, which every revision, event, replay and bridged event carries ([artifactr ADR-0072](../../adr/0072-native-files-are-manifests-over-json-patch.md)). They need a store, keyed so that a blob's access is its artifact's, and kept consistent with the log that names them.
 
 ## Decision
 

@@ -1,45 +1,45 @@
 # API reference
 
-The reference is generated from artifactr-files' docstrings and type annotations. It documents each package's public API: the names in its `__all__`.
+The reference is generated from `artifactr.files`' docstrings and type annotations. It documents each package's public API: the names in its `__all__`.
 
-## artifactr_files.manifest
+## artifactr.files.manifest
 
-::: artifactr_files.manifest
+::: artifactr.files.manifest
     options:
       show_root_heading: false
       show_root_toc_entry: false
 
-## artifactr_files.blobs
+## artifactr.files.blobs
 
-::: artifactr_files.blobs
+::: artifactr.files.blobs
     options:
       show_root_heading: false
       show_root_toc_entry: false
 
-## artifactr_files.checkouts
+## artifactr.files.checkouts
 
-::: artifactr_files.checkouts
+::: artifactr.files.checkouts
     options:
       show_root_heading: false
       show_root_toc_entry: false
 
-## artifactr_files.app
+## artifactr.files.app
 
-::: artifactr_files.app
+::: artifactr.files.app
     options:
       show_root_heading: false
       show_root_toc_entry: false
 
-## artifactr_files.files
+## artifactr.files.native
 
-::: artifactr_files.files
+::: artifactr.files.native
     options:
       show_root_heading: false
       show_root_toc_entry: false
 
-## artifactr_files.sql
+## artifactr.files.sql
 
-::: artifactr_files.sql
+::: artifactr.files.sql
     options:
       show_root_heading: false
       show_root_toc_entry: false

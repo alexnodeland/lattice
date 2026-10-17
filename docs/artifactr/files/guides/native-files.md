@@ -1,13 +1,13 @@
 # Native files
 
-A native file is an artifact whose data is a manifest over the file's bytes. This guide wires the package into an application and walks through what people and agents do with a file. Everything here runs with the fake app; the WordCraft adapter comes in a later phase of [lattice RFC-0003](../../rfcs/0003-native-files-as-artifacts.md).
+A native file is an artifact whose data is a manifest over the file's bytes. This guide wires artifactr's `files` extra into an application and walks through what people and agents do with a file. Everything here runs with the fake app; the WordCraft adapter comes in a later phase of [lattice RFC-0003](../../../rfcs/0003-native-files-as-artifacts.md).
 
 ## The types
 
 `WordDocument` is registered as `word_document` and holds `.docx` files (`DOCX`). Its manifest names three blobs, its content, its text and its review, and holds a fingerprint, an outline of up to 4,000 characters, its page count if known and its provenance:
 
 ```python
-from artifactr_files import WordDocument
+from artifactr.files import WordDocument
 
 WordDocument.formats  # frozenset({DOCX})
 WordDocument.write_policy  # "propose": an agent's edit is a proposal
@@ -20,15 +20,15 @@ A type for another format subclasses `NativeFile` and names its media types in `
 `NativeFiles` takes a blob store, a check-out store and an app. Every method takes the `Workspace` to act in, so `authorize` and the hiding of restricted artifacts apply as for any read or command:
 
 ```python
-from artifactr_files import FakeApp, InMemoryBlobs, InMemoryCheckouts, NativeFiles
+from artifactr.files import FakeApp, InMemoryBlobs, InMemoryCheckouts, NativeFiles
 
 files = NativeFiles(InMemoryBlobs(), InMemoryCheckouts(), FakeApp())
 ```
 
-In production, both stores are SQL, behind the `postgres` or `sqlite` extra. Migrate as the tables' owner; with row-level security, grant a role that owns nothing and give the stores its engine, as artifactr's storage has it:
+In production, both stores are SQL, with the `files` extra beside the `postgres` or `sqlite` one, as in `artifactr-ai[files,postgres]`. Migrate as the tables' owner; with row-level security, grant a role that owns nothing and give the stores its engine, as artifactr's storage has it:
 
 ```python
-from artifactr_files.sql import SqlBlobs, SqlCheckouts, migrate
+from artifactr.files.sql import SqlBlobs, SqlCheckouts, migrate
 
 await migrate(owner, application_role="app")
 files = NativeFiles(
@@ -43,7 +43,7 @@ The tables are `artifactr_files_blobs` and `artifactr_files_checkouts`, with the
 ## Uploading a file
 
 ```python
-from artifactr_files.blobs import once
+from artifactr.files.blobs import once
 
 outcome = await files.upload(
     ws, WordDocument, "contract.docx", once(data), media_type=DOCX

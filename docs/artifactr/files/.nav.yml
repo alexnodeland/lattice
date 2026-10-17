@@ -1,4 +1,4 @@
-# artifactr-files' section of the site, in order. Paths are from docs/artifactr-files/.
+# The native files' section of artifactr's, in order. Paths are from docs/artifactr/files/.
 nav:
 - Home: index.md
 - Architecture: architecture.md
@@ -11,4 +11,3 @@ nav:
   - adr/0002-blobs-in-a-port-of-the-package.md
   - adr/0003-check-outs-and-agents-edits-under-one-lease.md
   - adr/0004-an-app-is-a-port-of-stateless-calls.md
-- Changelog: project/changelog.md

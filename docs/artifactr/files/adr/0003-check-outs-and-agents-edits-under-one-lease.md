@@ -4,7 +4,7 @@
 **Date:** 2026-10-17
 **Deciders:** Alex Nodeland
 
-Records [lattice RFC-0003](../../rfcs/0003-native-files-as-artifacts.md)'s D3, on the package's side; the lease itself is [artifactr ADR-0071](../../artifactr/adr/0071-a-lease-on-an-artifact.md).
+Records [lattice RFC-0003](../../../rfcs/0003-native-files-as-artifacts.md)'s D3, on the package's side; the lease itself is [artifactr ADR-0071](../../adr/0071-a-lease-on-an-artifact.md).
 
 ## Context
 

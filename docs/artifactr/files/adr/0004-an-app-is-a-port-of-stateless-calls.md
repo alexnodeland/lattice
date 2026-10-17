@@ -4,7 +4,7 @@
 **Date:** 2026-10-17
 **Deciders:** Alex Nodeland
 
-Records the app port of [lattice RFC-0003](../../rfcs/0003-native-files-as-artifacts.md#the-app-port-and-the-worker).
+Records the app port of [lattice RFC-0003](../../../rfcs/0003-native-files-as-artifacts.md#the-app-port-and-the-worker).
 
 ## Context
 

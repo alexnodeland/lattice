@@ -6,7 +6,7 @@ Every area shows only where grantr allows its read, and every read names its ten
 
 !!! info "What each area needs"
 
-    `portalr:read_telemetry` for Feedback, Traces, Logs and Health; `portalr:read_spend` for Usage; for Access, the grantr action each part's changes take (`grantr:add_member`, `grantr:manage_groups`, `grantr:issue_key`, `grantr:define_role`, `grantr:grant`); `grantr:read_audit` for Audit; `reflexr:read_runs` for Runs, and `reflexr:retry_run`, `reflexr:skip_run` and `reflexr:cancel_run` for its buttons. grantr's built-in `owner` role holds every one of these, and `admin` holds them too: it lacks only deleting the tenant. A test of these guides holds that against grantr's catalog.
+    `portalr:read_telemetry` for Feedback, Traces, Logs and Health; `portalr:read_spend` for Usage; for Access, the grantr action each part's changes take (`grantr:add_member`, `grantr:manage_groups`, `grantr:issue_key`, `grantr:define_role`, `grantr:grant`); `grantr:read_audit` for Audit; `grantr:manage_integrations`, on the tenant, for Integrations; `reflexr:read_runs` for Runs, and `reflexr:retry_run`, `reflexr:skip_run` and `reflexr:cancel_run` for its buttons. grantr's built-in `owner` role holds every one of these, and `admin` holds them too: it lacks only deleting the tenant. A test of these guides holds that against grantr's catalog.
 
 ## Home
 
@@ -25,6 +25,22 @@ Where grantr's model is used: each part shows where its read is allowed, as a ta
 | Grants | Who holds which role on the tenant, a workspace or an item, given and revoked |
 
 People are shown by email where the application passes `people` to the router ([Getting started](../getting-started.md#mount-the-router)): in Members and its remove dialog, Groups, Grants, and Audit. Without it, or for someone it can't name, a person is the first eight characters of their id, such as `3f2a91c4…`; a service principal is its id. Audit's filter by who made a change still takes an id, since the address holds ids only. The email you invite is sent to Supabase Auth and not logged, returned or kept; [Privacy](privacy.md#emails-and-names) says who sees whose email, and for how long it is held.
+
+## Integrations
+
+What the tenant and each of its workspaces offer beyond the basics: the trackers, WordCraft, forms, dashboards, mini apps, diagrams, math and Mermaid, each switched on or off ([lattice ADR-0027](../../adr/0027-integrations-switched-per-workspace-through-one-port.md)). Choose **the tenant** or one of its workspaces at the top; the address keeps the choice, so a workspace's settings can be linked to.
+
+Each integration's switch says whether it is on, with a badge (a filled circle for **On**, an outlined square for **Off**) and where that comes from:
+
+| State | Means |
+|---|---|
+| Default | No one has set it here or on the tenant: it is what lattice's registry says. Mini apps and Mermaid are off by default; the rest are on |
+| Inherited from the tenant | The tenant's setting, which a workspace follows until it sets its own |
+| Set here | This level's own setting, with who set it and when; **Back to inherited** (on the tenant, **Back to the default**) unsets it |
+| Off for the tenant | The tenant turned it off, so no workspace can turn it on: the switch is disabled |
+| Not installed in this deployment | The deployment doesn't install it, so it is off everywhere: the switch is disabled |
+
+A switch is saved at once, and disabled until grantr answers; the page then says what came of it. Each change is in [Audit](#audit) as "turned … on in workspace …", by whom; **See the audit log** opens it filtered to integrations switched. grantr decides what is on, and every library checks it again before it acts ([grantr ADR-0034](../../grantr/adr/0034-integrations-switched-per-tenant-and-workspace-in-grantrs-table-audited.md), [ADR-0045](../adr/0045-integrations-in-admin-and-the-apps-read-of-them.md)). A workspace's own admins hold the action on their workspace, but admin opens for a tenant's owners and admins alone, so they switch nothing here yet.
 
 ## Audit
 

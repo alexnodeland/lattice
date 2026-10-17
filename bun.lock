@@ -88,7 +88,7 @@
     "packages/portalr/web/notices": {
       "name": "@portalr/notices",
       "devDependencies": {
-        "@types/bun": "1.4.2",
+        "@types/bun": "1.4.3",
         "vite": "8.3.4",
       },
     },

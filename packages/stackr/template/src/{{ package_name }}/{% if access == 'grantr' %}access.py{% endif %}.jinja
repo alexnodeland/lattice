@@ -23,11 +23,17 @@ from starlette.requests import HTTPConnection
 {% if use_artifactr -%}
 import artifactr.core as artifactr
 from artifactr.workspace import ACTIONS as ARTIFACTR_ACTIONS
+{%- if use_ui %}
+from artifactr.workspace import Workspace
+{%- endif %}
 {% endif -%}
 from grantr import (
     Agent,
     Grants,
     InMemoryStorage,
+{%- if use_ui %}
+    Resource,
+{%- endif %}
 {%- if use_reflexr %}
     RulePrincipal,
 {%- endif %}
@@ -268,6 +274,19 @@ class Access:
                 return self.application
             case _:  # an actor this application doesn't know holds nothing
                 return Agent()
+{%- if use_ui %}
+
+    async def administers(self, workspace: Workspace) -> bool:
+        """Whether a workspace's actor administers it: artifactr.ui's ``is_admin``.
+
+        Whoever may restrict what is in a workspace, its admins and the tenant's owners and
+        admins, may also change or close any form in it, as the form's author may.
+        """
+        tenant, workspace_id = workspace.tenant_id, workspace.workspace_id
+        subject = self.artifactr_subject(tenant, workspace_id, workspace.actor)
+        on = Resource(kind="workspace", workspace=workspace_id)
+        return await self.grants.check(tenant, subject, "grantr:restrict", on)
+{%- endif %}
 {%- endif %}
 {%- if use_reflexr %}
 

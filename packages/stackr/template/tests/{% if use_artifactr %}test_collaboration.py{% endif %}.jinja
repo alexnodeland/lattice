@@ -8,6 +8,9 @@ from fastapi.testclient import TestClient
 from mcp import Client
 from mcp.client.streamable_http import streamable_http_client
 from mcp.types import TextContent
+{%- if use_ui %}
+from pydantic_ai import ToolReturnPart
+{%- endif %}
 
 from artifactr import new_id
 
@@ -16,6 +19,14 @@ from {{ package_name }}.collaboration import Collaboration
 from conftest import TENANT, TENANT_KEY, Script, bearer, call, nobody, say, settings, wait_for
 
 BASE = "/artifactr/v1/workspaces/main"
+{%- if use_ui %}
+LAUNCH = {
+    "type": "object",
+    "properties": {"day": {"type": "string", "format": "date", "title": "Launch day"}},
+    "required": ["day"],
+}
+"""A form's schema: one date."""
+{%- endif %}
 
 
 def command(client: TestClient, **body: Any) -> dict[str, Any]:
@@ -101,3 +112,23 @@ async def test_mcp_clients_in_process_are_refused(script: Script) -> None:
     assert refused.is_error
     assert isinstance(content, TextContent)
     assert "connect over HTTP" in content.text
+{%- if use_ui %}
+
+
+def test_the_agent_asks_a_form_whose_answer_is_checked(client: TestClient, script: Script) -> None:
+    command(client, type="create_thread", thread_id="t1")
+    script.steps += [call("ask_form", title="Launch", schema=LAUNCH), say("Friday it is.")]
+    command(client, type="post_message", thread_id="t1", content="When do we launch?")
+    wait_for(lambda: events(client, "run_paused"))
+    [paused] = events(client, "run_paused")
+    [request] = paused["event"]["requests"]
+    assert request["tool_name"] == "ask_form"
+    answer = {"run_id": paused["event"]["run_id"], "tool_call_id": request["tool_call_id"]}
+
+    refused = command(client, type="answer_deferred", answer={"day": "Friday"}, **answer)
+    assert (refused["ok"], refused["rejection"]["type"]) == (False, "validation_failed")
+    assert command(client, type="answer_deferred", answer={"day": "2026-10-23"}, **answer)["ok"]
+    wait_for(lambda: events(client, "run_ended"))
+    [returned] = [p for p in script.requests[-1][-1].parts if isinstance(p, ToolReturnPart)]
+    assert returned.content == {"day": "2026-10-23"}
+{%- endif %}

@@ -4,7 +4,7 @@
  */
 
 import { type Answer, type GrantrApi, refusal } from "@portalr/client";
-import { Menu, type MenuItem } from "@portalr/ui";
+import { Alert, Menu, type MenuItem } from "@portalr/ui";
 import { type Ref, startTransition, useActionState } from "react";
 
 type AuditEntry = GrantrApi.components["schemas"]["AuditEntry"];
@@ -46,7 +46,7 @@ export function ThreadMenu({
   return (
     <div className="flex flex-col items-end gap-1">
       <Menu label="Thread actions" items={items} {...(triggerRef && { triggerRef })} />
-      {refused && <p role="alert">{refused}</p>}
+      {refused && <Alert tone="error">{refused}</Alert>}
     </div>
   );
 }

@@ -1,9 +1,25 @@
-import { type GrantrApi, orThrow, refusal } from "@portalr/client";
-import { Button, Card, ConfirmDialog, ItemTable, SectionTitle, TextField } from "@portalr/ui";
+import { type GrantrApi, type Names, orThrow, refusal } from "@portalr/client";
+import {
+  Alert,
+  Button,
+  Card,
+  ConfirmDialog,
+  ItemTable,
+  SectionTitle,
+  TextField,
+} from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useActionState, useId, useState } from "react";
-import { byKind, KIND, opening, type Said, useAccess } from "../../../../../access";
+import {
+  byKindThenName,
+  KIND,
+  opening,
+  peopleIn,
+  type Said,
+  useAccess,
+  useNames,
+} from "../../../../../access";
 
 type Member = GrantrApi.components["schemas"]["Member"];
 
@@ -26,6 +42,7 @@ function Members() {
   const { allowed, changed } = useAccess(tenant);
   const { data: members } = useSuspenseQuery(queries.grantr.members(tenant));
   const yourself = (member: Member) => member.kind === "user" && member.id === user;
+  const names = useNames(tenant, peopleIn(members));
   const removes = allowed.has("grantr:remove_member");
   const inviteId = useId();
   const principalId = useId();
@@ -54,18 +71,28 @@ function Members() {
       <ItemTable
         caption="Members"
         columns={[
-          { key: "member", label: "Member", cell: (member) => member.id },
+          {
+            key: "member",
+            label: "Member",
+            cell: (member) =>
+              member.kind === "user" ? (
+                <span title={member.id}>{names(member.id)}</span>
+              ) : (
+                member.id
+              ),
+          },
           {
             key: "kind",
             label: "Kind",
             cell: (member) => <span className="first-letter:uppercase">{KIND[member.kind]}</span>,
           },
         ]}
-        items={[...members].sort(byKind)}
+        items={[...members].sort(byKindThenName(names))}
         keyOf={(member) => `${member.kind}:${member.id}`}
         actions={
           removes
-            ? (member) => (yourself(member) ? null : <Remove tenant={tenant} member={member} />)
+            ? (member) =>
+                yourself(member) ? null : <Remove tenant={tenant} member={member} names={names} />
             : undefined
         }
         empty={{ title: "No members yet", body: "Invite someone, or add a service principal." }}
@@ -83,7 +110,7 @@ function Members() {
               value={email}
               onValueChange={(value) => setEmail(String(value))}
             />
-            {invited && <p role={invited.refused ? "alert" : "status"}>{invited.said}</p>}
+            {invited && <Alert tone={invited.refused ? "error" : "info"}>{invited.said}</Alert>}
             <Button type="submit" disabled={inviting} className="self-start">
               Invite
             </Button>
@@ -93,7 +120,7 @@ function Members() {
           <SectionTitle id={principalId}>Add a service principal</SectionTitle>
           <form className="flex flex-col gap-3" action={make}>
             <TextField label="Name" name="principal" autoComplete="off" required />
-            {made && <p role={made.refused ? "alert" : "status"}>{made.said}</p>}
+            {made && <Alert tone={made.refused ? "error" : "info"}>{made.said}</Alert>}
             <Button type="submit" disabled={making} className="self-start">
               Add
             </Button>
@@ -105,13 +132,17 @@ function Members() {
 }
 
 /** A member removed, once confirmed: what goes with them, which keys only a principal has. */
-function Remove({ tenant, member }: { tenant: string; member: Member }) {
+function Remove({ tenant, member, names }: { tenant: string; member: Member; names: Names }) {
   const { commands } = Route.useRouteContext();
   const { changed } = useAccess(tenant);
+  const name = member.kind === "user" ? names(member.id) : member.id;
   return (
     <ConfirmDialog
-      label={`Remove ${member.id}`}
-      title={`Remove ${member.id} from ${tenant}?`}
+      label="Remove"
+      about={name}
+      look="danger-soft"
+      size="sm"
+      title={`Remove ${name} from ${tenant}?`}
       confirm="Remove"
       onConfirm={async () =>
         orThrow("Not removed", await changed(commands.grantr.removeMember(tenant, member)))
@@ -119,8 +150,8 @@ function Remove({ tenant, member }: { tenant: string; member: Member }) {
     >
       <p>
         {member.kind === "user"
-          ? `${member.id} loses every role in ${tenant}, and their places in groups.`
-          : `${member.id} loses every role in ${tenant}, its places in groups, and every key issued to it.`}
+          ? `${name} loses every role in ${tenant}, and their places in groups.`
+          : `${name} loses every role in ${tenant}, its places in groups, and every key issued to it.`}
       </p>
     </ConfirmDialog>
   );

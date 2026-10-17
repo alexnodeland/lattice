@@ -29,7 +29,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dspy = ["dspy>=3.4"]
+dspy = ["dspy>=3.4.1"]
 jev = ["pydantic-ai-slim[typesafe]>=2.51"]
 langfuse = ["langfuse>=4.15"]
 hf = ["datasets>=5.0", "huggingface-hub>=0.25.0"]

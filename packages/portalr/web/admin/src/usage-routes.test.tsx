@@ -5,7 +5,7 @@
  */
 
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { page } from "vitest/browser";
+import { page, userEvent } from "vitest/browser";
 import { open as opened } from "./test/admin";
 
 /** The usage reads made, by their query. */
@@ -113,7 +113,8 @@ test("the week's spend, each day against its share, and each workspace's part", 
     .getByRole("navigation", { name: "Tenant" })
     .getByRole("link", { name: "Usage" })
     .click();
-  await expect.element(screen.getByText("$7.00")).toBeVisible();
+  // The window's spend is the headline, and the donut's total, at the centre of its ring.
+  await expect.element(screen.getByText("$7.00").first()).toBeVisible();
   const tracker = screen.getByRole("figure", {
     name: "Each day's spend against its share of the budget: $3.00 a day, of $90.00 over 30 days",
   });
@@ -130,7 +131,7 @@ test("the week's spend, each day against its share, and each workspace's part", 
       .getByRole("listitem")
       .elements()
       .map((item) => item.textContent),
-  ).toEqual(["notes$4.00 · 57%", "No workspace$2.00 · 29%", "plans$1.00 · 14%"]);
+  ).toEqual(["notes, $4.00, 57%", "No workspace, $2.00, 29%", "plans, $1.00, 14%"]);
   await expect.element(screen.getByText(/has no workspace split/)).toBeVisible();
   // The tenant's workspaces, as artifactr lists them, in order.
   expect(reads.at(-1)?.getAll("workspaces")).toEqual(["notes", "plans"]);
@@ -148,11 +149,28 @@ test("without a budget, there is no tracker", async () => {
 
 test("a window goes to portalr and into the address", async () => {
   const { screen, router } = await open("/t/acme/usage");
-  await screen.getByRole("combobox", { name: "Window" }).selectOptions("The last 30 days, in UTC");
+  await screen.getByRole("radio", { name: "30 days" }).click();
   await expect.poll(() => router.state.location.search).toMatchObject({ days: 30 });
   const start = new Date(reads.at(-1)?.get("start") ?? "");
   const end = new Date(reads.at(-1)?.get("end") ?? "");
   expect((end.getTime() - start.getTime()) / 86_400_000).toBe(30);
+});
+
+test("the arrow keys move the window, one step and one read each, and the focus stays on the window", async () => {
+  const { screen, router } = await open("/t/acme/usage");
+  await screen.getByRole("radio", { name: "7 days" }).click();
+  const group = screen.getByRole("radiogroup", { name: "Window" });
+  const navigated = vi.fn();
+  router.subscribe("onResolved", navigated);
+  await userEvent.keyboard("{ArrowRight}");
+  await expect.poll(() => router.state.location.search).toMatchObject({ days: 30 });
+  await expect.element(screen.getByRole("figure", { name: "Spend per day" })).toBeVisible();
+  expect(group.element().contains(document.activeElement)).toBe(true);
+  await userEvent.keyboard("{ArrowRight}");
+  await expect.poll(() => router.state.location.search).toMatchObject({ days: 90 });
+  expect(group.element().contains(document.activeElement)).toBe(true);
+  // Two presses, two navigations, none stacked on another.
+  expect(navigated.mock.calls.length).toBeLessThanOrEqual(2);
 });
 
 test("without artifactr's list, the spend is read whole, and says so", async () => {
@@ -165,7 +183,7 @@ test("without artifactr's list, the spend is read whole, and says so", async () 
 test("a partial read says so, with a badge", async () => {
   shape = "partial";
   const { screen } = await open("/t/acme/usage");
-  await expect.element(screen.getByText(/The days it didn't reach/)).toBeVisible();
+  await expect.element(screen.getByText(/days it didn't reach/)).toBeVisible();
   // The four days never reached are no blocks and no bars, not nothing spent.
   const tracker = screen.getByRole("figure", { name: /against its share of the budget/ });
   await tracker.getByText("Show the figures").click();
@@ -179,7 +197,7 @@ test("a partial read says so, with a badge", async () => {
       .getByRole("listitem")
       .elements()
       .map((item) => item.textContent),
-  ).toEqual(["notes$4.00 · 80%", "plans$1.00 · 20%"]);
+  ).toEqual(["notes, $4.00, 80%", "plans, $1.00, 20%"]);
 });
 
 test("LiteLLM not configured says so", async () => {

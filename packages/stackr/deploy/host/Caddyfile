@@ -17,11 +17,62 @@
 	}
 }
 
+# GoTrue behind the application's /auth/v1, which GoTrue does not have: the prefix comes off.
+(gotrue) {
+	uri strip_prefix /auth/v1
+	reverse_proxy gotrue:9999
+}
+
 app.{$STACKR_DOMAIN} {
 	{$CADDY_TLS}
 	import headers
-	# The template's app service, in its app profile on the stackr network.
-	reverse_proxy app:8000
+	# portalr's UIs sign in with supabase-js, which reaches Supabase Auth at <url>/auth/v1. The
+	# portal's URL is this host, so the browser stays on one origin (the CSP's connect-src 'self',
+	# and no CORS: GoTrue answers a preflight with no Access-Control headers). Only the three calls
+	# its sign-in makes reach GoTrue, by exact method and path: supabase-js's signInWithPassword
+	# and a session's refresh are POST /token, getUser is GET /user, signOut is POST /logout.
+	# Nothing else under
+	# /auth/v1 is GoTrue's to the internet: not the admin API, not signup, invite or recover.
+	# Whatever is not one of these is answered 404 here, whatever its spelling.
+	@sign_in {
+		method POST
+		path /auth/v1/token
+	}
+	@read_user {
+		method GET
+		path /auth/v1/user
+	}
+	@sign_out {
+		method POST
+		path /auth/v1/logout
+	}
+	handle @sign_in {
+		import gotrue
+	}
+	handle @read_user {
+		import gotrue
+	}
+	handle @sign_out {
+		import gotrue
+	}
+	@gotrue_other path /auth/v1 /auth/v1/*
+	handle @gotrue_other {
+		respond 404
+	}
+	# In depth: a path with an admin segment is never the application's (portalr's admin UI, at
+	# /portalr/admin/, is). GoTrue's admin API is for the application's commands, on the private
+	# network.
+	@admin {
+		path_regexp (?i)(^|/)admin(/|$)
+		not path /portalr/*
+	}
+	handle @admin {
+		respond 404
+	}
+	handle {
+		# The template's app service, in its app profile on the stackr network.
+		reverse_proxy app:8000
+	}
 }
 
 auth.{$STACKR_DOMAIN} {

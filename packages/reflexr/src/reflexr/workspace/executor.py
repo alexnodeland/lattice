@@ -3,8 +3,8 @@
 An executor claims a due run under its lease, starts an attempt, runs the action while
 renewing the lease, and records the outcome. Every step that changes the run is one
 transaction, and the outcome is recorded only if the attempt is still the run's current one,
-so an executor that lost its lease, or a run an operator cancelled, cannot overwrite a newer
-state.
+so an executor that lost its lease, or a run an operator cancelled or retried, cannot overwrite
+a newer state.
 """
 
 import asyncio
@@ -196,7 +196,7 @@ class Executor[D]:
             if claimed is None:
                 return False
             run, rule, events = claimed
-            span.set_attribute(a.ATTEMPT, run.attempts)
+            span.set_attributes({a.ATTEMPT: run.attempts, a.EPOCH: run.epoch})
             for envelope in events:
                 linked = parse_traceparent(envelope.traceparent)
                 if linked is not None:
@@ -385,7 +385,7 @@ class Executor[D]:
                         ref, run_lease(run.id), self._holder, self._lease_ttl
                     )
                     current = await storage.run(ref, run.id)
-                    if not kept or current is None or current.status != "running":
+                    if not kept or current is None or not current.is_running(run.epoch):
                         task.cancel()
                         return
         except Exception:
@@ -398,8 +398,8 @@ class Executor[D]:
         async with self._workspaces.storage.transaction(ref) as transaction:
             current = await transaction.run(run.id)
             assert current is not None, "runs are never deleted"
-            if (current.status, current.attempts) != ("running", run.attempts):
-                return None  # cancelled, or abandoned and attempted again elsewhere
+            if not current.is_running(run.epoch):
+                return None  # cancelled, retried, or abandoned and attempted again elsewhere
             now = self._workspaces.clock()
             if outcome.kind == "succeeded":
                 done, fact = succeed(current, now=now, output=outcome.output)

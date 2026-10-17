@@ -1,19 +1,21 @@
-import { orThrow } from "@portalr/client";
-import { Button, ConfirmDialog, ItemTable } from "@portalr/ui";
+import { type Names, orThrow } from "@portalr/client";
+import { Alert, Button, ConfirmDialog, ItemTable } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import {
   allowedNow,
-  byKind,
+  byKindThenName,
   counted,
   fromKey,
   keyOf,
   opening,
+  peopleIn,
   possessive,
   refused,
   type Said,
   useAccess,
+  useNames,
   who,
 } from "../../../../../access";
 import { type Changing, DefineSet, type DefineSetProps } from "../../../../../define-set";
@@ -22,9 +24,9 @@ import { type Changing, DefineSet, type DefineSetProps } from "../../../../../de
 const MEMBER_KINDS = ["user", "service_principal"] as const;
 
 /** A member's `kind:id` as people read it, or the key itself where it names none. */
-const named = (key: string) => {
+const named = (key: string, names: Names) => {
   const member = fromKey(key, MEMBER_KINDS);
-  return member ? who(member) : key;
+  return member ? who(member, names) : key;
 };
 
 /**
@@ -57,8 +59,9 @@ function Groups() {
   const { data: groups } = useSuspenseQuery(queries.grantr.groups(tenant));
   const [changing, setChanging] = useState<Changing | null>(null);
   const [said, setSaid] = useState<Said>(null);
+  const names = useNames(tenant, Object.values(groups).flatMap(peopleIn));
   const listed = Object.entries(groups)
-    .map(([name, members]) => ({ name, members: [...members].sort(byKind) }))
+    .map(([name, members]) => ({ name, members: [...members].sort(byKindThenName(names)) }))
     .sort((a, b) => a.name.localeCompare(b.name));
 
   /** Grantr's groups now, rather than as last read: a change starts from them. */
@@ -102,7 +105,7 @@ function Groups() {
       const one = removed.length === 1;
       return {
         title: `Take ${one ? "this member" : "these members"} out of ${name}?`,
-        body: `${removed.map(named).join(", ")} ${one ? "loses" : "lose"} every role granted to ${name}, and ${one ? "keeps" : "keep"} those granted to them.`,
+        body: `${removed.map((key) => named(key, names)).join(", ")} ${one ? "loses" : "lose"} every role granted to ${name}, and ${one ? "keeps" : "keep"} those granted to them.`,
       };
     },
     onSaved: (message) => {
@@ -121,22 +124,21 @@ function Groups() {
           {
             key: "members",
             label: "Members",
-            cell: (group) => group.members.map(who).join(", ") || "None",
+            cell: (group) => group.members.map((member) => who(member, names)).join(", ") || "None",
           },
         ]}
         items={listed}
         keyOf={(group) => group.name}
         actions={(group) => (
           <>
-            <Button
-              variant="secondary"
-              aria-label={define.words.change(group.name)}
-              onClick={() => void change(group.name)}
-            >
-              Change members
+            <Button variant="ghost" size="sm" onClick={() => void change(group.name)}>
+              Change<span className="sr-only"> {possessive(group.name)}</span> members
             </Button>
             <ConfirmDialog
-              label={`Delete ${group.name}`}
+              label="Delete"
+              about={group.name}
+              look="danger-soft"
+              size="sm"
               title={`Delete the group ${group.name}?`}
               confirm="Delete"
               onConfirm={async () =>
@@ -155,7 +157,7 @@ function Groups() {
         )}
         empty={{ title: "No groups yet", body: "A group's grants reach each of its members." }}
       />
-      {said && <p role={said.refused ? "alert" : "status"}>{said.said}</p>}
+      {said && <Alert tone={said.refused ? "error" : "info"}>{said.said}</Alert>}
       {allowed.has("grantr:add_member") ? (
         <FromMembers key={changing?.name ?? "new"} tenant={tenant} define={define} />
       ) : (
@@ -179,13 +181,14 @@ function FromMembers({
 }) {
   const { queries } = Route.useRouteContext();
   const { data: members } = useSuspenseQuery(queries.grantr.members(tenant));
+  const names = useNames(tenant, peopleIn(members));
   return (
     <DefineSet
       {...define}
       picking={{
-        choices: [...members].sort(byKind).map((member) => ({
+        choices: [...members].sort(byKindThenName(names)).map((member) => ({
           value: keyOf(member),
-          label: who(member),
+          label: who(member, names),
         })),
       }}
     />

@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { expect, onTestFinished, test } from "vitest";
 import { page } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { Tracker } from "./tracker";
@@ -61,4 +61,33 @@ test("a block past the levels is marked as the least, and named with none", asyn
   expect(block?.getAttribute("title")).toBe("10-11: $1.00");
   const blockMark = document.querySelector<HTMLElement>("[data-level] > div");
   expect(blockMark?.style.background).toBe("var(--line)");
+});
+
+test("only the block over its budget is hatched; colour-blind mode hatches every level", async () => {
+  await render(
+    <Tracker
+      label="Hatch"
+      index="Day"
+      figure="Spend"
+      levels={levels}
+      blocks={[
+        { key: "a", name: "10-11", level: 1, figure: "$1.00" },
+        { key: "b", name: "10-12", level: 2, figure: "$2.00" },
+        { key: "c", name: "10-13", level: 3, figure: "$9.00" },
+      ]}
+    />,
+  );
+  const hatch = () =>
+    [...document.querySelectorAll<HTMLElement>("[data-level] > div")].map((mark) =>
+      Number(getComputedStyle(mark).getPropertyValue("--chart-hatch")),
+    );
+  const [under, near, over] = hatch();
+  expect(under).toBe(0);
+  expect(near).toBe(0);
+  expect(over).toBeGreaterThan(0);
+  document.documentElement.dataset.cvd = "";
+  onTestFinished(() => {
+    delete document.documentElement.dataset.cvd;
+  });
+  expect(hatch().every((strength) => strength > 0)).toBe(true);
 });

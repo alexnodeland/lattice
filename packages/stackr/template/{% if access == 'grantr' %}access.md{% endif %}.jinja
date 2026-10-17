@@ -38,6 +38,11 @@
 | `grantr:restrict` |  |  | ✓ | ✓ |  | ✓ |  |  |  |
 | `grantr:revoke` |  |  | ✓ | ✓ |  | ✓ |  |  |  |
 | `grantr:revoke_key` |  |  | ✓ | ✓ |  |  |  |  |  |
+{%- if use_portal %}
+| `portalr:read_deployment` | ✓ |  |  |  |  |  |  |  |  |
+| `portalr:read_spend` |  |  | ✓ | ✓ |  |  |  |  |  |
+| `portalr:read_telemetry` |  |  | ✓ | ✓ |  |  |  |  |  |
+{%- endif %}
 | `reflexr:archive_rule` |  | ✓ | ✓ | ✓ |  | ✓ |  |  |  |
 | `reflexr:cancel_run` |  |  | ✓ | ✓ |  | ✓ | ✓ |  |  |
 | `reflexr:checkpoint_run` |  | ✓ | ✓ | ✓ |  | ✓ |  |  | ✓ |
@@ -96,6 +101,11 @@
 | `grantr:restrict` |  |  | ✓ | ✓ |  | ✓ |  |  |  |
 | `grantr:revoke` |  |  | ✓ | ✓ |  | ✓ |  |  |  |
 | `grantr:revoke_key` |  |  | ✓ | ✓ |  |  |  |  |  |
+{%- if use_portal %}
+| `portalr:read_deployment` | ✓ |  |  |  |  |  |  |  |  |
+| `portalr:read_spend` |  |  | ✓ | ✓ |  |  |  |  |  |
+| `portalr:read_telemetry` |  |  | ✓ | ✓ |  |  |  |  |  |
+{%- endif %}
 {% elif libraries == 'reflexr' -%}
 | Action | operator (deployment) | application (deployment) | owner (tenant) | admin (tenant) | member (tenant) | admin (workspace) | editor (workspace) | viewer (workspace) | rule (workspace) |
 |---|---|---|---|---|---|---|---|---|---|
@@ -112,6 +122,11 @@
 | `grantr:restrict` |  |  | ✓ | ✓ |  | ✓ |  |  |  |
 | `grantr:revoke` |  |  | ✓ | ✓ |  | ✓ |  |  |  |
 | `grantr:revoke_key` |  |  | ✓ | ✓ |  |  |  |  |  |
+{%- if use_portal %}
+| `portalr:read_deployment` | ✓ |  |  |  |  |  |  |  |  |
+| `portalr:read_spend` |  |  | ✓ | ✓ |  |  |  |  |  |
+| `portalr:read_telemetry` |  |  | ✓ | ✓ |  |  |  |  |  |
+{%- endif %}
 | `reflexr:archive_rule` |  | ✓ | ✓ | ✓ |  | ✓ |  |  |  |
 | `reflexr:cancel_run` |  |  | ✓ | ✓ |  | ✓ | ✓ |  |  |
 | `reflexr:checkpoint_run` |  | ✓ | ✓ | ✓ |  | ✓ |  |  | ✓ |

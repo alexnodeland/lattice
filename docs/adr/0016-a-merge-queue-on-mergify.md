@@ -1,6 +1,6 @@
 # ADR-0016: A merge queue on Mergify
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0024](0024-a-parallel-batched-merge-queue.md)
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 

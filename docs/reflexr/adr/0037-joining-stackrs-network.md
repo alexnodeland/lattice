@@ -6,7 +6,7 @@
 
 ## Context
 
-[ADR-0021](0021-contributor-compose-and-dev-containers.md) builds the dev container on the contributor Compose file. When stackr's stack is running, the container should join its network and send telemetry to its Collector; otherwise it should work alone. stackr's Compose project names its default network `stackr`, so other projects can join it as an external network. Compose has no optional external networks: a service that joins a missing one fails to start. Creating the network ahead of stackr does not work either, because stackr's own Compose project then refuses a network it did not create. artifactr met the same problem and decided the same way ([artifactr ADR-0040](https://github.com/alexnodeland/artifactr/blob/main/docs/adr/0040-joining-stackrs-network.md)).
+[ADR-0021](0021-contributor-compose-and-dev-containers.md) builds the dev container on the contributor Compose file. When stackr's stack is running, the container should join its network and send telemetry to its Collector; otherwise it should work alone. stackr's Compose project names its default network `stackr`, so other projects can join it as an external network. Compose has no optional external networks: a service that joins a missing one fails to start. Creating the network ahead of stackr does not work either, because stackr's own Compose project then refuses a network it did not create. artifactr met the same problem and decided the same way ([artifactr ADR-0040](../../artifactr/adr/0040-joining-stackrs-network.md)).
 
 ## Decision
 

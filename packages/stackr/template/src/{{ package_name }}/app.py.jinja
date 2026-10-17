@@ -17,6 +17,9 @@ principal's key, and names its tenant (``access.py``){% endif %}.
 
 - ``/grantr/v1``: grantr's admin API: tenants, members, groups, roles, grants and keys
 {%- endif %}
+{%- if use_portal %}
+- ``/portalr``: portalr's app and admin UIs, and the reads behind them (``portal.py``)
+{%- endif %}
 """
 
 import contextlib
@@ -51,6 +54,9 @@ from {{ package_name }}.collaboration import Collaboration
 {%- endif %}
 from {{ package_name }}.database import Database, create_schema, open_database
 from {{ package_name }}.gateway import gateway_model
+{%- if use_portal %}
+from {{ package_name }}.portal import Portal
+{%- endif %}
 from {{ package_name }}.redaction import LOG_CONFIG
 from {{ package_name }}.settings import Settings
 from {{ package_name }}.telemetry import TelemetryHandle, configure
@@ -189,6 +195,9 @@ def create_app(
 {%- if use_relayr %}
     bridge.connect(collaboration, automation)
 {%- endif %}
+{%- if use_portal %}
+    portal = Portal(access=access, settings=settings)
+{%- endif %}
 {%- if use_relayr %}
     # The bridge starts after the libraries' parts, and stops before them.
 {%- endif %}
@@ -204,6 +213,9 @@ def create_app(
 {%- endif %}
 {%- if use_relayr %}
         bridge,
+{%- endif %}
+{%- if use_portal %}
+        portal,
 {%- endif %}
     ]
 
@@ -231,6 +243,9 @@ def create_app(
             "name": TITLE,
 {%- if access == 'grantr' %}
             "grantr": "/grantr/v1",
+{%- endif %}
+{%- if use_portal %}
+            **({"portalr": "/portalr/"} if portal.configured else {}),
 {%- endif %}
 {%- if use_artifactr %}
             "artifactr": "/artifactr/v1",

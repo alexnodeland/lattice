@@ -8,5 +8,7 @@ Outside this series, an RFC is named as "lattice RFC-0001".
 |---|---|---|
 | [0001](0001-grantr-identity-and-access.md) | grantr, identity and access | Implemented |
 | [0002](0002-portalr-the-portal.md) | portalr, the portal | Accepted, amended by portalr ADR-0014, artifactr ADR-0068 and reflexr ADR-0065 |
+| [0003](0003-native-files-as-artifacts.md) | Native files as artifacts | Draft |
+| [0004](0004-relayr-and-task-trackers.md) | relayr and task trackers | Draft |
 
 To propose one, copy [`template.md`](template.md) to the next number. Each package's series uses the same template.

@@ -1,5 +1,6 @@
-import { type Answer, type GrantrApi, orThrow, refusal } from "@portalr/client";
+import { type Answer, type GrantrApi, type Names, orThrow, refusal } from "@portalr/client";
 import {
+  Alert,
   Button,
   Card,
   type Column,
@@ -15,13 +16,15 @@ import { createFileRoute } from "@tanstack/react-router";
 import { type FormEvent, useId, useState } from "react";
 import {
   allowedNow,
-  byKind,
+  byKindThenName,
   fromKey,
   keyOf,
   opening,
+  peopleIn,
   refused,
   type Said,
   useAccess,
+  useNames,
   where,
   whom,
   whomIn,
@@ -42,13 +45,18 @@ const RUNS_THE_TENANT = new Set(["owner", "admin"]);
 const IN_A_WORKSPACE = new Set<ResourceKind>(["workspace", "thread", "artifact", "rule"]);
 const AN_ITEM = new Set<ResourceKind>(["thread", "artifact", "rule"]);
 
-/** A grant as people read it, for its row's name and key: whom, as what, and where. */
-const said = (grant: Grant) => `${whom(grant.to)} as ${grant.role} on ${where(grant.on)}`;
+/** A grant as people read it, for its row's name: whom, as what, and where. */
+const said = (grant: Grant, names: Names) =>
+  `${whom(grant.to, names)} as ${grant.role} on ${where(grant.on)}`;
+
+/** A grant's row key: by ids, so a name arriving later does not make it another row. */
+const keyOfGrant = (grant: Grant) =>
+  `${JSON.stringify(grant.to)} as ${grant.role} on ${JSON.stringify(grant.on)}`;
 
 /** A member or group from a list, as people read it. */
-const whomOf = (grantee: { readonly kind: string; readonly id: string }) => {
+const whomOf = (grantee: { readonly kind: string; readonly id: string }, names: Names) => {
   const known = fromKey(keyOf(grantee), GRANTEE_KINDS);
-  return known ? whom(known) : keyOf(grantee);
+  return known ? whom(known, names) : keyOf(grantee);
 };
 
 /** No read: where grantr doesn't allow a list, the form goes without it. */
@@ -121,8 +129,12 @@ function Grants() {
     ...catalog.roles.filter((role) => owns || role.name !== "owner"),
     ...(custom ?? []).map((role) => ({ name: role.name, kinds: catalog.custom_kinds })),
   ];
+  const names = useNames(tenant, [
+    ...peopleIn(granted.map((grant) => grant.to)),
+    ...peopleIn(members ?? []),
+  ]);
   const listed = [
-    ...[...(members ?? [])].sort(byKind),
+    ...[...(members ?? [])].sort(byKindThenName(names)),
     ...Object.keys(groups ?? {})
       .sort()
       .map((id) => ({ kind: "group", id })),
@@ -139,12 +151,14 @@ function Grants() {
           heading={place === null ? "The tenant" : `Workspace ${place}`}
           grants={granted.filter((grant) => (grant.on.workspace ?? null) === place)}
           revocable={allowed.has("grantr:revoke") ? revocable : null}
+          names={names}
         />
       ))}
       <Granting
         tenant={tenant}
         roles={roles}
         listed={listed}
+        names={names}
         // Both lists read: choose from them. Either not: type, with what was read suggested.
         typed={members === null || groups === null}
       />
@@ -158,6 +172,7 @@ function Granted({
   heading,
   grants,
   revocable,
+  names,
 }: {
   tenant: string;
   /** The place, as its heading names it, and the table under it: "The tenant", "Workspace notes". */
@@ -165,6 +180,7 @@ function Granted({
   grants: readonly Grant[];
   /** Whether grantr would let a grant be revoked; null where revoking isn't allowed at all. */
   revocable: ((grant: Grant) => boolean) | null;
+  names: Names;
 }) {
   const { commands } = Route.useRouteContext();
   const { changed } = useAccess(tenant);
@@ -172,14 +188,14 @@ function Granted({
     (a, b) =>
       Number(AN_ITEM.has(a.on.kind)) - Number(AN_ITEM.has(b.on.kind)) ||
       where(a.on).localeCompare(where(b.on)) ||
-      whom(a.to).localeCompare(whom(b.to)) ||
+      whom(a.to, names).localeCompare(whom(b.to, names)) ||
       a.role.localeCompare(b.role),
   );
   const headingId = useId();
   // The place is the heading's: an item in it is named, and the place itself isn't again.
   const items = grants.some((grant) => AN_ITEM.has(grant.on.kind));
   const columns: [Column<Grant>, ...Column<Grant>[]] = [
-    { key: "to", label: "To", cell: (grant) => whom(grant.to), width: "40%" },
+    { key: "to", label: "To", cell: (grant) => whom(grant.to, names), width: "40%" },
     { key: "role", label: "Role", cell: (grant) => grant.role, width: "20%" },
     ...(items
       ? [
@@ -200,16 +216,18 @@ function Granted({
         labelledBy={headingId}
         columns={columns}
         items={sorted}
-        keyOf={said}
-        named={said}
+        keyOf={keyOfGrant}
+        named={(grant) => said(grant, names)}
         actions={
           revocable
             ? (grant) =>
                 !revocable(grant) ? null : (
                   <ConfirmDialog
                     label="Revoke"
-                    name={`Revoke ${said(grant)}`}
-                    title={`Revoke ${grant.role} from ${whomIn(grant.to)}?`}
+                    about={said(grant, names)}
+                    look="danger-soft"
+                    size="sm"
+                    title={`Revoke ${grant.role} from ${whomIn(grant.to, names)}?`}
                     confirm="Revoke"
                     onConfirm={async () =>
                       orThrow(
@@ -259,11 +277,13 @@ function Granting({
   roles,
   listed,
   typed,
+  names,
 }: {
   tenant: string;
   roles: readonly { readonly name: string; readonly kinds: readonly ResourceKind[] }[];
   listed: readonly { readonly kind: string; readonly id: string }[];
   typed: boolean;
+  names: Names;
 }) {
   const { queries, commands } = Route.useRouteContext();
   const { changed } = useAccess(tenant);
@@ -310,7 +330,10 @@ function Granting({
   function done(): Said {
     const place = kind ? ` on ${where(on(kind))}` : "";
     setFields(EMPTY);
-    return { said: `${to ? whom(to) : fields.to} holds ${fields.role}${place}.`, refused: false };
+    return {
+      said: `${to ? whom(to, names) : fields.to} holds ${fields.role}${place}.`,
+      refused: false,
+    };
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -335,7 +358,7 @@ function Granting({
           name="role"
           required
           value={fields.role}
-          onChange={(event) => set("role")(event.target.value)}
+          onValueChange={set("role")}
           options={[
             { value: "", label: "Choose a role…" },
             ...roles.map((role) => ({ value: role.name, label: role.name })),
@@ -347,7 +370,7 @@ function Granting({
             name="kind"
             required
             value={kind ?? ""}
-            onChange={(event) => set("kind")(event.target.value)}
+            onValueChange={set("kind")}
             options={[
               { value: "", label: "Choose where…" },
               ...kinds.map((one) => ({ value: one, label: one })),
@@ -396,7 +419,11 @@ function Granting({
             />
             <datalist id={suggestedGrantees}>
               {listed.map((grantee) => (
-                <option key={keyOf(grantee)} value={keyOf(grantee)} label={whomOf(grantee)} />
+                <option
+                  key={keyOf(grantee)}
+                  value={keyOf(grantee)}
+                  label={whomOf(grantee, names)}
+                />
               ))}
             </datalist>
           </>
@@ -406,19 +433,22 @@ function Granting({
             name="to"
             required
             value={fields.to}
-            onChange={(event) => set("to")(event.target.value)}
+            onValueChange={set("to")}
             options={[
               { value: "", label: "Choose whom…" },
-              ...listed.map((grantee) => ({ value: keyOf(grantee), label: whomOf(grantee) })),
+              ...listed.map((grantee) => ({
+                value: keyOf(grantee),
+                label: whomOf(grantee, names),
+              })),
             ]}
           />
         )}
-        {answered && <p role={answered.refused ? "alert" : "status"}>{answered.said}</p>}
+        {answered && <Alert tone={answered.refused ? "error" : "info"}>{answered.said}</Alert>}
         {confirmed ? (
           <ConfirmDialog
             label="Grant"
             className="self-start"
-            title={`Make ${whomIn(to)} ${fields.role} of ${tenant}?`}
+            title={`Make ${whomIn(to, names)} ${fields.role} of ${tenant}?`}
             confirm={`Grant ${fields.role}`}
             onConfirm={async () => {
               orThrow("Not granted", await grant());

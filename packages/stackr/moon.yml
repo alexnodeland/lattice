@@ -9,6 +9,7 @@ dependsOn:
   - 'evalr'
   - 'grantr'
   - 'relayr'
+  - 'portalr'
 
 # Its tasks run the workspace's tools, so the lock and the root's configuration are inputs too.
 tasks:
@@ -39,6 +40,7 @@ tasks:
       - '/packages/artifactr/src/**/*'
       - '/packages/reflexr/src/**/*'
       - '/packages/grantr/src/**/*'
+      - '/packages/portalr/src/**/*'
       - '/uv.lock'
 
   aws:

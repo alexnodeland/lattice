@@ -1,5 +1,7 @@
 import { type ReactNode, useId } from "react";
 import { Card } from "./card";
+import { Num } from "./num";
+import { TYPE } from "./type";
 
 /**
  * One figure, read on its own, as admin's Home shows each: an article of its title, its state
@@ -30,19 +32,19 @@ export function StatCard({
   return (
     <Card
       render={<article aria-labelledby={heading} aria-busy={busy} />}
-      className="flex flex-col gap-1"
+      className="flex h-full flex-col gap-1"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 id={heading} className="font-semibold text-muted text-sm">
+        <h2 id={heading} className={TYPE.labelQuiet}>
           {title}
         </h2>
         {badge}
       </div>
       {figure !== null && (
-        <p className="font-bold text-2xl text-fg tabular-nums tracking-tight">{figure}</p>
+        <p className={TYPE.figure}>{typeof figure === "string" ? <Num>{figure}</Num> : figure}</p>
       )}
-      {children && <div className="text-muted text-sm">{children}</div>}
-      {action && <div className="mt-2 text-sm">{action}</div>}
+      {children && <div className={TYPE.meta}>{children}</div>}
+      {action && <div className="mt-auto pt-2 text-sm">{action}</div>}
     </Card>
   );
 }

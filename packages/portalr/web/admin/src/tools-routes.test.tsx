@@ -4,6 +4,7 @@
  * ask a read of its own.
  */
 
+import { choose } from "@portalr/ui/testing";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { page } from "vitest/browser";
 import { open as opened } from "./test/admin";
@@ -46,7 +47,7 @@ const READERS = {
   grafana: true,
 };
 const open = (path: string, readers: Record<string, boolean> = READERS) =>
-  opened(path, [], portalr, ["acme"], readers);
+  opened(path, [], portalr, ["acme"], { readers });
 
 beforeEach(async () => {
   links = { ...FULL };
@@ -152,7 +153,7 @@ test("asking for others is another page, and each ask is a read of its own", asy
   const { screen, router } = await open("/deployment/tools?trace=t1");
   await expect.element(screen.getByRole("link", { name: "The trace in Langfuse" })).toBeVisible();
   await screen.getByRole("textbox", { name: "Trace id" }).fill("t2");
-  await screen.getByRole("combobox", { name: "Tenant" }).selectOptions("globex");
+  await choose(screen, "Tenant", "globex");
   await screen.getByRole("button", { name: "Get links" }).click();
   await expect
     .poll(() => router.state.location.search)
@@ -163,7 +164,7 @@ test("asking for others is another page, and each ask is a read of its own", asy
   // what was asked before is read again, since each ask is recorded and nothing is kept.
   await screen.getByRole("button", { name: "Get links" }).click();
   await screen.getByRole("textbox", { name: "Trace id" }).fill("t1");
-  await screen.getByRole("combobox", { name: "Tenant" }).selectOptions("No tenant");
+  await choose(screen, "Tenant", "No tenant");
   await screen.getByRole("button", { name: "Get links" }).click();
   await expect.poll(() => asks.length).toBe(3);
   expect(Object.fromEntries(asks[2] ?? [])).toEqual({ trace_id: "t1" });

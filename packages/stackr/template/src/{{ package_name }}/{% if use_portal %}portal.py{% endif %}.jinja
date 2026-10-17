@@ -1,0 +1,149 @@
+"""The portal: portalr's two UIs and its router, over the same grantr as the libraries'.
+
+- ``/portalr/app/``: the app, where people chat with the agents and see their work
+- ``/portalr/admin/``: the admin, for a tenant's owners and admins, and the deployment's operators
+- ``/portalr/v1``: the reads behind them: traces, logs, metrics, scores and spend, each asked of
+  grantr first, for the caller's tenant
+
+It is mounted only where the Supabase project the UIs sign in to is named (``PORTAL_SUPABASE_URL``
+and ``PORTAL_SUPABASE_KEY``); a tool is read only where its address is. The Supabase secret key
+stays here, for inviting people, and is never in what the browser is given.
+"""
+
+import contextlib
+import logging
+from collections.abc import AsyncGenerator
+from pathlib import Path
+
+import httpx
+from fastapi import FastAPI
+
+from grantr import Grants
+from portalr.fastapi import UI, Site, portalr_router
+from portalr.invites import Invite, InviteFailed, SupabaseInvite
+from portalr.readers import Grafana, Langfuse, LiteLLM, Loki, Prometheus, Readers, Tempo
+
+from {{ package_name }}.access import Access
+from {{ package_name }}.database import Database
+from {{ package_name }}.settings import Settings
+
+PREFIX = "/portalr"
+
+LOGGER = logging.getLogger(__name__)
+
+OFF = "the portal is off: PORTAL_SUPABASE_URL and PORTAL_SUPABASE_KEY are unset"
+PLAIN = "PORTAL_SUPABASE_URL is not an https address"
+
+
+def readers(settings: Settings, clients: list[httpx.AsyncClient]) -> Readers:
+    """The tools the settings name, each read at its address.
+
+    The clients made are added to ``clients``, for the portal to close.
+    """
+    portal = settings.portal
+    langfuse = None
+    if settings.langfuse_url and portal.langfuse_project and settings.langfuse_keys:
+        client = httpx.AsyncClient(auth=settings.langfuse_keys)
+        clients.append(client)
+        langfuse = Langfuse(settings.langfuse_url, project=portal.langfuse_project, client=client)
+    litellm = None
+    if portal.litellm_key:
+        client = httpx.AsyncClient(headers={"Authorization": f"Bearer {portal.litellm_key}"})
+        clients.append(client)
+        litellm = LiteLLM(settings.gateway.base_url, client=client)
+    return Readers(
+        tempo=Tempo(portal.tempo_url) if portal.tempo_url else None,
+        loki=Loki(portal.loki_url) if portal.loki_url else None,
+        prometheus=Prometheus(portal.prometheus_url) if portal.prometheus_url else None,
+        langfuse=langfuse,
+        litellm=litellm,
+        grafana=Grafana(portal.grafana_url) if portal.grafana_url else None,
+    )
+
+
+def invitations(settings: Settings, clients: list[httpx.AsyncClient]) -> Invite:
+    """Invite people by email through Supabase Auth's admin API.
+
+    That needs this application to have its secret key and the gateway's address; otherwise
+    every invitation fails, and says why.
+    """
+    url, key = settings.portal.auth_url, settings.auth.service_role_key
+    if not url or not key:
+
+        async def unavailable(_email: str) -> str:
+            raise InviteFailed("invitations need PORTAL_AUTH_URL and AUTH_SERVICE_ROLE_KEY")
+
+        return unavailable
+    client = httpx.AsyncClient()
+    clients.append(client)
+    return SupabaseInvite(url=url.rstrip("/"), secret_key=key, client=client)
+
+
+class Portal:
+    """portalr in the application: its router, its UIs, and the tools it reads.
+
+    Args:
+        access: grantr in the application, which says who the caller is and what they may do.
+        settings: The settings; the portal's are ``settings.portal``.
+    """
+
+    def __init__(self, *, access: Access, settings: Settings) -> None:
+        self._access = access
+        self._settings = settings
+        self._clients: list[httpx.AsyncClient] = []
+
+    @property
+    def grants(self) -> Grants:
+        """grantr, which the portal asks before every read."""
+        return self._access.grants
+
+    @property
+    def site(self) -> Site | None:
+        """The Supabase project the UIs sign in to, or None where it isn't named."""
+        portal = self._settings.portal
+        if portal.supabase_url and portal.supabase_key:
+            return Site(supabase_url=portal.supabase_url, supabase_key=portal.supabase_key)
+        return None
+
+    @property
+    def configured(self) -> bool:
+        """Whether the UIs have a Supabase project to sign in to."""
+        return self.site is not None
+
+    async def migrate(self, database: Database) -> None:
+        """The portal keeps nothing of its own in the database."""
+
+    @contextlib.asynccontextmanager
+    async def lifespan(self) -> AsyncGenerator[None]:
+        """Close the clients the portal made, when the application stops."""
+        try:
+            yield
+        finally:
+            for client in self._clients:
+                await client.aclose()
+
+    def mount(self, app: FastAPI) -> None:
+        """Add the router and the UIs, if a Supabase project is named.
+
+        Raises:
+            ValueError: If none is, or it is not at an https address, and the settings say the
+                application must have the portal.
+        """
+        portal = self._settings.portal
+        site = self.site
+        if site is None:
+            if portal.required:
+                raise ValueError(f"{OFF}, and PORTAL_REQUIRED says the application needs it")
+            LOGGER.info(OFF)
+            return
+        if portal.required and not site.supabase_url.startswith("https://"):
+            raise ValueError(f"{PLAIN}, and PORTAL_REQUIRED says the application needs one")
+        router = portalr_router(
+            resolve_actor=self._access.caller,
+            grants=self.grants,
+            readers=readers(self._settings, self._clients),
+            invite=invitations(self._settings, self._clients),
+            site=site,
+            ui=Path(portal.ui_dir) if portal.ui_dir else UI,
+        )
+        app.include_router(router, prefix=PREFIX)

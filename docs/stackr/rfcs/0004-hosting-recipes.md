@@ -1,6 +1,6 @@
 # RFC-0004: Hosting recipes
 
-**Status:** Accepted
+**Status:** Accepted, amended 2026-10-17 (see [Amendment](#amendment-2026-10-17-the-manual-apply-comes-after-v01))
 **Author:** Alex Nodeland
 **Created:** 2026-10-12
 **Discussion:** [#104](https://github.com/alexnodeland/lattice/pull/104); accepted on 2026-10-12, with the decisions in [Decisions](#decisions)
@@ -18,7 +18,7 @@ stackr runs on one machine, for development. This RFC adds two ways to host it, 
 1. **A single host:** stackr's Compose stack on one VM, shaped for production. Caddy is the only service that faces the internet.
 2. **AWS, with OpenTofu:** the stateless services on ECS Fargate, with RDS, ElastiCache and S3 as managed adapters. One EC2 "state host" runs ClickHouse and Prometheus with the single host's Compose.
 
-In both, the database is plain PostgreSQL 17 and identity is Supabase's auth server (GoTrue) on its own. GoTrue serves the same JWKS as local Supabase, so an application changes only its settings. CI tests the AWS recipe against Floci, an AWS emulator, and never against AWS itself. One manual apply on real AWS gates stackr's v0.1.
+In both, the database is plain PostgreSQL 17 and identity is Supabase's auth server (GoTrue) on its own. GoTrue serves the same JWKS as local Supabase, so an application changes only its settings. CI tests the AWS recipe against Floci, an AWS emulator, and never against AWS itself. One manual apply on real AWS gates stackr's v0.1. *Amended 2026-10-17 ([Amendment](#amendment-2026-10-17-the-manual-apply-comes-after-v01)): the apply is a stated limit of v0.1, not its gate.*
 
 The maintainer decided the recipes' scope, the database and identity, where state lives on AWS, how CI tests it, how ClickHouse is backed up, and where GoTrue is served, on 2026-10-12. The rest was settled with this RFC. [Decisions](#decisions) records both.
 
@@ -241,7 +241,7 @@ Floci emulates AWS's APIs locally. Some services only record what they are given
 | CloudWatch Logs | Yes | Tier 2: the tasks' logs arrive |
 | IAM | Stored. Enforcement is off by default | The spike tries `FLOCI_SERVICES_IAM_ENFORCEMENT_ENABLED` |
 
-**What Floci cannot test:** IAM policies (unless the spike's trial holds), TLS at the edge and to RDS (`rds.force_ssl`; `envs/floci` asks for `prefer`), DNS validation of certificates, NAT egress, SSM port forwarding, Multi-AZ, EBS snapshots and DLM, rollouts across zones, and autoscaling. The manual apply on real AWS covers these before stackr's v0.1.
+**What Floci cannot test:** IAM policies (unless the spike's trial holds), TLS at the edge and to RDS (`rds.force_ssl`; `envs/floci` asks for `prefer`), DNS validation of certificates, NAT egress, SSM port forwarding, Multi-AZ, EBS snapshots and DLM, rollouts across zones, and autoscaling. The manual apply on real AWS covers these before stackr's v0.1. *Amended 2026-10-17 ([Amendment](#amendment-2026-10-17-the-manual-apply-comes-after-v01)): the apply is a stated limit of v0.1, not its gate.*
 
 **Tier 1, on every pull request that touches `deploy/aws/**`:**
 
@@ -313,7 +313,7 @@ The maintainer decided H1 to H5, H12 and H15 on 2026-10-12, and H13's state buck
 | H2 | Database and identity | Plain PostgreSQL 17 (RDS on AWS, the `postgres` profile on the host), and GoTrue alone, serving the same JWKS. The Supabase CLI stays the development adapter | Supabase's self-hosting Compose file; hosted Supabase |
 | H3 | ClickHouse and Prometheus on AWS | One EC2 state host running them with the single host's Compose under systemd, with its own EBS volume and DLM snapshots. ECS runs only the Fargate services | The state host as an ECS container instance; Fargate with EFS, which Prometheus doesn't support; ClickHouse Cloud |
 | H4 | Traces, logs and profiles on AWS | Tempo, Loki and Pyroscope monolithic on Fargate, on S3; Prometheus on the state host | All of them on the state host; Mimir now |
-| H5 | Floci in CI | Two tiers: checks and a mocked test on every change to `deploy/aws/**`; a real apply against Floci, smoke and destroy when the recipe changes. AWS never in CI, and one manual apply on real AWS before stackr's v0.1 | An AWS account applied from CI |
+| H5 | Floci in CI | Two tiers: checks and a mocked test on every change to `deploy/aws/**`; a real apply against Floci, smoke and destroy when the recipe changes. AWS never in CI, and one manual apply on real AWS before stackr's v0.1 (amended: after it, as a stated limit of v0.1) | An AWS account applied from CI |
 | H6 | The scanner | checkov, run with `uvx` at an exact version, outside the workspace's resolution. It reads the plan's JSON as well as the modules, so values from variables are checked too | trivy, one more binary installed outside uv |
 | H7 | The single host's edge | Caddy, with ACME | Traefik, whose routing lives in labels on every service |
 | H8 | The host's Compose | An overlay, `deploy/host/compose.prod.yaml`, with `!reset` and `!override`, so only Caddy publishes 80 and 443 | A production Compose file generated from `compose.yaml` |
@@ -336,7 +336,7 @@ The maintainer decided H1 to H5, H12 and H15 on 2026-10-12, and H13's state buck
 | 2. Single host | The `auth` profile, `scripts/auth-keys`, `AUTH_ADMIN_URL`, `deploy/host/` with the overlay, the Caddyfile, PostgreSQL's image with pgBackRest, the backups and `restore-drill`, the CI job, and the template's `hosting: host` | CI brings the stack up with the overlay behind Caddy on a local CA, and `make smoke` and `make smoke-app` pass through it on the `postgres` adapter. The restore drill passes in the same job, against MinIO. An application generated with `hosting: host` passes its CI |
 | 3. AWS modules and tier 1 | The thin images and the Images job, the seven modules, `envs/prod` and `envs/floci`, OpenTofu and tflint in `.prototools`, and tier 1 | Tier 1 passes on a pull request that touches `deploy/aws/**`, and each of checkov's findings is fixed, or skipped with its reason in checkov's configuration |
 | 4. Tier 2 | The Docker-mode apply, the smoke through the ALB, `psql` through the relay, the trace in Tempo, destroy, and the template's `hosting: aws` | Tier 2 passes on a pull request that changes the recipe, and leaves nothing behind. An application generated with `hosting: aws` passes its CI. Amended by [ADR-0036](../adr/0036-tier-2-against-floci.md), which records what Floci 2.2.0 can't smoke |
-| 5. Docs, ADRs and the gate | The hosting guides, ADRs that record the decisions grouped by area (the hosts, AWS's layout, secrets, backups, CI), beside the spike's ADRs, the release step that publishes the thin images, and the manual apply on real AWS | A real AWS apply passes the smoke over HTTPS, then destroys, before stackr's v0.1 is tagged |
+| 5. Docs, ADRs and the gate | The hosting guides, ADRs that record the decisions grouped by area (the hosts, AWS's layout, secrets, backups, CI), beside the spike's ADRs, the release step that publishes the thin images, and the manual apply on real AWS | A real AWS apply passes the smoke over HTTPS, then destroys, before stackr's v0.1 is tagged (amended: after it is tagged; v0.1 states the apply as a limit) |
 
 Phase 2 and phase 3 are independent after the spike. Phase 4 needs 3.
 
@@ -374,3 +374,7 @@ Tracked in [#103](https://github.com/alexnodeland/lattice/issues/103).
 - [x] Phase 3: AWS modules and tier 1 ([ADR-0029](../adr/0029-the-aws-modules-and-tier-1.md), [ADR-0032](../adr/0032-the-edge-the-services-and-the-state-host.md), [ADR-0034](../adr/0034-the-stack-on-aws.md), [ADR-0035](../adr/0035-the-thin-images.md))
 - [ ] Phase 4: tier 2. Partly met: tier 2 passes in CI and leaves nothing behind ([ADR-0036](../adr/0036-tier-2-against-floci.md)); the template's `hosting: aws` is still to come
 - [ ] Phase 5: docs, ADRs and the gate
+
+## Amendment (2026-10-17): the manual apply comes after v0.1
+
+[lattice ADR-0023's amendment](../../adr/0023-publishing-to-pypi-from-the-release-workflow.md#amendment-2026-10-16) stages lattice's first release, and stackr's 0.1.0 is in its second half, which does not wait for the manual apply on real AWS. So the apply no longer gates stackr's v0.1: it is a stated limit of v0.1. stackr 0.1.0 is released with the AWS recipe applied, smoked and destroyed against Floci in CI (tier 2), and checked by review, checkov and tier 1's tests, but not yet applied on real AWS; [what Floci cannot test](#floci-and-ci), as [ADR-0025](../adr/0025-what-the-floci-spike-found.md#the-cannot-test-list-now) lists it now, is checked only by that apply, which comes after the release. Phase 5's exit criterion is met by the apply whenever it runs, not before the tag. Where this RFC says the apply gates v0.1, or comes before it (the Summary, what Floci cannot test, H5 and phase 5), this amendment supersedes it. The apply itself, what it checks and how, is unchanged.

@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0](https://github.com/alexnodeland/lattice/compare/artifactr-v0.2.1...artifactr-v0.3.0) (2026-10-17)
+
+
+### Features
+
+* **artifactr,artifactr-files:** native files as artifacts, phase 1 of RFC-0003 ([#346](https://github.com/alexnodeland/lattice/issues/346)) ([c61165b](https://github.com/alexnodeland/lattice/commit/c61165b36f553eaaec6e3cb53698c1350b20be56))
+
 ## [0.2.1](https://github.com/alexnodeland/lattice/compare/artifactr-v0.2.0...artifactr-v0.2.1) (2026-10-17)
 
 

@@ -1,6 +1,6 @@
 # ADR-0004: Optimistic concurrency and append-only revisions
 
-**Status:** Accepted
+**Status:** Accepted; its rejection of pessimistic locks narrowed by [ADR-0071](0071-a-lease-on-an-artifact.md)
 **Date:** 2026-09-28
 **Deciders:** Alex Nodeland
 

@@ -107,6 +107,8 @@ nav:
     - adr/0068-an-access-token-redacted-from-span-urls.md
     - adr/0069-a-claim-fences-the-writes-that-consume.md
     - adr/0070-a-runner-looks-again-for-what-a-dead-holder-was-asked.md
+    - adr/0071-a-lease-on-an-artifact.md
+    - adr/0072-native-files-are-manifests-over-json-patch.md
   - RFCs:
     - rfcs/README.md
     - rfcs/0001-v0.1-implementation-plan.md

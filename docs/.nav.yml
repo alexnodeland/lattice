@@ -40,7 +40,6 @@ nav:
       - Template: adr/template.md
   - Brand: assets/brand/README.md
   - artifactr: artifactr
-  - artifactr-files: artifactr-files
   - reflexr: reflexr
   - evalr: evalr
   - relayr: relayr

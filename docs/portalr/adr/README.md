@@ -16,7 +16,7 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0008](0008-the-bun-workspace-runs-in-bun.md) | The Bun workspace runs in Bun | Accepted |
 | [0009](0009-ui-tested-in-chromium-in-both-schemes-under-bun.md) | `ui` tested in Chromium, in both schemes, under Bun | Accepted |
 | [0010](0010-the-client-generated-types-and-resumable-stores.md) | The client: generated types, and resumable stores | Accepted, amended by artifactr 0063, reflexr 0061 and reflexr 0064 |
-| [0011](0011-the-router-and-its-readers.md) | The router and its readers | Accepted, amended by 0012 |
+| [0011](0011-the-router-and-its-readers.md) | The router and its readers | Accepted, amended by 0012 and 0041 |
 | [0012](0012-acceptance-against-a-two-tenant-stack.md) | Acceptance against a two-tenant stack | Accepted |
 | [0013](0013-the-apps-scenarios-against-the-test-application.md) | The app's scenarios, against the test application with Supabase Auth | Accepted |
 | [0014](0014-the-apps-shell.md) | The app's shell: English strings, a committed route tree, and Supabase Auth's client | Accepted |
@@ -46,5 +46,6 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0038](0038-people-by-email.md) | People by email, not by id | Accepted |
 | [0039](0039-elevation-status-colour-states-and-density.md) | Elevation, status colours, alerts and placeholders, and admin's compact density | Accepted |
 | [0040](0040-scenarios-against-a-generated-application-and-size-budgets.md) | Scenarios against a generated application, and size budgets | Accepted |
+| [0041](0041-first-party-webassembly-in-the-apps-policy.md) | First-party WebAssembly in the app's policy | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

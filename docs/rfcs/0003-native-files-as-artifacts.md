@@ -1,6 +1,6 @@
 # RFC-0003: Native files as artifacts
 
-**Status:** Draft
+**Status:** Draft, amended by [portalr ADR-0041](../portalr/adr/0041-first-party-webassembly-in-the-apps-policy.md)
 **Author:** Alex Nodeland
 **Created:** 2026-10-16
 **Discussion:** [#248](https://github.com/alexnodeland/lattice/pull/248)
@@ -315,7 +315,7 @@ Decided by the owner on 2026-10-16:
 
 - **Convert to Markdown and back,** which loses styles, comments, tracked changes and layout every time.
 - **An embedding API upstream,** or **our own build of the browser editor** over WordCraft's crates. Either would allow an editor inside portalr. The owner's constraint rules both out: no fork, no upstream contribution.
-- **Reaching into the browser build from a same-origin page,** through its WebAssembly memory or its DOM. That depends on internals that change every release, and putting it on portalr's origin would need `wasm-unsafe-eval` in portalr's CSP.
+- **Reaching into the browser build from a same-origin page,** through its WebAssembly memory or its DOM. That depends on internals that change every release, and putting it on portalr's origin would need `wasm-unsafe-eval` in portalr's CSP. (Amended by [portalr ADR-0041](../portalr/adr/0041-first-party-webassembly-in-the-apps-policy.md): `app`'s policy now allows first-party, pinned WebAssembly that a test lists by digest. This alternative stays rejected, for its other reasons: WordCraft's build is a third party's, and its internals change every release.)
 - **A CRDT, chosen by lattice.** lattice already has what a CRDT exists to do without: a server that orders every write and numbers each workspace's log ([ADR-0005][a-adr-0005]). Its collaboration is turn-based, through revisions and proposals ([ADR-0009][a-adr-0009]). A CRDT guarantees convergence, not a valid file. No craft app uses one, so `.docx` would have to be converted into a generic CRDT, which is lossy. It becomes worth it only for offline editing over hours, or several people typing at once.
 - **A session container started on demand** (D7). It needs the Docker API, or an orchestrator holding it, and that is root on the host, reachable from what the application can reach.
 - **LibreOffice headless.** Mature, but its edits are UNO calls rather than commands, and it is a large process to sandbox per call. It stays the fallback, and the `App` port admits it.

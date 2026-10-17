@@ -14,7 +14,7 @@
 
 **artifactr** is a Python library for chat applications in which people and agents work on the same documents, plans and specs, with every change versioned, attributed and fed back into the agent's context.
 
-> **Status:** alpha, on PyPI. [0.1.0](https://github.com/alexnodeland/artifactr/releases/tag/v0.1.0), from its original repository, was the first release and delivers [RFC-0001](https://lattice.alexnodeland.com/artifactr/rfcs/0001-v0.1-implementation-plan/), the v0.1 plan. The API may still change before 1.0.
+> **Status:** alpha, on PyPI. [0.1.0](https://github.com/alexnodeland/artifactr/releases/tag/v0.1.0), from its original repository, was the first release, and delivered [RFC-0001](https://lattice.alexnodeland.com/artifactr/rfcs/0001-v0.1-implementation-plan/), the v0.1 plan. The API may still change before 1.0.
 
 ## Why
 

@@ -4,7 +4,7 @@ This page gets portalr's two UIs, `app` and `admin`, running inside an applicati
 
 !!! note "What is built"
 
-    Every area of both UIs described in these guides is built and tested. [stackr's template](../stackr/guides/template.md) asks a `portal` question and mounts portalr for you ([stackr ADR-0038](../stackr/adr/0038-portalr-in-the-template.md)); this page is for an application that mounts it itself, and says what the template does for you. The template passes `people=` and `invite=` when it has the gateway's address and its secret key, and stackr's smoke test runs a few scenarios against a generated application ([ADR-0040](adr/0040-scenarios-against-a-generated-application-and-size-budgets.md)). Not built yet: magic links and other sign-in providers (a password signs in); and a control for colour-blind mode, whose hook is built.
+    Every area of both UIs described in these guides is built and tested. [stackr's template](../stackr/guides/template.md) asks a `portal` question and mounts portalr for you ([stackr ADR-0038](../stackr/adr/0038-portalr-in-the-template.md)); this page is for an application that mounts it itself, and says what the template does for you. The template passes `people=` and `invite=` when it has the gateway's address and its secret key, and stackr's smoke test runs a few scenarios against a generated application ([ADR-0040](adr/0040-scenarios-against-a-generated-application-and-size-budgets.md)). Not built yet: magic links and other sign-in providers (a password signs in).
 
 ## What you need
 

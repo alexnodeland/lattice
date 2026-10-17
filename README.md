@@ -139,7 +139,7 @@ make up                 # beside stackr's stack, at http://127.0.0.1:8800
 
 <br>
 
-Python 3.12 or newer. Every library is on PyPI, and installs with [uv](https://docs.astral.sh/uv/) or pip:
+Python 3.12 or newer. Every library is on PyPI. With [uv](https://docs.astral.sh/uv/) (or `pip install`):
 
 ```bash
 uv add artifactr-ai   # imported as artifactr
@@ -150,7 +150,7 @@ uv add grantr
 uv add portalr        # its wheel carries both UIs
 ```
 
-Each takes the packages of lattice it requires from PyPI too: relayr's, artifactr and reflexr, portalr's, grantr, and lattice-core, which artifactr, reflexr, grantr and portalr share. For a change on `main` before its release, install from this repository instead, as in `uv add "reflexr @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/reflexr"`; portalr's UIs are built into its wheel, not kept in git, so build that in a checkout (`moon run portalr:build`). Each package's getting-started page lists its extras, such as artifactr's `fastapi`, `mcp` and `postgres`: [artifactr](https://lattice.alexnodeland.com/artifactr/getting-started/), [reflexr](https://lattice.alexnodeland.com/reflexr/getting-started/), [evalr](https://lattice.alexnodeland.com/evalr/getting-started/), [grantr](https://lattice.alexnodeland.com/grantr/getting-started/).
+Each takes the packages of lattice it requires from PyPI too: relayr's, artifactr and reflexr, portalr's, grantr, and lattice-core, which artifactr, reflexr, grantr and portalr share. For a change on `main` before its release, install from this repository instead, as in `uv add "reflexr @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/reflexr"`; portalr's UIs are built into its wheel, not kept in git, so build its wheel in a checkout ([portalr's getting started](https://lattice.alexnodeland.com/portalr/getting-started/#install)). Each package's getting-started page lists its extras, such as artifactr's `fastapi`, `mcp` and `postgres`: [artifactr](https://lattice.alexnodeland.com/artifactr/getting-started/), [reflexr](https://lattice.alexnodeland.com/reflexr/getting-started/), [evalr](https://lattice.alexnodeland.com/evalr/getting-started/), [grantr](https://lattice.alexnodeland.com/grantr/getting-started/).
 
 </details>
 

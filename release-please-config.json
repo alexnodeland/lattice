@@ -68,17 +68,6 @@
         }
       ]
     },
-    "packages/artifactr-files": {
-      "release-type": "python",
-      "package-name": "artifactr-files",
-      "extra-files": [
-        {
-          "type": "toml",
-          "path": "/uv.lock",
-          "jsonpath": "$.package[?(@.name.value=='artifactr-files-ai')].version"
-        }
-      ]
-    },
     "packages/reflexr": {
       "release-type": "python",
       "package-name": "reflexr",

@@ -29,7 +29,7 @@
   },
   "overrides": [
     {
-      "includes": ["packages/portalr/web/ui/src/table.tsx"],
+      "includes": ["packages/portalr/web/ui/src/scroll-region.tsx"],
       "linter": {
         "rules": {
           "a11y": {

@@ -40,7 +40,7 @@ STACKR: Final = "packages/stackr"
 STAGES: Final[tuple[tuple[str, ...], ...]] = (
     ("packages/lattice-core", "packages/evalr"),
     ("packages/artifactr", "packages/reflexr", "packages/grantr"),
-    ("packages/relayr", "packages/artifactr-files"),
+    ("packages/relayr",),
     ("packages/portalr",),
 )
 """The packages that ship a wheel, in the order they are published: each stage after the ones its

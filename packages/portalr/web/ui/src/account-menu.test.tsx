@@ -123,6 +123,7 @@ test("the keyboard reaches it and a key toggles it", async () => {
   );
   await screen.getByRole("button", { name: "Account: Alex Nodeland" }).click();
   const item = screen.getByRole("menuitemcheckbox", { name: "Colour-blind friendly charts" });
+  await expect.element(item).toBeVisible();
   await item.element().focus();
   await expect.element(item).toHaveFocus();
   await userEvent.keyboard(" ");

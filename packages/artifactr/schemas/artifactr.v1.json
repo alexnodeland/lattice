@@ -772,6 +772,18 @@
           "title": "Tool Call Id",
           "type": "string"
         },
+        "tool_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tool Name"
+        },
         "type": {
           "const": "deferred_answered",
           "default": "deferred_answered",

@@ -223,6 +223,9 @@ class DeferredAnswered(_Event):
     run_id: RunId
     thread_id: ThreadId
     tool_call_id: str
+    tool_name: str | None = None
+    """The tool whose call was answered, copied from its request; ``None`` only in events
+    recorded before answers carried it."""
     answer: JsonValue = None
     approved: bool | None = None
 

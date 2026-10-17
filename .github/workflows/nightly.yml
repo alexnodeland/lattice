@@ -43,7 +43,6 @@ jobs:
       REFLEXR_TEST_POSTGRES_URL: postgresql+asyncpg://postgres:lattice@localhost:5432/reflexr
       GRANTR_TEST_POSTGRES_URL: postgresql+asyncpg://postgres:lattice@localhost:5432/grantr
       RELAYR_TEST_POSTGRES_URL: postgresql+asyncpg://postgres:lattice@localhost:5432/relayr
-      ARTIFACTR_FILES_TEST_POSTGRES_URL: postgresql+asyncpg://postgres:lattice@localhost:5432/artifactr_files
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -64,7 +63,7 @@ jobs:
       - name: One database per library
         env:
           PGPASSWORD: lattice
-        run: psql -h localhost -U postgres -c 'CREATE DATABASE artifactr' -c 'CREATE DATABASE reflexr' -c 'CREATE DATABASE grantr' -c 'CREATE DATABASE relayr' -c 'CREATE DATABASE artifactr_files'
+        run: psql -h localhost -U postgres -c 'CREATE DATABASE artifactr' -c 'CREATE DATABASE reflexr' -c 'CREATE DATABASE grantr' -c 'CREATE DATABASE relayr'
       - run: uv sync --locked --all-packages --all-groups --all-extras
       - run: bun install --frozen-lockfile
       - run: bun x --bun --no-install playwright install --with-deps --only-shell chromium

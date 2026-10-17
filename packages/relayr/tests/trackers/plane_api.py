@@ -108,6 +108,10 @@ class PlaneApi:
         """Comment in the web app, as a person does."""
         self._comment(ref.id, {"comment_html": body}, by=PERSON)
 
+    def label(self, name: str) -> str:
+        """Make a label in the web app, as a person does; return its id."""
+        return self._label({"name": name}).json()["id"]
+
     def delete(self, ref: ItemRef) -> None:
         """Delete a work item, which frees its external ids."""
         del self.issues[ref.id]
@@ -189,6 +193,7 @@ class PlaneApi:
             case "GET", ["work-items", issue_id, "comments"] if issue_id in self.issues:
                 return self._list(self.comments[issue_id][::-1], params)
             case "POST", ["work-items", issue_id, "comments"] if issue_id in self.issues:
+                # A comment on a deleted item is a 404 here; what Plane answers is unverified.
                 return self._comment(issue_id, body)
             case _:
                 return httpx.Response(404, json=NOT_FOUND)
@@ -273,6 +278,10 @@ class PlaneApi:
         return httpx.Response(201, json=issue)
 
     def _patch(self, issue: dict[str, Any], body: dict[str, Any]) -> httpx.Response:
+        if "state" in body and body["state"] not in {state["id"] for state in self.states}:
+            # The serializer checks the state is the project's (api/serializers/issue.py).
+            error = "State is not valid please pass a valid state_id"
+            return httpx.Response(400, json={"non_field_errors": [error]})
         issue.update({k: v for k, v in body.items() if k in issue})
         issue["updated_at"], issue["updated_by"] = self._tick(), USER
         return httpx.Response(200, json=issue)

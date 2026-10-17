@@ -1,16 +1,17 @@
 """A tracker in memory, for tests: one workspace's projects, items and comments.
 
-It keeps the port's promises as the trackers do: an item filed by a key already used is the one
-returned, an archived item is read but not listed, and a deleted one is gone. Tests act in it as
+It keeps the port's promises as the trackers do: an archived item is read but not listed, a
+deleted one is gone, and a second item filed by a key is made, as Vikunja makes it, unless the
+fake dedupes, as Plane does. Tests act in it as
 people do, and make it fail as a tracker does.
 """
 
-import hashlib
 import hmac
-import json
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
+
+from pydantic import ValidationError
 
 from relayr.ledger import Clock, utc_now
 from relayr.trackers.port import (
@@ -34,6 +35,7 @@ from relayr.trackers.port import (
     Unauthorized,
     Unavailable,
 )
+from relayr.trackers.signatures import signed
 
 SIGNATURE = "x-fake-signature"
 """The header a nudge's signature is in: HMAC-SHA256, hex, over the body."""
@@ -77,6 +79,7 @@ class _Store:
 
     api_key: str
     clock: Clock
+    dedupes: bool
     items: dict[str, _Item] = field(default_factory=dict[str, _Item])
     failures: list[TrackerError | None] = field(default_factory=list[TrackerError | None])
     lose_created: bool = False
@@ -132,11 +135,15 @@ class FakeTracker:
 
     Args:
         api_key: The key it accepts; a request with another is `Unauthorized`.
+        dedupes: Whether a create by a key already used returns its item, as Plane's 409 does,
+            rather than filing another, as Vikunja does.
         clock: Returns the current time, which items are updated at.
     """
 
-    def __init__(self, *, api_key: str = "key", clock: Clock = utc_now) -> None:
-        self._store = _Store(api_key=api_key, clock=clock)
+    def __init__(
+        self, *, api_key: str = "key", dedupes: bool = False, clock: Clock = utc_now
+    ) -> None:
+        self._store = _Store(api_key=api_key, clock=clock, dedupes=dedupes)
 
     def connect(self, credentials: TrackerCredentials, source: str) -> "FakeConnection":
         """Connect as a lattice workspace's adapter does, with the tenant's credentials."""
@@ -200,8 +207,9 @@ class FakeConnection:
         return None if found is None else _ref(found, self._source)
 
     async def create(self, project: ProjectId, key: ItemKey, draft: ItemDraft) -> ItemRef:
-        """File an item by a key, or return the item the key already filed."""
-        found = self._filed(project, key)
+        """File an item by a key; or, if the tracker dedupes, return the one the key filed."""
+        self._store.request(self._credentials)
+        found = self._match(project, key) if self._store.dedupes else None
         if found is None:
             found = self._store.add(project, (self._source, key), draft, self.user)
             if self._store.lose_created:
@@ -247,18 +255,21 @@ class FakeConnection:
         """Return an item's comments after one, oldest first, or all of them."""
         self._store.request(self._credentials)
         comments = [self._read(comment) for comment in self._store.existing(ref.id).comments]
-        if after is None:
-            return comments
         ids = [comment.ref.id for comment in comments]
-        return comments[ids.index(after.id) + 1 :]
+        return (
+            comments[ids.index(after.id) + 1 :]
+            if after is not None and after.id in ids
+            else comments
+        )
 
     def nudge(self, headers: Mapping[str, str], body: bytes) -> Nudge | None:
         """Verify a nudge's signature, and say which project to poll."""
-        secret = self._credentials.webhook_secret.encode()
-        expected = hmac.new(secret, body, hashlib.sha256).hexdigest()
-        if not hmac.compare_digest(headers.get(SIGNATURE, ""), expected):
+        if not signed(headers, body, self._credentials.webhook_secret.encode(), SIGNATURE):
             return None
-        return Nudge(project=json.loads(body)["project"])
+        try:
+            return Nudge.model_validate_json(body)
+        except ValidationError:
+            return None
 
     def link(self, ref: ItemRef) -> str:
         """Return the item's address."""
@@ -266,6 +277,9 @@ class FakeConnection:
 
     def _filed(self, project: ProjectId, key: ItemKey) -> _Item | None:
         self._store.request(self._credentials)
+        return self._match(project, key)
+
+    def _match(self, project: ProjectId, key: ItemKey) -> _Item | None:
         for item in self._store.items.values():
             if item.project == project and item.key == (self._source, key):
                 return item

@@ -7,8 +7,10 @@ anything is sent and records what it made. A key is the rule's own, or derived a
 adapter derives its ids (relayr ADR-0019), so a retried attempt makes nothing twice.
 """
 
+import asyncio
 import weakref
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import AsyncGenerator, Awaitable, Callable, Mapping
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from typing import Any, Final
 
@@ -40,16 +42,24 @@ from relayr.trackers.port import (
 )
 
 CLAIM_TTL: Final = timedelta(seconds=30)
-"""How long a key's claim holds without a record before another attempt may take it again:
-three times an adapter's 10 s request timeout."""
+"""How long a key's claim holds without a record before another attempt may take it again: longer
+than `WRITING`, which bounds the writes made under it."""
+
+WRITING: Final = timedelta(seconds=20)
+"""How long a claim's writes may take, all told: well inside the claim, so a claim taken again
+never overlaps a write relayr is still making. A request the tracker finishes after relayr gave
+up on it can still land later."""
+
+UNAVAILABLE: Final = "tracker_unavailable"
+"""The reason of a failure whose write may have landed: the tracker didn't answer in time."""
 
 CREDENTIALS_TTL: Final = timedelta(minutes=5)
 """How long a tenant's credentials are used before they are asked for again; a key the tracker
 refuses asks again at once."""
 
 type Connect = Callable[[TrackerCredentials, str], Tracker]
-"""Makes a lattice workspace's adapter from its tenant's credentials and its source: an adapter's
-class, as `PlaneTracker`, or the fake's `connect`."""
+"""Makes a lattice workspace's adapter from its tenant's credentials and its source: `plane(http)`,
+`vikunja(http)`, or the fake's `connect`."""
 
 type Credentials = Callable[[str], Awaitable[TrackerCredentials]]
 """Returns a tenant's tracker credentials, from wherever the deployment keeps them."""
@@ -99,7 +109,7 @@ class Trackers:
 
     Args:
         ledger: Where keys are claimed before each write and what they made is recorded.
-        connect: Makes a workspace's adapter, as `PlaneTracker` or `VikunjaTracker` does.
+        connect: Makes a workspace's adapter, as `plane(http)` or `vikunja(http)` does.
         credentials: Returns a tenant's credentials; asked again every five minutes, and after
             the tracker refuses a key.
         bindings: The tracker project each workspace files into. A workspace with none files
@@ -191,7 +201,8 @@ class TrackerActions:
 
         Raises:
             RunFailure: If another attempt claimed the key within the last 30 s and hasn't
-                recorded its item, so the attempt is retried.
+                recorded its item, so the attempt is retried. A write the tracker refused
+                releases the key's claim, so the rule may file by it again at once.
         """
         binding = self._bound()
         key = key or self._derive("item", canonical(draft.model_dump(mode="json")))
@@ -222,9 +233,9 @@ class TrackerActions:
         tracked = await self._ledger.tracked(self._key, "comment", key)
         if tracked is not None and tracked.ref is not None:
             return CommentRef.model_validate(tracked.ref)
-        await self._claim("comment", key)
-        ref = await self._call(lambda tracker: tracker.comment(item, key, body))
-        kept = await self._ledger.record_tracked(self._key, "comment", key, _json(ref))
+        async with self._claimed("comment", key):
+            ref = await self._call(lambda tracker: tracker.comment(item, key, body))
+            kept = await self._ledger.record_tracked(self._key, "comment", key, _json(ref))
         return CommentRef.model_validate(kept or _json(ref))
 
     async def set_state(self, item: ItemRef, state: State) -> None:
@@ -263,7 +274,9 @@ class TrackerActions:
         change = ItemFields.model_validate(changed)
         try:
             await self._call(lambda tracker: tracker.update(item, change))
-        except TrackerRefused:
+        except RunFailure as failure:
+            if failure.reason == UNAVAILABLE:
+                raise
             # The change never landed: what relayr set before it is what it last set.
             await self._ledger.forget_written(self._key, key, set(changed) - set(before))
             await self._ledger.record_written(
@@ -304,11 +317,16 @@ class TrackerActions:
             raise NotAllowed(f"workspace {self._key.workspace_id} has no tracker project")
         return self._binding
 
-    async def _claim(self, kind: TrackedKind, key: str) -> None:
-        """Claim a key before writing by it.
+    @asynccontextmanager
+    async def _claimed(self, kind: TrackedKind, key: str) -> AsyncGenerator[None]:
+        """Claim a key for the writes made within, which end well inside the claim.
+
+        A write the tracker certainly didn't take releases the claim, so the run may write by the
+        key again at once; one that may have landed keeps it, for its 30 s.
 
         Raises:
-            RunFailure: If another attempt holds a fresh claim, so this one is retried.
+            RunFailure: If another attempt holds a fresh claim, so this one is retried; or if the
+                writes took longer than `WRITING`, as `tracker_unavailable`.
         """
         run = self._reaction.run
         claimed = await self._ledger.claim_tracked(
@@ -318,10 +336,22 @@ class TrackerActions:
             raise RunFailure(
                 f"{kind} {key} is being written by another attempt", reason="tracker_claimed"
             )
+        try:
+            async with asyncio.timeout(WRITING.total_seconds()):
+                yield
+        except TimeoutError as error:
+            raise RunFailure(f"writing {kind} {key} took too long", reason=UNAVAILABLE) from error
+        except RunFailure as failure:
+            if failure.reason != UNAVAILABLE:
+                await self._ledger.release_tracked(self._key, kind, key)
+            raise
 
     async def _file(self, binding: TrackerBinding, key: ItemKey, draft: ItemDraft) -> ItemRef:
-        """Claim a key, then find the item it filed, or create one, and record it."""
-        await self._claim("item", key)
+        """Claim a key, then find the item it filed, or create one, and record it.
+
+        An item found was filed by an attempt that stopped before it recorded it, perhaps before
+        it labelled it, as Vikunja labels after it creates; its labels are made the draft's.
+        """
         filed = ItemDraft(
             title=draft.title,
             description=draft.description,
@@ -330,11 +360,14 @@ class TrackerActions:
             labels=tuple(dict.fromkeys((*binding.labels, *draft.labels))),
         )
         project = binding.project
-        ref = await self._call(lambda tracker: tracker.find(project, key))
-        if ref is None:
-            ref = await self._call(lambda tracker: tracker.create(project, key, filed))
-        kept = await self._ledger.record_tracked(self._key, "item", key, _json(ref))
-        return ItemRef.model_validate(kept or _json(ref))
+        async with self._claimed("item", key):
+            found = await self._call(lambda tracker: tracker.find(project, key))
+            ref = found or await self._call(lambda tracker: tracker.create(project, key, filed))
+            kept = await self._ledger.record_tracked(self._key, "item", key, _json(ref))
+        item = ItemRef.model_validate(kept or _json(ref))
+        if found is not None:
+            await self.update(item, ItemFields(labels=filed.labels))
+        return item
 
     async def _call[T](self, request: Callable[[Tracker], Awaitable[T]]) -> T:
         """Make a request, its errors as a run's failures.
@@ -351,7 +384,7 @@ class TrackerActions:
             except RateLimited as error:
                 raise RunFailure(str(error), reason="tracker_rate_limited") from error
             except Unavailable as error:
-                raise RunFailure(str(error), reason="tracker_unavailable") from error
+                raise RunFailure(str(error), reason=UNAVAILABLE) from error
             except (Refused, NotFound) as error:
                 raise TrackerRefused(error) from error
         raise RunFailure(

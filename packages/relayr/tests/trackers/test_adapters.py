@@ -3,6 +3,7 @@
 import json
 import re
 from collections.abc import Callable
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import httpx
@@ -11,10 +12,16 @@ import pytest
 from relayr.plane import PlaneTracker, plane
 from relayr.plane import tracker as plane_tracker
 from relayr.trackers import (
+    CommentRef,
+    Cursor,
+    FakeTracker,
     ItemDraft,
+    ItemFields,
+    ItemRef,
     NotFound,
     RateLimited,
     Refused,
+    Tracker,
     TrackerError,
     Unauthorized,
     Unavailable,
@@ -226,3 +233,89 @@ def test_each_adapter_connects_through_one_shared_client() -> None:
     http = client(answer(500))
     for connect, adapter in ((plane(http), PlaneTracker), (vikunja(http), VikunjaTracker)):
         assert isinstance(connect(credentials("https://t.test"), SOURCE), adapter)
+
+
+# ─── what the review found ────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize("header", ["X-Plane-Signature", "X-Vikunja-Signature", "x-fake-signature"])
+def test_a_signature_of_any_text_is_only_a_mismatch(header: str) -> None:
+    trackers: list[Tracker] = [
+        PlaneTracker(credentials(PlaneApi.URL), SOURCE, client=client(answer(500))),
+        VikunjaTracker(credentials("https://v.test"), SOURCE, client=client(answer(500))),
+        FakeTracker().connect(credentials("https://f.test"), SOURCE),
+    ]
+    for tracker in trackers:
+        assert tracker.nudge({header: "é" * 64}, b"{}") is None
+
+
+def test_the_fakes_nudge_reads_its_header_in_any_case_and_its_body_or_nothing() -> None:
+    fake = FakeTracker().connect(credentials("https://f.test"), SOURCE)
+    assert fake.nudge(*signed(b"not json", "X-Fake-Signature")) is None
+    nudge = fake.nudge(*signed(b'{"project": "ops"}', "X-Fake-Signature"))
+    assert nudge is not None
+    assert nudge.project == "ops"
+
+
+async def test_plane_reads_a_state_or_label_made_since_it_looked() -> None:
+    api = PlaneApi(secret=PLANE_SECRET)
+    tracker = planes(api)
+    ref = await tracker.create(api.project, "k", ItemDraft(title="t", labels=("a",)))
+    api.issues[ref.id]["labels"].append(api.label("made-in-the-web-app"))
+    item = await tracker.item(ref)
+    assert item is not None
+    assert item.labels == ("a", "made-in-the-web-app")
+
+
+async def test_plane_reads_its_states_again_after_one_is_refused() -> None:
+    api = PlaneApi(secret=PLANE_SECRET)
+    tracker = planes(api)
+    ref = await tracker.create(api.project, "k", ItemDraft(title="t", state="todo"))
+    started = next(state for state in api.states if state["group"] == "started")
+    started["id"] = "replaced"  # an admin deleted the state, and made another
+    with pytest.raises(Refused, match="valid state"):
+        await tracker.update(ref, ItemFields(state="started"))
+    await tracker.update(ref, ItemFields(state="started"))
+    item = await tracker.item(ref)
+    assert item is not None
+    assert item.state == "started"
+
+
+async def test_vikunja_asks_from_the_second_before_its_cursor_in_utc() -> None:
+    asked: list[httpx.Request] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        asked.append(request)
+        return httpx.Response(200, json=[])
+
+    tracker = VikunjaTracker(credentials("https://v.test/"), SOURCE, client=client(handle))
+    at = datetime(2026, 10, 17, 20, 29, 26, 500000, tzinfo=timezone(timedelta(hours=2)))
+    page = await tracker.items("2", Cursor(updated_at=at, id="9"))
+    assert (page.items, page.next) == ((), Cursor(updated_at=at, id="9"))
+    [request] = asked
+    assert request.url.path == "/api/v1/tasks", "a base URL's trailing slash is dropped"
+    assert request.url.params["filter"] == "project = 2 && updated > 2026-10-17T18:29:25Z"
+
+
+def comment(comment_id: int, body: str) -> dict[str, Any]:
+    return {"id": comment_id, "comment": body, "author": None, "created": "2026-10-17T18:29:26Z"}
+
+
+async def test_vikunja_reads_only_its_own_marker_at_the_end() -> None:
+    theirs = f"<p>lattice-key: {SOURCE}/other</p>"
+    body = f"<p>Pasted:</p>{theirs}<p>More.</p><p>lattice-key: {SOURCE}/mine</p>"
+    pages = [comment(1, body), comment(2, theirs + "<p>after</p>")]
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=pages)
+
+    tracker = vikunjas(handle)
+    ref = ItemRef(project="2", id="1", number=1, name="OPS-1")
+    found = await tracker.comments(ref, None)
+    assert [(c.key, c.body) for c in found] == [
+        ("mine", f"<p>Pasted:</p>{theirs}<p>More.</p>"),
+        (None, theirs + "<p>after</p>"),
+    ]
+    gone = CommentRef(item="1", id="99")
+    assert await tracker.comments(ref, gone) == found, "after a comment gone: all of them"
+    assert await tracker.comments(ref, found[0].ref) == found[1:]

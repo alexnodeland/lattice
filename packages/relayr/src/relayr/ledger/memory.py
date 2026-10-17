@@ -146,8 +146,15 @@ class InMemoryLedger:
         found = self._tracked.get((workspace, kind, key))
         if found is None:
             return None
-        found.ref = found.ref or ref
+        if found.ref is None:
+            found.ref = ref
         return found.ref
+
+    async def release_tracked(self, workspace: WorkspaceKey, kind: TrackedKind, key: str) -> None:
+        """Release a key's claim that recorded nothing, after a write that certainly didn't land."""
+        found = self._tracked.get((workspace, kind, key))
+        if found is not None and found.ref is None:
+            del self._tracked[workspace, kind, key]
 
     async def mark_tracked_deleted(self, workspace: WorkspaceKey, key: str) -> None:
         """Mark an item's key deleted, so it files nothing again."""

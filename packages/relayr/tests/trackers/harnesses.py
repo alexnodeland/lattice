@@ -80,7 +80,7 @@ def signed(body: bytes, header: str) -> Delivery:
 @asynccontextmanager
 async def fake() -> AsyncIterator[Harness]:
     clock = FakeClock()
-    tracker = FakeTracker(clock=clock)
+    tracker = FakeTracker(dedupes=True, clock=clock)
 
     async def tick() -> None:
         clock.advance(timedelta(seconds=1))
@@ -230,11 +230,11 @@ _TOKEN: dict[str, Any] = {
     "expires_at": "2099-01-01T00:00:00Z",
     "permissions": {
         "tasks": ["create", "read_one", "read_all", "update", "delete"],
-        "projects": ["create", "read_one"],
+        "projects": ["create"],
         "tasks_comments": ["create", "read_all"],
         "labels": ["create", "read_all"],
         "tasks_labels": ["create", "delete"],
     },
 }
-"""The scopes relayr's token needs, and `delete` on tasks and `create` on projects for the test
-to act as a person."""
+"""The scopes relayr's token needs (the tracker guide lists them), and `delete` on tasks and
+`create` on projects for the test to act as a person."""

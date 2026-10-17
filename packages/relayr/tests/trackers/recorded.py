@@ -4,7 +4,8 @@ A live run (`RELAYR_TEST_VIKUNJA_URL` set) records each request and response its
 through `Recorder`; with `RELAYR_RECORD=1` too, the recording replaces the test's fixture. A run
 without a tracker replays the fixture through `Replayer`, which fails on any request the
 recording doesn't have next, so the adapter's requests are pinned to what the tracker answered.
-Keys and secrets never reach a recording: only paths, queries and JSON bodies are kept.
+Keys and secrets never reach a recording: only paths, queries and JSON bodies are kept. A test
+that makes no request, such as the nudge's, records none, and replays its empty recording.
 """
 
 import json

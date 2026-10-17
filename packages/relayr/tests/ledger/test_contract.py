@@ -147,6 +147,19 @@ async def test_a_recorded_key_is_never_claimed_again(ledger: Ledger, clock: Fake
     assert await ledger.tracked(PROD, "comment", "k") is None
 
 
+async def test_a_released_claim_is_free_and_a_recorded_key_is_not_released(
+    ledger: Ledger,
+) -> None:
+    await ledger.claim_tracked(PROD, "item", "k", "evt_1", stale_after=STALE)
+    await ledger.release_tracked(PROD, "item", "k")
+    assert await ledger.tracked(PROD, "item", "k") is None
+    assert await ledger.claim_tracked(PROD, "item", "k", "evt_2", stale_after=STALE)
+    await ledger.record_tracked(PROD, "item", "k", REF)
+    await ledger.release_tracked(PROD, "item", "k")
+    await ledger.release_tracked(PROD, "comment", "k")
+    assert await ledger.tracked(PROD, "item", "k") == Tracked(correlation_id="evt_2", ref=REF)
+
+
 async def test_a_key_never_claimed_records_nothing(ledger: Ledger) -> None:
     assert await ledger.record_tracked(PROD, "item", "k", REF) is None
     await ledger.mark_tracked_deleted(PROD, "k")

@@ -98,7 +98,7 @@ graph LR
     vikunja --> V["Vikunja"]
 ```
 
-- **Once, by key.** Every write is made by a key, the rule's own or derived from the run as `Outbound` derives ids. `ensure_item` claims the key in the ledger, asks the tracker for the item it filed, and only then creates one, then records it; a claim 30 s old with no record is taken again, so a run killed between the create and the record makes one item. Comments are claimed the same way.
+- **Once, by key.** Every write is made by a key, the rule's own or derived from the run as `Outbound` derives ids. `ensure_item` claims the key in the ledger, asks the tracker for the item it filed, and only then creates one, then records it; a claim 30 s old with no record is taken again, so a run killed between the create and the record makes one item. A claim's writes take 20 s at most, and one the tracker refused releases it. Comments are claimed the same way.
 - **What the tracker keeps.** Plane gets each key as `external_id`, with `external_source` `lattice:<tenant>/<workspace>`, and answers a second create with the first item; Vikunja gets a marker at the end of what lattice writes, which `find` searches for and matches whole.
 - **A deleted item stays deleted.** An item filed before is read before it is returned; a deleted one marks its key, which then files nothing. An archived one is returned: Plane's adapter reads an item lattice filed by its external ids, which find it archived.
 - **Keyed edits.** `update` sends only the fields that differ, recording their values on the item's key first; a refused change puts back what was recorded before it.

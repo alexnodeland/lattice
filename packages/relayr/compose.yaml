@@ -54,7 +54,8 @@ services:
     ports:
       - "127.0.0.1:${RELAYR_VIKUNJA_PORT:-54333}:3456"
     healthcheck:
+      # Each check runs Vikunja's migrations first, so it checks every 10 s, not every 2.
       test: ["CMD", "/app/vikunja/vikunja", "healthcheck"]
-      interval: 2s
+      interval: 10s
       timeout: 10s
       retries: 30

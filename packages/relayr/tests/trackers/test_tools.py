@@ -117,3 +117,21 @@ async def test_an_agent_whose_rule_may_not_write_is_told(
         "retry: ops:file may not write to its tracker\n\nFix the errors and try again."
     ]
     assert tracker.created == 0
+
+
+async def test_an_agent_refused_may_file_by_the_same_key_again(
+    runs: Runs, tracker: FakeTracker
+) -> None:
+    model, returned = script(
+        [
+            refused(tracker, "file_item", key="incident/7", title="Payments down"),
+            call("file_item", key="incident/7", title="Payments down"),
+        ]
+    )
+    capability = TrackerCapability(runs.trackers)
+    agent = Agent(model, deps_type=r.Reaction[None], capabilities=[capability], retries=5)
+    await agent.run("A deploy failed.", deps=await runs.reaction())
+    assert returned == [
+        "retry: invalid\n\nFix the errors and try again.",
+        "Filed as OPS-1: https://tracker.test/ops/1",
+    ]

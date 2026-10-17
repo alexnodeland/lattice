@@ -94,6 +94,9 @@ class Forgetful:
     ) -> dict[str, JsonValue] | None:
         return await self._ledger.record_tracked(workspace, kind, key, ref)
 
+    async def release_tracked(self, workspace: WorkspaceKey, kind: TrackedKind, key: str) -> None:
+        await self._ledger.release_tracked(workspace, kind, key)
+
     async def mark_tracked_deleted(self, workspace: WorkspaceKey, key: str) -> None:
         await self._ledger.mark_tracked_deleted(workspace, key)
 

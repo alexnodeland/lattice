@@ -3,6 +3,7 @@
 Every test runs on every ledger, so the claims hold on memory, SQLite and PostgreSQL alike.
 """
 
+import asyncio
 from datetime import timedelta
 
 import pytest
@@ -14,6 +15,7 @@ from relayr.trackers import (
     CLAIM_TTL,
     CREDENTIALS_TTL,
     Deleted,
+    FakeConnection,
     FakeTracker,
     ItemDraft,
     ItemFields,
@@ -26,6 +28,7 @@ from relayr.trackers import (
     TrackerRefused,
     Unauthorized,
     Unavailable,
+    actions,
 )
 from tests.clock import FakeClock
 from tests.trackers.conftest import (
@@ -297,3 +300,70 @@ async def test_a_link_is_the_trackers(runs: Runs) -> None:
     acting = runs.trackers.acting(await runs.reaction())
     item = await filed(acting)
     assert await acting.link(item) == "https://tracker.test/ops/1"
+
+
+# ─── what a refused write leaves ──────────────────────────────────────────────
+
+
+async def test_a_refused_write_releases_its_claim_for_the_run_to_try_again(
+    runs: Runs, tracker: FakeTracker
+) -> None:
+    acting = runs.trackers.acting(await runs.reaction())
+    tracker.fail(None, Refused("no such label"))
+    with pytest.raises(TrackerRefused):
+        await acting.ensure_item(DRAFT, key=KEYED)
+    item = await filed(acting)
+    tracker.fail(RateLimited(5))
+    with pytest.raises(RunFailure, match="rate limited"):
+        await acting.comment(item, "<p>Once.</p>", key="note")
+    assert (await acting.comment(item, "<p>Once.</p>", key="note")).item == item.id
+    assert tracker.created == 1
+
+
+async def test_an_item_found_after_a_lost_answer_gets_the_drafts_labels(
+    runs: Runs, tracker: FakeTracker, clock: FakeClock
+) -> None:
+    reaction = await runs.reaction()
+    tracker.lose_next_created()
+    with pytest.raises(RunFailure):
+        await runs.trackers.acting(reaction).ensure_item(DRAFT, key=KEYED)
+    [lost] = tracker.items_in(PROJECT)
+    tracker.edit(lost.ref, ItemFields(labels=()))  # as Vikunja's, labelled after it is made
+    clock.advance(CLAIM_TTL)
+    item = await filed(runs.trackers.acting(await runs.reaction(attempt(reaction))))
+    found = await runs.trackers.acting(reaction).read(item)
+    assert found is not None
+    assert found.labels == ("lattice", "run-failed")
+
+
+async def test_writes_that_take_too_long_keep_their_claim(
+    runs: Runs, ledger: Ledger, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(actions, "WRITING", timedelta(milliseconds=10))
+    find = FakeConnection.find
+
+    async def slow(self: FakeConnection, project: str, key: str) -> ItemRef | None:
+        await asyncio.sleep(1)
+        return await find(self, project, key)
+
+    monkeypatch.setattr(FakeConnection, "find", slow)
+    with pytest.raises(RunFailure) as late:
+        await runs.trackers.acting(await runs.reaction()).ensure_item(DRAFT, key=KEYED)
+    assert late.value.reason == "tracker_unavailable"
+    assert await ledger.tracked(KEY, "item", KEYED) is not None, "it may have landed: held"
+
+
+async def test_an_edit_that_may_have_landed_keeps_its_record(
+    runs: Runs, tracker: FakeTracker, ledger: Ledger
+) -> None:
+    acting = runs.trackers.acting(await runs.reaction())
+    item = await filed(acting)
+    tracker.fail(None, Unavailable("timed out"))
+    with pytest.raises(RunFailure):
+        await acting.set_state(item, "done")
+    tracker.fail(None, RateLimited(1))
+    with pytest.raises(RunFailure):
+        await acting.update(item, ItemFields(title="later"))
+    tracked = await ledger.tracked(KEY, "item", KEYED)
+    assert tracked is not None
+    assert tracked.written == {"state": "done"}, "kept when it may have landed, not otherwise"

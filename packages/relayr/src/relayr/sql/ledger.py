@@ -319,6 +319,14 @@ class SqlLedger:
             )
 
     @awaited_to_the_end
+    async def release_tracked(self, workspace: WorkspaceKey, kind: TrackedKind, key: str) -> None:
+        """Release a key's claim that recorded nothing, after a write that certainly didn't land."""
+        async with self._session(workspace.tenant_id) as session, session.begin():
+            await session.execute(
+                delete(TrackedRow).where(_tracked(workspace, kind, key), TrackedRow.ref.is_(None))
+            )
+
+    @awaited_to_the_end
     async def mark_tracked_deleted(self, workspace: WorkspaceKey, key: str) -> None:
         """Mark an item's key deleted, so it files nothing again."""
         async with self._session(workspace.tenant_id) as session, session.begin():

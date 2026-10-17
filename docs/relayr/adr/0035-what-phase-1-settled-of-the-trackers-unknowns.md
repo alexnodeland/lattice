@@ -37,7 +37,7 @@ The RFC was written from both trackers' source, read and not run. Its phase 1 se
 
 ### Still unverified
 
-- **On Plane, everything live,** and in particular what moves a work item's `updated_at` besides a `PATCH` (a new comment, among others), and whether its browse link takes a trailing slash. The nightly live run the RFC plans comes with stackr's Plane recipe.
+- **On Plane, everything live,** and in particular what moves a work item's `updated_at` besides a `PATCH` (a new comment, among others), what a comment on a deleted work item answers (its create doesn't load the item, so perhaps not the 404 the stand-in gives), and whether its browse link takes a trailing slash. The nightly live run the RFC plans comes with stackr's Plane recipe.
 - **On Vikunja,** whether its web editor keeps the marker when a person edits a description, and its bot users.
 - **Plane's activities' shape,** needed only if T1's alternative is chosen.
 

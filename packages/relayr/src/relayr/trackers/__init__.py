@@ -9,7 +9,7 @@ Community edition in `relayr.plane` and Vikunja in `relayr.vikunja`, and one in 
 ```python
 trackers = Trackers(
     ledger,
-    connect=PlaneTracker,
+    connect=plane(http),
     credentials=tenant_credentials,
     bindings={WorkspaceKey("acme", "ops"): TrackerBinding(project=OPS, labels=("lattice",))},
     allowlists={"ops:dead-letters": Allowlist(trackers=True)},
@@ -17,12 +17,14 @@ trackers = Trackers(
 
 
 async def file_dead_letter(reaction: Reaction[Deps]) -> None:
+    event = reaction.events[0].event
+    assert isinstance(event, RunDeadLettered)
     actions = reaction.deps.trackers.acting(reaction)
     item = await actions.ensure_item(
-        ItemDraft(title="A run failed", priority="high"), key=f"dead-letter/{event.run_id}"
+        ItemDraft(title=f"{event.rule} failed", priority="high"), key=f"dead-letter/{event.rule}"
     )
     if not isinstance(item, Deleted):
-        await actions.comment(item, f"Retried {event.attempts} times")
+        await actions.comment(item, f"<p>Retried {event.attempts} times.</p>")
 ```
 
 Every write is made once, by a key the ledger claims before anything is sent.
@@ -31,6 +33,7 @@ Every write is made once, by a key the ledger claims before anything is sent.
 from relayr.trackers.actions import (
     CLAIM_TTL,
     CREDENTIALS_TTL,
+    WRITING,
     Connect,
     Credentials,
     Deleted,
@@ -69,6 +72,7 @@ from relayr.trackers.port import (
 __all__ = [
     "CLAIM_TTL",
     "CREDENTIALS_TTL",
+    "WRITING",
     "Comment",
     "CommentKey",
     "CommentRef",

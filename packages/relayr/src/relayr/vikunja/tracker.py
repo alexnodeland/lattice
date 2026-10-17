@@ -7,11 +7,9 @@ sends it whole. Labels are added and removed one at a time, which moves the task
 setting them in bulk doesn't.
 """
 
-import hashlib
-import hmac
 import re
 from collections.abc import AsyncIterator, Mapping
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from html import escape, unescape
 from typing import Any, Final
 
@@ -38,6 +36,7 @@ from relayr.trackers import (
     TrackerCredentials,
 )
 from relayr.trackers.http import Api
+from relayr.trackers.signatures import signed
 
 SIGNATURE: Final = "x-vikunja-signature"
 """The header Vikunja signs a webhook in: HMAC-SHA256, hex, over the bytes it sends."""
@@ -111,14 +110,14 @@ class VikunjaTracker:
     ) -> None:
         self._api = Api(
             client,
-            f"{credentials.base_url}/api/v1",
+            f"{credentials.base_url.rstrip('/')}/api/v1",
             {"Authorization": f"Bearer {credentials.api_key}"},
         )
         self._base_url = credentials.base_url.rstrip("/")
         self._secret = credentials.webhook_secret.encode()
         self._source = source
         self._marked = re.compile(
-            rf"<p>lattice-key: {re.escape(escape(source))}/(?P<key>.*?)</p>\s*\Z", re.DOTALL
+            rf"<p>lattice-key: {re.escape(escape(source))}/(?P<key>[^<]*)</p>\s*\Z"
         )
         self._labels: dict[str, int] = {}
 
@@ -181,15 +180,16 @@ class VikunjaTracker:
         """Return the project's tasks updated after a cursor, by `updated` then id.
 
         Vikunja keeps `updated` to the second, so the filter asks from the second before the
-        cursor's, and what isn't after it is dropped here.
+        cursor's, and what isn't after it is dropped here. Pages are read by id, which a change
+        during the read doesn't reshuffle.
         """
         params: dict[str, Any] = {
             "filter": f"project = {int(project)}",
-            "sort_by": ["updated", "id"],
-            "order_by": ["asc", "asc"],
+            "sort_by": "id",
+            "order_by": "asc",
         }
         if after is not None:
-            since = after.updated_at.replace(microsecond=0) - timedelta(seconds=1)
+            since = after.updated_at.astimezone(UTC).replace(microsecond=0) - timedelta(seconds=1)
             params["filter"] += f" && updated > {since.strftime('%Y-%m-%dT%H:%M:%SZ')}"
         found = [self._item(task) async for task in self._tasks(params)]
         found.sort(key=_order)
@@ -213,15 +213,12 @@ class VikunjaTracker:
             )
             for comment in await self._comments(ref)
         ]
-        if after is None:
-            return found
-        return [comment for comment in found if int(comment.ref.id) > int(after.id)]
+        ids = [comment.ref.id for comment in found]
+        return found[ids.index(after.id) + 1 :] if after is not None and after.id in ids else found
 
     def nudge(self, headers: Mapping[str, str], body: bytes) -> Nudge | None:
         """Verify a webhook's signature over its bytes, and return its project."""
-        signed = {name.lower(): value for name, value in headers.items()}.get(SIGNATURE, "")
-        expected = hmac.new(self._secret, body, hashlib.sha256).hexdigest()
-        if not hmac.compare_digest(signed, expected):
+        if not signed(headers, body, self._secret, SIGNATURE):
             return None
         try:
             hook = _Hook.model_validate_json(body)

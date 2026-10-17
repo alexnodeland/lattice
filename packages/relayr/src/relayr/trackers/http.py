@@ -13,8 +13,8 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 from relayr.trackers.port import NotFound, RateLimited, Refused, Unauthorized, Unavailable
 
 TIMEOUT: Final = 10.0
-"""How many seconds a request may take: well inside a claim's 30 s, so a claim taken again never
-overlaps a request still in flight from relayr (lattice RFC-0004)."""
+"""How many seconds each phase of a request may take (connecting, writing, reading); the writes
+under one claim are bounded together, by `relayr.trackers.WRITING`."""
 
 
 class Api:

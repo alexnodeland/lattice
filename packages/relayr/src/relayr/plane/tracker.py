@@ -10,8 +10,6 @@ leave those out.
 Plane answers an invalid key with 403 and a missing one with 401; both are `Unauthorized`.
 """
 
-import hashlib
-import hmac
 from collections.abc import AsyncIterator, Mapping
 from datetime import datetime
 from typing import Any, Final
@@ -39,6 +37,7 @@ from relayr.trackers import (
     TrackerCredentials,
 )
 from relayr.trackers.http import Api
+from relayr.trackers.signatures import signed
 
 SIGNATURE: Final = "x-plane-signature"
 """The header Plane signs a webhook in: HMAC-SHA256, hex, over `json.dumps` of its payload, which
@@ -201,7 +200,14 @@ class PlaneTracker:
             sent["state"] = await self._state(ref.project, fields.state)
         if fields.labels is not None:
             sent["labels"] = [await self._label(ref.project, name) for name in fields.labels]
-        await self._api.request("PATCH", f"/projects/{ref.project}/work-items/{ref.id}/", json=sent)
+        try:
+            await self._api.request(
+                "PATCH", f"/projects/{ref.project}/work-items/{ref.id}/", json=sent
+            )
+        except Refused:
+            # A state or label deleted since they were read: read them again next time.
+            self._forget(ref.project)
+            raise
 
     async def comment(self, ref: ItemRef, key: CommentKey, body: str) -> CommentRef:
         """Post a comment with the key as its external id; a used key returns its comment."""
@@ -218,12 +224,13 @@ class PlaneTracker:
     async def items(self, project: ProjectId, after: Cursor | None) -> Page[Item]:
         """Return the project's listed work items updated after a cursor, by `updated_at` then id.
 
-        Plane CE filters nothing by time, so every page of the list is read, 1000 at a time.
+        Plane CE filters nothing by time, so every page of the list is read, 1000 at a time, in
+        the order items were made, which a change during the read doesn't reshuffle.
         """
         issues = [
             _Issue.model_validate(issue)
             async for issue in self._listed(
-                f"/projects/{project}/work-items/", {"order_by": "updated_at"}
+                f"/projects/{project}/work-items/", {"order_by": "created_at"}
             )
         ]
         found = sorted([await self._item(issue) for issue in issues], key=_order)
@@ -259,9 +266,7 @@ class PlaneTracker:
 
     def nudge(self, headers: Mapping[str, str], body: bytes) -> Nudge | None:
         """Verify a webhook's signature over its bytes and its workspace, and return its project."""
-        signed = {name.lower(): value for name, value in headers.items()}.get(SIGNATURE, "")
-        expected = hmac.new(self._secret, body, hashlib.sha256).hexdigest()
-        if not hmac.compare_digest(signed, expected):
+        if not signed(headers, body, self._secret, SIGNATURE):
             return None
         try:
             hook = _Hook.model_validate_json(body)
@@ -320,9 +325,19 @@ class PlaneTracker:
             key=self._own(issue.external_id, issue.external_source),
         )
 
+    def _forget(self, project: ProjectId) -> None:
+        """Forget a project's states and labels, to read them again."""
+        self._states.pop(project, None)
+        self._labels.pop(project, None)
+
     async def _item(self, issue: _Issue) -> Item:
         states = {state.id: state.group for state in await self._project_states(issue.project)}
         labels = await self._project_labels(issue.project)
+        if issue.state not in states or not set(issue.labels) <= set(labels.values()):
+            # A state or label made since they were read: read them again.
+            self._forget(issue.project)
+            states = {s.id: s.group for s in await self._project_states(issue.project)}
+            labels = await self._project_labels(issue.project)
         names = {label_id: name for name, label_id in labels.items()}
         return Item(
             ref=await self._ref(issue),

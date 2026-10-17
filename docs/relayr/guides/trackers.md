@@ -9,6 +9,7 @@ Install the extra for your tracker, `relayr-ai[plane]` or `relayr-ai[vikunja]`. 
 ```python
 import httpx
 
+from relayr.ledger import WorkspaceKey
 from relayr.outbound import Allowlist
 from relayr.plane import plane
 from relayr.trackers import TrackerBinding, TrackerCredentials, Trackers
@@ -68,7 +69,7 @@ async def file_dead_letter(reaction: Reaction[Deps]) -> None:
 | `filed(key)` | The item a key filed, if it is still there |
 | `link(item)` | The item's address in the tracker's web app |
 
-States are `backlog`, `todo`, `started`, `done` and `cancelled`; priorities `none`, `low`, `medium`, `high` and `urgent`. Descriptions and comments are HTML, as both trackers keep them.
+States are `backlog`, `todo`, `started`, `done` and `cancelled`; priorities `none`, `low`, `medium`, `high` and `urgent`. Descriptions and comments are HTML, as both trackers keep them. Vikunja has only a `done` flag: `done` and `cancelled` set it, the others clear it, and it reads back as `done` or `todo`.
 
 ## From an agent
 
@@ -90,7 +91,7 @@ Its tools are `file_item`, `comment_on_item`, `set_item_state` and `read_item`. 
 Neither tracker deduplicates a retried request, so relayr does.
 
 - **A key per write.** An item is filed by the key the rule gives, or one derived from the run and the draft, as `Outbound` derives its ids. A key of the rule's own, such as `dead-letter/<rule>`, files later runs into the same item; a derived one gives each run its own.
-- **The claim comes first.** `ensure_item` claims its key in the ledger, then asks the tracker for an item the key filed, and only then creates one. A claim older than 30 seconds that never recorded an item is taken again, with another look first, so a run killed between creating the item and recording it makes one item. Every request takes 10 seconds at most.
+- **The claim comes first.** `ensure_item` claims its key in the ledger, then asks the tracker for an item the key filed, and only then creates one. A claim older than 30 seconds that never recorded an item is taken again, with another look first, so a run killed between creating the item and recording it makes one item; an item found that way is given the draft's labels, which Vikunja adds after it makes the task. The writes under a claim take 20 seconds at most, all told. A write the tracker refused releases the claim, so the run can write by the key again at once.
 - **What the tracker keeps.** Plane gets the key as `external_id`, and `lattice:<tenant>/<workspace>` as `external_source`, on every item, comment and label, and answers a second create with the first item. Vikunja has no external ids, so what lattice writes ends with a line, `lattice-key: lattice:<tenant>/<workspace>/<key>`, which people see.
 - **A deleted item stays deleted.** An item filed before is read before it is returned. If a person deleted it, the key is marked, and `ensure_item` returns `Deleted` from then on, without asking the tracker; use a new key to file a new item. A closed or archived item is returned, for the rule to reopen if it will.
 - **Edits are keyed.** `update` reads the item and sends only the fields that differ. The values it sets are recorded on the item's key first, for the reading side of phase 2 to tell relayr's changes from people's.
@@ -106,6 +107,7 @@ A rule writes to its tracker only if its allowlist says `trackers=True` ([ADR-00
 | Is unavailable, or times out | Fails with `tracker_unavailable`, and is retried on reflexr's backoff |
 | Is rate-limited (429) | Fails with `tracker_rate_limited`, and is retried: an attempt never sleeps |
 | Holds a fresh claim on the key from another attempt | Fails with `tracker_claimed`, and is retried |
+| Takes longer than 20 seconds over one claim's writes | Fails with `tracker_unavailable`, and is retried; the claim holds its 30 seconds |
 | Refuses a write as invalid, or about something missing | `TrackerRefused`: an agent's model may do otherwise; a function action's attempt is retried |
 | Refuses the tenant's key, after asking for the credentials again | Fails the run for good, with `tracker_unauthorized` |
 
@@ -113,7 +115,7 @@ reflexr's retries are the outbox: nothing is queued in relayr, and a tracker tha
 
 ## Running the tracker
 
-The tracker's API key is the tenant's own user's, a member of the tenant's workspace and its bound projects only. Plane CE makes workspaces, users and keys only in its web app, so an operator makes them by hand; Vikunja's are scriptable. Vikunja's token needs these scopes: `tasks` (`create`, `read_one`, `read_all`, `update`), `projects` (`read_one`), `tasks_comments` (`create`, `read_all`), `labels` (`create`, `read_all`) and `tasks_labels` (`create`, `delete`); its tokens must expire.
+The tracker's API key is the tenant's own user's, a member of the tenant's workspace and its bound projects only. Plane CE makes workspaces, users and keys only in its web app, so an operator makes them by hand; Vikunja's are scriptable. Vikunja's token needs these scopes: `tasks` (`create`, `read_one`, `read_all`, `update`), `tasks_comments` (`create`, `read_all`), `labels` (`create`, `read_all`) and `tasks_labels` (`create`, `delete`); its tokens must expire.
 
 stackr's recipes for both trackers, the provisioning checklist and `make tracker-check`, and the template's `tracker` question, are RFC-0004's phase 1 too, and come in a later pull request.
 

@@ -20,7 +20,7 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0012](0012-acceptance-against-a-two-tenant-stack.md) | Acceptance against a two-tenant stack | Accepted |
 | [0013](0013-the-apps-scenarios-against-the-test-application.md) | The app's scenarios, against the test application with Supabase Auth | Accepted |
 | [0014](0014-the-apps-shell.md) | The app's shell: English strings, a committed route tree, and Supabase Auth's client | Accepted |
-| [0015](0015-the-chat-components-and-streamdown.md) | The chat's components, and Markdown through Streamdown | Accepted |
+| [0015](0015-the-chat-components-and-streamdown.md) | The chat's components, and Markdown through Streamdown | Accepted, amended by 0043 |
 | [0016](0016-the-threads-area.md) | The Threads area: a workspace's stream, and a scripted agent to chat with | Accepted |
 | [0017](0017-the-artifacts-and-proposals-areas.md) | The Artifacts and Proposals areas: renderers by kind, and diffs by revision | Accepted |
 | [0018](0018-the-runs-area-and-feedback.md) | The Runs area, feedback on runs, and what a person may do | Accepted |
@@ -47,5 +47,7 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0039](0039-elevation-status-colour-states-and-density.md) | Elevation, status colours, alerts and placeholders, and admin's compact density | Accepted |
 | [0040](0040-scenarios-against-a-generated-application-and-size-budgets.md) | Scenarios against a generated application, and size budgets | Accepted |
 | [0041](0041-first-party-webassembly-in-the-apps-policy.md) | First-party WebAssembly in the app's policy | Accepted |
+| [0042](0042-mermaid-cant-draw-under-the-policy.md) | Mermaid can't draw in the page under the policy, so it is parked | Accepted |
+| [0043](0043-markdowns-basics.md) | Markdown's basics: code blocks, callouts, footnotes per message, copying, an add-ons seam, and tests under the policy | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

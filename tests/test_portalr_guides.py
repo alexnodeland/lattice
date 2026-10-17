@@ -215,15 +215,15 @@ def test_colour_blind_mode_is_a_setting_of_the_browser_in_the_account_menu() -> 
     ui = WEB / "ui"
     assert "[data-cvd] {" in (ui / "src" / "tokens.css").read_text()
     hook = (ui / "src" / "colour-blind.ts").read_text()
-    assert 'const KEY = "portalr-colour-blind"' in hook
+    assert 'key: "portalr-colour-blind"' in hook
     assert "dataset.cvd" in hook
-    assert "localStorage" in hook
+    assert "localStorage" in (ui / "src" / "stored-setting.ts").read_text()
     assert "portalr-colour-blind" in (ui / "public" / "scheme.js").read_text()
     menu = (ui / "src" / "account-menu.tsx").read_text()
-    assert "Colour-blind mode" in menu
+    assert "Colour-blind friendly charts" in menu
     assert "Menu.CheckboxItem" in menu
     for guide in ("guides/admin.md", "guides/app.md"):
-        assert "**Colour-blind mode** is a switch in the account menu" in text(guide), guide
+        assert "**Colour-blind friendly charts** is a switch in the account menu" in text(guide), guide
         assert "setting of this browser" in text(guide), guide
         assert "local storage" in text(guide), guide
         assert "control for colour-blind mode" not in text(guide), guide

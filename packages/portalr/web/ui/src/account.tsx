@@ -1,4 +1,4 @@
-/** Who is signed in, as every signed-in screen offers them: their scheme, colour-blind mode, and signing out. */
+/** Who is signed in, as every signed-in screen offers them: their scheme, colour-blind friendly charts, and signing out. */
 
 import type { Signed } from "@portalr/client";
 import { AccountMenu } from "./account-menu";

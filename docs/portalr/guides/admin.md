@@ -58,9 +58,9 @@ A failed or dead-lettered run is edged in red and a retrying one in gold, each w
 
 If reflexr can't be reached, the page says so after ten seconds of connecting (`PATIENCE` in `web/admin/src/runs.ts`), and keeps trying.
 
-## Colour-blind mode
+## Colour-blind friendly charts
 
-**Colour-blind mode** is a switch in the account menu, under **Colour**, in this UI and in the app. It is a setting of this browser: it is kept in the browser's local storage as the scheme is, so it is not shared with the person's other browsers or devices, and it is applied before the page first paints, so it never flashes on after the page. With it on, the charts' series take a blue, an orange or yellow and a purple that stay apart to people who see no red, no green or no blue, and every series past the first is hatched, dashed in a line and marked with a shape of its own, so no series relies on its hue ([ADR-0036](../adr/0036-the-chart-theme-and-colour-blind-mode.md)). The status colours are the same in both modes: they hold their contrast to every reader, and each status is a word and a shape too. In a high-contrast mode (forced colours) the patterns are on whatever was chosen.
+**Colour-blind friendly charts** is a switch in the account menu, under **Colour**, in this UI and in the app. It is a setting of this browser: it is kept in the browser's local storage as the scheme is, so it is not shared with the person's other browsers or devices, and it is applied before the page first paints, so it never flashes on after the page. With it on, the charts' series take a blue, an orange or yellow and a purple that stay apart to people who see no red, no green or no blue, and every series past the first is hatched, dashed in a line and marked with a shape of its own, so no series relies on its hue ([ADR-0036](../adr/0036-the-chart-theme-and-colour-blind-mode.md)). The status colours are the same in both modes: they hold their contrast to every reader, and each status is a word and a shape too. In a high-contrast mode (forced colours) the patterns are on whatever was chosen.
 
 ## What is not built
 

@@ -72,15 +72,15 @@ A mark that touches another sets `--chart-hatch: var(--chart-hatched)` of its ow
 - Easier: a chart's colour, marker or pattern changes in `tokens.css` alone, and a colour-blind control needs only to set an attribute.
 - Easier: a series' contrast and separation fail a test in the scheme and the mode that break them.
 - Harder: a chart that wants its own mark must add it to the theme, not to itself.
-- To revisit: the control for `data-cvd`, and the status colours' tokens, in their own changes; `StatCard`, `TraceView` and `RunList`'s figures, with `Num`.
+- Done since: the control for `data-cvd` (the amendment below), the status colours (ADR-0039), and `StatCard`, `TraceView` and `RunList`'s figures on `Num` (ADR-0039).
 
 ## Amendment, 2026-10-16: the control
 
 The control this record deferred is built.
 
-- **A switch in the account menu,** under **Colour**, which both UIs share (`Account`): a checkbox menu item, so its role is `menuitemcheckbox` and its state is announced as checked or not, and it is reached and toggled by the keyboard as the menu's other items are.
-- **A setting of the browser,** kept as the scheme is: `portalr-colour-blind` in `localStorage`, `"on"` or absent, read and written inside `try`, so without storage the choice lasts as long as the page. It is not kept on the server, so it is not shared between a person's browsers.
+- **A switch in the account menu,** under **Colour**, which both UIs share (`Account`), worded "Colour-blind friendly charts" with the hint "Changes chart colours and adds patterns": the status colours are unchanged, so it is not called a mode to a person. It is a checkbox menu item, so its role is `menuitemcheckbox` and its state is announced as checked or not, and it is reached and toggled by the keyboard as the menu's other items are.
+- **A setting of the browser,** kept as the scheme is: `portalr-colour-blind` in `localStorage`, `"on"` or absent, read and written inside `try`, so without storage the choice lasts as long as the page. It is not kept on the server, so it is not shared between a person's browsers. Both settings share one hook, `useStoredSetting`, which also hears a change made in another tab (a `storage` event), so every tab shows the choice and a later change starts from it; the scheme had the same gap, which the shared hook closes.
 - **Applied before the first paint.** `scheme.js`, the script the UIs already load for the scheme, also sets `data-cvd` on the root, so the mode never flashes on after the page. The hook is unchanged: `data-cvd`, with any value, on the root.
-- **Forced colours.** Under `forced-colors: active` every pattern, dash and marker shape is on as in the mode, whether it was chosen or not, since the system's colours replace the author's hues; the palette is then the system's.
-- **Status colours** stay identical in the mode, as decided in ADR-0039: they hold their floors to every reader on their own, and each is a shape and a word.
+- **Forced colours.** Under `forced-colors: active` every pattern, dash and marker shape is on as in the mode, whether it was chosen or not; a test holds the two token sets equal. Chromium forces text and backgrounds but leaves an SVG's fills and strokes as drawn, so a chart keeps its inks there and is told apart by the patterns, which a browser test on a real chart holds. Other engines may force the paints; then the patterns alone tell the series apart, which is why they are on.
+- **Status colours** stay identical in the mode, as ADR-0039 records: they hold their floors to every reader on their own, and each is a shape and a word.
 - The tests hold the palette, wired to `[data-cvd]`, to 3:1 on the paper and the surface and 20 or more apart under each simulated deficiency (existing), the storage and the pre-paint script (new), the menu item's role, state and key (new), forced colours (new), and the screenshots of charts and statuses with the mode on and off.

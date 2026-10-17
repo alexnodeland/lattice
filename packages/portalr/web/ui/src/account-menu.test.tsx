@@ -71,7 +71,7 @@ test("below the rail's width the name is hidden, but not in the drawer", async (
   expect((drawer as HTMLElement).innerText).toContain("alice@portalr.test");
 });
 
-test("colour-blind mode is a switch in the menu: a checkbox item that says whether it is on", async () => {
+test("colour-blind friendly charts are a switch in the menu: a checkbox item that says whether it is on", async () => {
   const onColourBlind = vi.fn();
   const screen = await render(
     <AccountMenu
@@ -84,7 +84,7 @@ test("colour-blind mode is a switch in the menu: a checkbox item that says wheth
     />,
   );
   await screen.getByRole("button", { name: "Account: Alex Nodeland" }).click();
-  const item = screen.getByRole("menuitemcheckbox", { name: "Colour-blind mode" });
+  const item = screen.getByRole("menuitemcheckbox", { name: "Colour-blind friendly charts" });
   await expect.element(item).toHaveAttribute("aria-checked", "false");
   await item.click();
   expect(onColourBlind).toHaveBeenCalledExactlyOnceWith(true);
@@ -103,7 +103,7 @@ test("when it is on, the item says so, and a click turns it off", async () => {
     />,
   );
   await screen.getByRole("button", { name: "Account: Alex Nodeland" }).click();
-  const item = screen.getByRole("menuitemcheckbox", { name: "Colour-blind mode" });
+  const item = screen.getByRole("menuitemcheckbox", { name: "Colour-blind friendly charts" });
   await expect.element(item).toHaveAttribute("aria-checked", "true");
   await item.click();
   expect(onColourBlind).toHaveBeenCalledExactlyOnceWith(false);
@@ -122,9 +122,26 @@ test("the keyboard reaches it and a key toggles it", async () => {
     />,
   );
   await screen.getByRole("button", { name: "Account: Alex Nodeland" }).click();
-  const item = screen.getByRole("menuitemcheckbox", { name: "Colour-blind mode" });
+  const item = screen.getByRole("menuitemcheckbox", { name: "Colour-blind friendly charts" });
   await item.element().focus();
   await expect.element(item).toHaveFocus();
   await userEvent.keyboard(" ");
   expect(onColourBlind).toHaveBeenCalledExactlyOnceWith(true);
+});
+
+test("the switch says what it does, as its description, and its name is the words alone", async () => {
+  const screen = await render(
+    <AccountMenu
+      name="Alex Nodeland"
+      appearance="system"
+      onAppearance={vi.fn()}
+      colourBlind={false}
+      onColourBlind={vi.fn()}
+      onSignOut={vi.fn()}
+    />,
+  );
+  await screen.getByRole("button", { name: "Account: Alex Nodeland" }).click();
+  const item = screen.getByRole("menuitemcheckbox", { name: "Colour-blind friendly charts" });
+  await expect.element(item).toHaveAccessibleName("Colour-blind friendly charts");
+  await expect.element(item).toHaveAccessibleDescription("Changes chart colours and adds patterns");
 });

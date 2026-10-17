@@ -291,3 +291,22 @@ test("under forced colours every pattern is on, as in colour-blind mode, whateve
   expect(Number(read("--chart-hatch"))).toBeGreaterThan(0);
   expect(read("--chart-marker-turn-3")).toBe("45deg");
 });
+
+test("forced colours turn on exactly the patterns colour-blind mode does: the two sets are equal", async () => {
+  onTestFinished(() => commands.forcedColors(false));
+  const patterns = [
+    "--chart-hatch",
+    "--chart-dash-2",
+    "--chart-dash-3",
+    "--chart-marker-size",
+    "--chart-marker-corner-2",
+    "--chart-marker-corner-3",
+    "--chart-marker-turn-3",
+  ];
+  const read = (within: Element) =>
+    patterns.map((name) => getComputedStyle(within).getPropertyValue(name).trim());
+  const mode = read(cvd());
+  expect(mode.every((value) => value !== "")).toBe(true);
+  await commands.forcedColors(true);
+  expect(read(document.body)).toEqual(mode);
+});

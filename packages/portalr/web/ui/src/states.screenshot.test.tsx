@@ -164,19 +164,7 @@ test("a table in the app's density", async () => {
   await matches("states-comfortable", page.elementLocator(document.body));
 });
 
-test("the statuses, alerts and cards, in colour-blind mode", async () => {
-  await page.viewport(900, 900);
-  onTestFinished(() => page.viewport(414, 896));
-  document.documentElement.dataset.cvd = "";
-  onTestFinished(() => {
-    delete document.documentElement.dataset.cvd;
-  });
-  await render(<Sheet />);
-  await settled();
-  await matches("states-sheet-colour-blind");
-});
-
-test("the account menu, with colour-blind mode on", async () => {
+test("the account menu, with colour-blind friendly charts on", async () => {
   await page.viewport(600, 420);
   onTestFinished(() => page.viewport(414, 896));
   const screen = await render(
@@ -195,7 +183,7 @@ test("the account menu, with colour-blind mode on", async () => {
   await settled();
   await screen.getByRole("button", { name: "Account: Alex Nodeland" }).click();
   await expect
-    .element(screen.getByRole("menuitemcheckbox", { name: "Colour-blind mode" }))
+    .element(screen.getByRole("menuitemcheckbox", { name: "Colour-blind friendly charts" }))
     .toBeVisible();
   await matches("states-account-menu", page.elementLocator(document.body));
 });

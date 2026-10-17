@@ -63,7 +63,7 @@ test("without storage the choice lasts as long as the page, and nothing throws",
   await expect.element(screen.getByRole("button", { name: "on" })).toBeVisible();
 });
 
-/** ui's scheme.js, run as a page runs it before its first paint. */
+/** ui's scheme.js, run as a page runs it before its first paint: the repo's own file, from the page's own origin. */
 async function paint() {
   const script = await (await fetch("/scheme.js")).text();
   new Function(script)();
@@ -85,5 +85,28 @@ test("scheme.js without storage leaves the page as it is", async () => {
     vi.restoreAllMocks();
   });
   await expect(paint()).resolves.toBeUndefined();
+  expect(document.documentElement.hasAttribute("data-cvd")).toBe(false);
+});
+
+test("another tab's change is followed: the page and the switch change, and a later change starts from it", async () => {
+  const screen = await render(<Mode />);
+  await expect.element(screen.getByRole("button", { name: "off" })).toBeVisible();
+  localStorage.setItem(KEY, "on");
+  window.dispatchEvent(new StorageEvent("storage", { key: KEY, newValue: "on" }));
+  await expect.element(screen.getByRole("button", { name: "on" })).toBeVisible();
+  expect(document.documentElement.hasAttribute("data-cvd")).toBe(true);
+  // This tab now turns it off, from what the other said, not from what it last knew.
+  await screen.getByRole("button", { name: "on" }).click();
+  expect(document.documentElement.hasAttribute("data-cvd")).toBe(false);
+  expect(localStorage.getItem(KEY)).toBeNull();
+  localStorage.removeItem(KEY);
+  window.dispatchEvent(new StorageEvent("storage", { key: null }));
+  await expect.element(screen.getByRole("button", { name: "off" })).toBeVisible();
+});
+
+test("a change to another key is not this setting's", async () => {
+  const screen = await render(<Mode />);
+  window.dispatchEvent(new StorageEvent("storage", { key: "something-else", newValue: "on" }));
+  await expect.element(screen.getByRole("button", { name: "off" })).toBeVisible();
   expect(document.documentElement.hasAttribute("data-cvd")).toBe(false);
 });

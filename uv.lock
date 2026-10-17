@@ -4424,6 +4424,9 @@ otel = [
     { name = "lattice-core-ai" },
     { name = "opentelemetry-sdk" },
 ]
+plane = [
+    { name = "httpx" },
+]
 postgres = [
     { name = "alembic" },
     { name = "asyncpg" },
@@ -4441,11 +4444,15 @@ sqlite = [
     { name = "lattice-core-ai", extra = ["sql"] },
     { name = "sqlalchemy", extra = ["asyncio"] },
 ]
+vikunja = [
+    { name = "httpx" },
+]
 
 [package.dev-dependencies]
 dev = [
     { name = "aiosqlite" },
     { name = "asyncpg" },
+    { name = "httpx" },
     { name = "hypothesis" },
     { name = "pyright" },
     { name = "pytest" },
@@ -4461,6 +4468,7 @@ lint = [
 test = [
     { name = "aiosqlite" },
     { name = "asyncpg" },
+    { name = "httpx" },
     { name = "hypothesis" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -4477,6 +4485,8 @@ requires-dist = [
     { name = "asyncpg", marker = "extra == 'postgres'", specifier = ">=0.31" },
     { name = "evalr", marker = "extra == 'evals'", editable = "packages/evalr" },
     { name = "evalr", extras = ["langfuse"], marker = "extra == 'langfuse'", editable = "packages/evalr" },
+    { name = "httpx", marker = "extra == 'plane'", specifier = ">=0.28" },
+    { name = "httpx", marker = "extra == 'vikunja'", specifier = ">=0.28" },
     { name = "langfuse", marker = "extra == 'langfuse'", specifier = ">=4.15,<5" },
     { name = "lattice-core-ai", marker = "extra == 'otel'", editable = "packages/lattice-core" },
     { name = "lattice-core-ai", extras = ["sql"], marker = "extra == 'sql'", editable = "packages/lattice-core" },
@@ -4490,12 +4500,13 @@ requires-dist = [
     { name = "relayr-ai", extras = ["sql"], marker = "extra == 'sqlite'" },
     { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'sql'", specifier = ">=2.1" },
 ]
-provides-extras = ["sql", "sqlite", "postgres", "otel", "evals", "langfuse"]
+provides-extras = ["sql", "sqlite", "postgres", "otel", "evals", "plane", "vikunja", "langfuse"]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "aiosqlite", specifier = ">=0.22" },
     { name = "asyncpg", specifier = ">=0.31" },
+    { name = "httpx", specifier = ">=0.28" },
     { name = "hypothesis", specifier = ">=6.168" },
     { name = "pyright", specifier = ">=1.1.414" },
     { name = "pytest", specifier = ">=9.1" },
@@ -4511,6 +4522,7 @@ lint = [
 test = [
     { name = "aiosqlite", specifier = ">=0.22" },
     { name = "asyncpg", specifier = ">=0.31" },
+    { name = "httpx", specifier = ">=0.28" },
     { name = "hypothesis", specifier = ">=6.168" },
     { name = "pytest", specifier = ">=9.1" },
     { name = "pytest-asyncio", specifier = ">=1.4" },

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/alexnodeland/lattice/compare/portalr-v0.1.1...portalr-v0.1.2) (2026-10-17)
+
+
+### Bug Fixes
+
+* four CI tickets: the select's Tab test, a warning for a second configure_telemetry, and the image tasks' compose projects ([#345](https://github.com/alexnodeland/lattice/issues/345)) ([09b0389](https://github.com/alexnodeland/lattice/commit/09b0389283d63744e324f66e0454a6e8f029e653)), closes [#193](https://github.com/alexnodeland/lattice/issues/193)
+
 ## [0.1.1](https://github.com/alexnodeland/lattice/compare/portalr-v0.1.0...portalr-v0.1.1) (2026-10-17)
 
 

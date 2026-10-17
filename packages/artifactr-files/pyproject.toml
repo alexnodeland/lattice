@@ -1,6 +1,6 @@
 [project]
 name = "artifactr-files-ai"
-version = "0.1.0.dev0"
+version = "0.1.0"
 description = "Native files as artifactr artifacts: a manifest over the file's bytes, edits by the file's own application, and one writer at a time."
 readme = "README.md"
 license = "MIT"

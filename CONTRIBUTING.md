@@ -123,7 +123,7 @@ docs(adr): record the documentation tooling decision
 
 Types: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`. Scopes are a package's module or area names, as each package used them before (`core`, `workspace`, `mcp`, `scores`, `template`, ...); the paths a commit touches say which packages it belongs to. Mark breaking changes with `!` (`feat(core)!: ...`) and a `BREAKING CHANGE:` footer. The `Title` check compares each package's public API with its last release, through griffe, and fails on a break the pull request adds that neither the title nor the description marks; `moon run lattice:breaks` shows the same breaks locally ([lattice ADR-0012][lattice-adr-0012]).
 
-Each package's `CHANGELOG.md` is written from these messages by release-please, which keeps a release pull request open with what is pending. Don't edit a `CHANGELOG.md` by hand.
+Each package's `CHANGELOG.md` is written from these messages by release-please, which keeps a release pull request open for each package with what is pending. Don't edit a `CHANGELOG.md` by hand.
 
 ## Dependencies
 

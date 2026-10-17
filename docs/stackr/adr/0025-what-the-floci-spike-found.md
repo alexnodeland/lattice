@@ -1,6 +1,6 @@
 # ADR-0025: What the Floci spike found
 
-**Status:** Accepted
+**Status:** Accepted, amended 2026-10-17 (see the [Amendment](#amendment-2026-10-17-the-manual-apply-comes-after-v01))
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 
@@ -67,3 +67,7 @@ IAM policies, security groups, TLS at the edge, to RDS and to ElastiCache, a cha
 - Easier: tier 2 tests the recipe as production builds it, except for the state host.
 - Harder: security groups, and the state host as built, are checked by hand, at the gate.
 - Revisit: enforcement, task roles and Docker in instances, when Floci makes them work together.
+
+## Amendment (2026-10-17): the manual apply comes after v0.1
+
+[lattice ADR-0023's amendment](../../adr/0023-publishing-to-pypi-from-the-release-workflow.md#amendment-2026-10-16) releases stackr's 0.1.0 without waiting for the manual apply on real AWS, and [RFC-0004's amendment](../rfcs/0004-hosting-recipes.md#amendment-2026-10-17-the-manual-apply-comes-after-v01) records it: the apply is a stated limit of v0.1, not its gate. What this ADR leaves to the apply (the cannot-test list) is still checked there, and only there, after the release. Where it says the apply comes before stackr's v0.1, or calls it a gate, this supersedes it.

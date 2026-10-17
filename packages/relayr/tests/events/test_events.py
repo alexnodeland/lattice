@@ -14,6 +14,7 @@ from relayr.events import (
     ArtifactArchived,
     ArtifactChanged,
     ArtifactCreated,
+    DeferredAnswered,
     FeedbackGiven,
     MessagePosted,
     Projections,
@@ -56,6 +57,7 @@ def test_every_bridged_type_is_in_the_artifactr_namespace() -> None:
         "artifactr:proposal_resolved",
         "artifactr:turn_ended",
         "artifactr:feedback_given",
+        "artifactr:deferred_answered",
     ]
 
 
@@ -177,6 +179,28 @@ DEFAULT_SET = [
         ),
         id="feedback_given",
     ),
+    pytest.param(
+        envelope(
+            a.DeferredAnswered(
+                run_id="run_1",
+                thread_id="thr_1",
+                tool_call_id="call_1",
+                tool_name="ask_user",
+                answer="Monday",
+            ),
+            thread_id="thr_1",
+            run_id="run_1",
+        ),
+        DeferredAnswered(
+            author=ALICE,
+            thread_id="thr_1",
+            turn_id="run_1",
+            tool_call_id="call_1",
+            tool_name="ask_user",
+            answer="Monday",
+        ),
+        id="deferred_answered",
+    ),
 ]
 
 
@@ -197,11 +221,21 @@ def test_a_bridged_event_round_trips_as_reflexr_stores_it(given: a.Envelope, exp
         a.FocusChanged(thread_id="thr_1", artifact_ids=()),
         a.RunStarted(run_id="run_1", thread_id="thr_1"),
         a.ToolCalled(run_id="run_1", thread_id="thr_1", tool_call_id="c", tool_name="t"),
+        a.RunPaused(
+            run_id="run_1",
+            thread_id="thr_1",
+            requests=(a.DeferredRequest(tool_call_id="c", tool_name="ask_user", kind="question"),),
+        ),
         a.AppEvent(name="deploy", data={"service": "api"}),
     ],
 )
 def test_the_default_set_leaves_the_rest_in_artifactr(event: Any) -> None:
     assert Projections().project(envelope(event)) is None
+
+
+def answered(given: a.Envelope) -> Deployed:
+    assert isinstance(given.event, a.DeferredAnswered)
+    return Deployed.model_validate(given.event.answer)
 
 
 def deployed(given: a.Envelope) -> Deployed:
@@ -217,7 +251,11 @@ def timeline(given: a.Envelope) -> TimelineChanged | None:
             return None
 
 
-PROJECTIONS = Projections(app_events={"deploy": deployed}, artifacts={"timeline": timeline})
+PROJECTIONS = Projections(
+    app_events={"deploy": deployed},
+    artifacts={"timeline": timeline},
+    deferred={"ask_deploy": answered},
+)
 
 
 def test_an_app_event_is_bridged_by_its_projection() -> None:
@@ -246,3 +284,19 @@ def test_a_proposal_on_a_projected_kind_is_bridged_as_the_default_sets() -> None
     change = a.CreateArtifact(artifact_id="art_1", kind="timeline", data={})
     proposed = envelope(a.ProposalCreated(proposal_id="prp_1", change=change), actor=AGENT)
     assert isinstance(PROJECTIONS.project(proposed), ProposalCreated)
+
+
+def test_a_deferred_tools_projection_replaces_the_default_set_for_its_answers() -> None:
+    asked = a.DeferredAnswered(
+        run_id="run_1",
+        thread_id="thr_1",
+        tool_call_id="call_1",
+        tool_name="ask_deploy",
+        answer={"service": "api"},
+    )
+    assert PROJECTIONS.project(envelope(asked, run_id="run_1")) == Deployed(service="api")
+    for tool_name in ("ask_user", None):
+        other = asked.model_copy(update={"tool_name": tool_name})
+        bridged = PROJECTIONS.project(envelope(other, run_id="run_1"))
+        assert isinstance(bridged, DeferredAnswered), "another tool's, or an unnamed one's"
+        assert bridged.tool_name == tool_name

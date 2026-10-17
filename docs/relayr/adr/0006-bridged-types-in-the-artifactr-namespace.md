@@ -1,6 +1,6 @@
 # ADR-0006: Bridged types in the `artifactr` namespace
 
-**Status:** Accepted
+**Status:** Accepted, and the amendment below
 **Date:** 2026-09-29
 **Deciders:** Alex Nodeland
 
@@ -33,6 +33,10 @@ reflexr's event registry is process-global. With flat names, its own facts (`run
 
 - Easier: a bridged type can never collide with reflexr's facts or an application's types, and its name is stable from the first release.
 - Harder: in reflexr's registry, the `artifactr` namespace is relayr's, not artifactr's, and reflexr refuses any other base that declares it in the same process.
+
+## Amendment (2026-10-17): a ninth type, `artifactr:deferred_answered`
+
+[lattice RFC-0005](../../rfcs/0005-forms-dashboards-and-mini-apps.md) bridges artifactr's `deferred_answered`, so a rule can react to what a person answered a paused turn, an `ask_form`'s values among them. It is `artifactr:deferred_answered`, under the same base, the ninth type in `BRIDGED`. A paused turn's `run_paused` stays in artifactr: a rule reacts to what a person did, not to a turn waiting. [ADR-0018](0018-bridged-events-their-fields-ids-and-projections.md)'s amendment gives its fields.
 
 [r-adr-0039]: ../../reflexr/adr/0039-namespaced-event-types.md
 [rfc-0002]: ../../stackr/rfcs/0002-the-combined-system.md#d6-bridged-event-names-before-reflexr-45

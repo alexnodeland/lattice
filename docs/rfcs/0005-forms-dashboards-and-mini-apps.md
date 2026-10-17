@@ -54,6 +54,8 @@ graph LR
 
 ### The package
 
+*Amendment (2026-10-17): by the owner's packaging decision, lattice's integrations are not distributions of their own. The package below is `artifactr.ui`, a layer of artifactr installed by its `forms` extra, `artifactr-ai[forms]` ([artifactr ADR-0074](../artifactr/adr/0074-forms-and-dashboards-in-artifactr-ui-behind-the-forms-extra.md)), and its `[relayr]` extra is relayr's `relayr.ui`, behind `relayr-ai[forms]` ([relayr ADR-0033](../relayr/adr/0033-one-event-for-both-ways-of-asking.md)). Where this RFC names `artifactr-ui`, `artifactr-ui-ai` or `artifactr_ui`, including O1, read those; the wire schema is `packages/artifactr/schemas/artifactr_ui.v1.json`.*
+
 `packages/artifactr-ui/` holds the schema subset and its validator, the artifact types, the agent toolset, the checks, and two extras: `[relayr]`, the projections, and later `[mcp]`, the export.
 
 - **A separate distribution,** for RFC-0003's reasons: it is a domain extension with its own types, tools and a hosted origin, and artifactr's dependencies stay as they are for an application that shows no UI. It is not an adapter of an artifactr port, so [artifactr ADR-0034][a-adr-0034]'s extras don't apply.
@@ -295,15 +297,17 @@ Each is a phase 1 or phase 2 exit criterion, settled and recorded in an ADR.
 ## Tracking
 
 - [ ] Sign-off on U1 to U4
-- [ ] artifactr: `Workspaces(checks=...)` and `DeferredAnswered.tool_name`, with an ADR
-- [ ] relayr: `artifactr:deferred_answered` in `BRIDGED`, and projections per deferred tool name
-- [ ] artifactr-ui: the package, schema subset and validator, types, toolset, checks, `[relayr]` extra, committed schema
+- [x] artifactr: `Workspaces(checks=...)` and `DeferredAnswered.tool_name`, with an ADR
+- [x] relayr: `artifactr:deferred_answered` in `BRIDGED`, and projections per deferred tool name
+- [x] artifactr-ui: the package, schema subset and validator, types, toolset, checks, `[relayr]` extra, committed schema
 - [ ] portalr: `SchemaForm`, `TextArea`, `DashboardView`, the renderers and `ask_form` in the chat; `generate.ts`
-- [ ] stackr: the template's `ui` question
-- [ ] Phase 1's unverified items settled, in an ADR
+- [x] stackr: the template's `ui` question
+- [x] Phase 1's unverified items settled, in an ADR
 - [ ] Mini apps: the proxy, `apps.<host>`, `AppFrame`, the bridge, the kill switch
 - [ ] The MCP export
-- [ ] Docs: the package's guide and ADRs, and the architecture
+- [x] Docs: the package's guide and ADRs, and the architecture
+
+*2026-10-17: the items above that name the package are met in `artifactr.ui` and `relayr.ui`, as the amendment under [The package](#the-package) says; its guide, ADRs and architecture are artifactr's and relayr's.*
 
 ## Evidence
 

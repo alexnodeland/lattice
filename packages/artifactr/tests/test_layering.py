@@ -91,6 +91,11 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         {*INNER, "artifactr.langfuse"},
         {"langfuse", "opentelemetry", "lattice_core.langfuse"},
     ),
+    # Forms and dashboards, behind the forms extra (ADR-0074): a plugin nothing else imports.
+    "ui": (
+        {*INNER, "artifactr.ui"},
+        {"pydantic", "pydantic_core", "pydantic_ai", "lattice_core.schema"},
+    ),
     # The evalr adapter: a feedback source, experiment tasks, a TurnEvaluator and measures.
     # Only this layer and the score mirror may import evalr.
     "evals": (

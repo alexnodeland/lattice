@@ -8,6 +8,9 @@ from fastapi.testclient import TestClient
 
 from artifactr import UserActor, Workspaces, new_id
 from artifactr.sql import SqlStorage
+{%- if use_ui %}
+from artifactr.ui import submission_id
+{%- endif %}
 from relayr.ledger import WorkspaceKey
 from relayr.sql import SqlLedger
 
@@ -75,6 +78,38 @@ def test_only_the_bridge_publishes_artifactr_events(client: TestClient) -> None:
     }
     refused = client.post(f"{REFLEXR}/events", json={"event": forged})
     assert (refused.status_code, refused.json()["detail"]["type"]) == (403, "forbidden")
+{%- if use_ui %}
+
+
+def test_a_submission_to_a_form_is_an_event_for_rules(client: TestClient) -> None:
+    poll = {"type": "object", "properties": {"lunch": {"type": "boolean", "title": "Lunch?"}}}
+    form = {"title": "Lunch", "schema": poll}
+    command(client, type="create_artifact", artifact_id="poll", kind="form", data=form)
+    sent = {"form_id": "poll", "version": 1, "values": {"lunch": True}}
+    submission = submission_id("poll")
+    command(client, type="create_artifact", artifact_id=submission, kind="submission", data=sent)
+
+    def submitted() -> list[dict[str, Any]]:
+        found = client.get(f"{REFLEXR}/events", params={"type": "ui:form_submitted"})
+        return [e["event"] for e in found.json()]
+
+    wait_for(submitted)
+    [event] = submitted()
+    assert (event["form_id"], event["version"], event["values"]) == ("poll", 1, {"lunch": True})
+    assert event["author"]["id"] == "alice"
+
+
+def test_only_the_bridge_publishes_form_submissions(client: TestClient) -> None:
+    forged = {
+        "type": "ui:form_submitted",
+        "author": {"kind": "user", "id": "bob", "name": "Bob"},
+        "form_id": "poll",
+        "version": 1,
+        "values": {"lunch": True},
+    }
+    refused = client.post(f"{REFLEXR}/events", json={"event": forged})
+    assert (refused.status_code, refused.json()["detail"]["type"]) == (403, "forbidden")
+{%- endif %}
 
 
 def test_a_restarted_application_follows_the_workspaces_it_knows(

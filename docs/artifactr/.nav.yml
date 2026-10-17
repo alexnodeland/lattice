@@ -16,6 +16,7 @@ nav:
   - Evaluation: guides/evaluation.md
   - The LLM gateway: guides/gateway.md
   - Testing your application: guides/testing.md
+  - Forms and dashboards: guides/forms-and-dashboards.md
 - Reference:
   - reference/index.md
   - artifactr.core: reference/core.md
@@ -30,6 +31,7 @@ nav:
   - artifactr.langfuse: reference/langfuse.md
   - artifactr.litellm: reference/litellm.md
   - artifactr.evals: reference/evals.md
+  - artifactr.ui: reference/ui.md
   - Thread protocol: protocol.md
   - Protocol JSON Schema: reference/schema.md
 - Design:
@@ -109,6 +111,14 @@ nav:
     - adr/0070-a-runner-looks-again-for-what-a-dead-holder-was-asked.md
     - adr/0071-a-lease-on-an-artifact.md
     - adr/0072-native-files-are-manifests-over-json-patch.md
+    - adr/0073-checks-that-refuse-a-command-before-it-commits.md
+    - adr/0074-forms-and-dashboards-in-artifactr-ui-behind-the-forms-extra.md
+    - adr/0075-forms-refused-at-the-boundary-through-the-checks.md
+    - adr/0076-the-form-schema-an-allow-list-compiled-to-pydantic.md
+    - adr/0077-formats-and-sizes-checked-by-artifactrs-own-code.md
+    - adr/0078-the-agents-toolset-for-forms-and-no-apps-yet.md
+    - adr/0079-forms-unverified-items-settled.md
+    - adr/0080-integrations-on-or-off-per-workspace.md
   - RFCs:
     - rfcs/README.md
     - rfcs/0001-v0.1-implementation-plan.md

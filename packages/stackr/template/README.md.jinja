@@ -47,7 +47,7 @@ Every surface needs a Supabase access token: in the `Authorization: Bearer` head
 
 The examples to replace with your own:
 {% if use_artifactr %}
-- **Notes** ([`notes.py`](src/{{ package_name }}/notes.py)): an artifact type, `note`, that people and the agent write together; the agent, with artifactr's tools; and a `rating` people give the agent's turns.
+- **Notes** ([`notes.py`](src/{{ package_name }}/notes.py)): an artifact type, `note`, that people and the agent write together; the agent, with artifactr's tools; and a `rating` people give the agent's turns.{% if use_ui %} With [artifactr's forms](https://lattice.alexnodeland.com/artifactr/guides/forms-and-dashboards/), the agent also asks people forms and shows them dashboards, and what they send is checked before it commits{% if use_relayr %}; an answer to a form, and a submission to one, reach reflexr as `ui:form_submitted`{% endif %}.{% endif %}
 {%- endif %}
 {%- if use_reflexr %}
 - **Tickets** ([`tickets.py`](src/{{ package_name }}/tickets.py)): the events `{{ package_name }}:ticket.opened` and `{{ package_name }}:ticket.triaged`; a rule, `{{ package_name }}:triage`, that runs the triage agent when a ticket is opened; and a `triage-review` people give its runs. reflexr names every event type and rule in a namespace, and the application's is its package's name.

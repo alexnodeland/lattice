@@ -237,6 +237,7 @@ dependencies = [
     { name = "opentelemetry-api" },
     { name = "pydantic" },
     { name = "pydantic-ai-slim" },
+    { name = "pydantic-core" },
 ]
 
 [package.optional-dependencies]
@@ -334,11 +335,12 @@ requires-dist = [
     { name = "opentelemetry-sdk", marker = "extra == 'otel'", specifier = ">=1.45" },
     { name = "pydantic", specifier = ">=2.13" },
     { name = "pydantic-ai-slim", specifier = ">=2.51" },
+    { name = "pydantic-core", specifier = ">=2.46.0" },
     { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'sql'", specifier = ">=2.1" },
     { name = "starlette", marker = "extra == 'fastapi'", specifier = ">=0.46.0" },
     { name = "starlette", marker = "extra == 'mcp'", specifier = ">=0.27" },
 ]
-provides-extras = ["sql", "sqlite", "postgres", "fastapi", "mcp", "otel", "langfuse", "litellm", "evals"]
+provides-extras = ["sql", "sqlite", "postgres", "fastapi", "mcp", "otel", "langfuse", "litellm", "evals", "forms"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -4414,6 +4416,9 @@ dependencies = [
 evals = [
     { name = "evalr" },
 ]
+forms = [
+    { name = "artifactr-ai" },
+]
 langfuse = [
     { name = "artifactr-ai", extra = ["langfuse"] },
     { name = "evalr", extra = ["langfuse"] },
@@ -4471,6 +4476,7 @@ requires-dist = [
     { name = "aiosqlite", marker = "extra == 'sqlite'", specifier = ">=0.22" },
     { name = "alembic", marker = "extra == 'sql'", specifier = ">=1.20" },
     { name = "artifactr-ai", editable = "packages/artifactr" },
+    { name = "artifactr-ai", extras = ["forms"], marker = "extra == 'forms'", editable = "packages/artifactr" },
     { name = "artifactr-ai", extras = ["langfuse"], marker = "extra == 'langfuse'", editable = "packages/artifactr" },
     { name = "asyncpg", marker = "extra == 'postgres'", specifier = ">=0.31" },
     { name = "evalr", marker = "extra == 'evals'", editable = "packages/evalr" },
@@ -4488,7 +4494,7 @@ requires-dist = [
     { name = "relayr-ai", extras = ["sql"], marker = "extra == 'sqlite'" },
     { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'sql'", specifier = ">=2.1" },
 ]
-provides-extras = ["sql", "sqlite", "postgres", "otel", "evals", "langfuse"]
+provides-extras = ["sql", "sqlite", "postgres", "otel", "evals", "forms", "langfuse"]
 
 [package.metadata.requires-dev]
 dev = [

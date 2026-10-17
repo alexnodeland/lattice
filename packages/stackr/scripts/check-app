@@ -12,6 +12,7 @@
 #   TEMPLATE_PYTHON      the application's Python version (default: 3.12)
 #   TEMPLATE_BRIDGE      true or false, for both libraries: relayr's bridge (default: true)
 #   TEMPLATE_PORTAL      true or false, with grantr: portalr's UIs and router (default: true)
+#   TEMPLATE_UI          true or false, with artifactr: artifactr's forms and dashboards, artifactr.ui (default: true)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -23,6 +24,7 @@ uv run copier copy --quiet --defaults --vcs-ref HEAD \
   --data access="${TEMPLATE_ACCESS:-grantr}" \
   --data bridge="${TEMPLATE_BRIDGE:-true}" \
   --data portal="${TEMPLATE_PORTAL:-true}" \
+  --data ui="${TEMPLATE_UI:-true}" \
   --data python_version="${TEMPLATE_PYTHON:-3.12}" \
   --data libraries_path="$(dirname "$PWD")" \
   ../.. "$scratch/app"

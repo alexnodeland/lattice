@@ -5,8 +5,8 @@ Usage: scripts/check-template [--keep DIR]
 
 Renders every variant of the template (artifactr, reflexr or both, with and without evals, with
 grantr or no access control, with portalr, which grantr needs, or without it, both without
-relayr's bridge, and both hosted on a single host) from
-this checkout, working tree included, under the name in NAME, and checks each one:
+relayr's bridge, both without artifactr's forms, and both hosted on a single host) from this
+checkout, working tree included, under the name in NAME, and checks each one:
 
 - every Jinja expression was rendered: nothing is left of `{{ ... }}` or `{% ... %}`, apart
   from GitHub Actions' own `${{ ... }}`
@@ -50,6 +50,7 @@ class Variant(NamedTuple):
     bridge: bool  # whether relayr bridges both libraries
     hosting: str
     portal: bool  # portalr, which only grantr's access can have
+    ui: bool  # artifactr's forms, artifactr.ui, which only artifactr can have
 
     @property
     def name(self) -> str:
@@ -60,18 +61,28 @@ class Variant(NamedTuple):
             f"{'-unbridged' if self.libraries == 'both' and not self.bridge else ''}"
             f"{'' if self.hosting == 'none' else f'-{self.hosting}'}"
             f"{'-noportal' if self.access == 'grantr' and not self.portal else ''}"
+            f"{'-noui' if self.libraries != 'reflexr' and not self.ui else ''}"
         )
 
 
 VARIANTS = [
-    Variant(libraries, evals, access, libraries == "both", "none", access == "grantr")
+    Variant(
+        libraries,
+        evals,
+        access,
+        libraries == "both",
+        "none",
+        access == "grantr",
+        libraries != "reflexr",
+    )
     for libraries, evals, access in itertools.product(
         ["artifactr", "reflexr", "both"], [True, False], ["grantr", "none"]
     )
 ] + [
-    Variant("both", True, "grantr", False, "none", True),
-    Variant("both", True, "grantr", True, "host", True),
-    Variant("both", True, "grantr", True, "none", False),
+    Variant("both", True, "grantr", False, "none", True, True),
+    Variant("both", True, "grantr", True, "host", True, True),
+    Variant("both", True, "grantr", True, "none", False, True),
+    Variant("both", True, "grantr", True, "none", True, False),
 ]
 """Every variant of the template."""
 LEFTOVER = re.compile(r"(?<!\$)\{\{|\{%|%\}")

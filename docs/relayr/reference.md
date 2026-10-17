@@ -78,3 +78,12 @@ The reference is generated from relayr's docstrings and type annotations. It doc
     options:
       show_root_heading: false
       show_root_toc_entry: false
+
+## relayr.ui
+
+The `forms` extra: `ui:form_submitted` and `ui:app_submitted` from artifactr's forms ([ADR-0033](adr/0033-one-event-for-both-ways-of-asking.md)).
+
+::: relayr.ui
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false

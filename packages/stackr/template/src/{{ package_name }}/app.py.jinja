@@ -177,6 +177,9 @@ def create_app(
         identify=access.identify,
         authorize=artifactr_hooks.authorize,
         hidden=artifactr_hooks.hidden,
+{%- if use_ui %}
+        is_admin=access.administers,
+{%- endif %}
 {%- else %}
         authenticate=verifier.authenticate,
         identify=verifier.authenticate,

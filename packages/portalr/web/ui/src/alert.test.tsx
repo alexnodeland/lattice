@@ -23,6 +23,16 @@ test("an error is an alert, and a note and a warning are statuses, each said in 
   expect(notes).toEqual(["These are the newest.", "Saved."]);
 });
 
+test("an alert that is part of what the page reads is a note, never a live region", async () => {
+  const screen = await render(
+    <Alert tone="error" live={false}>
+      Don't run this twice.
+    </Alert>,
+  );
+  await expect.element(screen.getByRole("note")).toHaveTextContent("Don't run this twice.");
+  expect(screen.container.querySelector("[role=alert], [role=status]")).toBeNull();
+});
+
 test("each tone has a shape of its own beside its words, hidden from assistive technology", async () => {
   const screen = await render(
     <div>

@@ -40,17 +40,37 @@ export default defineConfig({
   // reload the page under the tests.
   optimizeDeps: { entries: ["src/**/*.test.{ts,tsx}"] },
   test: {
-    setupFiles: ["./src/test/setup.ts"],
-    exclude: [...configDefaults.exclude, ...(process.env.CI ? [] : [screenshots])],
     // On 127.0.0.1, not localhost: ui's, app's and admin's servers, started at once, took one
     // port, on ::1 and on 127.0.0.1, and a Chromium reached the other's (portalr ADR-0009).
     api: { host: "127.0.0.1" },
-    browser: {
-      enabled: true,
-      headless: true,
-      provider: playwright(),
-      instances: [scheme("light"), scheme("dark")],
-      commands: { forcedColors, pointerAway, reduceMotion },
-    },
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: "components",
+          include: ["src/**/*.test.{ts,tsx}"],
+          setupFiles: ["./src/test/setup.ts"],
+          exclude: [...configDefaults.exclude, ...(process.env.CI ? [] : [screenshots])],
+          browser: {
+            enabled: true,
+            headless: true,
+            provider: playwright(),
+            instances: [scheme("light"), scheme("dark")],
+            commands: { forcedColors, pointerAway, reduceMotion },
+          },
+        },
+      },
+      // The Markdown under portalr's Content-Security-Policy: a page built as the UIs are, served
+      // with the policy, which Playwright drives from Node (portalr ADR-0043).
+      {
+        extends: true,
+        test: {
+          name: "csp",
+          include: ["csp/**/*.test.ts"],
+          environment: "node",
+          globalSetup: ["./csp/serve.ts"],
+        },
+      },
+    ],
   },
 });

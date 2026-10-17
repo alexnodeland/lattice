@@ -1,0 +1,29 @@
+import type { ReactNode } from "react";
+import { cn } from "./cn";
+
+/**
+ * What scrolls sideways when it is wider than the page, such as a table or a block of code: a tab
+ * stop, so a keyboard can scroll it as a pointer can, and a named region, so a reader can find it
+ * (WCAG 2.1.1). Name it with a label, or the id of the heading that names it.
+ */
+export function ScrollRegion({
+  className,
+  children,
+  ...naming
+}: ({ "aria-label": string } | { "aria-labelledby": string }) & {
+  className?: string | undefined;
+  children: ReactNode;
+}) {
+  return (
+    <section
+      {...naming}
+      tabIndex={0}
+      className={cn(
+        "overflow-x-auto outline-offset-2 focus-visible:outline-2 focus-visible:outline-focus",
+        className,
+      )}
+    >
+      {children}
+    </section>
+  );
+}

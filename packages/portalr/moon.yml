@@ -16,6 +16,8 @@ fileGroups:
     - 'scripts/**/*'
     - 'tests/**/*'
     - 'schemas/**/*'
+    # The policy ui's CSP tests serve, which a test holds to the router's.
+    - 'web/ui/csp/policy.txt'
     - 'pyproject.toml'
     - 'README.md'
     - 'LICENSE'

@@ -18,6 +18,7 @@ import {
 import { Alert } from "./alert";
 import { Button } from "./button";
 import { cn } from "./cn";
+import { CopyButton } from "./copy-button";
 import { Icon } from "./icon";
 import { Markdown } from "./markdown";
 import { StatusBadge, type Tone } from "./status-badge";
@@ -146,7 +147,10 @@ type MessageProps = {
   onThumbs?: GiveThumbs;
 };
 
-/** One message, named for who posted it: their name, its Markdown, and the reader's thumbs. */
+/**
+ * One message, named for who posted it: their name, its Markdown, a way to copy it as the Markdown
+ * it was written in, and the reader's thumbs.
+ */
 export function Message({ message, author, thumbs = null, onThumbs }: MessageProps) {
   const name = useId();
   return (
@@ -158,7 +162,10 @@ export function Message({ message, author, thumbs = null, onThumbs }: MessagePro
         {author}
       </span>
       <Markdown>{message.content}</Markdown>
-      {onThumbs && <Thumbs given={thumbs} onThumbs={onThumbs} />}
+      <div className="flex flex-wrap items-start gap-1">
+        <CopyButton text={message.content} label="Copy as Markdown" />
+        {onThumbs && <Thumbs given={thumbs} onThumbs={onThumbs} />}
+      </div>
     </li>
   );
 }

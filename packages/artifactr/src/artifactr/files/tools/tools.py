@@ -1,10 +1,10 @@
 """The agent's tools for native files, which ask `NativeFiles` for everything they do.
 
-The toolset is offered only while the app's integration is on in the run's workspace, read once
-a step, so a model in a workspace where it is off never sees it; `NativeFiles` refuses there
-too, whatever calls it. A rejection is raised as it is, for artifactr's capability to turn into
-a retry, except a person's check-out: the agent is told who has the file and plans again after
-the check-in, rather than retrying at once.
+The toolset is offered only while an app's integration is on in the run's workspace, read once
+a step, so a model in a workspace where every app is off never sees it; `NativeFiles` refuses a
+file whose app is off, whatever calls it. A rejection is raised as it is, for artifactr's
+capability to turn into a retry, except a person's check-out: the agent is told who has the
+file and plans again after the check-in, rather than retrying at once.
 """
 
 import json

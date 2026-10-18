@@ -49,7 +49,7 @@ def test_an_app_on_by_default_has_a_corpus_its_hostile_files_and_a_nightly_run()
 
 
 @pytest.mark.parametrize("corpus", CORPORA.values(), ids=list(CORPORA))
-def test_each_hostile_file_is_made(corpus: Corpus) -> None:
-    sizes = {name: len(corpus.hostile_file(name)) for name in corpus.hostile_names()}
+def test_each_given_hostile_file_is_made(corpus: Corpus) -> None:
+    sizes = {name: len(corpus.hostile_file(name)) for name in GIVEN}
     assert sizes["empty"] == 0
     assert all(size > 0 for name, size in sizes.items() if name != "empty")

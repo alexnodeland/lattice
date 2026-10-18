@@ -159,8 +159,14 @@ class NativeFiles:
     # ─── the switch ───────────────────────────────────────────────────────────
 
     async def enabled(self, ws: Workspace, file_type: type[NativeFile] | None = None) -> bool:
-        """Whether the app of a native type is on in the workspace; or, without one, any app."""
-        apps = list(self._apps.values()) if file_type is None else [self.app_of(file_type)]
+        """Whether the app of a native type is on in the workspace; or, without one, any app.
+
+        A type no app reads is off.
+        """
+        try:
+            apps = list(self._apps.values()) if file_type is None else [self.app_of(file_type)]
+        except ValidationFailed:
+            return False
         if self._integrations is None:
             return True
         for app in apps:

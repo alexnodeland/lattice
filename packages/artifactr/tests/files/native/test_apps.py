@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from starlette.requests import HTTPConnection
 
-from artifactr.core import Actor, NotEnabled, TenantId, UserActor, ValidationFailed
+from artifactr.core import Actor, NotEnabled, NotFound, TenantId, UserActor, ValidationFailed
 from artifactr.files.app import AppCommand, Applied, FakeApp, Inspection
 from artifactr.files.blobs import InMemoryBlobs, once
 from artifactr.files.checkouts import InMemoryCheckouts
@@ -53,14 +53,14 @@ class Reads(FakeApp):
         return Applied(content=applied.content, inspection=inspection)
 
 
-async def opened(files: NativeFiles) -> Workspace:
+async def opened() -> Workspace:
     return await Workspaces(InMemoryStorage()).open("acme", "w1", actor=ALICE)
 
 
 async def test_each_type_is_read_and_edited_by_its_own_app() -> None:
     words, sheets = FakeApp(), Sheets(integration="files:sheets")
     files = NativeFiles(InMemoryBlobs(), InMemoryCheckouts(), {NativeFile: words, Ledger: sheets})
-    ws = await opened(files)
+    ws = await opened()
     await files.upload(
         ws, WordDocument, "a.docx", once(FakeApp.file("A")), media_type=DOCX, artifact_id="a"
     )
@@ -83,7 +83,7 @@ async def test_each_app_is_switched_on_its_own() -> None:
     switch.off.add(("acme", "w1", "files:sheets"))
     apps = {WordDocument: FakeApp(), Ledger: Sheets(integration="files:sheets")}
     files = NativeFiles(InMemoryBlobs(), InMemoryCheckouts(), apps, integrations=switch)
-    ws = await opened(files)
+    ws = await opened()
     assert await files.enabled(ws), "one app is on"
     assert await files.enabled(ws, WordDocument)
     assert not await files.enabled(ws, Ledger)
@@ -96,9 +96,10 @@ async def test_each_app_is_switched_on_its_own() -> None:
 
 async def test_a_type_no_app_reads_is_refused_and_governed_by_no_switch() -> None:
     files = NativeFiles(InMemoryBlobs(), InMemoryCheckouts(), {WordDocument: FakeApp()})
-    ws = await opened(files)
+    ws = await opened()
     with pytest.raises(ValidationFailed, match="no app reads a ledger"):
         await files.upload(ws, Ledger, "b.xlsx", once(FakeApp.file("B")), media_type=XLSX)
+    assert not await files.enabled(ws, Ledger)
     assert files.key_of("ledger", {}) is None
     assert files.key_of("note", {}) is None, "not a native file"
 
@@ -110,7 +111,7 @@ def test_native_files_need_an_app() -> None:
 
 async def test_an_upload_the_app_reads_as_another_format_is_refused() -> None:
     files = NativeFiles(InMemoryBlobs(), InMemoryCheckouts(), Reads(PDF))
-    ws = await opened(files)
+    ws = await opened()
     with pytest.raises(ValidationFailed, match="the file is application/pdf, not "):
         await files.upload(ws, WordDocument, "a.docx", once(FakeApp.file("A")), media_type=DOCX)
 
@@ -121,7 +122,7 @@ async def test_a_check_in_in_another_format_is_refused_and_never_converted(
 ) -> None:
     app = FakeApp() if read is None else Reads(read)
     files = NativeFiles(InMemoryBlobs(), InMemoryCheckouts(), app)
-    ws = await opened(files)
+    ws = await opened()
     upload = once(FakeApp.file("A"))
     if read is None:
         await files.upload(ws, WordDocument, "a.docx", upload, media_type=DOCX, artifact_id="a")
@@ -139,7 +140,7 @@ async def test_a_check_in_in_another_format_is_refused_and_never_converted(
 
 async def test_a_check_in_in_its_own_format_goes_in() -> None:
     files = NativeFiles(InMemoryBlobs(), InMemoryCheckouts(), Reads(DOCX))
-    ws = await opened(files)
+    ws = await opened()
     await files.upload(
         ws, WordDocument, "a.docx", once(FakeApp.file("A")), media_type=DOCX, artifact_id="a"
     )
@@ -157,6 +158,7 @@ async def alice(_connection: HTTPConnection) -> tuple[TenantId, Actor]:
     [
         ("application/pdf", 409),
         ("application/octet-stream", 200),
+        ("text/plain", 200),
         (f"{DOCX}; charset=binary", 200),
     ],
 )
@@ -181,3 +183,30 @@ async def test_the_router_takes_the_check_ins_format_from_its_content_type(
     assert put.status_code == status, put.text
     if status == 409:
         assert put.json()["detail"]["checked_in"] == "application/pdf"
+
+
+async def test_a_check_out_of_a_file_whose_app_is_off_is_refused_before_any_lease() -> None:
+    switch = Switch()
+    apps = {WordDocument: FakeApp(), Ledger: Sheets(integration="files:sheets")}
+    files = NativeFiles(InMemoryBlobs(), InMemoryCheckouts(), apps, integrations=switch)
+    ws = await opened()
+    upload = once(FakeApp.file("B"))
+    await files.upload(ws, Ledger, "b.xlsx", upload, media_type=XLSX, artifact_id="b")
+    switch.off.add(("acme", "w1", "files:sheets"))
+    with pytest.raises(NotEnabled, match="files:sheets"):
+        await files.check_out(ws, "b")
+    assert await ws.artifact_lease("b") is None
+    with pytest.raises(NotFound):
+        await files.check_out(ws, "missing")  # a file is found before its app is asked
+
+
+async def test_after_a_check_in_in_another_format_the_right_one_goes_in() -> None:
+    files = NativeFiles(InMemoryBlobs(), InMemoryCheckouts(), FakeApp())
+    ws = await opened()
+    upload = once(FakeApp.file("A"))
+    await files.upload(ws, WordDocument, "a.docx", upload, media_type=DOCX, artifact_id="a")
+    checkout = await files.check_out(ws, "a")
+    with pytest.raises(FormatChanged):
+        await files.check_in(ws, checkout.id, once(FakeApp.file("B")), media_type=PDF)
+    applied = await files.check_in(ws, checkout.id, once(FakeApp.file("B")), media_type=DOCX)
+    assert applied is not None, "the check-out stayed open"

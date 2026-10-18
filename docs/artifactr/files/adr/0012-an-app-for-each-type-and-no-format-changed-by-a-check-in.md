@@ -14,9 +14,9 @@ A check-in put the uploaded bytes under the head's media type, whatever they wer
 ## Decision
 
 - **`NativeFiles` takes an app for each native type,** `NativeFiles(blobs, checkouts, {WordDocument: wordcraft, Workbook: gridcraft})`, or one app for every type, as before. A type's app is its own, or else its nearest base's. `app_of(type)` names it, and replaces the `app` property; an upload of a type no app reads is `ValidationFailed`.
-- **Each file is switched by its own app's key.** Every write asks the switch of its file's app, and refuses with `NotEnabled` while it is off; `enabled(ws, type)` asks for one type, and `enabled(ws)` whether any app is on, which is when the agent's tools are offered. `key_of` gives a native kind its app's key, and none to a type no app reads. `find_commands` takes the file whose app to ask, `find_commands(artifact_id, query)`.
-- **A check-in never changes a file's format.** It is refused, as `FormatChanged`, an `InvalidState` (409) naming the format checked out and the one checked in, when the file says it is another format, by the check-in's `Content-Type` (`check_in(..., media_type=)`), or when the app reads it as another, by the inspection's new `media_type`. The head keeps its format, and the person uploads the file as a new one. An upload whose app reads it as another format than it was declared is `ValidationFailed`.
-- **An app says what it reads a file as** in `Inspection.media_type`, or None if it doesn't tell formats apart. WordCraft's reads a Word package's main part, `.docx`, `.docm`, `.dotx` or `.dotm`, and an OpenDocument's `mimetype`, so an `.odt` or a `.docm` checked in over a `.docx` is refused.
+- **Each file is switched by its own app's key.** Every write reads the file first, to know its app, then asks that app's switch, still before any lease is taken, so a missing file is `NotFound` before an app that is off is `NotEnabled`, and a check-out, an edit and a render read the head once more than they did. Every write asks the switch of its file's app, and refuses with `NotEnabled` while it is off; `enabled(ws, type)` asks for one type, and `enabled(ws)` whether any app is on, which is when the agent's tools are offered. `key_of` gives a native kind its app's key, and none to a type no app reads. `find_commands` takes the file whose app to ask, `find_commands(artifact_id, query)`.
+- **A check-in never changes a file's format.** It is refused, as `FormatChanged`, an `InvalidState` (409) naming the format checked out and the one checked in, when the file says it is another format, by the check-in's `Content-Type` (`check_in(..., media_type=)`), or when the app reads it as another, by the inspection's new `media_type`. The router reads no format from a `Content-Type` a client sends by default (`application/octet-stream`, a form's, `text/plain`). The head keeps its format, and the person uploads the file as a new one. An upload whose app reads it as another format than it was declared is `ValidationFailed`.
+- **An app says what it reads a file as** in `Inspection.media_type`. The port allows None, for the fake; a crafting app's adapter must name one, or its call is `crashed`, so no adapter lets a check-in through unread. WordCraft's reads a Word package's main part, `.docx`, `.docm`, `.dotx` or `.dotm`, and an OpenDocument's `mimetype`, so an `.odt` or a `.docm` checked in over a `.docx` is refused.
 - **A format change is never a proposal.** A native type holds the formats it lists, so most changes couldn't be one; and a proposal that changed a file's format would ask its reviewer to accept a conversion they can't see. Moving a file to another format is a new artifact, which keeps the old one's history intact.
 - **The fidelity matrix states each format's limits.** Each app's corpus is of the format it keeps, and a feature its release doesn't keep is listed as not supported; a format an app only reads, such as DesignCraft's INDD, or writes only lossily, such as VectorCraft's AI, is in no corpus it would pass, and its adapter's documents say so.
 
@@ -46,11 +46,11 @@ Refusing costs the person a second upload when they meant to convert; accepting 
 
 - Easier: each app's work adds its type and its adapter to the mapping, and its key governs only its files.
 - Easier: portalr can check in each save the shim hands over, and show a refusal that says which format came back.
-- Harder: an app whose adapter can't tell formats apart relies on the declared type; each adapter should fill `media_type`.
+- Harder: each crafting app's adapter reads its format from the file, as WordCraft's reads a package's main part.
 - Revisit: converting on purpose, as a new artifact made from an old one, if people ask for it.
 
 ## Action items
 
 1. [x] `NativeFiles` with an app for each type; `app_of`; `enabled(ws, type)`; `key_of` by type; `find_commands(artifact_id, query)`.
 2. [x] `FormatChanged`, `Inspection.media_type`, `check_in(..., media_type=)`, the router's `Content-Type`; WordCraft's `media_type`.
-3. [ ] Each app's adapter fills `media_type`, by its own work.
+3. [x] `Headless` refuses an inspection that names no format.

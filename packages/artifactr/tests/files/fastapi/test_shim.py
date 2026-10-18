@@ -62,6 +62,7 @@ def test_the_shims_policy_runs_its_own_code_frames_its_origin_and_is_framed_by_t
         ("gridcraft", "https://portal.example/app", [], "the portal is an origin"),
         ("gridcraft", "javascript:alert(1)", [], "the portal is an origin"),
         ("gridcraft", PORTAL, ["open"], "GridCraft's build has no JavaScript API"),
+        ("filmcraft", PORTAL, ["inspect openProject"], "a method is named as JavaScript names one"),
     ],
 )
 def test_a_shim_that_cant_reach_or_be_reached_is_refused(
@@ -74,7 +75,7 @@ def test_a_shim_that_cant_reach_or_be_reached_is_refused(
 def test_the_editor_serves_the_shim_beside_the_build_and_lets_it_frame_the_build(
     build: Path,
 ) -> None:
-    client = TestClient(editor_app(build, bridge=CRAFTS["pdfcraft"], portal=PORTAL))
+    client = TestClient(editor_app(build, craft=CRAFTS["pdfcraft"], portal=PORTAL))
     shim = client.get(PATH)
     assert shim.text == shim_page(CRAFTS["pdfcraft"], PORTAL)
     assert shim.headers["content-security-policy"] == shim_policy(PORTAL)
@@ -94,7 +95,7 @@ def test_without_a_bridge_there_is_no_shim(build: Path) -> None:
 
 def test_a_shim_needs_its_app_and_its_portal(build: Path) -> None:
     with pytest.raises(ValueError, match="a shim needs both"):
-        editor_app(build, bridge=CRAFTS["gridcraft"])
+        editor_app(build, craft=CRAFTS["gridcraft"])
     with pytest.raises(ValueError, match="a shim needs both"):
         editor_app(build, portal=PORTAL)
 
@@ -102,4 +103,4 @@ def test_a_shim_needs_its_app_and_its_portal(build: Path) -> None:
 def test_a_build_with_files_where_the_shim_goes_is_refused(build: Path) -> None:
     (build / ".lattice").mkdir()
     with pytest.raises(ValueError, match="the build has files where the shim is served"):
-        editor_app(build, bridge=CRAFTS["gridcraft"], portal=PORTAL)
+        editor_app(build, craft=CRAFTS["gridcraft"], portal=PORTAL)

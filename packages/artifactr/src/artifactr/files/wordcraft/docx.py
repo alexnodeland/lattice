@@ -43,6 +43,9 @@ MAIN: Final = {
 
 TYPES: Final = "{http://schemas.openxmlformats.org/package/2006/content-types}Override"
 
+MIMETYPE: Final = 255
+"""The most of an OpenDocument's `mimetype` that is read."""
+
 
 def media_type(content: bytes) -> str | None:
     """The format a package says it is, or None if it says none.
@@ -50,14 +53,20 @@ def media_type(content: bytes) -> str | None:
     A Word package says it by its main part's content type, and an OpenDocument by its
     `mimetype`. Call it once `fingerprint` has read the package, which refuses one that isn't
     a zip or inflates past its limit.
+
+    Raises:
+        AppFailed: `refused` if its content types aren't XML.
     """
     with zipfile.ZipFile(io.BytesIO(content)) as archive:
         names = set(archive.namelist())
         if "mimetype" in names:
-            return archive.read("mimetype").decode("ascii", "replace").strip()
+            return archive.read("mimetype")[:MIMETYPE].decode("ascii", "replace").strip()
         if "[Content_Types].xml" not in names:
             return None
-        types = ElementTree.fromstring(archive.read("[Content_Types].xml"))
+        try:
+            types = ElementTree.fromstring(archive.read("[Content_Types].xml"))
+        except ElementTree.ParseError as error:
+            raise AppFailed("refused", f"not a .docx: its content types are {error}") from None
     declared = (override.get("ContentType", "") for override in types.iter(TYPES))
     return next((MAIN[found] for found in declared if found in MAIN), None)
 

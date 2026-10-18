@@ -147,3 +147,9 @@ def test_a_package_says_its_format_by_its_main_part_or_its_mimetype() -> None:
     )
     assert media_type(docx({"word/document.xml": b"<w/>"})) is None
     assert media_type(docx({"[Content_Types].xml": b"<Types/>"})) is None
+
+
+def test_content_types_that_arent_xml_are_refused() -> None:
+    with pytest.raises(AppFailed, match="its content types are") as refused:
+        media_type(docx({"[Content_Types].xml": b"<Types"}))
+    assert refused.value.failure == "refused"

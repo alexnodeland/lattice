@@ -50,7 +50,16 @@ DOWNLOAD: Final = {
 so never sniffed, never run as a page, and never kept by a cache on the way."""
 
 PNG: Final = "image/png"
-OCTETS: Final = "application/octet-stream"
+UNSAID: Final = frozenset(
+    {
+        "",
+        "application/octet-stream",
+        "application/x-www-form-urlencoded",
+        "multipart/form-data",
+        "text/plain",
+    }
+)
+"""The `Content-Type`s that say nothing of a check-in's format: those clients send by default."""
 TEXT: Final = "text/plain; charset=utf-8"
 
 
@@ -174,14 +183,15 @@ def files_router(
     ) -> CheckedIn:
         """Check the edited file in: its bytes are the body, streamed, and the check-out ends.
 
-        Its `Content-Type` is the file's format, unless it is `application/octet-stream`: a
-        file in another format than the one checked out is refused, never converted.
+        Its `Content-Type` is the file's format, unless it is none, or one a client sends by
+        default (`application/octet-stream`, a form's, or `text/plain`): a file in another
+        format than the one checked out is refused, never converted.
         """
         declared = request.headers.get("content-length", "")
         if declared.isdigit() and int(declared) > limit:
             raise HTTPException(status_code=413, detail=f"the file is larger than {limit} bytes")
-        given = request.headers.get("content-type", OCTETS).partition(";")[0].strip().lower()
-        media_type = None if given in ("", OCTETS) else given
+        given = request.headers.get("content-type", "").partition(";")[0].strip().lower()
+        media_type = None if given in UNSAID else given
         outcome = await _answered(
             files.check_in(ws, checkout_id, request.stream(), media_type=media_type)
         )

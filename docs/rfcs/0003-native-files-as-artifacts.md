@@ -236,7 +236,7 @@ The editor's origin:
 
 Apart from WordCraft's, these rows come from research on 2026-10-16, unverified here.
 
-> **Amended (2026-10-18) by native files [ADR-0010](../artifactr/files/adr/0010-a-shim-beside-the-build-and-talk-level-one-plus.md):** a `?host=parent` bridge (GridCraft, PdfCraft, CADCraft) gives open, save and dirty, not commands with replies: it is level 1+, `bridged`, reached through a shim of lattice's own on the editor's origin, run by hand with GridCraft 0.8.0 and PdfCraft 0.8.0. The JavaScript APIs' level is claimed per app once each has run through the shim.
+> **Amended (2026-10-18) by native files [ADR-0010](../artifactr/files/adr/0010-a-shim-beside-the-build-and-talk-level-one-plus.md):** a `?host=parent` bridge (GridCraft, PdfCraft, CADCraft) gives open, save and dirty, not commands with replies: it is level 1+, `bridged`, reached through a shim of lattice's own on the editor's origin, run by hand with GridCraft 0.8.0, PdfCraft 0.8.0 and CADCraft 0.8.0. The JavaScript APIs' level is claimed per app once each has run through the shim.
 
 The pilot stays at level 1. A later phase may embed WordCraft through a host bridge, if one lands upstream and ships unmodified; we neither fork nor contribute. Until an app pushes events, events are polled or synthesized from revisions. A same-origin iframe is a stand-in only for the three apps with JavaScript APIs.
 

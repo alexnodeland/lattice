@@ -129,6 +129,7 @@ An app's adapter subclasses `ToolsDialect` or `CommandsDialect`, which take the 
 **One app for each native type.** Give `NativeFiles` a mapping, and each file is read, edited and switched by its type's app, or else its nearest base's ([ADR-0012](../adr/0012-an-app-for-each-type-and-no-format-changed-by-a-check-in.md)):
 
 ```python
+# Workbook stands for the type GridCraft's own work adds.
 files = NativeFiles(blobs, checkouts, {WordDocument: wordcraft, Workbook: gridcraft})
 files.app_of(Workbook)  # gridcraft
 ```
@@ -232,7 +233,7 @@ Until the worker of RFC-0003's phase 3 is deployed, the server reads each check-
 GridCraft's, PdfCraft's and CADCraft's builds have a `?host=parent` bridge, on which a page of their own origin opens a file in them and hears each save and whether there are unsaved changes. Serve the editor with the shim, lattice's page beside the build, and frame it from your portal:
 
 ```python
-editor = editor_app(build, bridge=CRAFTS["gridcraft"], portal="https://portal.example")
+editor = editor_app(build, craft=CRAFTS["gridcraft"], portal="https://portal.example")
 ```
 
 The portal frames `https://<editor>/.lattice/shim.html`, and speaks to it by `postMessage`, at the editor's origin:
@@ -245,7 +246,7 @@ The portal frames `https://<editor>/.lattice/shim.html`, and speaks to it by `po
 | `lattice:save` | to the portal | `name`, `bytes`: each file the build would download; check it in, with its type |
 | `lattice:failed` | to the portal | `error`: the build couldn't start |
 
-The shim hears only your portal's origin and its own frame, and the build may then be framed only by the shim, inside your portal. The app's talk level is `bridged`, level 1+: no commands reach the editor. A build with a JavaScript API takes `methods=`, those of it the portal may call by `lattice:call` `{ id, method, args }`, answered by `lattice:reply` ([ADR-0010](../adr/0010-a-shim-beside-the-build-and-talk-level-one-plus.md)).
+The shim hears only your portal's origin and its own frame, and the build may then be framed by its own origin and your portal, and by nothing else. Send `lattice:open` once the shim says `lattice:ready`. The app's talk level is `bridged`, level 1+: no commands reach the editor. A build with a JavaScript API takes `methods=`, those of it the portal may call by `lattice:call` `{ id, method, args }`, answered by `lattice:reply` ([ADR-0010](../adr/0010-a-shim-beside-the-build-and-talk-level-one-plus.md)).
 
 ## Reading a revision
 

@@ -8,7 +8,8 @@ ADR-0010). The build is served unchanged; the shim is ours.
 
 The portal speaks one protocol to the shim, whatever the app's surface:
 
-- `lattice:open` (portal to shim): `{ name, bytes }`, the checked-out file, as an `ArrayBuffer`.
+- `lattice:open` (portal to shim): `{ name, bytes }`, the checked-out file, as an `ArrayBuffer`,
+  once the shim said `lattice:ready`: one sent before is lost.
 - `lattice:ready` (shim to portal): `{ version }`, the build is listening.
 - `lattice:save` (shim to portal): `{ name, bytes }`, each file the build would download,
   whatever its format: the portal checks it in, and the check-in refuses another format.
@@ -34,6 +35,9 @@ PATH: Final = "/.lattice/shim.html"
 ORIGIN: Final = re.compile(r"https?://[A-Za-z0-9.-]+(:[0-9]{1,5})?")
 """An origin the portal is served from, such as `https://portal.example`."""
 
+METHOD: Final = re.compile(r"[A-Za-z_$][A-Za-z0-9_$]*")
+"""A JavaScript API's method, by its name."""
+
 SCRIPT: Final = """
 const root = document.documentElement;
 const app = root.dataset.app;
@@ -41,15 +45,20 @@ const portal = root.dataset.portal;
 const methods = (root.dataset.methods || "").split(" ").filter(Boolean);
 const frame = document.querySelector("iframe");
 const own = location.origin;
-const tell = (message, transfer) => {
+const tell = (message, transfer) => parent.postMessage(message, portal, transfer || []);
+const reply = (id, answer) => {
   try {
-    parent.postMessage(message, portal, transfer || []);
+    tell({ type: "lattice:reply", id, ...answer });
   } catch (error) {
-    parent.postMessage({ type: "lattice:failed", error: String(error) }, portal);
+    tell({ type: "lattice:reply", id, error: String(error) });
   }
 };
 const buffer = (bytes) =>
-  bytes instanceof ArrayBuffer ? bytes : ArrayBuffer.isView(bytes) ? bytes.slice().buffer : null;
+  bytes instanceof ArrayBuffer
+    ? bytes
+    : ArrayBuffer.isView(bytes)
+      ? new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength).slice().buffer
+      : null;
 const fromPortal = (data) => {
   const bytes = buffer(data.bytes);
   if (data.type === "lattice:open" && typeof data.name === "string" && bytes) {
@@ -59,8 +68,8 @@ const fromPortal = (data) => {
     Promise.resolve()
       .then(() => frame.contentWindow[app][data.method](...args))
       .then(
-        (result) => tell({ type: "lattice:reply", id: data.id, result }),
-        (error) => tell({ type: "lattice:reply", id: data.id, error: String(error) }),
+        (result) => reply(data.id, { result }),
+        (error) => reply(data.id, { error: String(error) }),
       );
   }
 };
@@ -83,11 +92,13 @@ addEventListener("message", (event) => {
   else if (event.source === frame.contentWindow && event.origin === own) fromBuild(data);
 });
 if (root.dataset.surface === "global") {
+  const started = Date.now();
   const ready = setInterval(() => {
     const api = frame.contentWindow && frame.contentWindow[app];
-    if (api) {
+    if (api || Date.now() - started > 60000) {
       clearInterval(ready);
-      tell({ type: "lattice:ready", version: "" });
+      const failed = { type: "lattice:failed", error: "the build has no " + app + " API" };
+      tell(api ? { type: "lattice:ready", version: "" } : failed);
     }
   }, 100);
 }
@@ -111,7 +122,7 @@ def shim_page(craft: Craft, portal: str, methods: Sequence[str] = ()) -> str:
 
     Raises:
         ValueError: If the app's build has no host surface, the portal isn't an origin, or
-            methods are given for a surface that has none.
+            methods are given for a surface that has none, or aren't names.
     """
     if craft.bridge is None:
         raise ValueError(f"{craft.title}'s build has no host surface for a shim to reach")
@@ -119,6 +130,8 @@ def shim_page(craft: Craft, portal: str, methods: Sequence[str] = ()) -> str:
         raise ValueError(f"the portal is an origin, such as https://portal.example, not {portal!r}")
     if methods and craft.bridge != "global":
         raise ValueError(f"{craft.title}'s build has no JavaScript API to call methods of")
+    if not all(METHOD.fullmatch(method) for method in methods):
+        raise ValueError(f"a method is named as JavaScript names one, not {list(methods)}")
     data = {
         "app": craft.name,
         "portal": portal,

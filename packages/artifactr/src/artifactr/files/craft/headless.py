@@ -101,8 +101,7 @@ class Headless(ABC):
             if commands:
                 await self.batch(server, document, commands)
             content = await self.save(server, document)
-            inspection = await self.inspection(server, document, content)
-            return Applied(content=content, inspection=inspection)
+            return Applied(content=content, inspection=await self._read(server, document, content))
 
         return await self._spawn.run(deadline, apply)
 
@@ -111,7 +110,7 @@ class Headless(ABC):
 
         async def inspect(server: Server) -> Inspection:
             document = await self.open(server, source)
-            return await self.inspection(server, document, source)
+            return await self._read(server, document, source)
 
         return await self._spawn.run(deadline, inspect)
 
@@ -137,6 +136,21 @@ class Headless(ABC):
             return await self.find(server, query)
 
         return await self._spawn.run(self._lookup, find)
+
+    async def _read(self, server: Server, document: JsonValue, content: bytes) -> Inspection:
+        """The app's inspection, which must say what format it read the file as.
+
+        A check-in is refused when the app reads another format than the one checked out, so an
+        adapter that said none would let one through (native files ADR-0012).
+
+        Raises:
+            AppFailed: `crashed` if the adapter's inspection names no format.
+        """
+        inspection = await self.inspection(server, document, content)
+        if inspection.media_type is None:
+            message = f"{type(self).__name__}'s inspection names no format it read"
+            raise AppFailed("crashed", message)
+        return inspection
 
     # ─── the steps, each its dialect's ────────────────────────────────────────
     # Each step after `open` is given what `open` returned: what the server calls the file it
@@ -171,5 +185,8 @@ class Headless(ABC):
 
     @abstractmethod
     async def inspection(self, server: Server, document: JsonValue, content: bytes) -> Inspection:
-        """Read the open file, whose bytes are `content`, into an inspection: each app's own."""
+        """Read the open file, whose bytes are `content`, into an inspection: each app's own.
+
+        It names the format it read the file as, `media_type`, which a check-in is held to.
+        """
         ...

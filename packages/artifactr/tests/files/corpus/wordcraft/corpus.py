@@ -17,7 +17,7 @@ def parts(content: bytes) -> dict[str, bytes]:
 
 
 def bomb() -> bytes:
-    """A `.docx` whose document inflates to 300 MiB, past the adapter's limit, from 300 KiB."""
+    """A `.docx` whose document inflates to 300 MiB from 300 KiB, written a MiB at a time."""
     made = BytesIO()
     with (
         zipfile.ZipFile(BytesIO(FEATURES["text"]())) as source,
@@ -25,8 +25,27 @@ def bomb() -> bytes:
     ):
         for name in source.namelist():
             part = source.read(name)
-            if name == "word/document.xml":
-                part = part.replace(b"<w:body>", b"<w:body><!--" + b" " * (300 << 20) + b"-->", 1)
+            if name != "word/document.xml":
+                archive.writestr(name, part)
+                continue
+            head, _, tail = part.partition(b"<w:body>")
+            with archive.open(name, "w", force_zip64=True) as stream:
+                stream.write(head + b"<w:body><!--")
+                for _ in range(300):
+                    stream.write(b" " * (1 << 20))
+                stream.write(b"-->" + tail)
+    return made.getvalue()
+
+
+def untyped() -> bytes:
+    """A `.docx` whose content types aren't XML."""
+    made = BytesIO()
+    with (
+        zipfile.ZipFile(BytesIO(FEATURES["text"]())) as source,
+        zipfile.ZipFile(made, "w", zipfile.ZIP_DEFLATED) as archive,
+    ):
+        for name in source.namelist():
+            part = b"<Types" if name == "[Content_Types].xml" else source.read(name)
             archive.writestr(name, part)
     return made.getvalue()
 
@@ -43,6 +62,6 @@ CORPUS = Corpus(
     read=read,
     kept=parts,
     adapter=adapter,
-    hostile={"bomb": bomb},
+    hostile={"bomb": bomb, "untyped": untyped},
 )
 """WordCraft 0.7.0 keeps every feature."""

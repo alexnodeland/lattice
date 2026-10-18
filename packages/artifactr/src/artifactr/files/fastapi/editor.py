@@ -69,33 +69,33 @@ def editor_policy(index: str, *, portal: str | None = None) -> str:
 def editor_app(
     build: Path,
     *,
-    bridge: Craft | None = None,
+    craft: Craft | None = None,
     portal: str | None = None,
     methods: Sequence[str] = (),
 ) -> ASGIApp:
     """Serve a browser build's directory, as released, under its policy; and its shim, if asked.
 
-    With `bridge` and `portal`, it also serves the shim at `/.lattice/shim.html`, which the
+    With `craft` and `portal`, it also serves the shim at `/.lattice/shim.html`, which the
     portal frames to open the checked-out file in the build and hear its saves.
 
     Args:
         build: The directory holding the build's `index.html`, such as what
             `scripts/craft wordcraft web` prints.
-        bridge: The app whose build it is, if its build has a host surface for the shim to reach.
+        craft: The app whose build it is, if its build has a host surface for the shim to reach.
         portal: The portal's origin, the only one that may frame the shim, and that it answers.
         methods: For a build with a JavaScript API, the methods of it the portal may call.
 
     Raises:
         FileNotFoundError: If the directory has no `index.html`.
-        ValueError: If only one of `bridge` and `portal` is given, or the shim can't be made
+        ValueError: If only one of `craft` and `portal` is given, or the shim can't be made
             for them, or the build has a file where the shim is served.
     """
     index = (build / "index.html").read_text(encoding="utf-8")
     routes: list[Route | Mount] = [Mount("/", StaticFiles(directory=build, html=True))]
-    if (bridge is None) != (portal is None):
+    if (craft is None) != (portal is None):
         raise ValueError("a shim needs both the app it bridges to and the portal that frames it")
-    if bridge is not None and portal is not None:
-        page, framed = shim_page(bridge, portal, methods), shim_policy(portal)
+    if craft is not None and portal is not None:
+        page, framed = shim_page(craft, portal, methods), shim_policy(portal)
         if (build / PATH.lstrip("/")).parent.exists():
             raise ValueError(f"the build has files where the shim is served, {PATH}")
 

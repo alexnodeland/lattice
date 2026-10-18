@@ -69,5 +69,6 @@ def hostile() -> list[ParameterSet]:
 
 @pytest.mark.parametrize(("corpus", "name"), hostile())
 async def test_a_hostile_file_ends_in_a_typed_failure_in_time(corpus: Corpus, name: str) -> None:
-    with pytest.raises(AppFailed):
+    with pytest.raises(AppFailed) as failed:
         await running(corpus).inspect(corpus.hostile_file(name), deadline=DEADLINE)
+    assert failed.value.failure != "timeout", "refused, not left to run out its time"

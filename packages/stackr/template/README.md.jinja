@@ -43,6 +43,9 @@ Every surface needs a Supabase access token: in the `Authorization: Bearer` head
 | `/portalr/app/`, `/portalr/admin/` | [portalr](https://lattice.alexnodeland.com/portalr/)'s UIs: the app, to chat with the agents and see their work, and the admin, for access, feedback, traces, logs and spend; on when `PORTAL_SUPABASE_URL` and `PORTAL_SUPABASE_KEY` name the Supabase project they sign in to |
 | `/portalr/v1` | The reads behind them, each asked of grantr first and made for the caller's tenant |
 {%- endif %}
+{%- if use_tracker %}
+| `/relayr/v1/trackers/{tenant}/{{ tracker }}` | Where {% if tracker == 'plane' %}Plane{% else %}Vikunja{% endif %}'s webhooks reach relayr, which then reads the project at once; it needs no token, and refuses a webhook not signed with the tenant's secret |
+{%- endif %}
 | `/healthz` | Whether it is up, without a token |
 
 The examples to replace with your own:
@@ -147,6 +150,9 @@ It talks to stackr's ports only, through the settings in `.env` ([`settings.py`]
 | Identity | `AUTH_JWKS_URL`, `AUTH_JWT_SECRET`, `AUTH_AUDIENCE`, `AUTH_ISSUER`, `AUTH_TENANT_CLAIM` | [`auth.py`](src/{{ package_name }}/auth.py): Supabase's ES256 tokens against its published keys, or HS256 tokens with a legacy secret |
 {%- endif %}
 | LLM gateway | `LITELLM_BASE_URL`, `LITELLM_API_KEY`, `LITELLM_TENANT_KEYS`, `LITELLM_MODEL`, `LITELLM_GUARDRAILS` | [`gateway.py`](src/{{ package_name }}/gateway.py): agents on the `default` model group, each request with its tenant's key and the `pii-mask` and `prompt-injection` guardrails |
+{%- if use_tracker %}
+| Task tracker | `TRACKER_CREDENTIALS`, `TRACKER_BINDINGS`, `TRACKER_BUDGET` | [`tracking.py`](src/{{ package_name }}/tracking.py): relayr's connector to {% if tracker == 'plane' %}Plane{% else %}Vikunja{% endif %}, where each tenant has a workspace and a user of its own. The example files each rule whose runs are dead-lettered as one item, and comments on it for each; a follower per bound workspace publishes what people change in its project as `tracker:` events. stackr's [tracker guide](https://lattice.alexnodeland.com/stackr/guides/trackers/) provisions a tenant, and its `make tracker-check` checks one |
+{%- endif %}
 | Evaluation data | `LANGFUSE_BASE_URL`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` | [`scores.py`](src/{{ package_name }}/scores.py): each workspace's feedback mirrored to Langfuse scores on the traces it is about, a score per field by evalr's score mapping, carrying on after a cursor saved in the workspace when the application restarts |
 
 The app profile ([`compose.yaml`](compose.yaml)) joins the stack's networks and reaches its services by name, at the addresses in [`stackr.env`](stackr.env); `STACK_DATABASE_URL` points it at another database there, and `STACK_DATABASE_ADMIN_URL` names that database's owner, for row-level security.

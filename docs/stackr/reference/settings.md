@@ -261,6 +261,38 @@ Local model servers on this machine, as the gateway's container sees them.
 | `LM_STUDIO_API_BASE` | `http://host.docker.internal:1234/v1` |
 | `OMLX_API_BASE` | `http://host.docker.internal:4243/v1` |
 
+### Task trackers: the opt-in recipes, trackers/ (lattice RFC-0004)
+
+`make tracker-up TRACKER=plane` or `TRACKER=vikunja`, beside the stack.
+
+Plane's Community edition, at PLANE_URL, where people reach it, published on PLANE_PORT. Its API allows each key PLANE_API_KEY_RATE_LIMIT requests; its webhooks go only to PLANE_WEBHOOK_HOSTS, the application's name on the stackr network (Plane takes only a name with a dot in it).
+
+| Setting | In `.env.example` |
+|---|---|
+| `PLANE_PORT` | `3800` |
+| `PLANE_URL` | `http://localhost:3800` |
+| `PLANE_SECRET_KEY` | Generated: 43 URL-safe characters |
+| `PLANE_DB_PASSWORD` | Generated: 64 hex characters |
+| `PLANE_MQ_PASSWORD` | Generated: 64 hex characters |
+| `PLANE_API_KEY_RATE_LIMIT` | `300/minute` |
+| `PLANE_WEBHOOK_HOSTS` | `app.stackr.internal` |
+
+Celery's worker processes, which deliver webhooks; one per CPU by default.
+
+| Setting | In `.env.example` |
+|---|---|
+| `PLANE_WORKER_CONCURRENCY` | `2` |
+
+Vikunja, at VIKUNJA_URL, published on VIKUNJA_PORT. Sign-up stays off: the operator makes each tenant's user (the tracker guide).
+
+| Setting | In `.env.example` |
+|---|---|
+| `VIKUNJA_PORT` | `3456` |
+| `VIKUNJA_URL` | `http://localhost:3456` |
+| `VIKUNJA_SECRET` | Generated: 43 URL-safe characters |
+| `VIKUNJA_DB_PASSWORD` | Generated: 64 hex characters |
+| `VIKUNJA_REGISTRATION` | `false` |
+
 <!-- end generated -->
 
 ## The file

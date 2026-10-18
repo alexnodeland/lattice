@@ -1,0 +1,183 @@
+"""relayr's tracker connector: rules' runs file work in {% if tracker == 'plane' %}Plane{% else %}Vikunja{% endif %}, and people's changes come back.
+
+Outbound, the example, ``file-dead-letter``, files each rule whose runs are dead-lettered as one
+item, keyed ``dead-letter/<rule>``, and comments on it for each run that is: a rule's failures
+are one item to triage, not one each. It never fires on its own dead letters. Replace it with the
+application's own; every write is made once, by a key relayr claims before it is sent.
+
+Inbound, a follower per bound workspace reads its tracker project, from when reflexr first opens
+the workspace and from when the application starts, and publishes what people change there as
+``tracker:`` events, which only it may publish. A webhook to
+``/relayr/v1/trackers/<tenant>/{{ tracker }}`` makes it read at once; a lost one costs only time.
+
+Each tenant has a tracker workspace and user of its own (``TRACKER_CREDENTIALS``), and each
+workspace one project (``TRACKER_BINDINGS``): stackr's tracker guide provisions them, and its
+``make tracker-check`` checks them.
+"""
+
+import contextlib
+import html
+from collections.abc import AsyncGenerator, Mapping
+
+import httpx
+from fastapi import FastAPI
+
+from reflexr import F, Rule, on, run
+from reflexr.core import RunDeadLettered
+from reflexr.workspace import Action, Reaction, Workspaces
+from relayr.fastapi import tracker_router
+from relayr.ledger import Ledger, WorkspaceKey
+from relayr.outbound import Allowlist
+{%- if tracker == 'plane' %}
+from relayr.plane import INTEGRATION, plane
+{%- endif %}
+from relayr.trackers import (
+    Connect,
+    Deleted,
+    ItemDraft,
+    TrackerCredentials,
+    TrackerFollowers,
+    Trackers,
+)
+{%- if tracker == 'vikunja' %}
+from relayr.vikunja import INTEGRATION, vikunja
+{%- endif %}
+
+from {{ package_name }}.database import Database
+from {{ package_name }}.settings import TrackerSettings
+from {{ package_name }}.telemetry import TelemetryHandle
+
+FILE_DEAD_LETTER = "{{ package_name }}:file-dead-letter"
+
+file_dead_letter = Rule(
+    name=FILE_DEAD_LETTER,
+    description="A rule's run was dead-lettered. File the rule in the tracker, with the failure.",
+    # Its own would file into the tracker that failed it, and fail again.
+    when=on(RunDeadLettered).where(F.rule.ne(FILE_DEAD_LETTER)),
+    then=run("file-dead-letter"),
+)
+
+RULES = [file_dead_letter]
+
+ALLOWLISTS: Mapping[str, Allowlist] = {FILE_DEAD_LETTER: Allowlist(trackers=True)}
+"""What each rule may do in its tracker: by default, nothing."""
+
+
+def tracker_actions(trackers: Trackers) -> dict[str, Action[None]]:
+    """The example's actions, which write to the tracker through relayr.
+
+    Args:
+        trackers: What the runs do in their workspace's tracker.
+    """
+
+    async def file_dead_letter(reaction: Reaction[None]) -> None:
+        [dead] = reaction.events
+        failed = dead.event
+        assert isinstance(failed, RunDeadLettered)
+        workspace = WorkspaceKey(reaction.workspace.tenant_id, reaction.workspace.workspace_id)
+        if workspace not in trackers.bindings:
+            return  # the workspace files nowhere
+        acting = trackers.acting(reaction)
+        rule = html.escape(failed.rule)
+        draft = ItemDraft(
+            title=f"{failed.rule} fails",
+            description=f"<p>Runs of <code>{rule}</code> were dead-lettered, each a comment.</p>",
+            priority="high",
+            labels=("run-failed",),
+        )
+        item = await acting.ensure_item(draft, key=f"dead-letter/{failed.rule}")
+        if isinstance(item, Deleted):
+            return  # a person deleted it: the rule's failures are filed no more
+        tried = f"{failed.attempts} {'attempt' if failed.attempts == 1 else 'attempts'}"
+        said = f"Run <code>{failed.run_id}</code> failed after {tried}: {html.escape(failed.error)}"
+        await acting.comment(item, f"<p>{said}</p>")
+
+    return {"file-dead-letter": file_dead_letter}
+
+
+class Tracking:
+    """relayr's tracker connector: the example's actions, the followers, and the webhooks' route.
+
+    ``create_app`` gives its actions to the reactor and its :meth:`watch` to reflexr's part as its
+    ``on_open``, with the bridge's, and then :meth:`connect` s it to reflexr's workspaces.
+
+    Args:
+        ledger: The bridge's ledger, where every write is claimed before it is sent, and what the
+            followers read is kept.
+        settings: The tenants' credentials, the workspaces' bindings, and the budget.
+        connect: The tracker's adapter; {% if tracker == 'plane' %}Plane{% else %}Vikunja{% endif %}'s, over HTTP, by default. Tests pass
+            relayr's ``FakeTracker``'s.
+        telemetry: OpenTelemetry, for the followers' spans and the tracker's counters.
+    """
+
+    def __init__(
+        self,
+        ledger: Ledger,
+        settings: TrackerSettings,
+        *,
+        connect: Connect | None = None,
+        telemetry: TelemetryHandle | None = None,
+    ) -> None:
+        credentials = dict(settings.credentials)
+
+        async def credential(tenant: str) -> TrackerCredentials:
+            return credentials[tenant]
+
+        self._http: httpx.AsyncClient | None = None
+        """The client of the default adapter, which this part made and so closes."""
+        if connect is None:
+            self._http = httpx.AsyncClient()
+            connect = {{ tracker }}(self._http)
+        self._telemetry = telemetry
+        self.trackers = Trackers(
+            ledger,
+            connect=connect,
+            integration=INTEGRATION,
+            credentials=credential,
+            bindings=settings.bindings,
+            allowlists=ALLOWLISTS,
+            budget=settings.budget,
+            meter_provider=telemetry.meter_provider if telemetry else None,
+        )
+        self._followers: TrackerFollowers | None = None
+
+    def actions(self) -> dict[str, Action[None]]:
+        """The example's actions, which the reactor runs."""
+        return tracker_actions(self.trackers)
+
+    def connect(self, workspaces: Workspaces) -> None:
+        """Follow each bound workspace's project into reflexr's workspaces."""
+        self._followers = TrackerFollowers(
+            self.trackers,
+            workspaces,
+            tracer_provider=self._telemetry.tracer_provider if self._telemetry else None,
+            meter_provider=self._telemetry.meter_provider if self._telemetry else None,
+        )
+
+    async def watch(self, tenant_id: str, workspace_id: str) -> None:
+        """Follow a bound workspace's project, unless it is followed: reflexr's ``on_open`` hook."""
+        assert self._followers is not None, "create_app connects the tracker before anything opens"
+        await self._followers.watch(tenant_id, workspace_id)
+
+    async def migrate(self, database: Database) -> None:
+        """Nothing: the bridge migrates relayr's schema, the tracker's tables with it."""
+
+    @contextlib.asynccontextmanager
+    async def lifespan(self) -> AsyncGenerator[None]:
+        """Follow every bound workspace's project; stop each follower as the application stops.
+
+        It starts after the bridge, and stops before it.
+        """
+        assert self._followers is not None, "create_app connects the tracker"
+        try:
+            await self._followers.resume()
+            yield
+        finally:
+            await self._followers.aclose()
+            if self._http is not None:
+                await self._http.aclose()
+
+    def mount(self, app: FastAPI) -> None:
+        """Add the route the tracker's webhooks reach, which wakes the followers."""
+        assert self._followers is not None, "create_app connects the tracker"
+        app.include_router(tracker_router(self._followers))

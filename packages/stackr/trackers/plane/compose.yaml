@@ -1,0 +1,193 @@
+# Plane's Community edition, v1.4.2, beside stackr's stack: the opt-in recipe for relayr's
+# tracker connector (lattice RFC-0004, ADR-0039). Plane's own images, unmodified; NOTICE.md names
+# each, with its licence and source.
+#
+#   make tracker-up TRACKER=plane     (after `make up`, which creates the stackr network)
+#
+# It runs ten of the thirteen services Plane's own compose file does: the public pages (space),
+# the live collaboration server (live) and object storage are left out, so uploads don't work.
+# The proxy alone is published, at STACKR_BIND, as every port of the stack is (ADR-0006). The
+# proxy and the worker join the stackr network: an application reaches Plane there as
+# http://plane-proxy, and the worker sends Plane's webhooks to the application, at the one host
+# WEBHOOK_ALLOWED_HOSTS allows, app.stackr.internal: Plane takes only a URL whose host has a dot
+# in it, so the template's application has that name there as well as `app`.
+#
+# The services' names start with `plane-`, so none collides on the shared network; the proxy's
+# configuration names its upstreams web, api and admin, which are aliases on Plane's own network.
+
+name: stackr-plane
+
+networks:
+  default: {}
+  stackr:
+    external: true
+
+volumes:
+  plane-db:
+  plane-mq:
+
+# What every service of Plane's backend reads.
+x-plane-env: &plane-env
+  # Where people reach Plane: its links, sign-in redirects and CORS.
+  WEB_URL: ${PLANE_URL:-http://localhost:3800}
+  CORS_ALLOWED_ORIGINS: ${PLANE_URL:-http://localhost:3800}
+  DEBUG: "0"
+  SECRET_KEY: ${PLANE_SECRET_KEY:?run make env}
+  DATABASE_URL: postgresql://plane:${PLANE_DB_PASSWORD:?run make env}@plane-db:5432/plane
+  REDIS_URL: redis://plane-redis:6379/
+  AMQP_URL: amqp://plane:${PLANE_MQ_PASSWORD:?run make env}@plane-mq:5672/plane
+  GUNICORN_WORKERS: "1"
+  # Plane's default is 60 a minute per key, and one key is one tenant's; relayr's budget is set
+  # to match this (the template's TRACKER_BUDGET).
+  API_KEY_RATE_LIMIT: ${PLANE_API_KEY_RATE_LIMIT:-300/minute}
+  # Plane refuses webhooks to private addresses unless their host is allowed: the application's
+  # name on the stackr network, and nothing wider.
+  WEBHOOK_ALLOWED_HOSTS: ${PLANE_WEBHOOK_HOSTS:-app.stackr.internal}
+  # No object storage: its address names no host, so Plane's check of its bucket at startup
+  # fails at once, rather than asking AWS.
+  USE_MINIO: "0"
+  AWS_S3_ENDPOINT_URL: http://plane-uploads.invalid
+  AWS_S3_BUCKET_NAME: uploads
+
+# What the backend's services wait for.
+x-plane-depends-on: &plane-depends-on
+  plane-migrator:
+    condition: service_completed_successfully
+  plane-redis:
+    condition: service_healthy
+  plane-mq:
+    condition: service_healthy
+
+services:
+  plane-db:
+    image: postgres:15.7-alpine@sha256:468d34fefd6338031787c7b8e94078975b3aaf4d66c7ead25c39cd3ba46a15c6
+    restart: unless-stopped
+    command: postgres -c max_connections=200
+    environment:
+      POSTGRES_USER: plane
+      POSTGRES_PASSWORD: ${PLANE_DB_PASSWORD:?run make env}
+      POSTGRES_DB: plane
+    volumes:
+      - plane-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U plane -d plane"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  # Plane's cache, in memory only.
+  plane-redis:
+    image: valkey/valkey:7.2.11-alpine@sha256:10328d00120dc14fbc87b2ed61b7677ddbb0d011e705361b4788329a0ec69a93
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  # The queue the worker takes tasks from, webhooks' deliveries among them. 4.1, not the
+  # 3.13-management Plane's compose names, which stops at boot.
+  plane-mq:
+    image: rabbitmq:4.1.4-alpine@sha256:b736d649308e1b3e1a116c3f36986b605ee3d03e88f10166be2900083d2e63f2
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: plane
+      RABBITMQ_DEFAULT_PASS: ${PLANE_MQ_PASSWORD:?run make env}
+      RABBITMQ_DEFAULT_VHOST: plane
+    volumes:
+      - plane-mq:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+
+  plane-migrator:
+    image: makeplane/plane-backend:v1.4.2@sha256:90032ce088708889b60c00d491897916f4deb882facda27db59fd10fb68729ef
+    command: ./bin/docker-entrypoint-migrator.sh
+    environment: *plane-env
+    depends_on:
+      plane-db:
+        condition: service_healthy
+
+  plane-api:
+    image: makeplane/plane-backend:v1.4.2@sha256:90032ce088708889b60c00d491897916f4deb882facda27db59fd10fb68729ef
+    restart: unless-stopped
+    command: ./bin/docker-entrypoint-api.sh
+    environment: *plane-env
+    networks:
+      default:
+        aliases: [api]
+    depends_on: *plane-depends-on
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/instances/', timeout=3)
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+  # Celery's worker, which delivers webhooks. Its entrypoint's steps, with a concurrency: Celery
+  # forks a process per CPU by default, 1.25 GiB on 16 of them.
+  plane-worker:
+    image: makeplane/plane-backend:v1.4.2@sha256:90032ce088708889b60c00d491897916f4deb882facda27db59fd10fb68729ef
+    restart: unless-stopped
+    command:
+      - sh
+      - -c
+      - >-
+        python manage.py wait_for_db && python manage.py wait_for_migrations &&
+        exec celery -A plane worker -l info --concurrency ${PLANE_WORKER_CONCURRENCY:-2}
+    environment: *plane-env
+    networks: [default, stackr]
+    depends_on: *plane-depends-on
+
+  plane-beat-worker:
+    image: makeplane/plane-backend:v1.4.2@sha256:90032ce088708889b60c00d491897916f4deb882facda27db59fd10fb68729ef
+    restart: unless-stopped
+    command: ./bin/docker-entrypoint-beat.sh
+    environment: *plane-env
+    depends_on: *plane-depends-on
+
+  plane-web:
+    image: makeplane/plane-frontend:v1.4.2@sha256:22fd2434fb8d6658439f669ab72f999ce0773abe587663da21a77d70bd63ff61
+    restart: unless-stopped
+    networks:
+      default:
+        aliases: [web]
+    depends_on:
+      - plane-api
+
+  # The instance's admin, at /god-mode/: where its first admin is made, and telemetry turned off.
+  plane-admin:
+    image: makeplane/plane-admin:v1.4.2@sha256:6e1bb1d800d3c7ce84a09f810d5588db8613b35d4464e722a1bec12556ca0ebb
+    restart: unless-stopped
+    networks:
+      default:
+        aliases: [admin]
+    depends_on:
+      - plane-api
+
+  # Caddy, routing Plane's paths to its services. Its certificate settings stay unset: set but
+  # empty, they break its configuration.
+  plane-proxy:
+    image: makeplane/plane-proxy:v1.4.2@sha256:47e651c56749c287710cc26f82dc5d1046a2af76a332aa048ab7adb881cc4cd0
+    restart: unless-stopped
+    environment:
+      SITE_ADDRESS: ":80"
+      FILE_SIZE_LIMIT: "5242880"
+      BUCKET_NAME: uploads
+    ports:
+      - target: 80
+        published: ${PLANE_PORT:-3800}
+        host_ip: ${STACKR_BIND:-127.0.0.1}
+        protocol: tcp
+    networks: [default, stackr]
+    depends_on:
+      plane-api:
+        condition: service_healthy
+      plane-web:
+        condition: service_started

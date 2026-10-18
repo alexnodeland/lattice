@@ -65,6 +65,19 @@ bridge:
   default: true
   when: "{{ libraries == 'both' }}"
 
+tracker:
+  type: str
+  help: >-
+    A task tracker for relayr (rules' runs file items there, and people's changes come back as
+    events; with a dead-letter example)? It runs beside the stack from stackr's recipe for it,
+    with each tenant provisioned as stackr's tracker guide says.
+  choices:
+    none: none
+    plane (Plane's Community edition): plane
+    vikunja: vikunja
+  default: none
+  when: "{{ libraries == 'both' and bridge }}"
+
 access:
   type: str
   help: Who may do what
@@ -132,6 +145,11 @@ use_reflexr:
 use_relayr:
   type: bool
   default: "{{ libraries == 'both' and bridge }}"
+  when: false
+
+use_tracker:
+  type: bool
+  default: "{{ libraries == 'both' and bridge and tracker != 'none' }}"
   when: false
 
 use_portal:

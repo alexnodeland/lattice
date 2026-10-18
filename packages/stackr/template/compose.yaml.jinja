@@ -28,7 +28,15 @@ services:
       APP_PORT: "8000"
     ports:
       - ${APP_BIND:-127.0.0.1}:${APP_PORT:-{{ app_port }}}:8000
+{%- if use_tracker and tracker == 'plane' %}
+    networks:
+      stackr:
+        # Plane sends webhooks only to a name with a dot in it, which stackr's recipe allows.
+        aliases: [app.stackr.internal]
+      supabase: {}
+{%- else %}
     networks: [stackr, supabase]
+{%- endif %}
     healthcheck:
       test:
         - CMD

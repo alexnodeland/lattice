@@ -48,9 +48,11 @@ deploy/aws/         the AWS recipe (RFC-0004), in OpenTofu: its modules, with st
                     installs OpenTofu and TFLint with, and state-host/, the Compose its EC2 state
                     host runs
 deploy/postgres/    init.sql: each service's role and database, created by db-init
+trackers/           the task trackers' opt-in recipes (lattice RFC-0004): plane/ and vikunja/, each
+                    a Compose project beside the stack, with the NOTICE.md of the images it runs
 supabase/           the Supabase CLI project: config.toml (project id stackr-supabase) and seed.sql
-scripts/            setup-env, validate, smoke, create-tenant, check-config, check-template, check-app
-                    and docs-reference, run by make, moon and CI; _env.py reads the settings files
+scripts/            setup-env, validate, smoke, create-tenant, check-config, check-template, check-app,
+                    tracker-check and docs-reference, run by make, moon and CI; _env.py reads the settings files
                     for the Python ones; auth-keys, the AWS recipe's one-off task, which writes
                     _auth_keys.py's keys to Secrets Manager
 ```
@@ -172,6 +174,10 @@ The LiteLLM proxy is the LLM gateway port: an OpenAI-compatible API at <http://l
 ## A single host
 
 With `STACKR_RECIPE=host`, `make` adds `deploy/host/compose.prod.yaml` to the stack: Caddy publishes 80 and 443 and serves `app.<domain>` and `auth.<domain>`, the admin UIs keep their ports on `127.0.0.1` for SSH tunnels, and the rest publish nothing. It runs on the `postgres` adapter with the `auth` profile, GoTrue alone ([RFC-0004](rfcs/0004-hosting-recipes.md), [ADR-0026](adr/0026-the-single-host.md)). It backs up PostgreSQL with pgBackRest and ClickHouse with its own `BACKUP` to a bucket off the host, nightly, and a weekly restore drill checks them ([ADR-0027](adr/0027-the-single-hosts-backups.md)). [A single host](guides/single-host.md) covers it.
+
+## Task trackers
+
+relayr's tracker connector files rules' work in a task tracker and reads people's changes back ([lattice RFC-0004](../rfcs/0004-relayr-and-task-trackers.md)). Two opt-in recipes run one beside the stack, each a Compose project of its own that joins the `stackr` network and publishes one port at `STACKR_BIND`: Plane's Community edition (`make tracker-up TRACKER=plane`) and Vikunja (`TRACKER=vikunja`). Each tenant has a tracker workspace and a tracker user of its own, provisioned by a checklist and checked by `make tracker-check`; the template's `tracker` question wires an application to one ([ADR-0039](adr/0039-the-task-trackers-recipes-checker-and-question.md)). [Task trackers](guides/trackers.md) covers it.
 
 ## The database
 

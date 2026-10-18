@@ -5,7 +5,7 @@ Usage: scripts/check-template [--keep DIR]
 
 Renders every variant of the template (artifactr, reflexr or both, with and without evals, with
 grantr or no access control, with portalr, which grantr needs, or without it, both without
-relayr's bridge, and both hosted on a single host) from
+relayr's bridge, both hosted on a single host, and both filing in Plane or Vikunja) from
 this checkout, working tree included, under the name in NAME, and checks each one:
 
 - every Jinja expression was rendered: nothing is left of `{{ ... }}` or `{% ... %}`, apart
@@ -50,6 +50,7 @@ class Variant(NamedTuple):
     bridge: bool  # whether relayr bridges both libraries
     hosting: str
     portal: bool  # portalr, which only grantr's access can have
+    tracker: str = "none"  # the task tracker relayr files in, which only the bridge can have
 
     @property
     def name(self) -> str:
@@ -60,6 +61,7 @@ class Variant(NamedTuple):
             f"{'-unbridged' if self.libraries == 'both' and not self.bridge else ''}"
             f"{'' if self.hosting == 'none' else f'-{self.hosting}'}"
             f"{'-noportal' if self.access == 'grantr' and not self.portal else ''}"
+            f"{'' if self.tracker == 'none' else f'-{self.tracker}'}"
         )
 
 
@@ -72,6 +74,8 @@ VARIANTS = [
     Variant("both", True, "grantr", False, "none", True),
     Variant("both", True, "grantr", True, "host", True),
     Variant("both", True, "grantr", True, "none", False),
+    Variant("both", True, "grantr", True, "none", True, "plane"),
+    Variant("both", True, "none", True, "none", False, "vikunja"),
 ]
 """Every variant of the template."""
 LEFTOVER = re.compile(r"(?<!\$)\{\{|\{%|%\}")

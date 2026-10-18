@@ -1,0 +1,385 @@
+#!/usr/bin/env python3
+"""Check that a tenant's task tracker is provisioned as the tracker guide says, changing nothing.
+
+Usage: scripts/tracker-check TENANT --tracker plane|vikunja [--app-env PATH]
+
+It reads what the application reads: TRACKER_CREDENTIALS and TRACKER_BINDINGS, from the
+application's .env (--app-env) or else this environment. Then it asks the tracker, with the
+tenant's own key and only GET requests, about each step of the checklist (lattice RFC-0004), and
+says which is missing:
+
+- the key works, and is the key of relayr-<TENANT>, the tenant's own tracker user
+- on Plane: the user is an ordinary member of the tenant's workspace, and of each bound project
+- on Vikunja: each bound project is the user's, and a webhook on it names the application's route
+- isolation, as far as the API shows it: on Plane, the user is a member of no project that isn't
+  bound, and is refused in every other tenant's workspace TRACKER_CREDENTIALS names; on Vikunja,
+  it sees no project another user owns
+- on Vikunja: the token doesn't expire within 14 days (the `expires_at` its credentials keep)
+
+Plane's API keys can't read webhooks, so on Plane it says so. Then it reads
+relayr.trackers.unnudged from stackr's Prometheus, when the observability profile runs: changes
+a follower found that no webhook announced, which a webhook that never arrives shows as.
+
+Exits 1 if a step is missing or isolation is broken, and 0 otherwise; warnings don't fail it.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sys
+from collections.abc import Iterator, Mapping
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from typing import Any, Literal
+
+import httpx
+
+from _env import published_host, read_env, settings
+
+TRACKERS = ("plane", "vikunja")
+WARNING = timedelta(days=14)
+"""How long before a Vikunja token expires the check warns of it."""
+
+KEPT_OUT = frozenset({403, 404})
+"""What Plane answers a key for a workspace its user isn't in: anything else tells nothing."""
+
+PLANE_MEMBER = 15
+"""Plane's role of a workspace's or project's member: 20 is an admin, 5 a guest."""
+
+VIKUNJA_EVENTS = frozenset({"task.created", "task.updated", "task.deleted", "task.comment.created"})
+"""The events a Vikunja webhook sends for relayr's followers."""
+
+UNNUDGED = "sum(increase(relayr_trackers_unnudged_total{{tenant_id={tenant}}}[1h]))"
+"""The changes in the last hour a follower found that no webhook announced, by the tenant."""
+
+type Level = Literal["ok", "missing", "isolation", "warn", "skip"]
+FAILING: frozenset[Level] = frozenset({"missing", "isolation"})
+
+
+@dataclass(frozen=True)
+class Finding:
+    """What one check found."""
+
+    level: Level
+    text: str
+
+    def __str__(self) -> str:
+        return f"{self.level}: {self.text}"
+
+
+@dataclass(frozen=True)
+class Tenant:
+    """A tenant's tracker, as the application's settings name it."""
+
+    name: str
+    credentials: Mapping[str, Any]
+    projects: tuple[str, ...]
+    """The projects its workspaces are bound to."""
+
+    others: Mapping[str, str]
+    """The other tenants' Plane workspaces, by tenant."""
+
+    @property
+    def user(self) -> str:
+        return f"relayr-{self.name}"
+
+    @property
+    def route(self) -> str:
+        return f"/relayr/v1/trackers/{self.name}/"
+
+
+class Refused(Exception):
+    """The tracker refused a request, or didn't answer it.
+
+    Args:
+        reason: What happened, for people.
+        status: The HTTP status it answered with, or None if it answered none.
+    """
+
+    def __init__(self, reason: str, status: int | None = None) -> None:
+        super().__init__(reason)
+        self.status = status
+
+
+def tenant_of(env: Mapping[str, str], name: str) -> Tenant:
+    """Read a tenant's credentials and bound projects from the application's settings."""
+    credentials = _json_object(env.get("TRACKER_CREDENTIALS") or "{}", "TRACKER_CREDENTIALS")
+    bindings = _json_object(env.get("TRACKER_BINDINGS") or "{}", "TRACKER_BINDINGS")
+    own = credentials.get(name)
+    if not isinstance(own, dict):
+        raise SystemExit(f"tracker-check: TRACKER_CREDENTIALS has nothing for {name}")
+    projects = tuple(
+        str(binding["project"])
+        for key, binding in bindings.items()
+        if key.partition("/")[0] == name and isinstance(binding, dict) and "project" in binding
+    )
+    others = {
+        tenant: str(entry["workspace"])
+        for tenant, entry in credentials.items()
+        if tenant != name and isinstance(entry, dict) and entry.get("workspace")
+    }
+    return Tenant(name, own, projects, others)
+
+
+def check_plane(client: httpx.Client, tenant: Tenant) -> list[Finding]:
+    """Check a tenant's Plane workspace through Plane's API, with the tenant's key."""
+    api = Api(client, str(tenant.credentials["base_url"]), {"X-Api-Key": _key(tenant)})
+    slug = str(tenant.credentials.get("workspace", ""))
+    try:
+        me = api.get("/api/v1/users/me/")
+    except Refused as refused:
+        return [Finding("missing", f"the API key: {refused}; sign in as {tenant.user}, make one")]
+    if me.get("display_name") != tenant.user:
+        named = me.get("display_name") or me.get("email")
+        return [Finding("missing", f"the key is {named}'s, not {tenant.user}'s")]
+    found = [Finding("ok", f"the key is {tenant.user}'s")]
+    try:
+        members = api.get(f"/api/v1/workspaces/{slug}/members/")
+    except Refused as refused:
+        return [*found, Finding("missing", f"{tenant.user} in workspace {slug!r}: {refused}")]
+    role = next((m.get("role") for m in members if m.get("id") == me.get("id")), None)
+    if role == PLANE_MEMBER:
+        found.append(Finding("ok", f"{tenant.user} is a member of workspace {slug}"))
+    else:
+        found.append(
+            Finding("missing", f"{tenant.user} is role {role} in {slug}, not a member (15)")
+        )
+    found += _plane_projects(api, slug, tenant)
+    for other, workspace in sorted(tenant.others.items()):
+        found.append(_plane_elsewhere(api, tenant, other, workspace))
+    found.append(
+        Finding(
+            "skip",
+            "Plane's API keys can't read webhooks: check it in the workspace's settings, "
+            f"for work items and comments, to <application>{tenant.route}plane",
+        )
+    )
+    return found
+
+
+def _plane_projects(api: Api, slug: str, tenant: Tenant) -> Iterator[Finding]:
+    """Whether the user is a member of each bound project, and of no other."""
+    try:
+        projects = list(_plane_pages(api, f"/api/v1/workspaces/{slug}/projects/"))
+    except Refused as refused:
+        yield Finding("missing", f"the projects of {slug}: {refused}")
+        return
+    joined = {str(p["id"]): p for p in projects if p.get("is_member")}
+    listed = {str(p["id"]) for p in projects}
+    if not tenant.projects:
+        yield Finding("missing", f"TRACKER_BINDINGS binds none of {tenant.name}'s workspaces")
+    for project in tenant.projects:
+        if project in joined:
+            yield Finding("ok", f"{tenant.user} is a member of project {joined[project]['name']}")
+        elif project in listed:
+            yield Finding("missing", f"{tenant.user} is not a member of bound project {project}")
+        else:
+            yield Finding("missing", f"bound project {project} isn't in workspace {slug}")
+    for project, about in sorted(joined.items()):
+        if project not in tenant.projects:
+            name = about["name"]
+            yield Finding("isolation", f"{tenant.user} is a member of {name}, which isn't bound")
+
+
+def _plane_elsewhere(api: Api, tenant: Tenant, other: str, workspace: str) -> Finding:
+    """Whether the user is kept out of another tenant's workspace."""
+    try:
+        api.get(f"/api/v1/workspaces/{workspace}/members/")
+    except Refused as refused:
+        if refused.status in KEPT_OUT:
+            return Finding("ok", f"{tenant.user} is not in {other}'s workspace, {workspace}")
+        return Finding("missing", f"{other}'s workspace, {workspace}, couldn't be asked: {refused}")
+    return Finding("isolation", f"{tenant.user} is in {other}'s workspace, {workspace}")
+
+
+def check_vikunja(client: httpx.Client, tenant: Tenant, now: datetime) -> list[Finding]:
+    """Check a tenant's Vikunja projects through Vikunja's API, with the tenant's token."""
+    base = str(tenant.credentials["base_url"])
+    api = Api(client, base, {"Authorization": f"Bearer {_key(tenant)}"})
+    found = [_expiry(tenant, now)]
+    try:
+        me = api.get("/api/v1/user")
+    except Refused as refused:
+        missing = f"the token: {refused}; it needs every scope the tracker guide lists"
+        return [*found, Finding("missing", missing)]
+    if me.get("username") != tenant.user:
+        return [
+            *found,
+            Finding("missing", f"the token is {me.get('username')}'s, not {tenant.user}'s"),
+        ]
+    found.append(Finding("ok", f"the token is {tenant.user}'s"))
+    try:
+        projects = {str(p["id"]): p for p in _vikunja_pages(api, "/api/v1/projects")}
+    except Refused as refused:
+        return [*found, Finding("missing", f"the user's projects: {refused}")]
+    if not tenant.projects:
+        found.append(
+            Finding("missing", f"TRACKER_BINDINGS binds none of {tenant.name}'s workspaces")
+        )
+    for project in tenant.projects:
+        if project not in projects:
+            found.append(Finding("missing", f"bound project {project} isn't {tenant.user}'s"))
+            continue
+        found.append(Finding("ok", f"{tenant.user} has project {projects[project]['title']}"))
+        found.append(_vikunja_webhook(api, tenant, project))
+    for _, about in sorted(projects.items()):
+        owner = (about.get("owner") or {}).get("username")
+        if owner != tenant.user:
+            title = about["title"]
+            found.append(Finding("isolation", f"{tenant.user} sees {owner}'s project {title}"))
+    return found
+
+
+def _vikunja_webhook(api: Api, tenant: Tenant, project: str) -> Finding:
+    """Whether a bound project's webhook sends relayr's events to the application's route."""
+    try:
+        hooks = api.get(f"/api/v1/projects/{project}/webhooks")
+    except Refused as refused:
+        return Finding("missing", f"project {project}'s webhooks: {refused}")
+    route = f"{tenant.route}vikunja"
+    for hook in hooks:
+        if str(hook.get("target_url", "")).endswith(route):
+            lacking = VIKUNJA_EVENTS - set(hook.get("events") or ())
+            if lacking:
+                return Finding("missing", f"project {project}'s webhook sends no {sorted(lacking)}")
+            return Finding("ok", f"project {project}'s webhook goes to {hook['target_url']}")
+    return Finding("missing", f"project {project} has no webhook to <application>{route}")
+
+
+def _expiry(tenant: Tenant, now: datetime) -> Finding:
+    """When the token expires, as its credentials say: Vikunja's tokens can't read their own."""
+    kept = tenant.credentials.get("expires_at")
+    if not kept:
+        return Finding("warn", f"{tenant.name}'s credentials keep no expires_at for its token")
+    try:
+        expires = datetime.fromisoformat(str(kept))
+    except ValueError:
+        return Finding("warn", f"{tenant.name}'s expires_at, {kept!r}, isn't a date")
+    expires = expires if expires.tzinfo else expires.replace(tzinfo=UTC)
+    if expires <= now:
+        return Finding("missing", f"the token expired on {kept}: make another (rotation)")
+    if expires - now <= WARNING:
+        return Finding("warn", f"the token expires on {kept}, within 14 days: rotate it")
+    return Finding("ok", f"the token expires on {kept}")
+
+
+def check_nudges(client: httpx.Client, prometheus: str, tenant: Tenant) -> Finding:
+    """Read how many changes in the last hour came with no webhook, from Prometheus."""
+    query = UNNUDGED.format(tenant=json.dumps(tenant.name))
+    try:
+        response = client.get(f"{prometheus}/api/v1/query", params={"query": query})
+        response.raise_for_status()
+        result = response.json()["data"]["result"]
+    except (httpx.HTTPError, ValueError, KeyError) as error:
+        why = type(error).__name__
+        return Finding("skip", f"the nudges: Prometheus at {prometheus} answered no query ({why})")
+    if not result:
+        return Finding(
+            "skip", "the nudges: no follower has counted a change no webhook announced, yet"
+        )
+    unnudged = float(result[0]["value"][1])
+    if unnudged:
+        return Finding(
+            "warn",
+            f"{unnudged:.0f} changes in the last hour came with no webhook: is it registered, "
+            "active, and to a host the tracker allows?",
+        )
+    return Finding("ok", "every change in the last hour came with its webhook")
+
+
+class Api:
+    """GET requests to a tracker's API, with the tenant's key."""
+
+    def __init__(self, client: httpx.Client, base: str, headers: Mapping[str, str]) -> None:
+        self._client = client
+        self._base = base.rstrip("/")
+        self._headers = dict(headers)
+
+    def get(self, path: str, params: Mapping[str, str | int] | None = None) -> Any:
+        """The JSON a GET answers; raises Refused for anything but 200."""
+        try:
+            response = self._client.get(self._base + path, params=params, headers=self._headers)
+        except httpx.HTTPError as error:
+            raise Refused(f"{self._base} didn't answer ({type(error).__name__})") from error
+        if response.status_code != 200:
+            raise Refused(f"refused with {response.status_code}", response.status_code)
+        try:
+            return response.json()
+        except ValueError as error:
+            raise Refused("answered something other than JSON", response.status_code) from error
+
+
+def _plane_pages(api: Api, path: str) -> Iterator[dict[str, Any]]:
+    """Every entry of a Plane list, by its cursors, a thousand at a time."""
+    params: dict[str, str | int] = {"per_page": 1000}
+    while True:
+        page = api.get(path, params)
+        yield from page["results"]
+        if not page.get("next_page_results"):
+            return
+        params["cursor"] = page["next_cursor"]
+
+
+def _vikunja_pages(api: Api, path: str) -> Iterator[dict[str, Any]]:
+    """Every entry of a Vikunja list, page by page, fifty at a time."""
+    number = 1
+    while True:
+        entries = api.get(path, {"page": number, "per_page": 50})
+        yield from entries
+        if len(entries) < 50:
+            return
+        number += 1
+
+
+def _key(tenant: Tenant) -> str:
+    return str(tenant.credentials.get("api_key", ""))
+
+
+def _json_object(text: str, name: str) -> dict[str, Any]:
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError as error:
+        raise SystemExit(f"tracker-check: {name} isn't JSON") from error
+    if not isinstance(parsed, dict):
+        raise SystemExit(f"tracker-check: {name} isn't a JSON object")
+    return parsed
+
+
+def run(
+    tenant: Tenant, tracker: str, client: httpx.Client, prometheus: str, now: datetime
+) -> list[Finding]:
+    """Every check of a tenant's tracker, then its nudges."""
+    if tracker == "plane":
+        found = check_plane(client, tenant)
+    else:
+        found = check_vikunja(client, tenant, now)
+    return [*found, check_nudges(client, prometheus, tenant)]
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description=__doc__.splitlines()[0],
+        usage="scripts/tracker-check TENANT --tracker plane|vikunja [--app-env PATH]",
+    )
+    parser.add_argument("tenant")
+    parser.add_argument("--tracker", choices=TRACKERS, required=True)
+    parser.add_argument("--app-env", type=Path, help="the application's .env")
+    args = parser.parse_args()
+    if args.app_env is not None and not args.app_env.exists():
+        raise SystemExit(f"tracker-check: {args.app_env} is missing")
+    env = read_env(args.app_env) if args.app_env else dict(os.environ)
+    tenant = tenant_of(env, args.tenant)
+    stack = settings()
+    prometheus = f"http://{published_host(stack)}:{stack['PROMETHEUS_PORT']}"
+    with httpx.Client(timeout=10) as client:
+        found = run(tenant, args.tracker, client, prometheus, datetime.now(UTC))
+    for finding in found:
+        print(finding)
+    return 1 if any(finding.level in FAILING for finding in found) else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

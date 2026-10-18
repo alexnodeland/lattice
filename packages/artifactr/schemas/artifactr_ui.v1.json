@@ -2,7 +2,7 @@
   "$defs": {
     "App": {
       "additionalProperties": false,
-      "description": "A mini app: one HTML file an agent wrote, its text fallback, and its state.\n\nDefined in phase 1 and offered to no agent: portalr shows its title and summary, and runs\nnothing. A person changes only its ``state``.",
+      "description": "A mini app: one HTML file an agent wrote, its text fallback, and its state.\n\nportalr runs it sandboxed, on an origin of its own, with no network, while mini apps are on\nin the workspace; its ``summary`` is shown beside it, and in its place where it doesn't run.\nAn agent writes it, and its HTML names nothing to load, which the agent's tools and the\nchecks hold; a person changes only its ``state``, through the app.",
       "properties": {
         "html": {
           "title": "Html",

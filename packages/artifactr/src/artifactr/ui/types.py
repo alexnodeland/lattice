@@ -9,8 +9,8 @@ Register :data:`UI_TYPES` with the application's own types, in ``Workspaces(type
   against the version they saw. Its id is derived (:func:`~artifactr.ui.ids.submission_id`).
 - :class:`Dashboard`, kind ``dashboard``: a snapshot of figures in panels, true ``as_of`` a
   moment, which the agent writes.
-- :class:`App`, kind ``app``: a mini app's HTML and its state. Defined, and offered to no agent
-  yet: running one is RFC-0005's second phase.
+- :class:`App`, kind ``app``: a mini app's HTML and its state, which an agent writes through
+  its own tools, and which runs sandboxed, with no network, where mini apps are on.
 
 Their data's JSON Schema, with ``ask_form``'s request's, is :mod:`artifactr.ui.wire`'s.
 """
@@ -272,8 +272,10 @@ class Dashboard(Artifact, name="dashboard"):
 class App(Artifact, name="app"):
     """A mini app: one HTML file an agent wrote, its text fallback, and its state.
 
-    Defined in phase 1 and offered to no agent: portalr shows its title and summary, and runs
-    nothing. A person changes only its ``state``.
+    portalr runs it sandboxed, on an origin of its own, with no network, while mini apps are on
+    in the workspace; its ``summary`` is shown beside it, and in its place where it doesn't run.
+    An agent writes it, and its HTML names nothing to load, which the agent's tools and the
+    checks hold; a person changes only its ``state``, through the app.
     """
 
     title: _Title
@@ -294,5 +296,6 @@ UI_TYPES: Final[tuple[type[Artifact], ...]] = (Form, Submission, Dashboard, App)
 """The forms layer's artifact types, for ``Workspaces(types=...)``."""
 
 AGENT_TYPES: Final[tuple[type[Artifact], ...]] = (Form, Dashboard)
-"""The types an agent makes and changes itself, for ``ArtifactWorkspace(types=...)``: not a
-submission, which is a person's, nor an app, which phase 2 offers through tools of its own."""
+"""The types an agent makes and changes with ``ArtifactWorkspace``'s generic tools, for its
+``types=...``: not a submission, which is a person's, nor an app, which ``create_app`` and
+``update_app`` make and change, while mini apps are on."""

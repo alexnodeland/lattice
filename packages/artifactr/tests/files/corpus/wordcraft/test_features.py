@@ -1,29 +1,14 @@
-"""The corpus: one file per feature, as `make.py` makes it, each holding its feature."""
+"""WordCraft's corpus: what each feature's value means."""
 
-import pytest
-
-from tests.files.corpus.features import READERS, read
-from tests.files.corpus.make import FEATURES, HERE
+from tests.files.corpus.wordcraft.corpus import CORPUS
+from tests.files.corpus.wordcraft.features import READERS, read
 
 
-def test_the_corpus_is_what_make_makes() -> None:
-    assert sorted(p.name for p in HERE.iterdir()) == sorted(f"{f}.docx" for f in FEATURES)
-    for feature, make in FEATURES.items():
-        assert (HERE / f"{feature}.docx").read_bytes() == make(), (
-            f"{feature}.docx drifted: run python -m tests.files.corpus.make"
-        )
-
-
-@pytest.mark.parametrize("feature", sorted(FEATURES))
-def test_each_file_holds_its_feature(feature: str) -> None:
-    assert read(feature, (HERE / f"{feature}.docx").read_bytes())
-    assert set(READERS) == set(FEATURES)
+def value(feature: str) -> object:
+    return read(feature, CORPUS.source(feature))
 
 
 def test_a_features_value_is_what_it_means() -> None:
-    def value(feature: str) -> object:
-        return read(feature, (HERE / f"{feature}.docx").read_bytes())
-
     assert value("styles") == [
         ("title", "Contract"),
         ("heading 1", "Terms"),
@@ -46,3 +31,7 @@ def test_a_features_value_is_what_it_means() -> None:
         (("12240", "15840", None), ("1440", "1440", "1440", "1440"), "1"),
         (("15840", "12240", "landscape"), ("720", "720", "720", "720"), "2"),
     ]
+
+
+def test_every_feature_has_a_reader() -> None:
+    assert set(READERS) == set(CORPUS.makers)

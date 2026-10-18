@@ -1,70 +1,28 @@
-"""WordCraft itself, run headless from the pinned CLI: the fidelity report, and the adapter live.
+"""WordCraft itself, run headless from the pinned CLI: the adapter live.
 
-These run only where `ARTIFACTR_TEST_WORDCRAFT` names a `wordcraft-cli`, as Nightly sets it from
-`scripts/wordcraft cli`. Each corpus file is opened and saved, and its feature compared before and
-after; saving it again must be a fixpoint. With `WORDCRAFT_MATRIX` set, the conftest writes the
-results there as a Markdown matrix (lattice RFC-0003, phase 2).
+These run only where `ARTIFACTR_TEST_CRAFT` is `wordcraft` and `ARTIFACTR_TEST_CRAFT_CLI` names
+its CLI, as `moon run artifactr:fidelity` sets them from `scripts/craft wordcraft cli`. Its
+fidelity report is the corpus harness's, `tests/files/corpus/test_fidelity.py`.
 """
 
 import os
-import re
-import zipfile
-from io import BytesIO
-from pathlib import Path
 
 import pytest
 
 from artifactr.files.app import AppCommand, AppFailed
-from artifactr.files.wordcraft import STAMPED, Subprocess
-from tests.files.corpus.features import read
-from tests.files.corpus.make import FEATURES, HERE
+from artifactr.files.wordcraft import Subprocess
+from tests.files.corpus.harness import pinned
+from tests.files.corpus.wordcraft.corpus import CORPUS
 
-# Two calls a test, each within its deadline, well inside the test's own timeout: a test the
-# timeout ends would end the session before the conftest writes the matrix.
-pytestmark = [pytest.mark.wordcraft, pytest.mark.timeout(120)]
+pytestmark = [pytest.mark.craft("wordcraft"), pytest.mark.timeout(120)]
 DEADLINE = 20
-
-PIN = Path(__file__).parents[5] / "scripts" / "wordcraft.sha256"
-VERSION = re.findall(r"wordcraft-web-(\S+)\.zip", PIN.read_text())[0]
-"""The version scripts/wordcraft pins, which the CLI must be."""
-
-UNSUPPORTED: frozenset[str] = frozenset()
-"""The features the pinned WordCraft is known not to keep, which the matrix says, and which
-Nightly expects to fail: a feature that fails outside them, or passes inside them, turns it
-red. WordCraft 0.7.0 keeps every one."""
-
-
-def features() -> list[object]:
-    return [
-        pytest.param(f, marks=pytest.mark.xfail(strict=True) if f in UNSUPPORTED else ())
-        for f in sorted(FEATURES)
-    ]
+VERSION = pinned("wordcraft")
+"""The version scripts/craft pins, which the CLI must be."""
 
 
 @pytest.fixture(scope="module")
 def wordcraft() -> Subprocess:
-    return Subprocess(os.environ["ARTIFACTR_TEST_WORDCRAFT"], version=VERSION)
-
-
-def parts(content: bytes) -> dict[str, bytes]:
-    with zipfile.ZipFile(BytesIO(content)) as archive:
-        return {name: archive.read(name) for name in archive.namelist() if name not in STAMPED}
-
-
-@pytest.mark.parametrize("feature", features())
-async def test_an_open_and_a_save_keep_the_feature(wordcraft: Subprocess, feature: str) -> None:
-    source = (HERE / f"{feature}.docx").read_bytes()
-    saved = await wordcraft.apply(source, [], deadline=DEADLINE)
-    assert read(feature, saved.content) == read(feature, source)
-
-
-@pytest.mark.parametrize("feature", features())
-async def test_saving_twice_is_a_fixpoint(wordcraft: Subprocess, feature: str) -> None:
-    source = (HERE / f"{feature}.docx").read_bytes()
-    once = await wordcraft.apply(source, [], deadline=DEADLINE)
-    twice = await wordcraft.apply(once.content, [], deadline=DEADLINE)
-    assert parts(twice.content) == parts(once.content)
-    assert twice.inspection == once.inspection
+    return Subprocess(os.environ["ARTIFACTR_TEST_CRAFT_CLI"], version=VERSION)
 
 
 async def test_commands_edit_the_file_and_the_outline_is_its_headings(
@@ -100,7 +58,7 @@ async def test_what_wordcraft_cant_do_is_refused(wordcraft: Subprocess) -> None:
     for call in (
         wordcraft.apply(None, [AppCommand(name="format.disk")], deadline=DEADLINE),
         wordcraft.inspect(b"PK not a docx", deadline=DEADLINE),
-        wordcraft.render((HERE / "text.docx").read_bytes(), 9, scale=1, deadline=DEADLINE),
+        wordcraft.render(CORPUS.source("text"), 9, scale=1, deadline=DEADLINE),
     ):
         with pytest.raises(AppFailed) as refused:
             await call

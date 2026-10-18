@@ -12,6 +12,18 @@ def test_lattices_integrations_are_declared_once_each() -> None:
         "tracker:plane",
         "tracker:vikunja",
         "files:wordcraft",
+        "files:gridcraft",
+        "files:deckcraft",
+        "files:pdfcraft",
+        "files:cadcraft",
+        "files:photocraft",
+        "files:vectorcraft",
+        "files:designcraft",
+        "files:figcraft",
+        "files:filmcraft",
+        "files:effectcraft",
+        "files:soundcraft",
+        "files:lightcraft",
         "ui:forms",
         "ui:dashboards",
         "ui:mini-apps",
@@ -22,11 +34,14 @@ def test_lattices_integrations_are_declared_once_each() -> None:
     assert all(key == integration.key for key, integration in KNOWN.items())
 
 
-def test_mini_apps_and_mermaid_are_off_by_default() -> None:
+def test_mini_apps_mermaid_and_every_crafting_app_but_wordcraft_are_off_by_default() -> None:
+    crafts = {key for key in KNOWN if key.startswith("files:")} - {"files:wordcraft"}
     assert {key for key, integration in KNOWN.items() if not integration.default} == {
         "ui:mini-apps",
         "markdown:mermaid",
+        *crafts,
     }
+    assert len(crafts) == 12
 
 
 @pytest.mark.parametrize("key", ["excalidraw", "ui:mini-apps", "files:word-craft2", "a:b"])

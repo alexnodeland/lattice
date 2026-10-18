@@ -11,10 +11,10 @@ workspace as the person who sent the command:
   it isn't closed or archived (:class:`FormClosed`), the version it was made against is the
   form's head (:class:`FormChanged`), its values are valid, and its id is its derivation. A
   submission to an app is checked the same way, but an app has no schema to check values
-  against. An ``app`` is made by an agent alone.
+  against. An ``app`` is made by an agent alone, and its HTML loads nothing.
 - **``edit_artifact``:** a submission is never edited; a form's ``schema``, ``submissions`` and
   ``closed`` are changed only by its author or whom ``is_admin`` allows; and a person changes
-  only an app's ``state``, so the HTML that runs is always an agent's.
+  only an app's ``state``, so the HTML that runs is always an agent's, and loads nothing.
 - **``archive_artifact``:** a form, or a submission, is archived only by its author or whom
   ``is_admin`` allows.
 - **``propose_change``:** the change it proposes is checked as the change itself, and a
@@ -61,6 +61,7 @@ from artifactr.core import (
     same_principal,
 )
 from artifactr.ui._common import refusal
+from artifactr.ui._html import refused
 from artifactr.ui.ids import submission_id
 from artifactr.ui.integrations import FORMS
 from artifactr.ui.types import (
@@ -196,8 +197,10 @@ class _Rules:
         form.form_schema.validate_values(command.answer)
 
     async def create(self, workspace: Workspace, command: CreateArtifact) -> None:
-        if command.kind == App.kind and not is_agent(workspace.actor):
-            raise Forbidden("an app is an agent's: a person changes only its state")
+        if command.kind == App.kind:
+            if not is_agent(workspace.actor):
+                raise Forbidden("an app is an agent's: a person changes only its state")
+            _loads_nothing(command.data.get("html"))
         if command.kind == Submission.kind:
             await self._submitted(workspace, command)
 
@@ -257,6 +260,8 @@ class _Rules:
             outside = {*before, *after} - {"state"}
             if not is_agent(workspace.actor) and _changed(before, after, outside):
                 raise Forbidden(f"a person changes only app {artifact.id}'s state")
+            if _changed(before, after, ["html"]):
+                _loads_nothing(after.get("html"))
         elif _changed(before, after, _GOVERNED) and not await self._governs(workspace, artifact):
             raise Forbidden(
                 f"only form {artifact.id}'s author, or an admin, changes its schema, its "
@@ -286,6 +291,12 @@ class _Rules:
         if _authored(first.actor, workspace.actor):
             return True
         return self._is_admin is not None and await self._is_admin(workspace)
+
+
+def _loads_nothing(html: JsonValue) -> None:
+    """Refuse an app's HTML that loads from outside it; a type's own refusals are core's."""
+    if isinstance(html, str) and (why := refused(html)) is not None:
+        raise ValidationFailed(why, [_error(["data", "html"], why)])
 
 
 def _open(target: Versioned[Any], submission: Submission, *, closed: bool) -> None:

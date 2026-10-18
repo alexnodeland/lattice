@@ -1,6 +1,6 @@
 # artifactr.ui
 
-Forms and dashboards in the chat, behind the `forms` extra: `uv add "artifactr-ai[forms]"` ([ADR-0074](../adr/0074-forms-and-dashboards-in-artifactr-ui-behind-the-forms-extra.md), [the guide](../guides/forms-and-dashboards.md)). relayr bridges what people send into reflexr in `relayr.ui` ([relayr's reference](../../relayr/reference.md#relayrui)).
+Forms, dashboards and mini apps in the chat, behind the `forms` extra: `uv add "artifactr-ai[forms]"` ([ADR-0074](../adr/0074-forms-and-dashboards-in-artifactr-ui-behind-the-forms-extra.md), [the guide](../guides/forms-and-dashboards.md)). relayr bridges what people send into reflexr in `relayr.ui` ([relayr's reference](../../relayr/reference.md#relayrui)).
 
 ::: artifactr.ui
     options:
@@ -55,7 +55,7 @@ The checks for `Workspaces(checks=...)` ([ADR-0075](../adr/0075-forms-refused-at
 
 ## artifactr.ui.agent
 
-The agent's toolset ([ADR-0078](../adr/0078-the-agents-toolset-for-forms-and-no-apps-yet.md)).
+The agent's toolset ([ADR-0078](../adr/0078-the-agents-toolset-for-forms-and-no-apps-yet.md), [ADR-0082](../adr/0082-mini-apps-the-agents-tools-and-html-that-loads-nothing.md)).
 
 ::: artifactr.ui.agent
     options:

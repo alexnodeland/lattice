@@ -9,8 +9,8 @@ Register :data:`UI_TYPES` with the application's own types, in ``Workspaces(type
   against the version they saw. Its id is derived (:func:`~artifactr.ui.ids.submission_id`).
 - :class:`Dashboard`, kind ``dashboard``: a snapshot of figures in panels, true ``as_of`` a
   moment, which the agent writes.
-- :class:`App`, kind ``app``: a mini app's HTML and its state. Defined, and offered to no agent
-  yet: running one is RFC-0005's second phase.
+- :class:`App`, kind ``app``: a mini app's HTML and its state, which an agent writes through
+  its own tools, and which runs sandboxed, with no network, where mini apps are on.
 
 Their data's JSON Schema, with ``ask_form``'s request's, is :mod:`artifactr.ui.wire`'s.
 """
@@ -29,6 +29,7 @@ from pydantic import (
 
 from artifactr.core import Artifact, ArtifactId
 from artifactr.ui._common import Number, json_size
+from artifactr.ui._html import loaded
 from artifactr.ui.schema import MAX_SCHEMA_BYTES, FormSchema, UiHints
 
 __all__ = [
@@ -272,8 +273,10 @@ class Dashboard(Artifact, name="dashboard"):
 class App(Artifact, name="app"):
     """A mini app: one HTML file an agent wrote, its text fallback, and its state.
 
-    Defined in phase 1 and offered to no agent: portalr shows its title and summary, and runs
-    nothing. A person changes only its ``state``.
+    portalr runs it sandboxed, on an origin of its own, with no network, while mini apps are on
+    in the workspace; its ``summary`` is shown beside it, and in its place where it doesn't run.
+    Its HTML names nothing to load: what it needs is inline, or a ``data:`` URL. An agent writes
+    it; a person changes only its ``state``, through the app.
     """
 
     title: _Title
@@ -285,6 +288,11 @@ class App(Artifact, name="app"):
     def _fits(self) -> Self:
         if (size := len(self.html.encode())) > MAX_APP_HTML_BYTES:
             raise ValueError(f"the HTML is {size} bytes, over the limit of {MAX_APP_HTML_BYTES}")
+        if found := loaded(self.html):
+            raise ValueError(
+                "the HTML loads from outside the app, which reaches no network: write what it "
+                f"needs inline, or as a data: URL ({'; '.join(found)})"
+            )
         if (size := json_size(self.state)) > MAX_APP_STATE_BYTES:
             raise ValueError(f"the state is {size} bytes, over the limit of {MAX_APP_STATE_BYTES}")
         return self
@@ -294,5 +302,6 @@ UI_TYPES: Final[tuple[type[Artifact], ...]] = (Form, Submission, Dashboard, App)
 """The forms layer's artifact types, for ``Workspaces(types=...)``."""
 
 AGENT_TYPES: Final[tuple[type[Artifact], ...]] = (Form, Dashboard)
-"""The types an agent makes and changes itself, for ``ArtifactWorkspace(types=...)``: not a
-submission, which is a person's, nor an app, which phase 2 offers through tools of its own."""
+"""The types an agent makes and changes with ``ArtifactWorkspace``'s generic tools, for its
+``types=...``: not a submission, which is a person's, nor an app, which ``create_app`` and
+``update_app`` make and change, while mini apps are on."""

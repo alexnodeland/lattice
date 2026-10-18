@@ -85,5 +85,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0079](0079-forms-unverified-items-settled.md) | Forms' unverified items, settled | Accepted |
 | [0080](0080-integrations-on-or-off-per-workspace.md) | Integrations on or off per workspace | Accepted |
 | [0081](0081-a-gate-before-access-integrations-switched-off-answer-not-enabled.md) | A gate before access: integrations switched off answer NotEnabled | Accepted |
+| [0082](0082-mini-apps-the-agents-tools-and-html-that-loads-nothing.md) | Mini apps: the agent's tools, and HTML that loads nothing | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

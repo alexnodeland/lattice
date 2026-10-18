@@ -22,10 +22,11 @@ MODULES: dict[str, set[str]] = {
     # module: the artifactr.ui modules it may import
     "__init__": {"artifactr.ui"},
     "_common": set(),
+    "_html": set(),
     "schema": {"artifactr.ui._common"},
     "ids": set(),
     "integrations": set(),
-    "types": {"artifactr.ui._common", "artifactr.ui.schema"},
+    "types": {"artifactr.ui._common", "artifactr.ui._html", "artifactr.ui.schema"},
     "wire": {"artifactr.ui.types", "artifactr.ui.checks", "artifactr.ui.integrations"},
     "checks": {
         "artifactr.ui._common",

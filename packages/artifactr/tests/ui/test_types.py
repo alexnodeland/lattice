@@ -173,6 +173,49 @@ def test_an_app_is_capped(data: dict[str, Any], message: str) -> None:
         App.model_validate({"title": "Calc", "summary": "A calculator", **data})
 
 
+_DATA_PNG = "data:image/png;base64,iVBORw0KGgo="
+
+
+@pytest.mark.parametrize(
+    "html",
+    [
+        '<!doctype html><button disabled onclick="go()">Roll</button><script>go()</script>',
+        f'<img src="{_DATA_PNG}" srcset="{_DATA_PNG} 1x, {_DATA_PNG} 2x"><a href="#top">Up</a>',
+        "<style>body { background: url(data:image/png;base64,AA//) }</style>",
+        "<a href='javascript:void(0)' style=\"background: url('#grain')\">Go</a>",
+        '<link rel="icon" href="about:blank"><img src="" alt="">',
+        "<p>See https://example.com, in words only.</p>",
+    ],
+)
+def test_an_app_loads_only_what_it_holds(html: str) -> None:
+    assert App.model_validate({"title": "Dice", "summary": "Rolls dice", "html": html}).html == html
+
+
+@pytest.mark.parametrize(
+    ("html", "named"),
+    [
+        ('<script src="https://cdn.example/x.js"></script>', "<script src>: https://cdn"),
+        ('<link rel="stylesheet" href="//fonts.example/css">', "<link href>: //fonts"),
+        ('<img src="cat.png">', "<img src>: cat.png"),
+        (f'<img srcset="{_DATA_PNG} 1x, https://e.example/2.png 2x">', "<img srcset>: https://e"),
+        ('<a href="/" ping="https://e.example/p">x</a>', "<a href>: /; <a ping>: https://e"),
+        ('<form action="https://e.example/f"></form>', "<form action>: https://e"),
+        ("<div style=\"background:url( 'https://e.example/b' )\">", "<div style>: https://e"),
+        ("<style>@import 'https://e.example/s.css';</style>", "<style>: https://e"),
+        ('<style>p { background: image-set("x.png" 1x) }</style>', "<style>: x.png"),
+        ('<meta http-equiv="Refresh" content="0;url=https://e">', "<meta http-equiv>: a refresh"),
+        ('<object data="https://e.example/o"></object>', "<object data>: https://e"),
+        ('<base href="https://e.example/">', "<base href>: https://e"),
+    ],
+)
+def test_an_app_that_loads_from_outside_is_refused_with_what_it_loads(
+    html: str, named: str
+) -> None:
+    with pytest.raises(ValidationError, match="reaches no network") as refused:
+        App.model_validate({"title": "Dice", "summary": "Rolls dice", "html": html})
+    assert named in str(refused.value)
+
+
 def test_a_submission_id_takes_a_principal_or_a_nonce_not_both() -> None:
     with pytest.raises(ValueError, match="not both"):
         submission_id("form_1", principal="user:alice", nonce="n")

@@ -92,7 +92,7 @@ The inner layers (core, telemetry, workspace, agent) form a hexagon of ports and
 | `artifactr.fastapi` (extra) | agent, FastAPI | Driving adapter | The thread protocol over WebSocket, and REST commands. |
 | `artifactr.mcp` (extra) | agent, mcp, lattice-core's `logs` | Driving adapter | Artifacts as MCP resources, commands and reads as MCP tools. |
 | `artifactr.files` (extra) | the public API of core and workspace; its `sql` layer SQLAlchemy 2 async, Alembic and lattice-core's `sql` | A domain built on artifactr, with ports of its own: `Blobs`, `Checkouts` and `App` | Native files as artifacts: manifests over a blob store, check-outs and agents' edits under one lease, and its own tables and migrations ([its architecture](files/architecture.md), [lattice ADR-0026](../adr/0026-a-distribution-needs-a-reason-integrations-are-extras.md)). |
-| `artifactr.ui` (extra `forms`) | the public API of core, workspace and agent | A domain built on artifactr, filling its check hook | Forms and dashboards in the chat: the schema subset, its types, checks and agent toolset ([Forms and dashboards](#forms-and-dashboards)) |
+| `artifactr.ui` (extra `forms`) | the public API of core, workspace and agent | A domain built on artifactr, filling its check hook | Forms, dashboards and mini apps in the chat: the schema subset, its types, checks and agent toolset ([Forms and dashboards](#forms-and-dashboards)) |
 
 ### `artifactr.core`: sans-IO
 
@@ -540,16 +540,17 @@ Langfuse is the primary backend for traces and scores ([ADR-0027](adr/0027-opent
 
 ## Forms and dashboards
 
-`artifactr.ui`, behind the `forms` extra, puts forms and dashboards in the chat ([lattice RFC-0005](../rfcs/0005-forms-dashboards-and-mini-apps.md), [the guide](guides/forms-and-dashboards.md)): an agent asks a form with `ask_form`, which pauses its run until a person answers, or makes a form artifact that takes submissions without a run waiting, and shows figures as a dashboard. Whatever a person sends is one command, as that person, which its checks, on the [check hook](adr/0073-checks-that-refuse-a-command-before-it-commits.md), refuse before it commits if it doesn't fit.
+`artifactr.ui`, behind the `forms` extra, puts forms, dashboards and mini apps in the chat ([lattice RFC-0005](../rfcs/0005-forms-dashboards-and-mini-apps.md), [the guide](guides/forms-and-dashboards.md)): an agent asks a form with `ask_form`, which pauses its run until a person answers, or makes a form artifact that takes submissions without a run waiting, shows figures as a dashboard, and, where mini apps are on, makes an app, one HTML file portalr runs sandboxed with no network. Whatever a person sends is one command, as that person, which its checks, on the [check hook](adr/0073-checks-that-refuse-a-command-before-it-commits.md), refuse before it commits if it doesn't fit.
 
 ### Its modules
 
 | Module | Imports | Holds |
 |---|---|---|
 | `_common` (private) | `artifactr.core`, pydantic | The size measure, the bounded `Number`, and the refusal that names every error |
+| `_html` (private) | the standard library | `loaded`: what an app's HTML would load, its first filter |
 | `schema` | `_common`, `artifactr.core`, pydantic | `FormSchema`, its properties, `UiHints`, the limits |
 | `ids` | the standard library | `submission_id` |
-| `types` | `_common`, `schema`, `artifactr.core` | `Form`, `Submission`, `Dashboard` and its panels, `App`, `FormRequest`, `UI_TYPES`, `AGENT_TYPES`, `ASK_FORM` |
+| `types` | `_common`, `_html`, `schema`, `artifactr.core` | `Form`, `Submission`, `Dashboard` and its panels, `App`, `FormRequest`, `UI_TYPES`, `AGENT_TYPES`, `ASK_FORM` |
 | `integrations` | pydantic | The keys `FORMS`, `DASHBOARDS` and `MINI_APPS`, and `ui_key_of` for artifactr's `integration_gate` |
 | `checks` | `_common`, `ids`, `integrations`, `types`, `artifactr.core`, `artifactr.workspace` | `ui_checks`, `IsAdmin`, `FormChanged`, `FormClosed`, `RefusalReason` |
 | `wire` | `types`, `checks`, `integrations` | `wire_schema`, run as `python -m artifactr.ui.wire` by the `schema` task |
@@ -562,6 +563,7 @@ Langfuse is the primary backend for traces and scores ([ADR-0027](adr/0027-opent
 
 `FormSchema` is a Pydantic model of the subset ([ADR-0076](adr/0076-the-form-schema-an-allow-list-compiled-to-pydantic.md)), strict and closed: a keyword it doesn't hold is an extra input, refused at its place, and `$ref`, `$defs`, `pattern`, `if`, `then`, `else`, `allOf`, `anyOf`, `not`, a nested object and `format: "password"` are refused by name before anything else is read. A property is told apart by its `type`, or as choices by `enum` or `oneOf`; its name is an identifier, and bounds no value meets are refused. Each property gives the type its values are validated as, and a schema compiles them into a model of its values, once for each schema, kept by its JSON for the 256 used last, with each property's name as the field's alias, so an error's `loc` is `[name]`. A schema is stored as JSON Schema, with what was left out still left out, and reads back unchanged.
 
+- **An app's HTML loads nothing** ([ADR-0082](adr/0082-mini-apps-the-agents-tools-and-html-that-loads-nothing.md)): `App` refuses a URL in an attribute that loads or goes somewhere, in one that lists URLs, or in CSS, and a `<meta http-equiv="refresh">`, unless it is empty or starts with `#`, `data:`, `javascript:` or `about:blank`, naming each. It reads no script: the policy portalr runs the app under is the guard, and this a first filter.
 - **The limits** are constants: 50 properties, 64 choices, 10,000 characters a string whatever its `maxLength`, every number within ±(2⁵³ − 1), 32 KB of form (title, schema and hints) as stored, 64 KB of values, 256 KB of dashboard, 256 KB of an app's HTML, 64 KB of its state, 200 characters of a title and 2,000 of an app's summary. Each is measured by `json_size`, the UTF-8 bytes of compact JSON, as JavaScript's `JSON.stringify` writes it ([ADR-0077](adr/0077-formats-and-sizes-checked-by-artifactrs-own-code.md)).
 - **Formats and `multipleOf`** are artifactr.ui's own checks, which portalr's TypeScript repeats; `tests/ui/vectors/forms.json` holds the cases both sides test.
 
@@ -572,7 +574,7 @@ Langfuse is the primary backend for traces and scores ([ADR-0027](adr/0027-opent
 | `form` | `title`, `schema`, `ui`, `submissions` (`once`, `per_person`, `many`), `closed` | `schema`, `submissions`, `closed` and archiving only its author or an admin |
 | `submission` | `form_id` or `app_id`, `version`, `values`, and `nonce` for a `many` form or an app | Made by a person, never proposed or edited; archived only by its author or an admin |
 | `dashboard` | `title`, `panels` (`stat`, `bar`, `line`, `donut`, `table`, `text`, `form`), `as_of` | Anyone who may edit |
-| `app` | `title`, `summary`, `html`, `state` | Made by an agent; a person changes only its `state` |
+| `app` | `title`, `summary`, `html` (loading nothing), `state` | Made by an agent, through `create_app` and `update_app`; a person changes only its `state`; archiving it switches it off |
 
 `AGENT_TYPES`, the form and the dashboard, are what the agent's `ArtifactWorkspace` takes; `UI_TYPES`, all four, what `Workspaces(types=...)` takes.
 
@@ -601,7 +603,7 @@ What artifactr refuses itself, a second answer, a stale edit or an id in use, is
 
 ### The agent's tools
 
-`ui_tools(forms=True, dashboards=True)` is an application toolset. Each tool validates what the model wrote before anything is recorded, and gives a refusal back as `ModelRetry` naming every field and keyword. `ask_form` raises `CallDeferred`, so the run pauses with a `DeferredRequest` whose `args` are the tool's own; the answer, already checked, is the tool's result when the run resumes. A chat message doesn't answer it (artifactr's runner skips `ask_form` requests). `create_form` and `show_dashboard` create artifacts in the thread; `update_dashboard` edits one, as its next version.
+`ui_tools(forms=True, dashboards=True, apps=True)` is an application toolset. Each tool validates what the model wrote before anything is recorded, and gives a refusal back as `ModelRetry` naming every field and keyword. `ask_form` raises `CallDeferred`, so the run pauses with a `DeferredRequest` whose `args` are the tool's own; the answer, already checked, is the tool's result when the run resumes. A chat message doesn't answer it (artifactr's runner skips `ask_form` requests). `create_form` and `show_dashboard` create artifacts in the thread; `update_dashboard` edits one, as its next version. `create_app` and `update_app` make and replace an app, its state kept, and are offered only while `ui:mini-apps` is on; their description is the bridge portalr's host speaks: JSON-RPC 2.0 over `postMessage`, on MCP Apps' method names, with the tools `get_state`, `set_state` and `submit` ([ADR-0082](adr/0082-mini-apps-the-agents-tools-and-html-that-loads-nothing.md)).
 
 ## Aligned with reflexr
 

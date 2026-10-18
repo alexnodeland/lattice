@@ -44,7 +44,7 @@ runner = Runner(agent, app=None)
 ```
 
 - **`output_type` includes `DeferredToolRequests`,** since `ask_form` pauses the run.
-- **The workspaces take `UI_TYPES`, the agent's capability `AGENT_TYPES`:** the form and the dashboard. A submission is a person's, and an app is made through phase 2's tools, so the agent's generic tools never make or edit either.
+- **The workspaces take `UI_TYPES`, the agent's capability `AGENT_TYPES`:** the form and the dashboard. A submission is a person's, and an app is made through its own tools, so the agent's generic tools never make or edit either.
 - **`is_admin`** says who may change any form's schema, policy or closing, and archive any form or submission, as their authors may. It is the application's, from grantr's roles or its own; without it, only a form's author may.
 - **`integrations`** is lattice-core's `Integrations` port, grantr's store or `Defaults()`, which says whether forms (`ui:forms`), dashboards (`ui:dashboards`) or mini apps (`ui:mini-apps`, off by default) are on in a workspace ([ADR-0080](../adr/0080-integrations-on-or-off-per-workspace.md)). The gate, `integration_gate(integrations, ui_key_of)`, refuses making or changing their artifacts while one is off ([ADR-0081](../adr/0081-a-gate-before-access-integrations-switched-off-answer-not-enabled.md)); `ui_checks` refuses an answer to `ask_form` while forms are off, and `ui_tools` doesn't offer the agent their tools. Each refusal is `not_enabled`, whose payload names the `integration`; what exists still reads, and archives pass. Without it, each integration's default answers.
 - **Checks of your own for the same command types** go in one check that calls both: `Workspaces` takes one check a command type.
@@ -79,6 +79,12 @@ A `once` form's id is `submission_id(form.id)`, and a `many` form's `submission_
 ## Dashboards
 
 `show_dashboard(title, panels)` makes a `dashboard`, true as of the moment it is made, and `update_dashboard(id, panels)` replaces its panels as its next version. Panels are `stat`, `bar`, `line` (up to three series), `donut`, `table` (up to 500 rows), `text` (Markdown) and `form` (a form artifact's id: a form with no fields is a button). A dashboard is at most 256 KB.
+
+## Mini apps
+
+Where a workspace switches `ui:mini-apps` on (it is off by default), `ui_tools` offers the agent `create_app(title, summary, html)` and `update_app(id, html, summary)` ([ADR-0082](../adr/0082-mini-apps-the-agents-tools-and-html-that-loads-nothing.md)). An app is one HTML file, at most 256 KB, that portalr runs for everyone who opens the thread, sandboxed on an origin of its own with no network, beside its `summary` and a label saying an agent made it. Its HTML loads nothing: a script, a stylesheet, an image or a font from anywhere is refused, each named, and goes back to the model to write inline or as a `data:` URL.
+
+An app keeps a `state`, at most 64 KB, which the people using it change through portalr's host, as themselves: a person's edit of an app changes its `state` alone, and its HTML is always an agent's. What it sends with `submit` is a `submission` with `app_id`, which relayr bridges as `ui:app_submitted`. Archiving an app switches that one off; switching `ui:mini-apps` off, for the deployment, a tenant or a workspace, stops every app there.
 
 ## Rules
 

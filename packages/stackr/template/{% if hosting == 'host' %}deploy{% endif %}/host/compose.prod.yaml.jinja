@@ -18,7 +18,13 @@ services:
     build: !reset null
     image: ${APP_IMAGE:?set APP_IMAGE in .env, the image to run}
     ports: !reset []
+{%- if use_tracker and tracker == 'plane' %}
+    networks: !override
+      stackr:
+        aliases: [app.stackr.internal]
+{%- else %}
     networks: !override [stackr]
+{%- endif %}
     # GoTrue on the stack's network: its key set, and{% if access == 'grantr' %} its admin API, which the edge refuses{% else %} nothing else{% endif %}.
     environment:
       AUTH_JWKS_URL: http://gotrue:9999/.well-known/jwks.json

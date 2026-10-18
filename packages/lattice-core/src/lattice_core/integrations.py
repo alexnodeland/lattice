@@ -118,7 +118,7 @@ class Integrations(Protocol):
 
     It is asked before each command, and each model request, of an integration's, so an
     implementation answers from what it reads cheaply. A key it doesn't know is off. Its
-    arguments are positional, so a bound ``is_enabled`` is also relayr's ``Enabled``.
+    arguments are positional, so an implementation names them as it likes.
     """
 
     async def is_enabled(self, tenant_id: str, workspace_id: str, key: str, /) -> bool:

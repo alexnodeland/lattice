@@ -166,6 +166,13 @@ use_ui:
   default: "{{ libraries in ['artifactr', 'both'] and ui }}"
   when: false
 
+# Whether the application asks lattice-core's port of integrations itself: forms and dashboards,
+# or a tracker, are switched per workspace.
+use_integrations:
+  type: bool
+  default: "{{ use_ui or use_tracker }}"
+  when: false
+
 use_portal:
   type: bool
   default: "{{ access == 'grantr' and portal }}"

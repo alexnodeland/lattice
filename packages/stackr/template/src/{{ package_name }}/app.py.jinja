@@ -37,15 +37,15 @@ from typing import Protocol
 import uvicorn
 from fastapi import FastAPI
 from pydantic_ai.models import Model
-{%- if access == 'grantr' %}
-
+{%- if access == 'grantr' or use_integrations %}
+{% if access == 'grantr' %}
 from grantr import Grants
+{%- else %}
+from lattice_core.integrations import Defaults
+{%- endif %}
 {%- if use_tracker %}
 from relayr.trackers import Connect
 {%- endif %}
-{%- elif use_tracker %}
-
-from relayr.trackers import Connect
 {%- endif %}
 
 {% if access == 'grantr' -%}
@@ -164,11 +164,21 @@ def create_app(
     artifactr_hooks = access.grants.hooks(access.artifactr_subject)
 {%- endif %}
 {%- endif %}
+{%- if use_integrations %}
+    # Whether each integration is on in a workspace: {% if access == 'grantr' %}as grantr's switches say{% else %}each one's default, everywhere{% endif %}.
+    integrations = {% if access == 'grantr' %}access.grants{% else %}Defaults(){% endif %}
+{%- endif %}
 {%- if use_relayr %}
     bridge = Bridge(database=database, telemetry=telemetry{% if access == 'grantr' %}, grants=access.grants{% endif %})
 {%- endif %}
 {%- if use_tracker %}
-    tracking = Tracking(bridge.ledger, settings.tracker, connect=tracker, telemetry=telemetry)
+    tracking = Tracking(
+        bridge.ledger,
+        settings.tracker,
+        integrations=integrations,
+        connect=tracker,
+        telemetry=telemetry,
+    )
 {%- endif %}
 {%- if use_reflexr %}
     automation = Automation(
@@ -212,6 +222,9 @@ def create_app(
 {%- else %}
         authenticate=verifier.authenticate,
         identify=verifier.authenticate,
+{%- endif %}
+{%- if use_ui %}
+        integrations=integrations,
 {%- endif %}
         model=model,
         gateway=settings.gateway,

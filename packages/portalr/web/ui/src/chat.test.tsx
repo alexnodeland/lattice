@@ -1,5 +1,5 @@
 import type { Artifactr, ArtifactrV1 } from "@portalr/client";
-import { expect, onTestFinished, test, vi } from "vitest";
+import { describe, expect, onTestFinished, test, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import {
@@ -15,6 +15,7 @@ import {
   Thumbs,
   ToolCall,
 } from "./chat";
+import { IntegrationsContext } from "./integrations";
 import { contrast, token } from "./test/colours";
 
 /** A command handler whose commands end as `outcome`. */
@@ -469,4 +470,148 @@ test("a command button waits for its command, and says why one wasn't done", asy
   expect(onSend).toHaveBeenCalledOnce();
   await expect.element(screen.getByRole("alert")).toBeVisible();
   await expect.element(screen.getByRole("button", { name: "Retry" })).toBeEnabled();
+});
+
+describe("a form the agent asks", () => {
+  const asked: ArtifactrV1.DeferredRequest = {
+    kind: "question",
+    tool_call_id: "t1",
+    tool_name: "ask_form",
+    args: {
+      title: "Ship it?",
+      schema: {
+        type: "object",
+        properties: { when: { type: "string", title: "When" } },
+        required: ["when"],
+      },
+    },
+  };
+
+  test("is its fields, said to be the agent's, and takes the focus as it appears", async () => {
+    const screen = await render(<Request request={asked} onAnswer={sent()} />);
+    await expect.element(screen.getByText("The agent asks")).toBeVisible();
+    await expect.element(screen.getByRole("form", { name: "Ship it?" })).toBeVisible();
+    await expect.element(screen.getByRole("textbox", { name: "When (required)" })).toHaveFocus();
+  });
+
+  test("is answered once, with its values", async () => {
+    const onAnswer = sent();
+    const screen = await render(<Request request={asked} onAnswer={onAnswer} />);
+    await screen.getByRole("textbox", { name: /When/ }).fill("Friday");
+    await screen.getByRole("button", { name: "Ship it?" }).click();
+    expect(onAnswer.mock.calls).toEqual([[{ answer: { when: "Friday" } }]]);
+    await expect.element(screen.getByRole("status")).toHaveTextContent("Sent.");
+  });
+
+  test("answered, it says by whom in place of its fields", async () => {
+    const screen = await render(<Request request={asked} onAnswer={sent()} answeredBy="Alice" />);
+    await expect
+      .element(screen.getByRole("status"))
+      .toHaveTextContent("Answered: Alice answered it.");
+    await expect.element(screen.getByRole("textbox")).not.toBeInTheDocument();
+    await screen.rerender(<Request request={asked} onAnswer={sent()} answeredBy={null} />);
+    await expect.element(screen.getByRole("status")).toHaveTextContent("Answered.");
+  });
+
+  test("answered by another first, it says so, and who, once it is known", async () => {
+    const onAnswer = vi.fn(async () => ({
+      outcome: "refused" as const,
+      result: { rejection: { type: "invalid_state", message: "already answered" } },
+    }));
+    const screen = await render(<Request request={asked} onAnswer={onAnswer} />);
+    await screen.getByRole("textbox", { name: /When/ }).fill("Friday");
+    await screen.getByRole("button", { name: "Ship it?" }).click();
+    await expect.element(screen.getByRole("status")).toHaveTextContent("Already answered.");
+    await screen.rerender(<Request request={asked} onAnswer={onAnswer} answeredBy="Bob" />);
+    await expect
+      .element(screen.getByRole("status"))
+      .toHaveTextContent("Already answered: Bob answered it first.");
+  });
+
+  test("refused as off, it says forms are off and keeps the answers, unsendable", async () => {
+    const onAnswer = vi.fn(async () => ({
+      outcome: "refused" as const,
+      result: {
+        rejection: {
+          type: "not_enabled",
+          message: "ui:forms is not available in this workspace",
+          integration: "ui:forms",
+        },
+      },
+    }));
+    const screen = await render(<Request request={asked} onAnswer={onAnswer} />);
+    await screen.getByRole("textbox", { name: /When/ }).fill("Friday");
+    await screen.getByRole("button", { name: "Ship it?" }).click();
+    await expect
+      .element(screen.getByRole("status"))
+      .toHaveTextContent("Not available in this workspace: forms are off. This can't be sent.");
+    const when = screen.getByRole("textbox", { name: /When/ });
+    await expect.element(when).toHaveValue("Friday");
+    await expect.element(when).toBeDisabled();
+    await expect.element(screen.getByRole("button", { name: "Ship it?" })).not.toBeInTheDocument();
+  });
+
+  test("with forms off in the workspace, it shows its fields, unsendable, and says so", async () => {
+    const screen = await render(
+      <IntegrationsContext value={(key) => key !== "ui:forms"}>
+        <Request request={asked} onAnswer={sent()} />
+      </IntegrationsContext>,
+    );
+    await expect
+      .element(screen.getByRole("status"))
+      .toHaveTextContent("Not available in this workspace: forms are off. This can't be sent.");
+    await expect.element(screen.getByRole("textbox", { name: /When/ })).toBeDisabled();
+    await expect.element(screen.getByRole("button", { name: "Ship it?" })).not.toBeInTheDocument();
+  });
+
+  test("refused for its values, it says why under the field", async () => {
+    const onAnswer = vi.fn(async () => ({
+      outcome: "refused" as const,
+      result: {
+        rejection: { type: "validation_failed", errors: [{ loc: ["when"], msg: "too early" }] },
+      },
+    }));
+    const screen = await render(<Request request={asked} onAnswer={onAnswer} />);
+    await screen.getByRole("textbox", { name: /When/ }).fill("Now");
+    await screen.getByRole("button", { name: "Ship it?" }).click();
+    await expect
+      .element(screen.getByRole("textbox", { name: /When/ }))
+      .toHaveAccessibleDescription("Too early.");
+  });
+
+  test("without a title it has no heading, and its button says Send; a form it can't show says so", async () => {
+    const untitled = await render(
+      <Request request={{ ...asked, args: { schema: { type: "object" } } }} onAnswer={sent()} />,
+    );
+    await expect.element(untitled.getByRole("heading")).not.toBeInTheDocument();
+    await expect.element(untitled.getByRole("form", { name: "Send" })).toBeVisible();
+    await expect.element(untitled.getByRole("button", { name: "Send" })).toBeVisible();
+    await untitled.rerender(
+      <Request request={{ ...asked, args: { schema: { type: "tree" } } }} onAnswer={sent()} />,
+    );
+    await expect
+      .element(untitled.getByRole("status"))
+      .toHaveTextContent("This form can't be shown here: its fields aren't ones portalr can show.");
+  });
+
+  test("told another takes the focus, or answered, it doesn't take it", async () => {
+    const screen = await render(<Request request={asked} onAnswer={sent()} focus={false} />);
+    await expect.element(screen.getByRole("textbox", { name: /When/ })).not.toHaveFocus();
+    const question: ArtifactrV1.DeferredRequest = {
+      kind: "question",
+      tool_call_id: "t2",
+      tool_name: "ask_user",
+      args: { question: "Which?" },
+    };
+    await screen.rerender(<Request request={question} onAnswer={sent()} focus={false} />);
+    await expect.element(screen.getByRole("textbox", { name: "Answer" })).not.toHaveFocus();
+  });
+
+  test("open, it is edged in the working colour; answered, it isn't", async () => {
+    const screen = await render(<Request request={asked} onAnswer={sent()} />);
+    const card = screen.getByText("The agent asks").element().parentElement as Element;
+    expect(getComputedStyle(card).borderTopColor).toBe(token("accent"));
+    await screen.rerender(<Request request={asked} onAnswer={sent()} answeredBy="Alice" />);
+    expect(getComputedStyle(card).borderTopColor).toBe(token("line"));
+  });
 });

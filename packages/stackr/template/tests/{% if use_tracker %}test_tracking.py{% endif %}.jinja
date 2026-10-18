@@ -156,6 +156,19 @@ def test_a_workspace_with_no_binding_files_nothing(
     fire(client, "elsewhere")
     wait_for(lambda: runs(client, workspace="elsewhere") == ["succeeded"])
     assert tracker.created == 0
+{%- if access == 'grantr' %}
+
+
+def test_a_workspace_with_the_tracker_switched_off_files_nothing(
+    client: TestClient, tracker: FakeTracker
+) -> None:
+    switch = f"/grantr/v1/tenants/{TENANT}/workspaces/main/integrations/tracker:{{ tracker }}"
+    assert client.put(switch, json={"on": False}).status_code == 200
+    failing(client)
+    fire(client)
+    wait_for(lambda: runs(client) == ["dead"])  # not allowed: it would try again
+    assert tracker.created == 0
+{%- endif %}
 
 
 def nudge(client: TestClient, body: bytes, signature: str) -> int:

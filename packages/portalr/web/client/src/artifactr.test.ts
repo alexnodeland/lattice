@@ -107,6 +107,7 @@ test("a run streams its text until its message is posted, and keeps its status",
     tools: { t1: { name: "edit", status: "ok" } },
     text: "",
     requests: [],
+    answered: [],
     started: 1,
     feedback: [],
   });
@@ -129,8 +130,27 @@ test("a run pauses on its requests, and resumes when every one is answered", () 
       ),
     );
   const half = answered(paused, "t2", 3);
-  expect(half.runs.run_2).toMatchObject({ status: "paused", requests: [ask] });
-  expect(answered(half, "t1", 4).runs.run_2).toMatchObject({ status: "running", requests: [] });
+  const alice = { kind: "user", id: "alice" };
+  expect(half.runs.run_2).toMatchObject({
+    status: "paused",
+    requests: [ask],
+    answered: [{ request: approve, actor: alice }],
+  });
+  const whole = answered(half, "t1", 4);
+  expect(whole.runs.run_2).toMatchObject({
+    status: "running",
+    requests: [],
+    answered: [
+      { request: approve, actor: alice },
+      { request: ask, actor: alice },
+    ],
+  });
+  // Paused again, it waits on what it asks now, and what was answered before is put away.
+  const again = apply(
+    whole,
+    envelope({ type: "run_paused", run_id: "run_2", thread_id: "thr_1", requests: [ask] }, 5),
+  );
+  expect(again.runs.run_2).toMatchObject({ status: "paused", requests: [ask], answered: [] });
 });
 
 test("a run that started before what the store read is left alone", () => {
@@ -269,7 +289,7 @@ test("a run that ends waits on nothing more, and an answer to a running run does
     paused,
     envelope({ type: "run_ended", run_id: "run_3", thread_id: "thr_1", status: "stopped" }, 3),
   );
-  expect(ended.runs.run_3).toMatchObject({ status: "stopped", requests: [] });
+  expect(ended.runs.run_3).toMatchObject({ status: "stopped", requests: [], answered: [] });
   const running = replay({ type: "run_started", run_id: "run_4", thread_id: "thr_1" });
   const late = apply(
     running,
@@ -278,7 +298,7 @@ test("a run that ends waits on nothing more, and an answer to a running run does
       2,
     ),
   );
-  expect(late.runs.run_4?.status).toBe("running");
+  expect(late.runs.run_4).toMatchObject({ status: "running", answered: [] });
   const after = apply(
     ended,
     envelope(

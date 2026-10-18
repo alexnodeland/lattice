@@ -45,8 +45,8 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         {"relayr.events", "relayr.ledger", "relayr.outbound", "relayr.rules", "relayr.evals"},
         LIBRARIES,
     ),
-    # Whether an integration runs in a workspace: a protocol, to move to a shared home.
-    "integrations": ({"relayr.integrations"}, set()),
+    # Whether an integration runs in a workspace without a store: lattice-core's port, answered.
+    "integrations": ({"relayr.integrations"}, {"lattice_core.integrations"}),
     # The tracker connector (lattice RFC-0004): the port, the core, the followers and the fake;
     # and `http`, which only the adapters import, on httpx.
     "trackers": (
@@ -57,7 +57,14 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
             "relayr.telemetry",
             "relayr.trackers",
         },
-        {*LIBRARIES, "pydantic", "pydantic_ai", "httpx", "opentelemetry"},
+        {
+            *LIBRARIES,
+            "pydantic",
+            "pydantic_ai",
+            "httpx",
+            "opentelemetry",
+            "lattice_core.integrations",
+        },
     ),
     # The trackers' webhooks' route and the connector's reads, on FastAPI and lattice-core's
     # refusals; the reads ask reflexr's `authorize`, as reflexr's routes do, and say whose

@@ -344,6 +344,21 @@ async def test_only_a_forms_author_or_a_workspace_admin_closes_it() -> None:
         assert refused["rejection"]["type"] == "forbidden"
         assert "only form poll's author, or an admin" in refused["rejection"]["message"]
         await post(client, signed("bob"), **close)
+
+
+def test_forms_switched_off_in_a_workspace_are_refused_there_alone() -> None:
+    lunch = {"title": "Lunch", "schema": {"type": "object", "properties": {}}}
+    create = {"type": "create_artifact", "kind": "form", "data": lunch}
+    switch = f"/grantr/v1/tenants/{TENANT}/workspaces/main/integrations/ui:forms"
+
+    def sent(client: TestClient, workspace: str) -> dict[str, Any]:
+        frame = {"type": "command", "command_id": new_id("cmd"), "command": create}
+        return client.post(f"/artifactr/v1/workspaces/{workspace}/commands", json=frame).json()
+
+    with TestClient(app(Script()), headers=signed()) as client:
+        assert client.put(switch, json={"on": False}).status_code == 200
+        assert sent(client, "main")["rejection"]["type"] == "not_enabled"
+        assert sent(client, "other")["ok"], "on in every other workspace"
 {%- endif %}
 {%- endif %}
 {%- if use_reflexr %}

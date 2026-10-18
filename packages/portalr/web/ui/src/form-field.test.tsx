@@ -41,3 +41,15 @@ test("a field is no wider than 28rem, in a form as wide as the page, and fills a
   await page.viewport(390, 800);
   expect(input.getBoundingClientRect().width).toBeGreaterThan(300);
 });
+
+test("a control beside its label is named by it, and described by its hint and refusal", async () => {
+  const screen = await render(
+    <FormField label="Notify me" hint="By email." error="Choose yes or no." beside>
+      <Field.Control />
+    </FormField>,
+  );
+  const input = screen.getByRole("textbox", { name: "Notify me" });
+  await expect.element(input).toHaveAccessibleDescription("By email. Choose yes or no.");
+  const label = input.element().closest("label") as Element;
+  expect(label.firstElementChild).toBe(input.element());
+});

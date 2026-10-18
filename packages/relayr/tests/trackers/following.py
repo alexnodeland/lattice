@@ -9,8 +9,9 @@ from opentelemetry.metrics import MeterProvider
 
 import reflexr
 import reflexr.workspace as r
+from lattice_core.integrations import Integrations
 from reflexr.core import Envelope
-from relayr.integrations import Enabled, always
+from relayr.integrations import ALWAYS
 from relayr.ledger import Ledger, WorkspaceKey
 from relayr.outbound import Allowlist
 from relayr.trackers import (
@@ -90,7 +91,7 @@ def following(
     *,
     tracker: FakeTracker | None = None,
     bindings: Mapping[WorkspaceKey, TrackerBinding] | None = None,
-    enabled: Enabled = always,
+    integrations: Integrations = ALWAYS,
     budget: int = 40,
     projections: Mapping[WorkspaceKey, TrackerProjection] | None = None,
     rules: Rules = (),
@@ -124,7 +125,7 @@ def following(
         bindings={KEY: BINDING} if bindings is None else bindings,
         allowlists=allowlists,
         integration="tracker:fake",
-        enabled=enabled,
+        integrations=integrations,
         budget=budget,
         clock=clock,
     )

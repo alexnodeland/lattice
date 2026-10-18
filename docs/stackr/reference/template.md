@@ -41,6 +41,7 @@ These are computed from the answers, apart from `libraries_path`, which `scripts
 | `use_relayr` | bool | `{{ libraries == 'both' and bridge }}` |
 | `use_tracker` | bool | `{{ libraries == 'both' and bridge and tracker != 'none' }}` |
 | `use_ui` | bool | `{{ libraries in ['artifactr', 'both'] and ui }}` |
+| `use_integrations` | bool | `{{ use_ui or use_tracker }}` |
 | `use_portal` | bool | `{{ access == 'grantr' and portal }}` |
 
 | Copier setting | Value |

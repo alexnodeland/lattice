@@ -486,3 +486,22 @@ test("under forced colours a chart keeps its series apart: its fills are the aut
   expect(Number(stripe().strokeOpacity)).toBeGreaterThan(0);
   expect(stripe().stroke).not.toBe(base().fill);
 });
+
+test("a bare chart is its legend and drawing alone, for a caller that frames it with its figures", async () => {
+  const screen = await render(
+    <>
+      <BarChart
+        label="Spend"
+        index={days}
+        series={[{ key: "spend", name: "Spend" }]}
+        data={[{ day: "2026-10-12", spend: 1 }]}
+        bare
+      />
+      <DonutChart label="Parts" parts={[{ key: "a", name: "A", value: 1 }]} bare />
+    </>,
+  );
+  await expect.element(screen.getByRole("figure")).not.toBeInTheDocument();
+  await expect.element(screen.getByText("Show the figures")).not.toBeInTheDocument();
+  await expect.element(screen.getByText("Spend", { exact: true })).toBeVisible();
+  await expect.element(screen.getByText("Total")).toBeVisible();
+});

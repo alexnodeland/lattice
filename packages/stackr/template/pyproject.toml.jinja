@@ -26,6 +26,9 @@ dependencies = [
 {%- if use_portal %}
     "portalr",
 {%- endif %}
+{%- if use_integrations %}
+    "lattice-core-ai",
+{%- endif %}
     "pyjwt[crypto]>=2.10",
     "uvicorn[standard]>=0.54",
 ]
@@ -76,6 +79,7 @@ build-backend = "uv_build"
     ("grantr", "grantr", access == 'grantr'),
     ("relayr-ai", "relayr", use_relayr),
     ("portalr", "portalr", use_portal),
+    ("lattice-core-ai", "lattice-core", use_integrations),
 ] if used %}
 {%- if libraries_path %}
 {{ distribution }} = { path = "{{ libraries_path }}/{{ package }}", editable = true }
@@ -118,7 +122,7 @@ known-third-party = ["fastapi", "mcp", "langfuse"]
 section-order = ["future", "standard-library", "third-party", "family", "first-party", "local-folder"]
 
 [tool.ruff.lint.isort.sections]
-family = [{% if use_artifactr %}"artifactr", {% endif %}{% if use_reflexr %}"reflexr", {% endif %}"evalr"{% if access == 'grantr' %}, "grantr"{% endif %}{% if use_relayr %}, "relayr"{% endif %}{% if use_portal %}, "portalr"{% endif %}]
+family = [{% if use_artifactr %}"artifactr", {% endif %}{% if use_reflexr %}"reflexr", {% endif %}"evalr"{% if access == 'grantr' %}, "grantr"{% endif %}{% if use_relayr %}, "relayr"{% endif %}{% if use_portal %}, "portalr"{% endif %}{% if use_integrations %}, "lattice_core"{% endif %}]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["D", "ARG"]

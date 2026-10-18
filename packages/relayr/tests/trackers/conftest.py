@@ -9,7 +9,8 @@ import pytest
 import reflexr
 import reflexr.core
 import reflexr.workspace as r
-from relayr.integrations import Enabled, always
+from lattice_core.integrations import Integrations
+from relayr.integrations import ALWAYS
 from relayr.ledger import Ledger, WorkspaceKey
 from relayr.outbound import Allowlist
 from relayr.trackers import FakeTracker, TrackerBinding, TrackerCredentials, Trackers
@@ -38,6 +39,18 @@ class Tenant:
     async def __call__(self, tenant: str) -> TrackerCredentials:
         self.asked.append(tenant)
         return self.credentials
+
+
+@dataclass
+class Switch:
+    """lattice-core's integrations port, on or off everywhere, and what it was asked."""
+
+    on: bool = True
+    asked: list[tuple[str, str, str]] = field(default_factory=list[tuple[str, str, str]])
+
+    async def is_enabled(self, tenant_id: str, workspace_id: str, key: str, /) -> bool:
+        self.asked.append((tenant_id, workspace_id, key))
+        return self.on
 
 
 @dataclass
@@ -84,7 +97,7 @@ def connector(
     *,
     allowlists: Mapping[str, Allowlist] = ALLOWED,
     bindings: Mapping[WorkspaceKey, TrackerBinding] | None = None,
-    enabled: Enabled = always,
+    integrations: Integrations = ALWAYS,
 ) -> Trackers:
     return Trackers(
         ledger,
@@ -93,7 +106,7 @@ def connector(
         bindings={KEY: BINDING} if bindings is None else bindings,
         allowlists=allowlists,
         integration="tracker:fake",
-        enabled=enabled,
+        integrations=integrations,
         clock=clock,
     )
 

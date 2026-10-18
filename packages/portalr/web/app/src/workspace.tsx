@@ -4,7 +4,8 @@
  * rules and runs. The routes under it read either store, and where its connection is; and what
  * either log says changed, once live, makes stale the reads it changed (`client`'s `stale`), as
  * does a command artifactr refuses as `not_enabled`, which makes the workspace's integrations
- * stale. Those integrations say which add-ons the Markdown inside may draw (portalr ADR-0045).
+ * stale. Those integrations say what the parts inside may do: which add-ons Markdown may draw
+ * (portalr ADR-0045), and whether forms and dashboards may be sent and drawn (portalr ADR-0047).
  */
 
 import {
@@ -23,7 +24,7 @@ import {
   streamUrl,
   useEnabled,
 } from "@portalr/client";
-import { AddonsProvider, Alert, Reading } from "@portalr/ui";
+import { Alert, IntegrationsContext, Reading } from "@portalr/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   createContext,
@@ -110,8 +111,9 @@ export function WorkspaceStreams({
 }
 
 /**
- * The add-ons the Markdown inside may draw, from the workspace's integrations: each its default
- * until they are read, and where they can't be, so Mermaid stays off.
+ * The workspace's integrations, for the parts inside, which ask them by key: Markdown's add-ons,
+ * and whether a form may be sent. Each is its default until they are read, and where they can't
+ * be, so Mermaid and mini apps stay off.
  */
 export function WorkspaceAddons({
   queries,
@@ -125,13 +127,7 @@ export function WorkspaceAddons({
   children: ReactNode;
 }) {
   const enabled = useEnabled(queries, tenant, workspace);
-  return (
-    <AddonsProvider
-      value={{ math: enabled("markdown:math"), mermaid: enabled("markdown:mermaid") }}
-    >
-      {children}
-    </AddonsProvider>
-  );
+  return <IntegrationsContext value={enabled}>{children}</IntegrationsContext>;
 }
 
 function useStreams(): Streams {

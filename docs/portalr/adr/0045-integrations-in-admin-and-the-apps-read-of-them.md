@@ -1,6 +1,6 @@
 # ADR-0045: Integrations in admin, and the app's read of them: each its default where unread, and read again on `not_enabled`
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0047](0047-dashboards-on-demand-tables-and-the-panel-registry.md) (`AddonsProvider` folds into `IntegrationsContext`, the one seam the app gives)
 **Date:** 2026-10-17
 **Deciders:** Alex Nodeland
 **Amends:** [ADR-0043](0043-markdowns-basics.md), whose add-ons seam this feeds

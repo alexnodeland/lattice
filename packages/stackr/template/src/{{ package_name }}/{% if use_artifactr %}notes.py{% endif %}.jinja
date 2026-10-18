@@ -17,6 +17,7 @@ from artifactr import ArtifactWorkspace, Feedback, MarkdownArtifact, Session
 {%- if use_ui %}
 from artifactr.ui import AGENT_TYPES
 from artifactr.ui.agent import ui_tools
+from lattice_core.integrations import Integrations
 {%- endif %}
 
 INSTRUCTIONS = """\
@@ -52,12 +53,19 @@ def build_note_agent(
     model: Model,
     *,
     capabilities: Sequence[AbstractCapability[Session[None]]] = (),
+{%- if use_ui %}
+    integrations: Integrations | None = None,
+{%- endif %}
 ) -> Agent[Session[None], str | DeferredToolRequests]:
     """Build the notes agent.
 
     Args:
         model: The model: the gateway's model group, or a scripted one in tests.
         capabilities: More capabilities: the gateway's and telemetry's.
+{%- if use_ui %}
+        integrations: Whether forms and dashboards are on in a run's workspace; each one's
+            default if omitted, as the evals' agent has it.
+{%- endif %}
     """
     return Agent[Session[None], str | DeferredToolRequests](
         model,
@@ -65,7 +73,7 @@ def build_note_agent(
         instructions=INSTRUCTIONS,
         output_type=[str, DeferredToolRequests],
 {%- if use_ui %}
-        toolsets=[ui_tools()],
+        toolsets=[ui_tools(integrations=integrations)],
         capabilities=[ArtifactWorkspace(types=[Note, *AGENT_TYPES], ask=True), *capabilities],
 {%- else %}
         capabilities=[ArtifactWorkspace(types=[Note], ask=True), *capabilities],

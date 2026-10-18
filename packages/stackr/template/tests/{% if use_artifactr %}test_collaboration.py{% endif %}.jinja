@@ -13,6 +13,9 @@ from pydantic_ai import ToolReturnPart
 {%- endif %}
 
 from artifactr import new_id
+{%- if use_ui %}
+from lattice_core.integrations import Defaults
+{%- endif %}
 
 from {{ package_name }}.collaboration import Collaboration
 
@@ -103,6 +106,9 @@ async def test_mcp_clients_in_process_are_refused(script: Script) -> None:
         name="{{ project_slug }}",
         authenticate=nobody,
         identify=nobody,
+{%- if use_ui %}
+        integrations=Defaults(),
+{%- endif %}
         model=script.model,
         gateway=config.gateway,
     )

@@ -13,10 +13,12 @@ from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
 from artifactr.files.manifest import OUTLINE_LIMIT, Sha256
 
-Talk = Literal["save", "commands", "polled", "pushed"]
+Talk = Literal["save", "bridged", "commands", "polled", "pushed"]
 """How much the app talks to the host while a person edits in it (lattice RFC-0003): `save`, only
-the bytes when the person saves; `commands`, the host's commands, with replies; `polled`, changes
-the host asks for; `pushed`, changes as they happen."""
+the bytes when the person saves (level 1); `bridged`, through the editor's shim, the host opens
+the file in the editor and hears each save and whether there are unsaved changes, but sends no
+commands (level 1+, native files ADR-0010); `commands`, the host's commands, with replies;
+`polled`, changes the host asks for; `pushed`, changes as they happen."""
 
 Failure = Literal["timeout", "crashed", "too_large", "refused"]
 """How a call can fail: past its deadline, the app crashed, a limit was breached, or the app
@@ -68,6 +70,9 @@ class Inspection(BaseModel):
     """Its comments and tracked changes."""
 
     pages: int | None = Field(default=None, ge=0)
+    media_type: str | None = None
+    """The format the app read the file as, if it tells formats apart: a check-in in another
+    format than the one checked out is refused, never converted."""
 
 
 @dataclass(frozen=True)

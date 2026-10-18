@@ -1,6 +1,6 @@
 # RFC-0003: Native files as artifacts
 
-**Status:** Draft, amended by [portalr ADR-0041](../portalr/adr/0041-first-party-webassembly-in-the-apps-policy.md), [lattice ADR-0026](../adr/0026-a-distribution-needs-a-reason-integrations-are-extras.md) and [lattice ADR-0027](../adr/0027-integrations-switched-per-workspace-through-one-port.md)
+**Status:** Draft, amended by [portalr ADR-0041](../portalr/adr/0041-first-party-webassembly-in-the-apps-policy.md), [lattice ADR-0026](../adr/0026-a-distribution-needs-a-reason-integrations-are-extras.md) and [lattice ADR-0027](../adr/0027-integrations-switched-per-workspace-through-one-port.md), and by native files [ADR-0010](../artifactr/files/adr/0010-a-shim-beside-the-build-and-talk-level-one-plus.md), [ADR-0011](../artifactr/files/adr/0011-a-gate-for-each-app.md) and [ADR-0012](../artifactr/files/adr/0012-an-app-for-each-type-and-no-format-changed-by-a-check-in.md)
 **Author:** Alex Nodeland
 **Created:** 2026-10-16
 **Discussion:** [#248](https://github.com/alexnodeland/lattice/pull/248)
@@ -236,6 +236,8 @@ The editor's origin:
 
 Apart from WordCraft's, these rows come from research on 2026-10-16, unverified here.
 
+> **Amended (2026-10-18) by native files [ADR-0010](../artifactr/files/adr/0010-a-shim-beside-the-build-and-talk-level-one-plus.md):** a `?host=parent` bridge (GridCraft, PdfCraft, CADCraft) gives open, save and dirty, not commands with replies: it is level 1+, `bridged`, reached through a shim of lattice's own on the editor's origin, run by hand with GridCraft 0.8.0, PdfCraft 0.8.0 and CADCraft 0.8.0. The JavaScript APIs' level is claimed per app once each has run through the shim.
+
 The pilot stays at level 1. A later phase may embed WordCraft through a host bridge, if one lands upstream and ships unmodified; we neither fork nor contribute. Until an app pushes events, events are polled or synthesized from revisions. A same-origin iframe is a stand-in only for the three apps with JavaScript APIs.
 
 **Watching upstream.** Today there is no roadmap, spec or shared crate, and requests for pushed events (`photocraft#4939`, `vectorcraft#2188`) have no maintainer reply. What would change this: `gridcraft#1466` (a full control channel over `postMessage`), `photocraft#2263`, or WordCraft's `#405` and `#1655` (host bridges) merging; a shared `craft-embed` or `craft-control` crate; release notes mentioning `host=`, `window.` or `postMessage`.
@@ -280,6 +282,8 @@ The spike measures the cost per session and how many a host holds; the input-to-
 | 3. Worker and agent | The worker, stackr's image and recipe, the hostile corpus; `NativeFileTools` | Every hostile file ends in a typed failure within its deadline; egress from the worker fails; scripted-model tests for an edit, a proposal, a busy refusal and a conflict |
 | 4. Check-out pilot | The hosted editor, portalr's renderer, previews, diffs, check-out and check-in | `bdd` scenarios for a check-in, a stale check-in, an idempotent retry and a busy agent; the editor's origin serves nothing that calls out |
 | 5. Streamed session spike | The evaluation above | A person types in the streamed document while an agent inserts a paragraph, and both see both; a save becomes one revision; p95 input delay under 150 ms on a LAN; a session starts in under five seconds from a pool; no egress, nothing left behind; no Docker socket reachable from any container the application can reach. Then a written recommendation |
+
+> **Amended (2026-10-18) by native files [ADR-0011](../artifactr/files/adr/0011-a-gate-for-each-app.md):** no app waits on WordCraft's record. Each app's key is on by default only once it passes its own gate: its release pinned, its fidelity matrix green, its hostile files refused in time, its CLI confined or run by the worker, and its notices read.
 
 `FakeApp` runs on every pull request; the real worker image runs nightly and in the Acceptance job. **Before a second app,** WordCraft's matrix has held for two releases, no hostile file has escaped, the second app's licence is read, and its adapter needs no change to `App`, `Blobs` or `NativeFile`.
 

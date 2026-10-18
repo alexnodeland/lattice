@@ -16,3 +16,6 @@ nav:
   - adr/0007-check-out-over-http-and-the-editor-on-its-own-origin.md
   - adr/0008-what-portalr-reads-of-a-native-file.md
   - adr/0009-each-crafting-app-declared-once-on-one-of-two-dialects.md
+  - adr/0010-a-shim-beside-the-build-and-talk-level-one-plus.md
+  - adr/0011-a-gate-for-each-app.md
+  - adr/0012-an-app-for-each-type-and-no-format-changed-by-a-check-in.md

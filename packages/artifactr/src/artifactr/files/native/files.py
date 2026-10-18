@@ -11,7 +11,7 @@ import json
 import uuid
 from collections.abc import AsyncIterable, Mapping, Sequence
 from datetime import timedelta
-from typing import Final, Literal
+from typing import Final, Literal, cast, override
 
 from pydantic import JsonValue
 
@@ -64,8 +64,31 @@ class ContentUnavailable(InvalidState):
         self.part: Part = part
 
 
+class FormatChanged(InvalidState):
+    """A check-in is in another format than the file checked out, which is never converted.
+
+    An editor can save a file in another format than it opened, such as a workbook opened from
+    `.csv` saved as `.xlsx`, or a layout opened from INDD saved as IDML. The head keeps its
+    format: check the file in as a new one instead (native files ADR-0012).
+    """
+
+    def __init__(self, artifact_id: ArtifactId, *, checked_out: str, checked_in: str) -> None:
+        super().__init__(
+            f"artifact {artifact_id} is {checked_out}, and the file checked in is {checked_in}: "
+            "a format is never changed by a check-in, so upload it as a new file"
+        )
+        self.artifact_id = artifact_id
+        self.checked_out = checked_out
+        self.checked_in = checked_in
+
+    @override
+    def details(self) -> dict[str, JsonValue]:
+        """Return the format checked out and the one checked in."""
+        return {"checked_out": self.checked_out, "checked_in": self.checked_in}
+
+
 class NativeFiles:
-    """Native files in workspaces: their bytes, their check-outs and their app.
+    """Native files in workspaces: their bytes, their check-outs and the apps that read them.
 
     Every method takes the [`Workspace`][artifactr.workspace.Workspace] to act in, as the actor
     who acts, and reads and writes through it, so `authorize` and the hiding of restricted
@@ -74,7 +97,8 @@ class NativeFiles:
     Args:
         blobs: Where the files' bytes are kept.
         checkouts: Where check-outs are kept.
-        app: The app that reads the format and runs agents' commands.
+        app: The app that reads every native file and runs agents' commands on it; or, for
+            several, the app for each native type, a subclass's own or else its nearest base's.
         checkout_ttl: How long a check-out lasts, unless it is extended: eight hours by default.
         deadline: How long, in seconds, a call to the app may take: 30 by default.
         edit_ttl: How long an agent's edit holds the lease: the app's deadline and the commit,
@@ -83,20 +107,20 @@ class NativeFiles:
         keep: How long bytes no revision names are kept after they were last put, for the
             commit that follows a put: a day by default.
         clock: Returns the current time, which collection keeps bytes from.
-        integrations: Whether the app's integration, `app.integration`, is on in a workspace:
-            while it is off there, nothing is uploaded, checked out, extended, checked in or
-            edited, and each refuses with `NotEnabled`; reads and collection go on. None, the
-            default, is on everywhere.
+        integrations: Whether a file's app's integration, `app.integration`, is on in a
+            workspace: while it is off there, none of its files is uploaded, checked out,
+            extended, checked in or edited, and each refuses with `NotEnabled`; reads and
+            collection go on. None, the default, is on everywhere.
 
     Raises:
-        ValueError: If an edit's lease would end before the app's deadline.
+        ValueError: If an edit's lease would end before the apps' deadline, or no app is given.
     """
 
     def __init__(
         self,
         blobs: Blobs,
         checkouts: Checkouts,
-        app: App,
+        app: App | Mapping[type[NativeFile], App],
         *,
         checkout_ttl: timedelta = timedelta(hours=8),
         deadline: float = 30.0,
@@ -107,9 +131,13 @@ class NativeFiles:
     ) -> None:
         if edit_ttl.total_seconds() <= deadline:
             raise ValueError("an edit's lease must outlast the app's deadline, and the commit")
+        self._apps: Mapping[type[NativeFile], App] = (
+            dict(app) if isinstance(app, Mapping) else {NativeFile: app}
+        )
+        if not self._apps:
+            raise ValueError("native files need an app to read them")
         self._blobs = blobs
         self._checkouts = checkouts
-        self._app = app
         self._checkout_ttl = checkout_ttl
         self._deadline = deadline
         self._edit_ttl = edit_ttl
@@ -117,36 +145,61 @@ class NativeFiles:
         self._clock = clock
         self._integrations = integrations
 
-    @property
-    def app(self) -> App:
-        """The app that reads the files and runs agents' commands."""
-        return self._app
+    def app_of(self, file_type: type[NativeFile]) -> App:
+        """The app that reads a native type: its own, or else its nearest base's.
+
+        Raises:
+            ValidationFailed: If no app reads it.
+        """
+        for base in file_type.__mro__:
+            if (app := self._apps.get(cast(type[NativeFile], base))) is not None:
+                return app
+        raise ValidationFailed(f"no app reads a {file_type.kind}", [])
 
     # ─── the switch ───────────────────────────────────────────────────────────
 
-    async def enabled(self, ws: Workspace) -> bool:
-        """Whether the app's integration is on in the workspace."""
+    async def enabled(self, ws: Workspace, file_type: type[NativeFile] | None = None) -> bool:
+        """Whether the app of a native type is on in the workspace; or, without one, any app.
+
+        A type no app reads is off.
+        """
+        try:
+            apps = list(self._apps.values()) if file_type is None else [self.app_of(file_type)]
+        except ValidationFailed:
+            return False
         if self._integrations is None:
             return True
-        key = self._app.integration
-        return await self._integrations.is_enabled(ws.tenant_id, ws.workspace_id, key)
+        for app in apps:
+            if await self._integrations.is_enabled(ws.tenant_id, ws.workspace_id, app.integration):
+                return True
+        return False
 
     def key_of(self, kind: str, data: Mapping[str, JsonValue]) -> str | None:
-        """The integration that governs an artifact: the app's for a native file, else None.
+        """The integration that governs an artifact: its app's for a native file, else None.
 
-        It is the `key_of` of artifactr's `integration_gate`, so that while the app is off, an
-        edit of a native file is refused on every surface, REST and MCP too, not only here. It
-        claims every native file's kind for this app: a deployment has one app, as RFC-0003's
-        pilot does, until a second app's adapter says which formats are its.
+        It is the `key_of` of artifactr's `integration_gate`, so that while a file's app is off,
+        an edit of the file is refused on every surface, REST and MCP too, not only here. A
+        native type no app reads is governed by none, and no app edits it.
         """
-        del data  # every native file is the app's
+        del data  # a native file's app is its type's
         file_type = artifact_types().get(kind)
-        native = file_type is not None and issubclass(file_type, NativeFile)
-        return self._app.integration if native else None
+        if file_type is None or not issubclass(file_type, NativeFile):
+            return None
+        try:
+            return self.app_of(file_type).integration
+        except ValidationFailed:
+            return None
 
-    async def _switched_on(self, ws: Workspace) -> None:
-        if not await self.enabled(ws):
-            raise NotEnabled(self._app.integration)
+    async def _switched_on(self, ws: Workspace, file_type: type[NativeFile]) -> App:
+        """The type's app, if it is on in the workspace.
+
+        Raises:
+            NotEnabled: If it is off.
+        """
+        app = self.app_of(file_type)
+        if not await self.enabled(ws, file_type):
+            raise NotEnabled(app.integration)
+        return app
 
     # ─── uploads ──────────────────────────────────────────────────────────────
 
@@ -165,17 +218,20 @@ class NativeFiles:
 
         Raises:
             NotEnabled: If the app's integration is off in the workspace.
-            ValidationFailed: If the type doesn't hold files of `media_type`.
+            ValidationFailed: If the type doesn't hold files of `media_type`, no app reads it,
+                or its app reads the file as another format.
             TooLarge: If the file is larger than the blob store's limit.
             AppFailed: If the app can't read it.
         """
-        await self._switched_on(ws)
+        app = await self._switched_on(ws, file_type)
         if media_type not in file_type.formats:
             raise ValidationFailed(f"a {file_type.kind} holds {sorted(file_type.formats)}", [])
         artifact_id = artifact_id or new_artifact_id()
         scope = _scope(ws)
         content = await self._blobs.put(scope, artifact_id, data, media_type)
-        inspection = await self._inspect(scope, artifact_id, content)
+        inspection = await self._inspect(app, scope, artifact_id, content)
+        if inspection.media_type not in (None, media_type):
+            raise ValidationFailed(f"the file is {inspection.media_type}, not {media_type}", [])
         made = Provenance(source="upload")
         manifest = await self._manifest(
             scope, artifact_id, file_type, name, content, inspection, made
@@ -197,7 +253,7 @@ class NativeFiles:
             ArtifactBusy: If someone else has the file: a check-out, or an agent's edit.
             NotFound: If there is no such native file, or it is hidden from the actor.
         """
-        await self._switched_on(ws)
+        await self._switched_on(ws, type((await ws.get(NativeFile, artifact_id)).data))
         checkout_id = f"co_{uuid.uuid4().hex}"
         holder = holder_of(checkout_id, ws.actor)
         try:
@@ -230,8 +286,8 @@ class NativeFiles:
             ArtifactBusy: If its lease ended and someone else has the file now.
             InvalidState: If it was checked in.
         """
-        await self._switched_on(ws)
         checkout = await self._own(ws, checkout_id)
+        await self._switched_on(ws, type((await ws.get(NativeFile, checkout.artifact_id)).data))
         if checkout.checked_in:
             raise InvalidState(f"checkout {checkout_id} was checked in: check the file out again")
         lease = await ws.lease_artifact(
@@ -248,6 +304,7 @@ class NativeFiles:
         data: AsyncIterable[bytes],
         *,
         summary: str | None = None,
+        media_type: str | None = None,
     ) -> Applied | Proposed | None:
         """Check a file in: a revision from the version checked out, and the lease released.
 
@@ -259,6 +316,9 @@ class NativeFiles:
         records the check-out's base as its provenance. Either way the check-out ends: its
         record is closed and its lease released.
 
+        The file must be in the format checked out: one that says it is another, by
+        `media_type`, or that the app reads as another, is refused, and never converted.
+
         Returns:
             The revision's outcome, a proposal's if it was stale, or None if nothing changed.
 
@@ -266,17 +326,25 @@ class NativeFiles:
             NotEnabled: If the app's integration is off in the workspace.
             NotFound: If there is no such check-out, or its file is hidden from the actor.
             Forbidden: If it is someone else's.
+            FormatChanged: If the file is in another format than the one checked out.
             InvalidState: If it was checked in already, and this file is another.
             TooLarge: If the file is larger than the blob store's limit.
             AppFailed: If the app can't read it.
         """
-        await self._switched_on(ws)
         checkout = await self._own(ws, checkout_id)
         artifact_id = checkout.artifact_id
         head = await ws.get(NativeFile, artifact_id)
+        app = await self._switched_on(ws, type(head.data))
+        checked_out = head.data.content.media_type
+        if media_type not in (None, checked_out):
+            raise FormatChanged(artifact_id, checked_out=checked_out, checked_in=media_type)
         scope = _scope(ws)
-        content = await self._blobs.put(scope, artifact_id, data, head.data.content.media_type)
-        inspection = await self._inspect(scope, artifact_id, content)
+        content = await self._blobs.put(scope, artifact_id, data, checked_out)
+        inspection = await self._inspect(app, scope, artifact_id, content)
+        if inspection.media_type not in (None, checked_out):
+            raise FormatChanged(
+                artifact_id, checked_out=checked_out, checked_in=inspection.media_type
+            )
         if inspection.fingerprint == head.data.fingerprint:
             await self._close(ws, checkout)
             return None
@@ -365,7 +433,7 @@ class NativeFiles:
             ContentUnavailable: If the head's bytes aren't in the blob store.
             AppFailed: If the app can't run the batch.
         """
-        await self._switched_on(ws)
+        app = await self._switched_on(ws, type((await ws.get(NativeFile, artifact_id)).data))
         holder = f"edit:{uuid.uuid4()}"
         try:
             await ws.lease_artifact(artifact_id, holder=holder, ttl=self._edit_ttl)
@@ -374,15 +442,15 @@ class NativeFiles:
                 raise VersionConflict(artifact_id, base=base_version, head=head.version)
             scope = _scope(ws)
             source = await self._bytes(scope, artifact_id, head.data.content, "content")
-            applied = await self._app.apply(source, commands, deadline=self._deadline)
+            applied = await app.apply(source, commands, deadline=self._deadline)
             if applied.inspection.fingerprint == head.data.fingerprint:
                 return None
             batch: list[JsonValue] = [command.model_dump(mode="json") for command in commands]
             made = Provenance(
                 source="commands",
-                app=self._app.name,
-                app_version=self._app.version,
-                build=self._app.build,
+                app=app.name,
+                app_version=app.version,
+                build=app.build,
                 base=head.data.content.sha256,
                 commands=await self._put_json(scope, artifact_id, batch),
             )
@@ -447,8 +515,9 @@ class NativeFiles:
             ContentUnavailable: If the blob store doesn't have its bytes.
             AppFailed: If the app can't render it, or there is no such page.
         """
+        app = self.app_of(type((await ws.get(NativeFile, artifact_id)).data))
         source = await self.read(ws, artifact_id, version=version)
-        return await self._app.render(source, page, scale=1.0, deadline=self._deadline)
+        return await app.render(source, page, scale=1.0, deadline=self._deadline)
 
     async def proposed(
         self, ws: Workspace, proposal_id: ProposalId, *, part: Part = "content"
@@ -464,11 +533,7 @@ class NativeFiles:
             ContentUnavailable: If the proposal names nothing for `part`, as one that doesn't
                 edit the file's content, or bytes the blob store doesn't have.
         """
-        proposal = await ws.proposal(proposal_id)
-        await ws.get(NativeFile, proposal.artifact_id)
-        change = proposal.change
-        named = _replaced(change.patch, part) if isinstance(change, EditArtifact) else None
-        return await self._bytes(_scope(ws), proposal.artifact_id, named, part)
+        return (await self._proposed(ws, proposal_id, part))[0]
 
     async def render_proposed(self, ws: Workspace, proposal_id: ProposalId, page: int) -> bytes:
         """Render one page of what a proposal would make of a native file, from 1, as a PNG.
@@ -478,8 +543,18 @@ class NativeFiles:
             ContentUnavailable: If the proposal names no content, or the blob store hasn't it.
             AppFailed: If the app can't render it, or there is no such page.
         """
-        source = await self.proposed(ws, proposal_id)
-        return await self._app.render(source, page, scale=1.0, deadline=self._deadline)
+        source, file_type = await self._proposed(ws, proposal_id, "content")
+        return await self.app_of(file_type).render(source, page, scale=1.0, deadline=self._deadline)
+
+    async def _proposed(
+        self, ws: Workspace, proposal_id: ProposalId, part: Part
+    ) -> tuple[bytes, type[NativeFile]]:
+        """What a proposal would make of a part of a native file, and the file's type."""
+        proposal = await ws.proposal(proposal_id)
+        head = await ws.get(NativeFile, proposal.artifact_id)
+        change = proposal.change
+        named = _replaced(change.patch, part) if isinstance(change, EditArtifact) else None
+        return await self._bytes(_scope(ws), proposal.artifact_id, named, part), type(head.data)
 
     # ─── collection ───────────────────────────────────────────────────────────
 
@@ -513,9 +588,11 @@ class NativeFiles:
 
     # ─── what every write shares ──────────────────────────────────────────────
 
-    async def _inspect(self, scope: Scope, artifact_id: ArtifactId, content: Blob) -> Inspection:
+    async def _inspect(
+        self, app: App, scope: Scope, artifact_id: ArtifactId, content: Blob
+    ) -> Inspection:
         source = await self._bytes(scope, artifact_id, content, "content")
-        return await self._app.inspect(source, deadline=self._deadline)
+        return await app.inspect(source, deadline=self._deadline)
 
     async def _manifest[F: NativeFile](
         self,

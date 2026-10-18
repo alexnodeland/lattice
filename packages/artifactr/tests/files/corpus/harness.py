@@ -7,15 +7,19 @@ for each app with a corpus, and `conftest.py` writes the matrix (lattice RFC-000
 native files ADR-0009).
 """
 
+import random
 import re
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Final
 
 from artifactr.files.app import App
 
 PINS: Final = Path(__file__).parents[5] / "scripts" / "crafts"
+
+GIVEN: Final = ("empty", "noise", "truncated")
+"""The hostile files every app is given: nothing, noise, and a corpus file cut in half."""
 
 
 @dataclass(frozen=True)
@@ -45,9 +49,30 @@ class Corpus:
     """The features the pinned release is known not to keep, which the matrix says and Nightly
     expects to fail: a feature that fails outside them, or passes inside them, turns it red."""
 
+    hostile: Mapping[str, Callable[[], bytes]] = field(
+        default_factory=dict[str, Callable[[], bytes]]
+    )
+    """Files made to break this app's format, such as a zip bomb, beside those every app is
+    given: each must end in a typed failure within its deadline."""
+
     def source(self, feature: str) -> bytes:
         """The corpus' file for a feature."""
         return (self.folder / f"{feature}{self.extension}").read_bytes()
+
+    def hostile_names(self) -> list[str]:
+        """Every hostile file's name: those every app is given, and the app's own."""
+        return sorted({*GIVEN, *self.hostile})
+
+    def hostile_file(self, name: str) -> bytes:
+        """A hostile file, made when it is asked for, as some are large once inflated."""
+        if name in self.hostile:
+            return self.hostile[name]()
+        whole = self.source(min(self.makers))
+        return {
+            "empty": b"",
+            "noise": random.Random(0).randbytes(1 << 16),
+            "truncated": whole[: len(whole) // 2],
+        }[name]
 
 
 def pinned(app: str) -> str:

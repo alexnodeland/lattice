@@ -33,6 +33,11 @@ from mcp.types import CallToolResult, TextContent
 PNG = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC"
 )
+TYPES = (
+    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+    '<Override PartName="/word/document.xml" ContentType="application/'
+    'vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>'
+)
 COMMANDS = [
     {"id": "text.insert", "label": "Insert Text", "location": "Home", "params": '{"text": s}'},
     {"id": "para.heading1", "label": "Heading 1", "location": "Home > Styles", "params": "{}"},
@@ -149,6 +154,7 @@ def _zipped(document: dict[str, Any]) -> bytes:
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as archive:
         kept = {"blocks": document["blocks"], "comments": document["comments"]}
+        archive.writestr("[Content_Types].xml", TYPES)
         archive.writestr("word/document.json", json.dumps(kept))
         archive.writestr("docProps/core.xml", str(document["saves"]))
     return buffer.getvalue()

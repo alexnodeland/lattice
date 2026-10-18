@@ -1,10 +1,10 @@
 """The agent's tools for native files, which ask `NativeFiles` for everything they do.
 
-The toolset is offered only while the app's integration is on in the run's workspace, read once
-a step, so a model in a workspace where it is off never sees it; `NativeFiles` refuses there
-too, whatever calls it. A rejection is raised as it is, for artifactr's capability to turn into
-a retry, except a person's check-out: the agent is told who has the file and plans again after
-the check-in, rather than retrying at once.
+The toolset is offered only while an app's integration is on in the run's workspace, read once
+a step, so a model in a workspace where every app is off never sees it; `NativeFiles` refuses a
+file whose app is off, whatever calls it. A rejection is raised as it is, for artifactr's
+capability to turn into a retry, except a person's check-out: the agent is told who has the
+file and plans again after the check-in, rather than retrying at once.
 """
 
 import json
@@ -23,6 +23,7 @@ from pydantic_ai import (
 
 from artifactr.agent import Session, describe_outcome
 from artifactr.files.app import AppCommand, AppFailed
+from artifactr.files.manifest import NativeFile
 from artifactr.files.native import NativeFiles
 from artifactr.workspace import ArtifactBusy
 
@@ -79,14 +80,16 @@ def native_file_tools(files: NativeFiles, *, view: bool = False) -> AbstractTool
         rest = len(items) - end
         return shown + (f"\n\n[{rest} more: read on from start={end}]" if rest > 0 else "")
 
-    @toolset.tool_plain
-    async def find_commands(query: str) -> str:
-        """Find the app's commands that edit a native file, ten at most, by a word they mention.
+    @toolset.tool
+    async def find_commands(ctx: RunContext[Session[Any]], artifact_id: str, query: str) -> str:
+        """Find the commands of a native file's app that edit it, ten at most, by a word.
 
         Args:
+            artifact_id: The native file to edit.
             query: A word in the command's name or description, such as "comment" or "table".
         """
-        found = await files.app.commands(query)
+        head = await ctx.deps.workspace.get(NativeFile, artifact_id)
+        found = await files.app_of(type(head.data)).commands(query)
         if not found:
             return f"No command mentions {query!r}: try another word."
         return "\n".join(f"- {c.signature}: {c.description}" for c in found)

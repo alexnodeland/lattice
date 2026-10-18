@@ -27,10 +27,20 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         {*LIBRARY, "pydantic"},
     ),
     "app": ({"artifactr.files.manifest", "artifactr.files.app"}, {"pydantic"}),
-    # An app's adapter knows the port, and its app's own channel: WordCraft's is MCP.
+    # The crafting apps, and their CLIs' MCP servers spawned on this machine.
+    "craft": (
+        {"artifactr.files.manifest", "artifactr.files.app", "artifactr.files.craft"},
+        {"pydantic", "mcp", "anyio", "lattice_core.integrations"},
+    ),
+    # An app's adapter knows the port, the crafting apps, and how its own app reads a file.
     "wordcraft": (
-        {"artifactr.files.manifest", "artifactr.files.app", "artifactr.files.wordcraft"},
-        {"pydantic", "mcp", "anyio"},
+        {
+            "artifactr.files.manifest",
+            "artifactr.files.app",
+            "artifactr.files.craft",
+            "artifactr.files.wordcraft",
+        },
+        {"pydantic"},
     ),
     "native": (
         {

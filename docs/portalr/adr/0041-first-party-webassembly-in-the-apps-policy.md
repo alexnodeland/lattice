@@ -1,6 +1,6 @@
-# ADR-0041: First-party WebAssembly in the app's policy
+# ADR-0041: First-party WebAssembly in the UIs' policy
 
-**Status:** Accepted
+**Status:** Accepted, amended 2026-10-17 (see Amendment: both UIs, one policy)
 **Date:** 2026-10-17
 **Deciders:** Alex Nodeland
 **Amends:** the Content-Security-Policy of [ADR-0011](0011-the-router-and-its-readers.md), and the refusal of `'wasm-unsafe-eval'` on portalr's origin in [lattice RFC-0003](../../rfcs/0003-native-files-as-artifacts.md#alternatives)
@@ -49,3 +49,22 @@ Lattice RFC-0003 refused `'wasm-unsafe-eval'` on portalr's origin. The case it w
 2. [ ] `web/wasm-allowlist.json` and its test in `portalr:check`.
 3. [ ] RFC-0005's mini-app tests: `WebAssembly.compile` fails in the frame.
 4. [ ] RFC-0006's spike records whether editing compiles WebAssembly, and this record is revisited if nothing does.
+
+## Amendment, 2026-10-17: both UIs, one policy
+
+The owner decided that admin allows first-party WebAssembly too, under the same guardrails. It is done before either half of the split was built, so `ui_router` keeps the one policy it had.
+
+- **Both UIs' policy gains `'wasm-unsafe-eval'` in `script-src`.** Nothing else in it changes, and `'unsafe-eval'` stays absent. "admin's policy doesn't change" and "admin is unchanged" above are superseded.
+- **One policy, not one per UI.** `policy(site)` stays the one both UIs are served with, and the split this record planned isn't built. With both UIs allowing the same thing, a policy per name would be a branch with nothing to choose between, and a second policy to test. `ui/csp/policy.txt`, which a portalr test holds to `policy()`, is then the policy both UIs share, not one of two. Action item 1 is revised to this.
+- **The guardrails cover both UIs.** Modules ship only in our build, and `connect-src` stays `'self'` and Supabase. Nothing third-party-hosted or agent-authored is compiled, and RFC-0005's mini apps stay on their own origin with none.
+- **The allow-list is kept by digest.** `web/wasm-allowlist.json` lists, for each of `app` and `admin`, each module's package and the SHA-256 of its bytes. `scripts/check_wasm.py`, the `portalr:wasm` task that `portalr:check` runs, finds modules in each built UI both as `.wasm` files and as base64 inlined in any other file (`AGFzbQ`, the encoding of `\0asm`). It fails on a module not listed, a listed one the build doesn't hold, and raw magic outside a `.wasm` file, which it can't delimit. Entries don't name the built file, since Vite's names change with every build; the check reports the file that holds each module. Both lists are empty today: neither build holds a module.
+- **The policy is tested exactly.** `tests/fastapi/test_ui.py` holds the shared policy directive by directive, on each UI's `index.html` and on a hashed script under `assets/`.
+- **Markdown still needs none.** The policy can no longer refuse a module in ui's CSP harness ([ADR-0043](0043-markdowns-basics.md)), so the harness's page reports each reach for `WebAssembly`'s compiling calls, and every case still expects nothing reported: `Markdown` and its add-ons compile no WebAssembly ([ADR-0044](0044-highlighting-and-math-on-demand.md)). A case of its own compiles the smallest module, to show the policy allows it and the harness sees it.
+- **Harder, now for admin too.** A cross-site scripting flaw in admin, the operator's UI, could also compile WebAssembly. As for `app`, it could already run script, so the added reach is speed and obscurity, not access.
+
+Action items, as amended:
+
+1. [x] `ui_router`: one policy for both UIs, with `'wasm-unsafe-eval'`, and `test_ui.py` holding it exactly on both.
+2. [x] `web/wasm-allowlist.json` and its check in `portalr:check`, for both UIs.
+3. [ ] Unchanged: RFC-0005's mini-app tests: `WebAssembly.compile` fails in the frame.
+4. [ ] Unchanged: RFC-0006's spike records whether editing compiles WebAssembly, and this record is revisited if nothing does.

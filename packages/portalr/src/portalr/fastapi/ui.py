@@ -20,10 +20,12 @@ NO_CACHE: Final = "no-cache"
 
 
 def policy(site: Site) -> str:
-    """The UIs' Content-Security-Policy: their own origin, and Supabase Auth for signing in.
+    """The policy both UIs share: their own origin, and Supabase Auth for signing in.
 
     It matters because supabase-js keeps the session in ``localStorage`` (lattice RFC-0002). A
     Supabase project on a path of the application's own origin is already ``'self'``.
+    ``'wasm-unsafe-eval'`` lets either UI compile the WebAssembly its own build ships, which
+    ``web/wasm-allowlist.json`` lists, and nothing more: ``eval`` stays refused (portalr ADR-0041).
     """
     supabase = urlsplit(site.supabase_url)
     connect = " ".join(
@@ -32,7 +34,7 @@ def policy(site: Site) -> str:
     return "; ".join(
         (
             "default-src 'self'",
-            "script-src 'self'",
+            "script-src 'self' 'wasm-unsafe-eval'",
             "style-src 'self'",
             "img-src 'self' data:",
             "font-src 'self'",

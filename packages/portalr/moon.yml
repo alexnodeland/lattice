@@ -88,6 +88,18 @@ tasks:
       - 'app:build'
       - 'admin:build'
 
+  # Each WebAssembly module in either UI's build against web/wasm-allowlist.json (portalr ADR-0041).
+  wasm:
+    description: "Fail on a WebAssembly module in a built UI that the allow-list doesn't name"
+    command: 'uv run --no-project python scripts/check_wasm.py'
+    inputs:
+      - 'scripts/check_wasm.py'
+      - 'web/wasm-allowlist.json'
+      - 'src/portalr/static/**/*'
+    deps:
+      - 'app:build'
+      - 'admin:build'
+
   ui-in-wheel:
     description: "Check that the built wheel carries both UIs, and their third-party notices"
     command: 'uv run --no-project python scripts/check_wheel.py'
@@ -113,6 +125,7 @@ tasks:
     deps:
       - 'ui-in-wheel'
       - 'size'
+      - 'wasm'
     options:
       mergeInputs: 'replace'
 

@@ -266,7 +266,7 @@ class Integrations(Protocol):                     # lattice_core.integrations
 - English only, as the app is ([portalr ADR-0014][p-adr-0014]).
 - Fonts self-hosted: `window.EXCALIDRAW_ASSET_PATH` is set by a file script, as `scheme.js` is, since the policy forbids inline script. Without it, 0.18.1 fetches fonts from esm.sh.
 
-**The policy** gains `'wasm-unsafe-eval'` in `script-src`, across `app` (O4); admin's is unchanged, as [portalr ADR-0041][p-adr-0041] records with its guardrails. In 0.18.1, the WebAssembly is two modules, harfbuzz and woff2, inlined as base64 in one 743 kB (gzip) chunk. Only font subsetting reaches that chunk, through two dynamic imports, for SVG export with embedded fonts. Nothing in the static graph of `index.js` imports it. So plain editing likely never compiles WebAssembly, and phase 0 confirms it in Chromium under today's policy. Subsetting runs in a module worker (`new Worker(url, {type: "module"})`, same origin, so `worker-src` falls back to `'self'`) and falls back to the main thread if the worker fails. `connect-src` stays `'self'`.
+**The policy** gains `'wasm-unsafe-eval'` in `script-src`, across `app` (O4) and, by the owner's later decision, admin too: both UIs share one policy, as [portalr ADR-0041][p-adr-0041] records with its guardrails. In 0.18.1, the WebAssembly is two modules, harfbuzz and woff2, inlined as base64 in one 743 kB (gzip) chunk. Only font subsetting reaches that chunk, through two dynamic imports, for SVG export with embedded fonts. Nothing in the static graph of `index.js` imports it. So plain editing likely never compiles WebAssembly, and phase 0 confirms it in Chromium under a policy without `'wasm-unsafe-eval'`. Subsetting runs in a module worker (`new Worker(url, {type: "module"})`, same origin, so `worker-src` falls back to `'self'`) and falls back to the main thread if the worker fails. `connect-src` stays `'self'`.
 
 **A budget of its own.** `size-budget.json` gains a `canvas` entry, and `check_size.py` measures the chunks reachable only through the canvas's dynamic import under it, read from Vite's build manifest (`build.manifest`), since today it only globs files and reads `index.html`, leaving them out of `app`'s `total` and `largest`. `app`'s `initial` is unchanged, since the canvas is lazy. Two ceilings: `canvas.total` for editing, and `canvas.export` for the subsetting chunk. The package's own chunks are about 330 kB gzip without the subsetting chunk and 1.06 MB with it. Its dependencies (React aside, `roughjs`, `jotai`, Radix, `pako` and others) are external to the package and come on top; phase 0 measures the built total and sets the ceilings 10% above it. Fonts are not counted, as today: 0.18.1 ships 13 MB of them, 12 MB of which is Xiaolai, its CJK face, split by Unicode range and loaded only when used. Excalidraw and its dependencies are in the generated third-party notices and held to their licence allow-list ([portalr ADR-0033][p-adr-0033]). Its fonts' licences sit beside them in the wheel, as the kit's typefaces' do ([portalr ADR-0019][p-adr-0019]); which faces ship is an unresolved question.
 
@@ -326,7 +326,7 @@ Decided by the owner on 2026-10-17:
 | O1 | What a diagram is | An ordinary JSON artifact, `elements: {id: element}`, edited by JSON Patch scoped to elements with `test /elements/<id>/version`; no lease, no core change; leases stay for opaque native files | A `NativeFile` over a `.excalidraw` blob, checked out under a lease |
 | O2 | Packaging | A new distribution, `artifactr-excalidraw-ai`, depending on `artifactr-files` for `Blobs` only | An extension of `artifactr-files` or `artifactr-ui`; an artifactr extra |
 | O3 | Where the canvas runs | Directly in portalr's `app`, on its origin | A third UI, `canvas`, with its own policy (the brainstorm's recommendation); an origin of its own |
-| O4 | The policy | `'wasm-unsafe-eval'` app-wide, for first-party pinned WebAssembly only, with [ADR-0041][p-adr-0041]'s guardrails; amends RFC-0003's refusal; the spike still settles whether editing needs it | Holding RFC-0003's line, with the canvas on a separate origin |
+| O4 | The policy | `'wasm-unsafe-eval'` in the policy both UIs share, for first-party pinned WebAssembly only, with [ADR-0041][p-adr-0041]'s guardrails; amends RFC-0003's refusal; the spike still settles whether editing needs it | Holding RFC-0003's line, with the canvas on a separate origin |
 | O5 | Live collaboration | Full, from the first release: presence and live sync between people and agents | Coalesced commits first, presence later (the brainstorm's recommendation) |
 | O6 | Agents' edits | Proposals by default, with a switch per application to apply | Every edit applied; every edit proposed, always |
 | O7 | Conversion and export | A headless worker, so agents and rules work with no browser open | In the browser only |
@@ -348,7 +348,7 @@ Recommended, for the maintainer to decide:
 
 - **A heavy dependency on a moving target.** About 330 kB gzip of the package's own JavaScript to edit, 1.06 MB with export, before its dependencies, and 13 MB of fonts. Excalidraw's `main` carries an unreleased breaking rework: `excalidrawAPI` becomes `onExcalidrawAPI`, `restore()` is no longer exported, and arrow bindings change. Upgrading from 0.18.1 will be a migration of its own.
 - **Revision volume.** Live drawing makes many revisions, each holding the whole scene. An hour of drawing by three people can be thousands of revisions. The cadence and the size limits bound it; nothing compacts it.
-- **`'wasm-unsafe-eval'` for everyone** in `app`, to serve a feature some workspaces turn off. ADR-0041's guardrails narrow it, but a policy is now looser than it was.
+- **`'wasm-unsafe-eval'` for everyone** in both UIs, to serve a feature some workspaces turn off. ADR-0041's guardrails narrow it, but a policy is now looser than it was.
 - **The canvas can't meet portalr's accessibility bar.** The description, the list and the agent are equivalents, not the same experience.
 - **Last writer wins per element.** Two people moving the same shape in the same second see one move survive, as on excalidraw.com.
 - **A new protocol surface** with its own abuse cases: presence floods, oversized `editing`, a watcher who keeps seeing after losing access. Each has a limit or a re-check, and each is a test.
@@ -359,7 +359,7 @@ Recommended, for the maintainer to decide:
 - **Live collaboration through relayr events.** That is a category error: relayr bridges the durable log to reflexr through polled followers, and the browser never talks to relayr (RFC-0005). Every stroke would be a reflexr event.
 - **excalidraw-room,** Excalidraw's own relay: a small socket.io server passing encrypted scenes, with the key in the URL's fragment. It is another service with its own protocol and no notion of lattice's access, and its scenes would bypass the log.
 - **A CRDT (Yjs) under the scene.** Excalidraw's model is per-element last-writer-wins, not a CRDT, and lattice already orders writes on the server. A CRDT would add a second source of truth.
-- **A third UI or an origin of its own for the canvas** (O3). Its own policy would keep `'wasm-unsafe-eval'` off `app`, at the cost of a second session handover and a second WebSocket. The owner chose one origin.
+- **A third UI or an origin of its own for the canvas** (O3). Its own policy would keep `'wasm-unsafe-eval'` off `app` and admin, at the cost of a second session handover and a second WebSocket. The owner chose one origin.
 - **Conversion in the browser only** (O7). It needs no worker, but an agent couldn't draw unless someone had the diagram open.
 - **The official Excalidraw MCP server** as the agent's tools. It is an MCP App whose export uploads to excalidraw.com (O8). Its tool shapes, and `yctimlin/mcp_excalidraw`'s, informed `DiagramTools`.
 
@@ -373,7 +373,7 @@ Recommended, for the maintainer to decide:
 
 Each is settled in phase 0's ADR or carried as an exit criterion.
 
-- Plain editing in 0.18.1 never compiles WebAssembly in Chromium, and works under today's policy. The chunk graph says so; nothing was run.
+- Plain editing in 0.18.1 never compiles WebAssembly in Chromium, and works under a policy without `'wasm-unsafe-eval'`. The chunk graph says so; nothing was run.
 - The directives 0.18.1 needs beyond `'wasm-unsafe-eval'`: whether it writes a `<style>` element (`style-src`), uses `blob:` images, or needs `worker-src` named.
 - Excalidraw's canvas lets Escape move focus out, and exposes nothing to a screen reader beyond its toolbar. Its open issues on this (#5759, #7492, #8088) were not read here.
 - `UIOptions` hides the embeddable tool, and stroke and background presets can be replaced with a palette of ours.

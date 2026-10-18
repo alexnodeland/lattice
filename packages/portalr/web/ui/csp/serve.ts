@@ -1,5 +1,5 @@
 /**
- * Build the CSP tests' page, and serve it with portalr's Content-Security-Policy, which
+ * Build the CSP tests' page, and serve it with the Content-Security-Policy both UIs share, which
  * `policy.txt` holds and a portalr test holds to the router's own.
  */
 

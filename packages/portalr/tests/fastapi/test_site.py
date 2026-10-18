@@ -51,3 +51,32 @@ def test_an_editor_is_an_apps_at_a_web_address(key: str, url: str, said: str) ->
 def test_an_editor_on_loopback_may_be_http_and_an_apps_own() -> None:
     editors = {"files:wordcraft": "http://127.0.0.1:8001/", "files:gridcraft": "https://g.test/"}
     assert Site(supabase_url="/", supabase_key="sb_publishable_abc", editors=editors).editors
+
+
+@pytest.mark.parametrize(
+    ("apps", "kept"),
+    [
+        ("https://apps.example.com", "https://apps.example.com"),
+        ("https://Apps.Example.com/", "https://Apps.Example.com"),
+        ("http://127.0.0.1:8001", "http://127.0.0.1:8001"),
+        (None, None),
+    ],
+)
+def test_mini_apps_origin_is_kept_as_an_origin(apps: str | None, kept: str | None) -> None:
+    assert Site(supabase_url="/", supabase_key="sb_publishable_abc", apps=apps).apps == kept
+
+
+@pytest.mark.parametrize(
+    ("apps", "said"),
+    [
+        ("http://apps.example.com", "give them https"),
+        ("/apps", "give them https"),
+        ("https://user@apps.example.com", "no user or password"),
+        ("https://", "no user or password"),
+        ("https://apps.example.com/sandbox", "no path, query or fragment"),
+        ("https://apps.example.com/?x=1", "no path, query or fragment"),
+    ],
+)
+def test_mini_apps_origin_is_one_of_its_own(apps: str, said: str) -> None:
+    with pytest.raises(ValidationError, match=said):
+        Site(supabase_url="/", supabase_key="sb_publishable_abc", apps=apps)

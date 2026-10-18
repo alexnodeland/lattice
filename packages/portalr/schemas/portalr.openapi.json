@@ -46,6 +46,17 @@
       "Config": {
         "description": "``config.json``: what the UIs need of the deployment they run in.",
         "properties": {
+          "apps": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apps"
+          },
           "editors": {
             "additionalProperties": {
               "type": "string"
@@ -76,7 +87,8 @@
           "surfaces",
           "readers",
           "people",
-          "editors"
+          "editors",
+          "apps"
         ],
         "title": "Config",
         "type": "object"

@@ -1,7 +1,8 @@
 import { QueryClient } from "@tanstack/react-query";
 import type { Server } from "bun";
-import { afterAll, beforeAll, expect, test } from "vitest";
-import { pngDataUrl } from "./files";
+import { afterAll, afterEach, beforeAll, expect, test, vi } from "vitest";
+import { createCommands } from "./commands";
+import { checkIn, pngDataUrl } from "./files";
 import { createQueries, keys, Refused } from "./queries";
 import { createApi } from "./rest";
 
@@ -24,6 +25,16 @@ const STATUS = {
 const seen: URL[] = [];
 let server: Server<unknown>;
 let queries: ReturnType<typeof createQueries>;
+let commands: ReturnType<typeof createCommands>;
+const CHECKOUT = {
+  id: "co_1",
+  artifact_id: "doc_1",
+  base_version: 2,
+  base_sha256: "a".repeat(64),
+  actor: { kind: "user", id: "bob" },
+  expires_at: "2026-10-17T17:30:00Z",
+  checked_in: false,
+};
 
 beforeAll(() => {
   server = Bun.serve({
@@ -47,17 +58,27 @@ beforeAll(() => {
           return new Response(PNG, { headers: { "content-type": "application/octet-stream" } });
         case `${AT}/files/doc_1/versions/1/content`:
           return new Response("the file's bytes");
+        case `${AT}/files/doc_1/checkouts`:
+          return Response.json(CHECKOUT, { status: 201 });
+        case `${AT}/checkouts/co_1/extension`:
+          return Response.json({ ...CHECKOUT, expires_at: "2026-10-17T18:00:00Z" });
+        case `${AT}/checkouts/co_2/extension`:
+          return Response.json(
+            { detail: { type: "invalid_state", message: "checkout co_2 was checked in" } },
+            { status: 409 },
+          );
         default:
           return Response.json({ detail: "not found" }, { status: 404 });
       }
     },
   });
   const origin = `http://127.0.0.1:${server.port}`;
-  queries = createQueries(
-    createApi({ artifactr: `${origin}/artifactr/v1`, reflexr: "", grantr: origin }, () => ({
-      token: "t0k3n",
-    })),
+  const api = createApi(
+    { artifactr: `${origin}/artifactr/v1`, reflexr: "", grantr: origin },
+    () => ({ token: "t0k3n" }),
   );
+  queries = createQueries(api);
+  commands = createCommands(api);
 });
 
 afterAll(() => {
@@ -118,4 +139,159 @@ test("a change to a file makes its status stale, never its versions' words or pa
   expect(under(keys.files.status("acme", "ws_1", "doc_1"))).toBe(true);
   expect(under(keys.files.version("acme", "ws_1", "doc_1", 1))).toBe(false);
   expect(under(keys.files.proposal("acme", "ws_1", "p_1"))).toBe(false);
+});
+
+test("a check-out and its extension are commands on the file and the check-out", async () => {
+  const checkedOut = await commands.files.checkOut("acme", "ws_1", "doc_1");
+  expect(checkedOut).toEqual({ outcome: "done", result: CHECKOUT });
+  const extended = await commands.files.extend("acme", "ws_1", "co_1");
+  expect(extended.outcome === "done" && extended.result.expires_at).toBe("2026-10-17T18:00:00Z");
+  expect(await commands.files.extend("acme", "ws_1", "co_2")).toEqual({
+    outcome: "refused",
+    status: 409,
+    reasons: ["checkout co_2 was checked in"],
+  });
+});
+
+/** An `XMLHttpRequest` that keeps what it was sent, and answers as a test tells it. */
+class Upload {
+  static last: Upload;
+  method = "";
+  url = "";
+  headers: Record<string, string> = {};
+  body: unknown = null;
+  status = 0;
+  responseText = "";
+  upload: { onprogress: ((progress: { loaded: number; total: number }) => void) | null } = {
+    onprogress: null,
+  };
+  onload: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  onabort: (() => void) | null = null;
+
+  constructor() {
+    Upload.last = this;
+  }
+  open(method: string, url: string) {
+    this.method = method;
+    this.url = url;
+  }
+  setRequestHeader(name: string, value: string) {
+    this.headers[name] = value;
+  }
+  send(body: unknown) {
+    this.body = body;
+  }
+  abort() {
+    this.onabort?.();
+  }
+  answer(status: number, body: unknown) {
+    this.status = status;
+    this.responseText = typeof body === "string" ? body : JSON.stringify(body);
+    this.onload?.();
+  }
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+const sending = (signal?: AbortSignal) => {
+  const progress: [number, number][] = [];
+  const answer = checkIn({
+    surface: "/artifactr/v1/",
+    session: { token: "t0k3n" },
+    tenant: "acme",
+    workspace: "ws 1",
+    checkout: "co_1",
+    file: new Blob(["edited"]),
+    onProgress: (sent, total) => progress.push([sent, total]),
+    ...(signal && { signal }),
+  });
+  return { answer, progress, xhr: Upload.last };
+};
+
+test("a check-in puts the file to its check-out, as the reader, and says how far it has gone", async () => {
+  vi.stubGlobal("XMLHttpRequest", Upload);
+  const { answer, progress, xhr } = sending();
+  expect([xhr.method, xhr.url]).toEqual([
+    "PUT",
+    "/artifactr/v1/workspaces/ws%201/checkouts/co_1/file",
+  ]);
+  expect(xhr.headers).toEqual({
+    Authorization: "Bearer t0k3n",
+    "X-Tenant": "acme",
+    "Content-Type": "application/octet-stream",
+  });
+  expect(xhr.body).toBeInstanceOf(Blob);
+  xhr.upload.onprogress?.({ loaded: 3, total: 6 });
+  xhr.answer(200, { outcome: "applied", version: 3, proposal_id: null });
+  expect(await answer).toEqual({
+    outcome: "done",
+    result: { outcome: "applied", version: 3, proposal_id: null },
+  });
+  expect(progress).toEqual([[3, 6]]);
+});
+
+test("a check-in refused says why, and one never answered or stopped is status 0", async () => {
+  vi.stubGlobal("XMLHttpRequest", Upload);
+  const refused = sending();
+  refused.xhr.answer(413, { detail: "the file is larger than 4096 bytes" });
+  expect(await refused.answer).toEqual({
+    outcome: "refused",
+    status: 413,
+    reasons: ["the file is larger than 4096 bytes"],
+  });
+  const garbled = sending();
+  garbled.xhr.answer(502, "Bad Gateway");
+  expect(await garbled.answer).toEqual({
+    outcome: "refused",
+    status: 502,
+    reasons: ["The server answered 502."],
+  });
+  const dropped = sending();
+  dropped.xhr.onerror?.();
+  expect(await dropped.answer).toEqual({
+    outcome: "refused",
+    status: 0,
+    reasons: ["The connection ended before the server answered."],
+  });
+  const stop = new AbortController();
+  const stopped = sending(stop.signal);
+  stop.abort();
+  expect(await stopped.answer).toEqual({
+    outcome: "refused",
+    status: 0,
+    reasons: ["The check-in was stopped: what was sent may still have been checked in."],
+  });
+  const already = new AbortController();
+  already.abort();
+  expect(await sending(already.signal).answer).toMatchObject({ outcome: "refused", status: 0 });
+});
+
+test("a check-in refused says its rejection's type, and one refused unsigned ends the session", async () => {
+  vi.stubGlobal("XMLHttpRequest", Upload);
+  const busy = sending();
+  busy.xhr.answer(409, { detail: { type: "invalid_state", message: "checked in already" } });
+  expect(await busy.answer).toEqual({
+    outcome: "refused",
+    status: 409,
+    reasons: ["checked in already"],
+    type: "invalid_state",
+  });
+  let unsigned = 0;
+  const answer = checkIn({
+    surface: "/artifactr/v1",
+    session: { token: null },
+    tenant: "acme",
+    workspace: "ws_1",
+    checkout: "co_1",
+    file: new Blob(["edited"]),
+    unsigned: () => {
+      unsigned += 1;
+    },
+  });
+  Upload.last.answer(401, { detail: "sign in" });
+  expect(await answer).toMatchObject({ outcome: "refused", status: 401 });
+  expect(unsigned).toBe(1);
 });

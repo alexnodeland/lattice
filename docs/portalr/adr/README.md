@@ -54,5 +54,6 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0046](0046-tracker-links-on-runs.md) | Tracker links on runs: what a run's chain filed, and the items that set it off | Accepted |
 | [0047](0047-dashboards-on-demand-tables-and-the-panel-registry.md) | Dashboards on demand, tables by TanStack Table, the panel registry, and one seam for integrations | Accepted |
 | [0048](0048-native-files-in-the-app.md) | Native files in the app: the manifest, who has the file, its pages, a download, and its words compared | Accepted |
+| [0049](0049-checking-a-native-file-out-and-in.md) | Checking a native file out and in: the editor on its own origin, an upload with its progress, and a retry that is safe | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

@@ -47,7 +47,7 @@ Then("it is available to check out", async ({ page }) => {
 
 When("they download it", async ({ page, scenario }) => {
   const saved = page.waitForEvent("download");
-  await file(page).getByRole("button", { name: "Download" }).click();
+  await file(page).getByRole("button", { name: "Download", exact: true }).click();
   scenario.downloaded = (await saved).suggestedFilename();
 });
 

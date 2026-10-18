@@ -7,6 +7,7 @@
  * validation when the body isn't a command at all (portalr ADR-0020).
  */
 
+import type { components as Files } from "./generated/files.openapi";
 import type { components as Grantr } from "./generated/grantr.openapi";
 import type { components as Portalr } from "./generated/portalr.openapi";
 import type { components } from "./generated/reflexr.openapi";
@@ -23,6 +24,7 @@ type IssuedKey = Grantr["schemas"]["IssuedKey"];
 type Invited = Portalr["schemas"]["Invited"];
 type CreatedTenant = Portalr["schemas"]["CreatedTenant"];
 type IntegrationState = Grantr["schemas"]["IntegrationState"];
+type Checkout = Files["schemas"]["Checkout"];
 
 /** A command's answer: carried out, with what the server answered, or refused, with each reason. */
 export type Answer<R = Result> = { readonly outcome: "done"; readonly result: R } | Refusal;
@@ -32,6 +34,8 @@ export interface Refusal {
   readonly outcome: "refused";
   readonly status: number;
   readonly reasons: readonly string[];
+  /** The rejection's type, where the server named one and the caller reads it. */
+  readonly type?: string;
 }
 
 /** FastAPI's account of a body it couldn't validate. */
@@ -51,9 +55,9 @@ export function orThrow<R>(undone: string, answer: Answer<R>): R {
 }
 
 /**
- * The commands the UIs send over REST, over the given clients: reflexr's, and grantr's changes to
- * who may see and do what. `unsigned` is called when one is refused because no one is signed in,
- * as a read refused so ends the session.
+ * The commands the UIs send over REST, over the given clients: reflexr's, grantr's changes to
+ * who may see and do what, and a native file's check-out and its extension. `unsigned` is called
+ * when one is refused because no one is signed in, as a read refused so ends the session.
  */
 export function createCommands(api: Api, unsigned: () => void = () => {}) {
   /**
@@ -235,6 +239,24 @@ export function createCommands(api: Api, unsigned: () => void = () => {}) {
         answer(
           api.portalr.POST("/portalr/v1/deployment/tenants", {
             body: { tenant, owner_email: ownerEmail },
+          }),
+        ),
+    },
+    files: {
+      /** Check a native file out to the reader, holding it for them: then download its head. */
+      checkOut: (tenant: string, ws: string, artifact: string): Promise<Answer<Checkout>> =>
+        answer(
+          api.files.POST("/workspaces/{workspace_id}/files/{artifact_id}/checkouts", {
+            ...named(tenant),
+            params: { path: { workspace_id: ws, artifact_id: artifact } },
+          }),
+        ),
+      /** Extend the reader's check-out by its whole length again, from now. */
+      extend: (tenant: string, ws: string, checkout: string): Promise<Answer<Checkout>> =>
+        answer(
+          api.files.POST("/workspaces/{workspace_id}/checkouts/{checkout_id}/extension", {
+            ...named(tenant),
+            params: { path: { workspace_id: ws, checkout_id: checkout } },
           }),
         ),
     },

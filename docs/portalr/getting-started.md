@@ -191,13 +191,14 @@ The UIs read this first. It is public, so it holds no secret:
 | `surfaces` | Where you mounted each router: `artifactr` (default `/artifactr/v1`), `reflexr` (default `/reflexr/v1`), `grantr` (default `""`: its paths carry `/grantr/v1` themselves), `portalr` (default `/portalr/v1`) and `relayr` (default `null`: the application has no tracker; give the origin of relayr's tracker reads, `""` on this one, and runs link to what they filed). Pass `Surfaces(...)` in `Site` if you mounted them elsewhere |
 | `readers` | Which tools are configured, by name: `tempo`, `loki`, `prometheus`, `langfuse`, `litellm` and `grafana`, each true or false |
 | `people` | Whether the router names people by email: true where `people` was passed |
+| `editors` | Each native file's app's hosted editor, by its integration, such as `files:wordcraft`: pass `editors={...}` in `Site` where you serve one on an origin of its own ([ADR-0049](adr/0049-checking-a-native-file-out-and-in.md)). Empty by default |
 
 ```python
 from httpx import ASGITransport, AsyncClient
 
 async with AsyncClient(transport=ASGITransport(app=app), base_url="http://app") as client:
     config = (await client.get("/portalr/config.json")).json()
-    assert sorted(config) == ["people", "readers", "supabase", "surfaces"]
+    assert sorted(config) == ["editors", "people", "readers", "supabase", "surfaces"]
     assert config["readers"]["tempo"] is False
     assert config["people"] is True
 ```

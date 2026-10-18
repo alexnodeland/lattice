@@ -59,6 +59,7 @@ nav:
   - adr/0047-dashboards-on-demand-tables-and-the-panel-registry.md
   - adr/0048-native-files-in-the-app.md
   - adr/0049-checking-a-native-file-out-and-in.md
+  - adr/0050-a-native-files-proposals-and-the-pilots-scenarios.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

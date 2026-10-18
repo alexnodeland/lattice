@@ -17,6 +17,7 @@ import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useEffect, useMemo } from "react";
 import { useFormHost } from "../../../../../../../form-host";
 import { NativeFile, TextChanges, wordsChanged } from "../../../../../../../native-file";
+import { NativeProposal } from "../../../../../../../native-proposal";
 import { NATIVE, RENDERERS } from "../../../../../../../renderers";
 import { titleOf } from "../../../../../../../titles";
 import { Connection, useStream, useWorkspace } from "../../../../../../../workspace";
@@ -177,15 +178,22 @@ function Artifact() {
       {open.length > 0 && (
         <section aria-labelledby="open" className="flex flex-col gap-3">
           <SectionTitle id="open">Open proposals</SectionTitle>
-          {open.map((proposal) => (
-            <ProposalCard
-              key={proposal.id}
-              proposal={proposal}
-              onRespond={(decision) =>
-                stream.send({ type: "respond_to_proposal", proposal_id: proposal.id, decision })
-              }
-            />
-          ))}
+          {open.map((proposal) => {
+            const onRespond = (decision: "accept" | "reject") =>
+              stream.send({ type: "respond_to_proposal", proposal_id: proposal.id, decision });
+            return native ? (
+              <NativeProposal
+                key={proposal.id}
+                place={{ context, tenant, workspace, artifact: id }}
+                native={native}
+                me={me}
+                proposal={proposal}
+                onRespond={onRespond}
+              />
+            ) : (
+              <ProposalCard key={proposal.id} proposal={proposal} onRespond={onRespond} />
+            );
+          })}
         </section>
       )}
       <section aria-labelledby="revisions" className="flex flex-col gap-3">

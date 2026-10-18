@@ -418,28 +418,46 @@ function describe(change: NonNullable<Artifactr.Proposal["change"]>): string {
   }
 }
 
-/** A proposed change, with accept and reject while it is open, and what its caller adds. */
+/**
+ * A proposed change, with accept and reject while it is open, and what its caller adds. Where its
+ * caller knows it can't be accepted, such as one made against a version of a file since replaced,
+ * Accept is disabled and the reason is said beside it; it can still be rejected.
+ */
 export function ProposalCard({
   proposal,
   onRespond,
+  blocked = null,
   children,
 }: {
   proposal: Artifactr.Proposal;
   onRespond?: (decision: "accept" | "reject") => Sent;
+  /** Why it can't be accepted, or null where it can. */
+  blocked?: string | null;
   /** More about it, such as a link to the artifact it would change. */
   children?: ReactNode;
 }) {
   const what = proposal.change ? describe(proposal.change) : "A change";
   const { pending, unsent, send } = useSending();
+  const why = useId();
   return (
     <section className={card} aria-label={`Proposal: ${what}`}>
       <p className="font-semibold">{what}</p>
       {proposal.rationale && <p className="text-muted">{proposal.rationale}</p>}
       {children}
+      {proposal.status === "open" && blocked !== null && (
+        <p id={why} className="text-muted text-sm">
+          {blocked}
+        </p>
+      )}
       {proposal.status === "open" ? (
         onRespond && (
           <span className="flex gap-2">
-            <Button disabled={pending} onClick={() => send(() => onRespond("accept"))}>
+            <Button
+              disabled={pending || blocked !== null}
+              focusableWhenDisabled={blocked !== null}
+              aria-describedby={blocked === null ? undefined : why}
+              onClick={() => send(() => onRespond("accept"))}
+            >
               Accept
             </Button>
             <Button

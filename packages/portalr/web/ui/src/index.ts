@@ -75,6 +75,8 @@ export {
   fileSize,
   type Holder,
   nativeFile,
+  PageCompare,
+  type PagePair,
   type PageShown,
   PageStrip,
 } from "./native-file";

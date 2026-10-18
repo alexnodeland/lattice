@@ -53,4 +53,4 @@ The four reads are small, and each is resolved as the routes before them are. Th
 ## Action items
 
 1. [x] The text route, the check-out's id and the limit, and the proposal's reads, with their tests and the regenerated document.
-2. [ ] portalr's screens that read them (lattice RFC-0003, phase 4).
+2. [x] portalr's screens that read them (lattice RFC-0003, phase 4).

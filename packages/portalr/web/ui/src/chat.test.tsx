@@ -266,6 +266,20 @@ test("an open proposal says what it would change, and is accepted or rejected", 
   expect(onRespond.mock.calls).toEqual([["accept"], ["reject"]]);
 });
 
+test("a proposal that can't be accepted says why, keeps Accept in reach, and is rejected", async () => {
+  const onRespond = sent();
+  const screen = await render(
+    <ProposalCard proposal={proposal()} onRespond={onRespond} blocked="Outdated: reject it." />,
+  );
+  const accept = screen.getByRole("button", { name: "Accept" });
+  await expect.element(accept).toBeDisabled();
+  await expect.element(accept).toHaveAccessibleDescription("Outdated: reject it.");
+  await userEvent.tab();
+  await expect.element(accept).toHaveFocus();
+  await screen.getByRole("button", { name: "Reject" }).click();
+  expect(onRespond.mock.calls).toEqual([["reject"]]);
+});
+
 test("a resolved proposal says how, without buttons", async () => {
   const screen = await render(
     <>

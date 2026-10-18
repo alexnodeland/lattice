@@ -14,7 +14,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from artifactr.files.app import FakeApp
-from tests.app.main import create_app
+from tests.app.editor import app as editor_app
+from tests.app.main import create_app, editors
 
 ARTIFACTR = "/artifactr/v1/workspaces/notes"
 BOB = {"x-user": "bob"}
@@ -72,3 +73,21 @@ def test_a_drafted_document_waits_out_a_check_out_then_takes_a_proposal(
     assert client.put(url, content=edited, headers=BOB).json()["outcome"] == "applied"
     proposed = answer(client, "thr_docs", f"revise {document}")
     assert proposed.startswith("Done: Proposed as ")
+
+
+def test_the_editor_is_a_stand_in_served_under_its_own_policy() -> None:
+    editor = TestClient(editor_app)
+    page = editor.get("/")
+    policy = page.headers["content-security-policy"]
+    assert "'sha256-" in policy, "its inline script, by its hash"
+    assert policy.startswith("default-src 'self' blob:")
+    assert editor.get("/app-1a2b_bg.wasm").headers["content-type"] == "application/wasm"
+
+
+def test_the_application_names_the_editor_its_environment_names(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("PORTALR_EDITOR_URL", "http://127.0.0.1:8001/")
+    assert editors() == {"files:wordcraft": "http://127.0.0.1:8001/"}
+    monkeypatch.delenv("PORTALR_EDITOR_URL")
+    assert editors() == {}

@@ -339,7 +339,7 @@ Decided by the owner on 2026-10-16:
 - [ ] artifactr-files and stackr: the worker, its image, the recipe and the release pin check
 - [x] artifactr-files: `NativeFileTools`, as `native_file_tools`
 - [x] artifactr-files: `files_router`, check-out and check-in over HTTP, and the hosted editor's policy
-- [ ] portalr: the renderer, previews, diffs, check-out and check-in screens
+- [x] portalr: the renderer, previews, diffs, check-out and check-in screens
 - [ ] The streamed session spike and its recommendation
 - [x] Docs: the package's section and guide
 

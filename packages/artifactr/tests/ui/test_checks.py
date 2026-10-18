@@ -309,6 +309,26 @@ async def test_a_person_changes_only_an_apps_state(workspaces: Workspaces) -> No
     await ws.as_actor(agent(thread.id)).commit(_set(app_id, "/html", "<p>2</p>", version=2))
 
 
+async def test_an_apps_html_loads_nothing_as_it_is_made_or_changed(
+    workspaces: Workspaces,
+) -> None:
+    ws = await _open(workspaces)
+    thread = await ws.create_thread("Calc")
+    by_agent = ws.as_actor(agent(thread.id))
+    app: dict[str, Any] = {"title": "Calc", "summary": "A calculator", "html": "<img src=x.png>"}
+    with pytest.raises(ValidationFailed, match="reaches no network") as refused:
+        await by_agent.commit(CreateArtifact(kind="app", data=app))
+    assert locs(refused.value) == [["data", "html"]]
+    made = await by_agent.commit(CreateArtifact(kind="app", data={**app, "html": "<p>0</p>"}))
+    assert isinstance(made, Applied)
+    with pytest.raises(ValidationFailed, match="<script src>: https://cdn"):
+        await by_agent.commit(_set(made.artifact_id, "/html", "<script src=https://cdn/x>"))
+    await ws.commit(_set(made.artifact_id, "/state", {"total": 1}))
+    assert isinstance(
+        await by_agent.commit(_set(made.artifact_id, "/summary", "Adds", version=2)), Applied
+    )
+
+
 async def test_other_kinds_are_edited_unchecked(workspaces: Workspaces) -> None:
     ws = await _open(workspaces)
     thread = await ws.create_thread("Ops")

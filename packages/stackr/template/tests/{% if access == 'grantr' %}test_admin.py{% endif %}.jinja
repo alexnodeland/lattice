@@ -10,7 +10,7 @@ from dataclasses import replace
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import Any, ClassVar, cast
 from urllib.parse import parse_qs, urlparse
 
 import pytest
@@ -19,10 +19,19 @@ from sqlalchemy.dialects import postgresql
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from grantr import Invalid
+from grantr import Invalid, User
+from grantr.sql import SqlStorage
 
 import {{ package_name }}.admin as admin
-from {{ package_name }}.admin import Users, create_role, main, run, scram_verifier
+from {{ package_name }}.access import build_grants
+from {{ package_name }}.admin import (
+    Users,
+    ask_password,
+    create_role,
+    main,
+    run,
+    scram_verifier,
+)
 from {{ package_name }}.settings import AuthSettings, Settings
 
 from conftest import SECRET
@@ -51,9 +60,12 @@ USERS: list[dict[str, Any]] = [
 
 
 class Admin(BaseHTTPRequestHandler):
-    """Supabase Auth's ``/admin/users``, two users a page, for the service role's key only."""
+    """Supabase Auth's ``/admin/users``, two users a page, for the service role's key only; and
+    a new account, which it refuses a short password, and fails with nothing to say for
+    ``broken@``."""
 
     users: list[dict[str, Any]] = USERS
+    created: ClassVar[list[dict[str, Any]]] = []
 
     def do_GET(self) -> None:
         url = urlparse(self.path)
@@ -64,12 +76,29 @@ class Admin(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def do_POST(self) -> None:
+        body = json.loads(self.rfile.read(int(self.headers["content-length"])))
+        assert self.headers["apikey"] == "service"
+        assert self.path == "/auth/v1/admin/users"
+        if body["email"].startswith("broken@"):
+            self.send_response(500)
+            self.end_headers()
+            return
+        short = len(body["password"]) < 6
+        answer = {"msg": "Password should be at least 6 characters."} if short else {"id": "u-new"}
+        if not short:
+            self.created.append(body)
+        self.send_response(422 if short else 200)
+        self.end_headers()
+        self.wfile.write(json.dumps(answer).encode())
+
     def log_message(self, format: str, *args: Any) -> None:
         pass
 
 
 @pytest.fixture
-def issuer() -> Iterator[str]:
+def issuer(monkeypatch: pytest.MonkeyPatch) -> Iterator[str]:
+    monkeypatch.setattr(Admin, "created", [])
     server = ThreadingHTTPServer(("127.0.0.1", 0), Admin)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -100,6 +129,66 @@ async def test_the_first_operator_and_a_tenant(config: Settings) -> None:
     )
     assert await run(["tenant", "acme", "u-bob"], config) == "created acme, owned by u-bob"
     assert await run(["tenant", "acme", "u-carol"], config) == "acme exists, and is unchanged"
+
+
+def never() -> str:
+    raise AssertionError("no password is asked for an account that exists")
+
+
+async def test_the_first_person_in_has_an_account_a_tenant_and_a_workspace(
+    config: Settings,
+) -> None:
+    done = await run(["first-run", "erin@example.com"], config, password=lambda: "a-password")
+    assert done == (
+        "made an account for erin@example.com\n"
+        "erin@example.com is the deployment's operator\n"
+        "created home, owned by erin@example.com, with the workspace main"
+    )
+    assert Admin.created == [
+        {"email": "erin@example.com", "password": "a-password", "email_confirm": True}
+    ]
+    engine = create_async_engine(str(config.database_url))
+    try:
+        grants = build_grants(SqlStorage(engine), name=config.service_name)
+        assert await grants.workspaces("home", User(id="u-new")) == ["main"], "the app lists it"
+    finally:
+        await engine.dispose()
+
+
+async def test_the_first_run_skips_what_is_done(config: Settings) -> None:
+    assert await run(["operator", "u-carol"], config)
+    first = ["first-run", "alice@example.com", "--tenant", "acme", "--workspace", "notes"]
+    assert await run(first, config, password=never) == (
+        "alice@example.com has an account\n"
+        "the deployment has an operator already\n"
+        "created acme, owned by alice@example.com, with the workspace notes"
+    )
+    assert await run(first, config, password=never) == (
+        "alice@example.com has an account\n"
+        "the deployment has an operator already\n"
+        "acme exists, and is unchanged"
+    )
+
+
+@pytest.mark.parametrize(
+    ("email", "said"),
+    [("erin@example.com", "Password should be at least 6 characters."), ("broken@x.com", "500")],
+)
+async def test_an_account_supabase_refuses_says_why(
+    config: Settings, email: str, said: str
+) -> None:
+    with pytest.raises(Invalid, match="Supabase Auth refused the account") as refused:
+        await run(["first-run", email], config, password=lambda: "short")
+    assert str(refused.value).endswith(said)
+    assert "short" not in str(refused.value), "never what it was sent"
+
+
+def test_the_password_is_asked_twice(monkeypatch: pytest.MonkeyPatch) -> None:
+    answers = iter(["a-password", "a-password", "one", "another"])
+    monkeypatch.setattr(admin.getpass, "getpass", lambda prompt: next(answers))
+    assert ask_password() == "a-password"
+    with pytest.raises(Invalid, match="the passwords differ"):
+        ask_password()
 
 
 async def test_the_admin_api_is_asked_where_admin_url_says(config: Settings, issuer: str) -> None:

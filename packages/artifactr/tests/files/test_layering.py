@@ -51,6 +51,22 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         },
         {*LIBRARY, "artifactr.agent", "pydantic", "pydantic_ai"},
     ),
+    # People's check-out and check-in over HTTP, on artifactr's router's auth and statuses.
+    "fastapi": (
+        {
+            "artifactr.files.manifest",
+            "artifactr.files.blobs",
+            "artifactr.files.checkouts",
+            "artifactr.files.app",
+            "artifactr.files.native",
+            "artifactr.files.fastapi",
+        },
+        {
+            *LIBRARY,
+            *("artifactr.fastapi", "artifactr.telemetry", "lattice_core.refusals"),
+            *("fastapi", "starlette", "pydantic"),
+        },
+    ),
     "sql": (
         {
             "artifactr.files.manifest",

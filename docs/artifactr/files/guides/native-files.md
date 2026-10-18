@@ -144,6 +144,35 @@ The agent sees a native file's name, pages and outline through artifactr's own `
 
 They are offered only while the app is on in the run's workspace. Under `WordDocument`'s `propose` policy, an agent's edit is a proposal. If a person has the file checked out, `edit_native` tells the agent who, and until when, and the agent plans again once it is checked in, rather than retrying; another agent's edit, holding it for seconds, is retried, and a stale `base_version` asks it to read the file again.
 
+## Check-out and check-in over HTTP
+
+With the `fastapi` extra as well, as `artifactr-ai[files,fastapi]`, mount `files_router` beside artifactr's router, with the same workspaces and `resolve_actor`:
+
+```python
+from artifactr.files.fastapi import editor_app, files_router
+
+app.include_router(files_router(workspaces, files, resolve_actor=resolve_actor), prefix="/v1")
+```
+
+| Route | What it does |
+|---|---|
+| `GET /workspaces/{w}/files/{a}` | The head's name, type, size, outline and pages; whose check-out has it, until when; the app's talk level; whether the app is on |
+| `POST /workspaces/{w}/files/{a}/checkouts` | Check it out (201), for eight hours |
+| `POST /workspaces/{w}/checkouts/{c}/extension` | Extend the check-out |
+| `PUT /workspaces/{w}/checkouts/{c}/file` | Check the edited file in, as the body: `applied`, `proposed` if stale, or `unchanged` |
+| `GET /workspaces/{w}/files/{a}/versions/{v}/content` | A version's bytes, as an attachment |
+| `GET /workspaces/{w}/files/{a}/versions/{v}/pages/{p}` | A version's page, as a PNG |
+
+A check-in larger than `limit` (`files_router(..., limit=)`: give it your blob store's, 25 MiB by default) is refused from its `Content-Length` with 413, before it is read. The app's failures are 422 for a file or a page it refuses, 413 for a file too large, and 503 for a timeout or a crash; everything else is artifactr's statuses, so a busy file and an app switched off are 409.
+
+The person edits in the app's browser build, as released. Serve it with `editor_app`, on a host name of its own for which your portal sets no cookies, so it never sees a token:
+
+```python
+editor = editor_app(Path("/srv/wordcraft-web-0.7.0"))  # what `scripts/wordcraft web` prints
+```
+
+It adds headers only: a policy that runs the build's own code and its inline script by its hash, and reaches no other origin, with no framing; and caching for its hashed files. The check-out flow is then: check out, download the version, open it in the editor, edit, save it to disk, and check it in.
+
 ## Reading a revision
 
 `files.read(ws, artifact_id, version=None, part="content")` returns the bytes of the head or of a version, or its `text` or `review`. It resolves the artifact through the workspace first, which asks `authorize` and answers a restricted artifact as a missing one, and only then reads the bytes the revision names.

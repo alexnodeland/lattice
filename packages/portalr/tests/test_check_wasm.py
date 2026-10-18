@@ -58,10 +58,17 @@ def test_a_module_is_found_as_a_file_and_inlined_as_base64_padded_or_not(tmp_pat
     )
 
 
-def test_raw_magic_outside_a_wasm_file_is_reported(tmp_path: Path) -> None:
+def test_raw_magic_in_a_script_is_reported_and_in_a_font_is_chance(tmp_path: Path) -> None:
     static = built(tmp_path)
-    (static / "app" / "assets" / "blob.bin").write_bytes(b"lead" + FILED)
-    assert check_wasm.modules("app", static) == ({}, ["assets/blob.bin"])
+    (static / "app" / "assets" / "blob-abc.js").write_bytes(b"const a = '" + FILED + b"';")
+    (static / "app" / "assets" / "face.woff2").write_bytes(b"wOF2" + FILED)
+    assert check_wasm.modules("app", static) == ({}, ["assets/blob-abc.js"])
+
+
+def test_the_magics_encoding_inside_another_base64_run_is_not_a_module(tmp_path: Path) -> None:
+    other = base64.b64encode(b"\x89PNG" + bytes(5) + INLINED).decode()
+    assert "AGFzbQ" in other
+    assert check_wasm.modules("app", built(tmp_path, chunk=f'const png = "{other}";')) == ({}, [])
 
 
 def test_a_ui_that_is_not_built_stops_the_check_with_a_message(tmp_path: Path) -> None:
@@ -75,12 +82,12 @@ def test_a_module_not_listed_one_listed_but_absent_and_raw_magic_are_problems() 
         {"package": "@excalidraw/excalidraw", "sha256": sha(INLINED)},
         {"package": "gone", "sha256": "0" * 64},
     ]
-    assert check_wasm.problems("app", found, ["assets/blob.bin"], listed) == [
+    assert check_wasm.problems("app", found, ["assets/blob.js"], listed) == [
         f"app's assets/x.wasm holds a WebAssembly module (sha256 {sha(FILED)}) that "
         "web/wasm-allowlist.json doesn't list",
         f"web/wasm-allowlist.json lists gone's module (sha256 {'0' * 64}) for app, "
         "which app's build doesn't hold",
-        "app's assets/blob.bin holds WebAssembly's magic outside a .wasm file, not as base64",
+        "app's assets/blob.js holds WebAssembly's magic as raw bytes, not as base64",
     ]
     assert check_wasm.problems("app", {sha(INLINED): "assets/fonts.js"}, [], listed[:1]) == []
 

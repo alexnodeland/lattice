@@ -1,6 +1,6 @@
 # ADR-0043: Markdown's basics: code blocks, callouts, footnotes per message, copying, an add-ons seam, and tests under the policy
 
-**Status:** Accepted, amended by [ADR-0044](0044-highlighting-and-math-on-demand.md) (math joins the add-ons)
+**Status:** Accepted, amended by [ADR-0044](0044-highlighting-and-math-on-demand.md) (math joins the add-ons) and by [ADR-0041's amendment of 2026-10-17](0041-first-party-webassembly-in-the-apps-policy.md#amendment-2026-10-17-both-uis-one-policy) (the harness reports WebAssembly)
 **Date:** 2026-10-17
 **Deciders:** Alex Nodeland
 **Amends:** [ADR-0015](0015-the-chat-components-and-streamdown.md), for how Streamdown's code and callouts render
@@ -42,8 +42,8 @@ Highlighting, math and diagrams are add-ons, each loaded when a message needs it
   - A switch decides what is drawn, not what is safe: the sanitizer and the policy are the boundary.
 - **Tests under the policy** (`web/ui/csp`):
   - **The page:** Vite builds a small page that renders `Markdown`, with the React and Tailwind plugins and the public files app and admin build with, and `vite preview` serves it with the policy in `policy.txt`. A portalr test holds that file to the router's `policy()` for an application with Supabase on a path of its own origin. That is the policy both UIs are served with today. When `app`'s gains `'wasm-unsafe-eval'` ([ADR-0041](0041-first-party-webassembly-in-the-apps-policy.md)), the harness keeps admin's, the stricter: `Markdown` renders in both, and none of its add-ons compiles WebAssembly. (Amended by [ADR-0041](0041-first-party-webassembly-in-the-apps-policy.md#amendment-2026-10-17-both-uis-one-policy): both UIs share one policy with `'wasm-unsafe-eval'`, and the harness serves it. Its page reports each use of WebAssembly instead, so it still holds that none of the add-ons compiles any.)
-  - **The runner:** a Vitest project of its own (`csp`) drives Chromium through Playwright. A listener added before the page's scripts records every `securitypolicyviolation`, and the console's errors are recorded too. Any one fails the test.
-  - **The proof it sees:** a first test inserts an inline style and a `<style>`, and expects both reported.
+  - **The runner:** a Vitest project of its own (`csp`) drives Chromium through Playwright. A listener added before the page's scripts records every `securitypolicyviolation`, and every call that compiles WebAssembly, and the console's errors are recorded too. Any one fails the test.
+  - **The proof it sees:** a first test inserts an inline style and a `<style>`, and expects both reported; another compiles the smallest module, and expects it reported.
   - **What it checks:** every element whole and streamed a character at a time, Wrap and Copy, a diagram's fence with diagrams off and on, and each message of a hostile corpus.
 - **Beside it, in the component tests:**
   - axe finds nothing wrong with every element together.

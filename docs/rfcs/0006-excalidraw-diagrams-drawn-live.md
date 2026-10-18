@@ -413,7 +413,7 @@ Gathered on 2026-10-17. lattice was read at `origin/main` (`c61165b3`). The `@ex
 | `command_result`'s `Applied` carries the new `version` | `artifactr/core/state.py` | Verified |
 | `Workspaces(checks=...)` is not built | `artifactr/workspace/` | Verified |
 | `digests()` finds any `{sha256, size, media_type}`; `NativeFiles.collect` scans only `NativeFile` artifacts | `artifactr_files/files/native.py` | Verified |
-| portalr's policy: `script-src 'self'`, `style-src 'self'`, `img-src 'self' data:`, `font-src 'self'`, `connect-src 'self'` and Supabase, one policy for both UIs | `portalr/fastapi/ui.py` | Verified |
+| portalr's policy, before ADR-0041 amended it: `script-src 'self'`, `style-src 'self'`, `img-src 'self' data:`, `font-src 'self'`, `connect-src 'self'` and Supabase, one policy for both UIs | `portalr/fastapi/ui.py` | Verified |
 | `app`'s ceilings are 200 / 470 / 160 kB gzip (initial / total / largest); `check_size.py` counts every script and stylesheet, not typefaces | `portalr/size-budget.json`, `scripts/check_size.py` | Verified |
 | `Renderer` is `render`, `text`, `title`, `diff` | `portalr/web/ui/src/artifacts.tsx` | Verified |
 | No `Integrations` port, and no per-workspace settings, exist; the template's `for_workspace` resolves guardrails per workspace | lattice, `stackr/template` | Verified |

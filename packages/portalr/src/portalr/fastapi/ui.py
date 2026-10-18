@@ -24,8 +24,8 @@ def policy(site: Site) -> str:
 
     It matters because supabase-js keeps the session in ``localStorage`` (lattice RFC-0002). A
     Supabase project on a path of the application's own origin is already ``'self'``.
-    ``'wasm-unsafe-eval'`` lets either UI compile the WebAssembly its own build ships, which
-    ``web/wasm-allowlist.json`` lists, and nothing more: ``eval`` stays refused (portalr ADR-0041).
+    ``'wasm-unsafe-eval'`` lets either UI compile WebAssembly, and ``eval`` stays refused;
+    ``scripts/check_wasm.py`` holds what each build ships to ``web/wasm-allowlist.json`` (ADR-0041).
     """
     supabase = urlsplit(site.supabase_url)
     connect = " ".join(

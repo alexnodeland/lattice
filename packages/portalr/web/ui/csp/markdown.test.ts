@@ -2,7 +2,7 @@
  * ui's Markdown under the policy both UIs share, in Chromium: every element, streamed or whole,
  * each hostile message, and each control, with not one violation of the policy, and not one use of
  * WebAssembly. The policy allows first-party WebAssembly (portalr ADR-0041), so it can't refuse a
- * module here; the page reports each reach for one instead, since Markdown and its add-ons need
+ * module here; the page reports each call that compiles one instead, since Markdown and its add-ons need
  * none (ADR-0044). The page is built as the UIs are, so what is checked is what ships (ADR-0043).
  */
 
@@ -18,7 +18,7 @@ beforeAll(async () => {
 
 afterAll(() => browser.close());
 
-/** What compiles or instantiates WebAssembly: a page that reaches for one of these uses it. */
+/** What compiles or instantiates WebAssembly: a page that calls one of these uses it. */
 const COMPILING = ["compile", "compileStreaming", "instantiate", "instantiateStreaming", "Module"];
 
 /**
@@ -43,15 +43,22 @@ async function opened(): Promise<{ page: Page; reported: () => Promise<string[]>
     document.addEventListener("securitypolicyviolation", (event) => {
       seen.push(`${event.effectiveDirective}: ${event.blockedURI} at ${event.sourceFile}`);
     });
-    const wasm = new Proxy(WebAssembly, {
-      get(target, key) {
-        if (typeof key === "string" && compiling.includes(key)) {
-          seen.push(`WebAssembly.${key}`);
-        }
-        return Reflect.get(target, key);
-      },
-    });
-    Object.defineProperty(window, "WebAssembly", { value: wasm });
+    // Each call is reported, not each read, so a library that only feature-detects isn't. A
+    // worker has a WebAssembly of its own, which this doesn't reach; ui starts none.
+    for (const key of compiling) {
+      const real = Reflect.get(WebAssembly, key);
+      const used = () => seen.push(`WebAssembly.${key}`);
+      Reflect.set(
+        WebAssembly,
+        key,
+        new Proxy(real, {
+          apply: (target, self, args) => (used(), Reflect.apply(target, self, args)),
+          construct: (target, args, newTarget) => (
+            used(), Reflect.construct(target, args, newTarget)
+          ),
+        }),
+      );
+    }
   }, COMPILING);
   await page.goto(inject("harness"));
   await page.waitForFunction(() => typeof window.show === "function");
@@ -88,7 +95,7 @@ test("the harness sees WebAssembly: a module compiles under the policy, and is r
     return module instanceof WebAssembly.Module;
   });
   expect(compiled).toBe(true);
-  expect(await reported()).toEqual(["WebAssembly.compile", "WebAssembly.Module"]);
+  expect(await reported()).toEqual(["WebAssembly.compile"]);
   await page.context().close();
 });
 

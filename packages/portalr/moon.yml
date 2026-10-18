@@ -30,8 +30,9 @@ tasks:
     options:
       mergeInputs: 'replace'
   test:
-    # And the policy ui's CSP tests serve, which a test holds to the router's.
-    inputs: ['@group(python)', 'web/ui/csp/policy.txt']
+    # And the policy ui's CSP tests serve, which a test holds to the router's, and the allow-list
+    # and the budgets, whose shapes tests hold.
+    inputs: ['@group(python)', 'web/ui/csp/policy.txt', 'web/wasm-allowlist.json', 'size-budget.json']
     options:
       mergeInputs: 'replace'
   # The wheel carries the two UIs, which Vite builds into src/portalr/static/.

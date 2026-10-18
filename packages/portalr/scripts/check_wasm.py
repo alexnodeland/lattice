@@ -7,7 +7,9 @@ others (portalr ADR-0041). This check finds every module in each UI's build, as 
 - a module inlined in any other file as base64, by the encoding of its magic ``\0asm``,
   ``AGFzbQ``; the run is decoded to the module's bytes.
 
-Raw magic outside a ``.wasm`` file can't be delimited, so it is a problem of its own. Each module
+Raw magic in a file written as text (a script, a stylesheet, the index) can't be delimited, so it is
+a problem of its own; in a font or an image it is chance, and isn't looked for. Modules written as
+byte arrays, or compressed before base64, aren't found; Vite writes neither. Each module
 is known by the SHA-256 of its bytes, since Vite's file names change with every build. The
 allow-list names, for each UI, each module's package and its digest. A module not listed, a listed
 one the build doesn't hold, and raw magic each fail the check. Add a module or change its digest
@@ -29,8 +31,10 @@ STATIC = ROOT / "src" / "portalr" / "static"
 ALLOWLIST = ROOT / "web" / "wasm-allowlist.json"
 UIS = ("app", "admin")
 MAGIC = b"\0asm"
-INLINED = re.compile(rb"AGFzbQ[A-Za-z0-9+/]*={0,2}")
-"""A module inlined as base64: its magic's encoding, and the rest of the run."""
+INLINED = re.compile(rb"(?<![A-Za-z0-9+/])AGFzbQ[A-Za-z0-9+/]*={0,2}")
+"""A module inlined as base64: a run that starts with its magic's encoding, not one inside it."""
+TEXT = frozenset({".js", ".mjs", ".css", ".html", ".json", ".txt"})
+"""What Vite writes as text, where raw magic can only be a module written into it, not chance."""
 
 type Found = dict[str, str]
 """Each module a build holds, by the SHA-256 of its bytes, and the file that holds it."""
@@ -45,7 +49,9 @@ def modules(ui: str, static: Path | None = None) -> tuple[Found, list[str]]:
     """The modules a built UI holds, and each file with magic that can't be delimited."""
     root = (static or STATIC) / ui
     if not (root / "index.html").is_file():
-        raise SystemExit(f"check_wasm: {ui} isn't built: {root / 'index.html'} is missing")
+        raise SystemExit(
+            f"check_wasm: {ui} isn't built: {root / 'index.html'} is missing (run its build first)"
+        )
     found: Found = {}
     raw: list[str] = []
     for path in sorted(p for p in root.rglob("*") if p.is_file()):
@@ -57,7 +63,7 @@ def modules(ui: str, static: Path | None = None) -> tuple[Found, list[str]]:
         for run in INLINED.findall(data):
             # Padding added to a run that has its own is ignored, so a run that lost its is whole.
             found[digest(base64.b64decode(run + b"=="))] = name
-        if MAGIC in data:
+        if path.suffix in TEXT and MAGIC in data:
             raw.append(name)
     return found, raw
 
@@ -78,10 +84,7 @@ def problems(ui: str, found: Found, raw: list[str], listed: list[dict[str, Any]]
             for sha, package in allowed.items()
             if sha not in found
         ),
-        *(
-            f"{ui}'s {name} holds WebAssembly's magic outside a .wasm file, not as base64"
-            for name in raw
-        ),
+        *(f"{ui}'s {name} holds WebAssembly's magic as raw bytes, not as base64" for name in raw),
     ]
 
 

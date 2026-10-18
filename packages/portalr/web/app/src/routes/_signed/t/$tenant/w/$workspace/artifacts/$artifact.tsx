@@ -1,5 +1,6 @@
 import { allowedIn, changes, keys, Refused, thumbs, useMe, workspaceOf } from "@portalr/client";
 import {
+  AppHostContext,
   ArtifactContent,
   Card,
   Diff,
@@ -12,9 +13,10 @@ import {
   TextLink,
   Thumbs,
 } from "@portalr/ui";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useEffect, useMemo } from "react";
+import { useAppHost } from "../../../../../../../app-host";
 import { useFormHost } from "../../../../../../../form-host";
 import { NativeFile, TextChanges, wordsChanged } from "../../../../../../../native-file";
 import { NativeProposal } from "../../../../../../../native-proposal";
@@ -76,6 +78,7 @@ function Artifact() {
   const stream = useStream();
   const snapshot = useWorkspace();
   const host = useFormHost({ queries, tenant, workspace, me, renderers: RENDERERS });
+  const apps = useAppHost(context.config);
   // The revisions in order, whatever order the server sent, each with what it changed: worked out
   // once each time they are read, not on every event the workspace's stream brings.
   const history = useMemo(() => {
@@ -164,12 +167,15 @@ function Artifact() {
       <Connection snapshot={snapshot} waiting="the workspace" />
       <Card>
         <FormHostContext value={host}>
-          <ArtifactContent
-            kind={latest.kind}
-            data={latest.data}
-            shown={{ id, version: latest.version }}
-            renderers={RENDERERS}
-          />
+          <AppHostContext value={apps}>
+            {latest.kind === "app" && <KillSwitch tenant={tenant} workspace={workspace} />}
+            <ArtifactContent
+              kind={latest.kind}
+              data={latest.data}
+              shown={{ id, version: latest.version, archived: latest.archived }}
+              renderers={RENDERERS}
+            />
+          </AppHostContext>
         </FormHostContext>
       </Card>
       {native && (
@@ -222,4 +228,15 @@ function Artifact() {
       </section>
     </section>
   );
+}
+
+/**
+ * While an app runs, the workspace's integrations are read again every half minute, so an
+ * operator, a tenant's admin or a workspace's switching mini apps off stops it soon, as archiving
+ * it does at once (portalr ADR-0051).
+ */
+function KillSwitch({ tenant, workspace }: { tenant: string; workspace: string }) {
+  const { queries } = Route.useRouteContext();
+  useQuery({ ...queries.grantr.enabledIntegrations(tenant, workspace), refetchInterval: 30_000 });
+  return null;
 }

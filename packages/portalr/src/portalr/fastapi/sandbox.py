@@ -1,4 +1,4 @@
-"""Mini apps' sandbox, on an origin of its own (lattice RFC-0005, portalr ADR-0050).
+"""Mini apps' sandbox, on an origin of its own (lattice RFC-0005, portalr ADR-0051).
 
 An agent's app runs in two frames. The portal frames the sandbox, one static page served here on
 the apps' origin, which holds nothing: no cookie is set or read for it, and nothing else is

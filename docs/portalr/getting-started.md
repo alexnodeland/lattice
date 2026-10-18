@@ -192,16 +192,30 @@ The UIs read this first. It is public, so it holds no secret:
 | `readers` | Which tools are configured, by name: `tempo`, `loki`, `prometheus`, `langfuse`, `litellm` and `grafana`, each true or false |
 | `people` | Whether the router names people by email: true where `people` was passed |
 | `editors` | Each native file's app's hosted editor, by its integration, such as `files:wordcraft`: pass `editors={...}` in `Site` where you serve one on an origin of its own ([ADR-0049](adr/0049-checking-a-native-file-out-and-in.md)). Empty by default |
+| `apps` | The origin mini apps run on: pass `apps=` in `Site` where you serve their sandbox, below. `null` by default, and apps are then shown as their label and summary |
 
 ```python
 from httpx import ASGITransport, AsyncClient
 
 async with AsyncClient(transport=ASGITransport(app=app), base_url="http://app") as client:
     config = (await client.get("/portalr/config.json")).json()
-    assert sorted(config) == ["editors", "people", "readers", "supabase", "surfaces"]
+    assert sorted(config) == ["apps", "editors", "people", "readers", "supabase", "surfaces"]
     assert config["readers"]["tempo"] is False
     assert config["people"] is True
 ```
+
+### Run mini apps
+
+An agent's mini app runs in a sandbox on an origin of its own, the same site as the portal's, for which nothing sets a cookie ([lattice RFC-0005](../rfcs/0005-forms-dashboards-and-mini-apps.md), [ADR-0051](adr/0051-mini-apps-the-sandboxed-frame-and-its-bridge.md)). Point a host name, such as `apps.example.com`, at the application, add `SandboxOrigin`, which answers that host with the sandbox and nothing else, and name it in `Site`, so the UIs frame it and nothing more. Locally, a second port on 127.0.0.1 is an origin of its own:
+
+```python title="Illustrative"
+from portalr.fastapi import SandboxOrigin, Site
+
+site = Site(supabase_url="/", supabase_key="sb_publishable_...", apps="https://apps.example.com")
+app.add_middleware(SandboxOrigin, apps="https://apps.example.com", portal="https://app.example.com")
+```
+
+Apps then run where a workspace switches `ui:mini-apps` on, which is off by default.
 
 ## Name portalr's actions to grantr
 

@@ -86,14 +86,19 @@ jobs:
       - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
       - run: moon run :image
 
-  # WordCraft's fidelity (lattice RFC-0003, phase 2): the pinned CLI opens and saves each corpus
-  # file, and the matrix of what it kept, feature by feature, is the run's summary.
-  wordcraft:
-    name: WordCraft fidelity
+  # Each crafting app's fidelity (lattice RFC-0003, phase 2): its pinned CLI opens and saves each
+  # file of its corpus, and the matrix of what it kept, feature by feature, is the run's summary.
+  # The apps are those with a corpus, which a test holds this list to.
+  fidelity:
+    name: Fidelity (${{ matrix.app }})
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [wordcraft]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -102,7 +107,8 @@ jobs:
       - run: uv sync --locked --all-packages --all-groups --all-extras
       - run: moon run artifactr:fidelity
         env:
-          WORDCRAFT_MATRIX: ${{ github.workspace }}/fidelity.md
+          CRAFT: ${{ matrix.app }}
+          CRAFT_MATRIX: ${{ github.workspace }}/fidelity.md
       - name: The matrix
         if: always()
         run: if [[ -f fidelity.md ]]; then cat fidelity.md >>"$GITHUB_STEP_SUMMARY"; fi

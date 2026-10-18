@@ -13,6 +13,30 @@ from artifactr.core import Artifact, WritePolicy
 DOCX: Final = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 """The media type of a Word document, `.docx`."""
 
+XLSX: Final = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+"""The media type of an Excel workbook, `.xlsx`."""
+
+PPTX: Final = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+"""The media type of a PowerPoint presentation, `.pptx`."""
+
+PDF: Final = "application/pdf"
+"""The media type of a PDF document, `.pdf`."""
+
+DXF: Final = "image/vnd.dxf"
+"""The media type of a drawing in AutoCAD's exchange format, `.dxf`."""
+
+DWG: Final = "image/vnd.dwg"
+"""The media type of an AutoCAD drawing, `.dwg`."""
+
+PSD: Final = "image/vnd.adobe.photoshop"
+"""The media type of a Photoshop document, `.psd`."""
+
+SVG: Final = "image/svg+xml"
+"""The media type of an SVG image, `.svg`."""
+
+IDML: Final = "application/vnd.adobe.indesign-idml-package"
+"""The media type of an InDesign markup package, `.idml`."""
+
 OUTLINE_LIMIT: Final = 4_000
 """The most characters an outline holds: what the agent sees of a file by default."""
 

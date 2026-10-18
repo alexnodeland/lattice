@@ -9,7 +9,7 @@ one revision through the workspace, which a failure before the commit never reac
 import contextlib
 import json
 import uuid
-from collections.abc import AsyncIterable, Sequence
+from collections.abc import AsyncIterable, Mapping, Sequence
 from datetime import timedelta
 from typing import Final, Literal
 
@@ -20,6 +20,7 @@ from artifactr.core import (
     ArtifactId,
     Forbidden,
     InvalidState,
+    NotEnabled,
     NotFound,
     ProposeChange,
     Proposed,
@@ -27,6 +28,7 @@ from artifactr.core import (
     ValidationFailed,
     VersionConflict,
     Versioned,
+    artifact_types,
     create_artifact,
     new_artifact_id,
 )
@@ -36,6 +38,7 @@ from artifactr.files.blobs.port import utc_now
 from artifactr.files.checkouts import Checkout, Checkouts, holder_of
 from artifactr.files.manifest import Blob, NativeFile, Provenance, revise
 from artifactr.workspace import ArtifactBusy, Scope, Workspace
+from lattice_core.integrations import Integrations
 
 TEXT: Final = "text/plain; charset=utf-8"
 JSON: Final = "application/json"
@@ -76,6 +79,10 @@ class NativeFiles:
         keep: How long bytes no revision names are kept after they were last put, for the
             commit that follows a put: a day by default.
         clock: Returns the current time, which collection keeps bytes from.
+        integrations: Whether the app's integration, `app.integration`, is on in a workspace:
+            while it is off there, nothing is uploaded, checked out, extended, checked in or
+            edited, and each refuses with `NotEnabled`; reads and collection go on. None, the
+            default, is on everywhere.
 
     Raises:
         ValueError: If an edit's lease would end before the app's deadline.
@@ -92,6 +99,7 @@ class NativeFiles:
         edit_ttl: timedelta = timedelta(seconds=45),
         keep: timedelta = timedelta(days=1),
         clock: Clock = utc_now,
+        integrations: Integrations | None = None,
     ) -> None:
         if edit_ttl.total_seconds() <= deadline:
             raise ValueError("an edit's lease must outlast the app's deadline, and the commit")
@@ -103,6 +111,38 @@ class NativeFiles:
         self._edit_ttl = edit_ttl
         self._keep = keep
         self._clock = clock
+        self._integrations = integrations
+
+    @property
+    def app(self) -> App:
+        """The app that reads the files and runs agents' commands."""
+        return self._app
+
+    # ─── the switch ───────────────────────────────────────────────────────────
+
+    async def enabled(self, ws: Workspace) -> bool:
+        """Whether the app's integration is on in the workspace."""
+        if self._integrations is None:
+            return True
+        key = self._app.integration
+        return await self._integrations.is_enabled(ws.tenant_id, ws.workspace_id, key)
+
+    def key_of(self, kind: str, data: Mapping[str, JsonValue]) -> str | None:
+        """The integration that governs an artifact: the app's for a native file, else None.
+
+        It is the `key_of` of artifactr's `integration_gate`, so that while the app is off, an
+        edit of a native file is refused on every surface, REST and MCP too, not only here. It
+        claims every native file's kind for this app: a deployment has one app, as RFC-0003's
+        pilot does, until a second app's adapter says which formats are its.
+        """
+        del data  # every native file is the app's
+        file_type = artifact_types().get(kind)
+        native = file_type is not None and issubclass(file_type, NativeFile)
+        return self._app.integration if native else None
+
+    async def _switched_on(self, ws: Workspace) -> None:
+        if not await self.enabled(ws):
+            raise NotEnabled(self._app.integration)
 
     # ─── uploads ──────────────────────────────────────────────────────────────
 
@@ -120,10 +160,12 @@ class NativeFiles:
         """Create a native file from uploaded bytes, with a new id unless one is given.
 
         Raises:
+            NotEnabled: If the app's integration is off in the workspace.
             ValidationFailed: If the type doesn't hold files of `media_type`.
             TooLarge: If the file is larger than the blob store's limit.
             AppFailed: If the app can't read it.
         """
+        await self._switched_on(ws)
         if media_type not in file_type.formats:
             raise ValidationFailed(f"a {file_type.kind} holds {sorted(file_type.formats)}", [])
         artifact_id = artifact_id or new_artifact_id()
@@ -147,9 +189,11 @@ class NativeFiles:
         lease holds the file at.
 
         Raises:
+            NotEnabled: If the app's integration is off in the workspace.
             ArtifactBusy: If someone else has the file: a check-out, or an agent's edit.
             NotFound: If there is no such native file, or it is hidden from the actor.
         """
+        await self._switched_on(ws)
         checkout_id = f"co_{uuid.uuid4().hex}"
         holder = holder_of(checkout_id, ws.actor)
         try:
@@ -176,11 +220,13 @@ class NativeFiles:
         """Extend a check-out by its whole length again, from now.
 
         Raises:
+            NotEnabled: If the app's integration is off in the workspace.
             NotFound: If there is no such check-out.
             Forbidden: If it is someone else's.
             ArtifactBusy: If its lease ended and someone else has the file now.
             InvalidState: If it was checked in.
         """
+        await self._switched_on(ws)
         checkout = await self._own(ws, checkout_id)
         if checkout.checked_in:
             raise InvalidState(f"checkout {checkout_id} was checked in: check the file out again")
@@ -213,12 +259,14 @@ class NativeFiles:
             The revision's outcome, a proposal's if it was stale, or None if nothing changed.
 
         Raises:
+            NotEnabled: If the app's integration is off in the workspace.
             NotFound: If there is no such check-out, or its file is hidden from the actor.
             Forbidden: If it is someone else's.
             InvalidState: If it was checked in already, and this file is another.
             TooLarge: If the file is larger than the blob store's limit.
             AppFailed: If the app can't read it.
         """
+        await self._switched_on(ws)
         checkout = await self._own(ws, checkout_id)
         artifact_id = checkout.artifact_id
         head = await ws.get(NativeFile, artifact_id)
@@ -305,6 +353,7 @@ class NativeFiles:
             The revision's outcome, or None if the batch changed nothing.
 
         Raises:
+            NotEnabled: If the app's integration is off in the workspace.
             NotFound: If there is no such native file, or it is hidden from the actor.
             VersionConflict: If `base_version` isn't the head's: the agent plans again.
             ArtifactBusy: If someone else has the file, such as a person's check-out. The agent
@@ -312,6 +361,7 @@ class NativeFiles:
             ContentUnavailable: If the head's bytes aren't in the blob store.
             AppFailed: If the app can't run the batch.
         """
+        await self._switched_on(ws)
         holder = f"edit:{uuid.uuid4()}"
         try:
             await ws.lease_artifact(artifact_id, holder=holder, ttl=self._edit_ttl)
@@ -382,6 +432,19 @@ class NativeFiles:
         manifest = head.data if version in (None, head.version) else await _at(ws, head, version)
         parts = {"content": manifest.content, "text": manifest.text, "review": manifest.review}
         return await self._bytes(_scope(ws), artifact_id, parts[part], part)
+
+    async def render(
+        self, ws: Workspace, artifact_id: ArtifactId, page: int, *, version: int | None = None
+    ) -> bytes:
+        """Render one page of a native file, from 1, at its head or a version, as a PNG.
+
+        Raises:
+            NotFound: If there is no such native file, or it is hidden.
+            ContentUnavailable: If the blob store doesn't have its bytes.
+            AppFailed: If the app can't render it, or there is no such page.
+        """
+        source = await self.read(ws, artifact_id, version=version)
+        return await self._app.render(source, page, scale=1.0, deadline=self._deadline)
 
     # ─── collection ───────────────────────────────────────────────────────────
 

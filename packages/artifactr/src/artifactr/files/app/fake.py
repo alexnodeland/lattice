@@ -150,7 +150,7 @@ def _inspect(file: _File) -> Inspection:
         fingerprint=hashlib.sha256(canonical.encode()).hexdigest(),
         outline=outline[:OUTLINE_LIMIT],
         text="\n\n".join(file.paragraphs),
-        review={"comments": list(file.comments)},
+        review={"comments": [{"id": i, "text": c} for i, c in enumerate(file.comments)]},
         pages=_pages(file),
     )
 

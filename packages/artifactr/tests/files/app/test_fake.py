@@ -31,7 +31,7 @@ async def test_a_batch_makes_a_file_and_says_what_is_in_it() -> None:
     inspection = applied.inspection
     assert inspection.outline == "Terms\nSignatures", "each paragraph's first line"
     assert inspection.text == "Terms\nof payment\n\nSignatures"
-    assert inspection.review == {"comments": ["Check the dates"]}
+    assert inspection.review == {"comments": [{"id": 0, "text": "Check the dates"}]}
     assert inspection.pages == 1
     assert await FakeApp().inspect(applied.content, deadline=1) == inspection
 

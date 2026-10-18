@@ -1,9 +1,9 @@
 """The layering within the native files' package, `artifactr.files`, enforced.
 
 The package depends inward only: every name it imports from the rest of artifactr is in its
-module's `__all__` (lattice RFC-0003), and `tests/test_layering.py` holds the rest of artifactr to
-importing nothing of it. Within it, the manifest knows no other layer, and only the SQL layer
-knows SQL.
+module's `__all__` (lattice RFC-0003), only the agent's tools import the agent's, and
+`tests/test_layering.py` holds the rest of artifactr to importing nothing of it. Within it, the
+manifest knows no other layer, and only the SQL layer knows SQL.
 """
 
 import ast
@@ -40,7 +40,16 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
             "artifactr.files.app",
             "artifactr.files.native",
         },
-        {*LIBRARY, "pydantic"},
+        {*LIBRARY, "pydantic", "lattice_core.integrations"},
+    ),
+    # The agent's tools, on pydantic-ai and the agent's Session, the one layer that knows them.
+    "tools": (
+        {
+            "artifactr.files.app",
+            "artifactr.files.native",
+            "artifactr.files.tools",
+        },
+        {*LIBRARY, "artifactr.agent", "pydantic", "pydantic_ai"},
     ),
     "sql": (
         {
@@ -85,7 +94,7 @@ def test_layer_imports_only_what_it_may(layer: str) -> None:
                 continue
             assert _within(module, third_party), f"{where}: not a dependency of this layer"
             if root == "artifactr":
-                assert module in LIBRARY, f"{where}: not a public module"
+                assert module in third_party, f"{where}: not a public module"
             if root == "artifactr" and name is not None:
                 exported = importlib.import_module(module).__all__
                 assert name in exported, f"{where}.{name}: not artifactr's public API"

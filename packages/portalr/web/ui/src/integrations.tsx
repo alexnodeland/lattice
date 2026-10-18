@@ -4,22 +4,31 @@
  * add-ons, and forms and dashboards for whether they may be sent and drawn. The app gives a
  * workspace's here, as grantr answers them and `client`'s `useEnabled` reads them, each its
  * registry default until they are read and where they can't be (portalr ADR-0045, ADR-0047).
- * Without a provider, as in admin, each is that default too, read from the registry's generated
- * copy. A part whose key is off degrades to read-only, as it does when the server
+ * Without a provider, as in admin, each is that default too, written once below and tested
+ * against the registry. A part whose key is off degrades to read-only, as it does when the server
  * refuses a command as off.
  */
 
-import { INTEGRATIONS, type IntegrationKey } from "@portalr/client";
+import type { IntegrationKey } from "@portalr/client";
 import { createContext, use, useState } from "react";
 import { Alert } from "./alert";
 
 /** Whether the integration a key names is on, in the workspace shown. */
 export type IsEnabled = (key: IntegrationKey) => boolean;
 
-/** The keys that are on unless a workspace switches them off, as the registry says. */
-const ON_BY_DEFAULT: ReadonlySet<IntegrationKey> = new Set(
-  INTEGRATIONS.filter((known) => known.default).map((known) => known.key),
-);
+/**
+ * The keys that are on unless a workspace switches them off, as the registry says: an integration
+ * the registry adds is off here until it is listed, as most new ones are off there too.
+ */
+const ON_BY_DEFAULT: ReadonlySet<IntegrationKey> = new Set([
+  "tracker:plane",
+  "tracker:vikunja",
+  "files:wordcraft",
+  "ui:forms",
+  "ui:dashboards",
+  "excalidraw",
+  "markdown:math",
+]);
 
 /** Each integration as it is where no one has set it, as the registry says. */
 export const byDefault: IsEnabled = (key) => ON_BY_DEFAULT.has(key);

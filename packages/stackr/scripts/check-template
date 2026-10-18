@@ -101,6 +101,7 @@ DIRECTORIES = {
     "grantr": "grantr",
     "relayr-ai": "relayr",
     "portalr": "portalr",
+    "lattice-core-ai": "lattice-core",
 }
 """Each library's distribution, and its directory in lattice's packages/."""
 NAME = "Acme Template Check At Max Len"
@@ -136,6 +137,8 @@ def expected_sources(variant: Variant, commit: str) -> dict[str, dict[str, str]]
         "grantr": variant.access == "grantr",
         "relayr-ai": variant.bridge,
         "portalr": variant.access == "grantr" and variant.portal,
+        "lattice-core-ai": (variant.libraries != "reflexr" and variant.ui)
+        or (variant.bridge and variant.tracker != "none"),
     }
     return {
         name: {"git": REPOSITORY, "subdirectory": f"packages/{DIRECTORIES[name]}", "rev": commit}

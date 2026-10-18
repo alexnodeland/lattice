@@ -30,13 +30,16 @@ from artifactr.mcp import ArtifactrMcp, McpContext
 from artifactr.scores import FeedbackMirror, sync_score_configs
 from artifactr.sql import SqlStorage, migrate
 {%- if use_ui %}
-from artifactr.ui import UI_TYPES, ui_checks
+from artifactr.ui import UI_TYPES, ui_checks, ui_key_of
 {%- if access == 'grantr' %}
 from artifactr.ui.checks import IsAdmin
 {%- endif %}
 {%- endif %}
-from artifactr.workspace import Authorize, Hidden
+from artifactr.workspace import Authorize, Hidden{% if use_ui %}, integration_gate{% endif %}
 from evalr.langfuse import LangfuseScoreConfigStore, LangfuseScoreSink
+{%- if use_ui %}
+from lattice_core.integrations import Integrations
+{%- endif %}
 {%- if use_relayr %}
 from relayr.rules import RuleDraft
 {%- endif %}
@@ -71,6 +74,10 @@ class Collaboration:
         is_admin: Who may change or close any form, as its author may; without one, only its
             author.
 {%- endif %}
+{%- if use_ui %}
+        integrations: Whether forms and dashboards are on in a workspace: off, they are refused
+            there, and the agent isn't offered their tools.
+{%- endif %}
         model: The agent's model.
         gateway: The gateway's settings: tenant keys and guardrails.
         database: The database; without one, workspaces live in memory.
@@ -92,6 +99,9 @@ class Collaboration:
         hidden: Hidden | None = None,
 {%- if use_ui and access == 'grantr' %}
         is_admin: IsAdmin | None = None,
+{%- endif %}
+{%- if use_ui %}
+        integrations: Integrations,
 {%- endif %}
         model: Model,
         gateway: GatewaySettings,
@@ -124,7 +134,8 @@ class Collaboration:
             else InMemoryStorage(),
             types=[Note{% if use_ui %}, *UI_TYPES{% endif %}{% if use_relayr %}, Timeline, Postmortem, RuleDraft{% endif %}],
 {%- if use_ui %}
-            checks=ui_checks({% if access == 'grantr' %}is_admin=is_admin{% endif %}),
+            checks=ui_checks({% if access == 'grantr' %}is_admin=is_admin, {% endif %}integrations=integrations),
+            gate=integration_gate(integrations, ui_key_of),
 {%- endif %}
             authorize=authorize,
             hidden=hidden,
@@ -146,7 +157,7 @@ class Collaboration:
             capabilities.append(drafting)
 {%- endif %}
         self.runner = Runner[None](
-            build_note_agent(model, capabilities=capabilities),
+            build_note_agent(model, capabilities=capabilities{% if use_ui %}, integrations=integrations{% endif %}),
             app=None,
             agent_name="assistant",
             turn_context={% if use_relayr %}turn_context{% else %}langfuse_turn if langfuse else None{% endif %},

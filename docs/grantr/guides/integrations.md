@@ -115,9 +115,9 @@ class Narrowed:
 
 ## Adopting the port
 
-Three seams came before the port. One is still to move to it:
+Three seams came before the port. All three ask it now:
 
 - **relayr's `Enabled`** has gone: its trackers take the port, and `relayr.integrations.ALWAYS` is the answer with no store, every integration on ([relayr ADR-0033](../../relayr/adr/0033-the-tracker-port-and-runs-that-write-to-it-once.md)'s amendment).
-- **stackr's template** is to give `Grants` the deployment's `installed`, from its questions, and to wire `integration_gate` and relayr's `enabled` to it. Until then, an application it generates installs every integration, with each at its default.
+- **stackr's template** gives `Grants` the deployment's `installed` from its questions (the tracker it chose, forms and dashboards with `ui`, and math with the portal), and wires `integration_gate`, `ui_tools`, `ui_checks` and relayr's trackers to it; without grantr, to lattice-core's `Defaults` ([stackr ADR-0041](../../stackr/adr/0041-integrations-switched-per-workspace-in-the-template.md)).
 
 artifactr's forms and dashboards were built on the port: `ui_key_of` names their keys for `integration_gate`, and `ui_tools` and `ui_checks` take the port ([artifactr ADR-0080](../../artifactr/adr/0080-integrations-on-or-off-per-workspace.md)).

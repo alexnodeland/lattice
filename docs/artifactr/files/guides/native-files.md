@@ -100,7 +100,33 @@ files = NativeFiles(blobs, checkouts, app)
 
 A CLI that isn't `version` is refused, so the version a revision's provenance records is the one that ran. An agent's commands are WordCraft's own, such as `{"name": "text.insert", "args": {"text": "Fees"}}` or `{"name": "para.heading1"}`; `app.commands("comment")` finds them, ten at most, from the 617 it has. A batch stops at the first command that fails, which refuses it whole, naming the command.
 
-The CLI runs as your application's user, with its network: `Subprocess` is for tests and trusted files. The sandboxed worker for hostile ones is phase 3 of [lattice RFC-0003](../../../rfcs/0003-native-files-as-artifacts.md#the-app-port-and-the-worker). To fetch the pinned CLI, the one CI tests, run `scripts/wordcraft cli` in lattice: it downloads WordCraft's release once, checks its SHA-256 against `scripts/wordcraft.sha256`, and prints the CLI's path. `moon run artifactr:fidelity` runs the fidelity report with it.
+The CLI runs as your application's user, with its network: `Subprocess` is for tests and trusted files. The sandboxed worker for hostile ones is phase 3 of [lattice RFC-0003](../../../rfcs/0003-native-files-as-artifacts.md#the-app-port-and-the-worker). To fetch the pinned CLI, the one CI tests, run `scripts/craft wordcraft cli` in lattice: it downloads WordCraft's release once, checks its SHA-256 against `scripts/crafts/wordcraft.sha256`, and prints the CLI's path. `moon run artifactr:fidelity` runs the fidelity report with it.
+
+## The other crafting apps
+
+`artifactr.files.craft.CRAFTS` declares every crafting app, as its pinned release offers it, and each is an integration of its own, `files:<name>`, off by default but WordCraft's:
+
+| App | Its server's dialect | Its CLI confines files to | Kept as | Key |
+|---|---|---|---|---|
+| WordCraft | tools | a read and a write root | `.docx` | `files:wordcraft`, on |
+| GridCraft | tools | nothing | `.xlsx` | `files:gridcraft` |
+| DeckCraft | tools | nothing | `.pptx` | `files:deckcraft` |
+| PdfCraft | commands | one root | `.pdf` | `files:pdfcraft` |
+| CADCraft | tools | nothing | `.dxf`, `.dwg` | `files:cadcraft` |
+| PhotoCraft | commands | a read and a write root | `.psd` | `files:photocraft` |
+| VectorCraft | commands | a read and a write root | `.svg` | `files:vectorcraft` |
+| DesignCraft | tools | a read and a write root | `.idml` | `files:designcraft` |
+| FigCraft | tools | nothing | its adapter's | `files:figcraft` |
+| FilmCraft | commands | nothing | exports only | `files:filmcraft` |
+| EffectCraft | commands | a read and a write root | exports only | `files:effectcraft` |
+| SoundCraft | tools | a read and a write root | exports only | `files:soundcraft` |
+| LightCraft | commands | nothing | exports only | `files:lightcraft` |
+
+An app's adapter subclasses `ToolsDialect` or `CommandsDialect`, which take the CLI, the `version` it must be, `arguments` for it after `mcp`, `trusted`, `limit` and `lookup`. A CLI that confines nothing reads and writes wherever your application's user can, so its adapter refuses to be made, with `ValueError`, unless you pass `trusted=True`, saying its files are trusted or your process is already confined. Until the sandboxed worker exists, don't switch such an app on where people upload files you don't trust. FilmCraft, EffectCraft, SoundCraft and LightCraft keep projects that point at media outside them, so lattice keeps only what they render or export, one file at a time.
+
+`scripts/craft <app> cli`, `web` or `notices` (the licence files in this machine's CLI asset) fetches any of them at its pin, in `scripts/crafts/<app>.sha256`, and `CRAFT=<app> moon run artifactr:fidelity` runs an app's fidelity report, from its corpus in `tests/files/corpus/<app>/`.
+
+**Licences and notices.** Every app is `MIT OR Apache-2.0`, and its licence files and `NOTICE` travel with its CLI and its browser build; `scripts/craft <app> notices` lists those beside the CLI. PdfCraft's Linux tarballs also carry its OCR's two models, `text-detection.rten` and `text-recognition.rten`, by Robert Knight ([ocrs-models](https://github.com/robertknight/ocrs-models)), trained on HierText, under CC-BY-SA-4.0: whatever ships PdfCraft's CLI from them ships their `ATTRIBUTION.txt` and licence files with it, as `CRAFTS["pdfcraft"].notices` lists. Each app's brand licence lets the brand's marks appear only in its unmodified official builds, so they are served unchanged, and no key, name or document of yours should use the brand's name.
 
 ## Switching an app on and off
 
@@ -171,7 +197,7 @@ A check-in larger than `limit` (`files_router(..., limit=)`: give it your blob s
 The person edits in the app's browser build, as released. Serve it with `editor_app`, on a host name of its own for which your portal sets no cookies, so it never sees a token:
 
 ```python
-editor = editor_app(Path("/srv/wordcraft-web-0.7.0"))  # what `scripts/wordcraft web` prints
+editor = editor_app(Path("/srv/wordcraft-web-0.7.0"))  # what `scripts/craft wordcraft web` prints
 ```
 
 It adds headers only: a policy that runs the build's own code and its inline script by its hash, and reaches no other origin, with no framing; and caching for its hashed files. The check-out flow is then: check out, download the version, open it in the editor, edit, save it to disk, and check it in.

@@ -8,7 +8,15 @@ that first tests the digest it was made from ([`revise`][artifactr.files.manifes
 from artifactr.files.manifest.revisions import REVISED, revise
 from artifactr.files.manifest.types import (
     DOCX,
+    DWG,
+    DXF,
+    IDML,
     OUTLINE_LIMIT,
+    PDF,
+    PPTX,
+    PSD,
+    SVG,
+    XLSX,
     Blob,
     NativeFile,
     Provenance,
@@ -19,8 +27,16 @@ from artifactr.files.manifest.types import (
 
 __all__ = [
     "DOCX",
+    "DWG",
+    "DXF",
+    "IDML",
     "OUTLINE_LIMIT",
+    "PDF",
+    "PPTX",
+    "PSD",
     "REVISED",
+    "SVG",
+    "XLSX",
     "Blob",
     "NativeFile",
     "Provenance",

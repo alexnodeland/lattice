@@ -886,7 +886,7 @@ smoke_app() {
     jwks=http://gotrue:9999/.well-known/jwks.json
     # The admin commands find users by email through GoTrue's admin API, on the stack's network.
     admin="AUTH_SERVICE_ROLE_KEY=$(setting AUTH_SERVICE_ROLE_KEY)
-AUTH_ADMIN_URL=http://gotrue:9999"
+STACK_AUTH_ADMIN_URL=http://gotrue:9999"
   fi
   unset DOCKER_DEFAULT_PLATFORM
 
@@ -924,7 +924,8 @@ AUTH_ADMIN_URL=http://gotrue:9999"
   app_password=$(random_hex 16)
   (
     umask 077
-    cat >"$app_dir/.env" <<ENV
+    # .env.example first, as `make env` copies it, then what the smoke test sets: a later line wins.
+    { cat "$app_dir/.env.example"; cat <<ENV; } >"$app_dir/.env"
 STACK_DATABASE_URL=postgresql+asyncpg://$app_role:$app_password@$app_db_host:5432/postgres
 STACK_DATABASE_ADMIN_URL=postgresql+asyncpg://postgres:$app_db_admin_password@$app_db_host:5432/postgres
 APP_PORT=$app_port

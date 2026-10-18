@@ -12,3 +12,4 @@ nav:
   - adr/0003-check-outs-and-agents-edits-under-one-lease.md
   - adr/0004-an-app-is-a-port-of-stateless-calls.md
   - adr/0005-wordcraft-headless-pinned-by-checksum.md
+  - adr/0006-the-agents-tools-behind-each-apps-switch.md

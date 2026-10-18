@@ -102,6 +102,48 @@ A CLI that isn't `version` is refused, so the version a revision's provenance re
 
 The CLI runs as your application's user, with its network: `Subprocess` is for tests and trusted files. The sandboxed worker for hostile ones is phase 3 of [lattice RFC-0003](../../../rfcs/0003-native-files-as-artifacts.md#the-app-port-and-the-worker). To fetch the pinned CLI, the one CI tests, run `scripts/wordcraft cli` in lattice: it downloads WordCraft's release once, checks its SHA-256 against `scripts/wordcraft.sha256`, and prints the CLI's path. `moon run artifactr:fidelity` runs the fidelity report with it.
 
+## Switching an app on and off
+
+Each app is an integration of its own, `files:wordcraft` for WordCraft, which a workspace's admin switches through the shared Integrations switch (lattice ADR-0027). Give `NativeFiles` the same `Integrations` your application gives artifactr's gate, and the gate `files.key_of`:
+
+```python
+from artifactr.workspace import Workspaces, integration_gate
+
+files = NativeFiles(blobs, checkouts, app, integrations=grants)
+workspaces = Workspaces(storage, gate=integration_gate(grants, files.key_of))
+```
+
+While the app is off in a workspace, `NativeFiles` refuses to upload, check out, extend, check in or edit there, with `NotEnabled`, before it takes any lease, so a check-out made before it was switched off lapses on its own; and the gate refuses an edit of a native file on every other surface, REST and MCP included. Its files are still read and downloaded, and their history kept. Without `integrations`, every app is on.
+
+## The agent's tools
+
+```python
+from pydantic_ai import Agent
+
+from artifactr.agent import ArtifactWorkspace, Session
+from artifactr.files import WordDocument
+from artifactr.files.tools import native_file_tools
+
+agent = Agent(
+    model,
+    deps_type=Session[None],
+    toolsets=[native_file_tools(files)],
+    capabilities=[ArtifactWorkspace(types=[WordDocument])],
+)
+```
+
+The agent sees a native file's name, pages and outline through artifactr's own `read_artifact`, and gets more with these:
+
+| Tool | What it does |
+|---|---|
+| `read_native(artifact_id, start)` | The file's words, 8,000 characters a call, saying where to read on |
+| `read_review(artifact_id, start)` | Its comments and tracked changes, 50 a call, as the app gives them, with their ids |
+| `find_commands(query)` | The app's commands that mention a word, ten at most |
+| `edit_native(artifact_id, base_version, commands, summary)` | One batch of the app's commands, as `files.edit` runs it |
+| `view_page(artifact_id, page)` | One rendered page, as an image: only with `native_file_tools(files, view=True)` |
+
+They are offered only while the app is on in the run's workspace. Under `WordDocument`'s `propose` policy, an agent's edit is a proposal. If a person has the file checked out, `edit_native` tells the agent who, and until when, and the agent plans again once it is checked in, rather than retrying; another agent's edit, holding it for seconds, is retried, and a stale `base_version` asks it to read the file again.
+
 ## Reading a revision
 
 `files.read(ws, artifact_id, version=None, part="content")` returns the bytes of the head or of a version, or its `text` or `review`. It resolves the artifact through the workspace first, which asks `authorize` and answers a restricted artifact as a missing one, and only then reads the bytes the revision names.

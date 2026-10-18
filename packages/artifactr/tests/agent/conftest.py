@@ -45,6 +45,8 @@ class Script:
     def __init__(self, *steps: Step) -> None:
         self.steps = list(steps)
         self.requests: list[list[ModelMessage]] = []
+        self.infos: list[AgentInfo] = []
+        """What each request offered the model: its tools, among them."""
 
     @property
     def model(self) -> FunctionModel:
@@ -52,6 +54,7 @@ class Script:
 
     def _respond(self, messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
         self.requests.append(list(messages))
+        self.infos.append(info)
         step = self.steps.pop(0)
         return step(messages) if callable(step) else step
 

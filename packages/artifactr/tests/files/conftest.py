@@ -5,7 +5,7 @@ policies hold.
 """
 
 from collections.abc import AsyncIterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import pytest
@@ -55,3 +55,15 @@ async def stores(
         engine = database.engine()
         await create_schema(engine)
         yield Stores(SqlBlobs(engine, clock=clock), SqlCheckouts(engine))
+
+
+@dataclass
+class Switch:
+    """lattice-core's `Integrations`, with some keys off in some workspaces, recording each ask."""
+
+    off: set[tuple[str, str, str]] = field(default_factory=set[tuple[str, str, str]])
+    asked: list[tuple[str, str, str]] = field(default_factory=list[tuple[str, str, str]])
+
+    async def is_enabled(self, tenant_id: str, workspace_id: str, key: str, /) -> bool:
+        self.asked.append((tenant_id, workspace_id, key))
+        return (tenant_id, workspace_id, key) not in self.off

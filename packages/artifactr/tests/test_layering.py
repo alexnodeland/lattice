@@ -100,12 +100,18 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     # Native files, the files extra (lattice RFC-0003 and ADR-0026): built on the public API of
     # core and the workspace, with its SQL stores in the sql extra and WordCraft's adapter on the
     # MCP client the files extra brings, and the agent's tools on the agent's public API, behind
-    # the switch lattice-core declares. tests/files/test_layering.py holds its own layers.
+    # the switch lattice-core declares, and people's check-out over artifactr's router's auth.
+    # tests/files/test_layering.py holds its own layers.
     "files": (
-        {"artifactr.core", "artifactr.workspace", "artifactr.agent", "artifactr.files"},
+        {
+            *("artifactr.core", "artifactr.workspace", "artifactr.agent", "artifactr.fastapi"),
+            "artifactr.telemetry",
+            "artifactr.files",
+        },
         {
             *("pydantic", "pydantic_ai", "sqlalchemy", "alembic", "mcp", "anyio"),
-            *("lattice_core.sql", "lattice_core.integrations"),
+            *("fastapi", "starlette"),
+            *("lattice_core.sql", "lattice_core.integrations", "lattice_core.refusals"),
         },
     ),
 }

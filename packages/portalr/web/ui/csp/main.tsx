@@ -1,6 +1,6 @@
 /**
- * The page the CSP tests drive: ui's Markdown, built as app and admin are, and served with portalr's
- * Content-Security-Policy (`policy.txt`), so whatever it renders meets the policy the UIs meet.
+ * The page the CSP tests drive: ui's Markdown, built as app and admin are, and served with the
+ * Content-Security-Policy both UIs share (`policy.txt`), so whatever it renders meets it.
  */
 
 import "../src/styles.css";

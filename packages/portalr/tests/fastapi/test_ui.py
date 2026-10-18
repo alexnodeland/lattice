@@ -23,15 +23,39 @@ async def test_a_client_side_route_gets_the_index_which_is_never_cached(
         assert response.headers["cache-control"] == NO_CACHE
 
 
-async def test_every_ui_response_has_a_strict_policy(client: httpx.AsyncClient) -> None:
-    headers = (await client.get("/app/")).headers
-    policy = headers["content-security-policy"]
-    assert "default-src 'self'" in policy
-    assert "script-src 'self'" in policy
-    assert "connect-src 'self' https://project.supabase.co" in policy
-    assert "frame-ancestors 'none'" in policy
-    assert headers["x-content-type-options"] == "nosniff"
-    assert headers["referrer-policy"] == "no-referrer"
+POLICY = (
+    "default-src 'self'",
+    # First-party WebAssembly, in either UI (portalr ADR-0041); never 'unsafe-eval'.
+    "script-src 'self' 'wasm-unsafe-eval'",
+    "style-src 'self'",
+    "img-src 'self' data:",
+    "font-src 'self'",
+    "connect-src 'self' https://project.supabase.co",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+)
+"""The policy both UIs share, directive by directive, so a widening is a visible change."""
+
+
+async def test_both_uis_share_one_policy_on_the_index_and_on_a_hashed_script(
+    client: httpx.AsyncClient, ui: Path
+) -> None:
+    # admin built beside app; a worker script takes its policy from its own response.
+    (ui / "admin" / "assets").mkdir(parents=True)
+    (ui / "admin" / "index.html").write_text("<!doctype html><title>admin</title>")
+    (ui / "admin" / "assets" / "worker-def456.js").write_text("self.onmessage = () => {}")
+    for path in (
+        "/app/",
+        "/app/assets/index-abc123.js",
+        "/admin/",
+        "/admin/assets/worker-def456.js",
+    ):
+        headers = (await client.get(path)).headers
+        assert tuple(headers["content-security-policy"].split("; ")) == POLICY, path
+        assert headers["x-content-type-options"] == "nosniff"
+        assert headers["referrer-policy"] == "no-referrer"
 
 
 def test_supabase_on_the_applications_own_origin_is_already_self() -> None:

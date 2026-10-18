@@ -1,7 +1,9 @@
 /**
- * ui's Markdown under portalr's Content-Security-Policy, in Chromium: every element, streamed or
- * whole, each hostile message, and each control, with not one violation of the policy. The page
- * is built as the UIs are, so what is checked is what ships (portalr ADR-0043).
+ * ui's Markdown under the policy both UIs share, in Chromium: every element, streamed or whole,
+ * each hostile message, and each control, with not one violation of the policy, and not one use of
+ * WebAssembly. The policy allows first-party WebAssembly (portalr ADR-0041), so it can't refuse a
+ * module here; the page reports each call that compiles one instead, since Markdown and its add-ons need
+ * none (ADR-0044). The page is built as the UIs are, so what is checked is what ships (ADR-0043).
  */
 
 import { type Browser, chromium, type Page } from "playwright";
@@ -16,7 +18,13 @@ beforeAll(async () => {
 
 afterAll(() => browser.close());
 
-/** A page on the harness, and what it has reported: each violation of the policy, and each error. */
+/** What compiles or instantiates WebAssembly: a page that calls one of these uses it. */
+const COMPILING = ["compile", "compileStreaming", "instantiate", "instantiateStreaming", "Module"];
+
+/**
+ * A page on the harness, and what it has reported: each violation of the policy, each use of
+ * WebAssembly, and each error.
+ */
 async function opened(): Promise<{ page: Page; reported: () => Promise<string[]> }> {
   // The clipboard is the page's to write, so Copy copies, as it does for a person.
   const context = await browser.newContext({ permissions: ["clipboard-read", "clipboard-write"] });
@@ -29,13 +37,29 @@ async function opened(): Promise<{ page: Page; reported: () => Promise<string[]>
     }
   });
   // Before the page's own scripts, and whatever its policy: Playwright adds it, not the page.
-  await page.addInitScript(() => {
+  await page.addInitScript((compiling) => {
     const seen: string[] = [];
     Object.assign(window, { violations: seen });
     document.addEventListener("securitypolicyviolation", (event) => {
       seen.push(`${event.effectiveDirective}: ${event.blockedURI} at ${event.sourceFile}`);
     });
-  });
+    // Each call is reported, not each read, so a library that only feature-detects isn't. A
+    // worker has a WebAssembly of its own, which this doesn't reach; ui starts none.
+    for (const key of compiling) {
+      const real = Reflect.get(WebAssembly, key);
+      const used = () => seen.push(`WebAssembly.${key}`);
+      Reflect.set(
+        WebAssembly,
+        key,
+        new Proxy(real, {
+          apply: (target, self, args) => (used(), Reflect.apply(target, self, args)),
+          construct: (target, args, newTarget) => (
+            used(), Reflect.construct(target, args, newTarget)
+          ),
+        }),
+      );
+    }
+  }, COMPILING);
   await page.goto(inject("harness"));
   await page.waitForFunction(() => typeof window.show === "function");
   const reported = async () => {
@@ -60,6 +84,18 @@ test("the harness sees a violation: an inline style, and a style element, each r
   const seen = await reported();
   expect(seen.some((line) => line.startsWith("style-src-attr:"))).toBe(true);
   expect(seen.some((line) => line.startsWith("style-src-elem:"))).toBe(true);
+  await page.context().close();
+});
+
+test("the harness sees WebAssembly: a module compiles under the policy, and is reported", async () => {
+  const { page, reported } = await opened();
+  // The smallest module: its magic, `\0asm`, and version 1.
+  const compiled = await page.evaluate(async () => {
+    const module = await WebAssembly.compile(new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0]));
+    return module instanceof WebAssembly.Module;
+  });
+  expect(compiled).toBe(true);
+  expect(await reported()).toEqual(["WebAssembly.compile"]);
   await page.context().close();
 });
 

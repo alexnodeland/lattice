@@ -43,7 +43,7 @@ services:
       PORTAL_REQUIRED: "true"
       # The project is this host: the edge serves GoTrue's sign-in calls under /auth/v1 on the
       # application's own address, so a browser stays on one origin (the CSP's connect-src 'self',
-      # no CORS). Not the .env's PORTAL_SUPABASE_URL, which is local Supabase's.
+      # no CORS), and the application passes none itself. Not the .env's PORTAL_SUPABASE_URL.
       PORTAL_SUPABASE_URL: https://app.${STACKR_DOMAIN:?set STACKR_DOMAIN in .env, the domain stackr's edge serves}
       # Invitations need Supabase's gateway (`/auth/v1/invite`), which a single host's GoTrue,
       # alone, doesn't have behind its private address, and its admin API is the edge's to refuse.

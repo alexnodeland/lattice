@@ -1,7 +1,11 @@
 """The portal: portalr's router and UIs over the same grantr, off without a Supabase project."""
 
+import json
 import logging
+import threading
+from collections.abc import Iterator
 from dataclasses import replace
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
@@ -49,6 +53,95 @@ def test_the_portal_serves_its_config_and_both_uis(script: Script, ui: Path) -> 
             assert page.text == f"<title>{name}</title>"
             assert SUPABASE in page.headers["content-security-policy"]
         assert client.get("/").json()["portalr"] == "/portalr/"
+
+
+class Auth(BaseHTTPRequestHandler):
+    """Supabase Auth, answering each call with what it was sent, and a header not passed back."""
+
+    def answer(self) -> None:
+        body = self.rfile.read(int(self.headers.get("content-length") or 0)).decode()
+        headers = {name.lower(): value for name, value in self.headers.items()}
+        sent = {"method": self.command, "path": self.path, "body": body, "headers": headers}
+        self.send_response(200)
+        self.send_header("content-type", "application/json")
+        self.send_header("cache-control", "no-store")
+        self.send_header("set-cookie", "not=passed")
+        self.end_headers()
+        self.wfile.write(json.dumps(sent).encode())
+
+    def do_GET(self) -> None:
+        self.answer()
+
+    def do_POST(self) -> None:
+        self.answer()
+
+    def log_message(self, format: str, *args: Any) -> None:
+        pass
+
+
+@pytest.fixture
+def auth() -> Iterator[str]:
+    """Where Supabase Auth's paths are, as a gateway's ``/auth/v1``."""
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Auth)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    yield f"http://127.0.0.1:{server.server_address[1]}/auth/v1/"
+    server.shutdown()
+    server.server_close()
+
+
+def on_this_origin(ui: Path, auth: str | None) -> Settings:
+    """The portal signing in on the application's own origin, through Supabase Auth at ``auth``."""
+    named = with_portal(ui_dir=str(ui))
+    portal = replace(named.portal, supabase_url="/")
+    return replace(named, portal=portal, auth=replace(named.auth, admin_url=auth))
+
+
+def test_on_its_own_origin_the_portal_passes_its_three_sign_in_calls(
+    script: Script, ui: Path, auth: str
+) -> None:
+    with TestClient(app(script, on_this_origin(ui, auth))) as client:
+        assert client.get("/portalr/config.json").json()["supabase"]["url"] == "/"
+        policy = client.get("/portalr/app/").headers["content-security-policy"]
+        assert "connect-src 'self';" in policy, "the browser reaches nothing else"
+        token = client.post(
+            "/auth/v1/token?grant_type=password",
+            json={"email": "alice@example.com", "password": "a-password"},
+            headers={"apikey": KEY, "cookie": "a=b", "x-forwarded-for": "10.0.0.1"},
+        )
+        assert token.status_code == 200
+        sent = token.json()
+        assert (sent["method"], sent["path"]) == ("POST", "/auth/v1/token?grant_type=password")
+        assert json.loads(sent["body"]) == {"email": "alice@example.com", "password": "a-password"}
+        assert sent["headers"]["apikey"] == KEY
+        assert "cookie" not in sent["headers"]
+        assert "x-forwarded-for" not in sent["headers"]
+        assert token.headers["cache-control"] == "no-store"
+        assert "set-cookie" not in token.headers
+        user = client.get("/auth/v1/user", headers={"authorization": "Bearer t"})
+        assert user.json()["path"] == "/auth/v1/user"
+        assert user.json()["headers"]["authorization"] == "Bearer t"
+        assert client.post("/auth/v1/logout").json()["path"] == "/auth/v1/logout"
+        # Only the three calls, by their methods: nothing of the admin API, nor a change of user.
+        assert client.put("/auth/v1/user", json={}).status_code == 405
+        assert client.get("/auth/v1/admin/users").status_code == 404
+        assert client.post("/auth/v1/signup", json={}).status_code == 404
+
+
+def test_on_its_own_origin_sign_in_says_when_supabase_auth_doesnt_answer(
+    script: Script, ui: Path
+) -> None:
+    with TestClient(app(script, on_this_origin(ui, "http://127.0.0.1:1"))) as client:
+        refused = client.post("/auth/v1/token?grant_type=password", json={})
+        assert refused.status_code == 502
+        assert refused.json()["detail"] == "Supabase Auth didn't answer: ConnectError"
+
+
+def test_on_its_own_origin_the_portal_needs_supabase_auths_address(
+    script: Script, ui: Path
+) -> None:
+    with pytest.raises(ValueError, match="set AUTH_ISSUER"):
+        app(script, on_this_origin(ui, None))
 
 
 def test_without_a_supabase_project_the_portal_is_off(

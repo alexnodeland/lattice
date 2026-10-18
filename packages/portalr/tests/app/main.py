@@ -193,6 +193,12 @@ def readers() -> Readers:
     )
 
 
+def editors() -> dict[str, str]:
+    """The hosted editor, at the address the environment names, if it names one."""
+    url = os.environ.get("PORTALR_EDITOR_URL", "")
+    return {"files:wordcraft": url} if url else {}
+
+
 def create_app(ui: Path = UI) -> FastAPI:
     """The test application."""
     grants = Grants(
@@ -281,6 +287,7 @@ def create_app(ui: Path = UI) -> FastAPI:
                 supabase_url="/",
                 supabase_key="sb_publishable_test",
                 surfaces=Surfaces(relayr=""),
+                editors=editors(),
             ),
             ui=ui,
         ),

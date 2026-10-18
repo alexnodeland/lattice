@@ -31,6 +31,9 @@ services:
       OTEL_PYTHON_FASTAPI_EXCLUDED_URLS: portalr/config.json
       # Each second, so a scenario reads a turn's metrics back while it runs.
       OTEL_METRIC_EXPORT_INTERVAL: "1000"
+      # The hosted editor's address, as the browser reaches it: the app's scenarios start the
+      # editor first and name it here; empty, no editor is hosted.
+      PORTALR_EDITOR_URL: ${PORTALR_EDITOR_URL-}
     # Loki's image has no shell or probe of its own, so the application's check waits for it too.
     healthcheck:
       test:
@@ -53,6 +56,27 @@ services:
         condition: service_started
       prom-label-proxy:
         condition: service_healthy
+
+  # The hosted editor, under the `editor` profile: a stand-in for an app's browser build, served
+  # by artifactr's editor_app on a port of its own, so on another origin than the application's
+  # (tests/app/editor.py). The app's scenarios start it first, to name its address to the app.
+  editor:
+    profiles: [editor]
+    build:
+      context: ../..
+      dockerfile: packages/portalr/tests/app/Dockerfile
+    command: ["uvicorn", "tests.app.editor:app", "--host", "0.0.0.0", "--port", "8001"]
+    ports:
+      - "127.0.0.1::8001"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen("http://127.0.0.1:8001/")
+      interval: 2s
+      timeout: 5s
+      retries: 30
 
   # stackr's Collector, with its own configuration: it copies the libraries' tenant attributes to
   # `tenant.id`, and sends traces to Tempo alone, metrics to Prometheus, and logs to Loki. It

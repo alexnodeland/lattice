@@ -39,10 +39,10 @@ export interface Native {
 }
 
 /** How many pages are shown at first, and how many more each time more are asked for. */
-const PAGES_AT_ONCE = 4;
+export const PAGES_AT_ONCE = 4;
 
 /** The user a lease's check-out is a person's, by their id, if it is a person's. */
-const userOf = (lease: Lease | null | undefined): string | undefined =>
+export const userOf = (lease: Lease | null | undefined): string | undefined =>
   lease?.checked_out_by?.match(/^user:(.+)$/s)?.[1];
 
 /**

@@ -38,8 +38,11 @@ export type Serve = (request: Request, path: string) => Promise<Response | undef
 /** What the stream says of a command: its rejection's type, or null to carry it out. */
 export type Answer = (command: { type: string }) => string | null;
 
-/** A WebSocket that replays its log, reflexr's or none, then answers each command as `answer` says. */
-function socketAnswering(answer: Answer, reflexrLog: readonly unknown[]) {
+/** A WebSocket that replays its library's log, or none, then answers each command as `answer` says. */
+function socketAnswering(
+  answer: Answer,
+  logs: { readonly artifactr: readonly unknown[]; readonly reflexr: readonly unknown[] },
+) {
   return class {
     onopen: (() => void) | null = null;
     onmessage: ((message: { data: string }) => void) | null = null;
@@ -47,7 +50,7 @@ function socketAnswering(answer: Answer, reflexrLog: readonly unknown[]) {
     readonly #log: readonly unknown[];
 
     constructor(url: string) {
-      this.#log = url.includes("/reflexr/") ? reflexrLog : [];
+      this.#log = url.includes("/reflexr/") ? logs.reflexr : logs.artifactr;
       queueMicrotask(() => this.onopen?.());
     }
 
@@ -93,10 +96,11 @@ function server(serve: Serve) {
 }
 
 /**
- * What a test changes of the app's world: reflexr's log, the config's surfaces, and the editors
- * the deployment hosts, WordCraft's unless told.
+ * What a test changes of the app's world: artifactr's and reflexr's logs, the config's surfaces,
+ * and the editors the deployment hosts, WordCraft's unless told.
  */
 export interface World {
+  readonly artifactrLog?: readonly unknown[];
   readonly reflexrLog?: readonly unknown[];
   readonly surfaces?: Partial<Config["surfaces"]>;
   readonly editors?: Config["editors"];
@@ -111,7 +115,13 @@ export async function open(
 ) {
   const fetched = vi.fn(server(serve));
   vi.stubGlobal("fetch", fetched);
-  vi.stubGlobal("WebSocket", socketAnswering(answer, world.reflexrLog ?? []));
+  vi.stubGlobal(
+    "WebSocket",
+    socketAnswering(answer, {
+      artifactr: world.artifactrLog ?? [],
+      reflexr: world.reflexrLog ?? [],
+    }),
+  );
   const queryClient = createQueryClient(() => undefined);
   const config = {
     ...CONFIG,

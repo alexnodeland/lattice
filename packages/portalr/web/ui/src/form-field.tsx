@@ -6,20 +6,25 @@ import { cn } from "./cn";
  * A form control's frame: its label, the control, a hint under it, and why it was refused. Base
  * UI's Field names the control by its label and describes it by the hint and the error, so a
  * screen reader hears each with it. A field is no wider than `max-w-md`, 28rem, however wide its
- * form is: a control wider than the words it takes is harder to read than to fill.
+ * form is: a control wider than the words it takes is harder to read than to fill. A switch or a
+ * box goes `beside` its label.
  */
 export function FormField({
   label,
   hint,
   error = null,
+  beside = false,
   className,
   children,
 }: {
-  label: string;
+  /** What the field is, which names its control: words, or words and a mark such as "required". */
+  label: ReactNode;
   /** What to enter, or what the choices mean, said under the control. */
   hint?: ReactNode;
   /** Why what was entered was refused: it marks the field invalid, and says so beneath it. */
   error?: string | null;
+  /** Put the control before its label, on one line, as a switch or a box is. */
+  beside?: boolean;
   className?: string | undefined;
   /** The control, such as Base UI's `Field.Control`, or a `Select`. */
   children: ReactNode;
@@ -29,8 +34,17 @@ export function FormField({
       className={cn("flex w-full max-w-md flex-col gap-1", className)}
       invalid={error !== null}
     >
-      <Field.Label className="font-semibold text-fg text-sm">{label}</Field.Label>
-      {children}
+      {beside ? (
+        <Field.Label className="flex items-center gap-2 font-semibold text-fg text-sm">
+          {children}
+          <span>{label}</span>
+        </Field.Label>
+      ) : (
+        <>
+          <Field.Label className="font-semibold text-fg text-sm">{label}</Field.Label>
+          {children}
+        </>
+      )}
       {hint !== undefined && (
         <Field.Description className="text-muted text-xs">{hint}</Field.Description>
       )}

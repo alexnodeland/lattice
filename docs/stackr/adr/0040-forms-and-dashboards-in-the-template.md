@@ -1,6 +1,6 @@
 # ADR-0040: Forms and dashboards in the template
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0041](0041-integrations-switched-per-workspace-in-the-template.md)
 **Date:** 2026-10-17
 **Deciders:** Alex Nodeland
 

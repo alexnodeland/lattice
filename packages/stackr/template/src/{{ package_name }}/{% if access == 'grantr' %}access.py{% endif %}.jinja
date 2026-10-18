@@ -106,6 +106,21 @@ CATALOGS: Final = [
 ]
 """The libraries' catalogs{% if use_portal %}, and portalr's{% endif %}, which grantr's roles are made of."""
 
+INSTALLED: Final[list[str]] = [
+{%- if use_tracker %}
+    "tracker:{{ tracker }}",
+{%- endif %}
+{%- if use_ui %}
+    "ui:forms",
+    "ui:dashboards",
+{%- endif %}
+{%- if use_portal %}
+    "markdown:math",
+{%- endif %}
+]
+"""The integrations the application ships, which its tenants' and workspaces' admins switch:
+any other of lattice's is off everywhere (grantr's ``installed``)."""
+
 
 class Refused(Exception):
     """A signed-in caller a request can't be served for, with the HTTP status to answer.
@@ -132,6 +147,7 @@ def build_grants(
     return Grants(
         storage,
         catalogs=CATALOGS,
+        installed=INSTALLED,
         application=ServicePrincipal(id=name),
         tracer_provider=telemetry.tracer_provider if telemetry else None,
         meter_provider=telemetry.meter_provider if telemetry else None,

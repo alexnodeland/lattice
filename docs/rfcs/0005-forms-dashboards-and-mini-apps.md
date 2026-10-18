@@ -302,7 +302,7 @@ Each is a phase 1 or phase 2 exit criterion, settled and recorded in an ADR.
 - [x] artifactr: `Workspaces(checks=...)` and `DeferredAnswered.tool_name`, with an ADR
 - [x] relayr: `artifactr:deferred_answered` in `BRIDGED`, and projections per deferred tool name
 - [x] artifactr-ui: the package, schema subset and validator, types, toolset, checks, `[relayr]` extra, committed schema
-- [ ] portalr: `SchemaForm`, `TextArea`, `DashboardView`, the renderers and `ask_form` in the chat; `generate.ts`
+- [x] portalr: `SchemaForm`, `TextArea`, `DashboardView`, the renderers and `ask_form` in the chat; `generate.ts`
 - [x] stackr: the template's `ui` question
 - [x] Phase 1's unverified items settled, in an ADR
 - [ ] Mini apps: the proxy, `apps.<host>`, `AppFrame`, the bridge, the kill switch

@@ -1,6 +1,6 @@
 # ADR-0043: Markdown's basics: code blocks, callouts, footnotes per message, copying, an add-ons seam, and tests under the policy
 
-**Status:** Accepted, amended by [ADR-0044](0044-highlighting-and-math-on-demand.md) (math joins the add-ons) and by [ADR-0041's amendment of 2026-10-17](0041-first-party-webassembly-in-the-apps-policy.md#amendment-2026-10-17-both-uis-one-policy) (the harness reports WebAssembly)
+**Status:** Accepted, amended by [ADR-0044](0044-highlighting-and-math-on-demand.md) (math joins the add-ons), [ADR-0045](0045-integrations-in-admin-and-the-apps-read-of-them.md) (the app feeds the seam), [ADR-0047](0047-dashboards-on-demand-tables-and-the-panel-registry.md) (the seam is `IntegrationsContext`) and [ADR-0041's amendment of 2026-10-17](0041-first-party-webassembly-in-the-apps-policy.md#amendment-2026-10-17-both-uis-one-policy) (the harness reports WebAssembly)
 **Date:** 2026-10-17
 **Deciders:** Alex Nodeland
 **Amends:** [ADR-0015](0015-the-chat-components-and-streamdown.md), for how Streamdown's code and callouts render

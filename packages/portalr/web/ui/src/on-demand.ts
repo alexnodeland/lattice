@@ -1,24 +1,34 @@
 /**
- * What `Markdown` loads only when a message needs it: each add-on is a module of `on-demand/`,
- * which the bundle splits into chunks of its own, loaded the first time a page asks for one and
- * kept for the page's life (portalr ADR-0044). Until it has loaded, or if it fails to, a caller
- * has nothing, and shows what it would draw as its source.
+ * What a part loads only when a page needs it, such as `Markdown`'s math and a dashboard's charts:
+ * each add-on is a module of `on-demand/`, which the bundle splits into chunks of its own, loaded
+ * the first time a page asks for one and kept for the page's life (portalr ADR-0044). Until it
+ * has loaded, a caller has nothing; and one that won't load says so, so that a caller shows what
+ * it would draw another way, as it does where the add-on is off.
  */
 
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 
+/** An add-on as a caller has it: its module once loaded, or null, and whether it failed to load. */
+export interface Loaded<T> {
+  readonly module: T | null;
+  readonly failed: boolean;
+}
+
 type Loading<T> = {
-  value: T | null;
+  /** Replaced, never changed, as it loads, so a render can tell it changed by its identity. */
+  state: Loaded<T>;
   started: boolean;
   readonly listeners: Set<() => void>;
 };
+
+const NOTHING: Loaded<never> = { module: null, failed: false };
 
 const loads = new Map<() => Promise<unknown>, Loading<unknown>>();
 
 function loading<T>(load: () => Promise<T>): Loading<T> {
   let found = loads.get(load) as Loading<T> | undefined;
   if (!found) {
-    found = { value: null, started: false, listeners: new Set() };
+    found = { state: NOTHING, started: false, listeners: new Set() };
     loads.set(load, found);
   }
   return found;
@@ -30,20 +40,23 @@ function start<T>(load: () => Promise<T>): void {
     return;
   }
   entry.started = true;
+  const settle = (state: Loaded<T>) => {
+    entry.state = state;
+    for (const listener of entry.listeners) {
+      listener();
+    }
+  };
   load().then(
-    (value) => {
-      entry.value = value;
-      for (const listener of entry.listeners) {
-        listener();
-      }
-    },
-    // A chunk that won't load leaves what it would draw as its source, as an add-on that is off.
-    () => undefined,
+    (module) => settle({ module, failed: false }),
+    () => settle({ module: null, failed: true }),
   );
 }
 
-/** The loaded module `load` gives, once it has, or null; `load` starts only when `wanted`. */
-export function useOnDemand<T>(load: (() => Promise<T>) | undefined, wanted = true): T | null {
+/**
+ * The add-on `load` gives, as it loads: its module once it has, and whether it failed to; `load`
+ * starts only when `wanted`, and while it isn't, the caller has nothing.
+ */
+export function useLoaded<T>(load: (() => Promise<T>) | undefined, wanted = true): Loaded<T> {
   const entry = load && loading(load);
   const subscribe = useCallback(
     (changed: () => void) => {
@@ -54,11 +67,15 @@ export function useOnDemand<T>(load: (() => Promise<T>) | undefined, wanted = tr
     },
     [entry],
   );
-  const value = useSyncExternalStore(subscribe, () => entry?.value ?? null);
+  const state = useSyncExternalStore(subscribe, () => entry?.state ?? NOTHING);
   useEffect(() => {
     if (load && wanted) {
       start(load);
     }
   }, [load, wanted]);
-  return wanted ? value : null;
+  return wanted ? state : NOTHING;
 }
+
+/** The loaded module `load` gives, once it has, or null; `load` starts only when `wanted`. */
+export const useOnDemand = <T>(load: (() => Promise<T>) | undefined, wanted = true): T | null =>
+  useLoaded(load, wanted).module;

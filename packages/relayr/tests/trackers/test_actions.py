@@ -37,6 +37,7 @@ from tests.trackers.conftest import (
     PROJECT,
     SOURCE,
     Runs,
+    Switch,
     Tenant,
     attempt,
     connector,
@@ -310,13 +311,8 @@ async def test_a_rule_writes_only_if_its_allowlist_says(
 async def test_an_integration_switched_off_touches_neither_tracker_nor_ledger(
     runs: Runs, ledger: Ledger, tracker: FakeTracker, tenant: Tenant, clock: FakeClock
 ) -> None:
-    asked: list[tuple[str, str, str]] = []
-
-    async def enabled(tenant_id: str, workspace_id: str, key: str, /) -> bool:
-        asked.append((tenant_id, workspace_id, key))
-        return workspace_id != "ops"
-
-    off = connector(ledger, tracker, tenant, clock, enabled=enabled)
+    switch = Switch(on=False)
+    off = connector(ledger, tracker, tenant, clock, integrations=switch)
     item = ItemRef(project=PROJECT, id="1", number=1, name="OPS-1", key=KEYED)
     tracker.fail(Unavailable("asked"))  # any request would raise this, not NotAllowed
     acting = off.acting(await runs.reaction())
@@ -330,7 +326,7 @@ async def test_an_integration_switched_off_touches_neither_tracker_nor_ledger(
     ):
         with pytest.raises(NotAllowed, match="tracker:fake is off in workspace ops"):
             await call
-    assert asked == [("acme", "ops", "tracker:fake")] * 6
+    assert switch.asked == [("acme", "ops", "tracker:fake")] * 6
     assert (tracker.created, tenant.asked) == (0, []), "nothing written, no credentials asked"
     assert await ledger.tracked(KEY, "item", KEYED) is None, "the ledger untouched"
     assert await ledger.tracked(KEY, "comment", "note") is None

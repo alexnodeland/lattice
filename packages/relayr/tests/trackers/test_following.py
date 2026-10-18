@@ -18,7 +18,7 @@ from relayr.trackers import ItemFields, RateLimited, TrackerBinding, followers
 from relayr.trackers.fake import SIGNATURE
 from tests.clock import FakeClock
 from tests.stack import until
-from tests.trackers.conftest import BINDING, KEY, PROJECT, TENANT
+from tests.trackers.conftest import BINDING, KEY, PROJECT, TENANT, Switch
 from tests.trackers.following import Following, Odd, changes, following
 
 QUICK = timedelta(milliseconds=10)
@@ -168,15 +168,11 @@ def _tenancy() -> dict[str, str]:
 async def test_a_switched_off_follower_lets_its_lease_go_until_it_is_on(
     ledger: Ledger, clock: FakeClock
 ) -> None:
-    switched = {"on": True}
-
-    async def enabled(tenant_id: str, workspace_id: str, key: str, /) -> bool:
-        return switched["on"]
-
-    app = following(ledger, clock, enabled=enabled, interval=QUICK, lease_ttl=TTL)
+    switch = Switch()
+    app = following(ledger, clock, integrations=switch, interval=QUICK, lease_ttl=TTL)
     await app.followers.watch(*KEY)
     await until(lambda: _seeded(ledger))
-    switched["on"] = False
+    switch.on = False
 
     async def released() -> bool:
         taken = await ledger.acquire_tracker_lease(KEY, "p2", timedelta(milliseconds=1))
@@ -188,7 +184,7 @@ async def test_a_switched_off_follower_lets_its_lease_go_until_it_is_on(
     app.tracker.add(PROJECT, "Filed while off")
     await asyncio.sleep(0.05)
     assert await app.events() == []
-    switched["on"] = True
+    switch.on = True
     await published(app, 1)
     await app.followers.aclose()
 
@@ -226,22 +222,17 @@ async def test_a_rate_limited_follower_waits_as_the_tracker_asks(
 async def test_a_nudge_doesnt_cut_a_rate_limits_pause_short(
     ledger: Ledger, clock: FakeClock
 ) -> None:
-    asked: list[str] = []
-
-    async def enabled(tenant_id: str, workspace_id: str, key: str, /) -> bool:
-        asked.append(workspace_id)
-        return True
-
-    app = following(ledger, clock, enabled=enabled, interval=QUICK, lease_ttl=TTL)
+    switch = Switch()
+    app = following(ledger, clock, integrations=switch, interval=QUICK, lease_ttl=TTL)
     assert await app.poll()
     app.tracker.fail(RateLimited(0.2))
     await app.followers.watch(*KEY)
     await asyncio.sleep(0.02)
-    before = len(asked)
+    before = len(switch.asked)
     for _ in range(10):
         assert await app.followers.nudge(TENANT, "fake", *nudge())
         await asyncio.sleep(0.01)
-    assert len(asked) - before < 40, "it waits, renewing its lease, rather than spinning"
+    assert len(switch.asked) - before < 40, "it waits, renewing its lease, rather than spinning"
     await app.followers.aclose()
 
 

@@ -1,6 +1,6 @@
 # ADR-0033: The tracker port, and runs that write to it once
 
-**Status:** Accepted, amended by [ADR-0036](0036-reading-a-tracker-back.md)
+**Status:** Accepted, amended by [ADR-0036](0036-reading-a-tracker-back.md), and the amendment below
 **Date:** 2026-10-17
 **Deciders:** Alex Nodeland
 
@@ -50,3 +50,7 @@ RFC-0004 has rules' runs file and update work items in a task tracker. Neither P
 - Vikunja's marker is visible to people, and whether its editor keeps it is still unverified.
 - Vikunja's `done` flag holds two of the port's five states: `set_state("started")` on a Vikunja task reads back as `todo`, sends its fields again each time, and records `started`. The reading side has to compare states as Vikunja holds them.
 - A request a tracker finishes more than 30 s after relayr gave up could still make a second item on Vikunja, where `find` is a search; on Plane the 409 catches it.
+
+## Amendment (2026-10-17): lattice-core's port in place of `Enabled`
+
+lattice's shared store of switches came as lattice-core's `Integrations` port, answered by grantr's `Grants` ([lattice ADR-0027](../../adr/0027-integrations-switched-per-workspace-through-one-port.md)), so relayr asks it in place of a protocol of its own. `Trackers(..., integrations=...)` takes the port, as artifactr's `ui_tools` and `ui_checks` do, and an application passes its `Grants`; `Enabled` and `always` go, before any release had them. `relayr.integrations` keeps one name, `ALWAYS`, the port answered without a store: every integration runs everywhere. It is not lattice-core's `Defaults`, which answers each key's default and turns off a key it doesn't know: a tracker an application adds, under a key of its own, would never run. The followers and the webhooks' route ask the same port ([ADR-0036](0036-reading-a-tracker-back.md)).

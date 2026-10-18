@@ -3,7 +3,7 @@ import type { ComponentProps, ReactNode } from "react";
 import { FormField } from "./form-field";
 
 type Props = Omit<ComponentProps<typeof Field.Control>, "className"> & {
-  label: string;
+  label: ReactNode;
   hint?: ReactNode;
   /** Why what was entered was refused: it marks the field invalid, and says so beneath it. */
   error?: string | null;

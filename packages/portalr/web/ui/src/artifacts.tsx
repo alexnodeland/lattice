@@ -6,7 +6,7 @@
  */
 
 import type { Change, Granularity } from "@portalr/client";
-import type { ReactNode } from "react";
+import { createContext, type ReactNode } from "react";
 import { cn } from "./cn";
 import { Markdown } from "./markdown";
 
@@ -108,17 +108,32 @@ export function rendererFor(kind: string, renderers: Renderers): Renderer {
   return renderers.get(kind) ?? json;
 }
 
-/** An artifact's content, through its kind's renderer. */
+/** An artifact, and the version of it shown. */
+export interface Shown {
+  readonly id: string;
+  readonly version: number;
+}
+
+/** The artifact being shown, and its version: what a renderer that acts on it, such as a form's, acts on. */
+export const ShownContext = createContext<Shown | null>(null);
+
+/**
+ * An artifact's content, through its kind's renderer. Given which artifact it is, and at which
+ * version (`shown`), a renderer that acts on the artifact, such as a form's, knows which and when.
+ */
 export function ArtifactContent({
   kind,
   data,
   renderers,
+  shown,
 }: {
   kind: string;
   data: Data;
   renderers: Renderers;
+  shown?: Shown;
 }) {
-  return <>{rendererFor(kind, renderers).render(data)}</>;
+  const content = rendererFor(kind, renderers).render(data);
+  return shown === undefined ? content : <ShownContext value={shown}>{content}</ShownContext>;
 }
 
 /**

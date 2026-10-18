@@ -92,7 +92,7 @@ An admin reads each list with the action of the command that changes it ([ADR-00
 
 ## Integrations
 
-`Grants` answers lattice-core's `Integrations` port, and relayr's `Enabled`, with `is_enabled(tenant_id, workspace_id, key)`: whether an integration is on in a workspace, in two indexed reads ([ADR-0034](adr/0034-integrations-switched-per-tenant-and-workspace-in-grantrs-table-audited.md), [lattice ADR-0027](../adr/0027-integrations-switched-per-workspace-through-one-port.md)). It checks no one, as `hidden` doesn't.
+`Grants` answers lattice-core's `Integrations` port, which artifactr's gate and relayr's trackers ask, with `is_enabled(tenant_id, workspace_id, key)`: whether an integration is on in a workspace, in two indexed reads ([ADR-0034](adr/0034-integrations-switched-per-tenant-and-workspace-in-grantrs-table-audited.md), [lattice ADR-0027](../adr/0027-integrations-switched-per-workspace-through-one-port.md)). It checks no one, as `hidden` doesn't.
 
 - **The registry and the installation are configuration.** `Grants(integrations=...)` takes the integrations a tenant's admins switch, lattice-core's `KNOWN` if omitted, and `installed=...` the keys the deployment installs, every one if omitted.
 - **Three levels decide:** an integration is on in a workspace only if the deployment installs it and the tenant hasn't turned it off; then the workspace's setting decides, or, unset, the tenant's, or, unset too, its default. `grantr.core.effective` is the rule.

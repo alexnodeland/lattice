@@ -22,6 +22,7 @@ from collections.abc import AsyncGenerator, Mapping
 import httpx
 from fastapi import FastAPI
 
+from lattice_core.integrations import Integrations
 from reflexr import F, Rule, on, run
 from reflexr.core import RunDeadLettered
 from reflexr.workspace import Action, Reaction, Workspaces
@@ -105,6 +106,8 @@ class Tracking:
         ledger: The bridge's ledger, where every write is claimed before it is sent, and what the
             followers read is kept.
         settings: The tenants' credentials, the workspaces' bindings, and the budget.
+        integrations: Whether the tracker is on in a workspace: off, its runs write nothing
+            there, and its follower reads nothing.
         connect: The tracker's adapter; {% if tracker == 'plane' %}Plane{% else %}Vikunja{% endif %}'s, over HTTP, by default. Tests pass
             relayr's ``FakeTracker``'s.
         telemetry: OpenTelemetry, for the followers' spans and the tracker's counters.
@@ -115,6 +118,7 @@ class Tracking:
         ledger: Ledger,
         settings: TrackerSettings,
         *,
+        integrations: Integrations,
         connect: Connect | None = None,
         telemetry: TelemetryHandle | None = None,
     ) -> None:
@@ -133,6 +137,7 @@ class Tracking:
             ledger,
             connect=connect,
             integration=INTEGRATION,
+            integrations=integrations,
             credentials=credential,
             bindings=settings.bindings,
             allowlists=ALLOWLISTS,

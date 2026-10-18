@@ -20,6 +20,16 @@ import { Num } from "./num";
 /** The most series a chart draws, one per ink. */
 export const MAX_SERIES = 3;
 
+/**
+ * A whole's parts that hold something, the largest first, their total, and each one's share of it,
+ * as a percentage in words: what a donut draws, and its figures say.
+ */
+export function largestFirst<P extends { readonly value: number }>(parts: readonly P[]) {
+  const sorted = parts.filter((part) => part.value > 0).sort((a, b) => b.value - a.value);
+  const total = sorted.reduce((sum, part) => sum + part.value, 0);
+  return { sorted, total, share: (value: number) => `${Math.round((value / total) * 100)}%` };
+}
+
 /** A series' number for the tokens that name it, from 1: past the inks, the last. */
 const slot = (at: number) => Math.min(at, MAX_SERIES - 1) + 1;
 

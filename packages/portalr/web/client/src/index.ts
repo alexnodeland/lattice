@@ -15,6 +15,7 @@ export { type Change, changes, type Granularity } from "./diff";
 export { type Feedback, type Thumb, thumbs } from "./feedback";
 export type * as ArtifactrApi from "./generated/artifactr.openapi";
 export type * as ArtifactrV1 from "./generated/artifactr.v1";
+export type * as ArtifactrUiV1 from "./generated/artifactr_ui.v1";
 export type * as GrantrApi from "./generated/grantr.openapi";
 export { INTEGRATIONS } from "./generated/integrations";
 export type * as PortalrApi from "./generated/portalr.openapi";

@@ -3,6 +3,7 @@ import {
   ArtifactContent,
   Card,
   Diff,
+  FormHostContext,
   PageHeader,
   ProposalCard,
   proposedOn,
@@ -14,6 +15,7 @@ import {
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useEffect, useMemo } from "react";
+import { useFormHost } from "../../../../../../../form-host";
 import { RENDERERS } from "../../../../../../../renderers";
 import { titleOf } from "../../../../../../../titles";
 import { Connection, useStream, useWorkspace } from "../../../../../../../workspace";
@@ -70,6 +72,7 @@ function Artifact() {
   const { data: revisions } = useSuspenseQuery(queries.artifactr.revisions(tenant, workspace, id));
   const stream = useStream();
   const snapshot = useWorkspace();
+  const host = useFormHost({ queries, tenant, workspace, me, renderers: RENDERERS });
   // The revisions in order, whatever order the server sent, each with what it changed: worked out
   // once each time they are read, not on every event the workspace's stream brings.
   const history = useMemo(() => {
@@ -146,7 +149,14 @@ function Artifact() {
       />
       <Connection snapshot={snapshot} waiting="the workspace" />
       <Card>
-        <ArtifactContent kind={latest.kind} data={latest.data} renderers={RENDERERS} />
+        <FormHostContext value={host}>
+          <ArtifactContent
+            kind={latest.kind}
+            data={latest.data}
+            shown={{ id, version: latest.version }}
+            renderers={RENDERERS}
+          />
+        </FormHostContext>
       </Card>
       {open.length > 0 && (
         <section aria-labelledby="open" className="flex flex-col gap-3">

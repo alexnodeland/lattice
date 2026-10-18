@@ -59,6 +59,7 @@ export { DashboardView } from "./dashboard-view";
 export { Dialog } from "./dialog";
 export { EmptyState } from "./empty-state";
 export { failureSaid } from "./failure";
+export { FileChooser } from "./file-chooser";
 export { Icon } from "./icon";
 export { IntegrationList, type IntegrationRow, type IntegrationSource } from "./integration-list";
 export { IntegrationsContext, type IsEnabled } from "./integrations";
@@ -71,6 +72,7 @@ export { ago, Moment } from "./moment";
 export {
   FileHolder,
   factsOf,
+  fileSize,
   type Holder,
   nativeFile,
   type PageShown,
@@ -79,6 +81,7 @@ export {
 export { Num } from "./num";
 export { PageHeader } from "./page-header";
 export { Plain } from "./plain";
+export { Progress } from "./progress";
 export { Row, RowLink, Rows } from "./rows";
 export { RuleRunStatus, RunList, type RunParts } from "./run-list";
 export { safeHref } from "./safe-href";

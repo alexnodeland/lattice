@@ -23,3 +23,31 @@ def test_a_secret_key_cant_be_served(key: str) -> None:
 )
 def test_a_publishable_key_is_served(key: str) -> None:
     assert Site(supabase_url="https://p.supabase.co", supabase_key=key).supabase_key == key
+
+
+def test_a_native_files_editor_is_served_by_its_apps_key() -> None:
+    editors = {"files:wordcraft": "https://wordcraft.example.net/"}
+    site = Site(supabase_url="/", supabase_key="sb_publishable_abc", editors=editors)
+    assert site.editors == editors
+
+
+@pytest.mark.parametrize(
+    ("key", "url", "said"),
+    [
+        ("markdown:math", "https://editor.example.net", "no native file's app"),
+        ("files:Not An App", "https://editor.example.net", "no native file's app"),
+        ("files:wordcraft", "/editor", "give it https"),
+        ("files:wordcraft", "javascript:alert(1)", "give it https"),
+        ("files:wordcraft", "http://editor.example.net", "give it https"),
+        ("files:wordcraft", "https://me:secret@editor.example.net", "no user or password"),
+        ("files:wordcraft", "https://", "no user or password"),
+    ],
+)
+def test_an_editor_is_an_apps_at_a_web_address(key: str, url: str, said: str) -> None:
+    with pytest.raises(ValidationError, match=said):
+        Site(supabase_url="/", supabase_key="sb_publishable_abc", editors={key: url})
+
+
+def test_an_editor_on_loopback_may_be_http_and_an_apps_own() -> None:
+    editors = {"files:wordcraft": "http://127.0.0.1:8001/", "files:gridcraft": "https://g.test/"}
+    assert Site(supabase_url="/", supabase_key="sb_publishable_abc", editors=editors).editors

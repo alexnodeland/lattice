@@ -176,6 +176,20 @@ editor = editor_app(Path("/srv/wordcraft-web-0.7.0"))  # what `scripts/wordcraft
 
 It adds headers only: a policy that runs the build's own code and its inline script by its hash, and reaches no other origin, with no framing; and caching for its hashed files. The check-out flow is then: check out, download the version, open it in the editor, edit, save it to disk, and check it in.
 
+portalr's app does that flow on a native file's page: name the editor in `config.json`, by the app's integration, and the app opens it in a new tab as a person checks a file out, and never one on the portal's own origin ([portalr ADR-0049](../../../portalr/adr/0049-checking-a-native-file-out-and-in.md)):
+
+```python
+from portalr.fastapi import Site
+
+site = Site(
+    supabase_url="https://project.supabase.co",
+    supabase_key="sb_publishable_x",
+    editors={"files:wordcraft": "https://wordcraft.example.net/"},
+)
+```
+
+Until the worker of RFC-0003's phase 3 is deployed, the server reads each check-in through `Subprocess`, in the application's own process, which isolates nothing: check in trusted files only.
+
 ## Reading a revision
 
 `files.read(ws, artifact_id, version=None, part="content")` returns the bytes of the head or of a version, or its `text` or `review`. It resolves the artifact through the workspace first, which asks `authorize` and answers a restricted artifact as a missing one, and only then reads the bytes the revision names.

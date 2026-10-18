@@ -95,7 +95,14 @@ def table_rows(page: str, heading: str) -> dict[str, str]:
 
 def test_config_json_is_what_the_page_says() -> None:
     rows = table_rows("getting-started.md", "### `config.json`")
-    assert list(rows) == ["supabase.url", "supabase.key", "surfaces", "readers", "people"]
+    assert list(rows) == [
+        "supabase.url",
+        "supabase.key",
+        "surfaces",
+        "readers",
+        "people",
+        "editors",
+    ]
     for field, default in Surfaces().model_dump().items():
         shown = "null" if default is None else default or chr(34) * 2
         assert f"`{field}` (default `{shown}`" in rows["surfaces"], field

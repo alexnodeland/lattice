@@ -25,8 +25,9 @@ import {
   PageStrip,
   SectionTitle,
 } from "@portalr/ui";
-import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useId, useMemo, useState } from "react";
+import { useQueries, useQuery } from "@tanstack/react-query";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { CheckOut, editorAt, type Place, type Said } from "./check-out";
 
 type Queries = ReturnType<typeof createQueries>;
 type Lease = FilesApi.components["schemas"]["Lease"];
@@ -91,38 +92,39 @@ function save(blob: Blob, name: string) {
 }
 
 /**
- * A native file's own section: who has it, a download of its head, its pages, a few at a time,
- * and, where its app is off in the workspace, that it is only read here. Where its routes aren't
- * served, there is no section: the manifest above is all there is.
+ * A native file's own section: who has it, checking it out and in, a download of its head, its
+ * pages, a few at a time, and what came of what the reader did. Where its app is off in the
+ * workspace, it is only read here; where its routes aren't served, there is no section: the
+ * manifest above is all there is.
  */
 export function NativeFile({
-  queries,
-  tenant,
-  workspace,
-  artifact,
+  place,
   native,
   me,
-  people,
 }: {
-  queries: Queries;
-  tenant: string;
-  workspace: string;
-  artifact: string;
+  place: Place;
   /** The file's app, by its name and the integration that switches it. */
   native: Native;
   /** The reader's user id. */
   me: string;
-  /** Whether the server names people, by their emails. */
-  people: boolean;
 }) {
+  const { context, tenant, workspace, artifact } = place;
+  const { queries, queryClient, config } = context;
   const heading = useId();
-  const queryClient = useQueryClient();
   const enabled = useEnabled(queries, tenant, workspace);
   const { data: status, error } = useQuery(queries.files.status(tenant, workspace, artifact));
   const holder = userOf(status?.lease);
-  const names = usePeople(queries, people, tenant, holder === undefined ? [] : [holder]);
+  const names = usePeople(queries, config.people, tenant, holder === undefined ? [] : [holder]);
   const [shown, setShown] = useState(PAGES_AT_ONCE);
   const [saving, setSaving] = useState<"saving" | "failed" | null>(null);
+  const [said, setSaid] = useState<Said | null>(null);
+  // What came of an action is focused as it is said: the control that did it may be gone.
+  const told = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (said !== null) {
+      told.current?.focus();
+    }
+  }, [said]);
   const total = status?.pages ?? 0;
   const numbers = Array.from({ length: Math.min(shown, total) }, (_, index) => index + 1);
   const pages = useQueries({
@@ -146,13 +148,11 @@ export function NativeFile({
       </section>
     );
   }
-  const download = async () => {
+  const download = async (version: number) => {
     setSaving("saving");
     try {
       save(
-        await queryClient.fetchQuery(
-          queries.files.content(tenant, workspace, artifact, status.version),
-        ),
+        await queryClient.fetchQuery(queries.files.content(tenant, workspace, artifact, version)),
         status.name,
       );
       setSaving(null);
@@ -161,21 +161,48 @@ export function NativeFile({
     }
   };
   const on = status.enabled && enabled(native.integration);
+  const held = holderOf(status.lease, me, names);
   return (
     <section aria-labelledby={heading} className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         {title}
-        <Button variant="secondary" disabled={saving === "saving"} onClick={download}>
+        <Button
+          variant="secondary"
+          disabled={saving === "saving"}
+          onClick={() => void download(status.version)}
+        >
           {saving === "saving" ? "Downloading…" : "Download"}
         </Button>
       </div>
       {on ? (
-        <FileHolder holder={holderOf(status.lease, me, names)} />
+        <>
+          <div className="flex flex-wrap items-center gap-2">
+            <FileHolder holder={held} />
+            {held.kind === "agent" && (
+              <span className="text-muted text-sm">
+                It can be checked out once the edit is done.
+              </span>
+            )}
+          </div>
+          <CheckOut
+            place={place}
+            status={status}
+            app={native.app}
+            editor={editorAt(config.editors, native.integration)}
+            onSaid={setSaid}
+            onDownload={download}
+          />
+        </>
       ) : (
         <Alert>
           {native.app} is off in this workspace: you can read and download this file, but not check
           it out, and the agent can't edit it.
         </Alert>
+      )}
+      {said !== null && (
+        <div ref={told} tabIndex={-1} className="outline-none">
+          <Alert tone={said.tone}>{said.text}</Alert>
+        </div>
       )}
       {saving === "failed" && (
         <Alert tone="error">The file wasn't downloaded. Try again in a moment.</Alert>

@@ -23,6 +23,7 @@ const CONFIG: Config = {
   surfaces: { artifactr: "/artifactr/v1", reflexr: "/reflexr/v1", grantr: "", portalr: "" },
   readers: { tempo: false },
   people: true,
+  editors: {},
 };
 
 /** alice, signed in, as Supabase Auth would say, without asking it. */

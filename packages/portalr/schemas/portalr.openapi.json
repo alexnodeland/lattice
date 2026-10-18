@@ -46,6 +46,13 @@
       "Config": {
         "description": "``config.json``: what the UIs need of the deployment they run in.",
         "properties": {
+          "editors": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Editors",
+            "type": "object"
+          },
           "people": {
             "title": "People",
             "type": "boolean"
@@ -68,7 +75,8 @@
           "supabase",
           "surfaces",
           "readers",
-          "people"
+          "people",
+          "editors"
         ],
         "title": "Config",
         "type": "object"

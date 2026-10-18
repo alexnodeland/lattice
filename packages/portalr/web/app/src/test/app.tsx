@@ -24,6 +24,7 @@ const CONFIG: Config = {
   surfaces: { artifactr: "/artifactr/v1", reflexr: "/reflexr/v1", grantr: "", portalr: "" },
   readers: { tempo: false },
   people: false,
+  editors: { "files:wordcraft": "https://wordcraft.example.test/" },
 };
 
 /** alice, signed in, as Supabase Auth would say, without asking it. */
@@ -91,10 +92,14 @@ function server(serve: Serve) {
   };
 }
 
-/** What a test changes of the app's world: reflexr's log, and the config's surfaces. */
+/**
+ * What a test changes of the app's world: reflexr's log, the config's surfaces, and the editors
+ * the deployment hosts, WordCraft's unless told.
+ */
 export interface World {
   readonly reflexrLog?: readonly unknown[];
   readonly surfaces?: Partial<Config["surfaces"]>;
+  readonly editors?: Config["editors"];
 }
 
 /** The app, opened at `path`, over `serve` and streams that answer as `answer` does. */
@@ -108,7 +113,11 @@ export async function open(
   vi.stubGlobal("fetch", fetched);
   vi.stubGlobal("WebSocket", socketAnswering(answer, world.reflexrLog ?? []));
   const queryClient = createQueryClient(() => undefined);
-  const config = { ...CONFIG, surfaces: { ...CONFIG.surfaces, ...world.surfaces } };
+  const config = {
+    ...CONFIG,
+    surfaces: { ...CONFIG.surfaces, ...world.surfaces },
+    editors: world.editors ?? CONFIG.editors,
+  };
   const api = createApi(config.surfaces, () => ({ token: "t0k3n" }));
   const router = createRouter({
     routeTree,

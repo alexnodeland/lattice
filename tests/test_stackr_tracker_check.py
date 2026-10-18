@@ -197,6 +197,41 @@ def test_another_tenants_workspace_the_key_reaches_breaks_isolation() -> None:
     assert ("isolation", "relayr-acme is in globex's workspace, globex") in found
 
 
+@pytest.mark.parametrize("answer", [503, 429])
+def test_another_workspace_that_cannot_be_asked_is_not_taken_as_kept_out(answer: int) -> None:
+    found = levels(check_plane(Plane(elsewhere=answer)))
+    says = f"globex's workspace, globex, couldn't be asked: refused with {answer}"
+    assert ("missing", says) in found
+
+
+def test_another_workspace_that_does_not_answer_is_not_taken_as_kept_out() -> None:
+    plane = Plane()
+
+    def down(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("refused", request=request)
+
+    routes = {**plane.routes(), "plane.test/api/v1/workspaces/globex/members/": down}
+    with serving({**routes, **nudges(None)}, []) as client:
+        found = levels(script.check_plane(client, plane_tenant()))
+    assert (
+        "missing",
+        "globex's workspace, globex, couldn't be asked: "
+        "http://plane.test didn't answer (ConnectError)",
+    ) in found
+
+
+def test_an_answer_that_is_not_json_is_refused() -> None:
+    plane = Plane()
+
+    def page(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, text="<html>Plane</html>")
+
+    routes = {**plane.routes(), "plane.test/api/v1/users/me/": page}
+    with serving({**routes, **nudges(None)}, []) as client:
+        [refused, _nudges] = script.run(plane_tenant(), "plane", client, PROMETHEUS, NOW)
+    assert "answered something other than JSON" in refused.text
+
+
 def test_a_plane_that_does_not_answer_is_said_so() -> None:
     def down(request: httpx.Request) -> httpx.Response:
         raise httpx.ConnectError("refused", request=request)
@@ -424,7 +459,7 @@ def test_the_command_reads_the_applications_env_and_fails_on_what_is_missing(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     app_env = tmp_path / ".env"
-    credentials = json.dumps({"acme": {**CREDENTIALS["acme"], "base_url": "http://plane.test"}})
+    credentials = json.dumps({"acme": {**CREDENTIALS["acme"], "api_key": "plane_api_secret"}})
     app_env.write_text(f"TRACKER_CREDENTIALS={credentials}\nTRACKER_BINDINGS={{}}\n")
     transport = answering({**Plane().routes(), **nudges("0")}, [])
     monkeypatch.setattr(
@@ -436,6 +471,7 @@ def test_the_command_reads_the_applications_env_and_fails_on_what_is_missing(
     printed = capsys.readouterr().out.splitlines()
     assert "missing: TRACKER_BINDINGS binds none of acme's workspaces" in printed
     assert printed[0] == "ok: the key is relayr-acme's"
+    assert "plane_api_secret" not in "\n".join(printed), "the key is never printed"
 
 
 def test_an_applications_env_that_is_not_there_stops_it(

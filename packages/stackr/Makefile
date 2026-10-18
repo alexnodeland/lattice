@@ -91,7 +91,7 @@ SMOKE = $(COMPOSE_ENV) STACKR_DATABASE=$(STACKR_DATABASE) STACKR_RECIPE=$(STACKR
 TRACKERS := plane vikunja
 TRACKER_STACK = $(COMPOSE) --env-file .env -f trackers/$(TRACKER)/compose.yaml
 define need_tracker
-$(if $(filter $(TRACKERS),$(TRACKER)),,$(error TRACKER must be plane or vikunja, not '$(TRACKER)'))
+$(if $(filter $(TRACKERS),$(TRACKER)),,$(error TRACKER must be one of $(TRACKERS), not '$(TRACKER)'))
 endef
 
 .PHONY: help env up down reset ps logs tenant portal-key tracker-up tracker-down tracker-check backup restore-drill validate smoke smoke-app docs-reference clean

@@ -70,7 +70,7 @@ services:
     volumes:
       - plane-db:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U plane -d plane"]
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U plane -d plane"]
       interval: 3s
       timeout: 3s
       retries: 30
@@ -178,7 +178,6 @@ services:
     restart: unless-stopped
     environment:
       SITE_ADDRESS: ":80"
-      APP_DOMAIN: localhost
       FILE_SIZE_LIMIT: "5242880"
       BUCKET_NAME: uploads
     ports:

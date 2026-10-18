@@ -11,8 +11,9 @@ says which is missing:
 - the key works, and is the key of relayr-<TENANT>, the tenant's own tracker user
 - on Plane: the user is an ordinary member of the tenant's workspace, and of each bound project
 - on Vikunja: each bound project is the user's, and a webhook on it names the application's route
-- isolation: the user is in no project but the bound ones, as far as the API shows, and on Plane
-  in none of the other tenants' workspaces TRACKER_CREDENTIALS names
+- isolation, as far as the API shows it: on Plane, the user is a member of no project that isn't
+  bound, and is refused in every other tenant's workspace TRACKER_CREDENTIALS names; on Vikunja,
+  it sees no project another user owns
 - on Vikunja: the token doesn't expire within 14 days (the `expires_at` its credentials keep)
 
 Plane's API keys can't read webhooks, so on Plane it says so. Then it reads
@@ -41,6 +42,9 @@ from _env import published_host, read_env, settings
 TRACKERS = ("plane", "vikunja")
 WARNING = timedelta(days=14)
 """How long before a Vikunja token expires the check warns of it."""
+
+KEPT_OUT = frozenset({403, 404})
+"""What Plane answers a key for a workspace its user isn't in: anything else tells nothing."""
 
 PLANE_MEMBER = 15
 """Plane's role of a workspace's or project's member: 20 is an admin, 5 a guest."""
@@ -88,7 +92,16 @@ class Tenant:
 
 
 class Refused(Exception):
-    """The tracker refused a request, or didn't answer it."""
+    """The tracker refused a request, or didn't answer it.
+
+    Args:
+        reason: What happened, for people.
+        status: The HTTP status it answered with, or None if it answered none.
+    """
+
+    def __init__(self, reason: str, status: int | None = None) -> None:
+        super().__init__(reason)
+        self.status = status
 
 
 def tenant_of(env: Mapping[str, str], name: str) -> Tenant:
@@ -175,8 +188,10 @@ def _plane_elsewhere(api: Api, tenant: Tenant, other: str, workspace: str) -> Fi
     """Whether the user is kept out of another tenant's workspace."""
     try:
         api.get(f"/api/v1/workspaces/{workspace}/members/")
-    except Refused:
-        return Finding("ok", f"{tenant.user} is not in {other}'s workspace, {workspace}")
+    except Refused as refused:
+        if refused.status in KEPT_OUT:
+            return Finding("ok", f"{tenant.user} is not in {other}'s workspace, {workspace}")
+        return Finding("missing", f"{other}'s workspace, {workspace}, couldn't be asked: {refused}")
     return Finding("isolation", f"{tenant.user} is in {other}'s workspace, {workspace}")
 
 
@@ -290,8 +305,11 @@ class Api:
         except httpx.HTTPError as error:
             raise Refused(f"{self._base} didn't answer ({type(error).__name__})") from error
         if response.status_code != 200:
-            raise Refused(f"refused with {response.status_code}")
-        return response.json()
+            raise Refused(f"refused with {response.status_code}", response.status_code)
+        try:
+            return response.json()
+        except ValueError as error:
+            raise Refused("answered something other than JSON", response.status_code) from error
 
 
 def _plane_pages(api: Api, path: str) -> Iterator[dict[str, Any]]:

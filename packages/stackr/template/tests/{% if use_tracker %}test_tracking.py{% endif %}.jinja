@@ -4,9 +4,11 @@ The tracker is relayr's ``FakeTracker``, in memory, in place of {% if tracker ==
 """
 
 import asyncio
+import dataclasses
 import hashlib
 import hmac
 import json
+import time
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from typing import Any
@@ -41,12 +43,11 @@ CREDENTIALS = TrackerCredentials(
 
 def tracked(**binding: Any) -> Settings:
     """The tests' settings, with acme's workspace ``main`` bound to the tracker project ``ops``."""
-    base = settings()
     tracker = TrackerSettings(
         credentials={TENANT: CREDENTIALS},
         bindings={WorkspaceKey(TENANT, "main"): TrackerBinding(project="ops", **binding)},
     )
-    return Settings(auth=base.auth, gateway=base.gateway, tracker=tracker)
+    return dataclasses.replace(settings(), tracker=tracker)
 
 
 @pytest.fixture
@@ -127,9 +128,10 @@ def test_it_never_files_its_own_dead_letters(client: TestClient, tracker: FakeTr
     tracker.rotate("another-key")  # the tracker refuses the tenant's key: its runs fail for good
     failing(client)
     fire(client)
-    wait_for(lambda: runs(client) == ["dead"])
     fire(client)
+    wait_for(lambda: runs(client, "chat:fails") == ["dead", "dead"])
     wait_for(lambda: runs(client) == ["dead", "dead"])
+    time.sleep(0.5)  # a run for its own dead letter would start within a few polls
     assert runs(client) == ["dead", "dead"], "one for each dead letter of chat:fails, no more"
     assert tracker.created == 0
 

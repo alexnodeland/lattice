@@ -72,8 +72,8 @@ def tracker_actions(trackers: Trackers) -> dict[str, Action[None]]:
 
     async def file_dead_letter(reaction: Reaction[None]) -> None:
         [dead] = reaction.events
-        assert isinstance(dead.event, RunDeadLettered)
         failed = dead.event
+        assert isinstance(failed, RunDeadLettered)
         workspace = WorkspaceKey(reaction.workspace.tenant_id, reaction.workspace.workspace_id)
         if workspace not in trackers.bindings:
             return  # the workspace files nowhere
@@ -123,11 +123,15 @@ class Tracking:
         async def credential(tenant: str) -> TrackerCredentials:
             return credentials[tenant]
 
-        self._http = httpx.AsyncClient()
+        self._http: httpx.AsyncClient | None = None
+        """The client of the default adapter, which this part made and so closes."""
+        if connect is None:
+            self._http = httpx.AsyncClient()
+            connect = {{ tracker }}(self._http)
         self._telemetry = telemetry
         self.trackers = Trackers(
             ledger,
-            connect=connect or {{ tracker }}(self._http),
+            connect=connect,
             integration=INTEGRATION,
             credentials=credential,
             bindings=settings.bindings,
@@ -170,7 +174,8 @@ class Tracking:
             yield
         finally:
             await self._followers.aclose()
-            await self._http.aclose()
+            if self._http is not None:
+                await self._http.aclose()
 
     def mount(self, app: FastAPI) -> None:
         """Add the route the tracker's webhooks reach, which wakes the followers."""

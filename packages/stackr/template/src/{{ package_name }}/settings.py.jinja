@@ -316,6 +316,10 @@ def _tenant_keys(text: str) -> dict[str, str]:
 
 
 {% if use_tracker -%}
+FIELDS = "base_url, api_key{% if tracker == 'plane' %}, webhook_secret and workspace{% else %} and webhook_secret{% endif %}"
+"""What a tenant's tracker credentials must have."""
+
+
 def _tracker_credentials(text: str) -> dict[str, TrackerCredentials]:
     """Parse ``TRACKER_CREDENTIALS``: a JSON object from tenant ids to their tracker credentials.
 {% if tracker == 'plane' %}
@@ -331,9 +335,15 @@ def _tracker_credentials(text: str) -> dict[str, TrackerCredentials]:
     for tenant, entry in _json_object(text, "TRACKER_CREDENTIALS").items():
         try:
             credentials[tenant] = TrackerCredentials.model_validate(entry)
+{%- if tracker == 'plane' %}
         except ValidationError:
-            fields = "base_url, api_key and webhook_secret"
-            raise ValueError(f"TRACKER_CREDENTIALS of {tenant} must have {fields}") from None
+            raise ValueError(f"TRACKER_CREDENTIALS of {tenant} must have {FIELDS}") from None
+        if not credentials[tenant].workspace:
+            raise ValueError(f"TRACKER_CREDENTIALS of {tenant} must have {FIELDS}")
+{%- else %}
+        except ValidationError:
+            raise ValueError(f"TRACKER_CREDENTIALS of {tenant} must have {FIELDS}") from None
+{%- endif %}
     return credentials
 
 

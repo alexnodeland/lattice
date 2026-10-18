@@ -67,6 +67,9 @@ from {{ package_name }}.telemetry import TelemetryHandle
 {%- if use_reflexr %}
 from {{ package_name }}.tickets import RULES
 {%- endif %}
+{%- if use_tracker %}
+from {{ package_name }}.tracking import RULES as TRACKER_RULES
+{%- endif %}
 
 PREFIX = "/grantr"
 
@@ -74,7 +77,9 @@ KEY_PREFIX: Final = "grantr_sk_"
 """How a service principal's key begins, where a token would be."""
 
 {% if use_reflexr -%}
-{% if use_relayr -%}
+{% if use_tracker -%}
+CODE_RULES: Final = frozenset(rule.name for rule in [*RULES, *BRIDGE_RULES, *TRACKER_RULES])
+{%- elif use_relayr -%}
 CODE_RULES: Final = frozenset(rule.name for rule in [*RULES, *BRIDGE_RULES])
 {%- else -%}
 CODE_RULES: Final = frozenset(rule.name for rule in RULES)

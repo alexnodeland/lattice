@@ -79,7 +79,7 @@ Nothing is lost either way: a webhook only wakes a follower, and the follower's 
 
 ## Provision a tenant on Vikunja
 
-Vikunja's users, projects, tokens and webhooks are all scriptable. Each tenant has a top-level project, owned by its user, `relayr-acme`; Vikunja's users are instance-wide, so this isolation is weaker than Plane's, and suits a deployment of one tenant, or a few that trust each other. With `jq`, and a password of the operator's choosing:
+Vikunja's users, projects, tokens and webhooks are all scriptable. Each tenant has a top-level project, owned by its user, `relayr-acme`; Vikunja's users are instance-wide, so this isolation is weaker than Plane's. And the recipe sets `VIKUNJA_OUTGOINGREQUESTS_ALLOWNONROUTABLEIPS=true`, so that webhooks reach the application, which lets any Vikunja user point a webhook at any private address on the `stackr` network, the stack's services included. Vikunja suits a deployment of one tenant, or a few that trust each other. With `jq`, and a password of the operator's choosing:
 
 ```bash
 cd packages/stackr

@@ -172,6 +172,17 @@ def test_a_tenants_credentials_are_never_quoted_when_they_are_wrong() -> None:
     assert refused.value.__cause__ is None
 
 
+{%- if tracker == 'plane' %}
+
+
+def test_plane_credentials_name_the_tenants_workspace() -> None:
+    nameless = {"acme": {**CREDENTIALS, "workspace": ""}}
+    fields = "base_url, api_key, webhook_secret and workspace"
+    with pytest.raises(ValueError, match=f"TRACKER_CREDENTIALS of acme must have {fields}"):
+        Settings.from_environ({"TRACKER_CREDENTIALS": json.dumps(nameless)})
+{%- endif %}
+
+
 def test_a_bound_workspace_needs_its_tenants_credentials() -> None:
     with pytest.raises(ValueError, match="binds acme/main, and TRACKER_CREDENTIALS has none"):
         Settings.from_environ({"TRACKER_BINDINGS": '{"acme/main": {"project": "ops"}}'})

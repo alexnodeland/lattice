@@ -5,6 +5,6 @@
 | Image | Version | Licence | Source |
 |---|---|---|---|
 | `vikunja/vikunja` | 2.7.0 | AGPL-3.0-or-later | <https://github.com/go-vikunja/vikunja/tree/v2.7.0> |
-| `postgres` | 17 | PostgreSQL | <https://www.postgresql.org/ftp/source/>, image <https://github.com/docker-library/postgres> |
+| `postgres` | 17.11-alpine | PostgreSQL | <https://www.postgresql.org/ftp/source/>, image <https://github.com/docker-library/postgres> |
 
 Each image also holds its base system's packages, under their own licences.

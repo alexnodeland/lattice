@@ -40,11 +40,11 @@ from pydantic_ai.models import Model
 {%- if access == 'grantr' %}
 
 from grantr import Grants
-{%- endif %}
 {%- if use_tracker %}
-{%- if access != 'grantr' %}
-{# a section of its own #}
+from relayr.trackers import Connect
 {%- endif %}
+{%- elif use_tracker %}
+
 from relayr.trackers import Connect
 {%- endif %}
 

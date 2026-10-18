@@ -1,16 +1,6 @@
 import type { PortalrApi } from "@portalr/client";
 import { expect, test } from "vitest";
-import {
-  asked,
-  DOORS,
-  ignoredOf,
-  NOTICE,
-  safeHref,
-  shownOf,
-  TOOL_NAME,
-  TOOLS,
-  tenantsOf,
-} from "./tools";
+import { asked, DOORS, ignoredOf, NOTICE, shownOf, TOOL_NAME, TOOLS, tenantsOf } from "./tools";
 
 test("the address keeps the ids portalr takes and a tenant's name, and drops the rest", () => {
   expect(shownOf({})).toEqual({
@@ -39,34 +29,6 @@ test("the address keeps the ids portalr takes and a tenant's name, and drops the
 test("links are asked for only once an id is given", () => {
   expect(asked(shownOf({}))).toBe(false);
   expect(asked(shownOf({ run: "r1" }))).toBe(true);
-});
-
-test("a link is an href only if it is an http or https address", () => {
-  expect(safeHref("https://langfuse.example/project/p1/traces/t1")).toBe(
-    "https://langfuse.example/project/p1/traces/t1",
-  );
-  expect(safeHref("http://localhost:3000/explore?left=%7B%7D")).toBe(
-    "http://localhost:3000/explore?left=%7B%7D",
-  );
-  for (const bad of [
-    "javascript:alert(1)",
-    "JavaScript:alert(1)",
-    " javascript:alert(1)",
-    "data:text/html,<script>alert(1)</script>",
-    "vbscript:x",
-    "file:///etc/passwd",
-    "//evil.example/x",
-    "http:foo",
-    "https:/foo",
-    "HTTP:example.com",
-    "/relative/path",
-    "not a url",
-    "",
-    null,
-    undefined,
-  ]) {
-    expect(safeHref(bad), String(bad)).toBeNull();
-  }
 });
 
 test("every link the server makes has a door, and each door is made by one kind of id", () => {

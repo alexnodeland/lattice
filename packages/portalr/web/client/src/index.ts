@@ -21,6 +21,7 @@ export type * as PortalrApi from "./generated/portalr.openapi";
 export type * as ReflexrApi from "./generated/reflexr.openapi";
 export type * as ReflexrRulesV1 from "./generated/reflexr.rules.v1";
 export type * as ReflexrV1 from "./generated/reflexr.v1";
+export type * as RelayrApi from "./generated/relayr.openapi";
 export { changedIntegrations, type IntegrationKey, useEnabled } from "./integrations";
 export {
   type AdminLanding,
@@ -35,6 +36,9 @@ export { keepWithin, type Names, namesOf, shortId, usePeople } from "./people";
 export {
   type AuditFilter,
   createQueries,
+  type Filed,
+  type FiledItem,
+  type Following,
   keys,
   LOGS_LIMIT,
   type LogFilter,
@@ -72,3 +76,4 @@ export {
   type Trace,
   wholeTrace,
 } from "./traces";
+export { filedBy, type TrackerItem } from "./trackers";

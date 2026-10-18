@@ -4,12 +4,14 @@
  *
  * The reducer has one handler for every event of reflexr's own that the protocol's schema names,
  * which the compiler checks; the application's events, and any this version doesn't know, are
- * kept by the log and change nothing here.
+ * kept by the log and change nothing here, but relayr's `tracker:` events, of which it keeps the
+ * item each was about, so a run they fired links to it (lattice RFC-0004).
  */
 
 import type { Feedback } from "./feedback";
 import type * as v1 from "./generated/reflexr.v1";
 import type { Classified, Protocol, Stream } from "./stream";
+import type { TrackerItem } from "./trackers";
 
 /** reflexr's own events, which this version of the protocol names: those whose `type` is a literal. */
 export type Known = v1.LoggedEvent extends infer E
@@ -56,6 +58,8 @@ export interface Run {
   readonly history: readonly Intervention[];
   /** The feedback given on it, oldest first. */
   readonly feedback: readonly Feedback<v1.EventFrame["actor"]>[];
+  /** The causal chain it belongs to, by the id of the chain's first event. */
+  readonly chain: string;
 }
 
 export interface Rule {
@@ -68,6 +72,13 @@ export interface Rule {
 export interface Workspace {
   readonly rules: Readonly<Record<string, Rule>>;
   readonly runs: Readonly<Record<string, Run>>;
+  /**
+   * The item each `tracker:` event was about, by the event's `seq`, for the firings that match it;
+   * never what it said. It holds one entry per such event the stream brought.
+   */
+  readonly tracked: Readonly<Record<number, TrackerItem>>;
+  /** The tracker items each firing matched, by its run's id, where it matched any. */
+  readonly firedBy: Readonly<Record<string, readonly TrackerItem[]>>;
 }
 
 type Handlers = {
@@ -89,6 +100,7 @@ function withRun(state: Workspace, id: string, change: Partial<Run>): Workspace 
     reason: null,
     history: [],
     feedback: [],
+    chain: "",
   };
   return { ...state, runs: { ...state.runs, [id]: { ...run, ...change } } };
 }
@@ -134,8 +146,22 @@ const handlers: Handlers = {
     withRule(state, event.rule, { version: event.version, archived: false }),
   "reflexr:rule_archived": (state, event) =>
     withRule(state, event.rule, { version: event.version, archived: true }),
-  "reflexr:rule_fired": (state, event) =>
-    withRule(state, event.rule, { firings: (state.rules[event.rule]?.firings ?? 0) + 1 }),
+  "reflexr:rule_fired": (state, event) => {
+    const fired = withRule(state, event.rule, {
+      firings: (state.rules[event.rule]?.firings ?? 0) + 1,
+    });
+    // Two of an item's changes in one firing are one item.
+    const seen = new Map(
+      event.matched.flatMap((seq) => {
+        const item = state.tracked[seq];
+        return item ? [[`${item.tracker} ${item.link}`, item] as const] : [];
+      }),
+    );
+    const items = [...seen.values()];
+    return items.length === 0
+      ? fired
+      : { ...fired, firedBy: { ...fired.firedBy, [event.firing_id]: items } };
+  },
   "reflexr:run_started": (state, event, envelope) =>
     withRun(state, event.run_id, {
       rule: event.rule,
@@ -143,6 +169,7 @@ const handlers: Handlers = {
       attempt: event.attempt,
       // Its first attempt's `seq`: a later attempt doesn't make the run newer.
       started: state.runs[event.run_id]?.started || envelope.seq,
+      chain: envelope.correlation_id,
     }),
   "reflexr:run_retrying": (state, event) =>
     withRun(state, event.run_id, {
@@ -197,11 +224,31 @@ export function isKnown(event: v1.LoggedEvent): event is Known {
   return Object.hasOwn(handlers, event.type);
 }
 
+/**
+ * The item a `tracker:` event was about, if relayr's followers published it, as their source,
+ * `tracker`, and it names and links its item (lattice RFC-0004): an event of that type from anyone
+ * else is no item, whether or not the application reserved the namespace. What the event says of
+ * the item isn't kept.
+ */
+export function trackerItem(envelope: v1.EventFrame): TrackerItem | null {
+  const { event, actor } = envelope;
+  if (!event.type.startsWith("tracker:") || actor.kind !== "source" || actor.name !== "tracker") {
+    return null;
+  }
+  const { tracker, name, link } = event as Record<string, unknown>;
+  return typeof tracker === "string" && typeof name === "string" && typeof link === "string"
+    ? { tracker, name, link }
+    : null;
+}
+
 /** The state after one event. */
 export function apply(state: Workspace, envelope: v1.EventFrame): Workspace {
   const { event } = envelope;
   if (!isKnown(event)) {
-    return state;
+    const item = trackerItem(envelope);
+    return item === null
+      ? state
+      : { ...state, tracked: { ...state.tracked, [envelope.seq]: item } };
   }
   // A correlated union: `handlers[event.type]` takes this very event, which the compiler can't
   // follow through the lookup.
@@ -233,7 +280,7 @@ function classify(frame: v1.ServerFrame): Classified<v1.ServerFrame, v1.CommandR
 /** reflexr's workspace protocol, for a `Stream`. A publish with an `id` is idempotent itself. */
 export const reflexr: Protocol<Workspace, v1.ServerFrame, v1.Command, v1.CommandResult> = {
   name: "reflexr.v1",
-  initial: () => ({ rules: {}, runs: {} }),
+  initial: () => ({ rules: {}, runs: {}, tracked: {}, firedBy: {} }),
   classify,
   apply,
   other: (state) => state,

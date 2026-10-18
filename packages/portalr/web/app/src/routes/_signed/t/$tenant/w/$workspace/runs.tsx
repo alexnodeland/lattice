@@ -1,4 +1,4 @@
-import { allowedIn, thumbs, useMe, workspaceOf } from "@portalr/client";
+import { allowedIn, filedBy, thumbs, useMe, workspaceOf } from "@portalr/client";
 import {
   CommandButton,
   PageHeader,
@@ -9,8 +9,9 @@ import {
   SectionTitle,
   TextLink,
   Thumbs,
+  TrackerItems,
 } from "@portalr/ui";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo } from "react";
 import {
@@ -35,7 +36,8 @@ const ACTIONS = [
  * The workspace's runs: artifactr's turns, each with its thread, and reflexr's rule runs, the
  * dead-lettered marked, newest first. Each offers what its library does with a run, where grantr
  * allows: a running turn stops (artifactr can stop no other); a rule run retries, is skipped or is
- * cancelled, by its status, a queued one only cancelled.
+ * cancelled, by its status, a queued one only cancelled. A rule run links to the tracker items its
+ * chain filed, and to those whose changes fired it (lattice RFC-0004).
  */
 export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/runs")({
   head: ({ params }) => ({ meta: [{ title: `Runs · ${params.workspace} · portalr` }] }),
@@ -65,6 +67,8 @@ function Runs() {
   const reflexr = useAutomationStream();
   const turnRuns = useMemo(() => newest(turns.state.runs), [turns.state.runs]);
   const ruleRuns = useMemo(() => newest(automation.state.runs), [automation.state.runs]);
+  // What the runs filed in a tracker, which a run's end reads again; none where there's no tracker.
+  const { data: filed } = useQuery(queries.relayr.filed(tenant, workspace));
   const turnFeedback = allowed.has("artifactr:give_feedback");
   const runFeedback = allowed.has("reflexr:give_feedback");
 
@@ -124,6 +128,8 @@ function Runs() {
               retried {run.retries === 1 ? "once" : `${run.retries} times`}
             </span>
           )}
+          <TrackerItems label="From" items={automation.state.firedBy[run.id] ?? []} />
+          <TrackerItems label="Filed as" items={filedBy(filed, run.chain)} />
         </span>
       ),
       attempts: run.attempt,

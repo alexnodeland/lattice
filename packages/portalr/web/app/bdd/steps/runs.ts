@@ -56,7 +56,7 @@ async function ticket(
   return run as string;
 }
 
-const runOf = (page: Page, run: string | null) => {
+export const runOf = (page: Page, run: string | null) => {
   if (run === null) {
     throw new Error("no run was set off: publish a ticket first");
   }

@@ -51,5 +51,6 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0043](0043-markdowns-basics.md) | Markdown's basics: code blocks, callouts, footnotes per message, copying, an add-ons seam, and tests under the policy | Accepted, amended by 0044, 0045 and 0041 (2026-10-17) |
 | [0044](0044-highlighting-and-math-on-demand.md) | Highlighting and math, loaded on demand, each with a size budget of its own | Accepted |
 | [0045](0045-integrations-in-admin-and-the-apps-read-of-them.md) | Integrations in admin, and the app's read of them: each its default where unread, and read again on `not_enabled` | Accepted |
+| [0046](0046-tracker-links-on-runs.md) | Tracker links on runs: what a run's chain filed, and the items that set it off | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

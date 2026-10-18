@@ -12,6 +12,7 @@ const run = (id: string, status: Reflexr.Run["status"], started: number): Reflex
   reason: null,
   history: [],
   feedback: [],
+  chain: `chain-${id}`,
 });
 
 const RUNS = Object.fromEntries(

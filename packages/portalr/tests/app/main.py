@@ -46,11 +46,13 @@ from grantr.core import Resource, User
 from grantr.fastapi import Caller, Unauthorized, grantr_router
 from grantr.grants import Grants, InMemoryStorage
 from portalr.actions import ACTIONS
-from portalr.fastapi import UI, Site, portalr_router
+from portalr.fastapi import UI, Site, Surfaces, portalr_router
 from portalr.readers import Grafana, Langfuse, LiteLLM, Loki, Prometheus, Readers, Tempo
 from reflexr.workspace import ACTIONS as REFLEXR_ACTIONS
+from relayr.fastapi import tracker_reads_router
 from tests.app.notes import APPLICATION, collaboration
 from tests.app.tickets import automation
+from tests.app.tracking import Tracking
 
 OPS, ALICE, BOB, CAROL, DANA, ERIN, OLGA, VERA = (
     User(id=name) for name in ("ops", "alice", "bob", "carol", "dana", "erin", "olga", "vera")
@@ -197,7 +199,8 @@ def create_app(ui: Path = UI) -> FastAPI:
         application=APPLICATION,
     )
     workspaces, runner = collaboration(grants)
-    tickets, reactor = automation(grants, APPLICATION)
+    tracking = Tracking()
+    tickets, reactor = automation(grants, APPLICATION, tracking)
     gotrue = os.environ.get("PORTALR_GOTRUE_URL", "http://gotrue:9999")
 
     @asynccontextmanager
@@ -208,6 +211,7 @@ def create_app(ui: Path = UI) -> FastAPI:
         reacting = asyncio.create_task(
             reactor.serve(poll_interval=timedelta(milliseconds=200), stop=stop)
         )
+        await tracking.followers.resume()
         async with httpx.AsyncClient(base_url=gotrue) as auth:
             app.state.auth = auth
             try:
@@ -215,9 +219,16 @@ def create_app(ui: Path = UI) -> FastAPI:
             finally:
                 stop.set()
                 await reacting
+                await tracking.followers.aclose()
                 await runner.aclose()
 
     app = FastAPI(title="portalr's test application", lifespan=lifespan)
+    reflexr_actor = library_actor(
+        grants,
+        lambda user: reflexr.UserActor(id=user, name=user),
+        reflexr.fastapi.Unauthorized,
+        reflexr.core.Forbidden,
+    )
     app.include_router(grantr_router(grants, resolve_actor=resolve_actor), prefix="/grantr/v1")
     app.include_router(
         artifactr.fastapi.artifactr_router(
@@ -235,15 +246,14 @@ def create_app(ui: Path = UI) -> FastAPI:
     app.include_router(
         reflexr.fastapi.reflexr_router(
             tickets,
-            resolve_actor=library_actor(
-                grants,
-                lambda user: reflexr.UserActor(id=user, name=user),
-                reflexr.fastapi.Unauthorized,
-                reflexr.core.Forbidden,
-            ),
+            resolve_actor=reflexr_actor,
         ),
         prefix="/reflexr/v1",
     )
+    app.include_router(
+        tracker_reads_router(tracking.trackers, tickets, resolve_actor=reflexr_actor)
+    )
+    app.include_router(tracking.router())
     app.include_router(
         portalr_router(
             resolve_actor=resolve_actor,
@@ -251,7 +261,11 @@ def create_app(ui: Path = UI) -> FastAPI:
             readers=readers(),
             invite=invite,
             people=people,
-            site=Site(supabase_url="/", supabase_key="sb_publishable_test"),
+            site=Site(
+                supabase_url="/",
+                supabase_key="sb_publishable_test",
+                surfaces=Surfaces(relayr=""),
+            ),
             ui=ui,
         ),
         prefix="/portalr",

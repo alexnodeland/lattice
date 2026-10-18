@@ -21,6 +21,7 @@ tasks:
       - '/packages/reflexr/schemas/*.json'
       - '/packages/grantr/schemas/*.json'
       - '/packages/portalr/schemas/*.json'
+      - '/packages/relayr/schemas/*.json'
     options:
       mergeArgs: 'replace'
 

@@ -9,6 +9,8 @@ from relayr.ledger import (
     Ledger,
     Snapshot,
     Tracked,
+    TrackedKey,
+    TrackedKind,
     TrackerDeadLetter,
     TrackerFollowing,
     WorkspaceKey,
@@ -189,6 +191,30 @@ async def test_an_item_keeps_the_values_relayr_last_set(ledger: Ledger) -> None:
     assert await ledger.tracked(PROD, "comment", "k") == Tracked(correlation_id="evt_1")
 
 
+async def test_every_key_of_a_workspace_is_read_by_kind_then_key(ledger: Ledger) -> None:
+    assert await ledger.every_tracked(PROD) == {}
+    claims: list[tuple[TrackedKind, str, str]] = [
+        ("item", "b", "evt_1"),
+        ("comment", "c", "evt_2"),
+        ("item", "a", "evt_3"),
+    ]
+    for kind, key, chain in claims:
+        await ledger.claim_tracked(PROD, kind, key, chain, stale_after=STALE)
+    await ledger.claim_tracked(STAGING, "item", "z", "evt_4", stale_after=STALE)
+    await ledger.claim_tracked(OTHER, "item", "y", "evt_5", stale_after=STALE)
+    await ledger.record_tracked(PROD, "item", "b", REF)
+    await ledger.mark_tracked_deleted(PROD, "b")
+    every = await ledger.every_tracked(PROD)
+    assert list(every) == [
+        TrackedKey("comment", "c"),
+        TrackedKey("item", "a"),
+        TrackedKey("item", "b"),
+    ]
+    assert every[TrackedKey("item", "b")] == Tracked(correlation_id="evt_1", ref=REF, deleted=True)
+    assert every[TrackedKey("item", "a")] == Tracked(correlation_id="evt_3"), "a claim alone"
+    assert list(await ledger.every_tracked(OTHER)) == [TrackedKey("item", "y")]
+
+
 async def test_a_deleted_item_stays_deleted(ledger: Ledger) -> None:
     await ledger.claim_tracked(PROD, "item", "k", "evt_1", stale_after=STALE)
     await ledger.record_tracked(PROD, "item", "k", REF)
@@ -221,6 +247,27 @@ async def test_writes_to_an_item_are_counted_within_a_window(
     assert await ledger.snapshots(PROD) == {}, "a write is no snapshot"
 
 
+async def test_writes_to_each_item_are_read_within_a_window(
+    ledger: Ledger, clock: FakeClock
+) -> None:
+    hour = timedelta(hours=1)
+    assert await ledger.tracker_writes(PROD, within=hour) == {}
+    for _ in range(3):
+        await ledger.record_tracker_write(PROD, "8", within=hour)
+    await ledger.record_tracker_write(PROD, "7", within=hour)
+    await ledger.record_tracker_write(STAGING, "7", within=hour)
+    await ledger.save_snapshots(PROD, [snapshot("9")])
+    assert await ledger.tracker_writes(PROD, within=hour) == {"7": 1, "8": 3}, (
+        "by item, none left out"
+    )
+    clock.advance(timedelta(minutes=30))
+    await ledger.record_tracker_write(PROD, "7", within=hour)
+    clock.advance(timedelta(minutes=31))
+    assert await ledger.tracker_writes(PROD, within=hour) == {"7": 1}, "the earlier lapsed"
+    assert await ledger.tracker_writes(PROD, within=hour * 2) == {"7": 2, "8": 3}
+    assert await ledger.tracker_writes(OTHER, within=hour) == {}
+
+
 async def test_a_tracker_lease_is_apart_from_the_followers(
     ledger: Ledger, clock: FakeClock
 ) -> None:
@@ -240,10 +287,18 @@ async def test_a_tracker_lease_is_apart_from_the_followers(
 
 
 def following(
-    project: str = "ops", cursor: tuple[int, str] | None = None, swept: int = 0
+    project: str = "ops",
+    cursor: tuple[int, str] | None = None,
+    swept: int = 0,
+    read: int | None = None,
 ) -> TrackerFollowing:
     at = None if cursor is None else (START + timedelta(seconds=cursor[0]), cursor[1])
-    return TrackerFollowing(project=project, cursor=at, swept_at=START + timedelta(seconds=swept))
+    return TrackerFollowing(
+        project=project,
+        cursor=at,
+        swept_at=START + timedelta(seconds=swept),
+        read_at=None if read is None else START + timedelta(seconds=read),
+    )
 
 
 async def test_how_far_a_tracker_follower_read_only_moves_forward(ledger: Ledger) -> None:
@@ -262,6 +317,17 @@ async def test_how_far_a_tracker_follower_read_only_moves_forward(ledger: Ledger
     assert await ledger.tracker_following(PROD) == following("dev", swept=1), "another project"
     assert await ledger.tracker_following(STAGING) is None
     assert await ledger.tracker_following(OTHER) is None
+
+
+async def test_when_a_tracker_follower_last_read_only_moves_forward(ledger: Ledger) -> None:
+    await ledger.save_tracker_following(PROD, following(read=20))
+    await ledger.save_tracker_following(PROD, following(read=10))
+    await ledger.save_tracker_following(PROD, following())
+    assert await ledger.tracker_following(PROD) == following(read=20), "a read never goes back"
+    await ledger.save_tracker_following(PROD, following(read=30))
+    assert await ledger.tracker_following(PROD) == following(read=30)
+    await ledger.save_tracker_following(PROD, following("dev", read=5))
+    assert await ledger.tracker_following(PROD) == following("dev", read=5), "another project"
 
 
 def snapshot(item_id: str, title: str = "T", comments: int | None = None) -> Snapshot:

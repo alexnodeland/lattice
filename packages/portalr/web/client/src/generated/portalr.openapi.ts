@@ -804,6 +804,8 @@ export interface components {
              * @default /reflexr/v1
              */
             reflexr: string;
+            /** Relayr */
+            relayr?: string | null;
         };
         TenantId: string;
         /**

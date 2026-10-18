@@ -43,7 +43,9 @@ The agent's **turns** and the rules' **runs**, newest first:
 | What | Shows | Offers |
 |---|---|---|
 | A turn | Its thread and status | **Stop**, while it runs |
-| A rule's run | Its rule, its attempt, how often it was retried, and *Dead-lettered* where it failed every attempt | **Retry** when dead-lettered, **Skip** when dead-lettered or retrying, **Cancel** when queued, running or retrying |
+| A rule's run | Its rule, its attempt, how often it was retried, and *Dead-lettered* where it failed every attempt; where the workspace files into a task tracker, **Filed as** and the items its chain filed or commented on, and **From** and the items whose changes set it off | **Retry** when dead-lettered, **Skip** when dead-lettered or retrying, **Cancel** when queued, running or retrying |
+
+An item's link opens it in its tracker, Plane or Vikunja, in a new tab; the tracker decides whether you may see it. An item a person deleted shows its name, struck through, and *deleted*. The links show whether or not the tracker is switched on in the workspace: switching it off stops filing and reading, not what was filed.
 
 Each button shows only where grantr allows the action in that workspace: a viewer sees thumbs and none of them. Hiding a button is not the check: the server asks grantr again for every command.
 

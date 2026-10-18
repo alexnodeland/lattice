@@ -162,6 +162,19 @@ reflexr.Rule(
 
 The route is unauthenticated, and gives nothing away: a body over 1 MB is refused before more of it is read, a signature is checked first, with the secret the tenant's followers already hold, and an unknown tenant and a bad signature are the same 401, counted in `relayr.trackers.nudges_refused`. A nudge that reaches a replica not holding the binding's lease waits for the holder's next poll.
 
+## In the portal
+
+portalr shows, on each rule's run, the items its chain filed, with their links, and admin how the connector is doing in each workspace. Mount the connector's reads beside the webhooks' route, with the `resolve_actor` reflexr's router takes, and tell portalr where they are:
+
+```python
+from relayr.fastapi import tracker_reads_router
+
+app.include_router(tracker_reads_router(trackers, workspaces, resolve_actor=resolve_reflexr_actor))
+site = Site(supabase_url=..., supabase_key=..., surfaces=Surfaces(relayr=""))  # its paths carry /relayr/v1
+```
+
+Each read asks reflexr's `authorize`: what runs filed as `reflexr:read_runs`, how the follower is doing as `reflexr:read_dead_letters` ([ADR-0039](../adr/0039-the-tracker-connectors-reads-for-the-portal.md)).
+
 ## Allowlists
 
 A rule writes to its tracker only if its allowlist says `trackers=True` ([ADR-0034](../adr/0034-an-allowlist-for-the-tracker.md)). The default is false, and a rule without it gets `NotAllowed`.

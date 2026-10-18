@@ -59,8 +59,13 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         },
         {*LIBRARIES, "pydantic", "pydantic_ai", "httpx", "opentelemetry"},
     ),
-    # The trackers' webhooks' route, on FastAPI and lattice-core's refusals.
-    "fastapi": ({"relayr.trackers", "relayr.fastapi"}, {"fastapi", "lattice_core.refusals"}),
+    # The trackers' webhooks' route and the connector's reads, on FastAPI and lattice-core's
+    # refusals; the reads ask reflexr's `authorize`, as reflexr's routes do, and say whose
+    # workspace each span read.
+    "fastapi": (
+        {"relayr.ledger", "relayr.telemetry", "relayr.trackers", "relayr.fastapi"},
+        {"fastapi", "lattice_core.refusals", "opentelemetry", "pydantic", "reflexr"},
+    ),
     "plane": ({"relayr.trackers", "relayr.plane"}, {"httpx", "pydantic"}),
     "vikunja": ({"relayr.trackers", "relayr.vikunja"}, {"httpx", "pydantic"}),
     # The forms extra's: only it imports artifactr.ui (ADR-0038).

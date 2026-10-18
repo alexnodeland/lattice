@@ -8,6 +8,7 @@ import type { paths as ArtifactrPaths } from "./generated/artifactr.openapi";
 import type { paths as GrantrPaths } from "./generated/grantr.openapi";
 import type { components as Portalr, paths as PortalrPaths } from "./generated/portalr.openapi";
 import type { paths as ReflexrPaths } from "./generated/reflexr.openapi";
+import type { paths as RelayrPaths } from "./generated/relayr.openapi";
 import { type Session, sessionHeaders } from "./session";
 
 /** Where each surface is mounted, as the application's `config.json` says. */
@@ -21,6 +22,11 @@ export interface Surfaces {
    * portalr's carry `/portalr/v1`, so portalr's client is on it too.
    */
   readonly grantr: string;
+  /**
+   * The origin relayr's tracker reads are mounted at, whose paths carry `/relayr/v1`; none where
+   * the application has no tracker.
+   */
+  readonly relayr?: string | null | undefined;
 }
 
 export interface Api {
@@ -28,9 +34,11 @@ export interface Api {
   readonly reflexr: Client<ReflexrPaths>;
   readonly grantr: Client<GrantrPaths>;
   readonly portalr: Client<PortalrPaths>;
+  /** relayr's tracker reads, or none where the application has no tracker. */
+  readonly relayr: Client<RelayrPaths> | null;
 }
 
-/** The four clients, each sending the session that `session()` returns at the time. */
+/** The clients, each sending the session that `session()` returns at the time. */
 export function createApi(surfaces: Surfaces, session: () => Session): Api {
   const signed: Middleware = {
     onRequest({ request }) {
@@ -44,10 +52,12 @@ export function createApi(surfaces: Surfaces, session: () => Session): Api {
   const reflexr = createClient<ReflexrPaths>({ baseUrl: surfaces.reflexr });
   const grantr = createClient<GrantrPaths>({ baseUrl: surfaces.grantr });
   const portalr = createClient<PortalrPaths>({ baseUrl: surfaces.grantr });
-  for (const client of [artifactr, reflexr, grantr, portalr] as const) {
-    client.use(signed);
+  const relayr =
+    surfaces.relayr == null ? null : createClient<RelayrPaths>({ baseUrl: surfaces.relayr });
+  for (const client of [artifactr, reflexr, grantr, portalr, relayr] as const) {
+    client?.use(signed);
   }
-  return { artifactr, reflexr, grantr, portalr };
+  return { artifactr, reflexr, grantr, portalr, relayr };
 }
 
 /** The headers that name a request's tenant. */

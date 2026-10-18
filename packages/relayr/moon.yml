@@ -9,6 +9,13 @@ dependsOn:
   - 'reflexr'
 
 tasks:
+  schema:
+    description: "Regenerate the OpenAPI document of relayr's routes, which portalr's client is typed from"
+    script: 'uv run python -m relayr.fastapi.openapi > schemas/relayr.openapi.json'
+    options:
+      cache: false
+      runInCI: false
+
   pg-up:
     description: 'Start PostgreSQL for the SQL tests, from compose.yaml, on port 54332'
     command: 'docker compose up -d --wait postgres'

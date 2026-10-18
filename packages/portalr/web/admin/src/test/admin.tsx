@@ -71,8 +71,8 @@ export async function open(
 ) {
   vi.stubGlobal("fetch", vi.fn(server(allowed, serve, tenants)));
   const queryClient = createQueryClient(() => undefined);
-  const api = createApi(CONFIG.surfaces, () => ({ token: "t0k3n" }));
   const config = { ...CONFIG, ...settings };
+  const api = createApi(config.surfaces, () => ({ token: "t0k3n" }));
   const signed = new Alice(config, () => undefined);
   const router = createRouter({
     routeTree,

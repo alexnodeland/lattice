@@ -3,7 +3,8 @@
  * (portalr ADR-0032). One stream, for the one workspace chosen: it opens with the page, reconnects
  * with each refreshed token and from where it was after a drop, closes when the session ends, and
  * closes when the page does or another workspace is chosen. It asks for the run events alone, so
- * the bodies of the application's events never reach the browser.
+ * the bodies of the application's events never reach the browser. Each live run event makes stale
+ * what it changed, such as what the runs filed in a tracker.
  */
 
 import {
@@ -15,8 +16,10 @@ import {
   type Snapshot,
   Stream,
   type Surfaces,
+  stale,
   streamUrl,
 } from "@portalr/client";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   createContext,
   type ReactNode,
@@ -57,6 +60,16 @@ function Open({ surfaces, signed, tenant, workspace, children }: Props) {
           ),
         hello: { types: [...RUN_EVENTS] },
       }),
+  );
+  const queryClient = useQueryClient();
+  useEffect(
+    () =>
+      stream.onLiveEvent((envelope) => {
+        for (const queryKey of stale.reflexr(tenant, workspace, envelope)) {
+          void queryClient.invalidateQueries({ queryKey });
+        }
+      }),
+    [stream, queryClient, tenant, workspace],
   );
   useEffect(() => {
     stream.open();

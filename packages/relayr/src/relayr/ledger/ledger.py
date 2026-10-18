@@ -73,6 +73,13 @@ type TrackedKind = Literal["item", "comment"]
 """What a tracker key names: an item a run files, or a comment it posts."""
 
 
+class TrackedKey(NamedTuple):
+    """A tracker key, by what it names."""
+
+    kind: TrackedKind
+    key: str
+
+
 class Tracked(BaseModel):
     """A key a run writes to its workspace's tracker by, and what the write made."""
 
@@ -105,6 +112,9 @@ class TrackerFollowing(BaseModel):
 
     swept_at: datetime
     """When it last read the whole project, by the follower's clock."""
+
+    read_at: datetime | None = None
+    """When it last read the project at all, by the follower's clock; None if no read said."""
 
 
 class Snapshot(BaseModel):
@@ -218,6 +228,10 @@ class Ledger(Protocol):
         """
         ...
 
+    async def every_tracked(self, workspace: WorkspaceKey) -> dict[TrackedKey, Tracked]:
+        """Return every key claimed in the workspace, and what each made, by kind, then key."""
+        ...
+
     async def release_tracked(self, workspace: WorkspaceKey, kind: TrackedKind, key: str) -> None:
         """Release a key's claim that recorded nothing, after a write that certainly didn't land."""
         ...
@@ -256,6 +270,13 @@ class Ledger(Protocol):
         """
         ...
 
+    async def tracker_writes(self, workspace: WorkspaceKey, *, within: timedelta) -> dict[str, int]:
+        """Return how many writes relayr recorded to each item within `within`, by its id.
+
+        An item with none within it is left out.
+        """
+        ...
+
     async def acquire_tracker_lease(
         self, workspace: WorkspaceKey, holder: str, ttl: timedelta
     ) -> bool:
@@ -278,8 +299,8 @@ class Ledger(Protocol):
     ) -> None:
         """Save how far the workspace's tracker follower has read.
 
-        Within one project its cursor and its sweep only move forward; another project replaces
-        them.
+        Within one project its cursor, its sweep and its last read only move forward; another
+        project replaces them.
         """
         ...
 

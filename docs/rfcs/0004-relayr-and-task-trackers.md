@@ -112,7 +112,7 @@ A follower per binding polls its project, diffs what it finds against the ledger
 - **Changes are level-triggered.** For each item on the page, the follower compares the snapshot with the one on the item's row and publishes one event per field that differs. Two changes between polls show as one; a change undone between polls shows as none. Plane's activity log would give every edge, but only per item, at a request per changed item; it stays an option (Decision T1).
 - **Ids are derived, so publishing is exactly once:** `trk_` and the first 16 hex digits of a SHA-256 over the tenant, binding, tracker, item id, field, the new value as canonical JSON and the item's `updated_at`, joined by NUL bytes, as `_derive` joins its parts. A comment's is the same over the tenant, binding, tracker and the comment's id. The tenant and binding are there because Vikunja's ids are integers per instance. reflexr's `publish` appends an id once, so a page read again publishes nothing new, and the ids don't depend on the item's row: a lost row, reseeded, publishes nothing twice.
 - **Comments are read per changed item,** after the last comment the row has seen.
-- **Removals are found two ways.** A Plane delete webhook carries only the item's id, which the row maps back to its key. And a daily sweep lists every item id in the project, 1000 to a page on Plane and 50 on Vikunja, and publishes `tracker:item_removed` for rows whose item is gone. For an item lattice filed, Plane's external-id lookup then tells deleted from archived, and only a deleted one is marked so; for others, the event says only that the item left the list.
+- **Removals are found by the sweep.** Plane v1.4.2 sends no webhook when a work item or a comment is deleted ([relayr ADR-0035](../relayr/adr/0035-what-phase-1-settled-of-the-trackers-unknowns.md), confirmed live in [ADR-0037](../relayr/adr/0037-what-a-live-plane-settled.md)), so a daily sweep lists every item in the project, 1000 to a page on Plane and 50 on Vikunja, and publishes `tracker:item_removed` for rows whose item is gone. For an item lattice filed, Plane's external-id lookup then tells deleted from archived, and only a deleted one is marked so; for others, the event says only that the item left the list.
 - **Dead letters,** for a change whose projection raises, go in `relayr_tracker_dead_letters`, once per event id; anything else stops the follower until it is started again, as artifactr's followers do. `DepthExceeded` can't happen here: nothing is published with causation.
 - **What comes back is untrusted text.** Titles, descriptions and comments are written by whoever can reach the tracker, and reach rules and their agents as artifactr's messages do; agents' requests carry the gateway's `prompt-injection` guardrail as they do for chat. The item rows store titles and descriptions for the diff, so offboarding deletes them.
 
@@ -142,7 +142,7 @@ Every event carries `tracker` (`plane` or `vikunja`), the project and the item's
 - **`tracker_router(trackers)`** is a FastAPI router the application mounts beside the libraries': `POST /relayr/v1/trackers/{tenant}/{tracker}`. It verifies the signature with that tenant's secret, checks Plane's `workspace_slug` against the tenant's, wakes the binding's follower if this process holds its lease, and answers 204.
 - **It is unauthenticated, so it gives nothing away.** Bodies over 1 MB are refused before they are read. Signatures are compared with `hmac.compare_digest` over the raw bytes. Secrets come from the resolver's cache, refreshed on its own schedule, never fetched for a request, so a flood of requests can't amplify into the secrets store. An unknown tenant and a bad signature get the same 401, counted together. A replayed nudge only wakes a poll, debounced by 2 s.
 - **A nudge reaches one replica.** If that replica doesn't hold the binding's lease, the nudge is dropped, and the change waits for the holder's next poll: latency, accepted, rather than a signal shared between replicas.
-- **The signatures:** Plane's `X-Plane-Signature` is HMAC-SHA256, hex, over `json.dumps(payload)`; Vikunja's `X-Vikunja-Signature` is the same over the exact bytes it sends. Whether Plane's signed bytes equal its body is unverified (phase 1).
+- **The signatures:** Plane's `X-Plane-Signature` is HMAC-SHA256, hex, over `json.dumps(payload)`; Vikunja's `X-Vikunja-Signature` is the same over the exact bytes it sends. Plane's signed bytes are its body, as a live Plane showed ([relayr ADR-0037](../relayr/adr/0037-what-a-live-plane-settled.md)).
 - **A nudge lost is latency, never data.** Plane retries only `requests` exceptions (timeouts and connection errors), five times from 600 s, and then deactivates the webhook and emails its creator; it logs any status as sent. Vikunja retries any status above 399 five times, from memory. Either way the next poll finds the change. `relayr.trackers.unnudged` counts changes a poll found that no nudge announced, so an operator sees a webhook Plane switched off, or one Plane refuses to send because `WEBHOOK_ALLOWED_HOSTS` is wrong: Plane logs that refusal, and neither retries nor deactivates.
 
 ### Budget
@@ -249,7 +249,7 @@ Recommended, for the maintainer to decide:
 
 ### Unverified
 
-Each is a phase 1 exit criterion, settled against the pinned releases and recorded as a fixture.
+Each is a phase 1 exit criterion, settled against the pinned releases and recorded as a fixture. Vikunja's were settled in [relayr ADR-0035](../relayr/adr/0035-what-phase-1-settled-of-the-trackers-unknowns.md), and Plane's on a live Plane in [ADR-0037](../relayr/adr/0037-what-a-live-plane-settled.md), all but those it lists as still unverified; phase 2's departures are in [ADR-0036](../relayr/adr/0036-reading-a-tracker-back.md).
 
 - **Plane's signature:** whether `json.dumps(payload)` equals the body `requests` sends. If it doesn't, relayr verifies against the re-serialized parsed body, which is still safe for a nudge.
 - **What moves an item's `updated_at`,** on each tracker: a change of state, priority, title, description, labels or assignees, and a new comment. A field that doesn't is diffed by the daily sweep only, and comments, if they don't, are polled for open items lattice filed, within the budget.
@@ -264,11 +264,11 @@ Not in scope: two-way sync of artifacts, Plane's Commercial edition and its v2 w
 
 - [ ] Sign-off on T1 to T7
 - [x] relayr: the port, core, fake and contract test; the ledger's new methods, its contract test, and the migration with row-level security ([relayr ADR-0033](../relayr/adr/0033-the-tracker-port-and-runs-that-write-to-it-once.md): the items table only, the followers' two with phase 2)
-- [ ] relayr: the Plane and Vikunja adapters, with recorded fixtures (both built; Vikunja's fixtures recorded, Plane's derived from its source until a Plane runs)
+- [x] relayr: the Plane and Vikunja adapters, with recorded fixtures (both recorded from the pinned releases: [relayr ADR-0035](../relayr/adr/0035-what-phase-1-settled-of-the-trackers-unknowns.md) and [ADR-0037](../relayr/adr/0037-what-a-live-plane-settled.md))
 - [x] relayr: `TrackerActions`, `TrackerCapability` and `Allowlist.trackers` ([relayr ADR-0034](../relayr/adr/0034-an-allowlist-for-the-tracker.md))
 - [ ] stackr: the two recipes, the checklist and `make tracker-check`; the template's `tracker` question and example rule
-- [ ] The unverified items settled, in an ADR (Vikunja's and Plane's from its source in [relayr ADR-0035](../relayr/adr/0035-what-phase-1-settled-of-the-trackers-unknowns.md); a live Plane's remain)
-- [ ] relayr: followers and their resume, `tracker:*` events and projections, nudges, the sweep and the budget
+- [x] The unverified items settled, in an ADR ([relayr ADR-0035](../relayr/adr/0035-what-phase-1-settled-of-the-trackers-unknowns.md) and, on a live Plane, [ADR-0037](../relayr/adr/0037-what-a-live-plane-settled.md); Vikunja's editor and its bot users remain)
+- [x] relayr: followers and their resume, `tracker:*` events and projections, nudges, the sweep and the budget ([relayr ADR-0036](../relayr/adr/0036-reading-a-tracker-back.md): snapshots in a table of their own, and resumed from the bindings)
 - [ ] portalr: "filed as" and tracker links
 - [ ] Docs: relayr's guide and ADRs, stackr's tracker guide
 

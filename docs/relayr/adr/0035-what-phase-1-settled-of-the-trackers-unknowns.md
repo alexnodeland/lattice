@@ -1,6 +1,6 @@
 # ADR-0035: What phase 1 settled of the trackers' unknowns
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0037](0037-what-a-live-plane-settled.md)
 **Date:** 2026-10-17
 **Deciders:** Alex Nodeland
 
@@ -36,6 +36,8 @@ The RFC was written from both trackers' source, read and not run. Its phase 1 se
 - **Lists** are pages of `results`, by a cursor `<per_page>:<page>:0`, 1000 at most. Comments and labels are listed newest first whatever `order_by` says.
 
 ### Still unverified
+
+Plane's items were settled on a live Plane in [ADR-0037](0037-what-a-live-plane-settled.md).
 
 - **On Plane, everything live,** and in particular what moves a work item's `updated_at` besides a `PATCH` (a new comment, among others), what a comment on a deleted work item answers (its create doesn't load the item, so perhaps not the 404 the stand-in gives), and whether its browse link takes a trailing slash. The nightly live run the RFC plans comes with stackr's Plane recipe.
 - **On Vikunja,** whether its web editor keeps the marker when a person edits a description, and its bot users.

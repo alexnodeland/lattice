@@ -1,6 +1,6 @@
 # ADR-0033: The tracker port, and runs that write to it once
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0036](0036-reading-a-tracker-back.md)
 **Date:** 2026-10-17
 **Deciders:** Alex Nodeland
 

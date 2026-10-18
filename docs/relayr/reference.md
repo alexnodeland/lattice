@@ -51,6 +51,20 @@ The reference is generated from relayr's docstrings and type annotations. It doc
       show_root_heading: false
       show_root_toc_entry: false
 
+## relayr.trackers.events
+
+::: relayr.trackers.events
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+
+## relayr.fastapi
+
+::: relayr.fastapi
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+
 ## relayr.integrations
 
 ::: relayr.integrations

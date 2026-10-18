@@ -41,7 +41,7 @@ SIGNATURE = "x-fake-signature"
 """The header a nudge's signature is in: HMAC-SHA256, hex, over the body."""
 
 PERSON = "person"
-"""Who a test's changes are by, unless it names someone."""
+"""Who a test's changes are by, unless it names someone, or None, as Vikunja names no one."""
 
 type _Key = tuple[str, str]
 """What lattice filed something by: its source and its key."""
@@ -51,7 +51,7 @@ type _Key = tuple[str, str]
 class _Comment:
     ref: CommentRef
     body: str
-    author: str
+    author: str | None
     created_at: datetime
     key: _Key | None
 
@@ -67,7 +67,7 @@ class _Item:
     priority: Priority
     labels: set[str]
     updated_at: datetime
-    updated_by: str
+    updated_by: str | None
     key: _Key | None
     archived: bool = False
     comments: list[_Comment] = field(default_factory=list[_Comment])
@@ -99,7 +99,7 @@ class _Store:
             raise NotFound(f"no item {item_id}")
         return found
 
-    def add(self, project: ProjectId, key: _Key | None, draft: ItemDraft, by: str) -> _Item:
+    def add(self, project: ProjectId, key: _Key | None, draft: ItemDraft, by: str | None) -> _Item:
         self.created += 1
         number = 1 + sum(item.project == project for item in self.items.values())
         item = _Item(
@@ -118,15 +118,17 @@ class _Store:
         self.items[item.id] = item
         return item
 
-    def change(self, item: _Item, fields: ItemFields, by: str) -> None:
+    def change(self, item: _Item, fields: ItemFields, by: str | None) -> None:
         for name, value in fields.model_dump(exclude_none=True).items():
             setattr(item, name, set(value) if name == "labels" else value)
         item.updated_at, item.updated_by = self.clock(), by
 
-    def comment(self, item: _Item, key: _Key | None, body: str, by: str) -> _Comment:
+    def comment(self, item: _Item, key: _Key | None, body: str, by: str | None) -> _Comment:
+        """Comment on an item, which moves its `updated_at`, as Vikunja's comments do."""
         ref = CommentRef(item=item.id, id=f"{item.id}-comment-{len(item.comments) + 1}")
         comment = _Comment(ref=ref, body=body, author=by, created_at=self.clock(), key=key)
         item.comments.append(comment)
+        item.updated_at = self.clock()
         return comment
 
 
@@ -166,15 +168,15 @@ class FakeTracker:
         """Make the next item lattice files, and lose the answer, as `Unavailable`."""
         self._store.lose_created = True
 
-    def add(self, project: ProjectId, title: str, *, by: str = PERSON) -> ItemRef:
+    def add(self, project: ProjectId, title: str, *, by: str | None = PERSON) -> ItemRef:
         """File an item, as a person does, with no key."""
         return _ref(self._store.add(project, None, ItemDraft(title=title), by))
 
-    def edit(self, ref: ItemRef, fields: ItemFields, *, by: str = PERSON) -> None:
+    def edit(self, ref: ItemRef, fields: ItemFields, *, by: str | None = PERSON) -> None:
         """Change an item, as a person does."""
         self._store.change(self._store.existing(ref.id), fields, by)
 
-    def reply(self, ref: ItemRef, body: str, *, by: str = PERSON) -> CommentRef:
+    def reply(self, ref: ItemRef, body: str, *, by: str | None = PERSON) -> CommentRef:
         """Comment on an item, as a person does."""
         return self._store.comment(self._store.existing(ref.id), None, body, by).ref
 
@@ -274,6 +276,10 @@ class FakeConnection:
     def link(self, ref: ItemRef) -> str:
         """Return the item's address."""
         return f"{self._credentials.base_url}/{ref.project}/{ref.number}"
+
+    def holds(self, state: State) -> State:
+        """Every state, as Plane holds them."""
+        return state
 
     def _filed(self, project: ProjectId, key: ItemKey) -> _Item | None:
         self._store.request(self._credentials)

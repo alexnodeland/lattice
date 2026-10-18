@@ -233,6 +233,10 @@ class VikunjaTracker:
         """Return the task's page: `<base>/tasks/<id>`."""
         return f"{self._base_url}/tasks/{ref.id}"
 
+    def holds(self, state: State) -> State:
+        """`done` for `done` and `cancelled`, which set the task's flag; `todo` for the others."""
+        return "done" if _done(state) else "todo"
+
     # ─── how ──────────────────────────────────────────────────────────────────
 
     def _marker(self, key: str) -> str:

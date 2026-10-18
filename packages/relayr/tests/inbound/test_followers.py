@@ -26,8 +26,11 @@ from relayr.ledger import (
     DeadLetter,
     InMemoryLedger,
     Ledger,
+    Snapshot,
     Tracked,
     TrackedKind,
+    TrackerDeadLetter,
+    TrackerFollowing,
     WorkspaceKey,
 )
 from tests.app_types import Note
@@ -109,6 +112,53 @@ class Forgetful:
         self, workspace: WorkspaceKey, key: str, fields: Collection[str]
     ) -> None:
         await self._ledger.forget_written(workspace, key, fields)
+
+    async def consume_written(
+        self, workspace: WorkspaceKey, key: str, values: Mapping[str, JsonValue]
+    ) -> None:
+        await self._ledger.consume_written(workspace, key, values)
+
+    async def record_tracker_write(
+        self, workspace: WorkspaceKey, item_id: str, *, within: timedelta
+    ) -> int:
+        return await self._ledger.record_tracker_write(workspace, item_id, within=within)
+
+    async def acquire_tracker_lease(
+        self, workspace: WorkspaceKey, holder: str, ttl: timedelta
+    ) -> bool:
+        return await self._ledger.acquire_tracker_lease(workspace, holder, ttl)
+
+    async def release_tracker_lease(self, workspace: WorkspaceKey, holder: str) -> None:
+        await self._ledger.release_tracker_lease(workspace, holder)
+
+    async def tracker_following(self, workspace: WorkspaceKey) -> TrackerFollowing | None:
+        return await self._ledger.tracker_following(workspace)
+
+    async def save_tracker_following(
+        self, workspace: WorkspaceKey, following: TrackerFollowing
+    ) -> None:
+        await self._ledger.save_tracker_following(workspace, following)
+
+    async def snapshots(
+        self, workspace: WorkspaceKey, item_ids: Collection[str] | None = None
+    ) -> dict[str, Snapshot]:
+        return await self._ledger.snapshots(workspace, item_ids)
+
+    async def save_snapshots(
+        self, workspace: WorkspaceKey, snapshots: Collection[Snapshot]
+    ) -> None:
+        await self._ledger.save_snapshots(workspace, snapshots)
+
+    async def forget_snapshots(
+        self, workspace: WorkspaceKey, item_ids: Collection[str] | None = None
+    ) -> None:
+        await self._ledger.forget_snapshots(workspace, item_ids)
+
+    async def tracker_dead_letter(self, workspace: WorkspaceKey, letter: TrackerDeadLetter) -> None:
+        await self._ledger.tracker_dead_letter(workspace, letter)
+
+    async def tracker_dead_letters(self, workspace: WorkspaceKey) -> list[TrackerDeadLetter]:
+        return await self._ledger.tracker_dead_letters(workspace)
 
 
 async def test_a_message_fires_a_rule_exactly_once_across_a_restart_and_a_redelivery(

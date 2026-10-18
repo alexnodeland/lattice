@@ -42,6 +42,7 @@ def test_the_portal_serves_its_config_and_both_uis(script: Script, ui: Path) -> 
         config = client.get("/portalr/config.json").json()
         assert config["supabase"] == {"url": SUPABASE, "key": KEY}
         assert config["readers"]["tempo"] is False
+        assert config["surfaces"]["relayr"] {% if use_tracker %}== ""{% else %}is None{% endif %}
         for name in ("app", "admin"):
             page = client.get(f"/portalr/{name}/")
             assert page.status_code == 200

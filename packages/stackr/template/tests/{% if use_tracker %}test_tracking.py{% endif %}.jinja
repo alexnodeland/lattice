@@ -124,6 +124,20 @@ def test_a_rules_dead_letters_are_one_item_with_a_comment_each(
     assert len(comments(tracker, item)) == 2
 
 
+def test_the_portal_reads_what_a_workspace_filed(client: TestClient, tracker: FakeTracker) -> None:
+    failing(client)
+    fire(client)
+    wait_for(lambda: runs(client) == ["succeeded"])
+    [item] = filed(tracker)
+    reads = client.get("/relayr/v1/workspaces/main/tracker/items")
+    assert reads.status_code == 200, reads.text
+    assert reads.json()["tracker"] == "{{ tracker }}"
+    assert [each["id"] for each in reads.json()["items"]] == [item.ref.id]
+    assert client.get("/relayr/v1/workspaces/main/tracker").status_code == 200
+    anyone = client.get("/relayr/v1/workspaces/main/tracker", headers={"Authorization": ""})
+    assert anyone.status_code == 401
+
+
 def test_it_never_files_its_own_dead_letters(client: TestClient, tracker: FakeTracker) -> None:
     tracker.rotate("another-key")  # the tracker refuses the tenant's key: its runs fail for good
     failing(client)

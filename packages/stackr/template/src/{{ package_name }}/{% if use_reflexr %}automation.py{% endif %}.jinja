@@ -223,12 +223,13 @@ class Automation:
 
     def mount(self, app: FastAPI) -> None:
         """Add the REST and WebSocket routes and the MCP server to the application."""
-        router = reflexr_router(self.workspaces, resolve_actor=self._resolve_actor)
+        router = reflexr_router(self.workspaces, resolve_actor=self.resolve_actor)
         app.include_router(router, prefix=f"{PREFIX}/v1")
         mcp = self.mcp.http_app(streamable_http_path="/")
         app.mount(f"{PREFIX}/mcp", RequireToken(mcp, self._identify))
 
-    async def _resolve_actor(self, connection: HTTPConnection) -> tuple[TenantId, Actor]:
+    async def resolve_actor(self, connection: HTTPConnection) -> tuple[TenantId, Actor]:
+        """Who a request to reflexr's routes comes from, and in which tenant."""
         try:
             principal = await self._authenticate(connection)
         except Unauthenticated as error:

@@ -19,7 +19,7 @@ import httpx
 from fastapi import FastAPI
 
 from grantr import Grants
-from portalr.fastapi import UI, Site, portalr_router
+from portalr.fastapi import UI, Site, {% if use_tracker %}Surfaces, {% endif %}portalr_router
 from portalr.invites import Invite, InviteFailed, SupabaseInvite
 from portalr.people import People, SupabasePeople
 from portalr.readers import Grafana, Langfuse, LiteLLM, Loki, Prometheus, Readers, Tempo
@@ -116,10 +116,19 @@ class Portal:
 
     @property
     def site(self) -> Site | None:
-        """The Supabase project the UIs sign in to, or None where it isn't named."""
+        """The Supabase project the UIs sign in to, or None where it isn't named.{% if use_tracker %}
+
+        relayr's tracker reads are on this origin, at their own ``/relayr/v1`` paths.
+        {% endif %}"""
         portal = self._settings.portal
         if portal.supabase_url and portal.supabase_key:
-            return Site(supabase_url=portal.supabase_url, supabase_key=portal.supabase_key)
+            return Site(
+                supabase_url=portal.supabase_url,
+                supabase_key=portal.supabase_key,
+{%- if use_tracker %}
+                surfaces=Surfaces(relayr=""),
+{%- endif %}
+            )
         return None
 
     @property

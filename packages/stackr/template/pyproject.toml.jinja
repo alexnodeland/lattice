@@ -18,7 +18,10 @@ dependencies = [
     "grantr[sql,postgres,fastapi]",
 {%- endif %}
 {%- if use_relayr %}
-    "relayr-ai[sql,postgres,otel,langfuse,evals]",
+    "relayr-ai[sql,postgres,otel,langfuse,evals{% if use_tracker %},fastapi,{{ tracker }}{% endif %}]",
+{%- endif %}
+{%- if use_tracker %}
+    "httpx>=0.28",
 {%- endif %}
 {%- if use_portal %}
     "portalr",

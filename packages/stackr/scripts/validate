@@ -42,6 +42,10 @@ check_compose "all profiles" --profile '*'
 # A single host (RFC-0004): the overlay, on every profile, with the domain it serves.
 STACKR_DOMAIN=example.com check_compose "a single host" \
   -f compose.yaml -f deploy/host/compose.prod.yaml --profile '*'
+# The task trackers' recipes (lattice RFC-0004), each a project of its own, on stackr's .env.
+for tracker in trackers/*/compose.yaml; do
+  check_compose "${tracker%/compose.yaml}" --env-file .env -f "$tracker"
+done
 
 step "The single host's edge"
 if docker run --rm -v "$PWD/deploy/host/Caddyfile:/etc/caddy/Caddyfile:ro" -e STACKR_DOMAIN=example.com \

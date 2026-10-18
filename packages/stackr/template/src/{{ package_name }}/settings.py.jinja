@@ -1,9 +1,15 @@
 """Settings, read from the environment: the stack's ports, and a few of the application's own.
 
 The ports are stackr's (its ``docs/architecture.md``): OpenTelemetry's ``OTEL_*`` for telemetry,
+{%- if use_tracker %}
+``DATABASE_URL`` for the database, ``AUTH_*`` for identity, ``LITELLM_*`` for the LLM gateway,
+``LANGFUSE_*`` for evaluation data and ``TRACKER_*`` for the task tracker. Swapping what is
+behind a port changes these settings, never the code.
+{%- else %}
 ``DATABASE_URL`` for the database, ``AUTH_*`` for identity, ``LITELLM_*`` for the LLM gateway and
 ``LANGFUSE_*`` for evaluation data. Swapping what is behind a port changes these settings, never
 the code.
+{%- endif %}
 """
 
 import json
@@ -12,6 +18,13 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Self, cast
+{%- if use_tracker %}
+
+from pydantic import ValidationError
+
+from relayr.ledger import WorkspaceKey
+from relayr.trackers import TrackerBinding, TrackerCredentials
+{%- endif %}
 
 SCHEMA_NAME = re.compile(r"^[a-z_][a-z0-9_]{0,62}$")
 """The PostgreSQL schemas the application accepts: plain lowercase identifiers."""
@@ -72,6 +85,45 @@ class GatewaySettings:
     mock_response: str | None = None
 
 
+{% if use_tracker -%}
+@dataclass(frozen=True)
+class TrackerSettings:
+    """Where rules' runs file work, and whose changes come back: the task tracker port, {% if tracker == 'plane' %}Plane{% else %}Vikunja{% endif %}.
+
+    Each tenant has a tracker workspace and a tracker user of its own, ``relayr-<tenant>``, whose
+    key reaches only the tenant's work: stackr's tracker guide provisions them, and its
+    ``make tracker-check`` checks them.
+
+    Attributes:
+        credentials: Each tenant's tracker credentials: the tracker's URL, its user's key, its
+            webhooks' secret{% if tracker == 'plane' %} and its workspace's slug{% endif %}.
+        bindings: The tracker project each workspace files into and reads; a workspace without
+            one files nothing.
+{%- if tracker == 'plane' %}
+        budget: How many requests a minute each tenant's key may make from this process: the 300
+            stackr's recipe lets Plane take.
+{%- else %}
+        budget: How many requests a minute each tenant's key may make from this process; stackr's
+            recipe sets Vikunja no limit.
+{%- endif %}
+    """
+
+    credentials: Mapping[str, TrackerCredentials] = field(
+        default_factory=dict[str, TrackerCredentials]
+    )
+    bindings: Mapping[WorkspaceKey, TrackerBinding] = field(
+        default_factory=dict[WorkspaceKey, TrackerBinding]
+    )
+    budget: int = 300
+
+    def __post_init__(self) -> None:
+        for tenant, workspace in self.bindings:
+            if tenant not in self.credentials:
+                missing = f"TRACKER_CREDENTIALS has none for {tenant}"
+                raise ValueError(f"TRACKER_BINDINGS binds {tenant}/{workspace}, and {missing}")
+
+
+{% endif -%}
 {% if use_portal -%}
 @dataclass(frozen=True)
 class PortalSettings:
@@ -154,6 +206,9 @@ class Settings:
             which ``make db-roles`` creates.
         auth: How access tokens are verified.
         gateway: How agents reach models.
+{%- if use_tracker %}
+        tracker: Where rules' runs file work, and whose changes come back.
+{%- endif %}
         telemetry: Whether to export OpenTelemetry, to ``OTEL_EXPORTER_OTLP_ENDPOINT``.
         langfuse: Whether to use Langfuse, with the ``LANGFUSE_*`` keys, for trace attributes
             and scores.
@@ -173,6 +228,9 @@ class Settings:
     database_admin_url: str | None = None
     auth: AuthSettings = field(default_factory=AuthSettings)
     gateway: GatewaySettings = field(default_factory=GatewaySettings)
+{%- if use_tracker %}
+    tracker: TrackerSettings = field(default_factory=TrackerSettings)
+{%- endif %}
     telemetry: bool = False
     langfuse: bool = False
 {%- if use_portal %}
@@ -224,6 +282,13 @@ class Settings:
             database_admin_url=env.get("DATABASE_ADMIN_URL"),
             auth=auth,
             gateway=gateway,
+{%- if use_tracker %}
+            tracker=TrackerSettings(
+                credentials=_tracker_credentials(env.get("TRACKER_CREDENTIALS", "{}")),
+                bindings=_tracker_bindings(env.get("TRACKER_BINDINGS", "{}")),
+                budget=int(env.get("TRACKER_BUDGET", TrackerSettings.budget)),
+            ),
+{%- endif %}
             telemetry="OTEL_EXPORTER_OTLP_ENDPOINT" in env,
             langfuse="LANGFUSE_PUBLIC_KEY" in env,
 {%- if use_portal %}
@@ -250,6 +315,68 @@ def _tenant_keys(text: str) -> dict[str, str]:
     return {str(tenant): str(key) for tenant, key in pairs.items()}
 
 
+{% if use_tracker -%}
+FIELDS = "base_url, api_key{% if tracker == 'plane' %}, webhook_secret and workspace{% else %} and webhook_secret{% endif %}"
+"""What a tenant's tracker credentials must have."""
+
+
+def _tracker_credentials(text: str) -> dict[str, TrackerCredentials]:
+    """Parse ``TRACKER_CREDENTIALS``: a JSON object from tenant ids to their tracker credentials.
+{% if tracker == 'plane' %}
+    A tenant's are ``base_url``, ``api_key``, ``webhook_secret`` and ``workspace``, its Plane
+    workspace's slug. The errors never quote them: they are secrets.
+{%- else %}
+    A tenant's are ``base_url``, ``api_key`` and ``webhook_secret``; ``expires_at``, when the
+    token expires, is for stackr's ``make tracker-check``, which warns two weeks before. The
+    errors never quote them: they are secrets.
+{%- endif %}
+    """
+    credentials: dict[str, TrackerCredentials] = {}
+    for tenant, entry in _json_object(text, "TRACKER_CREDENTIALS").items():
+        try:
+            credentials[tenant] = TrackerCredentials.model_validate(entry)
+{%- if tracker == 'plane' %}
+        except ValidationError:
+            raise ValueError(f"TRACKER_CREDENTIALS of {tenant} must have {FIELDS}") from None
+        if not credentials[tenant].workspace:
+            raise ValueError(f"TRACKER_CREDENTIALS of {tenant} must have {FIELDS}")
+{%- else %}
+        except ValidationError:
+            raise ValueError(f"TRACKER_CREDENTIALS of {tenant} must have {FIELDS}") from None
+{%- endif %}
+    return credentials
+
+
+def _tracker_bindings(text: str) -> dict[WorkspaceKey, TrackerBinding]:
+    """Parse ``TRACKER_BINDINGS``: a JSON object from ``<tenant>/<workspace>`` to a binding.
+
+    A binding is the tracker ``project`` the workspace files into and reads, by the tracker's id,
+    and what its items have unless a rule says: a ``state``, a ``priority`` and ``labels``.
+    """
+    bindings: dict[WorkspaceKey, TrackerBinding] = {}
+    for name, entry in _json_object(text, "TRACKER_BINDINGS").items():
+        tenant, _, workspace = name.partition("/")
+        if not tenant or not workspace:
+            raise ValueError(f"TRACKER_BINDINGS names {name!r}, not <tenant>/<workspace>")
+        try:
+            bindings[WorkspaceKey(tenant, workspace)] = TrackerBinding.model_validate(entry)
+        except ValidationError as error:
+            raise ValueError(f"TRACKER_BINDINGS of {name}: {error}") from error
+    return bindings
+
+
+def _json_object(text: str, name: str) -> dict[str, object]:
+    """Parse a setting that is a JSON object."""
+    try:
+        parsed: object = json.loads(text)
+    except json.JSONDecodeError as error:
+        raise ValueError(f"{name} must be a JSON object") from error
+    if not isinstance(parsed, dict):
+        raise ValueError(f"{name} must be a JSON object")
+    return {str(key): value for key, value in cast(dict[object, object], parsed).items()}
+
+
+{% endif -%}
 def _names(text: str) -> tuple[str, ...]:
     """Parse a comma-separated list of names, where ``none`` is the empty list."""
     names = tuple(name.strip() for name in text.split(",") if name.strip())

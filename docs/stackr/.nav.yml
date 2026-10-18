@@ -14,6 +14,7 @@ nav:
   - Validation and CI: guides/validation.md
   - Security: guides/security.md
   - A single host: guides/single-host.md
+  - Task trackers: guides/trackers.md
   - Troubleshooting: guides/troubleshooting.md
 - Reference:
   - reference/index.md
@@ -64,6 +65,10 @@ nav:
     - adr/0033-the-combined-system-proved-in-ci.md
     - adr/0034-the-stack-on-aws.md
     - adr/0035-the-thin-images.md
+    - adr/0036-tier-2-against-floci.md
+    - adr/0037-the-state-hosts-clickhouse-backups.md
+    - adr/0038-portalr-in-the-template.md
+    - adr/0039-the-task-trackers-recipes-checker-and-question.md
   - RFCs:
     - rfcs/README.md
     - rfcs/0001-v0.1-implementation-plan.md

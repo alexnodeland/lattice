@@ -45,6 +45,9 @@ from reflexr.workspace import (
 from relayr.events import BRIDGED
 from relayr.inbound import SOURCE
 {%- endif %}
+{%- if use_tracker %}
+from relayr.trackers.events import PUBLISHERS, TRACKED
+{%- endif %}
 
 {% if access == 'grantr' -%}
 from {{ package_name }}.access import Refused
@@ -68,6 +71,9 @@ from {{ package_name }}.tickets import (
     build_triage_agent,
     triage_action,
 )
+{%- if use_tracker %}
+from {{ package_name }}.tracking import RULES as TRACKER_RULES
+{%- endif %}
 
 PREFIX = "/reflexr"
 
@@ -91,10 +97,21 @@ class Automation:
         poll_interval: How often the reactor looks for work.
         grace: How long running actions have to end when the application stops.
 {%- if use_relayr %}
+{%- if use_tracker %}
+        on_open: Called each time a workspace is opened, after the mirrors': relayr's followers,
+            the bridge's and the tracker's.
+{%- else %}
         on_open: Called each time a workspace is opened, after the mirrors': relayr's followers.
+{%- endif %}
         run_context: Entered around each run: relayr's Langfuse context, when Langfuse is on.
+{%- if use_tracker %}
+        actions: The bridge's rules' actions, which act in artifactr, and the tracker's, which
+            write to it; without them, the bridge's rules, the tracker's, and rules from chat,
+            are left out.
+{%- else %}
         actions: The bridge's rules' actions, which act in artifactr; without them, the bridge's
             rules, and rules from chat, are left out.
+{%- endif %}
 {%- endif %}
     """
 
@@ -133,7 +150,7 @@ class Automation:
 
             self._mirrors = Mirrors(follow)
 {%- if use_relayr %}
-        events = [*EVENTS, *BRIDGED, *INCIDENT_EVENTS]
+        events = [*EVENTS, *BRIDGED, *INCIDENT_EVENTS{% if use_tracker %}, *TRACKED{% endif %}]
         self.events: Mapping[str, type[Event]] = {t.event_type: t for t in events}
         """The event types the workspaces accept, by name, as rules from chat are checked."""
 {%- endif %}
@@ -146,10 +163,10 @@ class Automation:
             if database
             else InMemoryStorage(),
             events={% if use_relayr %}events{% else %}EVENTS{% endif %},
-            rules={% if use_relayr %}[*RULES, *(BRIDGE_RULES if actions else [])]{% else %}RULES{% endif %},
+            rules={% if use_tracker %}[*RULES, *(BRIDGE_RULES + TRACKER_RULES if actions else [])]{% elif use_relayr %}[*RULES, *(BRIDGE_RULES if actions else [])]{% else %}RULES{% endif %},
             authorize=authorize,
 {%- if use_relayr %}
-            publishers={"artifactr": [SOURCE]},
+            publishers={"artifactr": [SOURCE]{% if use_tracker %}, **PUBLISHERS{% endif %}},
             stored_rules=STORED_RULES if actions else None,
 {%- endif %}
             on_open=opened(self._mirrors.watch if self._mirrors else None{% if use_relayr %}, on_open{% endif %}),

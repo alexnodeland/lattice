@@ -48,6 +48,13 @@
       "allowedVersions": "/^17(\\..*)?$/"
     },
     {
+      "description": "Plane's recipe keeps PostgreSQL at 15, the major its data is in: a major upgrade of it is Plane's to make (stackr ADR-0039).",
+      "matchFileNames": ["packages/stackr/trackers/plane/compose.yaml"],
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["postgres"],
+      "allowedVersions": "/^15(\\..*)?$/"
+    },
+    {
       "description": "proto, which every CI job installs, waits three days too; its digests in .github/actions/toolchain/proto.sha256 move by hand (lattice ADR-0017).",
       "matchDepNames": ["proto"],
       "minimumReleaseAge": "3 days"

@@ -266,7 +266,7 @@ Not in scope: two-way sync of artifacts, Plane's Commercial edition and its v2 w
 - [x] relayr: the port, core, fake and contract test; the ledger's new methods, its contract test, and the migration with row-level security ([relayr ADR-0033](../relayr/adr/0033-the-tracker-port-and-runs-that-write-to-it-once.md): the items table only, the followers' two with phase 2)
 - [x] relayr: the Plane and Vikunja adapters, with recorded fixtures (both recorded from the pinned releases: [relayr ADR-0035](../relayr/adr/0035-what-phase-1-settled-of-the-trackers-unknowns.md) and [ADR-0037](../relayr/adr/0037-what-a-live-plane-settled.md))
 - [x] relayr: `TrackerActions`, `TrackerCapability` and `Allowlist.trackers` ([relayr ADR-0034](../relayr/adr/0034-an-allowlist-for-the-tracker.md))
-- [ ] stackr: the two recipes, the checklist and `make tracker-check`; the template's `tracker` question and example rule
+- [x] stackr: the two recipes, the checklist and `make tracker-check`; the template's `tracker` question and example rule ([stackr ADR-0039](../stackr/adr/0039-the-task-trackers-recipes-checker-and-question.md))
 - [x] The unverified items settled, in an ADR ([relayr ADR-0035](../relayr/adr/0035-what-phase-1-settled-of-the-trackers-unknowns.md) and, on a live Plane, [ADR-0037](../relayr/adr/0037-what-a-live-plane-settled.md); Vikunja's editor and its bot users remain)
 - [x] relayr: followers and their resume, `tracker:*` events and projections, nudges, the sweep and the budget ([relayr ADR-0036](../relayr/adr/0036-reading-a-tracker-back.md): snapshots in a table of their own, and resumed from the bindings)
 - [ ] portalr: "filed as" and tracker links

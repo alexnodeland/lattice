@@ -1,0 +1,190 @@
+"""relayr's tracker connector: a rule's dead letters filed once, and people's changes read back.
+
+The tracker is relayr's ``FakeTracker``, in memory, in place of {% if tracker == 'plane' %}Plane{% else %}Vikunja{% endif %}.
+"""
+
+import asyncio
+import dataclasses
+import hashlib
+import hmac
+import json
+import time
+from collections.abc import Iterator
+from datetime import UTC, datetime
+from typing import Any
+
+import pytest
+from fastapi.testclient import TestClient
+
+from artifactr import new_id
+from relayr.ledger import WorkspaceKey
+from relayr.trackers import (
+    Comment,
+    FakeTracker,
+    Item,
+    ItemFields,
+    TrackerBinding,
+    TrackerCredentials,
+)
+
+from {{ package_name }}.settings import Settings, TrackerSettings
+
+from conftest import TENANT, Script, app, bearer, settings, wait_for
+
+REFLEXR = "/reflexr/v1/workspaces"
+FIRED = "{{ package_name }}:alert.fired"
+FILE = "{{ package_name }}:file-dead-letter"
+KEY = "the-tracker-users-key"
+SECRET = "the-webhooks-secret"
+CREDENTIALS = TrackerCredentials(
+    base_url="https://tracker.test", api_key=KEY, webhook_secret=SECRET, workspace=TENANT
+)
+
+
+def tracked(**binding: Any) -> Settings:
+    """The tests' settings, with acme's workspace ``main`` bound to the tracker project ``ops``."""
+    tracker = TrackerSettings(
+        credentials={TENANT: CREDENTIALS},
+        bindings={WorkspaceKey(TENANT, "main"): TrackerBinding(project="ops", **binding)},
+    )
+    return dataclasses.replace(settings(), tracker=tracker)
+
+
+@pytest.fixture
+def tracker() -> FakeTracker:
+    return FakeTracker(api_key=KEY)
+
+
+@pytest.fixture
+def client(script: Script, tracker: FakeTracker) -> Iterator[TestClient]:
+    """The application, its workspace ``main`` filing into the fake tracker, as alice of acme."""
+    with TestClient(app(script, tracked(), tracker=tracker.connect), headers=bearer()) as client:
+        yield client
+
+
+def failing(client: TestClient, workspace: str = "main") -> None:
+    """Install a stored rule that is dead-lettered whenever an alert fires: it notifies a thread
+    that doesn't exist, and is tried once."""
+    rule = {
+        "name": "chat:fails",
+        "description": "Tell a thread that isn't there.",
+        "when": {
+            "filter": {"kind": "on", "types": [FIRED]},
+            "throttle": {"at_most": 10, "per": "PT1H"},
+        },
+        "then": {"action": "notify", "params": {"thread_id": "nowhere"}},
+        "retry": {"max_attempts": 1},
+        "ordering": "none",
+        "timeout": "PT1M",
+    }
+    command = {"type": "install_rule", "rule": rule}
+    frame = {"type": "command", "command_id": new_id("cmd"), "command": command}
+    response = client.post(f"{REFLEXR}/{workspace}/commands", json=frame)
+    assert response.json()["ok"], response.text
+
+
+def fire(client: TestClient, workspace: str = "main") -> None:
+    fired = {"type": FIRED, "service": "checkout", "summary": "Payments fail"}
+    response = client.post(f"{REFLEXR}/{workspace}/events", json={"event": fired})
+    assert response.status_code == 200, response.text
+
+
+def runs(client: TestClient, rule: str = FILE, workspace: str = "main") -> list[str]:
+    found = client.get(f"{REFLEXR}/{workspace}/runs", params={"rule": rule}).json()
+    return [run["status"] for run in found]
+
+
+def filed(tracker: FakeTracker) -> list[Item]:
+    return tracker.items_in("ops")
+
+
+def comments(tracker: FakeTracker, item: Item) -> list[Comment]:
+    connection = tracker.connect(CREDENTIALS, "a person")
+    return asyncio.run(connection.comments(item.ref, None))
+
+
+def test_a_rules_dead_letters_are_one_item_with_a_comment_each(
+    client: TestClient, tracker: FakeTracker
+) -> None:
+    failing(client)
+    fire(client)
+    wait_for(lambda: runs(client) == ["succeeded"])
+    [item] = filed(tracker)
+    assert (item.title, item.priority, item.labels) == ("chat:fails fails", "high", ("run-failed",))
+    lattice = tracker.connect(CREDENTIALS, f"lattice:{TENANT}/main")
+    found = asyncio.run(lattice.find("ops", "dead-letter/chat:fails"))
+    assert found is not None
+    assert found.id == item.ref.id, "filed by the rule's key"
+    [first] = comments(tracker, item)
+    assert "failed after 1 attempt: thread nowhere does not exist" in first.body
+
+    fire(client)
+    wait_for(lambda: runs(client) == ["succeeded", "succeeded"])
+    assert [i.ref.id for i in filed(tracker)] == [item.ref.id], "the rule's item, not another"
+    assert len(comments(tracker, item)) == 2
+
+
+def test_it_never_files_its_own_dead_letters(client: TestClient, tracker: FakeTracker) -> None:
+    tracker.rotate("another-key")  # the tracker refuses the tenant's key: its runs fail for good
+    failing(client)
+    fire(client)
+    fire(client)
+    wait_for(lambda: runs(client, "chat:fails") == ["dead", "dead"])
+    wait_for(lambda: runs(client) == ["dead", "dead"])
+    time.sleep(0.5)  # a run for its own dead letter would start within a few polls
+    assert runs(client) == ["dead", "dead"], "one for each dead letter of chat:fails, no more"
+    assert tracker.created == 0
+
+
+def test_an_item_a_person_deleted_is_not_filed_again(
+    client: TestClient, tracker: FakeTracker
+) -> None:
+    failing(client)
+    fire(client)
+    wait_for(lambda: filed(tracker))
+    [item] = filed(tracker)
+    tracker.delete(item.ref)
+    fire(client)
+    wait_for(lambda: runs(client) == ["succeeded", "succeeded"])
+    assert (filed(tracker), tracker.created) == ([], 1)
+
+
+def test_a_workspace_with_no_binding_files_nothing(
+    client: TestClient, tracker: FakeTracker
+) -> None:
+    failing(client, "elsewhere")
+    fire(client, "elsewhere")
+    wait_for(lambda: runs(client, workspace="elsewhere") == ["succeeded"])
+    assert tracker.created == 0
+
+
+def nudge(client: TestClient, body: bytes, signature: str) -> int:
+    headers = {"x-fake-signature": signature, "content-type": "application/json"}
+    path = f"/relayr/v1/trackers/{TENANT}/{{ tracker }}"
+    return client.post(path, content=body, headers=headers).status_code
+
+
+def published(client: TestClient, kind: str) -> list[dict[str, Any]]:
+    found = client.get(f"{REFLEXR}/main/events", params={"type": f"tracker:{kind}"}).json()
+    return [envelope["event"] for envelope in found]
+
+
+def test_what_people_change_comes_back_and_a_webhook_reads_it_at_once(
+    script: Script, tracker: FakeTracker
+) -> None:
+    ref = tracker.add("ops", "Checkout is slow")
+    since = tracked(since=datetime(2026, 1, 1, tzinfo=UTC))
+    with TestClient(app(script, since, tracker=tracker.connect), headers=bearer()) as client:
+        wait_for(lambda: published(client, "item_created"))
+        [created] = published(client, "item_created")
+        assert (created["tracker"], created["title"]) == ("{{ tracker }}", "Checkout is slow")
+
+        tracker.edit(ref, ItemFields(title="Checkout is down"))
+        body = json.dumps({"project": "ops"}).encode()
+        assert nudge(client, body, "not-the-signature") == 401
+        signature = hmac.new(SECRET.encode(), body, hashlib.sha256).hexdigest()
+        assert nudge(client, body, signature) == 204
+        # Sooner than the follower's thirty seconds: the webhook woke it.
+        wait_for(lambda: published(client, "item_changed"), timeout=15)
+        [changed] = published(client, "item_changed")
+        assert (changed["field"], changed["new"]) == ("title", "Checkout is down")

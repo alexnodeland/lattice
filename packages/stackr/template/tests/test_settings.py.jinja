@@ -1,8 +1,36 @@
 """Settings come from the environment: the stack's ports, with local defaults."""
+{%- if use_tracker %}
+
+import json
+{%- endif %}
 
 import pytest
+{%- if use_tracker %}
+
+from relayr.ledger import WorkspaceKey
+from relayr.trackers import TrackerBinding, TrackerCredentials
+
+from {{ package_name }}.settings import (
+    AuthSettings,
+    GatewaySettings,
+    Settings,
+    TrackerSettings,
+)
+
+CREDENTIALS = {
+    "base_url": "http://{% if tracker == 'plane' %}plane-proxy{% else %}vikunja:3456{% endif %}",
+    "api_key": "the-key",
+    "webhook_secret": "the-secret",
+{%- if tracker == 'plane' %}
+    "workspace": "acme",
+{%- else %}
+    "expires_at": "2027-01-01",
+{%- endif %}
+}
+{%- else %}
 
 from {{ package_name }}.settings import AuthSettings, GatewaySettings, Settings
+{%- endif %}
 
 
 def test_an_empty_environment_gives_the_defaults() -> None:
@@ -45,6 +73,11 @@ def test_every_setting_comes_from_its_variable() -> None:
             "LITELLM_GUARDRAILS": "pii-mask, ",
             "LITELLM_MOCK_RESPONSE": "ok",
             "LANGFUSE_PUBLIC_KEY": "pk-lf-1",
+{%- if use_tracker %}
+            "TRACKER_CREDENTIALS": json.dumps({"acme": CREDENTIALS}),
+            "TRACKER_BINDINGS": '{"acme/main": {"project": "ops", "labels": ["lattice"]}}',
+            "TRACKER_BUDGET": "60",
+{%- endif %}
         }
     )
     assert settings == Settings(
@@ -75,6 +108,15 @@ def test_every_setting_comes_from_its_variable() -> None:
             guardrails=("pii-mask",),
             mock_response="ok",
         ),
+{%- if use_tracker %}
+        tracker=TrackerSettings(
+            credentials={"acme": TrackerCredentials.model_validate(CREDENTIALS)},
+            bindings={
+                WorkspaceKey("acme", "main"): TrackerBinding(project="ops", labels=("lattice",))
+            },
+            budget=60,
+        ),
+{%- endif %}
         telemetry=True,
         langfuse=True,
     )
@@ -105,3 +147,43 @@ def test_the_schema_must_be_a_plain_identifier(schema: str) -> None:
 def test_the_tables_owner_needs_the_role_the_app_works_as() -> None:
     with pytest.raises(ValueError, match="DATABASE_ADMIN_URL needs DATABASE_URL"):
         Settings(database_admin_url="postgresql+asyncpg://owner:secret@db/postgres")
+{%- if use_tracker %}
+
+
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        ("TRACKER_CREDENTIALS", "not json"),
+        ("TRACKER_CREDENTIALS", '["acme"]'),
+        ("TRACKER_BINDINGS", '{"acme": {"project": "ops"}}'),
+        ("TRACKER_BINDINGS", '{"acme/main": {"labels": []}}'),
+    ],
+)
+def test_the_tracker_settings_must_be_json_objects_of_their_shape(name: str, value: str) -> None:
+    with pytest.raises(ValueError, match=name):
+        Settings.from_environ({name: value})
+
+
+def test_a_tenants_credentials_are_never_quoted_when_they_are_wrong() -> None:
+    wrong = {"acme": {"api_key": "a-secret-key", "webhook_secret": "a-secret"}}
+    with pytest.raises(ValueError, match="TRACKER_CREDENTIALS of acme must have") as refused:
+        Settings.from_environ({"TRACKER_CREDENTIALS": json.dumps(wrong)})
+    assert "a-secret" not in str(refused.value)
+    assert refused.value.__cause__ is None
+
+
+{%- if tracker == 'plane' %}
+
+
+def test_plane_credentials_name_the_tenants_workspace() -> None:
+    nameless = {"acme": {**CREDENTIALS, "workspace": ""}}
+    fields = "base_url, api_key, webhook_secret and workspace"
+    with pytest.raises(ValueError, match=f"TRACKER_CREDENTIALS of acme must have {fields}"):
+        Settings.from_environ({"TRACKER_CREDENTIALS": json.dumps(nameless)})
+{%- endif %}
+
+
+def test_a_bound_workspace_needs_its_tenants_credentials() -> None:
+    with pytest.raises(ValueError, match="binds acme/main, and TRACKER_CREDENTIALS has none"):
+        Settings.from_environ({"TRACKER_BINDINGS": '{"acme/main": {"project": "ops"}}'})
+{%- endif %}

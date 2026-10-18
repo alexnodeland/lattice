@@ -20,6 +20,9 @@ principal's key, and names its tenant (``access.py``){% endif %}.
 {%- if use_portal %}
 - ``/portalr``: portalr's app and admin UIs, and the reads behind them (``portal.py``)
 {%- endif %}
+{%- if use_tracker %}
+- ``/relayr/v1/trackers``: where {% if tracker == 'plane' %}Plane{% else %}Vikunja{% endif %}'s webhooks wake relayr's followers (``tracking.py``)
+{%- endif %}
 """
 
 import contextlib
@@ -37,6 +40,12 @@ from pydantic_ai.models import Model
 {%- if access == 'grantr' %}
 
 from grantr import Grants
+{%- if use_tracker %}
+from relayr.trackers import Connect
+{%- endif %}
+{%- elif use_tracker %}
+
+from relayr.trackers import Connect
 {%- endif %}
 
 {% if access == 'grantr' -%}
@@ -58,8 +67,14 @@ from {{ package_name }}.gateway import gateway_model
 from {{ package_name }}.portal import Portal
 {%- endif %}
 from {{ package_name }}.redaction import LOG_CONFIG
+{%- if use_tracker %}
+from {{ package_name }}.scores import opened
+{%- endif %}
 from {{ package_name }}.settings import Settings
 from {{ package_name }}.telemetry import TelemetryHandle, configure
+{%- if use_tracker %}
+from {{ package_name }}.tracking import Tracking
+{%- endif %}
 
 TITLE = {{ project_name | tojson }}
 DISTRIBUTION = "{{ project_slug }}"
@@ -99,6 +114,9 @@ def create_app(
     poll_interval: timedelta = timedelta(seconds=1),
     grace: timedelta = STOP_GRACE,
 {%- endif %}
+{%- if use_tracker %}
+    tracker: Connect | None = None,
+{%- endif %}
 ) -> FastAPI:
     """Build the application.
 
@@ -116,6 +134,10 @@ def create_app(
         poll_interval: How often the reactor looks for work.
         grace: How long the reactor's running actions have to end when the application stops;
             keep it below the time the platform gives a stopping process.
+{%- endif %}
+{%- if use_tracker %}
+        tracker: The task tracker's adapter; {% if tracker == 'plane' %}Plane{% else %}Vikunja{% endif %}'s, over HTTP, by default. Tests pass
+            relayr's ``FakeTracker``'s.
 {%- endif %}
     """
     settings = settings or Settings.from_environ()
@@ -145,6 +167,9 @@ def create_app(
 {%- if use_relayr %}
     bridge = Bridge(database=database, telemetry=telemetry{% if access == 'grantr' %}, grants=access.grants{% endif %})
 {%- endif %}
+{%- if use_tracker %}
+    tracking = Tracking(bridge.ledger, settings.tracker, connect=tracker, telemetry=telemetry)
+{%- endif %}
 {%- if use_reflexr %}
     automation = Automation(
         name=settings.service_name,
@@ -162,7 +187,11 @@ def create_app(
         telemetry=telemetry,
         poll_interval=poll_interval,
         grace=grace,
-{%- if use_relayr %}
+{%- if use_tracker %}
+        on_open=opened(bridge.watch, tracking.watch),
+        run_context=bridge.run_context,
+        actions={**bridge.actions(), **tracking.actions()},
+{%- elif use_relayr %}
         on_open=bridge.watch,
         run_context=bridge.run_context,
         actions=bridge.actions(),
@@ -195,6 +224,9 @@ def create_app(
 {%- if use_relayr %}
     bridge.connect(collaboration, automation)
 {%- endif %}
+{%- if use_tracker %}
+    tracking.connect(automation.workspaces)
+{%- endif %}
 {%- if use_portal %}
     portal = Portal(access=access, settings=settings)
 {%- endif %}
@@ -213,6 +245,9 @@ def create_app(
 {%- endif %}
 {%- if use_relayr %}
         bridge,
+{%- endif %}
+{%- if use_tracker %}
+        tracking,
 {%- endif %}
 {%- if use_portal %}
         portal,

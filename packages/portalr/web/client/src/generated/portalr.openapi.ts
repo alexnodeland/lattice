@@ -345,6 +345,10 @@ export interface components {
          * @description ``config.json``: what the UIs need of the deployment they run in.
          */
         Config: {
+            /** Editors */
+            editors: {
+                [key: string]: string;
+            };
             /** People */
             people: boolean;
             /** Readers */

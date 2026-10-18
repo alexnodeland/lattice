@@ -63,7 +63,8 @@ export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/artifacts/
 
 function Artifact() {
   const { tenant, workspace, artifact: id } = Route.useParams();
-  const { config, queries, queryClient, user } = Route.useRouteContext();
+  const context = Route.useRouteContext();
+  const { queries, queryClient, user } = context;
   const me = useMe(queries, user, tenant);
   const checks = useMemo(
     () => allowedIn(queries, tenant, workspaceOf(workspace), ACTIONS),
@@ -171,15 +172,7 @@ function Artifact() {
         </FormHostContext>
       </Card>
       {native && (
-        <NativeFile
-          queries={queries}
-          tenant={tenant}
-          workspace={workspace}
-          artifact={id}
-          native={native}
-          me={me}
-          people={config.people}
-        />
+        <NativeFile place={{ context, tenant, workspace, artifact: id }} native={native} me={me} />
       )}
       {open.length > 0 && (
         <section aria-labelledby="open" className="flex flex-col gap-3">

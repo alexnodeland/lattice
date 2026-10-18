@@ -1,5 +1,5 @@
 import type { Snapshot } from "@portalr/client";
-import { allowedIn, type Reflexr, workspaceOf } from "@portalr/client";
+import { allowedIn, filedBy, type Reflexr, type TrackerItem, workspaceOf } from "@portalr/client";
 import {
   Alert,
   ConfirmDialog,
@@ -13,8 +13,9 @@ import {
   SectionTitle,
   SegmentedFilter,
   SelectField,
+  TrackerItems,
 } from "@portalr/ui";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import {
   createFileRoute,
   type ErrorComponentProps,
@@ -160,12 +161,13 @@ function Runs({ tenant, workspace, show }: { tenant: string; workspace: string; 
   const { data: allowed } = useSuspenseQuery(
     allowedIn(queries, tenant, workspaceOf(workspace), GRANTS),
   );
+  const { data: filed } = useQuery(queries.relayr.filed(tenant, workspace));
   const runs = listed(snapshot.state.runs, show);
   const parts: RunParts[] = runs.map((run) => ({
     key: run.id,
     name: `Run ${run.id}`,
     status: <RuleRunStatus status={run.status} />,
-    title: <Title run={run} />,
+    title: <Title run={run} filed={filedBy(filed, run.chain)} />,
     attempts: run.attempt,
     feedback: null,
     actions: <Actions run={run} actions={offered(run.status, allowed)} heading={heading} />,
@@ -230,8 +232,11 @@ function Connecting() {
   );
 }
 
-/** A run's rule, why it last failed, how often it was retried, and what people did to it. */
-function Title({ run }: { run: Reflexr.Run }) {
+/**
+ * A run's rule, why it last failed, how often it was retried, the tracker items its chain filed,
+ * and what people did to it.
+ */
+function Title({ run, filed }: { run: Reflexr.Run; filed: readonly TrackerItem[] }) {
   return (
     <div className="flex flex-col gap-1">
       <code className="font-mono">{run.rule}</code>
@@ -241,6 +246,7 @@ function Title({ run }: { run: Reflexr.Run }) {
           retried {run.retries === 1 ? "once" : `${run.retries} times`}
         </span>
       )}
+      <TrackerItems label="Filed as" items={filed} />
       {run.history.length > 0 && (
         <details className="text-xs">
           <summary

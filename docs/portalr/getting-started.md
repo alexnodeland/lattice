@@ -188,7 +188,7 @@ The UIs read this first. It is public, so it holds no secret:
 |---|---|
 | `supabase.url` | Your Supabase project's URL, or a path on your own origin that leads to it |
 | `supabase.key` | Its publishable key |
-| `surfaces` | Where you mounted each router: `artifactr` (default `/artifactr/v1`), `reflexr` (default `/reflexr/v1`), `grantr` (default `""`: its paths carry `/grantr/v1` themselves) and `portalr` (default `/portalr/v1`). Pass `Surfaces(...)` in `Site` if you mounted them elsewhere |
+| `surfaces` | Where you mounted each router: `artifactr` (default `/artifactr/v1`), `reflexr` (default `/reflexr/v1`), `grantr` (default `""`: its paths carry `/grantr/v1` themselves), `portalr` (default `/portalr/v1`) and `relayr` (default `null`: the application has no tracker; give the origin of relayr's tracker reads, `""` on this one, and runs link to what they filed). Pass `Surfaces(...)` in `Site` if you mounted them elsewhere |
 | `readers` | Which tools are configured, by name: `tempo`, `loki`, `prometheus`, `langfuse`, `litellm` and `grafana`, each true or false |
 | `people` | Whether the router names people by email: true where `people` was passed |
 

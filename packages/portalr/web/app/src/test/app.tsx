@@ -1,8 +1,8 @@
 /**
  * The app as a route, over a stubbed server and a stubbed artifactr stream, for route-level tests:
  * alice is signed in, a member of acme who can open notes; a test's own `serve` answers the rest,
- * and its `answer` what the stream says of each command. The query client is the app's own, with
- * its retries.
+ * and its `answer` what the stream says of each command. reflexr's stream replays the log a test
+ * gives it, and artifactr's an empty one. The query client is the app's own, with its retries.
  */
 
 import {
@@ -37,14 +37,16 @@ export type Serve = (request: Request, path: string) => Promise<Response | undef
 /** What the stream says of a command: its rejection's type, or null to carry it out. */
 export type Answer = (command: { type: string }) => string | null;
 
-/** A WebSocket that replays an empty log, then answers each command as `answer` says. */
-function socketAnswering(answer: Answer) {
+/** A WebSocket that replays its log, reflexr's or none, then answers each command as `answer` says. */
+function socketAnswering(answer: Answer, reflexrLog: readonly unknown[]) {
   return class {
     onopen: (() => void) | null = null;
     onmessage: ((message: { data: string }) => void) | null = null;
     onclose: ((closed: { code: number }) => void) | null = null;
+    readonly #log: readonly unknown[];
 
-    constructor() {
+    constructor(url: string) {
+      this.#log = url.includes("/reflexr/") ? reflexrLog : [];
       queueMicrotask(() => this.onopen?.());
     }
 
@@ -55,7 +57,10 @@ function socketAnswering(answer: Answer) {
     send(data: string) {
       const frame = JSON.parse(data) as { type: string; command_id?: string; command?: never };
       if (frame.type === "hello") {
-        this.#emit({ type: "welcome", head_seq: 0 });
+        this.#emit({ type: "welcome", head_seq: this.#log.length });
+        for (const event of this.#log) {
+          this.#emit(event);
+        }
         this.#emit({ type: "replay_complete" });
         return;
       }
@@ -86,19 +91,31 @@ function server(serve: Serve) {
   };
 }
 
-/** The app, opened at `path`, over `serve` and a stream that answers as `answer` does. */
-export async function open(path: string, serve: Serve, answer: Answer = () => null) {
+/** What a test changes of the app's world: reflexr's log, and the config's surfaces. */
+export interface World {
+  readonly reflexrLog?: readonly unknown[];
+  readonly surfaces?: Partial<Config["surfaces"]>;
+}
+
+/** The app, opened at `path`, over `serve` and streams that answer as `answer` does. */
+export async function open(
+  path: string,
+  serve: Serve,
+  answer: Answer = () => null,
+  world: World = {},
+) {
   const fetched = vi.fn(server(serve));
   vi.stubGlobal("fetch", fetched);
-  vi.stubGlobal("WebSocket", socketAnswering(answer));
+  vi.stubGlobal("WebSocket", socketAnswering(answer, world.reflexrLog ?? []));
   const queryClient = createQueryClient(() => undefined);
-  const api = createApi(CONFIG.surfaces, () => ({ token: "t0k3n" }));
+  const config = { ...CONFIG, surfaces: { ...CONFIG.surfaces, ...world.surfaces } };
+  const api = createApi(config.surfaces, () => ({ token: "t0k3n" }));
   const router = createRouter({
     routeTree,
     history: createMemoryHistory({ initialEntries: [path] }),
     context: {
-      config: CONFIG,
-      signed: new Alice(CONFIG, () => undefined),
+      config,
+      signed: new Alice(config, () => undefined),
       queries: createQueries(api),
       commands: createCommands(api, () => undefined),
       queryClient,

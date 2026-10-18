@@ -396,6 +396,7 @@ class _Reading:
                 project=project,
                 cursor=None if cursor is None else (cursor.updated_at, cursor.id),
                 swept_at=self.now if swept or following is None else following.swept_at,
+                read_at=self.now,
             ),
         )
         return self.found

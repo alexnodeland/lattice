@@ -5,8 +5,9 @@ layer: 'library'
 tags: ['distribution', 'api']
 dependsOn:
   - 'grantr'
-  - 'artifactr' # its test application mounts artifactr's router and reflexr's
+  - 'artifactr' # its test application mounts artifactr's router, reflexr's and relayr's
   - 'reflexr'
+  - 'relayr'
   - 'lattice-core' # the workspace tag it reads spend by
 
 fileGroups:

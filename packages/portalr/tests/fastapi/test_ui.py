@@ -88,6 +88,7 @@ async def test_config_names_supabase_the_surfaces_and_the_tools(client: httpx.As
             "reflexr": "/reflexr/v1",
             "grantr": "",
             "portalr": "/portalr/v1",
+            "relayr": None,
         },
         "readers": dict.fromkeys(
             ("tempo", "loki", "prometheus", "langfuse", "litellm", "grafana"), True

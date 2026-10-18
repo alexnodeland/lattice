@@ -28,6 +28,7 @@ from relayr.ledger import (
     Ledger,
     Snapshot,
     Tracked,
+    TrackedKey,
     TrackedKind,
     TrackerDeadLetter,
     TrackerFollowing,
@@ -97,6 +98,9 @@ class Forgetful:
     ) -> dict[str, JsonValue] | None:
         return await self._ledger.record_tracked(workspace, kind, key, ref)
 
+    async def every_tracked(self, workspace: WorkspaceKey) -> dict[TrackedKey, Tracked]:
+        return await self._ledger.every_tracked(workspace)
+
     async def release_tracked(self, workspace: WorkspaceKey, kind: TrackedKind, key: str) -> None:
         await self._ledger.release_tracked(workspace, kind, key)
 
@@ -122,6 +126,9 @@ class Forgetful:
         self, workspace: WorkspaceKey, item_id: str, *, within: timedelta
     ) -> int:
         return await self._ledger.record_tracker_write(workspace, item_id, within=within)
+
+    async def tracker_writes(self, workspace: WorkspaceKey, *, within: timedelta) -> dict[str, int]:
+        return await self._ledger.tracker_writes(workspace, within=within)
 
     async def acquire_tracker_lease(
         self, workspace: WorkspaceKey, holder: str, ttl: timedelta

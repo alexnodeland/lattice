@@ -5,7 +5,9 @@ subject starts with ``fail``: then each attempt fails, the run retries once, and
 for a scenario to retry or skip. Its retries are short, so that happens within a scenario.
 
 A workspace's admin may install stored rules in the ``tickets`` namespace, which run ``triage``
-too, and a daily schedule ticks into every workspace, for the Rules area to list.
+too, and a daily schedule ticks into every workspace, for the Rules area to list. The tracker's
+rules and events are ``tracking.py``'s: a dead-lettered run is filed there, and its changes come
+back.
 """
 
 from datetime import timedelta
@@ -30,6 +32,9 @@ from reflexr import (
 )
 from reflexr.core import StoredRules
 from reflexr.workspace import InMemoryStorage, Reaction, Reactor, Schedule, Workspaces
+from relayr.trackers.events import PUBLISHERS, TRACKED
+from tests.app.tracking import RULES as TRACKER_RULES
+from tests.app.tracking import Tracking
 
 
 class PortalrEvent(Event, abstract=True, event_namespace="portalr"):
@@ -60,6 +65,9 @@ TRIAGE = Rule(
 STORED = StoredRules(actions={"triage": None}, namespaces={"tickets"})
 """What a workspace's stored rules may do: run ``triage``, named in the ``tickets`` namespace."""
 
+CODE_RULES = frozenset({TRIAGE.name, *(rule.name for rule in TRACKER_RULES)})
+"""The application's own rules, whose runs act as the application."""
+
 DIGEST = Schedule(name="portalr:digest", cron="0 9 * * *")
 """A tick into every workspace each morning, which no rule here reads."""
 
@@ -76,7 +84,8 @@ def subject(application: ServicePrincipal, workspace: str | None, actor: Actor) 
     """Who grantr checks for a reflexr actor, as the template's ``reflexr_subject`` maps them: a
     person, and a client acting for one, as them; a client with a key as its principal; the code
     rule's runs, and the application's own system, as the application; a stored rule's runs as
-    the rule; any other agent as no one."""
+    the rule; any other agent as no one. The tracker's follower publishes as a source, so as the
+    application."""
     match actor:
         case UserActor():
             return User(id=actor.id)
@@ -84,7 +93,7 @@ def subject(application: ServicePrincipal, workspace: str | None, actor: Actor) 
             return ServicePrincipal(id=actor.client_id)
         case ExternalAgentActor(on_behalf_of=UserActor(id=person)):
             return User(id=person)
-        case AgentActor(rule=rule) if rule == TRIAGE.name:
+        case AgentActor(rule=rule) if rule in CODE_RULES:
             return application
         case AgentActor(rule=rule) if workspace is not None:
             return RulePrincipal(workspace=workspace, rule=rule)
@@ -94,8 +103,11 @@ def subject(application: ServicePrincipal, workspace: str | None, actor: Actor) 
             return AgentSubject()
 
 
-def automation(grants: Grants, application: ServicePrincipal) -> tuple[Workspaces, Reactor[None]]:
-    """reflexr's workspaces, checked by grantr, and the reactor that runs their rules."""
+def automation(
+    grants: Grants, application: ServicePrincipal, tracking: Tracking
+) -> tuple[Workspaces, Reactor[None]]:
+    """reflexr's workspaces, checked by grantr, the reactor that runs their rules, and the
+    tracker's follower connected to them."""
 
     def checked_as(_tenant: str, workspace: str | None, actor: Actor) -> Subject:
         return subject(application, workspace, actor)
@@ -103,10 +115,14 @@ def automation(grants: Grants, application: ServicePrincipal) -> tuple[Workspace
     hooks = grants.hooks(checked_as)
     workspaces = Workspaces(
         InMemoryStorage(),
-        events=[TicketOpened],
-        rules=[TRIAGE],
+        events=[TicketOpened, *TRACKED],
+        rules=[TRIAGE, *TRACKER_RULES],
         stored_rules=STORED,
         schedules=[DIGEST],
         authorize=hooks.authorize,
+        publishers=PUBLISHERS,
+        on_open=tracking.watch,
     )
-    return workspaces, Reactor[None](workspaces, actions={"triage": triage})
+    tracking.connect(workspaces)
+    actions = {"triage": triage, **tracking.actions()}
+    return workspaces, Reactor[None](workspaces, actions=actions)

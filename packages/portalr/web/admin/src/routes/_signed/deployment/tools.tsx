@@ -8,6 +8,7 @@ import {
   Reading,
   SectionTitle,
   SelectField,
+  safeHref,
   TextField,
   TextLink,
 } from "@portalr/ui";
@@ -20,7 +21,6 @@ import {
   type Ignored,
   ignoredOf,
   NOTICE,
-  safeHref,
   shownOf,
   TOOL_NAME,
   TOOLS,

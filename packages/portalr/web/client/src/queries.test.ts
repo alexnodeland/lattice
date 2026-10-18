@@ -291,8 +291,31 @@ test("reflexr's rule events make its rules stale, its run events its runs, and t
   ]);
   expect(stale.reflexr("acme", "ws_1", reflexrFrame("reflexr:run_succeeded"))).toEqual([
     keys.reflexr.runs("acme", "ws_1"),
+    keys.relayr.filed("acme", "ws_1"),
+  ]);
+  expect(stale.reflexr("acme", "ws_1", reflexrFrame("reflexr:run_started"))).toEqual([
+    keys.reflexr.runs("acme", "ws_1"),
   ]);
   expect(stale.reflexr("acme", "ws_1", reflexrFrame("ops:alert.fired"))).toEqual([]);
+});
+
+test("relayr's reads name their tenant and workspace, and are none with no tracker", async () => {
+  const client = new QueryClient();
+  const tracked = createQueries(
+    createApi({ artifactr: "", reflexr: "", grantr: origin, relayr: origin }, () => ({
+      token: "t0k3n",
+    })),
+  );
+  await client.fetchQuery(tracked.relayr.filed("acme", "ws_1"));
+  expect(seen.at(-1)?.url.pathname).toBe("/relayr/v1/workspaces/ws_1/tracker/items");
+  expect(seen.at(-1)?.headers.get("x-tenant")).toBe("acme");
+  expect(seen.at(-1)?.headers.get("authorization")).toBe("Bearer t0k3n");
+  await client.fetchQuery(tracked.relayr.following("acme", "ws_1"));
+  expect(seen.at(-1)?.url.pathname).toBe("/relayr/v1/workspaces/ws_1/tracker");
+  const asked = seen.length;
+  expect(await client.fetchQuery(queries.relayr.filed("acme", "ws_2"))).toBeNull();
+  expect(await client.fetchQuery(queries.relayr.following("acme", "ws_2"))).toBeNull();
+  expect(seen.length).toBe(asked);
 });
 
 test("config.json is read from the deployment, or its failure said", async () => {

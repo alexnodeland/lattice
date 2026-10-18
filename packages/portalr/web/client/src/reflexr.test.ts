@@ -1,6 +1,9 @@
 import { expect, test } from "vitest";
 import type * as v1 from "./generated/reflexr.v1";
-import { apply, RUN_EVENTS, reflexr, type Workspace } from "./reflexr";
+import { apply, RUN_EVENTS, reflexr, trackerItem, type Workspace } from "./reflexr";
+
+/** relayr's tracker followers, the only source a `tracker:` event names an item from. */
+const TRACKER = { kind: "source", name: "tracker" } as const;
 
 function replay(...events: v1.EventFrame["event"][]): Workspace {
   return events
@@ -12,7 +15,7 @@ function replay(...events: v1.EventFrame["event"][]): Workspace {
           id: `evt_${index + 1}`,
           ts: "2026-10-12T00:00:00Z",
           workspace_id: "ws_1",
-          actor: { kind: "system", name: "reflexr" },
+          actor: event.type.startsWith("tracker:") ? TRACKER : { kind: "system", name: "reflexr" },
           correlation_id: "c",
           event,
         }) as v1.EventFrame,
@@ -23,8 +26,8 @@ function replay(...events: v1.EventFrame["event"][]): Workspace {
 test("a stored rule has its version, its firings, and whether it is archived", () => {
   const state = replay(
     { type: "reflexr:rule_installed", rule: "ops:page", version: 1 },
-    { type: "reflexr:rule_fired", rule: "ops:page", firing_id: "f1" },
-    { type: "reflexr:rule_fired", rule: "ops:page", firing_id: "f2" },
+    { type: "reflexr:rule_fired", rule: "ops:page", firing_id: "f1", matched: [] },
+    { type: "reflexr:rule_fired", rule: "ops:page", firing_id: "f2", matched: [] },
     { type: "reflexr:rule_archived", rule: "ops:page", version: 1 },
   );
   expect(state.rules["ops:page"]).toEqual({
@@ -66,6 +69,7 @@ test("a run moves through its statuses", () => {
       },
     ],
     feedback: [],
+    chain: "c",
   });
   expect(replay({ type: "reflexr:run_cancelled", run_id: "r" }).runs.r?.status).toBe("cancelled");
   expect(replay({ type: "reflexr:run_skipped", run_id: "r" }).runs.r?.status).toBe("skipped");
@@ -79,6 +83,72 @@ test("the application's events, and reflexr's that the store doesn't show, chang
   );
   expect(state).toEqual(reflexr.initial());
   expect(reflexr.creates({ type: "publish", event: { type: "ops:x" } })).toBe(false);
+});
+
+/** A `tracker:` event about OPS-12, as relayr's followers publish one, with what it said. */
+const changed = (name = "OPS-12") => ({
+  type: "tracker:item_changed",
+  tracker: "plane",
+  project: "p",
+  item_id: "i",
+  number: 12,
+  name,
+  link: `https://plane.test/acme/browse/${name}/`,
+  field: "title",
+  old: "what was said",
+  new: "what is said",
+});
+
+test("a run fired by tracker events links to their items, and keeps nothing they said", () => {
+  const state = replay(
+    changed(),
+    { type: "ops:alert.fired", service: "checkout" },
+    changed("OPS-13"),
+    { type: "reflexr:rule_fired", rule: "ops:follow", firing_id: "run_1", matched: [1, 2, 3] },
+    { type: "reflexr:rule_fired", rule: "ops:page", firing_id: "run_2", matched: [2] },
+  );
+  const twelve = {
+    tracker: "plane",
+    name: "OPS-12",
+    link: "https://plane.test/acme/browse/OPS-12/",
+  };
+  expect(state.firedBy).toEqual({
+    run_1: [twelve, { ...twelve, name: "OPS-13", link: "https://plane.test/acme/browse/OPS-13/" }],
+  });
+  expect(state.tracked[1]).toEqual(twelve);
+  expect(JSON.stringify(state)).not.toContain("said");
+});
+
+test("a firing that matched two of an item's changes links to it once", () => {
+  const state = replay(changed(), changed(), {
+    type: "reflexr:rule_fired",
+    rule: "ops:follow",
+    firing_id: "run_1",
+    matched: [1, 2],
+  });
+  expect(state.firedBy.run_1?.map((item) => item.name)).toEqual(["OPS-12"]);
+});
+
+test("an event that only looks like a tracker's names no item", () => {
+  const sent = (event: Record<string, unknown>, actor: object = TRACKER) =>
+    ({ type: "event", seq: 1, correlation_id: "c", actor, event }) as unknown as v1.EventFrame;
+  expect(trackerItem(sent(changed()))).not.toBeNull();
+  expect(trackerItem(sent({ type: "tracker:item_changed", name: "OPS-1" }))).toBeNull();
+  expect(
+    trackerItem(sent({ type: "trackers:x", tracker: "plane", name: "OPS-1", link: "l" })),
+  ).toBeNull();
+  // Anyone else's, such as a person's who publishes one where the namespace isn't reserved.
+  expect(trackerItem(sent(changed(), { kind: "user", id: "mallory" }))).toBeNull();
+  expect(trackerItem(sent(changed(), { kind: "source", name: "ci" }))).toBeNull();
+  const state = replay({ type: "tracker:item_removed", tracker: "plane", name: 1, link: "l" });
+  expect(state).toEqual(reflexr.initial());
+});
+
+test("a run keeps the causal chain it belongs to", () => {
+  expect(
+    replay({ type: "reflexr:run_started", run_id: "run_1", rule: "ops:page", attempt: 1 }).runs
+      .run_1?.chain,
+  ).toBe("c");
 });
 
 test("feedback on a run is kept with it; on a firing, a chain or an unread run, nowhere", () => {

@@ -17,6 +17,7 @@ import type {
 } from "./generated/grantr.openapi";
 import type { components as Portalr } from "./generated/portalr.openapi";
 import type * as reflexrV1 from "./generated/reflexr.v1";
+import type { components as Relayr } from "./generated/relayr.openapi";
 import { reasons } from "./reasons";
 import * as reflexr from "./reflexr";
 import { type Api, named } from "./rest";
@@ -40,6 +41,15 @@ export type AuditFilter = {
 };
 
 type Metric = Portalr["schemas"]["Metric"];
+
+/** What a workspace's runs filed in its tracker, as relayr answers. */
+export type Filed = Relayr["schemas"]["Filed"];
+
+/** One item a workspace's runs filed, with its link and the chains that wrote to it. */
+export type FiledItem = Relayr["schemas"]["FiledItem"];
+
+/** How the tracker connector is doing in a workspace, as relayr answers. */
+export type Following = Relayr["schemas"]["Following"];
 
 /** The most people one request for their emails names, as the server takes them. */
 export const PEOPLE_MAX = 100;
@@ -77,6 +87,14 @@ export const keys = {
       [...keys.reflexr.workspace(tenant, ws), "schedules", "list"] as const,
     runs: (tenant: string, ws: string) =>
       [...keys.reflexr.workspace(tenant, ws), "runs", "list"] as const,
+  },
+  relayr: {
+    workspace: (tenant: string, ws: string) => ["relayr", tenant, "workspace", ws] as const,
+    /** The items a workspace's runs filed in its tracker, which a run's end makes stale. */
+    filed: (tenant: string, ws: string) => [...keys.relayr.workspace(tenant, ws), "filed"] as const,
+    /** How the tracker connector is doing in a workspace. */
+    following: (tenant: string, ws: string) =>
+      [...keys.relayr.workspace(tenant, ws), "following"] as const,
   },
   grantr: {
     /** A person's tenants, by Supabase Auth's id for them. */
@@ -347,6 +365,39 @@ export function createQueries(api: Api) {
           queryKey: keys.reflexr.runs(tenant, ws),
           queryFn: () =>
             body(api.reflexr.GET("/workspaces/{workspace_id}/runs", workspace(tenant, ws))),
+        }),
+    },
+    relayr: {
+      /**
+       * The items a workspace's runs filed in its tracker, each with its link and the chains that
+       * wrote to it; none where the application has no tracker.
+       */
+      filed: (tenant: string, ws: string) =>
+        queryOptions({
+          queryKey: keys.relayr.filed(tenant, ws),
+          queryFn: (): Promise<Filed | null> =>
+            api.relayr === null
+              ? Promise.resolve(null)
+              : body(
+                  api.relayr.GET(
+                    "/relayr/v1/workspaces/{workspace_id}/tracker/items",
+                    workspace(tenant, ws),
+                  ),
+                ),
+        }),
+      /** How the tracker connector is doing in a workspace; none where there is no tracker. */
+      following: (tenant: string, ws: string) =>
+        queryOptions({
+          queryKey: keys.relayr.following(tenant, ws),
+          queryFn: (): Promise<Following | null> =>
+            api.relayr === null
+              ? Promise.resolve(null)
+              : body(
+                  api.relayr.GET(
+                    "/relayr/v1/workspaces/{workspace_id}/tracker",
+                    workspace(tenant, ws),
+                  ),
+                ),
         }),
     },
     grantr: {
@@ -876,7 +927,10 @@ export const stale = {
     }
   },
 
-  /** reflexr's rule events make its rules stale, its run events its runs, and ticks its schedules. */
+  /**
+   * reflexr's rule events make its rules stale, its run events its runs, and an attempt's end
+   * what the runs filed in a tracker too; ticks make its schedules stale.
+   */
   reflexr(tenant: string, ws: string, envelope: reflexrV1.EventFrame) {
     const { event } = envelope;
     if (!reflexr.isKnown(event)) {
@@ -889,11 +943,12 @@ export const stale = {
       case "reflexr:rule_installed":
       case "reflexr:rule_archived":
         return [keys.reflexr.rules(tenant, ws), keys.reflexr.rule(tenant, ws, event.rule)];
-      case "reflexr:run_started":
-      case "reflexr:run_progressed":
       case "reflexr:run_retrying":
       case "reflexr:run_succeeded":
       case "reflexr:run_dead_lettered":
+        return [keys.reflexr.runs(tenant, ws), keys.relayr.filed(tenant, ws)];
+      case "reflexr:run_started":
+      case "reflexr:run_progressed":
       case "reflexr:run_cancelled":
       case "reflexr:run_requeued":
       case "reflexr:run_skipped":

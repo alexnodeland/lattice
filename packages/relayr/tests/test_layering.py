@@ -45,14 +45,22 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         {"relayr.events", "relayr.ledger", "relayr.outbound", "relayr.rules", "relayr.evals"},
         LIBRARIES,
     ),
-    # The tracker connector (lattice RFC-0004): the port, the core and the fake; and `http`, which
-    # only the adapters import, on httpx.
     # Whether an integration runs in a workspace: a protocol, to move to a shared home.
     "integrations": ({"relayr.integrations"}, set()),
+    # The tracker connector (lattice RFC-0004): the port, the core, the followers and the fake;
+    # and `http`, which only the adapters import, on httpx.
     "trackers": (
-        {"relayr.integrations", "relayr.ledger", "relayr.outbound", "relayr.trackers"},
-        {*LIBRARIES, "pydantic", "pydantic_ai", "httpx"},
+        {
+            "relayr.integrations",
+            "relayr.ledger",
+            "relayr.outbound",
+            "relayr.telemetry",
+            "relayr.trackers",
+        },
+        {*LIBRARIES, "pydantic", "pydantic_ai", "httpx", "opentelemetry"},
     ),
+    # The trackers' webhooks' route, on FastAPI and lattice-core's refusals.
+    "fastapi": ({"relayr.trackers", "relayr.fastapi"}, {"fastapi", "lattice_core.refusals"}),
     "plane": ({"relayr.trackers", "relayr.plane"}, {"httpx", "pydantic"}),
     "vikunja": ({"relayr.trackers", "relayr.vikunja"}, {"httpx", "pydantic"}),
     "rules": (

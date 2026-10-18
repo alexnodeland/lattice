@@ -44,6 +44,13 @@ from tests.trackers.conftest import (
 
 DRAFT = ItemDraft(title="A run failed", description="<p>It failed.</p>", labels=("run-failed",))
 KEYED = "dead-letter/run_1"
+FILED = {
+    "title": DRAFT.title,
+    "description": DRAFT.description,
+    "priority": "medium",
+    "labels": ["lattice", "run-failed"],
+}
+"""What filing `DRAFT` in the bound workspace records, as the tracker holds it."""
 
 
 async def filed(acting: TrackerActions, key: str = KEYED, draft: ItemDraft = DRAFT) -> ItemRef:
@@ -182,7 +189,11 @@ async def test_an_edit_sends_only_what_differs_and_records_it_first(
     await acting.update(item, ItemFields(priority="urgent", labels=("lattice",)))
     tracked = await ledger.tracked(KEY, "item", KEYED)
     assert tracked is not None
-    assert tracked.written == {"state": "started", "priority": "urgent", "labels": ["lattice"]}
+    assert tracked.written == FILED | {
+        "state": "started",
+        "priority": "urgent",
+        "labels": ["lattice"],
+    }
     found = await acting.read(item)
     assert found is not None
     assert (found.state, found.priority, found.labels) == ("started", "urgent", ("lattice",))
@@ -200,7 +211,7 @@ async def test_an_edit_the_tracker_refuses_forgets_its_record(
     assert (refused.value.reason, refused.value.permanent) == ("tracker_refused", False)
     tracked = await ledger.tracked(KEY, "item", KEYED)
     assert tracked is not None
-    assert tracked.written == {"state": "started"}
+    assert tracked.written == FILED | {"state": "started"}
 
 
 async def test_an_edit_of_a_deleted_item_is_refused_and_marks_it(
@@ -395,4 +406,6 @@ async def test_an_edit_that_may_have_landed_keeps_its_record(
         await acting.update(item, ItemFields(title="later"))
     tracked = await ledger.tracked(KEY, "item", KEYED)
     assert tracked is not None
-    assert tracked.written == {"state": "done"}, "kept when it may have landed, not otherwise"
+    assert tracked.written == FILED | {"state": "done"}, (
+        "kept when it may have landed, not otherwise"
+    )

@@ -11,7 +11,7 @@ ADR-0001 to ADR-0007 record the decisions D1 to D7 of [stackr RFC-0002](../../st
 | [0003](0003-a-thread-is-never-a-chain.md) | A thread is never a chain | Accepted |
 | [0004](0004-sessions-linked-not-continued.md) | Sessions linked, not continued | Accepted |
 | [0005](0005-where-a-rules-source-of-truth-lives.md) | Where a rule's source of truth lives | Accepted |
-| [0006](0006-bridged-types-in-the-artifactr-namespace.md) | Bridged types in the `artifactr` namespace | Accepted |
+| [0006](0006-bridged-types-in-the-artifactr-namespace.md) | Bridged types in the `artifactr` namespace | Accepted, amended by 0036 |
 | [0007](0007-notices-by-default.md) | Notices by default | Accepted |
 | [0008](0008-trunk-based-development-with-rfcs-and-adrs.md) | Trunk-based development with RFCs, ADRs and evergreen docs | Accepted, amended by 0013 |
 | [0009](0009-quality-gates.md) | Quality gates | Accepted, amended by 0013 |
@@ -23,7 +23,7 @@ ADR-0001 to ADR-0007 record the decisions D1 to D7 of [stackr RFC-0002](../../st
 | [0015](0015-cursors-leases-and-dead-letters-in-the-ledger.md) | Cursors, leases and dead letters in the ledger | Accepted, amended by 0021 |
 | [0016](0016-followers-start-on-open.md) | Followers start on open | Accepted |
 | [0017](0017-the-follower-acts-as-the-application.md) | The follower acts as the application | Accepted |
-| [0018](0018-bridged-events-their-fields-ids-and-projections.md) | Bridged events, their fields, ids and projections | Accepted |
+| [0018](0018-bridged-events-their-fields-ids-and-projections.md) | Bridged events, their fields, ids and projections | Accepted, amended by 0036 |
 | [0019](0019-runs-act-once-through-derived-ids-and-keyed-edits.md) | Runs act once, through derived ids and keyed edits | Accepted, amended by 0026 |
 | [0020](0020-allowlists.md) | Allowlists | Accepted, amended by 0029 and 0034 |
 | [0021](0021-chains-continue-across-the-bridge.md) | Chains continue across the bridge | Accepted, amended by 0025 and 0026 |
@@ -38,8 +38,10 @@ ADR-0001 to ADR-0007 record the decisions D1 to D7 of [stackr RFC-0002](../../st
 | [0030](0030-drift-proposed-back-to-a-rules-artifact.md) | Drift proposed back to a rule's artifact | Accepted, amended by 0032 |
 | [0031](0031-proposal-outcomes-and-the-measures.md) | Proposal outcomes, and the measures | Accepted |
 | [0032](0032-a-rules-installs-read-from-its-history.md) | A rule's installs, read from its history | Accepted |
-| [0033](0033-the-tracker-port-and-runs-that-write-to-it-once.md) | The tracker port, and runs that write to it once | Accepted |
+| [0033](0033-the-tracker-port-and-runs-that-write-to-it-once.md) | The tracker port, and runs that write to it once | Accepted, amended by 0036 |
 | [0034](0034-an-allowlist-for-the-tracker.md) | An allowlist for the tracker | Accepted |
-| [0035](0035-what-phase-1-settled-of-the-trackers-unknowns.md) | What phase 1 settled of the trackers' unknowns | Accepted |
+| [0035](0035-what-phase-1-settled-of-the-trackers-unknowns.md) | What phase 1 settled of the trackers' unknowns | Accepted, amended by 0037 |
+| [0036](0036-reading-a-tracker-back.md) | Reading a tracker back | Accepted |
+| [0037](0037-what-a-live-plane-settled.md) | What a live Plane settled | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

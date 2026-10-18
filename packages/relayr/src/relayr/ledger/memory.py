@@ -11,8 +11,11 @@ from relayr.ledger.ledger import (
     CauseKind,
     Clock,
     DeadLetter,
+    Snapshot,
     Tracked,
     TrackedKind,
+    TrackerDeadLetter,
+    TrackerFollowing,
     WorkspaceKey,
     utc_now,
 )
@@ -23,6 +26,28 @@ class _Followed:
     seq: int = 0
     holder: str | None = None
     expires_at: datetime | None = None
+
+
+@dataclass
+class _Lease:
+    holder: str | None = None
+    expires_at: datetime | None = None
+
+    def take(self, holder: str, now: datetime, ttl: timedelta) -> bool:
+        if self.expires_at is not None and self.expires_at > now and self.holder != holder:
+            return False
+        self.holder, self.expires_at = holder, now + ttl
+        return True
+
+    def release(self, holder: str) -> None:
+        if self.holder == holder:
+            self.holder, self.expires_at = None, None
+
+
+@dataclass
+class _Item:
+    snapshot: Snapshot | None = None
+    writes: list[datetime] = field(default_factory=list[datetime])
 
 
 @dataclass
@@ -47,6 +72,10 @@ class InMemoryLedger:
         self._dead_letters: dict[WorkspaceKey, dict[int, DeadLetter]] = {}
         self._causes: dict[tuple[WorkspaceKey, CauseKind, str], tuple[Cause, datetime]] = {}
         self._tracked: dict[tuple[WorkspaceKey, TrackedKind, str], _Tracked] = {}
+        self._tracker_leases: dict[WorkspaceKey, _Lease] = {}
+        self._following: dict[WorkspaceKey, TrackerFollowing] = {}
+        self._items: dict[WorkspaceKey, dict[str, _Item]] = {}
+        self._tracker_dead_letters: dict[WorkspaceKey, dict[str, TrackerDeadLetter]] = {}
 
     async def acquire_lease(self, workspace: WorkspaceKey, holder: str, ttl: timedelta) -> bool:
         """Take or renew the workspace's lease for `ttl`. Return False if another holder has it."""
@@ -177,3 +206,96 @@ class InMemoryLedger:
         found = self._tracked.get((workspace, "item", key))
         if found is not None:
             found.written = {f: v for f, v in found.written.items() if f not in fields}
+
+    async def consume_written(
+        self, workspace: WorkspaceKey, key: str, values: Mapping[str, JsonValue]
+    ) -> None:
+        """Forget the values recorded for an item's fields that still hold the ones given."""
+        found = self._tracked.get((workspace, "item", key))
+        if found is not None:
+            found.written = {
+                f: v for f, v in found.written.items() if f not in values or values[f] != v
+            }
+
+    async def record_tracker_write(
+        self, workspace: WorkspaceKey, item_id: str, *, within: timedelta
+    ) -> int:
+        """Record a write relayr is about to make to an item; return how many are within."""
+        now = self._clock()
+        item = self._items.setdefault(workspace, {}).setdefault(item_id, _Item())
+        item.writes = [at for at in item.writes if at > now - within] + [now]
+        return len(item.writes)
+
+    async def acquire_tracker_lease(
+        self, workspace: WorkspaceKey, holder: str, ttl: timedelta
+    ) -> bool:
+        """Take or renew the workspace's tracker lease for `ttl`; False if another holder has it."""
+        return self._tracker_leases.setdefault(workspace, _Lease()).take(holder, self._clock(), ttl)
+
+    async def release_tracker_lease(self, workspace: WorkspaceKey, holder: str) -> None:
+        """Release the workspace's tracker lease, if `holder` has it."""
+        lease = self._tracker_leases.get(workspace)
+        if lease is not None:
+            lease.release(holder)
+
+    async def tracker_following(self, workspace: WorkspaceKey) -> TrackerFollowing | None:
+        """Return how far the workspace's tracker follower has read, or None if it never has."""
+        return self._following.get(workspace)
+
+    async def save_tracker_following(
+        self, workspace: WorkspaceKey, following: TrackerFollowing
+    ) -> None:
+        """Save how far the workspace's tracker follower has read; forward only, per project."""
+        before = self._following.get(workspace)
+        self._following[workspace] = (
+            following
+            if before is None or before.project != following.project
+            else _furthest(before, following)
+        )
+
+    async def snapshots(
+        self, workspace: WorkspaceKey, item_ids: Collection[str] | None = None
+    ) -> dict[str, Snapshot]:
+        """Return the snapshots of the items given, or of every item, by their ids."""
+        items = self._items.get(workspace, {})
+        wanted = items.keys() if item_ids is None else set(item_ids) & items.keys()
+        return {
+            item_id: snapshot
+            for item_id in wanted
+            if (snapshot := items[item_id].snapshot) is not None
+        }
+
+    async def save_snapshots(
+        self, workspace: WorkspaceKey, snapshots: Collection[Snapshot]
+    ) -> None:
+        """Save items' snapshots, in place of those before."""
+        items = self._items.setdefault(workspace, {})
+        for snapshot in snapshots:
+            items.setdefault(snapshot.item_id, _Item()).snapshot = snapshot
+
+    async def forget_snapshots(
+        self, workspace: WorkspaceKey, item_ids: Collection[str] | None = None
+    ) -> None:
+        """Forget the items given, or every item: their snapshots and relayr's writes to them."""
+        items = self._items.get(workspace, {})
+        for item_id in list(items) if item_ids is None else item_ids:
+            items.pop(item_id, None)
+
+    async def tracker_dead_letter(self, workspace: WorkspaceKey, letter: TrackerDeadLetter) -> None:
+        """Record a change the follower could not publish; once per event id, the first kept."""
+        self._tracker_dead_letters.setdefault(workspace, {}).setdefault(letter.event_id, letter)
+
+    async def tracker_dead_letters(self, workspace: WorkspaceKey) -> list[TrackerDeadLetter]:
+        """Return the workspace's tracker dead letters, by event id."""
+        letters = self._tracker_dead_letters.get(workspace, {})
+        return [letters[event_id] for event_id in sorted(letters)]
+
+
+def _furthest(before: TrackerFollowing, after: TrackerFollowing) -> TrackerFollowing:
+    """The further of two readings of one project: each of cursor and sweep only moves forward."""
+    cursors = [cursor for cursor in (before.cursor, after.cursor) if cursor is not None]
+    return TrackerFollowing(
+        project=after.project,
+        cursor=max(cursors, default=None),
+        swept_at=max(before.swept_at, after.swept_at),
+    )

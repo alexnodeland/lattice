@@ -1,0 +1,517 @@
+{
+ "exchanges": [
+  {
+   "body": null,
+   "headers": {},
+   "method": "GET",
+   "path": "/api/v1/workspaces/acme/projects/f1b17260-01ac-44fa-a561-ed79ff0ee332/labels/",
+   "query": [
+    [
+     "per_page",
+     "1000"
+    ],
+    [
+     "cursor",
+     "1000:0:0"
+    ]
+   ],
+   "response": {
+    "count": 0,
+    "extra_stats": null,
+    "grouped_by": null,
+    "next_cursor": "1000:1:0",
+    "next_page_results": false,
+    "prev_cursor": "1000:-1:1",
+    "prev_page_results": false,
+    "results": [],
+    "sub_grouped_by": null,
+    "total_count": 0,
+    "total_pages": 0,
+    "total_results": 0
+   },
+   "status": 200
+  },
+  {
+   "body": {
+    "external_id": "label/lattice",
+    "external_source": "lattice:acme/ops",
+    "name": "lattice"
+   },
+   "headers": {},
+   "method": "POST",
+   "path": "/api/v1/workspaces/acme/projects/f1b17260-01ac-44fa-a561-ed79ff0ee332/labels/",
+   "query": [],
+   "response": {
+    "color": "",
+    "created_at": "2026-10-17T22:57:24.524839Z",
+    "created_by": "951703c8-efdc-4463-be50-7a8babb29b72",
+    "deleted_at": null,
+    "description": "",
+    "external_id": "label/lattice",
+    "external_source": "lattice:acme/ops",
+    "id": "9f6a1c53-d3bb-454f-b294-0f6c98341d3a",
+    "name": "lattice",
+    "parent": null,
+    "project": "f1b17260-01ac-44fa-a561-ed79ff0ee332",
+    "sort_order": 65535.0,
+    "updated_at": "2026-10-17T22:57:24.524849Z",
+    "updated_by": null,
+    "workspace": "5869e3d0-cf0b-4fa6-8688-5783c8aebf5a"
+   },
+   "status": 201
+  },
+  {
+   "body": {
+    "external_id": "label/run-failed",
+    "external_source": "lattice:acme/ops",
+    "name": "run-failed"
+   },
+   "headers": {},
+   "method": "POST",
+   "path": "/api/v1/workspaces/acme/projects/f1b17260-01ac-44fa-a561-ed79ff0ee332/labels/",
+   "query": [],
+   "response": {
+    "color": "",
+    "created_at": "2026-10-17T22:57:25.667275Z",
+    "created_by": "951703c8-efdc-4463-be50-7a8babb29b72",
+    "deleted_at": null,
+    "description": "",
+    "external_id": "label/run-failed",
+    "external_source": "lattice:acme/ops",
+    "id": "67f5f783-0d7c-4ee3-9a9a-0b8a62cd7151",
+    "name": "run-failed",
+    "parent": null,
+    "project": "f1b17260-01ac-44fa-a561-ed79ff0ee332",
+    "sort_order": 75535.0,
+    "updated_at": "2026-10-17T22:57:25.667289Z",
+    "updated_by": null,
+    "workspace": "5869e3d0-cf0b-4fa6-8688-5783c8aebf5a"
+   },
+   "status": 201
+  },
+  {
+   "body": null,
+   "headers": {},
+   "method": "GET",
+   "path": "/api/v1/workspaces/acme/projects/f1b17260-01ac-44fa-a561-ed79ff0ee332/states/",
+   "query": [
+    [
+     "per_page",
+     "1000"
+    ],
+    [
+     "cursor",
+     "1000:0:0"
+    ]
+   ],
+   "response": {
+    "count": 5,
+    "extra_stats": null,
+    "grouped_by": null,
+    "next_cursor": "1000:1:0",
+    "next_page_results": false,
+    "prev_cursor": "1000:-1:1",
+    "prev_page_results": false,
+    "results": [
+     {
+      "color": "#60646C",
+      "created_at": "2026-10-17T22:57:24.284608Z",
+      "created_by": "951703c8-efdc-4463-be50-7a8babb29b72",
+      "default": true,
+      "deleted_at": null,
+      "description": "",
+      "external_id": null,
+      "external_source": null,
+      "group": "backlog",
+      "id": "d90dc05b-0fc2-4b0d-8dd6-bf27ed9d98df",
+      "is_triage": false,
+      "name": "Backlog",
+      "project": "f1b17260-01ac-44fa-a561-ed79ff0ee332",
+      "sequence": 15000.0,
+      "slug": "",
+      "updated_at": "2026-10-17T22:57:24.284614Z",
+      "updated_by": null,
+      "workspace": "5869e3d0-cf0b-4fa6-8688-5783c8aebf5a"
+     },
+     {
+      "color": "#60646C",
+      "created_at": "2026-10-17T22:57:24.284635Z",
+      "created_by": "951703c8-efdc-4463-be50-7a8babb29b72",
+      "default": false,
+      "deleted_at": null,
+      "description": "",
+      "external_id": null,
+      "external_source": null,
+      "group": "unstarted",
+      "id": "7a4fc45e-be8d-4786-be38-430d4f294c8d",
+      "is_triage": false,
+      "name": "Todo",
+      "project": "f1b17260-01ac-44fa-a561-ed79ff0ee332",
+      "sequence": 25000.0,
+      "slug": "",
+      "updated_at": "2026-10-17T22:57:24.284638Z",
+      "updated_by": null,
+      "workspace": "5869e3d0-cf0b-4fa6-8688-5783c8aebf5a"
+     },
+     {
+      "color": "#F59E0B",
+      "created_at": "2026-10-17T22:57:24.284655Z",
+      "created_by": "951703c8-efdc-4463-be50-7a8babb29b72",
+      "default": false,
+      "deleted_at": null,
+      "description": "",
+      "external_id": null,
+      "external_source": null,
+      "group": "started",
+      "id": "ed1bb763-f771-4e21-be8f-859f9ede1c11",
+      "is_triage": false,
+      "name": "In Progress",
+      "project": "f1b17260-01ac-44fa-a561-ed79ff0ee332",
+      "sequence": 35000.0,
+      "slug": "",
+      "updated_at": "2026-10-17T22:57:24.284658Z",
+      "updated_by": null,
+      "workspace": "5869e3d0-cf0b-4fa6-8688-5783c8aebf5a"
+     },
+     {
+      "color": "#46A758",
+      "created_at": "2026-10-17T22:57:24.284674Z",
+      "created_by": "951703c8-efdc-4463-be50-7a8babb29b72",
+      "default": false,
+      "deleted_at": null,
+      "description": "",
+      "external_id": null,
+      "external_source": null,
+      "group": "completed",
+      "id": "cb4e7814-2280-4503-843f-eb7940fd36e8",
+      "is_triage": false,
+      "name": "Done",
+      "project": "f1b17260-01ac-44fa-a561-ed79ff0ee332",
+      "sequence": 45000.0,
+      "slug": "",
+      "updated_at": "2026-10-17T22:57:24.284677Z",
+      "updated_by": null,
+      "workspace": "5869e3d0-cf0b-4fa6-8688-5783c8aebf5a"
+     },
+     {
+      "color": "#9AA4BC",
+      "created_at": "2026-10-17T22:57:24.284700Z",
+      "created_by": "951703c8-efdc-4463-be50-7a8babb29b72",
+      "default": false,
+      "deleted_at": null,
+      "description": "",
+      "external_id": null,
+      "external_source": null,
+      "group": "cancelled",
+      "id": "4b4a7f77-e3dd-4e93-8167-4c29c59462d1",
+      "is_triage": false,
+      "name": "Cancelled",
+      "project": "f1b17260-01ac-44fa-a561-ed79ff0ee332",
+      "sequence": 55000.0,
+      "slug": "",
+      "updated_at": "2026-10-17T22:57:24.284703Z",
+      "updated_by": null,
+      "workspace": "5869e3d0-cf0b-4fa6-8688-5783c8aebf5a"
+     }
+    ],
+    "sub_grouped_by": null,
+    "total_count": 5,
+    "total_pages": 1,
+    "total_results": 5
+   },
+   "status": 200
+  },
+  {
+   "body": {
+    "description_html": "<p>It failed.</p>",
+    "external_id": "dead-letter/run_10",
+    "external_source": "lattice:acme/ops",
+    "labels": [
+     "9f6a1c53-d3bb-454f-b294-0f6c98341d3a",
+     "67f5f783-0d7c-4ee3-9a9a-0b8a62cd7151"
+    ],
+    "name": "A run failed",
+    "priority": "high",
+    "state": "7a4fc45e-be8d-4786-be38-430d4f294c8d"
+   },
+   "headers": {},
+   "method": "POST",
+   "path": "/api/v1/workspaces/acme/projects/f1b17260-01ac-44fa-a561-ed79ff0ee332/work-items/",
+   "query": [],
+   "response": {
+    "archived_at": null,
+    "assignees": [],
+    "completed_at": null,
+    "created_at": "2026-10-17T22:57:26.898405Z",
+    "created_by": "951703c8-efdc-4463-be50-7a8babb29b72",
+    "deleted_at": null,
+    "description_binary": null,
+    "description_html": "<p>It failed.</p>",
+    "estimate_point": null,
+    "external_id": "dead-letter/run_10",
+    "external_source": "lattice:acme/ops",
+    "id": "d3447f1f-e2e4-4e02-a87c-31996ddee51c",
+    "is_draft": false,
+    "labels": [
+     "9f6a1c53-d3bb-454f-b294-0f6c98341d3a",
+     "67f5f783-0d7c-4ee3-9a9a-0b8a62cd7151"
+    ],
+    "name": "A run failed",
+    "parent": null,
+    "point": null,
+    "priority": "high",
+    "project": "f1b17260-01ac-44fa-a561-ed79ff0ee332",
+    "sequence_id": 1,
+    "sort_order": 65535.0,
+    "start_date": null,
+    "state": "7a4fc45e-be8d-4786-be38-430d4f294c8d",
+    "target_date": null,
+    "type": null,
+    "type_id": null,
+    "updated_at": "2026-10-17T22:57:26.898422Z",
+    "updated_by": null,
+    "workspace": "5869e3d0-cf0b-4fa6-8688-5783c8aebf5a"
+   },
+   "status": 201
+  },
+  {
+   "body": null,
+   "headers": {},
+   "method": "GET",
+   "path": "/api/v1/workspaces/acme/projects/f1b17260-01ac-44fa-a561-ed79ff0ee332/",
+   "query": [],
+   "response": {
+    "archive_in": 0,
+    "archived_at": null,
+    "close_in": 0,
+    "cover_image": null,
+    "cover_image_asset": null,
+    "cover_image_url": null,
+    "created_at": "2026-10-17T22:57:24.268224Z",
+    "created_by": "951703c8-efdc-4463-be50-7a8babb29b72",
+    "cycle_view": false,
+    "default_assignee": null,
+    "default_state": null,
+    "deleted_at": null,
+    "description": "",
+    "description_html": null,
+    "description_text": null,
+    "emoji": null,
+    "estimate": null,
+    "external_id": null,
+    "external_source": null,
+    "guest_view_all_features": false,
+    "icon_prop": null,
+    "id": "f1b17260-01ac-44fa-a561-ed79ff0ee332",
+    "identifier": "OPSE0F7",
+    "intake_view": false,
+    "is_deployed": false,
+    "is_issue_type_enabled": false,
+    "is_member": true,
+    "is_time_tracking_enabled": false,
+    "issue_views_view": false,
+    "logo_props": {
+     "icon": {
+      "color": "#5e6ad2",
+      "name": "view_timeline"
+     },
+     "in_use": "icon"
+    },
+    "member_role": 20,
+    "module_view": false,
+    "name": "ops OPSE0F7",
+    "network": 2,
+    "page_view": true,
+    "project_lead": null,
+    "timezone": "UTC",
+    "total_cycles": 0,
+    "total_members": 1,
+    "total_modules": 0,
+    "updated_at": "2026-10-17T22:57:24.268235Z",
+    "updated_by": null,
+    "workspace": "5869e3d0-cf0b-4fa6-8688-5783c8aebf5a"
+   },
+   "status": 200
+  },
+  {
+   "body": null,
+   "headers": {},
+   "method": "GET",
+   "path": "/api/v1/workspaces/acme/projects/f1b17260-01ac-44fa-a561-ed79ff0ee332/work-items/",
+   "query": [
+    [
+     "external_id",
+     "dead-letter/run_1"
+    ],
+    [
+     "external_source",
+     "lattice:acme/ops"
+    ]
+   ],
+   "response": {
+    "error": "The requested resource does not exist."
+   },
+   "status": 404
+  },
+  {
+   "body": {
+    "description_html": "<p>It failed.</p>",
+    "external_id": "dead-letter/run_1",
+    "external_source": "lattice:acme/ops",
+    "labels": [
+     "9f6a1c53-d3bb-454f-b294-0f6c98341d3a",
+     "67f5f783-0d7c-4ee3-9a9a-0b8a62cd7151"
+    ],
+    "name": "A run failed",
+    "priority": "high",
+    "state": "7a4fc45e-be8d-4786-be38-430d4f294c8d"
+   },
+   "headers": {},
+   "method": "POST",
+   "path": "/api/v1/workspaces/acme/projects/f1b17260-01ac-44fa-a561-ed79ff0ee332/work-items/",
+   "query": [],
+   "response": {
+    "archived_at": null,
+    "assignees": [],
+    "completed_at": null,
+    "created_at": "2026-10-17T22:57:28.261269Z",
+    "created_by": "951703c8-efdc-4463-be50-7a8babb29b72",
+    "deleted_at": null,
+    "description_binary": null,
+    "description_html": "<p>It failed.</p>",
+    "estimate_point": null,
+    "external_id": "dead-letter/run_1",
+    "external_source": "lattice:acme/ops",
+    "id": "677e5645-8991-4cc2-a298-fcf884977c4f",
+    "is_draft": false,
+    "labels": [
+     "9f6a1c53-d3bb-454f-b294-0f6c98341d3a",
+     "67f5f783-0d7c-4ee3-9a9a-0b8a62cd7151"
+    ],
+    "name": "A run failed",
+    "parent": null,
+    "point": null,
+    "priority": "high",
+    "project": "f1b17260-01ac-44fa-a561-ed79ff0ee332",
+    "sequence_id": 2,
+    "sort_order": 75535.0,
+    "start_date": null,
+    "state": "7a4fc45e-be8d-4786-be38-430d4f294c8d",
+    "target_date": null,
+    "type": null,
+    "type_id": null,
+    "updated_at": "2026-10-17T22:57:28.261282Z",
+    "updated_by": null,
+    "workspace": "5869e3d0-cf0b-4fa6-8688-5783c8aebf5a"
+   },
+   "status": 201
+  },
+  {
+   "body": null,
+   "headers": {},
+   "method": "GET",
+   "path": "/api/v1/workspaces/acme/projects/f1b17260-01ac-44fa-a561-ed79ff0ee332/work-items/",
+   "query": [
+    [
+     "external_id",
+     "dead-letter/run_1"
+    ],
+    [
+     "external_source",
+     "lattice:acme/ops"
+    ]
+   ],
+   "response": {
+    "archived_at": null,
+    "assignees": [],
+    "completed_at": null,
+    "created_at": "2026-10-17T22:57:28.280206Z",
+    "created_by": "951703c8-efdc-4463-be50-7a8babb29b72",
+    "deleted_at": null,
+    "description_binary": null,
+    "description_html": "<p>It failed.</p>",
+    "estimate_point": null,
+    "external_id": "dead-letter/run_1",
+    "external_source": "lattice:acme/ops",
+    "id": "677e5645-8991-4cc2-a298-fcf884977c4f",
+    "is_draft": false,
+    "labels": [
+     "9f6a1c53-d3bb-454f-b294-0f6c98341d3a",
+     "67f5f783-0d7c-4ee3-9a9a-0b8a62cd7151"
+    ],
+    "name": "A run failed",
+    "parent": null,
+    "point": null,
+    "priority": "high",
+    "project": "f1b17260-01ac-44fa-a561-ed79ff0ee332",
+    "sequence_id": 2,
+    "sort_order": 75535.0,
+    "start_date": null,
+    "state": "7a4fc45e-be8d-4786-be38-430d4f294c8d",
+    "target_date": null,
+    "type": null,
+    "type_id": null,
+    "updated_at": "2026-10-17T22:57:28.350873Z",
+    "updated_by": null,
+    "workspace": "5869e3d0-cf0b-4fa6-8688-5783c8aebf5a"
+   },
+   "status": 200
+  },
+  {
+   "body": null,
+   "headers": {},
+   "method": "GET",
+   "path": "/api/v1/workspaces/acme/projects/f1b17260-01ac-44fa-a561-ed79ff0ee332/work-items/",
+   "query": [
+    [
+     "external_id",
+     "dead-letter/run_10"
+    ],
+    [
+     "external_source",
+     "lattice:acme/ops"
+    ]
+   ],
+   "response": {
+    "archived_at": null,
+    "assignees": [],
+    "completed_at": null,
+    "created_at": "2026-10-17T22:57:26.917413Z",
+    "created_by": "951703c8-efdc-4463-be50-7a8babb29b72",
+    "deleted_at": null,
+    "description_binary": null,
+    "description_html": "<p>It failed.</p>",
+    "estimate_point": null,
+    "external_id": "dead-letter/run_10",
+    "external_source": "lattice:acme/ops",
+    "id": "d3447f1f-e2e4-4e02-a87c-31996ddee51c",
+    "is_draft": false,
+    "labels": [
+     "9f6a1c53-d3bb-454f-b294-0f6c98341d3a",
+     "67f5f783-0d7c-4ee3-9a9a-0b8a62cd7151"
+    ],
+    "name": "A run failed",
+    "parent": null,
+    "point": null,
+    "priority": "high",
+    "project": "f1b17260-01ac-44fa-a561-ed79ff0ee332",
+    "sequence_id": 1,
+    "sort_order": 65535.0,
+    "start_date": null,
+    "state": "7a4fc45e-be8d-4786-be38-430d4f294c8d",
+    "target_date": null,
+    "type": null,
+    "type_id": null,
+    "updated_at": "2026-10-17T22:57:26.986832Z",
+    "updated_by": null,
+    "workspace": "5869e3d0-cf0b-4fa6-8688-5783c8aebf5a"
+   },
+   "status": 200
+  }
+ ],
+ "setup": {
+  "identifier": "OPSE0F7",
+  "project": "f1b17260-01ac-44fa-a561-ed79ff0ee332",
+  "workspace": "acme"
+ }
+}

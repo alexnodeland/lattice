@@ -209,8 +209,8 @@ async def test_a_file_without_a_review_says_so(world: World) -> None:
 
 async def test_commands_are_found_by_a_word(world: World) -> None:
     script = Script(
-        call("find_commands", query="comment"),
-        call("find_commands", "call_2", query="nothing like it"),
+        call("find_commands", artifact_id="a1", query="comment"),
+        call("find_commands", "call_2", artifact_id="a1", query="nothing like it"),
         say("Found."),
     )
     await world.run(script)

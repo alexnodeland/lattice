@@ -15,7 +15,7 @@ from pydantic import BaseModel, JsonValue, TypeAdapter
 
 from artifactr.files.app import Inspection
 from artifactr.files.craft import CRAFTS, Craft, Server, ToolsDialect
-from artifactr.files.wordcraft.docx import Block, fingerprint, outline
+from artifactr.files.wordcraft.docx import Block, fingerprint, media_type, outline
 
 
 class _Text(BaseModel):
@@ -79,4 +79,5 @@ class Subprocess(ToolsDialect):
             text=text.text,
             review={"comments": comments, "changes": changes},
             pages=structure.pages,
+            media_type=media_type(content),
         )

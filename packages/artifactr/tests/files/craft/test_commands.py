@@ -39,6 +39,7 @@ class Toolcraft(CommandsDialect):
     craft: ClassVar[Craft] = TOOLCRAFT
     extension: ClassVar[str] = ".json"
     new_command: ClassVar[str | None] = "file.new"
+    formatless: ClassVar[bool] = False
 
     async def inspection(self, server: Server, document: JsonValue, content: bytes) -> Inspection:
         listed = await server.json("doc_inspect")
@@ -54,11 +55,16 @@ class Toolcraft(CommandsDialect):
             fingerprint=hashlib.sha256(json.dumps(words).encode()).hexdigest(),
             text="\n".join(words),
             pages=len(words),
+            media_type=None if self.formatless else "application/json",
         )
 
 
 class Blankless(Toolcraft):
     new_command: ClassVar[str | None] = None
+
+
+class Formatless(Toolcraft):
+    formatless: ClassVar[bool] = True
 
 
 class Unnamed(Toolcraft):
@@ -106,6 +112,13 @@ def test_it_is_an_app_named_by_its_craft(spawn: Make) -> None:
     app: App = spawn()
     assert (app.name, app.version, app.build) == ("toolcraft", "1.0.0", None)
     assert (app.talk, app.integration) == ("save", "files:toolcraft")
+
+
+def test_an_app_whose_build_has_a_parent_bridge_talks_through_the_shim(spawn: Make) -> None:
+    class Bridged(Toolcraft):
+        craft: ClassVar[Craft] = replace(TOOLCRAFT, bridge="parent")
+
+    assert Bridged("toolcraft-cli", version="1.0.0").talk == "bridged"
 
 
 async def test_a_batch_on_a_blank_file_names_the_open_document(spawn: Make) -> None:
@@ -235,3 +248,9 @@ def test_an_adapter_that_reads_files_names_its_craft() -> None:
                 self, server: Server, document: JsonValue, content: bytes
             ) -> Inspection:
                 raise NotImplementedError
+
+
+async def test_an_adapter_that_says_no_format_it_read_crashed(spawn: Make) -> None:
+    with pytest.raises(AppFailed, match="Formatless's inspection names no format") as crashed:
+        await spawn(adapter=Formatless).inspect(source("One"), deadline=20)
+    assert crashed.value.failure == "crashed"

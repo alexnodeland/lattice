@@ -42,6 +42,11 @@ def test_the_policy_runs_the_pages_own_script_by_its_hash_and_reaches_nowhere() 
     }
 
 
+def test_a_scripts_end_tag_may_have_space_before_its_bracket() -> None:
+    page = f"<script>{SCRIPT}</script >"
+    assert f"'sha256-{sha256(SCRIPT)}'" in editor_policy(page)
+
+
 def test_a_script_loaded_by_its_url_adds_no_hash() -> None:
     page = '<script type="module" src="./app.js"></script>'
     assert "sha256" not in editor_policy(page)

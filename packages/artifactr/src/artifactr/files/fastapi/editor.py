@@ -18,7 +18,7 @@ from starlette.routing import Mount
 from starlette.staticfiles import StaticFiles
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-INLINE: Final = re.compile(r"<script\b[^>]*>(.*?)</script>", re.DOTALL | re.IGNORECASE)
+INLINE: Final = re.compile(r"<script\b[^>]*>(.*?)</script\s*>", re.DOTALL | re.IGNORECASE)
 """An inline script in the page, which the policy allows by the hash of its text."""
 
 IMMUTABLE: Final = (".wasm", ".js")

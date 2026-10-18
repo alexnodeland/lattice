@@ -107,9 +107,9 @@ tasks:
       cli=$($workspaceRoot/scripts/wordcraft cli) && web=$($workspaceRoot/scripts/wordcraft web)
       && ARTIFACTR_TEST_WORDCRAFT=$cli ARTIFACTR_TEST_WORDCRAFT_WEB=$web
       uv run pytest -m wordcraft -p no:cacheprovider tests/files
+    # It runs in CI, where Nightly names it; no pull request's job does.
     options:
       cache: false
-      runInCI: false
 
   test-pg:
     description: 'Run the tests on PostgreSQL as well as SQLite (after pg-up)'

@@ -56,7 +56,7 @@ Each app is an integration of its own, named by its `integration` key, such as `
 
 ## People: check-out and check-in over HTTP
 
-WordCraft's browser build only opens and saves files, so a person checks a file out, downloads it, edits it in the build, saves it and uploads it. `files_router`, beside artifactr's router and with its `resolve_actor`, has the routes: a file's status and lease, check-out, extension, check-in, and a version's bytes or pages. Each names an artifact and a version, or a check-out, and resolves it through the workspace, as the actor, before any bytes move. `editor_app` serves the build as released on an origin of its own, under a policy that runs its own code only and reaches no other origin ([ADR-0007](adr/0007-check-out-over-http-and-the-editor-on-its-own-origin.md)).
+WordCraft's browser build only opens and saves files, so a person checks a file out, downloads it, edits it in the build, saves it and uploads it. `files_router`, beside artifactr's router and with its `resolve_actor`, has the routes: a file's status and lease, check-out, extension, check-in, a version's bytes, words or pages, and a proposal's words or pages, which a reviewer reads beside the head. Each names an artifact and a version, a check-out or a proposal, and resolves it through the workspace, as the actor, before any bytes move ([ADR-0008](adr/0008-what-portalr-reads-of-a-native-file.md)). `editor_app` serves the build as released on an origin of its own, under a policy that runs its own code only and reaches no other origin ([ADR-0007](adr/0007-check-out-over-http-and-the-editor-on-its-own-origin.md)).
 
 ## What it adds to the log
 

@@ -1,12 +1,13 @@
 """portalr's test application, for its acceptance tests only: the router over the stack's tools.
 
 It mounts ``portalr_router``, grantr's own router for the UIs' ``/me`` and ``/checks``, and
-artifactr's, with a scripted agent (``notes.py``), over grantr's ``Grants`` in memory, which checks
-every artifactr command and read; it invites without Supabase. acme's owner is alice, and bob is its
-member with no tenant role, an editor of its workspaces ``notes`` and ``plans``; globex's owner is
-carol; erin is a member of both, and edits acme's ``notes``; vera views ``notes``, and dana is its
-admin, who may change who sees its threads but not list acme's members; olga administers both
-tenants; ops is the deployment's operator.
+artifactr's, with a scripted agent (``notes.py``) and native files' routes beside it
+(``documents.py``), over grantr's ``Grants`` in memory, which checks every artifactr command and
+read; it invites without Supabase. acme's owner is alice, and bob is its member with no tenant role,
+an editor of its workspaces ``notes`` and ``plans``; globex's owner is carol; erin is a member of
+both, and edits acme's ``notes``; vera views ``notes``, and dana is its admin, who may change who
+sees its threads but not list acme's members; olga administers both tenants; ops is the deployment's
+operator.
 
 A caller is named by a Supabase Auth access token, verified as the template verifies one, or by
 the ``x-user`` header, which the API tests send. Signed in, a person's user id here is their
@@ -41,6 +42,7 @@ import reflexr
 import reflexr.core
 import reflexr.fastapi
 import reflexr.otel
+from artifactr.files.fastapi import files_router
 from artifactr.workspace import ACTIONS as ARTIFACTR_ACTIONS
 from grantr.core import Resource, User
 from grantr.fastapi import Caller, Unauthorized, grantr_router
@@ -198,7 +200,7 @@ def create_app(ui: Path = UI) -> FastAPI:
         catalogs=[ACTIONS, ARTIFACTR_ACTIONS, REFLEXR_ACTIONS],
         application=APPLICATION,
     )
-    workspaces, runner = collaboration(grants)
+    workspaces, runner, files = collaboration(grants)
     tracking = Tracking()
     tickets, reactor = automation(grants, APPLICATION, tracking)
     gotrue = os.environ.get("PORTALR_GOTRUE_URL", "http://gotrue:9999")
@@ -234,6 +236,20 @@ def create_app(ui: Path = UI) -> FastAPI:
         artifactr.fastapi.artifactr_router(
             workspaces,
             runner,
+            resolve_actor=library_actor(
+                grants,
+                lambda user: artifactr.UserActor(id=user, name=user),
+                artifactr.fastapi.Unauthorized,
+                artifactr.core.Forbidden,
+            ),
+        ),
+        prefix="/artifactr/v1",
+    )
+    # Native files' routes, beside artifactr's, as the UIs' client reads them.
+    app.include_router(
+        files_router(
+            workspaces,
+            files,
             resolve_actor=library_actor(
                 grants,
                 lambda user: artifactr.UserActor(id=user, name=user),

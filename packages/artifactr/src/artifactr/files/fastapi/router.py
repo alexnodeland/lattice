@@ -1,8 +1,8 @@
 """The routes for people's check-out and check-in, beside artifactr's own router.
 
-Every route names a workspace, then an artifact and a version, or a check-out, never a bare
-digest: the artifact is resolved through the workspace first, as the actor, so `authorize`, the
-hiding of restricted artifacts and the app's switch all apply before any bytes move.
+Every route names a workspace, then an artifact and a version, a check-out or a proposal, never a
+bare digest: the artifact is resolved through the workspace first, as the actor, so `authorize`,
+the hiding of restricted artifacts and the app's switch all apply before any bytes move.
 """
 
 from collections.abc import Awaitable
@@ -46,10 +46,11 @@ DOWNLOAD: Final = {
     "Content-Security-Policy": "sandbox",
     "Cache-Control": "private, no-store",
 }
-"""What a version's bytes are served with: they are an upload, so never sniffed, never run as a
-page, and never kept by a cache on the way."""
+"""What a version's bytes, and its words, are served with: they are an upload, or read from one,
+so never sniffed, never run as a page, and never kept by a cache on the way."""
 
 PNG: Final = "image/png"
+TEXT: Final = "text/plain; charset=utf-8"
 
 
 class Lease(BaseModel):
@@ -58,6 +59,9 @@ class Lease(BaseModel):
     checked_out_by: str | None
     """The participant whose check-out holds it, or None for an agent's edit, held for seconds."""
     expires_at: datetime
+    checkout_id: str | None = None
+    """The check-out's id, only when it is the caller's own: to extend it or check it in, from
+    another tab, or after a reload."""
 
 
 class FileStatus(BaseModel):
@@ -77,6 +81,8 @@ class FileStatus(BaseModel):
     downloads the file, edits it in the app and uploads it again."""
     enabled: bool
     """Whether the app is on in the workspace: off, the file is read but not checked out."""
+    limit: int
+    """The largest file, in bytes, that a check-in takes."""
 
 
 class CheckedIn(BaseModel):
@@ -135,9 +141,10 @@ def files_router(
                 size=content.size,
                 outline=head.data.outline,
                 pages=head.data.pages,
-                lease=None if lease is None else _lease(lease),
+                lease=None if lease is None else _lease(lease, ws.actor),
                 talk=files.app.talk,
                 enabled=await files.enabled(ws),
+                limit=limit,
             )
 
         return await _answered(status())
@@ -196,6 +203,18 @@ def files_router(
         return await _answered(content())
 
     @router.get(
+        "/workspaces/{workspace_id}/files/{artifact_id}/versions/{version}/text",
+        response_class=Response,
+        responses={200: {"content": {TEXT: {}}}},
+    )
+    async def text(
+        artifact_id: PathId, version: Version, ws: Workspace = current_workspace
+    ) -> Response:
+        """A version's words, as plain text, as the app read them: what a revision's diff shows."""
+        words = await _answered(files.read(ws, artifact_id, version=version, part="text"))
+        return Response(words, media_type=TEXT, headers=DOWNLOAD)
+
+    @router.get(
         "/workspaces/{workspace_id}/files/{artifact_id}/versions/{version}/pages/{page}",
         response_class=Response,
         responses={200: {"content": {PNG: {}}}},
@@ -210,14 +229,42 @@ def files_router(
         png = await _answered(files.render(ws, artifact_id, page, version=version))
         return Response(png, media_type=PNG)
 
+    @router.get(
+        "/workspaces/{workspace_id}/proposals/{proposal_id}/text",
+        response_class=Response,
+        responses={200: {"content": {TEXT: {}}}},
+    )
+    async def proposed_text(proposal_id: PathId, ws: Workspace = current_workspace) -> Response:
+        """The words a proposal would give a native file, as the app read them: its diff."""
+        words = await _answered(files.proposed(ws, proposal_id, part="text"))
+        return Response(words, media_type=TEXT, headers=DOWNLOAD)
+
+    @router.get(
+        "/workspaces/{workspace_id}/proposals/{proposal_id}/pages/{page}",
+        response_class=Response,
+        responses={200: {"content": {PNG: {}}}},
+    )
+    async def proposed_page(
+        proposal_id: PathId,
+        page: Annotated[int, Path(ge=1)],
+        ws: Workspace = current_workspace,
+    ) -> Response:
+        """One page of what a proposal would make of a native file, rendered by the app."""
+        png = await _answered(files.render_proposed(ws, proposal_id, page))
+        return Response(png, media_type=PNG)
+
     return router
 
 
-def _lease(lease: ArtifactLease) -> Lease:
-    """A lease as people see it: whose check-out, never the holder's own encoding."""
+def _lease(lease: ArtifactLease, actor: Actor) -> Lease:
+    """A lease as people see it: whose check-out, never the holder; its id to its own."""
     kind, _, rest = lease.holder.partition(":")
-    participant = rest.partition(":")[2] if kind == "checkout" else ""
-    return Lease(checked_out_by=participant or None, expires_at=lease.expires_at)
+    checkout_id, _, participant = rest.partition(":") if kind == "checkout" else ("", "", "")
+    return Lease(
+        checked_out_by=participant or None,
+        expires_at=lease.expires_at,
+        checkout_id=checkout_id if participant == actor.participant else None,
+    )
 
 
 async def _resolve(

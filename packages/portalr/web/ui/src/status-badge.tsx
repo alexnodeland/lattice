@@ -17,7 +17,8 @@ const TONE = {
   },
   waiting: {
     badge: "border-accent bg-accent text-on-accent",
-    glyph: "rotate-45 scale-75 bg-current",
+    // On the accent's fill, the ink's colour; under forced colours, where the fill goes, the text's.
+    glyph: "rotate-45 scale-75 bg-current forced-colors:bg-system-text",
   },
   done: { badge: "border-line bg-surface text-muted", glyph: "rounded-full bg-current" },
   failed: { badge: "border-status-failed bg-surface text-fg", glyph: "bg-status-failed" },

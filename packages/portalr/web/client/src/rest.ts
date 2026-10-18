@@ -5,6 +5,7 @@
 
 import createClient, { type Client, type Middleware } from "openapi-fetch";
 import type { paths as ArtifactrPaths } from "./generated/artifactr.openapi";
+import type { paths as FilesPaths } from "./generated/files.openapi";
 import type { paths as GrantrPaths } from "./generated/grantr.openapi";
 import type { components as Portalr, paths as PortalrPaths } from "./generated/portalr.openapi";
 import type { paths as ReflexrPaths } from "./generated/reflexr.openapi";
@@ -31,6 +32,8 @@ export interface Surfaces {
 
 export interface Api {
   readonly artifactr: Client<ArtifactrPaths>;
+  /** Native files' routes, which an application mounts beside artifactr's, on its surface. */
+  readonly files: Client<FilesPaths>;
   readonly reflexr: Client<ReflexrPaths>;
   readonly grantr: Client<GrantrPaths>;
   readonly portalr: Client<PortalrPaths>;
@@ -49,15 +52,16 @@ export function createApi(surfaces: Surfaces, session: () => Session): Api {
     },
   };
   const artifactr = createClient<ArtifactrPaths>({ baseUrl: surfaces.artifactr });
+  const files = createClient<FilesPaths>({ baseUrl: surfaces.artifactr });
   const reflexr = createClient<ReflexrPaths>({ baseUrl: surfaces.reflexr });
   const grantr = createClient<GrantrPaths>({ baseUrl: surfaces.grantr });
   const portalr = createClient<PortalrPaths>({ baseUrl: surfaces.grantr });
   const relayr =
     surfaces.relayr == null ? null : createClient<RelayrPaths>({ baseUrl: surfaces.relayr });
-  for (const client of [artifactr, reflexr, grantr, portalr, relayr] as const) {
+  for (const client of [artifactr, files, reflexr, grantr, portalr, relayr] as const) {
     client?.use(signed);
   }
-  return { artifactr, reflexr, grantr, portalr, relayr };
+  return { artifactr, files, reflexr, grantr, portalr, relayr };
 }
 
 /** The headers that name a request's tenant. */

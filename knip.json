@@ -3,6 +3,7 @@
   "moonrepo": true,
   "ignoreBinaries": ["noop", "uv"],
   "ignoreDependencies": ["@usebruno/cli"],
+  "ignore": ["packages/portalr/tests/app/editor/*.js"],
   "workspaces": {
     "packages/portalr/web/notices": {
       "entry": ["scripts/*.ts"]

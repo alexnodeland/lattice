@@ -55,5 +55,5 @@ Level 1 is what the unmodified build offers. The routes and the editor prove the
 
 1. [x] `files_router`, its OpenAPI document and its tests.
 2. [x] `editor_app` and `editor_policy`; the pilot run by hand, and its server side nightly.
-3. [ ] portalr's renderer, previews, diffs, check-out and check-in, with `bdd` scenarios.
+3. [x] portalr's renderer, previews, diffs, check-out and check-in, with `bdd` scenarios.
 4. [ ] stackr: the build at the edge, on its own host name.

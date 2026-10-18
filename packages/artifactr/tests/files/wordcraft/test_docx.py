@@ -1,4 +1,4 @@
-"""What the adapter reads from a `.docx` itself: the fingerprint, and the outline."""
+"""What the adapter reads from a `.docx` itself: the fingerprint, the format, and the outline."""
 
 import io
 import warnings
@@ -10,9 +10,10 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from artifactr.files.app import AppFailed
-from artifactr.files.manifest import OUTLINE_LIMIT
-from artifactr.files.wordcraft import STAMPED, fingerprint, outline
+from artifactr.files.manifest import DOCX, OUTLINE_LIMIT
+from artifactr.files.wordcraft import STAMPED, fingerprint, media_type, outline
 from artifactr.files.wordcraft.docx import Block
+from tests.files.corpus.wordcraft.corpus import CORPUS
 
 LIMIT = 1 << 20
 NAMES = st.sampled_from(["word/document.xml", "word/styles.xml", "[Content_Types].xml", "a"])
@@ -128,3 +129,21 @@ def test_without_headings_the_outline_is_each_blocks_first_line() -> None:
 
 def test_the_outline_keeps_to_its_limit() -> None:
     assert len(outline([Block(text="x" * 50, style="Heading 1")] * 200)) == OUTLINE_LIMIT
+
+
+def test_a_package_says_its_format_by_its_main_part_or_its_mimetype() -> None:
+    assert media_type(CORPUS.source("text")) == DOCX
+    types = (
+        '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        '<Override PartName="/docProps/core.xml" ContentType="application/xml"/>'
+        '<Override PartName="/word/document.xml" ContentType="application/'
+        'vnd.openxmlformats-officedocument.wordprocessingml.template.main+xml"/></Types>'
+    )
+    assert media_type(docx({"[Content_Types].xml": types.encode()})) == (
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.template"
+    )
+    assert media_type(docx({"mimetype": b"application/vnd.oasis.opendocument.text"})) == (
+        "application/vnd.oasis.opendocument.text"
+    )
+    assert media_type(docx({"word/document.xml": b"<w/>"})) is None
+    assert media_type(docx({"[Content_Types].xml": b"<Types/>"})) is None

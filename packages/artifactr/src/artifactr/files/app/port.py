@@ -70,6 +70,9 @@ class Inspection(BaseModel):
     """Its comments and tracked changes."""
 
     pages: int | None = Field(default=None, ge=0)
+    media_type: str | None = None
+    """The format the app read the file as, if it tells formats apart: a check-in in another
+    format than the one checked out is refused, never converted."""
 
 
 @dataclass(frozen=True)

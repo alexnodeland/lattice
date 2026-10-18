@@ -23,6 +23,7 @@ from pydantic_ai import (
 
 from artifactr.agent import Session, describe_outcome
 from artifactr.files.app import AppCommand, AppFailed
+from artifactr.files.manifest import NativeFile
 from artifactr.files.native import NativeFiles
 from artifactr.workspace import ArtifactBusy
 
@@ -79,14 +80,16 @@ def native_file_tools(files: NativeFiles, *, view: bool = False) -> AbstractTool
         rest = len(items) - end
         return shown + (f"\n\n[{rest} more: read on from start={end}]" if rest > 0 else "")
 
-    @toolset.tool_plain
-    async def find_commands(query: str) -> str:
-        """Find the app's commands that edit a native file, ten at most, by a word they mention.
+    @toolset.tool
+    async def find_commands(ctx: RunContext[Session[Any]], artifact_id: str, query: str) -> str:
+        """Find the commands of a native file's app that edit it, ten at most, by a word.
 
         Args:
+            artifact_id: The native file to edit.
             query: A word in the command's name or description, such as "comment" or "table".
         """
-        found = await files.app.commands(query)
+        head = await ctx.deps.workspace.get(NativeFile, artifact_id)
+        found = await files.app_of(type(head.data)).commands(query)
         if not found:
             return f"No command mentions {query!r}: try another word."
         return "\n".join(f"- {c.signature}: {c.description}" for c in found)

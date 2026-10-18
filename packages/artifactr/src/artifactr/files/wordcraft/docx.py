@@ -1,4 +1,4 @@
-"""What the adapter reads from a `.docx` itself: its fingerprint, and its outline.
+"""What the adapter reads from a `.docx` itself: its fingerprint, its format, and its outline.
 
 A `.docx` is a zip of XML parts. WordCraft stamps `docProps/core.xml` with the time, a revision
 count and the author on every save, so the fingerprint is the digest of the other parts: two
@@ -12,11 +12,12 @@ import zipfile
 import zlib
 from collections.abc import Sequence
 from typing import Final
+from xml.etree import ElementTree
 
 from pydantic import BaseModel
 
 from artifactr.files.app import AppFailed
-from artifactr.files.manifest import OUTLINE_LIMIT
+from artifactr.files.manifest import DOCX, OUTLINE_LIMIT
 
 HEADING: Final = re.compile(r"heading ?(\d+)", re.IGNORECASE)
 """A heading's style, by its id or its name: `Heading1` or `heading 1`."""
@@ -25,6 +26,40 @@ STAMPED: Final = frozenset({"docProps/core.xml"})
 """The parts every save stamps, which the fingerprint leaves out."""
 
 CHUNK: Final = 1 << 16
+
+MAIN: Final = {
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml": DOCX,
+    "application/vnd.ms-word.document.macroEnabled.main+xml": (
+        "application/vnd.ms-word.document.macroEnabled.12"
+    ),
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.template.main+xml": (
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.template"
+    ),
+    "application/vnd.ms-word.template.macroEnabledTemplate.main+xml": (
+        "application/vnd.ms-word.template.macroEnabled.12"
+    ),
+}
+"""A Word package's main part's content type, and the media type of a file it is the main of."""
+
+TYPES: Final = "{http://schemas.openxmlformats.org/package/2006/content-types}Override"
+
+
+def media_type(content: bytes) -> str | None:
+    """The format a package says it is, or None if it says none.
+
+    A Word package says it by its main part's content type, and an OpenDocument by its
+    `mimetype`. Call it once `fingerprint` has read the package, which refuses one that isn't
+    a zip or inflates past its limit.
+    """
+    with zipfile.ZipFile(io.BytesIO(content)) as archive:
+        names = set(archive.namelist())
+        if "mimetype" in names:
+            return archive.read("mimetype").decode("ascii", "replace").strip()
+        if "[Content_Types].xml" not in names:
+            return None
+        types = ElementTree.fromstring(archive.read("[Content_Types].xml"))
+    declared = (override.get("ContentType", "") for override in types.iter(TYPES))
+    return next((MAIN[found] for found in declared if found in MAIN), None)
 
 
 def fingerprint(content: bytes, *, limit: int) -> str:

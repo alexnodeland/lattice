@@ -55,6 +55,7 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     # The agent's tools, on pydantic-ai and the agent's Session, the one layer that knows them.
     "tools": (
         {
+            "artifactr.files.manifest",
             "artifactr.files.app",
             "artifactr.files.native",
             "artifactr.files.tools",

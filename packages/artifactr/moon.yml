@@ -98,16 +98,18 @@ tasks:
       cache: false
       runInCI: false
 
-  # WordCraft's fidelity report (lattice RFC-0003, phase 2): the pinned CLI opens and saves each
-  # corpus file, feature by feature, and the adapter runs live, as does the check-out pilot over
-  # HTTP with the browser build served. Nightly runs it and publishes the matrix; it downloads the
-  # release scripts/wordcraft pins, once.
+  # A crafting app's fidelity report (lattice RFC-0003, phase 2): its pinned CLI opens and saves
+  # each file of its corpus, feature by feature, and its adapter runs live, as does WordCraft's
+  # check-out pilot over HTTP with the browser build served. CRAFT names the app, wordcraft if
+  # unset; Nightly runs it for each app with a corpus and publishes the matrix. It downloads the
+  # release scripts/craft pins, once.
   fidelity:
-    description: "Run the WordCraft fidelity report and the adapter's live tests, on the pinned CLI"
+    description: "Run a crafting app's fidelity report and live tests, on its pinned CLI (CRAFT=app)"
     script: >-
-      cli=$($workspaceRoot/scripts/wordcraft cli) && web=$($workspaceRoot/scripts/wordcraft web)
-      && ARTIFACTR_TEST_WORDCRAFT=$cli ARTIFACTR_TEST_WORDCRAFT_WEB=$web
-      uv run pytest -m wordcraft -p no:cacheprovider tests/files
+      app=${CRAFT:-wordcraft} && cli=$($workspaceRoot/scripts/craft $app cli)
+      && web=$($workspaceRoot/scripts/craft $app web)
+      && ARTIFACTR_TEST_CRAFT=$app ARTIFACTR_TEST_CRAFT_CLI=$cli ARTIFACTR_TEST_CRAFT_WEB=$web
+      uv run pytest -m craft -p no:cacheprovider tests/files
     # It runs in CI, where Nightly names it; no pull request's job does.
     options:
       cache: false

@@ -1062,7 +1062,7 @@ async def test_whoever_can_open_a_workspace_reads_what_is_on_in_it(
     enabled = await grants.integrations_enabled("acme", "w1", by=BOB)
     assert list(enabled) == list(KNOWN)
     assert enabled == {
-        key: key not in ("excalidraw", "ui:mini-apps", "markdown:mermaid") for key in KNOWN
+        key: key != "excalidraw" and integration.default for key, integration in KNOWN.items()
     }
     assert await grants.integrations_enabled("acme", "w2", by=ALICE) == {
         key: integration.default for key, integration in KNOWN.items()

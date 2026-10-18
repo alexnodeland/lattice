@@ -16,11 +16,22 @@ import { Alert } from "./alert";
 /** Whether the integration a key names is on, in the workspace shown. */
 export type IsEnabled = (key: IntegrationKey) => boolean;
 
-/** The keys that are off unless a workspace switches them on, as the registry says. */
-const OFF_BY_DEFAULT: ReadonlySet<IntegrationKey> = new Set(["ui:mini-apps", "markdown:mermaid"]);
+/**
+ * The keys that are on unless a workspace switches them off, as the registry says: an integration
+ * the registry adds is off here until it is listed, as most new ones are off there too.
+ */
+const ON_BY_DEFAULT: ReadonlySet<IntegrationKey> = new Set([
+  "tracker:plane",
+  "tracker:vikunja",
+  "files:wordcraft",
+  "ui:forms",
+  "ui:dashboards",
+  "excalidraw",
+  "markdown:math",
+]);
 
 /** Each integration as it is where no one has set it, as the registry says. */
-export const byDefault: IsEnabled = (key) => !OFF_BY_DEFAULT.has(key);
+export const byDefault: IsEnabled = (key) => ON_BY_DEFAULT.has(key);
 
 /** The page's answer to whether an integration is on. */
 export const IntegrationsContext = createContext<IsEnabled>(byDefault);

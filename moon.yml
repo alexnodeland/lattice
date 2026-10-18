@@ -29,7 +29,7 @@ tasks:
 
   # The quality test reads every package's Python and portalr's TypeScript, the edges test every
   # project's configuration, the specs' tests read each formal spec and run scripts/tlc, and
-  # WordCraft's run scripts/wordcraft.
+  # scripts/craft's run it.
   test:
     description: "Run lattice's tests"
     command: 'uv run pytest'
@@ -45,8 +45,8 @@ tasks:
       - 'docs/*/spec/**/*'
       - 'scripts/tlc'
       - 'scripts/tlc.sha256'
-      - 'scripts/wordcraft'
-      - 'scripts/wordcraft.sha256'
+      - 'scripts/craft'
+      - 'scripts/crafts/*'
 
   docs:
     description: 'Build the documentation site in strict mode, and check that its lists rendered'

@@ -42,7 +42,7 @@ const HAS_WORDS = /[\p{L}\p{N}]/u;
 const UNDERSCORED = /(?<![\p{L}\p{N}_])(?:__|_)([^\n_]{1,200}?)(?:__|_)(?![\p{L}\p{N}_])/gu;
 
 /** White space collapsed, and the text cut to `LONGEST_TITLE` code points, ellipsis included. */
-function capped(text: string): string | null {
+export function capped(text: string): string | null {
   const plain = text.replace(/\s+/g, " ").trim();
   if (!HAS_WORDS.test(plain)) {
     return null;

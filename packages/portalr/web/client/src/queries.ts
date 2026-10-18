@@ -10,6 +10,7 @@
 
 import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 import * as artifactr from "./artifactr";
+import { pngDataUrl } from "./files";
 import type * as artifactrV1 from "./generated/artifactr.v1";
 import type {
   components as Grantr,
@@ -76,6 +77,19 @@ export const keys = {
       [...keys.artifactr.artifact(tenant, ws, artifact), "revisions"] as const,
     proposals: (tenant: string, ws: string) =>
       [...keys.artifactr.workspace(tenant, ws), "proposals", "list"] as const,
+  },
+  /**
+   * Native files. A file's status, with who has it, is under its artifact's key, so a change to
+   * the file makes it stale. What a version or a proposal holds never changes, so its words and
+   * pages are under keys of their own, which no event makes stale: a change refetches none.
+   */
+  files: {
+    status: (tenant: string, ws: string, artifact: string) =>
+      [...keys.artifactr.artifact(tenant, ws, artifact), "file"] as const,
+    version: (tenant: string, ws: string, artifact: string, version: number) =>
+      ["files", tenant, ws, "version", artifact, version] as const,
+    proposal: (tenant: string, ws: string, proposal: string) =>
+      ["files", tenant, ws, "proposal", proposal] as const,
   },
   reflexr: {
     workspace: (tenant: string, ws: string) => ["reflexr", tenant, "workspace", ws] as const,
@@ -198,6 +212,20 @@ async function body<D>(
     throw new Refused(answered.status, error);
   }
   return data;
+}
+
+/** A text read's words, or null where the server has none to give (`409`, nothing to read). */
+async function words(
+  response: Promise<{ data?: string; error?: unknown; response: Response }>,
+): Promise<string | null> {
+  try {
+    return await body(response);
+  } catch (error) {
+    if (error instanceof Refused && error.status === 409) {
+      return null;
+    }
+    throw error;
+  }
 }
 
 /** Whether a refusal is grantr's or portalr's `forbidden`: the reader may not, not that it failed. */
@@ -332,6 +360,116 @@ export function createQueries(api: Api) {
           queryKey: keys.artifactr.proposals(tenant, ws),
           queryFn: () =>
             body(api.artifactr.GET("/workspaces/{workspace_id}/proposals", workspace(tenant, ws))),
+        }),
+    },
+    files: {
+      /**
+       * A native file's status: its head, who has it and until when, and whether it can be checked
+       * out. A lease has no event, so it is read again every half minute, and every two seconds
+       * while an agent's edit holds the file, for seconds; once refused, not again until asked.
+       */
+      status: (tenant: string, ws: string, artifact: string) =>
+        queryOptions({
+          queryKey: keys.files.status(tenant, ws, artifact),
+          queryFn: () =>
+            body(
+              api.files.GET("/workspaces/{workspace_id}/files/{artifact_id}", {
+                ...named(tenant),
+                params: { path: { workspace_id: ws, artifact_id: artifact } },
+              }),
+            ),
+          refetchInterval: (query) => {
+            if (query.state.status === "error") {
+              return false; // refused, as where native files' routes aren't served: not again
+            }
+            return query.state.data?.lease?.checked_out_by === null ? 2_000 : 30_000;
+          },
+        }),
+      /**
+       * A version's bytes, for the app to save, as `fetchQuery` reads it: never kept, since a file
+       * can be megabytes and is saved once.
+       */
+      content: (tenant: string, ws: string, artifact: string, version: number) =>
+        queryOptions({
+          queryKey: [...keys.files.version(tenant, ws, artifact, version), "content"],
+          queryFn: () =>
+            body(
+              api.files.GET(
+                "/workspaces/{workspace_id}/files/{artifact_id}/versions/{version}/content",
+                {
+                  ...named(tenant),
+                  params: { path: { workspace_id: ws, artifact_id: artifact, version } },
+                  parseAs: "blob",
+                },
+              ),
+            ),
+          gcTime: 0,
+        }),
+      /** A version's words, or null where it has none to read (`409`). */
+      text: (tenant: string, ws: string, artifact: string, version: number) =>
+        queryOptions({
+          queryKey: [...keys.files.version(tenant, ws, artifact, version), "text"],
+          queryFn: () =>
+            words(
+              api.files.GET(
+                "/workspaces/{workspace_id}/files/{artifact_id}/versions/{version}/text",
+                {
+                  ...named(tenant),
+                  params: { path: { workspace_id: ws, artifact_id: artifact, version } },
+                  parseAs: "text",
+                },
+              ),
+            ),
+          staleTime: Number.POSITIVE_INFINITY,
+        }),
+      /** One page of a version, rendered, as a `data:` URL: the UIs' policy has no `blob:`. */
+      page: (tenant: string, ws: string, artifact: string, version: number, page: number) =>
+        queryOptions({
+          queryKey: [...keys.files.version(tenant, ws, artifact, version), "page", page],
+          queryFn: async () =>
+            pngDataUrl(
+              await body(
+                api.files.GET(
+                  "/workspaces/{workspace_id}/files/{artifact_id}/versions/{version}/pages/{page}",
+                  {
+                    ...named(tenant),
+                    params: { path: { workspace_id: ws, artifact_id: artifact, version, page } },
+                    parseAs: "arrayBuffer",
+                  },
+                ),
+              ),
+            ),
+          staleTime: Number.POSITIVE_INFINITY,
+        }),
+      /** The words a proposal would give a native file, or null where it names none. */
+      proposedText: (tenant: string, ws: string, proposal: string) =>
+        queryOptions({
+          queryKey: [...keys.files.proposal(tenant, ws, proposal), "text"],
+          queryFn: () =>
+            words(
+              api.files.GET("/workspaces/{workspace_id}/proposals/{proposal_id}/text", {
+                ...named(tenant),
+                params: { path: { workspace_id: ws, proposal_id: proposal } },
+                parseAs: "text",
+              }),
+            ),
+          staleTime: Number.POSITIVE_INFINITY,
+        }),
+      /** One page of what a proposal would make of a native file, as a `data:` URL. */
+      proposedPage: (tenant: string, ws: string, proposal: string, page: number) =>
+        queryOptions({
+          queryKey: [...keys.files.proposal(tenant, ws, proposal), "page", page],
+          queryFn: async () =>
+            pngDataUrl(
+              await body(
+                api.files.GET("/workspaces/{workspace_id}/proposals/{proposal_id}/pages/{page}", {
+                  ...named(tenant),
+                  params: { path: { workspace_id: ws, proposal_id: proposal, page } },
+                  parseAs: "arrayBuffer",
+                }),
+              ),
+            ),
+          staleTime: Number.POSITIVE_INFINITY,
         }),
     },
     reflexr: {

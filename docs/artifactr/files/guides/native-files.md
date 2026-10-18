@@ -156,12 +156,15 @@ app.include_router(files_router(workspaces, files, resolve_actor=resolve_actor),
 
 | Route | What it does |
 |---|---|
-| `GET /workspaces/{w}/files/{a}` | The head's name, type, size, outline and pages; whose check-out has it, until when; the app's talk level; whether the app is on |
+| `GET /workspaces/{w}/files/{a}` | The head's name, type, size, outline and pages; whose check-out has it, until when, and its id to its own holder; the app's talk level; whether the app is on; and the largest check-in it takes |
 | `POST /workspaces/{w}/files/{a}/checkouts` | Check it out (201), for eight hours |
 | `POST /workspaces/{w}/checkouts/{c}/extension` | Extend the check-out |
 | `PUT /workspaces/{w}/checkouts/{c}/file` | Check the edited file in, as the body: `applied`, `proposed` if stale, or `unchanged` |
 | `GET /workspaces/{w}/files/{a}/versions/{v}/content` | A version's bytes, as an attachment |
+| `GET /workspaces/{w}/files/{a}/versions/{v}/text` | A version's words, as plain text, as the app read them |
 | `GET /workspaces/{w}/files/{a}/versions/{v}/pages/{p}` | A version's page, as a PNG |
+| `GET /workspaces/{w}/proposals/{p}/text` | The words a proposal would give the file, such as a stale check-in's |
+| `GET /workspaces/{w}/proposals/{p}/pages/{n}` | A page of what a proposal would make of the file, as a PNG |
 
 A check-in larger than `limit` (`files_router(..., limit=)`: give it your blob store's, 25 MiB by default) is refused from its `Content-Length` with 413, before it is read. The app's failures are 422 for a file or a page it refuses, 413 for a file too large, and 503 for a timeout or a crash; everything else is artifactr's statuses, so a busy file and an app switched off are 409.
 

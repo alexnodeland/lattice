@@ -16,7 +16,8 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useEffect, useMemo } from "react";
 import { useFormHost } from "../../../../../../../form-host";
-import { RENDERERS } from "../../../../../../../renderers";
+import { NativeFile, TextChanges, wordsChanged } from "../../../../../../../native-file";
+import { NATIVE, RENDERERS } from "../../../../../../../renderers";
 import { titleOf } from "../../../../../../../titles";
 import { Connection, useStream, useWorkspace } from "../../../../../../../workspace";
 
@@ -62,7 +63,7 @@ export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/artifacts/
 
 function Artifact() {
   const { tenant, workspace, artifact: id } = Route.useParams();
-  const { queries, queryClient, user } = Route.useRouteContext();
+  const { config, queries, queryClient, user } = Route.useRouteContext();
   const me = useMe(queries, user, tenant);
   const checks = useMemo(
     () => allowedIn(queries, tenant, workspaceOf(workspace), ACTIONS),
@@ -85,7 +86,17 @@ function Artifact() {
     const versions = ordered.map((revision, index) => {
       const before = ordered[index - 1];
       const was = before ? renderer.text(before.data) : "";
-      return { revision, changes: changes(was, renderer.text(revision.data), renderer.diff) };
+      return {
+        revision,
+        changes: changes(was, renderer.text(revision.data), renderer.diff),
+        // A native file's words are compared apart, from the text the app read from each version.
+        before:
+          NATIVE.has(revision.kind) &&
+          before !== undefined &&
+          wordsChanged(before.data, revision.data)
+            ? before.version
+            : null,
+      };
     });
     return { latest, versions: versions.reverse() };
   }, [revisions]);
@@ -103,6 +114,7 @@ function Artifact() {
   }
   const { latest, versions } = history;
   const title = titleOf(latest.kind, latest.data);
+  const native = NATIVE.get(latest.kind);
   const open = Object.values(snapshot.state.proposals).filter(
     (proposal) => proposal.status === "open" && proposedOn(proposal) === id,
   );
@@ -158,6 +170,17 @@ function Artifact() {
           />
         </FormHostContext>
       </Card>
+      {native && (
+        <NativeFile
+          queries={queries}
+          tenant={tenant}
+          workspace={workspace}
+          artifact={id}
+          native={native}
+          me={me}
+          people={config.people}
+        />
+      )}
       {open.length > 0 && (
         <section aria-labelledby="open" className="flex flex-col gap-3">
           <SectionTitle id="open">Open proposals</SectionTitle>
@@ -175,7 +198,7 @@ function Artifact() {
       <section aria-labelledby="revisions" className="flex flex-col gap-3">
         <SectionTitle id="revisions">Revisions</SectionTitle>
         <ol aria-label="Revisions" className="flex flex-col gap-3">
-          {versions.map(({ revision, changes }) => (
+          {versions.map(({ revision, changes, before }) => (
             <li
               key={revision.version}
               aria-label={`Version ${revision.version}`}
@@ -183,6 +206,15 @@ function Artifact() {
             >
               <span className="font-semibold text-sm">Version {revision.version}</span>
               <Diff changes={changes} />
+              {before !== null && (
+                <TextChanges
+                  queries={queries}
+                  tenant={tenant}
+                  workspace={workspace}
+                  artifact={id}
+                  versions={[before, revision.version]}
+                />
+              )}
             </li>
           ))}
         </ol>

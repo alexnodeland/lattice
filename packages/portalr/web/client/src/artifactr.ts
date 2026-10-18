@@ -70,6 +70,12 @@ export interface Tool {
   readonly status: string;
 }
 
+/** A request a paused run asked, answered, and who answered it. */
+export interface Answered {
+  readonly request: v1.DeferredRequest;
+  readonly actor: v1.Actor;
+}
+
 export interface Run {
   readonly id: v1.RunId;
   readonly threadId: v1.ThreadId;
@@ -80,6 +86,11 @@ export interface Run {
   readonly text: string;
   /** What a paused run waits on: questions to answer and calls to approve, until each is. */
   readonly requests: readonly v1.DeferredRequest[];
+  /**
+   * The requests it paused on that are answered, and by whom, oldest first: until it pauses again
+   * or ends, so a form stays where it was asked and says who answered it.
+   */
+  readonly answered: readonly Answered[];
   /** The `seq` it started at: the later, the newer. */
   readonly started: number;
   /** The feedback given on the turn, oldest first. */
@@ -127,6 +138,7 @@ function withRun(state: Workspace, id: v1.RunId, change: Partial<Run>): Workspac
     tools: {},
     text: "",
     requests: [],
+    answered: [],
     started: 0,
     feedback: [],
   };
@@ -233,18 +245,29 @@ const handlers: Handlers = {
       },
     }),
   run_paused: (state, event) =>
-    withRun(state, event.run_id, { status: "paused", requests: event.requests }),
-  deferred_answered: (state, event) => {
+    withRun(state, event.run_id, { status: "paused", requests: event.requests, answered: [] }),
+  deferred_answered: (state, event, envelope) => {
     const run = state.runs[event.run_id];
-    const requests = (run?.requests ?? []).filter(
-      (request) => request.tool_call_id !== event.tool_call_id,
-    );
+    const asked = run?.requests ?? [];
+    const requests = asked.filter((request) => request.tool_call_id !== event.tool_call_id);
+    const answered = asked
+      .filter((request) => request.tool_call_id === event.tool_call_id)
+      .map((request) => ({ request, actor: envelope.actor }));
     // A paused run resumes once every request it paused on has its answer.
     const resumes = run?.status === "paused" && requests.length === 0;
-    return withRun(state, event.run_id, { requests, ...(resumes && { status: "running" }) });
+    return withRun(state, event.run_id, {
+      requests,
+      answered: [...(run?.answered ?? []), ...answered],
+      ...(resumes && { status: "running" }),
+    });
   },
   run_ended: (state, event) =>
-    withRun(state, event.run_id, { status: event.status, text: "", requests: [] }),
+    withRun(state, event.run_id, {
+      status: event.status,
+      text: "",
+      requests: [],
+      answered: [],
+    }),
   feedback_given: (state, event, envelope) => {
     const feedback: Feedback = {
       actor: envelope.actor,

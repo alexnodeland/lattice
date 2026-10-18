@@ -5,70 +5,33 @@
 
 import { Field } from "@base-ui/react/field";
 import type { Artifactr, ArtifactrV1, Thumb } from "@portalr/client";
-import { ThumbsDown, ThumbsUp } from "lucide-react";
+import { Bot, ThumbsDown, ThumbsUp } from "lucide-react";
 import {
   type FormEvent,
   type KeyboardEvent,
   type ReactNode,
   useEffect,
   useId,
+  useMemo,
   useRef,
   useState,
 } from "react";
 import { Alert } from "./alert";
+import type { Values } from "./artifactr-ui";
 import { Button } from "./button";
 import { cn } from "./cn";
 import { CopyButton } from "./copy-button";
+import { endedBy, readAskForm } from "./form-schema";
 import { Icon } from "./icon";
+import { FeatureOff, useFormLock } from "./integrations";
 import { Markdown } from "./markdown";
+import { SchemaForm } from "./schema-form";
+import { type Sent, Unsent, useSending } from "./sending";
 import { StatusBadge, type Tone } from "./status-badge";
 import { TextField } from "./text-field";
+import { TYPE } from "./type";
 
 const card = "flex flex-col gap-2 rounded-lg border border-line bg-surface p-4 text-sm";
-
-/**
- * How a command a part handed its caller ended, as `client`'s stream settles it, with the
- * server's answer where there was one, whose rejection says why it was refused.
- */
-export type Sent = Promise<{
-  readonly outcome: "done" | "refused" | "closed";
-  readonly result?: { readonly rejection?: { readonly [key: string]: unknown } | null };
-}>;
-
-const UNSENT = {
-  refused: "That wasn't done: the server refused it.",
-  closed: "That wasn't sent: the connection closed.",
-  // An integration it needs is off here: said of the workspace, never of the reader's grants.
-  not_enabled: "Not available in this workspace.",
-} as const;
-
-type Rejection = NonNullable<Awaited<Sent>["result"]>["rejection"];
-
-/** Why a command wasn't done, as people read it. */
-const unsentSaid = (outcome: "refused" | "closed", rejection: Rejection) =>
-  outcome === "refused" && rejection?.type === "not_enabled" ? UNSENT.not_enabled : UNSENT[outcome];
-
-/** A command in flight: whether it is, and why the last one wasn't done. */
-function useSending() {
-  const [pending, setPending] = useState(false);
-  const [unsent, setUnsent] = useState<string | null>(null);
-  async function send(command: () => Sent): Promise<boolean> {
-    setPending(true);
-    setUnsent(null);
-    const { outcome, result } = await command();
-    setPending(false);
-    if (outcome !== "done") {
-      setUnsent(unsentSaid(outcome, result?.rejection));
-    }
-    return outcome === "done";
-  }
-  return { pending, unsent, send };
-}
-
-/** Why a command wasn't done, announced. */
-function Unsent({ reason }: { reason: string | null }) {
-  return reason && <Alert tone="error">{reason}</Alert>;
-}
 
 /** A button that sends one command, waits while it is in flight, and says why one wasn't done. */
 export function CommandButton({
@@ -270,25 +233,122 @@ export function ToolCall({ tool }: { tool: Artifactr.Tool }) {
   );
 }
 
-type Answer = { approved: boolean } | { answer: string };
+/** The deferred tool that asks a form, whose answer is the form's values (lattice RFC-0005). */
+export const ASK_FORM = "ask_form";
+
+type Answer = { approved: boolean } | { answer: string } | { answer: Values };
 
 /**
- * What a paused run waits on: a call to approve or deny, or a question to answer. It takes the
- * focus when it appears, and answers once, with `answer_deferred`.
+ * A form the agent asks through `ask_form`, its fields from the request's arguments, answered
+ * once with its values. Once anyone has answered it, it says who, in place of its fields ("You",
+ * or a name, as the thread names people), until its run ends; and if the reader's answer comes
+ * after another's, it says it was answered already.
+ */
+function FormRequest({
+  request,
+  answeredBy,
+  focus,
+  onAnswer,
+}: {
+  request: ArtifactrV1.DeferredRequest;
+  answeredBy: string | null | undefined;
+  focus: boolean;
+  onAnswer: (values: Values) => Sent;
+}) {
+  const asked = useMemo(() => readAskForm(request.args), [request.args]);
+  const [late, setLate] = useState(false);
+  // Off in the workspace, or refused as off by the server: the form stays, and can't be sent.
+  const { off, refused: refusedAsOff } = useFormLock();
+  async function answer(values: Values) {
+    const settled = await onAnswer(values);
+    const ended = settled.outcome === "refused" ? endedBy(settled.result?.rejection) : null;
+    if (ended?.reason === "answered") {
+      setLate(true);
+    } else if (ended?.reason === "off") {
+      refusedAsOff(ended.integration);
+    }
+    return settled;
+  }
+  const ended =
+    late || answeredBy !== undefined ? (
+      <Alert>
+        {late ? "Already answered" : "Answered"}
+        {answeredBy && `: ${answeredBy} ${late ? "answered it first" : "answered it"}`}.
+      </Alert>
+    ) : undefined;
+  return (
+    <div className={cn(card, "gap-3", ended === undefined && off === null && "border-accent")}>
+      <p className={cn(TYPE.note, "inline-flex items-center gap-1.5")}>
+        <Icon icon={Bot} className="size-3.5" />
+        The agent asks
+      </p>
+      {asked === null ? (
+        <Alert tone="warn">
+          This form can't be shown here: its fields aren't ones portalr can show.
+        </Alert>
+      ) : (
+        <SchemaForm
+          {...(asked.title !== "" && { title: asked.title })}
+          schema={asked.schema}
+          ui={asked.ui}
+          onSubmit={answer}
+          ended={ended}
+          {...(off !== null && { locked: <FeatureOff integration={off} /> })}
+          autoFocus={focus && answeredBy === undefined}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * What a paused run waits on: a call to approve or deny, a question to answer, or a form to fill
+ * in. It takes the focus when it appears, unless `focus` says another should, and answers once,
+ * with `answer_deferred`. A form, asked through `ask_form`, stays once it is answered, until its
+ * run ends, and says by whom: `answeredBy`, or null where who isn't known.
  */
 export function Request({
   request,
   onAnswer,
+  answeredBy,
+  focus = true,
 }: {
   request: ArtifactrV1.DeferredRequest;
+  onAnswer: (answer: Answer) => Sent;
+  answeredBy?: string | null;
+  /** Take the focus as it appears: the newest of a run's forms does, and an answered one never. */
+  focus?: boolean;
+}) {
+  return request.tool_name === ASK_FORM ? (
+    <FormRequest
+      request={request}
+      answeredBy={answeredBy}
+      focus={focus}
+      onAnswer={(values) => onAnswer({ answer: values })}
+    />
+  ) : (
+    <Question request={request} focus={focus} onAnswer={onAnswer} />
+  );
+}
+
+/** A call to approve or deny, or a question to answer in a line. */
+function Question({
+  request,
+  focus,
+  onAnswer,
+}: {
+  request: ArtifactrV1.DeferredRequest;
+  focus: boolean;
   onAnswer: (answer: Answer) => Sent;
 }) {
   const [answered, setAnswered] = useState(false);
   const { pending, unsent, send } = useSending();
   const first = useRef<HTMLButtonElement & HTMLInputElement>(null);
   useEffect(() => {
-    first.current?.focus();
-  }, []);
+    if (focus) {
+      first.current?.focus();
+    }
+  }, [focus]);
   async function answer(given: Answer) {
     setAnswered(await send(() => onAnswer(given)));
   }

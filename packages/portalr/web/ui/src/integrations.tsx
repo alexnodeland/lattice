@@ -4,23 +4,25 @@
  * add-ons, and forms and dashboards for whether they may be sent and drawn. The app gives a
  * workspace's here, as grantr answers them and `client`'s `useEnabled` reads them, each its
  * registry default until they are read and where they can't be (portalr ADR-0045, ADR-0047).
- * Without a provider, as in admin, each is that default too, written once below and tested
- * against the registry. A part whose key is off degrades to read-only, as it does when the server
+ * Without a provider, as in admin, each is that default too, read from the registry's generated
+ * copy. A part whose key is off degrades to read-only, as it does when the server
  * refuses a command as off.
  */
 
-import type { IntegrationKey } from "@portalr/client";
+import { INTEGRATIONS, type IntegrationKey } from "@portalr/client";
 import { createContext, use, useState } from "react";
 import { Alert } from "./alert";
 
 /** Whether the integration a key names is on, in the workspace shown. */
 export type IsEnabled = (key: IntegrationKey) => boolean;
 
-/** The keys that are off unless a workspace switches them on, as the registry says. */
-const OFF_BY_DEFAULT: ReadonlySet<IntegrationKey> = new Set(["ui:mini-apps", "markdown:mermaid"]);
+/** The keys that are on unless a workspace switches them off, as the registry says. */
+const ON_BY_DEFAULT: ReadonlySet<IntegrationKey> = new Set(
+  INTEGRATIONS.filter((known) => known.default).map((known) => known.key),
+);
 
 /** Each integration as it is where no one has set it, as the registry says. */
-export const byDefault: IsEnabled = (key) => !OFF_BY_DEFAULT.has(key);
+export const byDefault: IsEnabled = (key) => ON_BY_DEFAULT.has(key);
 
 /** The page's answer to whether an integration is on. */
 export const IntegrationsContext = createContext<IsEnabled>(byDefault);

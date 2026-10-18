@@ -1,6 +1,6 @@
 # RFC-0003: Native files as artifacts
 
-**Status:** Draft, amended by [portalr ADR-0041](../portalr/adr/0041-first-party-webassembly-in-the-apps-policy.md) and [lattice ADR-0026](../adr/0026-a-distribution-needs-a-reason-integrations-are-extras.md)
+**Status:** Draft, amended by [portalr ADR-0041](../portalr/adr/0041-first-party-webassembly-in-the-apps-policy.md), [lattice ADR-0026](../adr/0026-a-distribution-needs-a-reason-integrations-are-extras.md) and [lattice ADR-0027](../adr/0027-integrations-switched-per-workspace-through-one-port.md)
 **Author:** Alex Nodeland
 **Created:** 2026-10-16
 **Discussion:** [#248](https://github.com/alexnodeland/lattice/pull/248)
@@ -28,6 +28,8 @@ artifactr gains a lease on an artifact, an addition to its workspace API; its pa
 - **The craft apps make it plausible.** [getartcraft.com/apps](https://getartcraft.com/apps) lists thirteen open-source Rust apps for native formats, each with a browser build. WordCraft has a headless MCP server that edits `.docx` by command; the [evidence](#evidence) records what was checked.
 
 ## Design
+
+> **Amended (2026-10-17) by [lattice ADR-0027](../adr/0027-integrations-switched-per-workspace-through-one-port.md):** A native file's app is an integration, `files:<app>`, such as `files:wordcraft`. The switch is the shared `Integrations` port in lattice-core, `is_enabled(tenant_id, workspace_id, key)`, answered by grantr per deployment, tenant and workspace, audited, and set from portalr's admin; artifactr refuses what it governs through `Workspaces(gate=...)`, as `NotEnabled`.
 
 ### Overview
 

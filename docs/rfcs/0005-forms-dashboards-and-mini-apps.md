@@ -1,6 +1,6 @@
 # RFC-0005: Forms, dashboards and mini apps in the chat
 
-**Status:** Draft, amended by [lattice ADR-0026](../adr/0026-a-distribution-needs-a-reason-integrations-are-extras.md)
+**Status:** Draft, amended by [lattice ADR-0026](../adr/0026-a-distribution-needs-a-reason-integrations-are-extras.md) and [lattice ADR-0027](../adr/0027-integrations-switched-per-workspace-through-one-port.md)
 **Author:** Alex Nodeland
 **Created:** 2026-10-17
 **Discussion:** [#334](https://github.com/alexnodeland/lattice/pull/334)
@@ -34,6 +34,8 @@ A new package, `artifactr-ui`, lets an agent put interactive UI in the chat: for
 - **`ask_user` stays** for a plain question.
 
 ## Design
+
+> **Amended (2026-10-17) by [lattice ADR-0027](../adr/0027-integrations-switched-per-workspace-through-one-port.md):** Forms, dashboards and mini apps are integrations, `ui:forms`, `ui:dashboards` and `ui:mini-apps`, the last off by default; the kill switch's deployment and tenant levels are the port's. The switch is the shared `Integrations` port in lattice-core, `is_enabled(tenant_id, workspace_id, key)`, answered by grantr per deployment, tenant and workspace, audited, and set from portalr's admin; artifactr refuses what it governs through `Workspaces(gate=...)`, as `NotEnabled`.
 
 ### Overview
 

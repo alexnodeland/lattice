@@ -1,6 +1,6 @@
 # RFC-0004: relayr and task trackers
 
-**Status:** Draft
+**Status:** Draft, amended by [lattice ADR-0027](../adr/0027-integrations-switched-per-workspace-through-one-port.md)
 **Author:** Alex Nodeland
 **Created:** 2026-10-16
 **Discussion:** [#260](https://github.com/alexnodeland/lattice/pull/260)
@@ -21,6 +21,8 @@ relayr gains a tracker connector: reflexr's runs file and update work items in a
 - **Self-hosted trackers are awkward integration targets.** Neither Plane CE nor Vikunja takes an `Idempotency-Key`, and neither sends a stable event id: Plane's `X-Plane-Delivery` is a new UUID on every attempt, and Vikunja's payload has none. Plane deactivates a webhook after five failed deliveries; Vikunja keeps its delivery queue in memory. An integration that trusts webhooks loses or repeats events, so this one trusts only what it can read back.
 
 ## Design
+
+> **Amended (2026-10-17) by [lattice ADR-0027](../adr/0027-integrations-switched-per-workspace-through-one-port.md):** Each tracker is an integration, `tracker:plane` and `tracker:vikunja`, and relayr's `Enabled` takes the port's bound `is_enabled`. The switch is the shared `Integrations` port in lattice-core, `is_enabled(tenant_id, workspace_id, key)`, answered by grantr per deployment, tenant and workspace, audited, and set from portalr's admin.
 
 ### Overview
 

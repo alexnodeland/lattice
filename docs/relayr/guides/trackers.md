@@ -41,15 +41,13 @@ Each tenant has its own tracker workspace (a Plane workspace, or a Vikunja top-l
 
 Each tracker is an integration of its own, by its key: `tracker:plane` or `tracker:vikunja`. Give `Trackers` an `enabled`, an async callable `(tenant_id, workspace_id, key) -> bool` ([`relayr.integrations.Enabled`](../reference.md)), and every action and tool asks it first; one switched off is `NotAllowed`, before the ledger or the tracker is touched. Without one, the tracker runs in every bound workspace.
 
+grantr's `Grants` answers it: its `is_enabled` is lattice's shared `Integrations` port, whose switches are kept per deployment, tenant and workspace, audited, and set from portalr's admin ([grantr's guide](../../grantr/guides/integrations.md)).
+
 ```python
-async def enabled(tenant_id: str, workspace_id: str, key: str, /) -> bool:
-    return await settings_store.enabled(tenant_id, workspace_id, key)
-
-
-trackers = Trackers(ledger, connect=plane(http), integration=INTEGRATION, enabled=enabled, ...)
+trackers = Trackers(
+    ledger, connect=plane(http), integration=INTEGRATION, enabled=grants.is_enabled, ...
+)
 ```
-
-lattice's shared store of integrations' switches, per deployment, tenant and workspace, audited, with portalr's admin page to set them, will implement this protocol; until then the application gives its own.
 
 ## From a function action
 

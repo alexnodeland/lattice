@@ -4917,6 +4917,7 @@ auth-keys = [
 dev = [
     { name = "copier" },
     { name = "cryptography" },
+    { name = "httpx" },
     { name = "pyjwt" },
     { name = "pyyaml" },
     { name = "ruff" },
@@ -4935,6 +4936,7 @@ auth-keys = [
 dev = [
     { name = "copier", specifier = ">=9.18" },
     { name = "cryptography", specifier = ">=50.0.2" },
+    { name = "httpx", specifier = ">=0.28" },
     { name = "pyjwt", specifier = ">=2.15.1" },
     { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "ruff", specifier = ">=0.16.9" },

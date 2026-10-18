@@ -1,0 +1,83 @@
+# Vikunja v2.7.0 beside stackr's stack: the opt-in recipe for relayr's tracker connector
+# (lattice RFC-0004, ADR-0039). Vikunja's own image, unmodified; NOTICE.md names it and
+# PostgreSQL, with their licences and sources.
+#
+#   make tracker-up TRACKER=vikunja   (after `make up`, which creates the stackr network)
+#
+# One binary and its PostgreSQL. Vikunja alone is published, at STACKR_BIND, as every port of the
+# stack is (ADR-0006), and joins the stackr network: an application reaches it there as
+# http://vikunja:3456, and Vikunja sends its webhooks to the application by name.
+
+name: stackr-vikunja
+
+networks:
+  default: {}
+  stackr:
+    external: true
+
+volumes:
+  vikunja-db:
+  vikunja-files:
+
+services:
+  vikunja-db:
+    image: postgres:17@sha256:2d2b8998d31037bf721cfdf764d76ba74171b4fab3431b7f72c27c56ddbdf9e3
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: vikunja
+      POSTGRES_PASSWORD: ${VIKUNJA_DB_PASSWORD:?run make env}
+      POSTGRES_DB: vikunja
+    volumes:
+      - vikunja-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U vikunja -d vikunja"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  # Docker makes a new volume root's, and Vikunja runs as uid 1000: this gives it its files'
+  # volume, with PostgreSQL's image, which is here already.
+  vikunja-files:
+    image: postgres:17@sha256:2d2b8998d31037bf721cfdf764d76ba74171b4fab3431b7f72c27c56ddbdf9e3
+    command: ["chown", "1000", "/files"]
+    volumes:
+      - vikunja-files:/files
+
+  vikunja:
+    image: vikunja/vikunja:2.7.0@sha256:e2204a1c1c6a81e833c2b3a5442be182ca2335b54c2e7e37578cc3fe12a27cfc
+    restart: unless-stopped
+    environment:
+      VIKUNJA_SERVICE_SECRET: ${VIKUNJA_SECRET:?run make env}
+      # Where people reach Vikunja: its links and its web app's API.
+      VIKUNJA_SERVICE_PUBLICURL: ${VIKUNJA_URL:-http://localhost:3456}/
+      # Each tenant's user is made by the operator, not by signing up (the tracker guide).
+      VIKUNJA_SERVICE_ENABLEREGISTRATION: ${VIKUNJA_REGISTRATION:-false}
+      VIKUNJA_DATABASE_TYPE: postgres
+      VIKUNJA_DATABASE_HOST: vikunja-db
+      VIKUNJA_DATABASE_USER: vikunja
+      VIKUNJA_DATABASE_PASSWORD: ${VIKUNJA_DB_PASSWORD:?run make env}
+      VIKUNJA_DATABASE_DATABASE: vikunja
+      VIKUNJA_FILES_BASEPATH: /app/vikunja/files
+      VIKUNJA_WEBHOOKS_ENABLED: "true"
+      # The application is a private address on the stackr network, which Vikunja's outgoing
+      # requests refuse unless allowed.
+      VIKUNJA_OUTGOINGREQUESTS_ALLOWNONROUTABLEIPS: "true"
+    volumes:
+      - vikunja-files:/app/vikunja/files
+    ports:
+      - target: 3456
+        published: ${VIKUNJA_PORT:-3456}
+        host_ip: ${STACKR_BIND:-127.0.0.1}
+        protocol: tcp
+    networks: [default, stackr]
+    depends_on:
+      vikunja-db:
+        condition: service_healthy
+      vikunja-files:
+        condition: service_completed_successfully
+    healthcheck:
+      # Each check runs Vikunja's migrations first, so it checks every 10 s, not every 3.
+      test: ["CMD", "/app/vikunja/vikunja", "healthcheck"]
+      interval: 10s
+      timeout: 10s
+      retries: 30

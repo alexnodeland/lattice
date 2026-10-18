@@ -85,7 +85,16 @@ COMPOSE_ENV = STACKR_TRACES_EXPORTERS='$(TRACES_EXPORTERS)' STACKR_GATEWAY_TELEM
 SMOKE = $(COMPOSE_ENV) STACKR_DATABASE=$(STACKR_DATABASE) STACKR_RECIPE=$(STACKR_RECIPE) \
 	STACKR_COMPOSE_FILES="$(COMPOSE_FILES)" SUPABASE="$(SUPABASE)" scripts/smoke
 
-.PHONY: help env up down reset ps logs tenant portal-key backup restore-drill validate smoke smoke-app docs-reference clean
+# --- the task trackers (lattice RFC-0004) ------------------------------------
+# Opt-in recipes, each a Compose project of its own beside the stack, joining its
+# network: TRACKER=plane or vikunja. Their settings are stackr's .env.
+TRACKERS := plane vikunja
+TRACKER_STACK = $(COMPOSE) --env-file .env -f trackers/$(TRACKER)/compose.yaml
+define need_tracker
+$(if $(filter $(TRACKERS),$(TRACKER)),,$(error TRACKER must be plane or vikunja, not '$(TRACKER)'))
+endef
+
+.PHONY: help env up down reset ps logs tenant portal-key tracker-up tracker-down tracker-check backup restore-drill validate smoke smoke-app docs-reference clean
 
 help: ## List the available commands
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -139,6 +148,19 @@ tenant: ## Create a tenant's team and key on the gateway: make tenant NAME=acme 
 
 portal-key: ## Create the read-only key portalr's admin reads spend with (PORTAL_LITELLM_KEY), not the master key; ARGS=--rotate replaces a lost one
 	$(UV) run scripts/create-portal-key $(ARGS)
+
+tracker-up: .env ## Start a task tracker beside the stack: make tracker-up TRACKER=plane (or vikunja)
+	$(need_tracker)
+	$(TRACKER_STACK) up --detach --wait --wait-timeout 600
+
+tracker-down: ## Stop a task tracker, keeping its data: make tracker-down TRACKER=plane
+	$(need_tracker)
+	$(TRACKER_STACK) down
+
+tracker-check: ## Check a tenant's tracker is provisioned, changing nothing: make tracker-check TENANT=acme TRACKER=plane APP_ENV=<the app's .env>
+	@if [ -z "$(TENANT)" ]; then echo "usage: make tracker-check TENANT=<tenant> TRACKER=plane|vikunja [APP_ENV=<the application's .env>]"; exit 2; fi
+	$(need_tracker)
+	$(UV) run scripts/tracker-check $(TENANT) --tracker $(TRACKER) $(if $(APP_ENV),--app-env $(APP_ENV))
 
 backup: ## On a single host: back up PostgreSQL and ClickHouse to the BACKUP_S3_* bucket now
 	$(if $(COMPOSE_FILES),deploy/host/backup,$(error backups are the single host's: set STACKR_RECIPE=host))

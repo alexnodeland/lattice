@@ -35,9 +35,10 @@ processors:
         value: ${env:STACKR_ENVIRONMENT}
         action: insert
   # One attribute names every signal's tenant, tenant.id, whichever library
-  # recorded it as artifactr.tenant.id or reflexr.tenant.id, so portalr filters
-  # Tempo, Loki and Prometheus on one name (lattice RFC-0002). Loki keeps it
-  # as the tenant_id structured metadata, and Prometheus as the tenant_id label.
+  # recorded it as artifactr.tenant.id, reflexr.tenant.id or relayr.tenant.id,
+  # so portalr filters Tempo, Loki and Prometheus on one name (lattice
+  # RFC-0002). Loki keeps it as the tenant_id structured metadata, and
+  # Prometheus as the tenant_id label.
   transform/tenant:
     error_mode: ignore
     trace_statements:
@@ -47,6 +48,9 @@ processors:
       - >-
         set(span.attributes["tenant.id"], span.attributes["reflexr.tenant.id"])
         where span.attributes["reflexr.tenant.id"] != nil
+      - >-
+        set(span.attributes["tenant.id"], span.attributes["relayr.tenant.id"])
+        where span.attributes["relayr.tenant.id"] != nil
     metric_statements:
       - >-
         set(datapoint.attributes["tenant.id"], datapoint.attributes["artifactr.tenant.id"])
@@ -54,6 +58,9 @@ processors:
       - >-
         set(datapoint.attributes["tenant.id"], datapoint.attributes["reflexr.tenant.id"])
         where datapoint.attributes["reflexr.tenant.id"] != nil
+      - >-
+        set(datapoint.attributes["tenant.id"], datapoint.attributes["relayr.tenant.id"])
+        where datapoint.attributes["relayr.tenant.id"] != nil
     log_statements:
       - >-
         set(log.attributes["tenant.id"], log.attributes["artifactr.tenant.id"])
@@ -61,6 +68,9 @@ processors:
       - >-
         set(log.attributes["tenant.id"], log.attributes["reflexr.tenant.id"])
         where log.attributes["reflexr.tenant.id"] != nil
+      - >-
+        set(log.attributes["tenant.id"], log.attributes["relayr.tenant.id"])
+        where log.attributes["relayr.tenant.id"] != nil
   batch: {}
 
 exporters:

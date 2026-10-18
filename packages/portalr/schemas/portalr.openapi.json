@@ -1176,6 +1176,17 @@
             "default": "/reflexr/v1",
             "title": "Reflexr",
             "type": "string"
+          },
+          "relayr": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relayr"
           }
         },
         "title": "Surfaces",

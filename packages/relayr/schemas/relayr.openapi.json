@@ -1,0 +1,712 @@
+{
+  "components": {
+    "schemas": {
+      "FieldError": {
+        "additionalProperties": true,
+        "description": "One problem FastAPI found with a request's parameters or body.",
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Loc",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Msg",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "FieldError",
+        "type": "object"
+      },
+      "Filed": {
+        "description": "What the runs of a workspace filed in its tracker.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/FiledItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "tracker": {
+            "title": "Tracker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tracker",
+          "items"
+        ],
+        "title": "Filed",
+        "type": "object"
+      },
+      "FiledItem": {
+        "description": "An item a run filed, and the chains that wrote to it.",
+        "properties": {
+          "chains": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Chains",
+            "type": "array"
+          },
+          "deleted": {
+            "title": "Deleted",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "link": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Link"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "number": {
+            "title": "Number",
+            "type": "integer"
+          },
+          "project": {
+            "title": "Project",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "project",
+          "id",
+          "number",
+          "name",
+          "link",
+          "deleted",
+          "chains"
+        ],
+        "title": "FiledItem",
+        "type": "object"
+      },
+      "Following": {
+        "description": "How the tracker connector is doing in a workspace.",
+        "properties": {
+          "binding": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TrackerBinding"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dead_letters": {
+            "items": {
+              "$ref": "#/components/schemas/TrackerDeadLetter"
+            },
+            "title": "Dead Letters",
+            "type": "array"
+          },
+          "filed": {
+            "title": "Filed",
+            "type": "integer"
+          },
+          "integration": {
+            "title": "Integration",
+            "type": "string"
+          },
+          "loop_cap": {
+            "description": "How many writes to one item the cap allows in its window.",
+            "title": "Loop Cap",
+            "type": "integer"
+          },
+          "loop_window_seconds": {
+            "description": "The cap's window, in seconds.",
+            "title": "Loop Window Seconds",
+            "type": "integer"
+          },
+          "reading": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Reading"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tracker": {
+            "title": "Tracker",
+            "type": "string"
+          },
+          "writes": {
+            "items": {
+              "$ref": "#/components/schemas/Writes"
+            },
+            "title": "Writes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tracker",
+          "integration",
+          "binding",
+          "reading",
+          "filed",
+          "dead_letters",
+          "writes",
+          "loop_cap",
+          "loop_window_seconds"
+        ],
+        "title": "Following",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "Priority": {
+        "enum": [
+          "none",
+          "low",
+          "medium",
+          "high",
+          "urgent"
+        ],
+        "type": "string"
+      },
+      "ProjectId": {
+        "type": "string"
+      },
+      "Reading": {
+        "description": "How far a workspace's tracker follower has read its project.",
+        "properties": {
+          "cursor_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cursor At"
+          },
+          "project": {
+            "title": "Project",
+            "type": "string"
+          },
+          "read_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Read At"
+          },
+          "swept_at": {
+            "format": "date-time",
+            "title": "Swept At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project",
+          "cursor_at",
+          "swept_at",
+          "read_at"
+        ],
+        "title": "Reading",
+        "type": "object"
+      },
+      "Refused": {
+        "description": "The body of a refused request.\n\n``detail`` is the rejection, the message of a resolver's refusal, or the problems FastAPI\nfound with the request.",
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RejectionDetail"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/FieldError"
+                },
+                "type": "array"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "required": [
+          "detail"
+        ],
+        "title": "Refused",
+        "type": "object"
+      },
+      "RejectionDetail": {
+        "additionalProperties": true,
+        "description": "A rejection, as REST sends it: its ``type``, its ``message`` and its typed details.",
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "message"
+        ],
+        "title": "RejectionDetail",
+        "type": "object"
+      },
+      "State": {
+        "enum": [
+          "backlog",
+          "todo",
+          "started",
+          "done",
+          "cancelled"
+        ],
+        "type": "string"
+      },
+      "TrackerBinding": {
+        "description": "The tracker project a workspace's runs file into, and whose changes its follower reads.",
+        "properties": {
+          "labels": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Labels",
+            "type": "array"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Priority"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "project": {
+            "$ref": "#/components/schemas/ProjectId"
+          },
+          "since": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Since"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/State"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "project"
+        ],
+        "title": "TrackerBinding",
+        "type": "object"
+      },
+      "TrackerDeadLetter": {
+        "description": "A change in a tracker the follower could not publish, and why.",
+        "properties": {
+          "error": {
+            "title": "Error",
+            "type": "string"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "event_type": {
+            "title": "Event Type",
+            "type": "string"
+          },
+          "item_id": {
+            "title": "Item Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "event_id",
+          "event_type",
+          "item_id",
+          "error"
+        ],
+        "title": "TrackerDeadLetter",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "Writes": {
+        "description": "relayr's recent writes to one item, which the cap on loops counts.",
+        "properties": {
+          "item_id": {
+            "title": "Item Id",
+            "type": "string"
+          },
+          "link": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Link"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "writes": {
+            "title": "Writes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "item_id",
+          "name",
+          "link",
+          "writes"
+        ],
+        "title": "Writes",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "relayr",
+    "version": "1"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/relayr/v1/trackers/{tenant}/{tracker}": {
+      "post": {
+        "description": "Verify a tracker's webhook, and make the followers of the project it names poll now.",
+        "operationId": "nudge_relayr_v1_trackers__tenant___tracker__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Tenant",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tracker",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Tracker",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Nudge a tracker project's follower",
+        "tags": [
+          "relayr"
+        ]
+      }
+    },
+    "/relayr/v1/workspaces/{workspace_id}/tracker": {
+      "get": {
+        "description": "The workspace's binding, how far its follower read, and what it couldn't publish.",
+        "operationId": "following_relayr_v1_workspaces__workspace_id__tracker_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Following"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          }
+        },
+        "summary": "How the tracker connector is doing in a workspace",
+        "tags": [
+          "relayr"
+        ]
+      }
+    },
+    "/relayr/v1/workspaces/{workspace_id}/tracker/items": {
+      "get": {
+        "description": "Each item the workspace's runs filed in its tracker, with its link and its chains.",
+        "operationId": "filed_relayr_v1_workspaces__workspace_id__tracker_items_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Filed"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          }
+        },
+        "summary": "The items a workspace's runs filed",
+        "tags": [
+          "relayr"
+        ]
+      }
+    }
+  }
+}

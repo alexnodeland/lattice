@@ -97,7 +97,8 @@ def test_config_json_is_what_the_page_says() -> None:
     rows = table_rows("getting-started.md", "### `config.json`")
     assert list(rows) == ["supabase.url", "supabase.key", "surfaces", "readers", "people"]
     for field, default in Surfaces().model_dump().items():
-        assert f"`{field}` (default `{default or chr(34) * 2}`" in rows["surfaces"], field
+        shown = "null" if default is None else default or chr(34) * 2
+        assert f"`{field}` (default `{shown}`" in rows["surfaces"], field
     for tool in Readers().configured():
         assert f"`{tool}`" in rows["readers"], tool
 

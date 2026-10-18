@@ -269,7 +269,7 @@ Not in scope: two-way sync of artifacts, Plane's Commercial edition and its v2 w
 - [x] stackr: the two recipes, the checklist and `make tracker-check`; the template's `tracker` question and example rule ([stackr ADR-0039](../stackr/adr/0039-the-task-trackers-recipes-checker-and-question.md))
 - [x] The unverified items settled, in an ADR ([relayr ADR-0035](../relayr/adr/0035-what-phase-1-settled-of-the-trackers-unknowns.md) and, on a live Plane, [ADR-0037](../relayr/adr/0037-what-a-live-plane-settled.md); Vikunja's editor and its bot users remain)
 - [x] relayr: followers and their resume, `tracker:*` events and projections, nudges, the sweep and the budget ([relayr ADR-0036](../relayr/adr/0036-reading-a-tracker-back.md): snapshots in a table of their own, and resumed from the bindings)
-- [ ] portalr: "filed as" and tracker links
+- [x] portalr: "filed as" and tracker links ([portalr ADR-0046](../portalr/adr/0046-tracker-links-on-runs.md), on a run's row; relayr's reads in [relayr ADR-0039](../relayr/adr/0039-the-tracker-connectors-reads-for-the-portal.md))
 - [ ] Docs: relayr's guide and ADRs, stackr's tracker guide
 
 ## Evidence

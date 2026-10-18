@@ -13,6 +13,7 @@ from relayr.ledger.ledger import (
     DeadLetter,
     Snapshot,
     Tracked,
+    TrackedKey,
     TrackedKind,
     TrackerDeadLetter,
     TrackerFollowing,
@@ -57,6 +58,14 @@ class _Tracked:
     ref: dict[str, JsonValue] | None = None
     deleted: bool = False
     written: dict[str, JsonValue] = field(default_factory=dict[str, JsonValue])
+
+    def read(self) -> Tracked:
+        return Tracked(
+            correlation_id=self.correlation_id,
+            ref=self.ref,
+            deleted=self.deleted,
+            written=self.written,
+        )
 
 
 class InMemoryLedger:
@@ -159,14 +168,15 @@ class InMemoryLedger:
     async def tracked(self, workspace: WorkspaceKey, kind: TrackedKind, key: str) -> Tracked | None:
         """Return a key's claim and record, or None if it was never claimed."""
         found = self._tracked.get((workspace, kind, key))
-        if found is None:
-            return None
-        return Tracked(
-            correlation_id=found.correlation_id,
-            ref=found.ref,
-            deleted=found.deleted,
-            written=found.written,
-        )
+        return None if found is None else found.read()
+
+    async def every_tracked(self, workspace: WorkspaceKey) -> dict[TrackedKey, Tracked]:
+        """Return every key claimed in the workspace, and what each made, by kind, then key."""
+        return {
+            TrackedKey(kind, key): self._tracked[at, kind, key].read()
+            for at, kind, key in sorted(self._tracked)
+            if at == workspace
+        }
 
     async def record_tracked(
         self, workspace: WorkspaceKey, kind: TrackedKind, key: str, ref: dict[str, JsonValue]
@@ -225,6 +235,15 @@ class InMemoryLedger:
         item = self._items.setdefault(workspace, {}).setdefault(item_id, _Item())
         item.writes = [at for at in item.writes if at > now - within] + [now]
         return len(item.writes)
+
+    async def tracker_writes(self, workspace: WorkspaceKey, *, within: timedelta) -> dict[str, int]:
+        """Return how many writes relayr recorded to each item within `within`, by its id."""
+        since = self._clock() - within
+        counted = {
+            item_id: sum(at > since for at in item.writes)
+            for item_id, item in self._items.get(workspace, {}).items()
+        }
+        return {item_id: count for item_id, count in sorted(counted.items()) if count}
 
     async def acquire_tracker_lease(
         self, workspace: WorkspaceKey, holder: str, ttl: timedelta
@@ -292,10 +311,12 @@ class InMemoryLedger:
 
 
 def _furthest(before: TrackerFollowing, after: TrackerFollowing) -> TrackerFollowing:
-    """The further of two readings of one project: each of cursor and sweep only moves forward."""
+    """The further of two readings of one project: cursor, sweep and read each only move forward."""
     cursors = [cursor for cursor in (before.cursor, after.cursor) if cursor is not None]
+    reads = [read for read in (before.read_at, after.read_at) if read is not None]
     return TrackerFollowing(
         project=after.project,
         cursor=max(cursors, default=None),
         swept_at=max(before.swept_at, after.swept_at),
+        read_at=max(reads, default=None),
     )

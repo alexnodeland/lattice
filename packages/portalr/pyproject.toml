@@ -59,13 +59,15 @@ test = [
 lint = ["ruff>=0.16", "pyright>=1.1.414"]
 # The acceptance tests' application (tests/app/), which its image serves: it verifies Supabase
 # Auth's tokens, serves artifactr's and reflexr's streams, and names their actions to grantr, so
-# that it lists workspaces and checks every command.
+# that it lists workspaces and checks every command; and relayr's tracker connector, over a fake
+# tracker, for the tracker's links.
 app = [
     "uvicorn>=0.54",
     "websockets>=15",
     "pyjwt>=2.15",
     "artifactr-ai[otel]",
     "reflexr[otel]",
+    "relayr-ai[fastapi]",
 ]
 dev = [
     { include-group = "test" },
@@ -78,6 +80,7 @@ dev = [
 grantr = { workspace = true }
 artifactr-ai = { workspace = true }
 reflexr = { workspace = true }
+relayr-ai = { workspace = true }
 lattice-core-ai = { workspace = true }
 
 [build-system]

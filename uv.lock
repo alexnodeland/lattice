@@ -3387,6 +3387,7 @@ app = [
     { name = "artifactr-ai", extra = ["otel"] },
     { name = "pyjwt" },
     { name = "reflexr", extra = ["otel"] },
+    { name = "relayr-ai", extra = ["fastapi"] },
     { name = "uvicorn" },
     { name = "websockets" },
 ]
@@ -3399,6 +3400,7 @@ dev = [
     { name = "pytest-cov" },
     { name = "pytest-timeout" },
     { name = "reflexr", extra = ["otel"] },
+    { name = "relayr-ai", extra = ["fastapi"] },
     { name = "ruff" },
     { name = "uvicorn" },
     { name = "websockets" },
@@ -3429,6 +3431,7 @@ app = [
     { name = "artifactr-ai", extras = ["otel"], editable = "packages/artifactr" },
     { name = "pyjwt", specifier = ">=2.15" },
     { name = "reflexr", extras = ["otel"], editable = "packages/reflexr" },
+    { name = "relayr-ai", extras = ["fastapi"], editable = "packages/relayr" },
     { name = "uvicorn", specifier = ">=0.54" },
     { name = "websockets", specifier = ">=15" },
 ]
@@ -3441,6 +3444,7 @@ dev = [
     { name = "pytest-cov", specifier = ">=7.1" },
     { name = "pytest-timeout", specifier = ">=2.4" },
     { name = "reflexr", extras = ["otel"], editable = "packages/reflexr" },
+    { name = "relayr-ai", extras = ["fastapi"], editable = "packages/relayr" },
     { name = "ruff", specifier = ">=0.16" },
     { name = "uvicorn", specifier = ">=0.54" },
     { name = "websockets", specifier = ">=15" },

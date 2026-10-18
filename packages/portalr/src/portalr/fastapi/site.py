@@ -15,6 +15,9 @@ class Surfaces(BaseModel):
     grantr: str = ""
     """The origin grantr's router is mounted at: its paths carry ``/grantr/v1`` themselves."""
     portalr: str = "/portalr/v1"
+    relayr: str | None = None
+    """The origin relayr's tracker reads are mounted at, whose paths carry ``/relayr/v1``
+    themselves; None where the application has no tracker, so the UIs never ask."""
 
 
 class Site(BaseModel):

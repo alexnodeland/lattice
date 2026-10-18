@@ -144,6 +144,9 @@ class TrackerFollowerRow(Base):
     swept_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
     """When it last read the whole project."""
 
+    read_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    """When it last read the project at all."""
+
     holder: Mapped[str | None]
     """Who holds the lease, if anyone does."""
 

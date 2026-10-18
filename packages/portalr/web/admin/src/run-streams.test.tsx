@@ -1,4 +1,5 @@
-import type { Signed } from "@portalr/client";
+import { keys, type Signed } from "@portalr/client";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Component, type ReactNode } from "react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { render } from "vitest-browser-react";
@@ -29,7 +30,15 @@ class Catch extends Component<{ children: ReactNode }, { message: string | null 
   }
 }
 
+/** The page's queries, which a live event makes stale. */
+let queryClient: QueryClient;
+
+function Queries({ children }: { children: ReactNode }) {
+  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+}
+
 beforeEach(() => {
+  queryClient = new QueryClient();
   stubSockets({
     log: [frame(1, { type: "reflexr:run_started", run_id: "r1", rule: "x", attempt: 1 })],
     answer: () => null,
@@ -46,6 +55,7 @@ test("another tenant's or workspace's stream is another stream, whatever key its
     <RunStreams {...props} tenant="acme" workspace="notes">
       <Count />
     </RunStreams>,
+    { wrapper: Queries },
   );
   await expect.element(screen.getByText("1 runs")).toBeVisible();
   expect(FakeSocket.sockets.map((each) => new URL(each.url).pathname)).toEqual([
@@ -80,6 +90,21 @@ test("runs are read inside a stream, and nowhere else", async () => {
     .toBeVisible();
 });
 
+test("a run's end, live, makes what the runs filed in a tracker stale", async () => {
+  const filed = keys.relayr.filed("acme", "notes");
+  queryClient.setQueryData(filed, { tracker: "plane", items: [] });
+  const screen = await render(
+    <RunStreams surfaces={SURFACES} signed={SIGNED} tenant="acme" workspace="notes">
+      <Count />
+    </RunStreams>,
+    { wrapper: Queries },
+  );
+  await expect.element(screen.getByText("1 runs")).toBeVisible();
+  expect(queryClient.getQueryState(filed)?.isInvalidated).toBe(false);
+  FakeSocket.sockets[0]?.push(frame(2, { type: "reflexr:run_succeeded", run_id: "r1" }));
+  await expect.poll(() => queryClient.getQueryState(filed)?.isInvalidated).toBe(true);
+});
+
 type Act = ReturnType<typeof useAct>;
 
 function Harness({ into }: { into: { act?: Act } }) {
@@ -93,6 +118,7 @@ test("a command's id is not let go while it is unanswered, and goes with its ans
     <RunStreams surfaces={SURFACES} signed={SIGNED} tenant="acme" workspace="notes">
       <Harness into={into} />
     </RunStreams>,
+    { wrapper: Queries },
   );
   await expect.poll(() => FakeSocket.sockets.length).toBe(1);
   const command = { type: "retry_run", run_id: "r1" } as const;

@@ -28,6 +28,7 @@ from relayr.ledger import (
     DeadLetter,
     Snapshot,
     Tracked,
+    TrackedKey,
     TrackedKind,
     TrackerDeadLetter,
     TrackerFollowing,
@@ -320,14 +321,25 @@ class SqlLedger:
         """Return a key's claim and record, or None if it was never claimed."""
         async with self._session(workspace.tenant_id) as session:
             row = await session.get(TrackedRow, (*workspace, kind, key))
-        if row is None:
-            return None
-        return Tracked(
-            correlation_id=row.correlation_id,
-            ref=row.ref,
-            deleted=row.deleted,
-            written=row.written,
+        return None if row is None else _read(row)
+
+    @awaited_to_the_end
+    async def every_tracked(self, workspace: WorkspaceKey) -> dict[TrackedKey, Tracked]:
+        """Return every key claimed in the workspace, and what each made, by kind, then key."""
+        query = (
+            select(TrackedRow)
+            .where(
+                TrackedRow.tenant_id == workspace.tenant_id,
+                TrackedRow.workspace_id == workspace.workspace_id,
+            )
+            .order_by(TrackedRow.kind, TrackedRow.key)
         )
+        async with self._session(workspace.tenant_id) as session:
+            rows = await session.scalars(query)
+            return {
+                TrackedKey("item" if row.kind == "item" else "comment", row.key): _read(row)
+                for row in rows
+            }
 
     @awaited_to_the_end
     async def record_tracked(
@@ -422,6 +434,23 @@ class SqlLedger:
             return len(row.writes)
 
     @awaited_to_the_end
+    async def tracker_writes(self, workspace: WorkspaceKey, *, within: timedelta) -> dict[str, int]:
+        """Return how many writes relayr recorded to each item within `within`, by its id."""
+        since = self._clock().astimezone(UTC) - within
+        query = (
+            select(SnapshotRow.item_id, SnapshotRow.writes)
+            .where(_in(workspace, SnapshotRow))
+            .order_by(SnapshotRow.item_id)
+        )
+        async with self._session(workspace.tenant_id) as session:
+            rows = (await session.execute(query)).all()
+        counted = {
+            item_id: sum(datetime.fromisoformat(at) > since for at in writes)
+            for item_id, writes in rows
+        }
+        return {item_id: count for item_id, count in counted.items() if count}
+
+    @awaited_to_the_end
     async def acquire_tracker_lease(
         self, workspace: WorkspaceKey, holder: str, ttl: timedelta
     ) -> bool:
@@ -454,7 +483,9 @@ class SqlLedger:
         cursor = None
         if row.cursor_at is not None and row.cursor_id is not None:
             cursor = (row.cursor_at, row.cursor_id)
-        return TrackerFollowing(project=row.project, cursor=cursor, swept_at=row.swept_at)
+        return TrackerFollowing(
+            project=row.project, cursor=cursor, swept_at=row.swept_at, read_at=row.read_at
+        )
 
     @awaited_to_the_end
     async def save_tracker_following(
@@ -474,7 +505,12 @@ class SqlLedger:
                     cursor = held if cursor is None else max(held, cursor)
                 if row.swept_at is not None and row.swept_at > following.swept_at:
                     following = following.model_copy(update={"swept_at": row.swept_at})
+                if row.read_at is not None and (
+                    following.read_at is None or row.read_at > following.read_at
+                ):
+                    following = following.model_copy(update={"read_at": row.read_at})
             row.project, row.swept_at = following.project, following.swept_at
+            row.read_at = following.read_at
             row.cursor_at, row.cursor_id = (None, None) if cursor is None else cursor
 
     @awaited_to_the_end
@@ -559,6 +595,12 @@ class SqlLedger:
                 )
                 for row in rows
             ]
+
+
+def _read(row: TrackedRow) -> Tracked:
+    return Tracked(
+        correlation_id=row.correlation_id, ref=row.ref, deleted=row.deleted, written=row.written
+    )
 
 
 async def _following(session: AsyncSession, workspace: WorkspaceKey) -> TrackerFollowerRow:

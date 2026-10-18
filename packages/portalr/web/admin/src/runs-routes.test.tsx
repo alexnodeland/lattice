@@ -72,6 +72,29 @@ async function portalr(_request: Request, path: string): Promise<Response | unde
 
 const open = (path: string, allowed: readonly string[] = EVERY) => opened(path, allowed, portalr);
 
+/** relayr's read of what the runs in notes filed: one item, by the chain every run here is in. */
+async function filed(request: Request, path: string): Promise<Response | undefined> {
+  if (path === "/relayr/v1/workspaces/notes/tracker/items") {
+    expect(request.headers.get("x-tenant")).toBe("acme");
+    return Response.json({
+      tracker: "plane",
+      items: [
+        {
+          key: "dead-letter/run_dead",
+          project: "p",
+          id: "i1",
+          number: 12,
+          name: "OPS-12",
+          link: "https://plane.example/acme/browse/OPS-12/",
+          deleted: false,
+          chains: ["c"],
+        },
+      ],
+    });
+  }
+  return portalr(request, path);
+}
+
 const confirm = (
   screen: Awaited<ReturnType<typeof open>>["screen"],
   title: string,
@@ -119,6 +142,32 @@ test("the runs that need someone are listed, with which dead letters they are", 
     .element(row(screen, "run_dead").getByText(/last failure: guardrail_blocked/))
     .toBeVisible();
   await expect.element(screen.getByText(/secret/)).not.toBeInTheDocument();
+});
+
+test("a run links to what its chain filed in the tracker, where the application has one", async () => {
+  const relayr = {
+    surfaces: {
+      artifactr: "/artifactr/v1",
+      reflexr: "/reflexr/v1",
+      grantr: "",
+      portalr: "",
+      relayr: "",
+    },
+  };
+  const { screen } = await opened("/t/acme/runs", EVERY, filed, ["acme"], relayr);
+  const link = row(screen, "run_dead").getByRole("link", {
+    name: "OPS-12, in Plane, opens in a new tab",
+  });
+  await expect.element(link).toHaveAttribute("href", "https://plane.example/acme/browse/OPS-12/");
+  await expect.element(row(screen, "run_dead").getByText("Filed as")).toBeVisible();
+});
+
+test("with no tracker, a run links to none, and relayr is never asked", async () => {
+  const { screen } = await open("/t/acme/runs");
+  await expect.element(row(screen, "run_dead")).toBeVisible();
+  await expect.element(screen.getByText("Filed as")).not.toBeInTheDocument();
+  const asked = vi.mocked(fetch).mock.calls.map(([input]) => String(input));
+  expect(asked.filter((url) => url.includes("/relayr/"))).toEqual([]);
 });
 
 test("every state may be shown, and each offers what its state takes", async () => {

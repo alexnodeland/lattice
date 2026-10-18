@@ -29,6 +29,12 @@ from artifactr.litellm import LiteLLMGateway
 from artifactr.mcp import ArtifactrMcp, McpContext
 from artifactr.scores import FeedbackMirror, sync_score_configs
 from artifactr.sql import SqlStorage, migrate
+{%- if use_ui %}
+from artifactr.ui import UI_TYPES, ui_checks
+{%- if access == 'grantr' %}
+from artifactr.ui.checks import IsAdmin
+{%- endif %}
+{%- endif %}
 from artifactr.workspace import Authorize, Hidden
 from evalr.langfuse import LangfuseScoreConfigStore, LangfuseScoreSink
 {%- if use_relayr %}
@@ -61,6 +67,10 @@ class Collaboration:
         identify: Checks a request's credentials alone, for the MCP server's door.
         authorize: Whether an actor may take an action; without one, everything is allowed.
         hidden: The threads and artifacts an actor may not see; without one, nothing is hidden.
+{%- if use_ui and access == 'grantr' %}
+        is_admin: Who may change or close any form, as its author may; without one, only its
+            author.
+{%- endif %}
         model: The agent's model.
         gateway: The gateway's settings: tenant keys and guardrails.
         database: The database; without one, workspaces live in memory.
@@ -80,6 +90,9 @@ class Collaboration:
         identify: Callable[[HTTPConnection], Awaitable[object]],
         authorize: Authorize | None = None,
         hidden: Hidden | None = None,
+{%- if use_ui and access == 'grantr' %}
+        is_admin: IsAdmin | None = None,
+{%- endif %}
         model: Model,
         gateway: GatewaySettings,
         database: Database | None = None,
@@ -109,7 +122,10 @@ class Collaboration:
             SqlStorage(database.engine, row_level_security=database.row_level_security)
             if database
             else InMemoryStorage(),
-            types=[Note{% if use_relayr %}, Timeline, Postmortem, RuleDraft{% endif %}],
+            types=[Note{% if use_ui %}, *UI_TYPES{% endif %}{% if use_relayr %}, Timeline, Postmortem, RuleDraft{% endif %}],
+{%- if use_ui %}
+            checks=ui_checks({% if access == 'grantr' %}is_admin=is_admin{% endif %}),
+{%- endif %}
             authorize=authorize,
             hidden=hidden,
             on_open=opened(self._mirrors.watch if self._mirrors else None{% if use_relayr %}, on_open{% endif %}),

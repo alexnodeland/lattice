@@ -78,6 +78,15 @@ tracker:
   default: none
   when: "{{ libraries == 'both' and bridge }}"
 
+ui:
+  type: bool
+  help: >-
+    Include artifactr's forms and dashboards (the agent asks people forms and shows them dashboards
+    in its chat; what they send is checked before it commits and, with the bridge, becomes an
+    event for rules)?
+  default: true
+  when: "{{ libraries in ['artifactr', 'both'] }}"
+
 access:
   type: str
   help: Who may do what
@@ -150,6 +159,11 @@ use_relayr:
 use_tracker:
   type: bool
   default: "{{ libraries == 'both' and bridge and tracker != 'none' }}"
+  when: false
+
+use_ui:
+  type: bool
+  default: "{{ libraries in ['artifactr', 'both'] and ui }}"
   when: false
 
 use_portal:

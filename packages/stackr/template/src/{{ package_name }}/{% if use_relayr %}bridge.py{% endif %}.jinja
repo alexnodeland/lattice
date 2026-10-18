@@ -4,6 +4,10 @@ Inbound, a follower per workspace publishes selected artifactr events into refle
 ``artifactr`` namespace, such as ``artifactr:message_posted``, so rules can react to what people
 and agents do. A workspace's follower starts the first time either library opens it, and when the
 application starts, for every workspace the ledger knows{% if access == 'grantr' %} and every workspace of every tenant{% endif %}.
+{%- if use_ui %}
+An answer to a form, and a submission to one, is ``ui:form_submitted`` instead, through
+relayr.ui's projections, so a rule is written once for both ways of asking.
+{%- endif %}
 
 Outbound, rules' runs act back in artifactr as their rules' own participants, within each rule's
 allowlist: proposals and notices by default (``incidents.py``). The ledger, in the application's
@@ -35,6 +39,9 @@ from grantr import Grants, Resource, User
 {%- endif %}
 from reflexr.workspace import Action, Reaction, RunContext, with_params
 from relayr.evals import Outcomes
+{%- if use_ui %}
+from relayr.events import Projections
+{%- endif %}
 from relayr.inbound import {% if access == 'grantr' %}FOLLOWER, {% endif %}Followers
 from relayr.langfuse import bridged_run, bridged_turns
 from relayr.ledger import InMemoryLedger, Ledger
@@ -42,6 +49,9 @@ from relayr.outbound import Outbound
 from relayr.rules import ALLOWLISTS as RELAYR_ALLOWLISTS
 from relayr.rules import Installer, {% if access == 'grantr' %}RuleChange, RuleDrafting{% else %}RuleDrafting, anyone{% endif %}
 from relayr.sql import SqlLedger, migrate
+{%- if use_ui %}
+from relayr.ui import UI_PROJECTIONS
+{%- endif %}
 
 from {{ package_name }}.automation import Automation
 from {{ package_name }}.chat_rules import ALLOWLISTS as CHAT_ALLOWLISTS
@@ -169,6 +179,9 @@ class Bridge:
             collaboration.workspaces,
             automation.workspaces,
             self.ledger,
+{%- if use_ui %}
+            projections=Projections(**UI_PROJECTIONS),
+{%- endif %}
             tracer_provider=tracer_provider,
             meter_provider=meter_provider,
         )

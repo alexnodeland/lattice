@@ -28,7 +28,7 @@ Python 3.12 or newer. artifactr is on PyPI as **`artifactr-ai`**, and imported a
 uv add "artifactr-ai[fastapi]"
 ```
 
-Extras: `fastapi` (WebSocket and REST), `mcp` (external agents), `postgres` or `sqlite` (SQL storage with a driver), and `sql` (SQL storage without one).
+Extras: `fastapi` (WebSocket and REST), `mcp` (external agents), `postgres` or `sqlite` (SQL storage with a driver), `sql` (SQL storage without one), `files` (native files, `artifactr.files`), and `forms` (forms and dashboards in the chat, `artifactr.ui`).
 
 ## Example
 

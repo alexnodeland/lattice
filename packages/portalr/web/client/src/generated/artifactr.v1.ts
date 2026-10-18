@@ -210,6 +210,7 @@ export type OutputTokens = number;
 export type Requests1 = number;
 export type Approved1 = boolean | null;
 export type ToolCallId4 = string;
+export type ToolName3 = string | null;
 export type Type29 = "deferred_answered";
 export type Error = string | null;
 export type Reason2 = string | null;
@@ -231,7 +232,7 @@ export type Event1 =
   PartStarted | TextDelta | ThinkingDelta | ToolArgsDelta | PartEnded | Draft | AppLive;
 export type Part = number;
 export type PartKind = "text" | "thinking" | "tool_call";
-export type ToolName3 = string | null;
+export type ToolName4 = string | null;
 export type Type36 = "part_started";
 export type Delta = string;
 export type Part1 = number;
@@ -892,6 +893,7 @@ export interface DeferredAnswered {
   run_id: RunId;
   thread_id: ThreadId;
   tool_call_id: ToolCallId4;
+  tool_name?: ToolName3;
   type: Type29;
 }
 /**
@@ -982,7 +984,7 @@ export interface LiveFrame {
 export interface PartStarted {
   part: Part;
   part_kind: PartKind;
-  tool_name?: ToolName3;
+  tool_name?: ToolName4;
   type: Type36;
 }
 /**

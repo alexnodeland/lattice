@@ -321,6 +321,30 @@ async def post(client: httpx.AsyncClient, headers: dict[str, str], **command: An
     frame = {"type": "command", "command_id": new_id("cmd"), "command": command}
     answer = await client.post("/commands", json=frame, headers=headers)
     assert answer.json()["ok"], answer.json()
+{%- if use_ui %}
+
+
+async def test_only_a_forms_author_or_a_workspace_admin_closes_it() -> None:
+    """erin edits main, but closes no form of alice's; bob, acme's admin, may."""
+    grants = seeded()
+    alice, erin = User(id="alice"), User(id="erin")
+    await grants.add_member(TENANT, erin, by=alice)
+    await grants.grant(TENANT, "editor", on=MAIN, to=erin, by=alice)
+    lunch = {"title": "Lunch", "schema": {"type": "object", "properties": {}}}
+    create = {"type": "create_artifact", "artifact_id": "poll", "kind": "form", "data": lunch}
+    patch = {"kind": "json_patch", "ops": [{"op": "replace", "path": "/closed", "value": True}]}
+    close = {"type": "edit_artifact", "artifact_id": "poll", "base_version": 1, "patch": patch}
+    async with (
+        serving(app(Script(), grants=grants)) as server,
+        httpx.AsyncClient(base_url=f"{server}{WORKSPACE}") as client,
+    ):
+        await post(client, signed(), **create)
+        frame = {"type": "command", "command_id": new_id("cmd"), "command": close}
+        refused = (await client.post("/commands", json=frame, headers=signed("erin"))).json()
+        assert refused["rejection"]["type"] == "forbidden"
+        assert "only form poll's author, or an admin" in refused["rejection"]["message"]
+        await post(client, signed("bob"), **close)
+{%- endif %}
 {%- endif %}
 {%- if use_reflexr %}
 

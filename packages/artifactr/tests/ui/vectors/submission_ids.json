@@ -1,0 +1,34 @@
+{
+  "description": "submission_id(form_id, principal=..., nonce=...): 'sub_' + the first 32 hex digits of SHA-256 over the UTF-8 of the parts joined by NUL: ['once', form_id], ['per_person', form_id, principal], or ['many', form_id, nonce], as for a form that takes many and for an app.",
+  "cases": [
+    {
+      "form_id": "form_1",
+      "id": "sub_1a5d68238d12af0572d271fb835070d5"
+    },
+    {
+      "form_id": "form_1",
+      "principal": "user:alice",
+      "id": "sub_a4efdc92510bb41d4dfe36b25b5ff3df"
+    },
+    {
+      "form_id": "form_1",
+      "principal": "user:bob",
+      "id": "sub_8f71bed7731ee77e98dc7b86aacee6ea"
+    },
+    {
+      "form_id": "form_1",
+      "nonce": "n-0001",
+      "id": "sub_f51cfc17eff2f67c3c8001e60e731925"
+    },
+    {
+      "form_id": "app_7",
+      "nonce": "e3b0c442-98fc-1c14-9afb-f4c8996fb924",
+      "id": "sub_209c8d9003251b3b1aea29af7d8410c5"
+    },
+    {
+      "form_id": "form_ü",
+      "principal": "user:zoë",
+      "id": "sub_4c642a801cb61065ae75eee2f4f5e8cb"
+    }
+  ]
+}

@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">={{ python_version }}"
 dependencies = [
 {%- if use_artifactr %}
-    "artifactr-ai[sql,postgres,fastapi,mcp,otel,langfuse,litellm]",
+    "artifactr-ai[sql,postgres,fastapi,mcp,otel,langfuse,litellm{% if use_ui %},forms{% endif %}]",
 {%- endif %}
 {%- if use_reflexr %}
     "reflexr[sql,postgres,fastapi,mcp,otel,langfuse,litellm{% if evals %},evals{% endif %}]",
@@ -18,7 +18,7 @@ dependencies = [
     "grantr[sql,postgres,fastapi]",
 {%- endif %}
 {%- if use_relayr %}
-    "relayr-ai[sql,postgres,otel,langfuse,evals{% if use_tracker %},fastapi,{{ tracker }}{% endif %}]",
+    "relayr-ai[sql,postgres,otel,langfuse,evals{% if use_ui %},forms{% endif %}{% if use_tracker %},fastapi,{{ tracker }}{% endif %}]",
 {%- endif %}
 {%- if use_tracker %}
     "httpx>=0.28",

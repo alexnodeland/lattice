@@ -36,6 +36,7 @@ The core install covers artifact types, workspaces with in-memory storage, and t
 | `litellm` | [The LLM gateway](guides/gateway.md): models over a LiteLLM proxy, with tenancy, keys and guardrails per request | `"artifactr-ai[litellm]"` |
 | `otel` | [`configure_telemetry`](guides/observability.md): the OpenTelemetry SDK, OTLP export and instrumentation in one call | `"artifactr-ai[otel]"` |
 | `files` | [Native files](files/index.md): Word documents as artifacts, edited by their own app, one writer at a time; with `postgres` or `sqlite` for its SQL stores. Unreleased | `"artifactr-ai[files]"` |
+| `forms` | [Forms and dashboards](guides/forms-and-dashboards.md) in the chat: forms an agent asks, checked against their schemas before they commit, and dashboards it shows. Unreleased | `"artifactr-ai[forms]"` |
 
 Combine extras with commas, as in `artifactr-ai[fastapi,postgres]`. You also need the pydantic-ai extra for your model provider, such as `pydantic-ai-slim[anthropic]` or `pydantic-ai-slim[openai]`, and its API key in the environment.
 

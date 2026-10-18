@@ -38,9 +38,13 @@ async def test_the_documents_application_admits_no_one() -> None:
 
 
 def _schemas(node: object) -> Iterator[dict[str, Any]]:
-    """Every object schema in a JSON Schema or an OpenAPI document, however deep."""
+    """Every object schema in a JSON Schema or an OpenAPI document, however deep.
+
+    An object schema says ``type: "object"``, so a model's field named ``properties``, such as
+    a form schema's, isn't taken for one.
+    """
     if isinstance(node, dict):
-        if "properties" in node:
+        if "properties" in node and node.get("type") == "object":
             yield node
         for value in node.values():
             yield from _schemas(value)

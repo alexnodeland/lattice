@@ -9,7 +9,8 @@ new: delivery is at least once, and the effect exactly once.
 
 A rule's run that wrote an envelope, or started the turn that did, continues its causal chain
 into reflexr one step deeper, so rules that answer each other stop at reflexr's depth limit. A
-person's answer to a rule's proposal joins the proposal's chain without going deeper.
+person's answer to a rule's proposal, or to a rule's paused turn, joins that chain without going
+deeper.
 
 An envelope is dead-lettered in the ledger, and the follower moves on, when its projection raises,
 an invalid event included, returns one of reflexr's own events, or would continue its chain past
@@ -313,12 +314,14 @@ class Followers:
         """The handle an envelope's event is published through, and the chain it joins.
 
         A rule's run behind the envelope (a write it made, or a turn its message started)
-        continues its chain, as the run's own events do. A person's answer to a rule's proposal
-        joins the proposal's chain without going deeper. Anything else starts a chain of its own.
+        continues its chain, as the run's own events do. A person's answer to a rule's proposal,
+        or to a rule's paused turn, joins that chain without going deeper. Anything else starts
+        a chain of its own.
         """
         cause = None
-        if envelope.run_id is not None:
-            cause = await self._ledger.cause(workspace, "turn", envelope.run_id)
+        turn = _writer(envelope)
+        if turn is not None:
+            cause = await self._ledger.cause(workspace, "turn", turn)
         written = _written(envelope)
         if cause is None and written is not None:
             cause = await self._ledger.cause(workspace, *written)
@@ -327,9 +330,9 @@ class Followers:
             return target.caused_by(causation, correlation_id=cause.correlation_id), None
         answered = _answered(envelope.event)
         if answered is not None:
-            proposed = await self._ledger.cause(workspace, "proposal", answered)
-            if proposed is not None:
-                return target, proposed.correlation_id
+            asked = await self._ledger.cause(workspace, *answered)
+            if asked is not None:
+                return target, asked.correlation_id
         return target, None
 
     async def _dead_letter(
@@ -356,6 +359,18 @@ class _Relayed:
     seq: int
 
 
+def _writer(envelope: artifactr.core.Envelope) -> artifactr.core.RunId | None:
+    """The turn that wrote an envelope, if one did.
+
+    An answer to a paused turn names that turn, but whoever answered wrote it, not the turn.
+    """
+    match envelope:
+        case artifactr.core.Envelope(event=artifactr.core.DeferredAnswered()):
+            return None
+        case _:
+            return envelope.run_id
+
+
 def _written(envelope: artifactr.core.Envelope) -> tuple[CauseKind, str] | None:
     """What a rule's run would have recorded this write by, if it made it."""
     match envelope:
@@ -378,8 +393,12 @@ def _written(envelope: artifactr.core.Envelope) -> tuple[CauseKind, str] | None:
             return None
 
 
-def _answered(event: artifactr.core.Event) -> str | None:
-    """The proposal an accepted or rejected proposal's events are about."""
+def _answered(event: artifactr.core.Event) -> tuple[CauseKind, str] | None:
+    """What a person's answer answers, if it is one.
+
+    An accepted or rejected proposal's events answer the proposal, and a paused turn's answer
+    the turn.
+    """
     match event:
         case (
             artifactr.core.ProposalResolved(proposal_id=proposal_id)
@@ -387,6 +406,8 @@ def _answered(event: artifactr.core.Event) -> str | None:
             | artifactr.core.ArtifactChanged(proposal_id=str() as proposal_id)
             | artifactr.core.ArtifactArchived(proposal_id=str() as proposal_id)
         ):
-            return proposal_id
+            return "proposal", proposal_id
+        case artifactr.core.DeferredAnswered(run_id=turn):
+            return "turn", turn
         case _:
             return None

@@ -35,6 +35,7 @@ graph LR
 | `relayr.vikunja` | `VikunjaTracker` and `vikunja()`, the port over Vikunja's API. The `vikunja` extra | `relayr.trackers`, httpx, pydantic |
 | `relayr.telemetry` | The `relayr` scope's attributes, the counters' registry, and `Telemetry`, through the OpenTelemetry API | the OpenTelemetry API |
 | `relayr.otel` | `telemetry()`, relayr's contribution to the libraries' `configure_telemetry`, a lattice-core `Contribution` ([lattice ADR-0020](../adr/0020-the-telemetry-contract-needs-no-extra.md)), and `metric_views`. The `otel` extra | `relayr.telemetry`, `lattice_core.otel.contribution`, the OpenTelemetry SDK |
+| `relayr.ui` | `ui:form_submitted` and `ui:app_submitted`, `UI_EVENTS`, `UI_PROJECTIONS` and `UI_PUBLISHERS`, from artifactr's forms ([ADR-0038](adr/0038-one-event-for-both-ways-of-asking.md)). The `forms` extra | `relayr.events`, artifactr (with `artifactr.ui`), reflexr, pydantic |
 | `relayr.langfuse` | `bridged_run` and `bridged_turns`, the libraries' Langfuse contexts with relayr's tags. The `langfuse` extra | `relayr.events`, `relayr.ledger`, `relayr.outbound`, artifactr, reflexr, Langfuse |
 
 `tests/test_layering.py` holds each package to its column, and checks that every name relayr imports from artifactr or reflexr is in its module's `__all__`.
@@ -53,9 +54,10 @@ Each bridged type is `artifactr:<name>`, and carries who acted in artifactr (`au
 | `proposal_resolved` | `artifactr:proposal_resolved` | `proposal_id`, `proposed_by`, `decision`, `artifact_id`, `changes`, `reason`, `version` |
 | `run_ended` | `artifactr:turn_ended` | `status`, `usage`, `error`, `reason` |
 | `feedback_given` | `artifactr:feedback_given` | `feedback_type`, `target`, `value` |
-| an `app_event`, or an artifact kind's events | what the application's projection returns | |
+| `deferred_answered` | `artifactr:deferred_answered`, whose `turn_id` is the turn that asked | `tool_call_id`, `tool_name`, `answer`, `approved` |
+| an `app_event`, an artifact kind's events, or an answer to a deferred tool | what the application's projection returns | |
 
-Thread, mode and focus changes, run starts and pauses, tool calls and returns, and deferred answers stay in artifactr. An envelope becomes at most one event, and its id is the envelope's.
+Thread, mode and focus changes, run starts and pauses, and tool calls and returns stay in artifactr. `Projections` takes the application's mappings per `app_event` name, per artifact kind and per deferred tool's name; a kind's or a tool's takes the place of the default set's events for it ([lattice RFC-0005](../rfcs/0005-forms-dashboards-and-mini-apps.md)). An envelope becomes at most one event, and its id is the envelope's.
 
 ## Followers
 
@@ -84,7 +86,7 @@ A rule's run acts in artifactr through `Outbound.acting(reaction)`: a function a
 
 ### Loop control
 
-Before each write, `RunActions` records the run behind it in the ledger, by the ids the follower will read off its envelope. The follower publishes a rule's write back into reflexr through `caused_by(...)`, in the run's chain, as deep as the run's own events; a turn acting for a rule continues the chain of the last of the messages its `run_started` names that a run posted ([ADR-0026](adr/0026-a-retried-send-asks-again-and-turns-traced-by-their-messages.md)). reflexr refuses a firing past its depth limit, so two rules that answer each other stop there. A person's answer to a rule's proposal joins the proposal's chain without going deeper ([ADR-0021](adr/0021-chains-continue-across-the-bridge.md)). `tests/outbound/test_loops.py` checks both of phase 2's exit criteria, on every ledger.
+Before each write, `RunActions` records the run behind it in the ledger, by the ids the follower will read off its envelope. The follower publishes a rule's write back into reflexr through `caused_by(...)`, in the run's chain, as deep as the run's own events; a turn acting for a rule continues the chain of the last of the messages its `run_started` names that a run posted ([ADR-0026](adr/0026-a-retried-send-asks-again-and-turns-traced-by-their-messages.md)). reflexr refuses a firing past its depth limit, so two rules that answer each other stop there. A person's answer to a rule's proposal joins the proposal's chain without going deeper, and so does an answer to a rule's paused turn, the turn's ([ADR-0021](adr/0021-chains-continue-across-the-bridge.md)). `tests/outbound/test_loops.py` checks both of phase 2's exit criteria, on every ledger.
 
 ## Trackers
 

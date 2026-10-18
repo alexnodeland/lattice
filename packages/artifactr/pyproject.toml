@@ -51,6 +51,10 @@ evals = ["evalr>=0.1.0"]
 # extra names the integration, and carries the apps' adapters' dependencies: WordCraft's speaks
 # MCP on stdio, under anyio's deadlines (lattice ADR-0026).
 files = ["mcp>=2.2", "anyio>=4.9"]
+# Forms and dashboards in the chat, artifactr.ui (ADR-0074): what it imports beyond artifactr's own
+# dependencies, Pydantic's core, which Pydantic installs already. The name an application installs
+# the forms by, which a dependency they ever need joins.
+forms = ["pydantic-core>=2.46.0"]
 
 [project.urls]
 Homepage = "https://lattice.alexnodeland.com/artifactr/"

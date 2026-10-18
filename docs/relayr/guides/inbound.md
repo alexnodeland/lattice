@@ -74,7 +74,7 @@ The envelope's actor is `SourceActor("artifactr")` on every bridged event; `auth
 
 ## Bridge your own events
 
-`Projections` maps an `app_event`, by its name, or an artifact kind to the application's own event type, in its own namespace:
+`Projections` maps an `app_event`, by its name, an artifact kind, or an answer to a deferred tool, by the tool's name, to the application's own event type, in its own namespace:
 
 ```python
 import artifactr.core
@@ -98,6 +98,7 @@ projections = Projections(app_events={"deploy": deployed})
 
 - **An `app_event` with no projection stays in artifactr.**
 - **An artifact kind's projection replaces the default set's** `artifact_created`, `artifact_changed` and `artifact_archived` for that kind. Proposals on it are still bridged as `artifactr:proposal_*`. Return None to bridge nothing.
+- **A deferred tool's projection replaces the default set's** `artifactr:deferred_answered` for answers to that tool (`Projections(deferred={"ask_form": ...})`). An answer to another tool, or one recorded before artifactr named the tool, is bridged as `artifactr:deferred_answered`.
 - **Add the projected types to `events`,** as with `BRIDGED`.
 
 ## Dead letters

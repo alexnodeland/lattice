@@ -16,6 +16,21 @@ def parts(content: bytes) -> dict[str, bytes]:
         return {name: archive.read(name) for name in archive.namelist() if name not in STAMPED}
 
 
+def bomb() -> bytes:
+    """A `.docx` whose document inflates to 300 MiB, past the adapter's limit, from 300 KiB."""
+    made = BytesIO()
+    with (
+        zipfile.ZipFile(BytesIO(FEATURES["text"]())) as source,
+        zipfile.ZipFile(made, "w", zipfile.ZIP_DEFLATED) as archive,
+    ):
+        for name in source.namelist():
+            part = source.read(name)
+            if name == "word/document.xml":
+                part = part.replace(b"<w:body>", b"<w:body><!--" + b" " * (300 << 20) + b"-->", 1)
+            archive.writestr(name, part)
+    return made.getvalue()
+
+
 def adapter(cli: str, version: str) -> App:
     return Subprocess(cli, version=version)
 
@@ -28,5 +43,6 @@ CORPUS = Corpus(
     read=read,
     kept=parts,
     adapter=adapter,
+    hostile={"bomb": bomb},
 )
 """WordCraft 0.7.0 keeps every feature."""

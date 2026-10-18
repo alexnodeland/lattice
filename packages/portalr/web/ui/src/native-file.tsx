@@ -10,7 +10,7 @@ import { capped, type Data, type Renderer } from "./artifacts";
 import { Button } from "./button";
 import { cn } from "./cn";
 import { Skeleton } from "./skeleton";
-import { StatusBadge } from "./status-badge";
+import { StatusBadge, type Tone } from "./status-badge";
 
 /** What people call a native file's type, by its media type. */
 const TYPES: Readonly<Record<string, string>> = {
@@ -186,6 +186,33 @@ export type PageShown =
   | { readonly page: number; readonly src: string }
   | { readonly page: number; readonly state: "reading" | "failed" };
 
+/** One page in a box of a page's proportions, named beneath, as it is read, drawn or failed. */
+function Page({ shown, name }: { shown: PageShown; name: string }) {
+  return (
+    <figure className="flex flex-col gap-1">
+      <div className="flex aspect-[1/1.414] items-center justify-center overflow-hidden rounded-sm border border-line bg-surface forced-colors:border-system-text">
+        {"src" in shown ? (
+          <img src={shown.src} alt={name} className="size-full object-contain" />
+        ) : shown.state === "reading" ? (
+          <Skeleton className="size-full rounded-none" />
+        ) : (
+          <p className="p-2 text-center text-muted text-xs">This page couldn't be shown.</p>
+        )}
+      </div>
+      {/* An image is named by its page, which its caption says again for the eye. */}
+      <figcaption
+        aria-hidden={"src" in shown ? true : undefined}
+        className="text-center text-muted text-xs"
+      >
+        {name}
+        {"state" in shown && shown.state === "reading" && (
+          <span className="sr-only">, being read</span>
+        )}
+      </figcaption>
+    </figure>
+  );
+}
+
 /**
  * A file's pages, rendered by its app, each in a box of a page's proportions with its number
  * beneath, side by side as the width allows. Only the pages given are shown; with `onMore`, a
@@ -208,42 +235,89 @@ export function PageStrip({
   return (
     <section aria-label={label} className={cn("flex flex-col gap-3", className)}>
       <ol className="grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-3">
-        {pages.map((shown) => {
-          const name = `Page ${shown.page} of ${total}`;
-          return (
-            <li key={shown.page}>
-              <figure className="flex flex-col gap-1">
-                <div className="flex aspect-[1/1.414] items-center justify-center overflow-hidden rounded-sm border border-line bg-surface forced-colors:border-system-text">
-                  {"src" in shown ? (
-                    <img src={shown.src} alt={name} className="size-full object-contain" />
-                  ) : shown.state === "reading" ? (
-                    <Skeleton className="size-full rounded-none" />
-                  ) : (
-                    <p className="p-2 text-center text-muted text-xs">
-                      This page couldn't be shown.
-                    </p>
-                  )}
-                </div>
-                {/* An image is named by its page, which its caption says again for the eye. */}
-                <figcaption
-                  aria-hidden={"src" in shown ? true : undefined}
-                  className="text-center text-muted text-xs"
-                >
-                  {name}
-                  {"state" in shown && shown.state === "reading" && (
-                    <span className="sr-only">, being read</span>
-                  )}
-                </figcaption>
-              </figure>
-            </li>
-          );
-        })}
+        {pages.map((shown) => (
+          <li key={shown.page}>
+            <Page shown={shown} name={`Page ${shown.page} of ${total}`} />
+          </li>
+        ))}
       </ol>
       {onMore && pages.length < total && (
         <Button variant="secondary" size="sm" className="self-start" onClick={onMore}>
           Show more pages
         </Button>
       )}
+    </section>
+  );
+}
+
+/** A page of two versions of a file, either of which may not have it. */
+export interface PagePair {
+  readonly page: number;
+  readonly before: PageShown | null;
+  readonly after: PageShown | null;
+}
+
+/** One side of a page's pair: the page, or where it has none, a box that says so. */
+function Side({ side, page, shown }: { side: string; page: number; shown: PageShown | null }) {
+  return shown === null ? (
+    <p className="flex aspect-[1/1.414] items-center justify-center rounded-sm border border-line border-dashed p-2 text-center text-muted text-xs forced-colors:border-system-text">
+      No page {page} here
+    </p>
+  ) : (
+    <Page shown={shown} name={`Page ${page}, ${side}`} />
+  );
+}
+
+/** Whether a page differs between two versions, as a shape and a word, once it is known. */
+function compared({ before, after }: PagePair): [Tone, string] | null {
+  if (before === null || after === null) {
+    return before === null ? ["queued", "New"] : ["stopped", "Gone"];
+  }
+  if (!("src" in before && "src" in after)) {
+    return null;
+  }
+  return before.src === after.src ? ["done", "Unchanged"] : ["retrying", "Changed"];
+}
+
+/**
+ * Two versions of a file's pages side by side, a row a page, each row saying by a shape and a
+ * word whether it changed, so a reviewer sees a check-in beside the version it would replace. Two renders of the
+ * same page by the same build are the same bytes, so a page that reads "Changed" did.
+ */
+export function PageCompare({
+  label,
+  before,
+  after,
+  pages,
+  className,
+}: {
+  /** What the comparison is of, such as "Pages, as they are and as proposed". */
+  label: string;
+  /** What each side is, such as "Version 3" and "Proposed". */
+  before: string;
+  after: string;
+  pages: readonly PagePair[];
+  className?: string;
+}) {
+  return (
+    <section aria-label={label} className={cn("flex flex-col gap-3", className)}>
+      <ol className="flex flex-col gap-4">
+        {pages.map((pair) => {
+          const said = compared(pair);
+          return (
+            <li key={pair.page} className="flex flex-col gap-2">
+              <p className="flex items-center gap-2 font-semibold text-sm">
+                Page {pair.page}
+                {said && <StatusBadge tone={said[0]}>{said[1]}</StatusBadge>}
+              </p>
+              <div className="grid max-w-md grid-cols-2 gap-3">
+                <Side side={before} page={pair.page} shown={pair.before} />
+                <Side side={after} page={pair.page} shown={pair.after} />
+              </div>
+            </li>
+          );
+        })}
+      </ol>
     </section>
   );
 }

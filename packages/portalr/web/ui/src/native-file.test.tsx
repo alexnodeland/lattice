@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import { render } from "vitest-browser-react";
 import { LONGEST_TITLE } from "./artifacts";
-import { FileHolder, factsOf, fileSize, nativeFile, PageStrip } from "./native-file";
+import { FileHolder, factsOf, fileSize, nativeFile, PageCompare, PageStrip } from "./native-file";
 import { axeViolations } from "./test/axe";
 import { FAILED, MANIFEST, NOW, PAGES, UNTIL } from "./test/native-file";
 
@@ -104,5 +104,33 @@ test("pages are named by their number, and say when they are read or couldn't be
   expect(buttons.elements()).toHaveLength(1);
   await buttons.click();
   expect(more).toBe(1);
+  expect(await axeViolations(screen.container)).toEqual([]);
+});
+
+test("two versions' pages side by side, each row saying whether it changed", async () => {
+  const [one, two] = PAGES as [{ page: number; src: string }, { page: number; src: string }];
+  const screen = await render(
+    <PageCompare
+      label="Its pages beside the head's"
+      before="Version 2"
+      after="Proposed"
+      pages={[
+        { page: 1, before: one, after: one },
+        { page: 2, before: one, after: { page: 2, src: two.src } },
+        { page: 3, before: { page: 3, state: "reading" }, after: null },
+        { page: 4, before: null, after: { page: 4, state: "failed" } },
+      ]}
+    />,
+  );
+  const rows = screen.getByRole("listitem").elements();
+  expect(rows.map((row) => row.querySelector("p")?.textContent)).toEqual([
+    "Page 1Unchanged",
+    "Page 2Changed",
+    "Page 3Gone",
+    "Page 4New",
+  ]);
+  await expect.element(screen.getByRole("img", { name: "Page 2, Proposed" })).toBeVisible();
+  await expect.element(screen.getByText("No page 3 here")).toBeVisible();
+  await expect.element(screen.getByText("No page 4 here")).toBeVisible();
   expect(await axeViolations(screen.container)).toEqual([]);
 });

@@ -50,4 +50,4 @@
 ## Action items
 
 1. [x] `Site.editors` and `config.json`'s; `client`'s check-out, extension and `checkIn`; `ui`'s `FileChooser` and `Progress`; the app's check-out and check-in.
-2. [ ] The RFC's scenarios, with the editor served on an origin of its own (lattice RFC-0003, phase 4).
+2. [x] The RFC's scenarios, with the editor served on an origin of its own ([ADR-0050](0050-a-native-files-proposals-and-the-pilots-scenarios.md)).

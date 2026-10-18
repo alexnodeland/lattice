@@ -51,5 +51,5 @@ Three things shape how the app reads them:
 
 1. [x] `nativeFile()`, `FileHolder` and `PageStrip` in `ui`, with their tests and screenshots.
 2. [x] `client`'s `files` client and queries; the app's file section and its words compared; the test application's native files, and the scenario.
-3. [ ] Check-out and check-in.
-4. [ ] A native file's proposals, with both versions' pages, and the RFC's scenarios.
+3. [x] Check-out and check-in ([ADR-0049](0049-checking-a-native-file-out-and-in.md)).
+4. [x] A native file's proposals, with both versions' pages, and the RFC's scenarios ([ADR-0050](0050-a-native-files-proposals-and-the-pilots-scenarios.md)).

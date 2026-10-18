@@ -1,9 +1,11 @@
 /**
- * What a scenario's steps share: the note the agent proposed an edit to, the document it drafted
- * and the name a download of it was saved under, the thread it started, the rule run it set off,
- * once it has, the stored rule it installed, and the tracker item a run filed.
+ * What a scenario's steps share: the note the agent proposed an edit to, the document it drafted,
+ * the name a download of it was saved under and the editor a check-out opened, the thread it
+ * started, the rule run it set off, once it has, the stored rule it installed, and the tracker
+ * item a run filed.
  */
 
+import type { Page } from "@playwright/test";
 import { test as base, createBdd } from "playwright-bdd";
 
 export const test = base.extend<{
@@ -12,6 +14,8 @@ export const test = base.extend<{
     document: string | null;
     /** The name the browser was told to save a download under. */
     downloaded: string | null;
+    /** The hosted editor's tab, once a check-out opened it, with what it asked for and refused. */
+    editor: { page: Page; requests: string[]; violations: string[] } | null;
     thread: string | null;
     run: string | null;
     rule: string | null;
@@ -28,6 +32,7 @@ export const test = base.extend<{
       note: null,
       document: null,
       downloaded: null,
+      editor: null,
       thread: null,
       run: null,
       rule: null,

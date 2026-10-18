@@ -68,6 +68,14 @@ export { Markdown } from "./markdown";
 export { Lockup, Mark, type Ui } from "./marks";
 export { Menu, type MenuItem } from "./menu";
 export { ago, Moment } from "./moment";
+export {
+  FileHolder,
+  factsOf,
+  type Holder,
+  nativeFile,
+  type PageShown,
+  PageStrip,
+} from "./native-file";
 export { Num } from "./num";
 export { PageHeader } from "./page-header";
 export { Plain } from "./plain";

@@ -53,5 +53,6 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0045](0045-integrations-in-admin-and-the-apps-read-of-them.md) | Integrations in admin, and the app's read of them: each its default where unread, and read again on `not_enabled` | Accepted, amended by 0047 |
 | [0046](0046-tracker-links-on-runs.md) | Tracker links on runs: what a run's chain filed, and the items that set it off | Accepted |
 | [0047](0047-dashboards-on-demand-tables-and-the-panel-registry.md) | Dashboards on demand, tables by TanStack Table, the panel registry, and one seam for integrations | Accepted |
+| [0048](0048-native-files-in-the-app.md) | Native files in the app: the manifest, who has the file, its pages, a download, and its words compared | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

@@ -57,6 +57,7 @@ nav:
   - adr/0045-integrations-in-admin-and-the-apps-read-of-them.md
   - adr/0046-tracker-links-on-runs.md
   - adr/0047-dashboards-on-demand-tables-and-the-panel-registry.md
+  - adr/0048-native-files-in-the-app.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

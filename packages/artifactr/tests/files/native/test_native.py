@@ -15,14 +15,20 @@ from artifactr.core import (
     Actor,
     AgentActor,
     Applied,
+    ArchiveArtifact,
     ArtifactChanged,
+    EditArtifact,
     Forbidden,
     InvalidState,
+    JsonPatch,
     NotFound,
     PatchFailed,
+    ProposeChange,
     Proposed,
     RespondToProposal,
     TenantId,
+    TextEdit,
+    TextEdits,
     UserActor,
     ValidationFailed,
     VersionConflict,
@@ -34,7 +40,7 @@ from artifactr.files.app import AppCommand, AppFailed, FakeApp
 from artifactr.files.blobs import once
 from artifactr.files.checkouts import Checkout, InMemoryCheckouts
 from artifactr.files.manifest import DOCX, Blob, WordDocument
-from artifactr.files.native import ContentUnavailable, NativeFiles
+from artifactr.files.native import ContentUnavailable, NativeFiles, Part
 from artifactr.files.native.files import digests
 from artifactr.workspace import (
     Access,
@@ -457,6 +463,74 @@ async def test_any_version_is_read_through_its_revision(world: World) -> None:
         await world.files.read(world.ws, "a1", version=3)
 
 
+async def test_a_proposal_is_read_and_rendered_as_the_file_it_would_make(world: World) -> None:
+    proposed = await world.files.edit(
+        world.agent, "a1", base_version=1, commands=[add("Fees")], summary="Added the fees"
+    )
+    assert isinstance(proposed, Proposed)
+    pid = proposed.proposal_id
+    assert await world.files.proposed(world.ws, pid, part="text") == b"Terms\n\nFees"
+    assert b"Fees" in await world.files.proposed(world.ws, pid)
+    page = await world.files.render_proposed(world.ws, pid, 1)
+    assert page.startswith(b"\x89PNG")
+    assert page != await world.files.render(world.ws, "a1", 1), (
+        "the proposal's page, not the head's"
+    )
+    with pytest.raises(AppFailed):
+        await world.files.render_proposed(world.ws, pid, 2)
+
+
+@pytest.mark.parametrize(
+    ("change", "part"),
+    [
+        (ArchiveArtifact(artifact_id="a1", base_version=1), "content"),
+        (
+            EditArtifact(
+                artifact_id="a1",
+                base_version=1,
+                patch=TextEdits(field="name", edits=(TextEdit(old="a", new="b"),)),
+            ),
+            "content",
+        ),
+        (
+            EditArtifact(
+                artifact_id="a1",
+                base_version=1,
+                patch=JsonPatch(ops=({"op": "replace", "path": "/outline", "value": "x"},)),
+            ),
+            "text",
+        ),
+        (
+            EditArtifact(
+                artifact_id="a1",
+                base_version=1,
+                patch=JsonPatch(ops=({"op": "replace", "path": "/text", "value": None},)),
+            ),
+            "text",
+        ),
+    ],
+)
+async def test_a_proposal_that_names_no_content_has_none_to_read(
+    world: World, change: ArchiveArtifact | EditArtifact, part: Part
+) -> None:
+    proposed = await world.agent.commit(ProposeChange(change=change))
+    with pytest.raises(ContentUnavailable, match=part):
+        await world.files.proposed(world.ws, proposed.proposal_id, part=part)
+
+
+async def test_a_proposal_names_what_its_last_replace_makes(world: World) -> None:
+    head = await world.head()
+    other = await world.stores.blobs.put(world.scope, "a1", once(b"Other"), "text/plain")
+    assert head.text is not None
+    ops = (
+        {"op": "replace", "path": "/text", "value": head.text.model_dump(mode="json")},
+        {"op": "replace", "path": "/text", "value": other.model_dump(mode="json")},
+    )
+    change = EditArtifact(artifact_id="a1", base_version=1, patch=JsonPatch(ops=ops))
+    proposed = await world.agent.commit(ProposeChange(change=change))
+    assert await world.files.proposed(world.ws, proposed.proposal_id, part="text") == b"Other"
+
+
 async def test_a_hidden_file_answers_as_a_missing_one(stores: Stores, clock: FakeClock) -> None:
     async def hidden(tenant: TenantId, workspace: WorkspaceId, actor: Actor) -> Visibility:
         return Visibility(artifacts=frozenset({"a1"} if acting_for(actor) == BOB else ()))
@@ -470,6 +544,12 @@ async def test_a_hidden_file_answers_as_a_missing_one(stores: Stores, clock: Fak
         await world.files.check_out(bob, "a1")
     with pytest.raises(NotFound):
         await world.files.edit(bob, "a1", base_version=1, commands=[], summary="x")
+    proposed = await world.files.edit(
+        world.agent, "a1", base_version=1, commands=[add("Fees")], summary="x"
+    )
+    assert isinstance(proposed, Proposed)
+    with pytest.raises(NotFound):
+        await world.files.proposed(bob, proposed.proposal_id)
     with pytest.raises(Forbidden, match="whole workspace"):
         await world.files.collect(bob)
 

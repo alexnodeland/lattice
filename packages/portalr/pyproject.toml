@@ -65,7 +65,7 @@ app = [
     "uvicorn>=0.54",
     "websockets>=15",
     "pyjwt>=2.15",
-    "artifactr-ai[otel,forms]",
+    "artifactr-ai[otel,files,forms]",
     "reflexr[otel]",
     "relayr-ai[fastapi]",
 ]

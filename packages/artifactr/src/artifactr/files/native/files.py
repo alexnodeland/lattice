@@ -18,10 +18,14 @@ from pydantic import JsonValue
 from artifactr.core import (
     Applied,
     ArtifactId,
+    EditArtifact,
     Forbidden,
     InvalidState,
+    JsonPatch,
     NotEnabled,
     NotFound,
+    Patch,
+    ProposalId,
     ProposeChange,
     Proposed,
     ThreadId,
@@ -446,6 +450,37 @@ class NativeFiles:
         source = await self.read(ws, artifact_id, version=version)
         return await self._app.render(source, page, scale=1.0, deadline=self._deadline)
 
+    async def proposed(
+        self, ws: Workspace, proposal_id: ProposalId, *, part: Part = "content"
+    ) -> bytes:
+        """Return what a proposal would make of a native file: its bytes, its text or its review.
+
+        A stale check-in is kept as a proposal, and its reviewer reads it beside the head. The
+        proposal is read through the workspace, and then its file, as a read of either is, so a
+        hidden one is answered as a missing one.
+
+        Raises:
+            NotFound: If there is no such proposal, it is to no native file, or either is hidden.
+            ContentUnavailable: If the proposal names nothing for `part`, as one that doesn't
+                edit the file's content, or bytes the blob store doesn't have.
+        """
+        proposal = await ws.proposal(proposal_id)
+        await ws.get(NativeFile, proposal.artifact_id)
+        change = proposal.change
+        named = _replaced(change.patch, part) if isinstance(change, EditArtifact) else None
+        return await self._bytes(_scope(ws), proposal.artifact_id, named, part)
+
+    async def render_proposed(self, ws: Workspace, proposal_id: ProposalId, page: int) -> bytes:
+        """Render one page of what a proposal would make of a native file, from 1, as a PNG.
+
+        Raises:
+            NotFound: If there is no such proposal, it is to no native file, or either is hidden.
+            ContentUnavailable: If the proposal names no content, or the blob store hasn't it.
+            AppFailed: If the app can't render it, or there is no such page.
+        """
+        source = await self.proposed(ws, proposal_id)
+        return await self._app.render(source, page, scale=1.0, deadline=self._deadline)
+
     # ─── collection ───────────────────────────────────────────────────────────
 
     async def collect(self, ws: Workspace) -> int:
@@ -529,6 +564,22 @@ def digests(value: JsonValue) -> set[str]:
             return {d for v in value for d in digests(v)}
         case _:
             return set()
+
+
+def _replaced(patch: Patch, part: Part) -> Blob | None:
+    """The blob a native file's revision gives one of its parts, as `revise` builds it, if any.
+
+    JSON Patch applies its operations in order, so the last that replaces the part is what the
+    revision would make. The proposed manifest was validated as the proposal was made, so what it
+    names is a blob, or None for a part it clears.
+    """
+    if not isinstance(patch, JsonPatch):
+        return None
+    for op in reversed(patch.ops):
+        if op.get("op") == "replace" and op.get("path") == f"/{part}":
+            value = op.get("value")
+            return None if value is None else Blob.model_validate(value)
+    return None
 
 
 def _scope(ws: Workspace) -> Scope:

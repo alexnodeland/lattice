@@ -18,9 +18,17 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from starlette.requests import HTTPConnection
 
-from artifactr.core import Actor, TenantId, UserActor, Visibility, WorkspaceId
+from artifactr.core import (
+    Actor,
+    AgentActor,
+    Proposed,
+    TenantId,
+    UserActor,
+    Visibility,
+    WorkspaceId,
+)
 from artifactr.fastapi import Unauthorized
-from artifactr.files.app import FakeApp
+from artifactr.files.app import AppCommand, FakeApp
 from artifactr.files.blobs import InMemoryBlobs, once
 from artifactr.files.checkouts import InMemoryCheckouts
 from artifactr.files.fastapi import files_router
@@ -63,6 +71,7 @@ class World:
     app: FakeApp
     clock: FakeClock
     ws: Workspace
+    files: NativeFiles
 
     def as_(self, user: str) -> dict[str, str]:
         return {"x-user": user}
@@ -93,7 +102,7 @@ async def world() -> World:
     await files.upload(ws, WordDocument, "c ø.docx", upload, media_type=DOCX, artifact_id="a1")
     server = FastAPI()
     server.include_router(files_router(workspaces, files, resolve_actor=resolve_actor, limit=LIMIT))
-    return World(TestClient(server), switch, app, clock, ws)
+    return World(TestClient(server), switch, app, clock, ws, files)
 
 
 def test_a_file_says_who_has_it_and_how_it_is_edited(world: World) -> None:
@@ -109,11 +118,14 @@ def test_a_file_says_who_has_it_and_how_it_is_edited(world: World) -> None:
         "lease": None,
         "talk": "save",
         "enabled": True,
+        "limit": LIMIT,
     }
     checkout = world.check_out()
     lease = world.client.get(FILE).json()["lease"]
     assert lease["checked_out_by"] == "user:alice"
     assert lease["expires_at"] == checkout["expires_at"]
+    assert lease["checkout_id"] == checkout["id"], "to its holder"
+    assert world.client.get(FILE, headers=world.as_("bob")).json()["lease"]["checkout_id"] is None
 
 
 def test_a_check_out_then_a_check_in_is_a_revision(world: World) -> None:
@@ -177,6 +189,45 @@ def test_a_check_in_past_the_limit_is_refused_before_it_is_read(world: World) ->
     assert streamed.json()["detail"] == f"the file is larger than {2 * LIMIT} bytes", "the store's"
 
 
+def test_a_versions_words_are_its_text_as_the_app_read_them(world: World) -> None:
+    checkout = world.check_out()
+    world.check_in(checkout, FakeApp.file("Terms", "Fees"))
+    first = world.client.get(f"{FILE}/versions/1/text")
+    assert first.text == "Terms"
+    assert first.headers["content-type"] == "text/plain; charset=utf-8"
+    assert first.headers["content-security-policy"] == "sandbox"
+    assert world.client.get(f"{FILE}/versions/2/text").text == "Terms\n\nFees"
+    assert world.client.get(f"{FILE}/versions/3/text").status_code == 404
+
+
+async def test_a_version_with_no_words_has_none_to_give(world: World) -> None:
+    head = await world.ws.get(WordDocument, "a1")
+    await world.ws.commit(head.edit(lambda data: setattr(data, "text", None)))
+    refused = world.client.get(f"{FILE}/versions/2/text")
+    assert (refused.status_code, refused.json()["detail"]["type"]) == (409, "invalid_state")
+
+
+async def test_a_proposal_is_read_and_rendered_beside_the_head(world: World) -> None:
+    agent = world.ws.as_actor(AgentActor(thread_id="t1", on_behalf_of=ALICE))
+    proposed = await world.files.edit(
+        agent,
+        "a1",
+        base_version=1,
+        commands=[AppCommand(name="add_paragraph", args={"text": "Fees"})],
+        summary="x",
+    )
+    assert isinstance(proposed, Proposed)
+    at = f"/workspaces/w1/proposals/{proposed.proposal_id}"
+    text = world.client.get(f"{at}/text")
+    assert (text.text, text.headers["content-security-policy"]) == ("Terms\n\nFees", "sandbox")
+    page = world.client.get(f"{at}/pages/1")
+    assert (page.status_code, page.headers["content-type"]) == (200, "image/png")
+    assert world.client.get(f"{at}/pages/2").status_code == 422
+    for read in ("text", "pages/1"):
+        assert world.client.get(f"{at}/{read}", headers=world.as_("eve")).status_code == 404
+        assert world.client.get(f"/workspaces/w1/proposals/zz/{read}").status_code == 404
+
+
 def test_a_page_is_a_png_and_one_past_the_end_is_refused(world: World) -> None:
     page = world.client.get(f"{FILE}/versions/1/pages/1")
     assert (page.status_code, page.headers["content-type"]) == (200, "image/png")
@@ -211,7 +262,8 @@ def test_a_missing_version_or_file_is_not_found(world: World) -> None:
 
 async def test_an_agents_edit_holds_the_file_for_no_one_named(world: World) -> None:
     await world.ws.lease_artifact("a1", holder="edit:someone", ttl=timedelta(seconds=45))
-    assert world.client.get(FILE).json()["lease"]["checked_out_by"] is None
+    lease = world.client.get(FILE).json()["lease"]
+    assert (lease["checked_out_by"], lease["checkout_id"]) == (None, None)
 
 
 @pytest.mark.parametrize(
@@ -220,6 +272,7 @@ async def test_an_agents_edit_holds_the_file_for_no_one_named(world: World) -> N
         ("get", FILE),
         ("post", f"{FILE}/checkouts"),
         ("get", f"{FILE}/versions/1/content"),
+        ("get", f"{FILE}/versions/1/text"),
         ("get", f"{FILE}/versions/1/pages/1"),
     ],
 )

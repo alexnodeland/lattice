@@ -96,7 +96,7 @@ workspaces = Workspaces(
 
 While one is off, creating, editing, proposing and accepting are refused for every command, on every surface, REST (409, `not_enabled`), MCP, the WebSocket and the agent's runs. Reads, archiving and rejecting a proposal still work, so what exists stays readable.
 
-**relayr's trackers** take the bound method as their `enabled`, which has the port's arguments: `Trackers(..., enabled=grants.is_enabled)`.
+**relayr's trackers** take the port as their `integrations`: `Trackers(..., integrations=grants)`.
 
 ## A provider that narrows
 
@@ -115,9 +115,9 @@ class Narrowed:
 
 ## Adopting the port
 
-Three seams came before the port. Two are still to move to it:
+Three seams came before the port. One is still to move to it:
 
-- **relayr's `Enabled`** has the port's arguments already, so an application passes `grants.is_enabled` today. relayr is to import the port in place of its own protocol; `always` stays the answer with no store.
+- **relayr's `Enabled`** has gone: its trackers take the port, and `relayr.integrations.ALWAYS` is the answer with no store, every integration on ([relayr ADR-0033](../../relayr/adr/0033-the-tracker-port-and-runs-that-write-to-it-once.md)'s amendment).
 - **stackr's template** is to give `Grants` the deployment's `installed`, from its questions, and to wire `integration_gate` and relayr's `enabled` to it. Until then, an application it generates installs every integration, with each at its default.
 
 artifactr's forms and dashboards were built on the port: `ui_key_of` names their keys for `integration_gate`, and `ui_tools` and `ui_checks` take the port ([artifactr ADR-0080](../../artifactr/adr/0080-integrations-on-or-off-per-workspace.md)).

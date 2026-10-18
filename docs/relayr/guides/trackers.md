@@ -40,13 +40,13 @@ Each tenant has its own tracker workspace (a Plane workspace, or a Vikunja top-l
 
 ## Switching it per workspace
 
-Each tracker is an integration of its own, by its key: `tracker:plane` or `tracker:vikunja`. Give `Trackers` an `enabled`, an async callable `(tenant_id, workspace_id, key) -> bool` ([`relayr.integrations.Enabled`](../reference.md)), and every action and tool asks it first; one switched off is `NotAllowed`, before the ledger or the tracker is touched. The followers and the webhooks' route ask it too: a switched-off workspace's follower polls nothing and lets its lease go, and its webhooks are refused. Without one, the tracker runs in every bound workspace.
+Each tracker is an integration of its own, by its key: `tracker:plane` or `tracker:vikunja`. Give `Trackers` the application's `integrations`, lattice-core's `Integrations` port, whose `is_enabled(tenant_id, workspace_id, key)` says whether the tracker runs in a workspace, and every action and tool asks it first; one switched off is `NotAllowed`, before the ledger or the tracker is touched. The followers and the webhooks' route ask it too: a switched-off workspace's follower polls nothing and lets its lease go, and its webhooks are refused. Without one, the tracker runs in every bound workspace ([`relayr.integrations.ALWAYS`](../reference.md)).
 
-grantr's `Grants` answers it: its `is_enabled` is lattice's shared `Integrations` port, whose switches are kept per deployment, tenant and workspace, audited, and set from portalr's admin ([grantr's guide](../../grantr/guides/integrations.md)).
+grantr's `Grants` is the port, whose switches are kept per deployment, tenant and workspace, audited, and set from portalr's admin ([grantr's guide](../../grantr/guides/integrations.md)).
 
 ```python
 trackers = Trackers(
-    ledger, connect=plane(http), integration=INTEGRATION, enabled=grants.is_enabled, ...
+    ledger, connect=plane(http), integration=INTEGRATION, integrations=grants, ...
 )
 ```
 

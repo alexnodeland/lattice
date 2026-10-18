@@ -23,6 +23,7 @@ classifiers = [
 dependencies = [
     "artifactr-ai>=0.2.0",
     "reflexr>=0.1.0",
+    "lattice-core-ai>=0.1.0",
     "pydantic>=2.13",
     "pydantic-ai-slim>=2.51",
     "opentelemetry-api>=1.45",

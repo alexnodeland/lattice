@@ -32,7 +32,7 @@ from relayr.trackers.events import (
     TrackerEvent,
 )
 from tests.clock import START, FakeClock
-from tests.trackers.conftest import BINDING, KEY, PROJECT, TENANT
+from tests.trackers.conftest import BINDING, KEY, PROJECT, TENANT, Switch
 from tests.trackers.following import Following, Odd, changes, following
 
 SECOND = timedelta(seconds=1)
@@ -469,18 +469,14 @@ async def test_a_type_reflexr_refuses_stops_the_follower(ledger: Ledger, clock: 
 async def test_a_switched_off_workspace_reads_and_writes_nothing(
     ledger: Ledger, clock: FakeClock
 ) -> None:
-    switched: dict[str, bool] = {"on": False}
-
-    async def enabled(tenant_id: str, workspace_id: str, key: str, /) -> bool:
-        assert (tenant_id, workspace_id, key) == (*KEY, "tracker:fake")
-        return switched["on"]
-
-    app = following(ledger, clock, enabled=enabled)
+    switch = Switch(on=False)
+    app = following(ledger, clock, integrations=switch)
     app.tracker.add(PROJECT, "Filed")
     assert not await app.poll()
     assert app.tenant.asked == [], "not even its credentials"
     assert await ledger.tracker_following(KEY) is None
-    switched["on"] = True
+    assert set(switch.asked) == {(*KEY, "tracker:fake")}
+    switch.on = True
     assert await app.poll()
     assert app.tenant.asked == [TENANT]
 

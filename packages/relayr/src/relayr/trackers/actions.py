@@ -18,8 +18,9 @@ from typing import Any, Final
 from opentelemetry.metrics import MeterProvider
 from pydantic import AwareDatetime, BaseModel, ConfigDict, JsonValue
 
+from lattice_core.integrations import Integrations
 from reflexr.workspace import Reaction, RunFailure
-from relayr.integrations import Enabled, always
+from relayr.integrations import ALWAYS
 from relayr.ledger import Clock, Ledger, TrackedKind, WorkspaceKey, utc_now
 from relayr.outbound.actions import NotAllowed
 from relayr.outbound.allowlist import Allowlist, Allowlists
@@ -134,8 +135,9 @@ class Trackers:
             A rule writes to its tracker only if its allowlist's `trackers` is set.
         integration: The tracker's key among the application's integrations:
             `relayr.plane.INTEGRATION` or `relayr.vikunja.INTEGRATION`.
-        enabled: Whether the integration runs in a workspace, asked before anything is done
-            there. By default it runs everywhere.
+        integrations: Whether the integration runs in a workspace, asked before anything is
+            done there: lattice-core's port, such as grantr's `Grants`. By default it runs
+            everywhere.
         budget: How many requests a minute each tenant's key may make from this process, all
             told: runs' writes spend it first, and the followers' polls take what is left.
             Plane allows 60 by default.
@@ -156,14 +158,14 @@ class Trackers:
         bindings: Mapping[WorkspaceKey, TrackerBinding],
         allowlists: Mapping[str, Allowlist] | None = None,
         integration: str,
-        enabled: Enabled = always,
+        integrations: Integrations = ALWAYS,
         budget: int = 40,
         clock: Clock = utc_now,
         meter_provider: MeterProvider | None = None,
     ) -> None:
         self._ledger = ledger
         self._integration = integration
-        self._enabled = enabled
+        self._integrations = integrations
         self._connections = _Connections(connect, credentials, clock)
         self._bindings = MappingProxyType(dict(bindings))
         self._allowlists = Allowlists(allowlists)
@@ -212,7 +214,7 @@ class Trackers:
 
     async def enabled(self, workspace: WorkspaceKey) -> bool:
         """Whether the integration runs in a workspace: asked before anything is done there."""
-        return await self._enabled(*workspace, self._integration)
+        return await self._integrations.is_enabled(*workspace, self._integration)
 
     async def connection(self, workspace: WorkspaceKey, *, fresh: bool = False) -> Tracker:
         """A workspace's adapter; with its tenant's credentials asked for again if `fresh`."""

@@ -4325,6 +4325,7 @@ version = "0.1.1"
 source = { editable = "packages/relayr" }
 dependencies = [
     { name = "artifactr-ai" },
+    { name = "lattice-core-ai" },
     { name = "opentelemetry-api" },
     { name = "pydantic" },
     { name = "pydantic-ai-slim" },
@@ -4421,6 +4422,7 @@ requires-dist = [
     { name = "httpx", marker = "extra == 'plane'", specifier = ">=0.28" },
     { name = "httpx", marker = "extra == 'vikunja'", specifier = ">=0.28" },
     { name = "langfuse", marker = "extra == 'langfuse'", specifier = ">=4.15,<5" },
+    { name = "lattice-core-ai", editable = "packages/lattice-core" },
     { name = "lattice-core-ai", marker = "extra == 'fastapi'", editable = "packages/lattice-core" },
     { name = "lattice-core-ai", marker = "extra == 'otel'", editable = "packages/lattice-core" },
     { name = "lattice-core-ai", extras = ["sql"], marker = "extra == 'sql'", editable = "packages/lattice-core" },

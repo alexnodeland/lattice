@@ -13,3 +13,4 @@ nav:
   - adr/0004-an-app-is-a-port-of-stateless-calls.md
   - adr/0005-wordcraft-headless-pinned-by-checksum.md
   - adr/0006-the-agents-tools-behind-each-apps-switch.md
+  - adr/0007-check-out-over-http-and-the-editor-on-its-own-origin.md

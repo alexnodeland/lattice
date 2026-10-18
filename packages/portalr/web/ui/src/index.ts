@@ -51,7 +51,7 @@ export {
   Thumbs,
   ToolCall,
 } from "./chat";
-export { type CheckboxChoice, CheckboxGroup } from "./checkbox";
+export { Checkbox, type CheckboxChoice, CheckboxGroup } from "./checkbox";
 export { useColourBlind } from "./colour-blind";
 export { ConfirmDialog } from "./confirm-dialog";
 export { Dialog } from "./dialog";
@@ -83,6 +83,7 @@ export { Switch } from "./switch";
 export { type Choice, Switcher, TenantSwitcher } from "./switcher";
 export { TabLink, TabNav } from "./tab-nav";
 export { Table } from "./table";
+export { TextArea } from "./text-area";
 export { TextField } from "./text-field";
 export { TextLink } from "./text-link";
 export { duration, type Reveal, type Standing, TraceView } from "./trace-view";

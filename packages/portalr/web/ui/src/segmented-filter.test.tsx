@@ -123,3 +123,21 @@ test("the arrow keys move the choice, once each, and the focus stays in the grou
     screen.getByRole("radiogroup", { name: "Show" }).element().contains(document.activeElement),
   ).toBe(true);
 });
+
+test("a shown filter's refusal is said under it, describes it, and marks it invalid", async () => {
+  const screen = await render(
+    <SegmentedFilter<Shown>
+      label="Show"
+      showLabel
+      hint="What to list."
+      error="Choose one."
+      segments={SEGMENTS}
+      value={"" as Shown}
+      onValueChange={vi.fn()}
+    />,
+  );
+  const group = screen.getByRole("radiogroup", { name: "Show" });
+  await expect.element(group).toHaveAttribute("aria-invalid", "true");
+  await expect.element(group).toHaveAccessibleDescription("What to list. Choose one.");
+  expect(getComputedStyle(group.element()).borderTopColor).toBe(token("fg"));
+});

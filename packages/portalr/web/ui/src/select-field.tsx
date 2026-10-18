@@ -34,7 +34,7 @@ export function SelectField({
   className,
   triggerRef,
 }: {
-  label: string;
+  label: ReactNode;
   hint?: ReactNode;
   error?: string | null;
   /** The choices, each a value and the words it shows as. */

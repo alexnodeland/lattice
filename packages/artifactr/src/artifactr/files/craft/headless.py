@@ -70,8 +70,12 @@ class Headless(ABC):
 
     @property
     def talk(self) -> Talk:
-        """People check its files out and in: its browser build opens and saves them."""
-        return "save"
+        """`bridged` if its build has a `?host=parent` bridge, which the shim reaches; else `save`.
+
+        A JavaScript API could carry commands, but no app's has been run through the shim, so
+        none is claimed.
+        """
+        return "bridged" if self.craft.bridge == "parent" else "save"
 
     @property
     def integration(self) -> str:

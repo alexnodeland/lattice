@@ -324,6 +324,7 @@
           "talk": {
             "enum": [
               "save",
+              "bridged",
               "commands",
               "polled",
               "pushed"

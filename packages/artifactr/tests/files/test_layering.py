@@ -69,6 +69,7 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
             "artifactr.files.checkouts",
             "artifactr.files.app",
             "artifactr.files.native",
+            "artifactr.files.craft",
             "artifactr.files.fastapi",
         },
         {

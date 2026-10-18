@@ -108,6 +108,13 @@ def test_it_is_an_app_named_by_its_craft(spawn: Make) -> None:
     assert (app.talk, app.integration) == ("save", "files:toolcraft")
 
 
+def test_an_app_whose_build_has_a_parent_bridge_talks_through_the_shim(spawn: Make) -> None:
+    class Bridged(Toolcraft):
+        craft: ClassVar[Craft] = replace(TOOLCRAFT, bridge="parent")
+
+    assert Bridged("toolcraft-cli", version="1.0.0").talk == "bridged"
+
+
 async def test_a_batch_on_a_blank_file_names_the_open_document(spawn: Make) -> None:
     applied = await spawn().apply(None, [page("One"), page("Two")], deadline=20)
     assert json.loads(applied.content) == {"pages": ["One", "Two"], "saves": 1}

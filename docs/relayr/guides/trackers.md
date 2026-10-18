@@ -184,7 +184,7 @@ reflexr's retries are the outbox: nothing is queued in relayr, and a tracker tha
 
 The tracker's API key is the tenant's own user's, a member of the tenant's workspace and its bound projects only. Plane CE makes workspaces, users and keys only in its web app, so an operator makes them by hand; Vikunja's are scriptable. Vikunja's token needs these scopes: `tasks` (`create`, `read_one`, `read_all`, `update`), `tasks_comments` (`create`, `read_all`), `labels` (`create`, `read_all`) and `tasks_labels` (`create`, `delete`); its tokens must expire.
 
-Register the webhook to `POST /relayr/v1/trackers/<tenant>/plane` (or `/vikunja`) for work items and comments, signed with the tenant's webhook secret. stackr's recipes for both trackers, the provisioning checklist and `make tracker-check`, and the template's `tracker` question, come in a later pull request.
+Register the webhook to `POST /relayr/v1/trackers/<tenant>/plane` (or `/vikunja`) for work items and comments, signed with the tenant's webhook secret. stackr's recipes for both trackers, the provisioning checklist and `make tracker-check`, which needs three more scopes to read with, and the template's `tracker` question are in [stackr's tracker guide](../../stackr/guides/trackers.md).
 
 ## Testing
 

@@ -26,18 +26,26 @@ export const enabledFrom =
   (key: IntegrationKey): boolean =>
     flags?.[key] ?? ON_BY_DEFAULT.has(key);
 
+/** Each integration as it is by default, before a read and where one fails. */
+const BY_DEFAULT = enabledFrom(undefined);
+
 /**
  * Whether each integration is on in a workspace, read once and kept, as `enabledIntegrations`
  * says. A failed read is never a reason for a screen to fail: it answers each default, or what
- * was last read.
+ * was last read. The answer is the same function until what is read changes, so a part that
+ * keeps what it was told, such as a form refused as off, can tell a new read from a render.
  */
 export function useEnabled(
   queries: ReturnType<typeof createQueries>,
   tenant: string,
   workspace: string,
 ): (key: IntegrationKey) => boolean {
-  const { data } = useQuery(queries.grantr.enabledIntegrations(tenant, workspace));
-  return enabledFrom(data);
+  // `select` is kept by the query, by what was read, so it answers the same function until then.
+  const { data } = useQuery({
+    ...queries.grantr.enabledIntegrations(tenant, workspace),
+    select: enabledFrom,
+  });
+  return data ?? BY_DEFAULT;
 }
 
 /**

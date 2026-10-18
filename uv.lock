@@ -3384,7 +3384,7 @@ dependencies = [
 
 [package.dev-dependencies]
 app = [
-    { name = "artifactr-ai", extra = ["otel"] },
+    { name = "artifactr-ai", extra = ["forms", "otel"] },
     { name = "pyjwt" },
     { name = "reflexr", extra = ["otel"] },
     { name = "relayr-ai", extra = ["fastapi"] },
@@ -3392,7 +3392,7 @@ app = [
     { name = "websockets" },
 ]
 dev = [
-    { name = "artifactr-ai", extra = ["otel"] },
+    { name = "artifactr-ai", extra = ["forms", "otel"] },
     { name = "pyjwt" },
     { name = "pyright" },
     { name = "pytest" },
@@ -3428,7 +3428,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 app = [
-    { name = "artifactr-ai", extras = ["otel"], editable = "packages/artifactr" },
+    { name = "artifactr-ai", extras = ["otel", "forms"], editable = "packages/artifactr" },
     { name = "pyjwt", specifier = ">=2.15" },
     { name = "reflexr", extras = ["otel"], editable = "packages/reflexr" },
     { name = "relayr-ai", extras = ["fastapi"], editable = "packages/relayr" },
@@ -3436,7 +3436,7 @@ app = [
     { name = "websockets", specifier = ">=15" },
 ]
 dev = [
-    { name = "artifactr-ai", extras = ["otel"], editable = "packages/artifactr" },
+    { name = "artifactr-ai", extras = ["otel", "forms"], editable = "packages/artifactr" },
     { name = "pyjwt", specifier = ">=2.15" },
     { name = "pyright", specifier = ">=1.1.414" },
     { name = "pytest", specifier = ">=9.1" },

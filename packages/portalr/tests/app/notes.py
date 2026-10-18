@@ -1,9 +1,10 @@
 """artifactr in portalr's test application: notes, thumbs on messages, and a scripted agent.
 
 The agent answers from a script, so the app's scenarios choose its path by the first word they
-post: ``ask`` makes it ask a question, ``publish`` makes it call a tool that waits for approval,
-``propose`` makes it write a note of its own and propose an edit to it, which it names in its
-answer, so each scenario resolves a proposal of its own; what follows ``propose``, such as
+post: ``ask`` makes it ask a question, ``form`` asks a form through artifactr.ui's ``ask_form``
+(lattice RFC-0005), whose answer it repeats, ``publish`` makes it call a tool that waits for
+approval, ``propose`` makes it write a note of its own and propose an edit to it, which it names
+in its answer, so each scenario resolves a proposal of its own; what follows ``propose``, such as
 ``a tighter plan``, is what the note is about, so two proposals aren't one. ``wait`` keeps its
 turn running until it is stopped, and ``fail`` fails its turn, for admin's count of failed turns.
 Anything else gets its words back. Each run streams, as every run does.
@@ -41,6 +42,8 @@ from artifactr import (
 )
 from artifactr.agent import function_model
 from artifactr.core import Actor
+from artifactr.ui import UI_TYPES, ui_checks
+from artifactr.ui.agent import ui_tools
 from grantr.core import Agent as AgentSubject
 from grantr.core import ServicePrincipal, Subject, User
 from grantr.grants import Grants
@@ -59,6 +62,20 @@ class Thumbs(Feedback, name="thumbs", targets={"message", "artifact", "turn"}):
     up: bool
     comment: str | None = None
 
+
+LEAVE = {
+    "title": "Request leave",
+    "schema": {
+        "type": "object",
+        "properties": {
+            "days": {"type": "integer", "title": "Working days", "minimum": 1, "maximum": 30},
+            "note": {"type": "string", "title": "Anything else"},
+        },
+        "required": ["days"],
+    },
+    "ui": {"submit_label": "Ask for leave"},
+}
+"""The form ``form`` asks: how many working days, at most 30, and a note."""
 
 DEFAULT_TOPIC = "launch"
 """What a note is about when ``propose`` says no more than "an edit"."""
@@ -100,6 +117,8 @@ async def answer(messages: list[ModelMessage], _info: AgentInfo) -> ModelRespons
             return ModelResponse(parts=[ToolCallPart("publish", {"note": "the notes"})])
         case ["ask"]:
             return ModelResponse(parts=[ToolCallPart("ask_user", {"question": "Which week?"})])
+        case ["form"]:
+            return ModelResponse(parts=[ToolCallPart("ask_form", LEAVE)])
         case ["wait"]:
             await asyncio.Event().wait()  # until someone stops the turn, which cancels it
             return ModelResponse(parts=[TextPart("Done waiting.")])
@@ -113,6 +132,8 @@ def after(returned: ToolReturnPart, messages: list[ModelMessage]) -> ModelRespon
     """What the agent does when a tool returns: propose an edit to a note it just wrote, or say
     how the tool went."""
     told = returned.model_response_str()
+    if returned.tool_name == "ask_form" and isinstance(returned.content, dict):
+        return ModelResponse(parts=[TextPart(f"Done: {returned.content['days']} working days off")])
     if returned.tool_name == "create_artifact" and (created := CREATED.search(told)):
         about = topic_of(first_prompt(messages))
         edit = {
@@ -148,6 +169,7 @@ def build_agent() -> Agent[Session[None], str | DeferredToolRequests]:
         deps_type=Session[None],
         output_type=[str, DeferredToolRequests],
         tools=[Tool(publish, requires_approval=True)],
+        toolsets=[ui_tools(dashboards=False)],
         capabilities=[ArtifactWorkspace(types=[Note], ask=True)],
     )
 
@@ -177,6 +199,10 @@ def collaboration(grants: Grants) -> tuple[Workspaces, Runner[None]]:
     """artifactr's workspaces, checked by grantr, and its runner."""
     hooks = grants.hooks(subject_of)
     workspaces = Workspaces(
-        InMemoryStorage(), types=[Note], authorize=hooks.authorize, hidden=hooks.hidden
+        InMemoryStorage(),
+        types=[Note, *UI_TYPES],
+        checks=ui_checks(),
+        authorize=hooks.authorize,
+        hidden=hooks.hidden,
     )
     return workspaces, Runner[None](build_agent(), app=None, agent_name="assistant")

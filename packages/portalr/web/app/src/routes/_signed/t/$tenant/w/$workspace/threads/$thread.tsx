@@ -10,6 +10,7 @@ import {
 } from "@portalr/client";
 import {
   Alert,
+  ASK_FORM,
   Composer,
   Message,
   Messages,
@@ -142,7 +143,13 @@ function Chat() {
     queries,
     config.people,
     tenant,
-    unnamedPeople(thread?.messages ?? [], me),
+    unnamedPeople(
+      [
+        ...(thread?.messages ?? []),
+        ...Object.values(runs).flatMap((run) => (run.threadId === id ? run.answered : [])),
+      ],
+      me,
+    ),
   );
   if (thread === undefined) {
     return snapshot.status === "live" ? (
@@ -223,10 +230,19 @@ function Chat() {
               ))}
             </ul>
           )}
-          {run.requests.map((request) => (
+          {[
+            ...run.requests.map((request) => ({ request, by: undefined })),
+            // A form stays where it was asked once it is answered, until its run ends, and says by whom.
+            ...run.answered
+              .filter(({ request }) => request.tool_name === ASK_FORM)
+              .map(({ request, actor }) => ({ request, by: author(actor, me, names) })),
+          ].map(({ request, by }) => (
             <Request
               key={request.tool_call_id}
               request={request}
+              {...(by !== undefined && { answeredBy: by })}
+              // The newest request waiting takes the focus, never one already answered.
+              focus={request === run.requests.at(-1)}
               onAnswer={(answer) =>
                 stream.send({
                   type: "answer_deferred",

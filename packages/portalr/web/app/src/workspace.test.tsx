@@ -1,11 +1,12 @@
 /**
- * A workspace's add-ons, from its integrations as grantr answers them: Mermaid on where it is on,
- * and off, its default, until they are read and where they can't be.
+ * A workspace's integrations as grantr answers them: Mermaid on where it is on, and off, its
+ * default, until they are read and where they can't be; and `ui`'s, such as forms, by key.
  */
 
-import { createApi, createQueries } from "@portalr/client";
-import { Markdown } from "@portalr/ui";
+import { createApi, createQueries, INTEGRATIONS, type IntegrationKey } from "@portalr/client";
+import { IntegrationsContext, Markdown } from "@portalr/ui";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { type ReactNode, use, useState } from "react";
 import { afterEach, expect, test, vi } from "vitest";
 import { render } from "vitest-browser-react";
 import { WorkspaceAddons } from "./workspace";
@@ -18,8 +19,30 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-/** A workspace's Markdown, with grantr answering its integrations as `answer` does. */
-async function shown(answer: (request: Request) => Promise<Response>) {
+const UI: readonly IntegrationKey[] = ["ui:forms", "ui:dashboards", "ui:mini-apps"];
+
+/** Whether each of `ui`'s integrations is on, as the parts inside are told. */
+function Gates() {
+  const isEnabled = use(IntegrationsContext);
+  return (
+    <ul>
+      {UI.map((key) => (
+        <li key={key}>{`${key} ${isEnabled(key) ? "on" : "off"}`}</li>
+      ))}
+    </ul>
+  );
+}
+
+/** Each of `ui`'s integrations as lattice's registry says it is by default. */
+const byDefault = UI.map(
+  (key) => `${key} ${INTEGRATIONS.find((known) => known.key === key)?.default ? "on" : "off"}`,
+);
+
+/** What is inside a workspace, with grantr answering its integrations as `answer` does. */
+async function shown(
+  answer: (request: Request) => Promise<Response>,
+  inside: ReactNode = <Markdown>{FENCE}</Markdown>,
+) {
   const asked = vi.fn(answer);
   vi.stubGlobal("fetch", asked);
   const queries = createQueries(
@@ -31,7 +54,7 @@ async function shown(answer: (request: Request) => Promise<Response>) {
   const screen = await render(
     <QueryClientProvider client={queryClient}>
       <WorkspaceAddons queries={queries} tenant="acme" workspace="notes">
-        <Markdown>{FENCE}</Markdown>
+        {inside}
       </WorkspaceAddons>
     </QueryClientProvider>,
   );
@@ -59,4 +82,45 @@ test("where the integrations can't be read, Mermaid is its default, off", async 
 test("where grantr fails, Mermaid is its default, off", async () => {
   const { screen } = await shown(async () => new Response("upstream gone", { status: 503 }));
   await expect.element(screen.getByText(OFF)).toBeVisible();
+});
+
+test("forms, dashboards and mini apps are on or off as the workspace's integrations say", async () => {
+  const { screen } = await shown(
+    async () => Response.json({ "ui:forms": false, "ui:mini-apps": true }),
+    <Gates />,
+  );
+  await expect.element(screen.getByText("ui:forms off")).toBeVisible();
+  // A key grantr didn't answer for is its default.
+  await expect.element(screen.getByText("ui:dashboards on")).toBeVisible();
+  await expect.element(screen.getByText("ui:mini-apps on")).toBeVisible();
+});
+
+test("where the integrations can't be read, ui's are each the registry's default", async () => {
+  const { screen, asked } = await shown(
+    async () => new Response("upstream gone", { status: 503 }),
+    <Gates />,
+  );
+  await expect.poll(() => asked.mock.calls.length).toBe(1);
+  for (const said of byDefault) {
+    await expect.element(screen.getByText(said)).toBeVisible();
+  }
+});
+
+test("the answer is the same until the integrations are read again, as a form refused as off asks", async () => {
+  const answers = new Set<unknown>();
+  function Kept() {
+    const [renders, setRenders] = useState(0);
+    answers.add(use(IntegrationsContext));
+    return (
+      <button type="button" onClick={() => setRenders(renders + 1)}>
+        {`Drawn ${renders + 1}`}
+      </button>
+    );
+  }
+  const { screen } = await shown(async () => Response.json({ "ui:forms": false }), <Kept />);
+  // The default before the read, then the read's.
+  await expect.poll(() => answers.size).toBe(2);
+  await screen.getByRole("button").click();
+  await expect.element(screen.getByRole("button", { name: "Drawn 2" })).toBeVisible();
+  expect(answers.size).toBe(2);
 });

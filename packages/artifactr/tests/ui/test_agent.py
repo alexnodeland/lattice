@@ -20,7 +20,9 @@ import artifactr.agent.runner as runner_module
 from artifactr.agent import ArtifactWorkspace, Runner, Session
 from artifactr.core import (
     AnswerDeferred,
+    EditArtifact,
     InvalidState,
+    JsonPatch,
     NotEnabled,
     NotFound,
     RunPaused,
@@ -323,50 +325,45 @@ async def test_the_toolset_offers_what_it_is_asked_for() -> None:
 DICE = "<button onclick=\"parent.postMessage({jsonrpc: '2.0', method: 'x'}, '*')\">Roll</button>"
 
 
-def _app_id(messages: list[ModelMessage]) -> str:
-    [made] = [
-        part.content
-        for message in messages
-        if isinstance(message, ModelRequest)
-        for part in message.parts
-        if isinstance(part, ToolReturnPart) and part.tool_name == "create_app"
-    ]
-    return str(made).split()[1]  # "Done: <id> is now at version 1."
-
-
 async def test_an_app_is_made_and_updated_with_its_state_kept(
-    ws: Workspace, thread: Thread, runners: list[Runner[None]]
+    ws: Workspace, runners: list[Runner[None]]
 ) -> None:
-    def update(messages: list[ModelMessage]) -> ModelResponse:
-        return call("update_app", "a4", id=_app_id(messages), html=DICE + "<p>Two dice</p>")
-
-    script = Script(
+    made = Script(
         call("create_app", "a1", title="Dice", summary="Rolls a die", html='<img src="d.png">'),
         call("create_app", "a2", title="Dice", summary="Rolls a die", html=DICE),
-        lambda messages: call("update_app", "a3", id=_app_id(messages), html="<img src=//x>"),
-        update,
-        lambda messages: call("update_app", "a5", id=_app_id(messages), html="", summary="None"),
         say("Made."),
     )
-    toggles = Toggles()
-    runner = _runner(runners, script, ui_tools(integrations=toggles))
-    sent = await runner.send(ws, thread.id, "Make me a dice roller")
+    await _run(runners, ws, made)
+    [retry] = [p for p in made.last_parts(1) if isinstance(p, RetryPromptPart)]
+    assert "reaches no network" in str(retry.content)
+    assert "<img src>: d.png" in str(retry.content)
+    [app] = await ws.artifacts(App)
+    played = JsonPatch(ops=({"op": "replace", "path": "/state", "value": {"rolled": 6}},))
+    await ws.commit(EditArtifact(artifact_id=app.id, base_version=1, patch=played))
+    updated = Script(
+        call("update_app", "a3", id=app.id, html="<img src=//x>"),
+        call("update_app", "a4", id=app.id, html=DICE + "<p>Two dice</p>"),
+        call("update_app", "a5", id=app.id, html="", summary="None"),
+        say("Updated."),
+    )
+    await _run(runners, ws, updated)
+    [retry] = [p for p in updated.last_parts(1) if isinstance(p, RetryPromptPart)]
+    assert "<img src>: //x" in str(retry.content)
+    [app] = await ws.artifacts(App)
+    assert (app.version, app.data.summary, app.data.html) == (4, "None", "")
+    assert app.data.state == {"rolled": 6}, "a person's state outlives the agent's changes"
+    third = (await ws.revisions(app.id))[2].data
+    assert (third["html"], third["summary"]) == (DICE + "<p>Two dice</p>", "Rolls a die")
+
+
+async def _run(runners: list[Runner[None]], ws: Workspace, script: Script) -> None:
+    """Run a script in a thread of its own, with every integration on."""
+    thread = await ws.create_thread("Apps")
+    sent = await _runner(runners, script, ui_tools(integrations=Toggles())).send(
+        ws, thread.id, "Make me a dice roller"
+    )
     assert sent.run is not None
     await sent.run.wait()
-    retries = [
-        str(part.content)
-        for request in (1, 3)
-        for part in script.last_parts(request)
-        if isinstance(part, RetryPromptPart)
-    ]
-    assert ["reaches no network" in retry for retry in retries] == [True, True]
-    assert "<img src>: d.png" in retries[0]
-    [app] = await ws.artifacts(App)
-    assert (app.version, app.data.summary, app.data.html) == (3, "None", "")
-    revisions = await ws.revisions(app.id)
-    assert revisions[1].data["html"] == DICE + "<p>Two dice</p>"
-    assert revisions[1].data["summary"] == "Rolls a die", "a summary not given is kept"
-    assert MINI_APPS in {key for _, _, key in toggles.asked}
 
 
 async def test_apps_are_offered_only_while_mini_apps_are_on(

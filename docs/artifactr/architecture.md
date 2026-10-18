@@ -547,14 +547,14 @@ Langfuse is the primary backend for traces and scores ([ADR-0027](adr/0027-opent
 | Module | Imports | Holds |
 |---|---|---|
 | `_common` (private) | `artifactr.core`, pydantic | The size measure, the bounded `Number`, and the refusal that names every error |
-| `_html` (private) | the standard library | `loaded`: what an app's HTML would load, its first filter |
+| `_html` (private) | the standard library | `loaded` and `refused`: what an app's HTML would load, its first filter |
 | `schema` | `_common`, `artifactr.core`, pydantic | `FormSchema`, its properties, `UiHints`, the limits |
 | `ids` | the standard library | `submission_id` |
-| `types` | `_common`, `_html`, `schema`, `artifactr.core` | `Form`, `Submission`, `Dashboard` and its panels, `App`, `FormRequest`, `UI_TYPES`, `AGENT_TYPES`, `ASK_FORM` |
+| `types` | `_common`, `schema`, `artifactr.core` | `Form`, `Submission`, `Dashboard` and its panels, `App`, `FormRequest`, `UI_TYPES`, `AGENT_TYPES`, `ASK_FORM` |
 | `integrations` | pydantic | The keys `FORMS`, `DASHBOARDS` and `MINI_APPS`, and `ui_key_of` for artifactr's `integration_gate` |
-| `checks` | `_common`, `ids`, `integrations`, `types`, `artifactr.core`, `artifactr.workspace` | `ui_checks`, `IsAdmin`, `FormChanged`, `FormClosed`, `RefusalReason` |
+| `checks` | `_common`, `_html`, `ids`, `integrations`, `types`, `artifactr.core`, `artifactr.workspace` | `ui_checks`, `IsAdmin`, `FormChanged`, `FormClosed`, `RefusalReason` |
 | `wire` | `types`, `checks`, `integrations` | `wire_schema`, run as `python -m artifactr.ui.wire` by the `schema` task |
-| `agent` | `_common`, `integrations`, `schema`, `types`, `artifactr.agent`, `artifactr.core`, pydantic-ai | `ui_tools` |
+| `agent` | `_common`, `_html`, `integrations`, `schema`, `types`, `artifactr.agent`, `artifactr.core`, pydantic-ai | `ui_tools` |
 
 - **It is a plugin, and depends inward only** ([ADR-0074](adr/0074-forms-and-dashboards-in-artifactr-ui-behind-the-forms-extra.md)). Nothing else in artifactr imports it, and every name it takes from artifactr is in `__all__` of `artifactr.core`, `artifactr.agent` or `artifactr.workspace`; `tests/ui/test_layering.py` holds both. relayr bridges it, in `relayr.ui`.
 - **No module imports `wire`,** so running it as `__main__` registers the artifact types once.
@@ -563,7 +563,7 @@ Langfuse is the primary backend for traces and scores ([ADR-0027](adr/0027-opent
 
 `FormSchema` is a Pydantic model of the subset ([ADR-0076](adr/0076-the-form-schema-an-allow-list-compiled-to-pydantic.md)), strict and closed: a keyword it doesn't hold is an extra input, refused at its place, and `$ref`, `$defs`, `pattern`, `if`, `then`, `else`, `allOf`, `anyOf`, `not`, a nested object and `format: "password"` are refused by name before anything else is read. A property is told apart by its `type`, or as choices by `enum` or `oneOf`; its name is an identifier, and bounds no value meets are refused. Each property gives the type its values are validated as, and a schema compiles them into a model of its values, once for each schema, kept by its JSON for the 256 used last, with each property's name as the field's alias, so an error's `loc` is `[name]`. A schema is stored as JSON Schema, with what was left out still left out, and reads back unchanged.
 
-- **An app's HTML loads nothing** ([ADR-0082](adr/0082-mini-apps-the-agents-tools-and-html-that-loads-nothing.md)): `App` refuses a URL in an attribute that loads or goes somewhere, in one that lists URLs, or in CSS, and a `<meta http-equiv="refresh">`, unless it is empty or starts with `#`, `data:`, `javascript:` or `about:blank`, naming each. It reads no script: the policy portalr runs the app under is the guard, and this a first filter.
+- **An app's HTML loads nothing** ([ADR-0082](adr/0082-mini-apps-the-agents-tools-and-html-that-loads-nothing.md)): the agent's tools and the checks refuse, as an app is made or its HTML changed, a URL in an attribute that loads or goes somewhere, in one that lists URLs, in CSS, in a script's static imports or import map, or in a frame's `srcdoc`, and a `<meta http-equiv="refresh">`, unless it is empty or starts with `#`, `data:`, `javascript:`, `mailto:`, `tel:` or `about:blank`, naming each. It runs no script: the policy portalr runs the app under is the guard, and this a first filter, kept out of `App` so a stricter one never makes an app that exists unreadable.
 - **The limits** are constants: 50 properties, 64 choices, 10,000 characters a string whatever its `maxLength`, every number within ±(2⁵³ − 1), 32 KB of form (title, schema and hints) as stored, 64 KB of values, 256 KB of dashboard, 256 KB of an app's HTML, 64 KB of its state, 200 characters of a title and 2,000 of an app's summary. Each is measured by `json_size`, the UTF-8 bytes of compact JSON, as JavaScript's `JSON.stringify` writes it ([ADR-0077](adr/0077-formats-and-sizes-checked-by-artifactrs-own-code.md)).
 - **Formats and `multipleOf`** are artifactr.ui's own checks, which portalr's TypeScript repeats; `tests/ui/vectors/forms.json` holds the cases both sides test.
 
@@ -589,8 +589,8 @@ A submission's id is derived ([ADR-0075](adr/0075-forms-refused-at-the-boundary-
 | `answer_deferred` to an `ask_form` request | Values that don't fit the schema in the request's `args` (`ValidationFailed`, each error at its property) |
 | `answer_deferred` whose request's `args` aren't a form | `ValidationFailed` |
 | `create_artifact` of a `submission` | A form the submitter can't read (`NotFound`); a closed or archived one (`FormClosed`), or one changed since its version (`FormChanged`); values that don't fit, a missing nonce or one a form doesn't take, or an id that isn't its derivation (`ValidationFailed`); a `per_person` submission from whoever acts for no one (`Forbidden`) |
-| `create_artifact` of an `app` | One a person makes (`Forbidden`) |
-| `edit_artifact` | Any edit of a submission; a change to a form's `schema`, `submissions` or `closed` by anyone but its author or whom `is_admin` allows; a person's change to an app outside `state` (`Forbidden`) |
+| `create_artifact` of an `app` | One a person makes (`Forbidden`); HTML that loads from outside (`ValidationFailed`) |
+| `edit_artifact` | Any edit of a submission; a change to a form's `schema`, `submissions` or `closed` by anyone but its author or whom `is_admin` allows; a person's change to an app outside `state` (`Forbidden`); an app's HTML changed to load from outside (`ValidationFailed`) |
 | `archive_artifact` | A form's or a submission's, by anyone but its author or whom `is_admin` allows (`Forbidden`) |
 | `propose_change` | A submission; otherwise what the change it wraps would be refused for |
 | `respond_to_proposal`, accepting | What the change would be refused for now, as its proposer, on the head; a reviewer's own `changes` on a form, an app or a submission (`Forbidden`) |

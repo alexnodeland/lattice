@@ -28,6 +28,7 @@ from pydantic_ai import CallDeferred, FunctionToolset, ModelRetry, RunContext, T
 from artifactr.agent import Session, describe_outcome
 from artifactr.core import CreateArtifact, EditArtifact, diff
 from artifactr.ui._common import MAX_NUMBER, refusal
+from artifactr.ui._html import refused
 from artifactr.ui.integrations import DASHBOARDS, FORMS, MINI_APPS
 from artifactr.ui.schema import MAX_CHOICES, MAX_LENGTH, MAX_PROPERTIES
 from artifactr.ui.types import (
@@ -70,16 +71,17 @@ and its images and fonts `data:` URLs. Its `summary` says in words what it does:
 beside the app, and in its place wherever apps don't run.
 
 It talks to its host in JSON-RPC 2.0, sending with `window.parent.postMessage(message, "*")` \
-and hearing the answers as `message` events. It asks `ui/initialize` first; the result's \
-`hostContext` has `theme` (`light` or `dark`) and `styles.variables`, the host's colours as CSS \
-variables, which `ui/notifications/host-context-changed` sends again when they change. It calls \
+and hearing the answers as `message` events. It asks `ui/initialize` first, then sends the \
+notification `ui/notifications/initialized`; the result's `hostContext` has `theme` (`light` \
+or `dark`) and `styles.variables`, the host's colours as CSS variables, which \
+`ui/notifications/host-context-changed` sends again when they change. It calls \
 its tools with `tools/call`, `{{"name": ..., "arguments": {{...}}}}`, each answering with \
 `structuredContent`: `get_state`, its `state` and `version`; `set_state`, with `patch`, a JSON \
 Patch on its state, at most {MAX_APP_STATE_BYTES // 1024} KB, kept as the person's and saved at \
 most once every 5 seconds; and `submit`, with `values`, an object sent as the person's \
 submission once they confirm it. `ui/open-link`, with a `url`, opens it once the person \
 confirms; `ui/notifications/size-changed`, with a `height`, sizes its frame. It has 60 calls \
-a minute; past them, the host stops answering."""
+a minute, each message counted; past them, the host stops answering it."""
 
 
 def ui_tools(
@@ -190,7 +192,7 @@ def ui_tools(
         async def create_app(
             ctx: RunContext[Session[Any]], title: str, summary: str, html: str
         ) -> str:
-            app = _checked(App, {"title": title, "summary": summary, "html": html})
+            app = _app({"title": title, "summary": summary, "html": html})
             command = CreateArtifact(
                 kind=app.kind, data=app.to_json(), thread_id=ctx.deps.thread_id
             )
@@ -208,7 +210,7 @@ def ui_tools(
             current = await workspace.get(App, id)
             data = current.data.to_json()
             changed = {"html": html, **({} if summary is None else {"summary": summary})}
-            app = _checked(App, {**data, **changed})
+            app = _app({**data, **changed})
             command = EditArtifact(
                 artifact_id=current.id,
                 base_version=current.version,
@@ -242,6 +244,14 @@ def _checked[M: BaseModel](model: type[M], data: dict[str, Any]) -> M:
         return model.model_validate(data)
     except ValidationError as error:
         raise ModelRetry(refusal("Refused, fix and retry", error).message) from error
+
+
+def _app(data: dict[str, Any]) -> App:
+    """An app the model wrote, within its limits and loading nothing, or a retry saying why."""
+    app = _checked(App, data)
+    if (why := refused(app.html)) is not None:
+        raise ModelRetry(f"Refused, fix and retry: {why}")
+    return app
 
 
 def _now() -> str:

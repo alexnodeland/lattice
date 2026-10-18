@@ -137,8 +137,8 @@ export interface ArtifactrUiV1 {
  *
  * portalr runs it sandboxed, on an origin of its own, with no network, while mini apps are on
  * in the workspace; its ``summary`` is shown beside it, and in its place where it doesn't run.
- * Its HTML names nothing to load: what it needs is inline, or a ``data:`` URL. An agent writes
- * it; a person changes only its ``state``, through the app.
+ * An agent writes it, and its HTML names nothing to load, which the agent's tools and the
+ * checks hold; a person changes only its ``state``, through the app.
  *
  * This interface was referenced by `ArtifactrUiV1`'s JSON-Schema
  * via the `definition` "App".

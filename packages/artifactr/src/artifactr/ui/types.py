@@ -29,7 +29,6 @@ from pydantic import (
 
 from artifactr.core import Artifact, ArtifactId
 from artifactr.ui._common import Number, json_size
-from artifactr.ui._html import loaded
 from artifactr.ui.schema import MAX_SCHEMA_BYTES, FormSchema, UiHints
 
 __all__ = [
@@ -275,8 +274,8 @@ class App(Artifact, name="app"):
 
     portalr runs it sandboxed, on an origin of its own, with no network, while mini apps are on
     in the workspace; its ``summary`` is shown beside it, and in its place where it doesn't run.
-    Its HTML names nothing to load: what it needs is inline, or a ``data:`` URL. An agent writes
-    it; a person changes only its ``state``, through the app.
+    An agent writes it, and its HTML names nothing to load, which the agent's tools and the
+    checks hold; a person changes only its ``state``, through the app.
     """
 
     title: _Title
@@ -288,11 +287,6 @@ class App(Artifact, name="app"):
     def _fits(self) -> Self:
         if (size := len(self.html.encode())) > MAX_APP_HTML_BYTES:
             raise ValueError(f"the HTML is {size} bytes, over the limit of {MAX_APP_HTML_BYTES}")
-        if found := loaded(self.html):
-            raise ValueError(
-                "the HTML loads from outside the app, which reaches no network: write what it "
-                f"needs inline, or as a data: URL ({'; '.join(found)})"
-            )
         if (size := json_size(self.state)) > MAX_APP_STATE_BYTES:
             raise ValueError(f"the state is {size} bytes, over the limit of {MAX_APP_STATE_BYTES}")
         return self

@@ -1,9 +1,9 @@
-"""The `.docx` corpus: one generated file per feature, in `docx/`, each holding that feature.
+"""WordCraft's corpus: one generated `.docx` per feature, beside this, each holding that feature.
 
 Every file is written by hand, part by part, from the OOXML schema's smallest valid shapes, with
 a fixed time on every zip entry, so the same code makes the same bytes. A test fails if the
-committed files drift from what this makes; `python -m tests.files.corpus.make` writes them
-again, from `packages/artifactr`.
+committed files drift from what this makes; `python -m tests.files.corpus.wordcraft.make`, from
+`packages/artifactr`, writes them again.
 """
 
 import io
@@ -14,7 +14,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Final
 
-HERE: Final = Path(__file__).parent / "docx"
+HERE: Final = Path(__file__).parent
 TIME: Final = (2026, 10, 17, 0, 0, 0)
 
 W: Final = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"

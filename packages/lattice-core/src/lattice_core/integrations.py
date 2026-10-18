@@ -80,6 +80,77 @@ KNOWN: Final = registry(
         description="WordCraft: Word documents kept as native files, edited by people and agents.",
     ),
     Integration(
+        "files:gridcraft",
+        default=False,
+        description="GridCraft: Excel workbooks kept as native files, edited by people and agents.",
+    ),
+    Integration(
+        "files:deckcraft",
+        default=False,
+        description=(
+            "DeckCraft: PowerPoint presentations kept as native files, edited by people and agents."
+        ),
+    ),
+    Integration(
+        "files:pdfcraft",
+        default=False,
+        description="PdfCraft: PDF documents kept as native files, edited by people and agents.",
+    ),
+    Integration(
+        "files:cadcraft",
+        default=False,
+        description=(
+            "CADCraft: DXF and DWG drawings kept as native files, edited by people and agents."
+        ),
+    ),
+    Integration(
+        "files:photocraft",
+        default=False,
+        description=(
+            "PhotoCraft: Photoshop documents kept as native files, edited by people and agents."
+        ),
+    ),
+    Integration(
+        "files:vectorcraft",
+        default=False,
+        description="VectorCraft: SVG drawings kept as native files, edited by people and agents.",
+    ),
+    Integration(
+        "files:designcraft",
+        default=False,
+        description=(
+            "DesignCraft: InDesign layouts, as IDML, kept as native files, edited by people "
+            "and agents."
+        ),
+    ),
+    Integration(
+        "files:figcraft",
+        default=False,
+        description=(
+            "FigCraft: interface designs kept as native files, edited by people and agents."
+        ),
+    ),
+    Integration(
+        "files:filmcraft",
+        default=False,
+        description="FilmCraft: video projects rendered and exported, one file at a time.",
+    ),
+    Integration(
+        "files:effectcraft",
+        default=False,
+        description="EffectCraft: motion graphics rendered and exported, one file at a time.",
+    ),
+    Integration(
+        "files:soundcraft",
+        default=False,
+        description="SoundCraft: audio sessions mixed down and exported, one file at a time.",
+    ),
+    Integration(
+        "files:lightcraft",
+        default=False,
+        description="LightCraft: photos developed and exported, one file at a time.",
+    ),
+    Integration(
         "ui:forms",
         default=True,
         description="Forms: the agent asks with a form, and people fill it in the chat.",

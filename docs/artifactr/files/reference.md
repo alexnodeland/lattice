@@ -30,6 +30,13 @@ The reference is generated from `artifactr.files`' docstrings and type annotatio
       show_root_heading: false
       show_root_toc_entry: false
 
+## artifactr.files.craft
+
+::: artifactr.files.craft
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+
 ## artifactr.files.wordcraft
 
 ::: artifactr.files.wordcraft

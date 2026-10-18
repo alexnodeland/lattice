@@ -128,7 +128,7 @@ filterwarnings = [
 ]
 markers = [
     "postgres: needs a PostgreSQL database (set ARTIFACTR_TEST_POSTGRES_URL)",
-    "wordcraft: needs WordCraft's CLI (set ARTIFACTR_TEST_WORDCRAFT, from scripts/wordcraft cli)",
+    "craft(app): needs the crafting app's CLI (set ARTIFACTR_TEST_CRAFT to the app, and ARTIFACTR_TEST_CRAFT_CLI from scripts/craft APP cli)",
 ]
 
 [tool.coverage.run]

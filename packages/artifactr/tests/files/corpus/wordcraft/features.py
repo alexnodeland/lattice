@@ -14,7 +14,7 @@ from collections.abc import Callable
 from typing import Final
 from xml.etree import ElementTree
 
-from tests.files.corpus.make import PKG, WP, A, R, W
+from tests.files.corpus.wordcraft.make import PKG, WP, A, R, W
 
 Value = list[tuple[object, ...]]
 

@@ -62,7 +62,7 @@ def editor_app(build: Path) -> ASGIApp:
 
     Args:
         build: The directory holding the build's `index.html`, such as what
-            `scripts/wordcraft web` prints.
+            `scripts/craft wordcraft web` prints.
 
     Raises:
         FileNotFoundError: If the directory has no `index.html`.

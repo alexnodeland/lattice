@@ -14,3 +14,4 @@ nav:
   - adr/0005-wordcraft-headless-pinned-by-checksum.md
   - adr/0006-the-agents-tools-behind-each-apps-switch.md
   - adr/0007-check-out-over-http-and-the-editor-on-its-own-origin.md
+  - adr/0009-each-crafting-app-declared-once-on-one-of-two-dialects.md

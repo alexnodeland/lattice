@@ -135,6 +135,7 @@ await rule.post_message(thread.id, "The rule is live.", kind="notice")
 | Running | steers the running agent, which is told at its next request, if the run acts for its author; otherwise it is taken by the next turn |
 | Ending, or pausing: its run no longer takes messages but still holds the thread | is taken by the next turn, which the run starts as it releases the thread |
 | Paused on questions or approvals | is the reply: it answers the questions, declines the approvals with the message as the reason, and resumes the run |
+| Paused on forms alone | waits: a form is answered only by its own answer, and the message reaches the run as the form's answer resumes it |
 
 Behind the table is one rule: the log decides ([ADR-0055](../adr/0055-turns-from-the-log.md)). A thread's messages are taken in the log's order, each by one turn: as a run's prompt, as a paused run's reply, or through the watcher of the run that holds the thread. A message or an answer sent with the runner asks for a turn. Whoever holds the thread next, in any process, starts the turn with the oldest message no turn has taken, and its watcher delivers the rest. So a message sent the moment a client sees `run_ended` is answered, and each message is consumed once: in the same transaction as the run's start it prompts, the answer it replies with, or the end of the run it was delivered to. The one exception is a claim that lapses while its holder lives, as when a process stalls past `claim_ttl`. A message the stalled run was delivered, and could not record, may then be consumed again by the thread's next holder.
 
@@ -155,6 +156,7 @@ if sent.run is not None:  # None when the thread's run takes the message, or wil
 - the thread's run is already active, in this process or another, so the message steers it; if that run is ending or pausing, it hands the thread over as it releases it, and the next turn takes the message; if its process died, this runner looks again once the run's claim could have lapsed, and takes the message then
 - another message or answer took the thread first, and its turn takes this one too, or the turn after it does, if this one is from another author
 - an answer leaves some of the paused run's requests unanswered, so the run waits for them
+- the paused run waits on a form, which a message doesn't answer, so the message waits too
 
 The run `send` started may take an older message first: the thread's oldest message that no turn has taken.
 
@@ -284,4 +286,6 @@ for request in run.pending:
     answered = await runner.answer(ws, command)  # resumes the run after the last answer
 ```
 
-Once every request is answered, the run resumes under the same `run_id`, with the answers passed to pydantic-ai as deferred tool results; an approved call runs then. A chat message sent to a paused thread is the reply, as described above, so the model history never ends in an unanswered tool call.
+Once every request is answered, the run resumes under the same `run_id`, with the answers passed to pydantic-ai as deferred tool results; an approved call runs then. A chat message sent to a paused thread is the reply, as described above, so the model history never ends in an unanswered tool call. A form, the `ask_form` tool of [artifactr's forms](forms-and-dashboards.md), is the exception: only its own answer answers it, so a reply leaves it open and the run paused, and a message posted while only forms are open is not taken until the form's answer resumes the run, which it joins ([ADR-0055](../adr/0055-turns-from-the-log.md)'s amendment).
+
+Each `deferred_answered` names the tool whose call it answers, `tool_name`, so whatever reads the log tells a form's answer from a question's or an approval's. An application may refuse an answer before it is recorded, with a check of `answer_deferred` ([Checks](security.md#checking-what-a-command-carries)); the request stays open, and the run paused.

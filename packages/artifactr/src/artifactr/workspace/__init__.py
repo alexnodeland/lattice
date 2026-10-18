@@ -2,8 +2,8 @@
 
 Open a :class:`Workspace` with :meth:`Workspaces.open`; every read and write goes through it,
 each asks the application's ``authorize`` hook, every read leaves out what its ``hidden``
-hook hides, and every write runs core's rules in one
-storage transaction.
+hook hides, every command passes the application's ``checks``, and every write runs core's rules
+in one storage transaction.
 """
 
 from artifactr.workspace.gate import KeyOf, integration_gate
@@ -17,6 +17,7 @@ from artifactr.workspace.workspace import (
     ArtifactLease,
     Authorize,
     Changes,
+    Check,
     Gate,
     Hidden,
     OnOpen,
@@ -33,6 +34,7 @@ __all__ = [
     "ArtifactLease",
     "Authorize",
     "Changes",
+    "Check",
     "Gate",
     "Hidden",
     "HistoryChunk",

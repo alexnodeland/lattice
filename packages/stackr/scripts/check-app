@@ -13,6 +13,7 @@
 #   TEMPLATE_BRIDGE      true or false, for both libraries: relayr's bridge (default: true)
 #   TEMPLATE_PORTAL      true or false, with grantr: portalr's UIs and router (default: true)
 #   TEMPLATE_TRACKER     none, plane or vikunja, with the bridge: relayr's task tracker (default: none)
+#   TEMPLATE_UI          true or false, with artifactr: artifactr's forms and dashboards, artifactr.ui (default: true)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -25,6 +26,7 @@ uv run copier copy --quiet --defaults --vcs-ref HEAD \
   --data bridge="${TEMPLATE_BRIDGE:-true}" \
   --data portal="${TEMPLATE_PORTAL:-true}" \
   --data tracker="${TEMPLATE_TRACKER:-none}" \
+  --data ui="${TEMPLATE_UI:-true}" \
   --data python_version="${TEMPLATE_PYTHON:-3.12}" \
   --data libraries_path="$(dirname "$PWD")" \
   ../.. "$scratch/app"

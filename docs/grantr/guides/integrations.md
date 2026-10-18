@@ -115,8 +115,9 @@ class Narrowed:
 
 ## Adopting the port
 
-Three seams came before the port. Each is to move to it:
+Three seams came before the port. Two are still to move to it:
 
 - **relayr's `Enabled`** has the port's arguments already, so an application passes `grants.is_enabled` today. relayr is to import the port in place of its own protocol; `always` stays the answer with no store.
-- **artifactr's forms and dashboards,** proposed with an `Integrations` of their own and a `FeatureOff` refusal, are to take lattice-core's port, and to refuse through the gate, as `NotEnabled`.
 - **stackr's template** is to give `Grants` the deployment's `installed`, from its questions, and to wire `integration_gate` and relayr's `enabled` to it. Until then, an application it generates installs every integration, with each at its default.
+
+artifactr's forms and dashboards were built on the port: `ui_key_of` names their keys for `integration_gate`, and `ui_tools` and `ui_checks` take the port ([artifactr ADR-0080](../../artifactr/adr/0080-integrations-on-or-off-per-workspace.md)).

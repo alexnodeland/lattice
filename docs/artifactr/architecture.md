@@ -92,6 +92,7 @@ The inner layers (core, telemetry, workspace, agent) form a hexagon of ports and
 | `artifactr.fastapi` (extra) | agent, FastAPI | Driving adapter | The thread protocol over WebSocket, and REST commands. |
 | `artifactr.mcp` (extra) | agent, mcp, lattice-core's `logs` | Driving adapter | Artifacts as MCP resources, commands and reads as MCP tools. |
 | `artifactr.files` (extra) | the public API of core and workspace; its `sql` layer SQLAlchemy 2 async, Alembic and lattice-core's `sql` | A domain built on artifactr, with ports of its own: `Blobs`, `Checkouts` and `App` | Native files as artifacts: manifests over a blob store, check-outs and agents' edits under one lease, and its own tables and migrations ([its architecture](files/architecture.md), [lattice ADR-0026](../adr/0026-a-distribution-needs-a-reason-integrations-are-extras.md)). |
+| `artifactr.ui` (extra `forms`) | the public API of core, workspace and agent | A domain built on artifactr, filling its check hook | Forms and dashboards in the chat: the schema subset, its types, checks and agent toolset ([Forms and dashboards](#forms-and-dashboards)) |
 
 ### `artifactr.core`: sans-IO
 
@@ -211,6 +212,7 @@ sequenceDiagram
     participant S as Storage (host transaction)
     participant L as Subscribers
     A->>W: commit(command)
+    W->>W: authorize, then the application's check of its type
     W->>S: begin, load current state
     W->>C: commit(command, current, actor)
     alt accepted
@@ -291,8 +293,9 @@ Application tools emit ephemeral progress with `ctx.emit(...)`. `ArtifactDraft(k
 
 - Each artifact type declares a `write_policy`: `"direct"` or `"propose"`. A thread can be switched into suggest mode, which forces proposals for every type. `edit_text(..., propose=True)` proposes explicitly.
 - Proposals do not block the run. The agent keeps working; the person accepts, rejects or edits the proposal whenever and from any surface; the outcome reaches the agent as a change note. When a proposal is accepted with edits, the note includes the person's changes.
-- Blocking points use pydantic-ai's deferred tools: `ask_user` (or any tool raising `CallDeferred`) asks a question, and tools declared `requires_approval=True` need approval. The agent's `output_type` must include `DeferredToolRequests`. The run ends with `DeferredToolRequests`, recorded as `run_paused` with its history. Answers arrive as `answer_deferred` commands from any surface; once every request is answered, `Runner.resume` continues the run under the same `run_id` with `deferred_tool_results`. The pause survives restarts because nothing waits in memory.
+- Blocking points use pydantic-ai's deferred tools: `ask_user` (or any tool raising `CallDeferred`) asks a question, and tools declared `requires_approval=True` need approval. The agent's `output_type` must include `DeferredToolRequests`. The run ends with `DeferredToolRequests`, recorded as `run_paused` with its history. Answers arrive as `answer_deferred` commands from any surface, and each `deferred_answered` names the tool whose call it answers; an application's check may refuse an answer ([ADR-0073](adr/0073-checks-that-refuse-a-command-before-it-commits.md)). Once every request is answered, `Runner.resume` continues the run under the same `run_id` with `deferred_tool_results`. The pause survives restarts because nothing waits in memory.
 - A chat message sent while a run is paused is the reply: it answers the pending questions and declines pending approvals with the message as the reason, and the run resumes. The conversation history therefore never ends in an unanswered tool call.
+- A form, `artifactr.ui`'s `ask_form`, is answered only by its own answer: a reply leaves it open, and the run stays paused. A message posted while only forms are open answers nothing and is not taken, and reaches the run as it resumes, beside the form's values ([ADR-0055](adr/0055-turns-from-the-log.md)'s amendment).
 
 ## Feedback
 
@@ -360,6 +363,7 @@ The run holds a thread claim, not a socket: if the connection that started it dr
 - **Every read leaves out what `hidden` hides.** `Workspaces(hidden=, hidden_refresh=)` holds a second hook, which returns the threads and artifacts an actor may not see; a hidden item is `NotFound`, listings and the log leave it out, and an open subscription asks again every `hidden_refresh` ([ADR-0062](adr/0062-restricted-items-left-out-of-every-read.md)). `tests/workspace/test_hidden.py` lists every method with what it hides.
 - **A gate refuses what an integration switched off governs.** `Workspaces(gate=)` holds a third hook, asked by `commit` once what a command names and implies passes `hidden`, and before `authorize` hears it, with what the command changes; it refuses with `NotEnabled`, so a hidden item stays missing and "off" says nothing of grants. `integration_gate(integrations, key_of)` builds one on lattice-core's `Integrations` port, from the integration that governs each artifact's kind and data ([ADR-0081](adr/0081-a-gate-before-access-integrations-switched-off-answer-not-enabled.md)). Reads and facts are never gated.
 - **Type allowlist.** `Workspaces(storage, types=[Doc, Plan])` rejects creating any other artifact type, even one registered elsewhere in the process.
+- **The application checks what a command carries.** `Workspaces(checks=)` maps a command's `type` to an async `Check(workspace, command)`, which `commit` calls once `authorize` allows the command and before its transaction, with the committing handle, so it reads as the command's actor ([ADR-0073](adr/0073-checks-that-refuse-a-command-before-it-commits.md)). It refuses with a `Rejection`, such as `ValidationFailed` with a field's errors; a `propose_change` is checked under its own type, and facts are not checked. A check holds nothing, so what it read may change before the command commits. `artifactr.ui`'s checks hold forms to their schemas this way ([Forms and dashboards](#forms-and-dashboards)) ([lattice RFC-0005](../rfcs/0005-forms-dashboards-and-mini-apps.md)).
 - **Optimistic concurrency.** Every edit names the version it was based on. A stale edit is rejected with the changes made since, so the agent retries against fresh state and a UI can rebase or ask the person.
 - **One active run per thread**, enforced by `Workspace.claim_thread`: a storage lease with a time-to-live, renewed while held, that works across replicas and lapses if its holder dies. Concurrency happens across threads. A message sent during a run steers it instead of queueing, and one sent as the run ends is taken by the turn the run hands the thread over to. Each claim has a holder of its own.
 - **A run whose process died, or whose claim lapsed,** is recorded as failed, with the reason `abandoned`, when the `Runner` next claims its thread. A run still going is cancelled when its claim lapses ([ADR-0020](adr/0020-running-agents-in-threads.md), [the agent guide](guides/agent.md#running-the-agent)).
@@ -533,6 +537,71 @@ The `Runner` takes a `turn_context`: an async context entered around each turn, 
 ### Langfuse
 
 Langfuse is the primary backend for traces and scores ([ADR-0027](adr/0027-opentelemetry-observability-with-langfuse.md), [ADR-0039](adr/0039-the-langfuse-adapter.md)). The `[langfuse]` extra adds `should_export_span`, a filter that keeps artifactr's, pydantic-graph's, the MCP SDK's and the HTTP and database instrumentations' spans as well as Langfuse's default LLM spans, so traces stay whole, and `langfuse_turn`, a `TurnContext` that propagates each turn's session, user, tags (tenant, workspace, the kinds of artifact followed), trace name and metadata. A `FeedbackMirror` puts feedback in Langfuse through evalr's `LangfuseScoreSink` and `LangfuseScoreConfigStore`. `configure_telemetry(langfuse="traces")` adds Langfuse to the same tracer provider, keeping a span if any library's contribution keeps it. A Collector can also send plain OTLP to Langfuse's HTTP endpoint, with the `x-langfuse-ingestion-version: 4` header; then `langfuse="scores"` sends Langfuse no spans, and the client only sets trace attributes and records scores.
+
+## Forms and dashboards
+
+`artifactr.ui`, behind the `forms` extra, puts forms and dashboards in the chat ([lattice RFC-0005](../rfcs/0005-forms-dashboards-and-mini-apps.md), [the guide](guides/forms-and-dashboards.md)): an agent asks a form with `ask_form`, which pauses its run until a person answers, or makes a form artifact that takes submissions without a run waiting, and shows figures as a dashboard. Whatever a person sends is one command, as that person, which its checks, on the [check hook](adr/0073-checks-that-refuse-a-command-before-it-commits.md), refuse before it commits if it doesn't fit.
+
+### Its modules
+
+| Module | Imports | Holds |
+|---|---|---|
+| `_common` (private) | `artifactr.core`, pydantic | The size measure, the bounded `Number`, and the refusal that names every error |
+| `schema` | `_common`, `artifactr.core`, pydantic | `FormSchema`, its properties, `UiHints`, the limits |
+| `ids` | the standard library | `submission_id` |
+| `types` | `_common`, `schema`, `artifactr.core` | `Form`, `Submission`, `Dashboard` and its panels, `App`, `FormRequest`, `UI_TYPES`, `AGENT_TYPES`, `ASK_FORM` |
+| `integrations` | pydantic | The keys `FORMS`, `DASHBOARDS` and `MINI_APPS`, and `ui_key_of` for artifactr's `integration_gate` |
+| `checks` | `_common`, `ids`, `integrations`, `types`, `artifactr.core`, `artifactr.workspace` | `ui_checks`, `IsAdmin`, `FormChanged`, `FormClosed`, `RefusalReason` |
+| `wire` | `types`, `checks`, `integrations` | `wire_schema`, run as `python -m artifactr.ui.wire` by the `schema` task |
+| `agent` | `_common`, `integrations`, `schema`, `types`, `artifactr.agent`, `artifactr.core`, pydantic-ai | `ui_tools` |
+
+- **It is a plugin, and depends inward only** ([ADR-0074](adr/0074-forms-and-dashboards-in-artifactr-ui-behind-the-forms-extra.md)). Nothing else in artifactr imports it, and every name it takes from artifactr is in `__all__` of `artifactr.core`, `artifactr.agent` or `artifactr.workspace`; `tests/ui/test_layering.py` holds both. relayr bridges it, in `relayr.ui`.
+- **No module imports `wire`,** so running it as `__main__` registers the artifact types once.
+
+### The schema subset
+
+`FormSchema` is a Pydantic model of the subset ([ADR-0076](adr/0076-the-form-schema-an-allow-list-compiled-to-pydantic.md)), strict and closed: a keyword it doesn't hold is an extra input, refused at its place, and `$ref`, `$defs`, `pattern`, `if`, `then`, `else`, `allOf`, `anyOf`, `not`, a nested object and `format: "password"` are refused by name before anything else is read. A property is told apart by its `type`, or as choices by `enum` or `oneOf`; its name is an identifier, and bounds no value meets are refused. Each property gives the type its values are validated as, and a schema compiles them into a model of its values, once for each schema, kept by its JSON for the 256 used last, with each property's name as the field's alias, so an error's `loc` is `[name]`. A schema is stored as JSON Schema, with what was left out still left out, and reads back unchanged.
+
+- **The limits** are constants: 50 properties, 64 choices, 10,000 characters a string whatever its `maxLength`, every number within ±(2⁵³ − 1), 32 KB of form (title, schema and hints) as stored, 64 KB of values, 256 KB of dashboard, 256 KB of an app's HTML, 64 KB of its state, 200 characters of a title and 2,000 of an app's summary. Each is measured by `json_size`, the UTF-8 bytes of compact JSON, as JavaScript's `JSON.stringify` writes it ([ADR-0077](adr/0077-formats-and-sizes-checked-by-artifactrs-own-code.md)).
+- **Formats and `multipleOf`** are artifactr.ui's own checks, which portalr's TypeScript repeats; `tests/ui/vectors/forms.json` holds the cases both sides test.
+
+### The artifact types
+
+| Kind | Holds | Who changes what |
+|---|---|---|
+| `form` | `title`, `schema`, `ui`, `submissions` (`once`, `per_person`, `many`), `closed` | `schema`, `submissions`, `closed` and archiving only its author or an admin |
+| `submission` | `form_id` or `app_id`, `version`, `values`, and `nonce` for a `many` form or an app | Made by a person, never proposed or edited; archived only by its author or an admin |
+| `dashboard` | `title`, `panels` (`stat`, `bar`, `line`, `donut`, `table`, `text`, `form`), `as_of` | Anyone who may edit |
+| `app` | `title`, `summary`, `html`, `state` | Made by an agent; a person changes only its `state` |
+
+`AGENT_TYPES`, the form and the dashboard, are what the agent's `ArtifactWorkspace` takes; `UI_TYPES`, all four, what `Workspaces(types=...)` takes.
+
+A submission's id is derived ([ADR-0075](adr/0075-forms-refused-at-the-boundary-through-the-checks.md)): `sub_` and 32 hex digits of SHA-256 over the policy and the form's id, with the person's principal for `per_person`, or the submit's nonce for `many` and apps, joined by NUL. artifactr's refusal of an id in use makes a retried submit one artifact and a form's policy hold. `tests/ui/vectors/submission_ids.json` holds ids portalr derives too.
+
+### The checks
+
+`ui_checks(is_admin=...)` returns a check per command type, which artifactr's `Workspace.commit` calls after `authorize` and its own checks of what the command names, and before its transaction, with the committing handle:
+
+| Command | Refused |
+|---|---|
+| `answer_deferred` to an `ask_form` request | Values that don't fit the schema in the request's `args` (`ValidationFailed`, each error at its property) |
+| `answer_deferred` whose request's `args` aren't a form | `ValidationFailed` |
+| `create_artifact` of a `submission` | A form the submitter can't read (`NotFound`); a closed or archived one (`FormClosed`), or one changed since its version (`FormChanged`); values that don't fit, a missing nonce or one a form doesn't take, or an id that isn't its derivation (`ValidationFailed`); a `per_person` submission from whoever acts for no one (`Forbidden`) |
+| `create_artifact` of an `app` | One a person makes (`Forbidden`) |
+| `edit_artifact` | Any edit of a submission; a change to a form's `schema`, `submissions` or `closed` by anyone but its author or whom `is_admin` allows; a person's change to an app outside `state` (`Forbidden`) |
+| `archive_artifact` | A form's or a submission's, by anyone but its author or whom `is_admin` allows (`Forbidden`) |
+| `propose_change` | A submission; otherwise what the change it wraps would be refused for |
+| `respond_to_proposal`, accepting | What the change would be refused for now, as its proposer, on the head; a reviewer's own `changes` on a form, an app or a submission (`Forbidden`) |
+
+With `Workspaces(gate=integration_gate(integrations, ui_key_of))` ([ADR-0080](adr/0080-integrations-on-or-off-per-workspace.md), [ADR-0081](adr/0081-a-gate-before-access-integrations-switched-off-answer-not-enabled.md)), making or changing a form, a submission, a dashboard or an app while its integration, `ui:forms`, `ui:dashboards` or `ui:mini-apps`, is off is refused as `not_enabled`; `ui_checks(integrations=...)` refuses an answer to `ask_form` while forms are off the same way, and `ui_tools(integrations=...)` leaves the integration's tools out of each model request. Without an `Integrations`, lattice-core's `Defaults` answer: forms and dashboards on, mini apps off.
+
+`FormChanged` and `FormClosed` are `invalid_state` refusals whose payload adds `reason`, `"changed"` or `"closed"`, and the target, so a client tells them apart without reading the message; every surface sends a refusal's payload as it is.
+
+What artifactr refuses itself, a second answer, a stale edit or an id in use, is left to it, so its refusal is the one a client sees.
+
+### The agent's tools
+
+`ui_tools(forms=True, dashboards=True)` is an application toolset. Each tool validates what the model wrote before anything is recorded, and gives a refusal back as `ModelRetry` naming every field and keyword. `ask_form` raises `CallDeferred`, so the run pauses with a `DeferredRequest` whose `args` are the tool's own; the answer, already checked, is the tool's result when the run resumes. A chat message doesn't answer it (artifactr's runner skips `ask_form` requests). `create_form` and `show_dashboard` create artifacts in the thread; `update_dashboard` edits one, as its next version.
 
 ## Aligned with reflexr
 

@@ -115,6 +115,49 @@ async def test_a_turn_for_a_rule_without_a_traced_message_starts_a_chain(
     assert ended.depth == 0
 
 
+async def answer_to(stack: Stack, ledger: Ledger, *, rule: bool) -> tuple[str, reflexr.Envelope]:
+    """Pause a turn acting for a rule's actor, or for Alice, and bridge Alice's answer to it.
+
+    The rule's turn carries out its message, posted by a run in the chain Alice's first message
+    starts. Returns that chain's id, and the bridged answer.
+    """
+    app = stack.process(ledger, rules=[])
+    alice = await app.collaboration.open(*KEY, actor=ALICE)
+    thread = await alice.create_thread()
+    await alice.post_message(thread.id, "start")
+    await bridged(stack, 1)
+    [first] = await stack.bridged()
+    if rule:
+        cause = Cause(
+            correlation_id=first.correlation_id, firing_id="fir_c", run_id="fir_c", depth=2
+        )
+        await ledger.record_cause(KEY, "message", "msg_ask", cause)
+    sender = alice.as_actor(ACTOR) if rule else alice
+    await sender.post_message(thread.id, "ask", message_id="msg_ask")
+    acting = ACTOR if rule else ALICE
+    agent = alice.as_actor(a.AgentActor(thread_id=thread.id, run_id="run_t", on_behalf_of=acting))
+    started = a.RunStarted(run_id="run_t", thread_id=thread.id, message_ids=("msg_ask",))
+    await agent.record(started)
+    request = a.DeferredRequest(tool_call_id="q1", tool_name="ask_user", kind="question")
+    await agent.record(a.RunPaused(run_id="run_t", thread_id=thread.id, requests=(request,)))
+    await alice.commit(a.AnswerDeferred(run_id="run_t", tool_call_id="q1", answer="Monday"))
+    await bridged(stack, 3)
+    [answered] = [e for e in await stack.bridged() if e.event_type == "artifactr:deferred_answered"]
+    return first.correlation_id, answered
+
+
+async def test_a_persons_answer_to_a_rules_paused_turn_joins_its_chain(
+    ledger: Ledger, stack: Stack
+) -> None:
+    chain, answered = await answer_to(stack, ledger, rule=True)
+    assert (answered.correlation_id, answered.depth) == (chain, 0)
+
+
+async def test_an_answer_to_anyone_elses_turn_starts_a_chain(ledger: Ledger, stack: Stack) -> None:
+    _, answered = await answer_to(stack, ledger, rule=False)
+    assert (answered.correlation_id, answered.depth) == (answered.id, 0)
+
+
 def test_the_rule_actor_is_an_external_agent_for_no_one() -> None:
     assert rule_actor("ops:triage") == artifactr.ExternalAgentActor(
         client_id="reflexr:ops:triage", name="ops:triage"

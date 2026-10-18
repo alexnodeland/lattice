@@ -125,6 +125,23 @@ class FeedbackGiven(ArtifactrEvent, name="feedback_given"):
     value: dict[str, JsonValue]
 
 
+class DeferredAnswered(ArtifactrEvent, name="deferred_answered"):
+    """A paused turn's question was answered, or its tool call approved or declined.
+
+    Its author is who answered, and its `turn_id` the turn that asked. A chat message that
+    answers is bridged as `artifactr:message_posted` too.
+    """
+
+    tool_call_id: str
+    tool_name: str | None = None
+    """The tool whose call was answered, such as `ask_user`; None only for answers artifactr
+    recorded before it named the tool."""
+
+    answer: JsonValue = None
+    approved: bool | None = None
+    """Whether an approval was given; None for a question's answer."""
+
+
 BRIDGED: tuple[type[ArtifactrEvent], ...] = (
     MessagePosted,
     ArtifactCreated,
@@ -134,6 +151,7 @@ BRIDGED: tuple[type[ArtifactrEvent], ...] = (
     ProposalResolved,
     TurnEnded,
     FeedbackGiven,
+    DeferredAnswered,
 )
 """Every bridged type: give them to reflexr's `Workspaces(events=...)`, with the application's
 own, so the follower may publish them."""

@@ -1,7 +1,8 @@
 """The example artifact type, its feedback and its agent: people and an agent write notes together.
 
 Replace them with the application's own. An artifact type is a Pydantic model; the agent edits
-it with artifactr's tools, and people with the same commands, over REST, the WebSocket or MCP.
+it with artifactr's tools, and people with the same commands, over REST, the WebSocket or MCP.{% if use_ui %}
+With artifactr.ui's toolset, it also asks people forms and shows them dashboards.{% endif %}
 """
 
 from collections.abc import Sequence
@@ -13,12 +14,19 @@ from pydantic_ai.capabilities import AbstractCapability
 from pydantic_ai.models import Model
 
 from artifactr import ArtifactWorkspace, Feedback, MarkdownArtifact, Session
+{%- if use_ui %}
+from artifactr.ui import AGENT_TYPES
+from artifactr.ui.agent import ui_tools
+{%- endif %}
 
 INSTRUCTIONS = """\
 You help a team keep notes: short Markdown documents they write with you.
 
 - Create a note when asked, and edit notes in small, precise steps.
 - Ask when something important is unclear; do not guess.
+{%- if use_ui %}
+- Ask with a form when you need several answers at once, and show figures as a dashboard.
+{%- endif %}
 - Answer in a sentence or two, and let the notes hold the detail.
 """
 
@@ -56,5 +64,10 @@ def build_note_agent(
         deps_type=Session[None],
         instructions=INSTRUCTIONS,
         output_type=[str, DeferredToolRequests],
+{%- if use_ui %}
+        toolsets=[ui_tools()],
+        capabilities=[ArtifactWorkspace(types=[Note, *AGENT_TYPES], ask=True), *capabilities],
+{%- else %}
         capabilities=[ArtifactWorkspace(types=[Note], ask=True), *capabilities],
+{%- endif %}
     )

@@ -626,6 +626,7 @@ def _answer(command: AnswerDeferred, state: State) -> CommitResult:
                 run_id=run.id,
                 thread_id=run.thread_id,
                 tool_call_id=command.tool_call_id,
+                tool_name=request.tool_name,
                 answer=command.answer,
                 approved=command.approved,
             ),

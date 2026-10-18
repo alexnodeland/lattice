@@ -15,6 +15,7 @@ The application template's questions are in stackr's `copier.yml`, which the `co
 | `evals` | bool | yes |  | always | Include evaluation with evalr (an evals/ directory and a starter experiment)? |
 | `bridge` | bool | yes |  | `libraries == 'both'` | Bridge them with relayr (chats and artifacts become events for rules, and rules' runs act back as proposals and notices; with an incident timeline example)? |
 | `tracker` | str | `none` | `none`, `plane`, `vikunja` | `libraries == 'both' and bridge` | A task tracker for relayr (rules' runs file items there, and people's changes come back as events; with a dead-letter example)? It runs beside the stack from stackr's recipe for it, with each tenant provisioned as stackr's tracker guide says. |
+| `ui` | bool | yes |  | `libraries in ['artifactr', 'both']` | Include artifactr's forms and dashboards (the agent asks people forms and shows them dashboards in its chat; what they send is checked before it commits and, with the bridge, becomes an event for rules)? |
 | `access` | str | `grantr` | `grantr`, `none` | always | Who may do what |
 | `portal` | bool | yes |  | `access == 'grantr'` | Include portalr (an app UI to chat with the agents and see their work, and an admin UI for access, feedback, traces and spend)? It signs people in through a Supabase project, which the application is told of in PORTAL_SUPABASE_URL and PORTAL_SUPABASE_KEY: without one it is off. It adds a Bun build and a network fetch to the image. |
 | `hosting` | str | `none` | `none`, `host` | always | Where it is hosted, beside stackr's recipe for it (stackr RFC-0004) |
@@ -39,6 +40,7 @@ These are computed from the answers, apart from `libraries_path`, which `scripts
 | `use_reflexr` | bool | `{{ libraries in ['reflexr', 'both'] }}` |
 | `use_relayr` | bool | `{{ libraries == 'both' and bridge }}` |
 | `use_tracker` | bool | `{{ libraries == 'both' and bridge and tracker != 'none' }}` |
+| `use_ui` | bool | `{{ libraries in ['artifactr', 'both'] and ui }}` |
 | `use_portal` | bool | `{{ access == 'grantr' and portal }}` |
 
 | Copier setting | Value |

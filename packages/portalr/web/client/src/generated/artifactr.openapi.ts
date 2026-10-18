@@ -485,6 +485,8 @@ export interface components {
             thread_id: components["schemas"]["ThreadId"];
             /** Tool Call Id */
             tool_call_id: string;
+            /** Tool Name */
+            tool_name?: string | null;
             /**
              * Type
              * @default deferred_answered

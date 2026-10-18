@@ -43,5 +43,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0037](0037-the-state-hosts-clickhouse-backups.md) | The state host's ClickHouse backups | Accepted |
 | [0038](0038-portalr-in-the-template.md) | portalr in the template | Accepted |
 | [0039](0039-the-task-trackers-recipes-checker-and-question.md) | The task trackers' recipes, their checker, and the template's question | Accepted |
+| [0040](0040-forms-and-dashboards-in-the-template.md) | Forms and dashboards in the template | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

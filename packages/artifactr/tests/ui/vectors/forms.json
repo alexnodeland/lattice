@@ -1,0 +1,1039 @@
+{
+  "description": "Forms in artifactr.ui's schema subset, with values each accepts and refuses, and schemas the subset refuses. A refused value names the property at its error's loc; a refused schema names the keyword or the reason in its message, at the loc given. portalr's TypeScript validator reads these too. A refused schema's loc is the Python validator's, which puts the property's kind after its name, as Pydantic tags it; another validator need match only the names.",
+  "limits": {
+    "measure": "the UTF-8 bytes of a value's compact JSON, as JSON.stringify writes it; max_schema_bytes counts a form's title, schema and ui together",
+    "max_properties": 50,
+    "max_choices": 64,
+    "max_length": 10000,
+    "max_schema_bytes": 32768,
+    "max_values_bytes": 65536,
+    "max_number": 9007199254740991,
+    "property_name": "^[A-Za-z_][A-Za-z0-9_-]{0,63}$, and not __proto__, constructor or prototype"
+  },
+  "forms": [
+    {
+      "name": "an incident report",
+      "schema": {
+        "type": "object",
+        "title": "Report an incident",
+        "properties": {
+          "summary": {
+            "type": "string",
+            "title": "Summary",
+            "minLength": 3,
+            "maxLength": 80
+          },
+          "severity": {
+            "type": "string",
+            "title": "Severity",
+            "oneOf": [
+              {
+                "const": "low",
+                "title": "Low"
+              },
+              {
+                "const": "high",
+                "title": "High"
+              }
+            ],
+            "default": "low"
+          },
+          "started": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "day": {
+            "type": "string",
+            "format": "date"
+          },
+          "reporter": {
+            "type": "string",
+            "format": "email"
+          },
+          "link": {
+            "type": "string",
+            "format": "uri"
+          },
+          "affected": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "ratio": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "exclusiveMaximum": 1
+          },
+          "step": {
+            "type": "number",
+            "multipleOf": 0.25
+          },
+          "paged": {
+            "type": "boolean",
+            "default": false
+          },
+          "areas": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "api",
+                "web",
+                "db"
+              ]
+            },
+            "uniqueItems": true,
+            "minItems": 1,
+            "maxItems": 2
+          }
+        },
+        "required": [
+          "summary",
+          "severity"
+        ]
+      },
+      "accepted": [
+        {
+          "summary": "Down",
+          "severity": "low"
+        },
+        {
+          "summary": "The API is down",
+          "severity": "high",
+          "started": "2026-10-17T09:30:00Z",
+          "day": "2024-02-29",
+          "reporter": "alice@example.com",
+          "link": "https://status.example.com/incidents/1",
+          "affected": 12,
+          "ratio": 0.5,
+          "step": 1.75,
+          "paged": true,
+          "areas": [
+            "api",
+            "db"
+          ]
+        },
+        {
+          "summary": "Ünïcode fine",
+          "severity": "low",
+          "started": "2026-10-17T09:30:00.123+02:00"
+        },
+        {
+          "summary": "abc",
+          "severity": "low",
+          "step": 3
+        },
+        {
+          "summary": "lower case",
+          "severity": "low",
+          "started": "2026-10-17t09:30:00z",
+          "link": "mailto:ops@example.com"
+        }
+      ],
+      "refused": [
+        {
+          "values": {
+            "severity": "low"
+          },
+          "loc": [
+            "summary"
+          ]
+        },
+        {
+          "values": {
+            "summary": "ab",
+            "severity": "low"
+          },
+          "loc": [
+            "summary"
+          ]
+        },
+        {
+          "values": {
+            "summary": "abc",
+            "severity": "medium"
+          },
+          "loc": [
+            "severity"
+          ]
+        },
+        {
+          "values": {
+            "summary": "abc",
+            "severity": "low",
+            "extra": 1
+          },
+          "loc": [
+            "extra"
+          ]
+        },
+        {
+          "values": {
+            "summary": "abc",
+            "severity": "low",
+            "started": "2026-10-17T09:30"
+          },
+          "loc": [
+            "started"
+          ]
+        },
+        {
+          "values": {
+            "summary": "abc",
+            "severity": "low",
+            "started": "2026-10-17 09:30:00Z"
+          },
+          "loc": [
+            "started"
+          ]
+        },
+        {
+          "values": {
+            "summary": "abc",
+            "severity": "low",
+            "day": "2023-02-29"
+          },
+          "loc": [
+            "day"
+          ]
+        },
+        {
+          "values": {
+            "summary": "abc",
+            "severity": "low",
+            "day": "20261017"
+          },
+          "loc": [
+            "day"
+          ]
+        },
+        {
+          "values": {
+            "summary": "abc",
+            "severity": "low",
+            "reporter": "alice"
+          },
+          "loc": [
+            "reporter"
+          ]
+        },
+        {
+          "values": {
+            "summary": "abc",
+            "severity": "low",
+            "reporter": "alice@example"
+          },
+          "loc": [
+            "reporter"
+          ]
+        },
+        {
+          "values": {
+            "summary": "abc",
+            "severity": "low",
+            "link": "status.example.com"
+          },
+          "loc": [
+            "link"
+          ]
+        },
+        {
+          "values": {
+            "summary": "abc",
+            "severity": "low",
+            "link": "https://exa mple.com"
+          },
+          "loc": [
+            "link"
+          ]
+        },
+        {
+          "values": {
+            "summary": "abc",
+            "severity": "low",
+            "affected": 0
+          },
+          "loc": [
+            "affected"
+          ]
+        },
+        {
+          "values": {
+            "summary": "abc",
+            "severity": "low",
+            "affected": 1.5
+          },
+          "loc": [
+            "affected"
+          ]
+        },
+        {
+          "values": {
+            "summary": "abc",
+            "severity": "low",
+            "affected": "3"
+          },
+          "loc": [
+            "affected"
+          ]
+        },
+        {
+          "values": {
+            "summary": "abc",
+            "severity": "low",
+            "ratio": 1
+          },
+          "loc": [
+            "ratio"
+          ]
+        },
+        {
+          "values": {
+            "summary": "abc",
+            "severity": "low",
+            "step": 0.3
+          },
+          "loc": [
+            "step"
+          ]
+        },
+        {
+          "values": {
+            "summary": "abc",
+            "severity": "low",
+            "paged": "yes"
+          },
+          "loc": [
+            "paged"
+          ]
+        },
+        {
+          "values": {
+            "summary": "abc",
+            "severity": "low",
+            "paged": 1
+          },
+          "loc": [
+            "paged"
+          ]
+        },
+        {
+          "values": {
+            "summary": "abc",
+            "severity": "low",
+            "areas": []
+          },
+          "loc": [
+            "areas"
+          ]
+        },
+        {
+          "values": {
+            "summary": "abc",
+            "severity": "low",
+            "areas": [
+              "api",
+              "api"
+            ]
+          },
+          "loc": [
+            "areas"
+          ]
+        },
+        {
+          "values": {
+            "summary": "abc",
+            "severity": "low",
+            "areas": [
+              "cache"
+            ]
+          },
+          "loc": [
+            "areas"
+          ]
+        },
+        {
+          "values": {
+            "summary": "abc",
+            "severity": "low",
+            "areas": [
+              "api",
+              "web",
+              "db"
+            ]
+          },
+          "loc": [
+            "areas"
+          ]
+        },
+        {
+          "values": {
+            "summary": "abc",
+            "severity": null
+          },
+          "loc": [
+            "severity"
+          ]
+        },
+        {
+          "values": [
+            "abc"
+          ],
+          "loc": []
+        },
+        {
+          "values": {
+            "summary": "abc",
+            "severity": "low",
+            "link": "javascript:alert(1)"
+          },
+          "loc": [
+            "link"
+          ]
+        },
+        {
+          "values": {
+            "summary": "abc",
+            "severity": "low",
+            "link": "ftp://example.com/x"
+          },
+          "loc": [
+            "link"
+          ]
+        },
+        {
+          "values": {
+            "summary": "abc",
+            "severity": "low",
+            "affected": 9007199254740992
+          },
+          "loc": [
+            "affected"
+          ]
+        },
+        {
+          "values": {
+            "summary": "abc",
+            "severity": "low",
+            "ratio": 1e+300
+          },
+          "loc": [
+            "ratio"
+          ]
+        },
+        {
+          "values": {
+            "summary": "abc",
+            "severity": "low",
+            "affected": -9007199254740992
+          },
+          "loc": [
+            "affected"
+          ]
+        },
+        {
+          "values": {
+            "summary": "Midnight",
+            "severity": "low",
+            "started": "2026-10-17T24:00:00Z"
+          },
+          "loc": [
+            "started"
+          ]
+        },
+        {
+          "values": {
+            "summary": "abc",
+            "severity": "low",
+            "day": "２０２６-10-17"
+          },
+          "loc": [
+            "day"
+          ]
+        },
+        {
+          "values": {
+            "summary": "abc",
+            "severity": "low",
+            "day": "2026-10-17\n"
+          },
+          "loc": [
+            "day"
+          ]
+        },
+        {
+          "values": {
+            "summary": "abc",
+            "severity": "low",
+            "day": "0000-01-01"
+          },
+          "loc": [
+            "day"
+          ]
+        },
+        {
+          "values": {
+            "summary": "abc",
+            "severity": "low",
+            "started": "0000-01-01T00:00:00Z"
+          },
+          "loc": [
+            "started"
+          ]
+        },
+        {
+          "values": {
+            "summary": "abc",
+            "severity": "low",
+            "reporter": "a b@example.com"
+          },
+          "loc": [
+            "reporter"
+          ]
+        },
+        {
+          "values": {
+            "summary": "abc",
+            "severity": "low",
+            "reporter": "a@bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee.fffff.com"
+          },
+          "loc": [
+            "reporter"
+          ]
+        },
+        {
+          "values": {
+            "summary": "abc",
+            "severity": "low",
+            "link": "https://example.com/a　b"
+          },
+          "loc": [
+            "link"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a button",
+      "schema": {
+        "type": "object",
+        "properties": {}
+      },
+      "accepted": [
+        {}
+      ],
+      "refused": [
+        {
+          "values": {
+            "anything": true
+          },
+          "loc": [
+            "anything"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a long text, capped at 10,000 characters whatever maxLength says",
+      "schema": {
+        "properties": {
+          "note": {
+            "type": "string"
+          }
+        }
+      },
+      "accepted": [
+        {},
+        {
+          "note": ""
+        }
+      ],
+      "refused": [
+        {
+          "values": {
+            "note": 1
+          },
+          "loc": [
+            "note"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a multiple too fine for a float's quotient",
+      "schema": {
+        "properties": {
+          "x": {
+            "type": "number",
+            "multipleOf": 1e-300
+          }
+        }
+      },
+      "accepted": [
+        {
+          "x": 0
+        }
+      ],
+      "refused": [
+        {
+          "values": {
+            "x": 9007199254740991
+          },
+          "loc": [
+            "x"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a multiple coarser than the value",
+      "schema": {
+        "properties": {
+          "x": {
+            "type": "number",
+            "multipleOf": 10000000000
+          }
+        }
+      },
+      "accepted": [
+        {
+          "x": 0
+        },
+        {
+          "x": 20000000000
+        }
+      ],
+      "refused": [
+        {
+          "values": {
+            "x": 3.5
+          },
+          "loc": [
+            "x"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "the safe integers, and no further",
+      "schema": {
+        "properties": {
+          "n": {
+            "type": "integer"
+          },
+          "x": {
+            "type": "number"
+          }
+        }
+      },
+      "accepted": [
+        {
+          "n": 9007199254740991,
+          "x": -9007199254740991
+        },
+        {
+          "n": -9007199254740991,
+          "x": 9007199254740991
+        }
+      ],
+      "refused": [
+        {
+          "values": {
+            "n": 9007199254740992
+          },
+          "loc": [
+            "n"
+          ]
+        },
+        {
+          "values": {
+            "x": -9007199254740992
+          },
+          "loc": [
+            "x"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a required selection may be empty unless minItems says otherwise",
+      "schema": {
+        "properties": {
+          "tags": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "a",
+                "b"
+              ]
+            }
+          }
+        },
+        "required": [
+          "tags"
+        ]
+      },
+      "accepted": [
+        {
+          "tags": []
+        },
+        {
+          "tags": [
+            "a"
+          ]
+        }
+      ],
+      "refused": [
+        {
+          "values": {},
+          "loc": [
+            "tags"
+          ]
+        }
+      ]
+    }
+  ],
+  "refused_schemas": [
+    {
+      "schema": {
+        "properties": {
+          "x": {
+            "$ref": "#/$defs/x"
+          }
+        }
+      },
+      "names": "$ref",
+      "loc": [
+        "properties",
+        "x"
+      ]
+    },
+    {
+      "schema": {
+        "$defs": {},
+        "properties": {}
+      },
+      "names": "$defs",
+      "loc": []
+    },
+    {
+      "schema": {
+        "properties": {
+          "x": {
+            "type": "object",
+            "properties": {}
+          }
+        }
+      },
+      "names": "nested objects",
+      "loc": [
+        "properties",
+        "x"
+      ]
+    },
+    {
+      "schema": {
+        "properties": {
+          "x": {
+            "type": "string",
+            "pattern": "^a"
+          }
+        }
+      },
+      "names": "pattern",
+      "loc": [
+        "properties",
+        "x"
+      ]
+    },
+    {
+      "schema": {
+        "if": {},
+        "then": {},
+        "else": {}
+      },
+      "names": "else, if, then",
+      "loc": []
+    },
+    {
+      "schema": {
+        "allOf": []
+      },
+      "names": "allOf",
+      "loc": []
+    },
+    {
+      "schema": {
+        "properties": {
+          "x": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ]
+          }
+        }
+      },
+      "names": "anyOf",
+      "loc": [
+        "properties",
+        "x"
+      ]
+    },
+    {
+      "schema": {
+        "properties": {
+          "x": {
+            "not": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "names": "not",
+      "loc": [
+        "properties",
+        "x"
+      ]
+    },
+    {
+      "schema": {
+        "properties": {
+          "x": {
+            "type": "string",
+            "format": "password"
+          }
+        }
+      },
+      "names": "password",
+      "loc": [
+        "properties",
+        "x"
+      ]
+    },
+    {
+      "schema": {
+        "properties": {
+          "x": {
+            "type": "string",
+            "maxLength": 10001
+          }
+        }
+      },
+      "names": "maxLength",
+      "loc": [
+        "properties",
+        "x",
+        "string",
+        "maxLength"
+      ]
+    },
+    {
+      "schema": {
+        "properties": {
+          "x": {
+            "type": "string",
+            "contentEncoding": "base64"
+          }
+        }
+      },
+      "names": "contentEncoding",
+      "loc": [
+        "properties",
+        "x",
+        "string",
+        "contentEncoding"
+      ]
+    },
+    {
+      "schema": {
+        "properties": {
+          "x": {
+            "type": "null"
+          }
+        }
+      },
+      "names": "Each property is",
+      "loc": [
+        "properties",
+        "x"
+      ]
+    },
+    {
+      "schema": {
+        "properties": {
+          "x": {
+            "enum": [
+              "a"
+            ],
+            "default": "b"
+          }
+        }
+      },
+      "names": "default",
+      "loc": [
+        "properties",
+        "x",
+        "choice"
+      ]
+    },
+    {
+      "schema": {
+        "properties": {
+          "x": {
+            "enum": [
+              "a",
+              "a"
+            ]
+          }
+        }
+      },
+      "names": "once",
+      "loc": [
+        "properties",
+        "x",
+        "choice"
+      ]
+    },
+    {
+      "schema": {
+        "properties": {
+          "x": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "y"
+        ]
+      },
+      "names": "y",
+      "loc": []
+    },
+    {
+      "schema": {
+        "additionalProperties": true
+      },
+      "names": "additionalProperties",
+      "loc": [
+        "additionalProperties"
+      ]
+    },
+    {
+      "schema": {
+        "properties": {
+          "__proto__": {
+            "type": "boolean"
+          }
+        }
+      },
+      "names": "property's name",
+      "loc": [
+        "properties",
+        "__proto__",
+        "[key]"
+      ]
+    },
+    {
+      "schema": {
+        "properties": {
+          "constructor": {
+            "type": "boolean"
+          }
+        }
+      },
+      "names": "property's name",
+      "loc": [
+        "properties",
+        "constructor",
+        "[key]"
+      ]
+    },
+    {
+      "schema": {
+        "properties": {
+          "a b": {
+            "type": "boolean"
+          }
+        }
+      },
+      "names": "property's name",
+      "loc": [
+        "properties",
+        "a b",
+        "[key]"
+      ]
+    },
+    {
+      "schema": {
+        "properties": {
+          "x": {
+            "type": "number",
+            "minimum": 9007199254740992
+          }
+        }
+      },
+      "names": "within ±(2**53 - 1)",
+      "loc": [
+        "properties",
+        "x",
+        "number",
+        "minimum"
+      ]
+    },
+    {
+      "schema": {
+        "properties": {
+          "x": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 2
+          }
+        }
+      },
+      "names": "minLength is more than maxLength",
+      "loc": [
+        "properties",
+        "x",
+        "string"
+      ]
+    },
+    {
+      "schema": {
+        "properties": {
+          "x": {
+            "type": "number",
+            "minimum": 2,
+            "exclusiveMaximum": 2
+          }
+        }
+      },
+      "names": "no number",
+      "loc": [
+        "properties",
+        "x",
+        "number"
+      ]
+    },
+    {
+      "schema": {
+        "properties": {
+          "x": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "a"
+              ]
+            },
+            "uniqueItems": true,
+            "minItems": 2
+          }
+        }
+      },
+      "names": "more than the choices",
+      "loc": [
+        "properties",
+        "x",
+        "array"
+      ]
+    }
+  ]
+}

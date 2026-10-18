@@ -1,6 +1,6 @@
 import { expect, onTestFinished, test, vi } from "vitest";
 import { render } from "vitest-browser-react";
-import { AddonsProvider } from "./addons";
+import { IntegrationsContext } from "./integrations";
 import { linkTo, Markdown, showable } from "./markdown";
 import { axeViolations } from "./test/axe";
 import { token } from "./test/colours";
@@ -186,9 +186,9 @@ test("a diagram shows as its source with one quiet line, whether diagrams are of
     .toBeVisible();
   expect(off.container.querySelector("svg:not([aria-hidden=true])")).toBeNull();
   const on = await render(
-    <AddonsProvider value={{ math: true, mermaid: true }}>
+    <IntegrationsContext value={() => true}>
       <Markdown>{fence}</Markdown>
-    </AddonsProvider>,
+    </IntegrationsContext>,
   );
   await expect
     .element(on.getByText("Diagrams can't be drawn yet: this is the diagram's source."))
@@ -350,9 +350,9 @@ test("a single dollar is a price, never math", async () => {
 
 test("with math off, a formula is its source: a block with its quiet line, and $$ within a line", async () => {
   const screen = await render(
-    <AddonsProvider value={{ math: false, mermaid: false }}>
+    <IntegrationsContext value={(key) => key !== "markdown:math" && key !== "markdown:mermaid"}>
       <Markdown>{"Energy is $$E = mc^2$$.\n\n$$\n\\frac{a}{b}\n$$"}</Markdown>
-    </AddonsProvider>,
+    </IntegrationsContext>,
   );
   await expect
     .element(screen.getByText("Math is off here: this is the formula's source."))

@@ -284,7 +284,7 @@ type Props = {
 
 /**
  * Markdown, as an agent writes it, rendered as it streams, through Streamdown: GitHub's Markdown and
- * its callouts, with code blocks of `ui`'s own, and the add-ons `AddonsProvider` allows.
+ * its callouts, with code blocks of `ui`'s own, and the add-ons the workspace's integrations allow.
  */
 export function Markdown({ children, streaming = false, className }: Props) {
   const addons = useAddons();

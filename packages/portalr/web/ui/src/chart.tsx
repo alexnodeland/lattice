@@ -41,6 +41,7 @@ import {
   LABELS_OFFSET,
   type Labels,
   Legend,
+  largestFirst,
   MARGIN,
   MAX_SERIES,
   type Margin,
@@ -90,6 +91,7 @@ function Figure({
   adjacent = false,
   labelled = false,
   left = MARGIN.left,
+  bare = false,
   children,
 }: {
   label: string;
@@ -105,6 +107,8 @@ function Figure({
   labelled?: boolean;
   /** The room to keep to the plot's left, for what is written there. */
   left?: number;
+  /** Its legend and drawing alone: the caller frames it, with a caption and the figures. */
+  bare?: boolean;
   /** The drawing, given the margin to draw it in. */
   children: (margin: Margin, labels: Labels) => ReactNode;
 }) {
@@ -122,15 +126,8 @@ function Figure({
       },
     })),
   ];
-  return (
-    <figure
-      aria-labelledby={caption}
-      className="flex flex-col gap-2"
-      {...(adjacent && { style: ADJACENT })}
-    >
-      <figcaption id={caption} className="font-semibold text-fg text-sm">
-        {label}
-      </figcaption>
+  const drawn = (
+    <>
       <Legend
         entries={series.map((one, at) => ({
           key: one.key,
@@ -141,6 +138,25 @@ function Figure({
       <div ref={plot} className="h-64 w-full text-muted text-xs" aria-hidden="true">
         {children({ ...MARGIN, left, right: labelled ? labels.room : MARGIN.right }, labels)}
       </div>
+    </>
+  );
+  if (bare) {
+    return (
+      <div className="flex flex-col gap-2" {...(adjacent && { style: ADJACENT })}>
+        {drawn}
+      </div>
+    );
+  }
+  return (
+    <figure
+      aria-labelledby={caption}
+      className="flex flex-col gap-2"
+      {...(adjacent && { style: ADJACENT })}
+    >
+      <figcaption id={caption} className="font-semibold text-fg text-sm">
+        {label}
+      </figcaption>
+      {drawn}
       <details className="text-sm">
         <summary className="cursor-pointer text-muted">Show the figures</summary>
         <ItemTable
@@ -372,6 +388,7 @@ export function BarChart({
   whole = false,
   unknown = 0,
   tick,
+  bare = false,
 }: {
   label: string;
   data: readonly Datum[];
@@ -385,6 +402,8 @@ export function BarChart({
   unknown?: number;
   /** An index as the axis writes it, such as a date without its year; the rows keep it whole. */
   tick?: (index: string) => string;
+  /** Its legend and drawing alone: the caller frames it, with a caption and the figures. */
+  bare?: boolean;
 }) {
   const id = useId();
   const drawn = series.slice(0, MAX_SERIES);
@@ -415,6 +434,7 @@ export function BarChart({
       data={data}
       shown={format}
       adjacent={diverging}
+      bare={bare}
       labelled={drawn.length > 1 && !diverging}
       left={diverging ? CAPTION_ROOM : MARGIN.left}
     >
@@ -477,6 +497,7 @@ export function LineChart({
   domain,
   unknown = 0,
   tick,
+  bare = false,
 }: {
   label: string;
   data: readonly Datum[];
@@ -489,6 +510,8 @@ export function LineChart({
   unknown?: number;
   /** An index as the axis writes it, such as a date without its year; the rows keep it whole. */
   tick?: (index: string) => string;
+  /** Its legend and drawing alone: the caller frames it, with a caption and the figures. */
+  bare?: boolean;
 }) {
   const drawn = series.slice(0, MAX_SERIES);
   return (
@@ -498,6 +521,7 @@ export function LineChart({
       series={drawn}
       data={data}
       shown={format}
+      bare={bare}
       line
       labelled={drawn.length > 1}
     >
@@ -558,96 +582,104 @@ export function DonutChart({
   label,
   parts,
   format = formatNumber,
+  bare = false,
 }: {
   label: string;
   parts: readonly Part[];
   format?: (value: number) => string;
+  /** Its legend and drawing alone: the caller frames it, with a caption and the figures. */
+  bare?: boolean;
 }) {
   const id = useId();
   const caption = useId();
-  const sorted = [...parts].filter((part) => part.value > 0).sort((a, b) => b.value - a.value);
+  const { sorted, total, share } = largestFirst(parts);
   const rest = sorted.slice(MAX_SERIES).reduce((sum, part) => sum + part.value, 0);
+  // Folded into "Other", the parts keep their total, so each share is the same.
   const shown: Part[] = [
     ...sorted.slice(0, MAX_SERIES),
     ...(rest > 0 ? [{ key: OTHER, name: "Other", value: rest }] : []),
   ];
-  const total = shown.reduce((sum, part) => sum + part.value, 0);
-  const share = (value: number) => `${Math.round((value / total) * 100)}%`;
+  const drawn = (
+    <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
+      <div className="relative size-40 shrink-0">
+        <div className="size-full" aria-hidden="true">
+          <ResponsiveContainer>
+            <PieChart>
+              <defs>
+                {shown.map(
+                  (part, at) => at > 0 && <Hatch key={part.key} id={`${id}-${at}`} at={at} />,
+                )}
+              </defs>
+              <Pie
+                data={[...shown]}
+                dataKey="value"
+                nameKey="name"
+                innerRadius="70%"
+                outerRadius="100%"
+                startAngle={90}
+                endAngle={-270}
+                stroke="var(--surface)"
+                strokeWidth={2}
+                isAnimationActive={false}
+              >
+                {shown.map((part, at) => (
+                  <Cell key={part.key} fill={fill(id, at)} />
+                ))}
+              </Pie>
+              <Tooltip
+                content={({ active, payload }) => {
+                  const part = payload[0];
+                  const at = shown.findIndex((one) => one.key === part?.payload?.key);
+                  return active && part && typeof part.value === "number" ? (
+                    <TooltipCard>
+                      <TooltipRow
+                        mark={<Swatch at={at} />}
+                        name={String(part.name)}
+                        value={`${format(part.value)} · ${share(part.value)}`}
+                      />
+                    </TooltipCard>
+                  ) : null;
+                }}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+        <p className="pointer-events-none absolute inset-0 m-auto flex size-24 flex-col items-center justify-center text-center">
+          <span className="text-muted text-xs">Total</span>
+          <span className="font-semibold text-fg text-lg">
+            <Num>{format(total)}</Num>
+          </span>
+        </p>
+      </div>
+      <ul className="grid w-fit grid-cols-[auto_auto_auto] gap-x-5 gap-y-1.5 text-sm">
+        {shown.map((part, at) => (
+          <li key={part.key} className="col-span-3 grid grid-cols-subgrid items-center">
+            <span className="inline-flex items-center gap-2 text-fg">
+              <Swatch at={at} />
+              {part.name}
+            </span>
+            <span className="sr-only">, </span>
+            <span className="text-right text-fg">
+              <Num>{format(part.value)}</Num>
+            </span>
+            <span className="sr-only">, </span>
+            <span className="text-right text-muted">
+              <Num>{share(part.value)}</Num>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+  if (bare) {
+    return drawn;
+  }
   return (
     <figure aria-labelledby={caption} className="flex flex-col gap-2">
       <figcaption id={caption} className="font-semibold text-fg text-sm">
         {label}
       </figcaption>
-      <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
-        <div className="relative size-40 shrink-0">
-          <div className="size-full" aria-hidden="true">
-            <ResponsiveContainer>
-              <PieChart>
-                <defs>
-                  {shown.map(
-                    (part, at) => at > 0 && <Hatch key={part.key} id={`${id}-${at}`} at={at} />,
-                  )}
-                </defs>
-                <Pie
-                  data={[...shown]}
-                  dataKey="value"
-                  nameKey="name"
-                  innerRadius="70%"
-                  outerRadius="100%"
-                  startAngle={90}
-                  endAngle={-270}
-                  stroke="var(--surface)"
-                  strokeWidth={2}
-                  isAnimationActive={false}
-                >
-                  {shown.map((part, at) => (
-                    <Cell key={part.key} fill={fill(id, at)} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  content={({ active, payload }) => {
-                    const part = payload[0];
-                    const at = shown.findIndex((one) => one.key === part?.payload?.key);
-                    return active && part && typeof part.value === "number" ? (
-                      <TooltipCard>
-                        <TooltipRow
-                          mark={<Swatch at={at} />}
-                          name={String(part.name)}
-                          value={`${format(part.value)} · ${share(part.value)}`}
-                        />
-                      </TooltipCard>
-                    ) : null;
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <p className="pointer-events-none absolute inset-0 m-auto flex size-24 flex-col items-center justify-center text-center">
-            <span className="text-muted text-xs">Total</span>
-            <span className="font-semibold text-fg text-lg">
-              <Num>{format(total)}</Num>
-            </span>
-          </p>
-        </div>
-        <ul className="grid w-fit grid-cols-[auto_auto_auto] gap-x-5 gap-y-1.5 text-sm">
-          {shown.map((part, at) => (
-            <li key={part.key} className="col-span-3 grid grid-cols-subgrid items-center">
-              <span className="inline-flex items-center gap-2 text-fg">
-                <Swatch at={at} />
-                {part.name}
-              </span>
-              <span className="sr-only">, </span>
-              <span className="text-right text-fg">
-                <Num>{format(part.value)}</Num>
-              </span>
-              <span className="sr-only">, </span>
-              <span className="text-right text-muted">
-                <Num>{share(part.value)}</Num>
-              </span>
-            </li>
-          ))}
-        </ul>
-      </div>
+      {drawn}
       <details className="text-sm">
         <summary className="cursor-pointer text-muted">Show the figures</summary>
         <ItemTable

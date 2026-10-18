@@ -7,7 +7,6 @@
 
 export { Account } from "./account";
 export { AccountMenu, type Appearance } from "./account-menu";
-export { type Addons, AddonsProvider } from "./addons";
 export { Alert, type AlertTone } from "./alert";
 export { AnsiText, type Run, runs } from "./ansi";
 export { AppShell } from "./app-shell";
@@ -36,6 +35,7 @@ export {
   type Series,
 } from "./chart";
 export { formatDay, formatMoment, formatNumber } from "./chart-theme";
+export type { ChartTokens } from "./chart-tokens";
 export {
   CommandButton,
   Composer,
@@ -54,11 +54,14 @@ export {
 export { Checkbox, type CheckboxChoice, CheckboxGroup } from "./checkbox";
 export { useColourBlind } from "./colour-blind";
 export { ConfirmDialog } from "./confirm-dialog";
+export { type FormOf, PANELS, type PanelProps, type PanelRenderers } from "./dashboard-panels";
+export { DashboardView } from "./dashboard-view";
 export { Dialog } from "./dialog";
 export { EmptyState } from "./empty-state";
 export { failureSaid } from "./failure";
 export { Icon } from "./icon";
 export { IntegrationList, type IntegrationRow, type IntegrationSource } from "./integration-list";
+export { IntegrationsContext, type IsEnabled } from "./integrations";
 export { type Column, ItemTable } from "./item-table";
 export { type LineReveal, LogList } from "./log-list";
 export { Markdown } from "./markdown";

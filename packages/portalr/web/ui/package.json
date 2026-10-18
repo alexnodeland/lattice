@@ -16,6 +16,7 @@
     "@shikijs/core": "4.5.0",
     "@shikijs/engine-javascript": "4.5.0",
     "@shikijs/langs": "4.5.0",
+    "@tanstack/react-table": "9.2.4",
     "@tanstack/react-virtual": "3.13.12",
     "clsx": "2.1.1",
     "hast-util-from-html-isomorphic": "2.0.0",

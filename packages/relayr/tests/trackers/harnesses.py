@@ -5,8 +5,11 @@
   live Vikunja, recorded (and saved as the fixtures with `RELAYR_RECORD=1`). A live run registers
   a user of its own, with an API token, and each test makes a project: the instance must allow
   registration, as `moon run relayr:vikunja-up` starts it.
-- `plane`: `PlaneApi`, Plane's API as its v1.4.2 source reads (`tests/trackers/plane_api.py`):
-  no Plane runs on a pull request or here, so its exchanges are not recorded but derived.
+- `plane`: Plane's recorded exchanges, replayed; or, with `RELAYR_TEST_PLANE_URL` set, a live Plane
+  CE, recorded (and saved as the fixtures with `RELAYR_RECORD=1`). A live run signs up a user of
+  its own in the web app, with a workspace and an API key, and each test makes a project; the
+  instance must allow sign-up, and its `API_KEY_RATE_LIMIT` must be well above its default of
+  60 a minute.
 """
 
 import asyncio
@@ -24,16 +27,16 @@ from typing import Any
 import httpx
 
 from relayr.plane import PlaneTracker
-from relayr.trackers import FakeTracker, ItemRef, Tracker, TrackerCredentials
+from relayr.trackers import FakeTracker, ItemFields, ItemRef, Tracker, TrackerCredentials
 from relayr.trackers.fake import SIGNATURE
 from relayr.vikunja import VikunjaTracker
 from tests.clock import FakeClock
-from tests.trackers.plane_api import PlaneApi
 from tests.trackers.recorded import FIXTURES, Recorder, Recording, Replayer
 
 SOURCE = "lattice:acme/ops"
 SECRET = "whsec-test"
 VIKUNJA_URL = os.environ.get("RELAYR_TEST_VIKUNJA_URL")
+PLANE_URL = os.environ.get("RELAYR_TEST_PLANE_URL")
 RECORD = os.environ.get("RELAYR_RECORD") == "1"
 
 type Delivery = tuple[Mapping[str, str], bytes]
@@ -57,6 +60,9 @@ class Harness:
 
     reply: Callable[[ItemRef, str], Awaitable[None]]
     """Comment on an item, as a person does."""
+
+    rename: Callable[[ItemRef, str], Awaitable[None]]
+    """Retitle an item, as a person does."""
 
     delete: Callable[[ItemRef], Awaitable[None]]
     archive: Callable[[ItemRef], None] | None
@@ -91,6 +97,9 @@ async def fake() -> AsyncIterator[Harness]:
     async def reply(ref: ItemRef, body: str) -> None:
         tracker.reply(ref, body)
 
+    async def rename(ref: ItemRef, title: str) -> None:
+        tracker.edit(ref, ItemFields(title=title))
+
     async def delete(ref: ItemRef) -> None:
         tracker.delete(ref)
 
@@ -102,6 +111,7 @@ async def fake() -> AsyncIterator[Harness]:
         link=lambda ref: f"https://fake.test/ops/{ref.number}",
         add=add,
         reply=reply,
+        rename=rename,
         delete=delete,
         archive=tracker.archive,
         tick=tick,
@@ -109,30 +119,69 @@ async def fake() -> AsyncIterator[Harness]:
 
 
 @asynccontextmanager
-async def plane() -> AsyncIterator[Harness]:
-    api = PlaneApi(secret=SECRET)
+async def plane(test: str) -> AsyncIterator[Harness]:
+    fixture = FIXTURES / "plane" / f"{test}.json"
+    hook = json.loads((FIXTURES / "plane" / "webhook.json").read_text())
+    session: _PlaneSession | None = None
+    if PLANE_URL is None:
+        recording = Recording.load(fixture)
+        replayer = Replayer(recording)
+        base, key = "https://plane.test", "key"
+        transport: httpx.AsyncBaseTransport = replayer
+    else:
+        base, replayer = PLANE_URL, None
+        session = _PLANE_SESSIONS.get(base) or await _plane_session(base)
+        _PLANE_SESSIONS[base] = session
+        recording = Recording(setup=await _plane_project(base, session))
+        key, transport = session.key, _Settling(recording)
+    workspace, project = recording.setup["workspace"], recording.setup["project"]
+    identifier = recording.setup["identifier"]
+    async with httpx.AsyncClient(transport=transport) as client:
+        api = f"{base}/api/v1/workspaces/{workspace}/projects/{project}/work-items"
+        headers = {"X-Api-Key": key}
 
-    async def add(title: str) -> ItemRef:
-        return api.add(title)
+        async def add(title: str) -> ItemRef:
+            made = (await client.post(f"{api}/", json={"name": title}, headers=headers)).json()
+            number = made["sequence_id"]
+            return ItemRef(
+                project=project, id=made["id"], number=number, name=f"{identifier}-{number}"
+            )
 
-    async def reply(ref: ItemRef, body: str) -> None:
-        api.reply(ref, body)
+        async def reply(ref: ItemRef, body: str) -> None:
+            await client.post(
+                f"{api}/{ref.id}/comments/", json={"comment_html": body}, headers=headers
+            )
 
-    async def delete(ref: ItemRef) -> None:
-        api.delete(ref)
+        async def rename(ref: ItemRef, title: str) -> None:
+            await client.patch(f"{api}/{ref.id}/", json={"name": title}, headers=headers)
 
-    async with httpx.AsyncClient(transport=httpx.MockTransport(api.handle)) as client:
+        async def delete(ref: ItemRef) -> None:
+            await client.delete(f"{api}/{ref.id}/", headers=headers)
+
+        def archive(ref: ItemRef) -> None:
+            """Archive in the web app, which archives only a done item; a replay has done so."""
+            if session is not None:
+                _plane_archive(base, session, workspace, project, ref.id)
+
+        credentials = TrackerCredentials(
+            base_url=base, api_key=key, webhook_secret=SECRET, workspace=workspace
+        )
         yield Harness(
-            tracker=PlaneTracker(credentials(PlaneApi.URL), SOURCE, client=client),
-            project=api.project,
-            delivery=api.delivery(),
-            delivered=api.project,
-            link=lambda ref: f"{PlaneApi.URL}/acme/browse/{ref.name}/",
+            tracker=PlaneTracker(credentials, SOURCE, client=client),
+            project=project,
+            delivery=_addressed(hook, workspace),
+            delivered=json.loads(hook["body"])["data"]["project"],
+            link=lambda ref: f"{base}/{workspace}/browse/{ref.name}/",
             add=add,
             reply=reply,
+            rename=rename,
             delete=delete,
-            archive=api.archive,
+            archive=archive,
         )
+    if replayer is not None:
+        assert replayer.done(), "the adapter asked for less than was recorded"
+    elif RECORD:
+        recording.save(fixture)
 
 
 @asynccontextmanager
@@ -169,6 +218,12 @@ async def vikunja(test: str) -> AsyncIterator[Harness]:
                 f"{api}/tasks/{ref.id}/comments", json={"comment": body}, headers=headers
             )
 
+        async def rename(ref: ItemRef, title: str) -> None:
+            task = (await client.get(f"{api}/tasks/{ref.id}", headers=headers)).json()
+            await client.post(
+                f"{api}/tasks/{ref.id}", json={**task, "title": title}, headers=headers
+            )
+
         async def delete(ref: ItemRef) -> None:
             await client.delete(f"{api}/tasks/{ref.id}", headers=headers)
 
@@ -180,6 +235,7 @@ async def vikunja(test: str) -> AsyncIterator[Harness]:
             link=lambda ref: f"{base}/tasks/{ref.id}",
             add=add,
             reply=reply,
+            rename=rename,
             delete=delete,
             archive=None,
             tick=tick,
@@ -238,3 +294,126 @@ _TOKEN: dict[str, Any] = {
 }
 """The scopes relayr's token needs (the tracker guide lists them), and `delete` on tasks and
 `create` on projects for the test to act as a person."""
+
+
+# ─── a live Plane ─────────────────────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class _PlaneSession:
+    """The run's Plane user: its API key, its web app session, and its workspace's slug."""
+
+    key: str
+    cookies: dict[str, str]
+    csrf: str
+    workspace: str
+
+
+_PLANE_SESSIONS: dict[str, _PlaneSession] = {}
+"""The run's user, by Plane's URL."""
+
+
+class _Settling(Recorder):
+    """Waits a second after each write: Plane's worker then touches the item's `updated_at`
+    again, and a read straight after would find it changed once more."""
+
+    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        response = await super().handle_async_request(request)
+        if request.method != "GET":
+            await asyncio.sleep(1)
+        return response
+
+
+async def _plane_session(url: str) -> _PlaneSession:
+    """Register the run's user in Plane's web app, with a workspace and an API key.
+
+    Plane makes users, workspaces and keys only through its web app's session API, so this signs
+    up as a browser does: a form with a CSRF token, then JSON with it in a header. A Plane never
+    set up gets an instance admin first, as its first visitor would make one.
+    """
+    async with httpx.AsyncClient(base_url=url, timeout=30) as client:
+        instance = (await client.get("/api/instances/")).raise_for_status().json()["instance"]
+        if not instance["is_setup_done"]:
+            admin = {"first_name": "relayr", "is_telemetry_enabled": "False"}
+            await _plane_form(client, "/api/instances/admins/sign-up/", admin)
+            client.cookies.clear()
+        await _plane_form(client, "/auth/sign-up/", {})
+        # `acme`, the recorded delivery's, if it is free, as on a new Plane.
+        free = await client.get("/api/workspace-slug-check/", params={"slug": "acme"})
+        workspace = "acme" if free.json()["status"] else f"acme-{secrets.token_hex(4)}"
+        made = await _plane_post(client, "/api/workspaces/", {"name": "acme", "slug": workspace})
+        made.raise_for_status()
+        token = await _plane_post(client, "/api/users/api-tokens/", {"label": "relayr"})
+        return _PlaneSession(
+            key=token.raise_for_status().json()["token"],
+            cookies=dict(client.cookies),
+            csrf=await _plane_csrf(client),
+            workspace=workspace,
+        )
+
+
+async def _plane_project(url: str, session: _PlaneSession) -> dict[str, Any]:
+    """A project of the test's own, in the run's workspace: the recording's setup."""
+    identifier = f"OPS{secrets.token_hex(2).upper()}"
+    async with httpx.AsyncClient(timeout=30) as client:
+        made = await client.post(
+            f"{url}/api/v1/workspaces/{session.workspace}/projects/",
+            json={"name": f"ops {identifier}", "identifier": identifier},
+            headers={"X-Api-Key": session.key},
+        )
+    project = made.raise_for_status().json()["id"]
+    return {"workspace": session.workspace, "project": project, "identifier": identifier}
+
+
+def _plane_archive(
+    url: str, session: _PlaneSession, workspace: str, project: str, item: str
+) -> None:
+    """Mark a work item done and archive it, which only Plane's web app does."""
+    projects = f"{url}/api/v1/workspaces/{workspace}/projects/{project}"
+    with httpx.Client(timeout=30, headers={"X-Api-Key": session.key}) as client:
+        states = client.get(f"{projects}/states/").raise_for_status().json()["results"]
+        done = next(state["id"] for state in states if state["group"] == "completed")
+        client.patch(f"{projects}/work-items/{item}/", json={"state": done}).raise_for_status()
+    with httpx.Client(timeout=30, cookies=session.cookies) as client:
+        client.post(
+            f"{url}/api/workspaces/{workspace}/projects/{project}/issues/{item}/archive/",
+            headers={"X-CSRFToken": session.csrf},
+        ).raise_for_status()
+
+
+async def _plane_csrf(client: httpx.AsyncClient) -> str:
+    return (await client.get("/auth/get-csrf-token/")).json()["csrf_token"]
+
+
+async def _plane_form(client: httpx.AsyncClient, path: str, fields: dict[str, str]) -> None:
+    """Post a sign-up form, as a new user `relayr-<hex>`; Plane answers each with a redirect,
+    which names its error if it failed."""
+    name = f"relayr-{secrets.token_hex(4)}"
+    token = await _plane_csrf(client)
+    signed_up = await client.post(
+        path,
+        data={
+            "csrfmiddlewaretoken": token,
+            "email": f"{name}@example.com",
+            "password": secrets.token_urlsafe(18),
+            **fields,
+        },
+        headers={"X-CSRFToken": token},
+    )
+    assert "error_code" not in signed_up.headers.get("location", ""), signed_up.headers
+
+
+async def _plane_post(client: httpx.AsyncClient, path: str, body: Any) -> httpx.Response:
+    return await client.post(path, json=body, headers={"X-CSRFToken": await _plane_csrf(client)})
+
+
+def _addressed(hook: dict[str, Any], workspace: str) -> Delivery:
+    """Plane's recorded delivery, as it signed it; or, to a run's workspace other than the one
+    it was recorded in, re-addressed and signed again with `SECRET`, as Plane would."""
+    body = hook["body"].encode()
+    payload = json.loads(body)
+    if payload["workspace_slug"] == workspace:
+        return hook["headers"], body
+    payload["workspace_slug"] = workspace
+    body = json.dumps(payload).encode()
+    return {**hook["headers"], **signed(body, "X-Plane-Signature")[0]}, body

@@ -42,7 +42,46 @@ DEAD_LETTERS: Final = Metric(
     attributes=frozenset({TENANT_ID, WORKSPACE_ID, EVENT_TYPE}),
 )
 
+TRACKER_DEAD_LETTERS: Final = Metric(
+    name="relayr.trackers.dead_letters",
+    unit="{event}",
+    description="Changes in a tracker a follower could not publish, and dead-lettered",
+    attributes=frozenset({TENANT_ID, WORKSPACE_ID, EVENT_TYPE}),
+)
+
+UNNUDGED: Final = Metric(
+    name="relayr.trackers.unnudged",
+    unit="{event}",
+    description="Changes in a tracker a follower found that no webhook announced",
+    attributes=frozenset({TENANT_ID, WORKSPACE_ID}),
+)
+
+NUDGES_REFUSED: Final = Metric(
+    name="relayr.trackers.nudges_refused",
+    unit="{request}",
+    description="Webhooks refused: an unknown tenant or tracker, a signature that didn't verify, "
+    "or a switched-off workspace",
+    attributes=frozenset(),
+)
+
+TRACKER_LOOPS: Final = Metric(
+    name="relayr.trackers.loops",
+    unit="{write}",
+    description="Writes to a tracker's item refused past the cap on writes to one item an hour",
+    attributes=frozenset({TENANT_ID, WORKSPACE_ID}),
+)
+
 METRICS: Mapping[str, Metric] = MappingProxyType(
-    {metric.name: metric for metric in (FOLLOWERS_STOPPED, DEAD_LETTERS)}
+    {
+        metric.name: metric
+        for metric in (
+            FOLLOWERS_STOPPED,
+            DEAD_LETTERS,
+            TRACKER_DEAD_LETTERS,
+            UNNUDGED,
+            NUDGES_REFUSED,
+            TRACKER_LOOPS,
+        )
+    }
 )
 """Every metric relayr records, by name."""

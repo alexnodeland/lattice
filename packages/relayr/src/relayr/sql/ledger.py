@@ -9,11 +9,12 @@ connection, which on SQLite can keep the database's write lock, or the pool's on
 """
 
 from collections.abc import Collection, Mapping
-from datetime import UTC, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Final
 
 from pydantic import JsonValue
 from sqlalchemy import ColumnElement, delete, or_, select, update
+from sqlalchemy.dialects import postgresql, sqlite
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import Session
@@ -25,12 +26,23 @@ from relayr.ledger import (
     CauseKind,
     Clock,
     DeadLetter,
+    Snapshot,
     Tracked,
     TrackedKind,
+    TrackerDeadLetter,
+    TrackerFollowing,
     WorkspaceKey,
     utc_now,
 )
-from relayr.sql.tables import CauseRow, DeadLetterRow, FollowerRow, TrackedRow
+from relayr.sql.tables import (
+    CauseRow,
+    DeadLetterRow,
+    FollowerRow,
+    SnapshotRow,
+    TrackedRow,
+    TrackerDeadLetterRow,
+    TrackerFollowerRow,
+)
 
 
 def _follower(workspace: WorkspaceKey) -> ColumnElement[bool]:
@@ -46,6 +58,17 @@ def _tracked(workspace: WorkspaceKey, kind: TrackedKind, key: str) -> ColumnElem
         & (TrackedRow.kind == kind)
         & (TrackedRow.key == key)
     )
+
+
+def _in(
+    workspace: WorkspaceKey,
+    model: type[SnapshotRow | TrackerDeadLetterRow | TrackerFollowerRow],
+) -> ColumnElement[bool]:
+    return (model.tenant_id == workspace.tenant_id) & (model.workspace_id == workspace.workspace_id)
+
+
+CHUNK: Final = 500
+"""How many items' ids one statement names at most, well within SQLite's limit on parameters."""
 
 
 async def _locked(session: AsyncSession, workspace: WorkspaceKey) -> FollowerRow:
@@ -102,12 +125,15 @@ class SqlLedger:
         )
         self._across = async_sessionmaker(across_tenants or engine, expire_on_commit=False)
         self._clock = clock
+        self._insert = postgresql.insert if engine.dialect.name == "postgresql" else sqlite.insert
 
     def _session(self, tenant_id: str) -> AsyncSession:
         """A session in a tenant."""
         return self._sessions(info={TENANT_KEY: tenant_id})
 
-    async def _insert_once(self, row: CauseRow | DeadLetterRow | TrackedRow) -> bool:
+    async def _insert_once(
+        self, row: CauseRow | DeadLetterRow | TrackedRow | TrackerDeadLetterRow
+    ) -> bool:
         """Insert a row, unless one with its key is there: the first is kept. True if inserted."""
         async with self._session(row.tenant_id) as session:
             session.add(row)
@@ -356,3 +382,192 @@ class SqlLedger:
             row = await session.get(TrackedRow, (*workspace, "item", key), with_for_update=True)
             if row is not None:
                 row.written = {f: v for f, v in row.written.items() if f not in fields}
+
+    @awaited_to_the_end
+    async def consume_written(
+        self, workspace: WorkspaceKey, key: str, values: Mapping[str, JsonValue]
+    ) -> None:
+        """Forget the values recorded for an item's fields that still hold the ones given.
+
+        The item's row is locked while it changes, so a value recorded meanwhile is kept.
+        """
+        async with self._session(workspace.tenant_id) as session, session.begin():
+            row = await session.get(TrackedRow, (*workspace, "item", key), with_for_update=True)
+            if row is not None:
+                row.written = {
+                    f: v for f, v in row.written.items() if f not in values or values[f] != v
+                }
+
+    @awaited_to_the_end
+    async def record_tracker_write(
+        self, workspace: WorkspaceKey, item_id: str, *, within: timedelta
+    ) -> int:
+        """Record a write relayr is about to make to an item; return how many are within.
+
+        The item's row is locked while it changes, so concurrent writes are each counted.
+        """
+        now = self._clock().astimezone(UTC)
+        async with self._session(workspace.tenant_id) as session, session.begin():
+            row = await lock_row(
+                session,
+                SnapshotRow,
+                (*workspace, item_id),
+                SnapshotRow(**workspace._asdict(), item_id=item_id, writes=[]),
+            )
+            since = now - within
+            row.writes = [
+                *(at for at in row.writes if datetime.fromisoformat(at) > since),
+                now.isoformat(),
+            ]
+            return len(row.writes)
+
+    @awaited_to_the_end
+    async def acquire_tracker_lease(
+        self, workspace: WorkspaceKey, holder: str, ttl: timedelta
+    ) -> bool:
+        """Take or renew the workspace's tracker lease for `ttl`; False if another holder has it."""
+        now = self._clock().astimezone(UTC)
+        async with self._session(workspace.tenant_id) as session, session.begin():
+            row = await _following(session, workspace)
+            if row.holder != holder and row.expires_at is not None and row.expires_at > now:
+                return False
+            row.holder, row.expires_at = holder, now + ttl
+            return True
+
+    @awaited_to_the_end
+    async def release_tracker_lease(self, workspace: WorkspaceKey, holder: str) -> None:
+        """Release the workspace's tracker lease, if `holder` has it."""
+        async with self._session(workspace.tenant_id) as session, session.begin():
+            await session.execute(
+                update(TrackerFollowerRow)
+                .where(_in(workspace, TrackerFollowerRow), TrackerFollowerRow.holder == holder)
+                .values(holder=None, expires_at=None)
+            )
+
+    @awaited_to_the_end
+    async def tracker_following(self, workspace: WorkspaceKey) -> TrackerFollowing | None:
+        """Return how far the workspace's tracker follower has read, or None if it never has."""
+        async with self._session(workspace.tenant_id) as session:
+            row = await session.get(TrackerFollowerRow, workspace)
+        if row is None or row.project is None or row.swept_at is None:
+            return None
+        cursor = None
+        if row.cursor_at is not None and row.cursor_id is not None:
+            cursor = (row.cursor_at, row.cursor_id)
+        return TrackerFollowing(project=row.project, cursor=cursor, swept_at=row.swept_at)
+
+    @awaited_to_the_end
+    async def save_tracker_following(
+        self, workspace: WorkspaceKey, following: TrackerFollowing
+    ) -> None:
+        """Save how far the workspace's tracker follower has read; forward only, per project.
+
+        The follower's row is locked while it is compared, so saves from several processes
+        leave the furthest.
+        """
+        async with self._session(workspace.tenant_id) as session, session.begin():
+            row = await _following(session, workspace)
+            cursor = following.cursor
+            if row.project == following.project:
+                if row.cursor_at is not None and row.cursor_id is not None:
+                    held = (row.cursor_at, row.cursor_id)
+                    cursor = held if cursor is None else max(held, cursor)
+                if row.swept_at is not None and row.swept_at > following.swept_at:
+                    following = following.model_copy(update={"swept_at": row.swept_at})
+            row.project, row.swept_at = following.project, following.swept_at
+            row.cursor_at, row.cursor_id = (None, None) if cursor is None else cursor
+
+    @awaited_to_the_end
+    async def snapshots(
+        self, workspace: WorkspaceKey, item_ids: Collection[str] | None = None
+    ) -> dict[str, Snapshot]:
+        """Return the snapshots of the items given, or of every item, by their ids."""
+        found: list[SnapshotRow] = []
+        query = select(SnapshotRow).where(
+            _in(workspace, SnapshotRow), SnapshotRow.item.is_not(None)
+        )
+        async with self._session(workspace.tenant_id) as session:
+            if item_ids is None:
+                found.extend(await session.scalars(query))
+            for chunk in _chunks(item_ids or ()):
+                found.extend(await session.scalars(query.where(SnapshotRow.item_id.in_(chunk))))
+        return {
+            row.item_id: Snapshot(
+                item_id=row.item_id, item=row.item or {}, comments_after=row.comments_after
+            )
+            for row in found
+        }
+
+    @awaited_to_the_end
+    async def save_snapshots(
+        self, workspace: WorkspaceKey, snapshots: Collection[Snapshot]
+    ) -> None:
+        """Save items' snapshots, in place of those before, in one transaction.
+
+        Each is inserted, or updated in place where its row is there, so relayr's writes to the
+        item, which the row keeps too, are left as they are.
+        """
+        rows: list[dict[str, object]] = [
+            {**workspace._asdict(), **snapshot.model_dump(), "writes": []} for snapshot in snapshots
+        ]
+        async with self._session(workspace.tenant_id) as session, session.begin():
+            for at in range(0, len(rows), CHUNK):
+                insert = self._insert(SnapshotRow).values(rows[at : at + CHUNK])
+                await session.execute(
+                    insert.on_conflict_do_update(
+                        index_elements=["tenant_id", "workspace_id", "item_id"],
+                        set_={
+                            "item": insert.excluded.item,
+                            "comments_after": insert.excluded.comments_after,
+                        },
+                    )
+                )
+
+    @awaited_to_the_end
+    async def forget_snapshots(
+        self, workspace: WorkspaceKey, item_ids: Collection[str] | None = None
+    ) -> None:
+        """Forget the items given, or every item: their snapshots and relayr's writes to them."""
+        statement = delete(SnapshotRow).where(_in(workspace, SnapshotRow))
+        async with self._session(workspace.tenant_id) as session, session.begin():
+            if item_ids is None:
+                await session.execute(statement)
+            for chunk in _chunks(item_ids or ()):
+                await session.execute(statement.where(SnapshotRow.item_id.in_(chunk)))
+
+    @awaited_to_the_end
+    async def tracker_dead_letter(self, workspace: WorkspaceKey, letter: TrackerDeadLetter) -> None:
+        """Record a change the follower could not publish; once per event id, the first kept."""
+        await self._insert_once(TrackerDeadLetterRow(**workspace._asdict(), **letter.model_dump()))
+
+    @awaited_to_the_end
+    async def tracker_dead_letters(self, workspace: WorkspaceKey) -> list[TrackerDeadLetter]:
+        """Return the workspace's tracker dead letters, by event id."""
+        query = (
+            select(TrackerDeadLetterRow)
+            .where(_in(workspace, TrackerDeadLetterRow))
+            .order_by(TrackerDeadLetterRow.event_id)
+        )
+        async with self._session(workspace.tenant_id) as session:
+            rows = await session.scalars(query)
+            return [
+                TrackerDeadLetter(
+                    event_id=row.event_id,
+                    event_type=row.event_type,
+                    item_id=row.item_id,
+                    error=row.error,
+                )
+                for row in rows
+            ]
+
+
+async def _following(session: AsyncSession, workspace: WorkspaceKey) -> TrackerFollowerRow:
+    """Lock a workspace's tracker follower's row, which starts with nothing read."""
+    return await lock_row(
+        session, TrackerFollowerRow, workspace, TrackerFollowerRow(**workspace._asdict())
+    )
+
+
+def _chunks(item_ids: Collection[str]) -> list[list[str]]:
+    ids = list(item_ids)
+    return [ids[at : at + CHUNK] for at in range(0, len(ids), CHUNK)]

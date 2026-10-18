@@ -41,10 +41,12 @@ class Telemetry:
             for name, metric in METRICS.items()
         }
 
-    def count(self, metric: Metric, attributes: Mapping[str, AttributeValue]) -> None:
-        """Add one to a counter, with only the attributes it may carry."""
+    def count(
+        self, metric: Metric, attributes: Mapping[str, AttributeValue], amount: int = 1
+    ) -> None:
+        """Add to a counter, one by default, with only the attributes it may carry."""
         kept = {key: value for key, value in attributes.items() if key in metric.attributes}
-        self._counters[metric.name].add(1, kept)
+        self._counters[metric.name].add(amount, kept)
 
 
 def workspace_attributes(tenant_id: str, workspace_id: str) -> dict[str, AttributeValue]:

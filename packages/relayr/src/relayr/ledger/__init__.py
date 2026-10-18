@@ -2,7 +2,8 @@
 
 A follower keeps its workspace's cursor and lease here, and the envelopes it could not bridge;
 the outbound adapter keeps the run behind each of its writes, so the follower continues its
-chain; and the tracker connector claims each key it writes by before it writes.
+chain; and the tracker connector claims each key it writes by before it writes, and its
+followers keep what they read of each bound project.
 The SQL adapter is `relayr.sql`.
 """
 
@@ -12,8 +13,11 @@ from relayr.ledger.ledger import (
     Clock,
     DeadLetter,
     Ledger,
+    Snapshot,
     Tracked,
     TrackedKind,
+    TrackerDeadLetter,
+    TrackerFollowing,
     WorkspaceKey,
     utc_now,
 )
@@ -26,8 +30,11 @@ __all__ = [
     "DeadLetter",
     "InMemoryLedger",
     "Ledger",
+    "Snapshot",
     "Tracked",
     "TrackedKind",
+    "TrackerDeadLetter",
+    "TrackerFollowing",
     "WorkspaceKey",
     "utc_now",
 ]

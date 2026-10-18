@@ -1,0 +1,11 @@
+{
+ "body": "{\"event\": \"issue\", \"action\": \"updated\", \"webhook_id\": \"b3c5c5b5-347d-4550-93d7-aa38b17dd16e\", \"workspace_id\": \"4ffcb93d-d0d5-427e-8fd3-c9b92e266b5d\", \"workspace_slug\": \"acme\", \"data\": {\"id\": \"8a49f01a-064a-486d-a52d-1fdd3563c86c\", \"labels\": [{\"id\": \"10c013b1-9d9c-4f49-abc1-264ab05e8c84\", \"name\": \"a\", \"color\": \"\"}], \"assignees\": [], \"state\": {\"id\": \"76330e5f-a16d-439f-a427-5e5cdc8f1049\", \"name\": \"In Progress\", \"color\": \"#F59E0B\", \"group\": \"started\"}, \"description\": {}, \"created_at\": \"2026-10-17T22:42:16.047312Z\", \"updated_at\": \"2026-10-17T22:42:31.304563Z\", \"deleted_at\": null, \"point\": null, \"name\": \"Renamed\", \"description_json\": {}, \"description_html\": \"<p>Again.</p>\", \"description_stripped\": \"Again.\", \"description_binary\": null, \"priority\": \"high\", \"start_date\": null, \"target_date\": null, \"sequence_id\": 1, \"sort_order\": 65535.0, \"completed_at\": null, \"archived_at\": null, \"is_draft\": false, \"external_source\": \"lattice:acme/ops\", \"external_id\": \"dead-letter/run_1\", \"created_by\": \"fcc2ae6f-b171-41da-8858-ed2ec5439b81\", \"updated_by\": \"fcc2ae6f-b171-41da-8858-ed2ec5439b81\", \"project\": \"d07cfeab-e42e-447f-94f7-6fa3af725367\", \"workspace\": \"4ffcb93d-d0d5-427e-8fd3-c9b92e266b5d\", \"parent\": null, \"estimate_point\": null, \"type\": null}, \"activity\": {\"field\": \"state\", \"new_value\": \"76330e5f-a16d-439f-a427-5e5cdc8f1049\", \"old_value\": \"ae5d69fb-a723-4f9b-a374-d33c01c15a4d\", \"actor\": {\"id\": \"fcc2ae6f-b171-41da-8858-ed2ec5439b81\", \"first_name\": \"\", \"last_name\": \"\", \"email\": \"relayr-acme@example.com\", \"avatar\": \"\", \"avatar_url\": null, \"display_name\": \"relayr-acme\"}, \"old_identifier\": null, \"new_identifier\": null}}",
+ "headers": {
+  "Content-Type": "application/json",
+  "User-Agent": "Autopilot",
+  "X-Plane-Delivery": "0a7e6bd4-3868-4bba-af29-8cfbd92da367",
+  "X-Plane-Event": "issue",
+  "X-Plane-Signature": "84a00975a1370b81a7735c77989aedca72d343b18d8a121c1f7021e4d928dd0b"
+ },
+ "secret": "whsec-test"
+}

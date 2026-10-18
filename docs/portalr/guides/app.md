@@ -10,7 +10,7 @@ Everything below is inside a workspace, `/t/<tenant>/w/<workspace>`, whose artif
 
 ### Integrations that are off
 
-A tenant's owners and admins turn its integrations on or off, on the tenant or in one of its workspaces, in [admin](admin.md#integrations), such as diagrams, forms or Mermaid. The app reads which are on when a workspace opens, and again when the window is focused after a few minutes. Markdown draws its add-ons by them: math, which is on by default and shows as its source where it is off, and Mermaid, whose diagrams show as their source either way. An action that needs an integration that is off is refused with **Not available in this workspace.**, which also makes the app read them again. If they can't be read, each is what it is by default: mini apps and Mermaid off, the rest on. The server checks every action, whatever the page shows ([ADR-0045](../adr/0045-integrations-in-admin-and-the-apps-read-of-them.md)).
+A tenant's owners and admins turn its integrations on or off, on the tenant or in one of its workspaces, in [admin](admin.md#integrations), such as diagrams, forms or Mermaid. The app reads which are on when a workspace opens, and again when the window is focused after a few minutes. Markdown draws its add-ons by them: math, which is on by default and shows as its source where it is off, and Mermaid, whose diagrams show as their source either way. Forms and dashboards follow them too: where forms are off, a form keeps its fields but can't be sent, and says **Not available in this workspace: forms are off.**, and where dashboards are off, a dashboard's charts aren't drawn and their figures show instead. Once forms are switched back on and the app reads them again, a form refused as off can be sent. An action that needs an integration that is off is refused with **Not available in this workspace.**, which also makes the app read them again. If they can't be read, each is what it is by default: mini apps and Mermaid off, the rest on. The server checks every action, whatever the page shows ([ADR-0045](../adr/0045-integrations-in-admin-and-the-apps-read-of-them.md)).
 
 ## Threads
 
@@ -18,7 +18,7 @@ A workspace's threads, and a new one. A **thread** is a conversation, and its pa
 
 - the messages, oldest first, and what an agent's run is streaming as it writes;
 - a **tool call** the run made, and how it returned;
-- what a **paused run waits on**: a call to approve or deny, or a question to answer;
+- what a **paused run waits on**: a call to approve or deny, a question to answer, or a **form** an agent asks through artifactr.ui's `ask_form` ([lattice RFC-0005](../../rfcs/0005-forms-dashboards-and-mini-apps.md)), whose fields say what they take, and say under a field what was refused; once answered, it says by whom, until the turn ends;
 - the thread's **proposals**, each with its rationale and how it was resolved, to accept or reject;
 - a composer, only where grantr allows the person to post.
 
@@ -30,7 +30,7 @@ A thread's menu, "Thread actions", holds **Share…** and **Restrict** (or **Lif
 
 ## Artifacts
 
-The workspace's artifacts that aren't archived, each by kind and latest version. An artifact's page shows it through its kind's renderer, its **revisions** newest first with what each changed (a diff, marked for screen readers as well as by colour), and its open proposals. The app registers the template's `note` kind as Markdown; an application with kinds of its own adds its renderers to `src/renderers.ts` in `web/app`. A kind with no renderer shows as formatted JSON.
+The workspace's artifacts that aren't archived, each by kind and latest version. An artifact's page shows it through its kind's renderer, its **revisions** newest first with what each changed (a diff, marked for screen readers as well as by colour), and its open proposals. The app registers the template's `note` kind as Markdown, and artifactr.ui's: a `form`, to fill in and send, once in all, once a person or any number of times as it says; a `submission`, its values by field; a `dashboard`, a snapshot of figures, charts with "Show the figures", a table to sort by a column, filter and page through, and notes, as true when it says; and an `app`, which shows its label and summary and runs nothing. Where a workspace has forms or dashboards switched off, a form keeps its fields but can't be sent, and says so. An application with kinds of its own adds its renderers to `src/renderers.ts` in `web/app`. A kind with no renderer shows as formatted JSON.
 
 ## Proposals
 

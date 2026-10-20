@@ -211,6 +211,7 @@ function Artifact() {
             revisions={shown}
             renderers={RENDERERS}
             compare={changes}
+            archived={latest.archived}
             more={(revision, before) => {
               const was = before === null ? undefined : byVersion.get(before);
               // A native file's words are compared apart, from the text the app read from each.

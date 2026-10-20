@@ -50,6 +50,9 @@ export const MINI_APPS = "ui:mini-apps";
 /** What the label says of every app, outside anything it draws. */
 const LABEL = "Made by the agent. Runs sandboxed, apart from your session.";
 
+/** What a preview tells its app that submits: nothing is sent from a preview. */
+export const PREVIEW_SENDS_NOTHING = "This is a preview of a version: nothing is sent from it.";
+
 /** The add-on that runs an app, loaded with the first app a page runs. */
 const loadApps = () => import("./on-demand/apps");
 
@@ -79,10 +82,13 @@ export function AppFrame({
   app,
   shown,
   titled = true,
+  preview = false,
 }: {
   app: ReadApp;
   shown: Shown;
   titled?: boolean;
+  /** A preview of a version, which writes no state and submits nothing (portalr ADR-0054). */
+  preview?: boolean;
 }) {
   const host = use(AppHostContext);
   const off = !use(IntegrationsContext)(MINI_APPS);
@@ -124,6 +130,7 @@ export function AppFrame({
           origin={origin}
           after={after}
           label={`${LABEL} Version ${shown.version}.`}
+          {...(preview && { submitsNothing: PREVIEW_SENDS_NOTHING })}
         />
       )}
     </section>

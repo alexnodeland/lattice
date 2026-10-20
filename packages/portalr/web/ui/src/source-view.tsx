@@ -1,5 +1,5 @@
 import { WrapText } from "lucide-react";
-import { useId, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { Button } from "./button";
 import { cn } from "./cn";
 import { CopyButton } from "./copy-button";
@@ -34,8 +34,15 @@ export function SourceView({
   const [unfolded, setUnfolded] = useState(false);
   const highlighted = useHighlightedLines(code, language);
   const region = useId();
-  // Each line with its number, which is its identity: a source's lines are only read whole.
-  const plain = code.split("\n").map((text, number) => ({ text, number }));
+  // Each line with its number, which is its identity: a source's lines are only read whole. A
+  // newline that ends the source ends its last line, and starts no other.
+  const plain = useMemo(
+    () =>
+      (code.endsWith("\n") ? code.slice(0, -1) : code)
+        .split(/\r?\n/)
+        .map((text, number) => ({ text, number })),
+    [code],
+  );
   const count = plain.length;
   const folded = !unfolded && count > FOLDED_LINES;
   const shown = folded ? FOLDED_LINES : count;
@@ -47,7 +54,7 @@ export function SourceView({
           <span className="inline-block font-semibold text-fg first-letter:uppercase">{name}</span>
           <span className="text-muted">
             {" "}
-            · {language} · {count === 1 ? "1 line" : `${count} lines`}
+            · {language} · {code === "" ? "empty" : count === 1 ? "1 line" : `${count} lines`}
           </span>
         </span>
         <span className="flex gap-1">

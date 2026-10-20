@@ -137,8 +137,70 @@ test("an app's preview runs on asking, one revision at a time, and saves nothing
   expect(screen.container.querySelectorAll("iframe")).toHaveLength(1);
   await userEvent.click(first.getByRole("button", { name: "Stop version 1" }));
   expect(screen.container.querySelectorAll("iframe")).toHaveLength(0);
-  expect(apps.setState).not.toHaveBeenCalled();
-  expect(apps.submit).not.toHaveBeenCalled();
+  // What a preview may send is the bridge's to refuse, before anyone is asked: app-bridge.test.ts.
+  // Closed and opened again, it waits to be asked to run again.
+  await userEvent.click(first.getByRole("button", { name: "Run version 1" }));
+  const summary = first.element().querySelector("summary") as HTMLElement;
+  await userEvent.click(summary);
+  await userEvent.click(summary);
+  await userEvent.click(first.getByRole("tab", { name: "Preview" }));
+  await expect.element(first.getByRole("button", { name: "Run version 1" })).toBeVisible();
+  expect(screen.container.querySelectorAll("iframe")).toHaveLength(0);
+});
+
+test("an archived app's revisions run nothing: they have no Preview", async () => {
+  const screen = await render(
+    <IntegrationsContext value={() => true}>
+      <AppHostContext value={host()}>
+        <Revisions
+          id="art_1"
+          revisions={APP_REVISIONS}
+          renderers={RENDERERS}
+          compare={compare}
+          archived
+        />
+      </AppHostContext>
+    </IntegrationsContext>,
+  );
+  const latest = screen.getByRole("listitem", { name: "Version 2" });
+  expect(
+    latest
+      .getByRole("tab")
+      .elements()
+      .map((tab) => tab.textContent),
+  ).toEqual(["Source", "Changes"]);
+});
+
+test("a part the version before had and this one hasn't is said to be removed", async () => {
+  const plan = (version: number, data: Record<string, unknown>): RevisionShown => ({
+    version,
+    kind: "app",
+    data,
+    by: "Ada",
+  });
+  const screen = await shown([
+    plan(1, { title: "Dice", summary: "Rolls.", html: "<p>1</p>" }),
+    plan(2, { title: "Dice", html: "<p>1</p>" }),
+  ]);
+  const latest = screen.getByRole("listitem", { name: "Version 2" });
+  await expect.element(latest.getByText("Changed the summary")).toBeVisible();
+  await expect
+    .element(latest.getByRole("region", { name: "summary", exact: true }).getByRole("deletion"))
+    .toHaveTextContent("removed: Rolls.");
+});
+
+test("a time ahead of the page's clock is just now, and the moment is read, not only hovered", async () => {
+  const screen = await render(
+    <Revisions
+      id="art_1"
+      revisions={[{ ...(APP_REVISIONS[0] as RevisionShown), at: "2026-10-20T12:05:00Z" }]}
+      renderers={RENDERERS}
+      compare={compare}
+      now={new Date("2026-10-20T12:00:00Z")}
+    />,
+  );
+  const when = screen.getByRole("time").element();
+  expect(when.textContent).toBe(`just now (${new Date("2026-10-20T12:05:00Z").toLocaleString()})`);
 });
 
 test("where apps don't run, an app's revision has no Preview", async () => {

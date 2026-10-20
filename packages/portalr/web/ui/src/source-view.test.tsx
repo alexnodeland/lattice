@@ -1,8 +1,8 @@
 import { expect, test } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
-import { JsonView } from "./json-view";
-import { CONTEXT_LINES, LineDiff, lineCounts } from "./line-diff";
+import { JsonView, MOST_ENTRIES } from "./json-view";
+import { CONTEXT_LINES, LineDiff, lineCounts, MOST_LINES } from "./line-diff";
 import { FOLDED_LINES, SourceView } from "./source-view";
 import { axeViolations } from "./test/axe";
 import { compare } from "./test/compare";
@@ -111,4 +111,52 @@ test("JSON as a tree: deep values folded, empty ones as brackets, and Copy as JS
   await expect.element(tree.getByText("3", { exact: true })).toBeVisible();
   await expect.element(screen.getByRole("button", { name: "Copy the data" })).toBeVisible();
   expect(await axeViolations(screen.container)).toEqual([]);
+});
+
+test("a source's last newline ends its last line, CRLF is a line break, and empty is said", async () => {
+  const screen = await render(<SourceView code={"a\r\nb\n"} language="text" name="text" />);
+  await expect.element(screen.getByText("· text · 2 lines")).toBeVisible();
+  expect([...screen.container.querySelectorAll("code")].map((line) => line.textContent)).toEqual([
+    "a\n",
+    "b",
+  ]);
+  const empty = await render(<SourceView code="" language="text" name="note" />);
+  await expect.element(empty.getByText("· text · empty")).toBeVisible();
+});
+
+test("a change of an empty line alone, and CRLF lines, are compared as lines", async () => {
+  const changed = compare("a\r\n\r\nb\r\n", "a\r\nb\r\n", "lines");
+  expect(lineCounts(changed ?? [])).toEqual({ added: 0, removed: 1 });
+  const screen = await render(<LineDiff changes={changed} name="text" />);
+  const removed = screen.getByRole("deletion").element();
+  expect(removed.textContent).toBe("removed: ");
+});
+
+test("a long change draws MOST_LINES lines, and more on asking", async () => {
+  const lines = (prefix: string) =>
+    Array.from({ length: MOST_LINES + 5 }, (_, at) => `${prefix}${at}`).join("\n");
+  const changed = [
+    { kind: "removed" as const, text: `${lines("a")}\n` },
+    { kind: "added" as const, text: `${lines("b")}\n` },
+  ];
+  const screen = await render(<LineDiff changes={changed} name="HTML" />);
+  const region = screen.getByRole("region", { name: "Changes to the HTML" }).element();
+  expect(region.querySelectorAll("del, ins")).toHaveLength(MOST_LINES);
+  await userEvent.click(screen.getByRole("button", { name: /more lines of/ }));
+  expect(region.querySelectorAll("del, ins")).toHaveLength(2 * MOST_LINES);
+});
+
+test("the lines a fold shows take the focus of its button", async () => {
+  const before = numbered(20);
+  const changed = compare(before, before.replace("<p>line 10</p>", "<p>ten</p>"), "lines");
+  const screen = await render(<LineDiff changes={changed} name="HTML" />);
+  await userEvent.click(screen.getByRole("button", { name: "Show 6 unchanged lines" }));
+  expect(document.activeElement?.textContent).toBe("<p>line 1</p>");
+});
+
+test("a long list shows its first MOST_ENTRIES items, and counts the rest", async () => {
+  const screen = await render(
+    <JsonView data={{ list: Array.from({ length: MOST_ENTRIES + 3 }, (_, at) => at) }} />,
+  );
+  await expect.element(screen.getByText("And 3 more, in what Copy copies.")).toBeVisible();
 });

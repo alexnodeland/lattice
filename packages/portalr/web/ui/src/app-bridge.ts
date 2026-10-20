@@ -399,6 +399,11 @@ export interface BridgeHost {
   readonly ask: (question: Question) => Promise<boolean>;
   /** Send values as the person's submission to the app: its id, or null where it wasn't sent. */
   readonly submit: (values: JsonObject) => Promise<string | null>;
+  /**
+   * Why nothing is submitted from here at all, as from a preview of an old version: said to the
+   * app at once, before the person is asked anything; or nothing, where submissions are sent.
+   */
+  readonly submitsNothing?: () => string | undefined;
   /** Open a link the person agreed to, in a new tab. */
   readonly open: (url: string) => void;
   /** Size the frame to a height, in pixels, within `LEAST_HEIGHT` and `MOST_HEIGHT`. */
@@ -507,6 +512,10 @@ export class Bridge {
         const { values } = args;
         if (!isObject(values)) {
           return this.#answer(id, toolRefusal("submit takes `values`, an object"));
+        }
+        const nothing = this.#host.submitsNothing?.();
+        if (nothing !== undefined) {
+          return this.#answer(id, toolRefusal(nothing));
         }
         if (!(await this.#host.ask({ kind: "submit", values: values as JsonObject }))) {
           return this.#answer(id, toolRefusal("The person didn't send it."));

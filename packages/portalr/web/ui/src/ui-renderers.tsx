@@ -250,7 +250,12 @@ function AppPreview({ data }: { data: Data }) {
     return <Unreadable kind="app" data={data} />;
   }
   return (
-    <AppFrame app={read} shown={shown ?? { id: "", version: 0, archived: true }} titled={false} />
+    <AppFrame
+      app={read}
+      shown={shown ?? { id: "", version: 0, archived: true }}
+      titled={false}
+      preview
+    />
   );
 }
 

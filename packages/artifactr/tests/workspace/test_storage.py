@@ -15,6 +15,7 @@ from artifactr.core import (
     MessagePosted,
     Needs,
     PostMessage,
+    Revision,
     State,
     UserActor,
     commit,
@@ -163,6 +164,17 @@ async def test_a_revision_is_dated_as_its_events_are(storage_factory: StorageFac
     stamped = [envelope.ts for envelope in await storage.read(SCOPE)]
     assert [revision.at for revision in await ws.revisions("n1")] == stamped
     assert stamped == [datetime(2026, 10, 1, 9, tzinfo=UTC), datetime(2026, 10, 2, 17, tzinfo=UTC)]
+
+
+def test_a_revision_saved_before_revisions_were_dated_reads_as_undated() -> None:
+    stored = {
+        "artifact_id": "n1",
+        "version": 1,
+        "kind": "note",
+        "data": {},
+        "actor": ALICE.model_dump(),
+    }
+    assert Revision.model_validate(stored).at is None
 
 
 async def test_envelopes_keep_the_trace_context_they_were_saved_with(storage: Storage) -> None:

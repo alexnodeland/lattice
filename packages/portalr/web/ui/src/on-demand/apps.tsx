@@ -160,12 +160,15 @@ export function Running({
   origin,
   after,
   label,
+  submitsNothing,
 }: {
   app: ReadApp;
   shown: Shown;
   host: AppHost;
   origin: string;
   after: string;
+  /** Why nothing is submitted from it, as from a preview; said to the app before asking anyone. */
+  submitsNothing?: string;
   /** What the host says of the app, which its full view shows outside the frame too. */
   label: string;
 }) {
@@ -183,8 +186,8 @@ export function Running({
     setRun({ html: app.html, count: run.count + 1 });
   }
   const keeper = useRef<StateKeeper | null>(null);
-  const head = useRef({ app, shown });
-  head.current = { app, shown };
+  const head = useRef({ app, shown, submitsNothing });
+  head.current = { app, shown, submitsNothing };
   // Filling the window, or in the page: the frame stays where it is, so the app runs on.
   const [full, setFull] = useState(false);
   const mode = useRef<DisplayMode>("inline");
@@ -237,6 +240,7 @@ export function Running({
       state: kept,
       host: {
         app: () => ({ title: head.current.app.title, html: head.current.app.html }),
+        submitsNothing: () => head.current.submitsNothing,
         context: () => hostContext(element, mode.current),
         ask: (question) =>
           new Promise<boolean>((settle) => {

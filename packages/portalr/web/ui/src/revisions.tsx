@@ -12,7 +12,7 @@
 import { Tabs } from "@base-ui/react/tabs";
 import type { Change, Granularity } from "@portalr/client";
 import { ChevronRight, Play, Square } from "lucide-react";
-import { createContext, type ReactNode, use, useId, useMemo, useState } from "react";
+import { createContext, type ReactNode, use, useEffect, useId, useMemo, useState } from "react";
 import { type AppHost, AppHostContext, MINI_APPS, stillWhy } from "./app-frame";
 import {
   type Data,
@@ -53,25 +53,70 @@ interface Changed {
   readonly changes: Change[] | null;
 }
 
-/** What a revision changed, part by part, since the version before it, or null for the first. */
-function changedParts(
-  renderer: Renderer,
-  data: Data,
-  before: Data | null,
-  compare: Compare,
-): Changed[] | null {
+/** A revision beside the one before it: each read through its own kind's renderer. */
+interface Pair {
+  readonly renderer: Renderer;
+  readonly data: Data;
+  readonly before: { readonly renderer: Renderer; readonly data: Data } | null;
+}
+
+/**
+ * The parts that changed since the version before, cheaply, by their text alone: a part it has, or
+ * one the version before had and it hasn't, which is removed. Null for a first version.
+ */
+function changedNames(pair: Pair): RevisionPart[] | null {
+  const { renderer, data, before } = pair;
   if (before === null) {
     return null;
   }
-  const was = new Map(partsOf(renderer, before).map((part) => [part.name, part.text]));
-  return partsOf(renderer, data).flatMap((part) => {
-    const earlier = was.get(part.name) ?? "";
-    return earlier === part.text ? [] : [{ part, changes: compare(earlier, part.text, part.diff) }];
-  });
+  const was = new Map(partsOf(before.renderer, before.data).map((part) => [part.name, part]));
+  const now = partsOf(renderer, data);
+  const kept = new Set(now.map((part) => part.name));
+  return [
+    ...now.filter((part) => (was.get(part.name)?.text ?? "") !== part.text),
+    ...[...was.values()]
+      .filter((part) => !kept.has(part.name))
+      .map((part) => ({ ...part, text: "" })),
+  ];
 }
 
-/** What a revision changed, in a line: "First version", "Changed the title and the HTML (+3 −1)". */
-export function changedSaid(changed: readonly Changed[] | null): string {
+/** Each pair's changes, kept by its data's identity, so a revision read again isn't compared again. */
+const compared = new WeakMap<Compare, WeakMap<Data, WeakMap<Data, Changed[]>>>();
+
+/** What a revision changed, part by part, since the version before it, or null for the first. */
+function changedParts(pair: Pair, compare: Compare): Changed[] | null {
+  const parts = changedNames(pair);
+  if (parts === null || pair.before === null) {
+    return null;
+  }
+  const byCompare = compared.get(compare) ?? new WeakMap();
+  compared.set(compare, byCompare);
+  const byAfter = byCompare.get(pair.data) ?? new WeakMap();
+  byCompare.set(pair.data, byAfter);
+  const found = byAfter.get(pair.before.data);
+  if (found) {
+    return found;
+  }
+  const was = new Map(
+    partsOf(pair.before.renderer, pair.before.data).map((part) => [part.name, part.text]),
+  );
+  const changed = parts.map((part) => ({
+    part,
+    changes: compare(was.get(part.name) ?? "", part.text, part.diff),
+  }));
+  byAfter.set(pair.before.data, changed);
+  return changed;
+}
+
+/**
+ * What a revision changed, in a line: "First version", "Changed the title and the HTML (+3 −1)".
+ * Parts alone, without what changed in each, are named without their counts.
+ */
+export function changedSaid(
+  changed:
+    | readonly (Changed | { readonly part: RevisionPart; readonly changes?: undefined })[]
+    | null,
+): string {
   if (changed === null) {
     return "First version";
   }
@@ -79,7 +124,7 @@ export function changedSaid(changed: readonly Changed[] | null): string {
     return "No change to its content";
   }
   const each = changed.map(({ part, changes }) => {
-    if (part.diff === "words" || changes === null) {
+    if (part.diff === "words" || changes == null) {
       return `the ${part.name}`;
     }
     const { added, removed } = lineCounts(changes);
@@ -92,7 +137,7 @@ export function changedSaid(changed: readonly Changed[] | null): string {
 /** Which revision's preview runs, of a list's: one at a time. */
 const RunningRevision = createContext<{
   readonly version: number | null;
-  readonly run: (version: number | null) => void;
+  readonly run: (next: (now: number | null) => number | null) => void;
 }>({ version: null, run: () => {} });
 
 /**
@@ -114,19 +159,29 @@ function useRunsHere(): boolean {
   return stillWhy({ id: "", version: 0 }, !on, host) === null;
 }
 
+interface Previewed {
+  readonly id: string;
+  readonly revision: RevisionShown;
+  readonly renderer: Renderer;
+}
+
 /** A revision's preview of a kind that runs what it holds: run on asking, one at a time. */
 function RunPreview({ id, revision, renderer }: Previewed) {
   const host = use(AppHostContext);
   const running = use(RunningRevision);
   const preview = useMemo(() => host && previewHost(host), [host]);
   const live = running.version === revision.version;
+  // Closed, or another tab chosen, a preview stops: reopened, it waits to be asked again.
+  const { run } = running;
+  const { version } = revision;
+  useEffect(() => () => run((now) => (now === version ? null : now)), [run, version]);
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <Button
           variant="secondary"
           size="sm"
-          onClick={() => running.run(live ? null : revision.version)}
+          onClick={() => running.run(() => (live ? null : revision.version))}
         >
           <Icon icon={live ? Square : Play} className="size-3.5" />
           {live ? `Stop version ${revision.version}` : `Run version ${revision.version}`}
@@ -146,14 +201,12 @@ function RunPreview({ id, revision, renderer }: Previewed) {
   );
 }
 
-interface Previewed {
-  readonly id: string;
-  readonly revision: RevisionShown;
-  readonly renderer: Renderer;
-}
-
 /** What a page adds under an open revision, such as a native file's words compared; or nothing. */
 export type More = (revision: RevisionShown, before: number | null) => ReactNode;
+
+/** Each open revision's tab panel: its focus ring drawn inside, as a tab's is. */
+const PANEL =
+  "rounded-sm pt-3 outline-none -outline-offset-2 focus-visible:outline-2 focus-visible:outline-focus";
 
 /** A revision's preview: its content through its kind's renderer, read-only. */
 function Preview({ id, revision, renderer }: Previewed) {
@@ -210,10 +263,14 @@ function Opened({
   id,
   revision,
   renderer,
-  changed,
+  pair,
+  compare,
+  archived,
   more,
-}: Previewed & { changed: readonly Changed[] | null; more: ReactNode }) {
-  const runsHere = useRunsHere();
+}: Previewed & { pair: Pair; compare: Compare; archived: boolean; more: ReactNode }) {
+  const runsHere = useRunsHere() && !archived;
+  // Compared only once open, and kept: closing and opening it again compares nothing again.
+  const changed = useMemo(() => changedParts(pair, compare), [pair, compare]);
   const sources = partsOf(renderer, revision.data).filter(
     (part): part is RevisionPart & { language: string } => part.language !== undefined,
   );
@@ -247,10 +304,10 @@ function Opened({
             </Tabs.Tab>
           ))}
         </Tabs.List>
-        <Tabs.Panel value="preview" className="pt-3 outline-none">
+        <Tabs.Panel value="preview" className={PANEL}>
           <Preview id={id} revision={revision} renderer={renderer} />
         </Tabs.Panel>
-        <Tabs.Panel value="source" className="flex flex-col gap-3 pt-3 outline-none">
+        <Tabs.Panel value="source" className={cn(PANEL, "flex flex-col gap-3")}>
           {sources.map((part) => (
             <SourceView
               key={part.name}
@@ -260,7 +317,7 @@ function Opened({
             />
           ))}
         </Tabs.Panel>
-        <Tabs.Panel value="changes" className="pt-3 outline-none">
+        <Tabs.Panel value="changes" className={PANEL}>
           {changed !== null && <Changes changed={changed} />}
         </Tabs.Panel>
       </Tabs.Root>
@@ -269,12 +326,17 @@ function Opened({
   );
 }
 
-/** When a revision was made: how long ago, with the moment itself on hover. */
+/**
+ * When a revision was made: how long ago, a moment a clock ahead of the page's said as "just now",
+ * and the moment itself, read by a screen reader and shown on hover.
+ */
 function When({ at, now }: { at: string; now: Date }) {
   const when = new Date(at);
+  const moment = when.toLocaleString();
   return (
-    <time dateTime={at} title={when.toLocaleString()}>
-      {ago(when, now)}
+    <time dateTime={at} title={moment}>
+      {when > now ? "just now" : ago(when, now)}
+      <span className="sr-only"> ({moment})</span>
     </time>
   );
 }
@@ -284,17 +346,26 @@ function Revision({
   id,
   revision,
   renderer,
-  changed,
+  pair,
+  compare,
+  archived,
   latest,
   more,
   now,
 }: Previewed & {
-  changed: readonly Changed[] | null;
+  pair: Pair;
+  compare: Compare;
+  archived: boolean;
   latest: boolean;
-  more: ReactNode;
+  more: () => ReactNode;
   now: Date;
 }) {
+  // Open as it is first shown if it is the latest; a version that arrives later leaves it as the
+  // reader left it.
   const [open, setOpen] = useState(latest);
+  // Closed, a revision says which parts changed; their counts are worked out once it is open.
+  const names = useMemo(() => changedNames(pair), [pair]);
+  const counted = useMemo(() => (open ? changedParts(pair, compare) : null), [open, pair, compare]);
   return (
     <li
       aria-label={`Version ${revision.version}`}
@@ -327,11 +398,21 @@ function Revision({
                 )}
               </span>
             </span>
-            <span className={cn(TYPE.meta, "break-words")}>{changedSaid(changed)}</span>
+            <span className={cn(TYPE.meta, "break-words")}>
+              {changedSaid(counted ?? names?.map((part) => ({ part })) ?? null)}
+            </span>
           </span>
         </summary>
         {open && (
-          <Opened id={id} revision={revision} renderer={renderer} changed={changed} more={more} />
+          <Opened
+            id={id}
+            revision={revision}
+            renderer={renderer}
+            pair={pair}
+            compare={compare}
+            archived={archived}
+            more={more()}
+          />
         )}
       </details>
     </li>
@@ -348,10 +429,13 @@ export function Revisions({
   renderers,
   compare,
   more,
+  archived = false,
   now = new Date(),
 }: {
   /** The artifact's id. */
   id: string;
+  /** Whether it is archived, which switches an app off: then no revision of it runs. */
+  archived?: boolean;
   revisions: readonly RevisionShown[];
   renderers: Renderers;
   compare: Compare;
@@ -361,34 +445,36 @@ export function Revisions({
 }): ReactNode {
   const [version, run] = useState<number | null>(null);
   const running = useMemo(() => ({ version, run }), [version]);
-  // Worked out once each time the revisions are read, not on every render of the page.
+  // Each revision beside the one before; what changed is worked out as each is shown or opened.
   const shown = useMemo(() => {
     const ordered = [...revisions].sort((a, b) => a.version - b.version);
     return ordered
       .map((revision, at) => {
         const renderer = rendererFor(revision.kind, renderers);
         const before = ordered[at - 1] ?? null;
-        return {
-          revision,
-          before: before?.version ?? null,
+        const pair: Pair = {
           renderer,
-          changed: changedParts(renderer, revision.data, before?.data ?? null, compare),
+          data: revision.data,
+          before: before && { renderer: rendererFor(before.kind, renderers), data: before.data },
         };
+        return { revision, before: before?.version ?? null, renderer, pair };
       })
       .reverse();
-  }, [revisions, renderers, compare]);
+  }, [revisions, renderers]);
   return (
     <RunningRevision value={running}>
       <ol aria-label="Revisions" className="flex flex-col gap-3">
-        {shown.map(({ revision, before, renderer, changed }, at) => (
+        {shown.map(({ revision, before, renderer, pair }, at) => (
           <Revision
             key={revision.version}
             id={id}
             revision={revision}
             renderer={renderer}
-            changed={changed}
+            pair={pair}
+            compare={compare}
+            archived={archived}
             latest={at === 0}
-            more={more?.(revision, before)}
+            more={() => more?.(revision, before)}
             now={now}
           />
         ))}

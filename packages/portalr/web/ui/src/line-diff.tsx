@@ -1,8 +1,11 @@
 import type { Change } from "@portalr/client";
-import { Fragment, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "./button";
 import { cn } from "./cn";
 import { ScrollRegion } from "./scroll-region";
+
+/** The most lines drawn at first, and drawn more at a time on asking: a long change can't hold the page. */
+export const MOST_LINES = 400;
 
 /** The unchanged lines kept on each side of a change; longer runs of them are folded. */
 export const CONTEXT_LINES = 3;
@@ -27,7 +30,7 @@ function linesOf(changes: readonly Change[]): Line[] {
   let before = 0;
   let after = 0;
   for (const change of changes) {
-    const texts = change.text.split("\n");
+    const texts = change.text.split(/\r?\n/);
     if (texts.at(-1) === "") {
       texts.pop(); // the newline that ends the run's last line
     }
@@ -87,7 +90,14 @@ function rowsOf(lines: readonly Line[]): Row[] {
 const SIGN = { added: "+", removed: "−", same: " " } as const;
 
 /** One line: its sign, its number and its text, an added or a removed one said so to a reader. */
-function LineRow({ line }: { line: Line }) {
+function LineRow({ line, focused = false }: { line: Line; focused?: boolean }) {
+  const text = useRef<HTMLSpanElement>(null);
+  // The first line a fold shows takes the focus of the button it replaced, once.
+  useEffect(() => {
+    if (focused) {
+      text.current?.focus();
+    }
+  }, [focused]);
   const mark = cn(
     "border-s-2 ps-2 pe-3 whitespace-pre-wrap break-words",
     line.kind === "added" && "border-accent bg-wash no-underline",
@@ -120,7 +130,13 @@ function LineRow({ line }: { line: Line }) {
           {line.text}
         </del>
       ) : (
-        <span className={mark}>{line.text}</span>
+        <span
+          className={cn(mark, "outline-none focus-visible:outline-2 focus-visible:outline-focus")}
+          ref={text}
+          {...(focused && { tabIndex: -1 })}
+        >
+          {line.text}
+        </span>
       )}
     </>
   );
@@ -134,44 +150,82 @@ function LineRow({ line }: { line: Line }) {
  */
 export function LineDiff({ changes, name }: { changes: readonly Change[] | null; name: string }) {
   const [unfolded, setUnfolded] = useState<ReadonlySet<number>>(new Set());
-  if (changes === null) {
+  // The fold last opened, whose first line takes the focus its button had.
+  const [opened, setOpened] = useState<number | null>(null);
+  const [limit, setLimit] = useState(MOST_LINES);
+  const rows = useMemo(() => (changes === null ? null : rowsOf(linesOf(changes))), [changes]);
+  if (rows === null) {
     return <p className="text-muted text-sm italic">Too large to compare.</p>;
   }
-  const rows = rowsOf(linesOf(changes));
+  // The rows drawn, as many lines as `limit`, a fold counting as one.
+  const drawn: ReactNode[] = [];
+  let lines = 0;
+  for (const row of rows) {
+    if (lines >= limit) {
+      break;
+    }
+    if ("line" in row) {
+      drawn.push(<LineRow key={`${row.line.was}:${row.line.number}`} line={row.line} />);
+      lines += 1;
+    } else if (unfolded.has(row.at)) {
+      row.folded.forEach((line, at) => {
+        drawn.push(
+          <LineRow
+            key={`${line.was}:${line.number}`}
+            line={line}
+            focused={at === 0 && opened === row.at}
+          />,
+        );
+      });
+      lines += row.folded.length;
+    } else {
+      drawn.push(
+        <div
+          key={`fold:${row.at}`}
+          className="col-span-4 border-line border-y bg-surface px-2 py-0.5"
+        >
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setUnfolded(new Set([...unfolded, row.at]));
+              setOpened(row.at);
+            }}
+          >
+            Show {row.folded.length} unchanged lines
+          </Button>
+        </div>,
+      );
+      lines += 1;
+    }
+  }
+  const total = rows.reduce(
+    (sum, row) => sum + ("line" in row ? 1 : unfolded.has(row.at) ? row.folded.length : 1),
+    0,
+  );
   return (
-    <ScrollRegion
-      aria-label={`Changes to the ${name}`}
-      className="max-h-[32rem] overflow-y-auto rounded-md border border-line bg-paper"
-    >
-      <div
-        dir="ltr"
-        className="grid grid-cols-[auto_auto_auto_minmax(0,1fr)] py-1 font-mono text-fg text-sm [font-variant-ligatures:none]"
+    <div className="flex flex-col gap-1">
+      <ScrollRegion
+        aria-label={`Changes to the ${name}`}
+        className="max-h-[32rem] overflow-y-auto rounded-md border border-line bg-paper"
       >
-        {rows.map((row) =>
-          "line" in row ? (
-            <LineRow key={`${row.line.was}:${row.line.number}`} line={row.line} />
-          ) : unfolded.has(row.at) ? (
-            <Fragment key={`fold:${row.at}`}>
-              {row.folded.map((line) => (
-                <LineRow key={`${line.was}:${line.number}`} line={line} />
-              ))}
-            </Fragment>
-          ) : (
-            <div
-              key={`fold:${row.at}`}
-              className="col-span-4 border-line border-y bg-surface px-2 py-0.5"
-            >
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setUnfolded(new Set([...unfolded, row.at]))}
-              >
-                Show {row.folded.length} unchanged lines
-              </Button>
-            </div>
-          ),
-        )}
-      </div>
-    </ScrollRegion>
+        <div
+          dir="ltr"
+          className="grid grid-cols-[auto_auto_auto_minmax(0,1fr)] py-1 font-mono text-fg text-sm [font-variant-ligatures:none]"
+        >
+          {drawn}
+        </div>
+      </ScrollRegion>
+      {total > limit && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="self-start"
+          onClick={() => setLimit(limit + MOST_LINES)}
+        >
+          Show {Math.min(MOST_LINES, total - limit)} more lines of {total - limit}
+        </Button>
+      )}
+    </div>
   );
 }

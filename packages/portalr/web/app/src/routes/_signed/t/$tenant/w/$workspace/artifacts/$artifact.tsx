@@ -204,30 +204,33 @@ function Artifact() {
       )}
       <section aria-labelledby="revisions" className="flex flex-col gap-3">
         <SectionTitle id="revisions">Revisions</SectionTitle>
-        <Revisions
-          id={id}
-          revisions={shown}
-          renderers={RENDERERS}
-          compare={changes}
-          more={(revision, before) => {
-            const was = before === null ? undefined : byVersion.get(before);
-            // A native file's words are compared apart, from the text the app read from each.
-            return (
-              NATIVE.has(revision.kind) &&
-              before !== null &&
-              was !== undefined &&
-              wordsChanged(was, revision.data) && (
-                <TextChanges
-                  queries={queries}
-                  tenant={tenant}
-                  workspace={workspace}
-                  artifact={id}
-                  versions={[before, revision.version]}
-                />
-              )
-            );
-          }}
-        />
+        {/* An app's revision runs in its preview, one at a time, as the page's apps do. */}
+        <AppHostContext value={apps}>
+          <Revisions
+            id={id}
+            revisions={shown}
+            renderers={RENDERERS}
+            compare={changes}
+            more={(revision, before) => {
+              const was = before === null ? undefined : byVersion.get(before);
+              // A native file's words are compared apart, from the text the app read from each.
+              return (
+                NATIVE.has(revision.kind) &&
+                before !== null &&
+                was !== undefined &&
+                wordsChanged(was, revision.data) && (
+                  <TextChanges
+                    queries={queries}
+                    tenant={tenant}
+                    workspace={workspace}
+                    artifact={id}
+                    versions={[before, revision.version]}
+                  />
+                )
+              );
+            }}
+          />
+        </AppHostContext>
       </section>
     </section>
   );

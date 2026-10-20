@@ -7,17 +7,21 @@ import { ScrollRegion } from "./scroll-region";
 /** The unchanged lines kept on each side of a change; longer runs of them are folded. */
 export const CONTEXT_LINES = 3;
 
-/** A line of a comparison: kept, added or removed, with its number in the version it is in. */
+/**
+ * A line of a comparison: kept, added or removed, with its number in the version before, unless
+ * it was added, and in this version, unless it was removed.
+ */
 interface Line {
   readonly kind: Change["kind"];
   readonly text: string;
-  readonly number: number;
+  readonly was: number | null;
+  readonly number: number | null;
 }
 
 /** A run of unchanged lines, folded, or a line shown. */
 type Row = { readonly line: Line } | { readonly folded: readonly Line[]; readonly at: number };
 
-/** Changes cut by line as lines, each numbered in the later version, or the earlier if removed. */
+/** Changes cut by line as lines, each numbered in the versions it is in. */
 function linesOf(changes: readonly Change[]): Line[] {
   const lines: Line[] = [];
   let before = 0;
@@ -28,14 +32,14 @@ function linesOf(changes: readonly Change[]): Line[] {
       texts.pop(); // the newline that ends the run's last line
     }
     for (const text of texts) {
-      if (change.kind === "removed") {
-        before += 1;
-        lines.push({ kind: "removed", text, number: before });
-      } else {
-        after += 1;
-        before += change.kind === "same" ? 1 : 0;
-        lines.push({ kind: change.kind, text, number: after });
-      }
+      before += change.kind === "added" ? 0 : 1;
+      after += change.kind === "removed" ? 0 : 1;
+      lines.push({
+        kind: change.kind,
+        text,
+        was: change.kind === "added" ? null : before,
+        number: change.kind === "removed" ? null : after,
+      });
     }
   }
   return lines;
@@ -94,6 +98,9 @@ function LineRow({ line }: { line: Line }) {
   return (
     <>
       <span aria-hidden="true" className={gutter}>
+        {line.was}
+      </span>
+      <span aria-hidden="true" className={gutter}>
         {line.number}
       </span>
       <span
@@ -138,21 +145,21 @@ export function LineDiff({ changes, name }: { changes: readonly Change[] | null;
     >
       <div
         dir="ltr"
-        className="grid grid-cols-[auto_auto_minmax(0,1fr)] py-1 font-mono text-fg text-sm [font-variant-ligatures:none]"
+        className="grid grid-cols-[auto_auto_auto_minmax(0,1fr)] py-1 font-mono text-fg text-sm [font-variant-ligatures:none]"
       >
         {rows.map((row) =>
           "line" in row ? (
-            <LineRow key={`${row.line.kind}:${row.line.number}`} line={row.line} />
+            <LineRow key={`${row.line.was}:${row.line.number}`} line={row.line} />
           ) : unfolded.has(row.at) ? (
             <Fragment key={`fold:${row.at}`}>
               {row.folded.map((line) => (
-                <LineRow key={`same:${line.number}`} line={line} />
+                <LineRow key={`${line.was}:${line.number}`} line={line} />
               ))}
             </Fragment>
           ) : (
             <div
               key={`fold:${row.at}`}
-              className="col-span-3 border-line border-y bg-surface px-2 py-0.5"
+              className="col-span-4 border-line border-y bg-surface px-2 py-0.5"
             >
               <Button
                 variant="ghost"

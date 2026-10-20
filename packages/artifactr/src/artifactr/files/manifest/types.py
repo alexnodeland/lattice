@@ -136,3 +136,9 @@ class WordDocument(NativeFile):
     """A Word document, `.docx`: registered as `word_document`."""
 
     formats: ClassVar[frozenset[str]] = frozenset({DOCX})
+
+
+class Drawing(NativeFile):
+    """A drawing, `.dxf` or `.dwg`: registered as `drawing`."""
+
+    formats: ClassVar[frozenset[str]] = frozenset({DXF, DWG})

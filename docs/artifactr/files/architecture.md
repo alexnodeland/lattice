@@ -6,12 +6,13 @@
 
 | Layer | What it is | It may import |
 |---|---|---|
-| `manifest` | `Blob`, `Provenance`, `NativeFile`, `WordDocument`, and `revise`, the patch that tests its base | artifactr, pydantic |
+| `manifest` | `Blob`, `Provenance`, `NativeFile`, a type for each app's files (`WordDocument`, `Drawing`), and `revise`, the patch that tests its base | artifactr, pydantic |
 | `blobs` | The `Blobs` port, its size limit and digest, and `InMemoryBlobs` | `manifest`, artifactr |
 | `checkouts` | `Checkout`, the record behind a person's lease, the `Checkouts` port, and `InMemoryCheckouts` | `manifest`, artifactr, pydantic |
 | `app` | The `App` port and `FakeApp` | `manifest`, pydantic |
 | `craft` | The crafting apps: `CRAFTS`, a `Craft` each; `Spawn`, which starts an app's CLI for a call; and the two dialects' adapters, `ToolsDialect` and `CommandsDialect` | `manifest`, `app`, pydantic, `mcp`, `anyio` |
 | `wordcraft` | WordCraft's adapter, `Subprocess`, and the `.docx` fingerprint and outline | `manifest`, `app`, `craft`, pydantic |
+| `cadcraft` | CADCraft's adapter, `Subprocess`, and a drawing's format, DXF or DWG, read from its first bytes | `manifest`, `app`, `craft`, pydantic |
 | `native` | `NativeFiles`: uploads, check-out and check-in, agents' edits, reads, renders and collection, behind the app's switch | `manifest`, `blobs`, `checkouts`, `app`, artifactr, `lattice_core.integrations` |
 | `tools` | `native_file_tools`, the agent's toolset | `app`, `native`, artifactr and its agent, pydantic-ai |
 | `fastapi` | `files_router`, people's check-out and check-in over HTTP, and `editor_app`, the app's browser build on an origin of its own | every layer but `sql` and `tools`, artifactr and its router, FastAPI |

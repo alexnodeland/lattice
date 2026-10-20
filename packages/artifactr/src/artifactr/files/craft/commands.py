@@ -118,14 +118,7 @@ class CommandsDialect(Headless):
     @override
     async def find(self, server: Server, query: str) -> Sequence[CommandSpec]:
         """The commands `command_list` finds for the query, ten at most."""
-        listed = await server.json("command_list", filter=query)
-        if isinstance(listed, Mapping):
-            listed = listed.get("commands", [])
-        try:
-            found = _LISTED.validate_python(listed)
-        except ValidationError as error:
-            raise AppFailed("crashed", f"command_list replied with no commands: {error}") from None
-        return [_spec(command) for command in found[:FOUND]]
+        return listed("command_list", await server.json("command_list", filter=query))
 
     def params(
         self, document: JsonValue, arguments: Mapping[str, JsonValue]
@@ -134,6 +127,25 @@ class CommandsDialect(Headless):
         if self.handle is None:
             return dict(arguments)
         return {**arguments, self.handle: document}
+
+
+def listed(tool: str, reply: JsonValue) -> list[CommandSpec]:
+    """The first ten commands a list tool replied with, as `command_list` lists them.
+
+    The reply is a list of commands, each its `id`, `label`, `menu` and `params`, or an object
+    holding that list as `commands`. A server of the `tools` dialect that lists commands so, as
+    CADCraft's does, reads its list with this too.
+
+    Raises:
+        AppFailed: `crashed` if the reply holds no list of commands.
+    """
+    if isinstance(reply, Mapping):
+        reply = reply.get("commands", [])
+    try:
+        found = _LISTED.validate_python(reply)
+    except ValidationError as error:
+        raise AppFailed("crashed", f"{tool} replied with no commands: {error}") from None
+    return [_spec(command) for command in found[:FOUND]]
 
 
 def _spec(command: _Listed) -> CommandSpec:

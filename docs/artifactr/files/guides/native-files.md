@@ -126,6 +126,18 @@ An app's adapter subclasses `ToolsDialect` or `CommandsDialect`, which take the 
 
 `scripts/craft <app> cli`, `web` or `notices` (the licence files in this machine's CLI asset) fetches any of them at its pin, in `scripts/crafts/<app>.sha256`, and `CRAFT=<app> moon run artifactr:fidelity` runs an app's fidelity report, from its corpus in `tests/files/corpus/<app>/`.
 
+**Each app's adapter.** An app with an adapter has a package of its own beside WordCraft's, `artifactr.files.<app>`, whose `Subprocess` is the adapter, and a native type its files are kept as. Each reads a file's format from the file itself and saves it in that format, so no edit converts it ([ADR-0012](../adr/0012-an-app-for-each-type-and-no-format-changed-by-a-check-in.md)), and each has a fidelity corpus of its own.
+
+- **CADCraft** keeps drawings, `Drawing`, `.dxf` and `.dwg`, and its CLI confines nothing, so its adapter is made with `trusted=True`. A drawing is opened in the format its first bytes say, and saved in it, so a DWG stays a DWG. Its server has no batch, so the commands, such as `{"name": "line", "args": {"points": [[0, 0], [10, 0]]}}`, run one at a time through its `execute`, and the first that fails refuses the batch before anything is saved. Its outline is the model space's entities by type, its layers and its layouts, its text is the drawing's texts, and it renders its model space, fitted to its extents, as page 1. Its corpus is of DXF, written by hand; its live tests open and save a DWG of CADCraft's own making. Its browser build has a `?host=parent` bridge, so it talks through the shim, but it saves DXF only: a DWG saved in it comes back a DXF, which the check-in refuses as `FormatChanged`.
+
+```python
+from artifactr.files import Drawing
+from artifactr.files.cadcraft import Subprocess as CADCraft
+
+cadcraft = CADCraft("/opt/cadcraft/bin/cadcraft-cli", version="0.8.0", trusted=True)
+files = NativeFiles(blobs, checkouts, {WordDocument: wordcraft, Drawing: cadcraft})
+```
+
 **One app for each native type.** Give `NativeFiles` a mapping, and each file is read, edited and switched by its type's app, or else its nearest base's ([ADR-0012](../adr/0012-an-app-for-each-type-and-no-format-changed-by-a-check-in.md)):
 
 ```python

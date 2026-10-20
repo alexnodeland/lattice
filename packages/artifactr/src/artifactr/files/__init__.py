@@ -10,7 +10,8 @@ The layers: [`artifactr.files.manifest`][artifactr.files.manifest], the types an
 [`artifactr.files.blobs`][artifactr.files.blobs], the blob store;
 [`artifactr.files.checkouts`][artifactr.files.checkouts], the check-out record;
 [`artifactr.files.app`][artifactr.files.app], the app port and its fake;
-[`artifactr.files.wordcraft`][artifactr.files.wordcraft], WordCraft's adapter;
+[`artifactr.files.wordcraft`][artifactr.files.wordcraft], WordCraft's adapter, and each
+crafting app's beside it, such as [`artifactr.files.cadcraft`][artifactr.files.cadcraft];
 [`artifactr.files.native`][artifactr.files.native], native files in a workspace;
 [`artifactr.files.tools`][artifactr.files.tools], the agent's tools; and
 [`artifactr.files.sql`][artifactr.files.sql], the stores in SQL, with the `sql` extra. Its
@@ -20,7 +21,7 @@ documentation is at <https://lattice.alexnodeland.com/artifactr/files/>.
 from artifactr.files.app import App, AppCommand, AppFailed, FakeApp
 from artifactr.files.blobs import Blobs, InMemoryBlobs, TooLarge
 from artifactr.files.checkouts import Checkout, Checkouts, InMemoryCheckouts
-from artifactr.files.manifest import DOCX, Blob, NativeFile, Provenance, WordDocument
+from artifactr.files.manifest import DOCX, Blob, Drawing, NativeFile, Provenance, WordDocument
 from artifactr.files.native import ContentUnavailable, NativeFiles
 
 __all__ = [
@@ -33,6 +34,7 @@ __all__ = [
     "Checkout",
     "Checkouts",
     "ContentUnavailable",
+    "Drawing",
     "FakeApp",
     "InMemoryBlobs",
     "InMemoryCheckouts",

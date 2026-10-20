@@ -1,0 +1,36 @@
+  0
+SECTION
+  2
+ENTITIES
+  0
+TEXT
+  8
+0
+ 10
+5.0
+ 20
+5.0
+ 30
+0.0
+ 40
+2.5
+  1
+Kitchen
+  0
+MTEXT
+  8
+0
+ 10
+5.0
+ 20
+20.0
+ 30
+0.0
+ 40
+2.5
+  1
+Two\Plines
+  0
+ENDSEC
+  0
+EOF

@@ -1,0 +1,275 @@
+"""The worker and the `Worker` that calls it, over the stand-in for `wordcraft-cli mcp`.
+
+Every request goes through httpx's ASGI transport, so no socket is opened. `test_hostile.py` runs
+the hostile corpus through the same worker, over WordCraft itself.
+"""
+
+import os
+import resource
+import runpy
+import stat
+import sys
+import time
+from collections.abc import AsyncIterator, Awaitable, Callable
+from pathlib import Path
+
+import anyio
+import httpx
+import pytest
+import uvicorn
+
+from artifactr.files.app import App, AppCommand, AppFailed, FakeApp
+from artifactr.files.wordcraft import Subprocess
+from artifactr.files.worker import Limits, Worker, worker_app
+from artifactr.files.worker.__main__ import worker_from_environment
+from artifactr.files.worker.limits import CONFINE
+from artifactr.files.worker.wire import CALL, Hello
+from tests.files.wordcraft.test_headless import FAKE, PNG
+
+TOKEN = "s3cret"
+LIMITS = Limits(edit=10, render=5, files=1 << 20, reply=1 << 20)
+
+Connect = Callable[..., Awaitable[Worker]]
+
+
+def cli(tmp_path: Path, name: str, script: str) -> Path:
+    """An executable that runs a line of Python, standing in for a CLI."""
+    path = tmp_path / name
+    path.write_text(f'#!/bin/sh\nexec "{sys.executable}" -I -c "{script}"\n')
+    path.chmod(path.stat().st_mode | stat.S_IXUSR)
+    return path
+
+
+def stand_in(tmp_path: Path, mode: str = "") -> Path:
+    """The stand-in for `wordcraft-cli`, misbehaving as `mode` says."""
+    path = tmp_path / f"wordcraft-cli{mode}"
+    path.write_text(
+        f'#!/bin/sh\nexport FAKE_PIDS="{tmp_path / "pids"}"\n'
+        f'exec "{sys.executable}" -I "{FAKE}" --mode "{mode}" "$@"\n'
+    )
+    path.chmod(path.stat().st_mode | stat.S_IXUSR)
+    return path
+
+
+@pytest.fixture
+async def connect() -> AsyncIterator[Connect]:
+    """Connect a `Worker` to a worker over an app, with the token it is given."""
+    workers: list[Worker] = []
+
+    async def connect(
+        app: App, *, limits: Limits = LIMITS, token: str = TOKEN, build: str | None = None
+    ) -> Worker:
+        served = worker_app(app, token=TOKEN, limits=limits, build=build)
+        transport = httpx.ASGITransport(app=served)
+        worker = await Worker.connect("http://worker", token=token, transport=transport)
+        workers.append(worker)
+        return worker
+
+    yield connect
+    for worker in workers:
+        await worker.aclose()
+
+
+def wordcraft(cli: Path, limits: Limits = LIMITS) -> Subprocess:
+    return Subprocess(cli, version="0.7.0", limit=limits.files, launcher=limits.launcher())
+
+
+async def test_it_is_the_app_the_worker_runs_in_its_image(connect: Connect, tmp_path: Path) -> None:
+    app: App = await connect(wordcraft(stand_in(tmp_path)), build="sha256:abc")
+    assert (app.name, app.version, app.build) == ("wordcraft", "0.7.0", "sha256:abc")
+    assert (app.talk, app.integration) == ("save", "files:wordcraft")
+
+
+async def test_its_calls_are_the_apps_own(connect: Connect, tmp_path: Path) -> None:
+    local = wordcraft(stand_in(tmp_path))
+    worker = await connect(local)
+    commands = [AppCommand(name="text.insert", args={"text": "Terms"})]
+    applied = await worker.apply(None, commands, deadline=10)
+    assert applied.inspection == (await local.apply(None, commands, deadline=10)).inspection
+    assert await worker.inspect(applied.content, deadline=10) == applied.inspection
+    assert (await worker.render(applied.content, 1, scale=0.5, deadline=10)).startswith(PNG)
+    assert await worker.commands("heading") == await local.commands("heading")
+
+
+async def test_what_the_app_refuses_the_worker_refuses(connect: Connect, tmp_path: Path) -> None:
+    worker = await connect(wordcraft(stand_in(tmp_path)))
+    with pytest.raises(AppFailed, match="not a valid zip package") as refused:
+        await worker.inspect(b"PK junk", deadline=10)
+    assert refused.value.failure == "refused"
+
+
+async def test_a_call_is_held_to_the_workers_deadline(connect: Connect, tmp_path: Path) -> None:
+    worker = await connect(wordcraft(stand_in(tmp_path, "hang")), limits=Limits(edit=2))
+    started = time.monotonic()
+    with pytest.raises(AppFailed, match="more than 2s") as late:
+        await worker.apply(None, [], deadline=60)
+    assert late.value.failure == "timeout"
+    assert time.monotonic() - started < 10
+
+
+async def test_a_call_waits_its_turn_within_its_deadline(connect: Connect, tmp_path: Path) -> None:
+    worker = await connect(wordcraft(stand_in(tmp_path, "hang")), limits=Limits(edit=2))
+    failures: list[str] = []
+
+    async def call(deadline: float) -> None:
+        with pytest.raises(AppFailed) as failed:
+            await worker.inspect(b"PK", deadline=deadline)
+        failures.append(str(failed.value))
+
+    async with anyio.create_task_group() as calls:
+        calls.start_soon(call, 2)
+        await anyio.sleep(0.5)
+        calls.start_soon(call, 1)
+    assert failures == [
+        "timeout: the worker was busy for more than 1s",
+        "timeout: wordcraft-cli took more than 2s",
+    ]
+
+
+async def test_a_file_past_the_limit_is_too_large(connect: Connect) -> None:
+    worker = await connect(FakeApp())
+    with pytest.raises(AppFailed, match="the file is larger than") as large:
+        await worker.inspect(b"x" * (LIMITS.files + 1), deadline=10)
+    assert large.value.failure == "too_large"
+
+
+async def test_a_reply_past_the_limit_is_too_large(connect: Connect) -> None:
+    worker = await connect(FakeApp(), limits=Limits(reply=100))
+    with pytest.raises(AppFailed, match="the reply is larger than 100 bytes") as large:
+        await worker.apply(
+            None, [AppCommand(name="add_paragraph", args={"text": "x"})], deadline=10
+        )
+    assert large.value.failure == "too_large"
+
+
+async def test_a_call_that_isnt_one_is_refused() -> None:
+    served = worker_app(FakeApp(), token=TOKEN, limits=LIMITS)
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=served), base_url="http://worker"
+    ) as client:
+        reply = await client.post(
+            "/render",
+            headers={"Authorization": f"Bearer {TOKEN}", CALL: '{"page": 0}'},
+            content=FakeApp.file("x"),
+        )
+    assert reply.status_code == 422
+    assert reply.json() == {"failure": "refused", "message": "the call is not one: 3 errors"}
+
+
+async def test_another_token_is_refused_before_any_call() -> None:
+    transport = httpx.ASGITransport(app=worker_app(FakeApp(), token=TOKEN, limits=LIMITS))
+    with pytest.raises(httpx.HTTPStatusError, match="401"):
+        await Worker.connect("http://worker", token="guess", transport=transport)
+
+
+async def test_a_worker_that_cant_be_reached_is_a_crash() -> None:
+    def unreachable(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("refused", request=request)
+
+    hello = Hello(name="fake", version="1.0", build=None, talk="save", integration="files:fake")
+    client = httpx.AsyncClient(transport=httpx.MockTransport(unreachable), base_url="http://worker")
+    async with client:
+        with pytest.raises(AppFailed, match="can't be reached") as crashed:
+            await Worker(client, hello).inspect(b"", deadline=1)
+    assert crashed.value.failure == "crashed"
+
+
+# ─── the limits the CLI is started under ─────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    ("script", "limits"),
+    [
+        ("while True: pass", Limits(cpu=1)),
+        ("open('big', 'wb').write(bytes(2 << 20)); input()", Limits(files=1 << 20)),
+        pytest.param(
+            "b = bytearray(1 << 30); input()",
+            Limits(memory=256 << 20),
+            marks=pytest.mark.skipif(
+                sys.platform == "darwin", reason="macOS doesn't enforce an address space's limit"
+            ),
+        ),
+    ],
+    ids=["cpu", "files", "memory"],
+)
+async def test_a_cli_past_its_limits_is_ended_as_a_crash(
+    tmp_path: Path, script: str, limits: Limits
+) -> None:
+    hostile = wordcraft(cli(tmp_path, "wordcraft-cli", script), limits)
+    started = time.monotonic()
+    with pytest.raises(AppFailed) as crashed:
+        await hostile.inspect(b"PK", deadline=20)
+    assert crashed.value.failure == "crashed"
+    assert time.monotonic() - started < 15
+
+
+def test_the_environment_says_which_wordcraft_it_runs(tmp_path: Path) -> None:
+    served = worker_from_environment(
+        {
+            "WORKER_TOKEN": TOKEN,
+            "WORDCRAFT_CLI": str(stand_in(tmp_path)),
+            "WORDCRAFT_VERSION": "0.7.0",
+            "WORKER_BUILD": "sha256:abc",
+        }
+    )
+    assert [route.path for route in served.routes] == [  # pyright: ignore[reportAttributeAccessIssue]
+        "/",
+        "/apply",
+        "/inspect",
+        "/render",
+        "/commands",
+    ]
+
+
+async def test_a_worker_that_doesnt_reply_in_time_is_a_timeout() -> None:
+    def late(request: httpx.Request) -> httpx.Response:
+        raise httpx.ReadTimeout("late", request=request)
+
+    hello = Hello(name="fake", version="1.0", build=None, talk="save", integration="files:fake")
+    client = httpx.AsyncClient(transport=httpx.MockTransport(late), base_url="http://worker")
+    async with client:
+        with pytest.raises(AppFailed, match="didn't reply to /inspect") as timeout:
+            await Worker(client, hello).inspect(b"", deadline=1)
+    assert timeout.value.failure == "timeout"
+
+
+@pytest.mark.parametrize(
+    ("platform", "limited"),
+    [
+        ("linux", {resource.RLIMIT_CPU: 3, resource.RLIMIT_FSIZE: 5, resource.RLIMIT_AS: 4}),
+        ("darwin", {resource.RLIMIT_CPU: 3, resource.RLIMIT_FSIZE: 5}),
+    ],
+)
+def test_the_launcher_sets_the_limits_then_becomes_the_cli(
+    monkeypatch: pytest.MonkeyPatch, platform: str, limited: dict[int, int]
+) -> None:
+    set_: dict[int, int] = {}
+    became: list[list[str]] = []
+    monkeypatch.setattr(sys, "platform", platform)
+    monkeypatch.setattr(resource, "setrlimit", lambda kind, both: set_.update({kind: both[0]}))
+    monkeypatch.setattr(os, "execvp", lambda _file, argv: became.append(argv))
+    launcher = Limits(cpu=3, memory=4, files=5).launcher()
+    monkeypatch.setattr(sys, "argv", [launcher[2], *launcher[3:], "cli", "mcp", "--x"])
+    runpy.run_path(str(CONFINE), run_name="__main__")
+    assert set_ == limited
+    assert became == [["cli", "mcp", "--x"]]
+
+
+def test_the_launcher_needs_a_cli(monkeypatch: pytest.MonkeyPatch) -> None:
+    assert "main" in runpy.run_path(str(CONFINE)), "imported, it starts nothing"
+    monkeypatch.setattr(sys, "argv", ["confine.py", "--cpu=1", "--memory=1", "--files=1", "--"])
+    with pytest.raises(SystemExit):
+        runpy.run_path(str(CONFINE), run_name="__main__")
+
+
+def test_the_module_serves_the_worker_on_loopback(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    served: list[tuple[str, int]] = []
+    monkeypatch.setattr(uvicorn, "run", lambda _app, host, port: served.append((host, port)))
+    monkeypatch.setenv("WORKER_TOKEN", TOKEN)
+    monkeypatch.setenv("WORDCRAFT_CLI", str(stand_in(tmp_path)))
+    monkeypatch.setenv("WORDCRAFT_VERSION", "0.7.0")
+    monkeypatch.delitem(sys.modules, "artifactr.files.worker.__main__")
+    runpy.run_module("artifactr.files.worker", run_name="__main__")
+    assert served == [("127.0.0.1", 8080)]

@@ -7,7 +7,7 @@ WordCraft's server is the `tools` dialect's first: what is WordCraft's own here 
 document is read.
 """
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import ClassVar, override
 
@@ -35,7 +35,8 @@ class Subprocess(ToolsDialect):
 
     It confines the CLI's file access to the call's own directory, but it is not a sandbox: the
     CLI runs as this process's user, with its network. It is for tests and trusted files; the
-    sandboxed worker runs hostile ones (lattice RFC-0003).
+    worker, `artifactr.files.worker`, runs it on hostile ones, inside its sandbox (lattice
+    RFC-0003).
 
     Args:
         cli: The `wordcraft-cli` executable.
@@ -44,6 +45,8 @@ class Subprocess(ToolsDialect):
         author: Who the CLI says tracked changes, comments and saves are by.
         limit: The most bytes a file may hold, saved or inflated: 256 MiB by default.
         lookup: How long, in seconds, finding commands may take: 10 by default.
+        launcher: The command the CLI is started under, given the CLI and its arguments, such
+            as the worker's, which sets its limits first; none by default.
     """
 
     craft: ClassVar[Craft] = CRAFTS["wordcraft"]
@@ -61,9 +64,15 @@ class Subprocess(ToolsDialect):
         author: str = "lattice",
         limit: int = 256 << 20,
         lookup: float = 10.0,
+        launcher: Sequence[str] = (),
     ) -> None:
         super().__init__(
-            cli, version=version, arguments=("--author", author), limit=limit, lookup=lookup
+            cli,
+            version=version,
+            arguments=("--author", author),
+            limit=limit,
+            lookup=lookup,
+            launcher=launcher,
         )
 
     @override

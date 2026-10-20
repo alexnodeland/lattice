@@ -121,7 +121,7 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         },
         {
             *("pydantic", "pydantic_ai", "sqlalchemy", "alembic", "mcp", "anyio"),
-            *("fastapi", "starlette"),
+            *("fastapi", "starlette", "uvicorn", "httpx"),
             *("lattice_core.sql", "lattice_core.integrations", "lattice_core.refusals"),
         },
     ),

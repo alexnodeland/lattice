@@ -3,8 +3,8 @@
 Each call starts the server in an empty temporary directory, holding the root or roots the CLI's
 file access is confined to, and ends the process and the directory with the call, so no document
 stays open between calls (native files ADR-0004). It is the one place a CLI is started: an
-adapter speaks its dialect to the [`Server`][artifactr.files.craft.Server] it is given, and a
-sandboxed worker will run the same adapter, and this, inside its sandbox.
+adapter speaks its dialect to the [`Server`][artifactr.files.craft.Server] it is given, and the
+worker runs the same adapter, and this, inside its sandbox, under a launcher that sets limits.
 """
 
 import base64
@@ -94,7 +94,7 @@ class Spawn:
     The CLI's file access is confined to the call's own directory by its root flags. An app whose
     CLI confines nothing (its descriptor's `roots` is `none`) reads and writes wherever this
     process's user can, so it is started only when the operator says the files are trusted, or
-    that this process is already confined, as the sandboxed worker is. Either way it is not a
+    that this process is already confined, as the worker is. Either way it is not a
     sandbox: the CLI runs as this process's user, with its network.
 
     Args:
@@ -106,6 +106,8 @@ class Spawn:
         trusted: Whether the files are trusted, or this process confined: required of an app
             whose CLI confines nothing.
         limit: The most bytes a saved file may hold.
+        launcher: The command the CLI is started under, given the CLI and its arguments, such
+            as the worker's, which sets its limits first; none by default.
 
     Raises:
         ValueError: If the app's CLI confines nothing and `trusted` isn't given.
@@ -120,17 +122,19 @@ class Spawn:
         arguments: Sequence[str] = (),
         trusted: bool = False,
         limit: int,
+        launcher: Sequence[str] = (),
     ) -> None:
         if craft.roots == "none" and not trusted:
             raise ValueError(
                 f"{craft.cli} confines no file it reads or writes: run it only on trusted "
-                "files, with trusted=True, until the sandboxed worker runs it"
+                "files, or in the worker, with trusted=True"
             )
         self.craft = craft
         self.version = version
         self._cli = str(cli)
         self._arguments = tuple(arguments)
         self._limit = limit
+        self._launcher = tuple(launcher)
 
     async def run[T](self, deadline: float, work: Callable[[Server], Awaitable[T]]) -> T:
         """Spawn the CLI in a directory of the call's own, do the work, and end both.
@@ -144,8 +148,11 @@ class Spawn:
             root = Path(directory)
             (root / "in").mkdir()
             (root / "out").mkdir()
+            command, *launched = (*self._launcher, self._cli)
             server = StdioServerParameters(
-                command=self._cli, args=["mcp", *self._arguments, *self._roots(root)], cwd=root
+                command=command,
+                args=[*launched, "mcp", *self._arguments, *self._roots(root)],
+                cwd=root,
             )
             with (root / "stderr").open("w+", errors="replace") as errlog:
                 try:
@@ -159,7 +166,7 @@ class Spawn:
                             served = Server(session, root / "in", root / "out", self._limit)
                             outcome = await self._attempt(served, work)
                 except TimeoutError:
-                    raise AppFailed("timeout", f"{cli} took more than {deadline}s") from None
+                    raise AppFailed("timeout", f"{cli} took more than {deadline:.3g}s") from None
                 except Exception as error:
                     # The CLI is a separate process reading hostile bytes: whatever ends it, or
                     # its replies, mid-call is a crash, told with what ended it and the end of

@@ -100,7 +100,29 @@ files = NativeFiles(blobs, checkouts, app)
 
 A CLI that isn't `version` is refused, so the version a revision's provenance records is the one that ran. An agent's commands are WordCraft's own, such as `{"name": "text.insert", "args": {"text": "Fees"}}` or `{"name": "para.heading1"}`; `app.commands("comment")` finds them, ten at most, from the 617 it has. A batch stops at the first command that fails, which refuses it whole, naming the command.
 
-The CLI runs as your application's user, with its network: `Subprocess` is for tests and trusted files. The sandboxed worker for hostile ones is phase 3 of [lattice RFC-0003](../../../rfcs/0003-native-files-as-artifacts.md#the-app-port-and-the-worker). To fetch the pinned CLI, the one CI tests, run `scripts/craft wordcraft cli` in lattice: it downloads WordCraft's release once, checks its SHA-256 against `scripts/crafts/wordcraft.sha256`, and prints the CLI's path. `moon run artifactr:fidelity` runs the fidelity report with it.
+The CLI runs as your application's user, with its network: `Subprocess` is for tests and trusted files; the worker, below, runs hostile ones. To fetch the pinned CLI, the one CI tests, run `scripts/craft wordcraft cli` in lattice: it downloads WordCraft's release once, checks its SHA-256 against `scripts/crafts/wordcraft.sha256`, and prints the CLI's path. `moon run artifactr:fidelity` runs the fidelity report with it.
+
+## The worker
+
+The worker runs an app on files you don't trust: one job at a time, behind a token, with each call's CLI under limits on its CPU time, address space and largest file, and limits on the deadline, the file sent and the reply. Each breach is an `AppFailed`, typed as any other. Run it in a container of its own, on a network with no route out, as stackr's recipe will (lattice RFC-0003); it reads its settings from the environment:
+
+```bash
+WORKER_TOKEN=$(openssl rand -hex 32) \
+WORDCRAFT_CLI=/opt/wordcraft/bin/wordcraft-cli WORDCRAFT_VERSION=0.7.0 \
+WORKER_BUILD=sha256:… WORKER_HOST=0.0.0.0 \
+python -m artifactr.files.worker
+```
+
+It listens on 127.0.0.1:8080 unless `WORKER_HOST` and `WORKER_PORT` say otherwise; inside its container, bind it to the internal network only. Your application calls it through `Worker`, an `App` like any other, whose version and build are the worker's, so a revision's provenance records the image that read it:
+
+```python
+from artifactr.files.worker import Worker
+
+app = await Worker.connect("http://worker:8080", token=os.environ["WORKER_TOKEN"])
+files = NativeFiles(blobs, checkouts, app)
+```
+
+A call that arrives while another runs waits its turn within its own deadline, so add containers, not jobs, to serve more. `worker_app(app, token=, limits=)` serves any app, if you build your own image: make the app with `launcher=limits.launcher()` and `limit=limits.files`, and pass `trusted=True` to one whose CLI confines nothing, since the worker is its confinement.
 
 ## The other crafting apps
 
@@ -122,7 +144,7 @@ The CLI runs as your application's user, with its network: `Subprocess` is for t
 | SoundCraft | tools | a read and a write root | exports only | `files:soundcraft` |
 | LightCraft | commands | nothing | exports only | `files:lightcraft` |
 
-An app's adapter subclasses `ToolsDialect` or `CommandsDialect`, which take the CLI, the `version` it must be, `arguments` for it after `mcp`, `trusted`, `limit` and `lookup`. A CLI that confines nothing reads and writes wherever your application's user can, so its adapter refuses to be made, with `ValueError`, unless you pass `trusted=True`, saying its files are trusted or your process is already confined. Until the sandboxed worker exists, don't switch such an app on where people upload files you don't trust. FilmCraft, EffectCraft, SoundCraft and LightCraft keep projects that point at media outside them, so lattice keeps only what they render or export, one file at a time.
+An app's adapter subclasses `ToolsDialect` or `CommandsDialect`, which take the CLI, the `version` it must be, `arguments` for it after `mcp`, `trusted`, `limit` and `lookup`. A CLI that confines nothing reads and writes wherever your application's user can, so its adapter refuses to be made, with `ValueError`, unless you pass `trusted=True`, saying its files are trusted or your process is already confined. Run such an app only in the worker where people upload files you don't trust. FilmCraft, EffectCraft, SoundCraft and LightCraft keep projects that point at media outside them, so lattice keeps only what they render or export, one file at a time.
 
 `scripts/craft <app> cli`, `web` or `notices` (the licence files in this machine's CLI asset) fetches any of them at its pin, in `scripts/crafts/<app>.sha256`, and `CRAFT=<app> moon run artifactr:fidelity` runs an app's fidelity report, from its corpus in `tests/files/corpus/<app>/`.
 
@@ -214,7 +236,7 @@ site = Site(
 )
 ```
 
-Until the worker of RFC-0003's phase 3 is deployed, the server reads each check-in through `Subprocess`, in the application's own process, which isolates nothing: check in trusted files only.
+Where people check in files you don't trust, give `NativeFiles` the `Worker`: through `Subprocess`, the server reads each check-in in the application's own process, which isolates nothing.
 
 ## Reading a revision
 

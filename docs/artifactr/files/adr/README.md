@@ -2,7 +2,7 @@
 
 Each record captures one decision: the context that forced it, the options considered, and the consequences we accepted. Records are immutable once accepted; a changed decision gets a new record that amends or supersedes the old one. The proposal behind these is [lattice RFC-0003](../../../rfcs/0003-native-files-as-artifacts.md); the decisions it changed in artifactr are [artifactr ADR-0071](../../adr/0071-a-lease-on-an-artifact.md) and [ADR-0072](../../adr/0072-native-files-are-manifests-over-json-patch.md).
 
-ADR-0001 to ADR-0003 record RFC-0003's D5, D2 and D3, ADR-0004 the app port it designs, ADR-0005 its phase 2, WordCraft headless, ADR-0006 the agent's tools of its phase 3, ADR-0007 the server side of its phase 4, ADR-0008 what portalr's screens read of it, and ADR-0009 the groundwork for the crafting apps after WordCraft.
+ADR-0001 to ADR-0003 record RFC-0003's D5, D2 and D3, ADR-0004 the app port it designs, ADR-0005 its phase 2, WordCraft headless, ADR-0006 the agent's tools of its phase 3, ADR-0007 the server side of its phase 4, ADR-0008 what portalr's screens read of it, ADR-0009 the groundwork for the crafting apps after WordCraft, and ADR-0010 the worker of its phase 3.
 
 This is the native files' own series, inside artifactr's section since `artifactr-files` became artifactr's `files` extra ([lattice ADR-0026](../../../adr/0026-a-distribution-needs-a-reason-integrations-are-extras.md)). Its records keep their numbers, and outside the series one is named "native files ADR-0002"; artifactr's own series is [`docs/artifactr/adr/`](../../adr/README.md).
 
@@ -17,5 +17,6 @@ This is the native files' own series, inside artifactr's section since `artifact
 | [0007](0007-check-out-over-http-and-the-editor-on-its-own-origin.md) | Check-out over HTTP, and the editor on an origin of its own | Accepted; amended by [0008](0008-what-portalr-reads-of-a-native-file.md) |
 | [0008](0008-what-portalr-reads-of-a-native-file.md) | What portalr reads of a native file: its words, its own check-out, its limit, and a proposal | Accepted |
 | [0009](0009-each-crafting-app-declared-once-on-one-of-two-dialects.md) | Each crafting app declared once, on one of two dialects, pinned on its own | Accepted |
+| [0010](0010-the-worker-runs-each-call-under-limits-behind-a-token.md) | The worker runs each call under limits, behind a token, one job at a time | Accepted |
 
 To add a record, copy lattice's [ADR template](../../../adr/template.md) to the next number and add a row above.

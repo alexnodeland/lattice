@@ -336,7 +336,8 @@ Decided by the owner on 2026-10-16:
 - [x] artifactr-files: the package, its `pyproject.toml`, a `moon.yml` that depends on artifactr and lattice-core, and its entry in `release-please-config.json` and the manifest
 - [x] artifactr-files: blobs, check-outs, migrations and row-level security
 - [x] artifactr-files: the WordCraft adapter, the corpus and the nightly fidelity report
-- [ ] artifactr-files and stackr: the worker, its image, the recipe and the release pin check
+- [x] artifactr-files: the worker, its limits, the `Worker` app and the hostile corpus
+- [ ] stackr: the worker's image, the recipe and the release pin check
 - [x] artifactr-files: `NativeFileTools`, as `native_file_tools`
 - [x] artifactr-files: `files_router`, check-out and check-in over HTTP, and the hosted editor's policy
 - [x] portalr: the renderer, previews, diffs, check-out and check-in screens

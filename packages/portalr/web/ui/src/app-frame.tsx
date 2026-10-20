@@ -51,7 +51,7 @@ export const MINI_APPS = "ui:mini-apps";
 const LABEL = "Made by the agent. Runs sandboxed, apart from your session.";
 
 /** What a preview tells its app that submits: nothing is sent from a preview. */
-export const PREVIEW_SENDS_NOTHING = "This is a preview of a version: nothing is sent from it.";
+const PREVIEW_SENDS_NOTHING = "This is a preview of a version: nothing is sent from it.";
 
 /** The add-on that runs an app, loaded with the first app a page runs. */
 const loadApps = () => import("./on-demand/apps");

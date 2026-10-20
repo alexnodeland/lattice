@@ -5,6 +5,7 @@ import io
 import stat
 import warnings
 import zipfile
+from pathlib import Path
 
 import pytest
 
@@ -14,6 +15,8 @@ from artifactr.files.freecad.document import DEPTH, PARTS, XML_LIMIT, with_gui
 from tests.files.freecad.documents import TIME, fcstd, obj, xml
 
 LIMIT = 1 << 20
+SHAPE = '<Part file="Box.Shape.brp"/>'
+"""Where a box's shape is named, as a part its document asks for."""
 
 
 def prop(kind: str, inner: str = "") -> str:
@@ -35,7 +38,7 @@ def test_a_document_of_the_allowed_types_is_scanned_for_its_label() -> None:
 
 
 def test_what_freecad_is_given_is_the_zip_the_scan_rebuilds() -> None:
-    source = fcstd(xml(), **{"Box.Shape.brp": "shape"})
+    source = fcstd(xml(SHAPE), **{"Box.Shape.brp": "shape"})
     scanned = scan(source + b"trailing junk", LIMIT)
     with zipfile.ZipFile(io.BytesIO(scanned.content)) as archive:
         assert archive.namelist() == ["Document.xml", "Box.Shape.brp"]
@@ -160,9 +163,10 @@ def test_a_no_op_save_of_a_gui_made_file_keeps_its_fingerprint() -> None:
     """The GUI writes a thumbnail and its part, in its own order; the console drops both."""
     gui = "<Document><ViewProviderData/></Document>"
     made = fcstd(
-        xml(), **{"GuiDocument.xml": gui, "thumbnails/Thumbnail.png": b"png", "Box.Shape.brp": "s"}
+        xml(SHAPE),
+        **{"GuiDocument.xml": gui, "thumbnails/Thumbnail.png": b"png", "Box.Shape.brp": "s"},
     )
-    saved = fcstd(xml(modified="2026-10-21T00:00:00Z"), **{"Box.Shape.brp": "s"})
+    saved = fcstd(xml(SHAPE, modified="2026-10-21T00:00:00Z"), **{"Box.Shape.brp": "s"})
     assert fingerprint(with_gui(saved, scan(made, LIMIT).content)) == fingerprint(made)
 
 
@@ -181,3 +185,71 @@ def test_the_gui_part_the_console_drops_is_put_back_and_the_thumbnail_isnt() -> 
 def test_a_list_counted_as_freecad_counts_it_is_read() -> None:
     counted = xml(obj("Box", "Part::Box")).replace("<Objects>", '<Objects Count="1">')
     assert scan(fcstd(counted), LIMIT).label == "Model"
+
+
+def test_document_xml_is_given_first_whatever_came_first() -> None:
+    """FreeCAD reads the zip's first entry as the document, whatever its name."""
+    source = fcstd(xml(SHAPE), **{"Box.Shape.brp": "s"})
+    with zipfile.ZipFile(io.BytesIO(source)) as given:
+        parts = [(name, given.read(name)) for name in reversed(given.namelist())]
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        for name, data in parts:
+            archive.writestr(name, data)
+    with zipfile.ZipFile(io.BytesIO(scan(buffer.getvalue(), LIMIT).content)) as archive:
+        assert archive.namelist() == ["Document.xml", "Box.Shape.brp"]
+
+
+@pytest.mark.parametrize("name", ["Box.Shape.brp.", "Box.Shape.brp ", "a./b.brp"])
+def test_a_name_ending_in_a_dot_or_a_space_is_refused(name: str) -> None:
+    with pytest.raises(AppFailed, match="a part is named"):
+        scan(fcstd(**{name: "x"}), LIMIT)
+
+
+def test_a_part_no_property_names_is_refused() -> None:
+    """A hostile document first in the zip, named otherwise, which FreeCAD would read first."""
+    with pytest.raises(AppFailed, match=r"nothing names a\.txt"):
+        scan(fcstd(xml(), **{"a.txt": xml(obj("Py", "App::FeaturePython"))}), LIMIT)
+
+
+@pytest.mark.parametrize(
+    ("element", "why"),
+    [
+        (
+            '<Object type="Part::Box" name="B" ViewType="Gui::ViewProviderPythonFeature"/>',
+            "ViewType",
+        ),
+        ('<Object name="B" onload="x"/>', "onload"),
+    ],
+)
+def test_an_object_attribute_freecad_doesnt_write_is_refused(element: str, why: str) -> None:
+    with pytest.raises(AppFailed, match=f"attribute that isn't allowed: {why}"):
+        scan(fcstd(xml(element)), LIMIT)
+
+
+def test_the_camera_the_gui_parses_is_emptied() -> None:
+    """An Open Inventor string, which the GUI would parse; the console never reads it."""
+    inventor = "#Inventor V2.1 ascii File { name &quot;/etc/passwd&quot; }"
+    gui = f'<Document><Camera settings="{inventor}"/></Document>'
+    scanned = scan(fcstd(xml(), **{"GuiDocument.xml": gui}), LIMIT)
+    with zipfile.ZipFile(io.BytesIO(scanned.content)) as archive:
+        assert b'<Camera settings=""/>' in archive.read("GuiDocument.xml")
+
+
+GUI_MADE = Path(__file__).with_name("gui_made.FCStd")
+"""A red box, hidden, saved by FreeCAD 1.1.4's own GUI (`freecad`, with Qt offscreen, in a Linux
+container), so its `GuiDocument.xml`, its view providers' extensions and its colour parts are
+FreeCAD's. A test's script made it: a `Part::Box`, `ShapeColor` red, `Visibility` off, `saveAs`."""
+
+
+def test_a_file_freecads_gui_saved_is_scanned_and_its_gui_parts_carried() -> None:
+    scanned = scan(GUI_MADE.read_bytes(), LIMIT)
+    assert scanned.label == "gui_made"
+    with zipfile.ZipFile(io.BytesIO(scanned.content)) as archive:
+        console = {n: archive.read(n) for n in ("Document.xml", "Box.Shape.brp")}
+        gui = [n for n in archive.namelist() if n not in console]
+    saved = fcstd(console["Document.xml"], **{"Box.Shape.brp": console["Box.Shape.brp"]})
+    carried = with_gui(saved, scanned.content)
+    with zipfile.ZipFile(io.BytesIO(carried)) as archive:
+        assert archive.namelist()[2:] == [n for n in gui if not n.startswith("thumbnails/")]
+    assert fingerprint(carried) == fingerprint(scanned.content), "a no-op save keeps it"

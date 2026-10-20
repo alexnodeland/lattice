@@ -7,9 +7,11 @@ every command and every step of `script.py` runs, which no pull request's covera
 """
 
 import base64
+import io
 import os
 import pickle
 import subprocess
+import zipfile
 from collections.abc import Callable
 from pathlib import Path
 
@@ -173,3 +175,15 @@ def test_freecad_itself_runs_no_pickle_and_imports_no_module_outside_its_own(
     )
     assert said in printed.stdout + printed.stderr
     assert not (tmp_path / "pickled").exists()
+
+
+async def test_a_file_freecads_gui_saved_keeps_its_colours_and_then_its_fingerprint(
+    freecad: Subprocess,
+) -> None:
+    """Its first save by the console rewrites what FreeCAD's GUI wrote; the next is a fixpoint."""
+    source = (Path(__file__).with_name("gui_made.FCStd")).read_bytes()
+    once = await freecad.apply(source, [], deadline=DEADLINE)
+    twice = await freecad.apply(once.content, [], deadline=DEADLINE)
+    assert twice.inspection == once.inspection
+    with zipfile.ZipFile(io.BytesIO(once.content)) as archive:
+        assert {"GuiDocument.xml", "ShapeAppearance"} <= set(archive.namelist())

@@ -199,6 +199,10 @@ HOSTILE: Final[dict[str, Callable[[], bytes]]] = {
     "local_only_entry": lambda: (
         zipped(("Document.xml", python_document())) + (HERE / "primitives.FCStd").read_bytes()
     ),
+    # FreeCAD reads the zip's first entry as the document, whatever its name.
+    "document_not_first": lambda: zipped(
+        ("a.txt", python_document()), ("Document.xml", member("primitives", "Document.xml"))
+    ),
     "duplicate_document": lambda: zipped(
         ("Document.xml", member("primitives", "Document.xml")),
         ("Document.xml", python_document()),

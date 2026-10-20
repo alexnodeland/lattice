@@ -37,8 +37,23 @@ XML_LIMIT: Final = 64 << 20
 DEPTH: Final = 256
 """The deepest an element of either may be."""
 
-NAME: Final = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_. -]*(/[A-Za-z0-9_][A-Za-z0-9_. -]*)*")
-"""A part's name: relative segments of plain characters, none of them `.` or `..`."""
+SEGMENT: Final = r"[A-Za-z0-9_](?:[A-Za-z0-9_. -]*[A-Za-z0-9_])?"
+NAME: Final = re.compile(rf"{SEGMENT}(?:/{SEGMENT})*")
+"""A part's name: relative segments of plain characters, none of them `.` or `..`, and none
+ending in a dot or a space, which some file systems drop."""
+
+ATTRIBUTES: Final = {
+    ("Object", True): frozenset(
+        {"type", "name", "id", "Extensions", "Touched", "Invalid", "Error"}
+    ),
+    ("ViewProvider", False): frozenset({"name", "expanded", "treeRank", "Extensions"}),
+}
+"""The attributes an object, or a view provider, may have, by element and whether it is in
+`Document.xml`: what FreeCAD 1.1.4's `Document::Restore` reads, but `ViewType`, which names a
+view provider to make."""
+
+CAMERA: Final = re.compile(rb'(<Camera\s+settings=")[^"]*(")')
+"""The GUI's camera, an Open Inventor string the GUI parses, which the scan empties."""
 
 OBJECTS: Final = frozenset({
     "App::Line", "App::Origin", "App::Plane", "App::Point",
@@ -54,6 +69,11 @@ EXTENSIONS: Final = frozenset({
     "Part::AttachExtension", "Part::PreviewExtension", "Part::PrismExtension",
 })  # fmt: skip
 """The extensions an object may have."""
+
+VIEW_EXTENSIONS: Final = frozenset({
+    "Gui::ViewProviderFaceTexture", "PartGui::ViewProviderAttachExtension",
+})  # fmt: skip
+"""The extensions a view provider may have: those FreeCAD 1.1.4's GUI saved for a box."""
 
 PROPERTIES: Final = frozenset({
     "App::PropertyAngle", "App::PropertyBool", "App::PropertyDistance",
@@ -134,10 +154,21 @@ def scan(content: bytes, limit: int) -> Scanned:
         raise AppFailed("refused", "not a FreeCAD document: not a zip it can read") from None
     if DOCUMENT not in read:
         raise AppFailed("refused", f"not a FreeCAD document: no {DOCUMENT}")
-    label = _Reader(DOCUMENT, PROPERTIES).read(read[DOCUMENT])
+    readers = [_Reader(DOCUMENT, PROPERTIES, EXTENSIONS)]
+    label = readers[0].read(read[DOCUMENT])
     if GUI in read:
-        _Reader(GUI, VIEW_PROPERTIES).read(read[GUI])
-    return Scanned(_zipped(read), label)
+        readers.append(_Reader(GUI, VIEW_PROPERTIES, VIEW_EXTENSIONS))
+        readers[1].read(read[GUI])
+        read[GUI] = CAMERA.sub(rb"\1\2", read[GUI])
+    named = {DOCUMENT, GUI}.union(*(reader.files for reader in readers))
+    if unnamed := sorted(n for n in read if n not in named and not n.startswith(THUMBNAILS)):
+        # A part no property names is one FreeCAD never asks for, unless it reads it as
+        # something else: none is passed on.
+        raise AppFailed("refused", f"not a FreeCAD document: nothing names {unnamed[0]}")
+    # FreeCAD's reader takes the zip's first entry as the document, whatever it is named
+    # (`Document::restore` in 1.1.4), and reads the others in the order they come, matching each
+    # to a file its objects asked for: Document.xml first, then the rest as they came.
+    return Scanned(_zipped({DOCUMENT: read.pop(DOCUMENT), **read}), label)
 
 
 def fingerprint(content: bytes) -> str:
@@ -157,20 +188,25 @@ def fingerprint(content: bytes) -> str:
 
 
 def with_gui(saved: bytes, source: bytes | None) -> bytes:
-    """The saved document, with the source's `GuiDocument.xml`, which FreeCAD's console drops.
+    """The saved document, with the source's GUI part and the parts it names, as colours.
 
-    Colours, visibility and the camera are in it; the thumbnail isn't kept, since a batch may
-    have made it stale. The source is the scan's, rebuilt.
+    FreeCAD's console drops them. They follow the document's own parts, as FreeCAD's GUI writes
+    them. The thumbnail isn't kept, since a batch may have made it stale. The source is the
+    scan's, rebuilt.
     """
     if source is None:
         return saved
     with zipfile.ZipFile(io.BytesIO(source)) as given:
         if GUI not in given.namelist():
             return saved
-        gui = given.read(GUI)
+        reader = _Reader(GUI, VIEW_PROPERTIES, VIEW_EXTENSIONS)
+        reader.read(gui := given.read(GUI))
+        named = [name for name in given.namelist() if name in reader.files]
+        carried = {GUI: gui, **{name: given.read(name) for name in named}}
     with zipfile.ZipFile(io.BytesIO(saved)) as made:
         parts = {name: made.read(name) for name in made.namelist() if name != GUI}
-    return _zipped({**parts, GUI: gui})
+    # A part of the document's own, by the same name, is the document's.
+    return _zipped({**parts, **{n: d for n, d in carried.items() if n not in parts}})
 
 
 def _named(parts: list[zipfile.ZipInfo]) -> list[zipfile.ZipInfo]:
@@ -231,11 +267,14 @@ def _zipped(parts: dict[str, bytes]) -> bytes:
 class _Reader:
     """Reads one XML part, refusing what isn't allowed, and the document's label."""
 
-    def __init__(self, name: str, properties: frozenset[str]) -> None:
+    def __init__(self, name: str, properties: frozenset[str], extensions: frozenset[str]) -> None:
         self.name = name
         self.properties = properties
+        self.extensions = extensions
         self.path: list[tuple[str, str]] = []
         self.label: str | None = None
+        self.files: set[str] = set()
+        """The parts the properties name, by their `file`."""
         self.counted: dict[str, str] = {}
         self.found: dict[str, int] = {}
         self.parser = expat.ParserCreate()
@@ -266,17 +305,22 @@ class _Reader:
             self._refuse(f"nests elements more than {DEPTH} deep")
         if ":" in tag or any(":" in key for key in attributes):
             self._refuse(f"holds a namespaced name: {tag}")
+        allowed = ATTRIBUTES.get((tag, self.name == DOCUMENT))
+        if allowed is not None and (unexpected := set(attributes) - allowed):
+            self._refuse(f"gives an {tag} an attribute that isn't allowed: {min(unexpected)}")
         kind = attributes.get("type", "")
         if tag == "Python":
             self._refuse("holds Python")
         if tag in {"Property", "_Property"} and kind not in self.properties:
             self._refuse(f"holds a property of a type that isn't allowed: {kind}")
-        if tag == "Extension" and kind not in EXTENSIONS:
+        if tag == "Extension" and kind not in self.extensions:
             self._refuse(f"holds an extension of a type that isn't allowed: {kind}")
         if tag == "Object" and "type" in attributes and kind not in OBJECTS:
             self._refuse(f"holds an object of a type that isn't allowed: {kind}")
         if tag.startswith("XLink") and attributes.get("file"):
             self._refuse(f"links to another file: {attributes['file']}")
+        if "file" in attributes:
+            self.files.add(attributes["file"])
         if tag == "DocMap" or (tag == "XLinks" and "docs" in attributes):
             self._refuse("links to another document")
         said = attributes.get("expression", "") + attributes.get("content", "")

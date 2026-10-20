@@ -5,18 +5,13 @@ count and the author on every save, so the fingerprint is the digest of the othe
 saves of the same document share it.
 """
 
-import hashlib
-import io
 import re
-import zipfile
-import zlib
 from collections.abc import Sequence
 from typing import Final
-from xml.etree import ElementTree
 
 from pydantic import BaseModel
 
-from artifactr.files.app import AppFailed
+from artifactr.files.craft import Package
 from artifactr.files.manifest import DOCX, OUTLINE_LIMIT
 
 HEADING: Final = re.compile(r"heading ?(\d+)", re.IGNORECASE)
@@ -24,8 +19,6 @@ HEADING: Final = re.compile(r"heading ?(\d+)", re.IGNORECASE)
 
 STAMPED: Final = frozenset({"docProps/core.xml"})
 """The parts every save stamps, which the fingerprint leaves out."""
-
-CHUNK: Final = 1 << 16
 
 MAIN: Final = {
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml": DOCX,
@@ -41,67 +34,23 @@ MAIN: Final = {
 }
 """A Word package's main part's content type, and the media type of a file it is the main of."""
 
-TYPES: Final = "{http://schemas.openxmlformats.org/package/2006/content-types}Override"
-
-MIMETYPE: Final = 255
-"""The most of an OpenDocument's `mimetype` that is read."""
+DOCX_PACKAGE: Final = Package(".docx", main=MAIN, stamped=STAMPED)
 
 
 def media_type(content: bytes) -> str | None:
-    """The format a package says it is, or None if it says none.
+    """The format a Word package or an OpenDocument says it is, or None if it says none.
 
-    A Word package says it by its main part's content type, and an OpenDocument by its
-    `mimetype`. Call it once `fingerprint` has read the package, which refuses one that isn't
-    a zip or inflates past its limit.
-
-    Raises:
-        AppFailed: `refused` if its content types aren't XML.
+    As [`Package.media_type`][artifactr.files.craft.Package.media_type] reads it.
     """
-    with zipfile.ZipFile(io.BytesIO(content)) as archive:
-        names = set(archive.namelist())
-        if "mimetype" in names:
-            return archive.read("mimetype")[:MIMETYPE].decode("ascii", "replace").strip()
-        if "[Content_Types].xml" not in names:
-            return None
-        try:
-            types = ElementTree.fromstring(archive.read("[Content_Types].xml"))
-        except ElementTree.ParseError as error:
-            raise AppFailed("refused", f"not a .docx: its content types are {error}") from None
-    declared = (override.get("ContentType", "") for override in types.iter(TYPES))
-    return next((MAIN[found] for found in declared if found in MAIN), None)
+    return DOCX_PACKAGE.media_type(content)
 
 
 def fingerprint(content: bytes, *, limit: int) -> str:
     """The digest of a `.docx`'s parts, by name, without the parts each save stamps.
 
-    Each part is hashed on its own, and the fingerprint is the digest of the parts' names and
-    digests, so no two different files share one. Each part is read as it inflates, so a zip
-    bomb is refused once it passes `limit`.
-
-    Raises:
-        AppFailed: `refused` if the bytes aren't a zip, or name a part twice, and `too_large` if
-            its parts, inflated, pass `limit` bytes.
+    As [`Package.fingerprint`][artifactr.files.craft.Package.fingerprint] reads it.
     """
-    digest = hashlib.sha256()
-    inflated = 0
-    try:
-        with zipfile.ZipFile(io.BytesIO(content)) as archive:
-            names = archive.namelist()
-            if len(set(names)) != len(names):
-                raise AppFailed("refused", "not a .docx: it names a part twice")
-            for name in sorted(set(names) - STAMPED):
-                part = hashlib.sha256()
-                with archive.open(name) as stream:
-                    while chunk := stream.read(CHUNK):
-                        inflated += len(chunk)
-                        if inflated > limit:
-                            raise AppFailed("too_large", f"its parts inflate past {limit} bytes")
-                        part.update(chunk)
-                digest.update(f"{len(name)}:{name}".encode() + part.digest())
-    except (zipfile.BadZipFile, zlib.error, EOFError, NotImplementedError, RuntimeError) as error:
-        # A corrupt deflate stream is zlib's error, and an encrypted part zipfile's RuntimeError.
-        raise AppFailed("refused", f"not a .docx: {error}") from None
-    return digest.hexdigest()
+    return DOCX_PACKAGE.fingerprint(content, limit=limit)
 
 
 class Block(BaseModel):

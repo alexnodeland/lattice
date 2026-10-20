@@ -115,7 +115,7 @@ So start the stack first: stackr's default `make up`, with local Supabase, or th
 With grantr and the portal, a person signs in to the app and chats with its agent through the gateway after these steps, on either of stackr's database adapters:
 
 1. In stackr: `make up`, then `make tenant NAME=home`, which prints a gateway key for the tenant's team.
-2. In the application: `make install` and `make env`, then fill in `.env`: `LITELLM_API_KEY`, the key from step 1; `AUTH_SERVICE_ROLE_KEY`; `PORTAL_SUPABASE_KEY`; and, for Langfuse, its keys and `PORTAL_LANGFUSE_PROJECT`. On local Supabase the two keys are `supabase status`'s secret and publishable keys. On the PostgreSQL adapter, GoTrue alone, `AUTH_SERVICE_ROLE_KEY` is stackr's own (its `.env`), `PORTAL_SUPABASE_KEY` any name such as `sb_publishable_local`, since GoTrue asks for none, and these lines point the application at GoTrue (`AUTH_ISSUER` is stackr's `AUTH_PUBLIC_URL`) and the stack's PostgreSQL:
+2. In the application: `make install` and `make env`, then fill in `.env`: `LITELLM_API_KEY`, the key from step 1; `AUTH_SERVICE_ROLE_KEY`; `PORTAL_SUPABASE_KEY`; and, for Langfuse, its keys and `PORTAL_LANGFUSE_PROJECT`. On local Supabase the two keys are `supabase status`'s secret and publishable keys. On the PostgreSQL adapter, GoTrue alone, `AUTH_SERVICE_ROLE_KEY` is stackr's own (its `.env`), `PORTAL_SUPABASE_KEY` any name such as `sb_publishable_local`, since GoTrue asks for none, and these lines, in place of `.env.example`'s (the local commands read a setting's first line, Compose its last), point the application at GoTrue (`AUTH_ISSUER` is stackr's `AUTH_PUBLIC_URL`) and the stack's PostgreSQL:
 
    ```bash
    AUTH_ISSUER=http://localhost:9999

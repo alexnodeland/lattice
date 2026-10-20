@@ -204,9 +204,9 @@ test("an app that fills its window keeps a frame at least as tall as it started"
   await page.close();
 });
 
-test("a tall app is shown up to the window's cap, and scrolls inside its frame past it", async () => {
-  const page = await running(`<body style="margin:0"><div style="height:2000px">Board</div>`);
-  // The harness's window is 720 px tall: its cap is 720 less 15rem, 480.
-  await expect.poll(() => drawn(page), SETTLED).toBe(480);
+test("a tall app is shown whole up to twice the window, and scrolls inside its frame past it", async () => {
+  const page = await running(`<body style="margin:0"><div style="height:3000px">Board</div>`);
+  // The harness's window is 720 px tall: its cap is twice that.
+  await expect.poll(() => drawn(page), SETTLED).toBe(1440);
   await page.close();
 });

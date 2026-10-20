@@ -381,7 +381,7 @@ export class StateKeeper {
 // ─── the bridge ───────────────────────────────────────────────────────────────
 
 /** The height a frame may be sized to, in pixels: an app's ask is kept within it. */
-export const LEAST_HEIGHT = 120;
+const LEAST_HEIGHT = 120;
 export const MOST_HEIGHT = 2_000;
 
 /** What the person is asked, outside the frame, before the host acts for the app. */

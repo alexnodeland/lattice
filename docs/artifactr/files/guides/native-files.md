@@ -124,6 +124,43 @@ files = NativeFiles(blobs, checkouts, app)
 
 A call that arrives while another runs waits its turn within its own deadline, so add containers, not jobs, to serve more. A `crashed` failure's message ends with what the CLI printed, which a hostile file can shape: log it, but don't show it to people or pass it to an agent as it is. `worker_app(app, token=, limits=)` serves any app, if you build your own image: make the app with `launcher=limits.launcher()` and `limit=limits.files`, and pass `trusted=True` to one whose CLI confines nothing, since the worker is its confinement.
 
+## GridCraft
+
+`artifactr.files.gridcraft.Subprocess` is GridCraft's adapter for `.xlsx` workbooks, of the type `Workbook`. GridCraft's CLI confines nothing, so the adapter is made only with `trusted=True`, for tests and files you trust, until the sandboxed worker runs it:
+
+```python
+from artifactr.files.gridcraft import Subprocess as GridCraft
+
+gridcraft = GridCraft("/opt/gridcraft/bin/gridcraft-cli", version="0.8.0", trusted=True)
+files = NativeFiles(blobs, checkouts, {WordDocument: wordcraft, Workbook: gridcraft})
+```
+
+An agent's commands are GridCraft's own, such as `{"name": "cell.set", "args": {"cell": "B2", "input": "=SUM(B3:B9)"}}`; `gridcraft.commands("sort")` finds them, with where each is in GridCraft's ribbon. Its server has no batch, so the adapter runs a batch's commands one at a time and stops at the first that fails, which refuses the batch, naming the command, and saves nothing. GridCraft would open a CSV, or another format it reads, whatever the file is named, and save it as a `.xlsx`; the adapter refuses a source that isn't a `.xlsx` before GridCraft reads it, so a check-in never converts a file. A workbook's outline is its sheets, the ranges they use and their tables, and its text each sheet's cells as GridCraft shows them. It renders no page headless, and lists no comments. `scripts/craft gridcraft cli` fetches the pinned CLI, and `CRAFT=gridcraft moon run artifactr:fidelity` runs its fidelity report: GridCraft 0.8.0 keeps every feature of its corpus; not covered by the corpus: charts, pivots, images, sparklines and data bars.
+
+## DeckCraft
+
+`artifactr.files.deckcraft.Subprocess` is DeckCraft's adapter for `.pptx` decks, of the type `Presentation`. DeckCraft's CLI confines nothing too, so it is made only with `trusted=True`:
+
+```python
+from artifactr.files.deckcraft import Subprocess as DeckCraft
+
+deckcraft = DeckCraft("/opt/deckcraft/bin/deckcraft-cli", version="0.7.0", trusted=True)
+```
+
+An agent's commands are DeckCraft's own, such as `{"name": "slide.new", "args": {"layout": "titleAndContent"}}` or `{"name": "comment.add", "args": {"text": "Check"}}`; a batch stops at the first that fails, which refuses it whole. A deck's outline is its slides' titles, numbered from 1; its text is each slide's shapes, tables and notes; its review is each slide's comments, and its pages are its slides, each of which `render` draws as a PNG. DeckCraft opens its own `.deckcraft` format whatever a file is named, so the adapter refuses a source that isn't a `.pptx` before DeckCraft reads it. Its second save of a file writes the same XML another way, so its fingerprint reads each XML part in its canonical form, and a save that changes nothing makes no revision. `CRAFT=deckcraft moon run artifactr:fidelity` runs its fidelity report: DeckCraft 0.7.0 keeps every feature of its corpus; not covered by the corpus: charts, masters and layouts beyond one, embedded media and animations. What the adapter reads of a deck's XML in its canonical form is bounded: 16 MiB a part, 500,000 elements in all, 256 deep; past that the file is refused.
+
+## PdfCraft
+
+`artifactr.files.pdfcraft.Subprocess` is PdfCraft's adapter for `.pdf` documents, of the type `PdfDocument`. Its CLI takes one root, so, as WordCraft's, it is confined to the call's own directory, and needs no `trusted`:
+
+```python
+from artifactr.files.pdfcraft import Subprocess as PdfCraft
+
+pdfcraft = PdfCraft("/opt/pdfcraft/bin/pdfcraft-cli", version="0.8.0")
+```
+
+An agent's commands are PdfCraft's own, run through its command registry, such as `{"name": "page.insert_blank", "args": {"at": 2}}`; the adapter names the open document in each, and a batch stops at the first that fails, which refuses it whole. A document's outline is its bookmarks, its text each page's, its review its comments, and its pages its pages, each of which `render` draws as a PNG. PdfCraft stamps the time on every save, so the fingerprint leaves the stamp out, and a save that changes nothing else makes no revision. A document PdfCraft can only read by repairing it, such as one cut short, is refused rather than saved as PdfCraft's repair. `CRAFT=pdfcraft moon run artifactr:fidelity` runs its fidelity report: PdfCraft 0.8.0 keeps every feature of its corpus; not covered by the corpus: signatures (which PdfCraft's full rewrite on save invalidates), annotations beyond text notes and links, encryption, XFA and incremental updates. The fingerprint reads the file in one pass and inflates object streams only up to `limit`. Its key stays off until it passes its gate; the notices its Linux tarballs carry are below.
+
 ## The other crafting apps
 
 `artifactr.files.craft.CRAFTS` declares every crafting app, as its pinned release offers it, and each is an integration of its own, `files:<name>`, off by default but WordCraft's:
@@ -171,7 +208,6 @@ files = NativeFiles(blobs, checkouts, {WordDocument: wordcraft, Drawing: cadcraf
 **One app for each native type.** Give `NativeFiles` a mapping, and each file is read, edited and switched by its type's app, or else its nearest base's ([ADR-0012](../adr/0012-an-app-for-each-type-and-no-format-changed-by-a-check-in.md)):
 
 ```python
-# Workbook stands for the type GridCraft's own work adds.
 files = NativeFiles(blobs, checkouts, {WordDocument: wordcraft, Workbook: gridcraft})
 files.app_of(Workbook)  # gridcraft
 ```

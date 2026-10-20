@@ -44,6 +44,27 @@ The reference is generated from `artifactr.files`' docstrings and type annotatio
       show_root_heading: false
       show_root_toc_entry: false
 
+## artifactr.files.gridcraft
+
+::: artifactr.files.gridcraft
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+
+## artifactr.files.deckcraft
+
+::: artifactr.files.deckcraft
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+
+## artifactr.files.pdfcraft
+
+::: artifactr.files.pdfcraft
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+
 ## artifactr.files.cadcraft
 
 ::: artifactr.files.cadcraft

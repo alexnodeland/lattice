@@ -12,10 +12,9 @@ from typing import ClassVar, Final, override
 
 from pydantic import BaseModel, JsonValue
 
-from artifactr.files.app import AppCommand, AppFailed, CommandSpec, Inspection
+from artifactr.files.app import AppCommand, AppFailed, Inspection
 from artifactr.files.cadcraft.drawing import EXTENSIONS, media_type
 from artifactr.files.craft import CRAFTS, PREVIEW, Craft, Server, ToolsDialect
-from artifactr.files.craft.commands import listed
 from artifactr.files.craft.spawn import reply_text
 from artifactr.files.manifest import DXF, OUTLINE_LIMIT
 
@@ -54,6 +53,7 @@ class Subprocess(ToolsDialect):
 
     craft: ClassVar[Craft] = CRAFTS["cadcraft"]
     extension: ClassVar[str] = EXTENSIONS[DXF]
+    list_argument: ClassVar[str] = "filter"
     new_tool: ClassVar[str] = "new_drawing"
     open_tool: ClassVar[str] = "open"
     save_tool: ClassVar[str] = "save"
@@ -110,11 +110,6 @@ class Subprocess(ToolsDialect):
         if page != 1:
             raise AppFailed("refused", f"no page {page}: CADCraft renders its model space only")
         return await server.png(self.render_tool, width=max(16, round(PREVIEW * scale)))
-
-    @override
-    async def find(self, server: Server, query: str) -> Sequence[CommandSpec]:
-        """The commands `list_commands` finds for the query, ten at most."""
-        return listed(self.list_tool, await server.json(self.list_tool, filter=query))
 
     @override
     async def inspection(self, server: Server, document: JsonValue, content: bytes) -> Inspection:

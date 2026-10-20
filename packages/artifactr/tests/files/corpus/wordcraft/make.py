@@ -6,47 +6,20 @@ committed files drift from what this makes; `python -m tests.files.corpus.wordcr
 `packages/artifactr`, writes them again.
 """
 
-import io
-import struct
-import zipfile
-import zlib
 from collections.abc import Callable
 from pathlib import Path
 from typing import Final
 
+from tests.files.corpus.package import PKG, REL, RELS, XML, png, zipped
+
 HERE: Final = Path(__file__).parent
-TIME: Final = (2026, 10, 17, 0, 0, 0)
 
 W: Final = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 R: Final = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
-REL: Final = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
-PKG: Final = "http://schemas.openxmlformats.org/package/2006/relationships"
 WP: Final = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
 A: Final = "http://schemas.openxmlformats.org/drawingml/2006/main"
 PIC: Final = "http://schemas.openxmlformats.org/drawingml/2006/picture"
 MAIN: Final = "application/vnd.openxmlformats-officedocument.wordprocessingml"
-RELS: Final = "application/vnd.openxmlformats-package.relationships+xml"
-XML: Final = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
-
-
-def png(width: int, height: int) -> bytes:
-    """A PNG of a gradient, so its bytes are an image's and not a blank's."""
-
-    def chunk(kind: bytes, data: bytes) -> bytes:
-        body = kind + data
-        return struct.pack(">I", len(data)) + body + struct.pack(">I", zlib.crc32(body))
-
-    rows = b"".join(
-        b"\0" + b"".join(bytes((x * 255 // width, y * 255 // height, 128)) for x in range(width))
-        for y in range(height)
-    )
-    header = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)
-    return (
-        b"\x89PNG\r\n\x1a\n"
-        + chunk(b"IHDR", header)
-        + chunk(b"IDAT", zlib.compress(rows, 9))
-        + chunk(b"IEND", b"")
-    )
 
 
 def p(text: str, *, props: str = "", run: str = "") -> str:
@@ -108,12 +81,7 @@ def package(
         ),
         **files,
     }
-    buffer = io.BytesIO()
-    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
-        for name, content in files.items():
-            data = content.encode() if isinstance(content, str) else content
-            archive.writestr(zipfile.ZipInfo(name, TIME), data, zipfile.ZIP_DEFLATED)
-    return buffer.getvalue()
+    return zipped(files)
 
 
 def part(root: str, inner: str) -> str:

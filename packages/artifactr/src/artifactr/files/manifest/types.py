@@ -142,6 +142,24 @@ class WordDocument(NativeFile):
     formats: ClassVar[frozenset[str]] = frozenset({DOCX})
 
 
+class Workbook(NativeFile):
+    """A spreadsheet workbook, `.xlsx`: registered as `workbook`."""
+
+    formats: ClassVar[frozenset[str]] = frozenset({XLSX})
+
+
+class Presentation(NativeFile):
+    """A presentation, `.pptx`: registered as `presentation`."""
+
+    formats: ClassVar[frozenset[str]] = frozenset({PPTX})
+
+
+class PdfDocument(NativeFile):
+    """A PDF document, `.pdf`: registered as `pdf_document`."""
+
+    formats: ClassVar[frozenset[str]] = frozenset({PDF})
+
+
 class Drawing(NativeFile):
     """A drawing, `.dxf` or `.dwg`: registered as `drawing`."""
 

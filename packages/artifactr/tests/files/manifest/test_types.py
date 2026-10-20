@@ -11,16 +11,22 @@ from artifactr.files.manifest import (
     FIGCRAFT,
     IDML,
     OUTLINE_LIMIT,
+    PDF,
+    PPTX,
     PSD,
     SVG,
+    XLSX,
     Design,
     Drawing,
     LayeredImage,
     NativeFile,
     PageLayout,
+    PdfDocument,
+    Presentation,
     Provenance,
     VectorImage,
     WordDocument,
+    Workbook,
 )
 from tests.files.files_of import blob, digest, document
 
@@ -31,6 +37,15 @@ def test_a_word_document_is_registered_and_proposed_by_agents() -> None:
     assert WordDocument.write_policy == "propose"
     with pytest.raises(NotFound):
         get_artifact_type("native_file")  # abstract: never registered
+
+
+def test_each_crafting_apps_type_is_registered_with_its_format() -> None:
+    assert get_artifact_type("workbook") is Workbook
+    assert Workbook.formats == frozenset({XLSX})
+    assert get_artifact_type("presentation") is Presentation
+    assert Presentation.formats == frozenset({PPTX})
+    assert get_artifact_type("pdf_document") is PdfDocument
+    assert PdfDocument.formats == frozenset({PDF})
 
 
 @pytest.mark.parametrize(

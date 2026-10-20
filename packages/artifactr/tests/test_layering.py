@@ -109,7 +109,7 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         {"evalr", "pydantic", "pydantic_ai", *OTEL_API},
     ),
     # Native files, the files extra (lattice RFC-0003 and ADR-0026): built on the public API of
-    # core and the workspace, with its SQL stores in the sql extra and WordCraft's adapter on the
+    # core and the workspace, with its SQL stores in the sql extra and the apps' adapters on the
     # MCP client the files extra brings, and the agent's tools on the agent's public API, behind
     # the switch lattice-core declares, and people's check-out over artifactr's router's auth.
     # The worker serves an app with Starlette and uvicorn, and the application calls it with

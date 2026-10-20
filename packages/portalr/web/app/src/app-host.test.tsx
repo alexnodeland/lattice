@@ -198,3 +198,99 @@ test("an app made in a thread runs there, once, where it was made, at its latest
   expect(items[0]?.textContent).toContain("Make me a game");
   expect(items[2]?.textContent).toContain("Here it is.");
 });
+
+/** The server for a thread: every check allowed, and the revisions `revisions` answers. */
+function threaded(revisions: (artifact: string) => Response | undefined) {
+  return async (request: Request, path: string) => {
+    if (path === "/grantr/v1/checks") {
+      return Response.json(((await request.json()) as unknown[]).map(() => true));
+    }
+    const asked = /\/artifacts\/(\w+)\/revisions$/.exec(path);
+    return asked?.[1] ? revisions(asked[1]) : serving(on)(request, path);
+  };
+}
+
+/** A revision of an app, as artifactr reads it. */
+const revision = (id: string, version: number, title: string, state = {}) => ({
+  artifact_id: id,
+  version,
+  kind: "app",
+  data: { title, summary: "Rolls a die.", html: "<button>Roll</button>", state },
+  archived: false,
+  actor: AGENT,
+});
+
+test("apps made elsewhere, or in no thread, aren't shown; a second is shown where it was made", async () => {
+  const log = [
+    ...THREAD,
+    logged(6, {
+      type: "artifact_created",
+      artifact_id: "app_2",
+      kind: "app",
+      version: 1,
+      data: {},
+      thread_id: "thr_1",
+    }),
+    logged(7, {
+      type: "artifact_created",
+      artifact_id: "app_3",
+      kind: "app",
+      version: 1,
+      data: {},
+    }),
+  ];
+  const { screen } = await open(
+    "/t/acme/w/notes/threads/thr_1",
+    threaded((id) => {
+      const titles: Record<string, string> = { app_1: "Dice", app_2: "Coin", app_3: "Lost" };
+      return Response.json([revision(id, 1, titles[id] ?? id)]);
+    }),
+    undefined,
+    { apps: APPS, artifactrLog: log },
+  );
+  await expect.element(screen.getByRole("listitem", { name: "Coin" })).toBeInTheDocument();
+  const items = [...screen.container.querySelectorAll("[role=log] > ol > li")];
+  // A message is named by who posted it, through aria-labelledby; an app by its title.
+  expect(items.map((item) => item.getAttribute("aria-label"))).toEqual([
+    null,
+    "Dice",
+    null,
+    "Coin",
+  ]);
+  expect(screen.container.textContent).not.toContain("Lost");
+});
+
+test("a new version keeps the frame running, and a read again that fails keeps it too", async () => {
+  let read: () => Response = () => Response.json([revision("app_1", 1, "Dice")]);
+  const { screen, queryClient } = await open(
+    "/t/acme/w/notes/threads/thr_1",
+    threaded(() => read()),
+    undefined,
+    { apps: APPS, artifactrLog: THREAD },
+  );
+  const inline = screen.getByRole("listitem", { name: "Dice" });
+  await expect.element(inline.getByText(/Version 1\./)).toBeVisible();
+  const frame = inline.getByTitle(TITLE).element();
+  read = () =>
+    Response.json([revision("app_1", 1, "Dice"), revision("app_1", 2, "Dice", { rolled: 3 })]);
+  await queryClient.invalidateQueries();
+  await expect.element(inline.getByText(/Version 2\./)).toBeVisible();
+  expect(inline.getByTitle(TITLE).element()).toBe(frame);
+  read = () => new Response(null, { status: 500 });
+  await queryClient.invalidateQueries();
+  await vi.waitFor(() => expect(queryClient.isFetching()).toBe(0));
+  expect(inline.getByTitle(TITLE).element()).toBe(frame);
+  expect(inline.element().textContent).not.toContain("couldn't be read");
+});
+
+test("an app whose first read fails says so", async () => {
+  const { screen } = await open(
+    "/t/acme/w/notes/threads/thr_1",
+    threaded(() => new Response(null, { status: 500 })),
+    undefined,
+    { apps: APPS, artifactrLog: THREAD },
+  );
+  await expect
+    .element(screen.getByText("This app couldn't be read. Reload the page to try again."))
+    .toBeVisible();
+});

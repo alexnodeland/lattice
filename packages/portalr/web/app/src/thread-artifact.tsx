@@ -35,7 +35,10 @@ export function ThreadArtifact({
   const { queries } = context;
   const apps = useAppHost(context.config);
   const read = useQuery(queries.artifactr.revisions(tenant, workspace, artifact.id));
-  const latest = read.data?.reduce((a, b) => (b.version > a.version ? b : a));
+  const latest = read.data?.reduce<NonNullable<typeof read.data>[number] | undefined>(
+    (newest, revision) => (newest && newest.version > revision.version ? newest : revision),
+    undefined,
+  );
   const name = (latest && titleOf(latest.kind, latest.data)) ?? `The agent's ${artifact.kind}`;
   const open = (
     <TextLink
@@ -51,7 +54,8 @@ export function ThreadArtifact({
   );
   return (
     <InlineArtifact name={name} open={open}>
-      {read.isError ? (
+      {/* A read again that fails keeps what was read, so a running app keeps running. */}
+      {latest === undefined && read.isError ? (
         <Alert tone="error">
           This {artifact.kind} couldn't be read. Reload the page to try again.
         </Alert>
@@ -65,7 +69,8 @@ export function ThreadArtifact({
           <ArtifactContent
             kind={latest.kind}
             data={latest.data}
-            // The log's version and archiving are ahead of the read until it is read again.
+            // The version is the read's, which the app's state is written on; archiving is the
+            // log's, which arrives before the read again, so an archived app stops at once.
             shown={{ id: artifact.id, version: latest.version, archived: artifact.archived }}
             renderers={RENDERERS}
           />

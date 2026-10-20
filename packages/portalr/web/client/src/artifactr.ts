@@ -123,7 +123,16 @@ function withThread(state: Workspace, id: v1.ThreadId, change: Partial<Thread>):
   return { ...state, threads: { ...state.threads, [id]: { ...thread(state, id), ...change } } };
 }
 
-/** An artifact's event: where it was made is kept from its first, which the store saw or didn't. */
+/**
+ * Where an artifact's event says it was made: its thread, and the `seq` of the first event of it
+ * the store saw, which for an artifact made before the store read the log is a later one's.
+ */
+const madeAt = (event: { thread_id?: v1.ThreadId | null }, envelope: v1.EventFrame) => ({
+  threadId: event.thread_id ?? null,
+  seq: envelope.seq,
+});
+
+/** An artifact's event: where it was made is kept from its first, as `madeAt` reads it. */
 function withArtifact(
   state: Workspace,
   artifact: Omit<Artifact, "feedback" | "threadId" | "seq">,
@@ -188,19 +197,19 @@ const handlers: Handlers = {
     withArtifact(
       state,
       { id: event.artifact_id, kind: event.kind, version: event.version, archived: false },
-      { threadId: event.thread_id ?? null, seq: envelope.seq },
+      madeAt(event, envelope),
     ),
   artifact_changed: (state, event, envelope) =>
     withArtifact(
       state,
       { id: event.artifact_id, kind: event.kind, version: event.version, archived: false },
-      { threadId: event.thread_id ?? null, seq: envelope.seq },
+      madeAt(event, envelope),
     ),
   artifact_archived: (state, event, envelope) =>
     withArtifact(
       state,
       { id: event.artifact_id, kind: event.kind, version: event.version, archived: true },
-      { threadId: event.thread_id ?? null, seq: envelope.seq },
+      madeAt(event, envelope),
     ),
   proposal_created: (state, event) => ({
     ...state,

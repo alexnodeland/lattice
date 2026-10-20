@@ -200,17 +200,41 @@ test("an app past its calls a minute is said to be unanswered", async () => {
   await expect.element(page.getByText(/sent more than 60 messages in a minute/)).toBeVisible();
 });
 
-test("an app fills the window in its full view, and Escape brings it back, the frame kept", async () => {
+test("an app's full view is a modal filling the window, labelled, and Escape brings it back", async () => {
   const screen = await shown();
   const frame = await frameIn(screen);
   await screen.getByRole("button", { name: "Full view" }).click();
   const full = screen.getByRole("dialog", { name: "Dice" });
-  await expect.element(full).toBeVisible();
-  expect(getComputedStyle(full.element()).position).toBe("fixed");
+  await expect.element(full).toHaveAttribute("aria-modal", "true");
+  const back = full.getByRole("button", { name: "Back to the page" });
+  await expect.element(back).toHaveFocus();
+  // The host's label stays outside the frame, in sight; the frame fills the rest.
+  await expect.element(full.getByText(/^Made by the agent\. .* Version 4\.$/)).toBeVisible();
+  await expect.element(full.getByText("Rolls a six-sided die.")).toBeVisible();
+  expect(frame.getBoundingClientRect().height).toBeGreaterThan(innerHeight * 0.6);
+  // The page behind it is inert while it is open.
+  expect(document.querySelector("[inert]")).not.toBeNull();
   await userEvent.keyboard("{Escape}");
   await expect.element(full).not.toBeInTheDocument();
+  expect(document.querySelector("[inert]")).toBeNull();
   await expect.element(screen.getByRole("button", { name: "Full view" })).toBeVisible();
   expect(await frameIn(screen)).toBe(frame);
+});
+
+test("Escape leaves a question open in the full view alone", async () => {
+  const screen = await shown();
+  const frame = await frameIn(screen);
+  await screen.getByRole("button", { name: "Full view" }).click();
+  fromFrame(frame, {
+    id: 9,
+    method: "tools/call",
+    params: { name: "submit", arguments: { values: { rolled: 1 } } },
+  });
+  const asked = screen.getByRole("alertdialog", { name: "Send this from Dice?" });
+  await expect.element(asked).toBeVisible();
+  await userEvent.keyboard("{Escape}");
+  await expect.element(asked).not.toBeInTheDocument();
+  await expect.element(screen.getByRole("dialog", { name: "Dice" })).toBeVisible();
 });
 
 test("a tall app's frame fits the window, below the page's chrome and above a pinned composer", async () => {

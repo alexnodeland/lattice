@@ -158,6 +158,14 @@ export function Streaming({ text, author }: { text: string; author: string }) {
 }
 
 /** A thread's messages, oldest first, and what is streaming after them, announced as they come. */
+export function Messages({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <div role="log" aria-label="Messages">
+      <ol className={cn("flex flex-col gap-4", className)}>{children}</ol>
+    </div>
+  );
+}
+
 /**
  * An artifact shown in the thread it was made in, where it was made, as its kind's renderer draws
  * it, with a way to its own page (`open`): one per artifact, at its latest version.
@@ -178,14 +186,6 @@ export function InlineArtifact({
       {children}
       <span className="self-start text-xs">{open}</span>
     </li>
-  );
-}
-
-export function Messages({ children, className }: { children: ReactNode; className?: string }) {
-  return (
-    <div role="log" aria-label="Messages">
-      <ol className={cn("flex flex-col gap-4", className)}>{children}</ol>
-    </div>
   );
 }
 

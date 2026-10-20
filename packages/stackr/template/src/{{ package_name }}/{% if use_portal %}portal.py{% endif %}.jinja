@@ -228,6 +228,8 @@ class Portal:
                 address isn't set; or the apps' origin is named without the portal's.
         """
         portal = self._settings.portal
+        if portal.apps_url and not portal.url:
+            raise ValueError(UNFRAMED)
         site = self.site
         if site is None:
             if portal.required:
@@ -254,9 +256,7 @@ class Portal:
             ui=Path(portal.ui_dir) if portal.ui_dir else UI,
         )
         app.include_router(router, prefix=PREFIX)
-        if portal.apps_url:
-            if not portal.url:
-                raise ValueError(UNFRAMED)
+        if portal.apps_url and portal.url:
             app.add_middleware(
                 SandboxOrigin,
                 apps=portal.apps_url,

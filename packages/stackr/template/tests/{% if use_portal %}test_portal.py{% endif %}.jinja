@@ -74,6 +74,15 @@ def test_mini_apps_run_on_an_origin_of_their_own(script: Script, ui: Path) -> No
 def test_an_apps_origin_without_the_portals_stops_the_application(script: Script, ui: Path) -> None:
     with pytest.raises(ValueError, match="PORTAL_URL"):
         app(script, with_portal(ui_dir=str(ui), apps_url=APPS))
+    off = replace(settings(), portal=PortalSettings(apps_url=APPS))
+    with pytest.raises(ValueError, match="PORTAL_URL"):
+        app(script, off)
+
+
+def test_without_the_portal_no_app_runs(script: Script) -> None:
+    off = replace(settings(), portal=PortalSettings(url=PORTAL, apps_url=APPS))
+    with TestClient(app(script, off)) as client:
+        assert client.get("/healthz", headers={"Host": "127.0.0.1:8801"}).status_code == 200
 
 
 class Auth(BaseHTTPRequestHandler):

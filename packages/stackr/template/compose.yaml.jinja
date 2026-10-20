@@ -32,8 +32,10 @@ services:
 {%- endif %}
     ports:
       - ${APP_BIND:-127.0.0.1}:${APP_PORT:-{{ app_port }}}:8000
-{%- if use_portal %}
-      # Mini apps' origin, the same application answering a second port (PORTAL_APPS_URL).
+{%- if use_portal and hosting != 'host' %}
+      # Mini apps' origin, the same application answering a second port: PORTAL_APPS_URL in .env
+      # names it, and must agree with APPS_PORT. Without PORTAL_APPS_URL the port answers as the
+      # application does, and runs no app.
       - ${APP_BIND:-127.0.0.1}:${APPS_PORT:-{{ app_port + 1 }}}:8000
 {%- endif %}
 {%- if use_tracker and tracker == 'plane' %}

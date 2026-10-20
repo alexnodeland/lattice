@@ -3,7 +3,9 @@
 # `tailscale serve`; never `tailscale funnel`, which would put it on the internet. Its port stays
 # on 127.0.0.1, where Tailscale reaches it. The portal signs in on the application's own origin
 # (PORTAL_SUPABASE_URL=/), so it needs nothing else served. `make tailnet` and `make tailnet-off`
-# run it.
+# run it. Mini apps run on PORTAL_APPS_URL, framed only by PORTAL_URL, both 127.0.0.1 origins by
+# default: on the tailnet name, open the portal at PORTAL_URL's origin, or leave PORTAL_APPS_URL
+# empty, since this serves no second origin for the apps.
 #
 # Usage: scripts/tailnet.sh on|off PORT APP_URL
 #   PORT      the HTTPS port on the tailnet name (443 serves at https://<name>/)

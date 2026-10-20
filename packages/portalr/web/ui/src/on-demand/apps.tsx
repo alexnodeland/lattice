@@ -29,12 +29,14 @@ import { offSaid } from "../integrations";
 import { isObject } from "../json";
 import type { Sent } from "../sending";
 import { submissionId } from "../submission-id";
+import { TYPE } from "../type";
 
 /**
  * The most an app's frame is in the page: the window's height less the page's chrome above it and
  * a composer pinned below, so the whole frame can be seen at once, on a phone too; never less than
  * the least an app may ask for. A taller app scrolls inside its frame, or opens its full view.
  */
+// 15rem: a narrow page's bar above (3.5rem), the composer pinned below (9rem), and room between.
 const FITS = `max(${LEAST_HEIGHT}px, calc(100dvh - 15rem))`;
 
 /** The height a frame starts at, in pixels, until its app asks for another. */
@@ -103,6 +105,27 @@ function hostContext(within: Element, displayMode: DisplayMode): JsonObject {
   };
 }
 
+/**
+ * Make everything but `within` and its ancestors inert, as a modal's page is behind it, and give
+ * back a way to undo it: only what this made inert is let go.
+ */
+function inertOutside(within: Element): () => void {
+  const made: Element[] = [];
+  for (let node: Element | null = within; node?.parentElement; node = node.parentElement) {
+    for (const sibling of node.parentElement.children) {
+      if (sibling !== node && !sibling.hasAttribute("inert")) {
+        sibling.setAttribute("inert", "");
+        made.push(sibling);
+      }
+    }
+  }
+  return () => {
+    for (const each of made) {
+      each.removeAttribute("inert");
+    }
+  };
+}
+
 /** A question open, and how its answer, yes or no, reaches the bridge. */
 type Asking = Question & { readonly settle: (yes: boolean) => void };
 
@@ -136,12 +159,15 @@ export function Running({
   host,
   origin,
   after,
+  label,
 }: {
   app: ReadApp;
   shown: Shown;
   host: AppHost;
   origin: string;
   after: string;
+  /** What the host says of the app, which its full view shows outside the frame too. */
+  label: string;
 }) {
   // The frame itself, so the bridge starts again with a new one, as when the HTML changes.
   const [element, setElement] = useState<HTMLIFrameElement | null>(null);
@@ -163,15 +189,30 @@ export function Running({
   const [full, setFull] = useState(false);
   const mode = useRef<DisplayMode>("inline");
   const bridged = useRef<Bridge | null>(null);
+  const dialog = useRef<HTMLDivElement>(null);
+  const back = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     mode.current = full ? "fullscreen" : "inline";
     bridged.current?.contextChanged();
-    if (!full) {
+    const within = dialog.current;
+    if (!full || within === null) {
       return;
     }
-    const leave = (event: KeyboardEvent) => event.key === "Escape" && setFull(false);
+    // A modal: the page behind it inert, and the way back focused first. Escape in the page
+    // leaves it, unless a question is open or something else took it; Escape inside the frame
+    // is the app's, as every key there is, so the way back stays in sight above it.
+    const restore = inertOutside(within);
+    back.current?.focus();
+    const leave = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !event.defaultPrevented && open.current === null) {
+        setFull(false);
+      }
+    };
     addEventListener("keydown", leave);
-    return () => removeEventListener("keydown", leave);
+    return () => {
+      removeEventListener("keydown", leave);
+      restore();
+    };
   }, [full]);
 
   useEffect(() => {
@@ -262,21 +303,32 @@ export function Running({
         Skip past {app.title}
       </a>
       <div
+        ref={dialog}
         className={cn("flex flex-col gap-2", full && "fixed inset-0 z-50 bg-paper p-4")}
-        {...(full && { role: "dialog", "aria-label": app.title })}
+        {...(full && { role: "dialog", "aria-modal": true, "aria-label": app.title })}
       >
-        <Button
-          variant="ghost"
-          className="self-end border-line px-2 py-1 text-xs"
-          onClick={() => setFull(!full)}
-        >
-          <Icon icon={full ? Minimize2 : Maximize2} className="size-3.5" />
-          {full ? "Back to the page" : "Full view"}
-        </Button>
+        <div className="flex items-start justify-between gap-3">
+          {full && (
+            <div className="flex min-w-0 flex-col gap-0.5">
+              <p className={TYPE.label}>{app.title}</p>
+              <p className={TYPE.note}>{label}</p>
+              <p className="line-clamp-2 text-fg text-sm">{app.summary}</p>
+            </div>
+          )}
+          <Button
+            ref={back}
+            variant="ghost"
+            className="ml-auto shrink-0 border-line px-2 py-1 text-xs"
+            onClick={() => setFull(!full)}
+          >
+            <Icon icon={full ? Minimize2 : Maximize2} className="size-3.5" />
+            {full ? "Back to the page" : "Full view"}
+          </Button>
+        </div>
         <div
           className={cn(
             "overflow-hidden rounded-lg border-2 border-edge bg-paper forced-colors:border-[CanvasText]",
-            full && "flex-1",
+            full && "flex min-h-0 flex-1 flex-col",
           )}
         >
           <iframe
@@ -286,8 +338,8 @@ export function Running({
             src={`${origin}/?host=${encodeURIComponent(location.origin)}`}
             sandbox="allow-scripts allow-same-origin"
             referrerPolicy="no-referrer"
-            className="block w-full"
-            style={full ? { height: "100%" } : { height, maxHeight: FITS }}
+            className={cn("block w-full", full && "min-h-0 flex-1")}
+            style={full ? undefined : { height, maxHeight: FITS }}
           />
         </div>
       </div>

@@ -24,6 +24,7 @@ const TYPES: Readonly<Record<string, string>> = {
   "image/svg+xml": "Vector image",
   "application/vnd.adobe.indesign-idml-package": "Page layout",
   "application/x-figcraft": "Design",
+  "application/x-extension-fcstd": "3D model",
 };
 
 const UNITS = ["bytes", "kB", "MB", "GB"] as const;

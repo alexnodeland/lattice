@@ -242,8 +242,47 @@ function AppArtifact({ data }: { data: Data }) {
   return <AppFrame app={read} shown={shown ?? { id: "", version: 0, archived: true }} />;
 }
 
-/** An `app`: an agent's HTML, run sandboxed, labelled outside what it draws, in its thread too. */
-const app: Renderer = { ...ofJson((data) => <AppArtifact data={data} />), inline: true };
+/** An app's preview, as a revision shows it: its title and summary are beside it, not in it. */
+function AppPreview({ data }: { data: Data }) {
+  const shown = use(ShownContext);
+  const read = readApp(data);
+  if (read === null) {
+    return <Unreadable kind="app" data={data} />;
+  }
+  return (
+    <AppFrame app={read} shown={shown ?? { id: "", version: 0, archived: true }} titled={false} />
+  );
+}
+
+/** A field of an app's data that is text, or nothing. */
+function field(data: Data, name: string): string {
+  const value = data[name];
+  return isString(value) ? value : "";
+}
+
+/**
+ * An `app`: an agent's HTML, run sandboxed, labelled outside what it draws, in its thread too. A
+ * revision reads it as its title and summary, word by word, its HTML, line by line, a source, and
+ * its state, as JSON; its preview runs it, one revision at a time (portalr ADR-0053).
+ */
+const app: Renderer = {
+  ...ofJson((data) => <AppArtifact data={data} />),
+  inline: true,
+  runs: true,
+  preview: (data) => <AppPreview data={data} />,
+  about: (data) => (isString(data.summary) ? data.summary : null),
+  parts: (data) => [
+    { name: "title", text: field(data, "title"), diff: "words" },
+    { name: "summary", text: field(data, "summary"), diff: "words" },
+    { name: "HTML", text: field(data, "html"), diff: "lines", language: "html" },
+    {
+      name: "state",
+      text: JSON.stringify(isObject(data.state) ? data.state : {}, null, 2),
+      diff: "lines",
+      language: "json",
+    },
+  ],
+};
 
 /** artifactr.ui's kinds and their renderers, for an application's registry. */
 export const UI_RENDERERS: readonly (readonly [string, Renderer])[] = [

@@ -6,6 +6,7 @@ implement :class:`Storage` themselves; the workspace behaviour suite in the test
 what an implementation must do.
 """
 
+import dataclasses
 import uuid
 from collections.abc import AsyncGenerator, Collection, Sequence
 from contextlib import AbstractAsyncContextManager
@@ -293,3 +294,14 @@ def seal(
             )
         )
     return envelopes
+
+
+def dated(result: CommitResult, ts: datetime) -> CommitResult:
+    """Stamp the revisions a result appends with when they were committed: their events' ``ts``.
+
+    Implementations of :meth:`Transaction.save` call it with the ``ts`` they :func:`seal` with.
+    """
+    if not result.revisions:
+        return result
+    revisions = tuple(r.model_copy(update={"at": ts}) for r in result.revisions)
+    return dataclasses.replace(result, revisions=revisions)

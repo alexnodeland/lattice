@@ -22,6 +22,7 @@ export {
   plainTitle,
   type Renderer,
   type Renderers,
+  type RevisionPart,
   rendererFor,
 } from "./artifacts";
 export { Button, type ButtonSize, type ButtonVariant } from "./button";
@@ -86,6 +87,7 @@ export { Num } from "./num";
 export { PageHeader } from "./page-header";
 export { Plain } from "./plain";
 export { Progress } from "./progress";
+export { type Compare, type More, type RevisionShown, Revisions } from "./revisions";
 export { Row, RowLink, Rows } from "./rows";
 export { RuleRunStatus, RunList, type RunParts } from "./run-list";
 export { safeHref } from "./safe-href";

@@ -34,7 +34,7 @@ from artifactr.core import (
     delivered_to,
 )
 from artifactr.core.actors import Actor
-from artifactr.workspace.storage import HistoryChunk, Scope, seal
+from artifactr.workspace.storage import HistoryChunk, Scope, dated, seal
 
 Clock = Callable[[], datetime]
 """Returns the current time; injectable so tests control expiry."""
@@ -96,12 +96,14 @@ class _Transaction:
     async def save(
         self, result: CommitResult, *, actor: Actor, traceparent: str | None = None
     ) -> list[Envelope]:
+        ts = self._clock()
+        result = dated(result, ts)
         envelopes = seal(
             result.events,
             after_seq=len(self._data.log) + len(self._envelopes),
             scope=self._scope,
             actor=actor,
-            ts=self._clock(),
+            ts=ts,
             traceparent=traceparent,
         )
         self._results.append(result)

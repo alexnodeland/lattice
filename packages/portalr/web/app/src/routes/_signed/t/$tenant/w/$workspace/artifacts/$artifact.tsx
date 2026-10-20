@@ -3,12 +3,11 @@ import {
   AppHostContext,
   ArtifactContent,
   Card,
-  Diff,
   FormHostContext,
   PageHeader,
   ProposalCard,
   proposedOn,
-  rendererFor,
+  Revisions,
   SectionTitle,
   TextLink,
   Thumbs,
@@ -17,6 +16,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useEffect, useMemo } from "react";
 import { useAppHost } from "../../../../../../../app-host";
+import { author } from "../../../../../../../author";
 import { useFormHost } from "../../../../../../../form-host";
 import { KillSwitch } from "../../../../../../../kill-switch";
 import { NativeFile, TextChanges, wordsChanged } from "../../../../../../../native-file";
@@ -27,8 +27,8 @@ import { Connection, useStream, useWorkspace } from "../../../../../../../worksp
 
 /**
  * An artifact: its content, through its kind's renderer; its revisions, newest first, each with
- * what it changed; and the proposals open on it. Its revisions are read over REST, again as the
- * workspace's log moves past them.
+ * who made it, when, and what it changed, readable (portalr ADR-0053); and the proposals open on
+ * it. Its revisions are read over REST, again as the workspace's log moves past them.
  */
 /** What a person may do on an artifact's page, beyond responding to its proposals. */
 const ACTIONS = ["artifactr:give_feedback"] as const;
@@ -80,34 +80,32 @@ function Artifact() {
   const snapshot = useWorkspace();
   const host = useFormHost({ queries, tenant, workspace, me, renderers: RENDERERS });
   const apps = useAppHost(context.config);
-  // The revisions in order, whatever order the server sent, each with what it changed: worked out
-  // once each time they are read, not on every event the workspace's stream brings.
-  const history = useMemo(() => {
-    const ordered = [...revisions].sort((a, b) => a.version - b.version);
-    const latest = ordered.at(-1);
-    if (latest === undefined) {
-      return null;
-    }
-    const renderer = rendererFor(latest.kind, RENDERERS);
-    const versions = ordered.map((revision, index) => {
-      const before = ordered[index - 1];
-      const was = before ? renderer.text(before.data) : "";
-      return {
-        revision,
-        changes: changes(was, renderer.text(revision.data), renderer.diff),
-        // A native file's words are compared apart, from the text the app read from each version.
-        before:
-          NATIVE.has(revision.kind) &&
-          before !== undefined &&
-          wordsChanged(before.data, revision.data)
-            ? before.version
-            : null,
-      };
-    });
-    return { latest, versions: versions.reverse() };
-  }, [revisions]);
+  const latest = useMemo(
+    () =>
+      revisions.reduce<(typeof revisions)[number] | undefined>(
+        (newest, revision) => (newest && newest.version > revision.version ? newest : revision),
+        undefined,
+      ),
+    [revisions],
+  );
+  // Each revision as the list names who made it: the reader as "You".
+  const shown = useMemo(
+    () =>
+      revisions.map((revision) => ({
+        version: revision.version,
+        kind: revision.kind,
+        data: revision.data,
+        by: author(revision.actor, me),
+        at: revision.at ?? null,
+      })),
+    [revisions, me],
+  );
+  const byVersion = useMemo(
+    () => new Map(revisions.map((revision) => [revision.version, revision.data])),
+    [revisions],
+  );
   const logged = snapshot.state.artifacts[id]?.version;
-  const read = history?.latest.version;
+  const read = latest?.version;
   useEffect(() => {
     if (logged !== undefined && read !== undefined && logged > read) {
       void queryClient.invalidateQueries({
@@ -115,10 +113,9 @@ function Artifact() {
       });
     }
   }, [logged, read, queryClient, tenant, workspace, id]);
-  if (history === null) {
+  if (latest === undefined) {
     return null; // the loader found it; it can't have no revisions
   }
-  const { latest, versions } = history;
   const title = titleOf(latest.kind, latest.data);
   const native = NATIVE.get(latest.kind);
   const open = Object.values(snapshot.state.proposals).filter(
@@ -207,16 +204,19 @@ function Artifact() {
       )}
       <section aria-labelledby="revisions" className="flex flex-col gap-3">
         <SectionTitle id="revisions">Revisions</SectionTitle>
-        <ol aria-label="Revisions" className="flex flex-col gap-3">
-          {versions.map(({ revision, changes, before }) => (
-            <li
-              key={revision.version}
-              aria-label={`Version ${revision.version}`}
-              className="flex flex-col gap-2 rounded-lg border border-line bg-surface p-4"
-            >
-              <span className="font-semibold text-sm">Version {revision.version}</span>
-              <Diff changes={changes} />
-              {before !== null && (
+        <Revisions
+          id={id}
+          revisions={shown}
+          renderers={RENDERERS}
+          compare={changes}
+          more={(revision, before) => {
+            const was = before === null ? undefined : byVersion.get(before);
+            // A native file's words are compared apart, from the text the app read from each.
+            return (
+              NATIVE.has(revision.kind) &&
+              before !== null &&
+              was !== undefined &&
+              wordsChanged(was, revision.data) && (
                 <TextChanges
                   queries={queries}
                   tenant={tenant}
@@ -224,10 +224,10 @@ function Artifact() {
                   artifact={id}
                   versions={[before, revision.version]}
                 />
-              )}
-            </li>
-          ))}
-        </ol>
+              )
+            );
+          }}
+        />
       </section>
     </section>
   );

@@ -20,6 +20,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useRef, useState } from "react";
 import type { Context } from "./context";
+import { startEditing, stopEditing, useEditing } from "./editing";
 import { EditorFrame } from "./editor-frame";
 
 type Status = FilesApi.components["schemas"]["FileStatus"];
@@ -146,7 +147,24 @@ export function CheckOut({
   const [own, keep] = useOwnCheckout(place);
   // Its build hands the file over and back where its editor is hosted: it is edited here.
   const here = editor !== null && status.talk === "bridged";
-  const [editing, setEditing] = useState(false);
+  // One file is edited in place on a page at a time; the version checked out is what it opens,
+  // which, once the page is loaded again, is the head the lease still holds.
+  const editing = useEditing()?.artifact === artifact;
+  const [base, setBase] = useState<number | null>(null);
+  const setEditing = (on: boolean) => {
+    if (!on) {
+      stopEditing(artifact);
+      return true;
+    }
+    const busy = startEditing(artifact, status.name);
+    if (busy !== null) {
+      onSaid({
+        tone: "warn",
+        text: `${busy.name} is open in its editor with unsaved changes: save or close it first. One file is edited here at a time.`,
+      });
+    }
+    return busy === null;
+  };
   const lease = status.lease;
   // The lease names the reader's check-out while it holds, made in this tab or another.
   const leased = lease?.checkout_id ?? null;
@@ -187,7 +205,10 @@ export function CheckOut({
       minute: "2-digit",
     });
     if (here) {
-      setEditing(true);
+      setBase(checkout.base_version);
+      if (!setEditing(true)) {
+        return;
+      }
       onSaid({ tone: "info", text: `Checked out until ${until}. ${app} is opening here.` });
       return;
     }
@@ -241,7 +262,7 @@ export function CheckOut({
           app={app}
           editor={editor}
           checkout={checkout}
-          version={status.version}
+          version={base ?? status.version}
           onSaid={onSaid}
           onEnded={() => {
             setEditing(false);

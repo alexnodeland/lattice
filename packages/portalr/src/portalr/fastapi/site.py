@@ -3,7 +3,7 @@
 import base64
 from urllib.parse import urlsplit
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 from lattice_core.integrations import KEY
 
@@ -77,6 +77,19 @@ class Site(BaseModel):
                 raise ValueError(f"{key}'s editor is at {url}: a host, with no user or password")
         return editors
 
+    @model_validator(mode="after")
+    def _editors_apart(self) -> "Site":
+        """Refuse an editor on the apps' origin or Supabase's.
+
+        The portal frames an editor with its origin's scripts allowed, so it must be an origin of
+        its own. The portal's own origin isn't known here; the UIs refuse an editor on it.
+        """
+        others = {_origin(url) for url in (self.apps, self.supabase_url) if url and _web(url)}
+        for key, url in self.editors.items():
+            if _origin(url) in others:
+                raise ValueError(f"{key}'s editor is at {url}: give it an origin of its own")
+        return self
+
     @field_validator("supabase_key")
     @classmethod
     def _publishable(cls, key: str) -> str:
@@ -84,6 +97,12 @@ class Site(BaseModel):
         if key.startswith("sb_secret_") or _role(key) == "service_role":
             raise ValueError("this is a secret key; config.json takes the publishable one")
         return key
+
+
+def _origin(url: str) -> str:
+    """A URL's origin, its scheme and host in lower case."""
+    parts = urlsplit(url)
+    return f"{parts.scheme.lower()}://{parts.netloc.lower()}"
 
 
 def _web(url: str) -> bool:

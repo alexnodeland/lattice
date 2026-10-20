@@ -18,9 +18,10 @@ import {
   sheetsOf,
 } from "@portalr/ui";
 import { useQuery } from "@tanstack/react-query";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useMemo, useRef, useState } from "react";
 import type { Place } from "./check-out";
 import { DownloadButton, FileControls, type Native, useDownload } from "./native-file";
+import { useNear } from "./near";
 
 const XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
@@ -115,7 +116,8 @@ function Pages({
 
 /** A workbook's sheets, one at a time, chosen by name where it has more than one. */
 function Sheets({ text, outline }: { text: string; outline: string }) {
-  const sheets = sheetsOf(text, sheetNames(outline));
+  // Read once for each text: a workbook's can be long, and the page renders on every poll.
+  const sheets = useMemo(() => sheetsOf(text, sheetNames(outline)), [text, outline]);
   const [chosen, setChosen] = useState("0");
   const index = Math.min(Number(chosen), sheets.length - 1);
   const sheet = sheets[index];
@@ -141,21 +143,44 @@ function Sheets({ text, outline }: { text: string; outline: string }) {
  * A native file, inline: what it is, a view of it, its download, and what the reader can do with
  * it. Where native files' routes aren't served, `unserved` is shown instead: the manifest alone.
  */
-export function NativeInline({
-  place,
-  native,
-  me,
-  unserved,
-}: {
+export function NativeInline(props: {
   place: Place;
   native: Native;
   me: string;
   unserved: ReactNode;
 }) {
-  const { context, tenant, workspace, artifact } = place;
-  const { data: status, error } = useQuery(
-    context.queries.files.status(tenant, workspace, artifact),
+  const box = useRef<HTMLDivElement>(null);
+  const { near, seen } = useNear(box);
+  return (
+    <div ref={box} className="min-h-12">
+      <FileView {...props} near={near} seen={seen} />
+    </div>
   );
+}
+
+function FileView({
+  place,
+  native,
+  me,
+  unserved,
+  near,
+  seen,
+}: {
+  place: Place;
+  native: Native;
+  me: string;
+  unserved: ReactNode;
+  near: boolean;
+  seen: boolean;
+}) {
+  const { context, tenant, workspace, artifact } = place;
+  const reads = context.queries.files.status(tenant, workspace, artifact);
+  // Read once it comes near the window, and polled only while it is near.
+  const { data: status, error } = useQuery({
+    ...reads,
+    enabled: seen,
+    refetchInterval: (near && reads.refetchInterval) || false,
+  });
   const { saving, download } = useDownload(place, status?.name);
   const [chosen, setChosen] = useState<View | null>(null);
   if (error instanceof Refused && error.status === 404) {

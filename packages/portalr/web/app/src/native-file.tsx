@@ -28,6 +28,7 @@ import {
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { CheckOut, editorAt, type Place, type Said } from "./check-out";
+import { useEditing } from "./editing";
 
 type Queries = ReturnType<typeof createQueries>;
 type Lease = FilesApi.components["schemas"]["Lease"];
@@ -166,9 +167,17 @@ export function FileControls({
   }, [said]);
   const on = status.enabled && enabled(native.integration);
   const held = holderOf(status.lease, me, names);
+  // Switched off while it is edited here, the editor stays, with the work in it, and says so.
+  const editing = useEditing()?.artifact === place.artifact;
   return (
     <>
-      {on ? (
+      {!on && editing && (
+        <Alert tone="warn">
+          {native.app} was switched off in this workspace while you edited {status.name}: a save
+          won't be checked in. Download your work from {native.app} before you close it.
+        </Alert>
+      )}
+      {on || editing ? (
         <>
           <div className="flex flex-wrap items-center gap-2">
             <FileHolder holder={held} />

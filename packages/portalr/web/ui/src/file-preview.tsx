@@ -38,8 +38,8 @@ export function PageViewer({
   const { page } = shown;
   const go = (to: number) => onPage(Math.min(total, Math.max(1, to)));
   const keys = useRef<HTMLDivElement>(null);
-  const latest = useRef({ page, total, go });
-  latest.current = { page, total, go };
+  const latest = useRef({ page, total, go, actual });
+  latest.current = { page, total, go, actual };
   // The keys are heard on the page's box, which is a tab stop, as they bubble from it.
   useEffect(() => {
     const within = keys.current;
@@ -117,12 +117,27 @@ export function PageViewer({
   );
 }
 
-/** A key on a page's box, as the viewer pages by it: the other way, by arrow, right to left. */
+/**
+ * A key on a page's box, as the viewer pages by it: the other way, by arrow, right to left. A key
+ * with a modifier is the browser's, and at its own size the arrows scroll the page, as a
+ * scrolled region's do; Page Up and Down, Home and End still page.
+ */
 function paged(
   event: KeyboardEvent,
   within: Element,
-  { page, total, go }: { page: number; total: number; go: (to: number) => void },
+  {
+    page,
+    total,
+    go,
+    actual,
+  }: { page: number; total: number; go: (to: number) => void; actual: boolean },
 ) {
+  if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || event.defaultPrevented) {
+    return;
+  }
+  if (actual && event.key.startsWith("Arrow")) {
+    return;
+  }
   const rtl = getComputedStyle(within).direction === "rtl";
   const step = { ArrowRight: 1, ArrowLeft: -1, PageDown: 1, PageUp: -1 }[event.key];
   if (step !== undefined) {
@@ -146,6 +161,8 @@ export interface Sheet {
  * line a row and a tab a cell, the sheets parted by an empty line. A sheet's own empty row is
  * only an empty line if it has one column, so what follows an empty line is a sheet's name only
  * where the outline names that sheet; else, without the outline, every empty line parts sheets.
+ * The text has no escapes: a cell holding a tab or a line break is read as two cells, or two rows,
+ * which the file itself, downloaded, shows as one.
  */
 export function sheetsOf(text: string, named: readonly string[] = []): Sheet[] {
   const sheets: { name: string; rows: string[][] }[] = [];
@@ -184,6 +201,9 @@ export function columnName(index: number): string {
 /** The most rows of a sheet shown at once: the file has the rest. */
 export const SHOWN_ROWS = 200;
 
+/** The most columns of a sheet shown at once. */
+const SHOWN_COLUMNS = 50;
+
 /**
  * A sheet's cells, in a table named by the sheet, its columns lettered and its rows numbered as
  * its app shows them, and scrolled sideways where it is wider than the page. Only the first
@@ -191,10 +211,13 @@ export const SHOWN_ROWS = 200;
  */
 export function SheetTable({ sheet }: { sheet: Sheet }) {
   const caption = useId();
-  const width = Math.max(0, ...sheet.rows.map((row) => row.length));
+  const shown = sheet.rows.slice(0, SHOWN_ROWS);
+  // As wide as the rows shown, up to `SHOWN_COLUMNS`: a wide sheet's cells past it are the file's.
+  const wide = shown.reduce((most, row) => Math.max(most, row.length), 0);
+  const width = Math.min(wide, SHOWN_COLUMNS);
   // Columns and rows are named by their place, as the app names them: their names are their keys.
   const columns = Array.from({ length: width }, (_, column) => columnName(column));
-  const rows = sheet.rows.slice(0, SHOWN_ROWS).map((cells, line) => ({ number: line + 1, cells }));
+  const rows = shown.map((cells, line) => ({ number: line + 1, cells }));
   return (
     <div className="flex flex-col gap-2">
       <ScrollRegion
@@ -207,7 +230,9 @@ export function SheetTable({ sheet }: { sheet: Sheet }) {
           </caption>
           <thead className="sticky top-0 bg-wash">
             <tr>
-              <td className="border-line border-e border-b px-2 py-1" />
+              <th scope="col" className="border-line border-e border-b px-2 py-1">
+                <span className="sr-only">Row</span>
+              </th>
               {columns.map((column) => (
                 <th
                   key={column}
@@ -241,9 +266,16 @@ export function SheetTable({ sheet }: { sheet: Sheet }) {
           </tbody>
         </table>
       </ScrollRegion>
-      {sheet.rows.length > SHOWN_ROWS && (
+      {(sheet.rows.length > SHOWN_ROWS || wide > SHOWN_COLUMNS) && (
         <p className={TYPE.note}>
-          The first {SHOWN_ROWS} of {sheet.rows.length} rows. Download the file for the rest.
+          {[
+            sheet.rows.length > SHOWN_ROWS &&
+              `The first ${SHOWN_ROWS} of ${sheet.rows.length} rows.`,
+            wide > SHOWN_COLUMNS && `The first ${SHOWN_COLUMNS} of ${wide} columns.`,
+          ]
+            .filter(Boolean)
+            .join(" ")}{" "}
+          Download the file for the rest.
         </p>
       )}
     </div>

@@ -1,6 +1,6 @@
 /**
- * Artifacts inline in their thread, pinned by screenshots (portalr ADR-0055): a note, a form and
- * a submission through their renderers, a Word document a page at a time, and a workbook's cells,
+ * Artifacts inline in their thread, pinned by screenshots (portalr ADR-0055): a note, a form, a
+ * submission and a dashboard through their renderers, a Word document a page at a time, and a workbook's cells,
  * each in the entry's chrome, wide and narrow, in each scheme; and a note's full view. The
  * baselines are Linux's, made in CI, with the faces loaded.
  */
@@ -13,6 +13,7 @@ import { InlineArtifact, Messages } from "./chat";
 import { PageViewer, SheetTable } from "./file-preview";
 import { FileHolder } from "./native-file";
 import { dark } from "./test/colours";
+import { SUPPORT } from "./test/dashboards";
 import { LEAVE, LEAVE_UI } from "./test/forms";
 import { PAGES } from "./test/native-file";
 import { type FormHost, FormHostContext, UI_RENDERERS } from "./ui-renderers";
@@ -68,6 +69,9 @@ function Thread() {
             renderers={RENDERERS}
           />
         </InlineArtifact>
+        <InlineArtifact name="Support this week" kind="Dashboard" open={open}>
+          <ArtifactContent kind="dashboard" data={SUPPORT} renderers={RENDERERS} />
+        </InlineArtifact>
         <InlineArtifact name="launch-brief.docx" kind="Word document" open={open}>
           <div className="flex flex-col gap-3">
             <p className="text-muted text-sm">48 kB · 4 pages · version 3</p>
@@ -111,6 +115,11 @@ async function shown(width: number) {
   ]);
   await document.fonts.ready;
   await expect.element(screen.getByRole("img", { name: "Page 1 of 4" })).toBeVisible();
+  // The dashboard's bar chart names its series once its labels are measured.
+  await expect
+    .poll(() => [...document.querySelectorAll("svg text")].some((t) => t.textContent === "Phone"))
+    .toBe(true);
+  await new Promise((settled) => requestAnimationFrame(() => requestAnimationFrame(settled)));
   await commands.pointerAway();
   return screen;
 }
@@ -125,6 +134,7 @@ for (const [name, width] of [
       ["Launch plan", "note"],
       ["Request leave", "form"],
       ["Answers to Request leave", "submission"],
+      ["Support this week", "dashboard"],
       ["launch-brief.docx", "word-document"],
       ["figures.xlsx", "workbook"],
     ] as const) {

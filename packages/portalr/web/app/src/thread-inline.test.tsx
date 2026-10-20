@@ -89,6 +89,7 @@ const DATA: Record<string, readonly [string, Record<string, unknown>]> = {
   ],
   doc_1: ["word_document", manifest("brief.docx", DOCX, "Brief\nFees", 3)],
   book_1: ["workbook", manifest("figures.xlsx", XLSX, "Costs (A1:B3)\nPlan", null)],
+  book_2: ["workbook", manifest("budget.xlsx", XLSX, "Budget", null)],
 };
 
 /** A file's status, as native files' routes answer it. */
@@ -357,8 +358,9 @@ test("a workbook whose build hands it over is edited in its editor, framed here,
   const frame = editor.element() as HTMLIFrameElement;
   expect(frame.getAttribute("src")).toBe("http://127.0.0.1:9/.lattice/shim.html");
   expect(frame.getAttribute("sandbox")).toBe(
-    "allow-scripts allow-same-origin allow-downloads allow-modals",
+    "allow-scripts allow-same-origin allow-downloads allow-modals allow-forms allow-popups",
   );
+  expect(frame.getAttribute("allow")).toBe("clipboard-read; clipboard-write");
   await expect.element(book.getByText("Opening figures.xlsx in GridCraft")).toBeVisible();
   // A message from another origin, or another window, is not heard.
   fromShim(frame, { type: "lattice:ready" }, "https://elsewhere.example.test");
@@ -431,4 +433,164 @@ test("an editor that fails, or never starts, says so, and can be closed and open
   vi.advanceTimersByTime(60_000);
   await expect.element(book.getByText("GridCraft didn't open here")).toBeVisible();
   vi.useRealTimers();
+});
+
+const MINE = { checked_out_by: "user:alice", expires_at: CHECKOUT.expires_at, checkout_id: "co_1" };
+
+/**
+ * A thread of bridged workbooks alice holds, each opened in its editor, ready: the frames, the
+ * screen, and what the server is asked. `flags` answers the workspace's switches at each read.
+ */
+async function editingIn(
+  books: readonly string[] = ["book_1"],
+  flags: () => Record<string, boolean> = () => ({ "files:gridcraft": true }),
+) {
+  vi.stubGlobal("XMLHttpRequest", Upload);
+  const opened = await open(
+    THREAD,
+    async (request, path) =>
+      path === FLAGS
+        ? Response.json(flags())
+        : serving({
+            status: (id) => Response.json({ ...statusOf(id), lease: MINE, talk: "bridged" }),
+          })(request, path),
+    undefined,
+    {
+      artifactrLog: thread(books.map((id) => [id, "workbook"] as const)),
+      editors: { "files:gridcraft": GRID },
+    },
+  );
+  return opened;
+}
+
+/** Open a book's editor, and say it is ready: its frame. */
+async function ready(screen: Awaited<ReturnType<typeof open>>["screen"], name: string) {
+  const book = screen.getByRole("listitem", { name });
+  await book.getByRole("button", { name: "Edit here in GridCraft" }).click();
+  const editor = book.getByTitle(`GridCraft, editing ${name}`);
+  await expect.element(editor).toBeInTheDocument();
+  const frame = editor.element() as HTMLIFrameElement;
+  fromShim(frame, { type: "lattice:ready" });
+  await expect
+    .element(book.getByText("Open in GridCraft: saving there checks it in"))
+    .toBeVisible();
+  return { book, frame, editor };
+}
+
+test("a save while one is sent, or one too large, isn't sent; a malformed dirty is ignored", async () => {
+  const { screen } = await editingIn();
+  const { book, frame } = await ready(screen, "figures.xlsx");
+  fromShim(frame, { type: "lattice:dirty", dirty: "yes" });
+  fromShim(frame, { type: "lattice:dirty" });
+  await expect
+    .element(book.getByText("Open in GridCraft: saving there checks it in"))
+    .toBeVisible();
+  fromShim(frame, {
+    type: "lattice:save",
+    name: "figures.xlsx",
+    bytes: new ArrayBuffer(26_214_401),
+  });
+  await expect.element(book.getByText(/^GridCraft saved figures\.xlsx at 26 MB/)).toBeVisible();
+  expect(Upload.sent).toHaveLength(0);
+  fromShim(frame, { type: "lattice:save", name: "figures.xlsx", bytes: new ArrayBuffer(8) });
+  fromShim(frame, { type: "lattice:save", name: "figures.xlsx", bytes: new ArrayBuffer(8) });
+  await expect.element(book.getByText(/^Your last save is still being checked in/)).toBeVisible();
+  expect(Upload.sent).toHaveLength(1);
+});
+
+test("a refused check-in (403, 409, a lapsed check-out) keeps the editor open with the work", async () => {
+  const { screen } = await editingIn();
+  const { book, frame, editor } = await ready(screen, "figures.xlsx");
+  fromShim(frame, { type: "lattice:dirty", dirty: true });
+  for (const [status, type] of [
+    [403, "forbidden"],
+    [409, "invalid_state"],
+    [404, "not_found"],
+  ] as const) {
+    fromShim(frame, { type: "lattice:save", name: "figures.xlsx", bytes: new ArrayBuffer(8) });
+    await expect.poll(() => Upload.sent.length).toBeGreaterThan(0);
+    (Upload.sent.at(-1) as Upload).answer(status, { detail: { type, message: "refused" } });
+    await expect.element(book.getByText(/^It wasn't checked in/)).toBeVisible();
+    await expect.element(editor).toBeInTheDocument();
+    await expect.element(book.getByText("Unsaved changes in GridCraft")).toBeVisible();
+    Upload.sent = [];
+  }
+});
+
+test("closing with unsaved changes is confirmed, and leaving the page is guarded", async () => {
+  const added = vi.spyOn(window, "addEventListener");
+  const removed = vi.spyOn(window, "removeEventListener");
+  const guards = (spy: typeof added) =>
+    spy.mock.calls.filter(([type]) => type === "beforeunload").map(([, guard]) => guard);
+  const { screen } = await editingIn();
+  const { book, frame, editor } = await ready(screen, "figures.xlsx");
+  fromShim(frame, { type: "lattice:dirty", dirty: true });
+  await expect.element(book.getByText("Unsaved changes in GridCraft")).toBeVisible();
+  await expect.poll(() => guards(added).length).toBe(1);
+  const [guard] = guards(added);
+  const leaving = new Event("beforeunload", { cancelable: true });
+  (guard as (event: Event) => void)(leaving);
+  expect(leaving.defaultPrevented).toBe(true);
+  await book.getByRole("button", { name: "Close without saving" }).click();
+  const asked = screen.getByRole("alertdialog", { name: "Close GridCraft without saving?" });
+  await asked.getByRole("button", { name: "Cancel" }).click();
+  await expect.element(editor).toBeInTheDocument();
+  await book.getByRole("button", { name: "Close without saving" }).click();
+  await screen
+    .getByRole("alertdialog")
+    .getByRole("button", { name: "Close without saving" })
+    .click();
+  await expect.element(editor).not.toBeInTheDocument();
+  await expect.poll(() => guards(removed)).toContain(guard);
+});
+
+test("switched off while it is edited, the editor stays and says a save won't be checked in", async () => {
+  let on = true;
+  const { screen, queryClient } = await editingIn(["book_1"], () => ({ "files:gridcraft": on }));
+  const { book, editor } = await ready(screen, "figures.xlsx");
+  on = false;
+  await queryClient.invalidateQueries();
+  await expect
+    .element(book.getByText(/^GridCraft was switched off in this workspace/))
+    .toBeVisible();
+  await expect.element(editor).toBeInTheDocument();
+});
+
+test("one file is edited at a time: another opens only once the first has no unsaved changes", async () => {
+  const { screen } = await editingIn(["book_1", "book_2"]);
+  const first = await ready(screen, "figures.xlsx");
+  fromShim(first.frame, { type: "lattice:dirty", dirty: true });
+  const second = screen.getByRole("listitem", { name: "budget.xlsx" });
+  await expect.element(first.book.getByText("Unsaved changes in GridCraft")).toBeVisible();
+  await second.getByRole("button", { name: "Edit here in GridCraft" }).click();
+  await expect
+    .element(second.getByText(/^figures\.xlsx is open in its editor with unsaved changes/))
+    .toBeVisible();
+  expect(second.getByTitle("GridCraft, editing budget.xlsx").elements()).toHaveLength(0);
+  fromShim(first.frame, { type: "lattice:dirty", dirty: false });
+  await expect
+    .element(first.book.getByText("Open in GridCraft: saving there checks it in"))
+    .toBeVisible();
+  await second.getByRole("button", { name: "Edit here in GridCraft" }).click();
+  await expect.element(second.getByTitle("GridCraft, editing budget.xlsx")).toBeInTheDocument();
+  await expect.element(first.editor).not.toBeInTheDocument();
+});
+
+test("an editor named at the portal's own origin isn't framed", async () => {
+  const { screen } = await open(
+    THREAD,
+    serving({
+      flags: { "files:gridcraft": true },
+      status: (id) => Response.json({ ...statusOf(id), lease: MINE, talk: "bridged" }),
+    }),
+    undefined,
+    {
+      artifactrLog: thread([["book_1", "workbook"]]),
+      editors: { "files:gridcraft": `${location.origin}/` },
+    },
+  );
+  const book = screen.getByRole("listitem", { name: "figures.xlsx" });
+  await expect.element(book.getByRole("button", { name: "Download again" })).toBeVisible();
+  expect(book.getByRole("button", { name: "Edit here in GridCraft" }).elements()).toHaveLength(0);
+  expect(screen.container.querySelector("iframe")).toBeNull();
 });

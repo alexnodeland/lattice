@@ -7,9 +7,10 @@
  */
 
 import { checkIn, type FilesApi } from "@portalr/client";
-import { Alert, Button, StatusBadge } from "@portalr/ui";
-import { useLayoutEffect, useRef, useState } from "react";
+import { Alert, Button, ConfirmDialog, fileSize, StatusBadge } from "@portalr/ui";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { checkedIn, type Place, refused, type Said } from "./check-out";
+import { editingDirty, stopEditing } from "./editing";
 
 type Status = FilesApi.components["schemas"]["FileStatus"];
 
@@ -27,6 +28,12 @@ function shimAt(editor: string): string | null {
     return null;
   }
 }
+
+/** The most messages a second the page hears from the editor; the rest are dropped. */
+const MESSAGES_A_SECOND = 50;
+
+/** How often a check-out is extended while the editor holds unsaved changes. */
+const EXTEND_EVERY = 10 * 60_000;
 
 /** An extension, such as ".xlsx", in lower case; or "" for a name without one. */
 const extensionOf = (name: string) => name.match(/\.[^./]+$/)?.[0]?.toLowerCase() ?? "";
@@ -68,7 +75,31 @@ export function EditorFrame({
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const src = shimAt(editor);
-  const origin = src === null ? null : new URL(src).origin;
+  const shim = src === null ? null : new URL(src).origin;
+  // Never the portal's own origin: a frame allowed its origin's scripts would run beside the
+  // session, whoever named the editor.
+  const origin = shim === location.origin ? null : shim;
+  const { artifact } = place;
+
+  // Unsaved changes keep the page from being left without a word, keep the check-out from
+  // running out, and keep another file's editor from opening (`editing.ts`).
+  useEffect(() => {
+    editingDirty(artifact, dirty);
+    if (!dirty) {
+      return;
+    }
+    const leaving = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener("beforeunload", leaving);
+    const extend = setInterval(() => {
+      const { place: at, checkout: held } = latest.current;
+      void at.context.commands.files.extend(at.tenant, at.workspace, held);
+    }, EXTEND_EVERY);
+    return () => {
+      window.removeEventListener("beforeunload", leaving);
+      clearInterval(extend);
+    };
+  }, [artifact, dirty]);
+  useEffect(() => () => stopEditing(artifact), [artifact]);
   // The latest of what a message is handled with, so the listener, and the time the build has to
   // start, are set once for the frame, whatever renders meanwhile.
   const now = { place, status, app, version, checkout, onSaid, onEnded, onAnswered };
@@ -110,11 +141,20 @@ export function EditorFrame({
         to("failed");
       }
     };
+    // One save checked in at a time: another while it is sent is said, and not sent.
+    let sending = false;
     const save = async (name: string, bytes: ArrayBuffer) => {
       const { place: at, status: file, app, checkout: held } = latest.current;
       const { onSaid: say, onEnded: ended } = latest.current;
       const { context, tenant, workspace } = at;
       const wanted = extensionOf(file.name);
+      if (sending) {
+        say({
+          tone: "warn",
+          text: `Your last save is still being checked in: save again once it is.`,
+        });
+        return;
+      }
       if (extensionOf(name) !== wanted) {
         say({
           tone: "warn",
@@ -122,6 +162,14 @@ export function EditorFrame({
         });
         return;
       }
+      if (bytes.byteLength > file.limit) {
+        say({
+          tone: "error",
+          text: `${app} saved ${name} at ${fileSize(bytes.byteLength)}: the largest file a check-in takes is ${fileSize(file.limit)}. It wasn't checked in.`,
+        });
+        return;
+      }
+      sending = true;
       setSaving(true);
       const answer = await checkIn({
         surface: context.config.surfaces.artifactr,
@@ -132,16 +180,21 @@ export function EditorFrame({
         file: new File([bytes], file.name),
         unsigned: () => void context.signed.signOut(),
       });
+      sending = false;
       setSaving(false);
       latest.current.onAnswered(answer.outcome === "done" ? null : answer.status);
       if (answer.outcome === "done") {
         const text = checkedIn(answer.result, file.name, false);
         say({ tone: answer.result.outcome === "proposed" ? "warn" : "info", text });
+        setDirty(false);
         ended();
       } else {
+        // The editor stays open with the work in it: it can be saved again, or downloaded there.
         say({ tone: "error", text: refused("It wasn't checked in", answer, app) });
       }
     };
+    let second = 0;
+    let heardThisSecond = 0;
     const heard = (event: MessageEvent) => {
       const data: unknown = event.data;
       if (
@@ -153,11 +206,19 @@ export function EditorFrame({
       ) {
         return;
       }
+      const now = Math.floor(Date.now() / 1000);
+      heardThisSecond = now === second ? heardThisSecond + 1 : 1;
+      second = now;
+      if (heardThisSecond > MESSAGES_A_SECOND) {
+        return;
+      }
       const message = data as { type: unknown; dirty?: unknown; name?: unknown; bytes?: unknown };
       if (message.type === "lattice:ready" && phaseNow === "starting") {
         void open();
-      } else if (message.type === "lattice:dirty") {
-        setDirty(message.dirty === true);
+      } else if (message.type === "lattice:dirty" && typeof message.dirty === "boolean") {
+        // Told at once, so another file's editor isn't let open in between.
+        editingDirty(latest.current.place.artifact, message.dirty);
+        setDirty(message.dirty);
       } else if (message.type === "lattice:failed") {
         to("failed");
       } else if (
@@ -175,9 +236,11 @@ export function EditorFrame({
     };
   }, [origin]);
 
-  if (src === null) {
+  if (origin === null) {
     return (
-      <Alert tone="error">{app}'s editor isn't at a web address, so it can't open here.</Alert>
+      <Alert tone="error">
+        {app}'s editor isn't at a web address of its own, so it can't open here.
+      </Alert>
     );
   }
   return (
@@ -206,9 +269,23 @@ export function EditorFrame({
             Opening {status.name} in {app}
           </StatusBadge>
         )}
-        <Button variant="secondary" size="sm" className="ms-auto" onClick={onClose}>
-          {dirty ? "Close without saving" : `Close ${app}`}
-        </Button>
+        {dirty ? (
+          <ConfirmDialog
+            label="Close without saving"
+            size="sm"
+            className="ms-auto"
+            title={`Close ${app} without saving?`}
+            confirm="Close without saving"
+            onConfirm={async () => onClose()}
+          >
+            Your changes to {status.name} in {app} haven't been saved, so they aren't checked in.
+            Closing loses them.
+          </ConfirmDialog>
+        ) : (
+          <Button variant="secondary" size="sm" className="ms-auto" onClick={onClose}>
+            Close {app}
+          </Button>
+        )}
       </div>
       {phase === "failed" && (
         <Alert tone="warn">
@@ -218,10 +295,12 @@ export function EditorFrame({
       )}
       <iframe
         ref={frame}
-        src={src}
+        src={src ?? undefined}
         title={`${app}, editing ${status.name}`}
         // Its own origin, which can reach none of the portal's; it saves through the shim.
-        sandbox="allow-scripts allow-same-origin allow-downloads allow-modals"
+        // Its pickers and links, and the clipboard, as the pilot builds use them.
+        sandbox="allow-scripts allow-same-origin allow-downloads allow-modals allow-forms allow-popups"
+        allow="clipboard-read; clipboard-write"
         referrerPolicy="no-referrer"
         className="block h-[min(80dvh,48rem)] w-full rounded-md border border-edge bg-paper forced-colors:border-[CanvasText]"
       />

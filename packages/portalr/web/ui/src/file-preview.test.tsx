@@ -137,3 +137,56 @@ test("a long sheet shows its first rows, and says so", async () => {
     )
     .toBeVisible();
 });
+
+test("a key with a modifier is the browser's, and at its own size the arrows scroll, not page", async () => {
+  const screen = await render(<Viewer />);
+  const box = screen.getByRole("region", { name: /: Page / });
+  (box.element() as HTMLElement).focus();
+  for (const key of [
+    "{Alt>}{ArrowRight}{/Alt}",
+    "{Control>}{ArrowRight}{/Control}",
+    "{Meta>}{ArrowRight}{/Meta}",
+    "{Shift>}{ArrowRight}{/Shift}",
+  ]) {
+    await userEvent.keyboard(key);
+  }
+  await expect.element(screen.getByRole("img", { name: "Page 1 of 4" })).toBeVisible();
+  await screen.getByRole("button", { name: "Actual size" }).click();
+  (box.element() as HTMLElement).focus();
+  await userEvent.keyboard("{ArrowRight}");
+  await expect.element(screen.getByRole("img", { name: "Page 1 of 4" })).toBeVisible();
+  await userEvent.keyboard("{PageDown}");
+  await expect.element(screen.getByRole("img", { name: "Page 2 of 4" })).toBeVisible();
+});
+
+test("a wide sheet shows its first columns, as wide as the rows shown, and says so", async () => {
+  const wide = Array.from({ length: 60 }, (_, at) => `c${at}`);
+  const screen = await render(
+    <SheetTable
+      sheet={{ name: "Wide", rows: [wide, ...Array.from({ length: 300 }, () => ["x"])] }}
+    />,
+  );
+  const table = screen.getByRole("table", { name: "Wide" });
+  // The corner names the row numbers' column, for a screen reader.
+  await expect.element(table.getByRole("columnheader", { name: "Row" })).toBeInTheDocument();
+  expect(table.getByRole("columnheader").elements()).toHaveLength(51);
+  await expect
+    .element(screen.getByText(/^The first 200 of 301 rows\. The first 50 of 60 columns\./))
+    .toBeVisible();
+  // Only the rows shown set the width: a wide row past them adds no column.
+  const late = await render(
+    <SheetTable
+      sheet={{ name: "Late", rows: [...Array.from({ length: 200 }, () => ["x"]), wide] }}
+    />,
+  );
+  expect(
+    late.getByRole("table", { name: "Late" }).getByRole("columnheader").elements(),
+  ).toHaveLength(2);
+});
+
+test("the text has no escapes: a tab or a line break in a cell reads as two cells or two rows", () => {
+  // As the app writes a sheet: a tab between cells, a line a row, whatever a cell holds.
+  expect(sheetsOf("Notes\nsee\tbelow\nsecond line", ["Notes"])).toEqual([
+    { name: "Notes", rows: [["see", "below"], ["second line"]] },
+  ]);
+});

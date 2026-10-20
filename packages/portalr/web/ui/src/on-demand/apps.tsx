@@ -14,6 +14,7 @@ import {
   Bridge,
   CALLS_A_MINUTE,
   type JsonObject,
+  LEAST_HEIGHT,
   type Question,
   StateKeeper,
   type Written,
@@ -28,6 +29,13 @@ import { offSaid } from "../integrations";
 import { isObject } from "../json";
 import type { Sent } from "../sending";
 import { submissionId } from "../submission-id";
+
+/**
+ * The most an app's frame is in the page: the window's height less the page's chrome above it and
+ * a composer pinned below, so the whole frame can be seen at once, on a phone too; never less than
+ * the least an app may ask for. A taller app scrolls inside its frame, or opens its full view.
+ */
+const FITS = `max(${LEAST_HEIGHT}px, calc(100dvh - 15rem))`;
 
 /** The height a frame starts at, in pixels, until its app asks for another. */
 const FIRST_HEIGHT = 360;
@@ -279,7 +287,7 @@ export function Running({
             sandbox="allow-scripts allow-same-origin"
             referrerPolicy="no-referrer"
             className="block w-full"
-            style={{ height: full ? "100%" : height }}
+            style={full ? { height: "100%" } : { height, maxHeight: FITS }}
           />
         </div>
       </div>

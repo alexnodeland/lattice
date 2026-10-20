@@ -212,3 +212,11 @@ test("an app fills the window in its full view, and Escape brings it back, the f
   await expect.element(screen.getByRole("button", { name: "Full view" })).toBeVisible();
   expect(await frameIn(screen)).toBe(frame);
 });
+
+test("a tall app's frame fits the window, below the page's chrome and above a pinned composer", async () => {
+  const screen = await shown();
+  const frame = await frameIn(screen);
+  fromFrame(frame, { method: "ui/notifications/size-changed", params: { height: 2000 } });
+  await vi.waitFor(() => expect(frame.style.height).toBe("2000px"));
+  expect(frame.getBoundingClientRect().height).toBeLessThanOrEqual(innerHeight - 240);
+});

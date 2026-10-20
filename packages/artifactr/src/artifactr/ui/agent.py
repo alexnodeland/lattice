@@ -200,16 +200,22 @@ def ui_tools(
 
         @toolset.tool(
             prepare=on_apps,
-            description="Replace a mini app's HTML, and its summary if it says something else "
-            "now, as its next version. Its state is kept. The HTML is as for create_app.",
+            description="Replace a mini app's HTML, and its title and summary if they say "
+            "something else now, as its next version. Its state is kept. The HTML is as for "
+            "create_app.",
         )
         async def update_app(
-            ctx: RunContext[Session[Any]], id: str, html: str, summary: str | None = None
+            ctx: RunContext[Session[Any]],
+            id: str,
+            html: str,
+            summary: str | None = None,
+            title: str | None = None,
         ) -> str:
             workspace = ctx.deps.workspace
             current = await workspace.get(App, id)
             data = current.data.to_json()
-            changed = {"html": html, **({} if summary is None else {"summary": summary})}
+            named = {"title": title, "summary": summary}
+            changed = {"html": html, **{k: v for k, v in named.items() if v is not None}}
             app = _app({**data, **changed})
             command = EditArtifact(
                 artifact_id=current.id,

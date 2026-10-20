@@ -4,7 +4,24 @@ import pytest
 from pydantic import ValidationError
 
 from artifactr.core import NotFound, get_artifact_type
-from artifactr.files.manifest import DOCX, OUTLINE_LIMIT, Provenance, WordDocument
+from artifactr.files.manifest import (
+    DOCX,
+    DWG,
+    DXF,
+    FIGCRAFT,
+    IDML,
+    OUTLINE_LIMIT,
+    PSD,
+    SVG,
+    Design,
+    Drawing,
+    LayeredImage,
+    NativeFile,
+    PageLayout,
+    Provenance,
+    VectorImage,
+    WordDocument,
+)
 from tests.files.files_of import blob, digest, document
 
 
@@ -14,6 +31,24 @@ def test_a_word_document_is_registered_and_proposed_by_agents() -> None:
     assert WordDocument.write_policy == "propose"
     with pytest.raises(NotFound):
         get_artifact_type("native_file")  # abstract: never registered
+
+
+@pytest.mark.parametrize(
+    ("kind", "native", "formats"),
+    [
+        ("drawing", Drawing, {DXF, DWG}),
+        ("design", Design, {FIGCRAFT}),
+        ("page_layout", PageLayout, {IDML}),
+        ("vector_image", VectorImage, {SVG}),
+        ("layered_image", LayeredImage, {PSD}),
+    ],
+)
+def test_each_crafting_apps_files_are_a_type_of_their_own(
+    kind: str, native: type[NativeFile], formats: set[str]
+) -> None:
+    assert get_artifact_type(kind) is native
+    assert native.formats == formats
+    assert native.write_policy == "propose"
 
 
 def test_its_content_is_in_its_format() -> None:

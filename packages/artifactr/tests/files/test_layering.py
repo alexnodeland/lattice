@@ -42,6 +42,51 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         },
         {"pydantic"},
     ),
+    "cadcraft": (
+        {
+            "artifactr.files.manifest",
+            "artifactr.files.app",
+            "artifactr.files.craft",
+            "artifactr.files.cadcraft",
+        },
+        {"pydantic"},
+    ),
+    "photocraft": (
+        {
+            "artifactr.files.manifest",
+            "artifactr.files.app",
+            "artifactr.files.craft",
+            "artifactr.files.photocraft",
+        },
+        {"pydantic"},
+    ),
+    "vectorcraft": (
+        {
+            "artifactr.files.manifest",
+            "artifactr.files.app",
+            "artifactr.files.craft",
+            "artifactr.files.vectorcraft",
+        },
+        {"pydantic"},
+    ),
+    "designcraft": (
+        {
+            "artifactr.files.manifest",
+            "artifactr.files.app",
+            "artifactr.files.craft",
+            "artifactr.files.designcraft",
+        },
+        {"pydantic"},
+    ),
+    "figcraft": (
+        {
+            "artifactr.files.manifest",
+            "artifactr.files.app",
+            "artifactr.files.craft",
+            "artifactr.files.figcraft",
+        },
+        {"pydantic"},
+    ),
     # The worker, over any app, and the App that calls it; its entry point runs WordCraft's.
     "worker": (
         {

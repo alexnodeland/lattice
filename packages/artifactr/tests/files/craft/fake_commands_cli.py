@@ -11,6 +11,8 @@ It confines its files to the roots it is given, `--root` or the read and write r
 - `garbled`: answers a failed batch with results that aren't its usual ones.
 - `quiet`: answers a failed batch naming no step that failed.
 - `lenient`: answers a failed batch as if it had not failed, but for its results.
+- `plain`: answers a batch in text only, and a failed one as if it had not failed, as
+  PhotoCraft's server does.
 
 Run as `python -I fake_commands_cli.py --mode MODE mcp ...`, with `FAKE_ARGS` naming a file it
 writes its arguments to.
@@ -123,6 +125,8 @@ def serve(mode: str, read_root: Path | None, write_root: Path | None) -> None:
         if mode == "quiet":
             results = [{"ok": True}]
         reply = {"completed": len(results) - failed, "failed": failed, "results": results}
+        if mode == "plain":
+            return CallToolResult(content=[TextContent(text=json.dumps(reply))])
         return replied(reply, error=failed > 0 and mode != "lenient")
 
     @server.tool()

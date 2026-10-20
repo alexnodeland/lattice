@@ -57,6 +57,10 @@ async function running(html: string): Promise<Page> {
 /** Long enough for the sandbox, the app and the bridge to start on a busy CI runner. */
 const SETTLED = { timeout: 15_000 };
 
+/** The app's own frame, inside the sandbox's. */
+const appFrame = (page: Page) =>
+  page.frames().find((frame) => frame.parentFrame()?.parentFrame() === page.mainFrame());
+
 /** The app's frame's height, which the app asks for through the bridge. */
 const height = (page: Page) =>
   page.getByTitle("Probe: an app made by the agent").evaluate((frame) => frame.style.height);
@@ -137,30 +141,39 @@ test("WebRTC from a srcdoc frame the app makes still reaches the sink: not refus
   await page.close();
 });
 
-test("an app plays turn after turn: each click is delivered, its state written and answered", async () => {
-  // As a game does: a click writes the state through the bridge, and the answer draws the next
-  // turn, whose button is enabled again; then a second and a third click do the same.
+test("a game's turns each write its state and read it back, so every turn's button comes back", async () => {
+  // As create_app's description teaches: initialize, then each click writes the state, reads it
+  // back from structuredContent, and draws everything from it in one render.
   const page = await running(
-    `<body><button id="play">Play</button><output id="moves">0</output><script>
-let moves = 0, waiting = false, id = 0;
-const render = () => { document.getElementById("moves").textContent = String(moves); document.getElementById("play").disabled = waiting; };
-addEventListener("message", (e) => {
-  const m = typeof e.data === "string" ? JSON.parse(e.data) : e.data;
-  if (m && m.result && m.result.structuredContent) { moves += 1; waiting = false; render(); }
+    `<body><button id="play" disabled>Play</button><output id="moves">0</output><script>
+let state = { moves: 0 }, waiting = true, id = 0;
+const pending = new Map();
+const call = (method, params) => new Promise((done) => {
+  pending.set(++id, done);
+  parent.postMessage({ jsonrpc: "2.0", id, method, params }, "*");
 });
-document.getElementById("play").addEventListener("click", () => {
+const render = () => {
+  document.getElementById("moves").textContent = String(state.moves);
+  document.getElementById("play").disabled = waiting;
+};
+addEventListener("message", (e) => pending.get(e.data?.id)?.(e.data.result));
+const read = async () => {
+  const result = await call("tools/call", { name: "get_state", arguments: {} });
+  state = { moves: result.structuredContent?.state?.moves ?? 0 };
+};
+document.getElementById("play").addEventListener("click", async () => {
   waiting = true; render();
-  parent.postMessage({ jsonrpc: "2.0", id: ++id, method: "tools/call", params: { name: "set_state", arguments: { patch: [{ op: "add", path: "/moves", value: moves + 1 }] } } }, "*");
+  await call("tools/call", { name: "set_state", arguments: { patch: [{ op: "add", path: "/moves", value: state.moves + 1 }] } });
+  await read();
+  waiting = false; render();
 });
-render();
+call("ui/initialize", {}).then(read).then(() => { waiting = false; render(); });
 </script>`,
   );
-  const app = () =>
-    page.frames().find((frame) => frame.parentFrame()?.parentFrame() === page.mainFrame());
-  await expect.poll(() => app()?.textContent("#moves"), SETTLED).toBe("0");
+  await expect.poll(() => appFrame(page)?.isEnabled("#play"), SETTLED).toBe(true);
   for (const turn of ["1", "2", "3"]) {
-    await app()?.click("#play");
-    await expect.poll(() => app()?.textContent("#moves"), SETTLED).toBe(turn);
+    await appFrame(page)?.click("#play");
+    await expect.poll(() => appFrame(page)?.textContent("#moves"), SETTLED).toBe(turn);
   }
   await page.close();
 });

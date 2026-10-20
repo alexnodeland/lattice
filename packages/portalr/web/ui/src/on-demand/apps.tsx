@@ -7,6 +7,7 @@
  */
 
 import { AlertDialog } from "@base-ui/react/alert-dialog";
+import { Maximize2, Minimize2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Alert } from "../alert";
 import {
@@ -20,7 +21,9 @@ import {
 import type { AppHost, ReadApp } from "../app-frame";
 import type { Shown } from "../artifacts";
 import { Button } from "../button";
+import { cn } from "../cn";
 import { actions, backdrop, description, title as heading, popup } from "../dialog";
+import { Icon } from "../icon";
 import { offSaid } from "../integrations";
 import { isObject } from "../json";
 import type { Sent } from "../sending";
@@ -58,8 +61,11 @@ const MEDIA = [
   "(prefers-reduced-motion: reduce)",
 ];
 
+/** How the app is shown: in the page, or filling the window. */
+type DisplayMode = "inline" | "fullscreen";
+
 /** The host's context as MCP Apps' `hostContext` has it, with the modes portalr has besides. */
-function hostContext(within: Element): JsonObject {
+function hostContext(within: Element, displayMode: DisplayMode): JsonObject {
   const probe = document.createElement("span");
   within.append(probe);
   const variables: Record<string, string> = {};
@@ -78,8 +84,8 @@ function hostContext(within: Element): JsonObject {
   return {
     theme: dark ? "dark" : "light",
     styles: { variables },
-    displayMode: "inline",
-    availableDisplayModes: ["inline"],
+    displayMode,
+    availableDisplayModes: ["inline", "fullscreen"],
     locale: navigator.language,
     timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     platform: "web",
@@ -145,6 +151,20 @@ export function Running({
   const keeper = useRef<StateKeeper | null>(null);
   const head = useRef({ app, shown });
   head.current = { app, shown };
+  // Filling the window, or in the page: the frame stays where it is, so the app runs on.
+  const [full, setFull] = useState(false);
+  const mode = useRef<DisplayMode>("inline");
+  const bridged = useRef<Bridge | null>(null);
+  useEffect(() => {
+    mode.current = full ? "fullscreen" : "inline";
+    bridged.current?.contextChanged();
+    if (!full) {
+      return;
+    }
+    const leave = (event: KeyboardEvent) => event.key === "Escape" && setFull(false);
+    addEventListener("keydown", leave);
+    return () => removeEventListener("keydown", leave);
+  }, [full]);
 
   useEffect(() => {
     keeper.current?.rebase({ state: app.state, version: shown.version });
@@ -168,7 +188,7 @@ export function Running({
       state: kept,
       host: {
         app: () => ({ title: head.current.app.title, html: head.current.app.html }),
-        context: () => hostContext(element),
+        context: () => hostContext(element, mode.current),
         ask: (question) =>
           new Promise<boolean>((settle) => {
             if (open.current !== null) {
@@ -190,6 +210,7 @@ export function Running({
         quieted: () => setQuieted(true),
       },
     });
+    bridged.current = bridge;
     const heard = (event: MessageEvent) => bridge.heard(event);
     addEventListener("message", heard);
 
@@ -213,6 +234,7 @@ export function Running({
       }
       kept.stop();
       keeper.current = null;
+      bridged.current = null;
       open.current?.settle(false);
       open.current = null;
     };
@@ -231,17 +253,35 @@ export function Running({
       >
         Skip past {app.title}
       </a>
-      <div className="overflow-hidden rounded-lg border-2 border-edge bg-paper forced-colors:border-[CanvasText]">
-        <iframe
-          key={run.count}
-          ref={setElement}
-          title={`${app.title}: an app made by the agent`}
-          src={`${origin}/?host=${encodeURIComponent(location.origin)}`}
-          sandbox="allow-scripts allow-same-origin"
-          referrerPolicy="no-referrer"
-          className="block w-full"
-          style={{ height }}
-        />
+      <div
+        className={cn("flex flex-col gap-2", full && "fixed inset-0 z-50 bg-paper p-4")}
+        {...(full && { role: "dialog", "aria-label": app.title })}
+      >
+        <Button
+          variant="ghost"
+          className="self-end border-line px-2 py-1 text-xs"
+          onClick={() => setFull(!full)}
+        >
+          <Icon icon={full ? Minimize2 : Maximize2} className="size-3.5" />
+          {full ? "Back to the page" : "Full view"}
+        </Button>
+        <div
+          className={cn(
+            "overflow-hidden rounded-lg border-2 border-edge bg-paper forced-colors:border-[CanvasText]",
+            full && "flex-1",
+          )}
+        >
+          <iframe
+            key={run.count}
+            ref={setElement}
+            title={`${app.title}: an app made by the agent`}
+            src={`${origin}/?host=${encodeURIComponent(location.origin)}`}
+            sandbox="allow-scripts allow-same-origin"
+            referrerPolicy="no-referrer"
+            className="block w-full"
+            style={{ height: full ? "100%" : height }}
+          />
+        </div>
       </div>
       <p id={after} tabIndex={-1} className="sr-only">
         End of {app.title}.

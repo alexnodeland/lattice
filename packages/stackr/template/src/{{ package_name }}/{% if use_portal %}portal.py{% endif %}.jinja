@@ -27,7 +27,7 @@ import httpx
 from fastapi import APIRouter, FastAPI, HTTPException, Request, Response
 
 from grantr import Grants
-from portalr.fastapi import UI, Site, {% if use_tracker %}Surfaces, {% endif %}portalr_router
+from portalr.fastapi import UI, SandboxOrigin, Site, {% if use_tracker %}Surfaces, {% endif %}portalr_router
 from portalr.invites import Invite, InviteFailed, SupabaseInvite
 from portalr.people import People, SupabasePeople
 from portalr.readers import Grafana, Langfuse, LiteLLM, Loki, Prometheus, Readers, Tempo
@@ -41,6 +41,7 @@ PREFIX = "/portalr"
 LOGGER = logging.getLogger(__name__)
 
 OFF = "the portal is off: PORTAL_SUPABASE_URL and PORTAL_SUPABASE_KEY are unset"
+UNFRAMED = "PORTAL_APPS_URL needs PORTAL_URL, the portal's own origin, which alone frames the apps"
 PLAIN = "PORTAL_SUPABASE_URL is not an https address"
 NOWHERE = "PORTAL_SUPABASE_URL is this origin, which passes sign-in on: set AUTH_ISSUER"
 
@@ -192,6 +193,7 @@ class Portal:
 {%- if use_tracker %}
                 surfaces=Surfaces(relayr=""),
 {%- endif %}
+                apps=portal.apps_url,
             )
         return None
 
@@ -213,14 +215,17 @@ class Portal:
                 await client.aclose()
 
     def mount(self, app: FastAPI) -> None:
-        """Add the router and the UIs, if a Supabase project is named.
+        """Add the router and the UIs, and mini apps' sandbox, as the settings name them.
+
+        The router and the UIs are added if a Supabase project is named, and the sandbox, on
+        an origin of its own, if the apps' origin is.
 
         On this origin (``/``), Supabase Auth's sign-in calls are passed on here too.
 
         Raises:
             ValueError: If none is, or it is not at an https address, and the settings say the
                 application must have the portal; or it is this origin, and Supabase Auth's
-                address isn't set.
+                address isn't set; or the apps' origin is named without the portal's.
         """
         portal = self._settings.portal
         site = self.site
@@ -249,3 +254,12 @@ class Portal:
             ui=Path(portal.ui_dir) if portal.ui_dir else UI,
         )
         app.include_router(router, prefix=PREFIX)
+        if portal.apps_url:
+            if not portal.url:
+                raise ValueError(UNFRAMED)
+            app.add_middleware(
+                SandboxOrigin,
+                apps=portal.apps_url,
+                portal=portal.url,
+                root=Path(portal.ui_dir) if portal.ui_dir else UI,
+            )

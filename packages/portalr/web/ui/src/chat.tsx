@@ -158,6 +158,29 @@ export function Streaming({ text, author }: { text: string; author: string }) {
 }
 
 /** A thread's messages, oldest first, and what is streaming after them, announced as they come. */
+/**
+ * An artifact shown in the thread it was made in, where it was made, as its kind's renderer draws
+ * it, with a way to its own page (`open`): one per artifact, at its latest version.
+ */
+export function InlineArtifact({
+  name,
+  open,
+  children,
+}: {
+  /** What it is called, which names it in the log. */
+  name: string;
+  /** A link to its own page, where it has its full view and its history. */
+  open: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <li aria-label={name} className={card}>
+      {children}
+      <span className="self-start text-xs">{open}</span>
+    </li>
+  );
+}
+
 export function Messages({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <div role="log" aria-label="Messages">

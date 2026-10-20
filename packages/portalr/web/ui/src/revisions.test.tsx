@@ -1,4 +1,3 @@
-import { changes } from "@portalr/client";
 import { expect, test, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
@@ -7,6 +6,7 @@ import { markdown } from "./artifacts";
 import { IntegrationsContext, type IsEnabled } from "./integrations";
 import { changedSaid, type RevisionShown, Revisions } from "./revisions";
 import { axeViolations } from "./test/axe";
+import { compare } from "./test/compare";
 import { UI_RENDERERS } from "./ui-renderers";
 
 const RENDERERS = new Map([["note", markdown()], ...UI_RENDERERS]);
@@ -43,7 +43,7 @@ function shown(
   return render(
     <IntegrationsContext value={enabled}>
       <AppHostContext value={apps}>
-        <Revisions id="art_1" revisions={revisions} renderers={RENDERERS} compare={changes} />
+        <Revisions id="art_1" revisions={revisions} renderers={RENDERERS} compare={compare} />
       </AppHostContext>
     </IntegrationsContext>,
   );

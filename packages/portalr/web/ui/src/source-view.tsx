@@ -34,7 +34,8 @@ export function SourceView({
   const [unfolded, setUnfolded] = useState(false);
   const highlighted = useHighlightedLines(code, language);
   const region = useId();
-  const plain = code.split("\n");
+  // Each line with its number, which is its identity: a source's lines are only read whole.
+  const plain = code.split("\n").map((text, number) => ({ text, number }));
   const count = plain.length;
   const folded = !unfolded && count > FOLDED_LINES;
   const shown = folded ? FOLDED_LINES : count;
@@ -73,8 +74,7 @@ export function SourceView({
             wrapped ? "grid-cols-[auto_minmax(0,1fr)]" : "w-max min-w-full grid-cols-[auto_1fr]",
           )}
         >
-          {plain.slice(0, shown).map((line, at) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: a line's number is its identity
+          {plain.slice(0, shown).map(({ text, number: at }) => (
             <span key={at} className="contents">
               <span
                 aria-hidden="true"
@@ -91,7 +91,7 @@ export function SourceView({
               >
                 {highlighted?.[at]
                   ? highlighted[at].map((token) => <Token key={token.offset} token={token} />)
-                  : line}
+                  : text}
                 {at < shown - 1 && "\n"}
               </code>
             </span>

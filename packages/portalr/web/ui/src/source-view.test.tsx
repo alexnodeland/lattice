@@ -1,4 +1,3 @@
-import { changes } from "@portalr/client";
 import { expect, test } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
@@ -6,6 +5,7 @@ import { JsonView } from "./json-view";
 import { CONTEXT_LINES, LineDiff, lineCounts } from "./line-diff";
 import { FOLDED_LINES, SourceView } from "./source-view";
 import { axeViolations } from "./test/axe";
+import { compare } from "./test/compare";
 
 const numbered = (count: number) =>
   Array.from({ length: count }, (_, at) => `<p>line ${at + 1}</p>`).join("\n");
@@ -62,7 +62,7 @@ test("a source too long to highlight, or in a language not highlighted, shows as
 test("lines changed: added and removed marked for a reader, unchanged runs folded", async () => {
   const before = numbered(20);
   const after = before.replace("<p>line 10</p>", "<p>line ten</p>");
-  const changed = changes(before, after, "lines");
+  const changed = compare(before, after, "lines");
   expect(lineCounts(changed ?? [])).toEqual({ added: 1, removed: 1 });
   const screen = await render(<LineDiff changes={changed} name="HTML" />);
   const region = screen.getByRole("region", { name: "Changes to the HTML" });
@@ -83,7 +83,7 @@ test("lines changed: added and removed marked for a reader, unchanged runs folde
 });
 
 test("a lone unchanged line isn't folded, and changes too large to compare say so", async () => {
-  const changed = changes("a\nb\nc\nd\n", "a\nb\nc\nd\ne\n", "lines");
+  const changed = compare("a\nb\nc\nd\n", "a\nb\nc\nd\ne\n", "lines");
   const one = await render(<LineDiff changes={changed} name="text" />);
   await expect.element(one.getByText("a", { exact: true })).toBeVisible();
   expect(one.getByRole("button").elements()).toHaveLength(0);

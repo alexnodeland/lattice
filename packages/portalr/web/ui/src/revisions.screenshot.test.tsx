@@ -5,7 +5,6 @@
  * faces loaded.
  */
 
-import { changes } from "@portalr/client";
 import { expect, onTestFinished, test } from "vitest";
 import { commands, page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
@@ -13,6 +12,7 @@ import { markdown } from "./artifacts";
 import { IntegrationsContext } from "./integrations";
 import { type RevisionShown, Revisions } from "./revisions";
 import { dark } from "./test/colours";
+import { compare } from "./test/compare";
 import { UI_RENDERERS } from "./ui-renderers";
 
 const RENDERERS = new Map([["note", markdown()], ...UI_RENDERERS]);
@@ -116,7 +116,7 @@ async function shown(revisions: readonly RevisionShown[], width: number, forced 
           id="art_1"
           revisions={revisions}
           renderers={RENDERERS}
-          compare={changes}
+          compare={compare}
           // A pinned "now", so "how long ago" reads the same in every run.
           now={new Date("2026-10-20T12:00:00Z")}
         />

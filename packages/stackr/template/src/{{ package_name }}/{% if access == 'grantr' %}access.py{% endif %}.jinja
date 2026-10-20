@@ -113,6 +113,9 @@ INSTALLED: Final[list[str]] = [
 {%- if use_ui %}
     "ui:forms",
     "ui:dashboards",
+{%- if use_portal %}
+    "ui:mini-apps",
+{%- endif %}
 {%- endif %}
 {%- if use_portal %}
     "markdown:math",

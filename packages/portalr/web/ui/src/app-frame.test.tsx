@@ -199,3 +199,16 @@ test("an app past its calls a minute is said to be unanswered", async () => {
   }
   await expect.element(page.getByText(/sent more than 60 messages in a minute/)).toBeVisible();
 });
+
+test("an app fills the window in its full view, and Escape brings it back, the frame kept", async () => {
+  const screen = await shown();
+  const frame = await frameIn(screen);
+  await screen.getByRole("button", { name: "Full view" }).click();
+  const full = screen.getByRole("dialog", { name: "Dice" });
+  await expect.element(full).toBeVisible();
+  expect(getComputedStyle(full.element()).position).toBe("fixed");
+  await userEvent.keyboard("{Escape}");
+  await expect.element(full).not.toBeInTheDocument();
+  await expect.element(screen.getByRole("button", { name: "Full view" })).toBeVisible();
+  expect(await frameIn(screen)).toBe(frame);
+});

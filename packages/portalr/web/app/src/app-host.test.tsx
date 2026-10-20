@@ -120,3 +120,81 @@ test("mini apps switched off while an app runs stop it at the next read", async 
     .toBeVisible();
   expect(screen.container.querySelector("iframe")).toBeNull();
 });
+
+/** An event of the workspace's log, at `seq`, by `actor`. */
+const logged = (seq: number, event: Record<string, unknown>, actor: unknown = AGENT) => ({
+  type: "event",
+  seq,
+  id: `evt_${seq}`,
+  ts: "2026-10-20T09:00:00Z",
+  workspace_id: "notes",
+  actor,
+  event,
+});
+
+const AGENT = { kind: "agent", thread_id: "thr_1", run_id: "run_1" };
+
+/** A thread in which alice asks for an app, and the agent makes it, then changes it. */
+const THREAD = [
+  logged(
+    1,
+    { type: "thread_created", thread_id: "thr_1", title: "Games" },
+    { kind: "user", id: "alice" },
+  ),
+  logged(
+    2,
+    { type: "message_posted", thread_id: "thr_1", message_id: "msg_1", content: "Make me a game" },
+    { kind: "user", id: "alice" },
+  ),
+  logged(3, {
+    type: "artifact_created",
+    artifact_id: "app_1",
+    kind: "app",
+    version: 1,
+    data: {},
+    thread_id: "thr_1",
+    run_id: "run_1",
+  }),
+  logged(4, {
+    type: "message_posted",
+    thread_id: "thr_1",
+    message_id: "msg_2",
+    content: "Here it is.",
+    run_id: "run_1",
+  }),
+  logged(5, {
+    type: "artifact_changed",
+    artifact_id: "app_1",
+    kind: "app",
+    version: 2,
+    patch: { kind: "json_patch", ops: [] },
+    summary: "",
+    thread_id: "thr_1",
+    run_id: "run_1",
+  }),
+];
+
+test("an app made in a thread runs there, once, where it was made, at its latest version", async () => {
+  const { screen } = await open(
+    "/t/acme/w/notes/threads/thr_1",
+    async (request, path) =>
+      path === "/grantr/v1/checks"
+        ? Response.json(((await request.json()) as unknown[]).map(() => true))
+        : serving(on)(request, path),
+    undefined,
+    { apps: APPS, artifactrLog: THREAD },
+  );
+  const inline = screen.getByRole("listitem", { name: "Dice" });
+  await expect.element(inline.getByTitle(TITLE)).toBeInTheDocument();
+  await expect.element(inline.getByText(/Version 2\./)).toBeVisible();
+  await expect
+    .element(inline.getByRole("link", { name: "Open its page" }))
+    .toHaveAttribute("href", expect.stringContaining("/artifacts/app_1"));
+  expect(screen.container.querySelectorAll("iframe")).toHaveLength(1);
+  const items = [...screen.container.querySelectorAll("[role=log] > ol > li")];
+  expect(
+    items.map((item) => item.getAttribute("aria-label") ?? item.textContent?.slice(0, 20)),
+  ).toEqual([expect.anything(), "Dice", expect.anything()]);
+  expect(items[0]?.textContent).toContain("Make me a game");
+  expect(items[2]?.textContent).toContain("Here it is.");
+});

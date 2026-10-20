@@ -85,7 +85,13 @@ def test_a_licence_text_holding_an_equals_line_stays_in_its_entry() -> None:
     assert check_wheel.notices_problems("app", _notices(*BUNDLED, tricky)) == []
 
 
-def _wheel(directory: Path, notices: dict[str, str | None], *, extra: tuple[str, ...] = ()) -> None:
+def _wheel(
+    directory: Path,
+    notices: dict[str, str | None],
+    *,
+    extra: tuple[str, ...] = (),
+    sandbox: bool = True,
+) -> None:
     """A wheel of this version in dist/, with both UIs, these notices (None: absent), and more."""
     (directory / "pyproject.toml").write_text('[project]\nversion = "1.2.3"\n')
     (directory / "dist").mkdir()
@@ -97,6 +103,8 @@ def _wheel(directory: Path, notices: dict[str, str | None], *, extra: tuple[str,
             if text is not None:
                 built.writestr(f"portalr/static/{ui}/{check_wheel.NOTICES}", text)
         built.writestr("portalr/static/app/assets/app.css", ".bg-accent{}")
+        if sandbox:
+            built.writestr(check_wheel.SANDBOX, "<!doctype html>")
         for name in extra:
             built.writestr(name, "{}")
         for licence in check_wheel.LICENCES:
@@ -119,6 +127,15 @@ def test_a_wheel_without_a_uis_notices_fails(
     monkeypatch.chdir(tmp_path)
     assert check_wheel.main() == 1
     assert "lacks the admin UI's THIRD-PARTY-NOTICES.txt" in capsys.readouterr().err
+
+
+def test_a_wheel_without_the_sandbox_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _wheel(tmp_path, {"app": _notices(*BUNDLED), "admin": _notices(*BUNDLED)}, sandbox=False)
+    monkeypatch.chdir(tmp_path)
+    assert check_wheel.main() == 1
+    assert "lacks mini apps' sandbox" in capsys.readouterr().err
 
 
 def test_a_wheel_carrying_a_vite_manifest_fails(

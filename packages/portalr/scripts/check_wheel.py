@@ -1,4 +1,4 @@
-"""Fail unless portalr's wheel carries both UIs, their typefaces, and what they hold's licences.
+"""Fail unless portalr's wheel carries both UIs, mini apps' sandbox, their typefaces and licences.
 
 That includes each UI's third-party notices, written by its build from the packages in its
 bundle (web/notices): present, and an entry for each package, with its licence's text.
@@ -19,6 +19,9 @@ from pathlib import Path
 UIS = ("app", "admin")
 LICENCES = ("OFL-schibsted-grotesk.txt", "OFL-fragment-mono.txt", "tremor.txt", "NOTICE")
 """The typefaces' licences, and Tremor's, whose charts ``ui`` adapts, and the notice saying so."""
+
+SANDBOX = "portalr/static/sandbox/index.html"
+"""The page mini apps run in, which app's build writes beside the UIs (portalr ADR-0051)."""
 
 NOTICES = "THIRD-PARTY-NOTICES.txt"
 """Written beside each UI's index.html by its build, from the bundle; never by hand."""
@@ -96,6 +99,9 @@ def main() -> int:
         return 1
     if missing := [ui for ui in UIS if f"portalr/static/{ui}/index.html" not in names]:
         sys.stderr.write(f"check_wheel: {wheel.name} lacks the {', '.join(missing)} UI\n")
+        return 1
+    if SANDBOX not in names:
+        sys.stderr.write(f"check_wheel: {wheel.name} lacks mini apps' sandbox, {SANDBOX}\n")
         return 1
     if STYLED not in styles:
         sys.stderr.write(f"check_wheel: the app's styles in {wheel.name} lack ui's classes\n")

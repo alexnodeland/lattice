@@ -41,6 +41,27 @@ class Site(BaseModel):
     the app's browser build, served over https on an origin of its own, for which the portal sets
     no cookies (lattice RFC-0003); http only on loopback, for tests. The app opens it in a new tab
     when a person checks a file out, and opens none that is on its own origin."""
+    apps: str | None = None
+    """The origin mini apps run on (lattice RFC-0005), such as ``https://apps.example.com``: a
+    host of its own, the same site as the portal's, for which nothing sets or reads a cookie,
+    serving the sandbox and nothing else (:class:`~portalr.fastapi.SandboxOrigin`); http only on
+    loopback, for development and tests. The portal frames it alone. None where the deployment
+    runs no apps: each is shown as its label and summary."""
+
+    @field_validator("apps")
+    @classmethod
+    def _apps(cls, apps: str | None) -> str | None:
+        """Refuse an apps origin that is no web origin of its own; keep it as its origin."""
+        if apps is None:
+            return None
+        parts = urlsplit(apps)
+        if not _web(apps):
+            raise ValueError(f"mini apps are at {apps}: give them https, or http on loopback")
+        if parts.username is not None or parts.password is not None or not parts.hostname:
+            raise ValueError(f"mini apps are at {apps}: a host, with no user or password")
+        if parts.path not in ("", "/") or parts.query or parts.fragment:
+            raise ValueError(f"mini apps are at {apps}: an origin, with no path, query or fragment")
+        return f"{parts.scheme}://{parts.netloc}"
 
     @field_validator("editors")
     @classmethod
@@ -50,8 +71,7 @@ class Site(BaseModel):
             if not (key.startswith("files:") and KEY.fullmatch(key)):
                 raise ValueError(f"{key} is no native file's app: its key is files:<app>")
             parts = urlsplit(url)
-            loopback = parts.hostname in ("localhost", "127.0.0.1", "::1")
-            if not (parts.scheme == "https" or (parts.scheme == "http" and loopback)):
+            if not _web(url):
                 raise ValueError(f"{key}'s editor is at {url}: give it https, or http on loopback")
             if parts.username is not None or parts.password is not None or not parts.hostname:
                 raise ValueError(f"{key}'s editor is at {url}: a host, with no user or password")
@@ -64,6 +84,13 @@ class Site(BaseModel):
         if key.startswith("sb_secret_") or _role(key) == "service_role":
             raise ValueError("this is a secret key; config.json takes the publishable one")
         return key
+
+
+def _web(url: str) -> bool:
+    """Whether a URL is https, or http on loopback, as a test's or a developer's is."""
+    parts = urlsplit(url)
+    loopback = parts.hostname in ("localhost", "127.0.0.1", "::1")
+    return parts.scheme == "https" or (parts.scheme == "http" and loopback)
 
 
 def _role(key: str) -> str | None:

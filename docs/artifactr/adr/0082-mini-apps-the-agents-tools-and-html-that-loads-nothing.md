@@ -9,7 +9,7 @@
 
 [lattice RFC-0005](../../rfcs/0005-forms-dashboards-and-mini-apps.md)'s second phase runs mini apps: one HTML file an agent writes, run for everyone who opens the thread, sandboxed on an origin of its own, loading nothing, and no person reviewing it first (its Decision O6). Phase 1 defined the `app` kind and its limits, and its checks already hold that only an agent makes an app and a person changes only its `state` ([ADR-0075](0075-forms-refused-at-the-boundary-through-the-checks.md)); no agent was offered a tool to make one ([ADR-0078](0078-the-agents-toolset-for-forms-and-no-apps-yet.md)). The integration, `ui:mini-apps`, is declared by lattice-core and off by default ([ADR-0080](0080-integrations-on-or-off-per-workspace.md)).
 
-The policy portalr runs an app under is what keeps it off the network. The RFC also asks artifactr.ui to refuse an app whose HTML names an external URL, as a first filter, so a model that wrote a script from a CDN or a web font learns of it at once, rather than from a blank frame.
+The policy portalr runs an app under is what keeps it from loading anything. The RFC also asks artifactr.ui to refuse an app whose HTML names an external URL, as a first filter, so a model that wrote a script from a CDN or a web font learns of it at once, rather than from a blank frame.
 
 ## Decision
 

@@ -29,13 +29,27 @@ test("a manifest of any shape is shown as far as it goes", async () => {
     pages: null,
     outline: "",
   });
-  expect(factsOf({ content: { media_type: "image/svg+xml", size: 1 }, pages: 1 }).type).toBe(
-    "image/svg+xml",
+  expect(factsOf({ content: { media_type: "text/plain", size: 1 }, pages: 1 }).type).toBe(
+    "text/plain",
   );
   const screen = await render(<>{renderer.render({ pages: 1 })}</>);
   await expect.element(screen.getByText("Unnamed file")).toBeVisible();
   await expect.element(screen.getByText("File · 1 page")).toBeVisible();
   await expect.element(screen.getByText("The app read no outline from this file.")).toBeVisible();
+});
+
+test.each([
+  ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Workbook"],
+  ["application/vnd.openxmlformats-officedocument.presentationml.presentation", "Presentation"],
+  ["application/pdf", "PDF document"],
+  ["image/vnd.dxf", "Drawing (DXF)"],
+  ["image/vnd.dwg", "Drawing (DWG)"],
+  ["image/vnd.adobe.photoshop", "Layered image"],
+  ["image/svg+xml", "Vector image"],
+  ["application/vnd.adobe.indesign-idml-package", "Page layout"],
+  ["application/x-figcraft", "Design"],
+])("a %s file is called a %s", (mediaType, type) => {
+  expect(factsOf({ content: { media_type: mediaType } }).type).toBe(type);
 });
 
 test("its changes are its outline's, line by line, and its title is its name", () => {

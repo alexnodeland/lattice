@@ -1,8 +1,8 @@
 /**
  * A mini app, run (lattice RFC-0005, portalr ADR-0051): the agent's HTML in the sandbox on the
  * apps' origin, inside chrome of the host's own that the app can't draw over. The chrome says it
- * is the agent's, runs sandboxed and can't reach the network, and keeps its summary beside it as
- * its text equivalent. Nothing runs where the app is archived, where mini apps are off in the
+ * is the agent's and runs sandboxed, apart from the person's session, and keeps its summary beside
+ * it as its text equivalent. Nothing runs where the app is archived, where mini apps are off in the
  * workspace, where the deployment names no apps' origin, or where that origin is the portal's own;
  * the label and the summary are shown instead. The bridge answers the frame as the person viewing
  * it: its state, coalesced to one version every five seconds, and a submission, or a link, only
@@ -48,7 +48,7 @@ export interface ReadApp {
 const MINI_APPS = "ui:mini-apps";
 
 /** What the label says of every app, outside anything it draws. */
-const LABEL = "Made by the agent. Runs sandboxed and can't reach the network.";
+const LABEL = "Made by the agent. Runs sandboxed, apart from your session.";
 
 /** The add-on that runs an app, loaded with the first app a page runs. */
 const loadApps = () => import("./on-demand/apps");

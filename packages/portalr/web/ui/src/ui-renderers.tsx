@@ -1,9 +1,10 @@
 /**
  * The renderers of artifactr.ui's kinds (lattice RFC-0005): a `form` that takes submissions, a
  * `submission`'s values, a `dashboard`'s panels, and an `app`, run in its sandbox where it may
- * run, through the `AppHost` its page gives, and otherwise its label and its summary. A form sends through the `FormHost` its page gives, as the
- * person viewing it, and knows which artifact and version it is from `ArtifactContent`; without a
- * host, its fields are shown as they are, read-only.
+ * run, through the `AppHost` its page gives, and otherwise its label and its summary. A form
+ * sends through the `FormHost` its page gives, as the person viewing it, and knows which artifact
+ * and version it is from `ArtifactContent`; without a host, its fields are shown as they are,
+ * read-only.
  */
 
 import { createContext, type ReactNode, use, useEffect, useRef, useState } from "react";
@@ -241,7 +242,7 @@ function AppArtifact({ data }: { data: Data }) {
   return <AppFrame app={read} shown={shown ?? { id: "", version: 0, archived: true }} />;
 }
 
-/** An `app`: an agent's HTML, run sandboxed with no network, labelled outside what it draws. */
+/** An `app`: an agent's HTML, run sandboxed, labelled outside what it draws. */
 const app = ofJson((data) => <AppArtifact data={data} />);
 
 /** artifactr.ui's kinds and their renderers, for an application's registry. */

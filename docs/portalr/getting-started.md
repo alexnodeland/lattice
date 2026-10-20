@@ -215,7 +215,9 @@ site = Site(supabase_url="/", supabase_key="sb_publishable_...", apps="https://a
 app.add_middleware(SandboxOrigin, apps="https://apps.example.com", portal="https://app.example.com")
 ```
 
-Apps then run where a workspace switches `ui:mini-apps` on, which is off by default.
+Name the same origin to both: `Site` alone frames an origin that nothing answers, and apps show an empty frame. Since the apps' host shares the portal's registrable domain, nothing in the deployment may set a cookie with `Domain=` on it, which the apps' origin would be sent: the portal's own and the edge's cookies are host-only, and its session is in `localStorage`, which the apps' origin can't read.
+
+An app reads nothing of the person's and loads nothing, but it can send what it was given, over WebRTC from a frame it makes, which Chromium lets no page refuse ([ADR-0051](adr/0051-mini-apps-the-sandboxed-frame-and-its-bridge.md)). Apps then run where a workspace switches `ui:mini-apps` on, which is off by default.
 
 ## Name portalr's actions to grantr
 

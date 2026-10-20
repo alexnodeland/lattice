@@ -5,7 +5,8 @@
  * nothing from anyone else, and runs it in a frame sandboxed to an opaque origin with scripts and
  * nothing more: no forms, popups, top navigation or downloads, and no origin to read. The app's
  * document inherits the sandbox's policy, which loads nothing from anywhere, and begins with the
- * same policy of its own, DNS prefetching off, and WebRTC taken away, which no policy can refuse.
+ * same policy of its own, DNS prefetching off, and WebRTC taken from its window, which no policy
+ * refuses in Chromium. A frame the app makes in its own document keeps WebRTC: see `NO_WEBRTC`.
  * What the app sends is relayed to the portal as JSON text, within the size a message may be;
  * what the portal sends is relayed to the app.
  */
@@ -18,12 +19,14 @@ export const APP_POLICY =
   "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:; base-uri 'none'; form-action 'none'";
 
 /**
- * Before the app's own script runs: every WebRTC constructor removed, since a peer connection's
- * ICE reaches any address over UDP and no policy refuses it in Chromium. A frame the app makes has
- * an opaque origin of its own, so it can't take them back from one.
+ * Before the app's own script runs: every WebRTC constructor removed from the app's window, since
+ * a peer connection's ICE reaches any address over UDP and no policy refuses it in Chromium. It
+ * closes the app's window alone: a `srcdoc` frame the app makes runs a script of its own in a
+ * window of its own, which has them, and a peer connection from there is heard (portalr
+ * ADR-0051, and the CSP tests' `sandbox.test.ts`).
  */
 const NO_WEBRTC =
-  "for(const k of Object.getOwnPropertyNames(globalThis))if(/^(webkit)?RTC/.test(k))delete globalThis[k];";
+  "for(const k of Object.getOwnPropertyNames(globalThis))if(/^(webkit|moz)?RTC/.test(k))delete globalThis[k];";
 
 /** The app's document: its own policy, no DNS prefetching and no WebRTC first, then its HTML. */
 export const appDocument = (html: string): string =>
@@ -34,6 +37,8 @@ export const APP_SANDBOX = "allow-scripts";
 
 /** Run the sandbox in `scope`, its page's window, if the portal at `?host=` frames it. */
 export function startSandbox(scope: Window): void {
+  // `?host=` is trusted because the sandbox's `frame-ancestors` names the portal alone, so no other
+  // page can frame it; and it is only ever where messages go, never written into the page.
   const host = new URLSearchParams(scope.location.search).get("host");
   if (scope.parent === scope || host === null) {
     return; // not framed: nothing to run, and no one to tell

@@ -60,7 +60,7 @@ test("an app is labelled as the agent's, outside its frame, with its version and
   const app = screen.getByRole("region", { name: "Dice" });
   await expect
     .element(
-      app.getByText("Made by the agent. Runs sandboxed and can't reach the network. Version 4."),
+      app.getByText("Made by the agent. Runs sandboxed, apart from your session. Version 4."),
     )
     .toBeVisible();
   await expect.element(app.getByText("Rolls a six-sided die.")).toBeVisible();

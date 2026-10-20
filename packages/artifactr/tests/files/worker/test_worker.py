@@ -16,13 +16,15 @@ import threading
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
 from pathlib import Path
+from typing import cast
 
 import anyio
 import httpx
 import pytest
 import uvicorn
+from starlette.routing import Route
 
-from artifactr.files.app import App, AppCommand, AppFailed, Applied, FakeApp
+from artifactr.files.app import App, AppCommand, AppFailed, Applied, FakeApp, Inspection
 from artifactr.files.wordcraft import Subprocess
 from artifactr.files.worker import Limits, Worker, worker_app
 from artifactr.files.worker.__main__ import HEAD, worker_from_environment
@@ -299,7 +301,7 @@ def test_the_environment_says_which_wordcraft_it_runs(tmp_path: Path) -> None:
             "WORKER_LIMITS": '{"edit": 5}',
         }
     )
-    assert [route.path for route in served.routes] == [  # pyright: ignore[reportAttributeAccessIssue]
+    assert [route.path for route in served.routes if isinstance(route, Route)] == [
         "/",
         "/apply",
         "/inspect",
@@ -334,7 +336,8 @@ async def test_a_reply_that_isnt_a_calls_is_a_crash(reply: httpx.Response, messa
 async def test_what_the_worker_cant_tell_as_a_reply_is_a_crash(connect: Connect) -> None:
     class Garbled(FakeApp):
         async def apply(self, *_args: object, **_kwargs: object) -> Applied:
-            return Applied(content=b"x", inspection={"fingerprint": "no"})  # pyright: ignore[reportArgumentType]
+            inspection = Inspection.model_construct(fingerprint="not a digest")
+            return Applied(content=cast(bytes, 1), inspection=inspection)
 
     worker = await connect(Garbled())
     with pytest.raises(AppFailed, match="the reply is not one") as crashed:

@@ -316,7 +316,7 @@ async def test_an_apps_html_loads_nothing_as_it_is_made_or_changed(
     thread = await ws.create_thread("Calc")
     by_agent = ws.as_actor(agent(thread.id))
     app: dict[str, Any] = {"title": "Calc", "summary": "A calculator", "html": "<img src=x.png>"}
-    with pytest.raises(ValidationFailed, match="reaches no network") as refused:
+    with pytest.raises(ValidationFailed, match="can load nothing") as refused:
         await by_agent.commit(CreateArtifact(kind="app", data=app))
     assert locs(refused.value) == [["data", "html"]]
     made = await by_agent.commit(CreateArtifact(kind="app", data={**app, "html": "<p>0</p>"}))
@@ -488,13 +488,19 @@ async def test_an_integration_switched_off_in_a_workspace_is_gated_as_not_enable
     run = ws.as_actor(agent(thread.id))
     made = await run.commit(CreateArtifact(kind="dashboard", data=data))
     assert isinstance(made, Applied)
-    toggles.off["ws_1"] = {FORMS, DASHBOARDS}
+    app: dict[str, Any] = {"title": "Calc", "summary": "A calculator", "html": "<p>0</p>"}
+    running = await run.commit(CreateArtifact(kind="app", data=app))
+    assert isinstance(running, Applied)
+    toggles.off["ws_1"] = {FORMS, DASHBOARDS, MINI_APPS}
     refusals = [
         (_submit(form_id), FORMS),
         (CreateArtifact(kind="form", data={"title": "Again?", "schema": SCHEMA}), FORMS),
         (CreateArtifact(kind="dashboard", data=data), DASHBOARDS),
         (_set(made.artifact_id, "/title", "Ops!"), DASHBOARDS),
         (_set(form_id, "/closed", True), FORMS),
+        # What a running app's bridge sends, refused at once, before the page reads it is off.
+        (_set(running.artifact_id, "/state", {"total": 1}), MINI_APPS),
+        (_submit(running.artifact_id, nonce="n1", to="app_id", values={"sum": 2}), MINI_APPS),
     ]
     for command, key in refusals:
         with pytest.raises(NotEnabled) as refused:
@@ -504,7 +510,9 @@ async def test_an_integration_switched_off_in_a_workspace_is_gated_as_not_enable
             "message": f"{key} is not available in this workspace",
             "integration": key,
         }
-    assert {a.kind for a in await ws.artifacts()} == {"form", "dashboard"}, "what exists reads"
+    assert {a.kind for a in await ws.artifacts()} == {"form", "dashboard", "app"}, (
+        "what exists reads"
+    )
     await ws.commit(ArchiveArtifact(artifact_id=form_id, base_version=1))  # archives pass
     other = await workspaces.open("tenant_a", "ws_2", actor=ALICE)
     assert isinstance(await other.commit(CreateArtifact(kind="dashboard", data=data)), Applied)

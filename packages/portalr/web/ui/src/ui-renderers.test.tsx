@@ -439,7 +439,7 @@ describe("a dashboard", () => {
 });
 
 describe("an app", () => {
-  test("is its label and its summary, and nothing runs", async () => {
+  test("shown without knowing which it is, as a preview is, is its label and summary alone", async () => {
     const screen = await render(
       <ArtifactContent
         kind="app"
@@ -447,19 +447,20 @@ describe("an app", () => {
         renderers={RENDERERS}
       />,
     );
-    const app = screen.getByRole("region", { name: "An app made by the agent" });
-    await expect
-      .element(app.getByText(/Made by the agent\. Apps don't run here yet/))
-      .toBeVisible();
+    const app = screen.getByRole("region", { name: "Tip" });
+    await expect.element(app.getByText(/Made by the agent\. Runs sandboxed/)).toBeVisible();
     await expect.element(app.getByText("Splits a bill.")).toBeVisible();
     expect(app.element().querySelector("iframe, script")).toBeNull();
     expect(app.element().textContent).not.toContain("x()");
   });
 
-  test("without a summary, says it has none", async () => {
+  test("that can't be read is said to be so, with its data", async () => {
     const screen = await render(
       <ArtifactContent kind="app" data={{ summary: "" }} renderers={RENDERERS} />,
     );
-    await expect.element(screen.getByText("It has no summary.")).toBeVisible();
+    expect(screen.container.querySelector("iframe")).toBeNull();
+    await expect
+      .element(screen.getByRole("status"))
+      .toHaveTextContent("This app can't be shown here. Its data are below.");
   });
 });

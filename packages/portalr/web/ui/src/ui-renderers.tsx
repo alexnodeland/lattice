@@ -1,21 +1,20 @@
 /**
  * The renderers of artifactr.ui's kinds (lattice RFC-0005): a `form` that takes submissions, a
- * `submission`'s values, a `dashboard`'s panels, and an `app`, which in phase 1 is its label and
- * its summary, and runs nothing. A form sends through the `FormHost` its page gives, as the
- * person viewing it, and knows which artifact and version it is from `ArtifactContent`; without a
- * host, its fields are shown as they are, read-only.
+ * `submission`'s values, a `dashboard`'s panels, and an `app`, run in its sandbox where it may
+ * run, through the `AppHost` its page gives, and otherwise its label and its summary. A form
+ * sends through the `FormHost` its page gives, as the person viewing it, and knows which artifact
+ * and version it is from `ArtifactContent`; without a host, its fields are shown as they are,
+ * read-only.
  */
 
-import { Bot } from "lucide-react";
 import { createContext, type ReactNode, use, useEffect, useRef, useState } from "react";
 import { Alert } from "./alert";
+import { AppFrame, type ReadApp } from "./app-frame";
 import type { Form, Submission, Values } from "./artifactr-ui";
 import { type Data, json, type Renderer, type Shown, ShownContext } from "./artifacts";
-import { cn } from "./cn";
 import type { FormOf } from "./dashboard-panels";
 import { DashboardView, readDashboard } from "./dashboard-view";
 import { endedBy, readForm } from "./form-schema";
-import { Icon } from "./icon";
 import { DASHBOARDS, FeatureOff, FormGates, useFormLock } from "./integrations";
 import { isObject, isString } from "./json";
 import { SchemaForm } from "./schema-form";
@@ -223,21 +222,28 @@ function DashboardArtifact({ data }: { data: Data }) {
 /** A `dashboard`: its figures as they were when it was made. */
 const dashboard = ofJson((data) => <DashboardArtifact data={data} />);
 
-/**
- * An `app`: in phase 1, nothing runs. It is labelled as the agent's, outside anything it draws,
- * and its summary, its text equivalent, says what it does.
- */
-const app = ofJson((data) => (
-  <section aria-label="An app made by the agent" className="flex flex-col gap-3">
-    <p className={cn(TYPE.note, "inline-flex items-center gap-1.5")}>
-      <Icon icon={Bot} className="size-3.5" />
-      Made by the agent. Apps don't run here yet, so this is what it says it does.
-    </p>
-    <p className="whitespace-pre-wrap text-fg text-sm">
-      {typeof data.summary === "string" && data.summary ? data.summary : "It has no summary."}
-    </p>
-  </section>
-));
+/** An `app`, read: its title, summary and HTML strings, and its state an object; or null. */
+function readApp(data: Data): ReadApp | null {
+  const { title, summary, html, state = {} } = data;
+  if (!isString(title) || !isString(summary) || !isString(html) || !isObject(state)) {
+    return null;
+  }
+  return { title, summary, html, state: state as ReadApp["state"] };
+}
+
+/** An `app`, run in its sandbox where it may run here, its label and summary always beside it. */
+function AppArtifact({ data }: { data: Data }) {
+  const shown = use(ShownContext);
+  const read = readApp(data);
+  if (read === null) {
+    return <Unreadable kind="app" data={data} />;
+  }
+  // Shown without knowing which artifact it is, as a preview is, it runs nothing.
+  return <AppFrame app={read} shown={shown ?? { id: "", version: 0, archived: true }} />;
+}
+
+/** An `app`: an agent's HTML, run sandboxed, labelled outside what it draws. */
+const app = ofJson((data) => <AppArtifact data={data} />);
 
 /** artifactr.ui's kinds and their renderers, for an application's registry. */
 export const UI_RENDERERS: readonly (readonly [string, Renderer])[] = [

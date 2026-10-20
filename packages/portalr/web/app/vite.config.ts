@@ -1,4 +1,6 @@
+import { fileURLToPath } from "node:url";
 import { notices, readPolicy } from "@portalr/notices";
+import { sandboxPage } from "@portalr/ui/sandbox";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
@@ -30,6 +32,10 @@ export default defineConfig({
     tailwindcss(),
     // The licences of the packages bundled, beside the UI (portalr ADR-0033).
     notices({ ui: "app", policy: readPolicy(new URL("../notices/policy.json", import.meta.url)) }),
+    // The page mini apps run in, served on the apps' origin alone (portalr ADR-0051).
+    sandboxPage(
+      fileURLToPath(new URL("../../src/portalr/static/sandbox/index.html", import.meta.url)),
+    ),
   ],
   // ui's public files, such as the script that sets the scheme before the first paint.
   publicDir: "../ui/public",

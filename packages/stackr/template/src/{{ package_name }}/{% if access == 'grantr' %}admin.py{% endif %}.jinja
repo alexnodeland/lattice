@@ -1,11 +1,17 @@
-"""The deployment's own commands: ``make tenant``, ``operator``, ``migrate-tenants``, ``db-roles``.
+"""The deployment's own commands: ``first-run``, ``tenant``, ``operator``, and the rest.
+
+``make first-run``, ``tenant``, ``operator``, ``migrate-tenants`` and ``db-roles`` run them.
 
 Each runs in process, on the database ``DATABASE_URL`` names, and is recorded in grantr's audit
 log as made by no one (grantr ADR-0021). A user is named by their id, Supabase Auth's ``sub``, or
 by their email, which Supabase Auth's admin API looks up with ``AUTH_SERVICE_ROLE_KEY``.
+``first-run`` is the first person in: it makes their account if they have none, with a password
+it asks for, makes them the deployment's operator if it has none, and creates a tenant they own,
+with a workspace, so they sign in to a portal with somewhere to chat.
 ``db-roles`` creates the role ``DATABASE_URL`` connects as, as ``DATABASE_ADMIN_URL``'s: run it
 before the application first starts with row-level security.
 
+    {{ project_slug }}-admin first-run alice@example.com --tenant home --workspace main
     {{ project_slug }}-admin operator alice@example.com
     {{ project_slug }}-admin tenant acme alice@example.com
     {{ project_slug }}-admin migrate-tenants
@@ -15,13 +21,15 @@ before the application first starts with row-level security.
 import argparse
 import asyncio
 import base64
+import getpass
 import hashlib
 import hmac
 import json
 import os
 import sys
+import urllib.error
 import urllib.request
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from itertools import groupby
 from typing import Any, cast
@@ -30,7 +38,7 @@ from sqlalchemy import URL, Connection, make_url, text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from grantr import Grants, Invalid
+from grantr import Forbidden, Grants, Invalid, Resource, User
 from grantr.core import MemberAdded, TenantCreated
 from grantr.sql import SqlStorage, migrate
 
@@ -46,6 +54,13 @@ SCRAM_ITERATIONS = 4096
 
 PAGE = 200
 """How many users the admin API is asked for at a time."""
+
+Password = Callable[[], str]
+"""Asks for a new account's password."""
+
+
+class NoSuchUser(LookupError):
+    """No user has the email."""
 
 
 @dataclass(frozen=True)
@@ -76,14 +91,49 @@ class Users:
         """A user's id: ``who`` itself, unless it is an email, which is looked up.
 
         Raises:
-            LookupError: If no user has that email.
+            NoSuchUser: If no user has that email.
+            LookupError: If the issuer or the service role's key isn't set.
         """
         if "@" not in who:
             return who
         for account in await self.accounts():
             if account.email.lower() == who.lower():
                 return account.id
-        raise LookupError(f"no user has the email {who}")
+        raise NoSuchUser(f"no user has the email {who}")
+
+    async def account(self, who: str, password: Password) -> tuple[str, bool]:
+        """A user's id, as :meth:`find` has it, and whether their account was made now.
+
+        If no user has the email, the account is made with ``password()``, its email confirmed.
+
+        Raises:
+            Invalid: If Supabase Auth refuses the account, such as for a short password.
+            LookupError: If the issuer or the service role's key isn't set.
+        """
+        try:
+            return await self.find(who), False
+        except NoSuchUser:
+            return await asyncio.to_thread(self._create, who, password()), True
+
+    def _create(self, email: str, password: str) -> str:
+        body = {"email": email, "password": password, "email_confirm": True}
+        request = urllib.request.Request(
+            f"{self._issuer}/admin/users",
+            data=json.dumps(body).encode(),
+            headers={
+                "apikey": str(self._key),
+                "Authorization": f"Bearer {self._key}",
+                "Content-Type": "application/json",
+            },
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                return str(json.load(response)["id"])
+        except urllib.error.HTTPError as error:
+            # What Supabase Auth said, never what it was sent; the answer is closed once read.
+            with error:
+                said = cast(dict[str, Any], json.loads(error.read() or b"{}")).get("msg")
+            raise Invalid(f"Supabase Auth refused the account: {said or error.code}") from None
 
     async def accounts(self) -> list[Account]:
         """Every user, oldest first.
@@ -118,6 +168,52 @@ def _account(user: dict[str, Any]) -> Account:
         created_at=str(user.get("created_at") or ""),
         tenant=tenant if isinstance(tenant, str) and tenant else None,
     )
+
+
+def ask_password() -> str:
+    """Ask for a new account's password, twice, without showing it.
+
+    Raises:
+        Invalid: If the two differ.
+    """
+    password = getpass.getpass("A password for the new account: ")
+    if getpass.getpass("The password again: ") != password:
+        raise Invalid("the passwords differ")
+    return password
+
+
+async def first_run(
+    grants: Grants, users: Users, who: str, *, name: str, workspace: str, password: Password
+) -> str:
+    """The first person in, with somewhere to work; each step is skipped if it is done.
+
+    Their account, if they have none; the deployment's operator, if it has none; a tenant they
+    own, if it is new; and a workspace in it they administer, if they can't open it yet, which
+    names it to grantr, so the app lists it. ``who`` is an email, or an existing user's id.
+
+    Raises:
+        Invalid: If the tenant is someone else's, where the person may not grant themselves.
+    """
+    user, made = await users.account(who, password)
+    lines = [f"made an account for {who}" if made else f"{who} has an account"]
+    try:
+        await grants.first_operator(user)
+        lines.append(f"{who} is the deployment's operator")
+    except Invalid:
+        lines.append("the deployment has an operator already")
+    created = await grants.provision_tenant(name, owner=user)
+    lines.append(f"created {name}, owned by {who}" if created else f"{name} exists")
+    person = User(id=user)
+    if workspace in await grants.workspaces(name, person):
+        lines.append(f"{who} opens the workspace {workspace} already")
+    else:
+        on = Resource(kind="workspace", workspace=workspace)
+        try:
+            await grants.grant(name, "admin", on=on, to=person, by=person)
+        except Forbidden:
+            raise Invalid(f"{who} may not give themselves a workspace in {name}") from None
+        lines.append(f"{who} administers the workspace {workspace}")
+    return "\n".join(lines)
 
 
 async def operator(grants: Grants, users: Users, who: str) -> str:
@@ -163,14 +259,22 @@ async def migrate_tenants(grants: Grants, users: Users) -> str:
     return "\n".join(lines) or "no user names a tenant"
 
 
-async def run(arguments: Sequence[str], settings: Settings) -> str:
+async def run(
+    arguments: Sequence[str], settings: Settings, *, password: Password = ask_password
+) -> str:
     """Carry out one command, and return what to print.
+
+    ``password`` asks for a new account's, for ``first-run``.
 
     Raises:
         SystemExit: If the arguments are wrong, or there is no database.
     """
     parser = argparse.ArgumentParser(prog=PROGRAM, description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
+    first = commands.add_parser("first-run", help="the first person in, with a tenant to work in")
+    first.add_argument("email", help="their email, or an existing user's id")
+    first.add_argument("--tenant", default="home")
+    first.add_argument("--workspace", default="main")
     commands.add_parser("operator", help="make a user the first operator").add_argument("user")
     new = commands.add_parser("tenant", help="create a tenant, with its owner")
     new.add_argument("name")
@@ -211,6 +315,15 @@ async def run(arguments: Sequence[str], settings: Settings) -> str:
             settings.auth.admin_url or settings.auth.issuer, settings.auth.service_role_key
         )
         match parsed.command:
+            case "first-run":
+                return await first_run(
+                    grants,
+                    users,
+                    parsed.email,
+                    name=parsed.tenant,
+                    workspace=parsed.workspace,
+                    password=password,
+                )
             case "operator":
                 return await operator(grants, users, parsed.user)
             case "tenant":

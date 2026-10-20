@@ -4,6 +4,13 @@
 - ``/portalr/admin/``: the admin, for a tenant's owners and admins, and the deployment's operators
 - ``/portalr/v1``: the reads behind them: traces, logs, metrics, scores and spend, each asked of
   grantr first, for the caller's tenant
+- ``/auth/v1/token``, ``/auth/v1/user`` and ``/auth/v1/logout``: Supabase Auth's three calls the
+  UIs sign in with, passed on, where ``PORTAL_SUPABASE_URL`` is ``/``, this origin
+
+On its own origin, the portal signs in wherever the application is reached: on this machine, on
+a tailnet (``make tailnet``), or behind a proxy, with GoTrue alone or Supabase's gateway behind
+it. The calls go where the deployment's commands find people, ``AUTH_ADMIN_URL`` or
+``AUTH_ISSUER``; only those three, and nothing of the admin API.
 
 It is mounted only where the Supabase project the UIs sign in to is named (``PORTAL_SUPABASE_URL``
 and ``PORTAL_SUPABASE_KEY``); a tool is read only where its address is. The Supabase secret key
@@ -12,14 +19,15 @@ stays here, for inviting people and naming them by email, and is never in what t
 
 import contextlib
 import logging
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from pathlib import Path
+from typing import Final
 
 import httpx
-from fastapi import FastAPI
+from fastapi import APIRouter, FastAPI, HTTPException, Request, Response
 
 from grantr import Grants
-from portalr.fastapi import UI, Site, portalr_router
+from portalr.fastapi import UI, Site, {% if use_tracker %}Surfaces, {% endif %}portalr_router
 from portalr.invites import Invite, InviteFailed, SupabaseInvite
 from portalr.people import People, SupabasePeople
 from portalr.readers import Grafana, Langfuse, LiteLLM, Loki, Prometheus, Readers, Tempo
@@ -34,6 +42,62 @@ LOGGER = logging.getLogger(__name__)
 
 OFF = "the portal is off: PORTAL_SUPABASE_URL and PORTAL_SUPABASE_KEY are unset"
 PLAIN = "PORTAL_SUPABASE_URL is not an https address"
+NOWHERE = "PORTAL_SUPABASE_URL is this origin, which passes sign-in on: set AUTH_ISSUER"
+
+SIGN_IN: Final = {"token": "POST", "user": "GET", "logout": "POST"}
+"""Supabase Auth's calls the UIs make to sign in, stay signed in and sign out, by path: the only
+ones passed on, as stackr's edge passes them on a single host."""
+
+SENT: Final = ("apikey", "authorization", "content-type")
+"""The headers of a sign-in call passed on to Supabase Auth."""
+
+KEPT: Final = ("content-type", "cache-control")
+"""The headers of Supabase Auth's answer passed back."""
+
+LARGEST: Final = 64 * 1024
+"""The largest body of a sign-in call passed on, in bytes: an email and a password, or a refresh
+token, are far less."""
+
+
+def sign_in(base: str, client: httpx.AsyncClient) -> APIRouter:
+    """Supabase Auth's three sign-in calls on this origin, each passed to ``base``.
+
+    ``base`` is where Supabase Auth's paths are, such as ``http://gotrue:9999`` or a gateway's
+    ``/auth/v1``. Nothing but the calls' query, body and three headers is sent, and nothing but
+    the answer's status, body and two headers comes back; neither is logged. A body larger than
+    ``LARGEST`` is refused, and not passed on.
+    """
+    router = APIRouter(include_in_schema=False)
+    for name, method in SIGN_IN.items():
+        router.add_api_route(
+            f"/auth/v1/{name}", _passed(f"{base}/{name}", client), methods=[method]
+        )
+    return router
+
+
+def _passed(url: str, client: httpx.AsyncClient) -> Callable[[Request], Awaitable[Response]]:
+    async def call(request: Request) -> Response:
+        headers = {name: value for name in SENT if (value := request.headers.get(name))}
+        body = bytearray()
+        async for chunk in request.stream():
+            body += chunk
+            if len(body) > LARGEST:
+                raise HTTPException(413, f"a sign-in call's body is at most {LARGEST} bytes")
+        try:
+            answer = await client.request(
+                request.method,
+                url,
+                params=request.url.query,
+                headers=headers,
+                content=bytes(body),
+            )
+        except httpx.HTTPError as error:
+            reason = f"Supabase Auth didn't answer: {type(error).__name__}"
+            raise HTTPException(502, reason) from None
+        kept = {name: value for name in KEPT if (value := answer.headers.get(name))}
+        return Response(answer.content, status_code=answer.status_code, headers=kept)
+
+    return call
 
 
 def readers(settings: Settings, clients: list[httpx.AsyncClient]) -> Readers:
@@ -116,10 +180,19 @@ class Portal:
 
     @property
     def site(self) -> Site | None:
-        """The Supabase project the UIs sign in to, or None where it isn't named."""
+        """The Supabase project the UIs sign in to, or None where it isn't named.{% if use_tracker %}
+
+        relayr's tracker reads are on this origin, at their own ``/relayr/v1`` paths.
+        {% endif %}"""
         portal = self._settings.portal
         if portal.supabase_url and portal.supabase_key:
-            return Site(supabase_url=portal.supabase_url, supabase_key=portal.supabase_key)
+            return Site(
+                supabase_url=portal.supabase_url,
+                supabase_key=portal.supabase_key,
+{%- if use_tracker %}
+                surfaces=Surfaces(relayr=""),
+{%- endif %}
+            )
         return None
 
     @property
@@ -142,9 +215,12 @@ class Portal:
     def mount(self, app: FastAPI) -> None:
         """Add the router and the UIs, if a Supabase project is named.
 
+        On this origin (``/``), Supabase Auth's sign-in calls are passed on here too.
+
         Raises:
             ValueError: If none is, or it is not at an https address, and the settings say the
-                application must have the portal.
+                application must have the portal; or it is this origin, and Supabase Auth's
+                address isn't set.
         """
         portal = self._settings.portal
         site = self.site
@@ -155,6 +231,14 @@ class Portal:
             return
         if portal.required and not site.supabase_url.startswith("https://"):
             raise ValueError(f"{PLAIN}, and PORTAL_REQUIRED says the application needs one")
+        if site.supabase_url == "/":
+            auth = self._settings.auth
+            base = auth.admin_url or auth.issuer
+            if not base:
+                raise ValueError(NOWHERE)
+            client = httpx.AsyncClient(timeout=10)
+            self._clients.append(client)
+            app.include_router(sign_in(base.rstrip("/"), client))
         router = portalr_router(
             resolve_actor=self._access.caller,
             grants=self.grants,

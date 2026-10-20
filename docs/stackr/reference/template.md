@@ -121,6 +121,7 @@ A file whose name ends in `.jinja` in `template/` is rendered with the answers; 
 | `evals/experiments.py` | `evals` | rendered |
 | `deploy/host/compose.prod.yaml` | `hosting == 'host'` | rendered |
 | `scripts/build-portal-ui.sh` | `use_portal` | copied |
+| `scripts/tailnet.sh` | `use_portal` | copied |
 
 <!-- end generated -->
 

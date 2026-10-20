@@ -1,6 +1,6 @@
 # ADR-0038: portalr in the template
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0042](0042-a-generated-application-as-a-local-product.md)
 **Date:** 2026-10-16
 **Deciders:** Alex Nodeland
 

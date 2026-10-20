@@ -866,17 +866,18 @@ smoke_scenarios() {
 
 smoke_app() {
   local adapter=${STACKR_DATABASE:-$(setting STACKR_DATABASE)} issuer jwks admin=""
-  # The Supabase project the portal's UIs sign in to, as the browser reaches it, and its key.
-  local portal_url=$app_url portal_publishable=sb_publishable_smoke
+  # The Supabase project the portal's UIs sign in to, as the browser reaches it, and its key: the
+  # application's own origin, which passes the sign-in calls on, or a single host's edge.
+  local portal_url=/ portal_publishable=sb_publishable_smoke
+  [[ ${STACKR_RECIPE:-local} == host ]] && portal_url=$app_url
   if [[ $adapter == supabase ]]; then
     auth=supabase
     supabase_status || { log "FAIL: app: local Supabase's status"; return 1; }
     issuer=$supabase_api/auth/v1
     jwks=""
-    # The scenarios' browser signs in at local Supabase, on this machine; the application names
-    # people by email, and invites, with its secret key, which stays in its environment (the
+    # The scenarios' browser signs in through the application, to local Supabase; the application
+    # names people by email, and invites, with its secret key, which stays in its environment (the
     # .env is written mode 0600, never an argument) and is not what the browser is given.
-    portal_url=$supabase_api
     portal_publishable=$supabase_publishable
     admin="AUTH_SERVICE_ROLE_KEY=$supabase_secret"
   else
@@ -886,7 +887,7 @@ smoke_app() {
     jwks=http://gotrue:9999/.well-known/jwks.json
     # The admin commands find users by email through GoTrue's admin API, on the stack's network.
     admin="AUTH_SERVICE_ROLE_KEY=$(setting AUTH_SERVICE_ROLE_KEY)
-AUTH_ADMIN_URL=http://gotrue:9999"
+STACK_AUTH_ADMIN_URL=http://gotrue:9999"
   fi
   unset DOCKER_DEFAULT_PLATFORM
 
@@ -924,7 +925,9 @@ AUTH_ADMIN_URL=http://gotrue:9999"
   app_password=$(random_hex 16)
   (
     umask 077
-    cat >"$app_dir/.env" <<ENV
+    # .env.example first, as `make env` copies it, then what the smoke test sets: Compose takes a
+    # setting's last line, which is all that reads it here (the local commands would take the first).
+    { cat "$app_dir/.env.example"; cat <<ENV; } >"$app_dir/.env"
 STACK_DATABASE_URL=postgresql+asyncpg://$app_role:$app_password@$app_db_host:5432/postgres
 STACK_DATABASE_ADMIN_URL=postgresql+asyncpg://postgres:$app_db_admin_password@$app_db_host:5432/postgres
 APP_PORT=$app_port
@@ -1025,6 +1028,18 @@ ENV
   else
     log "FAIL: the portal's config.json doesn't name the Supabase project"
     status=1
+  fi
+  if [[ $portal_url == / ]]; then
+    # A wrong password is refused by Supabase Auth itself (400), not by the application.
+    code=$(probe -s -o /dev/null -w '%{http_code}' -X POST "$app_url/auth/v1/token?grant_type=password" \
+      -H 'Content-Type: application/json' -H "apikey: $portal_publishable" \
+      --data '{"email": "nobody@stackr.test", "password": "not-the-password"}')
+    if [[ $code == 400 ]]; then
+      log "ok: the portal's sign-in reaches Supabase Auth through the application's own origin"
+    else
+      log "FAIL: the portal's sign-in through the application answered $code, not Supabase Auth's 400"
+      status=1
+    fi
   fi
   local spend
   spend=$(app_call "/portalr/v1/spend" -w '\n%{http_code}' || true)

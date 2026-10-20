@@ -23,9 +23,13 @@ services:
       - path: .env
         required: false
       - stackr.env
+    # Set here, over .env, which holds this machine's values for `make serve`.
     environment:
       APP_HOST: 0.0.0.0
       APP_PORT: "8000"
+{%- if use_portal %}
+      PORTAL_UI_DIR: /ui
+{%- endif %}
     ports:
       - ${APP_BIND:-127.0.0.1}:${APP_PORT:-{{ app_port }}}:8000
 {%- if use_tracker and tracker == 'plane' %}

@@ -11,10 +11,13 @@ COMPOSE ?= docker compose
 # for another architecture, under emulation.
 unexport DOCKER_DEFAULT_PLATFORM
 
-# Local commands read .env, when there is one.
+# Local commands read .env, when there is one. They take a setting's first line, and Compose its
+# last, so a setting set twice differs between them: each is named, to keep one line.
 ENV_FILE := $(if $(wildcard .env),--env-file .env)
+TWICE := $(shell sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' .env 2>/dev/null | sort | uniq -d)
+$(if $(TWICE),$(warning .env sets $(TWICE) more than once: local commands read the first line, the app profile the last))
 
-.PHONY: help install env fmt lint typecheck test check serve {% if evals %}evals evals-langfuse {% endif %}{% if access == 'grantr' %}tenant operator migrate-tenants db-roles access-matrix {% endif %}{% if use_portal %}portal-ui {% endif %}up down logs clean
+.PHONY: help install env fmt lint typecheck test check serve {% if evals %}evals evals-langfuse {% endif %}{% if access == 'grantr' %}first-run tenant operator migrate-tenants db-roles access-matrix {% endif %}{% if use_portal %}portal-ui tailnet tailnet-off {% endif %}up down logs clean
 
 help: ## List the available commands
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -56,6 +59,10 @@ evals-langfuse: ## Run them in Langfuse, with the gateway's model, as .env confi
 
 {%- if access == 'grantr' %}
 
+first-run: ## The first person in, with a tenant and a workspace: make first-run EMAIL=alice@example.com
+	@if [ -z "$(EMAIL)" ]; then echo "usage: make first-run EMAIL=<email> [TENANT=home] [WORKSPACE=main]"; exit 2; fi
+	$(UV) run $(ENV_FILE) {{ project_slug }}-admin first-run $(EMAIL) --tenant $(or $(TENANT),home) --workspace $(or $(WORKSPACE),main)
+
 tenant: ## Create a tenant, with its owner: make tenant NAME=acme OWNER=alice@example.com (or a user id)
 	@if [ -z "$(NAME)" ] || [ -z "$(OWNER)" ]; then echo "usage: make tenant NAME=<tenant> OWNER=<email or user id>"; exit 2; fi
 	$(UV) run $(ENV_FILE) {{ project_slug }}-admin tenant $(NAME) $(OWNER)
@@ -78,6 +85,19 @@ access-matrix: ## Write every role against every action to access.md, to review 
 
 portal-ui: ## Build portalr's UIs, from the commit uv.lock pins it at, into .portal-ui; then set PORTAL_UI_DIR to it
 	scripts/build-portal-ui.sh .portal-ui
+
+# The tailnet: `tailscale serve` puts the application on this machine's tailnet name, over HTTPS,
+# for your tailnet only; its port stays on 127.0.0.1. The portal signs in on that origin as on
+# this one, with PORTAL_SUPABASE_URL=/ (the default).
+TAILNET_PORT ?= 443
+TAILNET = UV="$(UV)" scripts/tailnet.sh
+APP_URL = http://127.0.0.1:$(or $(shell sed -n 's/^APP_PORT=//p' .env 2>/dev/null | tail -n 1),{{ app_port }})
+
+tailnet: ## Serve the application on your tailnet only, over HTTPS (TAILNET_PORT, 443), and print its address
+	$(TAILNET) on $(TAILNET_PORT) $(APP_URL)
+
+tailnet-off: ## Stop serving it on your tailnet: what `make tailnet` set up on TAILNET_PORT, alone
+	$(TAILNET) off $(TAILNET_PORT) $(APP_URL)
 {%- endif %}
 
 up: ## Build and start the application in the app profile, beside stackr's stack

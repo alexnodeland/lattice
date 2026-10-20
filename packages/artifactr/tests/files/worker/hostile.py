@@ -11,7 +11,8 @@ import zlib
 from collections.abc import Callable
 from typing import Final
 
-from tests.files.corpus.wordcraft.make import TIME, package, png
+from tests.files.corpus.package import TIME, png
+from tests.files.corpus.wordcraft.make import package
 
 
 def zip_bomb() -> bytes:

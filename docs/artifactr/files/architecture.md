@@ -6,7 +6,7 @@
 
 | Layer | What it is | It may import |
 |---|---|---|
-| `manifest` | `Blob`, `Provenance`, `NativeFile`, a type for each app's files (`WordDocument`, `Drawing`, `LayeredImage`, `VectorImage`, `PageLayout`), and `revise`, the patch that tests its base | artifactr, pydantic |
+| `manifest` | `Blob`, `Provenance`, `NativeFile`, a type for each app's files (`WordDocument`, `Drawing`, `LayeredImage`, `VectorImage`, `PageLayout`, `Design`), and `revise`, the patch that tests its base | artifactr, pydantic |
 | `blobs` | The `Blobs` port, its size limit and digest, and `InMemoryBlobs` | `manifest`, artifactr |
 | `checkouts` | `Checkout`, the record behind a person's lease, the `Checkouts` port, and `InMemoryCheckouts` | `manifest`, artifactr, pydantic |
 | `app` | The `App` port and `FakeApp` | `manifest`, pydantic |
@@ -16,6 +16,7 @@
 | `photocraft` | PhotoCraft's adapter, `Subprocess`, and a document's format, a `.psd` and not a `.psb`, read from its header | `manifest`, `app`, `craft`, pydantic |
 | `vectorcraft` | VectorCraft's adapter, `Subprocess`, and whether bytes are an SVG, read from their root element | `manifest`, `app`, `craft`, pydantic |
 | `designcraft` | DesignCraft's adapter, `Subprocess`, and a layout's format, IDML, read from its package's `mimetype` | `manifest`, `app`, `craft`, pydantic |
+| `figcraft` | FigCraft's adapter, `Subprocess`, and whether bytes are a `.figcraft`, read from its document | `manifest`, `app`, `craft`, pydantic |
 | `native` | `NativeFiles`: uploads, check-out and check-in, agents' edits, reads, renders and collection, behind the app's switch | `manifest`, `blobs`, `checkouts`, `app`, artifactr, `lattice_core.integrations` |
 | `tools` | `native_file_tools`, the agent's toolset | `app`, `native`, artifactr and its agent, pydantic-ai |
 | `fastapi` | `files_router`, people's check-out and check-in over HTTP, and `editor_app`, the app's browser build on an origin of its own | every layer but `sql` and `tools`, artifactr and its router, FastAPI |

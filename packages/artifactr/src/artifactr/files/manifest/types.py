@@ -164,3 +164,9 @@ class PageLayout(NativeFile):
     """A page layout, `.idml`: registered as `page_layout`."""
 
     formats: ClassVar[frozenset[str]] = frozenset({IDML})
+
+
+class Design(NativeFile):
+    """A design, `.figcraft`: registered as `design`."""
+
+    formats: ClassVar[frozenset[str]] = frozenset({FIGCRAFT})

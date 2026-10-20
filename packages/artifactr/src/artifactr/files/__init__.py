@@ -24,6 +24,7 @@ from artifactr.files.checkouts import Checkout, Checkouts, InMemoryCheckouts
 from artifactr.files.manifest import (
     DOCX,
     Blob,
+    Design,
     Drawing,
     LayeredImage,
     NativeFile,
@@ -44,6 +45,7 @@ __all__ = [
     "Checkout",
     "Checkouts",
     "ContentUnavailable",
+    "Design",
     "Drawing",
     "FakeApp",
     "InMemoryBlobs",

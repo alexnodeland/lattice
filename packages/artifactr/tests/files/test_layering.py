@@ -78,6 +78,15 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         },
         {"pydantic"},
     ),
+    "figcraft": (
+        {
+            "artifactr.files.manifest",
+            "artifactr.files.app",
+            "artifactr.files.craft",
+            "artifactr.files.figcraft",
+        },
+        {"pydantic"},
+    ),
     "native": (
         {
             "artifactr.files.manifest",

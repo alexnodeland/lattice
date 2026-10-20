@@ -203,7 +203,7 @@ function Changes({ changed }: { changed: readonly Changed[] }) {
 type Tab = "preview" | "source" | "changes";
 
 const TAB =
-  "-mb-px shrink-0 cursor-default whitespace-nowrap border-transparent border-b-2 px-3 py-1.5 font-medium text-muted text-sm -outline-offset-2 hover:text-fg focus-visible:outline-2 focus-visible:outline-focus data-[selected]:border-accent data-[selected]:text-fg forced-colors:border-system-canvas forced-colors:data-[selected]:border-system-highlight";
+  "-mb-px shrink-0 cursor-default whitespace-nowrap border-transparent border-b-2 px-3 py-1.5 font-medium text-muted text-sm -outline-offset-2 hover:text-fg focus-visible:outline-2 focus-visible:outline-focus aria-selected:border-accent aria-selected:text-fg forced-colors:border-system-canvas forced-colors:aria-selected:border-system-highlight";
 
 /** An open revision: its title and summary, where its kind has them, and its tabs. */
 function Opened({

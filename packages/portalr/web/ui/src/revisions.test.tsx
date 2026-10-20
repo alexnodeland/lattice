@@ -81,6 +81,10 @@ test("an app's revision: its title and summary as text, then its Changes, Source
   await expect
     .element(latest.getByRole("tab", { name: "Changes" }))
     .toHaveAttribute("aria-selected", "true");
+  // The chosen tab is underlined in the working colour; the others aren't.
+  const edge = (name: string) =>
+    getComputedStyle(latest.getByRole("tab", { name }).element()).borderBottomColor;
+  expect(edge("Changes")).not.toBe(edge("Source"));
   // The title's words, and the HTML's lines, each said to a reader as added or removed.
   const html = latest.getByRole("region", { name: "Changes to the HTML" });
   await expect

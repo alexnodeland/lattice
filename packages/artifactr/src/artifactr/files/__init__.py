@@ -12,6 +12,8 @@ The layers: [`artifactr.files.manifest`][artifactr.files.manifest], the types an
 [`artifactr.files.app`][artifactr.files.app], the app port and its fake;
 [`artifactr.files.wordcraft`][artifactr.files.wordcraft], WordCraft's adapter, and each
 crafting app's beside it, such as [`artifactr.files.cadcraft`][artifactr.files.cadcraft];
+[`artifactr.files.worker`][artifactr.files.worker], the worker that runs an app on hostile
+files, and the app that calls it;
 [`artifactr.files.native`][artifactr.files.native], native files in a workspace;
 [`artifactr.files.tools`][artifactr.files.tools], the agent's tools; and
 [`artifactr.files.sql`][artifactr.files.sql], the stores in SQL, with the `sql` extra. Its

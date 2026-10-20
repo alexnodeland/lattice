@@ -91,6 +91,8 @@ class Config(BaseModel):
     """Whether the router names people: whether the UIs may ask it for their emails."""
     editors: dict[str, str]
     """Each native file's hosted editor, by its app's integration."""
+    apps: str | None
+    """The origin mini apps run on, or None where the deployment runs none."""
 
 
 class NewInvite(BaseModel):
@@ -258,6 +260,7 @@ def portalr_router(
             readers=readers.configured(),
             people=people is not None,
             editors=site.editors,
+            apps=site.apps,
         )
 
     @api.get("/v1/traces", response_model=reading(list[TraceSummary]))

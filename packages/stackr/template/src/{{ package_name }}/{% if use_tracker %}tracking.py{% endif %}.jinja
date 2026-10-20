@@ -25,8 +25,9 @@ from fastapi import FastAPI
 from lattice_core.integrations import Integrations
 from reflexr import F, Rule, on, run
 from reflexr.core import RunDeadLettered
+from reflexr.fastapi import ResolveActor
 from reflexr.workspace import Action, Reaction, Workspaces
-from relayr.fastapi import tracker_router
+from relayr.fastapi import tracker_reads_router, tracker_router
 from relayr.ledger import Ledger, WorkspaceKey
 from relayr.outbound import Allowlist
 {%- if tracker == 'plane' %}
@@ -145,13 +146,20 @@ class Tracking:
             meter_provider=telemetry.meter_provider if telemetry else None,
         )
         self._followers: TrackerFollowers | None = None
+        self._workspaces: Workspaces | None = None
+        self._resolve_actor: ResolveActor | None = None
 
     def actions(self) -> dict[str, Action[None]]:
         """The example's actions, which the reactor runs."""
         return tracker_actions(self.trackers)
 
-    def connect(self, workspaces: Workspaces) -> None:
-        """Follow each bound workspace's project into reflexr's workspaces."""
+    def connect(self, workspaces: Workspaces, resolve_actor: ResolveActor) -> None:
+        """Follow each bound workspace's project into reflexr's workspaces.
+
+        The reads of what the workspaces filed resolve who asks as reflexr's routes do.
+        """
+        self._workspaces = workspaces
+        self._resolve_actor = resolve_actor
         self._followers = TrackerFollowers(
             self.trackers,
             workspaces,
@@ -183,6 +191,15 @@ class Tracking:
                 await self._http.aclose()
 
     def mount(self, app: FastAPI) -> None:
-        """Add the route the tracker's webhooks reach, which wakes the followers."""
+        """Add the route the tracker's webhooks reach, and the reads the portal shows.
+
+        The webhooks wake the followers; the reads say what each workspace filed, and how its
+        follower is doing.
+        """
         assert self._followers is not None, "create_app connects the tracker"
+        assert self._workspaces is not None
+        assert self._resolve_actor is not None
         app.include_router(tracker_router(self._followers))
+        app.include_router(
+            tracker_reads_router(self.trackers, self._workspaces, resolve_actor=self._resolve_actor)
+        )

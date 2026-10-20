@@ -10,7 +10,7 @@ Register :data:`UI_TYPES` with the application's own types, in ``Workspaces(type
 - :class:`Dashboard`, kind ``dashboard``: a snapshot of figures in panels, true ``as_of`` a
   moment, which the agent writes.
 - :class:`App`, kind ``app``: a mini app's HTML and its state, which an agent writes through
-  its own tools, and which runs sandboxed, with no network, where mini apps are on.
+  its own tools, and which runs sandboxed, loading nothing, where mini apps are on.
 
 Their data's JSON Schema, with ``ask_form``'s request's, is :mod:`artifactr.ui.wire`'s.
 """
@@ -272,7 +272,7 @@ class Dashboard(Artifact, name="dashboard"):
 class App(Artifact, name="app"):
     """A mini app: one HTML file an agent wrote, its text fallback, and its state.
 
-    portalr runs it sandboxed, on an origin of its own, with no network, while mini apps are on
+    portalr runs it sandboxed, on an origin of its own, loading nothing, while mini apps are on
     in the workspace; its ``summary`` is shown beside it, and in its place where it doesn't run.
     An agent writes it, and its HTML names nothing to load, which the agent's tools and the
     checks hold; a person changes only its ``state``, through the app.

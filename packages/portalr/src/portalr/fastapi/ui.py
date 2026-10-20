@@ -26,6 +26,8 @@ def policy(site: Site) -> str:
     Supabase project on a path of the application's own origin is already ``'self'``.
     ``'wasm-unsafe-eval'`` lets either UI compile WebAssembly, and ``eval`` stays refused;
     ``scripts/check_wasm.py`` holds what each build ships to ``web/wasm-allowlist.json`` (ADR-0041).
+    Where the deployment runs mini apps, ``frame-src`` names their origin alone, so the UIs frame
+    nothing else, and their own pages are still framed by no one (lattice RFC-0005).
     """
     supabase = urlsplit(site.supabase_url)
     connect = " ".join(
@@ -39,6 +41,7 @@ def policy(site: Site) -> str:
             "img-src 'self' data:",
             "font-src 'self'",
             f"connect-src {connect}",
+            *([f"frame-src {site.apps}"] if site.apps else []),
             "object-src 'none'",
             "base-uri 'self'",
             "form-action 'self'",

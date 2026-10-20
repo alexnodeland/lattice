@@ -24,6 +24,7 @@ const CONFIG: Config = {
   readers: { tempo: false },
   people: true,
   editors: {},
+  apps: null,
 };
 
 /** alice, signed in, as Supabase Auth would say, without asking it. */

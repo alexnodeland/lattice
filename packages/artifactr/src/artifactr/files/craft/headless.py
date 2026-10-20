@@ -34,6 +34,8 @@ class Headless(ABC):
             whose CLI confines nothing.
         limit: The most bytes a file may hold, saved or inflated: 256 MiB by default.
         lookup: How long, in seconds, finding commands may take: 10 by default.
+        launcher: The command the CLI is started under, given the CLI and its arguments; none by
+            default.
 
     Raises:
         ValueError: If the app's CLI confines nothing and `trusted` isn't given.
@@ -55,11 +57,18 @@ class Headless(ABC):
         trusted: bool = False,
         limit: int = 256 << 20,
         lookup: float = 10.0,
+        launcher: Sequence[str] = (),
     ) -> None:
         self.version: str = version
         self.limit = limit
         self._spawn = Spawn(
-            self.craft, cli, version=version, arguments=arguments, trusted=trusted, limit=limit
+            self.craft,
+            cli,
+            version=version,
+            arguments=arguments,
+            trusted=trusted,
+            limit=limit,
+            launcher=launcher,
         )
         self._lookup = lookup
 

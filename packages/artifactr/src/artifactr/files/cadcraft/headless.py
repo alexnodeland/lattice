@@ -48,8 +48,8 @@ class Subprocess(ToolsDialect):
     blank one is a DXF. CADCraft renders its model space, fitted to its extents, as page 1.
 
     Its CLI confines nothing: it reads and writes wherever this process's user can, so it is
-    made only with `trusted=True`, for trusted files or a process already confined, until the
-    sandboxed worker runs it (native files ADR-0009).
+    made only with `trusted=True`, for trusted files or a process already confined, such as the
+    worker, which runs it on hostile ones (native files ADR-0009, ADR-0013).
     """
 
     craft: ClassVar[Craft] = CRAFTS["cadcraft"]

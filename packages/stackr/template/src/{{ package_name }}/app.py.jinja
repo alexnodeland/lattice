@@ -241,7 +241,7 @@ def create_app(
     bridge.connect(collaboration, automation)
 {%- endif %}
 {%- if use_tracker %}
-    tracking.connect(automation.workspaces)
+    tracking.connect(automation.workspaces, automation.resolve_actor)
 {%- endif %}
 {%- if use_portal %}
     portal = Portal(access=access, settings=settings)

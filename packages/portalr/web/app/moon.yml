@@ -21,6 +21,7 @@ tasks:
       - '/packages/portalr/web/notices/policy.json'
     outputs:
       - '/packages/portalr/src/portalr/static/app/**/*'
+      - '/packages/portalr/src/portalr/static/sandbox/**/*'
     options:
       mergeOutputs: 'replace'
 

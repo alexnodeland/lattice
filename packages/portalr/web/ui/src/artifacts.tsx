@@ -108,10 +108,12 @@ export function rendererFor(kind: string, renderers: Renderers): Renderer {
   return renderers.get(kind) ?? json;
 }
 
-/** An artifact, and the version of it shown. */
+/** An artifact, the version of it shown, and whether it is archived. */
 export interface Shown {
   readonly id: string;
   readonly version: number;
+  /** Whether it is archived, which switches an app off; a page that doesn't know says nothing. */
+  readonly archived?: boolean;
 }
 
 /** The artifact being shown, and its version: what a renderer that acts on it, such as a form's, acts on. */

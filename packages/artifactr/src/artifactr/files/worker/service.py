@@ -41,7 +41,12 @@ def worker_app(app: App, *, token: str, limits: Limits, build: str | None = None
         token: What every request's `Authorization: Bearer` must be; any other is 401.
         limits: The deadlines and sizes each call is held to.
         build: The digest of the image the worker runs in, which provenance records.
+
+    Raises:
+        ValueError: If the token is empty, which would admit anyone.
     """
+    if not token:
+        raise ValueError("the worker needs a token: an empty one would admit anyone")
     hello = Hello(
         name=app.name,
         version=app.version,
@@ -55,14 +60,19 @@ def worker_app(app: App, *, token: str, limits: Limits, build: str | None = None
         handle: Callable[[Request], Awaitable[Response]],
     ) -> Callable[[Request], Awaitable[Response]]:
         async def endpoint(request: Request) -> Response:
-            given = request.headers.get("authorization", "").removeprefix("Bearer ")
-            if not hmac.compare_digest(given.encode(), token.encode()):
+            scheme, _, given = request.headers.get("authorization", "").partition(" ")
+            if scheme.lower() != "bearer" or not hmac.compare_digest(
+                given.encode(), token.encode()
+            ):
                 return Response(status_code=401, headers={"WWW-Authenticate": "Bearer"})
             try:
                 return await handle(request)
             except AppFailed as failed:
                 reply = Failed(failure=failed.failure, message=str(failed).partition(": ")[2])
-                return JSONResponse(reply.model_dump(), status_code=422)
+            except ValidationError as error:
+                # What the app returned can't be told as a reply: the app's fault, not the call's.
+                reply = Failed(failure="crashed", message=f"the reply is not one: {error!r}")
+            return JSONResponse(reply.model_dump(), status_code=422)
 
         return endpoint
 
@@ -71,12 +81,14 @@ def worker_app(app: App, *, token: str, limits: Limits, build: str | None = None
         started = anyio.current_time()
         with anyio.move_on_after(deadline) as waiting:
             await turn.acquire()
-        if waiting.cancelled_caught:
-            raise AppFailed("timeout", f"the worker was busy for more than {deadline:.3g}s")
         try:
-            return await work(deadline - (anyio.current_time() - started))
+            left = deadline - (anyio.current_time() - started)
+            if waiting.cancelled_caught or left <= 0:
+                raise AppFailed("timeout", f"the worker was busy for more than {deadline:.3g}s")
+            return await work(left)
         finally:
-            turn.release()
+            if not waiting.cancelled_caught:
+                turn.release()
 
     async def hi(_request: Request) -> Response:
         return JSONResponse(hello.model_dump())

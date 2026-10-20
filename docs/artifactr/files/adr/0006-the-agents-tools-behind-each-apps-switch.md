@@ -60,5 +60,4 @@ The switch is read where a write starts, and where a tool is offered: cheap, as 
 
 1. [x] `NativeFiles(integrations=)`, `enabled`, `key_of` and `render`.
 2. [x] `native_file_tools`, with scripted-model tests for an edit, a proposal, a busy refusal and a conflict.
-3. [x] The worker and the hostile corpus ([ADR-0010](0010-the-worker-runs-each-call-under-limits-behind-a-token.md)).
-4. [ ] The worker's image and recipe, in stackr.
+3. [ ] The worker, its image and recipe, and the hostile corpus: the worker and the corpus are built ([ADR-0010](0010-the-worker-runs-each-call-under-limits-behind-a-token.md)); the image and recipe, in stackr, are not.

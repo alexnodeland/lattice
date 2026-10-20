@@ -122,7 +122,7 @@ app = await Worker.connect("http://worker:8080", token=os.environ["WORKER_TOKEN"
 files = NativeFiles(blobs, checkouts, app)
 ```
 
-A call that arrives while another runs waits its turn within its own deadline, so add containers, not jobs, to serve more. `worker_app(app, token=, limits=)` serves any app, if you build your own image: make the app with `launcher=limits.launcher()` and `limit=limits.files`, and pass `trusted=True` to one whose CLI confines nothing, since the worker is its confinement.
+A call that arrives while another runs waits its turn within its own deadline, so add containers, not jobs, to serve more. A `crashed` failure's message ends with what the CLI printed, which a hostile file can shape: log it, but don't show it to people or pass it to an agent as it is. `worker_app(app, token=, limits=)` serves any app, if you build your own image: make the app with `launcher=limits.launcher()` and `limit=limits.files`, and pass `trusted=True` to one whose CLI confines nothing, since the worker is its confinement.
 
 ## The other crafting apps
 

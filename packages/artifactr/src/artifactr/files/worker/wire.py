@@ -5,6 +5,7 @@ with the deadline the caller gives it. A reply is JSON, but a render's, which is
 that fails replies 422 with how, a `Failed`.
 """
 
+import json
 from typing import Final
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -17,6 +18,14 @@ CALL: Final = "Worker-Call"
 CALL_LIMIT: Final = 64 << 10
 """The most bytes a call's JSON may hold, which the worker's server reads a request's head up to:
 a longer batch of commands is refused as too large before it is sent."""
+
+
+def header(call: BaseModel) -> str:
+    """A call as its header carries it: JSON in ASCII, every other character escaped.
+
+    A header's bytes are read as Latin-1, so a call's own characters can't be sent as UTF-8.
+    """
+    return json.dumps(call.model_dump(mode="json"), separators=(",", ":"))
 
 
 class _Call(BaseModel):

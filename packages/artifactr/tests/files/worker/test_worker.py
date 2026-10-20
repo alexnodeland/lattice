@@ -5,12 +5,16 @@ the hostile corpus through the same worker, over WordCraft itself.
 """
 
 import os
+import re
 import resource
 import runpy
+import signal
+import socket
 import stat
 import sys
+import threading
 import time
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
 from pathlib import Path
 
 import anyio
@@ -18,10 +22,10 @@ import httpx
 import pytest
 import uvicorn
 
-from artifactr.files.app import App, AppCommand, AppFailed, FakeApp
+from artifactr.files.app import App, AppCommand, AppFailed, Applied, FakeApp
 from artifactr.files.wordcraft import Subprocess
 from artifactr.files.worker import Limits, Worker, worker_app
-from artifactr.files.worker.__main__ import worker_from_environment
+from artifactr.files.worker.__main__ import HEAD, worker_from_environment
 from artifactr.files.worker.limits import CONFINE
 from artifactr.files.worker.wire import CALL, CALL_LIMIT, Hello
 from tests.files.wordcraft.test_headless import FAKE, PNG
@@ -33,9 +37,9 @@ Connect = Callable[..., Awaitable[Worker]]
 
 
 def cli(tmp_path: Path, name: str, script: str) -> Path:
-    """An executable that runs a line of Python, standing in for a CLI."""
+    """An executable that runs a line of Python, standing in for a CLI, and says how it ended."""
     path = tmp_path / name
-    path.write_text(f'#!/bin/sh\nexec "{sys.executable}" -I -c "{script}"\n')
+    path.write_text(f'#!/bin/sh\n"{sys.executable}" -I -c "{script}"\necho "status $?" >&2\n')
     path.chmod(path.stat().st_mode | stat.S_IXUSR)
     return path
 
@@ -56,12 +60,10 @@ async def connect() -> AsyncIterator[Connect]:
     """Connect a `Worker` to a worker over an app, with the token it is given."""
     workers: list[Worker] = []
 
-    async def connect(
-        app: App, *, limits: Limits = LIMITS, token: str = TOKEN, build: str | None = None
-    ) -> Worker:
+    async def connect(app: App, *, limits: Limits = LIMITS, build: str | None = None) -> Worker:
         served = worker_app(app, token=TOKEN, limits=limits, build=build)
         transport = httpx.ASGITransport(app=served)
-        worker = await Worker.connect("http://worker", token=token, transport=transport)
+        worker = await Worker.connect("http://worker", token=TOKEN, transport=transport)
         workers.append(worker)
         return worker
 
@@ -142,6 +144,45 @@ async def test_a_reply_past_the_limit_is_too_large(connect: Connect) -> None:
     assert large.value.failure == "too_large"
 
 
+@pytest.fixture
+def listening() -> Iterator[str]:
+    """A worker over the fake app, served by uvicorn as the entry point serves it, on loopback."""
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        config = uvicorn.Config(
+            worker_app(FakeApp(), token=TOKEN, limits=LIMITS),
+            http="h11",
+            h11_max_incomplete_event_size=HEAD,
+            log_level="warning",
+        )
+        server = uvicorn.Server(config)
+        serving = threading.Thread(target=server.run, kwargs={"sockets": [sock]})
+        serving.start()
+        while not server.started:
+            time.sleep(0.01)
+        yield f"http://127.0.0.1:{sock.getsockname()[1]}"
+        server.should_exit = True
+        serving.join()
+
+
+async def test_a_call_in_any_language_reaches_the_app_over_http(listening: str) -> None:
+    worker = await Worker.connect(listening, token=TOKEN)
+    batch = [AppCommand(name="add_paragraph", args={"text": "café, 東京"})]
+    applied = await worker.apply(None, batch, deadline=10)
+    assert applied.inspection.text == "café, 東京"
+    await worker.aclose()
+
+
+async def test_a_batch_as_long_as_a_call_may_be_is_read_whole(listening: str) -> None:
+    worker = await Worker.connect(listening, token=TOKEN)
+    text = "é" * ((CALL_LIMIT - 200) // 6)  # each escaped as \u00e9
+    applied = await worker.apply(
+        None, [AppCommand(name="add_paragraph", args={"text": text})], deadline=10
+    )
+    assert applied.inspection.text == text
+    await worker.aclose()
+
+
 async def test_a_batch_past_the_calls_limit_is_too_large_before_it_is_sent(
     connect: Connect,
 ) -> None:
@@ -172,6 +213,31 @@ async def test_another_token_is_refused_before_any_call() -> None:
         await Worker.connect("http://worker", token="guess", transport=transport)
 
 
+@pytest.mark.parametrize(
+    "authorization",
+    [None, f"Basic {TOKEN}", TOKEN, f"Bearer{TOKEN}", "Bearer ", f"Bearer {TOKEN}x"],
+    ids=["missing", "basic", "bare", "unspaced", "empty", "longer"],
+)
+async def test_only_the_bearer_token_is_let_in(authorization: str | None) -> None:
+    served = worker_app(FakeApp(), token=TOKEN, limits=LIMITS)
+    headers = {} if authorization is None else {"Authorization": authorization}
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=served), base_url="http://worker"
+    ) as client:
+        reply = await client.post("/inspect", headers=headers, content=FakeApp.file("x"))
+    assert reply.status_code == 401
+    assert reply.headers["www-authenticate"] == "Bearer"
+
+
+def test_an_empty_token_would_admit_anyone() -> None:
+    with pytest.raises(ValueError, match="needs a token"):
+        worker_app(FakeApp(), token="", limits=LIMITS)
+    with pytest.raises(ValueError, match="needs a token"):
+        worker_from_environment(
+            {"WORKER_TOKEN": "", "WORDCRAFT_CLI": "x", "WORDCRAFT_VERSION": "1"}
+        )
+
+
 async def test_a_worker_that_cant_be_reached_is_a_crash() -> None:
     def unreachable(request: httpx.Request) -> httpx.Response:
         raise httpx.ConnectError("refused", request=request)
@@ -188,13 +254,22 @@ async def test_a_worker_that_cant_be_reached_is_a_crash() -> None:
 
 
 @pytest.mark.parametrize(
-    ("script", "limits"),
+    ("script", "limits", "cause"),
     [
-        ("while True: pass", Limits(cpu=1)),
-        ("open('big', 'wb').write(bytes(2 << 20)); input()", Limits(files=1 << 20)),
+        (
+            "while True: pass",
+            Limits(cpu=1),  # SIGXCPU at the limit, or SIGKILL where the hard limit is the soft one
+            f"status ({128 + signal.SIGXCPU}|{128 + signal.SIGKILL})",
+        ),
+        (
+            "open('big', 'wb').write(bytes(2 << 20)); input()",
+            Limits(files=1 << 20),
+            "File too large",
+        ),
         pytest.param(
             "b = bytearray(1 << 30); input()",
             Limits(memory=256 << 20),
+            "MemoryError",
             marks=pytest.mark.skipif(
                 sys.platform == "darwin", reason="macOS doesn't enforce an address space's limit"
             ),
@@ -203,13 +278,14 @@ async def test_a_worker_that_cant_be_reached_is_a_crash() -> None:
     ids=["cpu", "files", "memory"],
 )
 async def test_a_cli_past_its_limits_is_ended_as_a_crash(
-    tmp_path: Path, script: str, limits: Limits
+    tmp_path: Path, script: str, limits: Limits, cause: str
 ) -> None:
     hostile = wordcraft(cli(tmp_path, "wordcraft-cli", script), limits)
     started = time.monotonic()
     with pytest.raises(AppFailed) as crashed:
         await hostile.inspect(b"PK", deadline=20)
     assert crashed.value.failure == "crashed"
+    assert re.search(cause, str(crashed.value))
     assert time.monotonic() - started < 15
 
 
@@ -232,16 +308,54 @@ def test_the_environment_says_which_wordcraft_it_runs(tmp_path: Path) -> None:
     ]
 
 
-async def test_a_worker_that_doesnt_reply_in_time_is_a_timeout() -> None:
-    def late(request: httpx.Request) -> httpx.Response:
-        raise httpx.ReadTimeout("late", request=request)
+def _replying(reply: httpx.Response) -> Worker:
+    hello = Hello(name="fake", version="1.0", build=None, talk="save", integration="files:fake")
+    transport = httpx.MockTransport(lambda _request: reply)
+    return Worker(httpx.AsyncClient(transport=transport, base_url="http://worker"), hello)
+
+
+@pytest.mark.parametrize(
+    ("reply", "message"),
+    [
+        (httpx.Response(500, text="Internal Server Error"), "replied 500 to /inspect"),
+        (httpx.Response(200, text="not JSON"), "the worker's reply is not one"),
+        (httpx.Response(422, json={"failure": "late"}), "the worker's reply is not one"),
+    ],
+    ids=["status", "garbled", "unknown-failure"],
+)
+async def test_a_reply_that_isnt_a_calls_is_a_crash(reply: httpx.Response, message: str) -> None:
+    worker = _replying(reply)
+    with pytest.raises(AppFailed, match=message) as crashed:
+        await worker.inspect(b"", deadline=1)
+    assert crashed.value.failure == "crashed"
+    await worker.aclose()
+
+
+async def test_what_the_worker_cant_tell_as_a_reply_is_a_crash(connect: Connect) -> None:
+    class Garbled(FakeApp):
+        async def apply(self, *_args: object, **_kwargs: object) -> Applied:
+            return Applied(content=b"x", inspection={"fingerprint": "no"})  # pyright: ignore[reportArgumentType]
+
+    worker = await connect(Garbled())
+    with pytest.raises(AppFailed, match="the reply is not one") as crashed:
+        await worker.apply(None, [], deadline=10)
+    assert crashed.value.failure == "crashed"
+
+
+async def test_the_deadline_bounds_the_whole_exchange(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def slow(_request: httpx.Request) -> httpx.Response:
+        await anyio.sleep(30)
+        return httpx.Response(200)
 
     hello = Hello(name="fake", version="1.0", build=None, talk="save", integration="files:fake")
-    client = httpx.AsyncClient(transport=httpx.MockTransport(late), base_url="http://worker")
+    client = httpx.AsyncClient(transport=httpx.MockTransport(slow), base_url="http://worker")
+    monkeypatch.setattr("artifactr.files.worker.client.GRACE", 0.1)
+    started = time.monotonic()
     async with client:
-        with pytest.raises(AppFailed, match="didn't reply to /inspect") as timeout:
-            await Worker(client, hello).inspect(b"", deadline=1)
-    assert timeout.value.failure == "timeout"
+        with pytest.raises(AppFailed, match="didn't reply to /inspect") as late:
+            await Worker(client, hello).inspect(b"", deadline=0.2)
+    assert late.value.failure == "timeout"
+    assert time.monotonic() - started < 5
 
 
 @pytest.mark.parametrize(

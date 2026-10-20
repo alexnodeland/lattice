@@ -9,6 +9,7 @@ by default. In its container it listens on the internal network alone.
 
 import os
 from collections.abc import Mapping
+from typing import Final
 
 import uvicorn
 from starlette.applications import Starlette
@@ -17,6 +18,9 @@ from artifactr.files.wordcraft import Subprocess
 from artifactr.files.worker.limits import Limits
 from artifactr.files.worker.service import worker_app
 from artifactr.files.worker.wire import CALL_LIMIT
+
+HEAD: Final = CALL_LIMIT + (16 << 10)
+"""The most bytes the server reads of a request's head: the longest call, and the other headers."""
 
 
 def worker_from_environment(environ: Mapping[str, str]) -> Starlette:
@@ -40,7 +44,7 @@ def main() -> None:
         host=os.environ.get("WORKER_HOST", "127.0.0.1"),
         port=int(os.environ.get("WORKER_PORT", "8080")),
         http="h11",
-        h11_max_incomplete_event_size=CALL_LIMIT + (16 << 10),
+        h11_max_incomplete_event_size=HEAD,
     )
 
 

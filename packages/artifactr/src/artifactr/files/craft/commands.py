@@ -75,11 +75,7 @@ class CommandsDialect(Headless):
             command = self.open_command
             path = server.source(source, f"source{self.extension}")
             opened = await server.json("command_run", id=command, params={"path": str(path)})
-        if self.handle is None:
-            return None
-        if not isinstance(opened, Mapping) or (document := opened.get(self.handle)) is None:
-            raise AppFailed("crashed", f"{command} named no document as {self.handle}")
-        return document
+        return self.named(command, opened)
 
     @override
     async def batch(
@@ -126,6 +122,18 @@ class CommandsDialect(Headless):
         except ValidationError as error:
             raise AppFailed("crashed", f"command_list replied with no commands: {error}") from None
         return [_spec(command) for command in found[:FOUND]]
+
+    def named(self, step: str, opened: JsonValue) -> JsonValue:
+        """What a step that opened a file, or made one, says the server calls it, by `handle`.
+
+        Raises:
+            AppFailed: `crashed` if it names no document.
+        """
+        if self.handle is None:
+            return None
+        if not isinstance(opened, Mapping) or (document := opened.get(self.handle)) is None:
+            raise AppFailed("crashed", f"{step} named no document as {self.handle}")
+        return document
 
     def params(
         self, document: JsonValue, arguments: Mapping[str, JsonValue]

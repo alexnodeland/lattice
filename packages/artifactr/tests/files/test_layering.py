@@ -42,6 +42,7 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     "wordcraft": _adapter("wordcraft"),
     "gridcraft": _adapter("gridcraft"),
     "deckcraft": _adapter("deckcraft"),
+    "pdfcraft": _adapter("pdfcraft"),
     # The worker, over any app, and the App that calls it; its entry point runs WordCraft's.
     "worker": (
         {

@@ -149,6 +149,18 @@ deckcraft = DeckCraft("/opt/deckcraft/bin/deckcraft-cli", version="0.7.0", trust
 
 An agent's commands are DeckCraft's own, such as `{"name": "slide.new", "args": {"layout": "titleAndContent"}}` or `{"name": "comment.add", "args": {"text": "Check"}}`; a batch stops at the first that fails, which refuses it whole. A deck's outline is its slides' titles, numbered from 1; its text is each slide's shapes, tables and notes; its review is each slide's comments, and its pages are its slides, each of which `render` draws as a PNG. DeckCraft opens its own `.deckcraft` format whatever a file is named, so the adapter refuses a source that isn't a `.pptx` before DeckCraft reads it. Its second save of a file writes the same XML another way, so its fingerprint reads each XML part in its canonical form, and a save that changes nothing makes no revision. `CRAFT=deckcraft moon run artifactr:fidelity` runs its fidelity report: DeckCraft 0.7.0 keeps every feature of its corpus.
 
+## PdfCraft
+
+`artifactr.files.pdfcraft.Subprocess` is PdfCraft's adapter for `.pdf` documents, of the type `PdfDocument`. Its CLI takes one root, so, as WordCraft's, it is confined to the call's own directory, and needs no `trusted`:
+
+```python
+from artifactr.files.pdfcraft import Subprocess as PdfCraft
+
+pdfcraft = PdfCraft("/opt/pdfcraft/bin/pdfcraft-cli", version="0.8.0")
+```
+
+An agent's commands are PdfCraft's own, run through its command registry, such as `{"name": "page.insert_blank", "args": {"at": 2}}`; the adapter names the open document in each, and a batch stops at the first that fails, which refuses it whole. A document's outline is its bookmarks, its text each page's, its review its comments, and its pages its pages, each of which `render` draws as a PNG. PdfCraft stamps the time on every save, so the fingerprint leaves the stamp out, and a save that changes nothing else makes no revision. A document PdfCraft can only read by repairing it, such as one cut short, is refused rather than saved as PdfCraft's repair. `CRAFT=pdfcraft moon run artifactr:fidelity` runs its fidelity report: PdfCraft 0.8.0 keeps every feature of its corpus. Its key stays off until it passes its gate; the notices its Linux tarballs carry are below.
+
 ## The other crafting apps
 
 `artifactr.files.craft.CRAFTS` declares every crafting app, as its pinned release offers it, and each is an integration of its own, `files:<name>`, off by default but WordCraft's:

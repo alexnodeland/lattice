@@ -7,8 +7,10 @@ from artifactr.core import NotFound, get_artifact_type
 from artifactr.files.manifest import (
     DOCX,
     OUTLINE_LIMIT,
+    PDF,
     PPTX,
     XLSX,
+    PdfDocument,
     Presentation,
     Provenance,
     WordDocument,
@@ -30,6 +32,8 @@ def test_each_crafting_apps_type_is_registered_with_its_format() -> None:
     assert Workbook.formats == frozenset({XLSX})
     assert get_artifact_type("presentation") is Presentation
     assert Presentation.formats == frozenset({PPTX})
+    assert get_artifact_type("pdf_document") is PdfDocument
+    assert PdfDocument.formats == frozenset({PDF})
 
 
 def test_its_content_is_in_its_format() -> None:

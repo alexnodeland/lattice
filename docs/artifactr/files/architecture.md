@@ -6,7 +6,7 @@
 
 | Layer | What it is | It may import |
 |---|---|---|
-| `manifest` | `Blob`, `Provenance`, `NativeFile`, a type for each kept format (`WordDocument`, `Workbook`, `Presentation`), and `revise`, the patch that tests its base | artifactr, pydantic |
+| `manifest` | `Blob`, `Provenance`, `NativeFile`, a type for each kept format (`WordDocument`, `Workbook`, `Presentation`, `PdfDocument`), and `revise`, the patch that tests its base | artifactr, pydantic |
 | `blobs` | The `Blobs` port, its size limit and digest, and `InMemoryBlobs` | `manifest`, artifactr |
 | `checkouts` | `Checkout`, the record behind a person's lease, the `Checkouts` port, and `InMemoryCheckouts` | `manifest`, artifactr, pydantic |
 | `app` | The `App` port and `FakeApp` | `manifest`, pydantic |
@@ -14,6 +14,7 @@
 | `wordcraft` | WordCraft's adapter, `Subprocess`, and the `.docx` fingerprint and outline | `manifest`, `app`, `craft`, pydantic |
 | `gridcraft` | GridCraft's adapter, `Subprocess`, and the `.xlsx` fingerprint, outline and text | `manifest`, `app`, `craft`, pydantic |
 | `deckcraft` | DeckCraft's adapter, `Subprocess`, and the `.pptx` fingerprint, outline and text | `manifest`, `app`, `craft`, pydantic |
+| `pdfcraft` | PdfCraft's adapter, `Subprocess`, and the `.pdf` fingerprint and outline | `manifest`, `app`, `craft`, pydantic |
 | `worker` | `worker_app`, the worker that runs an app on hostile files under `Limits`, and `Worker`, the `App` that calls it | `app`, `wordcraft` (its entry point), pydantic, `anyio`, Starlette, uvicorn, httpx |
 | `native` | `NativeFiles`: uploads, check-out and check-in, agents' edits, reads, renders and collection, behind the app's switch | `manifest`, `blobs`, `checkouts`, `app`, artifactr, `lattice_core.integrations` |
 | `tools` | `native_file_tools`, the agent's toolset | `app`, `native`, artifactr and its agent, pydantic-ai |
@@ -57,6 +58,8 @@ The worker, `worker_app`, serves an app's four calls over HTTP, one job at a tim
 GridCraft's adapter is a `ToolsDialect` too, over `new_workbook`, `open_workbook` and `save_workbook`, but for its batch: GridCraft's server has no batch tool, so each command is run by `execute_command` in turn, and the first that fails refuses the batch, the workbook unsaved. Its CLI confines nothing, so it is made only with `trusted=True`. GridCraft opens a CSV whatever it is named, so the adapter refuses a source that isn't a `.xlsx` before the CLI reads it, rather than save it as one. A workbook's outline is its sheets, with the ranges they use and their tables; its text is each sheet's cells as GridCraft shows them; it has no pages, GridCraft lists no comments, and it renders no page headless. GridCraft stamps nothing on a save, so the fingerprint is the digest of every part. Its talk level is `bridged`, as its build has a `?host=parent` bridge.
 
 DeckCraft's adapter is a `ToolsDialect` over `new_presentation`, `open_presentation`, `save_presentation`, its `batch` and `render_slide`, whose slides it numbers from 1 as DeckCraft numbers them from 0. Its CLI confines nothing, so it is made only with `trusted=True`, and DeckCraft opens its own format whatever a file is named, so a source that isn't a `.pptx` is refused before the CLI reads it. A deck's outline is its slides' titles, its text each slide's shapes, tables and notes, its review each slide's comments, and its pages its slides. DeckCraft stamps nothing, but writes a deck it made in other XML than the same deck reopened, `<a:p/>` for `<a:p></a:p>`, so its `Package` is `canonical`: the fingerprint reads each XML part in its canonical form (C14N 2.0).
+
+PdfCraft's adapter is the first `CommandsDialect`, whose defaults are PdfCraft's: `file.open`, which names the document `doc` in every command after it, `command_batch`, `file.save` and `render_preview`. A blank document is made by `doc_create`, since PdfCraft's `create.blank` has no headless tool. Its CLI takes one root, the call's directory. A document's outline is its bookmarks, its text each page's, its review its comments, and its pages its pages. PdfCraft stamps each save's time as the information dictionary's `/ModDate`, in a compressed object stream, so the fingerprint reads each object stream as what it holds, blanks the stamp, and leaves out the cross-reference stream and `startxref`, which only say where objects lie. A document PdfCraft had to repair to read, such as one cut short, is refused, since its save would be the repair. Its talk level is `bridged`.
 
 Each app is pinned by the checksums of one release, in `scripts/crafts/<app>.sha256`, which `scripts/craft` checks before it unpacks anything, fetching each asset only when it is first asked for. Nightly's fidelity report runs for each app with a corpus, in `tests/files/corpus/<app>/`: it opens and saves each file, one per feature, with that release, and publishes which features it kept and whether saving twice is a fixpoint.
 

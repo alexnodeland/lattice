@@ -148,3 +148,9 @@ class Presentation(NativeFile):
     """A presentation, `.pptx`: registered as `presentation`."""
 
     formats: ClassVar[frozenset[str]] = frozenset({PPTX})
+
+
+class PdfDocument(NativeFile):
+    """A PDF document, `.pdf`: registered as `pdf_document`."""
+
+    formats: ClassVar[frozenset[str]] = frozenset({PDF})

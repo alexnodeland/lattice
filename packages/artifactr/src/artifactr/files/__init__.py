@@ -14,6 +14,7 @@ The layers: [`artifactr.files.manifest`][artifactr.files.manifest], the types an
 [`artifactr.files.wordcraft`][artifactr.files.wordcraft], WordCraft's adapter;
 [`artifactr.files.gridcraft`][artifactr.files.gridcraft], GridCraft's;
 [`artifactr.files.deckcraft`][artifactr.files.deckcraft], DeckCraft's;
+[`artifactr.files.pdfcraft`][artifactr.files.pdfcraft], PdfCraft's;
 [`artifactr.files.worker`][artifactr.files.worker], the worker that runs an app on hostile
 files, and the app that calls it;
 [`artifactr.files.native`][artifactr.files.native], native files in a workspace;
@@ -29,6 +30,7 @@ from artifactr.files.manifest import (
     DOCX,
     Blob,
     NativeFile,
+    PdfDocument,
     Presentation,
     Provenance,
     WordDocument,
@@ -51,6 +53,7 @@ __all__ = [
     "InMemoryCheckouts",
     "NativeFile",
     "NativeFiles",
+    "PdfDocument",
     "Presentation",
     "Provenance",
     "TooLarge",

@@ -42,6 +42,15 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         },
         {"pydantic"},
     ),
+    # The worker, over any app, and the App that calls it; its entry point runs WordCraft's.
+    "worker": (
+        {
+            "artifactr.files.app",
+            "artifactr.files.wordcraft",
+            "artifactr.files.worker",
+        },
+        {"pydantic", "anyio", "starlette", "uvicorn", "httpx"},
+    ),
     "native": (
         {
             "artifactr.files.manifest",

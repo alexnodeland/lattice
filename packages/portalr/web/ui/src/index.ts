@@ -9,6 +9,7 @@ export { Account } from "./account";
 export { AccountMenu, type Appearance } from "./account-menu";
 export { Alert, type AlertTone } from "./alert";
 export { AnsiText, type Run, runs } from "./ansi";
+export { type AppHost, AppHostContext } from "./app-frame";
 export { AppShell } from "./app-shell";
 export { useAppearance } from "./appearance";
 export {

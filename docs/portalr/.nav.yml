@@ -60,6 +60,7 @@ nav:
   - adr/0048-native-files-in-the-app.md
   - adr/0049-checking-a-native-file-out-and-in.md
   - adr/0050-a-native-files-proposals-and-the-pilots-scenarios.md
+  - adr/0051-mini-apps-the-sandboxed-frame-and-its-bridge.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

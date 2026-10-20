@@ -63,5 +63,5 @@ def test_html_that_holds_what_it_needs_loads_nothing(html: str) -> None:
 def test_html_that_loads_from_outside_is_refused_with_what_it_loads(html: str, named: str) -> None:
     why = refused(html)
     assert why is not None
-    assert "reaches no network" in why
+    assert "can load nothing" in why
     assert named in why

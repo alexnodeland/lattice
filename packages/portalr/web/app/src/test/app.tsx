@@ -25,6 +25,7 @@ const CONFIG: Config = {
   readers: { tempo: false },
   people: false,
   editors: { "files:wordcraft": "https://wordcraft.example.test/" },
+  apps: null,
 };
 
 /** alice, signed in, as Supabase Auth would say, without asking it. */
@@ -97,13 +98,15 @@ function server(serve: Serve) {
 
 /**
  * What a test changes of the app's world: artifactr's and reflexr's logs, the config's surfaces,
- * and the editors the deployment hosts, WordCraft's unless told.
+ * the editors the deployment hosts, WordCraft's unless told, and the origin its mini apps run on,
+ * none unless told.
  */
 export interface World {
   readonly artifactrLog?: readonly unknown[];
   readonly reflexrLog?: readonly unknown[];
   readonly surfaces?: Partial<Config["surfaces"]>;
   readonly editors?: Config["editors"];
+  readonly apps?: Config["apps"];
 }
 
 /** The app, opened at `path`, over `serve` and streams that answer as `answer` does. */
@@ -127,6 +130,7 @@ export async function open(
     ...CONFIG,
     surfaces: { ...CONFIG.surfaces, ...world.surfaces },
     editors: world.editors ?? CONFIG.editors,
+    apps: world.apps ?? CONFIG.apps,
   };
   const api = createApi(config.surfaces, () => ({ token: "t0k3n" }));
   const router = createRouter({

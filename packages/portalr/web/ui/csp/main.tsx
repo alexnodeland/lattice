@@ -5,14 +5,16 @@
  * ADR-0047): `?markdown=` the Markdown given, whole, or with `&stream` a character at a time, as an
  * agent's run writes it, with the integrations `&on=` and `&off=` name, such as `markdown:math`,
  * switched so and the rest their defaults, and on the root `data-drawn` once it is whole, or
- * `data-error` if it stopped; `?dashboard` the dashboard gallery; and `?eval` an evaluated string.
+ * `data-error` if it stopped; `?dashboard` the dashboard gallery; `?eval` an evaluated string; and
+ * `?app=` a mini app of that HTML, run in the sandbox at `&apps=` (portalr ADR-0051).
  */
 
 import type { IntegrationKey } from "@portalr/client";
 import "../src/styles.css";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
-import { DashboardView, IntegrationsContext, Markdown } from "../src";
+import { AppHostContext, DashboardView, IntegrationsContext, Markdown } from "../src";
+import { AppFrame } from "../src/app-frame";
 import { byDefault } from "../src/integrations";
 import { SUPPORT } from "../src/test/dashboards";
 
@@ -68,4 +70,21 @@ if (asked.has("eval")) {
 }
 if (asked.has("dashboard")) {
   flushSync(() => root.render(<DashboardView dashboard={SUPPORT} />));
+}
+const html = asked.get("app");
+if (html !== null) {
+  const done = async () => ({ outcome: "done" as const });
+  const host = { origin: asked.get("apps"), setState: done, submit: done };
+  flushSync(() =>
+    root.render(
+      <IntegrationsContext value={() => true}>
+        <AppHostContext value={host}>
+          <AppFrame
+            app={{ title: "Probe", summary: "Tries every way out.", html, state: {} }}
+            shown={{ id: "app_1", version: 1 }}
+          />
+        </AppHostContext>
+      </IntegrationsContext>,
+    ),
+  );
 }

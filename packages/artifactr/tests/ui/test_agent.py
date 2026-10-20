@@ -335,7 +335,7 @@ async def test_an_app_is_made_and_updated_with_its_state_kept(
     )
     await _run(runners, ws, made)
     [retry] = [p for p in made.last_parts(1) if isinstance(p, RetryPromptPart)]
-    assert "reaches no network" in str(retry.content)
+    assert "can load nothing" in str(retry.content)
     assert "<img src>: d.png" in str(retry.content)
     [app] = await ws.artifacts(App)
     played = JsonPatch(ops=({"op": "replace", "path": "/state", "value": {"rolled": 6}},))

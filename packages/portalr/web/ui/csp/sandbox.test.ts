@@ -280,3 +280,105 @@ host.connect().then(async () => {
   }
   await page.close();
 });
+
+/** What the app wrote in `#said`, once it has. */
+const said = (page: Page) => appFrame(page)?.textContent("#said");
+
+test("a call the host never answers rejects, and the app's controls come back", async () => {
+  // A message past 64 KB is dropped, unanswered, as one past the app's limit would be.
+  const page = await running(
+    `<body><button id="play" disabled>Play</button><output id="said"></output><script>
+const play = document.getElementById("play");
+host.connect().then(async () => {
+  try {
+    await host.call("set_state", { patch: [{ op: "add", path: "/big", value: "x".repeat(70000) }] });
+  } catch (error) {
+    document.getElementById("said").textContent = error.code + ": " + error.message;
+  } finally {
+    play.disabled = false;
+  }
+});
+</script>`,
+  );
+  await expect.poll(() => said(page), { timeout: 30_000 }).toBe("timeout: the host did not answer");
+  expect(await appFrame(page)?.isEnabled("#play")).toBe(true);
+  await page.close();
+});
+
+test("a refusal rejects with isError, and an app's own requests are answered beside host's", async () => {
+  const page = await running(
+    `<body><output id="said"></output><script>
+const lines = [];
+addEventListener("message", (e) => {
+  if (e.data && e.data.id === 7) lines.push("raw: " + JSON.stringify(e.data.result.structuredContent.state));
+});
+host.connect().then(async () => {
+  await host.call("set_state", { patch: "not a patch" }).catch((error) => lines.push("refused: " + error.isError));
+  parent.postMessage({ jsonrpc: "2.0", id: 7, method: "tools/call", params: { name: "get_state", arguments: {} } }, "*");
+  const read = await host.call("get_state");
+  lines.push("host: " + JSON.stringify(read.state));
+  setTimeout(() => { document.getElementById("said").textContent = lines.join(" | "); }, 300);
+});
+</script>`,
+  );
+  await expect.poll(() => said(page), SETTLED).toBe("refused: true | raw: {} | host: {}");
+  await page.close();
+});
+
+test("an app that throws host away still talks to the host by hand", async () => {
+  const page = await running(
+    `<body><output id="said"></output><script>
+delete window.host;
+window.host = { call: () => Promise.reject(new Error("broken")) };
+addEventListener("message", (e) => {
+  if (e.data && e.data.id === 1) document.getElementById("said").textContent = "answered " + e.data.result.protocolVersion;
+});
+parent.postMessage({ jsonrpc: "2.0", id: 1, method: "ui/initialize", params: {} }, "*");
+</script>`,
+  );
+  await expect.poll(() => said(page), SETTLED).toMatch(/^answered \d{4}-\d{2}-\d{2}$/);
+  await page.close();
+});
+
+test("host.onAnswer runs after the app's own code that awaited the answer", async () => {
+  // An app that changes its state in an async function of its own, and leaves drawing to the hook.
+  const page = await running(
+    `<body><output id="moves">0</output><script>
+let moves = 0;
+host.onAnswer(() => { document.getElementById("moves").textContent = String(moves); });
+async function move() {
+  await host.call("set_state", { patch: [{ op: "add", path: "/moves", value: moves + 1 }] });
+  await Promise.resolve();
+  moves += 1;
+}
+host.connect().then(() => move()).then(() => move());
+</script>`,
+  );
+  await expect.poll(() => appFrame(page)?.textContent("#moves"), SETTLED).toBe("2");
+  await page.close();
+});
+
+test("the host's theme is kept on the app's document, and onContext hears it change", async () => {
+  const page = await running(
+    `<body><output id="said"></output><script>
+let heard = 0;
+const say = () => {
+  const root = document.documentElement;
+  document.getElementById("said").textContent = [
+    root.dataset.theme,
+    getComputedStyle(root).colorScheme,
+    root.style.getPropertyValue("--color-background-primary") ? "coloured" : "plain",
+    heard,
+  ].join(" ");
+};
+host.onContext(() => { heard += 1; say(); });
+host.connect().then(say);
+</script>`,
+  );
+  await expect.poll(() => said(page), SETTLED).toMatch(/^light light coloured \d+$/);
+  await page.evaluate(() => {
+    document.documentElement.dataset.theme = "dark";
+  });
+  await expect.poll(() => said(page), SETTLED).toMatch(/^dark dark coloured [1-9]\d*$/);
+  await page.close();
+});

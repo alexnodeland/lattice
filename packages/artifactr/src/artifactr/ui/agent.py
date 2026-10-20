@@ -71,18 +71,20 @@ and its images and fonts `data:` URLs. Its `summary` says in words what it does:
 beside the app, and in its place wherever apps don't run.
 
 It talks to its host through `window.host`, which the host gives every app before its own \
-script runs. `await host.connect()` first: it asks `ui/initialize`, says it is initialized, \
-and keeps the host's theme on the document. `await host.call(name, args)` calls a tool and \
-resolves to what it says, or rejects with an `Error` where the host refuses it: \
-`host.call("get_state")` to `{{state, version}}`; `host.call("set_state", {{patch}})`, a JSON \
-Patch on the app's state, at most {MAX_APP_STATE_BYTES // 1024} KB, kept as the person's and \
-saved at most once every 5 seconds; and `host.call("submit", {{values}})`, an object sent as \
-the person's submission once they confirm it. `host.request("ui/open-link", {{url}})` opens a \
-link once the person confirms it. `host.onAnswer(render)` draws again after every answer. The \
-host sizes the frame to what the app draws; `host.notify("ui/notifications/size-changed", \
-{{height}})` says a height of the app's own instead. It has 60 calls a minute; past them, the \
-host stops answering it. Beneath `host` is JSON-RPC 2.0 over `window.parent.postMessage`, on \
-MCP Apps' methods.
+script runs. `await host.connect()` first: it asks `ui/initialize`, whose result's \
+`hostContext` has `theme` (`light` or `dark`) and `styles.variables`, and keeps that theme on \
+the document as it changes. `await host.call(name, args)` calls a tool and resolves to what it \
+says: `host.call("get_state")` to `{{state, version}}`; `host.call("set_state", {{patch}})`, a \
+JSON Patch on the app's state, at most {MAX_APP_STATE_BYTES // 1024} KB, kept as the person's \
+and saved at most once every 5 seconds, to `{{state}}`; and `host.call("submit", {{values}})`, \
+an object sent as the person's submission once they confirm it. A call rejects with an `Error` \
+when the host refuses it (a refusal has no result; the error's `isError` is true) or doesn't \
+answer within 10 seconds (its `code` is `"timeout"`), as past 60 calls a minute: wrap each in \
+`try`, and draw again in `finally`. `host.request("ui/open-link", {{url}})` opens a link once \
+the person confirms it. `host.onAnswer(render)` draws again after every answer, a safety net \
+beside the app's own `render()`; `host.onContext(fn)` runs when the theme changes, for colours \
+drawn by script. The host sizes the frame to what the app draws; \
+`host.notify("ui/notifications/size-changed", {{height}})` says a height of its own instead.
 
 Keep what the app shows in one state, and draw all of it from that state in one `render()`, \
 called after every change: a click, a timer's callback, an answer or a refusal. A control \
@@ -92,10 +94,10 @@ that ran before the change. Before sending it, walk its first three turns and a 
 Its colours are the host's, which `host.connect()` sets on the document and changes with the \
 host's theme: `var(--color-background-primary)`, `--color-background-secondary`, \
 `--color-text-primary`, `--color-text-secondary`, `--color-border-primary`, and portalr's \
-`--accent` and `--on-accent`. Use them for every surface and its text, set no `color-scheme` \
-or palette of its own, and name no variable of its own like the host's (`--paper`, \
-`--surface`, `--fg`, `--line` and the rest), which the host's would replace. Every text \
-contrasts with what it is drawn on, in light and in dark."""
+`--accent`, whose text is `--on-accent`. Use them for every surface and its text, set no \
+`color-scheme` or palette of its own, and name no variable of its own like the host's \
+(`--paper`, `--surface`, `--fg`, `--line` and the rest), which the host's would replace. Every \
+text contrasts with what it is drawn on, in light and in dark."""
 
 
 def ui_tools(

@@ -54,6 +54,9 @@ async function running(html: string): Promise<Page> {
   return page;
 }
 
+/** Long enough for the sandbox, the app and the bridge to start on a busy CI runner. */
+const SETTLED = { timeout: 15_000 };
+
 /** The app's frame's height, which the app asks for through the bridge. */
 const height = (page: Page) =>
   page.getByTitle("Probe: an app made by the agent").evaluate((frame) => frame.style.height);
@@ -67,7 +70,7 @@ test("the sandbox's script and the app's run under the policy, and the app reach
   const page = await running(
     `<script>addEventListener("message",(e)=>{const m=JSON.parse(JSON.stringify(e.data));if(m.id===1)parent.postMessage({jsonrpc:"2.0",method:"ui/notifications/size-changed",params:{height:m.result.hostInfo.name==="portalr"?432:0}},"*")});parent.postMessage({jsonrpc:"2.0",id:1,method:"ui/initialize",params:{}},"*")</script>`,
   );
-  await expect.poll(() => height(page)).toBe("432px");
+  await expect.poll(() => height(page), SETTLED).toBe("432px");
   await page.close();
 });
 
@@ -111,7 +114,7 @@ test("every way out an app has is refused, and the sink hears nothing", async ()
   const page = await running(
     script(`${tried(ways)};setTimeout(()=>{${tried(LEAVING(sink))}},100)`, `${said}`),
   );
-  await expect.poll(() => height(page)).toBe(`${said}px`);
+  await expect.poll(() => height(page), SETTLED).toBe(`${said}px`);
   // Long enough for a request, a connection or ICE's first datagram to have arrived.
   await page.waitForTimeout(3000);
   expect(heard).toEqual([]);
@@ -129,7 +132,7 @@ test("WebRTC from a srcdoc frame the app makes still reaches the sink: not refus
       "321",
     ),
   );
-  await expect.poll(() => height(page)).toBe("321px");
+  await expect.poll(() => height(page), SETTLED).toBe("321px");
   await vi.waitFor(() => expect(heard).toContain("a UDP datagram"), { timeout: 10_000 });
   await page.close();
 });

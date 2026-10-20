@@ -116,7 +116,7 @@ A form is a `FormSchema`: a JSON Schema 2020-12 object with a separate `ui` obje
 - **`ask_form(title, schema, ui=None)`** checks the schema, then raises `CallDeferred`, so the run pauses with a `DeferredRequest` whose `args` are the tool's own: no core change, since `args` already carry any JSON. The answer is the values, already checked, and the run resumes with them as the tool's result. A schema the subset refuses goes back to the model as a retry, before anything pauses.
 - **`create_form(title, schema, ui=None, submissions="once")`** makes a form artifact in the thread and returns its id, for a poll, a sign-up or a form that outlives the run. The agent reads its submissions as artifacts, or a rule reacts to them.
 - **`show_dashboard(title, panels)`** and **`update_dashboard(id, panels)`** make and replace a dashboard, a new version each time.
-- **`make_app(title, summary, html)`** and **`update_app(id, html)`** exist only in phase 2, and only when the application turns apps on. *Amended 2026-10-18 ([artifactr ADR-0082](../artifactr/adr/0082-mini-apps-the-agents-tools-and-html-that-loads-nothing.md)): they are `create_app(title, summary, html)` and `update_app(id, html, summary=None)`, offered while `ui:mini-apps` is on.*
+- **`make_app(title, summary, html)`** and **`update_app(id, html)`** exist only in phase 2, and only when the application turns apps on. *Amended 2026-10-18 ([artifactr ADR-0082](../artifactr/adr/0082-mini-apps-the-agents-tools-and-html-that-loads-nothing.md)): they are `create_app(title, summary, html)` and `update_app(id, html, summary=None, title=None)`, offered while `ui:mini-apps` is on.*
 
 ### Checks: refusing at the boundary
 
@@ -232,7 +232,7 @@ Built after v0.1, which artifactr, reflexr, evalr and grantr have reached.
 | Phase | Deliverable | Exit criteria |
 |---|---|---|
 | 1. Forms and dashboards | The package: schema subset and validator, the four types (`app` defined, not offered), `ask_form`, `create_form`, `show_dashboard`, the checks; artifactr's hook and `tool_name`; relayr's bridged type and projections; portalr's `SchemaForm`, `DashboardView`, renderers and `TextArea`; the template's `ui` question | A `bdd` scenario asks a form, has it refused with a field's error, answers it and resumes; a rule fires once on `ui:form_submitted` from each way of asking; a retried submit is one artifact and one event; a stale tab gets "This form changed" and "Already answered"; a poll in a shared thread takes one submission per person; a two-tenant test reads nothing across tenants; the kit's tests pass in both schemes and colour-blind mode; and each item of [Unverified](#unverified) is settled in an ADR |
-| 2. Mini apps | `make_app`; the proxy, the policy and `apps.<host>` in stackr; `AppFrame` and the bridge host; the label, the limits and the kill switch | Every network path listed above fails from the frame in Chromium; a forged or foreign `postMessage` is dropped; an app reaches no artifact but its own; a submission needs the person's confirmation; a person's edit of an app's `html` is refused; the kill switch stops a running app at each level; portalr's own pages still refuse framing |
+| 2. Mini apps | `make_app`; the proxy, the policy and `apps.<host>` in stackr; `AppFrame` and the bridge host; the label, the limits and the kill switch | Every network path listed above fails from the frame in Chromium (*amended 2026-10-18, [portalr ADR-0051](../portalr/adr/0051-mini-apps-the-sandboxed-frame-and-its-bridge.md): all but WebRTC from a frame the app makes, which is unmet*); a forged or foreign `postMessage` is dropped; an app reaches no artifact but its own; a submission needs the person's confirmation; a person's edit of an app's `html` is refused; the kill switch stops a running app at each level; portalr's own pages still refuse framing |
 | 3. MCP export | `artifactr.mcp`'s `extensions=`; `artifactr_ui.mcp` | A form and a dashboard render in one external host, and its submission lands as the same command and event |
 
 ## Decisions
@@ -246,7 +246,7 @@ Decided by the owner on 2026-10-17:
 | O3 | Rendering | portalr's own components for forms and dashboards; sandboxed HTML for mini apps only | Sandboxed HTML for everything, as MCP Apps renders it |
 | O4 | Schema | A JSON Schema 2020-12 subset with separate UI hints | A form language of our own; full JSON Schema through a generic renderer |
 | O5 | Who submits | Any person with access to the thread, attributed to them | Only the person the turn acts for |
-| O6 | Mini apps' review | The sandbox and the policy, hardened: an origin of its own with no cookies, no network, sandbox attributes, limits, a kill switch, labels | A person accepting each version, through the `propose` write policy |
+| O6 | Mini apps' review | The sandbox and the policy, hardened: an origin of its own with no cookies, no network (*amended 2026-10-18, [portalr ADR-0051](../portalr/adr/0051-mini-apps-the-sandboxed-frame-and-its-bridge.md): nothing loaded, but WebRTC from a frame the app makes reaches the network*), sandbox attributes, limits, a kill switch, labels | A person accepting each version, through the `propose` write policy |
 | O7 | Where a form lives | `ask_form` on the pause, and form artifacts | Only one of them |
 | O8 | Reaching reflexr | relayr bridges `deferred_answered` | The resumed tool recording an `app_event` |
 | O9 | MCP Apps | Borrow its shapes now; export `ui://` over `artifactr.mcp` later | Adopting its iframes and SDKs in portalr now |
@@ -263,7 +263,7 @@ Recommended, for the maintainer to decide:
 
 ## Drawbacks
 
-- **An agent's code runs for others without a person approving it** (O6). A flaw in the sandbox, a browser bug, or a policy that slips reaches every viewer of the thread. The origin holds nothing to steal and the frame loads nothing, so the worst left is a misleading app, or one that sends what it was given over WebRTC from a frame it makes (amended 2026-10-18, [portalr ADR-0051](../portalr/adr/0051-mini-apps-the-sandboxed-frame-and-its-bridge.md)), which the label and the confirmation answer, and a denial of service in one tab.
+- **An agent's code runs for others without a person approving it** (O6). A flaw in the sandbox, a browser bug, or a policy that slips reaches every viewer of the thread. The origin holds nothing to steal and the frame loads nothing, so the worst left is a misleading app, or one that sends what it was given over WebRTC from a frame it makes (amended 2026-10-18, [portalr ADR-0051](../portalr/adr/0051-mini-apps-the-sandboxed-frame-and-its-bridge.md)), on which the label is silent, and a denial of service in one tab.
 - **Mini apps can't be held to portalr's accessibility,** and a summary is a weaker equivalent than a form.
 - **`deferred_answered` bridged by default widens what rules see:** every answer, including free text to `ask_user`.
 - **A pause has no deadline.** A form nobody answers leaves its run waiting, as `ask_user` does today.
@@ -293,7 +293,7 @@ Each is a phase 1 or phase 2 exit criterion, settled and recorded in an ADR.
 
 - **pydantic-ai keeps a 32 KB schema** in a `CallDeferred` call's arguments through `run_paused`, storage and resume, unchanged.
 - **Reserving `ui:`** to the follower's actor refuses every client's attempt to publish one.
-- **The browser's behaviour:** a `sandbox="allow-scripts"` frame inside the proxy, under portalr's `frame-src`, blocks every network path listed above in Chromium, and the inherited and declared policies combine as intended.
+- **The browser's behaviour:** a `sandbox="allow-scripts"` frame inside the proxy, under portalr's `frame-src`, blocks every network path listed above in Chromium (*amended 2026-10-18, [portalr ADR-0051](../portalr/adr/0051-mini-apps-the-sandboxed-frame-and-its-bridge.md): all but WebRTC from a frame the app makes, which reaches the network*), and the inherited and declared policies combine as intended.
 - **`mcp.server.apps`** in the `mcp` SDK serves `text/html;profile=mcp-app` resources with `_meta.ui`, and one external host renders them.
 
 ## Tracking

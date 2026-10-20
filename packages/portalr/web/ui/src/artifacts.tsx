@@ -25,6 +25,11 @@ export interface Renderer {
   title(data: Data): string | null;
   /** How finely those changes are cut. */
   readonly diff: Granularity;
+  /**
+   * Whether the thread it was made in shows it, inline, where it was made: once, at its latest
+   * version. A kind without it is reached from its own page alone.
+   */
+  readonly inline?: boolean;
 }
 
 /** The application's renderers, by artifact kind. */

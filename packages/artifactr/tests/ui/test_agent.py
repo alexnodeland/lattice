@@ -343,17 +343,26 @@ async def test_an_app_is_made_and_updated_with_its_state_kept(
     updated = Script(
         call("update_app", "a3", id=app.id, html="<img src=//x>"),
         call("update_app", "a4", id=app.id, html=DICE + "<p>Two dice</p>"),
-        call("update_app", "a5", id=app.id, html="", summary="None"),
+        call("update_app", "a5", id=app.id, html="", summary="None", title="Two dice"),
         say("Updated."),
     )
     await _run(runners, ws, updated)
     [retry] = [p for p in updated.last_parts(1) if isinstance(p, RetryPromptPart)]
     assert "<img src>: //x" in str(retry.content)
     [app] = await ws.artifacts(App)
-    assert (app.version, app.data.summary, app.data.html) == (4, "None", "")
+    assert (app.version, app.data.title, app.data.summary, app.data.html) == (
+        4,
+        "Two dice",
+        "None",
+        "",
+    )
     assert app.data.state == {"rolled": 6}, "a person's state outlives the agent's changes"
     third = (await ws.revisions(app.id))[2].data
-    assert (third["html"], third["summary"]) == (DICE + "<p>Two dice</p>", "Rolls a die")
+    assert (third["html"], third["title"], third["summary"]) == (
+        DICE + "<p>Two dice</p>",
+        "Dice",
+        "Rolls a die",
+    )
 
 
 async def _run(runners: list[Runner[None]], ws: Workspace, script: Script) -> None:

@@ -50,3 +50,7 @@ bun install --frozen-lockfile --filter '@portalr/app' --filter '@portalr/admin'
 for ui in app admin; do
   (cd "packages/portalr/web/$ui" && bun x --bun --no-install vite build --outDir "$out/$ui" --emptyOutDir)
 done
+# app's build writes mini apps' sandbox page beside portalr's own static files: SandboxOrigin
+# serves it from the same directory as the UIs.
+rm -rf "$out/sandbox"
+cp -R packages/portalr/src/portalr/static/sandbox "$out/sandbox"

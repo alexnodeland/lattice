@@ -42,6 +42,7 @@ export {
   CommandButton,
   Composer,
   type GiveThumbs,
+  InlineArtifact,
   Message,
   Messages,
   ProposalCard,

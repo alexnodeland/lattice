@@ -10,6 +10,7 @@ import { expect, onTestFinished, test } from "vitest";
 import { commands, page } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { AppFrame, type AppHost, AppHostContext, type ReadApp } from "./app-frame";
+import { InlineArtifact, Messages } from "./chat";
 import { IntegrationsContext } from "./integrations";
 import { dark } from "./test/colours";
 
@@ -125,4 +126,78 @@ test("a submission an app asks for, confirmed in the host's dialog", async () =>
   await expect.element(dialog).toBeVisible();
   await faces();
   await matches("app-submission", dialog);
+});
+
+test("an app running on a phone, as tall as it asks but no taller than the window can show", async () => {
+  await page.viewport(390, 844);
+  onTestFinished(() => page.viewport(414, 896));
+  const screen = await render(
+    <div className="bg-paper p-4 text-fg">
+      <IntegrationsContext value={() => true}>
+        <AppHostContext value={HOST}>
+          <AppFrame app={TIP} shown={{ id: "app_1", version: 3 }} />
+        </AppHostContext>
+      </IntegrationsContext>
+    </div>,
+  );
+  const titled = screen.getByTitle("Tip splitter: an app made by the agent");
+  await expect.element(titled).toBeInTheDocument();
+  dispatchEvent(
+    new MessageEvent("message", {
+      origin: HOST.origin ?? "",
+      source: (titled.element() as HTMLIFrameElement).contentWindow,
+      data: JSON.stringify({
+        jsonrpc: "2.0",
+        method: "ui/notifications/size-changed",
+        params: { height: 2000 },
+      }),
+    }),
+  );
+  await expect.poll(() => (titled.element() as HTMLElement).style.height).toBe("2000px");
+  await faces();
+  await matches("app-running-narrow", screen.getByRole("region", { name: "Tip splitter" }));
+});
+
+/** The app in its thread, as an entry among the messages. */
+async function inThread() {
+  return render(
+    <div className="bg-paper p-4 text-fg">
+      <Messages>
+        <InlineArtifact name="Tip splitter" open={<a href="#app">Open its page</a>}>
+          <IntegrationsContext value={() => true}>
+            <AppHostContext value={HOST}>
+              <AppFrame app={TIP} shown={{ id: "app_1", version: 3 }} />
+            </AppHostContext>
+          </IntegrationsContext>
+        </InlineArtifact>
+      </Messages>
+    </div>,
+  );
+}
+
+for (const [name, width] of [
+  ["wide", 900],
+  ["narrow", 390],
+] as const) {
+  test(`an app in its thread, ${name}`, async () => {
+    await page.viewport(width, 844);
+    onTestFinished(() => page.viewport(414, 896));
+    const screen = await inThread();
+    await expect
+      .element(screen.getByTitle("Tip splitter: an app made by the agent"))
+      .toBeInTheDocument();
+    await faces();
+    await matches(`app-in-thread-${name}`, screen.getByRole("listitem", { name: "Tip splitter" }));
+  });
+}
+
+test("an app in its full view", async () => {
+  await page.viewport(900, 700);
+  onTestFinished(() => page.viewport(414, 896));
+  const screen = await inThread();
+  await screen.getByRole("button", { name: "Full view" }).click();
+  const full = screen.getByRole("dialog", { name: "Tip splitter" });
+  await expect.element(full).toBeVisible();
+  await faces();
+  await matches("app-full-view", full);
 });

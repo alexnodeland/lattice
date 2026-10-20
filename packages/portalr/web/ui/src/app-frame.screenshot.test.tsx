@@ -128,7 +128,7 @@ test("a submission an app asks for, confirmed in the host's dialog", async () =>
   await matches("app-submission", dialog);
 });
 
-test("an app running on a phone, as tall as it asks but no taller than the window can show", async () => {
+test("an app running on a phone, shown whole, taller than the window", async () => {
   await page.viewport(390, 844);
   onTestFinished(() => page.viewport(414, 896));
   const screen = await render(
@@ -149,11 +149,11 @@ test("an app running on a phone, as tall as it asks but no taller than the windo
       data: JSON.stringify({
         jsonrpc: "2.0",
         method: "ui/notifications/size-changed",
-        params: { height: 2000 },
+        params: { height: 1000 },
       }),
     }),
   );
-  await expect.poll(() => (titled.element() as HTMLElement).style.height).toBe("2000px");
+  await expect.poll(() => (titled.element() as HTMLElement).style.height).toBe("1000px");
   await faces();
   await matches("app-running-narrow", screen.getByRole("region", { name: "Tip splitter" }));
 });

@@ -4,7 +4,8 @@ Each test runs only for the app `ARTIFACTR_TEST_CRAFT` names, with its CLI in
 `ARTIFACTR_TEST_CRAFT_CLI`, as `moon run artifactr:fidelity` sets them from `scripts/craft`. Each
 corpus file is opened and saved, and its feature compared before and after; saving it again
 must be a fixpoint. With `CRAFT_MATRIX` set, the conftest writes the results there as a Markdown
-matrix (lattice RFC-0003, phase 2).
+matrix (lattice RFC-0003, phase 2). Each hostile file must end in a typed failure within its
+deadline (native files ADR-0011).
 """
 
 import os
@@ -12,7 +13,7 @@ import os
 import pytest
 from _pytest.mark import ParameterSet
 
-from artifactr.files.app import App
+from artifactr.files.app import App, AppFailed
 from tests.files.corpus.corpora import CORPORA
 from tests.files.corpus.harness import Corpus, pinned
 
@@ -56,3 +57,18 @@ async def test_saving_twice_is_a_fixpoint(corpus: Corpus, feature: str) -> None:
     twice = await app.apply(once.content, [], deadline=DEADLINE)
     assert corpus.kept(twice.content) == corpus.kept(once.content)
     assert twice.inspection == once.inspection
+
+
+def hostile() -> list[ParameterSet]:
+    return [
+        pytest.param(corpus, name, id=f"{app}-{name}", marks=pytest.mark.craft(app))
+        for app, corpus in sorted(CORPORA.items())
+        for name in corpus.hostile_names()
+    ]
+
+
+@pytest.mark.parametrize(("corpus", "name"), hostile())
+async def test_a_hostile_file_ends_in_a_typed_failure_in_time(corpus: Corpus, name: str) -> None:
+    with pytest.raises(AppFailed) as failed:
+        await running(corpus).inspect(corpus.hostile_file(name), deadline=DEADLINE)
+    assert failed.value.failure != "timeout", "refused, not left to run out its time"

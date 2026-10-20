@@ -6,7 +6,7 @@ from the file itself, by [`fingerprint`][artifactr.files.wordcraft.fingerprint]:
 its parts without the one each save stamps (lattice RFC-0003, phase 2).
 """
 
-from artifactr.files.wordcraft.docx import STAMPED, fingerprint, outline
+from artifactr.files.wordcraft.docx import STAMPED, fingerprint, media_type, outline
 from artifactr.files.wordcraft.headless import Subprocess
 
-__all__ = ["STAMPED", "Subprocess", "fingerprint", "outline"]
+__all__ = ["STAMPED", "Subprocess", "fingerprint", "media_type", "outline"]

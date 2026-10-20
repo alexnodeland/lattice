@@ -1,4 +1,4 @@
-# ADR-0010: The worker runs each call under limits, behind a token, one job at a time
+# ADR-0013: The worker runs each call under limits, behind a token, one job at a time
 
 **Status:** Accepted
 **Date:** 2026-10-20

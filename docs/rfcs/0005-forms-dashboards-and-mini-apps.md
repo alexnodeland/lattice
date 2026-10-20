@@ -116,7 +116,7 @@ A form is a `FormSchema`: a JSON Schema 2020-12 object with a separate `ui` obje
 - **`ask_form(title, schema, ui=None)`** checks the schema, then raises `CallDeferred`, so the run pauses with a `DeferredRequest` whose `args` are the tool's own: no core change, since `args` already carry any JSON. The answer is the values, already checked, and the run resumes with them as the tool's result. A schema the subset refuses goes back to the model as a retry, before anything pauses.
 - **`create_form(title, schema, ui=None, submissions="once")`** makes a form artifact in the thread and returns its id, for a poll, a sign-up or a form that outlives the run. The agent reads its submissions as artifacts, or a rule reacts to them.
 - **`show_dashboard(title, panels)`** and **`update_dashboard(id, panels)`** make and replace a dashboard, a new version each time.
-- **`make_app(title, summary, html)`** and **`update_app(id, html)`** exist only in phase 2, and only when the application turns apps on.
+- **`make_app(title, summary, html)`** and **`update_app(id, html)`** exist only in phase 2, and only when the application turns apps on. *Amended 2026-10-18 ([artifactr ADR-0082](../artifactr/adr/0082-mini-apps-the-agents-tools-and-html-that-loads-nothing.md)): they are `create_app(title, summary, html)` and `update_app(id, html, summary=None)`, offered while `ui:mini-apps` is on.*
 
 ### Checks: refusing at the boundary
 

@@ -20,16 +20,18 @@ import artifactr.agent.runner as runner_module
 from artifactr.agent import ArtifactWorkspace, Runner, Session
 from artifactr.core import (
     AnswerDeferred,
+    EditArtifact,
     InvalidState,
+    JsonPatch,
     NotEnabled,
     NotFound,
     RunPaused,
     Thread,
     ValidationFailed,
 )
-from artifactr.ui import AGENT_TYPES, ASK_FORM, UI_TYPES, Dashboard, Form, ui_checks
+from artifactr.ui import AGENT_TYPES, ASK_FORM, UI_TYPES, App, Dashboard, Form, ui_checks
 from artifactr.ui.agent import ui_tools
-from artifactr.ui.integrations import DASHBOARDS, FORMS
+from artifactr.ui.integrations import DASHBOARDS, FORMS, MINI_APPS
 from artifactr.ui.schema import MAX_SCHEMA_BYTES, FormSchema, json_size
 from artifactr.workspace import Storage, Workspace, Workspaces
 from tests.ui.model import Script, call, say
@@ -310,14 +312,74 @@ async def test_a_dashboard_is_shown_and_updated_as_new_versions(
 
 
 async def test_the_toolset_offers_what_it_is_asked_for() -> None:
-    assert set(ui_tools().tools) == {
-        "ask_form",
-        "create_form",
-        "show_dashboard",
-        "update_dashboard",
-    }
-    assert set(ui_tools(forms=False).tools) == {"show_dashboard", "update_dashboard"}
-    assert set(ui_tools(dashboards=False).tools) == {"ask_form", "create_form"}
+    forms, dashboards = {"ask_form", "create_form"}, {"show_dashboard", "update_dashboard"}
+    apps = {"create_app", "update_app"}
+    assert set(ui_tools().tools) == forms | dashboards | apps
+    assert set(ui_tools(forms=False, apps=False).tools) == dashboards
+    assert set(ui_tools(dashboards=False, apps=False).tools) == forms
+    assert set(ui_tools(forms=False, dashboards=False).tools) == apps
+
+
+# ─── mini apps ────────────────────────────────────────────────────────────────
+
+DICE = "<button onclick=\"parent.postMessage({jsonrpc: '2.0', method: 'x'}, '*')\">Roll</button>"
+
+
+async def test_an_app_is_made_and_updated_with_its_state_kept(
+    ws: Workspace, runners: list[Runner[None]]
+) -> None:
+    made = Script(
+        call("create_app", "a1", title="Dice", summary="Rolls a die", html='<img src="d.png">'),
+        call("create_app", "a2", title="Dice", summary="Rolls a die", html=DICE),
+        say("Made."),
+    )
+    await _run(runners, ws, made)
+    [retry] = [p for p in made.last_parts(1) if isinstance(p, RetryPromptPart)]
+    assert "reaches no network" in str(retry.content)
+    assert "<img src>: d.png" in str(retry.content)
+    [app] = await ws.artifacts(App)
+    played = JsonPatch(ops=({"op": "replace", "path": "/state", "value": {"rolled": 6}},))
+    await ws.commit(EditArtifact(artifact_id=app.id, base_version=1, patch=played))
+    updated = Script(
+        call("update_app", "a3", id=app.id, html="<img src=//x>"),
+        call("update_app", "a4", id=app.id, html=DICE + "<p>Two dice</p>"),
+        call("update_app", "a5", id=app.id, html="", summary="None"),
+        say("Updated."),
+    )
+    await _run(runners, ws, updated)
+    [retry] = [p for p in updated.last_parts(1) if isinstance(p, RetryPromptPart)]
+    assert "<img src>: //x" in str(retry.content)
+    [app] = await ws.artifacts(App)
+    assert (app.version, app.data.summary, app.data.html) == (4, "None", "")
+    assert app.data.state == {"rolled": 6}, "a person's state outlives the agent's changes"
+    third = (await ws.revisions(app.id))[2].data
+    assert (third["html"], third["summary"]) == (DICE + "<p>Two dice</p>", "Rolls a die")
+
+
+async def _run(runners: list[Runner[None]], ws: Workspace, script: Script) -> None:
+    """Run a script in a thread of its own, with every integration on."""
+    thread = await ws.create_thread("Apps")
+    sent = await _runner(runners, script, ui_tools(integrations=Toggles())).send(
+        ws, thread.id, "Make me a dice roller"
+    )
+    assert sent.run is not None
+    await sent.run.wait()
+
+
+async def test_apps_are_offered_only_while_mini_apps_are_on(
+    ws: Workspace, runners: list[Runner[None]]
+) -> None:
+    toggles = Toggles(off={"ws_1": {MINI_APPS}})
+    script = Script(say("No apps here."), say("Apps now."), say("And by default, none."))
+    asked = _runner(runners, script, ui_tools(integrations=toggles))
+    for runner in (asked, asked, _runner(runners, script)):
+        thread = await ws.create_thread("Apps")
+        sent = await runner.send(ws, thread.id, "Make an app")
+        assert sent.run is not None
+        await sent.run.wait()
+        toggles.off.clear()
+    apps = {"create_app", "update_app"}
+    assert [apps <= set(tools) for tools in script.tools] == [False, True, False]
 
 
 async def test_a_feature_switched_off_offers_no_tools_and_takes_no_answer(

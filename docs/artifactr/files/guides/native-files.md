@@ -148,11 +148,21 @@ An app's adapter subclasses `ToolsDialect` or `CommandsDialect`, which take the 
 
 `scripts/craft <app> cli`, `web` or `notices` (the licence files in this machine's CLI asset) fetches any of them at its pin, in `scripts/crafts/<app>.sha256`, and `CRAFT=<app> moon run artifactr:fidelity` runs an app's fidelity report, from its corpus in `tests/files/corpus/<app>/`.
 
+**One app for each native type.** Give `NativeFiles` a mapping, and each file is read, edited and switched by its type's app, or else its nearest base's ([ADR-0012](../adr/0012-an-app-for-each-type-and-no-format-changed-by-a-check-in.md)):
+
+```python
+# Workbook stands for the type GridCraft's own work adds.
+files = NativeFiles(blobs, checkouts, {WordDocument: wordcraft, Workbook: gridcraft})
+files.app_of(Workbook)  # gridcraft
+```
+
+**The gate.** An app's key is on by default only once it passes its own gate: its release pinned, its fidelity matrix green in Nightly, its hostile files each refused in time, its CLI confined (or the worker running it), and its notices read. WordCraft passes it; the others' keys stay off until theirs do ([ADR-0011](../adr/0011-a-gate-for-each-app.md)).
+
 **Licences and notices.** Every app is `MIT OR Apache-2.0`, and its licence files and `NOTICE` travel with its CLI and its browser build; `scripts/craft <app> notices` lists those beside the CLI. PdfCraft's Linux tarballs also carry its OCR's two models, `text-detection.rten` and `text-recognition.rten`, by Robert Knight ([ocrs-models](https://github.com/robertknight/ocrs-models)), trained on HierText, under CC-BY-SA-4.0: whatever ships PdfCraft's CLI from them ships their `ATTRIBUTION.txt` and licence files with it, as `CRAFTS["pdfcraft"].notices` lists. Each app's brand licence lets the brand's marks appear only in its unmodified official builds, so they are served unchanged, and no key, name or document of yours should use the brand's name.
 
 ## Switching an app on and off
 
-Each app is an integration of its own, `files:wordcraft` for WordCraft, which a workspace's admin switches through the shared Integrations switch (lattice ADR-0027). Give `NativeFiles` the same `Integrations` your application gives artifactr's gate, and the gate `files.key_of`:
+Each app is an integration of its own, `files:wordcraft` for WordCraft, `files:gridcraft` for GridCraft, which a workspace's admin switches through the shared Integrations switch (lattice ADR-0027). Give `NativeFiles` the same `Integrations` your application gives artifactr's gate, and the gate `files.key_of`:
 
 ```python
 from artifactr.workspace import Workspaces, integration_gate
@@ -161,7 +171,7 @@ files = NativeFiles(blobs, checkouts, app, integrations=grants)
 workspaces = Workspaces(storage, gate=integration_gate(grants, files.key_of))
 ```
 
-While the app is off in a workspace, `NativeFiles` refuses to upload, check out, extend, check in or edit there, with `NotEnabled`, before it takes any lease, so a check-out made before it was switched off lapses on its own; and the gate refuses an edit of a native file on every other surface, REST and MCP included. Its files are still read and downloaded, and their history kept. Without `integrations`, every app is on.
+While a file's app is off in a workspace, `NativeFiles` refuses to upload, check out, extend, check in or edit its files there, with `NotEnabled`, before it takes any lease, so a check-out made before it was switched off lapses on its own; and the gate refuses an edit of a native file on every other surface, REST and MCP included. Its files are still read and downloaded, and their history kept. Without `integrations`, every app is on.
 
 ## The agent's tools
 
@@ -186,7 +196,7 @@ The agent sees a native file's name, pages and outline through artifactr's own `
 |---|---|
 | `read_native(artifact_id, start)` | The file's words, 8,000 characters a call, saying where to read on |
 | `read_review(artifact_id, start)` | Its comments and tracked changes, 50 a call, as the app gives them, with their ids |
-| `find_commands(query)` | The app's commands that mention a word, ten at most |
+| `find_commands(artifact_id, query)` | The commands of the file's app that mention a word, ten at most |
 | `edit_native(artifact_id, base_version, commands, summary)` | One batch of the app's commands, as `files.edit` runs it |
 | `view_page(artifact_id, page)` | One rendered page, as an image: only with `native_file_tools(files, view=True)` |
 
@@ -237,6 +247,28 @@ site = Site(
 ```
 
 Where people check in files you don't trust, give `NativeFiles` the `Worker`: through `Subprocess`, the server reads each check-in in the application's own process, which isolates nothing.
+
+**A check-in keeps the file's format.** Send the file's own type as the check-in's `Content-Type`, or `application/octet-stream` if you don't know it. A file in another format than the one checked out, by its `Content-Type` or as its app reads it, is refused with 409, `invalid_state`, naming `checked_out` and `checked_in`, and never converted: upload it as a new file instead ([ADR-0012](../adr/0012-an-app-for-each-type-and-no-format-changed-by-a-check-in.md)).
+
+### The shim, for a build with a host surface
+
+GridCraft's, PdfCraft's and CADCraft's builds have a `?host=parent` bridge, on which a page of their own origin opens a file in them and hears each save and whether there are unsaved changes. Serve the editor with the shim, lattice's page beside the build, and frame it from your portal:
+
+```python
+editor = editor_app(build, craft=CRAFTS["gridcraft"], portal="https://portal.example")
+```
+
+The portal frames `https://<editor>/.lattice/shim.html`, and speaks to it by `postMessage`, at the editor's origin:
+
+| Message | Way | Fields |
+|---|---|---|
+| `lattice:ready` | to the portal | `version`: the build is listening |
+| `lattice:open` | to the shim | `name`, `bytes` (an `ArrayBuffer`): the checked-out file |
+| `lattice:dirty` | to the portal | `dirty`: whether there are unsaved changes |
+| `lattice:save` | to the portal | `name`, `bytes`: each file the build would download; check it in, with its type |
+| `lattice:failed` | to the portal | `error`: the build couldn't start |
+
+The shim hears only your portal's origin and its own frame, and the build may then be framed by its own origin and your portal, and by nothing else. Send `lattice:open` once the shim says `lattice:ready`. The app's talk level is `bridged`, level 1+: no commands reach the editor. A build with a JavaScript API takes `methods=`, those of it the portal may call by `lattice:call` `{ id, method, args }`, answered by `lattice:reply` ([ADR-0010](../adr/0010-a-shim-beside-the-build-and-talk-level-one-plus.md)).
 
 ## Reading a revision
 

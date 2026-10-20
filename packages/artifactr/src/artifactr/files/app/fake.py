@@ -58,6 +58,8 @@ class FakeApp:
 
     Args:
         fails: How every call fails, to test what happens when the app does; None for never.
+        integration: The key that switches it, if not its class's, `files:fake`: another, to
+            stand in for one of several apps.
     """
 
     name: str = "fake"
@@ -66,8 +68,10 @@ class FakeApp:
     talk: Talk = "save"
     integration: str = "files:fake"
 
-    def __init__(self, *, fails: Failure | None = None) -> None:
+    def __init__(self, *, fails: Failure | None = None, integration: str | None = None) -> None:
         self.fails: Failure | None = fails
+        if integration is not None:
+            self.integration = integration
 
     @staticmethod
     def file(*paragraphs: str, comments: Sequence[str] = ()) -> bytes:

@@ -33,6 +33,10 @@ export interface paths {
         /**
          * Check In
          * @description Check the edited file in: its bytes are the body, streamed, and the check-out ends.
+         *
+         *     Its `Content-Type` is the file's format, unless it is none, or one a client sends by
+         *     default (`application/octet-stream`, a form's, or `text/plain`): a file in another
+         *     format than the one checked out is refused, never converted.
          */
         put: operations["check_in_workspaces__workspace_id__checkouts__checkout_id__file_put"];
         post?: never;
@@ -326,7 +330,7 @@ export interface components {
              * Talk
              * @enum {string}
              */
-            talk: "save" | "commands" | "polled" | "pushed";
+            talk: "save" | "bridged" | "commands" | "polled" | "pushed";
             /** Version */
             version: number;
         };
@@ -517,6 +521,7 @@ export interface operations {
         };
         requestBody: {
             content: {
+                "*/*": unknown;
                 "application/octet-stream": unknown;
             };
         };

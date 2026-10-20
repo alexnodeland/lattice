@@ -50,6 +50,16 @@ DOWNLOAD: Final = {
 so never sniffed, never run as a page, and never kept by a cache on the way."""
 
 PNG: Final = "image/png"
+UNSAID: Final = frozenset(
+    {
+        "",
+        "application/octet-stream",
+        "application/x-www-form-urlencoded",
+        "multipart/form-data",
+        "text/plain",
+    }
+)
+"""The `Content-Type`s that say nothing of a check-in's format: those clients send by default."""
 TEXT: Final = "text/plain; charset=utf-8"
 
 
@@ -142,8 +152,8 @@ def files_router(
                 outline=head.data.outline,
                 pages=head.data.pages,
                 lease=None if lease is None else _lease(lease, ws.actor),
-                talk=files.app.talk,
-                enabled=await files.enabled(ws),
+                talk=files.app_of(type(head.data)).talk,
+                enabled=await files.enabled(ws, type(head.data)),
                 limit=limit,
             )
 
@@ -162,17 +172,29 @@ def files_router(
     @router.put(
         "/workspaces/{workspace_id}/checkouts/{checkout_id}/file",
         openapi_extra={
-            "requestBody": {"required": True, "content": {"application/octet-stream": {}}}
+            "requestBody": {
+                "required": True,
+                "content": {"application/octet-stream": {}, "*/*": {}},
+            }
         },
     )
     async def check_in(
         checkout_id: PathId, request: Request, ws: Workspace = current_workspace
     ) -> CheckedIn:
-        """Check the edited file in: its bytes are the body, streamed, and the check-out ends."""
+        """Check the edited file in: its bytes are the body, streamed, and the check-out ends.
+
+        Its `Content-Type` is the file's format, unless it is none, or one a client sends by
+        default (`application/octet-stream`, a form's, or `text/plain`): a file in another
+        format than the one checked out is refused, never converted.
+        """
         declared = request.headers.get("content-length", "")
         if declared.isdigit() and int(declared) > limit:
             raise HTTPException(status_code=413, detail=f"the file is larger than {limit} bytes")
-        outcome = await _answered(files.check_in(ws, checkout_id, request.stream()))
+        given = request.headers.get("content-type", "").partition(";")[0].strip().lower()
+        media_type = None if given in UNSAID else given
+        outcome = await _answered(
+            files.check_in(ws, checkout_id, request.stream(), media_type=media_type)
+        )
         if isinstance(outcome, Applied):
             return CheckedIn(outcome="applied", version=outcome.version)
         if isinstance(outcome, Proposed):

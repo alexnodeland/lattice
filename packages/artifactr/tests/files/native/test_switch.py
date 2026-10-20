@@ -114,4 +114,4 @@ async def test_without_a_switch_every_workspace_has_it() -> None:
     files = NativeFiles(InMemoryBlobs(), InMemoryCheckouts(), FakeApp())
     ws = await Workspaces(InMemoryStorage()).open("acme", "w1", actor=ALICE)
     assert await files.enabled(ws)
-    assert files.app.integration == "files:fake"
+    assert files.app_of(WordDocument).integration == "files:fake"

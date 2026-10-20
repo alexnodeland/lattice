@@ -272,3 +272,58 @@ test("what changed, said in a line", () => {
     "Changed the outline",
   );
 });
+
+test("a tab panel shows a focus ring when the keyboard reaches it", async () => {
+  const screen = await shown(APP_REVISIONS);
+  const latest = screen.getByRole("listitem", { name: "Version 2" });
+  latest.getByRole("tab", { name: "Changes" }).element().focus();
+  await userEvent.keyboard("{Tab}");
+  const panel = document.activeElement as HTMLElement;
+  expect(panel.getAttribute("role")).toBe("tabpanel");
+  expect(getComputedStyle(panel).outlineStyle).not.toBe("none");
+  expect(getComputedStyle(panel).outlineWidth).not.toBe("0px");
+});
+
+test("archived while its preview runs, an app's revision stops it and gives up the tab", async () => {
+  const revisions = (archived: boolean) => (
+    <IntegrationsContext value={() => true}>
+      <AppHostContext value={host()}>
+        <Revisions
+          id="art_1"
+          revisions={APP_REVISIONS}
+          renderers={RENDERERS}
+          compare={compare}
+          archived={archived}
+        />
+      </AppHostContext>
+    </IntegrationsContext>
+  );
+  const screen = await render(revisions(false));
+  const latest = screen.getByRole("listitem", { name: "Version 2" });
+  await userEvent.click(latest.getByRole("tab", { name: "Preview" }));
+  await userEvent.click(latest.getByRole("button", { name: "Run version 2" }));
+  await expect
+    .element(latest.getByTitle("Dice game: an app made by the agent"))
+    .toBeInTheDocument();
+  await screen.rerender(revisions(true));
+  await expect
+    .element(latest.getByRole("tab", { name: "Changes" }))
+    .toHaveAttribute("aria-selected", "true");
+  expect(latest.getByRole("tab", { name: "Preview" }).elements()).toHaveLength(0);
+  expect(screen.container.querySelector("iframe")).toBeNull();
+});
+
+test("revisions read again, with the same data, are not compared again", async () => {
+  const counted = vi.fn(compare);
+  const list = (revisions: readonly RevisionShown[]) => (
+    <Revisions id="art_1" revisions={revisions} renderers={RENDERERS} compare={counted} />
+  );
+  const screen = await render(list(APP_REVISIONS));
+  await expect.element(screen.getByRole("tab", { name: "Changes" })).toBeVisible();
+  const calls = counted.mock.calls.length;
+  expect(calls).toBeGreaterThan(0);
+  // A refetch: new objects for each revision, its data the same.
+  await screen.rerender(list(APP_REVISIONS.map((revision) => ({ ...revision }))));
+  await expect.element(screen.getByRole("tab", { name: "Changes" })).toBeVisible();
+  expect(counted.mock.calls.length).toBe(calls);
+});

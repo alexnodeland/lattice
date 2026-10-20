@@ -160,3 +160,20 @@ test("a long list shows its first MOST_ENTRIES items, and counts the rest", asyn
   );
   await expect.element(screen.getByText("And 3 more, in what Copy copies.")).toBeVisible();
 });
+
+test("a long fold of unchanged lines shows MOST_LINES at a time, and the line it reveals is ringed", async () => {
+  const before = numbered(MOST_LINES + 50);
+  const changed = compare(before, `${before}\n<p>end</p>`, "lines");
+  const screen = await render(<LineDiff changes={changed} name="HTML" />);
+  const fold = screen.getByRole("button", {
+    name: `Show ${MOST_LINES} of ${MOST_LINES + 46} unchanged lines`,
+  });
+  fold.element().focus();
+  await userEvent.keyboard("{Enter}");
+  const line = document.activeElement as HTMLElement;
+  expect(line.textContent).toBe("<p>line 1</p>");
+  expect(getComputedStyle(line).outlineStyle).not.toBe("none");
+  await expect
+    .element(screen.getByRole("button", { name: "Show 46 unchanged lines" }))
+    .toBeVisible();
+});

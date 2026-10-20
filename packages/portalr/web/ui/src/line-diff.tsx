@@ -131,7 +131,7 @@ function LineRow({ line, focused = false }: { line: Line; focused?: boolean }) {
         </del>
       ) : (
         <span
-          className={cn(mark, "outline-none focus-visible:outline-2 focus-visible:outline-focus")}
+          className={cn(mark, "focus-visible:outline-2 focus-visible:outline-focus")}
           ref={text}
           {...(focused && { tabIndex: -1 })}
         >
@@ -149,9 +149,10 @@ function LineRow({ line, focused = false }: { line: Line; focused?: boolean }) {
  * between changes folded, to be shown on asking. Null changes, too large to compare, say so.
  */
 export function LineDiff({ changes, name }: { changes: readonly Change[] | null; name: string }) {
-  const [unfolded, setUnfolded] = useState<ReadonlySet<number>>(new Set());
+  // How many lines of each fold are shown: a long run of them shows MOST_LINES at a time.
+  const [unfolded, setUnfolded] = useState<ReadonlyMap<number, number>>(new Map());
   // The fold last opened, whose first line takes the focus its button had.
-  const [opened, setOpened] = useState<number | null>(null);
+  const [opened, setOpened] = useState<{ fold: number; first: number } | null>(null);
   const [limit, setLimit] = useState(MOST_LINES);
   const rows = useMemo(() => (changes === null ? null : rowsOf(linesOf(changes))), [changes]);
   if (rows === null) {
@@ -167,42 +168,50 @@ export function LineDiff({ changes, name }: { changes: readonly Change[] | null;
     if ("line" in row) {
       drawn.push(<LineRow key={`${row.line.was}:${row.line.number}`} line={row.line} />);
       lines += 1;
-    } else if (unfolded.has(row.at)) {
-      row.folded.forEach((line, at) => {
+    } else {
+      const shownOf = unfolded.get(row.at) ?? 0;
+      row.folded.slice(0, shownOf).forEach((line, at) => {
         drawn.push(
           <LineRow
             key={`${line.was}:${line.number}`}
             line={line}
-            focused={at === 0 && opened === row.at}
+            focused={at === opened?.first && opened.fold === row.at}
           />,
         );
       });
-      lines += row.folded.length;
-    } else {
-      drawn.push(
-        <div
-          key={`fold:${row.at}`}
-          className="col-span-4 border-line border-y bg-surface px-2 py-0.5"
-        >
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setUnfolded(new Set([...unfolded, row.at]));
-              setOpened(row.at);
-            }}
+      lines += shownOf;
+      const left = row.folded.length - shownOf;
+      if (left > 0) {
+        drawn.push(
+          <div
+            key={`fold:${row.at}`}
+            className="col-span-4 border-line border-y bg-surface px-2 py-0.5"
           >
-            Show {row.folded.length} unchanged lines
-          </Button>
-        </div>,
-      );
-      lines += 1;
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setUnfolded(new Map([...unfolded, [row.at, shownOf + Math.min(left, MOST_LINES)]]));
+                setOpened({ fold: row.at, first: shownOf });
+              }}
+            >
+              {left > MOST_LINES
+                ? `Show ${MOST_LINES} of ${left} unchanged lines`
+                : `Show ${left} unchanged lines`}
+            </Button>
+          </div>,
+        );
+        lines += 1;
+      }
     }
   }
-  const total = rows.reduce(
-    (sum, row) => sum + ("line" in row ? 1 : unfolded.has(row.at) ? row.folded.length : 1),
-    0,
-  );
+  const total = rows.reduce((sum, row) => {
+    if ("line" in row) {
+      return sum + 1;
+    }
+    const shownOf = unfolded.get(row.at) ?? 0;
+    return sum + shownOf + (shownOf < row.folded.length ? 1 : 0);
+  }, 0);
   return (
     <div className="flex flex-col gap-1">
       <ScrollRegion

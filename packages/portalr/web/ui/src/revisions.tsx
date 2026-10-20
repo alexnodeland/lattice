@@ -166,15 +166,24 @@ interface Previewed {
 }
 
 /** A revision's preview of a kind that runs what it holds: run on asking, one at a time. */
-function RunPreview({ id, revision, renderer }: Previewed) {
+function RunPreview({ id, revision, renderer, runs }: Previewed & { runs: boolean }) {
   const host = use(AppHostContext);
   const running = use(RunningRevision);
   const preview = useMemo(() => host && previewHost(host), [host]);
-  const live = running.version === revision.version;
+  // Where it may no longer run, archived or with apps switched off, nothing of it is drawn.
+  const live = runs && running.version === revision.version;
   // Closed, or another tab chosen, a preview stops: reopened, it waits to be asked again.
   const { run } = running;
   const { version } = revision;
-  useEffect(() => () => run((now) => (now === version ? null : now)), [run, version]);
+  useEffect(() => {
+    if (!runs) {
+      run((now) => (now === version ? null : now));
+    }
+    return () => run((now) => (now === version ? null : now));
+  }, [run, version, runs]);
+  if (!runs) {
+    return null;
+  }
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -187,7 +196,8 @@ function RunPreview({ id, revision, renderer }: Previewed) {
           {live ? `Stop version ${revision.version}` : `Run version ${revision.version}`}
         </Button>
         <p className={TYPE.note}>
-          One version runs at a time. What you do in a preview isn't saved.
+          One version runs at a time. What you do in a preview isn't saved, and it sends nothing; a
+          link it opens is still asked about first.
         </p>
       </div>
       {live && preview && (
@@ -206,12 +216,12 @@ export type More = (revision: RevisionShown, before: number | null) => ReactNode
 
 /** Each open revision's tab panel: its focus ring drawn inside, as a tab's is. */
 const PANEL =
-  "rounded-sm pt-3 outline-none -outline-offset-2 focus-visible:outline-2 focus-visible:outline-focus";
+  "rounded-sm pt-3 -outline-offset-2 focus-visible:outline-2 focus-visible:outline-focus";
 
 /** A revision's preview: its content through its kind's renderer, read-only. */
-function Preview({ id, revision, renderer }: Previewed) {
+function Preview({ id, revision, renderer, runs }: Previewed & { runs: boolean }) {
   return renderer.runs ? (
-    <RunPreview id={id} revision={revision} renderer={renderer} />
+    <RunPreview id={id} revision={revision} renderer={renderer} runs={runs} />
   ) : (
     // Archived as far as a renderer knows, so nothing in it acts on the artifact.
     <ShownContext value={{ id, version: revision.version, archived: true }}>
@@ -280,9 +290,12 @@ function Opened({
     ...(changed === null ? [] : [["changes", "Changes"] as [Tab, string]]),
   ];
   // What changed first; for a first version, its source, as its content is shown above the list.
-  const [tab, setTab] = useState<Tab>(
-    changed !== null ? "changes" : sources.length > 0 ? "source" : (tabs[0]?.[0] ?? "preview"),
-  );
+  const first: Tab =
+    changed !== null ? "changes" : sources.length > 0 ? "source" : (tabs[0]?.[0] ?? "preview");
+  const [chosen, setTab] = useState<Tab>(first);
+  // A tab that goes, as Preview does when the app is archived or apps are switched off while it
+  // is open, gives way to the first: its panel, and a preview running in it, stop.
+  const tab = tabs.some(([value]) => value === chosen) ? chosen : first;
   const title = renderer.about && renderer.title(revision.data);
   const about = renderer.about?.(revision.data);
   return (
@@ -305,7 +318,7 @@ function Opened({
           ))}
         </Tabs.List>
         <Tabs.Panel value="preview" className={PANEL}>
-          <Preview id={id} revision={revision} renderer={renderer} />
+          <Preview id={id} revision={revision} renderer={renderer} runs={runsHere} />
         </Tabs.Panel>
         <Tabs.Panel value="source" className={cn(PANEL, "flex flex-col gap-3")}>
           {sources.map((part) => (

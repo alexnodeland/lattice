@@ -131,3 +131,9 @@ async def test_a_command_past_the_open_file_is_refused_and_never_found(
         await gridcraft.apply(None, [command("file.saveAs", path="/etc/x")], deadline=20)
     assert not (tmp_path / "saves").exists()
     assert not [c for c in await gridcraft.commands("") if c.name.startswith("file.")]
+
+
+async def test_a_list_that_isnt_json_is_a_crash(gridcraft: Subprocess) -> None:
+    with pytest.raises(AppFailed, match="list_commands replied with no JSON") as crashed:
+        await gridcraft.commands("garbled")
+    assert crashed.value.failure == "crashed"

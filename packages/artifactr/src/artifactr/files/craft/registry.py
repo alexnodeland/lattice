@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Final, Literal
 
-from artifactr.files.manifest import DOCX, DWG, DXF, IDML, PDF, PPTX, PSD, SVG, XLSX
+from artifactr.files.manifest import DOCX, DWG, DXF, FIGCRAFT, IDML, PDF, PPTX, PSD, SVG, XLSX
 from lattice_core.integrations import KNOWN, Integration
 
 Dialect = Literal["tools", "commands"]
@@ -71,8 +71,8 @@ class Craft:
     dialect: Dialect
     roots: Roots
     formats: frozenset[str]
-    """The media types of the native files it keeps; none for an app whose formats have no
-    registered type yet, or whose reach is `export`."""
+    """The media types of the native files it keeps, which its native type holds; none for an
+    app whose reach is `export`."""
 
     render: bool
     """Whether its CLI renders a page as a PNG headless."""
@@ -203,8 +203,8 @@ CRAFTS: Final = _registry(
         title="FigCraft",
         dialect="tools",
         roots="none",
-        formats=frozenset(),
-        render=False,
+        formats=frozenset({FIGCRAFT}),
+        render=True,
         reach="file",
     ),
     Craft(

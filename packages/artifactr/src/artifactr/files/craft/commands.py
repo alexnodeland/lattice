@@ -27,6 +27,8 @@ class _Listed(BaseModel):
     id: str
     label: str = ""
     menu: str | list[str] | None = None
+    location: str = ""
+    """Where it is in the app, as WordCraft's server says it, which says no `menu`."""
     params: JsonValue = None
 
 
@@ -92,7 +94,7 @@ class CommandsDialect(Headless):
         reply = await server.session.call_tool(
             "command_batch", {"steps": steps, "stop_on_error": True}
         )
-        failed = _failed_step(commands, reply.structured_content)
+        failed = _failed_step(commands, reply.structured_content or reply_text(reply))
         if reply.is_error or failed:
             raise AppFailed("refused", failed or reply_text(reply))
 
@@ -114,14 +116,7 @@ class CommandsDialect(Headless):
     @override
     async def find(self, server: Server, query: str) -> Sequence[CommandSpec]:
         """The commands `command_list` finds for the query, ten at most."""
-        listed = await server.json("command_list", filter=query)
-        if isinstance(listed, Mapping):
-            listed = listed.get("commands", [])
-        try:
-            found = _LISTED.validate_python(listed)
-        except ValidationError as error:
-            raise AppFailed("crashed", f"command_list replied with no commands: {error}") from None
-        return [_spec(command) for command in found[:FOUND]]
+        return listed("command_list", await server.json("command_list", filter=query))
 
     def named(self, step: str, opened: JsonValue) -> JsonValue:
         """What a step that opened a file, or made one, says the server calls it, by `handle`.
@@ -144,9 +139,29 @@ class CommandsDialect(Headless):
         return {**arguments, self.handle: document}
 
 
+def listed(tool: str, reply: JsonValue, denied: tuple[str, ...] = ()) -> list[CommandSpec]:
+    """The first ten commands a list tool replied with, as `command_list` lists them.
+
+    The reply is a list of commands, each its `id`, `label`, `menu` (or `location`) and
+    `params`, or an object holding that list as `commands`. The `tools` dialect reads its list
+    tool's reply with this too. A command whose id starts with one of `denied` is left out.
+
+    Raises:
+        AppFailed: `crashed` if the reply holds no list of commands.
+    """
+    if isinstance(reply, Mapping):
+        reply = reply.get("commands", [])
+    try:
+        found = _LISTED.validate_python(reply)
+    except ValidationError as error:
+        raise AppFailed("crashed", f"{tool} replied with no commands: {error}") from None
+    return [_spec(command) for command in found if not command.id.startswith(denied)][:FOUND]
+
+
 def _spec(command: _Listed) -> CommandSpec:
     params = command.params if isinstance(command.params, str) else json.dumps(command.params)
     menu = " > ".join(command.menu) if isinstance(command.menu, list) else command.menu
+    menu = menu or command.location
     return CommandSpec(
         name=command.id,
         signature=command.id if command.params is None else f"{command.id} {params}",
@@ -154,10 +169,17 @@ def _spec(command: _Listed) -> CommandSpec:
     )
 
 
-def _failed_step(commands: Sequence[AppCommand], structured: Mapping[str, object] | None) -> str:
-    """Which command of a batch failed, and why, from the batch's results; empty if none did."""
+def _failed_step(commands: Sequence[AppCommand], reply: Mapping[str, object] | str) -> str:
+    """Which command of a batch failed, and why, from the batch's results; empty if none did.
+
+    The results are the reply's structured content, or else its text, as JSON: PhotoCraft's and
+    VectorCraft's servers reply in text only, and PhotoCraft's without the error flag.
+    """
     try:
-        results = _Batch.model_validate(structured or {}).results
+        if isinstance(reply, str):
+            results = _Batch.model_validate_json(reply).results
+        else:
+            results = _Batch.model_validate(reply).results
     except ValidationError:
         return ""
     failed = ((c.name, r.error) for c, r in zip(commands, results, strict=False) if not r.ok)

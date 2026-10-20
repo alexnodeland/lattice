@@ -83,6 +83,8 @@ def main() -> None:
 
     @server.tool()
     async def list_commands(search: str = "") -> str:
+        if search == "garbled":
+            return "no list"
         found = [c for c in COMMANDS if search.lower() in json.dumps(c).lower()]
         return json.dumps(found * 6)
 

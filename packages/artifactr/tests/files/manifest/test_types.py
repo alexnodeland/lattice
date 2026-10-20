@@ -6,13 +6,25 @@ from pydantic import ValidationError
 from artifactr.core import NotFound, get_artifact_type
 from artifactr.files.manifest import (
     DOCX,
+    DWG,
+    DXF,
+    FIGCRAFT,
+    IDML,
     OUTLINE_LIMIT,
     PDF,
     PPTX,
+    PSD,
+    SVG,
     XLSX,
+    Design,
+    Drawing,
+    LayeredImage,
+    NativeFile,
+    PageLayout,
     PdfDocument,
     Presentation,
     Provenance,
+    VectorImage,
     WordDocument,
     Workbook,
 )
@@ -34,6 +46,24 @@ def test_each_crafting_apps_type_is_registered_with_its_format() -> None:
     assert Presentation.formats == frozenset({PPTX})
     assert get_artifact_type("pdf_document") is PdfDocument
     assert PdfDocument.formats == frozenset({PDF})
+
+
+@pytest.mark.parametrize(
+    ("kind", "native", "formats"),
+    [
+        ("drawing", Drawing, {DXF, DWG}),
+        ("design", Design, {FIGCRAFT}),
+        ("page_layout", PageLayout, {IDML}),
+        ("vector_image", VectorImage, {SVG}),
+        ("layered_image", LayeredImage, {PSD}),
+    ],
+)
+def test_each_crafting_apps_files_are_a_type_of_their_own(
+    kind: str, native: type[NativeFile], formats: set[str]
+) -> None:
+    assert get_artifact_type(kind) is native
+    assert native.formats == formats
+    assert native.write_policy == "propose"
 
 
 def test_its_content_is_in_its_format() -> None:

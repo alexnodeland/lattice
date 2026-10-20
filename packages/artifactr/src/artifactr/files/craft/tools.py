@@ -13,23 +13,9 @@ from typing import ClassVar, override
 from pydantic import BaseModel, JsonValue, TypeAdapter, ValidationError
 
 from artifactr.files.app import AppCommand, AppFailed, CommandSpec
-from artifactr.files.craft.headless import FOUND, Headless
+from artifactr.files.craft.commands import listed
+from artifactr.files.craft.headless import Headless
 from artifactr.files.craft.spawn import Server, reply_text
-
-
-class _Command(BaseModel):
-    id: str
-    label: str = ""
-    location: str = ""
-    menu: list[str] = []
-    """Where it is in the app, as a server that doesn't say `location` says it."""
-    params: str = "{}"
-
-    @property
-    def description(self) -> str:
-        """Its label, and where it is in the app if the server says."""
-        place = self.location or " > ".join(self.menu)
-        return f"{self.label} ({place})" if place else self.label
 
 
 class _Step(BaseModel):
@@ -38,8 +24,8 @@ class _Step(BaseModel):
     error: str = ""
 
 
-_COMMANDS = TypeAdapter(list[_Command])
 _STEPS = TypeAdapter(list[_Step])
+_LIST: TypeAdapter[JsonValue] = TypeAdapter(JsonValue)
 
 
 class ToolsDialect(Headless):
@@ -113,17 +99,13 @@ class ToolsDialect(Headless):
 
     @override
     async def find(self, server: Server, query: str) -> Sequence[CommandSpec]:
-        """The commands the list tool finds for the query, ten at most."""
-        listed = await server.text(self.list_tool, **{self.list_argument: query})
-        found = _COMMANDS.validate_json(listed)
-        return [
-            CommandSpec(
-                name=command.id,
-                signature=f"{command.id} {command.params}",
-                description=command.description,
-            )
-            for command in [c for c in found if not c.id.startswith(self.denied)][:FOUND]
-        ]
+        """The commands the list tool finds for the query, ten at most, none of them denied."""
+        reply = await server.text(self.list_tool, **{self.list_argument: query})
+        try:
+            commands = _LIST.validate_json(reply)
+        except ValidationError:
+            raise AppFailed("crashed", f"{self.list_tool} replied with no JSON") from None
+        return listed(self.list_tool, commands, self.denied)
 
 
 def _failed_step(reply: str) -> str:

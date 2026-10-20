@@ -65,6 +65,41 @@ The reference is generated from `artifactr.files`' docstrings and type annotatio
       show_root_heading: false
       show_root_toc_entry: false
 
+## artifactr.files.cadcraft
+
+::: artifactr.files.cadcraft
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+
+## artifactr.files.photocraft
+
+::: artifactr.files.photocraft
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+
+## artifactr.files.vectorcraft
+
+::: artifactr.files.vectorcraft
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+
+## artifactr.files.designcraft
+
+::: artifactr.files.designcraft
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+
+## artifactr.files.figcraft
+
+::: artifactr.files.figcraft
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+
 ## artifactr.files.worker
 
 ::: artifactr.files.worker

@@ -142,7 +142,8 @@ async def test_the_first_person_in_has_an_account_a_tenant_and_a_workspace(
     assert done == (
         "made an account for erin@example.com\n"
         "erin@example.com is the deployment's operator\n"
-        "created home, owned by erin@example.com, with the workspace main"
+        "created home, owned by erin@example.com\n"
+        "erin@example.com administers the workspace main"
     )
     assert Admin.created == [
         {"email": "erin@example.com", "password": "a-password", "email_confirm": True}
@@ -161,13 +162,35 @@ async def test_the_first_run_skips_what_is_done(config: Settings) -> None:
     assert await run(first, config, password=never) == (
         "alice@example.com has an account\n"
         "the deployment has an operator already\n"
-        "created acme, owned by alice@example.com, with the workspace notes"
+        "created acme, owned by alice@example.com\n"
+        "alice@example.com administers the workspace notes"
     )
     assert await run(first, config, password=never) == (
         "alice@example.com has an account\n"
         "the deployment has an operator already\n"
-        "acme exists, and is unchanged"
+        "acme exists\n"
+        "alice@example.com opens the workspace notes already"
     )
+
+
+async def test_the_first_run_gives_a_tenant_made_without_it_its_workspace(
+    config: Settings,
+) -> None:
+    assert await run(["tenant", "acme", "alice@example.com"], config)
+    first = ["first-run", "alice@example.com", "--tenant", "acme"]
+    assert (await run(first, config, password=never)).endswith(
+        "acme exists\nalice@example.com administers the workspace main"
+    )
+
+
+async def test_the_first_run_refuses_a_workspace_in_someone_elses_tenant(
+    config: Settings,
+) -> None:
+    assert await run(["operator", "u-carol"], config)
+    assert await run(["tenant", "acme", "alice@example.com"], config)
+    first = ["first-run", "bob@example.com", "--tenant", "acme"]
+    with pytest.raises(Invalid, match="may not give themselves a workspace in acme"):
+        await run(first, config, password=never)
 
 
 @pytest.mark.parametrize(

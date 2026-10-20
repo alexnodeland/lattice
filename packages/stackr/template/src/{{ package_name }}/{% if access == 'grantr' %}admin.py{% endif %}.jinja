@@ -38,7 +38,7 @@ from sqlalchemy import URL, Connection, make_url, text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from grantr import Grants, Invalid, Resource, User
+from grantr import Forbidden, Grants, Invalid, Resource, User
 from grantr.core import MemberAdded, TenantCreated
 from grantr.sql import SqlStorage, migrate
 
@@ -187,8 +187,12 @@ async def first_run(
 ) -> str:
     """The first person in, with somewhere to work; each step is skipped if it is done.
 
-    Their account, if they have none; the deployment's operator, if it has none; and a tenant
-    they own, with a workspace they administer, which names it to grantr, so the app lists it.
+    Their account, if they have none; the deployment's operator, if it has none; a tenant they
+    own, if it is new; and a workspace in it they administer, if they can't open it yet, which
+    names it to grantr, so the app lists it. ``who`` is an email, or an existing user's id.
+
+    Raises:
+        Invalid: If the tenant is someone else's, where the person may not grant themselves.
     """
     user, made = await users.account(who, password)
     lines = [f"made an account for {who}" if made else f"{who} has an account"]
@@ -197,13 +201,18 @@ async def first_run(
         lines.append(f"{who} is the deployment's operator")
     except Invalid:
         lines.append("the deployment has an operator already")
-    if await grants.provision_tenant(name, owner=user):
-        owner = User(id=user)
-        on = Resource(kind="workspace", workspace=workspace)
-        await grants.grant(name, "admin", on=on, to=owner, by=owner)
-        lines.append(f"created {name}, owned by {who}, with the workspace {workspace}")
+    created = await grants.provision_tenant(name, owner=user)
+    lines.append(f"created {name}, owned by {who}" if created else f"{name} exists")
+    person = User(id=user)
+    if workspace in await grants.workspaces(name, person):
+        lines.append(f"{who} opens the workspace {workspace} already")
     else:
-        lines.append(f"{name} exists, and is unchanged")
+        on = Resource(kind="workspace", workspace=workspace)
+        try:
+            await grants.grant(name, "admin", on=on, to=person, by=person)
+        except Forbidden:
+            raise Invalid(f"{who} may not give themselves a workspace in {name}") from None
+        lines.append(f"{who} administers the workspace {workspace}")
     return "\n".join(lines)
 
 
@@ -263,7 +272,7 @@ async def run(
     parser = argparse.ArgumentParser(prog=PROGRAM, description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     first = commands.add_parser("first-run", help="the first person in, with a tenant to work in")
-    first.add_argument("email")
+    first.add_argument("email", help="their email, or an existing user's id")
     first.add_argument("--tenant", default="home")
     first.add_argument("--workspace", default="main")
     commands.add_parser("operator", help="make a user the first operator").add_argument("user")

@@ -925,7 +925,8 @@ STACK_AUTH_ADMIN_URL=http://gotrue:9999"
   app_password=$(random_hex 16)
   (
     umask 077
-    # .env.example first, as `make env` copies it, then what the smoke test sets: a later line wins.
+    # .env.example first, as `make env` copies it, then what the smoke test sets: Compose takes a
+    # setting's last line, which is all that reads it here (the local commands would take the first).
     { cat "$app_dir/.env.example"; cat <<ENV; } >"$app_dir/.env"
 STACK_DATABASE_URL=postgresql+asyncpg://$app_role:$app_password@$app_db_host:5432/postgres
 STACK_DATABASE_ADMIN_URL=postgresql+asyncpg://postgres:$app_db_admin_password@$app_db_host:5432/postgres

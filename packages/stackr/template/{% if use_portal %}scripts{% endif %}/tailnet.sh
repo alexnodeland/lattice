@@ -33,8 +33,9 @@ fi
 
 json() { "${UV:-uv}" run --no-project python -c "$@"; }
 
-# What PORT serves now: nothing ("free"), the application alone ("ours"), or more ("taken"). A
-# port Funnel puts on the internet is taken, whatever it serves: `on` would leave it there.
+# What PORT serves now: nothing ("free"); the application alone, for the tailnet ("ours") or
+# with Funnel on, on the internet too ("funnel"); or something else ("taken"). `on` refuses
+# "funnel", which it would leave public, and `off` removes it, which is the safe way out.
 state=$("$tailscale" serve status --json | json '
 import json, sys
 port, app = sys.argv[1:]
@@ -42,22 +43,23 @@ config = json.loads(sys.stdin.read() or "{}") or {}
 def here(section):
     return [v for k, v in (config.get(section) or {}).items() if k.endswith(f":{port}")]
 handlers = [site.get("Handlers") or {} for site in here("Web")]
-if any(here("AllowFunnel")):
-    print("taken")
-elif port not in (config.get("TCP") or {}):
+if port not in (config.get("TCP") or {}) and not any(here("AllowFunnel")):
     print("free")
+elif handlers != [{"/": {"Proxy": app}}]:
+    print("taken")
 else:
-    print("ours" if handlers == [{"/": {"Proxy": app}}] else "taken")
+    print("funnel" if any(here("AllowFunnel")) else "ours")
 ' "$port" "$app")
-if [[ $state == taken ]]; then
+if [[ $state == taken || ($state == funnel && $action == on) ]]; then
   echo "tailnet: something else is served on port $port, or Funnel puts it on the internet;" >&2
-  echo "  choose another, such as TAILNET_PORT=8444" >&2
+  echo "  choose another, such as TAILNET_PORT=8444, or run \`make tailnet-off\` there first" >&2
   exit 1
 fi
 
+# tailscale's own output is shown: it says when this machine must first allow Serve or HTTPS.
 case $action in
   on)
-    "$tailscale" serve --bg --yes --https="$port" "$app" >/dev/null
+    "$tailscale" serve --bg --yes --https="$port" "$app"
     name=$("$tailscale" status --json | json \
       'import json, sys; print(json.load(sys.stdin)["Self"]["DNSName"].rstrip("."))')
     origin=https://$name
@@ -65,11 +67,11 @@ case $action in
     echo "On your tailnet only: $origin/portalr/app/ and $origin/portalr/admin/"
     ;;
   off)
-    if [[ $state == ours ]]; then
-      "$tailscale" serve --yes --https="$port" off >/dev/null
-      echo "No longer on your tailnet, on port $port"
-    else
+    if [[ $state == free ]]; then
       echo "Nothing of this application's is served on port $port"
+    else
+      "$tailscale" serve --yes --https="$port" off
+      echo "No longer served on port $port, on your tailnet or by Funnel"
     fi
     ;;
   *)

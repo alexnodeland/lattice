@@ -98,7 +98,7 @@ With `access=grantr`, the application's own commands set up its tenants, in proc
 
 | Command | What it does |
 |---|---|
-| `make first-run EMAIL=...` | The first person in: makes their account in Supabase Auth if they have none, with a password it asks for twice; makes them the deployment's operator if it has none; and creates a tenant they own (`TENANT`, `home`) with a workspace they administer (`WORKSPACE`, `main`), which the app then lists. Each step is skipped once done |
+| `make first-run EMAIL=...` | The first person in: makes their account in Supabase Auth if they have none, with a password it asks for twice; makes them the deployment's operator if it has none; creates a tenant they own (`TENANT`, `home`); and gives them a workspace there to administer (`WORKSPACE`, `main`) if they can't open it, which the app then lists. Each step is skipped once done, and `EMAIL` may be an existing user's id |
 | `make operator EMAIL=...` | Makes a user the deployment's first operator, who may create tenants through grantr's API |
 | `make tenant NAME=... OWNER=...` | Creates a tenant, with its owner, once |
 | `make migrate-tenants` | Moves each user's tenant from their token's `app_metadata.tenant_id` into grantr: a new tenant's earliest user becomes its owner, and the rest its admins; a tenant grantr holds gains its claimed users who aren't members, as admins. It prints who got what, and can run again |

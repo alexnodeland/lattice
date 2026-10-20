@@ -54,13 +54,18 @@ SENT: Final = ("apikey", "authorization", "content-type")
 KEPT: Final = ("content-type", "cache-control")
 """The headers of Supabase Auth's answer passed back."""
 
+LARGEST: Final = 64 * 1024
+"""The largest body of a sign-in call passed on, in bytes: an email and a password, or a refresh
+token, are far less."""
+
 
 def sign_in(base: str, client: httpx.AsyncClient) -> APIRouter:
     """Supabase Auth's three sign-in calls on this origin, each passed to ``base``.
 
     ``base`` is where Supabase Auth's paths are, such as ``http://gotrue:9999`` or a gateway's
     ``/auth/v1``. Nothing but the calls' query, body and three headers is sent, and nothing but
-    the answer's status, body and two headers comes back; neither is logged.
+    the answer's status, body and two headers comes back; neither is logged. A body larger than
+    ``LARGEST`` is refused, and not passed on.
     """
     router = APIRouter(include_in_schema=False)
     for name, method in SIGN_IN.items():
@@ -73,13 +78,18 @@ def sign_in(base: str, client: httpx.AsyncClient) -> APIRouter:
 def _passed(url: str, client: httpx.AsyncClient) -> Callable[[Request], Awaitable[Response]]:
     async def call(request: Request) -> Response:
         headers = {name: value for name in SENT if (value := request.headers.get(name))}
+        body = bytearray()
+        async for chunk in request.stream():
+            body += chunk
+            if len(body) > LARGEST:
+                raise HTTPException(413, f"a sign-in call's body is at most {LARGEST} bytes")
         try:
             answer = await client.request(
                 request.method,
                 url,
                 params=request.url.query,
                 headers=headers,
-                content=await request.body(),
+                content=bytes(body),
             )
         except httpx.HTTPError as error:
             reason = f"Supabase Auth didn't answer: {type(error).__name__}"

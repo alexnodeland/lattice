@@ -29,6 +29,8 @@ OTHER: dict[str, Any] = {
     "Web": {f"{NAME}:443": {"Handlers": {"/": {"Proxy": "http://127.0.0.1:3000"}}}},
 }
 FUNNELED: dict[str, Any] = {**OURS, "AllowFunnel": {f"{NAME}:443": True}}
+FUNNEL_ELSEWHERE: dict[str, Any] = {**OURS, "AllowFunnel": {f"{NAME}:8443": True}}
+FORWARDED: dict[str, Any] = {"TCP": {"443": {"TCPForward": "127.0.0.1:22"}}}
 
 # The CLI's stub: it records each call, and answers the two it is asked for JSON.
 STUB = """#!/usr/bin/env bash
@@ -63,7 +65,9 @@ def run(tmp_path: Path, *arguments: str, served: dict[str, Any]) -> tuple[int, s
     return done.returncode, done.stdout + done.stderr, called
 
 
-@pytest.mark.parametrize("served", [{}, OURS], ids=["free", "ours"])
+@pytest.mark.parametrize(
+    "served", [{}, OURS, FUNNEL_ELSEWHERE], ids=["free", "ours", "Funnel on another port"]
+)
 def test_on_serves_the_application_on_the_tailnet_name(
     tmp_path: Path, served: dict[str, Any]
 ) -> None:
@@ -83,7 +87,7 @@ def test_another_port_is_in_the_address(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("action", ["on", "off"])
-@pytest.mark.parametrize("served", [OTHER, FUNNELED], ids=["another server", "Funnel"])
+@pytest.mark.parametrize("served", [OTHER, FORWARDED], ids=["another server", "a TCP forward"])
 def test_a_port_something_else_has_is_refused_and_left_as_it_is(
     tmp_path: Path, action: str, served: dict[str, Any]
 ) -> None:
@@ -93,11 +97,19 @@ def test_a_port_something_else_has_is_refused_and_left_as_it_is(
     assert called == ["serve status --json"]
 
 
-def test_off_removes_what_on_set_up(tmp_path: Path) -> None:
-    status, printed, called = run(tmp_path, "off", "443", APP, served=OURS)
+def test_on_refuses_a_port_funnel_puts_on_the_internet(tmp_path: Path) -> None:
+    status, printed, called = run(tmp_path, "on", "443", APP, served=FUNNELED)
+    assert status == 1
+    assert "Funnel puts it on the internet" in printed
+    assert called == ["serve status --json"]
+
+
+@pytest.mark.parametrize("served", [OURS, FUNNELED], ids=["ours", "ours, with Funnel"])
+def test_off_removes_what_on_set_up(tmp_path: Path, served: dict[str, Any]) -> None:
+    status, printed, called = run(tmp_path, "off", "443", APP, served=served)
     assert status == 0, printed
     assert called == ["serve status --json", "serve --yes --https=443 off"]
-    assert printed == "No longer on your tailnet, on port 443\n"
+    assert printed == "No longer served on port 443, on your tailnet or by Funnel\n"
 
 
 def test_off_changes_nothing_where_nothing_is_served(tmp_path: Path) -> None:

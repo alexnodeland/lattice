@@ -37,6 +37,10 @@ SVG: Final = "image/svg+xml"
 IDML: Final = "application/vnd.adobe.indesign-idml-package"
 """The media type of an InDesign markup package, `.idml`."""
 
+FIGCRAFT: Final = "application/x-figcraft"
+"""The media type of a FigCraft design, `.figcraft`, which has no registered one: a zip holding
+its document as JSON."""
+
 OUTLINE_LIMIT: Final = 4_000
 """The most characters an outline holds: what the agent sees of a file by default."""
 
@@ -142,3 +146,9 @@ class Drawing(NativeFile):
     """A drawing, `.dxf` or `.dwg`: registered as `drawing`."""
 
     formats: ClassVar[frozenset[str]] = frozenset({DXF, DWG})
+
+
+class LayeredImage(NativeFile):
+    """A layered image, `.psd`: registered as `layered_image`."""
+
+    formats: ClassVar[frozenset[str]] = frozenset({PSD})

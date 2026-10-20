@@ -9,7 +9,9 @@ from artifactr.files.manifest import (
     DWG,
     DXF,
     OUTLINE_LIMIT,
+    PSD,
     Drawing,
+    LayeredImage,
     NativeFile,
     Provenance,
     WordDocument,
@@ -27,7 +29,7 @@ def test_a_word_document_is_registered_and_proposed_by_agents() -> None:
 
 @pytest.mark.parametrize(
     ("kind", "native", "formats"),
-    [("drawing", Drawing, {DXF, DWG})],
+    [("drawing", Drawing, {DXF, DWG}), ("layered_image", LayeredImage, {PSD})],
 )
 def test_each_crafting_apps_files_are_a_type_of_their_own(
     kind: str, native: type[NativeFile], formats: set[str]

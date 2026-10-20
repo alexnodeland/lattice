@@ -96,7 +96,7 @@ class CommandsDialect(Headless):
         reply = await server.session.call_tool(
             "command_batch", {"steps": steps, "stop_on_error": True}
         )
-        failed = _failed_step(commands, reply.structured_content)
+        failed = _failed_step(commands, reply.structured_content or reply_text(reply))
         if reply.is_error or failed:
             raise AppFailed("refused", failed or reply_text(reply))
 
@@ -158,10 +158,17 @@ def _spec(command: _Listed) -> CommandSpec:
     )
 
 
-def _failed_step(commands: Sequence[AppCommand], structured: Mapping[str, object] | None) -> str:
-    """Which command of a batch failed, and why, from the batch's results; empty if none did."""
+def _failed_step(commands: Sequence[AppCommand], reply: Mapping[str, object] | str) -> str:
+    """Which command of a batch failed, and why, from the batch's results; empty if none did.
+
+    The results are the reply's structured content, or else its text, as JSON: PhotoCraft's and
+    VectorCraft's servers reply in text only, and PhotoCraft's without the error flag.
+    """
     try:
-        results = _Batch.model_validate(structured or {}).results
+        if isinstance(reply, str):
+            results = _Batch.model_validate_json(reply).results
+        else:
+            results = _Batch.model_validate(reply).results
     except ValidationError:
         return ""
     failed = ((c.name, r.error) for c, r in zip(commands, results, strict=False) if not r.ok)

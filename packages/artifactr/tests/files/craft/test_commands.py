@@ -168,6 +168,7 @@ async def test_an_open_that_replies_with_no_json_is_a_crash(spawn: Make) -> None
         ("garbled", '"failed": 1'),
         ("quiet", '"failed": 1'),
         ("lenient", 'nope: command "nope" has no headless tool'),
+        ("plain", 'nope: command "nope" has no headless tool'),
     ],
 )
 async def test_a_command_that_fails_refuses_the_batch_and_is_named(

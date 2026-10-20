@@ -21,7 +21,15 @@ documentation is at <https://lattice.alexnodeland.com/artifactr/files/>.
 from artifactr.files.app import App, AppCommand, AppFailed, FakeApp
 from artifactr.files.blobs import Blobs, InMemoryBlobs, TooLarge
 from artifactr.files.checkouts import Checkout, Checkouts, InMemoryCheckouts
-from artifactr.files.manifest import DOCX, Blob, Drawing, NativeFile, Provenance, WordDocument
+from artifactr.files.manifest import (
+    DOCX,
+    Blob,
+    Drawing,
+    LayeredImage,
+    NativeFile,
+    Provenance,
+    WordDocument,
+)
 from artifactr.files.native import ContentUnavailable, NativeFiles
 
 __all__ = [
@@ -38,6 +46,7 @@ __all__ = [
     "FakeApp",
     "InMemoryBlobs",
     "InMemoryCheckouts",
+    "LayeredImage",
     "NativeFile",
     "NativeFiles",
     "Provenance",

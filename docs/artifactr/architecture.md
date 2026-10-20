@@ -540,7 +540,7 @@ Langfuse is the primary backend for traces and scores ([ADR-0027](adr/0027-opent
 
 ## Forms and dashboards
 
-`artifactr.ui`, behind the `forms` extra, puts forms, dashboards and mini apps in the chat ([lattice RFC-0005](../rfcs/0005-forms-dashboards-and-mini-apps.md), [the guide](guides/forms-and-dashboards.md)): an agent asks a form with `ask_form`, which pauses its run until a person answers, or makes a form artifact that takes submissions without a run waiting, shows figures as a dashboard, and, where mini apps are on, makes an app, one HTML file portalr runs sandboxed with no network. Whatever a person sends is one command, as that person, which its checks, on the [check hook](adr/0073-checks-that-refuse-a-command-before-it-commits.md), refuse before it commits if it doesn't fit.
+`artifactr.ui`, behind the `forms` extra, puts forms, dashboards and mini apps in the chat ([lattice RFC-0005](../rfcs/0005-forms-dashboards-and-mini-apps.md), [the guide](guides/forms-and-dashboards.md)): an agent asks a form with `ask_form`, which pauses its run until a person answers, or makes a form artifact that takes submissions without a run waiting, shows figures as a dashboard, and, where mini apps are on, makes an app, one HTML file portalr runs sandboxed, loading nothing ([portalr ADR-0051](../portalr/adr/0051-mini-apps-the-sandboxed-frame-and-its-bridge.md)). Whatever a person sends is one command, as that person, which its checks, on the [check hook](adr/0073-checks-that-refuse-a-command-before-it-commits.md), refuse before it commits if it doesn't fit.
 
 ### Its modules
 

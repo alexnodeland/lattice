@@ -66,7 +66,7 @@ the button."""
 
 _APP = f"""\
 The app is one HTML file, at most {MAX_APP_HTML_BYTES // 1024} KB, run sandboxed for everyone \
-who opens the thread, with no network: it loads nothing, so its scripts and styles are inline, \
+who opens the thread, under a policy that loads nothing, so its scripts and styles are inline, \
 and its images and fonts `data:` URLs. Its `summary` says in words what it does: it is shown \
 beside the app, and in its place wherever apps don't run.
 

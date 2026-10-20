@@ -27,7 +27,7 @@ A new package, `artifactr-ui`, lets an agent put interactive UI in the chat: for
 
 - **No code from a model in portalr's origin.** Forms and dashboards are data; portalr's components render them. Only mini apps run code, and never on portalr's origin.
 - **No full JSON Schema,** no generic schema-form library, and no layout language: the subset below, and hints that name the kit's components.
-- **No network from a mini app,** and no app that calls a model, a tool or a server. What it does is through the host, as the person viewing it.
+- **No network from a mini app,** and no app that calls a model, a tool or a server. What it does is through the host, as the person viewing it. *Amended 2026-10-18 ([portalr ADR-0051](../portalr/adr/0051-mini-apps-the-sandboxed-frame-and-its-bridge.md)): an app loads nothing and reads nothing of the person's, but WebRTC from a frame it makes reaches the network in Chromium, so what it was given can be sent.*
 - **No MCP client in lattice.** portalr doesn't render MCP Apps from other servers. Exporting lattice's UI over `artifactr.mcp` is phase 3.
 - **No plugin loader.** The application registers the package's types, toolset, checks and projections, as it registers everything else.
 - **No published TypeScript package.** The renderers live in `@portalr/ui`, which stays private.
@@ -45,7 +45,7 @@ graph LR
     ws -- "run_paused, artifact_created" --> chat["portalr chat:<br/>SchemaForm, DashboardView, AppFrame"]
     chat -- "answer_deferred, or create_artifact<br/>(kind submission), as the person" --> check["artifactr_ui checks"]
     check --> ws
-    frame["mini app, apps.&lt;host&gt;<br/>sandboxed, no network"] -- "postMessage bridge" --> chat
+    frame["mini app, apps.&lt;host&gt;<br/>sandboxed, loads nothing"] -- "postMessage bridge" --> chat
     ws -- "the log" --> relayr["relayr follower"]
     relayr -- "artifactr:deferred_answered,<br/>ui:form_submitted, ui:app_submitted" --> reflexr["reflexr rules"]
 ```
@@ -263,7 +263,7 @@ Recommended, for the maintainer to decide:
 
 ## Drawbacks
 
-- **An agent's code runs for others without a person approving it** (O6). A flaw in the sandbox, a browser bug, or a policy that slips reaches every viewer of the thread. The origin holds nothing to steal and the frame can reach no network, so the worst left is a misleading app, which the label and the confirmation answer, and a denial of service in one tab.
+- **An agent's code runs for others without a person approving it** (O6). A flaw in the sandbox, a browser bug, or a policy that slips reaches every viewer of the thread. The origin holds nothing to steal and the frame loads nothing, so the worst left is a misleading app, or one that sends what it was given over WebRTC from a frame it makes (amended 2026-10-18, [portalr ADR-0051](../portalr/adr/0051-mini-apps-the-sandboxed-frame-and-its-bridge.md)), which the label and the confirmation answer, and a denial of service in one tab.
 - **Mini apps can't be held to portalr's accessibility,** and a summary is a weaker equivalent than a form.
 - **`deferred_answered` bridged by default widens what rules see:** every answer, including free text to `ask_user`.
 - **A pause has no deadline.** A form nobody answers leaves its run waiting, as `ask_user` does today.

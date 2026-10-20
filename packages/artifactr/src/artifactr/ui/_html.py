@@ -1,7 +1,7 @@
 """The first filter on a mini app's HTML: it names nothing to load (lattice RFC-0005).
 
 Private to artifactr.ui: the agent's tools and the checks refuse an app's HTML it finds wanting,
-as each writes one. An app reaches no network, and the policy it runs under is what holds that
+as each writes one. An app loads nothing, and the policy it runs under is what holds that
 (ADR-0082); this filter only tells a model at once that it wrote a script, a module, a stylesheet,
 an image, a font or a frame to load from somewhere, so it writes it inline, or as a ``data:`` URL,
 instead. It reads the markup with the standard library's tokenizer, as a browser's reads it, the
@@ -52,7 +52,7 @@ def refused(html: str) -> str | None:
     """Say why an app's HTML is refused, naming what it would load and where; or None."""
     if found := loaded(html):
         return (
-            "the HTML loads from outside the app, which reaches no network: write what it needs "
+            "the HTML loads from outside the app, which can load nothing: write what it needs "
             f"inline, or as a data: URL, and open links with ui/open-link ({'; '.join(found)})"
         )
     return None

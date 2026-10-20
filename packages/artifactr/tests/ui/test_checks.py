@@ -316,7 +316,7 @@ async def test_an_apps_html_loads_nothing_as_it_is_made_or_changed(
     thread = await ws.create_thread("Calc")
     by_agent = ws.as_actor(agent(thread.id))
     app: dict[str, Any] = {"title": "Calc", "summary": "A calculator", "html": "<img src=x.png>"}
-    with pytest.raises(ValidationFailed, match="reaches no network") as refused:
+    with pytest.raises(ValidationFailed, match="can load nothing") as refused:
         await by_agent.commit(CreateArtifact(kind="app", data=app))
     assert locs(refused.value) == [["data", "html"]]
     made = await by_agent.commit(CreateArtifact(kind="app", data={**app, "html": "<p>0</p>"}))

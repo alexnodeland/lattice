@@ -24,11 +24,14 @@ from artifactr.files.manifest.types import (
     LayeredImage,
     NativeFile,
     PageLayout,
+    PdfDocument,
+    Presentation,
     Provenance,
     Sha256,
     Source,
     VectorImage,
     WordDocument,
+    Workbook,
 )
 
 __all__ = [
@@ -50,10 +53,13 @@ __all__ = [
     "LayeredImage",
     "NativeFile",
     "PageLayout",
+    "PdfDocument",
+    "Presentation",
     "Provenance",
     "Sha256",
     "Source",
     "VectorImage",
     "WordDocument",
+    "Workbook",
     "revise",
 ]

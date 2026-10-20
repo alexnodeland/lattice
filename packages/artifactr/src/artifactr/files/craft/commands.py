@@ -27,6 +27,8 @@ class _Listed(BaseModel):
     id: str
     label: str = ""
     menu: str | list[str] | None = None
+    location: str = ""
+    """Where it is in the app, as WordCraft's server says it, which says no `menu`."""
     params: JsonValue = None
 
 
@@ -75,11 +77,7 @@ class CommandsDialect(Headless):
             command = self.open_command
             path = server.source(source, f"source{self.extension}")
             opened = await server.json("command_run", id=command, params={"path": str(path)})
-        if self.handle is None:
-            return None
-        if not isinstance(opened, Mapping) or (document := opened.get(self.handle)) is None:
-            raise AppFailed("crashed", f"{command} named no document as {self.handle}")
-        return document
+        return self.named(command, opened)
 
     @override
     async def batch(
@@ -120,6 +118,18 @@ class CommandsDialect(Headless):
         """The commands `command_list` finds for the query, ten at most."""
         return listed("command_list", await server.json("command_list", filter=query))
 
+    def named(self, step: str, opened: JsonValue) -> JsonValue:
+        """What a step that opened a file, or made one, says the server calls it, by `handle`.
+
+        Raises:
+            AppFailed: `crashed` if it names no document.
+        """
+        if self.handle is None:
+            return None
+        if not isinstance(opened, Mapping) or (document := opened.get(self.handle)) is None:
+            raise AppFailed("crashed", f"{step} named no document as {self.handle}")
+        return document
+
     def params(
         self, document: JsonValue, arguments: Mapping[str, JsonValue]
     ) -> dict[str, JsonValue]:
@@ -129,12 +139,12 @@ class CommandsDialect(Headless):
         return {**arguments, self.handle: document}
 
 
-def listed(tool: str, reply: JsonValue) -> list[CommandSpec]:
+def listed(tool: str, reply: JsonValue, denied: tuple[str, ...] = ()) -> list[CommandSpec]:
     """The first ten commands a list tool replied with, as `command_list` lists them.
 
-    The reply is a list of commands, each its `id`, `label`, `menu` and `params`, or an object
-    holding that list as `commands`. A server of the `tools` dialect that lists commands so, as
-    CADCraft's does, reads its list with this too.
+    The reply is a list of commands, each its `id`, `label`, `menu` (or `location`) and
+    `params`, or an object holding that list as `commands`. The `tools` dialect reads its list
+    tool's reply with this too. A command whose id starts with one of `denied` is left out.
 
     Raises:
         AppFailed: `crashed` if the reply holds no list of commands.
@@ -145,12 +155,13 @@ def listed(tool: str, reply: JsonValue) -> list[CommandSpec]:
         found = _LISTED.validate_python(reply)
     except ValidationError as error:
         raise AppFailed("crashed", f"{tool} replied with no commands: {error}") from None
-    return [_spec(command) for command in found[:FOUND]]
+    return [_spec(command) for command in found if not command.id.startswith(denied)][:FOUND]
 
 
 def _spec(command: _Listed) -> CommandSpec:
     params = command.params if isinstance(command.params, str) else json.dumps(command.params)
     menu = " > ".join(command.menu) if isinstance(command.menu, list) else command.menu
+    menu = menu or command.location
     return CommandSpec(
         name=command.id,
         signature=command.id if command.params is None else f"{command.id} {params}",

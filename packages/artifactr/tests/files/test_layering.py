@@ -18,6 +18,13 @@ SRC = Path(__file__).parents[2] / "src" / "artifactr" / "files"
 LIBRARY = {"artifactr.core", "artifactr.workspace"}
 """What it may import of the rest of artifactr: these, by their `__all__`."""
 
+
+def _adapter(app: str) -> tuple[set[str], set[str]]:
+    """An app's adapter knows the port, the crafting apps, and how its own app reads a file."""
+    own = {"artifactr.files.manifest", "artifactr.files.app", "artifactr.files.craft"}
+    return {*own, f"artifactr.files.{app}"}, {"pydantic"}
+
+
 LAYERS: dict[str, tuple[set[str], set[str]]] = {
     # layer: (artifactr.files packages it may import, the others it may import)
     "manifest": ({"artifactr.files.manifest"}, {*LIBRARY, "pydantic"}),
@@ -32,61 +39,15 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         {"artifactr.files.manifest", "artifactr.files.app", "artifactr.files.craft"},
         {"pydantic", "mcp", "anyio", "lattice_core.integrations"},
     ),
-    # An app's adapter knows the port, the crafting apps, and how its own app reads a file.
-    "wordcraft": (
-        {
-            "artifactr.files.manifest",
-            "artifactr.files.app",
-            "artifactr.files.craft",
-            "artifactr.files.wordcraft",
-        },
-        {"pydantic"},
-    ),
-    "cadcraft": (
-        {
-            "artifactr.files.manifest",
-            "artifactr.files.app",
-            "artifactr.files.craft",
-            "artifactr.files.cadcraft",
-        },
-        {"pydantic"},
-    ),
-    "photocraft": (
-        {
-            "artifactr.files.manifest",
-            "artifactr.files.app",
-            "artifactr.files.craft",
-            "artifactr.files.photocraft",
-        },
-        {"pydantic"},
-    ),
-    "vectorcraft": (
-        {
-            "artifactr.files.manifest",
-            "artifactr.files.app",
-            "artifactr.files.craft",
-            "artifactr.files.vectorcraft",
-        },
-        {"pydantic"},
-    ),
-    "designcraft": (
-        {
-            "artifactr.files.manifest",
-            "artifactr.files.app",
-            "artifactr.files.craft",
-            "artifactr.files.designcraft",
-        },
-        {"pydantic"},
-    ),
-    "figcraft": (
-        {
-            "artifactr.files.manifest",
-            "artifactr.files.app",
-            "artifactr.files.craft",
-            "artifactr.files.figcraft",
-        },
-        {"pydantic"},
-    ),
+    "wordcraft": _adapter("wordcraft"),
+    "gridcraft": _adapter("gridcraft"),
+    "deckcraft": _adapter("deckcraft"),
+    "pdfcraft": _adapter("pdfcraft"),
+    "cadcraft": _adapter("cadcraft"),
+    "photocraft": _adapter("photocraft"),
+    "vectorcraft": _adapter("vectorcraft"),
+    "designcraft": _adapter("designcraft"),
+    "figcraft": _adapter("figcraft"),
     # The worker, over any app, and the App that calls it; its entry point runs WordCraft's.
     "worker": (
         {

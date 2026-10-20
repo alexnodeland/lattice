@@ -15,9 +15,8 @@ from typing import ClassVar, Final, override
 
 from pydantic import BaseModel, Field, JsonValue, ValidationError
 
-from artifactr.files.app import AppCommand, AppFailed, CommandSpec, Inspection
+from artifactr.files.app import AppCommand, AppFailed, Inspection
 from artifactr.files.craft import CRAFTS, Craft, Server, ToolsDialect
-from artifactr.files.craft.commands import listed
 from artifactr.files.craft.spawn import reply_text
 from artifactr.files.designcraft.package import media_type
 from artifactr.files.manifest import OUTLINE_LIMIT
@@ -57,6 +56,7 @@ class Subprocess(ToolsDialect):
 
     craft: ClassVar[Craft] = CRAFTS["designcraft"]
     extension: ClassVar[str] = ".idml"
+    list_argument: ClassVar[str] = "filter"
     new_tool: ClassVar[str] = "new_document"
     open_tool: ClassVar[str] = "execute"
     save_tool: ClassVar[str] = "execute"
@@ -100,11 +100,6 @@ class Subprocess(ToolsDialect):
     async def page(self, server: Server, document: JsonValue, page: int, scale: float) -> bytes:
         """Render one page with `render_page`, which numbers them from 0."""
         return await server.png(self.render_tool, page=page - 1, scale=scale)
-
-    @override
-    async def find(self, server: Server, query: str) -> Sequence[CommandSpec]:
-        """The commands `list_commands` finds for the query, ten at most."""
-        return listed(self.list_tool, await server.json(self.list_tool, filter=query))
 
     @override
     async def inspection(self, server: Server, document: JsonValue, content: bytes) -> Inspection:

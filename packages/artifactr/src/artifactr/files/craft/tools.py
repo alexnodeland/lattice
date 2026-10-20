@@ -13,15 +13,9 @@ from typing import ClassVar, override
 from pydantic import BaseModel, JsonValue, TypeAdapter, ValidationError
 
 from artifactr.files.app import AppCommand, AppFailed, CommandSpec
-from artifactr.files.craft.headless import FOUND, Headless
+from artifactr.files.craft.commands import listed
+from artifactr.files.craft.headless import Headless
 from artifactr.files.craft.spawn import Server, reply_text
-
-
-class _Command(BaseModel):
-    id: str
-    label: str = ""
-    location: str = ""
-    params: str = "{}"
 
 
 class _Step(BaseModel):
@@ -30,8 +24,8 @@ class _Step(BaseModel):
     error: str = ""
 
 
-_COMMANDS = TypeAdapter(list[_Command])
 _STEPS = TypeAdapter(list[_Step])
+_LIST: TypeAdapter[JsonValue] = TypeAdapter(JsonValue)
 
 
 class ToolsDialect(Headless):
@@ -48,6 +42,22 @@ class ToolsDialect(Headless):
     batch_tool: ClassVar[str] = "batch"
     render_tool: ClassVar[str] = "render_page"
     list_tool: ClassVar[str] = "list_commands"
+    list_argument: ClassVar[str] = "query"
+    """The list tool's argument that it matches commands by."""
+    denied: ClassVar[tuple[str, ...]] = ()
+    """The prefixes of the commands no batch may run, such as `file.`, which reach past the open
+    file: refused before any command runs, and never found."""
+
+    def allowed(self, commands: Sequence[AppCommand]) -> None:
+        """Refuse a batch that holds a denied command, before any runs.
+
+        Raises:
+            AppFailed: `refused`, naming the command.
+        """
+        if found := next((c.name for c in commands if c.name.startswith(self.denied)), None):
+            raise AppFailed(
+                "refused", f"{found}: {self.craft.title}'s adapter runs no such command"
+            )
 
     @override
     async def open(self, server: Server, source: bytes | None) -> JsonValue:
@@ -67,6 +77,7 @@ class ToolsDialect(Headless):
         self, server: Server, document: JsonValue, commands: Sequence[AppCommand]
     ) -> None:
         """Run the commands as one batch, refused whole, naming the command that failed."""
+        self.allowed(commands)
         steps: list[JsonValue] = [
             {"command": command.name, "params": command.args} for command in commands
         ]
@@ -88,16 +99,13 @@ class ToolsDialect(Headless):
 
     @override
     async def find(self, server: Server, query: str) -> Sequence[CommandSpec]:
-        """The commands the list tool finds for the query, ten at most."""
-        found = _COMMANDS.validate_json(await server.text(self.list_tool, query=query))
-        return [
-            CommandSpec(
-                name=command.id,
-                signature=f"{command.id} {command.params}",
-                description=f"{command.label} ({command.location})",
-            )
-            for command in found[:FOUND]
-        ]
+        """The commands the list tool finds for the query, ten at most, none of them denied."""
+        reply = await server.text(self.list_tool, **{self.list_argument: query})
+        try:
+            commands = _LIST.validate_json(reply)
+        except ValidationError:
+            raise AppFailed("crashed", f"{self.list_tool} replied with no JSON") from None
+        return listed(self.list_tool, commands, self.denied)
 
 
 def _failed_step(reply: str) -> str:

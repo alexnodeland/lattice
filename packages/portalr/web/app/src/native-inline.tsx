@@ -19,9 +19,11 @@ import {
 } from "@portalr/ui";
 import { useQuery } from "@tanstack/react-query";
 import { type ReactNode, useMemo, useRef, useState } from "react";
-import type { Place } from "./check-out";
+import { editorAt, type Place } from "./check-out";
+import { useEditing } from "./editing";
 import { DownloadButton, FileControls, type Native, useDownload } from "./native-file";
 import { useNear } from "./near";
+import { ViewSlotsContext } from "./view-slots";
 
 const XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
@@ -183,6 +185,11 @@ function FileView({
   });
   const { saving, download } = useDownload(place, status?.name);
   const [chosen, setChosen] = useState<View | null>(null);
+  // One box for the file: its preview, or, while it is edited here, its editor, flipped in place.
+  const editing = useEditing()?.artifact === artifact;
+  const [viewport, setViewport] = useState<HTMLElement | null>(null);
+  const [toggle, setToggle] = useState<HTMLElement | null>(null);
+  const slots = useMemo(() => ({ viewport, toggle }), [viewport, toggle]);
   if (error instanceof Refused && error.status === 404) {
     return unserved;
   }
@@ -203,6 +210,9 @@ function FileView({
     "text",
   ];
   const view = chosen !== null && views.includes(chosen) ? chosen : (views[0] ?? "outline");
+  // Its build hands the file over and its editor is hosted: the box flips between the two.
+  const editable =
+    status.talk === "bridged" && editorAt(context.config.editors, native.integration) !== null;
   const about = [
     fileSize(status.size),
     pages > 0 ? `${pages} ${pages === 1 ? "page" : "pages"}` : null,
@@ -215,55 +225,73 @@ function FileView({
         <p className="text-muted text-sm">{about.join(" · ")}</p>
         <DownloadButton saving={saving} onDownload={() => void download(status.version)} />
       </div>
-      <SegmentedFilter
-        label={`Show ${status.name} as`}
-        segments={views.map((each) => ({ value: each, label: VIEWS[each] }))}
-        value={view}
-        onValueChange={setChosen}
-      />
-      {view === "pages" && (
-        <Pages place={place} version={status.version} total={pages} name={status.name} />
-      )}
-      {view === "sheets" && (
-        <Words place={place} version={status.version}>
-          {(text) => <Sheets text={text} outline={status.outline} />}
-        </Words>
-      )}
-      {view === "outline" &&
-        (status.outline.trim() === "" ? (
-          <p className="text-muted text-sm italic">The app read no outline from this file.</p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        {editing ? (
+          <p className="text-muted text-sm">Editing in {native.app}</p>
         ) : (
-          <ol
-            aria-label={`Outline of ${status.name}`}
-            className="flex flex-col gap-0.5 border-line border-s-2 ps-3 text-fg text-sm"
-          >
-            {outlined(status.outline).map(({ line, key }) => (
-              <li key={key} className="whitespace-pre-wrap">
-                {line}
-              </li>
-            ))}
-          </ol>
-        ))}
-      {view === "text" && (
-        <Words place={place} version={status.version}>
-          {(text) => (
-            <ScrollRegion
-              aria-label={`Text of ${status.name}`}
-              className="max-h-[70dvh] overflow-y-auto rounded-md border border-line bg-paper p-3"
-            >
-              <p className="whitespace-pre-wrap break-words text-fg text-sm">{text}</p>
-            </ScrollRegion>
+          <SegmentedFilter
+            label={`Show ${status.name} as`}
+            segments={views.map((each) => ({ value: each, label: VIEWS[each] }))}
+            value={view}
+            onValueChange={setChosen}
+          />
+        )}
+        <span ref={setToggle} className="ms-auto empty:hidden" />
+      </div>
+      <div className={editable ? "h-[min(80dvh,48rem)]" : undefined}>
+        {/* Hidden, not taken down, while it is edited: its page, its zoom and its view are kept. */}
+        <div
+          hidden={editing}
+          className={`flip-in flex flex-col gap-3 ${editable ? "h-full overflow-auto" : ""}`}
+        >
+          {view === "pages" && (
+            <Pages place={place} version={status.version} total={pages} name={status.name} />
           )}
-        </Words>
-      )}
-      <FileControls
-        place={place}
-        native={native}
-        me={me}
-        status={status}
-        onDownload={download}
-        saving={saving}
-      />
+          {view === "sheets" && (
+            <Words place={place} version={status.version}>
+              {(text) => <Sheets text={text} outline={status.outline} />}
+            </Words>
+          )}
+          {view === "outline" &&
+            (status.outline.trim() === "" ? (
+              <p className="text-muted text-sm italic">The app read no outline from this file.</p>
+            ) : (
+              <ol
+                aria-label={`Outline of ${status.name}`}
+                className="flex flex-col gap-0.5 border-line border-s-2 ps-3 text-fg text-sm"
+              >
+                {outlined(status.outline).map(({ line, key }) => (
+                  <li key={key} className="whitespace-pre-wrap">
+                    {line}
+                  </li>
+                ))}
+              </ol>
+            ))}
+          {view === "text" && (
+            <Words place={place} version={status.version}>
+              {(text) => (
+                <ScrollRegion
+                  aria-label={`Text of ${status.name}`}
+                  className="max-h-[70dvh] overflow-y-auto rounded-md border border-line bg-paper p-3"
+                >
+                  <p className="whitespace-pre-wrap break-words text-fg text-sm">{text}</p>
+                </ScrollRegion>
+              )}
+            </Words>
+          )}
+        </div>
+        <div ref={setViewport} hidden={!editing} className="flip-in h-full" />
+      </div>
+      <ViewSlotsContext value={slots}>
+        <FileControls
+          place={place}
+          native={native}
+          me={me}
+          status={status}
+          onDownload={download}
+          saving={saving}
+        />
+      </ViewSlotsContext>
     </div>
   );
 }

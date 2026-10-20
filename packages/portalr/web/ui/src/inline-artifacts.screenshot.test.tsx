@@ -9,9 +9,12 @@ import { expect, onTestFinished, test } from "vitest";
 import { commands, page } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { ArtifactContent, markdown, type Renderers } from "./artifacts";
+import { Button } from "./button";
 import { InlineArtifact, Messages } from "./chat";
 import { PageViewer, SheetTable } from "./file-preview";
 import { FileHolder } from "./native-file";
+import { SegmentedFilter } from "./segmented-filter";
+import { StatusBadge } from "./status-badge";
 import { dark } from "./test/colours";
 import { SUPPORT } from "./test/dashboards";
 import { LEAVE, LEAVE_UI } from "./test/forms";
@@ -87,6 +90,21 @@ function Thread() {
           </div>
         </InlineArtifact>
         <InlineArtifact name="figures.xlsx" kind="Workbook" open={open}>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <SegmentedFilter
+              label="Show figures.xlsx as"
+              segments={[
+                { value: "cells", label: "Cells" },
+                { value: "outline", label: "Outline" },
+                { value: "text", label: "Text" },
+              ]}
+              value="cells"
+              onValueChange={() => {}}
+            />
+            <Button size="sm" className="ms-auto">
+              Edit in GridCraft
+            </Button>
+          </div>
           <SheetTable
             sheet={{
               name: "Costs",
@@ -98,6 +116,18 @@ function Thread() {
               ],
             }}
           />
+        </InlineArtifact>
+        <InlineArtifact name="budget.xlsx" kind="Workbook" open={open}>
+          {/* Flipped to its editor, as it opens: the box the preview had, the frame not yet drawn. */}
+          <div className="flex h-72 flex-col gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusBadge tone="working">Opening budget.xlsx in GridCraft</StatusBadge>
+              <Button variant="secondary" size="sm" className="ms-auto">
+                Back to preview
+              </Button>
+            </div>
+            <div className="min-h-0 flex-1 rounded-md border border-edge bg-paper" />
+          </div>
         </InlineArtifact>
       </Messages>
     </div>
@@ -137,6 +167,7 @@ for (const [name, width] of [
       ["Support this week", "dashboard"],
       ["launch-brief.docx", "word-document"],
       ["figures.xlsx", "workbook"],
+      ["budget.xlsx", "editor-opening"],
     ] as const) {
       await expect
         .soft(screen.getByRole("listitem", { name: entry }))

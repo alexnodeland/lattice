@@ -352,7 +352,7 @@ test("a workbook whose build hands it over is edited in its editor, framed here,
     { artifactrLog: thread([["book_1", "workbook"]]), editors: { "files:gridcraft": GRID } },
   );
   const book = screen.getByRole("listitem", { name: "figures.xlsx" });
-  await book.getByRole("button", { name: "Edit here in GridCraft" }).click();
+  await book.getByRole("button", { name: "Edit in GridCraft" }).click();
   const editor = book.getByTitle("GridCraft, editing figures.xlsx");
   await expect.element(editor).toBeInTheDocument();
   const frame = editor.element() as HTMLIFrameElement;
@@ -384,7 +384,7 @@ test("a workbook whose build hands it over is edited in its editor, framed here,
   ).toBe(true);
   fromShim(frame, { type: "lattice:dirty", dirty: true });
   await expect.element(book.getByText("Unsaved changes in GridCraft")).toBeVisible();
-  await expect.element(book.getByRole("button", { name: "Close without saving" })).toBeVisible();
+  await expect.element(book.getByRole("button", { name: "Back to preview" })).toBeVisible();
   // An export in another format isn't checked in.
   fromShim(frame, { type: "lattice:save", name: "figures.pdf", bytes: new ArrayBuffer(4) });
   await expect
@@ -419,16 +419,16 @@ test("an editor that fails, or never starts, says so, and can be closed and open
     { artifactrLog: thread([["book_1", "workbook"]]), editors: { "files:gridcraft": GRID } },
   );
   const book = screen.getByRole("listitem", { name: "figures.xlsx" });
-  await book.getByRole("button", { name: "Edit here in GridCraft" }).click();
+  await book.getByRole("button", { name: "Edit in GridCraft" }).click();
   const editor = book.getByTitle("GridCraft, editing figures.xlsx");
   await expect.element(editor).toBeInTheDocument();
   fromShim(editor.element() as HTMLIFrameElement, { type: "lattice:failed", error: "no wasm" });
   await expect.element(book.getByText("GridCraft didn't open here")).toBeVisible();
   await expect.element(book.getByText(/^GridCraft didn't start here\./)).toBeVisible();
-  await book.getByRole("button", { name: "Close GridCraft" }).click();
+  await book.getByRole("button", { name: "Back to preview" }).click();
   await expect.element(editor).not.toBeInTheDocument();
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-  await book.getByRole("button", { name: "Edit here in GridCraft" }).click();
+  await book.getByRole("button", { name: "Edit in GridCraft" }).click();
   await expect.element(editor).toBeInTheDocument();
   vi.advanceTimersByTime(60_000);
   await expect.element(book.getByText("GridCraft didn't open here")).toBeVisible();
@@ -470,7 +470,7 @@ async function editingIn(
 /** Open a book's editor, and say it is ready: its frame. */
 async function ready(screen: Awaited<ReturnType<typeof open>>["screen"], name: string) {
   const book = screen.getByRole("listitem", { name });
-  await book.getByRole("button", { name: "Edit here in GridCraft" }).click();
+  await book.getByRole("button", { name: "Edit in GridCraft" }).click();
   const editor = book.getByTitle(`GridCraft, editing ${name}`);
   await expect.element(editor).toBeInTheDocument();
   const frame = editor.element() as HTMLIFrameElement;
@@ -535,14 +535,14 @@ test("closing with unsaved changes is confirmed, and leaving the page is guarded
   const leaving = new Event("beforeunload", { cancelable: true });
   (guard as (event: Event) => void)(leaving);
   expect(leaving.defaultPrevented).toBe(true);
-  await book.getByRole("button", { name: "Close without saving" }).click();
-  const asked = screen.getByRole("alertdialog", { name: "Close GridCraft without saving?" });
-  await asked.getByRole("button", { name: "Cancel" }).click();
+  await book.getByRole("button", { name: "Back to preview" }).click();
+  const asked = screen.getByRole("alertdialog", { name: "Back to the preview without saving?" });
+  await asked.getByRole("button", { name: "Keep editing" }).click();
   await expect.element(editor).toBeInTheDocument();
-  await book.getByRole("button", { name: "Close without saving" }).click();
+  await book.getByRole("button", { name: "Back to preview" }).click();
   await screen
     .getByRole("alertdialog")
-    .getByRole("button", { name: "Close without saving" })
+    .getByRole("button", { name: "Discard and go back" })
     .click();
   await expect.element(editor).not.toBeInTheDocument();
   await expect.poll(() => guards(removed)).toContain(guard);
@@ -568,7 +568,7 @@ test("one file is edited at a time: another opens only once the first has no uns
   // Read once it comes near the window.
   second.element().scrollIntoView();
   await expect.element(first.book.getByText("Unsaved changes in GridCraft")).toBeVisible();
-  await second.getByRole("button", { name: "Edit here in GridCraft" }).click();
+  await second.getByRole("button", { name: "Edit in GridCraft" }).click();
   await expect
     .element(second.getByText(/^figures\.xlsx is open in its editor with unsaved changes/))
     .toBeVisible();
@@ -577,7 +577,7 @@ test("one file is edited at a time: another opens only once the first has no uns
   await expect
     .element(first.book.getByText("Open in GridCraft: saving there checks it in"))
     .toBeVisible();
-  await second.getByRole("button", { name: "Edit here in GridCraft" }).click();
+  await second.getByRole("button", { name: "Edit in GridCraft" }).click();
   await expect.element(second.getByTitle("GridCraft, editing budget.xlsx")).toBeInTheDocument();
   await expect.element(first.editor).not.toBeInTheDocument();
 });
@@ -597,7 +597,7 @@ test("an editor named at the portal's own origin isn't framed", async () => {
   );
   const book = screen.getByRole("listitem", { name: "figures.xlsx" });
   await expect.element(book.getByRole("button", { name: "Download again" })).toBeVisible();
-  expect(book.getByRole("button", { name: "Edit here in GridCraft" }).elements()).toHaveLength(0);
+  expect(book.getByRole("button", { name: "Edit in GridCraft" }).elements()).toHaveLength(0);
   expect(screen.container.querySelector("iframe")).toBeNull();
 });
 
@@ -634,7 +634,7 @@ test("a file isn't checked out for an editor that can't open while another has u
   const second = screen.getByRole("listitem", { name: "budget.xlsx" });
   // Read once it comes near the window.
   second.element().scrollIntoView();
-  await second.getByRole("button", { name: "Edit here in GridCraft" }).click();
+  await second.getByRole("button", { name: "Edit in GridCraft" }).click();
   await expect
     .element(second.getByText(/^figures\.xlsx is open in its editor with unsaved changes/))
     .toBeVisible();
@@ -707,4 +707,81 @@ test("a file far from the window isn't read, near it is read and polled, and far
   expect(reads()).toBe(2);
   await expect.element(screen.getByRole("img", { name: "Page 1 of 3" })).toBeVisible();
   vi.useRealTimers();
+});
+
+test("the preview flips to the editor in the same box and back, keeping its view, and the check-out ends", async () => {
+  const held = { lease: null as unknown };
+  vi.stubGlobal("XMLHttpRequest", Upload);
+  const { screen } = await open(
+    THREAD,
+    serving({
+      held,
+      flags: { "files:gridcraft": true },
+      status: (id) => Response.json({ ...statusOf(id), lease: held.lease, talk: "bridged" }),
+    }),
+    undefined,
+    { artifactrLog: thread([["book_1", "workbook"]]), editors: { "files:gridcraft": GRID } },
+  );
+  const book = screen.getByRole("listitem", { name: "figures.xlsx" });
+  // A view chosen in the preview is kept across the flip.
+  await book.getByRole("radio", { name: "Plan" }).click();
+  const plan = book.getByRole("table", { name: "Plan" });
+  await expect.element(plan).toBeVisible();
+  const planned = plan.element();
+  await book.getByRole("button", { name: "Edit in GridCraft" }).click();
+  const editor = book.getByTitle("GridCraft, editing figures.xlsx");
+  await expect.element(editor).toBeInTheDocument();
+  // The same box: the preview hidden, not gone, and the editor where it was.
+  const frame = editor.element() as HTMLIFrameElement;
+  const box = frame.closest("[hidden], .flip-in")?.parentElement;
+  expect(box?.className).toContain("h-[min(80dvh,48rem)]");
+  expect(box?.contains(planned)).toBe(true);
+  expect(planned.closest("[hidden]")).not.toBeNull();
+  expect(book.getByRole("radio", { name: "Cells" }).elements()).toHaveLength(0);
+  // Motion is reduced here: the flip turns nothing.
+  expect(getComputedStyle(frame.closest(".flip-in") as Element).animationName).toBe("none");
+  fromShim(frame, { type: "lattice:ready" });
+  await expect
+    .element(book.getByText("Open in GridCraft: saving there checks it in"))
+    .toBeVisible();
+  // Back, clean: the version checked out is checked in again, unchanged, which ends the check-out.
+  await book.getByRole("button", { name: "Back to preview" }).click();
+  await expect.element(editor).not.toBeInTheDocument();
+  await expect.element(plan).toBeVisible();
+  expect(plan.element()).toBe(planned);
+  await expect.poll(() => Upload.sent.length).toBe(1);
+  expect((Upload.sent[0] as Upload).url).toBe("/artifactr/v1/workspaces/notes/checkouts/co_1/file");
+  held.lease = null;
+  (Upload.sent[0] as Upload).answer(200, { outcome: "unchanged" });
+  await expect
+    .element(book.getByText("Back to the preview: figures.xlsx is no longer checked out."))
+    .toBeVisible();
+  await expect.element(book.getByRole("button", { name: "Edit in GridCraft" })).toBeVisible();
+});
+
+test("back to the preview, a check-out that can't be let go says it holds until it runs out", async () => {
+  const { screen } = await editingIn();
+  const { book } = await ready(screen, "figures.xlsx");
+  await book.getByRole("button", { name: "Back to preview" }).click();
+  await expect.poll(() => Upload.sent.length).toBe(1);
+  (Upload.sent[0] as Upload).answer(409, { detail: { type: "invalid_state", message: "no" } });
+  await expect
+    .element(book.getByText(/^Back to the preview\. Your check-out couldn't be let go/))
+    .toBeVisible();
+});
+
+test("a file whose app has no hosted editor keeps its preview, with no switch", async () => {
+  const { screen } = await open(
+    THREAD,
+    serving({
+      flags: { "files:gridcraft": true },
+      status: (id) => Response.json({ ...statusOf(id), talk: "bridged" }),
+    }),
+    undefined,
+    { artifactrLog: thread([["book_1", "workbook"]]), editors: {} },
+  );
+  const book = screen.getByRole("listitem", { name: "figures.xlsx" });
+  await expect.element(book.getByRole("table", { name: "Costs" })).toBeVisible();
+  expect(book.getByRole("button", { name: /Edit in/ }).elements()).toHaveLength(0);
+  await expect.element(book.getByRole("button", { name: "Check out and download" })).toBeVisible();
 });

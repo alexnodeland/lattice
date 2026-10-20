@@ -18,10 +18,12 @@ import {
 import { Button, FileChooser, fileSize, Moment, Progress, TextLink } from "@portalr/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { type ReactNode, useRef, useState } from "react";
+import { type ReactNode, use, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { Context } from "./context";
 import { startEditing, stopEditing, useEditing } from "./editing";
 import { EditorFrame } from "./editor-frame";
+import { ViewSlotsContext } from "./view-slots";
 
 type Status = FilesApi.components["schemas"]["FileStatus"];
 
@@ -165,6 +167,45 @@ export function CheckOut({
     }
     return busy === null;
   };
+  // In a thread, the editor takes the preview's box, and the switch to it sits above it.
+  const slots = here ? use(ViewSlotsContext) : null;
+  const flips = slots?.viewport != null && slots.toggle != null;
+  /**
+   * Back to the preview, the check-out let go: the version checked out is checked in again as it
+   * was, which changes nothing and ends the check-out, so a file isn't held by a closed editor.
+   */
+  const release = async (held: string, version: number) => {
+    setEditing(false);
+    try {
+      const blob = await queryClient.fetchQuery(
+        context.queries.files.content(tenant, workspace, artifact, version),
+      );
+      const answer = await checkIn({
+        surface: context.config.surfaces.artifactr,
+        session: context.signed.session(),
+        tenant,
+        workspace,
+        checkout: held,
+        file: new File([blob], status.name),
+        unsigned: () => void context.signed.signOut(),
+      });
+      reread(answer.outcome === "done" ? null : answer.status);
+      if (answer.outcome === "done") {
+        keep(null);
+        onSaid({
+          tone: "info",
+          text: `Back to the preview: ${status.name} is no longer checked out.`,
+        });
+        return;
+      }
+    } catch {
+      // Said below: the check-out stays, until it is checked in or runs out.
+    }
+    onSaid({
+      tone: "warn",
+      text: `Back to the preview. Your check-out couldn't be let go, so it holds until it runs out, or you check the file in.`,
+    });
+  };
   const lease = status.lease;
   // The lease names the reader's check-out while it holds, made in this tab or another.
   const leased = lease?.checkout_id ?? null;
@@ -238,6 +279,23 @@ export function CheckOut({
   };
   const checkout = leased ?? own;
   if (checkout === null) {
+    if (lease === null && flips && slots?.toggle) {
+      return (
+        <>
+          {createPortal(
+            <Button size="sm" disabled={pending} onClick={checkOut}>
+              Edit in {app}
+            </Button>,
+            slots.toggle,
+          )}
+          <p className="text-muted text-sm">
+            Editing checks it out, so no one else changes it meanwhile, and turns the preview into{" "}
+            {app}, on a site of its own that can't see your session. When you save there, it is
+            checked in; back to the preview, the check-out ends.
+          </p>
+        </>
+      );
+    }
     return lease === null ? (
       <div className="flex flex-col items-start gap-2">
         <Button disabled={pending} onClick={checkOut}>
@@ -257,25 +315,37 @@ export function CheckOut({
       </div>
     ) : null; // someone else's, or an agent's: who has it says so
   }
+  const opened = base ?? status.version;
+  const frame = here && editing && (
+    <EditorFrame
+      place={place}
+      status={status}
+      app={app}
+      editor={editor}
+      checkout={checkout}
+      version={opened}
+      flipped={flips}
+      onSaid={onSaid}
+      onEnded={() => {
+        setEditing(false);
+        keep(null);
+      }}
+      onAnswered={reread}
+      onClose={() => (flips ? void release(checkout, opened) : setEditing(false))}
+    />
+  );
   return (
     <div className="flex flex-col gap-3">
-      {here && editing && (
-        <EditorFrame
-          place={place}
-          status={status}
-          app={app}
-          editor={editor}
-          checkout={checkout}
-          version={base ?? status.version}
-          onSaid={onSaid}
-          onEnded={() => {
-            setEditing(false);
-            keep(null);
-          }}
-          onAnswered={reread}
-          onClose={() => setEditing(false)}
-        />
-      )}
+      {flips && slots?.viewport ? frame && createPortal(frame, slots.viewport) : frame}
+      {flips &&
+        slots?.toggle &&
+        !editing &&
+        createPortal(
+          <Button size="sm" disabled={pending} onClick={() => setEditing(true)}>
+            Edit in {app}
+          </Button>,
+          slots.toggle,
+        )}
       <p className="text-sm">
         {lease !== null && leased !== null ? (
           <>
@@ -289,7 +359,7 @@ export function CheckOut({
           : `Edit it in ${app}, save it to this computer, then check it in here.`}
       </p>
       <div className="flex flex-wrap items-center gap-2">
-        {here && !editing && (
+        {here && !editing && !flips && (
           <Button size="sm" disabled={pending} onClick={() => setEditing(true)}>
             Edit here in {app}
           </Button>

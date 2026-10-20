@@ -60,6 +60,7 @@ export function EditorFrame({
   onEnded,
   onAnswered,
   onClose,
+  flipped = false,
 }: {
   place: Place;
   status: Status;
@@ -73,6 +74,8 @@ export function EditorFrame({
   onEnded: () => void;
   onAnswered: (refusal: number | null) => void;
   onClose: () => void;
+  /** Whether it took the preview's box, which "Back to preview" turns back to. */
+  flipped?: boolean;
 }) {
   const frame = useRef<HTMLIFrameElement>(null);
   const [phase, setPhase] = useState<Phase>("starting");
@@ -277,7 +280,7 @@ export function EditorFrame({
     );
   }
   return (
-    <div className="flex flex-col gap-2">
+    <div className={flipped ? "flex h-full flex-col gap-2" : "flex flex-col gap-2"}>
       <div className="flex flex-wrap items-center gap-2">
         {phase === "failed" ? (
           <StatusBadge tone="stopped" live>
@@ -304,19 +307,22 @@ export function EditorFrame({
         )}
         {dirty ? (
           <ConfirmDialog
-            label="Close without saving"
+            label={flipped ? "Back to preview" : "Close without saving"}
             size="sm"
             className="ms-auto"
-            title={`Close ${app} without saving?`}
-            confirm="Close without saving"
+            title={flipped ? `Back to the preview without saving?` : `Close ${app} without saving?`}
+            confirm={flipped ? "Discard and go back" : "Close without saving"}
+            dismiss="Keep editing"
             onConfirm={async () => onClose()}
           >
             Your changes to {status.name} in {app} haven't been saved, so they aren't checked in.
-            Closing loses them.
+            {flipped
+              ? ` Going back discards them: to keep them, save in ${app} first.`
+              : " Closing loses them."}
           </ConfirmDialog>
         ) : (
           <Button variant="secondary" size="sm" className="ms-auto" onClick={onClose}>
-            Close {app}
+            {flipped ? "Back to preview" : `Close ${app}`}
           </Button>
         )}
       </div>
@@ -350,7 +356,7 @@ export function EditorFrame({
         sandbox="allow-scripts allow-same-origin allow-downloads allow-modals allow-forms allow-popups"
         allow="clipboard-read; clipboard-write"
         referrerPolicy="no-referrer"
-        className="block h-[min(80dvh,48rem)] w-full rounded-md border border-edge bg-paper forced-colors:border-[CanvasText]"
+        className={`block w-full rounded-md border border-edge bg-paper forced-colors:border-[CanvasText] ${flipped ? "min-h-0 flex-1" : "h-[min(80dvh,48rem)]"}`}
       />
     </div>
   );

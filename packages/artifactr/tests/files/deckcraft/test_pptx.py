@@ -1,11 +1,11 @@
 """What the adapter reads from a `.pptx` itself: the fingerprint, the format, outline and text."""
 
-import time
 from collections.abc import Callable
 
 import pytest
 
 from artifactr.files.app import AppFailed
+from artifactr.files.craft import package as craft_package
 from artifactr.files.deckcraft import fingerprint, media_type, outline, text
 from artifactr.files.deckcraft.pptx import Shape, Slide, Table
 from artifactr.files.manifest import OUTLINE_LIMIT, PPTX
@@ -60,7 +60,7 @@ def test_the_text_is_each_slides_shapes_tables_and_notes() -> None:
         (
             lambda: package.flat(CORPUS.source("text"), SLIDE),
             "too_large",
-            "more than 500000 elements",
+            "more than 1000 elements",
         ),
         (
             lambda: package.zipped({SLIDE: b"<a>" + b" " * (16 << 20) + b"</a>"}),
@@ -71,13 +71,13 @@ def test_the_text_is_each_slides_shapes_tables_and_notes() -> None:
     ids=["nested", "flat", "large"],
 )
 def test_xml_read_in_its_canonical_form_is_bounded(
-    made: Callable[[], bytes], failure: str, found: str
+    made: Callable[[], bytes], failure: str, found: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    started = time.monotonic()
+    # The live hostile files hold the time it takes; here, fewer elements are enough.
+    monkeypatch.setattr(craft_package, "ELEMENTS", 1000)
     with pytest.raises(AppFailed, match=found) as bounded:
         fingerprint(made(), limit=1 << 28)
     assert bounded.value.failure == failure
-    assert time.monotonic() - started < 5
 
 
 def test_a_mimetype_that_claims_a_presentation_is_no_format() -> None:

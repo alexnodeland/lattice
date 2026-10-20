@@ -28,9 +28,41 @@ export const APP_POLICY =
 const NO_WEBRTC =
   "for(const k of Object.getOwnPropertyNames(globalThis))if(/^(webkit|moz)?RTC/.test(k))delete globalThis[k];";
 
-/** The app's document: its own policy, no DNS prefetching and no WebRTC first, then its HTML. */
+/**
+ * The app's size, measured for it, in the app's own document: its height as laid out, whenever
+ * it changes, at most every 200 ms, as `ui/notifications/size-changed` with portalr's
+ * `measured`. An app that says nothing, or a height taken before it was laid out, is still shown
+ * whole, and grows and shrinks with what it draws. A height that grew by just what its window
+ * grew (an app at `100vh`, with a margin or a border round it) is the window's, not the app's,
+ * and isn't said: the frame stays put rather than climbing. One that says its own height is
+ * sized by that instead (the bridge's `#sizeChanged`).
+ *
+ * The window's growth, worked: an app at `min-height: 100vh` in a body with its 8 px margins
+ * measures 376 in a 360 frame, 16 beyond its window, and says it. The frame grows to 376, and it
+ * measures 392, again 16 beyond: grown just as its window did, it isn't said, and stays at 376.
+ * An app that draws more is beyond its window by more than before, and is said.
+ */
+const SIZED = [
+  'addEventListener("DOMContentLoaded", () => {',
+  "  let said = 0, over = null, timer = 0;",
+  "  const measure = () => {",
+  "    timer = 0;",
+  "    const height = Math.ceil(document.documentElement.getBoundingClientRect().height);",
+  "    const beyond = height - innerHeight;",
+  "    const windowed = height > said && said > 0 && beyond === over;",
+  "    over = beyond;",
+  "    if (!height || height === said || windowed) return;",
+  "    said = height;",
+  '    parent.postMessage({ jsonrpc: "2.0", method: "ui/notifications/size-changed", params: { height, measured: true } }, "*");',
+  "  };",
+  "  new ResizeObserver(() => { timer ||= setTimeout(measure, 200); }).observe(document.documentElement);",
+  "  measure();",
+  "});",
+].join("\n");
+
+/** The app's document: its own policy, no DNS prefetching, no WebRTC and its size first. */
 export const appDocument = (html: string): string =>
-  `<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${APP_POLICY}"><meta http-equiv="x-dns-prefetch-control" content="off"><script>${NO_WEBRTC}</script>${html}`;
+  `<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${APP_POLICY}"><meta http-equiv="x-dns-prefetch-control" content="off"><script>${NO_WEBRTC}\n${SIZED}</script>${html}`;
 
 /** What the app's frame may do: run its scripts, and nothing else. */
 export const APP_SANDBOX = "allow-scripts";

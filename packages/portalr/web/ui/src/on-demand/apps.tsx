@@ -14,7 +14,6 @@ import {
   Bridge,
   CALLS_A_MINUTE,
   type JsonObject,
-  LEAST_HEIGHT,
   type Question,
   StateKeeper,
   type Written,
@@ -32,12 +31,12 @@ import { submissionId } from "../submission-id";
 import { TYPE } from "../type";
 
 /**
- * The most an app's frame is in the page: the window's height less the page's chrome above it and
- * a composer pinned below, so the whole frame can be seen at once, on a phone too; never less than
- * the least an app may ask for. A taller app scrolls inside its frame, or opens its full view.
+ * The most an app's frame is in the page: twice the window's height. An app is shown whole, as
+ * tall as it is, the page scrolling past it, and a scroll over it passing on to the page, since
+ * the frame has nothing to scroll; only a truly large app scrolls inside its frame, or opens its
+ * full view.
  */
-// 15rem: a narrow page's bar above (3.5rem), the composer pinned below (9rem), and room between.
-const FITS = `max(${LEAST_HEIGHT}px, calc(100dvh - 15rem))`;
+const FITS = "200dvh";
 
 /** The height a frame starts at, in pixels, until its app asks for another. */
 const FIRST_HEIGHT = 360;

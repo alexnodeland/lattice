@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100" viewBox="0 0 200 100"><rect id="box" x="10" y="10" width="80" height="40" fill="#cccccc"/><circle id="dot" cx="150" cy="50" r="20" fill="#cccccc"/><path id="wedge" d="M 100 90 L 140 60 L 180 90 Z" fill="#cccccc"/></svg>

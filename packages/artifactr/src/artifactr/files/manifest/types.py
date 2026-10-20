@@ -152,3 +152,9 @@ class LayeredImage(NativeFile):
     """A layered image, `.psd`: registered as `layered_image`."""
 
     formats: ClassVar[frozenset[str]] = frozenset({PSD})
+
+
+class VectorImage(NativeFile):
+    """A vector image, `.svg`: registered as `vector_image`."""
+
+    formats: ClassVar[frozenset[str]] = frozenset({SVG})

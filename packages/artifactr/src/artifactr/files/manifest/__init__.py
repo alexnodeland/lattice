@@ -25,6 +25,7 @@ from artifactr.files.manifest.types import (
     Provenance,
     Sha256,
     Source,
+    VectorImage,
     WordDocument,
 )
 
@@ -48,6 +49,7 @@ __all__ = [
     "Provenance",
     "Sha256",
     "Source",
+    "VectorImage",
     "WordDocument",
     "revise",
 ]

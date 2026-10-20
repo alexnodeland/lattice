@@ -58,6 +58,13 @@ The reference is generated from `artifactr.files`' docstrings and type annotatio
       show_root_heading: false
       show_root_toc_entry: false
 
+## artifactr.files.vectorcraft
+
+::: artifactr.files.vectorcraft
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+
 ## artifactr.files.native
 
 ::: artifactr.files.native

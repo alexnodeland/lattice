@@ -60,6 +60,15 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         },
         {"pydantic"},
     ),
+    "vectorcraft": (
+        {
+            "artifactr.files.manifest",
+            "artifactr.files.app",
+            "artifactr.files.craft",
+            "artifactr.files.vectorcraft",
+        },
+        {"pydantic"},
+    ),
     "native": (
         {
             "artifactr.files.manifest",

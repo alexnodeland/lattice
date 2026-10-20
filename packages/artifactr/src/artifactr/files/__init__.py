@@ -28,6 +28,7 @@ from artifactr.files.manifest import (
     LayeredImage,
     NativeFile,
     Provenance,
+    VectorImage,
     WordDocument,
 )
 from artifactr.files.native import ContentUnavailable, NativeFiles
@@ -51,5 +52,6 @@ __all__ = [
     "NativeFiles",
     "Provenance",
     "TooLarge",
+    "VectorImage",
     "WordDocument",
 ]

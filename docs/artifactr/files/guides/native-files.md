@@ -132,6 +132,8 @@ An app's adapter subclasses `ToolsDialect` or `CommandsDialect`, which take the 
 
 - **PhotoCraft** keeps layered images, `LayeredImage`, `.psd`, and its CLI takes a read and a write root. It refuses `file.open`, so a file is opened, made and saved through its own tools, `doc_open`, `doc_new` and `doc_save`, and its commands act on the document open last. A file is opened only if its header says it is a `.psd`: a `.psb`, its large form, is refused, since saving it as a `.psd` would convert it. Its outline is its layers, top to bottom and indented by group, its text is its type layers' words, its review is its notes, and it renders the flattened image as page 1. Its corpus is six features written by hand, which 0.9.0 keeps; type layers are left to its live tests, since their descriptors are impractical to write by hand. Its browser build has no host surface, so a person downloads and uploads its files.
 
+- **VectorCraft** keeps vector images, `VectorImage`, `.svg`, and its CLI takes a read and a write root. VectorCraft opens PDF, Illustrator, EPS and more and would save any of them as an SVG, so a file whose root element isn't `svg` is refused before the CLI starts. Its commands act on the document open last, which none of them names. Its outline is its layers and groups, its text is its type objects' words, top to bottom, and each artboard is a page, rendered by `render_preview`. A save writes every shape as a path, bakes transforms into the geometry, and sets the SVG's `<title>` to the file's name: a title isn't kept. Its browser build has no host surface, so a person downloads and uploads its files.
+
 ```python
 from artifactr.files import Drawing
 from artifactr.files.cadcraft import Subprocess as CADCraft

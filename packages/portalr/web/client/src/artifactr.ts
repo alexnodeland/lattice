@@ -75,6 +75,9 @@ export interface Tool {
   readonly args: string;
   /** What it returned, or why it failed or was refused, as recorded; empty until it returns. */
   readonly result: string;
+  /** Whether the run cut `args`, or `result`, short at its limit. */
+  readonly argsCut: boolean;
+  readonly resultCut: boolean;
   /** The `seq` it was called at: where its thread shows it. */
   readonly seq: number;
 }
@@ -303,6 +306,8 @@ const handlers: Handlers = {
           status: "called",
           args: event.args_summary ?? "",
           result: "",
+          argsCut: event.args_truncated ?? false,
+          resultCut: false,
           seq: envelope.seq,
         },
       },
@@ -317,6 +322,8 @@ const handlers: Handlers = {
           status: event.status,
           args: called?.args ?? "",
           result: event.summary ?? "",
+          argsCut: called?.argsCut ?? false,
+          resultCut: event.truncated ?? false,
           seq: called?.seq ?? envelope.seq,
         },
       },

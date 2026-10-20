@@ -9,9 +9,17 @@ from pydantic_ai import ModelResponse, TextPart
 from starlette.testclient import WebSocketTestSession
 from starlette.websockets import WebSocketDisconnect
 
-from artifactr.core import Actor, TenantId, Visibility, WorkspaceId
+from artifactr.core import (
+    Actor,
+    AgentActor,
+    RunStarted,
+    TenantId,
+    UserActor,
+    Visibility,
+    WorkspaceId,
+)
 from artifactr.fastapi import stream
-from artifactr.workspace import integration_gate
+from artifactr.workspace import InMemoryStorage, Workspace, Workspaces, integration_gate
 from tests.agent.conftest import Script, ask, call, say
 from tests.fastapi.conftest import Latch, build, command, hello, wait_for
 from tests.workspace.gating import NOTES, Switch, key_of
@@ -321,6 +329,37 @@ def test_runs_in_progress_are_listed_and_watched() -> None:
             assert {"type": "text_delta", "part": 0, "delta": "Released."} in deltas
 
 
+def test_a_run_running_as_a_client_joins_is_streamed_once_though_its_start_follows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    latch = Latch()
+    app, _ = build(Script(call("hold"), say("Released.")), latch=latch)
+
+    async def before_the_start(self: Workspace) -> int:
+        return 2  # the head as read just before the run's run_started, seq 3, was written
+
+    with TestClient(app) as client:
+        _post(client, "c1", type="create_thread", thread_id="t1")
+        _post(client, "c2", type="post_message", thread_id="t1", content="Go")
+        wait_for(latch.entered.is_set)
+        monkeypatch.setattr(Workspace, "head_seq", before_the_start)
+        with client.websocket_connect(STREAM) as ws:
+            ws.send_json(hello(threads=["t1"]))
+            assert len(ws.receive_json()["active_runs"]) == 1, "listed as running"
+            latch.released.set()
+            frames = _until_event(ws, "run_ended")
+            started = [
+                f for f in frames if f["type"] == "event" and f["event"]["type"] == "run_started"
+            ]
+            assert [f["seq"] for f in started] == [3], "and its start follows the head"
+            deltas = [
+                f["event"]["delta"]
+                for f in frames
+                if f["type"] == "live" and f["event"]["type"] == "text_delta"
+            ]
+            assert deltas == ["Released."], "streamed once"
+
+
 def test_a_client_from_the_head_still_watches_runs_in_progress() -> None:
     latch = Latch()
     app, _ = build(Script(call("hold"), say("Released.")), latch=latch)
@@ -458,3 +497,20 @@ def test_a_watched_run_stops_once_its_thread_is_hidden() -> None:
             frames = _until_event(ws, "thread_created")
             assert [f["type"] for f in frames] == ["event"], "nothing of t1's run"
             assert frames[-1]["thread_id"] == "t2"
+
+
+ALICE = UserActor(id="alice")
+
+
+async def test_a_runs_latest_start_is_read_back_a_page_at_a_time(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ws = await Workspaces(InMemoryStorage()).open("acme", "w", actor=ALICE)
+    thread = await ws.create_thread()
+    agent = ws.as_actor(AgentActor(thread_id=thread.id, run_id="run_1"))
+    started = await agent.record(RunStarted(run_id="run_1", thread_id=thread.id))
+    for text in ("after", "the", "start"):
+        await ws.post_message(thread.id, text)
+    monkeypatch.setattr(stream, "_PAGE", 1)
+    assert await stream._started(ws, "run_1", thread.id) == started.seq
+    assert await stream._started(ws, "run_none", thread.id) == 0

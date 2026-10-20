@@ -30,10 +30,10 @@ from pydantic import (
 from artifactr.core.errors import ValidationFailed
 
 ASK_USER: Final = "ask_user"
+"""The agent's tool that asks the people in its thread questions and waits for their answers."""
 
 OTHER: Final = "other"
 """The choice clients draw for a person's own words, which no option may be labelled."""
-"""The agent's tool that asks the people in its thread questions and waits for their answers."""
 
 
 class Option(BaseModel):

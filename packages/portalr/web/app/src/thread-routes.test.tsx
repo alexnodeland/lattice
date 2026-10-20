@@ -203,3 +203,20 @@ test("a message posted shows at once, and goes if the server refuses it", async 
   expect(log.getByText("Hello?").elements()).toHaveLength(0);
   await expect.element(screen.getByRole("textbox", { name: "Message" })).toHaveValue("Hello?");
 });
+
+test("Try again refused as already posted, by another tab, says nothing went wrong", async () => {
+  const { screen } = await open(
+    "/t/acme/w/notes/threads/thr_1",
+    serve,
+    (command) =>
+      command.type === "post_message"
+        ? { type: "invalid_state", message: "message msg_again_run_2 already exists" }
+        : null,
+    { artifactrLog: LOG },
+  );
+  const log = screen.getByRole("log", { name: "Messages" });
+  await log.getByRole("button", { name: "Try again" }).click();
+  const posting = log.getByRole("listitem", { name: "You" }).last();
+  await expect.element(posting.getByText("Sending…")).toBeVisible();
+  expect(screen.getByText("That wasn't done: the server refused it.").elements()).toHaveLength(0);
+});

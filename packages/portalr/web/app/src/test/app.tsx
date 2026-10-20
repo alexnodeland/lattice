@@ -36,8 +36,13 @@ class Alice extends Signed {
 /** A test's answers, past who alice is: undefined for none. */
 export type Serve = (request: Request, path: string) => Promise<Response | undefined>;
 
-/** What the stream says of a command: its rejection's type, or null to carry it out. */
-export type Answer = (command: { type: string }) => string | null;
+/**
+ * What the stream says of a command: its rejection's type, or its type and message, or null to
+ * carry it out.
+ */
+export type Answer = (command: {
+  type: string;
+}) => string | { readonly type: string; readonly message: string } | null;
 
 /** A WebSocket that replays its library's log, or none, then answers each command as `answer` says. */
 function socketAnswering(
@@ -69,12 +74,13 @@ function socketAnswering(
         this.#emit({ type: "replay_complete" });
         return;
       }
-      const rejection = answer(frame.command ?? { type: "" });
+      const refused = answer(frame.command ?? { type: "" });
+      const rejection = typeof refused === "string" ? { type: refused, message: refused } : refused;
       this.#emit({
         type: "command_result",
         command_id: frame.command_id,
         ok: rejection === null,
-        ...(rejection !== null && { rejection: { type: rejection, message: rejection } }),
+        ...(rejection !== null && { rejection }),
       });
     }
 

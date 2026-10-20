@@ -75,8 +75,10 @@ export function threadLog(
   }, []);
 }
 
-/** A failed turn tried again: the message that started it, posted again under `id`. */
+/** A failed turn tried again: the messages that started it, posted again as one under `id`. */
 export interface Retry {
+  /** The failed run, whose notice offers it. */
+  readonly run: string;
   /** Derived from the run, so a second try, from here or another tab, is the same message. */
   readonly id: string;
   readonly content: string;
@@ -84,8 +86,10 @@ export interface Retry {
 
 /**
  * What "Try again" sends for the thread's latest turn, if it failed and the reader started it:
- * the message that started it, posted again under an id derived from the run, which the server
- * takes once. Null if its latest turn didn't fail, someone else started it, or it was tried again.
+ * the messages that started it, in order, posted again as one, under an id derived from the run,
+ * which the server takes once. If another message already has that id, the next one is used, so
+ * no one can take the try away by posting under its id first.
+ * Null if the latest turn didn't fail, someone else started it, or it was tried again.
  */
 export function retryOf(
   thread: Artifactr.Thread,
@@ -98,10 +102,24 @@ export function retryOf(
   if (latest?.status !== "failed") {
     return null;
   }
-  const id = `msg_again_${latest.id}`;
-  const [first] = latest.prompt;
-  const started = thread.messages.find((message) => message.id === first);
-  const mine = started?.actor.kind === "user" && started.actor.id === me;
-  const again = thread.messages.some((message) => message.id === id);
-  return started && mine && !again ? { id, content: started.content } : null;
+  const byId = new Map(thread.messages.map((message) => [message.id, message]));
+  const started = latest.prompt.flatMap((id) => byId.get(id) ?? []);
+  const mine = (message: Artifactr.Message) =>
+    message.actor.kind === "user" && message.actor.id === me;
+  if (started.length === 0 || !started.every(mine)) {
+    return null;
+  }
+  const content = started.map((message) => message.content).join("\n\n");
+  // The first of `msg_again_<run>`, `…_2`, `…_3` that no one else's message has: the same from
+  // render to render and tab to tab, so every try is the one message.
+  for (let n = 1; ; n++) {
+    const id = n === 1 ? `msg_again_${latest.id}` : `msg_again_${latest.id}_${n}`;
+    const taken = byId.get(id);
+    if (taken === undefined) {
+      return { run: latest.id, id, content };
+    }
+    if (mine(taken) && taken.content === content) {
+      return null; // tried again already
+    }
+  }
 }

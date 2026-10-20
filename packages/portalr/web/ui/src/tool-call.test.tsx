@@ -9,6 +9,8 @@ const tool = (change: Partial<Artifactr.Tool> = {}): Artifactr.Tool => ({
   status: "ok",
   args: '{"kind": "note", "data": {"text": "Ship Friday"}}',
   result: "Done: note_1 is now at version 1.",
+  argsCut: false,
+  resultCut: false,
   seq: 1,
   ...change,
 });
@@ -100,16 +102,17 @@ test("a long value is capped, and scrolls; a value that isn't JSON is shown as i
   expect(result.tabIndex).toBe(0); // the keyboard reaches it, to scroll it
 });
 
-test("a value the run cut short says so", async () => {
+test("a value the run cut short says so, and one that only ends in an ellipsis doesn't", async () => {
   const screen = await render(
     <ToolCalls>
-      <ToolCall tool={tool({ result: "The first part…" })} />
+      <ToolCall tool={tool({ result: "The first part…", resultCut: true })} />
     </ToolCalls>,
   );
   await screen.getByText("create_artifact").click();
   await expect
     .element(screen.getByText("Cut short: the run keeps the first part of each value."))
     .toBeVisible();
+  expect(screen.getByText(/^Cut short/).elements()).toHaveLength(1); // its arguments weren't
 });
 
 test("a status the run didn't name is said as it was", async () => {

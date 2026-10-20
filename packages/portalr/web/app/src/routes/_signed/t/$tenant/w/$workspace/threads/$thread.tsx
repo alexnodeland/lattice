@@ -225,7 +225,6 @@ function Chat() {
   const log = threadLog(thread, runs, inline);
   // The thread's latest turn, if it failed, can be tried again by whoever may post.
   const retry = allowed.has("artifactr:post_message") ? retryOf(thread, runs, me) : null;
-  const lastFailed = log.findLast(({ kind }) => kind === "failed");
   const latestRequest = active.flatMap((run) => run.requests).at(-1);
 
   return (
@@ -303,8 +302,9 @@ function Chat() {
                   reason={entry.run.reason}
                   // What it failed with, which may name the reader's own words, is its author's.
                   error={entry.run.actsFor === me ? entry.run.error : null}
-                  {...(retry !== null &&
-                    entry === lastFailed && { onRetry: () => send(retry.content, retry.id) })}
+                  {...(retry?.run === entry.run.id && {
+                    onRetry: () => send(retry.content, retry.id),
+                  })}
                 />
               );
             default:

@@ -104,7 +104,17 @@ test("a run streams its text until its message is posted, and keeps its status",
     id: "run_1",
     threadId: "thr_1",
     status: "completed",
-    tools: { t1: { name: "edit", status: "ok", args: "", result: "", seq: 2 } },
+    tools: {
+      t1: {
+        name: "edit",
+        status: "ok",
+        args: "",
+        result: "",
+        argsCut: false,
+        resultCut: false,
+        seq: 2,
+      },
+    },
     text: "",
     requests: [],
     answered: [],
@@ -129,6 +139,7 @@ test("a tool call keeps its arguments, what it returned and where it was called"
       tool_call_id: "t1",
       tool_name: "draft_rule",
       args_summary: '{"rule": {}}',
+      args_truncated: true,
     },
     {
       type: "tool_returned",
@@ -137,6 +148,7 @@ test("a tool call keeps its arguments, what it returned and where it was called"
       tool_call_id: "t1",
       status: "retry",
       summary: "rule: Field required",
+      truncated: true,
     },
     // Refused before it was called: its return is all there is, where it was returned.
     {
@@ -155,9 +167,19 @@ test("a tool call keeps its arguments, what it returned and where it was called"
       status: "retry",
       args: '{"rule": {}}',
       result: "rule: Field required",
+      argsCut: true,
+      resultCut: true,
       seq: 2,
     },
-    t2: { name: "draft_rule", status: "error", args: "", result: "Boom", seq: 4 },
+    t2: {
+      name: "draft_rule",
+      status: "error",
+      args: "",
+      result: "Boom",
+      argsCut: false,
+      resultCut: false,
+      seq: 4,
+    },
   });
 });
 

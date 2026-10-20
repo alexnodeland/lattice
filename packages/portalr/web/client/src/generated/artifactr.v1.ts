@@ -216,6 +216,7 @@ export type TraceId = string;
 export type Trigger = "message" | "resume" | "api";
 export type Type25 = "run_started";
 export type ArgsSummary = string;
+export type ArgsTruncated = boolean;
 export type ToolCallId1 = string;
 export type ToolName = string;
 export type Type26 = "tool_called";
@@ -223,6 +224,7 @@ export type Status = "ok" | "error" | "retry";
 export type Summary2 = string;
 export type ToolCallId2 = string;
 export type ToolName1 = string;
+export type Truncated = boolean;
 export type Type27 = "tool_returned";
 /**
  * @minItems 1
@@ -911,6 +913,7 @@ export interface RunStarted {
  */
 export interface ToolCalled {
   args_summary?: ArgsSummary;
+  args_truncated?: ArgsTruncated;
   artifact_id?: ArtifactId | null;
   run_id: RunId;
   thread_id: ThreadId;
@@ -932,6 +935,7 @@ export interface ToolReturned {
   thread_id: ThreadId;
   tool_call_id: ToolCallId2;
   tool_name?: ToolName1;
+  truncated?: Truncated;
   type: Type27;
 }
 /**

@@ -190,6 +190,8 @@ class ToolCalled(_Event):
     tool_call_id: str
     tool_name: str
     args_summary: str = ""
+    args_truncated: bool = False
+    """Whether ``args_summary`` was cut short, at the capability's limit."""
     artifact_id: ArtifactId | None = None
     """The artifact the call names, if its arguments name one: a reader who may not see it
     doesn't see the call."""
@@ -204,6 +206,8 @@ class ToolReturned(_Event):
     tool_call_id: str
     status: Literal["ok", "error", "retry"]
     summary: str = ""
+    truncated: bool = False
+    """Whether ``summary`` was cut short, at the capability's limit."""
     tool_name: str = ""
     """The tool's name, as in its ``tool_called``; empty in events from earlier versions."""
     artifact_id: ArtifactId | None = None

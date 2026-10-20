@@ -11,7 +11,8 @@ portalr now shows each tool call's arguments and result, and why a run failed ([
 ## Decision
 
 - **A call names the artifact its arguments name.** `tool_called` and `tool_returned` carry `artifact_id`, from the call's `artifact_id` argument, the name every artifactr tool and the convention for an application's take. A reader who may not see that artifact doesn't see the call, or what it returned, as an event about a hidden artifact is dropped from every read. It is an optional field, so the protocol stays `artifactr.v1`.
-- **What a run failed with, and a tool's own error, are recorded without what looks like a secret:** a URL's credentials, query and fragment, a bearer token, and keys in the shapes providers give them (`sk-…`). The run's reason stays as it is.
+- **What a run failed with, and a tool's errors and refusals, are recorded without what looks like a secret:** a URL's credentials, query and fragment, an `Authorization` header's credentials, a secret given by name (`api_key=`, `token:`, `"password": …`), and tokens in their issuers' shapes (`sk-…`, GitHub's `ghp_…` and `github_pat_…`, JWTs). The run's reason stays as it is.
+- **A summary says when it was cut short:** `tool_called.args_truncated` and `tool_returned.truncated`, so a client needn't guess from an ellipsis.
 - **portalr shows a failure's Details only to the person the turn acted for;** everyone else sees its reason. The event itself carries the redacted error to every reader of the thread.
 - **A tool's author keeps the rest out:** a result is recorded, up to `max_summary_chars`, for every reader of the thread. A tool that reads what some of them may not see names it by `artifact_id`, returns ids rather than contents where it can, and keeps secrets out of what it returns and raises. `max_summary_chars=0` records no arguments or results.
 - **Reasons say what happened.** `tool_retries_exhausted` is a model that kept calling a tool in ways it refused until no retries were left; `unexpected_model_behavior` is any other answer the run couldn't use.
@@ -30,4 +31,5 @@ portalr now shows each tool call's arguments and result, and why a run failed ([
 
 - Easier: a restricted artifact stays restricted through the tool calls that read it.
 - Harder: an application's tool that reads restricted data names its artifact, or keeps it out of its result.
+- Not covered: a run's live frames, such as `tool_args_delta`, aren't filtered by artifact. They are forwarded to the readers of the turn's thread as it streams, as the turn's text is, which is the turn's author's to see ([ADR-0057](0057-a-turn-acts-for-one-author.md)), and are never stored.
 - Revisit: a list of the artifacts a result names, if `list_artifacts`' ids of restricted artifacts prove sensitive.

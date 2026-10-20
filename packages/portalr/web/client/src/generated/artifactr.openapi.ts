@@ -1253,6 +1253,11 @@ export interface components {
              * @default
              */
             args_summary: string;
+            /**
+             * Args Truncated
+             * @default false
+             */
+            args_truncated: boolean;
             artifact_id?: components["schemas"]["ArtifactId"] | null;
             run_id: components["schemas"]["RunId"];
             thread_id: components["schemas"]["ThreadId"];
@@ -1292,6 +1297,11 @@ export interface components {
              * @default
              */
             tool_name: string;
+            /**
+             * Truncated
+             * @default false
+             */
+            truncated: boolean;
             /**
              * Type
              * @default tool_returned

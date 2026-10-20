@@ -7,10 +7,18 @@ from typing import override
 
 import pytest
 from pydantic import BaseModel
-from pydantic_ai import Agent, FunctionToolset, ModelMessage, ModelRequest, ModelResponse
+from pydantic_ai import (
+    Agent,
+    FunctionToolset,
+    ModelMessage,
+    ModelRequest,
+    ModelResponse,
+    ModelRetry,
+)
 from pydantic_ai.exceptions import UnexpectedModelBehavior
 
 from artifactr.agent import ArtifactWorkspace, Runner, Session, last_seen, load_history
+from artifactr.agent.capability import redacted
 from artifactr.core import (
     AgentActor,
     Applied,
@@ -184,6 +192,7 @@ async def test_a_call_whose_arguments_are_refused_is_recorded_and_retried(
     [called, _] = [event_as(e, ToolCalled) for e in log if isinstance(e.event, ToolCalled)]
     [refused, _] = [event_as(e, ToolReturned) for e in log if isinstance(e.event, ToolReturned)]
     assert (called.tool_call_id, called.args_summary) == ("c1", '{"kind":"note"}')
+    assert not called.args_truncated
     assert (refused.tool_call_id, refused.status) == ("c1", "retry")
     assert "data\n  Field required" in refused.summary, "pydantic's error, as the model is told"
     assert event_as(log[-1], RunEnded).status == "completed", "the model was told, and retried"
@@ -256,6 +265,8 @@ async def test_a_capability_told_to_record_no_summaries_records_none(
     calls = [e.event for e in await ws.read() if isinstance(e.event, ToolCalled | ToolReturned)]
     summaries = [c.args_summary if isinstance(c, ToolCalled) else c.summary for c in calls]
     assert summaries == ["", ""]
+    cut = [c.args_truncated if isinstance(c, ToolCalled) else c.truncated for c in calls]
+    assert cut == [True, True], "each says it was cut short"
 
 
 async def test_what_a_run_failed_with_is_recorded_without_its_secrets(
@@ -463,3 +474,38 @@ async def test_an_unwatched_failure_does_not_warn(
 
 def test_history_messages_are_model_requests_first() -> None:
     assert ModelRequest.kind == "request"
+
+
+@pytest.mark.parametrize(
+    ("text", "kept"),
+    [
+        ("Authorization: Basic dXNlcjpwYXNz", "Authorization: Basic [redacted]"),
+        ("failed with api_key=abc123 set", "failed with api_key=[redacted] set"),
+        ('{"token": "t0k3n", "n": 1}', '{"token": "[redacted]", "n": 1}'),
+        ("password: hunter2", "password: [redacted]"),
+        ("used ghp_abcdefghijklmnopqrstuvwxyz0123", "used [redacted]"),
+        ("used github_pat_11AAAAAAAAAAAAAAAAAAAAAA_b", "used [redacted]"),
+        ("jwt eyJhbGci.eyJzdWIi.c2ln", "jwt [redacted]"),
+        ("no artifact art_1", "no artifact art_1"),
+    ],
+)
+def test_what_looks_like_a_secret_is_redacted(text: str, kept: str) -> None:
+    assert redacted(text) == kept
+
+
+async def test_a_tools_own_refusal_is_recorded_without_its_secrets(
+    ws: Workspace, thread: Thread, gate: Gate
+) -> None:
+    tools = FunctionToolset[Session[Gate]]()
+
+    @tools.tool_plain
+    async def fetch() -> str:
+        """Fetch something."""
+        raise ModelRetry("GET https://api.example/x?token=s3cret refused")
+
+    script = Script(call("fetch"), say("Gave up."))
+    await started(
+        await make_runner(make_agent(script, tools=[tools]), gate).send(ws, thread.id, "Go")
+    ).wait()
+    [returned] = [e.event for e in await ws.read() if isinstance(e.event, ToolReturned)]
+    assert returned.summary == "GET https://api.example/x refused"

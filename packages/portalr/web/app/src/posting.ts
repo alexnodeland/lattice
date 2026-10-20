@@ -17,6 +17,19 @@ export interface Posting {
   readonly unsent: boolean;
 }
 
+/** Whether the server refused a post as one it already has, which a message id is once. */
+function alreadyPosted(sent: Awaited<Sent>, id: string): boolean {
+  const rejection = sent.outcome === "refused" ? sent.result?.rejection : undefined;
+  return (
+    typeof rejection === "object" &&
+    rejection !== null &&
+    "type" in rejection &&
+    rejection.type === "invalid_state" &&
+    "message" in rejection &&
+    rejection.message === `message ${id} already exists`
+  );
+}
+
 /** A new message's id, as artifactr's own are made. */
 const messageId = () => `msg_${crypto.randomUUID().replaceAll("-", "")}`;
 
@@ -40,6 +53,11 @@ export function usePosting(messages: readonly Artifactr.Message[] | undefined) {
   ): Sent {
     setPosting((all) => [...all.filter((each) => each.id !== id), { id, content, unsent: false }]);
     const sent = await send(id);
+    if (alreadyPosted(sent, id)) {
+      // An earlier try, from here or another tab, posted it: it is on its way to the thread.
+      settle(id, { unsent: false });
+      return { outcome: "done" };
+    }
     if (sent.outcome === "refused") {
       settle(id, null);
     } else if (sent.outcome === "closed") {

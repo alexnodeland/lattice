@@ -61,6 +61,8 @@ const tool = (name: string, status: string, result: string): Artifactr.Tool => (
   status,
   args: '{"kind": "note", "data": {"text": "Launching next week."}}',
   result,
+  argsCut: false,
+  resultCut: false,
   seq: 1,
 });
 

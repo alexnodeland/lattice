@@ -35,7 +35,17 @@ function pretty(text: string): string {
  * A part of a call: its name, a way to copy it, and its value, scrolled where it is long, which
  * the keyboard reaches and scrolls too. A value the run cut short, at its limit, says so.
  */
-function Part({ name, tool, text }: { name: string; tool: string; text: string }) {
+function Part({
+  name,
+  tool,
+  text,
+  cut,
+}: {
+  name: string;
+  tool: string;
+  text: string;
+  cut: boolean;
+}) {
   const what = `the ${name.toLowerCase()} of ${tool}`;
   return (
     <div className="flex flex-col gap-1">
@@ -49,9 +59,7 @@ function Part({ name, tool, text }: { name: string; tool: string; text: string }
       >
         <pre className="whitespace-pre-wrap break-words p-3 font-mono text-xs">{text}</pre>
       </ScrollRegion>
-      {text.endsWith("…") && (
-        <p className={TYPE.note}>Cut short: the run keeps the first part of each value.</p>
-      )}
+      {cut && <p className={TYPE.note}>Cut short: the run keeps the first part of each value.</p>}
     </div>
   );
 }
@@ -77,9 +85,19 @@ export function ToolCall({ tool }: { tool: Artifactr.Tool }) {
           </StatusBadge>
         </summary>
         <div className="flex flex-col gap-3 border-line border-t p-3">
-          <Part name="Arguments" tool={tool.name} text={pretty(tool.args) || "{}"} />
+          <Part
+            name="Arguments"
+            tool={tool.name}
+            text={pretty(tool.args) || "{}"}
+            cut={tool.argsCut}
+          />
           {tool.status !== "called" && (
-            <Part name={returned} tool={tool.name} text={pretty(tool.result)} />
+            <Part
+              name={returned}
+              tool={tool.name}
+              text={pretty(tool.result)}
+              cut={tool.resultCut}
+            />
           )}
         </div>
       </details>

@@ -305,8 +305,8 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
         self, ctx: Context, *, call: ToolCallPart, tool_def: ToolDefinition, args: ValidatedToolArgs
     ) -> ValidatedToolArgs:
         """Record the tool call."""
-        summary = _clip(json.dumps(args, default=str), self.max_summary_chars)
-        await ctx.deps.workspace.record(self._tool_called(ctx, call, summary, _named(args)))
+        called = self._tool_called(ctx, call, json.dumps(args, default=str), _named(args))
+        await ctx.deps.workspace.record(called)
         return args
 
     @override
@@ -323,9 +323,8 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
         workspace = ctx.deps.workspace
         raw = args if isinstance(args, str) else json.dumps(args, default=str)
         named = None if isinstance(args, str) else _named(args)
-        summary = _clip(raw, self.max_summary_chars)
-        await workspace.record(self._tool_called(ctx, call, summary, named))
-        why = _clip(str(error), self.max_summary_chars)
+        await workspace.record(self._tool_called(ctx, call, raw, named))
+        why = redacted(str(error))
         await _record(workspace, self._tool_returned(ctx, call, "retry", why, named))
         raise error
 
@@ -348,8 +347,8 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
             return await handler(args)
         except (ToolRetryError, ToolFailedError) as error:
             status = "retry" if isinstance(error, ToolRetryError) else "error"
-            summary = _clip(str(error), self.max_summary_chars)
-            returned = self._tool_returned(ctx, call, status, summary, _named(args))
+            why = redacted(str(error))
+            returned = self._tool_returned(ctx, call, status, why, _named(args))
             await _record(ctx.deps.workspace, returned)
             raise
 
@@ -364,8 +363,7 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
         result: Any,
     ) -> Any:
         """Record the tool's result."""
-        summary = _clip(str(result), self.max_summary_chars)
-        returned = self._tool_returned(ctx, call, "ok", summary, _named(args))
+        returned = self._tool_returned(ctx, call, "ok", str(result), _named(args))
         await _record(ctx.deps.workspace, returned)
         return result
 
@@ -390,34 +388,36 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
                 else ""
             )
             raise ModelRetry(error.message + hint) from error
-        summary = _clip(redacted(f"{type(error).__name__}: {error}"), self.max_summary_chars)
-        await _record(workspace, self._tool_returned(ctx, call, "error", summary, _named(args)))
+        why = redacted(f"{type(error).__name__}: {error}")
+        await _record(workspace, self._tool_returned(ctx, call, "error", why, _named(args)))
         raise error
 
-    @staticmethod
     def _tool_called(
-        ctx: Context, call: ToolCallPart, summary: str, artifact_id: str | None
+        self, ctx: Context, call: ToolCallPart, args: str, artifact_id: str | None
     ) -> ToolCalled:
+        """The call, its arguments cut to ``max_summary_chars``, and whether they were."""
         return ToolCalled(
             run_id=ctx.deps.run_id,
             thread_id=ctx.deps.thread_id,
             tool_call_id=call.tool_call_id,
             tool_name=call.tool_name,
-            args_summary=summary,
+            args_summary=_clip(args, self.max_summary_chars),
+            args_truncated=len(args) > self.max_summary_chars,
             artifact_id=artifact_id,
         )
 
-    @staticmethod
     def _tool_returned(
-        ctx: Context, call: ToolCallPart, status: Any, summary: str, artifact_id: str | None
+        self, ctx: Context, call: ToolCallPart, status: Any, said: str, artifact_id: str | None
     ) -> ToolReturned:
+        """How the call returned, what it said cut to ``max_summary_chars``, and whether it was."""
         return ToolReturned(
             run_id=ctx.deps.run_id,
             thread_id=ctx.deps.thread_id,
             tool_call_id=call.tool_call_id,
             tool_name=call.tool_name,
             status=status,
-            summary=summary,
+            summary=_clip(said, self.max_summary_chars),
+            truncated=len(said) > self.max_summary_chars,
             artifact_id=artifact_id,
         )
 
@@ -479,17 +479,31 @@ _SECRETS = (
     # A URL's credentials and query, where tokens and keys travel; its host and path stay.
     (re.compile(r"(\w+://)[^/\s@]*@"), r"\1"),
     (re.compile(r"(\w+://[^\s?#]*)[?#][^\s'\"]*"), r"\1"),
-    # Bearer tokens, and keys in the shapes providers give them.
-    (re.compile(r"(?i)\b(bearer)\s+[\w.~+/=-]+"), r"\1 [redacted]"),
+    # An Authorization header's credentials, whatever their scheme.
+    (re.compile(r"(?i)\b(authorization\s*[:=]\s*\w+)\s+\S+"), r"\1 [redacted]"),
+    (re.compile(r"(?i)\b(bearer|basic)\s+[\w.~+/=-]+"), r"\1 [redacted]"),
+    # A secret given by name, outside a URL: api_key=..., token: ..., "password": "...".
+    (
+        re.compile(
+            r"(?i)\b((?:api[_-]?key|access[_-]?token|token|secret|password)[\"']?\s*[:=]\s*[\"']?)"
+            r"[^\s\"',}]+"
+        ),
+        r"\1[redacted]",
+    ),
+    # Tokens in the shapes their issuers give them: provider keys, GitHub's, and JWTs.
     (re.compile(r"\b(?:sk|pk|rk|key)-[\w-]{8,}"), "[redacted]"),
+    (re.compile(r"\b(?:gh[pousr]_\w{20,}|github_pat_\w{20,})"), "[redacted]"),
+    (re.compile(r"\beyJ[\w-]+\.eyJ[\w-]+\.[\w-]+"), "[redacted]"),
 )
 
 
 def redacted(text: str) -> str:
     """Text with what looks like a secret taken out.
 
-    A URL's credentials and query, a bearer token and a provider's key go. What a run failed
-    with, and a tool's error, are recorded in the thread, which everyone who may read it reads.
+    A URL's credentials and query, an Authorization header's credentials, a secret given by
+    name (``api_key=``, ``token:``), and tokens in their issuers' shapes (``sk-``, GitHub's,
+    JWTs) go. What a run failed with, and a tool's errors and refusals, are recorded in the
+    thread, which everyone who may read it reads.
     """
     for pattern, replacement in _SECRETS:
         text = pattern.sub(replacement, text)

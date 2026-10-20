@@ -5,7 +5,16 @@ from pathlib import Path
 import pytest
 
 from artifactr.files.craft import CRAFTS, Craft
-from artifactr.files.manifest import DOCX
+from artifactr.files.manifest import (
+    DOCX,
+    Design,
+    Drawing,
+    LayeredImage,
+    NativeFile,
+    PageLayout,
+    VectorImage,
+    WordDocument,
+)
 from artifactr.files.wordcraft import Subprocess
 from lattice_core.integrations import KNOWN
 
@@ -78,3 +87,18 @@ def test_pdfcrafts_ocr_models_carry_their_attribution() -> None:
 def test_wordcraft_is_its_descriptors() -> None:
     assert Subprocess.craft is CRAFTS["wordcraft"]
     assert CRAFTS["wordcraft"].formats == {DOCX}
+
+
+@pytest.mark.parametrize(
+    ("app", "native"),
+    [
+        ("wordcraft", WordDocument),
+        ("cadcraft", Drawing),
+        ("photocraft", LayeredImage),
+        ("vectorcraft", VectorImage),
+        ("designcraft", PageLayout),
+        ("figcraft", Design),
+    ],
+)
+def test_an_apps_formats_are_its_native_types(app: str, native: type[NativeFile]) -> None:
+    assert CRAFTS[app].formats == native.formats

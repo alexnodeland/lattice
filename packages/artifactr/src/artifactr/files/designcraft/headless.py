@@ -11,7 +11,7 @@ layout is read: its pages and stories by `inspect_document`, and each story's wo
 import hashlib
 import json
 from collections.abc import Sequence
-from typing import ClassVar, override
+from typing import ClassVar, Final, override
 
 from pydantic import BaseModel, Field, JsonValue, ValidationError
 
@@ -21,6 +21,10 @@ from artifactr.files.craft.commands import listed
 from artifactr.files.craft.spawn import reply_text
 from artifactr.files.designcraft.package import media_type
 from artifactr.files.manifest import OUTLINE_LIMIT
+
+STORIES: Final = 1_000
+"""The most stories whose words are read, a `get_story` call each: a layout of more is read
+only so far, so its stories can't make a call run out its deadline."""
 
 
 class _Failed(BaseModel):
@@ -106,12 +110,13 @@ class Subprocess(ToolsDialect):
     async def inspection(self, server: Server, document: JsonValue, content: bytes) -> Inspection:
         """The layout's stories' words, each story's first line, its pages, and its format.
 
-        DesignCraft stamps nothing on an export, so the fingerprint is the bytes' digest.
+        DesignCraft stamps nothing on an export, so the fingerprint is the bytes' digest. Only
+        the first `STORIES` stories' words are read.
         """
         layout = _Layout.model_validate(await server.json("inspect_document"))
         stories = [
             _Text.model_validate(await server.json("get_story", story=story.id)).text
-            for story in layout.stories
+            for story in layout.stories[:STORIES]
         ]
         lines = [story.strip().splitlines()[0] for story in stories if story.strip()]
         return Inspection(

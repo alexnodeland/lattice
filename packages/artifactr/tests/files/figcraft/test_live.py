@@ -5,7 +5,9 @@ its CLI, as `moon run artifactr:fidelity` sets them from `scripts/craft figcraft
 fidelity report is the corpus harness's, `tests/files/corpus/test_fidelity.py`.
 """
 
+import io
 import os
+import zipfile
 
 import pytest
 
@@ -53,11 +55,24 @@ async def test_what_figcraft_cant_do_is_refused(figcraft: Subprocess) -> None:
     for call in (
         figcraft.apply(None, [AppCommand(name="format.disk")], deadline=DEADLINE),
         figcraft.inspect(b'{"name": "a design as JSON"}', deadline=DEADLINE),
-        figcraft.render(CORPUS.source("frames"), 1, scale=1, deadline=DEADLINE),
+        figcraft.render(CORPUS.source("frames"), 9, scale=1, deadline=DEADLINE),
     ):
         with pytest.raises(AppFailed) as refused:
             await call
         assert refused.value.failure == "refused"
+
+
+async def test_it_draws_a_canvas_page(figcraft: Subprocess) -> None:
+    png = await figcraft.render(CORPUS.source("frames"), 1, scale=0.25, deadline=DEADLINE)
+    assert png.startswith(b"\x89PNG\r\n\x1a\n")
+
+
+async def test_it_writes_its_format_first_as_the_adapter_reads_it(figcraft: Subprocess) -> None:
+    """The adapter tells a `.figcraft` by its document's first key: a release that wrote it
+    elsewhere would have every design refused, so this fails first."""
+    saved = (await figcraft.apply(CORPUS.source("frames"), [], deadline=DEADLINE)).content
+    with zipfile.ZipFile(io.BytesIO(saved)) as archive:
+        assert archive.read("document.json").startswith(b'{"format":"figcraft"')
 
 
 async def test_it_finds_commands_in_its_catalog(figcraft: Subprocess) -> None:

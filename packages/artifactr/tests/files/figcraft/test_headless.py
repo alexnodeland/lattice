@@ -16,6 +16,7 @@ from artifactr.files.figcraft import Subprocess
 from artifactr.files.manifest import FIGCRAFT
 
 FAKE = Path(__file__).with_name("fake_cli.py")
+PNG = b"\x89PNG\r\n\x1a\n"
 
 
 @pytest.fixture
@@ -51,7 +52,7 @@ async def test_a_batch_on_the_untitled_design_says_what_is_in_it(figcraft: Subpr
     assert inspection.outline == "Page 1\n  Frame\n    Hello\n    World"
     assert (inspection.text, inspection.pages, inspection.media_type) == (
         "Hello\nWorld",
-        None,
+        1,
         FIGCRAFT,
     )
     assert inspection.review == {"comments": [{"id": 1, "text": "Why?"}]}
@@ -70,11 +71,15 @@ async def test_a_command_that_fails_refuses_the_batch_and_is_named(figcraft: Sub
     assert refused.value.failure == "refused"
 
 
-async def test_it_renders_no_page(figcraft: Subprocess) -> None:
-    design = (await figcraft.apply(None, [], deadline=20)).content
-    with pytest.raises(AppFailed, match="FigCraft renders no page headless") as refused:
-        await figcraft.render(design, 1, scale=1, deadline=20)
+async def test_it_renders_each_canvas_page_and_refuses_an_empty_one(figcraft: Subprocess) -> None:
+    design = (await figcraft.apply(None, [text("Hello")], deadline=20)).content
+    assert (await figcraft.render(design, 1, scale=0.0001, deadline=20)).startswith(PNG)
+    with pytest.raises(AppFailed, match="no such page") as refused:
+        await figcraft.render(design, 2, scale=1, deadline=20)
     assert refused.value.failure == "refused"
+    blank = (await figcraft.apply(None, [], deadline=20)).content
+    with pytest.raises(AppFailed, match="nothing to render"):
+        await figcraft.render(blank, 1, scale=1, deadline=20)
 
 
 async def test_it_finds_ten_commands_at_most_from_its_lines(figcraft: Subprocess) -> None:

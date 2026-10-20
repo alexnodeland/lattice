@@ -6,10 +6,13 @@ fidelity report is the corpus harness's, `tests/files/corpus/test_fidelity.py`.
 """
 
 import os
+from pathlib import Path
 
 import pytest
+from pydantic import JsonValue
 
 from artifactr.files.app import AppCommand, AppFailed
+from artifactr.files.craft import CRAFTS, Server, Spawn
 from artifactr.files.manifest import PSD
 from artifactr.files.photocraft import Subprocess
 from tests.files.corpus.harness import pinned
@@ -61,3 +64,20 @@ async def test_it_finds_commands_in_its_catalog(photocraft: Subprocess) -> None:
     found = await photocraft.commands("gaussian")
     assert 0 < len(found) <= 10
     assert any(c.name == "filter.blur.gaussianBlur" for c in found)
+
+
+async def test_a_file_outside_its_roots_is_refused(tmp_path: Path) -> None:
+    """Its CLI is confined to the call's read and write roots: a file of its own format, beside
+    them, is refused unopened."""
+    outside = tmp_path / "outside.psd"
+    outside.write_bytes(CORPUS.source("groups"))
+    cli = os.environ["ARTIFACTR_TEST_CRAFT_CLI"]
+    spawn = Spawn(CRAFTS["photocraft"], cli, version=VERSION, limit=1 << 20)
+
+    async def opening(server: Server) -> JsonValue:
+        opened = await server.call("doc_open", path=str(outside))
+        return opened.structured_content
+
+    with pytest.raises(AppFailed, match="automation path rejected") as refused:
+        await spawn.run(DEADLINE, opening)
+    assert refused.value.failure == "refused"

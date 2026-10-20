@@ -1,9 +1,10 @@
 """FigCraft run headless on this machine: a fresh `figcraft-cli mcp` for every call.
 
-FigCraft's server is the `tools` dialect's, but for its list, which is text, a command a line,
-and a blank design, which is the untitled one every session starts with. What is FigCraft's own
-here is how a design is read: its pages and layers by `inspect_document`, and its comments by
-`comment.list`. Its CLI confines nothing, so the adapter is made only with `trusted=True`.
+FigCraft's server is the `tools` dialect's, but for its list, which is text, a command a line;
+a blank design, which is the untitled one every session starts with; and a page, which it draws
+by going to it and taking its `screenshot`. What is FigCraft's own here is how a design is read:
+its pages and layers by `inspect_document`, and its comments by `comment.list`. Its CLI confines
+nothing, so the adapter is made only with `trusted=True`.
 """
 
 import hashlib
@@ -14,7 +15,7 @@ from typing import ClassVar, Final, override
 from pydantic import BaseModel, JsonValue
 
 from artifactr.files.app import AppFailed, CommandSpec, Inspection
-from artifactr.files.craft import CRAFTS, FOUND, Craft, Server, ToolsDialect
+from artifactr.files.craft import CRAFTS, FOUND, PREVIEW, Craft, Server, ToolsDialect
 from artifactr.files.figcraft.design import media_type
 from artifactr.files.manifest import OUTLINE_LIMIT
 
@@ -47,10 +48,8 @@ class Subprocess(ToolsDialect):
     """FigCraft's headless MCP server, spawned from its CLI on this machine for every call.
 
     A design is opened only if it is a `.figcraft`, and saved as one; a blank design is the
-    untitled one the server starts with. FigCraft renders no page headless, as its descriptor
-    says (native files ADR-0009), so a render is refused before the CLI starts. Its 0.6.0
-    server's `screenshot` does return the current canvas page as a PNG, headless, which a later
-    change could render pages by.
+    untitled one the server starts with. Each canvas page is a page, drawn with its background
+    by `screenshot`; an empty one is refused, as FigCraft has nothing to draw.
 
     Its CLI confines nothing: it reads and writes wherever this process's user can, so it is
     made only with `trusted=True`, for trusted files or a process already confined, until the
@@ -77,6 +76,12 @@ class Subprocess(ToolsDialect):
         return None
 
     @override
+    async def page(self, server: Server, document: JsonValue, page: int, scale: float) -> bytes:
+        """Go to the page, from 1, and draw it, its longer side at most `PREVIEW` times `scale`."""
+        await server.call("run_command", command="page.select", params={"index": page - 1})
+        return await server.png("screenshot", maxSize=max(1, round(PREVIEW * scale)))
+
+    @override
     async def find(self, server: Server, query: str) -> Sequence[CommandSpec]:
         """The commands `list_commands` finds for the query, a line each, ten at most."""
         found = (
@@ -99,8 +104,7 @@ class Subprocess(ToolsDialect):
     async def inspection(self, server: Server, document: JsonValue, content: bytes) -> Inspection:
         """The design's pages and layers, its words, its comments, and its format.
 
-        FigCraft stamps nothing on a save, so the fingerprint is the bytes' digest. It renders
-        no page, so it says none.
+        FigCraft stamps nothing on a save, so the fingerprint is the bytes' digest.
         """
         design = _Design.model_validate(
             await server.json("inspect_document", allPages=True, depth=DEPTH)
@@ -113,6 +117,7 @@ class Subprocess(ToolsDialect):
             outline=_outline(design),
             text="\n".join(_words(design.pages)),
             review={"comments": comments.comments},
+            pages=len(design.pages),
             media_type=media_type(content),
         )
 

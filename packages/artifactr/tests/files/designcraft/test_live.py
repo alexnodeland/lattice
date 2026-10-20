@@ -6,10 +6,13 @@ fidelity report is the corpus harness's, `tests/files/corpus/test_fidelity.py`.
 """
 
 import os
+from pathlib import Path
 
 import pytest
+from pydantic import JsonValue
 
 from artifactr.files.app import AppCommand, AppFailed
+from artifactr.files.craft import CRAFTS, Server, Spawn
 from artifactr.files.designcraft import Subprocess
 from artifactr.files.manifest import IDML
 from tests.files.corpus.designcraft.corpus import CORPUS
@@ -70,3 +73,21 @@ async def test_it_finds_commands_in_its_catalog(designcraft: Subprocess) -> None
     found = await designcraft.commands("frame")
     assert 0 < len(found) <= 10
     assert any(c.name == "frame.create" for c in found)
+
+
+async def test_a_file_outside_its_roots_is_refused(tmp_path: Path) -> None:
+    """Its CLI is confined to the call's read and write roots: a file of its own format, beside
+    them, is refused unopened."""
+    outside = tmp_path / "outside.idml"
+    outside.write_bytes(CORPUS.source("text"))
+    cli = os.environ["ARTIFACTR_TEST_CRAFT_CLI"]
+    spawn = Spawn(CRAFTS["designcraft"], cli, version=VERSION, limit=1 << 20)
+
+    async def opening(server: Server) -> JsonValue:
+        return (
+            await server.call("execute", command="file.openIdml", params={"path": str(outside)})
+        ).structured_content
+
+    with pytest.raises(AppFailed, match="automation path rejected") as refused:
+        await spawn.run(DEADLINE, opening)
+    assert refused.value.failure == "refused"

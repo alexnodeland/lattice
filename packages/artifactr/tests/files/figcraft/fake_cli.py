@@ -8,13 +8,14 @@ Its replies are JSON in text, and its list a command a line, as FigCraft's are. 
 """
 
 import asyncio
+import base64
 import io
 import json
 import zipfile
 from pathlib import Path
 from typing import Any
 
-from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver import Image, MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import CallToolResult, TextContent
 
@@ -24,6 +25,11 @@ text.create* — Text {text, x, y}
 view.comments — Comments [View] (Shift+C) {on?}
 comment.add* — Add comment {x, y, text}
 not a command"""
+
+
+PNG = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC"
+)
 
 
 def main() -> None:
@@ -69,9 +75,20 @@ def main() -> None:
 
     @server.tool()
     async def run_command(command: str, params: dict[str, Any] | None = None) -> CallToolResult:
-        if command != "comment.list" or (params or {}).get("page") != "all":
+        params = params or {}
+        if command == "page.select" and params.get("index") == 0:
+            return replied({"ok": True})
+        if command == "page.select":
+            raise ToolError("invalid parameters for `page.select`: no such page")
+        if command != "comment.list" or params.get("page") != "all":
             raise ToolError(f"unknown command `{command}`")
         return replied({"comments": design["comments"]})
+
+    @server.tool()
+    async def screenshot() -> Image:
+        if not design["words"]:
+            raise ToolError("the current page is empty: nothing to render")
+        return Image(data=PNG, format="png")
 
     @server.tool()
     async def list_commands(filter: str = "") -> CallToolResult:

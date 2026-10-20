@@ -20,7 +20,9 @@ from tests.agent.conftest import (
     HeldStorage,
     MakeRunner,
     Script,
+    ask,
     call,
+    in_words,
     make_agent,
     say,
     settled,
@@ -79,7 +81,7 @@ def _refuse_taken(monkeypatch: pytest.MonkeyPatch) -> None:
 async def test_n1_a_reply_racing_an_answer_strands_the_thread(
     storage: After, ws: Workspace, thread: Thread, runners: MakeRunner
 ) -> None:
-    script = Script(call("ask_user", call_id="q1", question="Which day?"), *[say("ok")] * 3)
+    script = Script(ask("q1", "Which day?"), *[say("ok")] * 3)
     runner = runners(make_agent(script, ask=True, output_type=ASKING))
     paused = started(await runner.send(ws, thread.id, "Plan it"))
     await paused.wait()
@@ -89,7 +91,7 @@ async def test_n1_a_reply_racing_an_answer_strands_the_thread(
     message = PostMessage(thread_id=thread.id, content="Tuesday, and book the room")
     sending = asyncio.create_task(runner.execute(bob, message, command_id="c1"))
     await _entered(planning)  # Bob's send holds the thread, having read the paused run
-    answer = AnswerDeferred(run_id=paused.run_id, tool_call_id="q1", answer="Monday")
+    answer = AnswerDeferred(run_id=paused.run_id, tool_call_id="q1", answer=in_words("Monday"))
     sent = await runner.answer(ws, answer)  # Alice answers: the thread is claimed
     assert sent.run is None
     planning.release.set()
@@ -122,7 +124,7 @@ async def test_n2_a_reply_whose_resume_fails_early_is_given_twice(
             raise RuntimeError("the tracing backend blinked")
         yield
 
-    script = Script(call("ask_user", call_id="q1", question="Which day?"), *[say("ok")] * 3)
+    script = Script(ask("q1", "Which day?"), *[say("ok")] * 3)
     runner = runners(
         make_agent(script, ask=True, output_type=ASKING), turn_context=resuming_fails_once
     )
@@ -145,7 +147,7 @@ async def test_n2_a_reply_whose_resume_fails_early_is_given_twice(
 async def test_n2b_a_runner_closed_after_the_reply_is_committed(
     storage: After, ws: Workspace, thread: Thread, runners: MakeRunner
 ) -> None:
-    script = Script(call("ask_user", call_id="q1", question="Which day?"), *[say("ok")] * 3)
+    script = Script(ask("q1", "Which day?"), *[say("ok")] * 3)
     runner = runners(make_agent(script, ask=True, output_type=ASKING))
     paused = started(await runner.send(ws, thread.id, "Plan the launch"))
     await paused.wait()
@@ -181,9 +183,7 @@ async def test_n2b_a_runner_closed_after_the_reply_is_committed(
 async def test_n3_a_pause_whose_position_is_not_recorded_answers_with_its_prompt(
     ws: Workspace, thread: Thread, runners: MakeRunner, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    script = Script(
-        say("Hi."), call("ask_user", call_id="q1", question="Which day?"), *[say("ok")] * 3
-    )
+    script = Script(say("Hi."), ask("q1", "Which day?"), *[say("ok")] * 3)
     runner = runners(make_agent(script, ask=True, output_type=ASKING))
     await started(await runner.send(ws, thread.id, "Hello")).wait()
     await runner.drain()
@@ -203,7 +203,7 @@ async def test_n3_a_pause_whose_position_is_not_recorded_answers_with_its_prompt
         if isinstance(e.event, DeferredAnswered)
     ]
     run = await ws.run(paused.run_id)
-    assert answered == [("q1", "Tuesday")], (
+    assert answered == [("q1", {"reply": "Tuesday"})], (
         f"answered {answered}; run {run.status}; the model's answers {script.answers()}, "
         f"its last conversation {script.conversation()}"
     )

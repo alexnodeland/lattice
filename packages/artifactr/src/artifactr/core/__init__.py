@@ -161,6 +161,17 @@ from artifactr.core.protocol import (
     Welcome,
     resume,
 )
+from artifactr.core.questions import (
+    ASK_USER,
+    Answers,
+    Chosen,
+    Option,
+    Question,
+    Questions,
+    Reply,
+    answer_for_model,
+    check_answer,
+)
 from artifactr.core.rules import Fact, NotLoaded, commit, needs, record
 from artifactr.core.state import (
     Applied,
@@ -181,6 +192,7 @@ from artifactr.core.state import (
 from artifactr.core.visibility import Hides, Visibility
 
 __all__ = [
+    "ASK_USER",
     "PROTOCOL",
     "TARGET_KINDS",
     "WORKSPACE_SCOPED",
@@ -188,6 +200,7 @@ __all__ = [
     "Actor",
     "AgentActor",
     "AnswerDeferred",
+    "Answers",
     "AppEvent",
     "AppLive",
     "Applied",
@@ -199,6 +212,7 @@ __all__ = [
     "ArtifactId",
     "ArtifactTarget",
     "ChangeNote",
+    "Chosen",
     "ClientFrame",
     "Command",
     "CommandFrame",
@@ -243,6 +257,7 @@ __all__ = [
     "NotLoaded",
     "Note",
     "NoticeNote",
+    "Option",
     "Outcome",
     "PartEnded",
     "PartStarted",
@@ -257,9 +272,12 @@ __all__ = [
     "ProposeChange",
     "Proposed",
     "ProposedChange",
+    "Question",
+    "Questions",
     "Recorded",
     "Rejection",
     "ReplayComplete",
+    "Reply",
     "Resolved",
     "RespondToProposal",
     "ResumePlan",
@@ -308,9 +326,11 @@ __all__ = [
     "WritePolicy",
     "acting_for",
     "acts_as",
+    "answer_for_model",
     "apply_patch",
     "artifact_types",
     "change_notes",
+    "check_answer",
     "commit",
     "create_artifact",
     "delivered_to",

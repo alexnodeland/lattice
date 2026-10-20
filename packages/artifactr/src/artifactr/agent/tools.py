@@ -10,8 +10,9 @@ rejections into retries with the rejection's message.
 
 import json
 from collections.abc import Sequence
-from typing import Any
+from typing import Annotated, Any
 
+from pydantic import Field, JsonValue
 from pydantic_ai import CallDeferred, FunctionToolset, RunContext
 
 from artifactr.agent.session import Session
@@ -25,6 +26,7 @@ from artifactr.core import (
     Outcome,
     ProposeChange,
     Proposed,
+    Question,
     Resolved,
     SetFocus,
     Versioned,
@@ -46,7 +48,8 @@ def artifact_tools(
     Args:
         types: The artifact types the agent may create; their JSON Schemas are described to
             the model once, so tool definitions never change between requests.
-        ask: Whether to include ``ask_user``, which pauses the run until someone answers.
+        ask: Whether to include ``ask_user``, which asks questions and pauses the run until
+            someone answers them (ADR-0083).
             The agent's ``output_type`` must then include ``DeferredToolRequests``.
     """
     toolset = FunctionToolset[Session[Any]]()
@@ -133,15 +136,23 @@ def artifact_tools(
     if ask:
 
         @toolset.tool_plain
-        async def ask_user(question: str, choices: list[str] | None = None) -> str:
-            """Ask the people in this thread a question and wait for the answer.
+        async def ask_user(
+            questions: Annotated[list[Question], Field(min_length=1, max_length=4)],
+        ) -> JsonValue:
+            """Ask the people in this thread one to four questions, and wait for their answers.
+
+            Ask only what you can't decide yourself, and ask together what you need at once.
+            Each question offers two to four options, each a short label and what choosing it
+            means. Mark the option you would choose ``recommended``. Set ``multiple`` where more
+            than one may apply, and ``other`` where a person may need to answer in their own
+            words. You get each question back with the labels chosen and any words of their
+            own, or, if they replied in a message instead, their reply.
 
             Args:
-                question: What you need to know.
-                choices: Suggested answers, if the question has a few likely ones.
+                questions: The questions, each with a short header such as ``Due date``.
             """
-            metadata = {"kind": "question", "question": question, "choices": choices}
-            raise CallDeferred(metadata=metadata)
+            del questions  # validated: the request carries them, as its arguments
+            raise CallDeferred(metadata={"kind": "question"})
 
     return toolset
 

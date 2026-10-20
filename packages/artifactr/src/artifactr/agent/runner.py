@@ -6,9 +6,10 @@ comes from:
 - In an idle thread, a message starts a run.
 - In a busy thread, it steers the running agent: the run's watcher delivers it.
 - In a thread whose run is paused on questions, it is the reply: questions are answered with
-  it, approvals are declined with it as the reason, and the run resumes. A form is answered
-  only by its own answer, so a message posted while one is open waits, not taken, and reaches
-  the run as it resumes, beside the form's values (lattice RFC-0005).
+  it, ``ask_user``'s as a reply in place of choices (ADR-0083), approvals are declined with it
+  as the reason, and the run resumes. A form is answered only by its own answer, so a message
+  posted while one is open waits, not taken, and reaches the run as it resumes, beside the
+  form's values (lattice RFC-0005).
 
 The log decides what each turn carries out (ADR-0055). A thread's messages are taken in order,
 each by one turn: as the prompt of a run, the reply to a paused one, or through the watcher of
@@ -75,6 +76,7 @@ from opentelemetry.trace import (
     StatusCode,
     TracerProvider,
 )
+from pydantic import JsonValue
 from pydantic_ai import Agent, AgentRunResult, DeferredToolRequests, DeferredToolResults, ToolDenied
 from pydantic_ai.messages import repair_messages
 
@@ -82,11 +84,13 @@ from artifactr.agent.live import FanoutChannel, forward_live
 from artifactr.agent.results import CommandKey, CommandResults, InMemoryCommandResults
 from artifactr.agent.session import Session, Trigger, last_seen, load_history
 from artifactr.core import (
+    ASK_USER,
     AgentActor,
     AnswerDeferred,
     Command,
     CommandResult,
     DeferredAnswered,
+    DeferredRequest,
     Envelope,
     ExternalAgentActor,
     Forbidden,
@@ -110,6 +114,7 @@ from artifactr.core import (
     ValidationFailed,
     WorkspaceId,
     acting_for,
+    answer_for_model,
     new_id,
     new_message_id,
     new_run_id,
@@ -691,6 +696,7 @@ class Runner[AppDepsT]:
         try:
             async with claim:
                 stopping = asyncio.create_task(_cancel_when_lost(lost, run))
+                self.live.open(session.run_id)  # a resumed run's turn streams again
                 try:
                     return await self._turn(session, turn.prompt, turn.deferred, caller)
                 finally:
@@ -982,7 +988,7 @@ def _resume(
     rest = untaken[len(ours) :]
     deferred = DeferredToolResults(
         calls={
-            r.tool_call_id: run.answers[r.tool_call_id].answer
+            r.tool_call_id: _for_model(r, run.answers[r.tool_call_id].answer)
             for r in run.pending
             if r.kind == "question"
         },
@@ -1035,7 +1041,7 @@ async def _reply(
         answer = AnswerDeferred(
             run_id=run.id,
             tool_call_id=request.tool_call_id,
-            answer=content,
+            answer={"reply": content} if request.tool_name == ASK_USER else content,
             approved=False if declined else None,
         )
         try:
@@ -1046,6 +1052,11 @@ async def _reply(
             continue  # answered first
         answered = True
     return answered
+
+
+def _for_model(request: DeferredRequest, answer: JsonValue) -> JsonValue:
+    """What a question's call returns: ``ask_user``'s questions beside their answers."""
+    return answer_for_model(request.args, answer) if request.tool_name == ASK_USER else answer
 
 
 def _from_others(envelope: Envelope, thread_id: ThreadId) -> bool:

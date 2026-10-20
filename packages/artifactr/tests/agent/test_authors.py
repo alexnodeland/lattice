@@ -23,7 +23,9 @@ from tests.agent.conftest import (
     ALICE,
     Gate,
     Script,
+    ask,
     call,
+    in_words,
     make_agent,
     make_runner,
     say,
@@ -86,14 +88,14 @@ async def test_a_resumed_run_acts_for_whoever_answered_it(
     ws: Workspace, thread: Thread, gate: Gate
 ) -> None:
     asking = [str, DeferredToolRequests]
-    script = Script(
-        call("ask_user", call_id="q1", question="Which day?"), say("Monday."), say("Hi Bob.")
-    )
+    script = Script(ask("q1", "Which day?"), say("Monday."), say("Hi Bob."))
     runner = make_runner(make_agent(script, ask=True, output_type=asking), gate)
     bob = ws.as_actor(BOB)
     handle = started(await runner.send(bob, thread.id, "Plan it"))
     await handle.wait()
-    await ws.commit(AnswerDeferred(run_id=handle.run_id, tool_call_id="q1", answer="Monday"))
+    await ws.commit(
+        AnswerDeferred(run_id=handle.run_id, tool_call_id="q1", answer=in_words("Monday"))
+    )
     resumed = started(await runner.send(bob, thread.id, "Any news?"))
     await resumed.wait()
     assert resumed.run_id == handle.run_id, "Bob's message resumes the answered run"
@@ -141,7 +143,7 @@ async def test_a_reply_its_author_may_not_give_is_passed_over(
     ws = await workspaces.open("tenant", "ws", actor=ALICE)
     thread = await ws.create_thread()
     asking = [str, DeferredToolRequests]
-    script = Script(call("ask_user", call_id="q1", question="Which day?"), say("Monday."))
+    script = Script(ask("q1", "Which day?"), say("Monday."))
     runner = make_runner(make_agent(script, ask=True, output_type=asking), gate)
     await started(await runner.send(ws, thread.id, "Plan it")).wait()
     await ws.as_actor(BOB).post_message(thread.id, "Tuesday")  # Bob may not answer
@@ -157,11 +159,11 @@ async def test_a_resume_its_answerer_may_not_start_ends_the_run(
     ws = await workspaces.open("tenant", "ws", actor=ALICE)
     thread = await ws.create_thread()
     asking = [str, DeferredToolRequests]
-    script = Script(call("ask_user", call_id="q1", question="Which day?"), say("Hi Alice."))
+    script = Script(ask("q1", "Which day?"), say("Hi Alice."))
     runner = make_runner(make_agent(script, ask=True, output_type=asking), gate)
     paused = started(await runner.send(ws, thread.id, "Plan it"))
     await paused.wait()
-    answer = AnswerDeferred(run_id=paused.run_id, tool_call_id="q1", answer="Monday")
+    answer = AnswerDeferred(run_id=paused.run_id, tool_call_id="q1", answer=in_words("Monday"))
     await ws.as_actor(BOB).commit(answer)  # Bob may answer, but not run the agent
     await started(await runner.send(ws, thread.id, "Hello")).wait()
     await settled(thread.id, runner)

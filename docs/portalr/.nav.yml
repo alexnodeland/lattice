@@ -62,6 +62,7 @@ nav:
   - adr/0050-a-native-files-proposals-and-the-pilots-scenarios.md
   - adr/0051-mini-apps-the-sandboxed-frame-and-its-bridge.md
   - adr/0052-artifacts-inline-in-their-thread.md
+  - adr/0053-the-chats-questions-tool-calls-sides-failures-and-streaming.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

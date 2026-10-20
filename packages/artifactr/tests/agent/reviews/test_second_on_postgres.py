@@ -25,7 +25,8 @@ from tests.agent.conftest import (
     Gate,
     MakeRunner,
     Script,
-    call,
+    ask,
+    in_words,
     make_agent,
     say,
     settled,
@@ -73,12 +74,12 @@ async def test_s3_answer_then_message_from_another_process_in_the_pausing_window
     a, here, there = two
     thread = await here.create_thread("Launch")
     releasing = a.held = Gate()
-    script = Script(call("ask_user", call_id="q1", question="Which day?"), *[say("ok")] * 4)
+    script = Script(ask("q1", "Which day?"), *[say("ok")] * 4)
     runner = runners(make_agent(script, ask=True, output_type=ASKING))
     other = runners(make_agent(Script(), ask=True, output_type=ASKING))
     first = started(await runner.send(here, thread.id, "Plan the launch"))
     await asyncio.wait_for(releasing.entered.wait(), timeout=5)
-    answer = AnswerDeferred(run_id=first.run_id, tool_call_id="q1", answer="Monday")
+    answer = AnswerDeferred(run_id=first.run_id, tool_call_id="q1", answer=in_words("Monday"))
     assert (await other.answer(there, answer)).run is None
     assert (await other.send(there, thread.id, "And book the big room")).run is None
     a.held = None

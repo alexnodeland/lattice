@@ -39,6 +39,24 @@ def call(tool: str, call_id: str = "call_1", **args: Any) -> ModelResponse:
     return ModelResponse(parts=[ToolCallPart(tool_name=tool, args=args, tool_call_id=call_id)])
 
 
+def asking(question: str) -> dict[str, Any]:
+    """``ask_user``'s arguments for one question, which takes words of a person's own."""
+    options = [{"label": "Monday"}, {"label": "Tuesday", "recommended": True}]
+    return {
+        "questions": [{"question": question, "header": "Day", "options": options, "other": True}]
+    }
+
+
+def ask(call_id: str = "call_1", question: str = "Which day?") -> ModelResponse:
+    """A call to ``ask_user`` with one question."""
+    return call("ask_user", call_id, **asking(question))
+
+
+def in_words(words: str) -> dict[str, Any]:
+    """An answer to :func:`asking`'s question, in a person's own words."""
+    return {"answers": [{"other": words}]}
+
+
 class Script:
     """A model that answers each request with the next scripted step, recording requests."""
 
@@ -64,10 +82,10 @@ class Script:
         return last.instructions or ""
 
     def tool_returns(self, request: int) -> list[str]:
-        """The tool results sent to the model in a request."""
+        """The tool results sent to the model in a request, answers in their words."""
         last = self.requests[request][-1]
         assert isinstance(last, ModelRequest)
-        return [str(p.content) for p in last.parts if isinstance(p, ToolReturnPart)]
+        return [_words(p.content) for p in last.parts if isinstance(p, ToolReturnPart)]
 
     def prompt_texts(self, request: int) -> list[str]:
         """Every user-prompt text in a request's messages, each of a prompt's several apart."""
@@ -85,14 +103,25 @@ class Script:
         return self.prompt_texts(len(self.requests) - 1)
 
     def answers(self) -> list[str]:
-        """The tool results the model last saw, in order: its questions' answers among them."""
+        """The tool results the model last saw, in order: its questions' answers among them, in
+        their words, a reply's or a person's own (:func:`in_words`)."""
         return [
-            str(part.content)
+            _words(part.content)
             for message in self.requests[-1]
             if isinstance(message, ModelRequest)
             for part in message.parts
             if part.part_kind == "tool-return"
         ]
+
+
+def _words(content: Any) -> str:
+    match content:
+        case {"reply": str(reply)}:
+            return reply
+        case [{"other": str(words)}]:
+            return words
+        case _:
+            return str(content)
 
 
 class Recorder:

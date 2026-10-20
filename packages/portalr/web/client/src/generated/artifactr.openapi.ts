@@ -1253,6 +1253,12 @@ export interface components {
              * @default
              */
             args_summary: string;
+            /**
+             * Args Truncated
+             * @default false
+             */
+            args_truncated: boolean;
+            artifact_id?: components["schemas"]["ArtifactId"] | null;
             run_id: components["schemas"]["RunId"];
             thread_id: components["schemas"]["ThreadId"];
             /** Tool Call Id */
@@ -1271,6 +1277,7 @@ export interface components {
          * @description A tool call finished.
          */
         ToolReturned: {
+            artifact_id?: components["schemas"]["ArtifactId"] | null;
             run_id: components["schemas"]["RunId"];
             /**
              * Status
@@ -1290,6 +1297,11 @@ export interface components {
              * @default
              */
             tool_name: string;
+            /**
+             * Truncated
+             * @default false
+             */
+            truncated: boolean;
             /**
              * Type
              * @default tool_returned

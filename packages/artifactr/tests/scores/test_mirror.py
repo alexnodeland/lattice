@@ -27,6 +27,7 @@ from artifactr.scores import FeedbackMirror, sync_score_configs
 from artifactr.workspace import InMemoryStorage, Workspace, Workspaces
 from evalr.core import Score
 from evalr.memory import InMemoryScoreSink
+from tests.agent.conftest import asking
 from tests.artifact_types import Accuracy, Helpfulness, Note
 from tests.scores.fakes import seeded
 
@@ -58,7 +59,9 @@ async def test_turn_and_message_feedback_is_scored_on_the_runs_latest_trace(
 ) -> None:
     thread = await ws.create_thread()
     agent = ws.as_actor(AgentActor(thread_id=thread.id, run_id="run_1"))
-    question = DeferredRequest(tool_call_id="q1", tool_name="ask_user", kind="question")
+    question = DeferredRequest(
+        tool_call_id="q1", tool_name="ask_user", kind="question", args=asking("Which day?")
+    )
     await agent.record(RunStarted(run_id="run_1", thread_id=thread.id, trace_id=FIRST))
     await agent.record(RunPaused(run_id="run_1", thread_id=thread.id, requests=(question,)))
     await agent.record(

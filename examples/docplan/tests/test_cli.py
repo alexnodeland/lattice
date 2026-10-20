@@ -23,6 +23,12 @@ ALICE = {"kind": "user", "id": "alice", "name": "alice"}
 AGENT = {"kind": "agent", "thread_id": "thr_1", "run_id": "run_1", "name": "docplan"}
 JUDGE = {"kind": "evaluator", "name": "edit-size", "version": "1:0.5"}
 
+OWNER = {
+    "question": "Who owns it?",
+    "header": "Owner",
+    "options": [{"label": "Alice"}, {"label": "Bob"}],
+}
+
 
 def terminal() -> tuple[Console, io.StringIO]:
     out = io.StringIO()
@@ -217,7 +223,7 @@ FRAMES: list[dict[str, Any]] = [
         type="run_paused",
         run_id="run_1",
         requests=[
-            {"kind": "question", "tool_name": "ask_user", "args": {"question": "Who owns it?"}},
+            {"kind": "question", "tool_name": "ask_user", "args": {"questions": [OWNER]}},
             {"kind": "approval", "tool_name": "delete_everything", "args": {}},
         ],
     ),
@@ -283,7 +289,7 @@ def test_frames_render_as_a_transcript() -> None:
         "  /accept prp_3 or /reject prp_3",
         "? docplan proposes to archive art_1",
         "  /accept prp_4 or /reject prp_4",
-        "docplan asks: Who owns it?",
+        "docplan asks: Who owns it? (Alice / Bob)",
         "  (reply to answer)",
         "docplan wants to call delete_everything",
         "alice accepted prp_1",

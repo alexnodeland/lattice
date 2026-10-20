@@ -22,7 +22,7 @@ from evalr.core import FunctionEvaluator, HandOff, Verdict
 from evalr.measures import Transcript
 from evalr.memory import InMemoryScoreSink
 from evalr.online import Budget, OnlineResult
-from tests.agent.conftest import Gate, Script, call, make_agent, say, started
+from tests.agent.conftest import Gate, Script, ask, call, make_agent, say, started
 from tests.artifact_types import Accuracy, Helpfulness
 from tests.evals.conftest import Said, said
 from tests.telemetry.conftest import Recorder, trace_id
@@ -217,7 +217,7 @@ async def test_only_sampled_turns_that_ended_as_asked_are_judged(
 ) -> None:
     thread = await traced.create_thread("Launch")
     asking = make_agent(
-        Script(call("ask_user", question="Which day?"), say("Done.")),
+        Script(ask(question="Which day?"), say("Done.")),
         ask=True,
         output_type=[str, DeferredToolRequests],
     )

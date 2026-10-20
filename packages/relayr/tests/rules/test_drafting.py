@@ -1,5 +1,6 @@
 """The chat agent drafts rules: `draft_rule` checks a draft, previews it, and proposes it."""
 
+import json
 from collections.abc import Callable, Iterator
 from typing import Any
 
@@ -145,6 +146,74 @@ async def test_a_draft_is_previewed_for_a_person(actor: a.Actor, previewed: bool
         assert answer.startswith("Proposed as ")
     else:
         assert answer.startswith("retry: Only a person can ask for a rule; this turn acts for no")
+
+
+async def test_a_rule_refused_three_times_is_still_drafted() -> None:
+    events = {t.event_type: t for t in (*BRIDGED, Deployed)}
+    automation = r.Workspaces(
+        r.InMemoryStorage(), events=list(events.values()), stored_rules=STORED
+    )
+    alice = await artifactr.Workspaces(artifactr.InMemoryStorage()).open(*KEY, actor=ALICE)
+    thread = await alice.create_thread()
+
+    def not_a_rule(returned: list[str]) -> tuple[str, dict[str, Any]]:
+        return "draft_rule", {"rule": {"name": "x"}, "rationale": "?"}  # its arguments refused
+
+    shell = drafting(draft(action="shell"), rationale="Tell me.")  # the draft refused
+    respond, returned = script(
+        [not_a_rule, not_a_rule, shell, drafting(draft(), rationale="Tell me.")]
+    )
+    agent = Agent(
+        artifactr.agent.function_model(respond),
+        deps_type=artifactr.agent.Session[None],
+        capabilities=[RuleDrafting(automation, events)],
+    )
+    runner = artifactr.agent.Runner(agent, app=None)
+    try:
+        sent = await runner.send(alice, thread.id, "Tell me whenever auth deploys.")
+        assert sent.run is not None
+        await sent.run.wait()
+    finally:
+        await runner.aclose()
+    *refused, drafted = returned
+    assert [answer.split(":")[0] for answer in refused] == ["retry"] * 3
+    assert drafted.startswith("Proposed as "), "within the tool's retries"
+
+
+async def test_a_rule_sent_as_a_string_of_json_is_read_as_its_object() -> None:
+    events = {t.event_type: t for t in (*BRIDGED, Deployed)}
+    automation = r.Workspaces(
+        r.InMemoryStorage(), events=list(events.values()), stored_rules=STORED
+    )
+    alice = await artifactr.Workspaces(artifactr.InMemoryStorage()).open(*KEY, actor=ALICE)
+    thread = await alice.create_thread()
+    rule = json.dumps(draft().rule.model_dump(mode="json"))
+
+    def as_text(returned: list[str]) -> tuple[str, dict[str, Any]]:
+        return "draft_rule", {"rule": rule, "rationale": "Tell me."}
+
+    def not_json(returned: list[str]) -> tuple[str, dict[str, Any]]:
+        return "draft_rule", {"rule": "a rule", "rationale": "Tell me."}
+
+    def too_deep(returned: list[str]) -> tuple[str, dict[str, Any]]:
+        return "draft_rule", {"rule": "[" * 100_000, "rationale": "Tell me."}
+
+    respond, returned = script([not_json, too_deep, as_text])
+    agent = Agent(
+        artifactr.agent.function_model(respond),
+        deps_type=artifactr.agent.Session[None],
+        capabilities=[RuleDrafting(automation, events)],
+    )
+    runner = artifactr.agent.Runner(agent, app=None)
+    try:
+        sent = await runner.send(alice, thread.id, "Tell me whenever auth deploys.")
+        assert sent.run is not None
+        await sent.run.wait()
+    finally:
+        await runner.aclose()
+    *refused, drafted = returned
+    assert [answer[:7] for answer in refused] == ["retry: "] * 2, "a string that isn't JSON is none"
+    assert drafted.startswith("Proposed as ")
 
 
 def test_drafting_needs_stored_rules() -> None:

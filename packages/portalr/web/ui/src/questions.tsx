@@ -184,8 +184,7 @@ function Asking({
     <form ref={form} aria-label="The agent asks" className="flex flex-col gap-5" onSubmit={submit}>
       {questions.map((question, at) => (
         <Asked
-          // biome-ignore lint/suspicious/noArrayIndexKey: the questions never change order
-          key={at}
+          key={question.question}
           question={question}
           choosing={choosing[at] as Choosing}
           error={errors[at] ?? null}
@@ -391,8 +390,7 @@ function Answered({
             const chosen = answer.answers[at];
             const said = [...(chosen?.selected ?? []), ...(chosen?.other ? [chosen.other] : [])];
             return (
-              // biome-ignore lint/suspicious/noArrayIndexKey: the questions never change order
-              <div key={at} className="flex flex-col items-start gap-1">
+              <div key={question.question} className="flex flex-col items-start gap-1">
                 <dt className="flex flex-col items-start gap-1.5">
                   <Header>{question.header}</Header>
                   <span className="text-muted">{question.question}</span>

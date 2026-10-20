@@ -57,6 +57,8 @@ def test_one_to_four_questions_are_asked() -> None:
         Questions.model_validate({"questions": []})
     with pytest.raises(ValidationError, match="at most 4"):
         Questions.model_validate({"questions": [DAY] * 5})
+    with pytest.raises(ValidationError, match="asked once"):
+        Questions.model_validate({"questions": [DAY, DAY]})
 
 
 def test_choices_and_words_answer_the_questions_in_order() -> None:

@@ -77,6 +77,13 @@ class Questions(BaseModel):
 
     questions: Annotated[tuple[Question, ...], Field(min_length=1, max_length=4)]
 
+    @field_validator("questions")
+    @classmethod
+    def _distinct(cls, questions: tuple[Question, ...]) -> tuple[Question, ...]:
+        if len({question.question for question in questions}) != len(questions):
+            raise ValueError("each question is asked once")
+        return questions
+
 
 class Chosen(BaseModel):
     """The answer to one question: the labels chosen, and any words of the person's own."""

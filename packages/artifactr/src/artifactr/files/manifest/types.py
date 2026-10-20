@@ -37,6 +37,10 @@ SVG: Final = "image/svg+xml"
 IDML: Final = "application/vnd.adobe.indesign-idml-package"
 """The media type of an InDesign markup package, `.idml`."""
 
+FIGCRAFT: Final = "application/x-figcraft"
+"""The media type of a FigCraft design, `.figcraft`, which has no registered one: a zip holding
+its document as JSON."""
+
 OUTLINE_LIMIT: Final = 4_000
 """The most characters an outline holds: what the agent sees of a file by default."""
 
@@ -136,3 +140,33 @@ class WordDocument(NativeFile):
     """A Word document, `.docx`: registered as `word_document`."""
 
     formats: ClassVar[frozenset[str]] = frozenset({DOCX})
+
+
+class Drawing(NativeFile):
+    """A drawing, `.dxf` or `.dwg`: registered as `drawing`."""
+
+    formats: ClassVar[frozenset[str]] = frozenset({DXF, DWG})
+
+
+class LayeredImage(NativeFile):
+    """A layered image, `.psd`: registered as `layered_image`."""
+
+    formats: ClassVar[frozenset[str]] = frozenset({PSD})
+
+
+class VectorImage(NativeFile):
+    """A vector image, `.svg`: registered as `vector_image`."""
+
+    formats: ClassVar[frozenset[str]] = frozenset({SVG})
+
+
+class PageLayout(NativeFile):
+    """A page layout, `.idml`: registered as `page_layout`."""
+
+    formats: ClassVar[frozenset[str]] = frozenset({IDML})
+
+
+class Design(NativeFile):
+    """A design, `.figcraft`: registered as `design`."""
+
+    formats: ClassVar[frozenset[str]] = frozenset({FIGCRAFT})

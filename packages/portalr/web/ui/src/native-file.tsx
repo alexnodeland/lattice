@@ -1,5 +1,5 @@
 /**
- * Native files: a Word document and its kin, kept as a manifest over the file's bytes (lattice
+ * Native files: a Word document, a workbook, a drawing and their kin, kept as a manifest over the file's bytes (lattice
  * RFC-0003). The renderer shows what the manifest holds, the name, type, size, pages and outline,
  * and changes are read from the outline; the app adds what it reads from the server, the pages
  * and who has the file, through `PageStrip` and `FileHolder` (portalr ADR-0048).
@@ -15,6 +15,15 @@ import { StatusBadge, type Tone } from "./status-badge";
 /** What people call a native file's type, by its media type. */
 const TYPES: Readonly<Record<string, string>> = {
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "Word document",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "Workbook",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation": "Presentation",
+  "application/pdf": "PDF document",
+  "image/vnd.dxf": "Drawing (DXF)",
+  "image/vnd.dwg": "Drawing (DWG)",
+  "image/vnd.adobe.photoshop": "Layered image",
+  "image/svg+xml": "Vector image",
+  "application/vnd.adobe.indesign-idml-package": "Page layout",
+  "application/x-figcraft": "Design",
 };
 
 const UNITS = ["bytes", "kB", "MB", "GB"] as const;

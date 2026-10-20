@@ -24,7 +24,7 @@ HEADER: Final = 1024
 MARK: Final = re.compile(rb"(?P<obj>(?<!\d)\d+\s+\d+\s+obj\b)|(?P<stream>stream\r?\n)|endobj")
 """Where an object starts, where its stream starts, and where it ends: found in one pass."""
 
-LENGTH: Final = re.compile(rb"/Length\s+(\d+)(?!\s+\d+\s+R)")
+LENGTH: Final = re.compile(rb"/Length\s+(\d+)(?!\d|\s+\d+\s+R)")
 """A stream's length, given directly: one given by a reference is left as written."""
 
 XREF: Final = re.compile(rb"/Type\s*/XRef\b")

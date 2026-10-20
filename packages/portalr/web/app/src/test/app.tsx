@@ -149,5 +149,5 @@ export async function open(
       <RouterProvider router={router} />
     </QueryClientProvider>,
   );
-  return { screen, router, fetched };
+  return { screen, router, fetched, queryClient };
 }

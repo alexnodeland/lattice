@@ -7,12 +7,14 @@
  */
 
 import { AlertDialog } from "@base-ui/react/alert-dialog";
+import { Maximize2, Minimize2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Alert } from "../alert";
 import {
   Bridge,
   CALLS_A_MINUTE,
   type JsonObject,
+  LEAST_HEIGHT,
   type Question,
   StateKeeper,
   type Written,
@@ -20,11 +22,22 @@ import {
 import type { AppHost, ReadApp } from "../app-frame";
 import type { Shown } from "../artifacts";
 import { Button } from "../button";
+import { cn } from "../cn";
 import { actions, backdrop, description, title as heading, popup } from "../dialog";
+import { Icon } from "../icon";
 import { offSaid } from "../integrations";
 import { isObject } from "../json";
 import type { Sent } from "../sending";
 import { submissionId } from "../submission-id";
+import { TYPE } from "../type";
+
+/**
+ * The most an app's frame is in the page: the window's height less the page's chrome above it and
+ * a composer pinned below, so the whole frame can be seen at once, on a phone too; never less than
+ * the least an app may ask for. A taller app scrolls inside its frame, or opens its full view.
+ */
+// 15rem: a narrow page's bar above (3.5rem), the composer pinned below (9rem), and room between.
+const FITS = `max(${LEAST_HEIGHT}px, calc(100dvh - 15rem))`;
 
 /** The height a frame starts at, in pixels, until its app asks for another. */
 const FIRST_HEIGHT = 360;
@@ -58,8 +71,11 @@ const MEDIA = [
   "(prefers-reduced-motion: reduce)",
 ];
 
+/** How the app is shown: in the page, or filling the window. */
+type DisplayMode = "inline" | "fullscreen";
+
 /** The host's context as MCP Apps' `hostContext` has it, with the modes portalr has besides. */
-function hostContext(within: Element): JsonObject {
+function hostContext(within: Element, displayMode: DisplayMode): JsonObject {
   const probe = document.createElement("span");
   within.append(probe);
   const variables: Record<string, string> = {};
@@ -78,14 +94,35 @@ function hostContext(within: Element): JsonObject {
   return {
     theme: dark ? "dark" : "light",
     styles: { variables },
-    displayMode: "inline",
-    availableDisplayModes: ["inline"],
+    displayMode,
+    availableDisplayModes: ["inline", "fullscreen"],
     locale: navigator.language,
     timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     platform: "web",
     colourBlind: within.closest("[data-cvd]") !== null,
     forcedColours: matchMedia("(forced-colors: active)").matches,
     reducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches,
+  };
+}
+
+/**
+ * Make everything but `within` and its ancestors inert, as a modal's page is behind it, and give
+ * back a way to undo it: only what this made inert is let go.
+ */
+function inertOutside(within: Element): () => void {
+  const made: Element[] = [];
+  for (let node: Element | null = within; node?.parentElement; node = node.parentElement) {
+    for (const sibling of node.parentElement.children) {
+      if (sibling !== node && !sibling.hasAttribute("inert")) {
+        sibling.setAttribute("inert", "");
+        made.push(sibling);
+      }
+    }
+  }
+  return () => {
+    for (const each of made) {
+      each.removeAttribute("inert");
+    }
   };
 }
 
@@ -122,12 +159,15 @@ export function Running({
   host,
   origin,
   after,
+  label,
 }: {
   app: ReadApp;
   shown: Shown;
   host: AppHost;
   origin: string;
   after: string;
+  /** What the host says of the app, which its full view shows outside the frame too. */
+  label: string;
 }) {
   // The frame itself, so the bridge starts again with a new one, as when the HTML changes.
   const [element, setElement] = useState<HTMLIFrameElement | null>(null);
@@ -145,6 +185,35 @@ export function Running({
   const keeper = useRef<StateKeeper | null>(null);
   const head = useRef({ app, shown });
   head.current = { app, shown };
+  // Filling the window, or in the page: the frame stays where it is, so the app runs on.
+  const [full, setFull] = useState(false);
+  const mode = useRef<DisplayMode>("inline");
+  const bridged = useRef<Bridge | null>(null);
+  const dialog = useRef<HTMLDivElement>(null);
+  const back = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    mode.current = full ? "fullscreen" : "inline";
+    bridged.current?.contextChanged();
+    const within = dialog.current;
+    if (!full || within === null) {
+      return;
+    }
+    // A modal: the page behind it inert, and the way back focused first. Escape in the page
+    // leaves it, unless a question is open or something else took it; Escape inside the frame
+    // is the app's, as every key there is, so the way back stays in sight above it.
+    const restore = inertOutside(within);
+    back.current?.focus();
+    const leave = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !event.defaultPrevented && open.current === null) {
+        setFull(false);
+      }
+    };
+    addEventListener("keydown", leave);
+    return () => {
+      removeEventListener("keydown", leave);
+      restore();
+    };
+  }, [full]);
 
   useEffect(() => {
     keeper.current?.rebase({ state: app.state, version: shown.version });
@@ -168,7 +237,7 @@ export function Running({
       state: kept,
       host: {
         app: () => ({ title: head.current.app.title, html: head.current.app.html }),
-        context: () => hostContext(element),
+        context: () => hostContext(element, mode.current),
         ask: (question) =>
           new Promise<boolean>((settle) => {
             if (open.current !== null) {
@@ -190,6 +259,7 @@ export function Running({
         quieted: () => setQuieted(true),
       },
     });
+    bridged.current = bridge;
     const heard = (event: MessageEvent) => bridge.heard(event);
     addEventListener("message", heard);
 
@@ -213,6 +283,7 @@ export function Running({
       }
       kept.stop();
       keeper.current = null;
+      bridged.current = null;
       open.current?.settle(false);
       open.current = null;
     };
@@ -231,17 +302,46 @@ export function Running({
       >
         Skip past {app.title}
       </a>
-      <div className="overflow-hidden rounded-lg border-2 border-edge bg-paper forced-colors:border-[CanvasText]">
-        <iframe
-          key={run.count}
-          ref={setElement}
-          title={`${app.title}: an app made by the agent`}
-          src={`${origin}/?host=${encodeURIComponent(location.origin)}`}
-          sandbox="allow-scripts allow-same-origin"
-          referrerPolicy="no-referrer"
-          className="block w-full"
-          style={{ height }}
-        />
+      <div
+        ref={dialog}
+        className={cn("flex flex-col gap-2", full && "fixed inset-0 z-50 bg-paper p-4")}
+        {...(full && { role: "dialog", "aria-modal": true, "aria-label": app.title })}
+      >
+        <div className="flex items-start justify-between gap-3">
+          {full && (
+            <div className="flex min-w-0 flex-col gap-0.5">
+              <p className={TYPE.label}>{app.title}</p>
+              <p className={TYPE.note}>{label}</p>
+              <p className="line-clamp-2 text-fg text-sm">{app.summary}</p>
+            </div>
+          )}
+          <Button
+            ref={back}
+            variant="ghost"
+            className="ml-auto shrink-0 border-line px-2 py-1 text-xs"
+            onClick={() => setFull(!full)}
+          >
+            <Icon icon={full ? Minimize2 : Maximize2} className="size-3.5" />
+            {full ? "Back to the page" : "Full view"}
+          </Button>
+        </div>
+        <div
+          className={cn(
+            "overflow-hidden rounded-lg border-2 border-edge bg-paper forced-colors:border-[CanvasText]",
+            full && "flex min-h-0 flex-1 flex-col",
+          )}
+        >
+          <iframe
+            key={run.count}
+            ref={setElement}
+            title={`${app.title}: an app made by the agent`}
+            src={`${origin}/?host=${encodeURIComponent(location.origin)}`}
+            sandbox="allow-scripts allow-same-origin"
+            referrerPolicy="no-referrer"
+            className={cn("block w-full", full && "min-h-0 flex-1")}
+            style={full ? undefined : { height, maxHeight: FITS }}
+          />
+        </div>
       </div>
       <p id={after} tabIndex={-1} className="sr-only">
         End of {app.title}.

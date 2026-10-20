@@ -18,6 +18,7 @@ import {
   ProposalCard,
   Request,
   RunStatus,
+  rendererFor,
   Streaming,
   TextLink,
   ToolCall,
@@ -30,7 +31,9 @@ import {
 import { CatchBoundary, createFileRoute, Link } from "@tanstack/react-router";
 import { type ReactNode, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { author, unnamedPeople } from "../../../../../../../author";
+import { RENDERERS } from "../../../../../../../renderers";
 import { ShareDialog } from "../../../../../../../share-dialog";
+import { ThreadArtifact } from "../../../../../../../thread-artifact";
 import { ThreadMenu } from "../../../../../../../thread-menu";
 import { Connection, useStream, useWorkspace } from "../../../../../../../workspace";
 
@@ -135,7 +138,7 @@ function Chat() {
       wasLive.current = true;
     }
   }, [snapshot.status, queryClient, checks.queryKey]);
-  const { threads, runs, proposals } = snapshot.state;
+  const { threads, runs, proposals, artifacts } = snapshot.state;
   const thread = threads[id];
   // The people who posted without a name of their own, named when drawn: the stream's state
   // holds the actors as the server sent them, never an email.
@@ -173,6 +176,14 @@ function Chat() {
     (run) => run.threadId === id && (run.status === "running" || run.status === "paused"),
   );
   const proposed = Object.values(proposals).filter((proposal) => proposal.threadId === id);
+  // The artifacts made here whose kind the thread shows, each once, where it was made.
+  const inline = Object.values(artifacts).filter(
+    (artifact) => artifact.threadId === id && rendererFor(artifact.kind, RENDERERS).inline,
+  );
+  const logged = [
+    ...thread.messages.map((message) => ({ seq: message.seq, message })),
+    ...inline.map((artifact) => ({ seq: artifact.seq, artifact })),
+  ].sort((a, b) => a.seq - b.seq);
 
   const give = (message: Artifactr.Message) => (up: boolean, comment: string | null) =>
     stream.send({
@@ -205,15 +216,25 @@ function Chat() {
       />
       <Connection snapshot={snapshot} waiting="the thread" />
       <Messages>
-        {thread.messages.map((message) => (
-          <Message
-            key={message.id}
-            message={message}
-            author={author(message.actor, me, names)}
-            thumbs={thumbs(message.feedback, me)}
-            {...(message.runId !== null && { onThumbs: give(message) })}
-          />
-        ))}
+        {logged.map((each) =>
+          "message" in each ? (
+            <Message
+              key={each.message.id}
+              message={each.message}
+              author={author(each.message.actor, me, names)}
+              thumbs={thumbs(each.message.feedback, me)}
+              {...(each.message.runId !== null && { onThumbs: give(each.message) })}
+            />
+          ) : (
+            <ThreadArtifact
+              key={each.artifact.id}
+              context={{ config, queries }}
+              tenant={tenant}
+              workspace={workspace}
+              artifact={each.artifact}
+            />
+          ),
+        )}
         {active
           .filter((run) => run.text)
           .map((run) => (

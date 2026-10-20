@@ -13,11 +13,12 @@ import {
   TextLink,
   Thumbs,
 } from "@portalr/ui";
-import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useEffect, useMemo } from "react";
 import { useAppHost } from "../../../../../../../app-host";
 import { useFormHost } from "../../../../../../../form-host";
+import { KillSwitch } from "../../../../../../../kill-switch";
 import { NativeFile, TextChanges, wordsChanged } from "../../../../../../../native-file";
 import { NativeProposal } from "../../../../../../../native-proposal";
 import { NATIVE, RENDERERS } from "../../../../../../../renderers";
@@ -168,7 +169,9 @@ function Artifact() {
       <Card>
         <FormHostContext value={host}>
           <AppHostContext value={apps}>
-            {latest.kind === "app" && <KillSwitch tenant={tenant} workspace={workspace} />}
+            {latest.kind === "app" && (
+              <KillSwitch queries={queries} tenant={tenant} workspace={workspace} />
+            )}
             <ArtifactContent
               kind={latest.kind}
               data={latest.data}
@@ -228,15 +231,4 @@ function Artifact() {
       </section>
     </section>
   );
-}
-
-/**
- * While an app runs, the workspace's integrations are read again every half minute, so an
- * operator, a tenant's admin or a workspace's switching mini apps off stops it soon, as archiving
- * it does at once (portalr ADR-0051).
- */
-function KillSwitch({ tenant, workspace }: { tenant: string; workspace: string }) {
-  const { queries } = Route.useRouteContext();
-  useQuery({ ...queries.grantr.enabledIntegrations(tenant, workspace), refetchInterval: 30_000 });
-  return null;
 }

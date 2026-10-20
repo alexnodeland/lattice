@@ -47,9 +47,10 @@ def test_anything_else_changes_it(changed: bytes) -> None:
     assert fingerprint(saved(""), limit=LIMIT) != fingerprint(changed, limit=LIMIT)
 
 
-def test_a_stream_given_its_length_by_reference_is_read_as_written() -> None:
+@pytest.mark.parametrize("reference", ["6 0 R", "13 0 R", "130 12 R"])
+def test_a_stream_given_its_length_by_reference_is_read_as_written(reference: str) -> None:
     def where(at: bytes) -> bytes:
-        xref = "<< /Type /XRef /Length 6 0 R >>\nstream\n" + at.decode() + "\nendstream"
+        xref = f"<< /Type /XRef /Length {reference} >>\nstream\n" + at.decode() + "\nendstream"
         return pdf(["<< /Type /Catalog >>", xref])
 
     assert fingerprint(where(b"\x01"), limit=LIMIT) != fingerprint(where(b"\x02"), limit=LIMIT)

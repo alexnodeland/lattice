@@ -22,6 +22,7 @@ CHUNK: Final = 1 << 16
 TYPES: Final = "{http://schemas.openxmlformats.org/package/2006/content-types}Override"
 
 XML_PARTS: Final = (".xml", ".rels")
+"""The names a package's XML parts end with."""
 
 PART: Final = 16 << 20
 """The most bytes of one XML part a canonical package reads in its canonical form."""
@@ -31,7 +32,6 @@ ELEMENTS: Final = 500_000
 
 DEPTH: Final = 256
 """The deepest an element of a canonical package's XML parts is nested."""
-"""The names a package's XML parts end with."""
 
 MIMETYPE: Final = 255
 """The most of an OpenDocument's `mimetype` that is read."""

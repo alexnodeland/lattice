@@ -192,11 +192,18 @@ export function CheckOut({
     return null;
   };
   const checkOut = async () => {
+    // The editor's place is asked for first: a file isn't held for an editor that can't open.
+    if (here && !setEditing(true)) {
+      return;
+    }
     const checkout = await run(
       context.commands.files.checkOut(tenant, workspace, artifact),
       "It wasn't checked out",
     );
     if (checkout === null) {
+      if (here) {
+        setEditing(false);
+      }
       return;
     }
     keep(checkout.id);
@@ -206,9 +213,6 @@ export function CheckOut({
     });
     if (here) {
       setBase(checkout.base_version);
-      if (!setEditing(true)) {
-        return;
-      }
       onSaid({ tone: "info", text: `Checked out until ${until}. ${app} is opening here.` });
       return;
     }

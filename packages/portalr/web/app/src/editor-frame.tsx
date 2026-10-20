@@ -7,7 +7,8 @@
  */
 
 import { checkIn, type FilesApi } from "@portalr/client";
-import { Alert, Button, ConfirmDialog, fileSize, StatusBadge } from "@portalr/ui";
+import { Alert, Button, ConfirmDialog, Dialog, fileSize, StatusBadge } from "@portalr/ui";
+import { useBlocker } from "@tanstack/react-router";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { checkedIn, type Place, refused, type Said } from "./check-out";
 import { editingDirty, stopEditing } from "./editing";
@@ -32,8 +33,11 @@ function shimAt(editor: string): string | null {
 /** The most messages a second the page hears from the editor; the rest are dropped. */
 const MESSAGES_A_SECOND = 50;
 
-/** How often a check-out is extended while the editor holds unsaved changes. */
-const EXTEND_EVERY = 10 * 60_000;
+/** How often the check-out's time left is looked at while the editor holds unsaved changes. */
+const LOOK_EVERY = 60_000;
+
+/** How little time left on a check-out has it extended, while there are unsaved changes. */
+const EXTEND_WITHIN = 15 * 60_000;
 
 /** An extension, such as ".xlsx", in lower case; or "" for a name without one. */
 const extensionOf = (name: string) => name.match(/\.[^./]+$/)?.[0]?.toLowerCase() ?? "";
@@ -90,19 +94,48 @@ export function EditorFrame({
     }
     const leaving = (event: BeforeUnloadEvent) => event.preventDefault();
     window.addEventListener("beforeunload", leaving);
-    const extend = setInterval(() => {
-      const { place: at, checkout: held } = latest.current;
-      void at.context.commands.files.extend(at.tenant, at.workspace, held);
-    }, EXTEND_EVERY);
+    // Extended only once it is about to run out; a refusal is said once, as the check-in's would be.
+    let told = false;
+    const extend = setInterval(async () => {
+      const { place: at, checkout: held, status: file, app: name, onSaid: say } = latest.current;
+      const until = file.lease?.expires_at;
+      if (until === undefined || Date.parse(until) - Date.now() > EXTEND_WITHIN) {
+        return;
+      }
+      const answer = await at.context.commands.files.extend(at.tenant, at.workspace, held);
+      if (answer.outcome !== "done" && !told) {
+        told = true;
+        say({
+          tone: "warn",
+          text: `${refused("Your check-out wasn't extended", answer, name)} Save your work from ${name} soon, or download it there.`,
+        });
+      }
+    }, LOOK_EVERY);
     return () => {
       window.removeEventListener("beforeunload", leaving);
       clearInterval(extend);
     };
   }, [artifact, dirty]);
   useEffect(() => () => stopEditing(artifact), [artifact]);
+  // Leaving for another page of the app with unsaved changes is asked about, as closing is.
+  const leaving = useBlocker({
+    shouldBlockFn: () => latest.current.dirtyNow,
+    enableBeforeUnload: false,
+    withResolver: true,
+  });
   // The latest of what a message is handled with, so the listener, and the time the build has to
   // start, are set once for the frame, whatever renders meanwhile.
-  const now = { place, status, app, version, checkout, onSaid, onEnded, onAnswered };
+  const now = {
+    place,
+    status,
+    app,
+    version,
+    checkout,
+    onSaid,
+    onEnded,
+    onAnswered,
+    dirtyNow: dirty,
+  };
   const latest = useRef(now);
   latest.current = now;
 
@@ -293,6 +326,21 @@ export function EditorFrame({
           check it in below.
         </Alert>
       )}
+      <Dialog
+        open={leaving.status === "blocked"}
+        onOpenChange={(open) => {
+          if (!open && leaving.status === "blocked") {
+            leaving.reset();
+          }
+        }}
+        title={`Leave ${app} without saving?`}
+        description={`Your changes to ${status.name} in ${app} haven't been saved, so they aren't checked in. Leaving loses them.`}
+        close="Stay"
+      >
+        <Button variant="danger" className="self-start" onClick={() => leaving.proceed?.()}>
+          Leave without saving
+        </Button>
+      </Dialog>
       <iframe
         ref={frame}
         src={src ?? undefined}

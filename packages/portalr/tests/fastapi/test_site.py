@@ -59,6 +59,17 @@ def test_an_editor_shares_no_origin_with_the_apps_or_supabase(url: str) -> None:
         )
 
 
+def test_an_editor_on_another_port_of_the_same_host_is_its_own_origin() -> None:
+    editors = {"files:gridcraft": "https://apps.example.com:8443/"}
+    site = Site(
+        supabase_url="/",
+        supabase_key="sb_publishable_abc",
+        apps="https://apps.example.com",
+        editors=editors,
+    )
+    assert site.editors == editors
+
+
 def test_an_editor_on_loopback_may_be_http_and_an_apps_own() -> None:
     editors = {"files:wordcraft": "http://127.0.0.1:8001/", "files:gridcraft": "https://g.test/"}
     assert Site(supabase_url="/", supabase_key="sb_publishable_abc", editors=editors).editors

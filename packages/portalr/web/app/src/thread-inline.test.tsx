@@ -444,6 +444,8 @@ const MINE = { checked_out_by: "user:alice", expires_at: CHECKOUT.expires_at, ch
 async function editingIn(
   books: readonly string[] = ["book_1"],
   flags: () => Record<string, boolean> = () => ({ "files:gridcraft": true }),
+  lease: (id: string) => unknown = () => MINE,
+  extension: () => Response = () => Response.json(CHECKOUT),
 ) {
   vi.stubGlobal("XMLHttpRequest", Upload);
   const opened = await open(
@@ -451,9 +453,11 @@ async function editingIn(
     async (request, path) =>
       path === FLAGS
         ? Response.json(flags())
-        : serving({
-            status: (id) => Response.json({ ...statusOf(id), lease: MINE, talk: "bridged" }),
-          })(request, path),
+        : path === `${AT}/checkouts/co_1/extension`
+          ? extension()
+          : serving({
+              status: (id) => Response.json({ ...statusOf(id), lease: lease(id), talk: "bridged" }),
+            })(request, path),
     undefined,
     {
       artifactrLog: thread(books.map((id) => [id, "workbook"] as const)),
@@ -561,6 +565,8 @@ test("one file is edited at a time: another opens only once the first has no uns
   const first = await ready(screen, "figures.xlsx");
   fromShim(first.frame, { type: "lattice:dirty", dirty: true });
   const second = screen.getByRole("listitem", { name: "budget.xlsx" });
+  // Read once it comes near the window.
+  second.element().scrollIntoView();
   await expect.element(first.book.getByText("Unsaved changes in GridCraft")).toBeVisible();
   await second.getByRole("button", { name: "Edit here in GridCraft" }).click();
   await expect
@@ -593,4 +599,112 @@ test("an editor named at the portal's own origin isn't framed", async () => {
   await expect.element(book.getByRole("button", { name: "Download again" })).toBeVisible();
   expect(book.getByRole("button", { name: "Edit here in GridCraft" }).elements()).toHaveLength(0);
   expect(screen.container.querySelector("iframe")).toBeNull();
+});
+
+test("leaving for another page with unsaved changes is asked about, and staying keeps the work", async () => {
+  const { screen, router } = await editingIn();
+  const { book, frame, editor } = await ready(screen, "figures.xlsx");
+  fromShim(frame, { type: "lattice:dirty", dirty: true });
+  await expect.element(book.getByText("Unsaved changes in GridCraft")).toBeVisible();
+  void router.navigate({
+    to: "/t/$tenant/w/$workspace",
+    params: { tenant: "acme", workspace: "notes" },
+  });
+  const asked = screen.getByRole("dialog", { name: "Leave GridCraft without saving?" });
+  await expect.element(asked).toBeVisible();
+  await asked.getByRole("button", { name: "Stay" }).click();
+  await expect.element(asked).not.toBeInTheDocument();
+  await expect.element(editor).toBeInTheDocument();
+  expect(router.state.location.pathname).toBe(THREAD);
+  void router.navigate({
+    to: "/t/$tenant/w/$workspace",
+    params: { tenant: "acme", workspace: "notes" },
+  });
+  await screen.getByRole("dialog").getByRole("button", { name: "Leave without saving" }).click();
+  await expect.poll(() => router.state.location.pathname).toBe("/t/acme/w/notes");
+});
+
+test("a file isn't checked out for an editor that can't open while another has unsaved work", async () => {
+  const { screen, fetched } = await editingIn(["book_1", "book_2"], undefined, (id) =>
+    id === "book_1" ? MINE : null,
+  );
+  const first = await ready(screen, "figures.xlsx");
+  fromShim(first.frame, { type: "lattice:dirty", dirty: true });
+  await expect.element(first.book.getByText("Unsaved changes in GridCraft")).toBeVisible();
+  const second = screen.getByRole("listitem", { name: "budget.xlsx" });
+  // Read once it comes near the window.
+  second.element().scrollIntoView();
+  await second.getByRole("button", { name: "Edit here in GridCraft" }).click();
+  await expect
+    .element(second.getByText(/^figures\.xlsx is open in its editor with unsaved changes/))
+    .toBeVisible();
+  const asked = fetched.mock.calls.filter(
+    ([input]) =>
+      (input as Request).method === "POST" &&
+      (input as Request).url.endsWith("/files/book_2/checkouts"),
+  );
+  expect(asked).toHaveLength(0);
+});
+
+test("with unsaved changes, a check-out about to run out is extended, and a refusal said once", async () => {
+  const soon = () => ({ ...MINE, expires_at: new Date(Date.now() + 5 * 60_000).toISOString() });
+  let answer = () => Response.json(CHECKOUT);
+  const { screen, fetched } = await editingIn(["book_1"], undefined, soon, () => answer());
+  const extended = () =>
+    fetched.mock.calls.filter(([input]) =>
+      (input as Request).url.endsWith("/checkouts/co_1/extension"),
+    ).length;
+  const { book, frame } = await ready(screen, "figures.xlsx");
+  vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+  fromShim(frame, { type: "lattice:dirty", dirty: true });
+  await expect.element(book.getByText("Unsaved changes in GridCraft")).toBeVisible();
+  await vi.advanceTimersByTimeAsync(60_000);
+  await expect.poll(extended).toBe(1);
+  answer = () =>
+    Response.json(
+      { detail: { type: "forbidden", message: "the check-out lapsed" } },
+      { status: 403 },
+    );
+  await vi.advanceTimersByTimeAsync(60_000);
+  await expect.element(book.getByText(/^Your check-out wasn't extended/)).toBeVisible();
+  await vi.advanceTimersByTimeAsync(60_000);
+  await expect.poll(extended).toBe(3);
+  expect(book.getByText(/^Your check-out wasn't extended/).elements()).toHaveLength(1);
+  vi.useRealTimers();
+});
+
+test("a file far from the window isn't read, near it is read and polled, and far again it rests", async () => {
+  const observers: ((entries: { isIntersecting: boolean }[]) => void)[] = [];
+  vi.stubGlobal(
+    "IntersectionObserver",
+    class {
+      constructor(seen: (entries: { isIntersecting: boolean }[]) => void) {
+        observers.push(seen);
+      }
+      observe() {}
+      disconnect() {}
+    },
+  );
+  const { screen, fetched } = await open(THREAD, serving(), undefined, {
+    artifactrLog: thread([["doc_1", "word_document"]]),
+  });
+  const reads = () =>
+    fetched.mock.calls.filter(
+      ([input]) => new URL((input as Request).url).pathname === `${AT}/files/doc_1`,
+    ).length;
+  await expect.element(screen.getByText("Reading the file…")).toBeVisible();
+  await expect.poll(() => observers.length).toBeGreaterThan(0);
+  expect(reads()).toBe(0);
+  vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+  for (const seen of observers) seen([{ isIntersecting: true }]);
+  await expect.element(screen.getByRole("img", { name: "Page 1 of 3" })).toBeVisible();
+  expect(reads()).toBe(1);
+  await vi.advanceTimersByTimeAsync(31_000);
+  await expect.poll(reads).toBe(2);
+  for (const seen of observers) seen([{ isIntersecting: false }]);
+  await vi.advanceTimersByTimeAsync(0);
+  await vi.advanceTimersByTimeAsync(95_000);
+  expect(reads()).toBe(2);
+  await expect.element(screen.getByRole("img", { name: "Page 1 of 3" })).toBeVisible();
+  vi.useRealTimers();
 });

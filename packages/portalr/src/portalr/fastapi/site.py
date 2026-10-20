@@ -1,6 +1,7 @@
 """What the UIs need to know about the application they run in, as ``config.json`` serves it."""
 
 import base64
+from typing import Final
 from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
@@ -99,10 +100,14 @@ class Site(BaseModel):
         return key
 
 
-def _origin(url: str) -> str:
-    """A URL's origin, its scheme and host in lower case."""
+DEFAULT_PORTS: Final = {"http": 80, "https": 443}
+
+
+def _origin(url: str) -> tuple[str, str, int | None]:
+    """A URL's origin as a browser compares it: scheme, host and port, the default filled in."""
     parts = urlsplit(url)
-    return f"{parts.scheme.lower()}://{parts.netloc.lower()}"
+    scheme = parts.scheme.lower()
+    return scheme, (parts.hostname or "").lower(), parts.port or DEFAULT_PORTS.get(scheme)
 
 
 def _web(url: str) -> bool:

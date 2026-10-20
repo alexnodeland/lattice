@@ -6,12 +6,12 @@
  */
 
 import { ChevronLeft, ChevronRight, Maximize, Minimize } from "lucide-react";
-import { type KeyboardEvent, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Button } from "./button";
 import { cn } from "./cn";
 import { Icon } from "./icon";
 import type { PageShown } from "./native-file";
-import { SCROLLS, ScrollRegion } from "./scroll-region";
+import { ScrollRegion } from "./scroll-region";
 import { Skeleton } from "./skeleton";
 import { TYPE } from "./type";
 
@@ -35,21 +35,21 @@ export function PageViewer({
   onPage: (page: number) => void;
 }) {
   const [actual, setActual] = useState(false);
-  const status = useId();
   const { page } = shown;
   const go = (to: number) => onPage(Math.min(total, Math.max(1, to)));
-  const key = (event: KeyboardEvent<HTMLElement>) => {
-    const rtl = getComputedStyle(event.currentTarget).direction === "rtl";
-    const step = { ArrowRight: 1, ArrowLeft: -1, PageDown: 1, PageUp: -1 }[event.key];
-    if (step !== undefined) {
-      go(page + (rtl && event.key.startsWith("Arrow") ? -step : step));
-    } else if (event.key === "Home" || event.key === "End") {
-      go(event.key === "Home" ? 1 : total);
-    } else {
+  const keys = useRef<HTMLDivElement>(null);
+  const latest = useRef({ page, total, go });
+  latest.current = { page, total, go };
+  // The keys are heard on the page's box, which is a tab stop, as they bubble from it.
+  useEffect(() => {
+    const within = keys.current;
+    if (within === null) {
       return;
     }
-    event.preventDefault();
-  };
+    const heard = (event: KeyboardEvent) => paged(event, within, latest.current);
+    within.addEventListener("keydown", heard);
+    return () => within.removeEventListener("keydown", heard);
+  }, []);
   const name = `Page ${page} of ${total}`;
   return (
     <section aria-label={label} className="flex flex-col gap-2">
@@ -63,7 +63,7 @@ export function PageViewer({
         >
           <Icon icon={ChevronLeft} className="size-4 rtl:rotate-180" />
         </Button>
-        <p id={status} aria-live="polite" className={cn(TYPE.meta, "tabular-nums")}>
+        <p aria-live="polite" className={cn(TYPE.meta, "tabular-nums")}>
           {name}
         </p>
         <Button
@@ -86,38 +86,53 @@ export function PageViewer({
           Actual size
         </Button>
       </div>
-      <figure
-        // A tab stop, so the keys page through it, and a keyboard scrolls it at its own size.
-        // biome-ignore lint/a11y/noNoninteractiveTabindex: it scrolls, and takes keys (WCAG 2.1.1)
-        tabIndex={0}
-        aria-describedby={status}
-        aria-label={`${label}: ${name}`}
-        onKeyDown={key}
-        className={cn(
-          SCROLLS,
-          "flex justify-center rounded-md border border-line bg-paper p-2 forced-colors:border-[CanvasText]",
-          actual ? "max-h-[80dvh] overflow-auto" : "items-center",
-        )}
-      >
-        {"src" in shown ? (
-          <img
-            src={shown.src}
-            alt={name}
-            className={cn(
-              "bg-white",
-              actual ? "max-w-none" : "max-h-[70dvh] w-auto max-w-full object-contain",
-            )}
-          />
-        ) : shown.state === "reading" ? (
-          <Skeleton className="aspect-[1/1.414] h-[min(70dvh,32rem)] max-w-full rounded-sm" />
-        ) : (
-          <p className="p-6 text-center text-muted text-sm">
-            This page couldn't be shown. The file can still be downloaded.
-          </p>
-        )}
-      </figure>
+      {/* A tab stop, so the keys page through it, and a keyboard scrolls it at its own size. */}
+      <div ref={keys}>
+        <ScrollRegion
+          aria-label={`${label}: ${name}`}
+          className={cn(
+            "flex justify-center rounded-md border border-line bg-paper p-2 forced-colors:border-[CanvasText]",
+            actual ? "max-h-[80dvh] overflow-auto" : "items-center",
+          )}
+        >
+          {"src" in shown ? (
+            <img
+              src={shown.src}
+              alt={name}
+              className={cn(
+                "bg-white",
+                actual ? "max-w-none" : "max-h-[70dvh] w-auto max-w-full object-contain",
+              )}
+            />
+          ) : shown.state === "reading" ? (
+            <Skeleton className="aspect-[1/1.414] h-[min(70dvh,32rem)] max-w-full rounded-sm" />
+          ) : (
+            <p className="p-6 text-center text-muted text-sm">
+              This page couldn't be shown. The file can still be downloaded.
+            </p>
+          )}
+        </ScrollRegion>
+      </div>
     </section>
   );
+}
+
+/** A key on a page's box, as the viewer pages by it: the other way, by arrow, right to left. */
+function paged(
+  event: KeyboardEvent,
+  within: Element,
+  { page, total, go }: { page: number; total: number; go: (to: number) => void },
+) {
+  const rtl = getComputedStyle(within).direction === "rtl";
+  const step = { ArrowRight: 1, ArrowLeft: -1, PageDown: 1, PageUp: -1 }[event.key];
+  if (step !== undefined) {
+    go(page + (rtl && event.key.startsWith("Arrow") ? -step : step));
+  } else if (event.key === "Home" || event.key === "End") {
+    go(event.key === "Home" ? 1 : total);
+  } else {
+    return;
+  }
+  event.preventDefault();
 }
 
 /** A sheet of a workbook, as its app read it: its name, and its rows of cells' text. */
@@ -177,7 +192,9 @@ export const SHOWN_ROWS = 200;
 export function SheetTable({ sheet }: { sheet: Sheet }) {
   const caption = useId();
   const width = Math.max(0, ...sheet.rows.map((row) => row.length));
-  const rows = sheet.rows.slice(0, SHOWN_ROWS);
+  // Columns and rows are named by their place, as the app names them: their names are their keys.
+  const columns = Array.from({ length: width }, (_, column) => columnName(column));
+  const rows = sheet.rows.slice(0, SHOWN_ROWS).map((cells, line) => ({ number: line + 1, cells }));
   return (
     <div className="flex flex-col gap-2">
       <ScrollRegion
@@ -191,36 +208,32 @@ export function SheetTable({ sheet }: { sheet: Sheet }) {
           <thead className="sticky top-0 bg-wash">
             <tr>
               <td className="border-line border-e border-b px-2 py-1" />
-              {Array.from({ length: width }, (_, column) => (
+              {columns.map((column) => (
                 <th
-                  // Columns are fixed by position, which is what names them.
-                  // biome-ignore lint/suspicious/noArrayIndexKey: a column is its position
                   key={column}
                   scope="col"
                   className="border-line border-e border-b px-2 py-1 text-center font-normal text-muted text-xs"
                 >
-                  {columnName(column)}
+                  {column}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, line) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: a row is its position
-              <tr key={line}>
+            {rows.map(({ number, cells }) => (
+              <tr key={number}>
                 <th
                   scope="row"
                   className="border-line border-e border-b bg-wash px-2 py-1 text-end font-normal text-muted text-xs tabular-nums"
                 >
-                  {line + 1}
+                  {number}
                 </th>
-                {Array.from({ length: width }, (_, column) => (
+                {columns.map((column, at) => (
                   <td
-                    // biome-ignore lint/suspicious/noArrayIndexKey: a cell is its position
                     key={column}
                     className="whitespace-pre border-line border-e border-b px-2 py-1 text-fg"
                   >
-                    {row[column] ?? ""}
+                    {cells[at] ?? ""}
                   </td>
                 ))}
               </tr>

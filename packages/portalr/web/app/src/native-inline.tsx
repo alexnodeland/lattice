@@ -40,6 +40,19 @@ const sheetNames = (outline: string): string[] =>
     .filter((line) => line !== "" && !line.startsWith(" "))
     .map((line) => line.replace(/ \([A-Z]+[0-9]+(?::[A-Z]+[0-9]+)?\)$/, ""));
 
+/** An outline's lines with words, each keyed by its text and how often it came before. */
+function outlined(outline: string) {
+  const seen = new Map<string, number>();
+  return outline
+    .split("\n")
+    .filter((line) => line.trim() !== "")
+    .map((line) => {
+      const before = seen.get(line) ?? 0;
+      seen.set(line, before + 1);
+      return { line, key: `${line}#${before}` };
+    });
+}
+
 /** A version's words, as the server keeps them, read once asked for. */
 function useWords(place: Place, version: number) {
   const { context, tenant, workspace, artifact } = place;
@@ -199,15 +212,11 @@ export function NativeInline({
             aria-label={`Outline of ${status.name}`}
             className="flex flex-col gap-0.5 border-line border-s-2 ps-3 text-fg text-sm"
           >
-            {status.outline
-              .split("\n")
-              .filter((line) => line.trim() !== "")
-              .map((line, at) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: an outline's lines can repeat
-                <li key={at} className="whitespace-pre-wrap">
-                  {line}
-                </li>
-              ))}
+            {outlined(status.outline).map(({ line, key }) => (
+              <li key={key} className="whitespace-pre-wrap">
+                {line}
+              </li>
+            ))}
           </ol>
         ))}
       {view === "text" && (

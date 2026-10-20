@@ -40,7 +40,7 @@ test("a page is shown one at a time, paged through by its buttons", async () => 
 
 test("the keys page through it", async () => {
   const screen = await render(<Viewer />);
-  const page = screen.getByRole("figure");
+  const page = screen.getByRole("region", { name: /: Page / });
   (page.element() as HTMLElement).focus();
   await userEvent.keyboard("{ArrowRight}");
   await expect.element(screen.getByRole("img", { name: "Page 2 of 4" })).toBeVisible();
@@ -61,7 +61,7 @@ test("the keys page through it", async () => {
 
 test("in a page read right to left, the arrow keys go the other way", async () => {
   const rtl = await render(<Viewer dir="rtl" />);
-  (rtl.getByRole("figure").element() as HTMLElement).focus();
+  (rtl.getByRole("region", { name: /: Page / }).element() as HTMLElement).focus();
   await userEvent.keyboard("{ArrowLeft}");
   await expect.element(rtl.getByRole("img", { name: "Page 2 of 4" })).toBeVisible();
   await userEvent.keyboard("{ArrowRight}");

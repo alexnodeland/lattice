@@ -68,11 +68,14 @@ const SIZED = [
  *   and its colours as CSS variables, a colour no longer given removed.
  * - `host.call(name, args)` resolves to a tool's `structuredContent`; it rejects with an `Error`
  *   on a refusal (`isError: true` on the error), a JSON-RPC error (its `code`), or no answer in
- *   `ANSWER_WITHIN` ms (`code` `"timeout"`), as past the app's messages a minute.
+ *   `ANSWER_WITHIN` ms (`code` `"timeout"`), as past the app's messages a minute. `submit` and
+ *   `ui/open-link` have no time limit: they wait for the person, whose answer, either way, the
+ *   host gives.
  * - `host.request(method, params)` asks anything else, as `call` does; `host.notify` says.
  * - `host.onAnswer(fn)` runs after every answer, refusal or timeout, a task later, so after the
  *   app's own code that awaited it: a safety net, since the app still renders after its own
- *   changes. `host.onContext(fn)` runs after every change of theme, for colours drawn by script.
+ *   changes. `host.onContext(fn)` runs after every theme the host gives, the first, as
+ *   `connect()` receives it, included, for colours drawn by script.
  *
  * Its ids are its own (`host:1`), so an app's own requests never meet its answers; it hears its
  * parent, the sandbox, alone. Like the measure, it is the app document's inline script, under
@@ -130,7 +133,8 @@ const HOST = [
   "  });",
   "  const request = (method, params = {}) => new Promise((answer, refuse) => {",
   '    const id = "host:" + ++next;',
-  "    const timer = setTimeout(",
+  '    const person = method === "ui/open-link" || (method === "tools/call" && params.name === "submit");',
+  "    const timer = person ? 0 : setTimeout(",
   '      () => settle(id, (pending) => pending.refuse(failure("the host did not answer", { code: "timeout" }))),',
   `      ${ANSWER_WITHIN},`,
   "    );",

@@ -325,18 +325,51 @@ host.connect().then(async () => {
   await page.close();
 });
 
-test("an app that throws host away still talks to the host by hand", async () => {
+test("with host deleted, the frame and the bridge keep working by hand", async () => {
   const page = await running(
-    `<body><output id="said"></output><script>
+    `<body style="margin:0"><output id="said"></output><script>
 delete window.host;
-window.host = { call: () => Promise.reject(new Error("broken")) };
+const lines = [];
 addEventListener("message", (e) => {
-  if (e.data && e.data.id === 1) document.getElementById("said").textContent = "answered " + e.data.result.protocolVersion;
+  if (e.data && e.data.id === 1) lines.push("initialized");
+  if (e.data && e.data.id === 2) lines.push("state " + JSON.stringify(e.data.result.structuredContent.state));
+  document.getElementById("said").textContent = [typeof window.host, ...lines].join(" ");
 });
-parent.postMessage({ jsonrpc: "2.0", id: 1, method: "ui/initialize", params: {} }, "*");
+const ask = (id, method, params) => parent.postMessage({ jsonrpc: "2.0", id, method, params }, "*");
+ask(1, "ui/initialize", {});
+ask(2, "tools/call", { name: "set_state", arguments: { patch: [{ op: "add", path: "/x", value: 1 }] } });
+parent.postMessage({ jsonrpc: "2.0", method: "ui/notifications/size-changed", params: { height: 432 } }, "*");
 </script>`,
   );
-  await expect.poll(() => said(page), SETTLED).toMatch(/^answered \d{4}-\d{2}-\d{2}$/);
+  await expect.poll(() => said(page), SETTLED).toBe('undefined initialized state {"x":1}');
+  await expect.poll(() => drawn(page), SETTLED).toBe(432);
+  await page.close();
+});
+
+test("a submission waits for the person however long, and gets their answer, once", async () => {
+  const page = await running(
+    `<body><output id="said"></output><script>
+const lines = [];
+const say = () => { document.getElementById("said").textContent = lines.join(" | "); };
+host.connect().then(async () => {
+  try { const sent = await host.call("submit", { values: { roll: 6 } }); lines.push("sent " + sent.submitted); }
+  catch (error) { lines.push("failed " + (error.code || error.isError)); }
+  say();
+  try { await host.call("submit", { values: { roll: 1 } }); lines.push("sent again"); }
+  catch (error) { lines.push("refused " + error.isError); }
+  say();
+});
+</script>`,
+  );
+  const dialog = page.getByRole("alertdialog", { name: "Send this from Probe?" });
+  await dialog.waitFor({ timeout: 15_000 });
+  // Held past the 10 seconds a call that the host answers at once may take.
+  await page.waitForTimeout(11_000);
+  await dialog.getByRole("button", { name: "Send it", exact: true }).click();
+  await expect.poll(() => said(page), SETTLED).toBe("sent true");
+  await dialog.waitFor({ timeout: 15_000 });
+  await dialog.getByRole("button", { name: "Don't send it" }).click();
+  await expect.poll(() => said(page), SETTLED).toBe("sent true | refused true");
   await page.close();
 });
 

@@ -80,11 +80,13 @@ and saved at most once every 5 seconds, to `{{state}}`; and `host.call("submit",
 an object sent as the person's submission once they confirm it. A call rejects with an `Error` \
 when the host refuses it (a refusal has no result; the error's `isError` is true) or doesn't \
 answer within 10 seconds (its `code` is `"timeout"`), as past 60 calls a minute: wrap each in \
-`try`, and draw again in `finally`. `host.request("ui/open-link", {{url}})` opens a link once \
-the person confirms it. `host.onAnswer(render)` draws again after every answer, a safety net \
-beside the app's own `render()`; `host.onContext(fn)` runs when the theme changes, for colours \
-drawn by script. The host sizes the frame to what the app draws; \
-`host.notify("ui/notifications/size-changed", {{height}})` says a height of its own instead.
+`try`, and draw again in `finally`. `submit` and `host.request("ui/open-link", {{url}})`, which \
+opens a link once the person confirms it, wait for the person as long as they take, and never \
+time out; the person saying no is a refusal. `host.onAnswer(render)` draws again after every \
+answer, a safety net beside the app's own `render()`; `host.onContext(fn)` runs with each \
+theme the host gives, the first included, for colours drawn by script. The host sizes the \
+frame to what the app draws; `host.notify("ui/notifications/size-changed", {{height}})` says a \
+height of its own instead.
 
 Keep what the app shows in one state, and draw all of it from that state in one `render()`, \
 called after every change: a click, a timer's callback, an answer or a refusal. A control \

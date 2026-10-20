@@ -222,7 +222,10 @@ function Opened({
     ...(sources.length > 0 ? [["source", "Source"] as [Tab, string]] : []),
     ...(changed === null ? [] : [["changes", "Changes"] as [Tab, string]]),
   ];
-  const [tab, setTab] = useState<Tab>(changed !== null ? "changes" : (tabs[0]?.[0] ?? "source"));
+  // What changed first; for a first version, its source, as its content is shown above the list.
+  const [tab, setTab] = useState<Tab>(
+    changed !== null ? "changes" : sources.length > 0 ? "source" : (tabs[0]?.[0] ?? "preview"),
+  );
   const title = renderer.about && renderer.title(revision.data);
   const about = renderer.about?.(revision.data);
   return (

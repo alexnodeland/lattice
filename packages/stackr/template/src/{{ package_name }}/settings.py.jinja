@@ -142,6 +142,10 @@ class PortalSettings:
             invitations.
         ui_dir: A directory holding the built ``app`` and ``admin`` UIs, when portalr's
             package has none of its own, as an install from a repository hasn't.
+        url: The portal's own origin, as people's browsers reach it: the one page that may frame
+            mini apps' sandbox.
+        apps_url: The origin mini apps run on, an origin of its own that this application
+            answers with the sandbox alone; with ``url``. Without it, no app runs.
         tempo_url: Tempo's HTTP API, for traces.
         loki_url: Loki's HTTP API, for logs.
         prometheus_url: prom-label-proxy, in front of Prometheus, for metrics.
@@ -161,6 +165,8 @@ class PortalSettings:
     supabase_key: str | None = None
     auth_url: str | None = None
     ui_dir: str | None = None
+    url: str | None = None
+    apps_url: str | None = None
     tempo_url: str | None = None
     loki_url: str | None = None
     prometheus_url: str | None = None
@@ -177,6 +183,8 @@ class PortalSettings:
             supabase_key=env.get("PORTAL_SUPABASE_KEY"),
             auth_url=env.get("PORTAL_AUTH_URL"),
             ui_dir=env.get("PORTAL_UI_DIR"),
+            url=env.get("PORTAL_URL"),
+            apps_url=env.get("PORTAL_APPS_URL"),
             tempo_url=env.get("PORTAL_TEMPO_URL"),
             loki_url=env.get("PORTAL_LOKI_URL"),
             prometheus_url=env.get("PORTAL_PROMETHEUS_URL"),

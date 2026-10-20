@@ -49,6 +49,9 @@ export interface Artifact {
   /** The latest version the log has reached; its content is read over REST. */
   readonly version: number;
   readonly archived: boolean;
+  /** The thread it was made in, and the `seq` it was made at: where a thread shows it. */
+  readonly threadId: v1.ThreadId | null;
+  readonly seq: number;
   /** The feedback given on its latest version, oldest first: each version is judged anew. */
   readonly feedback: readonly Feedback[];
 }
@@ -120,10 +123,28 @@ function withThread(state: Workspace, id: v1.ThreadId, change: Partial<Thread>):
   return { ...state, threads: { ...state.threads, [id]: { ...thread(state, id), ...change } } };
 }
 
-function withArtifact(state: Workspace, artifact: Omit<Artifact, "feedback">): Workspace {
+/**
+ * Where an artifact's event says it was made: its thread, and the `seq` of the first event of it
+ * the store saw, which for an artifact made before the store read the log is a later one's.
+ */
+const madeAt = (event: { thread_id?: v1.ThreadId | null }, envelope: v1.EventFrame) => ({
+  threadId: event.thread_id ?? null,
+  seq: envelope.seq,
+});
+
+/** An artifact's event: where it was made is kept from its first, as `madeAt` reads it. */
+function withArtifact(
+  state: Workspace,
+  artifact: Omit<Artifact, "feedback" | "threadId" | "seq">,
+  made: { threadId: v1.ThreadId | null; seq: number },
+): Workspace {
   const before = state.artifacts[artifact.id];
   const feedback = before?.version === artifact.version ? before.feedback : [];
-  return { ...state, artifacts: { ...state.artifacts, [artifact.id]: { ...artifact, feedback } } };
+  const where = before ? { threadId: before.threadId, seq: before.seq } : made;
+  return {
+    ...state,
+    artifacts: { ...state.artifacts, [artifact.id]: { ...artifact, ...where, feedback } },
+  };
 }
 
 function withRun(state: Workspace, id: v1.RunId, change: Partial<Run>): Workspace {
@@ -172,27 +193,24 @@ const handlers: Handlers = {
     // The posted message is the authoritative text of what the run streamed.
     return event.run_id ? withRun(next, event.run_id, { text: "" }) : next;
   },
-  artifact_created: (state, event) =>
-    withArtifact(state, {
-      id: event.artifact_id,
-      kind: event.kind,
-      version: event.version,
-      archived: false,
-    }),
-  artifact_changed: (state, event) =>
-    withArtifact(state, {
-      id: event.artifact_id,
-      kind: event.kind,
-      version: event.version,
-      archived: false,
-    }),
-  artifact_archived: (state, event) =>
-    withArtifact(state, {
-      id: event.artifact_id,
-      kind: event.kind,
-      version: event.version,
-      archived: true,
-    }),
+  artifact_created: (state, event, envelope) =>
+    withArtifact(
+      state,
+      { id: event.artifact_id, kind: event.kind, version: event.version, archived: false },
+      madeAt(event, envelope),
+    ),
+  artifact_changed: (state, event, envelope) =>
+    withArtifact(
+      state,
+      { id: event.artifact_id, kind: event.kind, version: event.version, archived: false },
+      madeAt(event, envelope),
+    ),
+  artifact_archived: (state, event, envelope) =>
+    withArtifact(
+      state,
+      { id: event.artifact_id, kind: event.kind, version: event.version, archived: true },
+      madeAt(event, envelope),
+    ),
   proposal_created: (state, event) => ({
     ...state,
     proposals: {

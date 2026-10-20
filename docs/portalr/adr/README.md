@@ -57,5 +57,6 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0049](0049-checking-a-native-file-out-and-in.md) | Checking a native file out and in: the editor on its own origin, an upload with its progress, and a retry that is safe | Accepted |
 | [0050](0050-a-native-files-proposals-and-the-pilots-scenarios.md) | A native file's proposals: outdated, never rebased, and compared page by page; and the check-out pilot's scenarios | Accepted |
 | [0051](0051-mini-apps-the-sandboxed-frame-and-its-bridge.md) | Mini apps: the sandboxed frame and its bridge | Accepted |
+| [0052](0052-artifacts-inline-in-their-thread.md) | Artifacts inline in their thread, a mini app first | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

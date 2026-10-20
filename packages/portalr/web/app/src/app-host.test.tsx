@@ -120,3 +120,177 @@ test("mini apps switched off while an app runs stop it at the next read", async 
     .toBeVisible();
   expect(screen.container.querySelector("iframe")).toBeNull();
 });
+
+/** An event of the workspace's log, at `seq`, by `actor`. */
+const logged = (seq: number, event: Record<string, unknown>, actor: unknown = AGENT) => ({
+  type: "event",
+  seq,
+  id: `evt_${seq}`,
+  ts: "2026-10-20T09:00:00Z",
+  workspace_id: "notes",
+  actor,
+  event,
+});
+
+const AGENT = { kind: "agent", thread_id: "thr_1", run_id: "run_1" };
+
+/** A thread in which alice asks for an app, and the agent makes it, then changes it. */
+const THREAD = [
+  logged(
+    1,
+    { type: "thread_created", thread_id: "thr_1", title: "Games" },
+    { kind: "user", id: "alice" },
+  ),
+  logged(
+    2,
+    { type: "message_posted", thread_id: "thr_1", message_id: "msg_1", content: "Make me a game" },
+    { kind: "user", id: "alice" },
+  ),
+  logged(3, {
+    type: "artifact_created",
+    artifact_id: "app_1",
+    kind: "app",
+    version: 1,
+    data: {},
+    thread_id: "thr_1",
+    run_id: "run_1",
+  }),
+  logged(4, {
+    type: "message_posted",
+    thread_id: "thr_1",
+    message_id: "msg_2",
+    content: "Here it is.",
+    run_id: "run_1",
+  }),
+  logged(5, {
+    type: "artifact_changed",
+    artifact_id: "app_1",
+    kind: "app",
+    version: 2,
+    patch: { kind: "json_patch", ops: [] },
+    summary: "",
+    thread_id: "thr_1",
+    run_id: "run_1",
+  }),
+];
+
+test("an app made in a thread runs there, once, where it was made, at its latest version", async () => {
+  const { screen } = await open(
+    "/t/acme/w/notes/threads/thr_1",
+    async (request, path) =>
+      path === "/grantr/v1/checks"
+        ? Response.json(((await request.json()) as unknown[]).map(() => true))
+        : serving(on)(request, path),
+    undefined,
+    { apps: APPS, artifactrLog: THREAD },
+  );
+  const inline = screen.getByRole("listitem", { name: "Dice" });
+  await expect.element(inline.getByTitle(TITLE)).toBeInTheDocument();
+  await expect.element(inline.getByText(/Version 2\./)).toBeVisible();
+  await expect
+    .element(inline.getByRole("link", { name: "Open its page" }))
+    .toHaveAttribute("href", expect.stringContaining("/artifacts/app_1"));
+  expect(screen.container.querySelectorAll("iframe")).toHaveLength(1);
+  const items = [...screen.container.querySelectorAll("[role=log] > ol > li")];
+  expect(
+    items.map((item) => item.getAttribute("aria-label") ?? item.textContent?.slice(0, 20)),
+  ).toEqual([expect.anything(), "Dice", expect.anything()]);
+  expect(items[0]?.textContent).toContain("Make me a game");
+  expect(items[2]?.textContent).toContain("Here it is.");
+});
+
+/** The server for a thread: every check allowed, and the revisions `revisions` answers. */
+function threaded(revisions: (artifact: string) => Response | undefined) {
+  return async (request: Request, path: string) => {
+    if (path === "/grantr/v1/checks") {
+      return Response.json(((await request.json()) as unknown[]).map(() => true));
+    }
+    const asked = /\/artifacts\/(\w+)\/revisions$/.exec(path);
+    return asked?.[1] ? revisions(asked[1]) : serving(on)(request, path);
+  };
+}
+
+/** A revision of an app, as artifactr reads it. */
+const revision = (id: string, version: number, title: string, state = {}) => ({
+  artifact_id: id,
+  version,
+  kind: "app",
+  data: { title, summary: "Rolls a die.", html: "<button>Roll</button>", state },
+  archived: false,
+  actor: AGENT,
+});
+
+test("apps made elsewhere, or in no thread, aren't shown; a second is shown where it was made", async () => {
+  const log = [
+    ...THREAD,
+    logged(6, {
+      type: "artifact_created",
+      artifact_id: "app_2",
+      kind: "app",
+      version: 1,
+      data: {},
+      thread_id: "thr_1",
+    }),
+    logged(7, {
+      type: "artifact_created",
+      artifact_id: "app_3",
+      kind: "app",
+      version: 1,
+      data: {},
+    }),
+  ];
+  const { screen } = await open(
+    "/t/acme/w/notes/threads/thr_1",
+    threaded((id) => {
+      const titles: Record<string, string> = { app_1: "Dice", app_2: "Coin", app_3: "Lost" };
+      return Response.json([revision(id, 1, titles[id] ?? id)]);
+    }),
+    undefined,
+    { apps: APPS, artifactrLog: log },
+  );
+  await expect.element(screen.getByRole("listitem", { name: "Coin" })).toBeInTheDocument();
+  const items = [...screen.container.querySelectorAll("[role=log] > ol > li")];
+  // A message is named by who posted it, through aria-labelledby; an app by its title.
+  expect(items.map((item) => item.getAttribute("aria-label"))).toEqual([
+    null,
+    "Dice",
+    null,
+    "Coin",
+  ]);
+  expect(screen.container.textContent).not.toContain("Lost");
+});
+
+test("a new version keeps the frame running, and a read again that fails keeps it too", async () => {
+  let read: () => Response = () => Response.json([revision("app_1", 1, "Dice")]);
+  const { screen, queryClient } = await open(
+    "/t/acme/w/notes/threads/thr_1",
+    threaded(() => read()),
+    undefined,
+    { apps: APPS, artifactrLog: THREAD },
+  );
+  const inline = screen.getByRole("listitem", { name: "Dice" });
+  await expect.element(inline.getByText(/Version 1\./)).toBeVisible();
+  const frame = inline.getByTitle(TITLE).element();
+  read = () =>
+    Response.json([revision("app_1", 1, "Dice"), revision("app_1", 2, "Dice", { rolled: 3 })]);
+  await queryClient.invalidateQueries();
+  await expect.element(inline.getByText(/Version 2\./)).toBeVisible();
+  expect(inline.getByTitle(TITLE).element()).toBe(frame);
+  read = () => new Response(null, { status: 500 });
+  await queryClient.invalidateQueries();
+  await vi.waitFor(() => expect(queryClient.isFetching()).toBe(0));
+  expect(inline.getByTitle(TITLE).element()).toBe(frame);
+  expect(inline.element().textContent).not.toContain("couldn't be read");
+});
+
+test("an app whose first read fails says so", async () => {
+  const { screen } = await open(
+    "/t/acme/w/notes/threads/thr_1",
+    threaded(() => new Response(null, { status: 500 })),
+    undefined,
+    { apps: APPS, artifactrLog: THREAD },
+  );
+  await expect
+    .element(screen.getByText("This app couldn't be read. Reload the page to try again."))
+    .toBeVisible();
+});

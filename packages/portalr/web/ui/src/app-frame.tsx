@@ -98,7 +98,14 @@ export function AppFrame({ app, shown }: { app: ReadApp; shown: Shown }) {
       ) : apps === null ? (
         <Reading>Loading the app…</Reading>
       ) : (
-        <apps.Running app={app} shown={shown} host={host} origin={origin} after={after} />
+        <apps.Running
+          app={app}
+          shown={shown}
+          host={host}
+          origin={origin}
+          after={after}
+          label={`${LABEL} Version ${shown.version}.`}
+        />
       )}
     </section>
   );

@@ -164,9 +164,16 @@ test("a run that started before what the store read is left alone", () => {
   expect(artifactr.other?.(state, live("run_0", "late"))).toBe(state);
 });
 
-test("artifacts keep their kind, latest version and whether they are archived", () => {
+test("artifacts keep their kind, latest version, whether they are archived, and where they were made", () => {
   const state = replay(
-    { type: "artifact_created", artifact_id: "plan_1", kind: "plan", version: 1, data: {} },
+    {
+      type: "artifact_created",
+      artifact_id: "plan_1",
+      kind: "plan",
+      version: 1,
+      data: {},
+      thread_id: "thr_1",
+    },
     {
       type: "artifact_changed",
       artifact_id: "plan_1",
@@ -174,6 +181,7 @@ test("artifacts keep their kind, latest version and whether they are archived", 
       version: 2,
       patch: { kind: "json_patch", ops: [] },
       summary: "",
+      thread_id: "thr_2",
     },
     { type: "artifact_archived", artifact_id: "plan_1", kind: "plan", version: 3 },
   );
@@ -182,6 +190,8 @@ test("artifacts keep their kind, latest version and whether they are archived", 
     kind: "plan",
     version: 3,
     archived: true,
+    threadId: "thr_1",
+    seq: 1,
     feedback: [],
   });
 });

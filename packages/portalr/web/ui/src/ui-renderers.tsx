@@ -242,8 +242,8 @@ function AppArtifact({ data }: { data: Data }) {
   return <AppFrame app={read} shown={shown ?? { id: "", version: 0, archived: true }} />;
 }
 
-/** An `app`: an agent's HTML, run sandboxed, labelled outside what it draws. */
-const app = ofJson((data) => <AppArtifact data={data} />);
+/** An `app`: an agent's HTML, run sandboxed, labelled outside what it draws, in its thread too. */
+const app: Renderer = { ...ofJson((data) => <AppArtifact data={data} />), inline: true };
 
 /** artifactr.ui's kinds and their renderers, for an application's registry. */
 export const UI_RENDERERS: readonly (readonly [string, Renderer])[] = [

@@ -33,20 +33,25 @@ fi
 
 json() { "${UV:-uv}" run --no-project python -c "$@"; }
 
-# What PORT serves now: nothing ("free"), the application alone ("ours"), or more ("taken").
+# What PORT serves now: nothing ("free"), the application alone ("ours"), or more ("taken"). A
+# port Funnel puts on the internet is taken, whatever it serves: `on` would leave it there.
 state=$("$tailscale" serve status --json | json '
 import json, sys
 port, app = sys.argv[1:]
 config = json.loads(sys.stdin.read() or "{}") or {}
-sites = [site for name, site in (config.get("Web") or {}).items() if name.endswith(f":{port}")]
-handlers = [site.get("Handlers") or {} for site in sites]
-if port not in (config.get("TCP") or {}):
+def here(section):
+    return [v for k, v in (config.get(section) or {}).items() if k.endswith(f":{port}")]
+handlers = [site.get("Handlers") or {} for site in here("Web")]
+if any(here("AllowFunnel")):
+    print("taken")
+elif port not in (config.get("TCP") or {}):
     print("free")
 else:
     print("ours" if handlers == [{"/": {"Proxy": app}}] else "taken")
 ' "$port" "$app")
 if [[ $state == taken ]]; then
-  echo "tailnet: something else is served on port $port; choose another, such as TAILNET_PORT=8444" >&2
+  echo "tailnet: something else is served on port $port, or Funnel puts it on the internet;" >&2
+  echo "  choose another, such as TAILNET_PORT=8444" >&2
   exit 1
 fi
 

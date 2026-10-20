@@ -11,7 +11,7 @@ from starlette.websockets import WebSocketDisconnect
 from artifactr.core import Actor, TenantId, Visibility, WorkspaceId
 from artifactr.fastapi import stream
 from artifactr.workspace import integration_gate
-from tests.agent.conftest import Script, call, say
+from tests.agent.conftest import Script, ask, call, say
 from tests.fastapi.conftest import Latch, build, command, hello, wait_for
 from tests.workspace.gating import NOTES, Switch, key_of
 
@@ -237,6 +237,25 @@ def test_live_frames_of_runs_in_followed_threads() -> None:
             assert {"type": "text_delta", "part": 0, "delta": "Hello there."} in live
             types = [f["event"]["type"] for f in frames if f["type"] == "event"]
             assert "run_ended" in types
+
+
+def test_a_run_resumed_by_an_answer_streams_again() -> None:
+    app, _ = build(Script(ask("q1"), say("Tuesday it is.")), ask=True)
+    with TestClient(app) as client:
+        _post(client, "c1", type="create_thread", thread_id="t1")
+        with client.websocket_connect(STREAM) as ws:
+            ws.send_json(hello(threads=["t1"]))
+            _receive_until(ws, "replay_complete")
+            ws.send_json(command("c2", type="post_message", thread_id="t1", content="Plan"))
+            [paused] = [f for f in _until_event(ws, "run_paused") if f["type"] == "event"][-1:]
+            answer = {"answers": [{"selected": ["Tuesday"]}]}
+            run = paused["event"]["run_id"]
+            ws.send_json(
+                command("c3", type="answer_deferred", run_id=run, tool_call_id="q1", answer=answer)
+            )
+            frames = _until_event(ws, "run_ended")
+            live = [f["event"] for f in frames if f["type"] == "live"]
+            assert {"type": "text_delta", "part": 0, "delta": "Tuesday it is."} in live
 
 
 def test_runs_in_progress_are_listed_and_watched() -> None:

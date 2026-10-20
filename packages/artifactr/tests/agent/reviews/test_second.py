@@ -28,7 +28,10 @@ from tests.agent.conftest import (
     HeldStorage,
     MakeRunner,
     Script,
+    ask,
+    asking,
     call,
+    in_words,
     make_agent,
     say,
     settled,
@@ -140,8 +143,8 @@ async def test_a2_a_partial_answer_while_another_thread_commits(
 ) -> None:
     both = ModelResponse(
         parts=[
-            ToolCallPart(tool_name="ask_user", args={"question": "Day?"}, tool_call_id="q1"),
-            ToolCallPart(tool_name="ask_user", args={"question": "Time?"}, tool_call_id="q2"),
+            ToolCallPart(tool_name="ask_user", args=asking("Day?"), tool_call_id="q1"),
+            ToolCallPart(tool_name="ask_user", args=asking("Time?"), tool_call_id="q2"),
         ]
     )
     runner = runners(make_agent(Script(both, say("ok")), ask=True, output_type=ASKING))
@@ -151,7 +154,9 @@ async def test_a2_a_partial_answer_while_another_thread_commits(
     other = await ws.create_thread("Elsewhere")
     head = storage.held_head = Gate()
     answering = asyncio.create_task(
-        runner.answer(ws, AnswerDeferred(run_id=paused.run_id, tool_call_id="q1", answer="Monday"))
+        runner.answer(
+            ws, AnswerDeferred(run_id=paused.run_id, tool_call_id="q1", answer=in_words("Monday"))
+        )
     )
     await _entered(head)
     await ws.post_message(other.id, "meanwhile, in another thread")
@@ -197,13 +202,13 @@ async def test_c1_a_resume_that_fails_early_loses_a_message_sent_in_the_pausing_
         yield
 
     releasing = storage.held = Gate()
-    script = Script(call("ask_user", call_id="q1", question="Which day?"), *[say("ok")] * 4)
+    script = Script(ask("q1", "Which day?"), *[say("ok")] * 4)
     runner = runners(
         make_agent(script, ask=True, output_type=ASKING), turn_context=resume_fails_once
     )
     first = started(await runner.send(ws, thread.id, "Plan the launch"))
     await _entered(releasing)
-    answer = AnswerDeferred(run_id=first.run_id, tool_call_id="q1", answer="Monday")
+    answer = AnswerDeferred(run_id=first.run_id, tool_call_id="q1", answer=in_words("Monday"))
     assert (await runner.answer(ws, answer)).run is None
     assert (await runner.send(ws, thread.id, "And book the big room")).run is None
     releasing.release.set()
@@ -219,11 +224,11 @@ async def test_c2_a_resume_whose_watcher_is_slow_loses_a_message_sent_in_the_pau
     storage: Probe, ws: Workspace, thread: Thread, runners: MakeRunner
 ) -> None:
     releasing = storage.held = Gate()
-    script = Script(call("ask_user", call_id="q1", question="Which day?"), *[say("ok")] * 4)
+    script = Script(ask("q1", "Which day?"), *[say("ok")] * 4)
     runner = runners(make_agent(script, ask=True, output_type=ASKING))
     first = started(await runner.send(ws, thread.id, "Plan the launch"))
     await _entered(releasing)
-    answer = AnswerDeferred(run_id=first.run_id, tool_call_id="q1", answer="Monday")
+    answer = AnswerDeferred(run_id=first.run_id, tool_call_id="q1", answer=in_words("Monday"))
     assert (await runner.answer(ws, answer)).run is None
     assert (await runner.send(ws, thread.id, "And book the big room")).run is None
     slow = storage.held_subscribe = Gate()  # the resumed run's watcher reads late

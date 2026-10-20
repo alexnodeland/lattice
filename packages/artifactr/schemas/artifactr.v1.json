@@ -110,6 +110,24 @@
       "title": "AnswerDeferred",
       "type": "object"
     },
+    "Answers": {
+      "additionalProperties": false,
+      "description": "An answer to every question a request asked, in the order they were asked.",
+      "properties": {
+        "answers": {
+          "items": {
+            "$ref": "#/$defs/Chosen"
+          },
+          "title": "Answers",
+          "type": "array"
+        }
+      },
+      "required": [
+        "answers"
+      ],
+      "title": "Answers",
+      "type": "object"
+    },
     "AppEvent": {
       "description": "An application-defined fact. ``name`` identifies it; ``data`` is free-form JSON.",
       "properties": {
@@ -509,6 +527,34 @@
         "kind"
       ],
       "title": "ArtifactTarget",
+      "type": "object"
+    },
+    "Chosen": {
+      "additionalProperties": false,
+      "description": "The answer to one question: the labels chosen, and any words of the person's own.",
+      "properties": {
+        "other": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Other"
+        },
+        "selected": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Selected",
+          "type": "array"
+        }
+      },
+      "title": "Chosen",
       "type": "object"
     },
     "CommandFrame": {
@@ -1565,6 +1611,33 @@
       "title": "MessageTarget",
       "type": "object"
     },
+    "Option": {
+      "description": "One answer a question offers.",
+      "properties": {
+        "description": {
+          "default": "",
+          "maxLength": 200,
+          "title": "Description",
+          "type": "string"
+        },
+        "label": {
+          "maxLength": 60,
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "recommended": {
+          "default": false,
+          "title": "Recommended",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "label"
+      ],
+      "title": "Option",
+      "type": "object"
+    },
     "PartEnded": {
       "description": "A response part is complete.",
       "properties": {
@@ -1971,6 +2044,68 @@
       "title": "Proposed",
       "type": "object"
     },
+    "Question": {
+      "description": "One question, and the options it offers.",
+      "properties": {
+        "header": {
+          "maxLength": 16,
+          "minLength": 1,
+          "title": "Header",
+          "type": "string"
+        },
+        "multiple": {
+          "default": false,
+          "title": "Multiple",
+          "type": "boolean"
+        },
+        "options": {
+          "items": {
+            "$ref": "#/$defs/Option"
+          },
+          "maxItems": 4,
+          "minItems": 2,
+          "title": "Options",
+          "type": "array"
+        },
+        "other": {
+          "default": false,
+          "title": "Other",
+          "type": "boolean"
+        },
+        "question": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Question",
+          "type": "string"
+        }
+      },
+      "required": [
+        "question",
+        "header",
+        "options"
+      ],
+      "title": "Question",
+      "type": "object"
+    },
+    "Questions": {
+      "description": "What ``ask_user`` asks: its arguments.",
+      "properties": {
+        "questions": {
+          "items": {
+            "$ref": "#/$defs/Question"
+          },
+          "maxItems": 4,
+          "minItems": 1,
+          "title": "Questions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "questions"
+      ],
+      "title": "Questions",
+      "type": "object"
+    },
     "Recorded": {
       "description": "The command was recorded; it changed no artifact.",
       "properties": {
@@ -2029,6 +2164,22 @@
         "type"
       ],
       "title": "ReplayComplete",
+      "type": "object"
+    },
+    "Reply": {
+      "additionalProperties": false,
+      "description": "A message that answered the questions in its own words, instead of choosing.",
+      "properties": {
+        "reply": {
+          "minLength": 1,
+          "title": "Reply",
+          "type": "string"
+        }
+      },
+      "required": [
+        "reply"
+      ],
+      "title": "Reply",
       "type": "object"
     },
     "Resolved": {
@@ -2900,8 +3051,22 @@
     }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "Frames of the artifactr.v1 thread protocol: `client` is any frame a client sends, `server` any frame a server sends.",
+  "description": "Frames of the artifactr.v1 thread protocol: `client` is any frame a client sends, `server` any frame a server sends. `ask_user` is the `args` of a paused request whose `tool_name` is `ask_user`, and `ask_user_answer` the `answer` it takes.",
   "properties": {
+    "ask_user": {
+      "$ref": "#/$defs/Questions"
+    },
+    "ask_user_answer": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Answers"
+        },
+        {
+          "$ref": "#/$defs/Reply"
+        }
+      ],
+      "title": "Ask User Answer"
+    },
     "client": {
       "discriminator": {
         "mapping": {

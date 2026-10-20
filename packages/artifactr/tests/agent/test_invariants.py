@@ -56,7 +56,10 @@ from tests.agent.conftest import (
     MakeRunner,
     Recorder,
     Script,
+    ask,
+    asking,
     call,
+    in_words,
     make_agent,
     say,
     settled,
@@ -162,7 +165,7 @@ def _paused_agent(script: Script, **options: Any) -> Any:
 
 
 def _asking() -> ModelResponse:
-    return call("ask_user", call_id="q1", question="Which day?")
+    return ask("q1", "Which day?")
 
 
 # ─── I1: exactly once ─────────────────────────────────────────────────────────
@@ -239,7 +242,7 @@ async def test_i2_a_reply_is_consumed_with_its_answer_so_it_is_never_a_prompt(
         if isinstance(e.event, DeferredAnswered)
     ]
     assert await _taken(storage, thread) == replied.outcome.seq, "taken with the answer"
-    assert answered == ["Monday"]
+    assert answered == [{"reply": "Monday"}]
     await runner.aclose()  # the resumed run never starts
     resuming.release.set()
     restarted = runners(_paused_agent(script))
@@ -612,7 +615,7 @@ async def test_i6_a_message_committed_directly_in_a_paused_thread_is_its_reply(
     await paused.wait()
     await runner.drain()
     await ws.as_actor(BOB).post_message(thread.id, "Not before legal signs off")
-    answer = AnswerDeferred(run_id=paused.run_id, tool_call_id="q1", answer="Monday")
+    answer = AnswerDeferred(run_id=paused.run_id, tool_call_id="q1", answer=in_words("Monday"))
     assert (await runner.answer(ws, answer)).run is not None
     await settled(thread.id, runner)
     [declined] = [
@@ -635,7 +638,7 @@ async def test_i6_a_reply_that_an_answer_beat_is_the_resumed_runs_prompt(
     message = PostMessage(thread_id=thread.id, content="Tuesday, and book the room")
     sending = asyncio.create_task(runner.execute(ws.as_actor(BOB), message, command_id="c1"))
     await _entered(planning)
-    answer = AnswerDeferred(run_id=paused.run_id, tool_call_id="q1", answer="Monday")
+    answer = AnswerDeferred(run_id=paused.run_id, tool_call_id="q1", answer=in_words("Monday"))
     assert (await other.answer(there, answer)).run is None, "the thread is claimed"
     planning.release.set()
     assert (await sending).ok
@@ -727,7 +730,9 @@ async def test_i1_a_reply_whose_claim_another_holder_took_answers_nothing(
 ) -> None:
     agent = ws.as_actor(AgentActor(thread_id=thread.id, run_id="run_1"))
     await agent.record(RunStarted(run_id="run_1", thread_id=thread.id))
-    question = DeferredRequest(tool_call_id="q1", tool_name="ask_user", kind="question")
+    question = DeferredRequest(
+        tool_call_id="q1", tool_name="ask_user", kind="question", args=asking("Which day?")
+    )
     await agent.record(RunPaused(run_id="run_1", thread_id=thread.id, requests=(question,)))
     await ws.post_message(thread.id, "Tuesday")
     [reply] = await ws.read(threads={thread.id}, last=1)

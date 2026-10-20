@@ -115,8 +115,12 @@ class FanoutChannel:
         finally:
             watchers.discard(queue)
 
+    def open(self, run_id: RunId) -> None:
+        """Take a run's frames again: a run that paused, and was closed, resumes under its id."""
+        self._closed.pop(run_id, None)
+
     def close(self, run_id: RunId) -> None:
-        """End every watcher of a run, and any that start watching it later."""
+        """End every watcher of a run, and any that start watching it later, until it opens."""
         self._closed[run_id] = None
         if len(self._closed) > self._remember_closed:
             self._closed.popitem(last=False)

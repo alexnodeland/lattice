@@ -8,7 +8,7 @@ from pydantic_ai import DeferredToolRequests, FunctionToolset, ModelMessage, Mod
 from artifactr.agent import EndedTurn, Runner, Session
 from artifactr.core import Thread
 from artifactr.workspace import InMemoryStorage, Workspace, Workspaces
-from tests.agent.conftest import ALICE, Gate, Script, call, make_agent, say, started
+from tests.agent.conftest import ALICE, Gate, Script, ask, call, make_agent, say, started
 from tests.telemetry.conftest import Recorder, recording, trace_id
 
 
@@ -45,7 +45,7 @@ async def test_each_turn_is_handed_to_the_evaluators_as_it_ends(
     thread = await traced_ws.create_thread("Launch")
     collected = Collected()
     agent = make_agent(
-        Script(call("ask_user", question="Which date?"), say("Monday it is.")),
+        Script(ask(question="Which date?"), say("Monday it is.")),
         ask=True,
         output_type=[str, DeferredToolRequests],
     )

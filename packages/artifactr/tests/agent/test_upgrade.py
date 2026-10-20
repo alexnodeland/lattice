@@ -24,7 +24,8 @@ from tests.agent.conftest import (
     Gate,
     MakeRunner,
     Script,
-    call,
+    ask,
+    in_words,
     make_agent,
     say,
     settled,
@@ -61,7 +62,7 @@ async def _before_the_upgrade(engine: AsyncEngine, gate: Gate, *, pauses: bool =
     await ws.post_message(thread.id, "Plan the launch")
     session = Session.start(ws, thread.id, app=gate)
     if pauses:
-        asking = Script(call("ask_user", call_id="q1", question="Which day?"))
+        asking = Script(ask("q1", "Which day?"))
         await make_agent(asking, ask=True, output_type=ASKING).run("Plan the launch", deps=session)
     else:
         await make_agent(Script(say("Drafted."))).run("Plan the launch", deps=session)
@@ -108,7 +109,7 @@ async def test_a_paused_run_from_before_the_upgrade_resumes_on_its_answer(
     before = await _before_the_upgrade(database.engine(), gate, pauses=True)
     script = Script(say("Monday it is."))
     runner = runners(make_agent(script, ask=True, output_type=ASKING))
-    answer = AnswerDeferred(run_id=before.run_id, tool_call_id="q1", answer="Monday")
+    answer = AnswerDeferred(run_id=before.run_id, tool_call_id="q1", answer=in_words("Monday"))
     resumed = started(await runner.answer(before.ws, answer))
     assert resumed.run_id == before.run_id
     assert (await resumed.wait()).output == "Monday it is."

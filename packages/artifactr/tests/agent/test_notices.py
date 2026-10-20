@@ -11,6 +11,7 @@ from artifactr.workspace import Workspace
 from tests.agent.conftest import (
     Gate,
     Script,
+    ask,
     call,
     make_agent,
     make_runner,
@@ -39,7 +40,7 @@ async def test_a_notice_starts_no_turn(ws: Workspace, thread: Thread, gate: Gate
 
 
 async def test_a_notice_answers_no_paused_run(ws: Workspace, thread: Thread, gate: Gate) -> None:
-    script = Script(call("ask_user", call_id="q1", question="Which day?"))
+    script = Script(ask("q1", "Which day?"))
     agent = make_agent(script, ask=True, output_type=[str, DeferredToolRequests])
     runner = make_runner(agent, gate)
     handle = started(await runner.send(ws, thread.id, "Plan the launch"))

@@ -219,8 +219,11 @@ class Renderer:
                 self._state.active_run = None
                 for request in event["requests"]:
                     if request["kind"] == "question":
-                        question = escape(str(request["args"].get("question", "")))
-                        self._line(f"[magenta]{who} asks: {question}\n  (reply to answer)[/]")
+                        for asked in request["args"].get("questions", []):
+                            options = " / ".join(option["label"] for option in asked["options"])
+                            question = escape(f"{asked['question']} ({options})")
+                            self._line(f"[magenta]{who} asks: {question}[/]")
+                        self._line("[magenta]  (reply to answer)[/]")
                     else:
                         self._line(f"[magenta]{who} wants to call {request['tool_name']}[/]")
             case "feedback_given" if event["feedback_type"] == "rating":

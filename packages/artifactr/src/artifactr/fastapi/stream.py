@@ -223,10 +223,13 @@ class Stream:
         self._watched.add(run_id)
 
         async def forward() -> None:
-            async for frame in self._runner.watch(run_id):
-                if thread_id in (await workspace.hidden()).threads:
-                    return
-                self._put(frame)
+            try:
+                async for frame in self._runner.watch(run_id):
+                    if thread_id in (await workspace.hidden()).threads:
+                        return
+                    self._put(frame)
+            finally:  # the turn ended: a resumed run's next turn is watched again
+                self._watched.discard(run_id)
 
         self._spawn(forward())
 

@@ -74,6 +74,7 @@ from artifactr.core.feedback import (
 )
 from artifactr.core.ids import ArtifactId, ProposalId, RunId, ThreadId, TraceId
 from artifactr.core.patches import Patch, apply_patch, describe_patch, diff
+from artifactr.core.questions import ASK_USER, check_answer
 from artifactr.core.state import (
     Applied,
     CommitResult,
@@ -618,6 +619,8 @@ def _answer(command: AnswerDeferred, state: State) -> CommitResult:
             if request.kind == "approval"
             else "a question is answered with answer, not approved"
         )
+    if request.tool_name == ASK_USER:
+        check_answer(request.args, command.answer)
     answer = DeferredAnswer(answer=command.answer, approved=command.approved)
     return CommitResult(
         outcome=Recorded(),

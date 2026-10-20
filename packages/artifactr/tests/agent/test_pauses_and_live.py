@@ -17,6 +17,7 @@ from pydantic_ai import (
     ThinkingPartDelta,
     ToolCallPart,
     ToolCallPartDelta,
+    ToolReturnPart,
 )
 from pydantic_ai.messages import CustomEvent, FinalResultEvent
 
@@ -39,7 +40,18 @@ from artifactr.core import (
     ToolArgsDelta,
 )
 from artifactr.workspace import Workspace
-from tests.agent.conftest import Gate, Script, call, event_as, make_agent, make_runner, say, started
+from tests.agent.conftest import (
+    Gate,
+    Script,
+    ask,
+    call,
+    event_as,
+    in_words,
+    make_agent,
+    make_runner,
+    say,
+    started,
+)
 
 ASKING = [str, DeferredToolRequests]
 
@@ -58,7 +70,7 @@ def _approval_tools() -> FunctionToolset[Session[Gate]]:
 async def test_a_question_pauses_the_run_until_answered(
     ws: Workspace, thread: Thread, gate: Gate
 ) -> None:
-    script = Script(call("ask_user", call_id="q1", question="Which day?"), say("Monday it is."))
+    script = Script(ask("q1", "Which day?"), say("Monday it is."))
     runner = make_runner(make_agent(script, ask=True, output_type=ASKING), gate)
     handle = (await runner.send(ws, thread.id, "Plan the launch")).run
     assert handle is not None
@@ -70,7 +82,9 @@ async def test_a_question_pauses_the_run_until_answered(
     assert pause.usage is not None
     assert pause.usage.requests == 1, "what the run used before it paused"
     resumed = (
-        await runner.answer(ws, AnswerDeferred(run_id=run.id, tool_call_id="q1", answer="Monday"))
+        await runner.answer(
+            ws, AnswerDeferred(run_id=run.id, tool_call_id="q1", answer=in_words("Monday"))
+        )
     ).run
     assert resumed is not None
     assert resumed.run_id == handle.run_id
@@ -79,10 +93,29 @@ async def test_a_question_pauses_the_run_until_answered(
     assert script.tool_returns(1) == ["Monday"]
 
 
+async def test_the_agent_is_told_each_question_beside_what_was_chosen(
+    ws: Workspace, thread: Thread, gate: Gate
+) -> None:
+    script = Script(ask("q1", "Which day?"), say("Tuesday it is."))
+    runner = make_runner(make_agent(script, ask=True, output_type=ASKING), gate)
+    await started(await runner.send(ws, thread.id, "Plan the launch")).wait()
+    [run] = await ws.runs(status="paused")
+    tools = {tool.name: tool for tool in script.infos[0].function_tools}
+    assert tools["ask_user"].parameters_json_schema["properties"]["questions"]["maxItems"] == 4
+    chosen = AnswerDeferred(
+        run_id=run.id, tool_call_id="q1", answer={"answers": [{"selected": ["Tuesday"]}]}
+    )
+    await started(await runner.answer(ws, chosen)).wait()
+    [returned] = [
+        part.content for part in script.requests[1][-1].parts if isinstance(part, ToolReturnPart)
+    ]
+    assert returned == [{"question": "Which day?", "selected": ["Tuesday"]}]
+
+
 async def test_a_chat_message_answers_a_paused_run(
     ws: Workspace, thread: Thread, gate: Gate
 ) -> None:
-    script = Script(call("ask_user", call_id="q1", question="Which day?"), say("Monday then."))
+    script = Script(ask("q1", "Which day?"), say("Monday then."))
     runner = make_runner(make_agent(script, ask=True, output_type=ASKING), gate)
     handle = (await runner.send(ws, thread.id, "Plan it")).run
     assert handle is not None
@@ -127,9 +160,9 @@ async def test_a_chat_message_declines_a_pending_approval(
 
 async def test_a_run_waits_for_every_answer(ws: Workspace, thread: Thread, gate: Gate) -> None:
     both = Script(
-        lambda _: call("ask_user", call_id="q1", question="Day?").__class__(
+        lambda _: ask("q1", "Day?").__class__(
             parts=[
-                *call("ask_user", call_id="q1", question="Day?").parts,
+                *ask("q1", "Day?").parts,
                 *call("publish", call_id="a1", channel="blog").parts,
             ]
         ),
@@ -141,7 +174,7 @@ async def test_a_run_waits_for_every_answer(ws: Workspace, thread: Thread, gate:
     handle = (await runner.send(ws, thread.id, "Go")).run
     assert handle is not None
     await handle.wait()
-    first = AnswerDeferred(run_id=handle.run_id, tool_call_id="q1", answer="Monday")
+    first = AnswerDeferred(run_id=handle.run_id, tool_call_id="q1", answer=in_words("Monday"))
     assert (await runner.answer(ws, first)).run is None
     second = AnswerDeferred(run_id=handle.run_id, tool_call_id="a1", approved=False)
     resumed = (await runner.answer(ws, second)).run
@@ -292,8 +325,8 @@ async def test_a_chat_reply_fills_only_unanswered_requests(
     two_questions = Script(
         lambda _: say("").__class__(
             parts=[
-                *call("ask_user", call_id="q1", question="Day?").parts,
-                *call("ask_user", call_id="q2", question="Time?").parts,
+                *ask("q1", "Day?").parts,
+                *ask("q2", "Time?").parts,
             ]
         ),
         say("Booked."),
@@ -302,7 +335,7 @@ async def test_a_chat_reply_fills_only_unanswered_requests(
     handle = (await runner.send(ws, thread.id, "Book it")).run
     assert handle is not None
     await handle.wait()
-    first = AnswerDeferred(run_id=handle.run_id, tool_call_id="q1", answer="Monday")
+    first = AnswerDeferred(run_id=handle.run_id, tool_call_id="q1", answer=in_words("Monday"))
     unanswered = await runner.answer(ws, first)
     assert (unanswered.run, unanswered.outcome.run_id) == (None, None), "q2 is still open"
     replied = await runner.send(ws, thread.id, "9am")
@@ -329,16 +362,19 @@ async def test_a_late_watcher_gets_the_run_so_far() -> None:
     assert [frame async for frame in watcher] == []
     await channel.send(LiveFrame(run_id="run_1", event=TextDelta(part=0, delta="late")))
     assert [frame async for frame in channel.watch("run_1")] == [], "an ended run stays ended"
+    channel.open("run_1")  # until it resumes
+    await channel.send(LiveFrame(run_id="run_1", event=TextDelta(part=0, delta="again")))
+    assert (await channel.watch("run_1").__anext__()).event == TextDelta(part=0, delta="again")
 
 
 async def test_execute_routes_answers_and_stops(
     ws: Workspace, thread: Thread, gate: Gate, app_tools: FunctionToolset[Session[Gate]]
 ) -> None:
-    script = Script(call("ask_user", call_id="q1", question="Day?"), say("Monday."), call("hold"))
+    script = Script(ask("q1", "Day?"), say("Monday."), call("hold"))
     runner = make_runner(make_agent(script, ask=True, tools=[app_tools], output_type=ASKING), gate)
     await started(await runner.send(ws, thread.id, "Plan")).wait()
     [paused] = await ws.runs(status="paused")
-    answer = AnswerDeferred(run_id=paused.id, tool_call_id="q1", answer="Monday")
+    answer = AnswerDeferred(run_id=paused.id, tool_call_id="q1", answer=in_words("Monday"))
     answered = await runner.execute(ws, answer, command_id="c1")
     assert isinstance(answered.outcome, Recorded)
     assert answered.outcome.run_id == paused.id, "it resumed the run"
@@ -373,7 +409,7 @@ async def _starts(ws: Workspace) -> list[tuple[str, tuple[str, ...]]]:
 async def test_run_started_names_the_messages_its_start_carries_out(
     ws: Workspace, thread: Thread, gate: Gate
 ) -> None:
-    script = Script(call("ask_user", call_id="q1", question="Which day?"), say("Monday then."))
+    script = Script(ask("q1", "Which day?"), say("Monday then."))
     runner = make_runner(make_agent(script, ask=True, output_type=ASKING), gate)
     await started(await runner.send(ws, thread.id, "Plan it", message_id="m1")).wait()
     await started(await runner.send(ws, thread.id, "Monday", message_id="m2")).wait()
@@ -383,11 +419,13 @@ async def test_run_started_names_the_messages_its_start_carries_out(
 async def test_a_resumed_run_names_the_messages_it_takes_as_its_prompt(
     ws: Workspace, thread: Thread, gate: Gate
 ) -> None:
-    script = Script(call("ask_user", call_id="q1", question="Which day?"), say("Monday then."))
+    script = Script(ask("q1", "Which day?"), say("Monday then."))
     runner = make_runner(make_agent(script, ask=True, output_type=ASKING), gate)
     handle = started(await runner.send(ws, thread.id, "Plan it", message_id="m1"))
     await handle.wait()
-    await ws.commit(AnswerDeferred(run_id=handle.run_id, tool_call_id="q1", answer="Monday"))
+    await ws.commit(
+        AnswerDeferred(run_id=handle.run_id, tool_call_id="q1", answer=in_words("Monday"))
+    )
     await ws.post_message(thread.id, "And at noon", message_id="m2")
     resumed = await runner.resume(ws, handle.run_id)
     assert resumed is not None

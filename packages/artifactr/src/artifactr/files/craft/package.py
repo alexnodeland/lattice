@@ -21,6 +21,9 @@ CHUNK: Final = 1 << 16
 
 TYPES: Final = "{http://schemas.openxmlformats.org/package/2006/content-types}Override"
 
+XML_PARTS: Final = (".xml", ".rels")
+"""The names a package's XML parts end with."""
+
 MIMETYPE: Final = 255
 """The most of an OpenDocument's `mimetype` that is read."""
 
@@ -37,6 +40,10 @@ class Package:
 
     stamped: frozenset[str] = frozenset()
     """The parts its app stamps on every save, which the fingerprint leaves out."""
+
+    canonical: bool = False
+    """Whether the fingerprint reads each XML part in its canonical form (C14N 2.0), for an app
+    whose saves write the same XML in more than one way, such as `<a:p/>` and `<a:p></a:p>`."""
 
     def media_type(self, content: bytes) -> str | None:
         """The format a package says it is, or None if it says none.
@@ -67,11 +74,13 @@ class Package:
 
         Each part is hashed on its own, and the fingerprint is the digest of the parts' names
         and digests, so no two different files share one. Each part is read as it inflates, so
-        a zip bomb is refused once it passes `limit`.
+        a zip bomb is refused once it passes `limit`; a `canonical` package's XML parts are
+        hashed in their canonical form.
 
         Raises:
-            AppFailed: `refused` if the bytes aren't a zip, or name a part twice, and
-                `too_large` if its parts, inflated, pass `limit` bytes.
+            AppFailed: `refused` if the bytes aren't a zip, name a part twice, or, canonical,
+                hold an XML part that isn't XML, and `too_large` if its parts, inflated, pass
+                `limit` bytes.
         """
         digest = hashlib.sha256()
         inflated = 0
@@ -82,13 +91,20 @@ class Package:
                     raise AppFailed("refused", f"not a {self.extension}: it names a part twice")
                 for name in sorted(set(names) - self.stamped):
                     part = hashlib.sha256()
+                    xml = self.canonical and name.endswith(XML_PARTS)
+                    kept: list[bytes] = []
                     with archive.open(name) as stream:
                         while chunk := stream.read(CHUNK):
                             inflated += len(chunk)
                             if inflated > limit:
                                 message = f"its parts inflate past {limit} bytes"
                                 raise AppFailed("too_large", message)
-                            part.update(chunk)
+                            if xml:
+                                kept.append(chunk)
+                            else:
+                                part.update(chunk)
+                    if xml:
+                        part.update(self._canonical(name, b"".join(kept)))
                     digest.update(f"{len(name)}:{name}".encode() + part.digest())
         except (
             zipfile.BadZipFile,
@@ -117,3 +133,14 @@ class Package:
             raise AppFailed(
                 "refused", f"not a {self.extension}: it says it is {found or 'no format'}"
             )
+
+    def _canonical(self, name: str, part: bytes) -> bytes:
+        """An XML part in its canonical form, the same however a save wrote it.
+
+        Raises:
+            AppFailed: `refused` if it isn't XML.
+        """
+        try:
+            return ElementTree.canonicalize(from_file=io.BytesIO(part)).encode()
+        except ElementTree.ParseError as error:
+            raise AppFailed("refused", f"not a {self.extension}: {name} is {error}") from None

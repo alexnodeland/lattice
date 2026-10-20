@@ -12,6 +12,7 @@ import zipfile
 import zlib
 from collections.abc import Mapping
 from typing import Final
+from xml.etree import ElementTree
 
 TIME: Final = (2026, 10, 17, 0, 0, 0)
 XML: Final = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
@@ -81,6 +82,17 @@ def parts(content: bytes, stamped: frozenset[str] = frozenset()) -> dict[str, by
     """A package's parts, without those each save stamps."""
     with zipfile.ZipFile(io.BytesIO(content)) as archive:
         return {name: archive.read(name) for name in archive.namelist() if name not in stamped}
+
+
+def canonical(content: bytes) -> dict[str, bytes]:
+    """A package's parts, each XML part in its canonical form (C14N 2.0), as an app that writes
+    the same XML in more than one way is held to it."""
+    return {
+        name: ElementTree.canonicalize(part.decode()).encode()
+        if name.endswith((".xml", ".rels"))
+        else part
+        for name, part in parts(content).items()
+    }
 
 
 def bomb(content: bytes, main: str) -> bytes:

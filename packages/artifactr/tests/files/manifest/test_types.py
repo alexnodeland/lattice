@@ -4,7 +4,16 @@ import pytest
 from pydantic import ValidationError
 
 from artifactr.core import NotFound, get_artifact_type
-from artifactr.files.manifest import DOCX, OUTLINE_LIMIT, XLSX, Provenance, WordDocument, Workbook
+from artifactr.files.manifest import (
+    DOCX,
+    OUTLINE_LIMIT,
+    PPTX,
+    XLSX,
+    Presentation,
+    Provenance,
+    WordDocument,
+    Workbook,
+)
 from tests.files.files_of import blob, digest, document
 
 
@@ -19,6 +28,8 @@ def test_a_word_document_is_registered_and_proposed_by_agents() -> None:
 def test_each_crafting_apps_type_is_registered_with_its_format() -> None:
     assert get_artifact_type("workbook") is Workbook
     assert Workbook.formats == frozenset({XLSX})
+    assert get_artifact_type("presentation") is Presentation
+    assert Presentation.formats == frozenset({PPTX})
 
 
 def test_its_content_is_in_its_format() -> None:

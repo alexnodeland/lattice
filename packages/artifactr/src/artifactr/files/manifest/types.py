@@ -142,3 +142,9 @@ class Workbook(NativeFile):
     """A spreadsheet workbook, `.xlsx`: registered as `workbook`."""
 
     formats: ClassVar[frozenset[str]] = frozenset({XLSX})
+
+
+class Presentation(NativeFile):
+    """A presentation, `.pptx`: registered as `presentation`."""
+
+    formats: ClassVar[frozenset[str]] = frozenset({PPTX})

@@ -137,6 +137,18 @@ files = NativeFiles(blobs, checkouts, {WordDocument: wordcraft, Workbook: gridcr
 
 An agent's commands are GridCraft's own, such as `{"name": "cell.set", "args": {"cell": "B2", "input": "=SUM(B3:B9)"}}`; `gridcraft.commands("sort")` finds them, with where each is in GridCraft's ribbon. Its server has no batch, so the adapter runs a batch's commands one at a time and stops at the first that fails, which refuses the batch, naming the command, and saves nothing. GridCraft would open a CSV, or another format it reads, whatever the file is named, and save it as a `.xlsx`; the adapter refuses a source that isn't a `.xlsx` before GridCraft reads it, so a check-in never converts a file. A workbook's outline is its sheets, the ranges they use and their tables, and its text each sheet's cells as GridCraft shows them. It renders no page headless, and lists no comments. `scripts/craft gridcraft cli` fetches the pinned CLI, and `CRAFT=gridcraft moon run artifactr:fidelity` runs its fidelity report: GridCraft 0.8.0 keeps every feature of its corpus.
 
+## DeckCraft
+
+`artifactr.files.deckcraft.Subprocess` is DeckCraft's adapter for `.pptx` decks, of the type `Presentation`. DeckCraft's CLI confines nothing too, so it is made only with `trusted=True`:
+
+```python
+from artifactr.files.deckcraft import Subprocess as DeckCraft
+
+deckcraft = DeckCraft("/opt/deckcraft/bin/deckcraft-cli", version="0.7.0", trusted=True)
+```
+
+An agent's commands are DeckCraft's own, such as `{"name": "slide.new", "args": {"layout": "titleAndContent"}}` or `{"name": "comment.add", "args": {"text": "Check"}}`; a batch stops at the first that fails, which refuses it whole. A deck's outline is its slides' titles, numbered from 1; its text is each slide's shapes, tables and notes; its review is each slide's comments, and its pages are its slides, each of which `render` draws as a PNG. DeckCraft opens its own `.deckcraft` format whatever a file is named, so the adapter refuses a source that isn't a `.pptx` before DeckCraft reads it. Its second save of a file writes the same XML another way, so its fingerprint reads each XML part in its canonical form, and a save that changes nothing makes no revision. `CRAFT=deckcraft moon run artifactr:fidelity` runs its fidelity report: DeckCraft 0.7.0 keeps every feature of its corpus.
+
 ## The other crafting apps
 
 `artifactr.files.craft.CRAFTS` declares every crafting app, as its pinned release offers it, and each is an integration of its own, `files:<name>`, off by default but WordCraft's:

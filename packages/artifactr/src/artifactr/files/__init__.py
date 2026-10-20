@@ -13,6 +13,7 @@ The layers: [`artifactr.files.manifest`][artifactr.files.manifest], the types an
 [`artifactr.files.craft`][artifactr.files.craft], the crafting apps and their two dialects;
 [`artifactr.files.wordcraft`][artifactr.files.wordcraft], WordCraft's adapter;
 [`artifactr.files.gridcraft`][artifactr.files.gridcraft], GridCraft's;
+[`artifactr.files.deckcraft`][artifactr.files.deckcraft], DeckCraft's;
 [`artifactr.files.worker`][artifactr.files.worker], the worker that runs an app on hostile
 files, and the app that calls it;
 [`artifactr.files.native`][artifactr.files.native], native files in a workspace;
@@ -24,7 +25,15 @@ documentation is at <https://lattice.alexnodeland.com/artifactr/files/>.
 from artifactr.files.app import App, AppCommand, AppFailed, FakeApp
 from artifactr.files.blobs import Blobs, InMemoryBlobs, TooLarge
 from artifactr.files.checkouts import Checkout, Checkouts, InMemoryCheckouts
-from artifactr.files.manifest import DOCX, Blob, NativeFile, Provenance, WordDocument, Workbook
+from artifactr.files.manifest import (
+    DOCX,
+    Blob,
+    NativeFile,
+    Presentation,
+    Provenance,
+    WordDocument,
+    Workbook,
+)
 from artifactr.files.native import ContentUnavailable, NativeFiles
 
 __all__ = [
@@ -42,6 +51,7 @@ __all__ = [
     "InMemoryCheckouts",
     "NativeFile",
     "NativeFiles",
+    "Presentation",
     "Provenance",
     "TooLarge",
     "WordDocument",

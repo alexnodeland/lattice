@@ -227,6 +227,16 @@ for (const [fills, style] of [
   });
 }
 
+test("an app at 100vh that draws more grows: the window's growth is ignored, its own isn't", async () => {
+  const page = await running(
+    `<body><div style="min-height:100vh">Board</div><div id="more"></div><script>
+setTimeout(() => { document.getElementById("more").style.height = "300px"; }, 1500);
+</script>`,
+  );
+  await expect.poll(() => drawn(page), SETTLED).toBeGreaterThanOrEqual(360 + 16 + 300);
+  await page.close();
+});
+
 test("a tall app is shown whole up to twice the window, and scrolls inside its frame past it", async () => {
   const page = await running(`<body style="margin:0"><div style="height:3000px">Board</div>`);
   const twice = await page.evaluate(() => innerHeight * 2);

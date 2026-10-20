@@ -356,13 +356,32 @@ test("the sandbox's measure sizes a frame until the app says its own height", as
     );
   await size(500, true);
   await size(0);
-  await size(520, true); // too soon after the last measure: dropped
+  await size(520, true); // too soon after the last measure: held
+  await vi.advanceTimersByTimeAsync(200);
   await vi.advanceTimersByTimeAsync(200);
   await size(640, true);
   await size(700);
   await vi.advanceTimersByTimeAsync(200);
   await size(300, true);
-  expect(sized).toEqual([500, 640, 700]);
+  expect(sized).toEqual([500, 520, 640, 700]);
+});
+
+test("measures bunched together are applied as their last, never lost", async () => {
+  const { hear, sized } = bridged();
+  const measure = (height: number) =>
+    hear(
+      text({
+        jsonrpc: "2.0",
+        method: "ui/notifications/size-changed",
+        params: { height, measured: true },
+      }),
+    );
+  await measure(400);
+  await measure(450);
+  await measure(480); // the final height, heard too soon, and never said again
+  expect(sized).toEqual([400]);
+  await vi.advanceTimersByTimeAsync(200);
+  expect(sized).toEqual([400, 480]);
 });
 
 test("the sandbox's measures don't count against an app's messages a minute", async () => {

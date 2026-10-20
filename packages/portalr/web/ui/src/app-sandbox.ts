@@ -36,6 +36,11 @@ const NO_WEBRTC =
  * grew (an app at `100vh`, with a margin or a border round it) is the window's, not the app's,
  * and isn't said: the frame stays put rather than climbing. One that says its own height is
  * sized by that instead (the bridge's `#sizeChanged`).
+ *
+ * The window's growth, worked: an app at `min-height: 100vh` in a body with its 8 px margins
+ * measures 376 in a 360 frame, 16 beyond its window, and says it. The frame grows to 376, and it
+ * measures 392, again 16 beyond: grown just as its window did, it isn't said, and stays at 376.
+ * An app that draws more is beyond its window by more than before, and is said.
  */
 const SIZED = [
   'addEventListener("DOMContentLoaded", () => {',

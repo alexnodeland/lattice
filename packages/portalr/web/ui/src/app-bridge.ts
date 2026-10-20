@@ -430,8 +430,10 @@ export class Bridge {
   readonly #limiter: Limiter;
   /** Whether the app has said its own height, which the sandbox's measure then gives way to. */
   #sized = false;
-  /** When the sandbox's measure was last heard, by `#now`. */
+  /** When the sandbox's measure was last applied, by `#now`. */
   #measuredAt = Number.NEGATIVE_INFINITY;
+  /** The latest measure heard too soon after the last, applied when its time comes. */
+  #held: { height: number; timer: ReturnType<typeof setTimeout> } | null = null;
   readonly #now: () => number;
 
   constructor(options: {
@@ -468,24 +470,51 @@ export class Bridge {
     this.#host.resize(Math.round(Math.min(MOST_HEIGHT, height)));
   }
 
+  /**
+   * The sandbox's own measure, not the app's: never counted against it, and applied at most
+   * every `MEASURED_EVERY`. One heard sooner is held, the latest replacing the one before, and
+   * applied when its time comes, since the sandbox says a height once, when it changes: a final
+   * height bunched behind another is never lost.
+   */
+  #measure(height: number) {
+    const wait = this.#measuredAt + MEASURED_EVERY - this.#now();
+    if (wait > 0) {
+      if (this.#held === null) {
+        const timer = setTimeout(() => {
+          const held = this.#held;
+          this.#held = null;
+          if (held !== null) {
+            this.#measure(held.height);
+          }
+        }, wait);
+        this.#held = { height, timer };
+      } else {
+        this.#held = { ...this.#held, height };
+      }
+      return;
+    }
+    this.#measuredAt = this.#now();
+    this.#sizeChanged(height, true);
+  }
+
   /** Hear a message: answered if it is the sandbox's, within its calls a minute; else dropped. */
   heard(event: { readonly source: unknown; readonly origin: string; readonly data: unknown }) {
     if (event.source !== this.#source || event.origin !== this.#origin) {
       return; // not this app's sandbox: dropped, whatever it says
     }
-    const message = readMessage(event.data);
-    if (message !== null && isMeasured(message)) {
-      // The sandbox's own measure, not the app's: paced apart, never counted against it.
-      if (this.#now() - this.#measuredAt >= MEASURED_EVERY) {
-        this.#measuredAt = this.#now();
-        this.#sizeChanged(message.params.height as number, true);
-      }
+    // Only what could be the sandbox's measure is read before the limit: the rest is counted
+    // first, so an app past its limit has none of its messages read.
+    const measured = isString(event.data) && event.data.includes('"measured"');
+    const read = measured ? readMessage(event.data) : null;
+    if (read !== null && isMeasured(read)) {
+      this.#measure(read.params.height as number);
       return;
     }
     if (!this.#limiter.take()) {
       this.#host.quieted();
       return;
     }
+    const message = read ?? readMessage(event.data);
     if (message === null) {
       return;
     }

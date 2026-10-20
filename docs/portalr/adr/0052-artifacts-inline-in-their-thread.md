@@ -22,5 +22,6 @@
 
 - Easier: an app the agent makes or updates is played where it was asked for, live, and one instance at a time.
 - Easier: a later kind is shown inline by setting `inline` on its renderer.
+- Harder: an app taller than its window by a share of it (`150vh`) is beyond its window by more each time the frame grows, so it climbs to the cap; only growth by what the window grew is told apart.
 - Harder: a thread with many apps runs each at once, a frame, a sandbox and a bridge apiece, each reading the integrations every half minute; the kill switch and archiving stop them all.
 - Harder: `make serve` listens on one port, so apps run under `make up` until it listens on two.

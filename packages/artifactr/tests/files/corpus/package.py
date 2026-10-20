@@ -8,6 +8,7 @@ same code makes the same bytes.
 
 import io
 import struct
+import warnings
 import zipfile
 import zlib
 from collections.abc import Mapping
@@ -125,3 +126,29 @@ def untyped(content: bytes) -> bytes:
             for name, part in parts(content).items()
         }
     )
+
+
+def doubled(content: bytes) -> bytes:
+    """The package with a part named twice, each time with other bytes."""
+    made = io.BytesIO()
+    with warnings.catch_warnings(action="ignore"), zipfile.ZipFile(made, "w") as archive:
+        for name, part in parts(content).items():
+            archive.writestr(name, part)
+        archive.writestr("[Content_Types].xml", b"<Types/>")
+    return made.getvalue()
+
+
+def spoofed(content: bytes, media_type: str) -> bytes:
+    """The package's parts without its content types, and a `mimetype` claiming its format."""
+    kept = {name: part for name, part in parts(content).items() if name != "[Content_Types].xml"}
+    return zipped({"mimetype": media_type, **kept})
+
+
+def nested(content: bytes, part: str, depth: int = 50_000) -> bytes:
+    """The package with a part nested `depth` elements deep."""
+    return zipped({**parts(content), part: b"<a>" * depth + b"</a>" * depth})
+
+
+def flat(content: bytes, part: str, elements: int = 3_000_000) -> bytes:
+    """The package with a part of `elements` empty elements, 12 MiB of them from 40 KiB."""
+    return zipped({**parts(content), part: b"<a>" + b"<b/>" * elements + b"</a>"})

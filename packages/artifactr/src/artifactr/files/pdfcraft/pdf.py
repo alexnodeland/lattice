@@ -21,8 +21,9 @@ from artifactr.files.manifest import OUTLINE_LIMIT, PDF
 HEADER: Final = 1024
 """How far into a file its `%PDF-` header may be, as readers allow."""
 
-OBJECT: Final = re.compile(rb"(?<!\d)\d+\s+\d+\s+obj\b")
-STREAM: Final = re.compile(rb"stream\r?\n")
+MARK: Final = re.compile(rb"(?P<obj>(?<!\d)\d+\s+\d+\s+obj\b)|(?P<stream>stream\r?\n)|endobj")
+"""Where an object starts, where its stream starts, and where it ends: found in one pass."""
+
 LENGTH: Final = re.compile(rb"/Length\s+(\d+)(?!\s+\d+\s+R)")
 """A stream's length, given directly: one given by a reference is left as written."""
 
@@ -33,7 +34,8 @@ PACKED: Final = re.compile(rb"/Type\s*/ObjStm\b")
 DEFLATED: Final = re.compile(rb"/Filter\s*/FlateDecode\b")
 
 STAMPED: Final = re.compile(rb"/ModDate\s*\((?:\\.|[^\\)])*\)")
-"""What every save stamps: the information dictionary's modification date."""
+"""What every save stamps: the information dictionary's modification date. It is blanked
+wherever it is written, which is only there: an annotation's date is `/M`."""
 
 WHERE: Final = re.compile(rb"startxref\s+\d+")
 
@@ -46,7 +48,9 @@ def media_type(content: bytes) -> str | None:
 def fingerprint(content: bytes, *, limit: int) -> str:
     """The digest of a `.pdf` without what each save stamps, or where its objects lie.
 
-    It leaves out exactly what PdfCraft's saves change, and reads any other file the same way.
+    It leaves out exactly what PdfCraft's saves change, and reads any other file the same way,
+    in one pass over its bytes. Only an object stream deflated by `/FlateDecode`, with its length
+    given directly, is read as what it holds; every other stream is hashed as it is written.
     Each object stream is inflated as it is read, so one that inflates past `limit` is refused.
 
     Raises:
@@ -56,29 +60,33 @@ def fingerprint(content: bytes, *, limit: int) -> str:
     kept: list[bytes] = []
     budget = limit
     at = 0
-    for found in OBJECT.finditer(content):
-        stream = STREAM.search(content, found.end())
-        if found.start() < at or stream is None:
-            continue  # within a stream already read, or after the last stream
-        if content.find(b"endobj", found.end(), stream.start()) >= 0:
-            continue  # an object without a stream
-        head = content[found.end() : stream.start()]
+    opened: re.Match[bytes] | None = None
+    for mark in MARK.finditer(content):
+        if mark.start() < at:
+            continue  # within a stream already read
+        if mark["obj"]:
+            opened = mark
+            continue
+        if not mark["stream"] or opened is None:
+            opened = None  # an object's end, or a stream no object opened
+            continue
+        head, start, opened = content[opened.end() : mark.start()], opened.start(), None
         packed = PACKED.search(head) and DEFLATED.search(head)
         if not (length := LENGTH.search(head)) or not (packed or XREF.search(head)):
             continue  # a stream kept as it is written
-        data = content[stream.end() : stream.end() + int(length[1])]
-        kept.append(content[at : found.start()])
+        data = content[mark.end() : mark.end() + int(length[1])]
+        kept.append(content[at:start])
         if packed:
             held = _inflated(data, budget)
             budget -= len(held)
             kept.append(held)
-        at = stream.end() + len(data)
+        at = mark.end() + len(data)
     kept.append(content[at:])
     return hashlib.sha256(WHERE.sub(b"", STAMPED.sub(b"", b"".join(kept)))).hexdigest()
 
 
 def _inflated(data: bytes, budget: int) -> bytes:
-    """A deflated stream's bytes, refused once they pass the budget."""
+    """A deflated stream's bytes, whole, refused once they pass the budget."""
     inflater = zlib.decompressobj()
     try:
         held = inflater.decompress(data, max(budget, 1))
@@ -86,6 +94,8 @@ def _inflated(data: bytes, budget: int) -> bytes:
         raise AppFailed("refused", f"not a .pdf: an object stream is {error}") from None
     if inflater.unconsumed_tail or len(held) > budget:
         raise AppFailed("too_large", "its object streams inflate past their limit")
+    if not inflater.eof:
+        raise AppFailed("refused", "not a .pdf: an object stream is cut short")
     return held
 
 

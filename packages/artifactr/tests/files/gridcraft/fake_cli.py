@@ -4,12 +4,14 @@ Its workbooks are zips, as a `.xlsx` is, whose content types say they are workbo
 sheets as JSON in `xl/workbook.json`, each sheet's cells by reference. It confines nothing, as
 GridCraft doesn't, and runs each command by `execute_command`, having no batch.
 
-Run as `python -I fake_cli.py mcp`.
+Run as `python -I fake_cli.py mcp`, with `FAKE_SAVES` naming a file it adds each save to.
 """
 
 import asyncio
 import json
+import os
 import zipfile
+from pathlib import Path
 from typing import Any
 
 from mcp.server.mcpserver import MCPServer
@@ -23,6 +25,7 @@ TYPES = (
 COMMANDS = [
     {"id": "cell.set", "label": "Enter", "menu": ["Home", "Editing"], "params": "{cell, input}"},
     {"id": "sheet.add", "label": "Insert Sheet", "menu": [], "params": "{name}"},
+    {"id": "file.saveAs", "label": "Save As", "menu": ["File"], "params": "{path}"},
 ]
 
 
@@ -87,6 +90,8 @@ def main() -> None:
 
 
 def _save(book: dict[str, Any], path: str) -> None:
+    with Path(os.environ["FAKE_SAVES"]).open("a") as saves:
+        saves.write(f"{path}\n")
     with zipfile.ZipFile(path, "w") as archive:
         archive.writestr("[Content_Types].xml", TYPES)
         archive.writestr("xl/workbook.json", json.dumps(book))

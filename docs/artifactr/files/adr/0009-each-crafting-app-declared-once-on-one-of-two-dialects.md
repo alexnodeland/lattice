@@ -67,3 +67,7 @@ The dialect bases hold what is the same and leave what isn't to each app; the re
 3. [x] `scripts/craft`, a pin for each app, and their tests.
 4. [x] The fidelity harness and Nightly's `fidelity` job, by app.
 5. [ ] Each app's adapter, corpus, normalizer and type, by its own work.
+
+## Notes
+
+- 2026-10-20: GridCraft's, DeckCraft's and PdfCraft's adapters, types and corpora. Each corpus covers only what it generates; not covered: GridCraft's charts, pivots, images, sparklines and data bars; DeckCraft's charts, its masters and layouts beyond one, embedded media and animations; PdfCraft's signatures (which its full rewrite on save invalidates), annotations beyond text notes and links, encryption, XFA and incremental updates. What the adapters read in-process is bounded: a package's inflated parts by `limit`; a canonical package's XML parts (DeckCraft's) at 16 MiB each, 500,000 elements in all and 256 deep; a PDF's object streams by `limit`, read in one pass.

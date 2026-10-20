@@ -28,6 +28,7 @@ TYPES = (
 COMMANDS = [
     {"id": "slide.new", "label": "New Slide", "menu": ["Home", "Slides"], "params": "{layout?}"},
     {"id": "comment.add", "label": "New Comment", "menu": ["Review"], "params": "{text}"},
+    {"id": "app.quit", "label": "Quit", "menu": ["App"], "params": "{}"},
 ]
 
 

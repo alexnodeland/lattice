@@ -41,6 +41,11 @@ def bomb() -> bytes:
     return document([(page("CONTENT"), words("Packed"))], more=[stream])
 
 
+def headers() -> bytes:
+    """A document of nothing but 200,000 objects' headers, none of them ended."""
+    return b"%PDF-1.7\n" + b"1 0 obj\n" * 200_000
+
+
 CORPUS = Corpus(
     app="pdfcraft",
     extension=".pdf",
@@ -49,6 +54,6 @@ CORPUS = Corpus(
     read=read,
     kept=kept,
     adapter=adapter,
-    hostile={"cycle": cycle, "locked": locked, "bomb": bomb},
+    hostile={"cycle": cycle, "locked": locked, "bomb": bomb, "headers": headers},
 )
 """PdfCraft 0.8.0 keeps every feature."""

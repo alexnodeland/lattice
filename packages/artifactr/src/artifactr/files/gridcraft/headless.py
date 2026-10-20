@@ -59,6 +59,7 @@ class Subprocess(ToolsDialect):
     open_tool: ClassVar[str] = "open_workbook"
     save_tool: ClassVar[str] = "save_workbook"
     list_argument: ClassVar[str] = "search"
+    denied: ClassVar[tuple[str, ...]] = ("file.", "app.")
 
     def __init__(
         self,
@@ -93,6 +94,7 @@ class Subprocess(ToolsDialect):
 
         The workbook isn't saved once one has failed, so none of the batch is kept.
         """
+        self.allowed(commands)
         for command in commands:
             arguments: dict[str, JsonValue] = {"command": command.name, "params": command.args}
             reply = await server.session.call_tool("execute_command", arguments)

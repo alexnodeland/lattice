@@ -1,5 +1,8 @@
 """What the adapter reads from a `.pdf` itself: the fingerprint, the format, and the outline."""
 
+import time
+import zlib
+
 import pytest
 
 from artifactr.files.app import AppFailed
@@ -81,3 +84,28 @@ def test_the_outline_is_the_bookmarks_indented_under_their_parents() -> None:
     ]
     assert outline(bookmarks) == "Start\n  Detail\n    Deep\nEnd"
     assert len(outline([Bookmark(title="x" * 50)] * 200)) == OUTLINE_LIMIT
+
+
+def test_what_a_cross_reference_stream_holds_is_never_read_as_objects() -> None:
+    def where(at: bytes) -> bytes:
+        xref = f"<< /Type /XRef /Length {len(at)} >>\nstream\n" + at.decode() + "\nendstream"
+        return pdf(["<< /Type /Catalog >>", xref])
+
+    assert fingerprint(where(b"9 0 obj"), limit=LIMIT) == fingerprint(where(b"\x01"), limit=LIMIT)
+
+
+def test_an_object_stream_cut_short_is_refused() -> None:
+    whole = zlib.compress(b"6 0 << >>")
+    cut = f"<< /Type /ObjStm /Filter /FlateDecode /Length {len(whole) - 4} >>\nstream\n"
+    with pytest.raises(AppFailed, match="cut short") as refused:
+        fingerprint(
+            pdf(["<< /Type /Catalog >>", cut + whole[:-4].decode("latin-1") + "\nendstream"]),
+            limit=LIMIT,
+        )
+    assert refused.value.failure == "refused"
+
+
+def test_many_objects_without_streams_are_read_in_one_pass() -> None:
+    started = time.monotonic()
+    fingerprint(b"%PDF-1.7\n" + b"1 0 obj\n" * 200_000, limit=LIMIT)
+    assert time.monotonic() - started < 2

@@ -2,6 +2,7 @@
 
 from artifactr.files.app import App
 from artifactr.files.gridcraft import Subprocess
+from artifactr.files.manifest import XLSX
 from tests.files.corpus import package
 from tests.files.corpus.gridcraft.features import read
 from tests.files.corpus.gridcraft.make import FEATURES, HERE
@@ -24,6 +25,8 @@ CORPUS = Corpus(
     hostile={
         "bomb": lambda: package.bomb(FEATURES["values"](), "xl/worksheets/sheet1.xml"),
         "untyped": lambda: package.untyped(FEATURES["values"]()),
+        "doubled": lambda: package.doubled(FEATURES["values"]()),
+        "spoofed": lambda: package.spoofed(FEATURES["values"](), XLSX),
     },
 )
 """GridCraft 0.8.0 keeps every feature."""

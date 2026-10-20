@@ -23,7 +23,10 @@ FAKE = Path(__file__).with_name("fake_cli.py")
 @pytest.fixture
 def gridcraft(tmp_path: Path) -> Subprocess:
     cli = tmp_path / "gridcraft-cli"
-    cli.write_text(f'#!/bin/sh\nexec "{sys.executable}" -I "{FAKE}" "$@"\n')
+    cli.write_text(
+        f'#!/bin/sh\nexport FAKE_SAVES="{tmp_path / "saves"}"\n'
+        f'exec "{sys.executable}" -I "{FAKE}" "$@"\n'
+    )
     cli.chmod(cli.stat().st_mode | stat.S_IXUSR)
     return Subprocess(cli, version="0.8.0", trusted=True, limit=1 << 20)
 
@@ -57,7 +60,9 @@ async def test_a_batch_makes_a_workbook_and_says_what_is_in_it(gridcraft: Subpro
     assert await gridcraft.inspect(applied.content, deadline=20) == inspection
 
 
-async def test_a_command_that_fails_refuses_the_batch_and_is_named(gridcraft: Subprocess) -> None:
+async def test_a_command_that_fails_refuses_the_batch_and_is_named(
+    gridcraft: Subprocess, tmp_path: Path
+) -> None:
     with pytest.raises(AppFailed, match=r"nope: .*unknown command `nope`") as refused:
         await gridcraft.apply(
             None, [command("cell.set", cell="A1", input="1"), command("nope")], deadline=20
@@ -105,3 +110,24 @@ async def test_it_finds_ten_commands_at_most_by_where_they_are(gridcraft: Subpro
     listed = await gridcraft.commands("")
     assert len(listed) == 10
     assert listed[1].description == "Insert Sheet", "in no menu"
+
+
+async def test_a_batch_that_fails_after_a_command_ran_saves_nothing(
+    gridcraft: Subprocess, tmp_path: Path
+) -> None:
+    source = (await gridcraft.apply(None, [], deadline=20)).content
+    (tmp_path / "saves").unlink()
+    with pytest.raises(AppFailed, match="nope"):
+        await gridcraft.apply(
+            source, [command("cell.set", cell="A1", input="1"), command("nope")], deadline=20
+        )
+    assert not (tmp_path / "saves").exists()
+
+
+async def test_a_command_past_the_open_file_is_refused_and_never_found(
+    gridcraft: Subprocess, tmp_path: Path
+) -> None:
+    with pytest.raises(AppFailed, match=r"file\.saveAs: GridCraft's adapter runs no such command"):
+        await gridcraft.apply(None, [command("file.saveAs", path="/etc/x")], deadline=20)
+    assert not (tmp_path / "saves").exists()
+    assert not [c for c in await gridcraft.commands("") if c.name.startswith("file.")]

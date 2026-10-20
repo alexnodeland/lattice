@@ -110,3 +110,11 @@ async def test_it_finds_ten_commands_at_most_by_where_they_are(deckcraft: Subpro
     assert len(found) == 6, "the stand-in repeats each match six times"
     assert (found[0].name, found[0].description) == ("slide.new", "New Slide (Home > Slides)")
     assert len(await deckcraft.commands("")) == 10
+
+
+async def test_a_command_past_the_open_file_is_refused_and_never_found(
+    deckcraft: Subprocess,
+) -> None:
+    with pytest.raises(AppFailed, match=r"app\.quit: DeckCraft's adapter runs no such command"):
+        await deckcraft.apply(None, [command("app.quit")], deadline=20)
+    assert not [c for c in await deckcraft.commands("") if c.name.startswith("app.")]

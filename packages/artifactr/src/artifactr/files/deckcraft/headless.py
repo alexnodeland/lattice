@@ -58,6 +58,7 @@ class Subprocess(ToolsDialect):
     save_tool: ClassVar[str] = "save_presentation"
     render_tool: ClassVar[str] = "render_slide"
     list_argument: ClassVar[str] = "filter"
+    denied: ClassVar[tuple[str, ...]] = ("file.", "app.")
 
     def __init__(
         self,

@@ -10,7 +10,7 @@ import hashlib
 import io
 import zipfile
 import zlib
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Final
 from xml.etree import ElementTree
@@ -22,6 +22,15 @@ CHUNK: Final = 1 << 16
 TYPES: Final = "{http://schemas.openxmlformats.org/package/2006/content-types}Override"
 
 XML_PARTS: Final = (".xml", ".rels")
+
+PART: Final = 16 << 20
+"""The most bytes of one XML part a canonical package reads in its canonical form."""
+
+ELEMENTS: Final = 500_000
+"""The most elements a canonical package's XML parts hold, together."""
+
+DEPTH: Final = 256
+"""The deepest an element of a canonical package's XML parts is nested."""
 """The names a package's XML parts end with."""
 
 MIMETYPE: Final = 255
@@ -49,8 +58,9 @@ class Package:
         """The format a package says it is, or None if it says none.
 
         An Office Open XML package says it by its main part's content type, and an OpenDocument
-        by its `mimetype`. Call it once `fingerprint` has read the package, which refuses one
-        that isn't a zip or inflates past its limit.
+        by its `mimetype`, which can't claim one of this package's formats. Call it once
+        `fingerprint` has read the package, which refuses one that isn't a zip or inflates past
+        its limit.
 
         Raises:
             AppFailed: `refused` if its content types aren't XML.
@@ -58,7 +68,10 @@ class Package:
         with zipfile.ZipFile(io.BytesIO(content)) as archive:
             names = set(archive.namelist())
             if "mimetype" in names:
-                return archive.read("mimetype")[:MIMETYPE].decode("ascii", "replace").strip()
+                said = archive.read("mimetype")[:MIMETYPE].decode("ascii", "replace").strip()
+                # Only an OpenDocument says its format so: one that says it is of this
+                # package's formats is spoofing it, and says none.
+                return None if said in self.main.values() else said
             if "[Content_Types].xml" not in names:
                 return None
             try:
@@ -84,6 +97,7 @@ class Package:
         """
         digest = hashlib.sha256()
         inflated = 0
+        elements = [ELEMENTS]
         try:
             with zipfile.ZipFile(io.BytesIO(content)) as archive:
                 names = archive.namelist()
@@ -93,6 +107,9 @@ class Package:
                     part = hashlib.sha256()
                     xml = self.canonical and name.endswith(XML_PARTS)
                     kept: list[bytes] = []
+                    if xml and archive.getinfo(name).file_size > PART:
+                        message = f"{name} is larger than {PART} bytes"
+                        raise AppFailed("too_large", message)
                     with archive.open(name) as stream:
                         while chunk := stream.read(CHUNK):
                             inflated += len(chunk)
@@ -104,7 +121,7 @@ class Package:
                             else:
                                 part.update(chunk)
                     if xml:
-                        part.update(self._canonical(name, b"".join(kept)))
+                        part.update(self._canonical(name, b"".join(kept), elements))
                     digest.update(f"{len(name)}:{name}".encode() + part.digest())
         except (
             zipfile.BadZipFile,
@@ -134,13 +151,45 @@ class Package:
                 "refused", f"not a {self.extension}: it says it is {found or 'no format'}"
             )
 
-    def _canonical(self, name: str, part: bytes) -> bytes:
+    def _canonical(self, name: str, part: bytes, elements: list[int]) -> bytes:
         """An XML part in its canonical form, the same however a save wrote it.
 
+        Its elements are counted against what is left of the package's, `elements`.
+
         Raises:
-            AppFailed: `refused` if it isn't XML.
+            AppFailed: `refused` if it isn't XML or nests past `DEPTH`, and `too_large` if the
+                package's parts hold more than `ELEMENTS` elements.
         """
+        written: list[str] = []
+        parser = ElementTree.XMLParser(target=_Bounded(written.append, elements, self, name))
         try:
-            return ElementTree.canonicalize(from_file=io.BytesIO(part)).encode()
+            parser.feed(part)
+            parser.close()
         except ElementTree.ParseError as error:
             raise AppFailed("refused", f"not a {self.extension}: {name} is {error}") from None
+        return "".join(written).encode()
+
+
+class _Bounded(ElementTree.C14NWriterTarget):
+    """C14N 2.0's writer, refusing a part that nests too deep or holds too many elements."""
+
+    def __init__(
+        self, write: Callable[[str], object], elements: list[int], package: Package, name: str
+    ) -> None:
+        super().__init__(write)
+        self._elements = elements
+        self._depth = 0
+        self._where = f"{name} of a {package.extension}"
+
+    def start(self, tag: str, attrs: Mapping[str, str]) -> None:
+        self._depth += 1
+        self._elements[0] -= 1
+        if self._elements[0] < 0:
+            raise AppFailed("too_large", f"its XML parts hold more than {ELEMENTS} elements")
+        if self._depth > DEPTH:
+            raise AppFailed("refused", f"{self._where} nests deeper than {DEPTH}")
+        super().start(tag, attrs)
+
+    def end(self, tag: str) -> None:
+        self._depth -= 1
+        super().end(tag)

@@ -1,5 +1,8 @@
 """What the adapter reads from a `.pptx` itself: the fingerprint, the format, outline and text."""
 
+import time
+from collections.abc import Callable
+
 import pytest
 
 from artifactr.files.app import AppFailed
@@ -48,3 +51,34 @@ def test_the_text_is_each_slides_shapes_tables_and_notes() -> None:
         Slide(shapes=[Shape(text="Thanks")]),
     ]
     assert text(slides) == "Results\nRegion\tRevenue\nNorth\t120\nSay hi\n\nThanks"
+
+
+@pytest.mark.parametrize(
+    ("made", "failure", "found"),
+    [
+        (lambda: package.nested(CORPUS.source("text"), SLIDE), "refused", "nests deeper than 256"),
+        (
+            lambda: package.flat(CORPUS.source("text"), SLIDE),
+            "too_large",
+            "more than 500000 elements",
+        ),
+        (
+            lambda: package.zipped({SLIDE: b"<a>" + b" " * (16 << 20) + b"</a>"}),
+            "too_large",
+            "larger than 16777216 bytes",
+        ),
+    ],
+    ids=["nested", "flat", "large"],
+)
+def test_xml_read_in_its_canonical_form_is_bounded(
+    made: Callable[[], bytes], failure: str, found: str
+) -> None:
+    started = time.monotonic()
+    with pytest.raises(AppFailed, match=found) as bounded:
+        fingerprint(made(), limit=1 << 28)
+    assert bounded.value.failure == failure
+    assert time.monotonic() - started < 5
+
+
+def test_a_mimetype_that_claims_a_presentation_is_no_format() -> None:
+    assert media_type(package.spoofed(CORPUS.source("text"), PPTX)) is None

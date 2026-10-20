@@ -1,10 +1,10 @@
 """PdfCraft run headless on this machine: a fresh `pdfcraft-cli mcp` for every call.
 
-Each call spawns the CLI's MCP server on stdio, in an empty temporary directory that is its one
-root and nothing else, opens the bytes it was given, runs what it was asked, and ends the
-process and the directory with the call. PdfCraft's server is the `commands` dialect's first:
-what is PdfCraft's own here is how a blank document is made, which no command does headless,
-and how a document is read.
+Each call spawns the CLI's MCP server on stdio, in a temporary directory of the call's own, its
+one root, which holds the source, the saved file and what the CLI prints; opens the bytes it
+was given, runs what it was asked, and ends the process and the directory with the call.
+PdfCraft's server is the `commands` dialect's first: what is PdfCraft's own here is how a blank
+document is made, which no command does headless, and how a document is read.
 """
 
 from pathlib import Path

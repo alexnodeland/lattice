@@ -122,6 +122,10 @@ export interface Run {
   /** Why it failed, as its `run_ended` says: what happened, and a code for it, where known. */
   readonly error: string | null;
   readonly reason: string | null;
+  /** The messages its first start carried out, oldest first: what started it. */
+  readonly prompt: readonly v1.MessageId[];
+  /** The person its latest start acts for, or null where it acts for no person. */
+  readonly actsFor: string | null;
   /** What it asked through `ask_user`, oldest first, answered or not. */
   readonly questions: readonly Question[];
   /** The feedback given on the turn, oldest first. */
@@ -192,6 +196,8 @@ function withRun(state: Workspace, id: v1.RunId, change: Partial<Run>): Workspac
     ended: null,
     error: null,
     reason: null,
+    prompt: [],
+    actsFor: null,
     questions: [],
     feedback: [],
   };
@@ -274,12 +280,20 @@ const handlers: Handlers = {
       },
     };
   },
-  run_started: (state, event, envelope) =>
-    withRun(state, event.run_id, {
+  run_started: (state, event, envelope) => {
+    const first = state.runs[event.run_id]?.prompt.length ? undefined : event.message_ids;
+    const { actor } = envelope;
+    return withRun(state, event.run_id, {
       threadId: event.thread_id,
       status: "running",
       started: envelope.seq,
-    }),
+      ...(first && { prompt: first }),
+      ...(actor.kind === "agent" &&
+        actor.on_behalf_of?.kind === "user" && {
+          actsFor: actor.on_behalf_of.id,
+        }),
+    });
+  },
   tool_called: (state, event, envelope) =>
     withRun(state, event.run_id, {
       tools: {

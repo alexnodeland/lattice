@@ -30,6 +30,8 @@ from artifactr.core import (
     RunStarted,
     SetFocus,
     TenantId,
+    ToolCalled,
+    ToolReturned,
     TurnTarget,
     UserActor,
     Visibility,
@@ -46,6 +48,7 @@ OPEN, CLOSED = "thr_open", "thr_closed"
 SHARED, RESTRICTED, FROM_CLOSED = "a_shared", "a_restricted", "a_from_closed"
 ON_RESTRICTED, FROM_CLOSED_PROPOSAL = "prp_restricted", "prp_closed"
 CLOSED_RUN = "run_closed"
+OPEN_RUN = "run_open"
 
 
 class Hider:
@@ -80,6 +83,20 @@ async def bob(storage: Storage, hider: Hider) -> Workspace:
         Note(text="from the closed thread"), artifact_id=FROM_CLOSED, thread_id=CLOSED
     )
     await alice.commit(SetFocus(thread_id=OPEN, artifact_ids=(SHARED, RESTRICTED)))
+    # Alice's turn in the open thread reads both: what it read of the restricted one is hers.
+    reader = alice.as_actor(AgentActor(thread_id=OPEN, run_id=OPEN_RUN, on_behalf_of=ALICE))
+    await reader.record(RunStarted(run_id=OPEN_RUN, thread_id=OPEN))
+    for call, artifact in (("c_shared", SHARED), ("c_restricted", RESTRICTED)):
+        named = {
+            "run_id": OPEN_RUN,
+            "thread_id": OPEN,
+            "tool_call_id": call,
+            "artifact_id": artifact,
+        }
+        await reader.record(ToolCalled.model_validate({**named, "tool_name": "read_artifact"}))
+        await reader.record(
+            ToolReturned.model_validate({**named, "status": "ok", "summary": "its text"})
+        )
     agent = alice.as_actor(AgentActor(thread_id=CLOSED, run_id=CLOSED_RUN))
     await agent.record(RunStarted(run_id=CLOSED_RUN, thread_id=CLOSED))
     await alice.record(AppEvent(name="noted", thread_id=CLOSED), history=b'[{"kind":"request"}]')
@@ -214,7 +231,7 @@ async def test_listings_leave_hidden_items_out(bob: Workspace) -> None:
     assert [t.id for t in await bob.threads()] == [OPEN]
     assert (await bob.thread(OPEN)).focus == (SHARED,)
     assert [t.focus for t in await bob.threads()] == [(SHARED,)]
-    assert await bob.runs() == []
+    assert [run.id for run in await bob.runs()] == [OPEN_RUN]
     [proposal] = await bob.proposals(status=None)
     assert proposal.id == FROM_CLOSED_PROPOSAL
     assert CLOSED not in proposal.model_dump_json()
@@ -231,6 +248,8 @@ async def test_the_log_drops_hidden_items_and_where_an_artifact_came_from(bob: W
     ]
     assert created.thread_id is None
     assert [e.event.artifact_ids for e in log if isinstance(e.event, FocusChanged)] == [(SHARED,)]
+    calls = [e.event for e in log if isinstance(e.event, ToolCalled | ToolReturned)]
+    assert {call.artifact_id for call in calls} == {SHARED}, "a call is as hidden as its artifact"
     assert [e.seq for e in log] == [e.seq async for e in _replay(bob, len(log))]
     assert not [n for n in await bob.change_notes(after_seq=0) if RESTRICTED in n.model_dump_json()]
 

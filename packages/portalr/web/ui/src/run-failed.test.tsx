@@ -8,7 +8,7 @@ test("a failed turn says why in words, the run's own under Details, and can be t
   const screen = await render(
     <Messages>
       <RunFailed
-        reason="unexpected_model_behavior"
+        reason="tool_retries_exhausted"
         error="Tool 'draft_rule' exceeded max retries count of 1"
         onRetry={onRetry}
       />
@@ -31,9 +31,11 @@ test("a failure further up, or one without a reason, is a note, with no way to t
     <Messages>
       <RunFailed reason={null} error={null} />
       <RunFailed reason="something_new" error="Boom" />
+      <RunFailed reason="unexpected_model_behavior" error={null} />
     </Messages>,
   );
-  const [plain, unknown] = screen.getByRole("note").elements();
+  const [plain, unknown, unusable] = screen.getByRole("note").elements();
+  expect(unusable?.textContent).toContain("The model answered in a way the turn couldn't use.");
   expect(plain?.textContent).toContain("Something went wrong before it answered.");
   expect(unknown?.textContent).toContain("Something went wrong before it answered.");
   expect(screen.getByText("Details").elements()).toHaveLength(1);

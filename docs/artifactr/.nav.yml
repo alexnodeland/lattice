@@ -123,6 +123,7 @@ nav:
     - adr/0081-a-gate-before-access-integrations-switched-off-answer-not-enabled.md
     - adr/0082-mini-apps-the-agents-tools-and-html-that-loads-nothing.md
     - adr/0083-ask-user-asks-questions-with-options.md
+    - adr/0084-what-a-run-records-of-its-calls-and-who-reads-it.md
   - RFCs:
     - rfcs/README.md
     - rfcs/0001-v0.1-implementation-plan.md

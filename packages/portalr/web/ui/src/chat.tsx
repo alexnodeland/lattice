@@ -123,6 +123,8 @@ type MessageProps = {
   mine?: boolean;
   /** Whether it is on its way: shown as the reader wrote it until the thread has it. */
   sending?: boolean;
+  /** Send it again, under its id, where its answer never came: it says so, with a button. */
+  onSendAgain?: () => Sent;
   /** The reader's thumbs on it, as `client`'s `thumbs` reads them. */
   thumbs?: Thumb | null;
   /** Give thumbs; without it, there are none. */
@@ -147,6 +149,7 @@ export function Message({
   author,
   mine = false,
   sending = false,
+  onSendAgain,
   thumbs = null,
   onThumbs,
 }: MessageProps) {
@@ -169,7 +172,12 @@ export function Message({
         <Markdown>{message.content}</Markdown>
       </div>
       <div className="flex min-h-7 flex-wrap items-start gap-1">
-        {sending ? (
+        {sending && onSendAgain ? (
+          <span className="flex items-center gap-2">
+            <span className={TYPE.note}>It may not have been sent.</span>
+            <CommandButton onSend={onSendAgain}>Send again</CommandButton>
+          </span>
+        ) : sending ? (
           <span className={TYPE.note}>Sending…</span>
         ) : (
           <>
@@ -252,13 +260,16 @@ export function InlineArtifact({
 
 /**
  * Write a message: Enter sends it, Shift+Enter starts a new line, and composing text waits. It
- * clears as it sends, as the thread shows the message at once; one that isn't sent comes back.
+ * clears as it sends, as the thread shows the message at once; one refused comes back.
  */
 export function Composer({
   onSend,
   disabled = false,
 }: {
-  /** Post the message; the text is cleared as it is sent, and comes back if it isn't. */
+  /**
+   * Post the message; the text is cleared as it is sent, and comes back if the server refused
+   * it. One whose answer never came may have been posted: the thread offers to send it again.
+   */
   onSend: (text: string) => Sent;
   disabled?: boolean;
 }) {
@@ -268,7 +279,12 @@ export function Composer({
     const message = text.trim();
     if (message && !pending) {
       setText("");
-      if (!(await sending(() => onSend(message)))) {
+      let refused = false;
+      const told = (settled: { outcome: string }) => {
+        refused = settled.outcome === "refused";
+        return false; // the composer says why, whatever it was
+      };
+      if (!(await sending(() => onSend(message), told)) && refused) {
         setText((written) => written || message); // back, unless something new was written
       }
     }

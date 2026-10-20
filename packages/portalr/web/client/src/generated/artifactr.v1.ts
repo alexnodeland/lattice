@@ -911,6 +911,7 @@ export interface RunStarted {
  */
 export interface ToolCalled {
   args_summary?: ArgsSummary;
+  artifact_id?: ArtifactId | null;
   run_id: RunId;
   thread_id: ThreadId;
   tool_call_id: ToolCallId1;
@@ -924,6 +925,7 @@ export interface ToolCalled {
  * via the `definition` "ToolReturned".
  */
 export interface ToolReturned {
+  artifact_id?: ArtifactId | null;
   run_id: RunId;
   status: Status;
   summary?: Summary2;

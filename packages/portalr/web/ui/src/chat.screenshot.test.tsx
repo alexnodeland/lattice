@@ -106,7 +106,7 @@ function Ended() {
           />
         </li>
         <RunFailed
-          reason="unexpected_model_behavior"
+          reason="tool_retries_exhausted"
           error="Tool 'draft_rule' exceeded max retries count of 3"
           onRetry={sent}
         />

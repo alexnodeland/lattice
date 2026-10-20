@@ -94,9 +94,22 @@ test("a long value is capped, and scrolls; a value that isn't JSON is shown as i
   );
   await screen.getByText("create_artifact").click();
   await expect.element(screen.getByRole("group").getByText("not JSON…").last()).toBeVisible();
-  const result = screen.getByText(/line 79/).element();
+  const result = screen.getByRole("region", { name: "The result of create_artifact" }).element();
   expect(result.scrollHeight).toBeGreaterThan(result.clientHeight);
   expect(getComputedStyle(result).overflowY).toBe("auto");
+  expect(result.tabIndex).toBe(0); // the keyboard reaches it, to scroll it
+});
+
+test("a value the run cut short says so", async () => {
+  const screen = await render(
+    <ToolCalls>
+      <ToolCall tool={tool({ result: "The first part…" })} />
+    </ToolCalls>,
+  );
+  await screen.getByText("create_artifact").click();
+  await expect
+    .element(screen.getByText("Cut short: the run keeps the first part of each value."))
+    .toBeVisible();
 });
 
 test("a status the run didn't name is said as it was", async () => {

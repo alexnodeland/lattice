@@ -30,6 +30,9 @@ from pydantic import (
 from artifactr.core.errors import ValidationFailed
 
 ASK_USER: Final = "ask_user"
+
+OTHER: Final = "other"
+"""The choice clients draw for a person's own words, which no option may be labelled."""
 """The agent's tool that asks the people in its thread questions and waits for their answers."""
 
 
@@ -67,6 +70,8 @@ class Question(BaseModel):
         labels = [option.label for option in options]
         if len(set(labels)) != len(labels):
             raise ValueError("each option's label must be unique in its question")
+        if any(label.strip().casefold() == OTHER for label in labels):
+            raise ValueError("'Other' is offered by setting other, not as an option")
         return tuple(sorted(options, key=lambda option: not option.recommended))
 
 
@@ -91,7 +96,7 @@ class Chosen(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     selected: tuple[str, ...] = ()
-    other: str | None = None
+    other: Annotated[str, Field(max_length=2000)] | None = None
 
 
 class Answers(BaseModel):
@@ -107,7 +112,7 @@ class Reply(BaseModel):
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    reply: Annotated[str, Field(min_length=1)]
+    reply: Annotated[str, Field(min_length=1, max_length=20000, pattern=r"\S")]
 
 
 _ANSWER = TypeAdapter[Answers | Reply](Answers | Reply)
@@ -147,9 +152,14 @@ def check_answer(args: dict[str, JsonValue], answer: JsonValue) -> Answers | Rep
 def answer_for_model(args: dict[str, JsonValue], answer: JsonValue) -> JsonValue:
     """What the agent's ``ask_user`` call returns: each question beside how it was answered.
 
-    The answer is one :func:`check_answer` held when it was committed.
+    Core holds an answer only as it is committed. One committed before it held them, such as a
+    string answering a question asked before ``ask_user`` took options, is passed through as it
+    was, so its run still resumes.
     """
-    given = check_answer(args, answer)
+    try:
+        given = check_answer(args, answer)
+    except ValidationFailed:
+        return answer
     if isinstance(given, Reply):
         return {"reply": given.reply}
     asked = Questions.model_validate(args)

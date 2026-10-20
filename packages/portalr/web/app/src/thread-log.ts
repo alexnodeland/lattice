@@ -75,26 +75,33 @@ export function threadLog(
   }, []);
 }
 
+/** A failed turn tried again: the message that started it, posted again under `id`. */
+export interface Retry {
+  /** Derived from the run, so a second try, from here or another tab, is the same message. */
+  readonly id: string;
+  readonly content: string;
+}
+
 /**
- * What "Try again" sends for the thread's latest turn, if it failed: the last message the reader
- * posted before it ended, again. Null if its latest turn didn't fail, or the reader posted nothing
- * before it.
+ * What "Try again" sends for the thread's latest turn, if it failed and the reader started it:
+ * the message that started it, posted again under an id derived from the run, which the server
+ * takes once. Null if its latest turn didn't fail, someone else started it, or it was tried again.
  */
 export function retryOf(
   thread: Artifactr.Thread,
   runs: Readonly<Record<string, Artifactr.Run>>,
   me: string,
-): string | null {
+): Retry | null {
   const latest = Object.values(runs)
     .filter((run) => run.threadId === thread.id)
     .sort((a, b) => b.started - a.started)[0];
-  if (latest?.status !== "failed" || latest.ended === null) {
+  if (latest?.status !== "failed") {
     return null;
   }
-  const ended = latest.ended;
-  const posted = thread.messages.findLast(
-    ({ actor, kind, seq }) =>
-      kind === "message" && seq < ended && actor.kind === "user" && actor.id === me,
-  );
-  return posted?.content ?? null;
+  const id = `msg_again_${latest.id}`;
+  const [first] = latest.prompt;
+  const started = thread.messages.find((message) => message.id === first);
+  const mine = started?.actor.kind === "user" && started.actor.id === me;
+  const again = thread.messages.some((message) => message.id === id);
+  return started && mine && !again ? { id, content: started.content } : null;
 }

@@ -7,12 +7,13 @@ from typing import override
 
 import pytest
 from pydantic import BaseModel
-from pydantic_ai import FunctionToolset, ModelMessage, ModelRequest, ModelResponse
+from pydantic_ai import Agent, FunctionToolset, ModelMessage, ModelRequest, ModelResponse
 from pydantic_ai.exceptions import UnexpectedModelBehavior
 
-from artifactr.agent import Runner, Session, last_seen, load_history
+from artifactr.agent import ArtifactWorkspace, Runner, Session, last_seen, load_history
 from artifactr.core import (
     AgentActor,
+    Applied,
     InvalidState,
     Run,
     RunEnded,
@@ -196,8 +197,80 @@ async def test_a_model_out_of_retries_fails_its_run_for_that_reason(
     with pytest.raises(UnexpectedModelBehavior):
         await started(await runner.send(ws, thread.id, "Draft a plan")).wait()
     ended = event_as((await ws.read())[-1], RunEnded)
-    assert (ended.status, ended.reason) == ("failed", "unexpected_model_behavior")
+    assert (ended.status, ended.reason) == ("failed", "tool_retries_exhausted")
     assert "exceeded max retries" in str(ended.error)
+
+
+async def test_a_model_that_answers_no_way_the_run_takes_fails_for_that_reason(
+    ws: Workspace, thread: Thread, gate: Gate
+) -> None:
+    class Plan(BaseModel):
+        steps: int
+
+    script = Script(*[call("final_result", steps="many")] * 3)  # never a number
+    runner = make_runner(make_agent(script, output_type=Plan), gate)
+    with pytest.raises(UnexpectedModelBehavior):
+        await started(await runner.send(ws, thread.id, "hi")).wait()
+    ended = event_as((await ws.read())[-1], RunEnded)
+    assert (ended.status, ended.reason) == ("failed", "unexpected_model_behavior")
+
+
+async def test_a_call_names_the_artifact_it_names_so_it_is_as_hidden(
+    ws: Workspace, thread: Thread, gate: Gate
+) -> None:
+    note = await ws.create(Note(text="Ship Friday"))
+    assert isinstance(note, Applied)
+    script = Script(
+        call("read_artifact", call_id="c1", artifact_id=note.artifact_id),
+        call("read_artifact", call_id="c2", artifact_id="art_none"),
+        say("Read."),
+    )
+    runner = make_runner(make_agent(script), gate)
+    await started(await runner.send(ws, thread.id, "Read it")).wait()
+    log = await ws.read()
+    named = [
+        (e.event.type, e.event.artifact_id)
+        for e in log
+        if isinstance(e.event, ToolCalled | ToolReturned)
+    ]
+    assert named == [
+        ("tool_called", note.artifact_id),
+        ("tool_returned", note.artifact_id),
+        ("tool_called", "art_none"),
+        ("tool_returned", "art_none"),
+    ]
+
+
+async def test_a_capability_told_to_record_no_summaries_records_none(
+    ws: Workspace, thread: Thread, gate: Gate
+) -> None:
+    note = await ws.create(Note(text="Ship Friday"))
+    assert isinstance(note, Applied)
+    script = Script(call("read_artifact", artifact_id=note.artifact_id), say("Read."))
+    agent = Agent(
+        script.model,
+        deps_type=Session[Gate],
+        capabilities=[ArtifactWorkspace(types=[Note], max_summary_chars=0)],
+    )
+    await started(await make_runner(agent, gate).send(ws, thread.id, "Read it")).wait()
+    calls = [e.event for e in await ws.read() if isinstance(e.event, ToolCalled | ToolReturned)]
+    summaries = [c.args_summary if isinstance(c, ToolCalled) else c.summary for c in calls]
+    assert summaries == ["", ""]
+
+
+async def test_what_a_run_failed_with_is_recorded_without_its_secrets(
+    ws: Workspace, thread: Thread, gate: Gate
+) -> None:
+    def fail(messages: list[ModelMessage]) -> ModelResponse:
+        raise RuntimeError(
+            "POST https://u:p@llm.example/v1?api_key=k1 sent Bearer abc sk-0123456789"
+        )
+
+    runner = make_runner(make_agent(Script(fail)), gate)
+    with pytest.raises(RuntimeError):
+        await started(await runner.send(ws, thread.id, "hi")).wait()
+    ended = event_as((await ws.read())[-1], RunEnded)
+    assert ended.error == "POST https://llm.example/v1 sent Bearer [redacted] [redacted]"
 
 
 async def test_a_run_left_running_is_abandoned_when_its_thread_is_next_claimed(

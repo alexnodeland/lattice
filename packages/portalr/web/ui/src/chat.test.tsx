@@ -400,7 +400,7 @@ test("a message is named for who posted it", async () => {
   await expect.element(screen.getByRole("listitem", { name: "Alice" })).toBeVisible();
 });
 
-test("a refused post keeps its text, and says it wasn't done", async () => {
+test("a refused post gives its text back, and says it wasn't done", async () => {
   const screen = await render(<Composer onSend={sent("refused")} />);
   const box = screen.getByRole("textbox", { name: "Message" });
   await box.fill("Draft the plan");
@@ -428,17 +428,40 @@ test("a post clears as it is sent, and waits for its answer before another can b
   await expect.element(box).toHaveValue("Two");
 });
 
-test("a post that wasn't sent comes back, unless something new was written", async () => {
-  let done: (value: { outcome: "closed" }) => void = () => undefined;
-  const onSend = vi.fn(() => new Promise<{ outcome: "closed" }>((resolve) => (done = resolve)));
+test("a post refused comes back, unless something new was written", async () => {
+  let done: (value: { outcome: "refused" }) => void = () => undefined;
+  const onSend = vi.fn(() => new Promise<{ outcome: "refused" }>((resolve) => (done = resolve)));
   const screen = await render(<Composer onSend={onSend} />);
   const box = screen.getByRole("textbox", { name: "Message" });
   await box.fill("One");
   await userEvent.keyboard("{Enter}");
   await box.fill("Two");
-  done({ outcome: "closed" });
+  done({ outcome: "refused" });
   await expect.element(screen.getByRole("alert")).toBeVisible();
   await expect.element(box).toHaveValue("Two");
+});
+
+test("a post whose answer never came stays with the thread, not back in the box", async () => {
+  const screen = await render(<Composer onSend={sent("closed")} />);
+  const box = screen.getByRole("textbox", { name: "Message" });
+  await box.fill("One");
+  await userEvent.keyboard("{Enter}");
+  await expect
+    .element(screen.getByRole("alert"))
+    .toHaveTextContent("That wasn't sent: the connection closed.");
+  await expect.element(box).toHaveValue("");
+});
+
+test("a message whose answer never came may not have been sent, and is sent again", async () => {
+  const again = sent();
+  const screen = await render(
+    <Messages>
+      <Message message={message()} author="You" mine sending onSendAgain={again} />
+    </Messages>,
+  );
+  await expect.element(screen.getByText("It may not have been sent.")).toBeVisible();
+  await screen.getByRole("button", { name: "Send again" }).click();
+  expect(again).toHaveBeenCalledOnce();
 });
 
 test("an answer that wasn't sent can be given again", async () => {

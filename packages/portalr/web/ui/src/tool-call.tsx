@@ -9,6 +9,7 @@ import { ChevronRight, Wrench } from "lucide-react";
 import type { ReactNode } from "react";
 import { CopyButton } from "./copy-button";
 import { Icon } from "./icon";
+import { ScrollRegion } from "./scroll-region";
 import { StatusBadge, type Tone } from "./status-badge";
 import { TYPE } from "./type";
 
@@ -30,17 +31,27 @@ function pretty(text: string): string {
   }
 }
 
-/** A part of a call: its name, a way to copy it, and its value, scrolled where it is long. */
+/**
+ * A part of a call: its name, a way to copy it, and its value, scrolled where it is long, which
+ * the keyboard reaches and scrolls too. A value the run cut short, at its limit, says so.
+ */
 function Part({ name, tool, text }: { name: string; tool: string; text: string }) {
+  const what = `the ${name.toLowerCase()} of ${tool}`;
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-center justify-between gap-2">
         <span className={TYPE.note}>{name}</span>
-        <CopyButton text={text} what={`the ${name.toLowerCase()} of ${tool}`} />
+        <CopyButton text={text} what={what} />
       </div>
-      <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md border border-line bg-paper p-3 font-mono text-xs">
-        {text}
-      </pre>
+      <ScrollRegion
+        aria-label={what.charAt(0).toUpperCase() + what.slice(1)}
+        className="max-h-64 overflow-y-auto rounded-md border border-line bg-paper"
+      >
+        <pre className="whitespace-pre-wrap break-words p-3 font-mono text-xs">{text}</pre>
+      </ScrollRegion>
+      {text.endsWith("…") && (
+        <p className={TYPE.note}>Cut short: the run keeps the first part of each value.</p>
+      )}
     </div>
   );
 }

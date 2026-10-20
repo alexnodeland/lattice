@@ -8,7 +8,12 @@ import { afterEach, expect, test, vi } from "vitest";
 import { open, type Serve } from "./test/app";
 
 const ALICE = { kind: "user", id: "alice" };
-const agent = (run: string) => ({ kind: "agent", thread_id: "thr_1", run_id: run });
+const agent = (run: string) => ({
+  kind: "agent",
+  thread_id: "thr_1",
+  run_id: run,
+  on_behalf_of: ALICE,
+});
 
 const QUESTIONS = {
   questions: [
@@ -89,7 +94,10 @@ const LOG = (
       ALICE,
       { type: "message_posted", thread_id: "thr_1", message_id: "m3", content: "Draft a rule" },
     ],
-    [agent("run_2"), { type: "run_started", run_id: "run_2", thread_id: "thr_1" }],
+    [
+      agent("run_2"),
+      { type: "run_started", run_id: "run_2", thread_id: "thr_1", message_ids: ["m3"] },
+    ],
     [
       agent("run_2"),
       {
@@ -110,7 +118,7 @@ const LOG = (
         thread_id: "thr_1",
         status: "failed",
         error: "Tool 'draft_rule' exceeded max retries count of 1",
-        reason: "unexpected_model_behavior",
+        reason: "tool_retries_exhausted",
       },
     ],
   ] as const
@@ -137,7 +145,7 @@ afterEach(() => {
 });
 
 test("a thread shows its messages by side, its calls and questions in place, and why a turn failed", async () => {
-  const sent: { type: string; content?: string }[] = [];
+  const sent: { type: string; content?: string; message_id?: string }[] = [];
   const { screen } = await open(
     "/t/acme/w/notes/threads/thr_1",
     serve,
@@ -169,7 +177,12 @@ test("a thread shows its messages by side, its calls and questions in place, and
   const failed = log.getByRole("alert");
   await expect.element(failed.getByText(/The model kept calling a tool/)).toBeVisible();
   await failed.getByRole("button", { name: "Try again" }).click();
-  expect(sent.at(-1)).toMatchObject({ type: "post_message", content: "Draft a rule" });
+  await expect.element(failed.getByText("Details")).toBeVisible(); // the turn acted for alice
+  expect(sent.at(-1)).toMatchObject({
+    type: "post_message",
+    content: "Draft a rule",
+    message_id: "msg_again_run_2",
+  });
   const posting = log.getByRole("listitem", { name: "You" }).last();
   await expect.element(posting.getByText("Draft a rule")).toBeVisible();
   await expect.element(posting.getByText("Sending…")).toBeVisible();

@@ -78,7 +78,8 @@ class Stream:
         self._outbox: asyncio.Queue[str] = asyncio.Queue(maxsize=outbox_size)
         self._overflowed = False
         self._tasks: set[asyncio.Task[None]] = set()
-        self._watched: set[RunId] = set()
+        self._watched: dict[RunId, int] = {}
+        """Each run forwarded, by the latest turn: the ``seq`` of its ``run_started``, or 0."""
         self._telemetry = telemetry
         self._tenancy: dict[str, str] = {WORKSPACE_ID: workspace_id}
         self._close_code: int | None = None
@@ -183,7 +184,8 @@ class Stream:
             if delivered_to(envelope, threads):
                 self._put(EventFrame(**dict(envelope)))
                 if isinstance(envelope.event, RunStarted):
-                    self._watch(workspace, envelope.event.run_id, envelope.event.thread_id)
+                    run, thread = envelope.event.run_id, envelope.event.thread_id
+                    self._watch(workspace, run, thread, turn=envelope.seq)
 
     async def _read(self, workspace: Workspace) -> None:
         while True:
@@ -216,20 +218,24 @@ class Stream:
             logger.exception("command %s failed", frame.command_id)
             self._put(ErrorFrame(message=f"command {frame.command_id} failed on the server"))
 
-    def _watch(self, workspace: Workspace, run_id: RunId, thread_id: ThreadId) -> None:
-        """Forward a run's live frames until it ends, or its thread is hidden from the client."""
-        if run_id in self._watched:
+    def _watch(
+        self, workspace: Workspace, run_id: RunId, thread_id: ThreadId, *, turn: int = 0
+    ) -> None:
+        """Forward a run's live frames until its turn ends, or its thread is hidden.
+
+        A run that paused and resumed is watched again for its new turn, the ``seq`` of the
+        ``run_started`` that began it; a turn already watched, or the one in progress as the
+        client joined (0), isn't watched twice. A turn's forwarder ends as its turn does.
+        """
+        if self._watched.get(run_id, -1) >= turn:
             return
-        self._watched.add(run_id)
+        self._watched[run_id] = turn
 
         async def forward() -> None:
-            try:
-                async for frame in self._runner.watch(run_id):
-                    if thread_id in (await workspace.hidden()).threads:
-                        return
-                    self._put(frame)
-            finally:  # the turn ended: a resumed run's next turn is watched again
-                self._watched.discard(run_id)
+            async for frame in self._runner.watch(run_id):
+                if thread_id in (await workspace.hidden()).threads:
+                    return
+                self._put(frame)
 
         self._spawn(forward())
 

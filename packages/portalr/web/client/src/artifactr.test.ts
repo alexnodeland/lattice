@@ -112,6 +112,8 @@ test("a run streams its text until its message is posted, and keeps its status",
     ended: 5,
     error: null,
     reason: null,
+    prompt: [],
+    actsFor: null,
     questions: [],
     feedback: [],
   });
@@ -157,6 +159,22 @@ test("a tool call keeps its arguments, what it returned and where it was called"
     },
     t2: { name: "draft_rule", status: "error", args: "", result: "Boom", seq: 4 },
   });
+});
+
+test("a run keeps the messages that started it, and the person it acts for", () => {
+  const bob = {
+    kind: "agent",
+    thread_id: "thr_1",
+    run_id: "run_1",
+    on_behalf_of: { kind: "user", id: "bob" },
+  };
+  const state = [
+    { type: "run_started", run_id: "run_1", thread_id: "thr_1", message_ids: ["m1"] },
+    { type: "run_started", run_id: "run_1", thread_id: "thr_1", message_ids: ["m2"] },
+  ]
+    .map((event, index) => ({ ...envelope(event, index + 1), actor: bob }) as v1.EventFrame)
+    .reduce(apply, artifactr.initial());
+  expect(state.runs.run_1).toMatchObject({ prompt: ["m1"], actsFor: "bob", started: 2 });
 });
 
 test("a failed run keeps why, and when it ended", () => {

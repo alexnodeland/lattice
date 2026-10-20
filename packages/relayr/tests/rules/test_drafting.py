@@ -195,7 +195,10 @@ async def test_a_rule_sent_as_a_string_of_json_is_read_as_its_object() -> None:
     def not_json(returned: list[str]) -> tuple[str, dict[str, Any]]:
         return "draft_rule", {"rule": "a rule", "rationale": "Tell me."}
 
-    respond, returned = script([not_json, as_text])
+    def too_deep(returned: list[str]) -> tuple[str, dict[str, Any]]:
+        return "draft_rule", {"rule": "[" * 100_000, "rationale": "Tell me."}
+
+    respond, returned = script([not_json, too_deep, as_text])
     agent = Agent(
         artifactr.agent.function_model(respond),
         deps_type=artifactr.agent.Session[None],
@@ -208,8 +211,8 @@ async def test_a_rule_sent_as_a_string_of_json_is_read_as_its_object() -> None:
         await sent.run.wait()
     finally:
         await runner.aclose()
-    refused, drafted = returned
-    assert refused.startswith("retry: "), "a string that isn't JSON is no rule"
+    *refused, drafted = returned
+    assert [answer[:7] for answer in refused] == ["retry: "] * 2, "a string that isn't JSON is none"
     assert drafted.startswith("Proposed as ")
 
 

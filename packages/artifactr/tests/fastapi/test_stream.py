@@ -5,6 +5,7 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic_ai import ModelResponse, TextPart
 from starlette.testclient import WebSocketTestSession
 from starlette.websockets import WebSocketDisconnect
 
@@ -256,6 +257,48 @@ def test_a_run_resumed_by_an_answer_streams_again() -> None:
             frames = _until_event(ws, "run_ended")
             live = [f["event"] for f in frames if f["type"] == "live"]
             assert {"type": "text_delta", "part": 0, "delta": "Tuesday it is."} in live
+
+
+def test_every_turn_of_a_run_that_pauses_again_and_again_streams_once() -> None:
+    def turn(step: int) -> ModelResponse:
+        asked = ask(f"q{step}").parts
+        return ModelResponse(parts=[TextPart(f"Step {step}."), *asked])
+
+    app, _ = build(Script(*[turn(step) for step in range(5)], say("Done.")), ask=True)
+    with TestClient(app) as client:
+        _post(client, "c1", type="create_thread", thread_id="t1")
+        with client.websocket_connect(STREAM) as ws:
+            ws.send_json(hello(threads=["t1"]))
+            _receive_until(ws, "replay_complete")
+            ws.send_json(command("c", type="post_message", thread_id="t1", content="Plan"))
+            said: list[str] = []
+            for step in range(5):
+                frames = _until_event(ws, "run_paused")
+                said += [
+                    f["event"]["delta"]
+                    for f in frames
+                    if f["type"] == "live" and f["event"]["type"] == "text_delta"
+                ]
+                run = next(
+                    f for f in frames if f["type"] == "event" and f["event"]["type"] == "run_paused"
+                )["event"]["run_id"]
+                answer = {"reply": "Go on"}
+                ws.send_json(
+                    command(
+                        f"a{step}",
+                        type="answer_deferred",
+                        run_id=run,
+                        tool_call_id=f"q{step}",
+                        answer=answer,
+                    )
+                )
+            frames = _until_event(ws, "run_ended")
+            said += [
+                f["event"]["delta"]
+                for f in frames
+                if f["type"] == "live" and f["event"]["type"] == "text_delta"
+            ]
+            assert said == [f"Step {step}." for step in range(5)] + ["Done."]
 
 
 def test_runs_in_progress_are_listed_and_watched() -> None:

@@ -1253,6 +1253,7 @@ export interface components {
              * @default
              */
             args_summary: string;
+            artifact_id?: components["schemas"]["ArtifactId"] | null;
             run_id: components["schemas"]["RunId"];
             thread_id: components["schemas"]["ThreadId"];
             /** Tool Call Id */
@@ -1271,6 +1272,7 @@ export interface components {
          * @description A tool call finished.
          */
         ToolReturned: {
+            artifact_id?: components["schemas"]["ArtifactId"] | null;
             run_id: components["schemas"]["RunId"];
             /**
              * Status

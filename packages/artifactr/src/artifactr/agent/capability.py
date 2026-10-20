@@ -14,6 +14,7 @@ attribution to those spans, and record each attempt's trace id with ``run_starte
 import asyncio
 import json
 import logging
+import re
 from collections.abc import Sequence
 from dataclasses import KW_ONLY, dataclass, field
 from typing import Any, override
@@ -212,7 +213,7 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
             raise
         except Exception as error:
             reason = _reason(error)
-            failed = self._ended(session, "failed", error=str(error), reason=reason)
+            failed = self._ended(session, "failed", error=redacted(str(error)), reason=reason)
             await _record(workspace, failed, cursor=delivered.at(delivered.seq))
             raise
         await self._finish(session, result)
@@ -305,7 +306,7 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
     ) -> ValidatedToolArgs:
         """Record the tool call."""
         summary = _clip(json.dumps(args, default=str), self.max_summary_chars)
-        await ctx.deps.workspace.record(self._tool_called(ctx, call, summary))
+        await ctx.deps.workspace.record(self._tool_called(ctx, call, summary, _named(args)))
         return args
 
     @override
@@ -321,9 +322,11 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
         """Record a call whose arguments were refused, and why: the model is told, and retries."""
         workspace = ctx.deps.workspace
         raw = args if isinstance(args, str) else json.dumps(args, default=str)
-        await workspace.record(self._tool_called(ctx, call, _clip(raw, self.max_summary_chars)))
+        named = None if isinstance(args, str) else _named(args)
+        summary = _clip(raw, self.max_summary_chars)
+        await workspace.record(self._tool_called(ctx, call, summary, named))
         why = _clip(str(error), self.max_summary_chars)
-        await _record(workspace, self._tool_returned(ctx, call, "retry", why))
+        await _record(workspace, self._tool_returned(ctx, call, "retry", why, named))
         raise error
 
     @override
@@ -346,7 +349,8 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
         except (ToolRetryError, ToolFailedError) as error:
             status = "retry" if isinstance(error, ToolRetryError) else "error"
             summary = _clip(str(error), self.max_summary_chars)
-            await _record(ctx.deps.workspace, self._tool_returned(ctx, call, status, summary))
+            returned = self._tool_returned(ctx, call, status, summary, _named(args))
+            await _record(ctx.deps.workspace, returned)
             raise
 
     @override
@@ -361,7 +365,8 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
     ) -> Any:
         """Record the tool's result."""
         summary = _clip(str(result), self.max_summary_chars)
-        await _record(ctx.deps.workspace, self._tool_returned(ctx, call, "ok", summary))
+        returned = self._tool_returned(ctx, call, "ok", summary, _named(args))
+        await _record(ctx.deps.workspace, returned)
         return result
 
     @override
@@ -377,29 +382,35 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
         """Turn rejections into retries the model can act on; record every failure."""
         workspace = ctx.deps.workspace
         if isinstance(error, Rejection):
-            await _record(workspace, self._tool_returned(ctx, call, "retry", error.message))
+            retry = self._tool_returned(ctx, call, "retry", error.message, _named(args))
+            await _record(workspace, retry)
             hint = (
                 " Read the artifact again, then retry."
                 if isinstance(error, VersionConflict)
                 else ""
             )
             raise ModelRetry(error.message + hint) from error
-        summary = _clip(f"{type(error).__name__}: {error}", self.max_summary_chars)
-        await _record(workspace, self._tool_returned(ctx, call, "error", summary))
+        summary = _clip(redacted(f"{type(error).__name__}: {error}"), self.max_summary_chars)
+        await _record(workspace, self._tool_returned(ctx, call, "error", summary, _named(args)))
         raise error
 
     @staticmethod
-    def _tool_called(ctx: Context, call: ToolCallPart, summary: str) -> ToolCalled:
+    def _tool_called(
+        ctx: Context, call: ToolCallPart, summary: str, artifact_id: str | None
+    ) -> ToolCalled:
         return ToolCalled(
             run_id=ctx.deps.run_id,
             thread_id=ctx.deps.thread_id,
             tool_call_id=call.tool_call_id,
             tool_name=call.tool_name,
             args_summary=summary,
+            artifact_id=artifact_id,
         )
 
     @staticmethod
-    def _tool_returned(ctx: Context, call: ToolCallPart, status: Any, summary: str) -> ToolReturned:
+    def _tool_returned(
+        ctx: Context, call: ToolCallPart, status: Any, summary: str, artifact_id: str | None
+    ) -> ToolReturned:
         return ToolReturned(
             run_id=ctx.deps.run_id,
             thread_id=ctx.deps.thread_id,
@@ -407,6 +418,7 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
             tool_name=call.tool_name,
             status=status,
             summary=summary,
+            artifact_id=artifact_id,
         )
 
 
@@ -457,16 +469,46 @@ def _requests(calls: list[ToolCallPart], kind: Any) -> list[DeferredRequest]:
     ]
 
 
+def _named(args: dict[str, Any]) -> str | None:
+    """The artifact a call's arguments name, by the ``artifact_id`` artifactr's tools take."""
+    artifact_id = args.get("artifact_id")
+    return artifact_id if isinstance(artifact_id, str) else None
+
+
+_SECRETS = (
+    # A URL's credentials and query, where tokens and keys travel; its host and path stay.
+    (re.compile(r"(\w+://)[^/\s@]*@"), r"\1"),
+    (re.compile(r"(\w+://[^\s?#]*)[?#][^\s'\"]*"), r"\1"),
+    # Bearer tokens, and keys in the shapes providers give them.
+    (re.compile(r"(?i)\b(bearer)\s+[\w.~+/=-]+"), r"\1 [redacted]"),
+    (re.compile(r"\b(?:sk|pk|rk|key)-[\w-]{8,}"), "[redacted]"),
+)
+
+
+def redacted(text: str) -> str:
+    """Text with what looks like a secret taken out.
+
+    A URL's credentials and query, a bearer token and a provider's key go. What a run failed
+    with, and a tool's error, are recorded in the thread, which everyone who may read it reads.
+    """
+    for pattern, replacement in _SECRETS:
+        text = pattern.sub(replacement, text)
+    return text
+
+
 def _reason(error: Exception) -> str | None:
     """Why a run failed, where it is known.
 
-    A :class:`RunFailure` says why itself. ``unexpected_model_behavior`` is a model that kept
-    calling a tool in ways it refused until no retries were left, or answered in a way no output
-    accepts.
+    A :class:`RunFailure` says why itself. ``tool_retries_exhausted`` is a model that kept
+    calling a tool in ways it refused until no retries were left; ``unexpected_model_behavior``
+    any other answer the run couldn't use, such as output no output type accepts.
     """
     if isinstance(error, RunFailure):
         return error.reason
-    return "unexpected_model_behavior" if isinstance(error, UnexpectedModelBehavior) else None
+    if not isinstance(error, UnexpectedModelBehavior):
+        return None
+    exhausted = error.message.startswith("Tool ") and "exceeded max retries" in error.message
+    return "tool_retries_exhausted" if exhausted else "unexpected_model_behavior"
 
 
 def _wrap(notes: list[Note]) -> str:
@@ -474,4 +516,7 @@ def _wrap(notes: list[Note]) -> str:
 
 
 def _clip(text: str, limit: int) -> str:
+    """Text cut to ``limit`` characters, its end marked; none at all for a limit of 0."""
+    if limit <= 0:
+        return ""
     return text if len(text) <= limit else text[: limit - 1] + "…"

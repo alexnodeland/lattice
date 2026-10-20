@@ -9,16 +9,17 @@ import type { Sent } from "./sending";
 
 /** Why a run failed, in words, by the reason its `run_ended` names (artifactr ADR-0042). */
 const REASONS: Readonly<Record<string, string>> = {
-  unexpected_model_behavior:
+  tool_retries_exhausted:
     "The model kept calling a tool in a way the tool refused, and ran out of tries.",
+  unexpected_model_behavior: "The model answered in a way the turn couldn't use.",
   abandoned: "The turn stopped answering, and was given up.",
   guardrail_blocked: "A guardrail stopped the turn.",
 };
 
 /**
- * A failed turn: what went wrong, the run's own words under "Details", and "Try again" where
- * `onRetry` is given, which the thread gives its latest turn. Only that one is announced, as it
- * fails; a failure further up is a note.
+ * A failed turn: what went wrong, the run's own words under "Details" where `error` is given,
+ * which the thread gives the person the turn acted for, and "Try again" where `onRetry` is, which
+ * it gives its latest turn. Only that one is announced, as it fails; one further up is a note.
  */
 export function RunFailed({
   reason,

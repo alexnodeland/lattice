@@ -45,6 +45,7 @@ def test_the_options_an_agent_recommends_come_first() -> None:
         ({"options": [{"label": "Monday"}, {"label": "Monday"}]}, "unique"),
         ({"options": [{"label": "Monday"}]}, "at least 2"),
         ({"header": "A header far too long"}, "at most 16"),
+        ({"options": [{"label": "Monday"}, {"label": " Other"}]}, "setting other"),
     ],
 )
 def test_a_question_is_refused_as_the_agent_asks_it(change: dict[str, Any], why: str) -> None:
@@ -101,3 +102,18 @@ def test_a_question_asked_in_words_before_is_answered_only_with_a_reply() -> Non
     with pytest.raises(ValidationFailed, match="asked no questions to choose from") as refused:
         check_answer(asked_before, {"answers": [{"selected": ["Monday"]}]})
     assert refused.value.errors, "pydantic's errors, as the wire carries them"
+
+
+def test_an_answer_committed_before_questions_had_options_is_passed_through() -> None:
+    assert answer_for_model(ASKED, "Monday") == "Monday"
+    assert answer_for_model({"question": "Which day?"}, "Monday") == "Monday"
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [{"reply": "   "}, {"reply": "x" * 20001}, {"answers": [{"other": "x" * 2001}, {}]}],
+    ids=["a blank reply", "a reply too long", "words too long"],
+)
+def test_words_are_not_blank_or_without_end(answer: JsonValue) -> None:
+    with pytest.raises(ValidationFailed):
+        check_answer(ASKED, answer)

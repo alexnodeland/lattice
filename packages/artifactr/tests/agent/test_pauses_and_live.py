@@ -38,6 +38,7 @@ from artifactr.core import (
     ThinkingDelta,
     Thread,
     ToolArgsDelta,
+    rules,
 )
 from artifactr.workspace import Workspace
 from tests.agent.conftest import (
@@ -110,6 +111,22 @@ async def test_the_agent_is_told_each_question_beside_what_was_chosen(
         part.content for part in script.requests[1][-1].parts if isinstance(part, ToolReturnPart)
     ]
     assert returned == [{"question": "Which day?", "selected": ["Tuesday"]}]
+
+
+async def test_a_question_answered_as_a_string_before_resumes_after(
+    ws: Workspace, thread: Thread, gate: Gate, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    script = Script(ask("q1", "Which day?"), say("Monday then."))
+    runner = make_runner(make_agent(script, ask=True, output_type=ASKING), gate)
+    paused = started(await runner.send(ws, thread.id, "Plan it"))
+    await paused.wait()
+    with monkeypatch.context() as before:  # as core committed answers before it held them
+        before.setattr(rules, "check_answer", lambda args, answer: None)
+        await ws.commit(AnswerDeferred(run_id=paused.run_id, tool_call_id="q1", answer="Monday"))
+    resumed = await runner.resume(ws, paused.run_id)
+    assert resumed is not None
+    assert (await resumed.wait()).output == "Monday then."
+    assert script.tool_returns(1) == ["Monday"], "passed through as it was committed"
 
 
 async def test_a_chat_message_answers_a_paused_run(

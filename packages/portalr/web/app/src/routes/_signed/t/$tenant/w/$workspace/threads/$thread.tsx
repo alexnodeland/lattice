@@ -209,9 +209,12 @@ function Chat() {
         tool_call_id: request.tool_call_id,
         ...answered,
       });
-  const send = async (content: string) => {
-    const sent = await post(content, (message_id) =>
-      stream.send({ type: "post_message", thread_id: id, content, message_id }),
+  /** Post a message, under `messageId` where it has one already: a retry's, or one unsent. */
+  const send = async (content: string, messageId?: string) => {
+    const sent = await post(
+      content,
+      (message_id) => stream.send({ type: "post_message", thread_id: id, content, message_id }),
+      messageId,
     );
     if (sent.outcome === "refused") {
       // Refused, perhaps since they may no longer post or read it: ask grantr again.
@@ -298,15 +301,17 @@ function Chat() {
                 <RunFailed
                   key={entry.run.id}
                   reason={entry.run.reason}
-                  error={entry.run.error}
-                  {...(retry !== null && entry === lastFailed && { onRetry: () => send(retry) })}
+                  // What it failed with, which may name the reader's own words, is its author's.
+                  error={entry.run.actsFor === me ? entry.run.error : null}
+                  {...(retry !== null &&
+                    entry === lastFailed && { onRetry: () => send(retry.content, retry.id) })}
                 />
               );
             default:
               return entry satisfies never;
           }
         })}
-        {posting.map(({ id: posted, content }) => (
+        {posting.map(({ id: posted, content, unsent }) => (
           <Message
             key={posted}
             message={{
@@ -321,6 +326,7 @@ function Chat() {
             author="You"
             mine
             sending
+            {...(unsent && { onSendAgain: () => send(content, posted) })}
           />
         ))}
         {active

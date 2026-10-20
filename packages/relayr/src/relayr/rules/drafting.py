@@ -126,7 +126,7 @@ def _decoded(rule: object) -> object:
     if isinstance(rule, str):
         try:
             return json.loads(rule)
-        except json.JSONDecodeError:
+        except (json.JSONDecodeError, RecursionError):
             return rule  # refused as what it is: not an object
     return rule
 

@@ -25,6 +25,8 @@ from artifactr.core.events import (
     FocusChanged,
     ProposalCreated,
     ProposalResolved,
+    ToolCalled,
+    ToolReturned,
 )
 from artifactr.core.feedback import ArtifactTarget
 from artifactr.core.ids import ArtifactId, ThreadId
@@ -72,6 +74,8 @@ def artifact_of(envelope: Envelope) -> ArtifactId | None:
             return change.artifact_id
         case FeedbackGiven(target=ArtifactTarget(artifact_id=artifact_id)):
             return artifact_id
+        case ToolCalled() | ToolReturned():
+            return envelope.event.artifact_id
         case _:
             return None
 

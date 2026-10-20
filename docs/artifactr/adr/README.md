@@ -87,5 +87,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0081](0081-a-gate-before-access-integrations-switched-off-answer-not-enabled.md) | A gate before access: integrations switched off answer NotEnabled | Accepted |
 | [0082](0082-mini-apps-the-agents-tools-and-html-that-loads-nothing.md) | Mini apps: the agent's tools, and HTML that loads nothing | Accepted |
 | [0083](0083-ask-user-asks-questions-with-options.md) | `ask_user` asks questions with options, and takes answers per question | Accepted |
+| [0084](0084-what-a-run-records-of-its-calls-and-who-reads-it.md) | What a run records of its calls and its failure, and who reads it | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

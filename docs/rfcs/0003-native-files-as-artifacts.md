@@ -279,7 +279,7 @@ The spike measures the cost per session and how many a host holds; the input-to-
 |---|---|---|
 | 1. Foundations | artifactr's lease; the package, its types and check-out record, `Blobs` with memory and SQL adapters, `App` and `FakeApp` | 100% coverage; the blob suite on memory, SQLite and PostgreSQL; a two-tenant test reads nothing across tenants; `collect` keeps every referenced blob; accepting a stale native proposal fails with `PatchFailed`, and the proposal rebuilt at the head applies; lease tests for renewal, takeover after expiry, and a lease that vanishes before `ArtifactBusy` reads it |
 | 2. WordCraft headless | The `Subprocess` adapter; inspection, fingerprint and render; a corpus in `tests/corpus/docx/`, one generated file per feature, plus documents whose licences allow it | A nightly report compares normalized OOXML after an open and a save, feature by feature (text, styles, run properties, tables, lists, images, headers and footers, footnotes, comments, tracked changes, sections), and publishes a matrix where "supported" is per feature; saving twice is a fixpoint |
-| 3. Worker and agent | The worker, stackr's image and recipe, the hostile corpus; `NativeFileTools` | Every hostile file ends in a typed failure within its deadline; egress from the worker fails; scripted-model tests for an edit, a proposal, a busy refusal and a conflict |
+| 3. Worker and agent | The worker, stackr's image and recipe, the hostile corpus; `NativeFileTools` | Every hostile file ends within its deadline, in a typed failure or a reading that holds to every limit (amended by native files ADR-0013: WordCraft reads the enormous image without its pixels); egress from the worker fails; scripted-model tests for an edit, a proposal, a busy refusal and a conflict |
 | 4. Check-out pilot | The hosted editor, portalr's renderer, previews, diffs, check-out and check-in | `bdd` scenarios for a check-in, a stale check-in, an idempotent retry and a busy agent; the editor's origin serves nothing that calls out |
 | 5. Streamed session spike | The evaluation above | A person types in the streamed document while an agent inserts a paragraph, and both see both; a save becomes one revision; p95 input delay under 150 ms on a LAN; a session starts in under five seconds from a pool; no egress, nothing left behind; no Docker socket reachable from any container the application can reach. Then a written recommendation |
 
@@ -340,7 +340,7 @@ Decided by the owner on 2026-10-16:
 - [x] artifactr-files: the package, its `pyproject.toml`, a `moon.yml` that depends on artifactr and lattice-core, and its entry in `release-please-config.json` and the manifest
 - [x] artifactr-files: blobs, check-outs, migrations and row-level security
 - [x] artifactr-files: the WordCraft adapter, the corpus and the nightly fidelity report
-- [ ] artifactr-files and stackr: the worker, its image, the recipe and the release pin check
+- [ ] The worker (phase 3): artifactr-files' worker, limits, `Worker` app and hostile corpus are built (native files ADR-0013); stackr's image, recipe, network, release pin check and the egress test are not
 - [x] artifactr-files: `NativeFileTools`, as `native_file_tools`
 - [x] artifactr-files: `files_router`, check-out and check-in over HTTP, and the hosted editor's policy
 - [x] portalr: the renderer, previews, diffs, check-out and check-in screens

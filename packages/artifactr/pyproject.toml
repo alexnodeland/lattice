@@ -49,8 +49,9 @@ litellm = ["lattice-core-ai[litellm]>=0.1.0"]
 evals = ["evalr>=0.1.0"]
 # Native files (lattice RFC-0003): artifactr.files, with its SQL stores in the sql extra. The
 # extra names the integration, and carries the apps' adapters' dependencies: WordCraft's speaks
-# MCP on stdio, under anyio's deadlines (lattice ADR-0026).
-files = ["mcp>=2.2", "anyio>=4.9"]
+# MCP on stdio, under anyio's deadlines (lattice ADR-0026); the worker serves an app over HTTP,
+# and the application calls it with httpx.
+files = ["mcp>=2.2", "anyio>=4.9", "starlette>=0.46.0", "uvicorn>=0.35", "httpx>=0.28"]
 # Forms and dashboards in the chat, artifactr.ui (ADR-0074): what it imports beyond artifactr's own
 # dependencies, Pydantic's core, which Pydantic installs already. The name an application installs
 # the forms by, which a dependency they ever need joins.

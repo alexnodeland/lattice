@@ -248,7 +248,10 @@ fastapi = [
 ]
 files = [
     { name = "anyio" },
+    { name = "httpx" },
     { name = "mcp" },
+    { name = "starlette" },
+    { name = "uvicorn" },
 ]
 forms = [
     { name = "pydantic-core" },
@@ -328,6 +331,7 @@ requires-dist = [
     { name = "evalr", marker = "extra == 'evals'", editable = "packages/evalr" },
     { name = "evalr", extras = ["langfuse"], marker = "extra == 'langfuse'", editable = "packages/evalr" },
     { name = "fastapi", marker = "extra == 'fastapi'", specifier = ">=0.141" },
+    { name = "httpx", marker = "extra == 'files'", specifier = ">=0.28" },
     { name = "jsonpatch", specifier = ">=1.33" },
     { name = "jsonpointer", specifier = ">=1.9" },
     { name = "langfuse", marker = "extra == 'langfuse'", specifier = ">=4.15,<5" },
@@ -345,7 +349,9 @@ requires-dist = [
     { name = "pydantic-core", marker = "extra == 'forms'", specifier = ">=2.46.0" },
     { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'sql'", specifier = ">=2.1" },
     { name = "starlette", marker = "extra == 'fastapi'", specifier = ">=0.46.0" },
+    { name = "starlette", marker = "extra == 'files'", specifier = ">=0.46.0" },
     { name = "starlette", marker = "extra == 'mcp'", specifier = ">=0.27" },
+    { name = "uvicorn", marker = "extra == 'files'", specifier = ">=0.35" },
 ]
 provides-extras = ["sql", "sqlite", "postgres", "fastapi", "mcp", "otel", "langfuse", "litellm", "evals", "files", "forms"]
 

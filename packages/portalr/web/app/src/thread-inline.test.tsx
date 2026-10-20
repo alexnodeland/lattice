@@ -79,6 +79,14 @@ const manifest = (name: string, mediaType: string, outline: string, pages: numbe
 const DATA: Record<string, readonly [string, Record<string, unknown>]> = {
   note_1: ["note", { text: "# Plan\n\nShip the **brief** on Friday." }],
   form_1: ["form", POLL],
+  sub_1: ["submission", { form_id: "form_1", version: 1, values: { dish: "Soup" } }],
+  dash_1: [
+    "dashboard",
+    {
+      title: "Support this week",
+      panels: [{ type: "stat", label: "Open tickets", value: 42, change: -6 }],
+    },
+  ],
   doc_1: ["word_document", manifest("brief.docx", DOCX, "Brief\nFees", 3)],
   book_1: ["workbook", manifest("figures.xlsx", XLSX, "Costs (A1:B3)\nPlan", null)],
 };
@@ -221,6 +229,28 @@ test("a form made in a thread is sent from it, as the reader", async () => {
   await expect
     .poll(() => sent.find((command) => command.type === "create_artifact"))
     .toMatchObject({ kind: "submission" });
+});
+
+test("a dashboard made in a thread shows its panels there, with its full view", async () => {
+  const { screen } = await open(THREAD, serving(), undefined, {
+    artifactrLog: thread([["dash_1", "dashboard"]]),
+  });
+  const dashboard = screen.getByRole("listitem", { name: "Support this week" });
+  await expect.element(dashboard.getByText("Dashboard", { exact: true })).toBeVisible();
+  await expect.element(dashboard.getByText("Open tickets")).toBeVisible();
+  await expect.element(dashboard.getByText("42", { exact: true })).toBeVisible();
+  await dashboard.getByRole("button", { name: "Full view" }).click();
+  await expect
+    .element(screen.getByRole("dialog", { name: "Support this week" }).getByText("Open tickets"))
+    .toBeVisible();
+});
+
+test("an untitled artifact is named by its kind", async () => {
+  const { screen } = await open(THREAD, serving(), undefined, {
+    artifactrLog: thread([["sub_1", "submission"]]),
+  });
+  const entry = screen.getByRole("listitem", { name: "Submission" });
+  await expect.element(entry.getByText("Soup")).toBeVisible();
 });
 
 test("a native file is read a page at a time, with its outline and words, and downloaded", async () => {

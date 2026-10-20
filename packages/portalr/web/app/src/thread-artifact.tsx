@@ -58,7 +58,9 @@ export function ThreadArtifact({
     (newest, revision) => (newest && newest.version > revision.version ? newest : revision),
     undefined,
   );
-  const name = (latest && titleOf(latest.kind, latest.data)) ?? `The agent's ${artifact.kind}`;
+  // Untitled, it is named by its kind: a person's as well as the agent's is made in a thread.
+  const name =
+    (latest && titleOf(latest.kind, latest.data)) ?? kindName(artifact.kind, latest?.data ?? {});
   const open = (
     <TextLink
       render={

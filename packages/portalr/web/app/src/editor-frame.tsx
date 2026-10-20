@@ -63,16 +63,17 @@ export function EditorFrame({
   onAnswered: (refusal: number | null) => void;
   onClose: () => void;
 }) {
-  const { context, tenant, workspace, artifact } = place;
   const frame = useRef<HTMLIFrameElement>(null);
   const [phase, setPhase] = useState<Phase>("starting");
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const src = shimAt(editor);
   const origin = src === null ? null : new URL(src).origin;
-  // The latest of what a message is handled with, so the listener is added once.
-  const latest = useRef({ status, version, checkout, onSaid, onEnded, onAnswered });
-  latest.current = { status, version, checkout, onSaid, onEnded, onAnswered };
+  // The latest of what a message is handled with, so the listener, and the time the build has to
+  // start, are set once for the frame, whatever renders meanwhile.
+  const now = { place, status, app, version, checkout, onSaid, onEnded, onAnswered };
+  const latest = useRef(now);
+  latest.current = now;
 
   // Heard from as the frame is put in the page, before it can load: a shim that is quick to say
   // it is ready isn't missed.
@@ -92,7 +93,8 @@ export function EditorFrame({
     }, STARTS_WITHIN);
     const open = async () => {
       to("opening");
-      const { status: file, version: base } = latest.current;
+      const { place: at, status: file, version: base } = latest.current;
+      const { context, tenant, workspace, artifact } = at;
       try {
         const blob = await context.queryClient.fetchQuery(
           context.queries.files.content(tenant, workspace, artifact, base),
@@ -109,7 +111,9 @@ export function EditorFrame({
       }
     };
     const save = async (name: string, bytes: ArrayBuffer) => {
-      const { status: file, checkout: held, onSaid: say, onEnded: ended } = latest.current;
+      const { place: at, status: file, app, checkout: held } = latest.current;
+      const { onSaid: say, onEnded: ended } = latest.current;
+      const { context, tenant, workspace } = at;
       const wanted = extensionOf(file.name);
       if (extensionOf(name) !== wanted) {
         say({
@@ -169,7 +173,7 @@ export function EditorFrame({
       clearTimeout(late);
       removeEventListener("message", heard);
     };
-  }, [origin, app, context, tenant, workspace, artifact]);
+  }, [origin]);
 
   if (src === null) {
     return (

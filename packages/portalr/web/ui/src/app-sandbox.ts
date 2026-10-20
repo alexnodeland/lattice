@@ -28,9 +28,19 @@ export const APP_POLICY =
 const NO_WEBRTC =
   "for(const k of Object.getOwnPropertyNames(globalThis))if(/^(webkit|moz)?RTC/.test(k))delete globalThis[k];";
 
-/** The app's document: its own policy, no DNS prefetching and no WebRTC first, then its HTML. */
+/**
+ * The app's size, measured for it: its document's height, as laid out, whenever it changes, at
+ * most every 200 ms, as `ui/notifications/size-changed` with portalr's `measured`. An app that
+ * says nothing, or a height taken before it was laid out, is still shown whole, and grows and
+ * shrinks with what it draws; one that fills its window (`100vh`) keeps the frame it has. One
+ * that says its own height is sized by that instead (the bridge's `#sizeChanged`).
+ */
+const SIZED =
+  'addEventListener("DOMContentLoaded",()=>{let l=0,t=0;const s=()=>{t=0;const h=Math.ceil(document.documentElement.getBoundingClientRect().height);if(h&&h!==l){l=h;parent.postMessage({jsonrpc:"2.0",method:"ui/notifications/size-changed",params:{height:h,measured:true}},"*")}};new ResizeObserver(()=>{t||(t=setTimeout(s,200))}).observe(document.documentElement);s()});';
+
+/** The app's document: its own policy, no DNS prefetching, no WebRTC and its size first. */
 export const appDocument = (html: string): string =>
-  `<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${APP_POLICY}"><meta http-equiv="x-dns-prefetch-control" content="off"><script>${NO_WEBRTC}</script>${html}`;
+  `<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${APP_POLICY}"><meta http-equiv="x-dns-prefetch-control" content="off"><script>${NO_WEBRTC}${SIZED}</script>${html}`;
 
 /** What the app's frame may do: run its scripts, and nothing else. */
 export const APP_SANDBOX = "allow-scripts";

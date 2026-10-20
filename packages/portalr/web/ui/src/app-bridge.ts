@@ -418,6 +418,8 @@ export class Bridge {
   readonly #host: BridgeHost;
   readonly #state: StateKeeper;
   readonly #limiter: Limiter;
+  /** Whether the app has said its own height, which the sandbox's measure then gives way to. */
+  #sized = false;
 
   constructor(options: {
     source: unknown;
@@ -433,6 +435,23 @@ export class Bridge {
     this.#host = options.host;
     this.#state = options.state;
     this.#limiter = new Limiter(CALLS_A_MINUTE, 60_000, options.now);
+  }
+
+  /**
+   * A height the app said, or the sandbox measured for it (`measured`, portalr's own). The app's
+   * own wins from the first it says; one below `LEAST_HEIGHT`, as a height measured before the
+   * app was laid out is, is no height, and leaves the measure to size it.
+   */
+  #sizeChanged(height: number, measured: boolean) {
+    if (!measured) {
+      if (height < LEAST_HEIGHT) {
+        return;
+      }
+      this.#sized = true;
+    } else if (this.#sized) {
+      return;
+    }
+    this.#host.resize(Math.round(Math.min(MOST_HEIGHT, height)));
   }
 
   /** Hear a message: answered if it is the sandbox's, within its calls a minute; else dropped. */
@@ -453,7 +472,7 @@ export class Bridge {
       if (method === PROXY_READY) {
         this.#notify(RESOURCE_READY, { ...this.#host.app() });
       } else if (method === SIZE_CHANGED && isNumber(params.height)) {
-        this.#host.resize(Math.round(Math.min(MOST_HEIGHT, Math.max(LEAST_HEIGHT, params.height))));
+        this.#sizeChanged(params.height, params.measured === true);
       }
       return;
     }

@@ -177,3 +177,36 @@ call("ui/initialize", {}).then(read).then(() => { waiting = false; render(); });
   }
   await page.close();
 });
+
+/** The app's frame's height as drawn, in pixels. */
+const drawn = (page: Page) =>
+  page
+    .getByTitle("Probe: an app made by the agent")
+    .evaluate((frame) => frame.getBoundingClientRect().height);
+
+test("an app is shown whole without saying its size, and grows as it draws more", async () => {
+  // Says a height of 0, as one measured before it was laid out, and then nothing.
+  const page = await running(
+    `<body style="margin:0"><div id="box" style="height:300px">Board</div><script>
+parent.postMessage({ jsonrpc: "2.0", method: "ui/notifications/size-changed", params: { height: 0 } }, "*");
+setTimeout(() => { document.getElementById("box").style.height = "420px"; }, 1500);
+</script>`,
+  );
+  await expect.poll(() => drawn(page), SETTLED).toBe(300);
+  await expect.poll(() => drawn(page), SETTLED).toBe(420);
+  await page.close();
+});
+
+test("an app that fills its window keeps a frame at least as tall as it started", async () => {
+  const page = await running(`<body style="margin:0"><div style="height:100vh">Board</div>`);
+  await page.waitForTimeout(1500);
+  expect(await drawn(page)).toBeGreaterThanOrEqual(360);
+  await page.close();
+});
+
+test("a tall app is shown up to the window's cap, and scrolls inside its frame past it", async () => {
+  const page = await running(`<body style="margin:0"><div style="height:2000px">Board</div>`);
+  // The harness's window is 720 px tall: its cap is 720 less 15rem, 480.
+  await expect.poll(() => drawn(page), SETTLED).toBe(480);
+  await page.close();
+});

@@ -8,6 +8,7 @@ from typing import override
 import pytest
 from pydantic import BaseModel
 from pydantic_ai import FunctionToolset, ModelMessage, ModelRequest, ModelResponse
+from pydantic_ai.exceptions import UnexpectedModelBehavior
 
 from artifactr.agent import Runner, Session, last_seen, load_history
 from artifactr.core import (
@@ -20,6 +21,8 @@ from artifactr.core import (
     SystemActor,
     Thread,
     ThreadId,
+    ToolCalled,
+    ToolReturned,
 )
 from artifactr.workspace import InMemoryStorage, Scope, Workspace, Workspaces
 from tests.agent.conftest import (
@@ -164,6 +167,37 @@ async def test_a_failed_run_is_recorded(ws: Workspace, thread: Thread, gate: Gat
         await handle.wait()
     ended = event_as((await ws.read())[-1], RunEnded)
     assert (ended.status, ended.error) == ("failed", "model unavailable")
+
+
+async def test_a_call_whose_arguments_are_refused_is_recorded_and_retried(
+    ws: Workspace, thread: Thread, gate: Gate
+) -> None:
+    script = Script(
+        call("create_artifact", call_id="c1", kind="note"),  # no data
+        call("create_artifact", call_id="c2", kind="note", data={"text": "Ship Friday"}),
+        say("Drafted."),
+    )
+    runner = make_runner(make_agent(script), gate)
+    await started(await runner.send(ws, thread.id, "Draft a plan")).wait()
+    log = await ws.read()
+    [called, _] = [event_as(e, ToolCalled) for e in log if isinstance(e.event, ToolCalled)]
+    [refused, _] = [event_as(e, ToolReturned) for e in log if isinstance(e.event, ToolReturned)]
+    assert (called.tool_call_id, called.args_summary) == ("c1", '{"kind":"note"}')
+    assert (refused.tool_call_id, refused.status) == ("c1", "retry")
+    assert "data\n  Field required" in refused.summary, "pydantic's error, as the model is told"
+    assert event_as(log[-1], RunEnded).status == "completed", "the model was told, and retried"
+
+
+async def test_a_model_out_of_retries_fails_its_run_for_that_reason(
+    ws: Workspace, thread: Thread, gate: Gate
+) -> None:
+    script = Script(*[call("create_artifact", kind="note")] * 2)
+    runner = make_runner(make_agent(script), gate)
+    with pytest.raises(UnexpectedModelBehavior):
+        await started(await runner.send(ws, thread.id, "Draft a plan")).wait()
+    ended = event_as((await ws.read())[-1], RunEnded)
+    assert (ended.status, ended.reason) == ("failed", "unexpected_model_behavior")
+    assert "exceeded max retries" in str(ended.error)
 
 
 async def test_a_run_left_running_is_abandoned_when_its_thread_is_next_claimed(

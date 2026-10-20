@@ -18,6 +18,7 @@ from collections.abc import Sequence
 from dataclasses import KW_ONLY, dataclass, field
 from typing import Any, override
 
+from pydantic import ValidationError
 from pydantic_ai import (
     AgentRunResult,
     DeferredToolRequests,
@@ -29,11 +30,17 @@ from pydantic_ai import (
 )
 from pydantic_ai.capabilities import AbstractCapability
 from pydantic_ai.capabilities.abstract import (
+    RawToolArgs,
     ValidatedToolArgs,
     WrapRunHandler,
     WrapToolExecuteHandler,
 )
-from pydantic_ai.exceptions import ToolFailedError, ToolRetryError, UserError
+from pydantic_ai.exceptions import (
+    ToolFailedError,
+    ToolRetryError,
+    UnexpectedModelBehavior,
+    UserError,
+)
 
 from artifactr.agent.session import Session, last_seen
 from artifactr.agent.tools import artifact_tools
@@ -103,7 +110,8 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
             agent's ``output_type`` must then include ``DeferredToolRequests``.
         max_render_chars: How much of each followed artifact's rendering to include in the
             instructions.
-        max_summary_chars: How much of each tool call's arguments and result to record.
+        max_summary_chars: How much of each tool call's arguments and result to record, which
+            is what people see of the call.
         notices: Tell the agent about the notices others post in its thread, as change notes,
             when a run starts and while it runs, so they are kept in its history. They are left
             out by default.
@@ -113,7 +121,7 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
     _: KW_ONLY
     ask: bool = False
     max_render_chars: int = 4000
-    max_summary_chars: int = 200
+    max_summary_chars: int = 2000
     notices: bool = False
     _toolset: FunctionToolset[Session[Any]] = field(init=False, repr=False)
 
@@ -203,7 +211,7 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
             await _record(workspace, stopped, cursor=delivered.at(delivered.seq))
             raise
         except Exception as error:
-            reason = error.reason if isinstance(error, RunFailure) else None
+            reason = _reason(error)
             failed = self._ended(session, "failed", error=str(error), reason=reason)
             await _record(workspace, failed, cursor=delivered.at(delivered.seq))
             raise
@@ -299,6 +307,24 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
         summary = _clip(json.dumps(args, default=str), self.max_summary_chars)
         await ctx.deps.workspace.record(self._tool_called(ctx, call, summary))
         return args
+
+    @override
+    async def on_tool_validate_error(
+        self,
+        ctx: Context,
+        *,
+        call: ToolCallPart,
+        tool_def: ToolDefinition,
+        args: RawToolArgs,
+        error: ValidationError | ModelRetry,
+    ) -> ValidatedToolArgs:
+        """Record a call whose arguments were refused, and why: the model is told, and retries."""
+        workspace = ctx.deps.workspace
+        raw = args if isinstance(args, str) else json.dumps(args, default=str)
+        await workspace.record(self._tool_called(ctx, call, _clip(raw, self.max_summary_chars)))
+        why = _clip(str(error), self.max_summary_chars)
+        await _record(workspace, self._tool_returned(ctx, call, "retry", why))
+        raise error
 
     @override
     async def wrap_tool_execute(
@@ -429,6 +455,18 @@ def _requests(calls: list[ToolCallPart], kind: Any) -> list[DeferredRequest]:
         )
         for call in calls
     ]
+
+
+def _reason(error: Exception) -> str | None:
+    """Why a run failed, where it is known.
+
+    A :class:`RunFailure` says why itself. ``unexpected_model_behavior`` is a model that kept
+    calling a tool in ways it refused until no retries were left, or answered in a way no output
+    accepts.
+    """
+    if isinstance(error, RunFailure):
+        return error.reason
+    return "unexpected_model_behavior" if isinstance(error, UnexpectedModelBehavior) else None
 
 
 def _wrap(notes: list[Note]) -> str:

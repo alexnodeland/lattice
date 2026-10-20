@@ -72,6 +72,8 @@ def build_note_agent(
         deps_type=Session[None],
         instructions=INSTRUCTIONS,
         output_type=[str, DeferredToolRequests],
+        # A model that fills a tool's arguments wrongly is told why, and tries again this often.
+        retries=3,
 {%- if use_ui %}
         toolsets=[ui_tools(integrations=integrations)],
         capabilities=[ArtifactWorkspace(types=[Note, *AGENT_TYPES], ask=True), *capabilities],

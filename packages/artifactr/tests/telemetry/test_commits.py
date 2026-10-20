@@ -63,6 +63,7 @@ from artifactr.telemetry.attributes import (
     WORKSPACE_ID,
 )
 from artifactr.workspace import InMemoryStorage, Scope, Workspace, Workspaces
+from tests.agent.conftest import asking, in_words
 from tests.artifact_types import Checklist, Note
 from tests.telemetry.conftest import Recorder, attributes, trace_id
 
@@ -182,7 +183,7 @@ async def test_a_rejected_commit_is_recorded_as_rejected(ws: Workspace, recorder
     with pytest.raises(VersionConflict):
         await ws.commit(note.edit_text("a", "c"))
     with pytest.raises(NotFound):
-        await ws.commit(AnswerDeferred(run_id="run_nope", tool_call_id="c1", answer="x"))
+        await ws.commit(AnswerDeferred(run_id="run_nope", tool_call_id="c1", answer=in_words("x")))
     conflict, _ = recorder.spans("artifactr.commit edit_artifact")[::-1]
     assert (attributes(conflict)[OUTCOME], attributes(conflict)[REJECTION]) == (
         "rejected",
@@ -243,7 +244,9 @@ async def test_what_events_do_is_counted(ws: Workspace, recorder: Recorder) -> N
     [proposal] = await ws.proposals()
     await ws.commit(RespondToProposal(proposal_id=proposal.id, decision="reject"))
     await agent.post_message(thread.id, "done")
-    question = DeferredRequest(tool_call_id="q1", tool_name="ask_user", kind="question")
+    question = DeferredRequest(
+        tool_call_id="q1", tool_name="ask_user", kind="question", args=asking("Which day?")
+    )
     usage = RunUsage(requests=1, input_tokens=10, output_tokens=0)
     await agent.record(
         RunPaused(run_id="run_1", thread_id=thread.id, requests=(question,), usage=usage)

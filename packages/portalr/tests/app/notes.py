@@ -1,8 +1,8 @@
 """artifactr in portalr's test application: notes, thumbs on messages, and a scripted agent.
 
 The agent answers from a script, so the app's scenarios choose its path by the first word they post:
-``ask`` makes it ask a question, ``form`` asks a form through artifactr.ui's ``ask_form`` (lattice
-RFC-0005), whose answer it repeats, ``publish`` makes it call a tool that waits for approval,
+``ask`` makes it ask two questions, and ``form`` a form through artifactr.ui's ``ask_form`` (lattice
+RFC-0005), whose answers it repeats; ``publish`` makes it call a tool that waits for approval,
 ``propose`` makes it write a note of its own and propose an edit to it, which it names in its
 answer, so each scenario resolves a proposal of its own; what follows ``propose``, such as ``a
 tighter plan``, is what the note is about, so two proposals aren't one. ``draft`` makes it draft a
@@ -90,6 +90,32 @@ LEAVE = {
 }
 """The form ``form`` asks: how many working days, at most 30, and a note."""
 
+QUESTIONS = {
+    "questions": [
+        {
+            "question": "Which week?",
+            "header": "Week",
+            "options": [
+                {"label": "This week", "description": "Starting Monday"},
+                {"label": "The next", "description": "A week to prepare", "recommended": True},
+            ],
+            "other": True,
+        },
+        {
+            "question": "What should the notes cover?",
+            "header": "Topics",
+            "options": [
+                {"label": "Agenda", "description": "What is planned, in order"},
+                {"label": "Decisions", "description": "What was settled, and by whom"},
+                {"label": "Actions", "description": "Who does what next"},
+            ],
+            "multiple": True,
+        },
+    ]
+}
+"""What ``ask`` asks through ``ask_user``: one choice that takes words of a person's own, and
+several choices."""
+
 DEFAULT_TOPIC = "launch"
 """What a note is about when ``propose`` says no more than "an edit"."""
 
@@ -139,7 +165,7 @@ async def answer(messages: list[ModelMessage], _info: AgentInfo) -> ModelRespons
         case ["publish"]:
             return ModelResponse(parts=[ToolCallPart("publish", {"note": "the notes"})])
         case ["ask"]:
-            return ModelResponse(parts=[ToolCallPart("ask_user", {"question": "Which week?"})])
+            return ModelResponse(parts=[ToolCallPart("ask_user", QUESTIONS)])
         case ["form"]:
             return ModelResponse(parts=[ToolCallPart("ask_form", LEAVE)])
         case ["wait"]:
@@ -155,6 +181,12 @@ def after(returned: ToolReturnPart, messages: list[ModelMessage]) -> ModelRespon
     """What the agent does when a tool returns: propose an edit to a note it just wrote, edit a
     document it just read, or say how the tool went."""
     told = returned.model_response_str()
+    if returned.tool_name == "ask_user" and isinstance(returned.content, list):
+        chosen = (
+            ", ".join([*answer["selected"], *filter(None, [answer.get("other")])])
+            for answer in returned.content
+        )
+        return ModelResponse(parts=[TextPart(f"Done: {'; '.join(chosen)}")])
     if returned.tool_name == "ask_form" and isinstance(returned.content, dict):
         return ModelResponse(parts=[TextPart(f"Done: {returned.content['days']} working days off")])
     if returned.tool_name == "create_artifact" and (created := CREATED.search(told)):

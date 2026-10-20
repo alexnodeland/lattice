@@ -7,11 +7,21 @@ from typing import override
 
 import pytest
 from pydantic import BaseModel
-from pydantic_ai import FunctionToolset, ModelMessage, ModelRequest, ModelResponse
+from pydantic_ai import (
+    Agent,
+    FunctionToolset,
+    ModelMessage,
+    ModelRequest,
+    ModelResponse,
+    ModelRetry,
+)
+from pydantic_ai.exceptions import UnexpectedModelBehavior
 
-from artifactr.agent import Runner, Session, last_seen, load_history
+from artifactr.agent import ArtifactWorkspace, Runner, Session, last_seen, load_history
+from artifactr.agent.capability import redacted
 from artifactr.core import (
     AgentActor,
+    Applied,
     InvalidState,
     Run,
     RunEnded,
@@ -20,6 +30,8 @@ from artifactr.core import (
     SystemActor,
     Thread,
     ThreadId,
+    ToolCalled,
+    ToolReturned,
 )
 from artifactr.workspace import InMemoryStorage, Scope, Workspace, Workspaces
 from tests.agent.conftest import (
@@ -164,6 +176,112 @@ async def test_a_failed_run_is_recorded(ws: Workspace, thread: Thread, gate: Gat
         await handle.wait()
     ended = event_as((await ws.read())[-1], RunEnded)
     assert (ended.status, ended.error) == ("failed", "model unavailable")
+
+
+async def test_a_call_whose_arguments_are_refused_is_recorded_and_retried(
+    ws: Workspace, thread: Thread, gate: Gate
+) -> None:
+    script = Script(
+        call("create_artifact", call_id="c1", kind="note"),  # no data
+        call("create_artifact", call_id="c2", kind="note", data={"text": "Ship Friday"}),
+        say("Drafted."),
+    )
+    runner = make_runner(make_agent(script), gate)
+    await started(await runner.send(ws, thread.id, "Draft a plan")).wait()
+    log = await ws.read()
+    [called, _] = [event_as(e, ToolCalled) for e in log if isinstance(e.event, ToolCalled)]
+    [refused, _] = [event_as(e, ToolReturned) for e in log if isinstance(e.event, ToolReturned)]
+    assert (called.tool_call_id, called.args_summary) == ("c1", '{"kind":"note"}')
+    assert not called.args_truncated
+    assert (refused.tool_call_id, refused.status) == ("c1", "retry")
+    assert "data\n  Field required" in refused.summary, "pydantic's error, as the model is told"
+    assert event_as(log[-1], RunEnded).status == "completed", "the model was told, and retried"
+
+
+async def test_a_model_out_of_retries_fails_its_run_for_that_reason(
+    ws: Workspace, thread: Thread, gate: Gate
+) -> None:
+    script = Script(*[call("create_artifact", kind="note")] * 2)
+    runner = make_runner(make_agent(script), gate)
+    with pytest.raises(UnexpectedModelBehavior):
+        await started(await runner.send(ws, thread.id, "Draft a plan")).wait()
+    ended = event_as((await ws.read())[-1], RunEnded)
+    assert (ended.status, ended.reason) == ("failed", "tool_retries_exhausted")
+    assert "exceeded max retries" in str(ended.error)
+
+
+async def test_a_model_that_answers_no_way_the_run_takes_fails_for_that_reason(
+    ws: Workspace, thread: Thread, gate: Gate
+) -> None:
+    class Plan(BaseModel):
+        steps: int
+
+    script = Script(*[call("final_result", steps="many")] * 3)  # never a number
+    runner = make_runner(make_agent(script, output_type=Plan), gate)
+    with pytest.raises(UnexpectedModelBehavior):
+        await started(await runner.send(ws, thread.id, "hi")).wait()
+    ended = event_as((await ws.read())[-1], RunEnded)
+    assert (ended.status, ended.reason) == ("failed", "unexpected_model_behavior")
+
+
+async def test_a_call_names_the_artifact_it_names_so_it_is_as_hidden(
+    ws: Workspace, thread: Thread, gate: Gate
+) -> None:
+    note = await ws.create(Note(text="Ship Friday"))
+    assert isinstance(note, Applied)
+    script = Script(
+        call("read_artifact", call_id="c1", artifact_id=note.artifact_id),
+        call("read_artifact", call_id="c2", artifact_id="art_none"),
+        say("Read."),
+    )
+    runner = make_runner(make_agent(script), gate)
+    await started(await runner.send(ws, thread.id, "Read it")).wait()
+    log = await ws.read()
+    named = [
+        (e.event.type, e.event.artifact_id)
+        for e in log
+        if isinstance(e.event, ToolCalled | ToolReturned)
+    ]
+    assert named == [
+        ("tool_called", note.artifact_id),
+        ("tool_returned", note.artifact_id),
+        ("tool_called", "art_none"),
+        ("tool_returned", "art_none"),
+    ]
+
+
+async def test_a_capability_told_to_record_no_summaries_records_none(
+    ws: Workspace, thread: Thread, gate: Gate
+) -> None:
+    note = await ws.create(Note(text="Ship Friday"))
+    assert isinstance(note, Applied)
+    script = Script(call("read_artifact", artifact_id=note.artifact_id), say("Read."))
+    agent = Agent(
+        script.model,
+        deps_type=Session[Gate],
+        capabilities=[ArtifactWorkspace(types=[Note], max_summary_chars=0)],
+    )
+    await started(await make_runner(agent, gate).send(ws, thread.id, "Read it")).wait()
+    calls = [e.event for e in await ws.read() if isinstance(e.event, ToolCalled | ToolReturned)]
+    summaries = [c.args_summary if isinstance(c, ToolCalled) else c.summary for c in calls]
+    assert summaries == ["", ""]
+    cut = [c.args_truncated if isinstance(c, ToolCalled) else c.truncated for c in calls]
+    assert cut == [True, True], "each says it was cut short"
+
+
+async def test_what_a_run_failed_with_is_recorded_without_its_secrets(
+    ws: Workspace, thread: Thread, gate: Gate
+) -> None:
+    def fail(messages: list[ModelMessage]) -> ModelResponse:
+        raise RuntimeError(
+            "POST https://u:p@llm.example/v1?api_key=k1 sent Bearer abc sk-0123456789"
+        )
+
+    runner = make_runner(make_agent(Script(fail)), gate)
+    with pytest.raises(RuntimeError):
+        await started(await runner.send(ws, thread.id, "hi")).wait()
+    ended = event_as((await ws.read())[-1], RunEnded)
+    assert ended.error == "POST https://llm.example/v1 sent Bearer [redacted] [redacted]"
 
 
 async def test_a_run_left_running_is_abandoned_when_its_thread_is_next_claimed(
@@ -356,3 +474,38 @@ async def test_an_unwatched_failure_does_not_warn(
 
 def test_history_messages_are_model_requests_first() -> None:
     assert ModelRequest.kind == "request"
+
+
+@pytest.mark.parametrize(
+    ("text", "kept"),
+    [
+        ("Authorization: Basic dXNlcjpwYXNz", "Authorization: Basic [redacted]"),
+        ("failed with api_key=abc123 set", "failed with api_key=[redacted] set"),
+        ('{"token": "t0k3n", "n": 1}', '{"token": "[redacted]", "n": 1}'),
+        ("password: hunter2", "password: [redacted]"),
+        ("used ghp_abcdefghijklmnopqrstuvwxyz0123", "used [redacted]"),
+        ("used github_pat_11AAAAAAAAAAAAAAAAAAAAAA_b", "used [redacted]"),
+        ("jwt eyJhbGci.eyJzdWIi.c2ln", "jwt [redacted]"),
+        ("no artifact art_1", "no artifact art_1"),
+    ],
+)
+def test_what_looks_like_a_secret_is_redacted(text: str, kept: str) -> None:
+    assert redacted(text) == kept
+
+
+async def test_a_tools_own_refusal_is_recorded_without_its_secrets(
+    ws: Workspace, thread: Thread, gate: Gate
+) -> None:
+    tools = FunctionToolset[Session[Gate]]()
+
+    @tools.tool_plain
+    async def fetch() -> str:
+        """Fetch something."""
+        raise ModelRetry("GET https://api.example/x?token=s3cret refused")
+
+    script = Script(call("fetch"), say("Gave up."))
+    await started(
+        await make_runner(make_agent(script, tools=[tools]), gate).send(ws, thread.id, "Go")
+    ).wait()
+    [returned] = [e.event for e in await ws.read() if isinstance(e.event, ToolReturned)]
+    assert returned.summary == "GET https://api.example/x refused"

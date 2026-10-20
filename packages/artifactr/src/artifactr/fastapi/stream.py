@@ -78,7 +78,8 @@ class Stream:
         self._outbox: asyncio.Queue[str] = asyncio.Queue(maxsize=outbox_size)
         self._overflowed = False
         self._tasks: set[asyncio.Task[None]] = set()
-        self._watched: set[RunId] = set()
+        self._watched: dict[RunId, int] = {}
+        """Each run forwarded, by the latest turn: the ``seq`` of its ``run_started``, or 0."""
         self._telemetry = telemetry
         self._tenancy: dict[str, str] = {WORKSPACE_ID: workspace_id}
         self._close_code: int | None = None
@@ -146,10 +147,13 @@ class Stream:
         self._telemetry.add(STREAM_CONNECTIONS, 1, self._tenancy)
         self._spawn(self._write())
         self._spawn(self._follow(workspace, plan.replay_after, head, hello.threads))
-        # Runs that started up to head_seq are watched from this list; later ones as they start.
+        # Runs running as the client joined are watched from this list, each as the turn its
+        # latest run_started began, so that run_started, if the log has it after head_seq, is
+        # the same turn and not watched twice; later turns as they start.
         for run in running:
             if hello.threads is None or run.thread_id in hello.threads:
-                self._watch(workspace, run.id, run.thread_id)
+                turn = await _started(workspace, run.id, run.thread_id)
+                self._watch(workspace, run.id, run.thread_id, turn=turn)
         await self._read(workspace)
 
     async def _hello(self) -> Hello | None:
@@ -183,7 +187,8 @@ class Stream:
             if delivered_to(envelope, threads):
                 self._put(EventFrame(**dict(envelope)))
                 if isinstance(envelope.event, RunStarted):
-                    self._watch(workspace, envelope.event.run_id, envelope.event.thread_id)
+                    run, thread = envelope.event.run_id, envelope.event.thread_id
+                    self._watch(workspace, run, thread, turn=envelope.seq)
 
     async def _read(self, workspace: Workspace) -> None:
         while True:
@@ -216,11 +221,18 @@ class Stream:
             logger.exception("command %s failed", frame.command_id)
             self._put(ErrorFrame(message=f"command {frame.command_id} failed on the server"))
 
-    def _watch(self, workspace: Workspace, run_id: RunId, thread_id: ThreadId) -> None:
-        """Forward a run's live frames until it ends, or its thread is hidden from the client."""
-        if run_id in self._watched:
+    def _watch(
+        self, workspace: Workspace, run_id: RunId, thread_id: ThreadId, *, turn: int = 0
+    ) -> None:
+        """Forward a run's live frames until its turn ends, or its thread is hidden.
+
+        A run that paused and resumed is watched again for its new turn, the ``seq`` of the
+        ``run_started`` that began it; a turn already watched isn't watched twice, and 0, a run a
+        client asks to watch, is whatever turn it is in. A turn's forwarder ends as its turn does.
+        """
+        if self._watched.get(run_id, -1) >= turn:
             return
-        self._watched.add(run_id)
+        self._watched[run_id] = turn
 
         async def forward() -> None:
             async for frame in self._runner.watch(run_id):
@@ -248,3 +260,18 @@ class Stream:
         task = asyncio.create_task(work)
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
+
+
+_PAGE = 100
+"""How many envelopes of a thread a look for a run's latest start reads at a time."""
+
+
+async def _started(workspace: Workspace, run_id: RunId, thread_id: ThreadId) -> int:
+    """The ``seq`` of a running run's latest ``run_started``, read back from its thread's end."""
+    before: int | None = None
+    while page := await workspace.read(threads={thread_id}, before_seq=before, last=_PAGE):
+        for envelope in reversed(page):
+            if isinstance(envelope.event, RunStarted) and envelope.event.run_id == run_id:
+                return envelope.seq
+        before = page[0].seq
+    return 0

@@ -39,6 +39,7 @@ export { formatDay, formatMoment, formatNumber } from "./chart-theme";
 export type { ChartTokens } from "./chart-tokens";
 export {
   ASK_FORM,
+  ASK_USER,
   CommandButton,
   Composer,
   type GiveThumbs,
@@ -51,7 +52,6 @@ export {
   RunStatus,
   Streaming,
   Thumbs,
-  ToolCall,
 } from "./chat";
 export { Checkbox, type CheckboxChoice, CheckboxGroup } from "./checkbox";
 export { useColourBlind } from "./colour-blind";
@@ -86,7 +86,9 @@ export { Num } from "./num";
 export { PageHeader } from "./page-header";
 export { Plain } from "./plain";
 export { Progress } from "./progress";
+export { Questions, type QuestionsAnswer } from "./questions";
 export { Row, RowLink, Rows } from "./rows";
+export { RunFailed } from "./run-failed";
 export { RuleRunStatus, RunList, type RunParts } from "./run-list";
 export { safeHref } from "./safe-href";
 export { SchemaForm } from "./schema-form";
@@ -107,6 +109,7 @@ export { Table } from "./table";
 export { TextArea } from "./text-area";
 export { TextField } from "./text-field";
 export { TextLink } from "./text-link";
+export { ToolCall, ToolCalls } from "./tool-call";
 export { duration, type Reveal, type Standing, TraceView } from "./trace-view";
 export { type Block, type Level, Tracker } from "./tracker";
 export { type TrackerItem, TrackerItems, trackerName } from "./tracker-items";

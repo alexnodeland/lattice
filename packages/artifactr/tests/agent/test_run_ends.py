@@ -32,7 +32,9 @@ from tests.agent.conftest import (
     HeldStorage,
     MakeRunner,
     Script,
-    call,
+    ask,
+    asking,
+    in_words,
     make_agent,
     say,
     settled,
@@ -135,12 +137,12 @@ async def test_every_reply_sent_as_a_run_pauses_reaches_it(
     storage: HeldStorage, ws: Workspace, thread: Thread, runners: MakeRunner, reply: str
 ) -> None:
     releasing = storage.held = Gate()
-    script = Script(call("ask_user", call_id="q1", question="Which day?"), *[say("Monday.")] * 3)
+    script = Script(ask("q1", "Which day?"), *[say("Monday.")] * 3)
     runner = runners(make_agent(script, ask=True, output_type=ASKING))
     first = started(await runner.send(ws, thread.id, "Plan the launch"))
     await _entered(releasing)
     if reply == "answer":
-        answer = AnswerDeferred(run_id=first.run_id, tool_call_id="q1", answer="Monday")
+        answer = AnswerDeferred(run_id=first.run_id, tool_call_id="q1", answer=in_words("Monday"))
         sent = await runner.answer(ws, answer)
     else:
         sent = await runner.send(ws, thread.id, "Monday")
@@ -163,22 +165,22 @@ async def test_an_answer_sent_as_a_run_pauses_waits_for_the_others(
     releasing = storage.held = Gate()
     both = ModelResponse(
         parts=[
-            ToolCallPart(tool_name="ask_user", args={"question": "Day?"}, tool_call_id="q1"),
-            ToolCallPart(tool_name="ask_user", args={"question": "Time?"}, tool_call_id="q2"),
+            ToolCallPart(tool_name="ask_user", args=asking("Day?"), tool_call_id="q1"),
+            ToolCallPart(tool_name="ask_user", args=asking("Time?"), tool_call_id="q2"),
         ]
     )
     script = Script(both, say("Monday at noon."))
     runner = runners(make_agent(script, ask=True, output_type=ASKING))
     first = started(await runner.send(ws, thread.id, "Plan the launch"))
     await _entered(releasing)
-    answer = AnswerDeferred(run_id=first.run_id, tool_call_id="q1", answer="Monday")
+    answer = AnswerDeferred(run_id=first.run_id, tool_call_id="q1", answer=in_words("Monday"))
     assert (await runner.answer(ws, answer)).run is None
     releasing.release.set()
     await first.wait()
     await runner.drain()
     assert runner.running(thread.id) is None
     assert (await ws.run(first.run_id)).status == "paused", "q2 is unanswered"
-    last = AnswerDeferred(run_id=first.run_id, tool_call_id="q2", answer="noon")
+    last = AnswerDeferred(run_id=first.run_id, tool_call_id="q2", answer=in_words("noon"))
     assert (await started(await runner.answer(ws, last)).wait()).output == "Monday at noon."
 
 
@@ -271,12 +273,12 @@ async def test_a_resume_that_fails_before_it_starts_is_resumed_by_the_next_messa
         yield
 
     failed: list[str] = []
-    script = Script(call("ask_user", call_id="q1", question="Which day?"), *[say("Monday.")] * 3)
+    script = Script(ask("q1", "Which day?"), *[say("Monday.")] * 3)
     agent = make_agent(script, ask=True, output_type=ASKING)
     runner = runners(agent, turn_context=resuming_fails_once)
     paused = started(await runner.send(ws, thread.id, "Plan the launch"))
     await paused.wait()
-    answer = AnswerDeferred(run_id=paused.run_id, tool_call_id="q1", answer="Monday")
+    answer = AnswerDeferred(run_id=paused.run_id, tool_call_id="q1", answer=in_words("Monday"))
     with pytest.raises(RuntimeError, match="blinked"):
         await started(await runner.answer(ws, answer)).wait()
     await runner.drain()

@@ -1,5 +1,6 @@
 import {
   type Artifactr,
+  type ArtifactrV1,
   allowedIn,
   changedAccess,
   type GrantrApi,
@@ -11,17 +12,21 @@ import {
 import {
   Alert,
   ASK_FORM,
+  ASK_USER,
   Composer,
   Message,
   Messages,
   PageHeader,
   ProposalCard,
+  Questions,
   Request,
+  RunFailed,
   RunStatus,
   rendererFor,
   Streaming,
   TextLink,
   ToolCall,
+  ToolCalls,
 } from "@portalr/ui";
 import {
   type UseSuspenseQueryOptions,
@@ -31,9 +36,11 @@ import {
 import { CatchBoundary, createFileRoute, Link } from "@tanstack/react-router";
 import { type ReactNode, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { author, unnamedPeople } from "../../../../../../../author";
+import { usePosting } from "../../../../../../../posting";
 import { RENDERERS } from "../../../../../../../renderers";
 import { ShareDialog } from "../../../../../../../share-dialog";
 import { ThreadArtifact } from "../../../../../../../thread-artifact";
+import { retryOf, threadLog } from "../../../../../../../thread-log";
 import { ThreadMenu } from "../../../../../../../thread-menu";
 import { Connection, useStream, useWorkspace } from "../../../../../../../workspace";
 
@@ -140,6 +147,7 @@ function Chat() {
   }, [snapshot.status, queryClient, checks.queryKey]);
   const { threads, runs, proposals, artifacts } = snapshot.state;
   const thread = threads[id];
+  const { posting, post } = usePosting(thread?.messages);
   // The people who posted without a name of their own, named when drawn: the stream's state
   // holds the actors as the server sent them, never an email.
   const names = usePeople(
@@ -149,7 +157,11 @@ function Chat() {
     unnamedPeople(
       [
         ...(thread?.messages ?? []),
-        ...Object.values(runs).flatMap((run) => (run.threadId === id ? run.answered : [])),
+        ...Object.values(runs).flatMap((run) =>
+          run.threadId === id
+            ? [...run.answered, ...run.questions.flatMap(({ answer }) => answer ?? [])]
+            : [],
+        ),
       ],
       me,
     ),
@@ -180,10 +192,6 @@ function Chat() {
   const inline = Object.values(artifacts).filter(
     (artifact) => artifact.threadId === id && rendererFor(artifact.kind, RENDERERS).inline,
   );
-  const logged = [
-    ...thread.messages.map((message) => ({ seq: message.seq, message })),
-    ...inline.map((artifact) => ({ seq: artifact.seq, artifact })),
-  ].sort((a, b) => a.seq - b.seq);
 
   const give = (message: Artifactr.Message) => (up: boolean, comment: string | null) =>
     stream.send({
@@ -192,6 +200,32 @@ function Chat() {
       target: { kind: "message", thread_id: id, message_id: message.id, run_id: message.runId },
       value: comment === null ? { up } : { up, comment },
     });
+  const answer =
+    (run: Artifactr.Run, request: ArtifactrV1.DeferredRequest) =>
+    (answered: Omit<ArtifactrV1.AnswerDeferred, "type" | "run_id" | "tool_call_id">) =>
+      stream.send({
+        type: "answer_deferred",
+        run_id: run.id,
+        tool_call_id: request.tool_call_id,
+        ...answered,
+      });
+  /** Post a message, under `messageId` where it has one already: a retry's, or one unsent. */
+  const send = async (content: string, messageId?: string) => {
+    const sent = await post(
+      content,
+      (message_id) => stream.send({ type: "post_message", thread_id: id, content, message_id }),
+      messageId,
+    );
+    if (sent.outcome === "refused") {
+      // Refused, perhaps since they may no longer post or read it: ask grantr again.
+      void queryClient.invalidateQueries({ queryKey: checks.queryKey });
+    }
+    return sent;
+  };
+  const log = threadLog(thread, runs, inline);
+  // The thread's latest turn, if it failed, can be tried again by whoever may post.
+  const retry = allowed.has("artifactr:post_message") ? retryOf(thread, runs, me) : null;
+  const latestRequest = active.flatMap((run) => run.requests).at(-1);
 
   return (
     <section aria-labelledby="thread" className="flex max-w-190 flex-col gap-6">
@@ -216,27 +250,87 @@ function Chat() {
       />
       <Connection snapshot={snapshot} waiting="the thread" />
       <Messages>
-        {logged.map((each) =>
-          "message" in each ? (
-            <Message
-              key={each.message.id}
-              message={each.message}
-              author={author(each.message.actor, me, names)}
-              thumbs={thumbs(each.message.feedback, me)}
-              {...(each.message.runId !== null && { onThumbs: give(each.message) })}
-            />
-          ) : (
-            <ThreadArtifact
-              key={each.artifact.id}
-              context={{ config, queries }}
-              tenant={tenant}
-              workspace={workspace}
-              artifact={each.artifact}
-            />
-          ),
-        )}
+        {log.map((entry) => {
+          switch (entry.kind) {
+            case "message":
+              return (
+                <Message
+                  key={entry.message.id}
+                  message={entry.message}
+                  author={author(entry.message.actor, me, names)}
+                  mine={entry.message.actor.kind === "user" && entry.message.actor.id === me}
+                  thumbs={thumbs(entry.message.feedback, me)}
+                  {...(entry.message.runId !== null && { onThumbs: give(entry.message) })}
+                />
+              );
+            case "tools":
+              return (
+                <ToolCalls key={entry.tools[0]?.[0]}>
+                  {entry.tools.map(([call, tool]) => (
+                    <ToolCall key={call} tool={tool} />
+                  ))}
+                </ToolCalls>
+              );
+            case "question": {
+              const { request, answer: given } = entry.question;
+              return (
+                <li key={request.tool_call_id}>
+                  <Questions
+                    request={request}
+                    answer={given?.value ?? null}
+                    answeredBy={given ? author(given.actor, me, names) : null}
+                    focus={request === latestRequest}
+                    onAnswer={(value) => answer(entry.run, request)({ answer: value })}
+                  />
+                </li>
+              );
+            }
+            case "artifact":
+              return (
+                <ThreadArtifact
+                  key={entry.artifact.id}
+                  context={{ config, queries }}
+                  tenant={tenant}
+                  workspace={workspace}
+                  artifact={entry.artifact}
+                />
+              );
+            case "failed":
+              return (
+                <RunFailed
+                  key={entry.run.id}
+                  reason={entry.run.reason}
+                  // What it failed with, which may name the reader's own words, is its author's.
+                  error={entry.run.actsFor === me ? entry.run.error : null}
+                  {...(retry?.run === entry.run.id && {
+                    onRetry: () => send(retry.content, retry.id),
+                  })}
+                />
+              );
+            default:
+              return entry satisfies never;
+          }
+        })}
+        {posting.map(({ id: posted, content, unsent }) => (
+          <Message
+            key={posted}
+            message={{
+              id: posted,
+              seq: snapshot.seq,
+              actor: { kind: "user", id: me },
+              content,
+              kind: "message",
+              runId: null,
+              feedback: [],
+            }}
+            author="You"
+            mine
+            sending
+            {...(unsent && { onSendAgain: () => send(content, posted) })}
+          />
+        ))}
         {active
-          .filter((run) => run.text)
+          .filter((run) => run.status === "running")
           .map((run) => (
             <Streaming key={run.id} text={run.text} author="Assistant" />
           ))}
@@ -244,15 +338,10 @@ function Chat() {
       {active.map((run) => (
         <div key={run.id} className="flex flex-col gap-2">
           <RunStatus status={run.status} />
-          {Object.keys(run.tools).length > 0 && (
-            <ul aria-label="Tools" className="flex flex-col gap-1">
-              {Object.entries(run.tools).map(([call, tool]) => (
-                <ToolCall key={call} tool={tool} />
-              ))}
-            </ul>
-          )}
           {[
-            ...run.requests.map((request) => ({ request, by: undefined })),
+            ...run.requests
+              .filter((request) => request.tool_name !== ASK_USER)
+              .map((request) => ({ request, by: undefined })),
             // A form stays where it was asked once it is answered, until its run ends, and says by whom.
             ...run.answered
               .filter(({ request }) => request.tool_name === ASK_FORM)
@@ -263,15 +352,8 @@ function Chat() {
               request={request}
               {...(by !== undefined && { answeredBy: by })}
               // The newest request waiting takes the focus, never one already answered.
-              focus={request === run.requests.at(-1)}
-              onAnswer={(answer) =>
-                stream.send({
-                  type: "answer_deferred",
-                  run_id: run.id,
-                  tool_call_id: request.tool_call_id,
-                  ...answer,
-                })
-              }
+              focus={request === latestRequest}
+              onAnswer={answer(run, request)}
             />
           ))}
         </div>
@@ -287,17 +369,7 @@ function Chat() {
       ))}
       {snapshot.status !== "closed" && allowed.has("artifactr:post_message") && (
         <div className="sticky bottom-0 z-10 bg-paper pt-2 pb-4">
-          <Composer
-            disabled={snapshot.status !== "live"}
-            onSend={async (content) => {
-              const sent = await stream.send({ type: "post_message", thread_id: id, content });
-              if (sent.outcome === "refused") {
-                // Refused, perhaps since they may no longer post or read it: ask grantr again.
-                void queryClient.invalidateQueries({ queryKey: checks.queryKey });
-              }
-              return sent;
-            }}
-          />
+          <Composer disabled={snapshot.status !== "live"} onSend={send} />
         </div>
       )}
     </section>

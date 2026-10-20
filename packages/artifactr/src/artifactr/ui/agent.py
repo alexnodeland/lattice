@@ -75,13 +75,21 @@ and hearing the answers as `message` events. It asks `ui/initialize` first, then
 notification `ui/notifications/initialized`; the result's `hostContext` has `theme` (`light` \
 or `dark`) and `styles.variables`, the host's colours as CSS variables, which \
 `ui/notifications/host-context-changed` sends again when they change. It calls \
-its tools with `tools/call`, `{{"name": ..., "arguments": {{...}}}}`, each answering with \
-`structuredContent`: `get_state`, its `state` and `version`; `set_state`, with `patch`, a JSON \
+its tools with `tools/call`, `{{"name": ..., "arguments": {{...}}}}`, each answering with a \
+result whose `structuredContent` holds what it says (`result.structuredContent.state`, not \
+`result.state`): `get_state`, its `state` and `version`; `set_state`, with `patch`, a JSON \
 Patch on its state, at most {MAX_APP_STATE_BYTES // 1024} KB, kept as the person's and saved at \
 most once every 5 seconds; and `submit`, with `values`, an object sent as the person's \
 submission once they confirm it. `ui/open-link`, with a `url`, opens it once the person \
 confirms; `ui/notifications/size-changed`, with a `height`, sizes its frame. It has 60 calls \
-a minute, each message counted; past them, the host stops answering it."""
+a minute, each message counted; past them, the host stops answering it. A refused call \
+answers with `isError: true` and no `structuredContent`: the app renders anyway, and enables \
+again what waited on it.
+
+Keep what the app shows in one state, and draw all of it from that state in one `render()`, \
+called after every change: a click, a timer's callback, a tool's answer. A control enabled or \
+disabled by the state is then right on every turn, never left disabled by a render that ran \
+before the change. Before sending it, walk its first three turns and a restart."""
 
 
 def ui_tools(

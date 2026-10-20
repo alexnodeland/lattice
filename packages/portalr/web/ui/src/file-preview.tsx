@@ -1,0 +1,238 @@
+/**
+ * A native file read where it is shown, such as in its thread (portalr ADR-0055): a page at a
+ * time, as its app rendered it, to page through and see at its own size; and a workbook, whose
+ * app renders no page, as its sheets' cells, as its app read them. Neither reads the file itself:
+ * a page is the app's PNG, and a sheet is the text the server keeps.
+ */
+
+import { ChevronLeft, ChevronRight, Maximize, Minimize } from "lucide-react";
+import { type KeyboardEvent, useId, useState } from "react";
+import { Button } from "./button";
+import { cn } from "./cn";
+import { Icon } from "./icon";
+import type { PageShown } from "./native-file";
+import { SCROLLS, ScrollRegion } from "./scroll-region";
+import { Skeleton } from "./skeleton";
+import { TYPE } from "./type";
+
+/**
+ * One page of a file, with the way to the one before and after it and to its own size: the
+ * buttons, or the arrow keys, Page Up and Down, Home and End on the page, which in a page read
+ * right to left go the other way. Fitted, a page is as tall as the window allows; at its own
+ * size, it scrolls.
+ */
+export function PageViewer({
+  label,
+  shown,
+  total,
+  onPage,
+}: {
+  /** What the pages are of, such as "brief.docx, version 3". */
+  label: string;
+  shown: PageShown;
+  total: number;
+  /** Show another page, by its number. */
+  onPage: (page: number) => void;
+}) {
+  const [actual, setActual] = useState(false);
+  const status = useId();
+  const { page } = shown;
+  const go = (to: number) => onPage(Math.min(total, Math.max(1, to)));
+  const key = (event: KeyboardEvent<HTMLElement>) => {
+    const rtl = getComputedStyle(event.currentTarget).direction === "rtl";
+    const step = { ArrowRight: 1, ArrowLeft: -1, PageDown: 1, PageUp: -1 }[event.key];
+    if (step !== undefined) {
+      go(page + (rtl && event.key.startsWith("Arrow") ? -step : step));
+    } else if (event.key === "Home" || event.key === "End") {
+      go(event.key === "Home" ? 1 : total);
+    } else {
+      return;
+    }
+    event.preventDefault();
+  };
+  const name = `Page ${page} of ${total}`;
+  return (
+    <section aria-label={label} className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          variant="secondary"
+          size="sm"
+          aria-label="Previous page"
+          disabled={page <= 1}
+          onClick={() => go(page - 1)}
+        >
+          <Icon icon={ChevronLeft} className="size-4 rtl:rotate-180" />
+        </Button>
+        <p id={status} aria-live="polite" className={cn(TYPE.meta, "tabular-nums")}>
+          {name}
+        </p>
+        <Button
+          variant="secondary"
+          size="sm"
+          aria-label="Next page"
+          disabled={page >= total}
+          onClick={() => go(page + 1)}
+        >
+          <Icon icon={ChevronRight} className="size-4 rtl:rotate-180" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="ms-auto"
+          aria-pressed={actual}
+          onClick={() => setActual(!actual)}
+        >
+          <Icon icon={actual ? Minimize : Maximize} className="size-3.5" />
+          Actual size
+        </Button>
+      </div>
+      <figure
+        // A tab stop, so the keys page through it, and a keyboard scrolls it at its own size.
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: it scrolls, and takes keys (WCAG 2.1.1)
+        tabIndex={0}
+        aria-describedby={status}
+        aria-label={`${label}: ${name}`}
+        onKeyDown={key}
+        className={cn(
+          SCROLLS,
+          "flex justify-center rounded-md border border-line bg-paper p-2 forced-colors:border-[CanvasText]",
+          actual ? "max-h-[80dvh] overflow-auto" : "items-center",
+        )}
+      >
+        {"src" in shown ? (
+          <img
+            src={shown.src}
+            alt={name}
+            className={cn(
+              "bg-white",
+              actual ? "max-w-none" : "max-h-[70dvh] w-auto max-w-full object-contain",
+            )}
+          />
+        ) : shown.state === "reading" ? (
+          <Skeleton className="aspect-[1/1.414] h-[min(70dvh,32rem)] max-w-full rounded-sm" />
+        ) : (
+          <p className="p-6 text-center text-muted text-sm">
+            This page couldn't be shown. The file can still be downloaded.
+          </p>
+        )}
+      </figure>
+    </section>
+  );
+}
+
+/** A sheet of a workbook, as its app read it: its name, and its rows of cells' text. */
+export interface Sheet {
+  readonly name: string;
+  readonly rows: readonly (readonly string[])[];
+}
+
+/**
+ * A workbook's sheets, from the text the server keeps of it: each sheet its name on a line, then a
+ * line a row and a tab a cell, the sheets parted by an empty line. A sheet's own empty row is
+ * only an empty line if it has one column, so what follows an empty line is a sheet's name only
+ * where the outline names that sheet; else, without the outline, every empty line parts sheets.
+ */
+export function sheetsOf(text: string, named: readonly string[] = []): Sheet[] {
+  const sheets: { name: string; rows: string[][] }[] = [];
+  const lines = text.split("\n");
+  let index = 0;
+  while (index < lines.length) {
+    const name = lines[index] ?? "";
+    const rows: string[][] = [];
+    index += 1;
+    while (index < lines.length) {
+      const line = lines[index] ?? "";
+      const next = lines[index + 1];
+      const parts =
+        line === "" && next !== undefined && (named.length === 0 || named.includes(next));
+      if (parts) {
+        index += 1;
+        break;
+      }
+      rows.push(line.split("\t"));
+      index += 1;
+    }
+    sheets.push({ name, rows });
+  }
+  return sheets;
+}
+
+/** A column's letters, as a spreadsheet names it: A to Z, then AA. */
+export function columnName(index: number): string {
+  let name = "";
+  for (let left = index + 1; left > 0; left = Math.floor((left - 1) / 26)) {
+    name = String.fromCharCode(65 + ((left - 1) % 26)) + name;
+  }
+  return name;
+}
+
+/** The most rows of a sheet shown at once: the file has the rest. */
+export const SHOWN_ROWS = 200;
+
+/**
+ * A sheet's cells, in a table named by the sheet, its columns lettered and its rows numbered as
+ * its app shows them, and scrolled sideways where it is wider than the page. Only the first
+ * `SHOWN_ROWS` rows are shown, which it says.
+ */
+export function SheetTable({ sheet }: { sheet: Sheet }) {
+  const caption = useId();
+  const width = Math.max(0, ...sheet.rows.map((row) => row.length));
+  const rows = sheet.rows.slice(0, SHOWN_ROWS);
+  return (
+    <div className="flex flex-col gap-2">
+      <ScrollRegion
+        aria-labelledby={caption}
+        className="max-h-[70dvh] overflow-auto rounded-md border border-line"
+      >
+        <table className="border-collapse text-sm">
+          <caption id={caption} className="sr-only">
+            {sheet.name}
+          </caption>
+          <thead className="sticky top-0 bg-wash">
+            <tr>
+              <td className="border-line border-e border-b px-2 py-1" />
+              {Array.from({ length: width }, (_, column) => (
+                <th
+                  // Columns are fixed by position, which is what names them.
+                  // biome-ignore lint/suspicious/noArrayIndexKey: a column is its position
+                  key={column}
+                  scope="col"
+                  className="border-line border-e border-b px-2 py-1 text-center font-normal text-muted text-xs"
+                >
+                  {columnName(column)}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, line) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: a row is its position
+              <tr key={line}>
+                <th
+                  scope="row"
+                  className="border-line border-e border-b bg-wash px-2 py-1 text-end font-normal text-muted text-xs tabular-nums"
+                >
+                  {line + 1}
+                </th>
+                {Array.from({ length: width }, (_, column) => (
+                  <td
+                    // biome-ignore lint/suspicious/noArrayIndexKey: a cell is its position
+                    key={column}
+                    className="whitespace-pre border-line border-e border-b px-2 py-1 text-fg"
+                  >
+                    {row[column] ?? ""}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </ScrollRegion>
+      {sheet.rows.length > SHOWN_ROWS && (
+        <p className={TYPE.note}>
+          The first {SHOWN_ROWS} of {sheet.rows.length} rows. Download the file for the rest.
+        </p>
+      )}
+    </div>
+  );
+}

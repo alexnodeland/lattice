@@ -27,7 +27,8 @@ export interface Renderer {
   readonly diff: Granularity;
   /**
    * Whether the thread it was made in shows it, inline, where it was made: once, at its latest
-   * version. A kind without it is reached from its own page alone.
+   * version. Every kind the kit draws is; one shown as JSON is reached from its own page alone,
+   * and an application's own kind is shown inline by setting it (portalr ADR-0055).
    */
   readonly inline?: boolean;
 }
@@ -105,6 +106,7 @@ export function markdown(field = "text"): Renderer {
     text,
     title: (data) => plainTitle(text(data)),
     diff: "words",
+    inline: true,
   };
 }
 

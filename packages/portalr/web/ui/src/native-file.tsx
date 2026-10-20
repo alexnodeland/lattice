@@ -127,6 +127,7 @@ export function nativeFile(): Renderer {
     text: (data) => factsOf(data).outline,
     title: (data) => capped(factsOf(data).name),
     diff: "lines",
+    inline: true,
   };
 }
 

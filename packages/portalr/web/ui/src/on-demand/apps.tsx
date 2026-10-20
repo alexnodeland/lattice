@@ -24,6 +24,7 @@ import type { Shown } from "../artifacts";
 import { Button } from "../button";
 import { cn } from "../cn";
 import { actions, backdrop, description, title as heading, popup } from "../dialog";
+import { inertOutside } from "../full-view";
 import { Icon } from "../icon";
 import { offSaid } from "../integrations";
 import { isObject } from "../json";
@@ -102,27 +103,6 @@ function hostContext(within: Element, displayMode: DisplayMode): JsonObject {
     colourBlind: within.closest("[data-cvd]") !== null,
     forcedColours: matchMedia("(forced-colors: active)").matches,
     reducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches,
-  };
-}
-
-/**
- * Make everything but `within` and its ancestors inert, as a modal's page is behind it, and give
- * back a way to undo it: only what this made inert is let go.
- */
-function inertOutside(within: Element): () => void {
-  const made: Element[] = [];
-  for (let node: Element | null = within; node?.parentElement; node = node.parentElement) {
-    for (const sibling of node.parentElement.children) {
-      if (sibling !== node && !sibling.hasAttribute("inert")) {
-        sibling.setAttribute("inert", "");
-        made.push(sibling);
-      }
-    }
-  }
-  return () => {
-    for (const each of made) {
-      each.removeAttribute("inert");
-    }
   };
 }
 

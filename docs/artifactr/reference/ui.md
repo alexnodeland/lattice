@@ -57,6 +57,8 @@ The checks for `Workspaces(checks=...)` ([ADR-0075](../adr/0075-forms-refused-at
 
 The agent's toolset ([ADR-0078](../adr/0078-the-agents-toolset-for-forms-and-no-apps-yet.md), [ADR-0082](../adr/0082-mini-apps-the-agents-tools-and-html-that-loads-nothing.md)).
 
+An app's `tools/call` is answered with a result whose `structuredContent` holds what the tool says (`get_state`'s `state` and `version`), or, refused, with `isError: true` and no `structuredContent`. `create_app`'s description asks an app to draw everything from one state in one `render()` after every change, a timer's or an answer's included, so no control is left disabled.
+
 ::: artifactr.ui.agent
     options:
       show_root_heading: false

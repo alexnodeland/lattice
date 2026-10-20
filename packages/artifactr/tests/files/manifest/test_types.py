@@ -8,6 +8,7 @@ from artifactr.files.manifest import (
     DOCX,
     DWG,
     DXF,
+    FCSTD,
     FIGCRAFT,
     IDML,
     OUTLINE_LIMIT,
@@ -16,6 +17,7 @@ from artifactr.files.manifest import (
     PSD,
     SVG,
     XLSX,
+    CadModel,
     Design,
     Drawing,
     LayeredImage,
@@ -56,6 +58,7 @@ def test_each_crafting_apps_type_is_registered_with_its_format() -> None:
         ("page_layout", PageLayout, {IDML}),
         ("vector_image", VectorImage, {SVG}),
         ("layered_image", LayeredImage, {PSD}),
+        ("cad_model", CadModel, {FCSTD}),
     ],
 )
 def test_each_crafting_apps_files_are_a_type_of_their_own(

@@ -1,7 +1,7 @@
 """The crafting apps, each declared once: what its release offers, and how lattice may use it.
 
 A [`Craft`][artifactr.files.craft.Craft] is a declaration, read from the app's pinned release
-(native files ADR-0009): the dialect its CLI's MCP server speaks, whether that CLI confines the
+(native files ADR-0009): the dialect its CLI speaks, whether that CLI confines the
 files it touches, the formats it keeps, whether it renders a page headless, the host surface its
 browser build has, and whether lattice keeps its files or only what it exports. Its key,
 `files:<name>`, is an integration of lattice-core's registry, which holds its default and its
@@ -9,18 +9,32 @@ description, and a test holds the two registries together.
 """
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Final, Literal
 
-from artifactr.files.manifest import DOCX, DWG, DXF, FIGCRAFT, IDML, PDF, PPTX, PSD, SVG, XLSX
+from artifactr.files.manifest import (
+    DOCX,
+    DWG,
+    DXF,
+    FCSTD,
+    FIGCRAFT,
+    IDML,
+    PDF,
+    PPTX,
+    PSD,
+    SVG,
+    XLSX,
+)
 from lattice_core.integrations import KNOWN, Integration
 
-Dialect = Literal["tools", "commands"]
-"""How the CLI's MCP server is driven: `tools`, a tool for each step (`open_document`, `batch`,
-`save_document`, `list_commands`), as WordCraft's; `commands`, every step a command run through
-`command_run` and `command_batch`, rendered by `render_preview`, as PdfCraft's and FilmCraft's
-(whose servers read a file through `doc_inspect`)."""
+Dialect = Literal["tools", "commands", "script"]
+"""How the CLI is driven: `tools`, an MCP server with a tool for each step (`open_document`,
+`batch`, `save_document`, `list_commands`), as WordCraft's; `commands`, an MCP server running
+every step as a command through `command_run` and `command_batch`, rendered by `render_preview`,
+as PdfCraft's and FilmCraft's (whose servers read a file through `doc_inspect`); `script`, no
+server, but a script of the adapter's that the CLI runs for each call, as FreeCAD's `freecadcmd`
+(native files ADR-0014)."""
 
 Roots = Literal["split", "single", "none"]
 """How the CLI confines the files it reads and writes: `split`, to a read root and a write root
@@ -81,6 +95,15 @@ class Craft:
 
     bridge: Bridge | None = None
     notices: tuple[Notice, ...] = ()
+    cli: str = field(default="", kw_only=True)
+    """Its CLI's name: `<name>-cli` unless given, as every storytold app's is."""
+
+    repository: str = field(default="", kw_only=True)
+    """Where it is released on GitHub: `storytold/<name>` unless given."""
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "cli", self.cli or f"{self.name}-cli")
+        object.__setattr__(self, "repository", self.repository or f"storytold/{self.name}")
 
     @property
     def key(self) -> str:
@@ -91,16 +114,6 @@ class Craft:
     def integration(self) -> Integration:
         """Its integration in lattice-core's registry: its default, and its admin's sentence."""
         return KNOWN[self.key]
-
-    @property
-    def cli(self) -> str:
-        """Its CLI's name: `<name>-cli`."""
-        return f"{self.name}-cli"
-
-    @property
-    def repository(self) -> str:
-        """Where it is released: `storytold/<name>` on GitHub."""
-        return f"storytold/{self.name}"
 
 
 def _registry(*crafts: Craft) -> Mapping[str, Craft]:
@@ -208,6 +221,17 @@ CRAFTS: Final = _registry(
         reach="file",
     ),
     Craft(
+        name="freecad",
+        title="FreeCAD",
+        dialect="script",
+        roots="none",
+        formats=frozenset({FCSTD}),
+        render=True,
+        reach="file",
+        cli="freecadcmd",
+        repository="FreeCAD/FreeCAD",
+    ),
+    Craft(
         name="filmcraft",
         title="FilmCraft",
         dialect="commands",
@@ -248,4 +272,5 @@ CRAFTS: Final = _registry(
     ),
 )
 """The crafting apps, by name, read-only: what each pinned release offers, checked on
-2026-10-18 against its CLI's own MCP tools and options."""
+2026-10-18 against its CLI's own MCP tools and options; and FreeCAD, a third party's, checked
+on 2026-10-20 against its console (native files ADR-0014)."""

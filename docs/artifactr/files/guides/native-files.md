@@ -163,9 +163,9 @@ An agent's commands are PdfCraft's own, run through its command registry, such a
 
 ## The other crafting apps
 
-`artifactr.files.craft.CRAFTS` declares every crafting app, as its pinned release offers it, and each is an integration of its own, `files:<name>`, off by default but WordCraft's:
+`artifactr.files.craft.CRAFTS` declares every crafting app, as its pinned release offers it, and FreeCAD, below; each is an integration of its own, `files:<name>`, off by default but WordCraft's:
 
-| App | Its server's dialect | Its CLI confines files to | Kept as | Key |
+| App | Its dialect | Its CLI confines files to | Kept as | Key |
 |---|---|---|---|---|
 | WordCraft | tools | a read and a write root | `.docx` | `files:wordcraft`, on |
 | GridCraft | tools | nothing | `.xlsx` | `files:gridcraft` |
@@ -176,12 +176,13 @@ An agent's commands are PdfCraft's own, run through its command registry, such a
 | VectorCraft | commands | a read and a write root | `.svg` | `files:vectorcraft` |
 | DesignCraft | tools | a read and a write root | `.idml` | `files:designcraft` |
 | FigCraft | tools | nothing | `.figcraft` | `files:figcraft` |
+| FreeCAD | script | nothing | `.FCStd` | `files:freecad` |
 | FilmCraft | commands | nothing | exports only | `files:filmcraft` |
 | EffectCraft | commands | a read and a write root | exports only | `files:effectcraft` |
 | SoundCraft | tools | a read and a write root | exports only | `files:soundcraft` |
 | LightCraft | commands | nothing | exports only | `files:lightcraft` |
 
-An app's adapter subclasses `ToolsDialect` or `CommandsDialect`, which take the CLI, the `version` it must be, `arguments` for it after `mcp`, `trusted`, `limit` and `lookup`. A CLI that confines nothing reads and writes wherever your application's user can, so its adapter refuses to be made, with `ValueError`, unless you pass `trusted=True`, saying its files are trusted or your process is already confined. Run such an app only in the worker where people upload files you don't trust. FilmCraft, EffectCraft, SoundCraft and LightCraft keep projects that point at media outside them, so lattice keeps only what they render or export, one file at a time.
+A crafting app's adapter subclasses `ToolsDialect` or `CommandsDialect`, its MCP server's dialect, which take the CLI, the `version` it must be, `arguments` for it after `mcp`, `trusted`, `limit` and `lookup`. A CLI that confines nothing reads and writes wherever your application's user can, so its adapter refuses to be made, with `ValueError`, unless you pass `trusted=True`, saying its files are trusted or your process is already confined. Run such an app only in the worker where people upload files you don't trust. FilmCraft, EffectCraft, SoundCraft and LightCraft keep projects that point at media outside them, so lattice keeps only what they render or export, one file at a time.
 
 `scripts/craft <app> cli`, `web` or `notices` (the licence files in this machine's CLI asset) fetches any of them at its pin, in `scripts/crafts/<app>.sha256`, and `CRAFT=<app> moon run artifactr:fidelity` runs an app's fidelity report, from its corpus in `tests/files/corpus/<app>/`.
 
@@ -214,7 +215,27 @@ files.app_of(Workbook)  # gridcraft
 
 **The gate.** An app's key is on by default only once it passes its own gate: its release pinned, its fidelity matrix green in Nightly, its hostile files each refused in time, its CLI confined (or the worker running it), and its notices read. WordCraft passes it; the others' keys stay off until theirs do ([ADR-0011](../adr/0011-a-gate-for-each-app.md)).
 
-**Licences and notices.** Every app is `MIT OR Apache-2.0`, and its licence files and `NOTICE` travel with its CLI and its browser build; `scripts/craft <app> notices` lists those beside the CLI. PdfCraft's Linux tarballs also carry its OCR's two models, `text-detection.rten` and `text-recognition.rten`, by Robert Knight ([ocrs-models](https://github.com/robertknight/ocrs-models)), trained on HierText, under CC-BY-SA-4.0: whatever ships PdfCraft's CLI from them ships their `ATTRIBUTION.txt` and licence files with it, as `CRAFTS["pdfcraft"].notices` lists. Each app's brand licence lets the brand's marks appear only in its unmodified official builds, so they are served unchanged, and no key, name or document of yours should use the brand's name.
+**Licences and notices.** Every storytold app is `MIT OR Apache-2.0`, and its licence files and `NOTICE` travel with its CLI and its browser build; `scripts/craft <app> notices` lists those beside the CLI. PdfCraft's Linux tarballs also carry its OCR's two models, `text-detection.rten` and `text-recognition.rten`, by Robert Knight ([ocrs-models](https://github.com/robertknight/ocrs-models)), trained on HierText, under CC-BY-SA-4.0: whatever ships PdfCraft's CLI from them ships their `ATTRIBUTION.txt` and licence files with it, as `CRAFTS["pdfcraft"].notices` lists. Each app's brand licence lets the brand's marks appear only in its unmodified official builds, so they are served unchanged, and no key, name or document of yours should use the brand's name.
+
+## FreeCAD
+
+FreeCAD is the FreeCAD project's parametric 3D modeller, under LGPL-2.1-or-later, not one of the crafting apps, and its key is `files:freecad`, off by default. It keeps 3D models, `CadModel`, `.FCStd`, under `FCSTD`, `application/x-extension-fcstd`, the media type FreeCAD's own MIME file gives it ([ADR-0014](../adr/0014-freecad-on-a-third-dialect-and-no-python-a-file-or-an-agent-brings.md)). It has no server: its adapter runs FreeCAD's console, `freecadcmd`, on a script of its own for every call, with the call as JSON, in a directory of the call's own, with nothing of your environment and no user macro, addon or setting (`--safe-mode`). The script reads and writes wherever your user can, so the adapter is made with `trusted=True`: run it in the worker where files aren't trusted.
+
+```python
+from artifactr.files import CadModel
+from artifactr.files.freecad import Subprocess as FreeCAD
+
+freecad = FreeCAD(cli, version="1.1.4", trusted=True)  # cli: from scripts/craft freecad cli
+files = NativeFiles(blobs, checkouts, {WordDocument: wordcraft, CadModel: freecad})
+```
+
+**No Python a file or an agent brings.** Opening a document in FreeCAD restores a Python feature by importing the module it names, so before FreeCAD starts, the adapter refuses a document that holds a Python feature or proxy, in `Document.xml` or `GuiDocument.xml`, a link to another file, an object outside FreeCAD's C++ workbenches (`App`, `Part`, `PartDesign`, `Sketcher` and `Spreadsheet`), a DTD, XML nested more than 256 deep, more than 1,000 parts, or more than the limit inflated. That refuses every Draft and BIM object, and every addon's: keep such a file as an upload. FreeCAD 1.1.4's own restore refuses a pickled proxy and any module outside FreeCAD's own behind it, which a live test holds. A document whose objects' links make a cycle is refused by the script once FreeCAD has opened it.
+
+**The commands are lattice's.** An agent's commands are a fixed set the script carries out through FreeCAD's document API, none of them Python: `box`, `cylinder`, `sphere`, `cone`, `boolean` (`cut`, `fuse`, `common`), `sketch`, `sketch.line`, `sketch.circle`, `sketch.constraint`, `extrude`, `move`, `set`, `remove`, `sheet`, `sheet.set` and `sheet.alias`, such as `{"name": "box", "args": {"length": 20, "width": 10, "height": 5}}`. `app.commands("sketch")` finds them with no CLI started. Each argument is checked by its type; `set` writes a number, a string or a boolean to a property its object already has. A batch is recomputed, an object it leaves invalid refuses it, and a batch's document is saved as a reopened one is, so its next save is a fixpoint.
+
+**What a save keeps.** A document is saved under the label it had, with no recompute when no command ran, so its shapes' bytes are kept; the console drops `GuiDocument.xml`, which holds colours and visibility, so the adapter puts the source's back, and the thumbnail is dropped. The fingerprint is every part's bytes, with the time each save writes left out. The outline is each object's label and type, a line each, and the text is the sheets' cells. Page 1 is the model drawn isometrically, its visible edges in black; a model with no shape is refused. Its corpus is nine features made by FreeCAD itself, each kept by 1.1.4.
+
+`scripts/craft freecad cli` fetches FreeCAD's Linux AppImage for this machine, checks it against `scripts/crafts/freecad.sha256`, unpacks it, and prints its `freecadcmd`; there is no macOS CLI and no browser build, so a person edits a model in their own FreeCAD, and downloads and uploads it. `notices` lists the licence files the AppImage carries.
 
 ## Switching an app on and off
 

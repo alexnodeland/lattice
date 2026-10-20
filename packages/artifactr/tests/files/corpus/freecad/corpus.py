@@ -92,7 +92,12 @@ def inflating(name: str, head: bytes, size: int, tail: bytes = b"") -> bytes:
 
 def member(feature: str, name: str) -> bytes:
     """A part of a corpus file."""
-    with zipfile.ZipFile(HERE / f"{feature}.FCStd") as archive:
+    return in_zip((HERE / f"{feature}.FCStd").read_bytes(), name)
+
+
+def in_zip(content: bytes, name: str) -> bytes:
+    """A part of a zip."""
+    with zipfile.ZipFile(io.BytesIO(content)) as archive:
         return archive.read(name)
 
 
@@ -165,6 +170,9 @@ def python(proxy: str) -> bytes:
     )
 
 
+INERT: Final = '<Python value="e30=" encoded="yes" json="yes" module="this" class="Thing"/>'
+"""A proxy FreeCAD 1.1.4 refuses to import, so a file holding it does nothing when opened."""
+
 PICKLED: Final = base64.b64encode(pickle.dumps(_Shell(), protocol=2)).decode()
 HOSTILE: Final[dict[str, Callable[[], bytes]]] = {
     # 1 GiB of a shape's part: refused by the zip's directory, nothing inflated.
@@ -201,7 +209,8 @@ HOSTILE: Final[dict[str, Callable[[], bytes]]] = {
     ),
     # FreeCAD reads the zip's first entry as the document, whatever its name.
     "document_not_first": lambda: zipped(
-        ("a.txt", python_document()), ("Document.xml", member("primitives", "Document.xml"))
+        ("a.txt", in_zip(python(INERT), "Document.xml")),
+        ("Document.xml", member("primitives", "Document.xml")),
     ),
     "duplicate_document": lambda: zipped(
         ("Document.xml", member("primitives", "Document.xml")),

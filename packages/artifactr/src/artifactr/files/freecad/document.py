@@ -52,8 +52,9 @@ ATTRIBUTES: Final = {
 `Document.xml`: what FreeCAD 1.1.4's `Document::Restore` reads, but `ViewType`, which names a
 view provider to make."""
 
-CAMERA: Final = re.compile(rb'(<Camera\s+settings=")[^"]*(")')
-"""The GUI's camera, an Open Inventor string the GUI parses, which the scan empties."""
+CAMERA: Final = re.compile(rb"""(<Camera\s+settings\s*=\s*)(["'])[^"']*\2""")
+"""The GUI's camera, an Open Inventor string the GUI parses, which the scan empties; the part is
+read again after, and refused if any camera still holds one."""
 
 OBJECTS: Final = frozenset({
     "App::Line", "App::Origin", "App::Plane", "App::Point",
@@ -154,21 +155,28 @@ def scan(content: bytes, limit: int) -> Scanned:
         raise AppFailed("refused", "not a FreeCAD document: not a zip it can read") from None
     if DOCUMENT not in read:
         raise AppFailed("refused", f"not a FreeCAD document: no {DOCUMENT}")
-    readers = [_Reader(DOCUMENT, PROPERTIES, EXTENSIONS)]
-    label = readers[0].read(read[DOCUMENT])
+    document = _Reader(DOCUMENT, PROPERTIES, EXTENSIONS)
+    label = document.read(read[DOCUMENT])
+    order = [DOCUMENT, *document.files]
     if GUI in read:
-        readers.append(_Reader(GUI, VIEW_PROPERTIES, VIEW_EXTENSIONS))
-        readers[1].read(read[GUI])
-        read[GUI] = CAMERA.sub(rb"\1\2", read[GUI])
-    named = {DOCUMENT, GUI}.union(*(reader.files for reader in readers))
-    if unnamed := sorted(n for n in read if n not in named and not n.startswith(THUMBNAILS)):
+        gui = _Reader(GUI, VIEW_PROPERTIES, VIEW_EXTENSIONS)
+        gui.read(read[GUI])
+        read[GUI] = CAMERA.sub(rb"\1\2\2", read[GUI])
+        if any(_Reader(GUI, VIEW_PROPERTIES, VIEW_EXTENSIONS).cameras_of(read[GUI])):
+            raise AppFailed("refused", f"{GUI} holds a camera the scan can't empty")
+        order += [GUI, *gui.files]
+    for thumbnail in [n for n in read if n.startswith(THUMBNAILS)]:
+        del read[thumbnail]
+    if unnamed := sorted(set(read) - set(order)):
         # A part no property names is one FreeCAD never asks for, unless it reads it as
         # something else: none is passed on.
         raise AppFailed("refused", f"not a FreeCAD document: nothing names {unnamed[0]}")
-    # FreeCAD's reader takes the zip's first entry as the document, whatever it is named
-    # (`Document::restore` in 1.1.4), and reads the others in the order they come, matching each
-    # to a file its objects asked for: Document.xml first, then the rest as they came.
-    return Scanned(_zipped({DOCUMENT: read.pop(DOCUMENT), **read}), label)
+    # FreeCAD 1.1.4's `Document::restore` takes the zip's first entry as the document, whatever
+    # it is named, and `XMLReader::readFiles` reads the rest in their order, matching each to the
+    # next file asked for and never going back: so the parts go in the order they are asked for.
+    return Scanned(
+        _zipped({name: read[name] for name in dict.fromkeys(order) if name in read}), label
+    )
 
 
 def fingerprint(content: bytes) -> str:
@@ -201,7 +209,7 @@ def with_gui(saved: bytes, source: bytes | None) -> bytes:
             return saved
         reader = _Reader(GUI, VIEW_PROPERTIES, VIEW_EXTENSIONS)
         reader.read(gui := given.read(GUI))
-        named = [name for name in given.namelist() if name in reader.files]
+        named = [name for name in reader.files if name in given.namelist()]
         carried = {GUI: gui, **{name: given.read(name) for name in named}}
     with zipfile.ZipFile(io.BytesIO(saved)) as made:
         parts = {name: made.read(name) for name in made.namelist() if name != GUI}
@@ -273,8 +281,10 @@ class _Reader:
         self.extensions = extensions
         self.path: list[tuple[str, str]] = []
         self.label: str | None = None
-        self.files: set[str] = set()
-        """The parts the properties name, by their `file`."""
+        self.files: dict[str, None] = {}
+        """The parts the properties name, by their `file`, in the order they name them."""
+        self.cameras: list[str] = []
+        """What each camera's `settings` hold."""
         self.counted: dict[str, str] = {}
         self.found: dict[str, int] = {}
         self.parser = expat.ParserCreate()
@@ -282,6 +292,11 @@ class _Reader:
         self.parser.EntityDeclHandler = self._refuse_dtd
         self.parser.StartElementHandler = self._start
         self.parser.EndElementHandler = self._end
+
+    def cameras_of(self, data: bytes) -> list[str]:
+        """What the cameras of a part hold, once read."""
+        self.read(data)
+        return self.cameras
 
     def read(self, data: bytes) -> str | None:
         try:
@@ -305,6 +320,10 @@ class _Reader:
             self._refuse(f"nests elements more than {DEPTH} deep")
         if ":" in tag or any(":" in key for key in attributes):
             self._refuse(f"holds a namespaced name: {tag}")
+        if tag == "Camera":
+            if self.name != GUI or set(attributes) != {"settings"}:
+                self._refuse("holds a camera other than the GUI's, with its settings alone")
+            self.cameras.append(attributes["settings"])
         allowed = ATTRIBUTES.get((tag, self.name == DOCUMENT))
         if allowed is not None and (unexpected := set(attributes) - allowed):
             self._refuse(f"gives an {tag} an attribute that isn't allowed: {min(unexpected)}")
@@ -320,7 +339,7 @@ class _Reader:
         if tag.startswith("XLink") and attributes.get("file"):
             self._refuse(f"links to another file: {attributes['file']}")
         if "file" in attributes:
-            self.files.add(attributes["file"])
+            self.files.setdefault(attributes["file"])
         if tag == "DocMap" or (tag == "XLinks" and "docs" in attributes):
             self._refuse("links to another document")
         said = attributes.get("expression", "") + attributes.get("content", "")

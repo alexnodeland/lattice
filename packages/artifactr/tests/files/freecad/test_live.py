@@ -18,7 +18,7 @@ from pathlib import Path
 import pytest
 
 from artifactr.files.app import AppCommand, AppFailed
-from artifactr.files.freecad import COMMANDS, Subprocess
+from artifactr.files.freecad import COMMANDS, Subprocess, scan
 from artifactr.files.manifest import FCSTD
 from tests.files.corpus.freecad.corpus import CORPUS, python
 from tests.files.corpus.harness import pinned
@@ -187,3 +187,51 @@ async def test_a_file_freecads_gui_saved_keeps_its_colours_and_then_its_fingerpr
     assert twice.inspection == once.inspection
     with zipfile.ZipFile(io.BytesIO(once.content)) as archive:
         assert {"GuiDocument.xml", "ShapeAppearance"} <= set(archive.namelist())
+
+
+def opened(tmp_path: Path, content: bytes) -> list[str]:
+    """Each object FreeCAD opens from `content`, its name, type and whether its shape is there."""
+    path = tmp_path / "opened.FCStd"
+    path.write_bytes(content)
+    script = tmp_path / "opened.py"
+    script.write_text(
+        "import FreeCAD\n"
+        f"document = FreeCAD.openDocument({str(path)!r})\n"
+        "for o in document.Objects:\n"
+        "    shape = getattr(o, 'Shape', None)\n"
+        "    print('OPENED', o.Name, o.TypeId, shape is not None and not shape.isNull())\n"
+    )
+    printed = subprocess.run(
+        [os.environ["ARTIFACTR_TEST_CRAFT_CLI"], "--safe-mode", str(script)],
+        env={"HOME": str(tmp_path), "LANG": "C.UTF-8", "QT_QPA_PLATFORM": "offscreen"},
+        capture_output=True,
+        text=True,
+        errors="replace",
+        timeout=60,
+        check=False,
+    )
+    return [
+        line.removeprefix("OPENED ") for line in printed.stdout.splitlines() if "OPENED" in line
+    ]
+
+
+def test_freecad_takes_the_first_entry_as_the_document_whatever_its_name(tmp_path: Path) -> None:
+    """Why the scan writes Document.xml first, and refuses a part nothing names."""
+    hostile = CORPUS.hostile_file("document_not_first")
+    assert "Py App::FeaturePython False" in opened(tmp_path, hostile), "a.txt, read first"
+    with pytest.raises(AppFailed, match=r"nothing names a\.txt"):
+        scan(hostile, 1 << 28)
+
+
+def test_freecad_reads_parts_only_in_the_order_it_asks_for_them(tmp_path: Path) -> None:
+    """Why the scan orders parts as Document.xml names them, not by name."""
+    canonical = scan(CORPUS.source("booleans"), 1 << 28).content
+    with zipfile.ZipFile(io.BytesIO(canonical)) as archive:
+        parts = {name: archive.read(name) for name in archive.namelist()}
+    by_name = io.BytesIO()
+    with zipfile.ZipFile(by_name, "w") as archive:
+        archive.writestr("Document.xml", parts.pop("Document.xml"))
+        for name in sorted(parts):
+            archive.writestr(name, parts[name])
+    assert all(line.endswith("True") for line in opened(tmp_path, canonical))
+    assert any(line.endswith("False") for line in opened(tmp_path, by_name.getvalue()))

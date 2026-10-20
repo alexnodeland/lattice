@@ -253,3 +253,53 @@ def test_a_file_freecads_gui_saved_is_scanned_and_its_gui_parts_carried() -> Non
     with zipfile.ZipFile(io.BytesIO(carried)) as archive:
         assert archive.namelist()[2:] == [n for n in gui if not n.startswith("thumbnails/")]
     assert fingerprint(carried) == fingerprint(scanned.content), "a no-op save keeps it"
+
+
+@pytest.mark.parametrize(
+    "camera",
+    [
+        "<Camera settings='#Inventor V2.1 ascii File { }'/>",
+        '<Camera  settings = "#Inventor V2.1 ascii File { }" />',
+    ],
+)
+def test_a_camera_written_otherwise_is_emptied_too(camera: str) -> None:
+    gui = f"<Document>{camera}</Document>"
+    scanned = scan(fcstd(xml(), **{"GuiDocument.xml": gui}), LIMIT)
+    with zipfile.ZipFile(io.BytesIO(scanned.content)) as archive:
+        assert b"Inventor" not in archive.read("GuiDocument.xml")
+
+
+@pytest.mark.parametrize(
+    "camera",
+    [
+        '<Camera onload="x" settings="#Inventor V2.1 ascii"/>',
+        '<Camera settings="" style="x"/>',
+        "<Camera/>",
+    ],
+)
+def test_a_camera_with_more_or_less_than_its_settings_is_refused(camera: str) -> None:
+    with pytest.raises(AppFailed, match="camera"):
+        scan(fcstd(xml(), **{"GuiDocument.xml": f"<Document>{camera}</Document>"}), LIMIT)
+
+
+def test_a_camera_in_the_document_is_refused() -> None:
+    with pytest.raises(AppFailed, match="camera"):
+        scan(fcstd(xml('<Camera settings=""/>')), LIMIT)
+
+
+def test_two_orders_of_the_same_parts_are_given_alike_in_the_order_freecad_asks() -> None:
+    shapes = '<Part file="Box.Shape.brp"/><Part file="Axle.Shape.brp"/>'
+    parts = {"Box.Shape.brp": "box", "Axle.Shape.brp": "axle", "thumbnails/Thumbnail.png": "png"}
+    one = fcstd(xml(shapes), **parts)
+    other = fcstd(xml(shapes), **dict(reversed(parts.items())))
+    assert one != other
+    assert scan(one, LIMIT).content == scan(other, LIMIT).content
+    with zipfile.ZipFile(io.BytesIO(scan(other, LIMIT).content)) as archive:
+        assert archive.namelist() == ["Document.xml", "Box.Shape.brp", "Axle.Shape.brp"]
+
+
+def test_a_camera_the_scan_cant_empty_is_refused() -> None:
+    """One quote inside the other: the substitution leaves it, and reading it again finds it."""
+    gui = """<Document><Camera settings='File { name "/etc/passwd" }'/></Document>"""
+    with pytest.raises(AppFailed, match="camera the scan can't empty"):
+        scan(fcstd(xml(), **{"GuiDocument.xml": gui}), LIMIT)

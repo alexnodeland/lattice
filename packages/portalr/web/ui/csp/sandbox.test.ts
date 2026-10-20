@@ -57,6 +57,10 @@ async function running(html: string): Promise<Page> {
 /** Long enough for the sandbox, the app and the bridge to start on a busy CI runner. */
 const SETTLED = { timeout: 15_000 };
 
+/** The app's own frame, inside the sandbox's. */
+const appFrame = (page: Page) =>
+  page.frames().find((frame) => frame.parentFrame()?.parentFrame() === page.mainFrame());
+
 /** The app's frame's height, which the app asks for through the bridge. */
 const height = (page: Page) =>
   page.getByTitle("Probe: an app made by the agent").evaluate((frame) => frame.style.height);
@@ -134,5 +138,42 @@ test("WebRTC from a srcdoc frame the app makes still reaches the sink: not refus
   );
   await expect.poll(() => height(page), SETTLED).toBe("321px");
   await vi.waitFor(() => expect(heard).toContain("a UDP datagram"), { timeout: 10_000 });
+  await page.close();
+});
+
+test("a game's turns each write its state and read it back, so every turn's button comes back", async () => {
+  // As create_app's description teaches: initialize, then each click writes the state, reads it
+  // back from structuredContent, and draws everything from it in one render.
+  const page = await running(
+    `<body><button id="play" disabled>Play</button><output id="moves">0</output><script>
+let state = { moves: 0 }, waiting = true, id = 0;
+const pending = new Map();
+const call = (method, params) => new Promise((done) => {
+  pending.set(++id, done);
+  parent.postMessage({ jsonrpc: "2.0", id, method, params }, "*");
+});
+const render = () => {
+  document.getElementById("moves").textContent = String(state.moves);
+  document.getElementById("play").disabled = waiting;
+};
+addEventListener("message", (e) => pending.get(e.data?.id)?.(e.data.result));
+const read = async () => {
+  const result = await call("tools/call", { name: "get_state", arguments: {} });
+  state = { moves: result.structuredContent?.state?.moves ?? 0 };
+};
+document.getElementById("play").addEventListener("click", async () => {
+  waiting = true; render();
+  await call("tools/call", { name: "set_state", arguments: { patch: [{ op: "add", path: "/moves", value: state.moves + 1 }] } });
+  await read();
+  waiting = false; render();
+});
+call("ui/initialize", {}).then(read).then(() => { waiting = false; render(); });
+</script>`,
+  );
+  await expect.poll(() => appFrame(page)?.isEnabled("#play"), SETTLED).toBe(true);
+  for (const turn of ["1", "2", "3"]) {
+    await appFrame(page)?.click("#play");
+    await expect.poll(() => appFrame(page)?.textContent("#moves"), SETTLED).toBe(turn);
+  }
   await page.close();
 });

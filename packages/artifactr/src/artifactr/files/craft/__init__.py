@@ -14,7 +14,7 @@ from artifactr.files.craft.commands import PREVIEW, CommandsDialect
 from artifactr.files.craft.headless import FOUND, Headless
 from artifactr.files.craft.package import Package
 from artifactr.files.craft.registry import CRAFTS, Bridge, Craft, Dialect, Notice, Reach, Roots
-from artifactr.files.craft.spawn import Server, Spawn
+from artifactr.files.craft.spawn import Server, Spawn, reply_text
 from artifactr.files.craft.tools import ToolsDialect
 
 __all__ = [
@@ -33,4 +33,5 @@ __all__ = [
     "Server",
     "Spawn",
     "ToolsDialect",
+    "reply_text",
 ]

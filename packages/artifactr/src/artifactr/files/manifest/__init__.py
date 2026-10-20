@@ -23,6 +23,7 @@ from artifactr.files.manifest.types import (
     Sha256,
     Source,
     WordDocument,
+    Workbook,
 )
 
 __all__ = [
@@ -43,5 +44,6 @@ __all__ = [
     "Sha256",
     "Source",
     "WordDocument",
+    "Workbook",
     "revise",
 ]

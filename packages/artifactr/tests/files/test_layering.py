@@ -40,6 +40,7 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         {"pydantic", "mcp", "anyio", "lattice_core.integrations"},
     ),
     "wordcraft": _adapter("wordcraft"),
+    "gridcraft": _adapter("gridcraft"),
     # The worker, over any app, and the App that calls it; its entry point runs WordCraft's.
     "worker": (
         {

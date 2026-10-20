@@ -101,3 +101,19 @@ class Package:
             # RuntimeError.
             raise AppFailed("refused", f"not a {self.extension}: {error}") from None
         return digest.hexdigest()
+
+    def require(self, content: bytes, media_type: str, *, limit: int) -> None:
+        """Refuse a file that doesn't say it is `media_type`, before its app opens it.
+
+        For an app that opens other formats whatever a file is named, and saves what it opened
+        in the format it is asked for: a file of another format is refused, never converted.
+
+        Raises:
+            AppFailed: `refused` if it isn't a zip, or says it is another format or none, and
+                `too_large` if its parts, inflated, pass `limit` bytes.
+        """
+        self.fingerprint(content, limit=limit)
+        if (found := self.media_type(content)) != media_type:
+            raise AppFailed(
+                "refused", f"not a {self.extension}: it says it is {found or 'no format'}"
+            )

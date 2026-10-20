@@ -21,7 +21,15 @@ class _Command(BaseModel):
     id: str
     label: str = ""
     location: str = ""
+    menu: list[str] = []
+    """Where it is in the app, as a server that doesn't say `location` says it."""
     params: str = "{}"
+
+    @property
+    def description(self) -> str:
+        """Its label, and where it is in the app if the server says."""
+        place = self.location or " > ".join(self.menu)
+        return f"{self.label} ({place})" if place else self.label
 
 
 class _Step(BaseModel):
@@ -48,6 +56,8 @@ class ToolsDialect(Headless):
     batch_tool: ClassVar[str] = "batch"
     render_tool: ClassVar[str] = "render_page"
     list_tool: ClassVar[str] = "list_commands"
+    list_argument: ClassVar[str] = "query"
+    """The list tool's argument that it matches commands by."""
 
     @override
     async def open(self, server: Server, source: bytes | None) -> JsonValue:
@@ -89,12 +99,13 @@ class ToolsDialect(Headless):
     @override
     async def find(self, server: Server, query: str) -> Sequence[CommandSpec]:
         """The commands the list tool finds for the query, ten at most."""
-        found = _COMMANDS.validate_json(await server.text(self.list_tool, query=query))
+        listed = await server.text(self.list_tool, **{self.list_argument: query})
+        found = _COMMANDS.validate_json(listed)
         return [
             CommandSpec(
                 name=command.id,
                 signature=f"{command.id} {command.params}",
-                description=f"{command.label} ({command.location})",
+                description=command.description,
             )
             for command in found[:FOUND]
         ]

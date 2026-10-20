@@ -70,26 +70,32 @@ who opens the thread, under a policy that loads nothing, so its scripts and styl
 and its images and fonts `data:` URLs. Its `summary` says in words what it does: it is shown \
 beside the app, and in its place wherever apps don't run.
 
-It talks to its host in JSON-RPC 2.0, sending with `window.parent.postMessage(message, "*")` \
-and hearing the answers as `message` events. It asks `ui/initialize` first, then sends the \
-notification `ui/notifications/initialized`; the result's `hostContext` has `theme` (`light` \
-or `dark`) and `styles.variables`, the host's colours as CSS variables, which \
-`ui/notifications/host-context-changed` sends again when they change. It calls \
-its tools with `tools/call`, `{{"name": ..., "arguments": {{...}}}}`, each answering with a \
-result whose `structuredContent` holds what it says (`result.structuredContent.state`, not \
-`result.state`): `get_state`, its `state` and `version`; `set_state`, with `patch`, a JSON \
-Patch on its state, at most {MAX_APP_STATE_BYTES // 1024} KB, kept as the person's and saved at \
-most once every 5 seconds; and `submit`, with `values`, an object sent as the person's \
-submission once they confirm it. `ui/open-link`, with a `url`, opens it once the person \
-confirms; `ui/notifications/size-changed`, with a `height`, sizes its frame. It has 60 calls \
-a minute, each message counted; past them, the host stops answering it. A refused call \
-answers with `isError: true` and no `structuredContent`: the app renders anyway, and enables \
-again what waited on it.
+It talks to its host through `window.host`, which the host gives every app before its own \
+script runs. `await host.connect()` first: it asks `ui/initialize`, says it is initialized, \
+and keeps the host's theme on the document. `await host.call(name, args)` calls a tool and \
+resolves to what it says, or rejects with an `Error` where the host refuses it: \
+`host.call("get_state")` to `{{state, version}}`; `host.call("set_state", {{patch}})`, a JSON \
+Patch on the app's state, at most {MAX_APP_STATE_BYTES // 1024} KB, kept as the person's and \
+saved at most once every 5 seconds; and `host.call("submit", {{values}})`, an object sent as \
+the person's submission once they confirm it. `host.request("ui/open-link", {{url}})` opens a \
+link once the person confirms it. `host.onAnswer(render)` draws again after every answer. The \
+host sizes the frame to what the app draws; `host.notify("ui/notifications/size-changed", \
+{{height}})` says a height of the app's own instead. It has 60 calls a minute; past them, the \
+host stops answering it. Beneath `host` is JSON-RPC 2.0 over `window.parent.postMessage`, on \
+MCP Apps' methods.
 
 Keep what the app shows in one state, and draw all of it from that state in one `render()`, \
-called after every change: a click, a timer's callback, a tool's answer. A control enabled or \
-disabled by the state is then right on every turn, never left disabled by a render that ran \
-before the change. Before sending it, walk its first three turns and a restart."""
+called after every change: a click, a timer's callback, an answer or a refusal. A control \
+enabled or disabled by the state is then right on every turn, never left disabled by a render \
+that ran before the change. Before sending it, walk its first three turns and a restart.
+
+Its colours are the host's, which `host.connect()` sets on the document and changes with the \
+host's theme: `var(--color-background-primary)`, `--color-background-secondary`, \
+`--color-text-primary`, `--color-text-secondary`, `--color-border-primary`, and portalr's \
+`--accent` and `--on-accent`. Use them for every surface and its text, set no `color-scheme` \
+or palette of its own, and name no variable of its own like the host's (`--paper`, \
+`--surface`, `--fg`, `--line` and the rest), which the host's would replace. Every text \
+contrasts with what it is drawn on, in light and in dark."""
 
 
 def ui_tools(

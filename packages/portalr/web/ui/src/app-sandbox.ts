@@ -60,9 +60,66 @@ const SIZED = [
   "});",
 ].join("\n");
 
-/** The app's document: its own policy, no DNS prefetching, no WebRTC and its size first. */
+/**
+ * `window.host`, the bridge's shapes as the app's to use, so an app gets them right by default:
+ * `host.call(name, args)` resolves to a tool's `structuredContent` and rejects on a refusal
+ * (`isError`) or an error; `host.request(method, params)` asks anything else; `host.notify`
+ * says something; `host.onAnswer(render)` runs after every answer, so the app draws again; and
+ * `host.connect()` asks `ui/initialize`, says `initialized`, and keeps the host's theme on the
+ * document as it changes: `color-scheme`, `data-theme`, and its colours as CSS variables. Its
+ * ids are its own (`host:1`), so an app's own requests never meet its answers. Like the measure,
+ * it is the app document's inline script, under the same policy: nothing is loaded.
+ */
+const HOST = [
+  "(() => {",
+  "  let next = 0;",
+  "  const waiting = new Map(), hooks = [];",
+  '  const post = (message) => parent.postMessage({ jsonrpc: "2.0", ...message }, "*");',
+  "  const theme = (context) => {",
+  "    if (!context) return;",
+  "    const root = document.documentElement, colours = context.styles && context.styles.variables;",
+  "    if (context.theme) { root.style.colorScheme = context.theme; root.dataset.theme = context.theme; }",
+  "    if (colours) for (const name in colours) root.style.setProperty(name, colours[name]);",
+  "  };",
+  '  addEventListener("message", (event) => {',
+  "    const message = event.data;",
+  '    if (!message || message.jsonrpc !== "2.0") return;',
+  '    if (message.method === "ui/notifications/host-context-changed") theme(message.params);',
+  "    if (message.id == null || !waiting.has(message.id)) return;",
+  "    const [answer, refuse] = waiting.get(message.id);",
+  "    waiting.delete(message.id);",
+  "    const result = message.result;",
+  "    if (message.error || (result && result.isError)) {",
+  "      const said = (message.error && message.error.message) || (result && result.content && result.content[0] && result.content[0].text);",
+  '      refuse(new Error(said || "refused"));',
+  "    } else {",
+  "      answer(result && result.structuredContent !== undefined ? result.structuredContent : result);",
+  "    }",
+  "    Promise.resolve().then(() => { for (const hook of hooks) hook(); });",
+  "  });",
+  "  const request = (method, params = {}) => new Promise((answer, refuse) => {",
+  '    const id = "host:" + ++next;',
+  "    waiting.set(id, [answer, refuse]);",
+  "    post({ id, method, params });",
+  "  });",
+  "  window.host = {",
+  "    request,",
+  '    call: (name, args = {}) => request("tools/call", { name, arguments: args }),',
+  "    notify: (method, params = {}) => post({ method, params }),",
+  "    onAnswer: (hook) => { hooks.push(hook); },",
+  "    connect: async () => {",
+  '      const result = await request("ui/initialize", {});',
+  "      theme(result && result.hostContext);",
+  '      post({ method: "ui/notifications/initialized", params: {} });',
+  "      return result;",
+  "    },",
+  "  };",
+  "})();",
+].join("\n");
+
+/** The app's document: its own policy, no DNS prefetching, no WebRTC, its size and `host` first. */
 export const appDocument = (html: string): string =>
-  `<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${APP_POLICY}"><meta http-equiv="x-dns-prefetch-control" content="off"><script>${NO_WEBRTC}\n${SIZED}</script>${html}`;
+  `<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${APP_POLICY}"><meta http-equiv="x-dns-prefetch-control" content="off"><script>${NO_WEBRTC}\n${SIZED}\n${HOST}</script>${html}`;
 
 /** What the app's frame may do: run its scripts, and nothing else. */
 export const APP_SANDBOX = "allow-scripts";

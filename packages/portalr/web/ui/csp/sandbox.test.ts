@@ -243,3 +243,40 @@ test("a tall app is shown whole up to twice the window, and scrolls inside its f
   await expect.poll(() => drawn(page), SETTLED).toBe(twice);
   await page.close();
 });
+
+test("an app plays through the sandbox's host: its answers, a refusal, and a render after each", async () => {
+  // As create_app's description now teaches: `host.connect`, `host.call`, `host.onAnswer`.
+  const page = await running(
+    `<body><button id="play" disabled>Play</button><output id="moves">0</output><output id="said"></output><output id="theme"></output><script>
+let state = { moves: 0 }, waiting = true, renders = 0;
+const render = () => {
+  renders += 1;
+  document.getElementById("moves").textContent = String(state.moves);
+  document.getElementById("play").disabled = waiting;
+};
+host.onAnswer(render);
+document.getElementById("play").addEventListener("click", async () => {
+  waiting = true; render();
+  await host.call("set_state", { patch: [{ op: "add", path: "/moves", value: state.moves + 1 }] });
+  state = (await host.call("get_state")).state;
+  waiting = false; render();
+});
+host.connect().then(async () => {
+  document.getElementById("theme").textContent = getComputedStyle(document.documentElement).colorScheme;
+  await host.call("nope").catch((error) => { document.getElementById("said").textContent = "refused: " + error.message; });
+  state = (await host.call("get_state")).state ?? { moves: 0 };
+  state.moves = state.moves ?? 0;
+  waiting = false; render();
+});
+</script>`,
+  );
+  const app = () => appFrame(page);
+  await expect.poll(() => app()?.isEnabled("#play"), SETTLED).toBe(true);
+  expect(await app()?.textContent("#said")).toMatch(/^refused: /);
+  expect(await app()?.textContent("#theme")).toMatch(/^(light|dark)$/);
+  for (const turn of ["1", "2", "3"]) {
+    await app()?.click("#play");
+    await expect.poll(() => app()?.textContent("#moves"), SETTLED).toBe(turn);
+  }
+  await page.close();
+});

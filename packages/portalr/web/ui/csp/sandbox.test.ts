@@ -136,3 +136,31 @@ test("WebRTC from a srcdoc frame the app makes still reaches the sink: not refus
   await vi.waitFor(() => expect(heard).toContain("a UDP datagram"), { timeout: 10_000 });
   await page.close();
 });
+
+test("an app plays turn after turn: each click is delivered, its state written and answered", async () => {
+  // As a game does: a click writes the state through the bridge, and the answer draws the next
+  // turn, whose button is enabled again; then a second and a third click do the same.
+  const page = await running(
+    `<body><button id="play">Play</button><output id="moves">0</output><script>
+let moves = 0, waiting = false, id = 0;
+const render = () => { document.getElementById("moves").textContent = String(moves); document.getElementById("play").disabled = waiting; };
+addEventListener("message", (e) => {
+  const m = typeof e.data === "string" ? JSON.parse(e.data) : e.data;
+  if (m && m.result && m.result.structuredContent) { moves += 1; waiting = false; render(); }
+});
+document.getElementById("play").addEventListener("click", () => {
+  waiting = true; render();
+  parent.postMessage({ jsonrpc: "2.0", id: ++id, method: "tools/call", params: { name: "set_state", arguments: { patch: [{ op: "add", path: "/moves", value: moves + 1 }] } } }, "*");
+});
+render();
+</script>`,
+  );
+  const app = () =>
+    page.frames().find((frame) => frame.parentFrame()?.parentFrame() === page.mainFrame());
+  await expect.poll(() => app()?.textContent("#moves"), SETTLED).toBe("0");
+  for (const turn of ["1", "2", "3"]) {
+    await app()?.click("#play");
+    await expect.poll(() => app()?.textContent("#moves"), SETTLED).toBe(turn);
+  }
+  await page.close();
+});

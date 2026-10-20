@@ -1,6 +1,7 @@
 """How the follower carries a rule's causal chain back into reflexr, and where it stops."""
 
 import pytest
+from pydantic import JsonValue
 
 import artifactr
 import artifactr.core as a
@@ -140,7 +141,8 @@ async def answer_to(stack: Stack, ledger: Ledger, *, rule: bool) -> tuple[str, r
     await agent.record(started)
     request = a.DeferredRequest(tool_call_id="q1", tool_name="ask_user", kind="question")
     await agent.record(a.RunPaused(run_id="run_t", thread_id=thread.id, requests=(request,)))
-    await alice.commit(a.AnswerDeferred(run_id="run_t", tool_call_id="q1", answer="Monday"))
+    answer: JsonValue = {"reply": "Monday"}  # a request with no questions takes a reply
+    await alice.commit(a.AnswerDeferred(run_id="run_t", tool_call_id="q1", answer=answer))
     await bridged(stack, 3)
     [answered] = [e for e in await stack.bridged() if e.event_type == "artifactr:deferred_answered"]
     return first.correlation_id, answered

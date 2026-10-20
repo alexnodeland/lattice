@@ -3,7 +3,7 @@
  * formatted JSON for any kind without one, so a new kind is never invisible (lattice RFC-0002).
  * Text renders through `Markdown`, never as HTML. A kind's renderer also says what of its data
  * a revision's changes are read from, and how finely (portalr ADR-0017), and, part by part, what
- * a revision shows as its source and its changes (portalr ADR-0053).
+ * a revision shows as its source and its changes (portalr ADR-0054).
  */
 
 import type { Change, Granularity } from "@portalr/client";

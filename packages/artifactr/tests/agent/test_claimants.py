@@ -27,7 +27,10 @@ from tests.agent.conftest import (
     HeldStorage,
     MakeRunner,
     Script,
+    ask,
+    asking,
     call,
+    in_words,
     make_agent,
     say,
     settled,
@@ -58,8 +61,8 @@ async def _entered(gate: Gate) -> None:
 def _both_questions() -> ModelResponse:
     return ModelResponse(
         parts=[
-            ToolCallPart(tool_name="ask_user", args={"question": "Day?"}, tool_call_id="q1"),
-            ToolCallPart(tool_name="ask_user", args={"question": "Time?"}, tool_call_id="q2"),
+            ToolCallPart(tool_name="ask_user", args=asking("Day?"), tool_call_id="q1"),
+            ToolCallPart(tool_name="ask_user", args=asking("Time?"), tool_call_id="q2"),
         ]
     )
 
@@ -90,7 +93,7 @@ async def test_a_partial_answer_while_another_thread_commits_ends(
     await runner.drain()
     elsewhere = await ws.create_thread("Elsewhere again")
     asking = storage.held_head = Gate()
-    answer = AnswerDeferred(run_id=paused.run_id, tool_call_id="q1", answer="Monday")
+    answer = AnswerDeferred(run_id=paused.run_id, tool_call_id="q1", answer=in_words("Monday"))
     answering = asyncio.create_task(runner.answer(ws, answer))
     await _entered(asking)  # the answer is about to ask for a turn up to the log's head
     await ws.post_message(elsewhere.id, "Meanwhile, in another thread")
@@ -217,12 +220,12 @@ async def test_a_resume_that_fails_before_it_starts_leaves_its_messages_for_the_
         yield
 
     releasing = storage.held = Gate()
-    script = Script(call("ask_user", call_id="q1", question="Which day?"), *[say("ok")] * 3)
+    script = Script(ask("q1", "Which day?"), *[say("ok")] * 3)
     agent = make_agent(script, ask=True, output_type=ASKING)
     runner = runners(agent, turn_context=resuming_fails_once)
     first = started(await runner.send(ws, thread.id, "Plan the launch"))
     await _entered(releasing)
-    answer = AnswerDeferred(run_id=first.run_id, tool_call_id="q1", answer="Monday")
+    answer = AnswerDeferred(run_id=first.run_id, tool_call_id="q1", answer=in_words("Monday"))
     assert (await runner.answer(ws, answer)).run is None
     assert (await runner.send(ws, thread.id, "And book the big room")).run is None
     releasing.release.set()
@@ -239,11 +242,11 @@ async def test_a_resume_gives_the_run_its_messages_however_slow_its_watcher(
     storage: HeldStorage, ws: Workspace, thread: Thread, runners: MakeRunner
 ) -> None:
     releasing = storage.held = Gate()
-    script = Script(call("ask_user", call_id="q1", question="Which day?"), *[say("ok")] * 3)
+    script = Script(ask("q1", "Which day?"), *[say("ok")] * 3)
     runner = runners(make_agent(script, ask=True, output_type=ASKING))
     first = started(await runner.send(ws, thread.id, "Plan the launch"))
     await _entered(releasing)
-    answer = AnswerDeferred(run_id=first.run_id, tool_call_id="q1", answer="Monday")
+    answer = AnswerDeferred(run_id=first.run_id, tool_call_id="q1", answer=in_words("Monday"))
     assert (await runner.answer(ws, answer)).run is None
     assert (await runner.send(ws, thread.id, "And book the big room")).run is None
     slow = storage.held_subscribe = Gate()  # the resumed run's watcher reads late
@@ -278,7 +281,7 @@ async def test_a_message_posted_directly_in_a_paused_thread_is_its_reply(
 ) -> None:
     both = ModelResponse(
         parts=[
-            *call("ask_user", call_id="q1", question="Day?").parts,
+            *ask("q1", "Day?").parts,
             *call("publish", call_id="a1", channel="blog").parts,
         ]
     )
@@ -289,7 +292,7 @@ async def test_a_message_posted_directly_in_a_paused_thread_is_its_reply(
     await paused.wait()
     await runner.drain()
     await ws.as_actor(BOB).post_message(thread.id, "Not yet, legal hasn't signed off")
-    answer = AnswerDeferred(run_id=paused.run_id, tool_call_id="q1", answer="Monday")
+    answer = AnswerDeferred(run_id=paused.run_id, tool_call_id="q1", answer=in_words("Monday"))
     resumed = (await runner.answer(ws, answer)).run
     assert resumed is not None, "Bob's message declines the approval, so the run resumes"
     await settled(thread.id, runner)
@@ -304,7 +307,7 @@ async def test_a_message_posted_directly_in_a_paused_thread_is_its_reply(
 async def test_resume_takes_a_message_posted_directly_as_the_reply(
     ws: Workspace, thread: Thread, runners: MakeRunner
 ) -> None:
-    script = Script(call("ask_user", call_id="q1", question="Which day?"), say("Monday then."))
+    script = Script(ask("q1", "Which day?"), say("Monday then."))
     runner = runners(make_agent(script, ask=True, output_type=ASKING))
     paused = started(await runner.send(ws, thread.id, "Plan it"))
     await paused.wait()
@@ -319,7 +322,7 @@ async def test_resume_takes_a_message_posted_directly_as_the_reply(
 async def test_a_notice_posted_in_a_paused_thread_answers_nothing(
     ws: Workspace, thread: Thread, runners: MakeRunner
 ) -> None:
-    script = Script(call("ask_user", call_id="q1", question="Which day?"), say("Monday then."))
+    script = Script(ask("q1", "Which day?"), say("Monday then."))
     runner = runners(make_agent(script, ask=True, output_type=ASKING))
     paused = started(await runner.send(ws, thread.id, "Plan it"))
     await paused.wait()

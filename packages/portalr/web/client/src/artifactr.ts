@@ -69,8 +69,32 @@ export interface Proposal {
 
 export interface Tool {
   readonly name: string;
-  /** `called` until it returns, then the status it returned with. */
+  /** `called` until it returns, then the status it returned with: `ok`, `error` or `retry`. */
   readonly status: string;
+  /** Its arguments, as the run recorded them: JSON, cut short past the run's limit. */
+  readonly args: string;
+  /** What it returned, or why it failed or was refused, as recorded; empty until it returns. */
+  readonly result: string;
+  /** Whether the run cut `args`, or `result`, short at its limit. */
+  readonly argsCut: boolean;
+  readonly resultCut: boolean;
+  /** The `seq` it was called at: where its thread shows it. */
+  readonly seq: number;
+}
+
+/** The deferred tool that asks questions with options (artifactr ADR-0083). */
+const ASK_USER = "ask_user";
+
+/**
+ * A request to `ask_user` a run paused on, where its thread shows it, and its answer once given:
+ * for the run's life, so a thread keeps what was asked and what was chosen.
+ */
+export interface Question {
+  readonly request: v1.DeferredRequest;
+  /** The `seq` of the pause that asked it. */
+  readonly seq: number;
+  /** The answer, as sent, and who sent it; null until it is answered. */
+  readonly answer: { readonly value: v1.JsonValue; readonly actor: v1.Actor } | null;
 }
 
 /** A request a paused run asked, answered, and who answered it. */
@@ -96,6 +120,17 @@ export interface Run {
   readonly answered: readonly Answered[];
   /** The `seq` it started at: the later, the newer. */
   readonly started: number;
+  /** The `seq` it ended at, or null while it hasn't. */
+  readonly ended: number | null;
+  /** Why it failed, as its `run_ended` says: what happened, and a code for it, where known. */
+  readonly error: string | null;
+  readonly reason: string | null;
+  /** The messages its first start carried out, oldest first: what started it. */
+  readonly prompt: readonly v1.MessageId[];
+  /** The person its latest start acts for, or null where it acts for no person. */
+  readonly actsFor: string | null;
+  /** What it asked through `ask_user`, oldest first, answered or not. */
+  readonly questions: readonly Question[];
   /** The feedback given on the turn, oldest first. */
   readonly feedback: readonly Feedback[];
 }
@@ -161,6 +196,12 @@ function withRun(state: Workspace, id: v1.RunId, change: Partial<Run>): Workspac
     requests: [],
     answered: [],
     started: 0,
+    ended: null,
+    error: null,
+    reason: null,
+    prompt: [],
+    actsFor: null,
+    questions: [],
     feedback: [],
   };
   return { ...state, runs: { ...state.runs, [id]: { ...base, ...change } } };
@@ -242,28 +283,63 @@ const handlers: Handlers = {
       },
     };
   },
-  run_started: (state, event, envelope) =>
-    withRun(state, event.run_id, {
+  run_started: (state, event, envelope) => {
+    const first = state.runs[event.run_id]?.prompt.length ? undefined : event.message_ids;
+    const { actor } = envelope;
+    return withRun(state, event.run_id, {
       threadId: event.thread_id,
       status: "running",
       started: envelope.seq,
-    }),
-  tool_called: (state, event) =>
+      ...(first && { prompt: first }),
+      ...(actor.kind === "agent" &&
+        actor.on_behalf_of?.kind === "user" && {
+          actsFor: actor.on_behalf_of.id,
+        }),
+    });
+  },
+  tool_called: (state, event, envelope) =>
     withRun(state, event.run_id, {
       tools: {
         ...state.runs[event.run_id]?.tools,
-        [event.tool_call_id]: { name: event.tool_name, status: "called" },
+        [event.tool_call_id]: {
+          name: event.tool_name,
+          status: "called",
+          args: event.args_summary ?? "",
+          result: "",
+          argsCut: event.args_truncated ?? false,
+          resultCut: false,
+          seq: envelope.seq,
+        },
       },
     }),
-  tool_returned: (state, event) =>
-    withRun(state, event.run_id, {
+  tool_returned: (state, event, envelope) => {
+    const called = state.runs[event.run_id]?.tools[event.tool_call_id];
+    return withRun(state, event.run_id, {
       tools: {
         ...state.runs[event.run_id]?.tools,
-        [event.tool_call_id]: { name: event.tool_name ?? "", status: event.status },
+        [event.tool_call_id]: {
+          name: event.tool_name || (called?.name ?? ""),
+          status: event.status,
+          args: called?.args ?? "",
+          result: event.summary ?? "",
+          argsCut: called?.argsCut ?? false,
+          resultCut: event.truncated ?? false,
+          seq: called?.seq ?? envelope.seq,
+        },
       },
-    }),
-  run_paused: (state, event) =>
-    withRun(state, event.run_id, { status: "paused", requests: event.requests, answered: [] }),
+    });
+  },
+  run_paused: (state, event, envelope) => {
+    const asked = event.requests
+      .filter((request) => request.tool_name === ASK_USER)
+      .map((request) => ({ request, seq: envelope.seq, answer: null }));
+    return withRun(state, event.run_id, {
+      status: "paused",
+      requests: event.requests,
+      answered: [],
+      questions: [...(state.runs[event.run_id]?.questions ?? []), ...asked],
+    });
+  },
   deferred_answered: (state, event, envelope) => {
     const run = state.runs[event.run_id];
     const asked = run?.requests ?? [];
@@ -273,18 +349,27 @@ const handlers: Handlers = {
       .map((request) => ({ request, actor: envelope.actor }));
     // A paused run resumes once every request it paused on has its answer.
     const resumes = run?.status === "paused" && requests.length === 0;
+    const answer = { value: event.answer ?? null, actor: envelope.actor };
     return withRun(state, event.run_id, {
       requests,
       answered: [...(run?.answered ?? []), ...answered],
+      questions: (run?.questions ?? []).map((question) =>
+        question.request.tool_call_id === event.tool_call_id && question.answer === null
+          ? { ...question, answer }
+          : question,
+      ),
       ...(resumes && { status: "running" }),
     });
   },
-  run_ended: (state, event) =>
+  run_ended: (state, event, envelope) =>
     withRun(state, event.run_id, {
       status: event.status,
       text: "",
       requests: [],
       answered: [],
+      ended: envelope.seq,
+      error: event.error ?? null,
+      reason: event.reason ?? null,
     }),
   feedback_given: (state, event, envelope) => {
     const feedback: Feedback = {

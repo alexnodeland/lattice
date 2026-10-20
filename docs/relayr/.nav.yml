@@ -49,6 +49,7 @@ nav:
   - adr/0035-what-phase-1-settled-of-the-trackers-unknowns.md
   - adr/0038-one-event-for-both-ways-of-asking.md
   - adr/0039-the-tracker-connectors-reads-for-the-portal.md
+  - adr/0040-draft-rule-reads-a-rule-sent-as-json-and-stays-offered.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

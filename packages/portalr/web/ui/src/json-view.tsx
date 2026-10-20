@@ -71,7 +71,7 @@ function Branch({
 }
 
 /**
- * JSON, as a reader reads it rather than as it is escaped (portalr ADR-0053): an object's keys,
+ * JSON, as a reader reads it rather than as it is escaped (portalr ADR-0054): an object's keys,
  * each beside its value, a long string or one with line breaks as a block of its text, and a
  * nested object or list folded past the second level; in a region of its own height at most,
  * which scrolls, with Copy, which copies the JSON as it is.

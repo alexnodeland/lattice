@@ -1,10 +1,12 @@
 """The chat agent drafts rules: a tool that checks a draft, previews it, and proposes it."""
 
+import json
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import timedelta
-from typing import Any, override
+from typing import Annotated, Any, override
 
+from pydantic import BeforeValidator
 from pydantic_ai import FunctionToolset, ModelRetry, RunContext
 from pydantic_ai.capabilities import AbstractCapability
 
@@ -37,6 +39,9 @@ class RuleDrafting(AbstractCapability[Session[Any]]):
             configuration a draft is checked against.
         events: The event types those workspaces accept, by name.
         window: How far back the preview looks.
+        retries: How many times the model may call `draft_rule` again after a refusal, its
+            arguments' or the draft's, in a run: a rule is a large schema to fill, and the
+            refusal says what to change.
 
     Raises:
         ValueError: If ``automation`` has no stored rules.
@@ -45,6 +50,7 @@ class RuleDrafting(AbstractCapability[Session[Any]]):
     automation: reflexr.workspace.Workspaces
     events: Mapping[str, type[Event]]
     window: timedelta = timedelta(days=7)
+    retries: int = 3
     _stored_rules: StoredRules = field(init=False, repr=False)
     _toolset: FunctionToolset[Session[Any]] = field(init=False, repr=False)
 
@@ -65,14 +71,14 @@ class RuleDrafting(AbstractCapability[Session[Any]]):
         return INSTRUCTIONS
 
     def _tools(self) -> FunctionToolset[Session[Any]]:
-        toolset = FunctionToolset[Session[Any]]()
+        toolset = FunctionToolset[Session[Any]](max_retries=self.retries)
 
         # The tool annotates its context as RunContext[...] literally: pydantic-ai detects
         # context-taking tools by that annotation.
         @toolset.tool
         async def draft_rule(
             ctx: RunContext[Session[Any]],
-            rule: Rule,
+            rule: Annotated[Rule, BeforeValidator(_decoded)],
             rationale: str,
             artifact_id: str | None = None,
         ) -> str:
@@ -109,6 +115,20 @@ class RuleDrafting(AbstractCapability[Session[Any]]):
         times = "1 time" if previewed.firings == 1 else f"{previewed.firings} times"
         seen = "" if previewed.complete else ", among the newest events"
         return f"It would have fired {times} since {since:%Y-%m-%d}{seen}."
+
+
+def _decoded(rule: object) -> object:
+    """A rule as the object it encodes, where a model sent it as a string of JSON.
+
+    Some models, GLM among them, send a nested object as a string. The schema they are shown
+    stays an object's.
+    """
+    if isinstance(rule, str):
+        try:
+            return json.loads(rule)
+        except (json.JSONDecodeError, RecursionError):
+            return rule  # refused as what it is: not an object
+    return rule
 
 
 def _person(acting_for: a.UserActor | a.ExternalAgentActor | None) -> reflexr.UserActor:

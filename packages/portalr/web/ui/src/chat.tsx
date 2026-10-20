@@ -25,6 +25,7 @@ import { endedBy, readAskForm } from "./form-schema";
 import { Icon } from "./icon";
 import { FeatureOff, useFormLock } from "./integrations";
 import { Markdown } from "./markdown";
+import { Questions, type QuestionsAnswer } from "./questions";
 import { SchemaForm } from "./schema-form";
 import { type Sent, Unsent, useSending } from "./sending";
 import { StatusBadge, type Tone } from "./status-badge";
@@ -118,42 +119,110 @@ type MessageProps = {
   message: Artifactr.Message;
   /** How to name who posted it, which names the message too. */
   author: string;
+  /** Whether the reader posted it, which sets it at the end of the line, as theirs. */
+  mine?: boolean;
+  /** Whether it is on its way: shown as the reader wrote it until the thread has it. */
+  sending?: boolean;
+  /** Send it again, under its id, where its answer never came: it says so, with a button. */
+  onSendAgain?: () => Sent;
   /** The reader's thumbs on it, as `client`'s `thumbs` reads them. */
   thumbs?: Thumb | null;
   /** Give thumbs; without it, there are none. */
   onThumbs?: GiveThumbs;
 };
 
+/** A message's bubble: the reader's at the end of the line, everyone else's at its start. */
+const bubble = (mine: boolean) =>
+  cn(
+    "min-w-0 max-w-full rounded-2xl border px-3.5 py-2",
+    mine ? "rounded-se-sm border-line bg-wash" : "rounded-ss-sm border-line bg-surface",
+  );
+
 /**
- * One message, named for who posted it: their name, its Markdown, a way to copy it as the Markdown
- * it was written in, and the reader's thumbs.
+ * One message, named for who posted it: their name, its Markdown in a bubble, a way to copy it as
+ * the Markdown it was written in, and the reader's thumbs. The reader's own are at the end of the
+ * line, the agent's and others' at its start, in either direction of writing. A notice is set
+ * apart, without a bubble.
  */
-export function Message({ message, author, thumbs = null, onThumbs }: MessageProps) {
+export function Message({
+  message,
+  author,
+  mine = false,
+  sending = false,
+  onSendAgain,
+  thumbs = null,
+  onThumbs,
+}: MessageProps) {
   const name = useId();
+  const notice = message.kind === "notice";
   return (
     <li
       aria-labelledby={name}
-      className={cn("flex flex-col gap-1", message.kind === "notice" && "text-muted italic")}
+      aria-busy={sending || undefined}
+      className={cn(
+        "flex max-w-[min(100%,42rem)] flex-col gap-1",
+        mine ? "items-end self-end" : "items-start self-start",
+        notice && "text-muted italic",
+      )}
     >
       <span id={name} className="font-semibold text-xs">
         {author}
       </span>
-      <Markdown>{message.content}</Markdown>
-      <div className="flex flex-wrap items-start gap-1">
-        <CopyButton text={message.content} what="as Markdown" />
-        {onThumbs && <Thumbs given={thumbs} onThumbs={onThumbs} />}
+      <div className={notice ? "min-w-0 max-w-full" : bubble(mine)}>
+        <Markdown>{message.content}</Markdown>
+      </div>
+      <div className="flex min-h-7 flex-wrap items-start gap-1">
+        {sending && onSendAgain ? (
+          <span className="flex items-center gap-2">
+            <span className={TYPE.note}>It may not have been sent.</span>
+            <CommandButton onSend={onSendAgain}>Send again</CommandButton>
+          </span>
+        ) : sending ? (
+          <span className={TYPE.note}>Sending…</span>
+        ) : (
+          <>
+            <CopyButton text={message.content} what="as Markdown" />
+            {onThumbs && <Thumbs given={thumbs} onThumbs={onThumbs} />}
+          </>
+        )}
       </div>
     </li>
   );
 }
 
-/** What a run is streaming, as it arrives. */
+/**
+ * What a run is streaming, as it arrives, in the bubble its message will have, so nothing moves
+ * when the message replaces it. Before its first words, it says the agent is thinking.
+ */
 export function Streaming({ text, author }: { text: string; author: string }) {
   return (
-    <li className="flex flex-col gap-1" aria-busy="true" aria-label={`${author} is writing`}>
+    <li
+      className="flex max-w-[min(100%,42rem)] flex-col items-start gap-1 self-start"
+      aria-busy="true"
+      aria-label={text ? `${author} is writing` : `${author} is thinking`}
+    >
       <span className="font-semibold text-xs">{author}</span>
-      <Markdown streaming>{text}</Markdown>
+      <div className={bubble(false)}>
+        {text ? <Markdown streaming>{text}</Markdown> : <Thinking />}
+      </div>
+      <div aria-hidden="true" className="min-h-7" />
     </li>
+  );
+}
+
+/** Three dots that pulse in turn while the agent thinks, and stay still where motion is reduced. */
+function Thinking() {
+  return (
+    <span className="flex h-6 items-center gap-1 text-muted">
+      {[0, 150, 300].map((delay) => (
+        <span
+          key={delay}
+          style={{ animationDelay: `${delay}ms` }}
+          className="size-1.5 rounded-full bg-current motion-safe:animate-pulse"
+        />
+      ))}
+      <span className="sr-only">Thinking</span>
+    </span>
   );
 }
 
@@ -189,12 +258,18 @@ export function InlineArtifact({
   );
 }
 
-/** Write a message: Enter sends it, Shift+Enter starts a new line, and composing text waits. */
+/**
+ * Write a message: Enter sends it, Shift+Enter starts a new line, and composing text waits. It
+ * clears as it sends, as the thread shows the message at once; one refused comes back.
+ */
 export function Composer({
   onSend,
   disabled = false,
 }: {
-  /** Post the message; the text stays until the post is done. */
+  /**
+   * Post the message; the text is cleared as it is sent, and comes back if the server refused
+   * it. One whose answer never came may have been posted: the thread offers to send it again.
+   */
   onSend: (text: string) => Sent;
   disabled?: boolean;
 }) {
@@ -202,8 +277,16 @@ export function Composer({
   const { pending, unsent, send: sending } = useSending();
   async function send() {
     const message = text.trim();
-    if (message && !pending && (await sending(() => onSend(message)))) {
+    if (message && !pending) {
       setText("");
+      let refused = false;
+      const told = (settled: { outcome: string }) => {
+        refused = settled.outcome === "refused";
+        return false; // the composer says why, whatever it was
+      };
+      if (!(await sending(() => onSend(message), told)) && refused) {
+        setText((written) => written || message); // back, unless something new was written
+      }
     }
   }
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -246,20 +329,17 @@ export function Composer({
   );
 }
 
-/** A tool the run called, and how it returned. */
-export function ToolCall({ tool }: { tool: Artifactr.Tool }) {
-  return (
-    <li className={cn(card, "flex-row items-center justify-between")}>
-      <code className="font-mono">{tool.name}</code>
-      <span className="text-muted">{tool.status === "called" ? "running" : tool.status}</span>
-    </li>
-  );
-}
-
 /** The deferred tool that asks a form, whose answer is the form's values (lattice RFC-0005). */
 export const ASK_FORM = "ask_form";
 
-type Answer = { approved: boolean } | { answer: string } | { answer: Values };
+/** The deferred tool that asks questions with options, answered per question (artifactr ADR-0083). */
+export const ASK_USER = "ask_user";
+
+type Answer =
+  | { approved: boolean }
+  | { answer: string }
+  | { answer: Values }
+  | { answer: QuestionsAnswer };
 
 /**
  * A form the agent asks through `ask_form`, its fields from the request's arguments, answered
@@ -325,8 +405,8 @@ function FormRequest({
 }
 
 /**
- * What a paused run waits on: a call to approve or deny, a question to answer, or a form to fill
- * in. It takes the focus when it appears, unless `focus` says another should, and answers once,
+ * What a paused run waits on: a call to approve or deny, questions to answer (`ask_user`'s
+ * options, or another tool's in a line), or a form to fill in. It takes the focus when it appears, unless `focus` says another should, and answers once,
  * with `answer_deferred`. A form, asked through `ask_form`, stays once it is answered, until its
  * run ends, and says by whom: `answeredBy`, or null where who isn't known.
  */
@@ -342,19 +422,26 @@ export function Request({
   /** Take the focus as it appears: the newest of a run's forms does, and an answered one never. */
   focus?: boolean;
 }) {
-  return request.tool_name === ASK_FORM ? (
-    <FormRequest
-      request={request}
-      answeredBy={answeredBy}
-      focus={focus}
-      onAnswer={(values) => onAnswer({ answer: values })}
-    />
-  ) : (
-    <Question request={request} focus={focus} onAnswer={onAnswer} />
-  );
+  switch (request.tool_name) {
+    case ASK_FORM:
+      return (
+        <FormRequest
+          request={request}
+          answeredBy={answeredBy}
+          focus={focus}
+          onAnswer={(values) => onAnswer({ answer: values })}
+        />
+      );
+    case ASK_USER:
+      return (
+        <Questions request={request} focus={focus} onAnswer={(answer) => onAnswer({ answer })} />
+      );
+    default:
+      return <Question request={request} focus={focus} onAnswer={onAnswer} />;
+  }
 }
 
-/** A call to approve or deny, or a question to answer in a line. */
+/** A call to approve or deny, or another tool's question to answer in a line. */
 function Question({
   request,
   focus,

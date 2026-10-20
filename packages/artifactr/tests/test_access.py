@@ -274,9 +274,11 @@ CONNECT = [
     "artifactr:read_runs",
     "artifactr:read_events",
     "artifactr:read_events",
+    "artifactr:read_events",
 ]
 """What a WebSocket connection is asked for as it opens: its workspace, the log's head and the
-runs in progress (welcome), then the log it replays, here in one page, and the log it follows."""
+runs in progress (welcome), then the log it replays, here in one page, the log it follows, and,
+for the run in progress, its thread's log, back to where the run's turn started."""
 
 ROUTES: dict[tuple[str, str], tuple[str, list[str]]] = {
     ("POST", "/workspaces/{workspace_id}/commands"): ("", ["artifactr:create_thread"]),

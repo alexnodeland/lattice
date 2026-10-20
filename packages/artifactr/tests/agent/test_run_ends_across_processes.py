@@ -23,7 +23,8 @@ from tests.agent.conftest import (
     MakeRunner,
     Recorder,
     Script,
-    call,
+    ask,
+    in_words,
     make_agent,
     say,
     settled,
@@ -102,7 +103,7 @@ async def test_every_reply_sent_from_another_process_as_a_run_pauses_reaches_it(
     storage, here, there = processes
     thread = await here.create_thread("Launch")
     releasing = storage.held = Gate()
-    script = Script(call("ask_user", call_id="q1", question="Which day?"), *[say("Monday.")] * 3)
+    script = Script(ask("q1", "Which day?"), *[say("Monday.")] * 3)
     runner = runners(make_agent(script, ask=True, output_type=ASKING))
     other = runners(make_agent(Script(), ask=True, output_type=ASKING))
     first = started(await runner.send(here, thread.id, "Plan the launch"))
@@ -138,12 +139,12 @@ async def test_an_answer_and_a_message_from_another_process_as_a_run_pauses_reac
     storage, here, there = processes
     thread = await here.create_thread("Launch")
     releasing = storage.held = Gate()
-    script = Script(call("ask_user", call_id="q1", question="Which day?"), *[say("ok")] * 3)
+    script = Script(ask("q1", "Which day?"), *[say("ok")] * 3)
     runner = runners(make_agent(script, ask=True, output_type=ASKING))
     other = runners(make_agent(Script(), ask=True, output_type=ASKING))
     first = started(await runner.send(here, thread.id, "Plan the launch"))
     await asyncio.wait_for(releasing.entered.wait(), timeout=5)
-    answer = AnswerDeferred(run_id=first.run_id, tool_call_id="q1", answer="Monday")
+    answer = AnswerDeferred(run_id=first.run_id, tool_call_id="q1", answer=in_words("Monday"))
     assert (await other.answer(there, answer)).run is None
     assert (await other.send(there, thread.id, "And book the big room")).run is None
     releasing.release.set()

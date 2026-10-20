@@ -1,5 +1,5 @@
 /**
- * An artifact's revisions, pinned by screenshots (portalr ADR-0019, ADR-0053): a mini app's, open
+ * An artifact's revisions, pinned by screenshots (portalr ADR-0019, ADR-0054): a mini app's, open
  * on its Changes and on its Source, a note's, and a kind's without a renderer, as JSON; wide and
  * narrow, in each scheme, and under forced colours. Baselines are Linux's, made in CI, with the
  * faces loaded.

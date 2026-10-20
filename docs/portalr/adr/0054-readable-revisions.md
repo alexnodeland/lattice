@@ -1,4 +1,4 @@
-# ADR-0053: Readable revisions: per kind, in parts, one preview running
+# ADR-0054: Readable revisions: per kind, in parts, one preview running
 
 **Status:** Accepted
 **Date:** 2026-10-20

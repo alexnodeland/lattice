@@ -127,7 +127,7 @@ function LineRow({ line }: { line: Line }) {
 }
 
 /**
- * What changed between two versions of a source, line by line (portalr ADR-0053): each added line
+ * What changed between two versions of a source, line by line (portalr ADR-0054): each added line
  * marked `+` on the wash, edged in the working colour, each removed one `−`, edged in red and
  * muted, and each a `<ins>` or a `<del>` that a screen reader says is one; the unchanged lines
  * between changes folded, to be shown on asking. Null changes, too large to compare, say so.

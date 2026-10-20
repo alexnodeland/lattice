@@ -13,7 +13,7 @@ export const FOLDED_LINES = 40;
 /**
  * A whole source, such as a mini app's HTML, to read: its lines numbered, highlighted where `ui`
  * highlights its language, with a toggle that wraps its long lines and Copy, and beyond
- * `FOLDED_LINES` lines folded until the reader asks for the rest (portalr ADR-0053). Each line is
+ * `FOLDED_LINES` lines folded until the reader asks for the rest (portalr ADR-0054). Each line is
  * a row of its own, so a wrapped line keeps its number beside its start. The numbers are drawn,
  * not read: a screen reader reads the code alone, as Copy copies it.
  */

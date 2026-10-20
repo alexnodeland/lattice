@@ -10,7 +10,7 @@ from typing import Any
 import pytest
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
-from pydantic_ai import Agent, FunctionToolset, RunContext
+from pydantic_ai import Agent, DeferredToolRequests, FunctionToolset, RunContext
 from starlette.requests import HTTPConnection
 
 from artifactr.agent import ArtifactWorkspace, Runner, Session
@@ -75,13 +75,15 @@ def build(
     hidden: Hidden | None = None,
     hidden_refresh: timedelta = timedelta(seconds=30),
     gate: Gate | None = None,
+    ask: bool = False,
     **options: Any,
 ) -> tuple[FastAPI, Runner[Latch]]:
     agent: Agent[Session[Latch], Any] = Agent(
         script.model,
         deps_type=Session[Latch],
+        output_type=[str, DeferredToolRequests] if ask else str,
         toolsets=[latch_tools()],
-        capabilities=[ArtifactWorkspace(types=[Note, Checklist])],
+        capabilities=[ArtifactWorkspace(types=[Note, Checklist], ask=ask)],
     )
     runner = Runner(agent, app=latch or Latch())
     workspaces = Workspaces(

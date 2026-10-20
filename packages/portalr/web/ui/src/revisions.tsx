@@ -1,5 +1,5 @@
 /**
- * An artifact's revisions, readable (portalr ADR-0053): newest first, each a disclosure whose
+ * An artifact's revisions, readable (portalr ADR-0054): newest first, each a disclosure whose
  * summary says which version it is, who made it, when, and what it changed, the latest open and
  * the rest closed. Open, a revision shows its kind's title and summary where it has them, then
  * its Preview, its Source and its Changes, as tabs: its content through its kind's renderer, its

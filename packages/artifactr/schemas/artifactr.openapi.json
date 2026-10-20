@@ -2636,6 +2636,21 @@
             "title": "Args Summary",
             "type": "string"
           },
+          "args_truncated": {
+            "default": false,
+            "title": "Args Truncated",
+            "type": "boolean"
+          },
+          "artifact_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArtifactId"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "run_id": {
             "$ref": "#/components/schemas/RunId"
           },
@@ -2670,6 +2685,16 @@
       "ToolReturned": {
         "description": "A tool call finished.",
         "properties": {
+          "artifact_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArtifactId"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "run_id": {
             "$ref": "#/components/schemas/RunId"
           },
@@ -2698,6 +2723,11 @@
             "default": "",
             "title": "Tool Name",
             "type": "string"
+          },
+          "truncated": {
+            "default": false,
+            "title": "Truncated",
+            "type": "boolean"
           },
           "type": {
             "const": "tool_returned",

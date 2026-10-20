@@ -263,7 +263,7 @@ function field(data: Data, name: string): string {
 /**
  * An `app`: an agent's HTML, run sandboxed, labelled outside what it draws, in its thread too. A
  * revision reads it as its title and summary, word by word, its HTML, line by line, a source, and
- * its state, as JSON; its preview runs it, one revision at a time (portalr ADR-0053).
+ * its state, as JSON; its preview runs it, one revision at a time (portalr ADR-0054).
  */
 const app: Renderer = {
   ...ofJson((data) => <AppArtifact data={data} />),

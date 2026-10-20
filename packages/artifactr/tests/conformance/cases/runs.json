@@ -20,7 +20,725 @@
                 "tool_name": "ask_user",
                 "kind": "question",
                 "args": {
-                  "question": "Which day?"
+                  "questions": [
+                    {
+                      "question": "Which day?",
+                      "header": "Day",
+                      "options": [
+                        {
+                          "label": "Monday",
+                          "description": "The start of the week"
+                        },
+                        {
+                          "label": "Friday",
+                          "recommended": true
+                        }
+                      ],
+                      "other": true
+                    }
+                  ]
+                }
+              },
+              {
+                "tool_call_id": "call_a",
+                "tool_name": "delete_note",
+                "kind": "approval",
+                "args": {
+                  "id": "note_1"
+                }
+              }
+            ],
+            "answers": {}
+          }
+        ]
+      },
+      "command": {
+        "type": "answer_deferred",
+        "run_id": "run_p",
+        "tool_call_id": "call_q",
+        "answer": {
+          "answers": [
+            {
+              "selected": [
+                "Monday"
+              ]
+            }
+          ]
+        }
+      },
+      "expect": {
+        "outcome": {
+          "type": "recorded"
+        },
+        "events": [
+          {
+            "type": "deferred_answered",
+            "run_id": "run_p",
+            "thread_id": "thr_1",
+            "tool_call_id": "call_q",
+            "tool_name": "ask_user",
+            "answer": {
+              "answers": [
+                {
+                  "selected": [
+                    "Monday"
+                  ]
+                }
+              ]
+            },
+            "approved": null
+          }
+        ],
+        "runs": [
+          {
+            "id": "run_p",
+            "status": "paused",
+            "answers": {
+              "call_q": {
+                "answer": {
+                  "answers": [
+                    {
+                      "selected": [
+                        "Monday"
+                      ]
+                    }
+                  ]
+                },
+                "approved": null
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "a question is answered with a reply",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "runs": [
+          {
+            "id": "run_p",
+            "thread_id": "thr_1",
+            "status": "paused",
+            "pending": [
+              {
+                "tool_call_id": "call_q",
+                "tool_name": "ask_user",
+                "kind": "question",
+                "args": {
+                  "questions": [
+                    {
+                      "question": "Which day?",
+                      "header": "Day",
+                      "options": [
+                        {
+                          "label": "Monday",
+                          "description": "The start of the week"
+                        },
+                        {
+                          "label": "Friday",
+                          "recommended": true
+                        }
+                      ],
+                      "other": true
+                    }
+                  ]
+                }
+              },
+              {
+                "tool_call_id": "call_a",
+                "tool_name": "delete_note",
+                "kind": "approval",
+                "args": {
+                  "id": "note_1"
+                }
+              }
+            ],
+            "answers": {}
+          }
+        ]
+      },
+      "command": {
+        "type": "answer_deferred",
+        "run_id": "run_p",
+        "tool_call_id": "call_q",
+        "answer": {
+          "reply": "Whenever suits the team"
+        }
+      },
+      "expect": {
+        "outcome": {
+          "type": "recorded"
+        },
+        "events": [
+          {
+            "type": "deferred_answered",
+            "run_id": "run_p",
+            "thread_id": "thr_1",
+            "tool_call_id": "call_q",
+            "tool_name": "ask_user",
+            "answer": {
+              "reply": "Whenever suits the team"
+            },
+            "approved": null
+          }
+        ],
+        "runs": [
+          {
+            "id": "run_p",
+            "status": "paused",
+            "answers": {
+              "call_q": {
+                "answer": {
+                  "reply": "Whenever suits the team"
+                },
+                "approved": null
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "a question is answered in a person's own words",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "runs": [
+          {
+            "id": "run_p",
+            "thread_id": "thr_1",
+            "status": "paused",
+            "pending": [
+              {
+                "tool_call_id": "call_q",
+                "tool_name": "ask_user",
+                "kind": "question",
+                "args": {
+                  "questions": [
+                    {
+                      "question": "Which day?",
+                      "header": "Day",
+                      "options": [
+                        {
+                          "label": "Monday",
+                          "description": "The start of the week"
+                        },
+                        {
+                          "label": "Friday",
+                          "recommended": true
+                        }
+                      ],
+                      "other": true
+                    }
+                  ]
+                }
+              },
+              {
+                "tool_call_id": "call_a",
+                "tool_name": "delete_note",
+                "kind": "approval",
+                "args": {
+                  "id": "note_1"
+                }
+              }
+            ],
+            "answers": {}
+          }
+        ]
+      },
+      "command": {
+        "type": "answer_deferred",
+        "run_id": "run_p",
+        "tool_call_id": "call_q",
+        "answer": {
+          "answers": [
+            {
+              "other": "Next Tuesday"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "outcome": {
+          "type": "recorded"
+        },
+        "events": [
+          {
+            "type": "deferred_answered",
+            "run_id": "run_p",
+            "thread_id": "thr_1",
+            "tool_call_id": "call_q",
+            "tool_name": "ask_user",
+            "answer": {
+              "answers": [
+                {
+                  "other": "Next Tuesday"
+                }
+              ]
+            },
+            "approved": null
+          }
+        ],
+        "runs": [
+          {
+            "id": "run_p",
+            "status": "paused",
+            "answers": {
+              "call_q": {
+                "answer": {
+                  "answers": [
+                    {
+                      "other": "Next Tuesday"
+                    }
+                  ]
+                },
+                "approved": null
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "a question of several choices takes several",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "runs": [
+          {
+            "id": "run_p",
+            "thread_id": "thr_1",
+            "status": "paused",
+            "pending": [
+              {
+                "tool_call_id": "call_q",
+                "tool_name": "ask_user",
+                "kind": "question",
+                "args": {
+                  "questions": [
+                    {
+                      "question": "Which day?",
+                      "header": "Day",
+                      "options": [
+                        {
+                          "label": "Monday",
+                          "description": "The start of the week"
+                        },
+                        {
+                          "label": "Friday",
+                          "recommended": true
+                        }
+                      ],
+                      "other": false,
+                      "multiple": true
+                    }
+                  ]
+                }
+              },
+              {
+                "tool_call_id": "call_a",
+                "tool_name": "delete_note",
+                "kind": "approval",
+                "args": {
+                  "id": "note_1"
+                }
+              }
+            ],
+            "answers": {}
+          }
+        ]
+      },
+      "command": {
+        "type": "answer_deferred",
+        "run_id": "run_p",
+        "tool_call_id": "call_q",
+        "answer": {
+          "answers": [
+            {
+              "selected": [
+                "Monday",
+                "Friday"
+              ]
+            }
+          ]
+        }
+      },
+      "expect": {
+        "outcome": {
+          "type": "recorded"
+        },
+        "events": [
+          {
+            "type": "deferred_answered",
+            "run_id": "run_p",
+            "thread_id": "thr_1",
+            "tool_call_id": "call_q",
+            "tool_name": "ask_user",
+            "answer": {
+              "answers": [
+                {
+                  "selected": [
+                    "Monday",
+                    "Friday"
+                  ]
+                }
+              ]
+            },
+            "approved": null
+          }
+        ],
+        "runs": [
+          {
+            "id": "run_p",
+            "status": "paused",
+            "answers": {
+              "call_q": {
+                "answer": {
+                  "answers": [
+                    {
+                      "selected": [
+                        "Monday",
+                        "Friday"
+                      ]
+                    }
+                  ]
+                },
+                "approved": null
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "a question is answered with its own options",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "runs": [
+          {
+            "id": "run_p",
+            "thread_id": "thr_1",
+            "status": "paused",
+            "pending": [
+              {
+                "tool_call_id": "call_q",
+                "tool_name": "ask_user",
+                "kind": "question",
+                "args": {
+                  "questions": [
+                    {
+                      "question": "Which day?",
+                      "header": "Day",
+                      "options": [
+                        {
+                          "label": "Monday",
+                          "description": "The start of the week"
+                        },
+                        {
+                          "label": "Friday",
+                          "recommended": true
+                        }
+                      ],
+                      "other": true
+                    }
+                  ]
+                }
+              },
+              {
+                "tool_call_id": "call_a",
+                "tool_name": "delete_note",
+                "kind": "approval",
+                "args": {
+                  "id": "note_1"
+                }
+              }
+            ],
+            "answers": {}
+          }
+        ]
+      },
+      "command": {
+        "type": "answer_deferred",
+        "run_id": "run_p",
+        "tool_call_id": "call_q",
+        "answer": {
+          "answers": [
+            {
+              "selected": [
+                "Sunday"
+              ]
+            }
+          ]
+        }
+      },
+      "expect": {
+        "rejection": {
+          "type": "validation_failed",
+          "message": "'Day' offers no option 'Sunday'"
+        }
+      }
+    },
+    {
+      "name": "a question of one choice takes one",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "runs": [
+          {
+            "id": "run_p",
+            "thread_id": "thr_1",
+            "status": "paused",
+            "pending": [
+              {
+                "tool_call_id": "call_q",
+                "tool_name": "ask_user",
+                "kind": "question",
+                "args": {
+                  "questions": [
+                    {
+                      "question": "Which day?",
+                      "header": "Day",
+                      "options": [
+                        {
+                          "label": "Monday",
+                          "description": "The start of the week"
+                        },
+                        {
+                          "label": "Friday",
+                          "recommended": true
+                        }
+                      ],
+                      "other": true
+                    }
+                  ]
+                }
+              },
+              {
+                "tool_call_id": "call_a",
+                "tool_name": "delete_note",
+                "kind": "approval",
+                "args": {
+                  "id": "note_1"
+                }
+              }
+            ],
+            "answers": {}
+          }
+        ]
+      },
+      "command": {
+        "type": "answer_deferred",
+        "run_id": "run_p",
+        "tool_call_id": "call_q",
+        "answer": {
+          "answers": [
+            {
+              "selected": [
+                "Monday",
+                "Friday"
+              ]
+            }
+          ]
+        }
+      },
+      "expect": {
+        "rejection": {
+          "type": "validation_failed",
+          "message": "'Day' takes one answer"
+        }
+      }
+    },
+    {
+      "name": "a question takes words of a person's own only where it offers them",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "runs": [
+          {
+            "id": "run_p",
+            "thread_id": "thr_1",
+            "status": "paused",
+            "pending": [
+              {
+                "tool_call_id": "call_q",
+                "tool_name": "ask_user",
+                "kind": "question",
+                "args": {
+                  "questions": [
+                    {
+                      "question": "Which day?",
+                      "header": "Day",
+                      "options": [
+                        {
+                          "label": "Monday",
+                          "description": "The start of the week"
+                        },
+                        {
+                          "label": "Friday",
+                          "recommended": true
+                        }
+                      ],
+                      "other": false,
+                      "multiple": true
+                    }
+                  ]
+                }
+              },
+              {
+                "tool_call_id": "call_a",
+                "tool_name": "delete_note",
+                "kind": "approval",
+                "args": {
+                  "id": "note_1"
+                }
+              }
+            ],
+            "answers": {}
+          }
+        ]
+      },
+      "command": {
+        "type": "answer_deferred",
+        "run_id": "run_p",
+        "tool_call_id": "call_q",
+        "answer": {
+          "answers": [
+            {
+              "other": "Sunday"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "rejection": {
+          "type": "validation_failed",
+          "message": "'Day' is answered only with its options"
+        }
+      }
+    },
+    {
+      "name": "every question asked is answered",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "runs": [
+          {
+            "id": "run_p",
+            "thread_id": "thr_1",
+            "status": "paused",
+            "pending": [
+              {
+                "tool_call_id": "call_q",
+                "tool_name": "ask_user",
+                "kind": "question",
+                "args": {
+                  "questions": [
+                    {
+                      "question": "Which day?",
+                      "header": "Day",
+                      "options": [
+                        {
+                          "label": "Monday",
+                          "description": "The start of the week"
+                        },
+                        {
+                          "label": "Friday",
+                          "recommended": true
+                        }
+                      ],
+                      "other": true
+                    }
+                  ]
+                }
+              },
+              {
+                "tool_call_id": "call_a",
+                "tool_name": "delete_note",
+                "kind": "approval",
+                "args": {
+                  "id": "note_1"
+                }
+              }
+            ],
+            "answers": {}
+          }
+        ]
+      },
+      "command": {
+        "type": "answer_deferred",
+        "run_id": "run_p",
+        "tool_call_id": "call_q",
+        "answer": {
+          "answers": []
+        }
+      },
+      "expect": {
+        "rejection": {
+          "type": "validation_failed",
+          "message": "each question needs its answer: 1 asked, 0 answered"
+        }
+      }
+    },
+    {
+      "name": "a question is answered with answers, not text",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "runs": [
+          {
+            "id": "run_p",
+            "thread_id": "thr_1",
+            "status": "paused",
+            "pending": [
+              {
+                "tool_call_id": "call_q",
+                "tool_name": "ask_user",
+                "kind": "question",
+                "args": {
+                  "questions": [
+                    {
+                      "question": "Which day?",
+                      "header": "Day",
+                      "options": [
+                        {
+                          "label": "Monday",
+                          "description": "The start of the week"
+                        },
+                        {
+                          "label": "Friday",
+                          "recommended": true
+                        }
+                      ],
+                      "other": true
+                    }
+                  ]
                 }
               },
               {
@@ -43,32 +761,10 @@
         "answer": "Monday"
       },
       "expect": {
-        "outcome": {
-          "type": "recorded"
-        },
-        "events": [
-          {
-            "type": "deferred_answered",
-            "run_id": "run_p",
-            "thread_id": "thr_1",
-            "tool_call_id": "call_q",
-            "tool_name": "ask_user",
-            "answer": "Monday",
-            "approved": null
-          }
-        ],
-        "runs": [
-          {
-            "id": "run_p",
-            "status": "paused",
-            "answers": {
-              "call_q": {
-                "answer": "Monday",
-                "approved": null
-              }
-            }
-          }
-        ]
+        "rejection": {
+          "type": "validation_failed",
+          "message": "questions are answered with answers or a reply"
+        }
       }
     },
     {
@@ -90,7 +786,23 @@
                 "tool_name": "ask_user",
                 "kind": "question",
                 "args": {
-                  "question": "Which day?"
+                  "questions": [
+                    {
+                      "question": "Which day?",
+                      "header": "Day",
+                      "options": [
+                        {
+                          "label": "Monday",
+                          "description": "The start of the week"
+                        },
+                        {
+                          "label": "Friday",
+                          "recommended": true
+                        }
+                      ],
+                      "other": true
+                    }
+                  ]
                 }
               },
               {
@@ -175,7 +887,23 @@
                 "tool_name": "ask_user",
                 "kind": "question",
                 "args": {
-                  "question": "Which day?"
+                  "questions": [
+                    {
+                      "question": "Which day?",
+                      "header": "Day",
+                      "options": [
+                        {
+                          "label": "Monday",
+                          "description": "The start of the week"
+                        },
+                        {
+                          "label": "Friday",
+                          "recommended": true
+                        }
+                      ],
+                      "other": true
+                    }
+                  ]
                 }
               },
               {
@@ -223,7 +951,23 @@
                 "tool_name": "ask_user",
                 "kind": "question",
                 "args": {
-                  "question": "Which day?"
+                  "questions": [
+                    {
+                      "question": "Which day?",
+                      "header": "Day",
+                      "options": [
+                        {
+                          "label": "Monday",
+                          "description": "The start of the week"
+                        },
+                        {
+                          "label": "Friday",
+                          "recommended": true
+                        }
+                      ],
+                      "other": true
+                    }
+                  ]
                 }
               },
               {
@@ -271,7 +1015,23 @@
                 "tool_name": "ask_user",
                 "kind": "question",
                 "args": {
-                  "question": "Which day?"
+                  "questions": [
+                    {
+                      "question": "Which day?",
+                      "header": "Day",
+                      "options": [
+                        {
+                          "label": "Monday",
+                          "description": "The start of the week"
+                        },
+                        {
+                          "label": "Friday",
+                          "recommended": true
+                        }
+                      ],
+                      "other": true
+                    }
+                  ]
                 }
               },
               {
@@ -285,7 +1045,15 @@
             ],
             "answers": {
               "call_q": {
-                "answer": "Friday"
+                "answer": {
+                  "answers": [
+                    {
+                      "selected": [
+                        "Friday"
+                      ]
+                    }
+                  ]
+                }
               }
             }
           }
@@ -295,7 +1063,15 @@
         "type": "answer_deferred",
         "run_id": "run_p",
         "tool_call_id": "call_q",
-        "answer": "Monday"
+        "answer": {
+          "answers": [
+            {
+              "selected": [
+                "Monday"
+              ]
+            }
+          ]
+        }
       },
       "expect": {
         "rejection": {
@@ -322,7 +1098,23 @@
                 "tool_name": "ask_user",
                 "kind": "question",
                 "args": {
-                  "question": "Which day?"
+                  "questions": [
+                    {
+                      "question": "Which day?",
+                      "header": "Day",
+                      "options": [
+                        {
+                          "label": "Monday",
+                          "description": "The start of the week"
+                        },
+                        {
+                          "label": "Friday",
+                          "recommended": true
+                        }
+                      ],
+                      "other": true
+                    }
+                  ]
                 }
               },
               {
@@ -370,7 +1162,23 @@
                 "tool_name": "ask_user",
                 "kind": "question",
                 "args": {
-                  "question": "Which day?"
+                  "questions": [
+                    {
+                      "question": "Which day?",
+                      "header": "Day",
+                      "options": [
+                        {
+                          "label": "Monday",
+                          "description": "The start of the week"
+                        },
+                        {
+                          "label": "Friday",
+                          "recommended": true
+                        }
+                      ],
+                      "other": true
+                    }
+                  ]
                 }
               },
               {
@@ -468,7 +1276,23 @@
                 "tool_name": "ask_user",
                 "kind": "question",
                 "args": {
-                  "question": "Which day?"
+                  "questions": [
+                    {
+                      "question": "Which day?",
+                      "header": "Day",
+                      "options": [
+                        {
+                          "label": "Monday",
+                          "description": "The start of the week"
+                        },
+                        {
+                          "label": "Friday",
+                          "recommended": true
+                        }
+                      ],
+                      "other": true
+                    }
+                  ]
                 }
               },
               {
@@ -574,13 +1398,37 @@
                 "tool_name": "ask_user",
                 "kind": "question",
                 "args": {
-                  "question": "Which day?"
+                  "questions": [
+                    {
+                      "question": "Which day?",
+                      "header": "Day",
+                      "options": [
+                        {
+                          "label": "Monday",
+                          "description": "The start of the week"
+                        },
+                        {
+                          "label": "Friday",
+                          "recommended": true
+                        }
+                      ],
+                      "other": true
+                    }
+                  ]
                 }
               }
             ],
             "answers": {
               "call_q": {
-                "answer": "Monday"
+                "answer": {
+                  "answers": [
+                    {
+                      "selected": [
+                        "Monday"
+                      ]
+                    }
+                  ]
+                }
               }
             },
             "trace_ids": [
@@ -638,13 +1486,37 @@
                 "tool_name": "ask_user",
                 "kind": "question",
                 "args": {
-                  "question": "Which day?"
+                  "questions": [
+                    {
+                      "question": "Which day?",
+                      "header": "Day",
+                      "options": [
+                        {
+                          "label": "Monday",
+                          "description": "The start of the week"
+                        },
+                        {
+                          "label": "Friday",
+                          "recommended": true
+                        }
+                      ],
+                      "other": true
+                    }
+                  ]
                 }
               }
             ],
             "answers": {
               "call_q": {
-                "answer": "Monday"
+                "answer": {
+                  "answers": [
+                    {
+                      "selected": [
+                        "Monday"
+                      ]
+                    }
+                  ]
+                }
               }
             },
             "trace_ids": [
@@ -816,7 +1688,23 @@
                 "tool_name": "ask_user",
                 "kind": "question",
                 "args": {
-                  "question": "Which day?"
+                  "questions": [
+                    {
+                      "question": "Which day?",
+                      "header": "Day",
+                      "options": [
+                        {
+                          "label": "Monday",
+                          "description": "The start of the week"
+                        },
+                        {
+                          "label": "Friday",
+                          "recommended": true
+                        }
+                      ],
+                      "other": true
+                    }
+                  ]
                 }
               },
               {
@@ -916,7 +1804,23 @@
                 "tool_name": "ask_user",
                 "kind": "question",
                 "args": {
-                  "question": "Which day?"
+                  "questions": [
+                    {
+                      "question": "Which day?",
+                      "header": "Day",
+                      "options": [
+                        {
+                          "label": "Monday",
+                          "description": "The start of the week"
+                        },
+                        {
+                          "label": "Friday",
+                          "recommended": true
+                        }
+                      ],
+                      "other": true
+                    }
+                  ]
                 }
               },
               {
@@ -1022,7 +1926,23 @@
             "tool_name": "ask_user",
             "kind": "question",
             "args": {
-              "question": "Which day?"
+              "questions": [
+                {
+                  "question": "Which day?",
+                  "header": "Day",
+                  "options": [
+                    {
+                      "label": "Monday",
+                      "description": "The start of the week"
+                    },
+                    {
+                      "label": "Friday",
+                      "recommended": true
+                    }
+                  ],
+                  "other": true
+                }
+              ]
             }
           }
         ]
@@ -1040,7 +1960,23 @@
                 "tool_name": "ask_user",
                 "kind": "question",
                 "args": {
-                  "question": "Which day?"
+                  "questions": [
+                    {
+                      "question": "Which day?",
+                      "header": "Day",
+                      "options": [
+                        {
+                          "label": "Monday",
+                          "description": "The start of the week"
+                        },
+                        {
+                          "label": "Friday",
+                          "recommended": true
+                        }
+                      ],
+                      "other": true
+                    }
+                  ]
                 }
               }
             ]
@@ -1065,7 +2001,23 @@
                 "tool_name": "ask_user",
                 "kind": "question",
                 "args": {
-                  "question": "Which day?"
+                  "questions": [
+                    {
+                      "question": "Which day?",
+                      "header": "Day",
+                      "options": [
+                        {
+                          "label": "Monday",
+                          "description": "The start of the week"
+                        },
+                        {
+                          "label": "Friday",
+                          "recommended": true
+                        }
+                      ],
+                      "other": true
+                    }
+                  ]
                 }
               },
               {

@@ -27,7 +27,7 @@ runner = Runner(agent, app=AppDeps(search=SearchClient()))
 ```
 
 - **`deps_type=Session[AppDeps]`.** The run's dependencies are a `Session`: `workspace` (a handle acting as this thread's agent), `thread_id`, `run_id`, and `app`, your own dependencies. Use `Session[None]` if you have none.
-- **`ArtifactWorkspace(types=...)`** lists the artifact types the agent may create. `ask=True` adds the `ask_user` tool (see [Pausing](#pausing-for-people)); `max_render_chars` (4,000) limits how much of each followed artifact goes into the instructions; `max_summary_chars` (200) limits how much of each tool call's arguments and result is recorded; `notices=True` tells the agent about notices (see [Notices](#notices)).
+- **`ArtifactWorkspace(types=...)`** lists the artifact types the agent may create. `ask=True` adds the `ask_user` tool (see [Pausing](#pausing-for-people)); `max_render_chars` (4,000) limits how much of each followed artifact goes into the instructions; `max_summary_chars` (2,000) limits how much of each tool call's arguments and result is recorded, which is what everyone who may read the thread sees of the call (`0` records none: a tool that reads what some readers may not see names it by `artifact_id`, so the call is hidden with it, and keeps secrets out of what it returns and raises, [ADR-0084](../adr/0084-what-a-run-records-of-its-calls-and-who-reads-it.md)); `notices=True` tells the agent about notices (see [Notices](#notices)).
 - **`Runner(agent, app=...)`** passes `app` to every run as `ctx.deps.app`. Its other options are `agent_name` (how the agent is named in the workspace, `"assistant"` by default), `claim_ttl` (how long a thread claim survives a dead process, 30 seconds), `live` (where live output goes; see [Live output](live-output.md)) and `results` (where commands' results are remembered, so a retried command is carried out once; see [Serving](serving.md#rest)).
 
 The capability composes with any other capabilities, toolsets, output types and model settings the agent has. A turn is an ordinary pydantic-ai run.
@@ -43,7 +43,7 @@ Every agent with the capability gets tools that work for any artifact type. Thei
 | `create_artifact(kind, data)` | Creates an artifact of one of the capability's types; the description includes each type's JSON Schema |
 | `edit_text(artifact_id, old, new, field="text", summary=None, propose=False, rationale=None)` | Replaces one exact passage of a text field, or proposes the replacement |
 | `archive_artifact(artifact_id)` | Archives an artifact |
-| `ask_user(question, choices=None)` | Asks the people in the thread and pauses the run; only with `ask=True` |
+| `ask_user(questions)` | Asks the people in the thread one to four questions with options, and pauses the run; only with `ask=True` |
 
 Reading, creating or editing an artifact through these tools adds it to the thread's focus, so the agent hears about later changes to it.
 
@@ -246,7 +246,7 @@ Proposals do not block the run ([ADR-0009](../adr/0009-write-policies-and-non-bl
 
 Some points need a person before the agent can continue: a question only they can answer, or an action that needs approval. These use pydantic-ai's deferred tools ([ADR-0010](../adr/0010-pausing-with-deferred-tools.md)):
 
-- `ask_user`, added by `ArtifactWorkspace(..., ask=True)`, asks a question. Any tool that raises `CallDeferred` does the same.
+- `ask_user`, added by `ArtifactWorkspace(..., ask=True)`, asks one to four questions, each with a short `header` and two to four options (a `label`, a `description`, and `recommended` on the one the agent would choose), one choice or `multiple`, and, where it sets `other`, an answer in the person's own words ([ADR-0083](../adr/0083-ask-user-asks-questions-with-options.md)). Any tool that raises `CallDeferred` pauses the same way.
 - A tool declared with `requires_approval=True` needs approval before it runs.
 
 The agent's `output_type` must include `DeferredToolRequests`:
@@ -279,13 +279,16 @@ from artifactr.core import AnswerDeferred
 
 run = await ws.run(run_id)
 for request in run.pending:
-    if request.kind == "question":
-        command = AnswerDeferred(run_id=run.id, tool_call_id=request.tool_call_id, answer="Monday")
+    if request.kind == "question":  # ask_user's: one answer per question it asked
+        answer = {"answers": [{"selected": ["Monday"]}]}
+        command = AnswerDeferred(run_id=run.id, tool_call_id=request.tool_call_id, answer=answer)
     else:
         command = AnswerDeferred(run_id=run.id, tool_call_id=request.tool_call_id, approved=True)
     answered = await runner.answer(ws, command)  # resumes the run after the last answer
 ```
 
-Once every request is answered, the run resumes under the same `run_id`, with the answers passed to pydantic-ai as deferred tool results; an approved call runs then. A chat message sent to a paused thread is the reply, as described above, so the model history never ends in an unanswered tool call. A form, the `ask_form` tool of [artifactr's forms](forms-and-dashboards.md), is the exception: only its own answer answers it, so a reply leaves it open and the run paused, and a message posted while only forms are open is not taken until the form's answer resumes the run, which it joins ([ADR-0055](../adr/0055-turns-from-the-log.md)'s amendment).
+An answer to `ask_user` is `{"answers": [...]}`, one `{"selected": [labels], "other": words}` per question, in order, or `{"reply": words}`, which answers them all in words; core refuses one that doesn't fit the questions as `validation_failed`, at `["answers", n]`. The agent reads each question beside its answer: `[{"question": ..., "selected": [...], "other": ...}]`, or the reply.
+
+Once every request is answered, the run resumes under the same `run_id`, with the answers passed to pydantic-ai as deferred tool results; an approved call runs then. A chat message sent to a paused thread is the reply, `ask_user`'s as `{"reply": text}`, as described above, so the model history never ends in an unanswered tool call. A form, the `ask_form` tool of [artifactr's forms](forms-and-dashboards.md), is the exception: only its own answer answers it, so a reply leaves it open and the run paused, and a message posted while only forms are open is not taken until the form's answer resumes the run, which it joins ([ADR-0055](../adr/0055-turns-from-the-log.md)'s amendment).
 
 Each `deferred_answered` names the tool whose call it answers, `tool_name`, so whatever reads the log tells a form's answer from a question's or an approval's. An application may refuse an answer before it is recorded, with a check of `answer_deferred` ([Checks](security.md#checking-what-a-command-carries)); the request stays open, and the run paused.

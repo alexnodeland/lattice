@@ -34,7 +34,7 @@ from artifactr.telemetry.attributes import (
     WORKSPACE_ID,
 )
 from artifactr.workspace import InMemoryStorage, Workspace, Workspaces
-from tests.agent.conftest import Gate, HeldStorage, Script, call, say, started
+from tests.agent.conftest import Gate, HeldStorage, Script, ask, call, in_words, say, started
 from tests.artifact_types import Checklist, Note
 from tests.telemetry.conftest import Recorder, attributes, trace_id
 
@@ -229,12 +229,12 @@ async def test_a_message_carried_out_as_a_run_ends_starts_a_turn_linked_to_it(
 async def test_each_attempt_of_a_paused_run_is_its_own_trace(
     ws: Workspace, thread: Thread, recorder: Recorder, gate: Gate
 ) -> None:
-    script = Script(call("ask_user", call_id="q1", question="Which day?"), say("Monday it is."))
+    script = Script(ask("q1", "Which day?"), say("Monday it is."))
     agent = traced(script, recorder, output_type=[str, DeferredToolRequests])
     runner = Runner(agent, app=gate, **recorder.providers)
     handle = started(await runner.send(ws, thread.id, "Plan the launch"))
     await handle.wait()
-    answer = AnswerDeferred(run_id=handle.run_id, tool_call_id="q1", answer="Monday")
+    answer = AnswerDeferred(run_id=handle.run_id, tool_call_id="q1", answer=in_words("Monday"))
     resumed = started(await runner.answer(ws.as_actor(BOB), answer))
     await resumed.wait()
 

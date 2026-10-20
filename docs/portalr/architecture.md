@@ -89,10 +89,12 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 
 | Component | Renders | Sends |
 |---|---|---|
-| `Messages`, `Message`, `Streaming` | A thread's messages, oldest first, and what a run is streaming | Thumbs on a message; a message copied as the Markdown it was written in ([ADR-0043](adr/0043-markdowns-basics.md)) |
-| `Composer` | A message being written | The message |
-| `ToolCall` | A tool a run called, and how it returned | Nothing |
-| `Request` | What a paused run waits on: a call to approve, or a question | An approval, a denial or an answer |
+| `Messages`, `Message`, `Streaming` | A thread's messages, oldest first, the reader's at the end of the line and everyone else's at its start, a message on its way, and what a run is streaming, or that it is thinking ([ADR-0053](adr/0053-the-chats-questions-tool-calls-sides-failures-and-streaming.md)) | Thumbs on a message; a message copied as the Markdown it was written in ([ADR-0043](adr/0043-markdowns-basics.md)) |
+| `Composer` | A message being written, cleared as it is sent and put back if it isn't | The message |
+| `ToolCalls`, `ToolCall` | A run's calls, each a summary of its name, status and arguments, or why it failed, that opens to its arguments and result | Nothing |
+| `Questions` | What the agent asks through `ask_user`: radio and checkbox groups, recommended options first, words of the reader's own where offered; once answered, what was chosen and by whom | Each question's answer |
+| `RunFailed` | A failed turn: why, and the run's own error | "Try again", on the thread's latest |
+| `Request` | What a paused run waits on: a call to approve, questions, or another tool's question | An approval, a denial or an answer |
 | `ProposalCard` | A proposed change, its rationale and how it was resolved, and why it can't be accepted where its caller says so | Accept or reject |
 | `RunStatus` | How a run is going | Nothing |
 | `ArtifactContent`, `rendererFor`, `markdown`, `json` | An artifact, through the renderer its kind is registered with, or as JSON; a renderer also gives its title ([ADR-0029](adr/0029-ui-polish-from-the-screenshots.md)) | Nothing |

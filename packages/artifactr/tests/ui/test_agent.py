@@ -34,6 +34,7 @@ from artifactr.ui.agent import ui_tools
 from artifactr.ui.integrations import DASHBOARDS, FORMS, MINI_APPS
 from artifactr.ui.schema import MAX_SCHEMA_BYTES, FormSchema, json_size
 from artifactr.workspace import Storage, Workspace, Workspaces
+from tests.agent.conftest import ask, in_words
 from tests.ui.model import Script, call, say
 from tests.ui.people import ALICE, BOB
 from tests.ui.refusals import locs
@@ -146,13 +147,15 @@ async def test_a_second_answer_is_refused_as_answered(
 async def test_an_answer_to_another_tool_or_to_no_request_is_left_to_artifactr(
     ws: Workspace, thread: Thread, runners: list[Runner[None]]
 ) -> None:
-    script = Script(call("ask_user", "q1", question="Who is coming?"), say("Thanks."))
+    script = Script(ask("q1", "Who is coming?"), say("Thanks."))
     runner = _runner(runners, script)
     run_id = await _paused(runner, ws, thread)
     with pytest.raises(NotFound):
-        await ws.commit(AnswerDeferred(run_id=run_id, tool_call_id="nope", answer="Bob"))
+        await ws.commit(AnswerDeferred(run_id=run_id, tool_call_id="nope", answer=in_words("Bob")))
     resumed = (
-        await runner.answer(ws, AnswerDeferred(run_id=run_id, tool_call_id="q1", answer="Bob"))
+        await runner.answer(
+            ws, AnswerDeferred(run_id=run_id, tool_call_id="q1", answer=in_words("Bob"))
+        )
     ).run
     assert resumed is not None
     assert (await resumed.wait()).output == "Thanks."

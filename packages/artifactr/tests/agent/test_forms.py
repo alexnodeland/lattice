@@ -8,7 +8,7 @@ from pydantic_ai.messages import ModelResponse
 from artifactr.agent import Session
 from artifactr.core import AnswerDeferred, RunStarted, Thread
 from artifactr.workspace import Workspace
-from tests.agent.conftest import Gate, MakeRunner, Script, call, make_agent, say, started
+from tests.agent.conftest import Gate, MakeRunner, Script, ask, call, make_agent, say, started
 
 ASKING = [str, DeferredToolRequests]
 VALUES = {"day": "Monday", "attendees": 3}
@@ -44,7 +44,7 @@ async def test_a_message_answers_the_questions_and_leaves_a_form_open(
     ws: Workspace, thread: Thread, runners: MakeRunner
 ) -> None:
     script = Script(
-        lambda _: _ask(call("ask_user", call_id="q1", question="Which day?"), FORM),
+        lambda _: _ask(ask("q1", "Which day?"), FORM),
         say("Booked."),
     )
     runner = runners(make_agent(script, ask=True, tools=[_form_tools()], output_type=ASKING))

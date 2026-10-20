@@ -27,7 +27,7 @@ import { Connection, useStream, useWorkspace } from "../../../../../../../worksp
 
 /**
  * An artifact: its content, through its kind's renderer; its revisions, newest first, each with
- * who made it, when, and what it changed, readable (portalr ADR-0053); and the proposals open on
+ * who made it, when, and what it changed, readable (portalr ADR-0054); and the proposals open on
  * it. Its revisions are read over REST, again as the workspace's log moves past them.
  */
 /** What a person may do on an artifact's page, beyond responding to its proposals. */

@@ -20,7 +20,8 @@ from tests.agent.conftest import (
     Gate,
     HeldStorage,
     Script,
-    call,
+    ask,
+    in_words,
     make_agent,
     make_runner,
     say,
@@ -100,12 +101,12 @@ async def test_probe_a_second_message_in_the_pausing_window_is_lost(
     def slow_second(messages: Any) -> ModelResponse:
         return ModelResponse(parts=[TextPart("Monday it is.")])
 
-    script = Script(call("ask_user", call_id="q1", question="Which day?"), slow_second)
+    script = Script(ask("q1", "Which day?"), slow_second)
     runner = make_runner(make_agent(script, ask=True, output_type=ASKING), gate)
     first = started(await runner.send(ws, thread.id, "Plan the launch"))
     await asyncio.wait_for(releasing.entered.wait(), timeout=2)
     if first_reply == "answer":
-        answer = AnswerDeferred(run_id=first.run_id, tool_call_id="q1", answer="Monday")
+        answer = AnswerDeferred(run_id=first.run_id, tool_call_id="q1", answer=in_words("Monday"))
         assert (await runner.answer(ws, answer)).run is None
     else:
         assert (await runner.send(ws, thread.id, "Monday")).run is None

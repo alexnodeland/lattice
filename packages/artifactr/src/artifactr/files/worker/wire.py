@@ -14,6 +14,10 @@ from artifactr.files.app import AppCommand, Failure, Inspection, Talk
 CALL: Final = "Worker-Call"
 """The header that carries a call, as JSON."""
 
+CALL_LIMIT: Final = 64 << 10
+"""The most bytes a call's JSON may hold, which the worker's server reads a request's head up to:
+a longer batch of commands is refused as too large before it is sent."""
+
 
 class _Call(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")

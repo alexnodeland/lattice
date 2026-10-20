@@ -23,7 +23,7 @@ from artifactr.files.wordcraft import Subprocess
 from artifactr.files.worker import Limits, Worker, worker_app
 from artifactr.files.worker.__main__ import worker_from_environment
 from artifactr.files.worker.limits import CONFINE
-from artifactr.files.worker.wire import CALL, Hello
+from artifactr.files.worker.wire import CALL, CALL_LIMIT, Hello
 from tests.files.wordcraft.test_headless import FAKE, PNG
 
 TOKEN = "s3cret"
@@ -142,6 +142,16 @@ async def test_a_reply_past_the_limit_is_too_large(connect: Connect) -> None:
     assert large.value.failure == "too_large"
 
 
+async def test_a_batch_past_the_calls_limit_is_too_large_before_it_is_sent(
+    connect: Connect,
+) -> None:
+    worker = await connect(FakeApp())
+    batch = [AppCommand(name="add_paragraph", args={"text": "x" * (CALL_LIMIT + 1)})]
+    with pytest.raises(AppFailed, match="the call is larger than") as large:
+        await worker.apply(None, batch, deadline=10)
+    assert large.value.failure == "too_large"
+
+
 async def test_a_call_that_isnt_one_is_refused() -> None:
     served = worker_app(FakeApp(), token=TOKEN, limits=LIMITS)
     async with httpx.AsyncClient(
@@ -210,6 +220,7 @@ def test_the_environment_says_which_wordcraft_it_runs(tmp_path: Path) -> None:
             "WORDCRAFT_CLI": str(stand_in(tmp_path)),
             "WORDCRAFT_VERSION": "0.7.0",
             "WORKER_BUILD": "sha256:abc",
+            "WORKER_LIMITS": '{"edit": 5}',
         }
     )
     assert [route.path for route in served.routes] == [  # pyright: ignore[reportAttributeAccessIssue]
@@ -266,7 +277,7 @@ def test_the_module_serves_the_worker_on_loopback(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     served: list[tuple[str, int]] = []
-    monkeypatch.setattr(uvicorn, "run", lambda _app, host, port: served.append((host, port)))
+    monkeypatch.setattr(uvicorn, "run", lambda _app, host, port, **_: served.append((host, port)))
     monkeypatch.setenv("WORKER_TOKEN", TOKEN)
     monkeypatch.setenv("WORDCRAFT_CLI", str(stand_in(tmp_path)))
     monkeypatch.setenv("WORDCRAFT_VERSION", "0.7.0")

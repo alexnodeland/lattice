@@ -112,7 +112,8 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     # core and the workspace, with its SQL stores in the sql extra and WordCraft's adapter on the
     # MCP client the files extra brings, and the agent's tools on the agent's public API, behind
     # the switch lattice-core declares, and people's check-out over artifactr's router's auth.
-    # tests/files/test_layering.py holds its own layers.
+    # The worker serves an app with Starlette and uvicorn, and the application calls it with
+    # httpx. tests/files/test_layering.py holds its own layers.
     "files": (
         {
             *("artifactr.core", "artifactr.workspace", "artifactr.agent", "artifactr.fastapi"),

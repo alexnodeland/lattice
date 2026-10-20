@@ -9,6 +9,7 @@ from pydantic import BaseModel, TypeAdapter
 from artifactr.files.app import AppCommand, AppFailed, Applied, CommandSpec, Inspection, Talk
 from artifactr.files.worker.wire import (
     CALL,
+    CALL_LIMIT,
     AppliedReply,
     ApplyCall,
     CommandsCall,
@@ -117,11 +118,14 @@ class Worker:
 
     async def _send(self, path: str, call: BaseModel, body: bytes, deadline: float) -> bytes:
         """Send one call, and return its reply's body, or raise how it failed."""
+        sent = call.model_dump_json()
+        if len(sent.encode()) > CALL_LIMIT:
+            raise AppFailed("too_large", f"the call is larger than {CALL_LIMIT} bytes")
         try:
             reply = await self._client.post(
                 path,
                 content=body,
-                headers={CALL: call.model_dump_json()},
+                headers={CALL: sent},
                 timeout=deadline + GRACE,
             )
         except httpx.TimeoutException:

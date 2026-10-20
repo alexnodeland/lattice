@@ -109,11 +109,11 @@ The worker runs an app on files you don't trust: one job at a time, behind a tok
 ```bash
 WORKER_TOKEN=$(openssl rand -hex 32) \
 WORDCRAFT_CLI=/opt/wordcraft/bin/wordcraft-cli WORDCRAFT_VERSION=0.7.0 \
-WORKER_BUILD=sha256:… WORKER_HOST=0.0.0.0 \
+WORKER_BUILD=sha256:… WORKER_LIMITS='{"render": 5}' \
 python -m artifactr.files.worker
 ```
 
-It listens on 127.0.0.1:8080 unless `WORKER_HOST` and `WORKER_PORT` say otherwise; inside its container, bind it to the internal network only. Your application calls it through `Worker`, an `App` like any other, whose version and build are the worker's, so a revision's provenance records the image that read it:
+`WORKER_LIMITS` sets any of `Limits`' fields, the rest their defaults. It listens on 127.0.0.1:8080 unless `WORKER_HOST` and `WORKER_PORT` say otherwise; inside its container, set `WORKER_HOST` to its address on the internal network, and nothing else. Your application calls it through `Worker`, an `App` like any other, whose version and build are the worker's, so a revision's provenance records the image that read it:
 
 ```python
 from artifactr.files.worker import Worker

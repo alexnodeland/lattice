@@ -106,7 +106,9 @@ test("a submission an app asks for, confirmed in the host's dialog", async () =>
       </AppHostContext>
     </IntegrationsContext>,
   );
-  const frame = screen.getByTitle("Tip splitter: an app made by the agent").element();
+  const titled = screen.getByTitle("Tip splitter: an app made by the agent");
+  await expect.element(titled).toBeInTheDocument();
+  const frame = titled.element();
   dispatchEvent(
     new MessageEvent("message", {
       origin: HOST.origin ?? "",

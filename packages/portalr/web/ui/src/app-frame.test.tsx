@@ -30,6 +30,13 @@ function hosted(origin: string | null = APPS) {
   } satisfies AppHost;
 }
 
+/** The app's frame, once the `apps` add-on that draws it has loaded. */
+async function frameIn(screen: Awaited<ReturnType<typeof shown>>) {
+  const frame = screen.getByTitle("Dice: an app made by the agent");
+  await expect.element(frame).toBeInTheDocument();
+  return frame.element() as HTMLIFrameElement;
+}
+
 async function shown({
   host = hosted(),
   enabled = allOn,
@@ -62,7 +69,7 @@ test("an app is labelled as the agent's, outside its frame, with its version and
 
 test("its frame is the sandbox on the apps' origin, sandboxed and titled, and leavable", async () => {
   const screen = await shown();
-  const frame = screen.getByTitle("Dice: an app made by the agent").element() as HTMLIFrameElement;
+  const frame = await frameIn(screen);
   expect(frame.getAttribute("sandbox")).toBe("allow-scripts allow-same-origin");
   expect(frame.getAttribute("src")).toBe(`${APPS}/?host=${encodeURIComponent(location.origin)}`);
   expect(frame.getAttribute("referrerpolicy")).toBe("no-referrer");
@@ -113,14 +120,11 @@ function fromFrame(frame: HTMLIFrameElement, message: unknown, origin = APPS) {
   );
 }
 
-const frameIn = (screen: Awaited<ReturnType<typeof shown>>) =>
-  screen.getByTitle("Dice: an app made by the agent").element() as HTMLIFrameElement;
-
 test("a submission is shown in the host's own dialog, and sent as the person once confirmed", async () => {
   const host = hosted();
   const screen = await shown({ host });
   const values = { rolled: 6 };
-  fromFrame(frameIn(screen), {
+  fromFrame(await frameIn(screen), {
     id: 1,
     method: "tools/call",
     params: { name: "submit", arguments: { values } },
@@ -140,12 +144,12 @@ test("a link is opened only once the person agrees to its full address", async (
   const opened = vi.spyOn(window, "open").mockReturnValue(null);
   const screen = await shown();
   const url = "https://example.com/a/long/path?with=query";
-  fromFrame(frameIn(screen), { id: 2, method: "ui/open-link", params: { url } });
+  fromFrame(await frameIn(screen), { id: 2, method: "ui/open-link", params: { url } });
   const dialog = screen.getByRole("alertdialog", { name: "Open this link?" });
   await expect.element(dialog.getByText(url)).toBeVisible();
   await dialog.getByRole("button", { name: "Don't open it" }).click();
   expect(opened).not.toHaveBeenCalled();
-  fromFrame(frameIn(screen), { id: 3, method: "ui/open-link", params: { url } });
+  fromFrame(await frameIn(screen), { id: 3, method: "ui/open-link", params: { url } });
   await page.getByRole("button", { name: "Open the link" }).click();
   expect(opened).toHaveBeenCalledWith(url, "_blank", "noopener,noreferrer");
   opened.mockRestore();
@@ -155,7 +159,7 @@ test("a message from any other window or origin opens nothing", async () => {
   const host = hosted();
   const screen = await shown({ host });
   const submit = { id: 1, method: "tools/call", params: { name: "submit", arguments: {} } };
-  fromFrame(frameIn(screen), submit, "https://evil.example");
+  fromFrame(await frameIn(screen), submit, "https://evil.example");
   dispatchEvent(new MessageEvent("message", { data: JSON.stringify(submit), origin: APPS }));
   await new Promise((settled) => setTimeout(settled, 50));
   expect(screen.container.ownerDocument.querySelector('[role="alertdialog"]')).toBeNull();
@@ -169,7 +173,7 @@ test("the state the app sets is written as the person, and a refusal is said", a
   } as never);
   const screen = await shown({ host });
   const patch = [{ op: "replace", path: "/rolled", value: 5 }];
-  fromFrame(frameIn(screen), {
+  fromFrame(await frameIn(screen), {
     id: 1,
     method: "tools/call",
     params: { name: "set_state", arguments: { patch } },
@@ -182,16 +186,16 @@ test("the state the app sets is written as the person, and a refusal is said", a
 
 test("an app asks its frame's height, kept within the least and the most", async () => {
   const screen = await shown();
-  const frame = frameIn(screen);
+  const frame = await frameIn(screen);
   expect(frame.style.height).toBe("360px");
   fromFrame(frame, { method: "ui/notifications/size-changed", params: { height: 640 } });
   await vi.waitFor(() => expect(frame.style.height).toBe("640px"));
 });
 
 test("an app past its calls a minute is said to be unanswered", async () => {
-  const screen = await shown();
+  const frame = await frameIn(await shown());
   for (let id = 0; id <= 60; id += 1) {
-    fromFrame(frameIn(screen), { id, method: "tools/call", params: { name: "get_state" } });
+    fromFrame(frame, { id, method: "tools/call", params: { name: "get_state" } });
   }
-  await expect.element(screen.getByText(/sent more than 60 messages in a minute/)).toBeVisible();
+  await expect.element(page.getByText(/sent more than 60 messages in a minute/)).toBeVisible();
 });

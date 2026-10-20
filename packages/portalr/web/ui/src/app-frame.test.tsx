@@ -237,10 +237,12 @@ test("Escape leaves a question open in the full view alone", async () => {
   await expect.element(screen.getByRole("dialog", { name: "Dice" })).toBeVisible();
 });
 
-test("a tall app's frame fits the window, below the page's chrome and above a pinned composer", async () => {
+test("an app is shown whole, as tall as it asks, up to twice the window", async () => {
   const screen = await shown();
   const frame = await frameIn(screen);
+  fromFrame(frame, { method: "ui/notifications/size-changed", params: { height: 700 } });
+  await vi.waitFor(() => expect(frame.getBoundingClientRect().height).toBe(700));
   fromFrame(frame, { method: "ui/notifications/size-changed", params: { height: 2000 } });
   await vi.waitFor(() => expect(frame.style.height).toBe("2000px"));
-  expect(frame.getBoundingClientRect().height).toBeLessThanOrEqual(innerHeight - 240);
+  expect(frame.getBoundingClientRect().height).toBe(Math.min(2000, innerHeight * 2));
 });

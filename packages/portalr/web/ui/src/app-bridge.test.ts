@@ -331,16 +331,74 @@ test("a link opens only once the person confirms it, and only a web or mail addr
   expect(declined.posted[0]).toMatchObject({ error: { code: -32000 } });
 });
 
-test("a frame is sized as its app asks, within the least and the most", async () => {
+test("a frame is sized as its app asks, up to the most; a height too small to be one is none", async () => {
   const { hear, sized } = bridged();
   const size = (height: unknown) =>
     hear(text({ jsonrpc: "2.0", method: "ui/notifications/size-changed", params: { height } }));
+  await size(0);
   await size(480.4);
   await size(5);
   await size(1e9);
   await size("tall");
   await hear(text({ jsonrpc: "2.0", method: "ui/notifications/initialized" }));
-  expect(sized).toEqual([480, 120, MOST_HEIGHT]);
+  expect(sized).toEqual([480, MOST_HEIGHT]);
+});
+
+test("the sandbox's measure sizes a frame until the app says its own height", async () => {
+  const { hear, sized } = bridged();
+  const size = (height: number, measured?: boolean) =>
+    hear(
+      text({
+        jsonrpc: "2.0",
+        method: "ui/notifications/size-changed",
+        params: measured ? { height, measured } : { height },
+      }),
+    );
+  await size(500, true);
+  await size(0);
+  await size(520, true); // too soon after the last measure: held
+  await vi.advanceTimersByTimeAsync(200);
+  await vi.advanceTimersByTimeAsync(200);
+  await size(640, true);
+  await size(700);
+  await vi.advanceTimersByTimeAsync(200);
+  await size(300, true);
+  expect(sized).toEqual([500, 520, 640, 700]);
+});
+
+test("measures bunched together are applied as their last, never lost", async () => {
+  const { hear, sized } = bridged();
+  const measure = (height: number) =>
+    hear(
+      text({
+        jsonrpc: "2.0",
+        method: "ui/notifications/size-changed",
+        params: { height, measured: true },
+      }),
+    );
+  await measure(400);
+  await measure(450);
+  await measure(480); // the final height, heard too soon, and never said again
+  expect(sized).toEqual([400]);
+  await vi.advanceTimersByTimeAsync(200);
+  expect(sized).toEqual([400, 480]);
+});
+
+test("the sandbox's measures don't count against an app's messages a minute", async () => {
+  const { hear, posted, quiet } = bridged();
+  for (let each = 0; each < CALLS_A_MINUTE + 10; each += 1) {
+    await hear(
+      text({
+        jsonrpc: "2.0",
+        method: "ui/notifications/size-changed",
+        params: { height: 400 + each, measured: true },
+      }),
+    );
+    await vi.advanceTimersByTimeAsync(200);
+  }
+  await hear(text({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "get_state" } }));
+  expect(quiet()).toBe(0);
+  expect(posted.at(-1)).toMatchObject({ id: 1 });
 });
 
 test("past sixty messages in a minute, the frame isn't answered, and the page is told", async () => {

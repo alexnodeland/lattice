@@ -89,6 +89,16 @@ export function readMessage(text: unknown): Message | null {
   return { kind: "request", id, method, params: params as JsonObject };
 }
 
+/** The least time between two of the sandbox's measures the host hears, in milliseconds. */
+const MEASURED_EVERY = 200;
+
+/** A size the sandbox measured for the app, as `appDocument`'s script says it. */
+const isMeasured = (message: NonNullable<ReturnType<typeof readMessage>>) =>
+  message.kind === "notification" &&
+  message.method === SIZE_CHANGED &&
+  message.params.measured === true &&
+  isNumber(message.params.height);
+
 /** A tool's result, as MCP's `tools/call` answers: its structured content, and the same as text. */
 const toolResult = (structured: JsonObject) => ({
   content: [{ type: "text", text: JSON.stringify(structured) }],
@@ -381,7 +391,7 @@ export class StateKeeper {
 // ─── the bridge ───────────────────────────────────────────────────────────────
 
 /** The height a frame may be sized to, in pixels: an app's ask is kept within it. */
-export const LEAST_HEIGHT = 120;
+const LEAST_HEIGHT = 120;
 export const MOST_HEIGHT = 2_000;
 
 /** What the person is asked, outside the frame, before the host acts for the app. */
@@ -418,6 +428,13 @@ export class Bridge {
   readonly #host: BridgeHost;
   readonly #state: StateKeeper;
   readonly #limiter: Limiter;
+  /** Whether the app has said its own height, which the sandbox's measure then gives way to. */
+  #sized = false;
+  /** When the sandbox's measure was last applied, by `#now`. */
+  #measuredAt = Number.NEGATIVE_INFINITY;
+  /** The latest measure heard too soon after the last, applied when its time comes. */
+  #held: { height: number; timer: ReturnType<typeof setTimeout> } | null = null;
+  readonly #now: () => number;
 
   constructor(options: {
     source: unknown;
@@ -433,6 +450,51 @@ export class Bridge {
     this.#host = options.host;
     this.#state = options.state;
     this.#limiter = new Limiter(CALLS_A_MINUTE, 60_000, options.now);
+    this.#now = options.now ?? Date.now;
+  }
+
+  /**
+   * A height the app said, or the sandbox measured for it (`measured`, portalr's own). The app's
+   * own wins from the first it says; one below `LEAST_HEIGHT`, as a height measured before the
+   * app was laid out is, is no height, and leaves the measure to size it.
+   */
+  #sizeChanged(height: number, measured: boolean) {
+    if (!measured) {
+      if (height < LEAST_HEIGHT) {
+        return;
+      }
+      this.#sized = true;
+    } else if (this.#sized) {
+      return;
+    }
+    this.#host.resize(Math.round(Math.min(MOST_HEIGHT, height)));
+  }
+
+  /**
+   * The sandbox's own measure, not the app's: never counted against it, and applied at most
+   * every `MEASURED_EVERY`. One heard sooner is held, the latest replacing the one before, and
+   * applied when its time comes, since the sandbox says a height once, when it changes: a final
+   * height bunched behind another is never lost.
+   */
+  #measure(height: number) {
+    const wait = this.#measuredAt + MEASURED_EVERY - this.#now();
+    if (wait > 0) {
+      if (this.#held === null) {
+        const timer = setTimeout(() => {
+          const held = this.#held;
+          this.#held = null;
+          if (held !== null) {
+            this.#measure(held.height);
+          }
+        }, wait);
+        this.#held = { height, timer };
+      } else {
+        this.#held = { ...this.#held, height };
+      }
+      return;
+    }
+    this.#measuredAt = this.#now();
+    this.#sizeChanged(height, true);
   }
 
   /** Hear a message: answered if it is the sandbox's, within its calls a minute; else dropped. */
@@ -440,11 +502,19 @@ export class Bridge {
     if (event.source !== this.#source || event.origin !== this.#origin) {
       return; // not this app's sandbox: dropped, whatever it says
     }
+    // Only what could be the sandbox's measure is read before the limit: the rest is counted
+    // first, so an app past its limit has none of its messages read.
+    const measured = isString(event.data) && event.data.includes('"measured"');
+    const read = measured ? readMessage(event.data) : null;
+    if (read !== null && isMeasured(read)) {
+      this.#measure(read.params.height as number);
+      return;
+    }
     if (!this.#limiter.take()) {
       this.#host.quieted();
       return;
     }
-    const message = readMessage(event.data);
+    const message = read ?? readMessage(event.data);
     if (message === null) {
       return;
     }
@@ -453,7 +523,7 @@ export class Bridge {
       if (method === PROXY_READY) {
         this.#notify(RESOURCE_READY, { ...this.#host.app() });
       } else if (method === SIZE_CHANGED && isNumber(params.height)) {
-        this.#host.resize(Math.round(Math.min(MOST_HEIGHT, Math.max(LEAST_HEIGHT, params.height))));
+        this.#sizeChanged(params.height, params.measured === true);
       }
       return;
     }

@@ -13,7 +13,6 @@ import {
   RunStatus,
   Streaming,
   Thumbs,
-  ToolCall,
 } from "./chat";
 import { IntegrationsContext } from "./integrations";
 import { contrast, token } from "./test/colours";
@@ -105,6 +104,68 @@ test("a notice is set apart from messages", async () => {
   expect(getComputedStyle(notice).color).toBe(token("muted"));
 });
 
+test("the reader's messages are at the end of the line, everyone else's at its start", async () => {
+  const screen = await render(
+    <Messages>
+      <Message message={message()} author="You" mine />
+      <Message message={message({ id: "msg_2" })} author="Assistant" />
+    </Messages>,
+  );
+  const mine = screen.getByRole("listitem", { name: "You" }).element();
+  const theirs = screen.getByRole("listitem", { name: "Assistant" }).element();
+  expect(getComputedStyle(mine).alignSelf).toBe("flex-end");
+  expect(getComputedStyle(theirs).alignSelf).toBe("flex-start");
+  const list = mine.parentElement as HTMLElement;
+  const [start, end] = [list.getBoundingClientRect(), mine.getBoundingClientRect()];
+  expect(Math.round(end.right)).toBe(Math.round(start.right));
+  // Right to left, the reader's go to the left: the line's end.
+  list.dir = "rtl";
+  expect(Math.round(mine.getBoundingClientRect().left)).toBe(Math.round(start.left));
+});
+
+test("a message on its way says so, and can't be copied or judged yet", async () => {
+  const screen = await render(
+    <Messages>
+      <Message message={message()} author="You" mine sending onThumbs={sent()} />
+    </Messages>,
+  );
+  const posting = screen.getByRole("listitem", { name: "You" });
+  await expect.element(posting).toHaveAttribute("aria-busy", "true");
+  await expect.element(posting.getByText("Sending…")).toBeVisible();
+  expect(posting.getByRole("button").elements()).toHaveLength(0);
+});
+
+test("before its first words, a run says the agent is thinking, and stays still if asked", async () => {
+  const screen = await render(
+    <Messages>
+      <Streaming text="" author="Assistant" />
+    </Messages>,
+  );
+  const thinking = screen.getByRole("listitem", { name: "Assistant is thinking" });
+  await expect.element(thinking).toHaveAttribute("aria-busy", "true");
+  await expect.element(thinking.getByText("Thinking")).toBeInTheDocument();
+  const dot = thinking.element().querySelector(".rounded-full") as Element;
+  expect(getComputedStyle(dot).animationName).toBe("none"); // the tests reduce motion
+});
+
+test("what streams sits where its message will, so nothing moves when it is posted", async () => {
+  const screen = await render(
+    <Messages>
+      <Streaming text="Done." author="Assistant" />
+    </Messages>,
+  );
+  const streaming = screen.getByRole("listitem", { name: "Assistant is writing" }).element();
+  const before = streaming.getBoundingClientRect();
+  await screen.rerender(
+    <Messages>
+      <Message message={message({ content: "Done." })} author="Assistant" />
+    </Messages>,
+  );
+  const posted = screen.getByRole("listitem", { name: "Assistant" }).element();
+  const after = posted.getBoundingClientRect();
+  expect([after.top, after.left, after.height]).toEqual([before.top, before.left, before.height]);
+});
+
 test("streaming text shows as it arrives, marked busy", async () => {
   const screen = await render(
     <Messages>
@@ -168,17 +229,6 @@ test("the composer reached by the keyboard rings the whole of it in the focus co
   expect(composer.outlineColor).toBe(token("focus"));
 });
 
-test("a tool call says it is running until it returns", async () => {
-  const screen = await render(
-    <ul>
-      <ToolCall tool={{ name: "edit_artifact", status: "called" }} />
-      <ToolCall tool={{ name: "read_artifact", status: "ok" }} />
-    </ul>,
-  );
-  await expect.element(screen.getByText("running")).toBeVisible();
-  await expect.element(screen.getByText("ok")).toBeVisible();
-});
-
 test("a call to approve takes the focus, and is approved or denied once", async () => {
   const onAnswer = sent();
   const request: ArtifactrV1.DeferredRequest = {
@@ -210,12 +260,12 @@ test("a call can be denied", async () => {
   expect(onAnswer).toHaveBeenCalledWith({ approved: false });
 });
 
-test("a question takes the focus, and is answered once", async () => {
+test("another tool's question takes the focus, and is answered once, in a line", async () => {
   const onAnswer = sent();
   const request: ArtifactrV1.DeferredRequest = {
     kind: "question",
     tool_call_id: "t2",
-    tool_name: "ask_user",
+    tool_name: "ask_week",
     args: { question: "Which week?" },
   };
   const screen = await render(<Request request={request} onAnswer={onAnswer} />);
@@ -361,17 +411,34 @@ test("a refused post keeps its text, and says it wasn't done", async () => {
   await expect.element(box).toHaveValue("Draft the plan");
 });
 
-test("a post waits for its answer before another can be sent", async () => {
+test("a post clears as it is sent, and waits for its answer before another can be sent", async () => {
   let done: (value: { outcome: "done" }) => void = () => undefined;
   const onSend = vi.fn(() => new Promise<{ outcome: "done" }>((resolve) => (done = resolve)));
   const screen = await render(<Composer onSend={onSend} />);
-  await screen.getByRole("textbox", { name: "Message" }).fill("One");
+  const box = screen.getByRole("textbox", { name: "Message" });
+  await box.fill("One");
   await screen.getByRole("button", { name: "Send" }).click();
+  await expect.element(box).toHaveValue("");
+  await box.fill("Two");
   await expect.element(screen.getByRole("button", { name: "Send" })).toBeDisabled();
   await userEvent.keyboard("{Enter}");
   expect(onSend).toHaveBeenCalledOnce();
   done({ outcome: "done" });
-  await expect.element(screen.getByRole("textbox", { name: "Message" })).toHaveValue("");
+  await expect.element(screen.getByRole("button", { name: "Send" })).toBeEnabled();
+  await expect.element(box).toHaveValue("Two");
+});
+
+test("a post that wasn't sent comes back, unless something new was written", async () => {
+  let done: (value: { outcome: "closed" }) => void = () => undefined;
+  const onSend = vi.fn(() => new Promise<{ outcome: "closed" }>((resolve) => (done = resolve)));
+  const screen = await render(<Composer onSend={onSend} />);
+  const box = screen.getByRole("textbox", { name: "Message" });
+  await box.fill("One");
+  await userEvent.keyboard("{Enter}");
+  await box.fill("Two");
+  done({ outcome: "closed" });
+  await expect.element(screen.getByRole("alert")).toBeVisible();
+  await expect.element(box).toHaveValue("Two");
 });
 
 test("an answer that wasn't sent can be given again", async () => {
@@ -614,7 +681,7 @@ describe("a form the agent asks", () => {
     const question: ArtifactrV1.DeferredRequest = {
       kind: "question",
       tool_call_id: "t2",
-      tool_name: "ask_user",
+      tool_name: "ask_week",
       args: { question: "Which?" },
     };
     await screen.rerender(<Request request={question} onAnswer={sent()} focus={false} />);

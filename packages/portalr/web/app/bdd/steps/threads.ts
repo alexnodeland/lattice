@@ -28,10 +28,40 @@ Then("the agent asks {string}", async ({ page }, question: string) => {
   await expect(page.getByRole("form", { name: "The agent asks" })).toContainText(question);
 });
 
-When("they answer {string}", async ({ page }, answer: string) => {
+/** An option of the agent's questions, by its label: a radio, which may be recommended, or a box. */
+When("they choose {string}", async ({ page }, label: string) => {
   const asked = page.getByRole("form", { name: "The agent asks" });
-  await asked.getByRole("textbox", { name: "Answer" }).fill(answer);
-  await asked.getByRole("button", { name: "Answer" }).click();
+  const choice = asked.getByRole("radio", { name: new RegExp(`^${label}( Recommended)?$`) });
+  await ((await choice.count()) > 0
+    ? choice
+    : asked.getByRole("checkbox", { name: label })
+  ).click();
+});
+
+When("they write {string}", async ({ page }, words: string) => {
+  await page.getByRole("textbox", { name: "Your answer" }).fill(words);
+});
+
+When("they answer", async ({ page }) => {
+  await page
+    .getByRole("form", { name: "The agent asks" })
+    .getByRole("button", { name: "Answer" })
+    .click();
+});
+
+Then("the agent's questions say {string} was chosen", async ({ page }, label: string) => {
+  const asked = page.getByRole("region", { name: "The agent asked" });
+  await expect(asked.getByText(label, { exact: true })).toBeVisible();
+});
+
+Then("the thread says {int} turn(s) failed", async ({ page }, failed: number) => {
+  await expect(
+    page.getByRole("log", { name: "Messages" }).getByText("The assistant couldn't finish."),
+  ).toHaveCount(failed);
+});
+
+When("they try it again", async ({ page }) => {
+  await page.getByRole("button", { name: "Try again" }).click();
 });
 
 Then("the agent asks to run {string}", async ({ page }, tool: string) => {

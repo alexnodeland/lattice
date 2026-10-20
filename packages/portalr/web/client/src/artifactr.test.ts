@@ -104,13 +104,121 @@ test("a run streams its text until its message is posted, and keeps its status",
     id: "run_1",
     threadId: "thr_1",
     status: "completed",
-    tools: { t1: { name: "edit", status: "ok" } },
+    tools: { t1: { name: "edit", status: "ok", args: "", result: "", seq: 2 } },
     text: "",
     requests: [],
     answered: [],
     started: 1,
+    ended: 5,
+    error: null,
+    reason: null,
+    questions: [],
     feedback: [],
   });
+});
+
+test("a tool call keeps its arguments, what it returned and where it was called", () => {
+  const state = replay(
+    { type: "run_started", run_id: "run_1", thread_id: "thr_1" },
+    {
+      type: "tool_called",
+      run_id: "run_1",
+      thread_id: "thr_1",
+      tool_call_id: "t1",
+      tool_name: "draft_rule",
+      args_summary: '{"rule": {}}',
+    },
+    {
+      type: "tool_returned",
+      run_id: "run_1",
+      thread_id: "thr_1",
+      tool_call_id: "t1",
+      status: "retry",
+      summary: "rule: Field required",
+    },
+    // Refused before it was called: its return is all there is, where it was returned.
+    {
+      type: "tool_returned",
+      run_id: "run_1",
+      thread_id: "thr_1",
+      tool_call_id: "t2",
+      tool_name: "draft_rule",
+      status: "error",
+      summary: "Boom",
+    },
+  );
+  expect(state.runs.run_1?.tools).toEqual({
+    t1: {
+      name: "draft_rule",
+      status: "retry",
+      args: '{"rule": {}}',
+      result: "rule: Field required",
+      seq: 2,
+    },
+    t2: { name: "draft_rule", status: "error", args: "", result: "Boom", seq: 4 },
+  });
+});
+
+test("a failed run keeps why, and when it ended", () => {
+  const state = replay(
+    { type: "run_started", run_id: "run_1", thread_id: "thr_1" },
+    {
+      type: "run_ended",
+      run_id: "run_1",
+      thread_id: "thr_1",
+      status: "failed",
+      error: "Tool 'draft_rule' exceeded max retries count of 1",
+      reason: "unexpected_model_behavior",
+    },
+  );
+  expect(state.runs.run_1).toMatchObject({
+    status: "failed",
+    ended: 2,
+    error: "Tool 'draft_rule' exceeded max retries count of 1",
+    reason: "unexpected_model_behavior",
+  });
+});
+
+test("what a run asks through ask_user stays, with its answer, after the run ends", () => {
+  const ask = {
+    kind: "question",
+    tool_call_id: "q1",
+    tool_name: "ask_user",
+    args: { questions: [] },
+  };
+  const approve = { kind: "approval", tool_call_id: "t2", tool_name: "publish", args: {} };
+  const chosen = { answers: [{ selected: ["Monday"] }] };
+  const state = replay(
+    { type: "run_started", run_id: "run_1", thread_id: "thr_1" },
+    { type: "run_paused", run_id: "run_1", thread_id: "thr_1", requests: [ask, approve] },
+    {
+      type: "deferred_answered",
+      run_id: "run_1",
+      thread_id: "thr_1",
+      tool_call_id: "q1",
+      answer: chosen,
+    },
+    // A second answer to it, refused by the server, would never be recorded; one is ignored.
+    {
+      type: "deferred_answered",
+      run_id: "run_1",
+      thread_id: "thr_1",
+      tool_call_id: "q1",
+      answer: { reply: "late" },
+    },
+    {
+      type: "run_paused",
+      run_id: "run_1",
+      thread_id: "thr_1",
+      requests: [{ ...ask, tool_call_id: "q2" }],
+    },
+    { type: "run_ended", run_id: "run_1", thread_id: "thr_1", status: "stopped" },
+  );
+  const alice = { kind: "user", id: "alice" };
+  expect(state.runs.run_1?.questions).toEqual([
+    { request: ask, seq: 2, answer: { value: chosen, actor: alice } },
+    { request: { ...ask, tool_call_id: "q2" }, seq: 5, answer: null },
+  ]);
 });
 
 test("a run pauses on its requests, and resumes when every one is answered", () => {

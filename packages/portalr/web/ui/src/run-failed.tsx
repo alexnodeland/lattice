@@ -1,0 +1,57 @@
+/**
+ * A turn that failed, in its thread: why, in words a reader can act on, what the run recorded,
+ * and, for the thread's latest turn, a way to try again.
+ */
+
+import { Alert } from "./alert";
+import { CommandButton } from "./chat";
+import type { Sent } from "./sending";
+
+/** Why a run failed, in words, by the reason its `run_ended` names (artifactr ADR-0042). */
+const REASONS: Readonly<Record<string, string>> = {
+  unexpected_model_behavior:
+    "The model kept calling a tool in a way the tool refused, and ran out of tries.",
+  abandoned: "The turn stopped answering, and was given up.",
+  guardrail_blocked: "A guardrail stopped the turn.",
+};
+
+/**
+ * A failed turn: what went wrong, the run's own words under "Details", and "Try again" where
+ * `onRetry` is given, which the thread gives its latest turn. Only that one is announced, as it
+ * fails; a failure further up is a note.
+ */
+export function RunFailed({
+  reason,
+  error,
+  onRetry,
+}: {
+  reason: string | null;
+  error: string | null;
+  onRetry?: () => Sent;
+}) {
+  return (
+    <li className="self-stretch">
+      <Alert tone="error" live={onRetry !== undefined}>
+        <div className="flex flex-col gap-2">
+          <p>
+            <span className="font-semibold">The assistant couldn't finish. </span>
+            {(reason !== null && REASONS[reason]) || "Something went wrong before it answered."}
+          </p>
+          {error && (
+            <details className="text-muted">
+              <summary className="cursor-pointer">Details</summary>
+              <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-words font-mono text-xs">
+                {error}
+              </pre>
+            </details>
+          )}
+          {onRetry && (
+            <span>
+              <CommandButton onSend={onRetry}>Try again</CommandButton>
+            </span>
+          )}
+        </div>
+      </Alert>
+    </li>
+  );
+}

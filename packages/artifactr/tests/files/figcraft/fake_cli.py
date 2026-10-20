@@ -60,13 +60,12 @@ def main() -> None:
 
     @server.tool()
     async def inspect_document(
-        allPages: bool = False,  # noqa: N803 - FigCraft's own name
         depth: int = 1,
     ) -> CallToolResult:
         texts = [{"name": w, "type": "TEXT", "characters": w} for w in design["words"]]
         frame = {"name": "Frame", "type": "FRAME", "children": texts}
         pages = [{"name": "Page 1", "type": "PAGE", "children": [frame] if depth > 1 else []}]
-        return replied({"pages": pages if allPages else pages[:1]})
+        return replied({"pages": pages})
 
     @server.tool()
     async def run_command(command: str, params: dict[str, Any] | None = None) -> CallToolResult:

@@ -12,14 +12,13 @@ from artifactr.files.manifest import SVG
 HEAD: Final = 4096
 """How many of a file's first bytes its root element is looked for in."""
 
-PROLOGUE: Final = re.compile(
-    rb"\A(?:\xef\xbb\xbf)?\s*(?:<\?xml[^>]*\?>\s*)?"
-    rb"(?:(?:<!--.*?-->|<!DOCTYPE\s+svg[^>\[]*(?:\[.*?\])?\s*>)\s*)*"
-    rb"<(?:svg:)?svg[\s>/]",
-    re.DOTALL,
-)
-"""An SVG's start: a declaration, comments and its doctype, its internal subset too, then its
-root element, `svg`. What the subset declares is VectorCraft's to refuse."""
+BOM: Final = b"\xef\xbb\xbf"
+
+DOCTYPE: Final = re.compile(rb"<!DOCTYPE\s+svg[\s>\[]")
+"""An SVG's doctype, whose internal subset is VectorCraft's to refuse."""
+
+ROOT: Final = re.compile(rb"<(?:svg:)?svg[\s>/]")
+"""An SVG's root element, `svg`."""
 
 
 def media_type(content: bytes) -> str | None:
@@ -27,4 +26,25 @@ def media_type(content: bytes) -> str | None:
 
     A gzipped SVG, `.svgz`, isn't: VectorCraft would save it uncompressed.
     """
-    return SVG if PROLOGUE.match(content[:HEAD]) else None
+    return SVG if ROOT.match(_root(content[:HEAD].removeprefix(BOM))) else None
+
+
+def _root(head: bytes) -> bytes:
+    """What follows the prologue: its declaration, comments and doctype, each skipped in turn.
+
+    Each is skipped by finding its end, not by a pattern over all of them, so no input makes
+    the search backtrack.
+    """
+    while head := head.lstrip():
+        if head.startswith((b"<?xml", b"<!--")):
+            _, ended, head = head.partition(b"?>" if head.startswith(b"<?") else b"-->")
+        elif DOCTYPE.match(head):
+            opened, closed = head.find(b"["), head.find(b">")
+            if 0 <= opened < closed:
+                head = head[head.find(b"]", opened) + 1 :]
+            _, ended, head = head.partition(b">")
+        else:
+            return head
+        if not ended:
+            return b""
+    return head

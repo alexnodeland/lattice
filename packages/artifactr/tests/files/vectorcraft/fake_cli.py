@@ -11,7 +11,6 @@ import argparse
 import asyncio
 import base64
 import json
-import re
 from pathlib import Path
 from typing import Any
 
@@ -52,10 +51,11 @@ def serve(read_root: Path, write_root: Path) -> None:
         if command == "file.new":
             document.update(layers=[{"name": "Layer 1", "kind": "Layer"}], artboards=1)
         elif command == "document.open":
-            found = re.search(r"<!--(.*)-->", confined(params["path"], read_root).read_text())
-            if found is None:
+            _, opened, rest = confined(params["path"], read_root).read_text().partition("<!--")
+            held, closed, _ = rest.partition("-->")
+            if not (opened and closed):
                 raise ToolError("SVG parse error")
-            document.update(json.loads(found[1]))
+            document.update(json.loads(held))
         elif command == "document.save":
             confined(params["path"], write_root).write_text(SVG.format(json.dumps(document)))
         elif command == "layer.new":

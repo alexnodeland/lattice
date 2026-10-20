@@ -134,6 +134,8 @@ An app's adapter subclasses `ToolsDialect` or `CommandsDialect`, which take the 
 
 - **VectorCraft** keeps vector images, `VectorImage`, `.svg`, and its CLI takes a read and a write root. VectorCraft opens PDF, Illustrator, EPS and more and would save any of them as an SVG, so a file whose root element isn't `svg` is refused before the CLI starts. Its commands act on the document open last, which none of them names. Its outline is its layers and groups, its text is its type objects' words, top to bottom, and each artboard is a page, rendered by `render_preview`. A save writes every shape as a path, bakes transforms into the geometry, and sets the SVG's `<title>` to the file's name: a title isn't kept. Its browser build has no host surface, so a person downloads and uploads its files.
 
+- **DesignCraft** keeps page layouts, `PageLayout`, `.idml`, and its CLI takes a read and a write root. Its own save writes its native format, so a layout is opened and saved as IDML by its commands, `file.openIdml` and `file.exportIdml`, and anything else, its own format or an `.indd` it would convert, is refused before it is opened. Its batch names the command that failed, its outline is each story's first line, its text is its stories' words, and it renders each page, numbered from 1. Its corpus is seven IDML features written by hand. A table's words are kept, but a table's first save isn't a fixpoint, so no corpus file holds one, and a new layout's ids are numbered again on its next save: each costs one revision more. Its browser build has no host surface, so a person downloads and uploads its files.
+
 ```python
 from artifactr.files import Drawing
 from artifactr.files.cadcraft import Subprocess as CADCraft

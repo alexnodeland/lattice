@@ -158,3 +158,9 @@ class VectorImage(NativeFile):
     """A vector image, `.svg`: registered as `vector_image`."""
 
     formats: ClassVar[frozenset[str]] = frozenset({SVG})
+
+
+class PageLayout(NativeFile):
+    """A page layout, `.idml`: registered as `page_layout`."""
+
+    formats: ClassVar[frozenset[str]] = frozenset({IDML})

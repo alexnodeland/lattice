@@ -22,6 +22,9 @@ SCRIPT: Final = Path(__file__).parent / "console" / "script.py"
 """The script `freecadcmd` runs: in a folder that isn't a package, since it imports only in
 FreeCAD, and nothing that imports every module of artifactr must reach it."""
 
+SAVED: Final = "document.FCStd"
+"""What the script saves a document as, in `out/`."""
+
 ARGUMENTS: Final = ("-u", "user.cfg", "-s", "system.cfg", "--safe-mode")
 """Its settings in the call's directory, and no user macro, addon or setting of its own."""
 
@@ -195,23 +198,25 @@ class Subprocess:
         object it leaves invalid. With no commands, nothing is recomputed, so the shapes'
         bytes are kept.
         """
-        label = None if source is None else scan(source, self.limit).label
+        scanned = None if source is None else scan(source, self.limit)
         call: dict[str, JsonValue] = {
             "step": "apply",
-            "label": label,
+            "label": None if scanned is None else scanned.label,
             "commands": [command.model_dump(mode="json") for command in commands],
         }
-        ran = await self._script.run(deadline, call, source, self.extension)
-        if (saved := ran.files.get(f"document{self.extension}")) is None:
+        given = None if scanned is None else scanned.content
+        ran = await self._script.run(deadline, call, given, self.extension, wanted={SAVED})
+        if (saved := ran.files.get(SAVED)) is None:
             raise AppFailed("crashed", "freecadcmd saved no document")
-        content = with_gui(saved, source)
+        content = with_gui(saved, given)
         return Applied(content=content, inspection=_inspection(content, ran.result))
 
     async def inspect(self, source: bytes, *, deadline: float) -> Inspection:
         """Read a document's objects, its sheets' cells, and its fingerprint."""
-        call: dict[str, JsonValue] = {"step": "inspect", "label": scan(source, self.limit).label}
-        ran = await self._script.run(deadline, call, source, self.extension)
-        return _inspection(source, ran.result)
+        scanned = scan(source, self.limit)
+        call: dict[str, JsonValue] = {"step": "inspect", "label": scanned.label}
+        ran = await self._script.run(deadline, call, scanned.content, self.extension)
+        return _inspection(scanned.content, ran.result)
 
     async def render(self, source: bytes, page: int, *, scale: float, deadline: float) -> bytes:
         """Draw the model's visible edges, isometrically, `PREVIEW` times `scale` wide, as page 1.
@@ -221,13 +226,16 @@ class Subprocess:
         """
         if page != 1:
             raise AppFailed("refused", f"no page {page}: a model is drawn as page 1")
+        scanned = scan(source, self.limit)
         call: dict[str, JsonValue] = {
             "step": "render",
-            "label": scan(source, self.limit).label,
+            "label": scanned.label,
             "page": page,
             "width": max(16, round(PREVIEW * scale)),
         }
-        ran = await self._script.run(deadline, call, source, self.extension)
+        ran = await self._script.run(
+            deadline, call, scanned.content, self.extension, wanted={"page.png"}
+        )
         if (png := ran.files.get("page.png")) is None:
             raise AppFailed("crashed", "freecadcmd drew no page")
         return png

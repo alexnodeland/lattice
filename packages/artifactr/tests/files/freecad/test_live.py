@@ -87,7 +87,13 @@ async def test_every_command_builds_a_model_that_saves_reads_and_draws(
         ([command("python", code="import os")], "no command 'python'"),
         ([command("box", length=-1, width=1, height=1)], "length must be more than 0"),
         ([command("box", length=1, width=1, height=1, shell=True)], "unknown argument shell"),
-        ([command("set", object="Box", property="Proxy", value=1)], "no object Box"),
+        (
+            [
+                command("box", length=1, width=1, height=1),
+                command("set", object="Box", property="Proxy", value=1),
+            ],
+            "no property Proxy that can be set",
+        ),
         (
             [
                 command("box", length=1, width=1, height=1),

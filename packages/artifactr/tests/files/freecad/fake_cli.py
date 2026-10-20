@@ -14,9 +14,10 @@ import zipfile
 from pathlib import Path
 
 PNG = b"\x89PNG\r\n\x1a\n"
+STRING = 'type="App::PropertyString"'
 BLANK = (
-    '<Document><Properties><Property name="Label"><String value="document"/></Property>'
-    '<Property name="LastModifiedDate"><String value=""/></Property></Properties>'
+    f'<Document><Properties><Property name="Label" {STRING}><String value="document"/></Property>'
+    f'<Property name="LastModifiedDate" {STRING}><String value=""/></Property></Properties>'
     "<Objects></Objects></Document>"
 )
 OBJECT = re.compile(r'<Object type="([^"]+)" name="([^"]+)"')

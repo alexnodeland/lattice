@@ -9,8 +9,10 @@ import base64
 import io
 import os
 import pickle
+import stat
 import subprocess
 import tempfile
+import warnings
 import zipfile
 from collections.abc import Callable
 from functools import partial
@@ -88,6 +90,53 @@ def inflating(name: str, head: bytes, size: int, tail: bytes = b"") -> bytes:
     return buffer.getvalue()
 
 
+def member(feature: str, name: str) -> bytes:
+    """A part of a corpus file."""
+    with zipfile.ZipFile(HERE / f"{feature}.FCStd") as archive:
+        return archive.read(name)
+
+
+def zipped(*parts: tuple[str, bytes] | tuple[str, bytes, int]) -> bytes:
+    """A zip of the parts, in order, each a name, its bytes and its mode; a name may repeat."""
+    buffer = io.BytesIO()
+    with warnings.catch_warnings(), zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        warnings.simplefilter("ignore")  # zipfile warns of a name twice: it is the point
+        for name, data, *mode in parts:
+            info = zipfile.ZipInfo(name, TIME)
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.external_attr = (mode[0] if mode else stat.S_IFREG | 0o644) << 16
+            archive.writestr(info, data)
+    return buffer.getvalue()
+
+
+def python_document() -> bytes:
+    """The primitives' `Document.xml`, with a Python feature."""
+    return member("primitives", "Document.xml").replace(
+        b"</Objects>", b'<Object type="Part::FeaturePython" name="Py" id="9"/></Objects>'
+    )
+
+
+def linking(kind: str) -> bytes:
+    """The primitives, the box with a property of `kind` linking to `/etc/passwd`."""
+    linked = (
+        f'<Property name="Linked" type="{kind}">'
+        '<XLink file="/etc/passwd" stamp="" name="B"/></Property>'
+    )
+    anchor = '<Property name="Length" type="App::PropertyLength">'
+    return replaced("primitives", (anchor, linked + anchor))
+
+
+def lying() -> bytes:
+    """The primitives, with a shape whose local and central headers both understate its size."""
+    shape = b"0" * (64 << 10)
+    honest = zipped(
+        ("Document.xml", member("primitives", "Document.xml")), ("Box.Shape.brp", shape)
+    )
+    told = len(shape).to_bytes(4, "little")
+    assert honest.count(told) == 2
+    return honest.replace(told, (16).to_bytes(4, "little"))
+
+
 class _Shell:
     """What a pickled proxy would run, were it ever unpickled."""
 
@@ -143,14 +192,31 @@ HOSTILE: Final[dict[str, Callable[[], bytes]]] = {
             b"</Property></ViewProvider></Document>"
         },
     ),
-    "external_link": partial(
+    # A link to a file, in a real property of the box's: of its own type, and of an allowed one.
+    "external_link": partial(linking, "App::PropertyXLink"),
+    "external_link_in_a_link": partial(linking, "App::PropertyLink"),
+    # A Document.xml with Python, read by a reader that walks local headers, before the zip.
+    "local_only_entry": lambda: (
+        zipped(("Document.xml", python_document())) + (HERE / "primitives.FCStd").read_bytes()
+    ),
+    "duplicate_document": lambda: zipped(
+        ("Document.xml", member("primitives", "Document.xml")),
+        ("Document.xml", python_document()),
+    ),
+    "zip_slip": partial(replaced, "primitives", **{"../../etc/cron.d/x": b"* * * * * root id"}),
+    "absolute_name": partial(replaced, "primitives", **{"/etc/passwd": b"x"}),
+    "backslash_name": partial(replaced, "primitives", **{"..\\x.brp": b"x"}),
+    "symlink": lambda: zipped(
+        ("Document.xml", member("primitives", "Document.xml")),
+        ("Box.Shape.brp", b"/etc/passwd", stat.S_IFLNK | 0o777),
+    ),
+    # A shape's part whose headers say 16 bytes, holding 64 KiB.
+    "lying_header": lying,
+    # Five objects listed and four counted: FreeCAD would read four.
+    "lying_count": partial(
         replaced,
         "primitives",
-        (
-            "</Objects>",
-            '<Object type="App::Link" name="L" id="9"/><XLink file="/etc/passwd" name="B"/>'
-            "</Objects>",
-        ),
+        ("</Objects>", '<Object type="Part::Box" name="Extra" id="9"/></Objects>'),
     ),
     # Cut's base is the fusion, whose base is Cut: FreeCAD opens it, and the script refuses it.
     "cycle": partial(replaced, "booleans", ('<Link value="Box"/>', '<Link value="Fusion"/>')),

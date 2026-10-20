@@ -11,7 +11,7 @@ and failures.
 import json
 import subprocess
 import tempfile
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Final
@@ -37,7 +37,7 @@ class _Result(BaseModel):
 
 @dataclass(frozen=True)
 class Ran:
-    """What a call's script returned: its result, and the files it wrote in `out/`, by name."""
+    """What a call's script returned: its result, and the files wanted that it wrote, by name."""
 
     result: JsonValue
     files: Mapping[str, bytes]
@@ -89,9 +89,17 @@ class Script:
         self._limit = limit
 
     async def run(
-        self, deadline: float, call: Mapping[str, JsonValue], source: bytes | None, extension: str
+        self,
+        deadline: float,
+        call: Mapping[str, JsonValue],
+        source: bytes | None,
+        extension: str,
+        *,
+        wanted: Collection[str] = (),
     ) -> Ran:
         """Run the script on the call, and the source, in a directory of the call's own.
+
+        Of the files the script writes in `out/`, only those `wanted` are read back.
 
         Raises:
             AppFailed: `timeout` past the deadline; `crashed` if the script wrote no result that
@@ -125,7 +133,7 @@ class Script:
                 raise AppFailed("refused", f"{cli} is {ran.version}, not {self.version}")
             if ran.refused is not None:
                 raise AppFailed("refused", ran.refused)
-            return Ran(ran.result, self._written(root / "out"))
+            return Ran(ran.result, self._written(root / "out", wanted))
 
     async def _process(self, root: Path, printed: int) -> None:
         """The CLI, run to its end, or killed with the call when its deadline passes."""
@@ -145,10 +153,12 @@ class Script:
                 with anyio.CancelScope(shield=True):
                     await process.wait()
 
-    def _written(self, out: Path) -> dict[str, bytes]:
-        """Each file the script wrote in `out/`, refused as too large past the limit."""
+    def _written(self, out: Path, wanted: Collection[str]) -> dict[str, bytes]:
+        """Each file wanted that the script wrote, refused as too large past the limit."""
         written: dict[str, bytes] = {}
         for path in sorted(out.iterdir()):
+            if path.name not in wanted:
+                continue
             if path.stat().st_size > self._limit:
                 raise AppFailed("too_large", f"{path.name} is larger than {self._limit} bytes")
             written[path.name] = path.read_bytes()

@@ -65,10 +65,15 @@ async def test_a_call_runs_the_script_in_its_own_directory_with_nothing_of_this_
 async def test_the_files_it_writes_come_back_and_one_past_the_limit_is_too_large(
     cli: Path,
 ) -> None:
-    ran = await script(cli, limit=8).run(10, {"do": "write", "size": 8}, None, ".txt")
+    wanted = {"saved.txt"}
+    ran = await script(cli, limit=8).run(
+        10, {"do": "write", "size": 8}, None, ".txt", wanted=wanted
+    )
     assert ran.files == {"saved.txt": b"x" * 8}
+    unread = await script(cli, limit=8).run(10, {"do": "write", "size": 9}, None, ".txt")
+    assert unread.files == {}, "a file not wanted is never read, however large"
     with pytest.raises(AppFailed, match=r"saved\.txt is larger than 8 bytes") as failed:
-        await script(cli, limit=8).run(10, {"do": "write", "size": 9}, None, ".txt")
+        await script(cli, limit=8).run(10, {"do": "write", "size": 9}, None, ".txt", wanted=wanted)
     assert failed.value.failure == "too_large"
 
 
@@ -109,7 +114,7 @@ async def test_it_starts_under_the_launcher(cli: Path, tmp_path: Path) -> None:
         limit=1 << 20,
         launcher=(str(launcher),),
     )
-    ran = await launched.run(10, {"do": "write", "size": 1}, None, ".txt")
+    ran = await launched.run(10, {"do": "write", "size": 1}, None, ".txt", wanted={"launched"})
     assert ran.files["launched"] == b"launched\n"
 
 

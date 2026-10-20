@@ -235,7 +235,10 @@ def sheet_set(document, args):
     """Set a cell's content."""
     take(args, (), ("sheet", "cell", "content"))
     obj = found(document, args, "sheet", "Spreadsheet::Sheet")
-    obj.set(cell(args), text(args, "content"))
+    if "#" in (content := text(args, "content")):
+        # As the scan refuses it: `doc#Object` names another document, which FreeCAD opens.
+        raise Refused("content can't refer to another document: no #")
+    obj.set(cell(args), content)
 
 
 def sheet_alias(document, args):
@@ -415,4 +418,6 @@ def main():
     (here / "result.json").write_text(json.dumps(result))
 
 
-main()
+# freecadcmd runs a file as a module named after it; a test imports it under another name.
+if __name__ in {"__main__", "script"}:
+    main()

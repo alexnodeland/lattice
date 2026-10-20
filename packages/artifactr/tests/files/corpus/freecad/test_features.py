@@ -57,3 +57,9 @@ def test_each_hostile_file_is_a_document_broken_or_bearing_python() -> None:
     assert list(parts("gui_proxy")).count("GuiDocument.xml") == 1
     assert b'XLink file="/etc/passwd"' in document("external_link")
     assert document("cycle").count(b'<Link value="Fusion"/>') == 1
+    assert b'type="App::PropertyLink"><XLink file="/etc/passwd"' in document(
+        "external_link_in_a_link"
+    )
+    assert list(parts("zip_slip"))[-1] == "../../etc/cron.d/x"
+    assert parts("lying_header")["Box.Shape.brp"] == 16
+    assert b'name="Extra"' in document("lying_count")

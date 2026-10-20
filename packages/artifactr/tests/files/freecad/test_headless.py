@@ -80,7 +80,7 @@ async def test_a_document_holding_python_is_refused_before_freecad_starts(
         freecad.inspect(python, deadline=10),
         freecad.render(python, 1, scale=1, deadline=10),
     ):
-        with pytest.raises(AppFailed, match="holds Python"):
+        with pytest.raises(AppFailed, match="type that isn't allowed"):
             await call
 
 

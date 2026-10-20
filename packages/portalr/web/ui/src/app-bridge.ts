@@ -89,6 +89,16 @@ export function readMessage(text: unknown): Message | null {
   return { kind: "request", id, method, params: params as JsonObject };
 }
 
+/** The least time between two of the sandbox's measures the host hears, in milliseconds. */
+const MEASURED_EVERY = 200;
+
+/** A size the sandbox measured for the app, as `appDocument`'s script says it. */
+const isMeasured = (message: NonNullable<ReturnType<typeof readMessage>>) =>
+  message.kind === "notification" &&
+  message.method === SIZE_CHANGED &&
+  message.params.measured === true &&
+  isNumber(message.params.height);
+
 /** A tool's result, as MCP's `tools/call` answers: its structured content, and the same as text. */
 const toolResult = (structured: JsonObject) => ({
   content: [{ type: "text", text: JSON.stringify(structured) }],
@@ -420,6 +430,9 @@ export class Bridge {
   readonly #limiter: Limiter;
   /** Whether the app has said its own height, which the sandbox's measure then gives way to. */
   #sized = false;
+  /** When the sandbox's measure was last heard, by `#now`. */
+  #measuredAt = Number.NEGATIVE_INFINITY;
+  readonly #now: () => number;
 
   constructor(options: {
     source: unknown;
@@ -435,6 +448,7 @@ export class Bridge {
     this.#host = options.host;
     this.#state = options.state;
     this.#limiter = new Limiter(CALLS_A_MINUTE, 60_000, options.now);
+    this.#now = options.now ?? Date.now;
   }
 
   /**
@@ -459,11 +473,19 @@ export class Bridge {
     if (event.source !== this.#source || event.origin !== this.#origin) {
       return; // not this app's sandbox: dropped, whatever it says
     }
+    const message = readMessage(event.data);
+    if (message !== null && isMeasured(message)) {
+      // The sandbox's own measure, not the app's: paced apart, never counted against it.
+      if (this.#now() - this.#measuredAt >= MEASURED_EVERY) {
+        this.#measuredAt = this.#now();
+        this.#sizeChanged(message.params.height as number, true);
+      }
+      return;
+    }
     if (!this.#limiter.take()) {
       this.#host.quieted();
       return;
     }
-    const message = readMessage(event.data);
     if (message === null) {
       return;
     }

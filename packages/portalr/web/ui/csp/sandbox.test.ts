@@ -197,16 +197,39 @@ setTimeout(() => { document.getElementById("box").style.height = "420px"; }, 150
   await page.close();
 });
 
-test("an app that fills its window keeps a frame at least as tall as it started", async () => {
-  const page = await running(`<body style="margin:0"><div style="height:100vh">Board</div>`);
-  await page.waitForTimeout(1500);
-  expect(await drawn(page)).toBeGreaterThanOrEqual(360);
-  await page.close();
-});
+/** The frame's height once it has stopped changing: the same in two reads a second apart. */
+async function settled(page: Page): Promise<number> {
+  let last = -1;
+  await expect
+    .poll(
+      async () => {
+        const now = await drawn(page);
+        const same = now === last;
+        last = now;
+        return same;
+      },
+      { ...SETTLED, interval: 1000 },
+    )
+    .toBe(true);
+  return last;
+}
+
+for (const [fills, style] of [
+  ["min-height", "min-height:100vh"],
+  ["height", "height:100vh"],
+] as const) {
+  test(`an app that fills its window by ${fills}, with a margin round it, keeps its frame, not climbing`, async () => {
+    // The body's default 8 px margin makes the document 16 px taller than the window it fills.
+    const page = await running(`<body><div style="${style}">Board</div>`);
+    const height = await settled(page);
+    expect(height).toBeLessThanOrEqual(360 + 16);
+    await page.close();
+  });
+}
 
 test("a tall app is shown whole up to twice the window, and scrolls inside its frame past it", async () => {
   const page = await running(`<body style="margin:0"><div style="height:3000px">Board</div>`);
-  // The harness's window is 720 px tall: its cap is twice that.
-  await expect.poll(() => drawn(page), SETTLED).toBe(1440);
+  const twice = await page.evaluate(() => innerHeight * 2);
+  await expect.poll(() => drawn(page), SETTLED).toBe(twice);
   await page.close();
 });

@@ -10,6 +10,7 @@ nav:
       - rfcs/0004-relayr-and-task-trackers.md
       - rfcs/0005-forms-dashboards-and-mini-apps.md
       - rfcs/0006-excalidraw-diagrams-drawn-live.md
+      - rfcs/0007-portalr-brand-kits.md
       - Template: rfcs/template.md
   - Decisions:
       - adr/README.md

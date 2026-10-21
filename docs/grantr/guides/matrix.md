@@ -14,6 +14,7 @@ An application's own, with its custom roles, is in its `access.md` ([Roles and g
 | `artifactr:archive_artifact` |  |  | ✓ | ✓ |  | ✓ | ✓ |  |  |
 | `artifactr:claim_thread` |  | ✓ |  |  |  |  |  |  |  |
 | `artifactr:create_artifact` |  | ✓ | ✓ | ✓ |  | ✓ | ✓ |  |  |
+| `artifactr:create_native_file` |  |  | ✓ | ✓ |  | ✓ | ✓ |  |  |
 | `artifactr:create_thread` |  | ✓ | ✓ | ✓ |  | ✓ | ✓ |  |  |
 | `artifactr:edit_artifact` |  | ✓ | ✓ | ✓ |  | ✓ | ✓ |  |  |
 | `artifactr:give_feedback` |  | ✓ | ✓ | ✓ |  | ✓ | ✓ | ✓ |  |

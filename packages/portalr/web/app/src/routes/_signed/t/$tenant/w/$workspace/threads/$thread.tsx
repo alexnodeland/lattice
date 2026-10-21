@@ -41,6 +41,7 @@ import { ShareDialog } from "../../../../../../../share-dialog";
 import { ThreadArtifact } from "../../../../../../../thread-artifact";
 import { retryOf, threadLog } from "../../../../../../../thread-log";
 import { ThreadMenu } from "../../../../../../../thread-menu";
+import { Uploader } from "../../../../../../../upload";
 import { Connection, useStream, useWorkspace } from "../../../../../../../workspace";
 
 /**
@@ -373,6 +374,9 @@ function Chat() {
         <div className="sticky bottom-0 z-10 bg-paper pt-2 pb-4">
           <Composer disabled={snapshot.status !== "live"} onSend={send} />
         </div>
+      )}
+      {snapshot.status !== "closed" && (
+        <Uploader context={context} tenant={tenant} workspace={workspace} thread={id} />
       )}
     </section>
   );

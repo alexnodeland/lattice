@@ -68,6 +68,7 @@ EDITOR_COMMANDS: Final = frozenset(
         "artifactr:set_focus",
         "artifactr:set_thread_mode",
         "artifactr:create_artifact",
+        "artifactr:create_native_file",
         "artifactr:edit_artifact",
         "artifactr:propose_change",
         "artifactr:archive_artifact",
@@ -80,9 +81,9 @@ EDITOR_COMMANDS: Final = frozenset(
         "reflexr:cancel_run",
     }
 )
-"""The commands an editor may send beyond a viewer's: post, create, edit, propose, archive,
-resolve proposals, and operate runs, and ``artifactr:record``, which a turn that an editor's
-message starts asks as them. Rule management is the workspace admin's alone."""
+"""The commands an editor may send beyond a viewer's: post, create, upload a native file, edit,
+propose, archive, resolve proposals, and operate runs, and ``artifactr:record``, which a turn
+that an editor's message starts asks as them. Rule management is the workspace admin's alone."""
 
 BOOKKEEPING: Final = frozenset(
     {

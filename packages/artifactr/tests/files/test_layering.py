@@ -134,7 +134,7 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         {
             *LIBRARY,
             *("artifactr.fastapi", "artifactr.telemetry", "lattice_core.refusals"),
-            *("fastapi", "starlette", "pydantic"),
+            *("fastapi", "starlette", "pydantic", "anyio"),
         },
     ),
     "sql": (

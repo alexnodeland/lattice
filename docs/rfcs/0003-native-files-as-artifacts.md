@@ -349,6 +349,7 @@ Decided by the owner on 2026-10-16:
 - [x] The worker (phase 3): artifactr-files' worker, limits, `Worker` app and hostile corpus (native files ADR-0013); stackr's image, recipe, network, release pin check and the egress test, in the template, with a worker for each app (stackr ADR-0043). Each app's own corpus and hostile files, its gate (native files ADR-0011's second action item), are still open for all but WordCraft
 - [x] artifactr-files: `NativeFileTools`, as `native_file_tools`
 - [x] artifactr-files: `files_router`, check-out and check-in over HTTP, and the hosted editor's policy
+- [x] A person's upload over HTTP: told by its bytes, read before it is committed, held to quotas, a pace and the tenant's readings (native files ADR-0017), and portalr's control for it
 - [x] portalr: the renderer, previews, diffs, check-out and check-in screens
 - [ ] The streamed session spike and its recommendation
 - [x] Docs: the package's section and guide

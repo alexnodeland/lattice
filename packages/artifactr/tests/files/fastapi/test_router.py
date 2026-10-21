@@ -133,7 +133,9 @@ def test_a_check_out_then_a_check_in_is_a_revision(world: World) -> None:
     download = world.client.get(f"{FILE}/versions/1/content")
     assert download.content == FakeApp.file("Terms")
     assert download.headers["content-type"] == DOCX
-    assert download.headers["content-disposition"] == "attachment; filename*=UTF-8''c%20%C3%B8.docx"
+    assert download.headers["content-disposition"] == (
+        "attachment; filename=\"c ?.docx\"; filename*=UTF-8''c%20%C3%B8.docx"
+    )
     assert download.headers["x-content-type-options"] == "nosniff"
     assert download.headers["content-security-policy"] == "sandbox"
     assert download.headers["cache-control"] == "private, no-store"

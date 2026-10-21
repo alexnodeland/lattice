@@ -42,6 +42,7 @@ from artifactr.core import (
     WorkspaceId,
 )
 from artifactr.fastapi import artifactr_router
+from artifactr.files.native import CREATE_NATIVE_FILE
 from artifactr.mcp import ArtifactrMcp, artifact_uri
 from artifactr.workspace import ACTIONS, Access, InMemoryStorage, Workspace, Workspaces
 from tests.artifact_types import Note
@@ -513,5 +514,6 @@ def test_the_catalog_is_every_action_asked_for_and_no_other() -> None:
     asked |= {action for _, actions in FRAMES.values() for action in actions}
     asked |= {action for _, actions in ROUTES.values() for action in actions}
     asked |= {action for _, actions in TOOLS.values() for action in actions}
+    asked.add(CREATE_NATIVE_FILE)  # native files' upload route asks it (tests/files/fastapi)
     asked.add(RUN_CODE)  # a connected app's toolset asks it beside the workspace (tests/connect)
     assert asked | {"artifactr:open"} == ACTIONS

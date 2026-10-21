@@ -50,6 +50,19 @@ test("a file dropped on the zone is given too, the first of several, unless it i
   await expect.element(screen.getByLabelText("The edited file")).toBeDisabled();
 });
 
+test("with several allowed, each file chosen or dropped is given in turn", async () => {
+  const chosen: string[] = [];
+  const screen = await render(
+    <FileChooser label="Upload files" multiple onFile={(file) => chosen.push(file.name)} />,
+  );
+  const input = screen.getByLabelText("Upload files");
+  await expect.element(input).toHaveAttribute("multiple");
+  await expect.element(input).toHaveAccessibleDescription("Or drop them here.");
+  await input.upload([new File(["a"], "one.docx"), new File(["b"], "two.pdf")]);
+  drop(screen.container.firstElementChild as Element, new File(["c"], "three.docx"));
+  expect(chosen).toEqual(["one.docx", "two.pdf", "three.docx"]);
+});
+
 test("a file dragged over the zone marks it, over its children too, and leaving unmarks it", async () => {
   const screen = await render(<FileChooser label="The edited file" onFile={() => undefined} />);
   const zone = screen.container.firstElementChild as HTMLElement;

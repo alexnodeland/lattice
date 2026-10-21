@@ -24,6 +24,8 @@ class Row:
     path: str
     prop: str
     type: Type
+    loop: bool = False
+    """A loop's duration, which reduced motion pauses, rather than one that it makes instant."""
 
 
 @dataclass(frozen=True)
@@ -86,11 +88,12 @@ PRIMITIVES: tuple[Group, ...] = (
         _scale("shadow", "shadow", "--shadow", ("1", "2", "3")),
     ),
     Group(
-        "Motion: how long a change takes, and how it eases; a placeholder's pulse is a loop"
-        " (portalr ADR-0057).",
+        "Motion: how long a change takes, scaled by --motion-scale, which reduced motion makes 0"
+        " whatever the kit says, and how it eases; a placeholder's pulse is a loop, which reduced"
+        " motion pauses (portalr ADR-0057).",
         (
             *_scale("duration", "motion.duration", "--duration", ("fast", "moderate")),
-            Row("motion.duration.pulse", "--duration-pulse", "duration"),
+            Row("motion.duration.pulse", "--duration-pulse", "duration", loop=True),
             *_scale("cubicBezier", "motion.ease", "--ease", ("in", "out", "in-out", "pulse")),
         ),
     ),

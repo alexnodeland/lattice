@@ -168,6 +168,9 @@ def _printed(row: Row, value: object, tokens: Mapping[str, object], depth: int =
     match row.type:
         case "color":
             return _color(value, row.path)
+        case "duration" if not row.loop:
+            # Every change's duration is scaled by motion's scale, which reduced motion makes 0.
+            return f"calc({_measure(value, row.path, row.type)} * var(--motion-scale))"
         case "dimension" | "duration":
             return _measure(value, row.path, row.type)
         case "number":

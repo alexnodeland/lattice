@@ -61,11 +61,12 @@
   --shadow-3: 0 16px 40px -8px var(--shadow-color), 0 2px 6px var(--shadow-color);
 
   /*
-   * Motion: how long a change takes, and how it eases; a placeholder's pulse is a loop (portalr
-   * ADR-0057).
+   * Motion: how long a change takes, scaled by --motion-scale, which reduced motion makes 0
+   * whatever the kit says, and how it eases; a placeholder's pulse is a loop, which reduced motion
+   * pauses (portalr ADR-0057).
    */
-  --duration-fast: 150ms;
-  --duration-moderate: 200ms;
+  --duration-fast: calc(150ms * var(--motion-scale));
+  --duration-moderate: calc(200ms * var(--motion-scale));
   --duration-pulse: 2000ms;
   --ease-in: cubic-bezier(0.4, 0, 1, 1);
   --ease-out: cubic-bezier(0, 0, 0.2, 1);

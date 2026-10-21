@@ -328,6 +328,14 @@ COMPONENTS: tuple[Group, ...] = (
             Row("component.progress.duration", "--progress-duration", "duration"),
         ),
     ),
+    Group(
+        "A code block: its corners, and its code's padding.",
+        (
+            Row("component.code-block.radius", "--code-block-radius", "dimension"),
+            Row("component.code-block.pad-x", "--code-block-pad-x", "dimension"),
+            Row("component.code-block.pad-y", "--code-block-pad-y", "dimension"),
+        ),
+    ),
 )
 """Each component's tokens, defaulting to a role or a primitive (portalr ADR-0056)."""
 

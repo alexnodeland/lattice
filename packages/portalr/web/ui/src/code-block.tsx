@@ -27,7 +27,7 @@ export function CodeBlock({ code, language, note, children }: Props) {
   const named = language ? `${language} code` : "Code";
   const what = language ? `the ${language} code` : "the code";
   return (
-    <div className="flex min-w-0 flex-col rounded-md border border-line bg-paper">
+    <div className="flex min-w-0 flex-col rounded-(--code-block-radius) border border-line bg-paper">
       <div className="flex items-center justify-between gap-2 border-line border-b py-1 pr-1 pl-3">
         <span className="font-mono text-muted text-xs">{language || "Code"}</span>
         <span className="flex gap-1">
@@ -47,7 +47,7 @@ export function CodeBlock({ code, language, note, children }: Props) {
       <ScrollRegion aria-label={named} className="-outline-offset-(--focus-offset)">
         <pre
           className={cn(
-            "m-0 px-3 py-2 font-mono text-fg text-sm [font-variant-ligatures:none]",
+            "m-0 px-(--code-block-pad-x) py-(--code-block-pad-y) font-mono text-fg text-sm [font-variant-ligatures:none]",
             wrapped ? "whitespace-pre-wrap break-words" : "whitespace-pre",
           )}
         >

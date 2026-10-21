@@ -891,6 +891,17 @@
       "duration": {
         "$value": "{motion.duration.fast}"
       }
+    },
+    "code-block": {
+      "radius": {
+        "$value": "{radius.3}"
+      },
+      "pad-x": {
+        "$value": "{space.3}"
+      },
+      "pad-y": {
+        "$value": "{space.2}"
+      }
     }
   }
 }

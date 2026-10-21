@@ -280,4 +280,9 @@
   --progress-radius: var(--radius-full);
   --progress-height: var(--space-2);
   --progress-duration: var(--duration-fast);
+
+  /* A code block: its corners, and its code's padding. */
+  --code-block-radius: var(--radius-3);
+  --code-block-pad-x: var(--space-3);
+  --code-block-pad-y: var(--space-2);
 }

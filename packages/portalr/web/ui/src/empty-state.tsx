@@ -17,7 +17,7 @@ export function EmptyState({
   return (
     <section
       aria-labelledby={heading}
-      className="flex max-w-xl flex-col items-start gap-2 rounded-lg border border-line bg-surface p-6 shadow-raised"
+      className="flex max-w-xl flex-col items-start gap-2 rounded-(--card-radius) border border-line bg-surface p-(--empty-state-pad) shadow-(--card-shadow)"
     >
       <SectionTitle id={heading}>{title}</SectionTitle>
       <div className="text-muted text-sm">{children}</div>

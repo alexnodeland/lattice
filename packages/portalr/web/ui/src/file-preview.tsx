@@ -91,7 +91,7 @@ export function PageViewer({
         <ScrollRegion
           aria-label={`${label}: ${name}`}
           className={cn(
-            "flex justify-center rounded-md border border-line bg-paper p-2 forced-colors:border-[CanvasText]",
+            "flex justify-center rounded-(--code-block-radius) border border-line bg-paper p-2 forced-colors:border-[CanvasText]",
             actual ? "max-h-[80dvh] overflow-auto" : "items-center",
           )}
         >

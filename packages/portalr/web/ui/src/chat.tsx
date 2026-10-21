@@ -34,7 +34,8 @@ import { StatusBadge, type Tone } from "./status-badge";
 import { TextField } from "./text-field";
 import { TYPE } from "./type";
 
-const card = "flex flex-col gap-2 rounded-lg border border-line bg-surface p-4 text-sm";
+const card =
+  "flex flex-col gap-2 rounded-(--card-radius) border border-line bg-surface p-(--card-pad) text-sm";
 
 /** A button that sends one command, waits while it is in flight, and says why one wasn't done. */
 export function CommandButton({
@@ -136,8 +137,10 @@ type MessageProps = {
 /** A message's bubble: the reader's at the end of the line, everyone else's at its start. */
 const bubble = (mine: boolean) =>
   cn(
-    "min-w-0 max-w-full rounded-2xl border px-3.5 py-2",
-    mine ? "rounded-se-sm border-line bg-wash" : "rounded-ss-sm border-line bg-surface",
+    "min-w-0 max-w-full rounded-(--bubble-radius) border px-(--bubble-pad-x) py-(--bubble-pad-y)",
+    mine
+      ? "rounded-se-(--bubble-tail-radius) border-line bg-wash"
+      : "rounded-ss-(--bubble-tail-radius) border-line bg-surface",
   );
 
 /**
@@ -216,11 +219,12 @@ export function Streaming({ text, author }: { text: string; author: string }) {
 function Thinking() {
   return (
     <span className="flex h-6 items-center gap-1 text-muted">
+      {/* Each dot a beat behind the last: a delay, not a duration, so reduced motion's pause holds. */}
       {[0, 150, 300].map((delay) => (
         <span
           key={delay}
           style={{ animationDelay: `${delay}ms` }}
-          className="size-1.5 rounded-full bg-current motion-safe:animate-pulse"
+          className="size-1.5 rounded-full bg-current [animation-play-state:var(--motion-loop)] motion-safe:animate-pulse"
         />
       ))}
       <span className="sr-only">Thinking</span>
@@ -343,7 +347,7 @@ export function Composer({
   }
   return (
     <form
-      className="flex flex-col gap-1 rounded-lg border border-edge bg-surface p-1 outline-offset-2 has-[textarea:focus-visible]:outline-2 has-[textarea:focus-visible]:outline-focus"
+      className="flex flex-col gap-1 rounded-(--composer-radius) border border-edge bg-surface p-(--composer-pad) outline-offset-(--focus-offset) has-[textarea:focus-visible]:outline-(length:--focus-width) has-[textarea:focus-visible]:outline-focus"
       onSubmit={submit}
     >
       <Field.Root className="flex flex-col" disabled={disabled}>
@@ -513,7 +517,7 @@ function Question({
         </p>
         <Review review={request.review ?? {}} />
         {args && (
-          <pre className="overflow-x-auto rounded-md border border-line bg-paper p-3 font-mono text-xs">
+          <pre className="overflow-x-auto rounded-(--code-block-radius) border border-line bg-paper p-(--code-panel-pad) font-mono text-xs">
             {unhidden(JSON.stringify(request.args, null, 2))}
           </pre>
         )}

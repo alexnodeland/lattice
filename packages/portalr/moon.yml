@@ -33,9 +33,25 @@ tasks:
   test:
     # And the policy ui's CSP tests serve, which a test holds to the router's, and the allow-list
     # and the budgets, whose shapes tests hold.
-    inputs: ['@group(python)', 'web/ui/csp/policy.txt', 'web/wasm-allowlist.json', 'size-budget.json']
+    # And the UIs' tokens, which a test holds to the default brand kit compiled.
+    inputs:
+      - '@group(python)'
+      - 'web/ui/csp/policy.txt'
+      - 'web/wasm-allowlist.json'
+      - 'size-budget.json'
+      - 'web/ui/src/tokens.css'
     options:
       mergeInputs: 'replace'
+  # The UIs' tokens, written from the default brand kit (lattice RFC-0007): run it after editing
+  # the kit, and commit what it writes; a test fails while the two differ.
+  brand:
+    description: 'Write the UIs tokens.css from the default brand kit'
+    command: 'uv run python -m portalr.brand web/ui/src/tokens.css'
+    inputs: ['src/portalr/brand/**/*']
+    outputs: ['web/ui/src/tokens.css']
+    options:
+      cache: false
+
   # The wheel carries the two UIs, which Vite builds into src/portalr/static/.
   build:
     inputs: ['@group(python)', 'src/portalr/static/**/*']

@@ -4,6 +4,7 @@ evalr ADR-0005 and relayr ADR-0009), and the same gate over portalr's TypeScript
 """
 
 import re
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -129,3 +130,34 @@ def test_the_gate_on_uis_imports_finds_each_kind_of_value_import(source: str) ->
 )
 def test_the_gate_on_uis_imports_passes_types_alone(source: str) -> None:
     assert client_value_imports(source) == []
+
+
+CONFLICT = re.compile(r"^(?:<{7}|\|{7}|>{7})(?: |$)|^={7}$", re.MULTILINE)
+"""A merge's conflict markers, diff3's base marker (``|||||||``) among them, which pre-commit's
+``check-merge-conflict`` doesn't know: each at the start of a line, as git writes them."""
+
+
+def _tracked_text() -> list[Path]:
+    listed = subprocess.run(
+        ["git", "ls-files", "-z"], cwd=ROOT, capture_output=True, check=True
+    ).stdout.split(b"\0")
+    return [ROOT / name.decode() for name in listed if name and (ROOT / name.decode()).is_file()]
+
+
+def test_a_conflict_marker_is_seen_whichever_git_wrote() -> None:
+    for marker in ("<<<<<<< HEAD", "||||||| 92290709", "=======", ">>>>>>> 2ca041e2"):
+        assert CONFLICT.search(f"a line\n{marker}\nanother\n"), marker
+    for text in ("======== a longer rule", "a ||||||| in a line", "`=======`"):
+        assert not CONFLICT.search(text), text
+
+
+def test_no_tracked_file_holds_a_conflict_marker() -> None:
+    found = []
+    for path in _tracked_text():
+        data = path.read_bytes()
+        if b"\0" in data:
+            continue  # a binary file, such as a screenshot
+        for match in CONFLICT.finditer(data.decode("utf-8", "replace")):
+            line = data.decode("utf-8", "replace").count("\n", 0, match.start()) + 1
+            found.append(f"{path.relative_to(ROOT)}:{line}: {match.group(0)}")
+    assert found == []

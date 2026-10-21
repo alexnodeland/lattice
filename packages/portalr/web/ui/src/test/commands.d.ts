@@ -2,6 +2,7 @@
 declare module "vitest/browser" {
   interface BrowserCommands {
     forcedColors: (active: boolean) => Promise<void>;
+    pointAt: (selector: string, hold?: boolean) => Promise<void>;
     pointerAway: () => Promise<void>;
     reduceMotion: (reduce: boolean) => Promise<void>;
   }

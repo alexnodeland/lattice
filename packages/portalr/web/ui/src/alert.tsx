@@ -39,7 +39,7 @@ export function Alert({
     <div
       role={live ? role : "note"}
       className={cn(
-        "flex items-start gap-2 rounded-md border border-line border-l-4 bg-surface px-3 py-2 text-fg text-sm",
+        "flex items-start gap-2 rounded-(--alert-radius) border border-line border-l-4 bg-surface px-(--alert-pad-x) py-(--alert-pad-y) text-fg text-sm",
         edge,
         className,
       )}

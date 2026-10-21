@@ -208,7 +208,7 @@ function InlineCode({
 }) {
   const formula = className?.split(" ").includes("language-math");
   return (
-    <code className="rounded bg-paper px-1.5 py-0.5 font-mono text-fg text-sm [font-variant-ligatures:none]">
+    <code className="rounded-(--code-inline-radius) bg-paper px-(--code-inline-pad-x) py-(--code-inline-pad-y) font-mono text-fg text-sm [font-variant-ligatures:none]">
       {formula ? ["$$", children, "$$"] : children}
     </code>
   );

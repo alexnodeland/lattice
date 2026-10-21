@@ -152,6 +152,7 @@ All of it in Python, in the loader, before anything is served; `portalr brand va
 - **A checked-in pair manifest,** `packages/portalr/brand/pairs.json`: each entry a foreground token, a background token, a minimum ratio, and the schemes it holds in. The Python validator and the UI's token tests read the same file. Alpha tokens are composited over a named backdrop (`--paper` unless the entry names another) before a ratio is taken. The set: text on paper, surface and wash at 4.5:1; `--muted` likewise; `--on-accent` on `--accent` and `--accent-hover`; `--on-danger` on `--danger` and `--danger-hover`; control edges, status marks and chart marks at 3:1 on paper and surface; ANSI and code tokens at 4.5:1; disabled text and placeholders at 3:1 (WCAG exempts disabled controls; this floor is ours); and the chrome pairs below.
 - **Colour-vision distances,** using Machado et al. (2009) at severity 1.0 for protanopia, deuteranopia and tritanopia, plus normal vision: the three chart colours pairwise, each against `--status-failed` and `--status-warn`, and the two status colours against each other, 20 or more apart to CIEDE2000 (portalr ADR-0039). The ANSI colours are held to contrast only, not to distance, which across eight colours could not be met.
 - **Accessibility floors on tokens:** the focus ring at least 2px wide with an offset of at least 2px, and 3:1 against both the element and the surface around it; a minimum target of 24 by 24 CSS pixels, held on `--row-height`, the button and icon-button paddings and sizes; body text at least 14px with leading at least 1.4; and under the `flat` elevation preset, controls keep a border of at least 1px in `--edge`.
+  - **Admin's compact density is a deliberate exception** (owner's decision): its 13px table text and tighter rows (portalr ADR-0039) are exempt from the 14px text and 24px target floors, which hold for the app people use. A kit can't shrink the compact density further: its tokens (`--row-height`, `--row-pad`, `--table-text` under `[data-density="compact"]`) are in base.css, outside the kit's grammar.
 - **Assets:** SVG by an allow-list of elements and attributes. Refused: `script`, `foreignObject`, `style` elements and attributes, `use`, `image`, event handlers, `href` and `xlink:href` to anything but a fragment in the same file, `url()` to anything but a fragment, a DOCTYPE or entity declaration, and `data:` URLs. 64 KB per SVG. PNG favicons are checked by magic number, 128 KB each.
 - **Fonts:** WOFF2 only, checked by its magic number (`wOF2`), 400 KB per file and 1.5 MB per kit; every family has a licence entry with an SPDX id from an allowed list (OFL-1.1, Apache-2.0, MIT, or `LicenseRef-commercial` with its file). The licence is the kit author's attestation: the validator checks that it is declared and present, not that it is true.
 - **Motion guard rails,** below.
@@ -176,7 +177,7 @@ A closed set of entry and exit patterns (above), a duration scale and an easing 
 }
 ```
 
-`--motion-scale` and `--motion-loop` are not in the kit's grammar. Infinite animations (the pulse) read `animation-play-state: var(--motion-loop)` and have a defined still state (the placeholder at its resting opacity). Motion driven from script reads the same media query and tokens. A test renders a worst-case kit (every duration at 600ms, the `lively` preset) under reduced motion and asserts every computed `transition-duration` and `animation-duration` is 0s or the animation is paused at its still state. A kit that wants no motion at all takes the `none` preset.
+`--motion-scale` and `--motion-loop` are not in the kit's grammar. Infinite animations (the pulse) read `animation-play-state: var(--motion-loop)` and stop at rest, at their resting opacity (the placeholder at its resting opacity). Motion driven from script reads the same media query and tokens. A test renders a worst-case kit (every duration at 600ms, the `lively` preset) under reduced motion and asserts every computed `transition-duration` and `animation-duration` is 0s or the animation is paused at its still state. A kit that wants no motion at all takes the `none` preset.
 
 ### What a kit can't brand
 
@@ -239,6 +240,21 @@ Each step is one PR, reviewable alone.
 
 The polish PRs, approved by the owner (links and breadcrumbs, list rows, icon buttons and the inline artifact header, badges and headings, disclosures, the shell, empty and error states), follow the foundation and land on its tokens.
 
+## Foundation PR as built
+
+The foundation PR (#452) departs from the design above in these ways, each reviewed there:
+
+- **Derived colours stay `color-mix()`** in `base.css`: `--wash`, `--accent-hover`, `--danger-hover`, `--danger-wash` and `--chart-grid`. Computing them in Python risks a rounding difference from the browser's own mix, and `--wash` and `--accent-hover` are declared again under `[data-brand]`, where the accent changes. The loader PR computes them for a kit other than the default, and holds their pairs.
+- **The literal-value guard rail** exempts `tokens.css`, `base.css` and `styles.css`, not only the generated stylesheet. A few layout measures remain, listed in the test by count, including the editor's and the mini apps' frame heights, which stay as they are.
+- **The scales are as wide as today's values:** corners `--radius-0` to `--radius-6` and `--radius-full`, and shadows `--shadow-1` to `--shadow-3`, since a zero-change refactor can't snap a value to a nearer step. Tailwind's spacing utilities (`p-3`, `gap-2`) keep Tailwind's `--spacing` and are not on the `--space-*` scale; a component's token is.
+- **Motion's scale multiplies durations only.** Shifts and scale offsets are not multiplied: with every duration 0 they move nothing. Every duration token is declared on the root, where `--motion-scale` is already 0 under reduced motion, so an element can't undo it below, and no kit can declare `--motion-scale` or `--motion-loop`, which the tests hold.
+- **Not tokens yet:** `--button-shadow`, `--button-lift` and `--button-press-scale`, which have no value today; adding them changes a computed value. The polish pass adds them where a look needs them.
+- **Some component tokens are literals,** not primitives: `--dialog-pad`, `--dialog-scrim-blur`, `--segmented-item-pad-x`, `--popover-item-pad-x`, `--switch-width`, `--switch-height` and `--focus-offset`, as no primitive has their value. `--switch-thumb` and `--switch-travel` are separate tokens: a kit that changes one changes the other, which the loader PR checks.
+- **Colour ramps** come with the loader PR.
+- **The reduced-motion test** lays the generated stylesheet, every duration at 600ms, over the default, and opens a dialog, a menu, a select's list and the drawer; the guard rails' validation of a kit's motion is the loader PR's.
+- **Sizes** are read where a size token sets a box's width or height (the dialog's width and margin, the drawer's width, the switch, the checkbox, the progress bar and a row's height) and the enter and exit scales, by `token-sizes.test.tsx`; corners and padding are read by the computed-style snapshots; every other size by the screenshot suites; the computed-style snapshots read what a declaration sets and leave sizes, margins and transforms out.
+- **The style census** reports in the test's annotations, not yet in the CI step summary.
+
 ## Drawbacks
 
 - Hundreds of custom properties, and a refactor that touches every component. The zero-diff gate and the per-component commits are what make it reviewable.
@@ -262,7 +278,6 @@ The polish PRs, approved by the owner (links and breadcrumbs, list rows, icon bu
 - The final URL for `brand.json`'s schema.
 - The exact component token names, settled component by component in the foundation PR.
 - Whether `lively` earns its place once the motion playground shows it.
-- Whether the 14px body floor and the 24px target floor need an exception for admin's compact density (portalr ADR-0039 sets 13px table text), or whether compact density is exempt as today.
 - How the generated stylesheet and Tailwind's `@theme` meet: whether `styles.css`'s `@theme inline` block is generated as well.
 
 ## Tracking

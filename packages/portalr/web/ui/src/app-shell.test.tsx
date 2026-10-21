@@ -64,7 +64,8 @@ test("narrower, the navigation waits behind Menu, in a drawer that keeps the foc
   await expect.element(screen.getByRole("main")).not.toBeInTheDocument();
   for (let i = 0; i < 5; i += 1) {
     await userEvent.tab();
-    expect(drawer.element().contains(document.activeElement)).toBe(true);
+    // The drawer's focus guard returns the focus a moment after it leaves: wait for it.
+    await expect.poll(() => drawer.element().contains(document.activeElement)).toBe(true);
   }
   await userEvent.keyboard("{Escape}");
   await expect.element(screen.getByRole("dialog")).not.toBeInTheDocument();

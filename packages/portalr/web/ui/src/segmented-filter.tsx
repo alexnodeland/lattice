@@ -50,7 +50,7 @@ export function SegmentedFilter<V extends string>({
       value={value}
       disabled={disabled}
       onValueChange={(chosen) => onValueChange(chosen)}
-      className="inline-flex flex-wrap gap-0.5 self-start rounded-md border border-edge bg-surface p-0.5 aria-invalid:border-fg"
+      className="inline-flex flex-wrap gap-0.5 self-start rounded-(--segmented-radius) border border-edge bg-surface p-(--segmented-pad) aria-invalid:border-fg"
     >
       {segments.map((segment) => (
         <Radio.Root
@@ -59,7 +59,7 @@ export function SegmentedFilter<V extends string>({
           aria-label={
             segment.count === undefined ? undefined : `${segment.label}, ${segment.count}`
           }
-          className="inline-flex cursor-default items-center gap-1.5 rounded border border-transparent px-2.5 py-1 font-medium text-fg text-sm outline-offset-2 hover:not-data-disabled:bg-wash focus-visible:outline-2 focus-visible:outline-focus data-checked:border-accent data-checked:bg-wash data-checked:font-semibold data-checked:text-accent data-disabled:cursor-not-allowed data-disabled:text-muted data-checked:data-disabled:border-line data-checked:data-disabled:text-fg"
+          className="inline-flex cursor-default items-center gap-1.5 rounded-(--segmented-item-radius) border border-transparent px-(--segmented-item-pad-x) py-(--segmented-item-pad-y) font-medium text-fg text-sm outline-offset-(--focus-offset) hover:not-data-disabled:bg-wash focus-visible:outline-(length:--focus-width) focus-visible:outline-focus data-checked:border-accent data-checked:bg-wash data-checked:font-semibold data-checked:text-accent data-disabled:cursor-not-allowed data-disabled:text-muted data-checked:data-disabled:border-line data-checked:data-disabled:text-fg"
         >
           {segment.label}
           {segment.count !== undefined && (

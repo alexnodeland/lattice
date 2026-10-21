@@ -17,7 +17,7 @@ export function Card({ render, className, ...props }: Props) {
     props: mergeProps<"div">(
       {
         className: cn(
-          "rounded-lg border border-line bg-surface p-4 text-fg shadow-raised",
+          "rounded-(--card-radius) border border-line bg-surface p-(--card-pad) text-fg shadow-(--card-shadow)",
           className,
         ),
       },

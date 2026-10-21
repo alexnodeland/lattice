@@ -15,7 +15,7 @@ export function TextField({ label, hint, error = null, className, ...props }: Pr
   return (
     <FormField label={label} hint={hint} error={error} className={className}>
       <Field.Control
-        className="rounded-md border border-edge bg-surface px-3 py-1.5 text-fg text-sm outline-offset-2 placeholder:text-muted focus-visible:outline-2 focus-visible:outline-focus data-disabled:cursor-not-allowed data-disabled:border-line data-disabled:bg-line data-disabled:text-muted data-invalid:border-fg"
+        className="rounded-(--input-radius) border border-edge bg-surface px-(--input-pad-x) py-(--input-pad-y) text-fg text-sm outline-offset-(--focus-offset) placeholder:text-muted focus-visible:outline-(length:--focus-width) focus-visible:outline-focus data-disabled:cursor-not-allowed data-disabled:border-line data-disabled:bg-line data-disabled:text-muted data-invalid:border-fg"
         {...props}
       />
     </FormField>

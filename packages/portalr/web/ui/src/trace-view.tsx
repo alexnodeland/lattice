@@ -234,7 +234,7 @@ export function TraceView({ outline, reveal }: { outline: Outline; reveal: Revea
             }
           }}
           onKeyDown={walk}
-          className="@container max-h-[28rem] min-h-24 overflow-auto rounded-lg border border-line bg-surface"
+          className="@container max-h-[28rem] min-h-24 overflow-auto rounded-(--card-radius) border border-line bg-surface"
         >
           <div style={{ height: virtual.getTotalSize() }} className="relative w-full">
             {items.map((item) => {
@@ -265,7 +265,7 @@ export function TraceView({ outline, reveal }: { outline: Outline; reveal: Revea
                   onFocus={() => setChosen(row.id)}
                   style={{ height: ROW, transform: `translateY(${item.start}px)` }}
                   className={cn(
-                    "absolute inset-x-0 top-0 grid cursor-default grid-cols-[minmax(0,1fr)_4.5rem] items-center gap-3 border-line border-b px-2 text-sm outline-offset-[-2px] focus-visible:outline-2 focus-visible:outline-focus @xl:grid-cols-[minmax(11rem,2fr)_minmax(8rem,3fr)_4.5rem]",
+                    "absolute inset-x-0 top-0 grid cursor-default grid-cols-[minmax(0,1fr)_4.5rem] items-center gap-3 border-line border-b px-2 text-sm -outline-offset-(--focus-offset) focus-visible:outline-(length:--focus-width) focus-visible:outline-focus @xl:grid-cols-[minmax(11rem,2fr)_minmax(8rem,3fr)_4.5rem]",
                     on ? "bg-wash" : "hover:bg-wash/60",
                   )}
                 >
@@ -341,7 +341,7 @@ function Details({ row, reveal }: { row: Row; reveal: Reveal }) {
   return (
     <section
       aria-labelledby={`${base}-span`}
-      className="flex min-w-0 flex-col gap-3 rounded-lg border border-line bg-surface p-4"
+      className="flex min-w-0 flex-col gap-3 rounded-(--card-radius) border border-line bg-surface p-4"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 id={`${base}-span`} className="min-w-0 break-words font-semibold text-fg">
@@ -428,7 +428,7 @@ function WithheldNow({ row, reveal }: { row: Row; reveal: Reveal }) {
         parts.map((part) => (
           <div key={part.label} className="flex flex-col gap-1">
             <span className="break-words text-muted text-xs">{part.label}</span>
-            <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md bg-paper p-3 font-mono text-fg text-xs">
+            <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-(--code-block-radius) bg-paper p-(--code-panel-pad) font-mono text-fg text-xs">
               {part.text}
             </pre>
           </div>

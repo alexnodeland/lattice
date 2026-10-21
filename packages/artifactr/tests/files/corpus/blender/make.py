@@ -212,6 +212,7 @@ def make(path, build, *args):
 def main():
     given = sys.argv[sys.argv.index("--pass") + 1 :]
     folder = Path(given[0])
+    bpy.context.preferences.filepaths.save_version = 0  # no backup beside a save
     for feature in given[1:] or FEATURES:
         if feature == "hostile":
             (folder / "hostile").mkdir(exist_ok=True)

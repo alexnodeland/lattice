@@ -450,6 +450,8 @@ def main():
     """Run the call, and write its result beside it."""
     called = Path(sys.argv[sys.argv.index("--pass") + 1])
     here = called.parent
+    # No backup beside a save, no state between calls.
+    bpy.context.preferences.filepaths.save_version = 0
     version = ".".join(str(part) for part in bpy.app.version)
     try:
         result = {"version": version, "result": step(here, json.loads(called.read_text()))}

@@ -302,6 +302,9 @@ test("a character a reader wouldn't see is shown as its code point", () => {
     "a\u27e6U+202E\u27e7b\u27e6U+200B\u27e7c\u27e6U+0000\u27e7",
   );
   expect(unhidden("plain\tcode\n")).toBe("plain\tcode\n");
+  expect(unhidden("\u061c\u2028\u00ad\u{e0041}\ufe0f")).toBe(
+    "\u27e6U+061C\u27e7\u27e6U+2028\u27e7\u27e6U+00AD\u27e7\u27e6U+E0041\u27e7\u27e6U+FE0F\u27e7",
+  );
 });
 
 test("a call can be denied", async () => {

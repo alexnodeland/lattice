@@ -42,11 +42,13 @@ DUNDERS: Final = frozenset(
 
 
 HIDDEN: Final = re.compile(
-    "[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f\u200b-\u200f\u202a-\u202e\u2060-\u2064"
-    "\u2066-\u2069\ufeff\ud800-\udfff]"
+    "[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f\xad\u061c\u180e\u200b-\u200f\u2028-\u202e"
+    "\u2060-\u2064\u2066-\u2069\ufe00-\ufe0f\ufeff\ud800-\udfff\U000e0000-\U000e007f"
+    "\U000e0100-\U000e01ef]"
 )
-"""Characters a reader doesn't see as they run: controls, zero-width and direction-changing
-ones, and lone surrogates, which no encoding takes."""
+"""Characters a reader doesn't see as they run: controls, separators, soft hyphens, zero-width,
+direction-changing and tag characters, variation selectors, and lone surrogates, which no
+encoding takes. portalr's approval card shows the same ones as their code points."""
 
 
 def scan(code: str) -> list[str]:

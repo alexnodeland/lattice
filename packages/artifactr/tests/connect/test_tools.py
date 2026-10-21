@@ -19,6 +19,7 @@ from typing import Any
 import pytest
 from pydantic_ai import (
     Agent,
+    ApprovalRequired,
     BinaryContent,
     DeferredToolRequests,
     ModelRequest,
@@ -69,6 +70,7 @@ LISTED = Path(__file__).with_name("listed")
 COMMAND = (sys.executable, "-I", str(FAKE_SERVER))
 
 DIGESTS = {
+    "pictures": "165529d84d59f08d634ec9657b195e82cbeafcd7e8a550de2beb6999dead8b38",
     "many": "72085ed5a7064db4e8305105ee08310fbeee871361566502ff6291dfb5ea7970",
     "get_objects": "87d00691f105187b0c9da09adb30e60b91d6a37ad2229c5169ec5f9c6eba9b00",
     "get_view": "32b9cccdc840a6c433235d6a093900dd09ce04f5fbd2bf962999eca3e7dff9af",
@@ -119,7 +121,7 @@ SAFE = {
     "fake_get_view",
     "fake_create_object",
     *("fake_huge", "fake_inject", "fake_slow", "fake_refuse", "fake_odd", "fake_ask"),
-    *("fake_stamp", "fake_environ", "fake_many"),
+    *("fake_stamp", "fake_environ", "fake_many", "fake_pictures"),
 }
 CODE = "import FreeCAD\nFreeCAD.ActiveDocument.addObject('Part::Box', 'Box')\n"
 
@@ -520,12 +522,25 @@ def test_the_host_is_loopback_unless_the_operator_says_remote() -> None:
     for host in ("192.168.1.20", "0.0.0.0", "::", "localhost"):
         with pytest.raises(ValueError, match="isn't loopback"):
             connected(host=host)
-    for host in ("192.168.1.20", "0.0.0.0", "example.com"):
+    for host in (
+        "192.168.1.20",
+        "0.0.0.0",
+        "example.com",
+        "evil.com/x.ts.net",
+        "evil.com#.ts.net",
+        "a@evil.com?.ts.net",
+        "-studio.ts.net",
+        "Studio.ts.net",
+        ".ts.net",
+    ):
         with pytest.raises(ValueError, match="isn't a tailnet's"):
             connected(host=host, remote=True, secrets=("FAKE_TOKEN",))
     for host in ("100.64.0.7", "fd7a:115c:a1e0::1", "studio.tail1234.ts.net"):
         assert connected(host=host, remote=True, secrets=("FAKE_TOKEN",)).server is FAKE
     assert (connected(deadline=7).deadline, connected().approval_ttl) == (7, 15 * 60)
+    for port in (0, 65536):
+        with pytest.raises(ValueError, match="isn't a port"):
+            connected(port=port)
     with pytest.raises(ValueError, match="takes no port"):
         Connection(replace(FAKE, ports=False), command=COMMAND, port=9876)
     with pytest.raises(ValueError, match="a command starts the server"):
@@ -778,3 +793,21 @@ def test_the_vetted_digests_are_the_recorded_servers() -> None:
             assert (
                 digest(name, tool["description"], tool["input_schema"]) == server.tools[name].digest
             ), name
+
+
+async def test_an_approval_binds_the_arguments_it_was_asked_with(world: World) -> None:
+    tools, ctx = await _direct(world, everything(world))
+    offered = await tools.get_tools(ctx)
+    tool = offered["fake_execute_code"]
+    with pytest.raises(ApprovalRequired):
+        await tools.call_tool("fake_execute_code", {"code": CODE}, ctx, tool)
+    approved = replace(ctx, tool_call_approved=True)
+    with pytest.raises(ToolFailed, match="the approval is too old"):
+        await tools.call_tool("fake_execute_code", {"code": CODE + "x = 1\n"}, approved, tool)
+
+
+async def test_a_replys_images_together_are_capped_too(world: World) -> None:
+    world.switch.on.add(FAKE.key)
+    script = Script(call("fake_pictures"), say("Done."))
+    await world.run(script, connected())
+    assert seen(script).count("[an image past the reply's 2097152 bytes, left out]") == 1

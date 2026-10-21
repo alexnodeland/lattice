@@ -32,6 +32,21 @@ from artifactr.connect import BLENDER, FREECAD, scan
         ),
         ("ok = 1  # \u202e evil", ["line 1: holds an unseen character, U+202E"]),
         ("a\nb = '\u200b'", ["line 2: holds an unseen character, U+200B"]),
+        (
+            "x = '\u061c\u2028\xad'",
+            [
+                "line 1: holds an unseen character, U+061C",
+                "line 1: holds an unseen character, U+2028",
+                "line 1: holds an unseen character, U+00AD",
+            ],
+        ),
+        (
+            "x = '\U000e0041\ufe0f'",
+            [
+                "line 1: holds an unseen character, U+E0041",
+                "line 1: holds an unseen character, U+FE0F",
+            ],
+        ),
     ],
 )
 def test_each_finding_is_a_line_for_the_approver(code: str, found: list[str]) -> None:

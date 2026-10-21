@@ -514,7 +514,7 @@ function Question({
         <Review review={request.review ?? {}} />
         {args && (
           <pre className="overflow-x-auto rounded-md border border-line bg-paper p-3 font-mono text-xs">
-            {JSON.stringify(request.args, null, 2)}
+            {unhidden(JSON.stringify(request.args, null, 2))}
           </pre>
         )}
         <span className="flex gap-2">
@@ -595,19 +595,26 @@ function Review({ review }: { review: Record<string, unknown> }) {
   );
 }
 
-/** The ranges of characters a reader wouldn't see, as artifactr's scan finds them: controls but
- * tabs and newlines, zero-width and direction-changing ones, and lone surrogates. */
+/** The ranges of characters a reader wouldn't see, as artifactr's scan finds them, kept in step
+ * with its `HIDDEN`: controls but tabs and newlines, separators, soft hyphens, zero-width,
+ * direction-changing and tag characters, variation selectors, and lone surrogates. */
 const HIDDEN: readonly (readonly [number, number])[] = [
   [0x00, 0x08],
   [0x0b, 0x0c],
   [0x0e, 0x1f],
   [0x7f, 0x9f],
+  [0xad, 0xad],
+  [0x61c, 0x61c],
+  [0x180e, 0x180e],
   [0x200b, 0x200f],
-  [0x202a, 0x202e],
+  [0x2028, 0x202e],
   [0x2060, 0x2064],
   [0x2066, 0x2069],
+  [0xfe00, 0xfe0f],
   [0xfeff, 0xfeff],
   [0xd800, 0xdfff],
+  [0xe0000, 0xe007f],
+  [0xe0100, 0xe01ef],
 ];
 
 /** Code with each character a reader wouldn't see shown as its code point, so what is read is

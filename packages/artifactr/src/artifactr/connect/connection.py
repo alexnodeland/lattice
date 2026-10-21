@@ -2,7 +2,8 @@
 
 The server is third-party code, run unsandboxed as the runner's user: nothing here contains a
 hostile one. It is started for one call, in its own process group, in an empty temporary
-directory that is also its `HOME`, under a deadline, and ended with the group; its environment
+directory that is also its `HOME` (on Linux and macOS, where the SDK passes `HOME` through),
+under a deadline, and ended with the group; its environment
 is the MCP SDK's minimal one (`PATH`, `USER` and the like), the entry's own variables and the
 secrets the operator names, so the runner's model keys and everything else stay out. What it
 prints to stderr goes nowhere, and none of its words reach the model but its replies, which the
@@ -15,6 +16,7 @@ time. The app keeps its state, the operator's own session; the server and lattic
 import ipaddress
 import logging
 import os
+import re
 import tempfile
 import time
 from collections.abc import Awaitable, Callable, Sequence
@@ -42,11 +44,18 @@ TAILNET: Final = (
 """The addresses a tailnet gives its machines: a remote host is one of these, or a `.ts.net`
 name."""
 
+TS_NET: Final = re.compile(
+    r"[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*\.ts\.net"
+)
+"""A `.ts.net` name: lowercase ASCII labels, none starting or ending with a hyphen, and nothing
+else a URL could read as another host. Where it resolves isn't checked: an address is safer."""
+
 RETRY_AFTER: Final = 30.0
 """The seconds a failed listing is remembered before the server is asked again."""
 
 _LOCKS: Final[dict[tuple[str, ...], anyio.Lock]] = {}
-"""One lock for each app the runner reaches, by its server and address."""
+"""One lock for each app the runner reaches, by its server and address: in this process, on its
+one event loop, which anyio's lock refuses to leave. Two runner processes don't share it."""
 
 
 class ConnectionFailed(Exception):
@@ -114,6 +123,8 @@ class Connection:
             raise ValueError(f"a remote {server.title} needs its add-on's token in secrets")
         if port is not None and not server.ports:
             raise ValueError(f"{server.title}'s server takes no port")
+        if port is not None and not 1 <= port <= 65535:
+            raise ValueError(f"{port} isn't a port")
         risks = {name: tool.risk for name, tool in server.tools.items()}
         if wrong := sorted(name for name in allow if risks.get(name) not in PROTECTED):
             raise ValueError(
@@ -178,7 +189,8 @@ class Connection:
             if self._failed_at is not None and time.monotonic() - self._failed_at < RETRY_AFTER:
                 raise ConnectionFailed(f"{self._server.title} didn't answer a moment ago")
             try:
-                listed = await self._spawn(lambda session: session.list_tools())
+                async with self._lock:
+                    listed = await self._spawn(lambda session: session.list_tools())
             except ConnectionFailed:
                 self._failed_at = time.monotonic()
                 raise
@@ -208,8 +220,17 @@ class Connection:
 
         Raises:
             ConnectionFailed: Past the deadline, if the add-on's token isn't set, if the server
-                ended, made no sense or is another release, or if the work refused.
+                ended, made no sense or is another release, or if the work refused. Each is
+                logged for the operator as a warning, in lattice's words, so with no secret.
         """
+        try:
+            return await self._spawned(work)
+        except ConnectionFailed as failed:
+            logger.warning("%s: %s", self._server.key, failed)
+            raise
+
+    async def _spawned[T](self, work: Callable[[ClientSession], Awaitable[T]]) -> T:
+        """`_spawn`'s work, before its failure is logged."""
         server = self._server
         named = {name: os.environ.get(name, "") for name in self._secrets}
         if server.token is not None and server.token in named and not named[server.token]:
@@ -246,7 +267,6 @@ class Connection:
             except Exception as error:
                 if isinstance(refused := _innermost(error), ConnectionFailed):
                     raise refused from None
-                logger.debug("%s's server failed: %s", server.title, type(refused).__name__)
                 raise ConnectionFailed(
                     f"{server.title}'s server ended, or replied with what isn't MCP"
                 ) from error
@@ -259,7 +279,7 @@ def _nowhere() -> TextIO:
 
 def _tailnet(host: str) -> bool:
     """Whether a host is a tailnet's: one of its addresses, or a `.ts.net` name."""
-    if host.endswith(".ts.net"):
+    if TS_NET.fullmatch(host):
         return True
     try:
         address = ipaddress.ip_address(host)

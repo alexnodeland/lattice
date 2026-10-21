@@ -95,6 +95,12 @@ def main() -> None:
         return f"{sorted(os.environ)} home-is-cwd={home == os.getcwd()}"
 
     @server.tool()
+    def pictures() -> CallToolResult:
+        """Two images, each within the cap, too large together."""
+        png = base64.b64encode(PNG + b"\0" * (1536 * 1024)).decode()
+        return CallToolResult(content=[ImageContent(data=png, mime_type="image/png")] * 2)
+
+    @server.tool()
     def many() -> CallToolResult:
         """Forty parts."""
         return CallToolResult(content=[TextContent(text=f"part {n}") for n in range(40)])

@@ -92,36 +92,38 @@ export function ShareDialog({
       ) : (
         <Rows label="People with access">
           {grants.map((each) => (
-            <Row key={`${identity(each.to)}:${each.role}`}>
-              <span>
-                {each.to.kind === "user" ? (
+            <Row
+              key={`${identity(each.to)}:${each.role}`}
+              title={
+                each.to.kind === "user" ? (
                   <span title={each.to.id}>{named(each.to, names)}</span>
                 ) : (
                   named(each.to, names)
-                )}{" "}
-                <span className="text-muted">{each.role}</span>
-              </span>
-              {canRevoke && (
-                <ConfirmDialog
-                  className="ml-auto"
-                  label="Revoke"
-                  about={`${named(each.to, names)} as ${each.role}`}
-                  look="danger-soft"
-                  size="sm"
-                  title={`Revoke ${named(each.to, names)}'s ${each.role} role?`}
-                  confirm="Revoke the role"
-                  onConfirm={async () => {
-                    const answer = await onRevoke(each);
-                    if (answer.outcome !== "done") {
-                      throw new Error(refusal("Not revoked", answer));
-                    }
-                  }}
-                >
-                  {named(each.to, names)} loses the {each.role} role on this thread. While it's
-                  restricted, they no longer see it.
-                </ConfirmDialog>
-              )}
-            </Row>
+                )
+              }
+              meta={each.role}
+              end={
+                canRevoke && (
+                  <ConfirmDialog
+                    label="Revoke"
+                    about={`${named(each.to, names)} as ${each.role}`}
+                    look="danger-soft"
+                    size="sm"
+                    title={`Revoke ${named(each.to, names)}'s ${each.role} role?`}
+                    confirm="Revoke the role"
+                    onConfirm={async () => {
+                      const answer = await onRevoke(each);
+                      if (answer.outcome !== "done") {
+                        throw new Error(refusal("Not revoked", answer));
+                      }
+                    }}
+                  >
+                    {named(each.to, names)} loses the {each.role} role on this thread. While it's
+                    restricted, they no longer see it.
+                  </ConfirmDialog>
+                )
+              }
+            />
           ))}
         </Rows>
       )}

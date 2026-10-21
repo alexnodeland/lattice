@@ -50,7 +50,7 @@ test("the dialog lists who holds a role, starts at the person, and returns to th
   const dialog = screen.getByRole("dialog", { name: "Share the thread" });
   await expect
     .element(dialog.getByRole("listitem"))
-    .toHaveTextContent("erin editorRevoke erin as editor");
+    .toHaveTextContent("erineditorRevoke erin as editor");
   // A row shows "Revoke", and is named by whom and what it revokes.
   await expect.element(dialog.getByRole("button", { name: "Revoke erin as editor" })).toBeVisible();
   await expect.element(dialog.getByRole("combobox", { name: "Person" })).toHaveFocus();
@@ -104,7 +104,7 @@ test("people are offered and listed by their email, a short id where the server 
   expect(people).toContain("c0ffee00…");
   const holders = screen.getByRole("list", { name: "People with access" });
   await expect.element(holders).toBeVisible();
-  expect(holders.element().textContent).toContain("erin@acme.test editor");
+  expect(holders.element().textContent).toContain("erin@acme.testeditor");
 });
 
 test("what is sent for a person is their id, not their email", async () => {

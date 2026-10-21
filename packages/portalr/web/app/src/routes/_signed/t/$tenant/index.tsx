@@ -53,28 +53,30 @@ function Workspaces() {
       ) : (
         <Rows label="Workspaces">
           {workspaces.map((workspace) => (
-            <Row key={workspace}>
-              <RowLink
-                render={<Link to="/t/$tenant/w/$workspace" params={{ tenant, workspace }} />}
-              >
-                {workspace}
-              </RowLink>
-              <ul
-                aria-label={`${workspace}'s areas`}
-                className="relative z-10 ml-auto flex flex-wrap gap-x-4 gap-y-1"
-              >
-                {AREAS.map(({ to, label }) => (
-                  <li key={label}>
-                    <TextLink
-                      variant="nav"
-                      render={<Link to={to} params={{ tenant, workspace }} />}
-                    >
-                      {label}
-                    </TextLink>
-                  </li>
-                ))}
-              </ul>
-            </Row>
+            <Row
+              key={workspace}
+              title={
+                <RowLink
+                  render={<Link to="/t/$tenant/w/$workspace" params={{ tenant, workspace }} />}
+                >
+                  {workspace}
+                </RowLink>
+              }
+              end={
+                <ul aria-label={`${workspace}'s areas`} className="flex flex-wrap gap-x-4 gap-y-1">
+                  {AREAS.map(({ to, label }) => (
+                    <li key={label}>
+                      <TextLink
+                        variant="nav"
+                        render={<Link to={to} params={{ tenant, workspace }} />}
+                      >
+                        {label}
+                      </TextLink>
+                    </li>
+                  ))}
+                </ul>
+              }
+            />
           ))}
         </Rows>
       )}

@@ -598,13 +598,12 @@ export function Kit() {
         ]}
       />
       <Rows label="Threads">
-        <Row>
-          <RowLink href="#a">Launch plan</RowLink>
-          <span className="text-muted">2 days ago</span>
-        </Row>
-        <Row>
-          <RowLink href="#b">Move the launch</RowLink>
-        </Row>
+        <Row
+          title={<RowLink href="#a">Launch plan</RowLink>}
+          meta="2 days ago"
+          end={<StatusBadge tone="waiting">Waiting for you</StatusBadge>}
+        />
+        <Row title={<RowLink href="#b">Move the launch</RowLink>} />
       </Rows>
       <Skeleton className="h-4 w-32" />
       <Progress label="Checking in brief.docx" value={21} max={48} />

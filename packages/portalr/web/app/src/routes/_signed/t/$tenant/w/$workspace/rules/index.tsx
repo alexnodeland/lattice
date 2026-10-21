@@ -87,36 +87,44 @@ function Rules() {
       <Connection snapshot={automation} waiting="the latest changes to the rules" />
       <Rows label="Rules">
         {rules.map((rule) => (
-          <Row key={rule.rule} aria-label={`Rule ${rule.rule}`}>
-            <RowLink
-              className="font-mono"
-              render={
-                <Link
-                  to="/t/$tenant/w/$workspace/rules/$rule"
-                  params={{ tenant, workspace, rule: rule.rule }}
-                />
-              }
-            >
-              {rule.rule}
-            </RowLink>
-            <span className="text-muted">
-              {rule.origin === "code" ? "in code" : `stored, version ${rule.version}`}
-            </span>
-            {/* Its state and how far behind it is, kept on one line where the row wraps. */}
-            <span className="flex items-center gap-3">
-              <StatusBadge tone={rule.enabled ? "done" : "stopped"}>
-                {rule.enabled ? "Enabled" : "Disabled"}
-              </StatusBadge>
-              <span className="text-muted">
-                {rule.lag === 0 ? "caught up" : `${rule.lag} behind`}
-              </span>
-            </span>
-            {rule.dead_letters > 0 && (
-              <span className="text-muted">
-                {rule.dead_letters === 1 ? "1 dead letter" : `${rule.dead_letters} dead letters`}
-              </span>
-            )}
-          </Row>
+          <Row
+            key={rule.rule}
+            aria-label={`Rule ${rule.rule}`}
+            title={
+              <RowLink
+                className="font-mono"
+                render={
+                  <Link
+                    to="/t/$tenant/w/$workspace/rules/$rule"
+                    params={{ tenant, workspace, rule: rule.rule }}
+                  />
+                }
+              >
+                {rule.rule}
+              </RowLink>
+            }
+            meta={rule.origin === "code" ? "in code" : `stored, version ${rule.version}`}
+            end={
+              <>
+                {/* Its state and how far behind it is, kept on one line where the row wraps. */}
+                <span className="flex items-center gap-3">
+                  <StatusBadge tone={rule.enabled ? "done" : "stopped"}>
+                    {rule.enabled ? "Enabled" : "Disabled"}
+                  </StatusBadge>
+                  <span className="text-muted">
+                    {rule.lag === 0 ? "caught up" : `${rule.lag} behind`}
+                  </span>
+                </span>
+                {rule.dead_letters > 0 && (
+                  <span className="text-muted">
+                    {rule.dead_letters === 1
+                      ? "1 dead letter"
+                      : `${rule.dead_letters} dead letters`}
+                  </span>
+                )}
+              </>
+            }
+          />
         ))}
       </Rows>
       <section aria-labelledby="schedules" className="flex flex-col gap-3">
@@ -126,15 +134,16 @@ function Rules() {
         ) : (
           <Rows label="Schedules">
             {schedules.map((schedule) => (
-              <Row key={schedule.schedule} aria-label={`Schedule ${schedule.schedule}`}>
-                <code className="font-mono">{schedule.schedule}</code>
-                <span className="text-muted">
-                  next <When at={schedule.next_tick} />
-                </span>
-                <span className="text-muted">
-                  last <When at={schedule.last_tick} />
-                </span>
-              </Row>
+              <Row
+                key={schedule.schedule}
+                aria-label={`Schedule ${schedule.schedule}`}
+                title={<code className="font-mono">{schedule.schedule}</code>}
+                meta={
+                  <>
+                    next <When at={schedule.next_tick} />, last <When at={schedule.last_tick} />
+                  </>
+                }
+              />
             ))}
           </Rows>
         )}

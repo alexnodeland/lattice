@@ -42,31 +42,36 @@ function Artifacts() {
       {listed.length > 0 && (
         <Rows label="Artifacts">
           {listed.map((artifact) => (
-            <Row key={artifact.id}>
-              <RowLink
-                aria-describedby={`${artifact.id}-meta`}
-                render={
-                  <Link
-                    to="/t/$tenant/w/$workspace/artifacts/$artifact"
-                    params={{ tenant, workspace, artifact: artifact.id }}
-                  />
-                }
-              >
-                {titles.has(artifact.id) ? (
-                  titles.get(artifact.id)
-                ) : (
-                  <span className="font-mono">{artifact.id}</span>
-                )}
-              </RowLink>
-              <span id={`${artifact.id}-meta`} className="text-muted">
-                {titles.has(artifact.id) && (
-                  <>
-                    <span className="font-mono">{artifact.id}</span>,{" "}
-                  </>
-                )}
-                {artifact.kind}, version {artifact.version}
-              </span>
-            </Row>
+            <Row
+              key={artifact.id}
+              title={
+                <RowLink
+                  aria-describedby={`${artifact.id}-meta`}
+                  render={
+                    <Link
+                      to="/t/$tenant/w/$workspace/artifacts/$artifact"
+                      params={{ tenant, workspace, artifact: artifact.id }}
+                    />
+                  }
+                >
+                  {titles.has(artifact.id) ? (
+                    titles.get(artifact.id)
+                  ) : (
+                    <span className="font-mono">{artifact.id}</span>
+                  )}
+                </RowLink>
+              }
+              meta={
+                <span id={`${artifact.id}-meta`}>
+                  {titles.has(artifact.id) && (
+                    <>
+                      <span className="font-mono">{artifact.id}</span>,{" "}
+                    </>
+                  )}
+                  {artifact.kind}, version {artifact.version}
+                </span>
+              }
+            />
           ))}
         </Rows>
       )}

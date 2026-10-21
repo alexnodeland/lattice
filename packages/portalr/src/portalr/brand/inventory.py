@@ -395,6 +395,13 @@ COMPONENTS: tuple[Group, ...] = (
             Row("component.link.mark-gap", "--link-mark-gap", "dimension"),
             Row("component.breadcrumb.target", "--breadcrumb-target", "dimension"),
             Row("component.breadcrumb.gap", "--breadcrumb-gap", "dimension"),
+        "A list's row: its padding, the gap between what it is and its end, and between its "
+        "title's line and its meta's (portalr ADR-0060).",
+        (
+            Row("component.list-row.pad-x", "--list-row-pad-x", "dimension"),
+            Row("component.list-row.pad-y", "--list-row-pad-y", "dimension"),
+            Row("component.list-row.gap", "--list-row-gap", "dimension"),
+            Row("component.list-row.line-gap", "--list-row-line-gap", "dimension"),
         ),
     ),
 )

@@ -12,17 +12,35 @@ export function Rows({ label, children }: { label: string; children: ReactNode }
   );
 }
 
-/** One row: what it is, then what is said about it. Its `RowLink`, if any, is the whole row's target. */
+/**
+ * One row (portalr ADR-0060): what it is, on its first line, then what is said about it, quieter, on
+ * its second, and at its end what it is doing or what can be done to it. Its `RowLink`, if its
+ * title is one, is the whole row's target; what is at its end stays its own target, above it.
+ */
 export function Row({
-  children,
+  title,
+  meta,
+  end,
   ...props
-}: Omit<ComponentProps<"li">, "className"> & { children: ReactNode }) {
+}: Omit<ComponentProps<"li">, "className" | "title" | "children"> & {
+  title: ReactNode;
+  meta?: ReactNode;
+  end?: ReactNode;
+}) {
   return (
     <li
-      className="relative flex flex-wrap items-center gap-x-3 gap-y-1 px-2 py-3 text-sm has-[a:hover]:bg-wash has-[a:focus-visible]:bg-wash"
+      className="relative grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-(--list-row-gap) px-(--list-row-pad-x) py-(--list-row-pad-y) text-sm has-[a:hover]:bg-wash has-[a:focus-visible]:bg-wash"
       {...props}
     >
-      {children}
+      <div className="flex min-w-0 flex-col gap-(--list-row-line-gap)">
+        <span className="min-w-0 truncate">{title}</span>
+        {meta && <span className="min-w-0 truncate text-muted">{meta}</span>}
+      </div>
+      {end && (
+        <div className="relative z-10 flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
+          {end}
+        </div>
+      )}
     </li>
   );
 }
@@ -41,7 +59,7 @@ export function RowLink({ render, className, ...props }: RowLinkProps) {
     props: mergeProps<"a">(
       {
         className: cn(
-          "font-semibold text-accent underline underline-offset-2 outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:outline-(length:--focus-width) focus-visible:after:outline-focus focus-visible:after:-outline-offset-(--focus-offset)",
+          "font-semibold text-fg underline-offset-(--link-underline-offset) outline-none after:absolute hover:text-accent hover:underline after:inset-0 after:content-[''] focus-visible:after:outline-(length:--focus-width) focus-visible:after:outline-focus focus-visible:after:-outline-offset-(--focus-offset)",
           className,
         ),
       },

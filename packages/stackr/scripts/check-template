@@ -5,9 +5,9 @@ Usage: scripts/check-template [--keep DIR]
 
 Renders every variant of the template (artifactr, reflexr or both, with and without evals, with
 grantr or no access control, with portalr, which grantr needs, or without it, both without
-relayr's bridge, both without artifactr's forms, both hosted on a single host, and both filing in
-Plane or Vikunja) from this checkout, working tree included, under the name in NAME, and checks
-each one:
+relayr's bridge, both without artifactr's forms, both without native files, both hosted on a
+single host, and both filing in Plane or Vikunja) from this checkout, working tree included,
+under the name in NAME, and checks each one:
 
 - every Jinja expression was rendered: nothing is left of `{{ ... }}` or `{% ... %}`, apart
   from GitHub Actions' own `${{ ... }}`
@@ -15,7 +15,13 @@ each one:
   lattice's packages/, at the commit the variant was rendered from (ADR-0018)
 - the Python is formatted and passes lint, with the generated project's own ruff settings
 - the YAML passes yamllint, and the shell scripts shellcheck
-- the Compose file is valid for the app profile, with the single host's overlay when it has one
+- the Compose file is valid for the app profile, with the single host's overlay when it has one,
+  and with every profile, native files' workers and editors among them
+
+It checks the release pins once, too: the template's crafting apps are lattice's own, each pinned
+by the same file as scripts/crafts, fetched by the same scripts/craft, at the version its pin
+names (lattice RFC-0003's release-pin check), so a worker's CLI and its editor's build are one
+release, the one lattice's tests ran.
 
 The generated applications' types and tests need their dependencies installed: CI's template
 job runs `make check` in each variant for that.
@@ -35,6 +41,7 @@ import warnings
 from pathlib import Path
 from typing import NamedTuple
 
+import yaml
 from copier import run_copy
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -53,6 +60,7 @@ class Variant(NamedTuple):
     portal: bool  # portalr, which only grantr's access can have
     ui: bool  # artifactr's forms, artifactr.ui, which only artifactr can have
     tracker: str = "none"  # the task tracker relayr files in, which only the bridge can have
+    native_files: bool = True  # native files' workers and editors, which only artifactr can have
 
     @property
     def name(self) -> str:
@@ -65,6 +73,7 @@ class Variant(NamedTuple):
             f"{'-noportal' if self.access == 'grantr' and not self.portal else ''}"
             f"{'-noui' if self.libraries != 'reflexr' and not self.ui else ''}"
             f"{'' if self.tracker == 'none' else f'-{self.tracker}'}"
+            f"{'-nofiles' if self.libraries != 'reflexr' and not self.native_files else ''}"
         )
 
 
@@ -86,10 +95,13 @@ VARIANTS = [
     Variant("both", True, "grantr", True, "host", True, True),
     Variant("both", True, "grantr", True, "none", False, True),
     Variant("both", True, "grantr", True, "none", True, False),
+    Variant("both", True, "grantr", True, "none", True, True, native_files=False),
     Variant("both", True, "grantr", True, "none", True, True, "plane"),
     Variant("both", True, "none", True, "none", False, True, "vikunja"),
 ]
 """Every variant of the template."""
+RELEASE = re.compile(r"[-_](\d+\.\d+\.\d+)-")
+"""A release's version, in the name of one of its assets."""
 LEFTOVER = re.compile(r"(?<!\$)\{\{|\{%|%\}")
 TEXT = {".py", ".toml", ".yaml", ".yml", ".md", ".json", ".sh", ".example", ""}
 ANSWERS = ".copier-answers.yml"
@@ -137,7 +149,7 @@ def expected_sources(variant: Variant, commit: str) -> dict[str, dict[str, str]]
         "grantr": variant.access == "grantr",
         "relayr-ai": variant.bridge,
         "portalr": variant.access == "grantr" and variant.portal,
-        "lattice-core-ai": (variant.libraries != "reflexr" and variant.ui)
+        "lattice-core-ai": (variant.libraries != "reflexr" and (variant.ui or variant.native_files))
         or (variant.bridge and variant.tracker != "none"),
     }
     return {
@@ -183,6 +195,27 @@ def check_bun(app: Path) -> list[str]:
     return []
 
 
+def check_crafts() -> list[str]:
+    """Check that the template's crafting apps are pinned and fetched as lattice's own are."""
+    ours = ROOT / "template" / "{% if use_files %}scripts{% endif %}"
+    theirs = LATTICE / "scripts"
+    crafts = yaml.safe_load((ROOT / "copier.yml").read_text())["crafts"]["default"]
+    problems = []
+    if (ours / "craft").read_bytes() != (theirs / "craft").read_bytes():
+        problems.append("the template's scripts/craft isn't lattice's")
+    pinned = sorted(path.stem for path in (ours / "crafts").glob("*.sha256"))
+    if pinned != sorted(crafts):
+        problems.append(f"the template pins {pinned}, and copier.yml's crafts are {sorted(crafts)}")
+    for name, craft in crafts.items():
+        pin = Path("crafts", f"{name}.sha256")
+        if (ours / pin).read_bytes() != (theirs / pin).read_bytes():
+            problems.append(f"the template's scripts/{pin} isn't lattice's")
+        versions = set(RELEASE.findall((theirs / pin).read_text()))
+        if versions != {craft["version"]}:
+            problems.append(f"copier.yml's {name} is {craft['version']}; its pin is {versions}")
+    return problems
+
+
 def check(app: Path, sources: dict[str, dict[str, str]]) -> list[str]:
     """Check one rendered application, which needs these sources; return the problems found."""
     problems = check_sources(app, sources)
@@ -205,6 +238,8 @@ def check(app: Path, sources: dict[str, dict[str, str]]) -> list[str]:
     problems += run("shellcheck", ["shellcheck", *scripts], app)
     compose = ["docker", "compose", "--profile", "app", "config", "--quiet"]
     problems += run("compose", compose, app)
+    every = ["docker", "compose", "--profile", "*", "config", "--quiet"]
+    problems += run("compose, with every profile", every, app)
     host = app / "deploy" / "host" / "compose.prod.yaml"
     if host.exists():
         overlay = ["docker", "compose", "-f", "compose.yaml", "-f", str(host), *compose[2:]]
@@ -219,6 +254,9 @@ def main() -> int:
     parser.add_argument("--keep", type=Path, help="render into this directory, and keep it")
     args = parser.parse_args()
     failures = 0
+    for problem in check_crafts():
+        print(f"FAIL: release pins: {problem}", file=sys.stderr)
+        failures += 1
     with tempfile.TemporaryDirectory() as scratch:
         base = args.keep or Path(scratch)
         for variant in VARIANTS:

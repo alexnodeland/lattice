@@ -16,6 +16,18 @@ unexport DOCKER_DEFAULT_PLATFORM
 ENV_FILE := $(if $(wildcard .env),--env-file .env)
 TWICE := $(shell sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' .env 2>/dev/null | sort | uniq -d)
 $(if $(TWICE),$(warning .env sets $(TWICE) more than once: local commands read the first line, the app profile the last))
+{%- if use_files %}
+
+# Native files: the crafting apps whose workers run, FILES_CRAFTS in .env, or
+# `make up FILES="wordcraft gridcraft"`, which the application is told too. Each is a profile.
+comma := ,
+space := $() $()
+FILES ?= $(subst $(comma),$(space),$(shell sed -n 's/^FILES_CRAFTS=//p' .env 2>/dev/null | tail -n 1))
+export FILES_CRAFTS := $(subst $(space),$(comma),$(strip $(FILES)))
+PROFILES := --profile app $(foreach craft,$(FILES),--profile files-$(craft))
+{%- else %}
+PROFILES := --profile app
+{%- endif %}
 
 .PHONY: help install env fmt lint typecheck test check serve {% if evals %}evals evals-langfuse {% endif %}{% if access == 'grantr' %}first-run tenant operator migrate-tenants db-roles access-matrix {% endif %}{% if use_portal %}portal-ui tailnet tailnet-off {% endif %}up down logs clean
 
@@ -27,8 +39,21 @@ install: ## Install the dependencies and the git hooks
 	$(UV) sync --all-groups
 	$(UV) run pre-commit install --hook-type pre-commit --hook-type commit-msg
 
+{%- if use_files %}
+# Each worker's token is its own, from openssl; .env is readable by its owner alone.
+env: ## Create .env from .env.example, with each worker's token, if there is none
+	@test -f .env && echo ".env exists; compare it with .env.example" || ( \
+		command -v openssl >/dev/null || { echo "make env: the workers' tokens need openssl" >&2; exit 1; }; \
+		umask 077 && cp .env.example .env.new && \
+		for app in $$(sed -n 's/^FILES_\([A-Z]*\)_TOKEN=$$/\1/p' .env.example); do \
+			token=$$(openssl rand -hex 32) && \
+			sed "s/^FILES_$${app}_TOKEN=$$/FILES_$${app}_TOKEN=$$token/" .env.new > .env.next && \
+			mv .env.next .env.new || exit 1; \
+		done && mv .env.new .env && echo "created .env")
+{%- else %}
 env: ## Create .env from .env.example, if there is none
 	@test -f .env && echo ".env exists; compare it with .env.example" || (cp .env.example .env && echo "created .env")
+{%- endif %}
 
 fmt: ## Format the code and apply safe lint fixes
 	$(UV) run ruff format .
@@ -46,7 +71,11 @@ test: ## Run the tests with the 100% branch-coverage gate
 
 check: lint typecheck test ## Run everything CI runs
 
-serve: ## Serve the application on this machine, with the settings in .env
+{%- if use_files %}
+# On this machine the workers, on their internal network, can't be reached: native files need `make up`.
+serve: FILES_CRAFTS =
+{%- endif %}
+serve: ## Serve the application on this machine, with the settings in .env{% if use_files %}, and native files off{% endif %}
 	$(UV) run $(ENV_FILE) {{ project_slug }}
 {%- if evals %}
 
@@ -100,14 +129,14 @@ tailnet-off: ## Stop serving it on your tailnet: what `make tailnet` set up on T
 	$(TAILNET) off $(TAILNET_PORT) $(APP_URL)
 {%- endif %}
 
-up: ## Build and start the application in the app profile, beside stackr's stack
-	$(COMPOSE) --profile app up --detach --build --wait
+up: ## Build and start the application in the app profile, beside stackr's stack{% if use_files %}, with FILES' workers{% endif %}
+	$(COMPOSE) $(PROFILES) up --detach --build --wait
 
-down: ## Stop the application
-	$(COMPOSE) --profile app down
+down: ## Stop the application{% if use_files %}, and every worker{% endif %}
+	$(COMPOSE) --profile {% if use_files %}'*'{% else %}app{% endif %} down
 
 logs: ## Follow the application's logs
-	$(COMPOSE) --profile app logs --follow --tail=100
+	$(COMPOSE) $(PROFILES) logs --follow --tail=100
 
 clean: ## Remove caches
 	rm -rf .pytest_cache .ruff_cache .coverage coverage.xml htmlcov dist

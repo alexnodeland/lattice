@@ -15,6 +15,7 @@ import sys
 import threading
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
+from functools import partial
 from pathlib import Path
 from typing import cast
 
@@ -25,14 +26,20 @@ import uvicorn
 from starlette.routing import Route
 
 from artifactr.files.app import App, AppCommand, AppFailed, Applied, FakeApp, Inspection
+from artifactr.files.craft import CRAFTS
 from artifactr.files.wordcraft import Subprocess
 from artifactr.files.worker import Limits, Worker, worker_app
-from artifactr.files.worker.__main__ import HEAD, worker_from_environment
+from artifactr.files.worker.__main__ import (
+    ADAPTERS,
+    HEAD,
+    app_from_environment,
+    worker_from_environment,
+)
 from artifactr.files.worker.limits import CONFINE
 from artifactr.files.worker.wire import CALL, CALL_LIMIT, Hello
 from tests.files.wordcraft.test_headless import FAKE, PNG
 
-TOKEN = "s3cret"
+TOKEN = "a-token-for-the-tests-of-32-or-more"
 LIMITS = Limits(edit=10, render=5, files=1 << 20, reply=1 << 20)
 
 Connect = Callable[..., Awaitable[Worker]]
@@ -243,9 +250,7 @@ def test_an_empty_token_would_admit_anyone() -> None:
     with pytest.raises(ValueError, match="needs a token"):
         worker_app(FakeApp(), token="", limits=LIMITS)
     with pytest.raises(ValueError, match="needs a token"):
-        worker_from_environment(
-            {"WORKER_TOKEN": "", "WORDCRAFT_CLI": "x", "WORDCRAFT_VERSION": "1"}
-        )
+        worker_from_environment({"WORKER_TOKEN": "", "WORKER_CLI": "x", "WORKER_VERSION": "1"})
 
 
 async def test_a_worker_that_cant_be_reached_is_a_crash() -> None:
@@ -303,8 +308,8 @@ def test_the_environment_says_which_wordcraft_it_runs(tmp_path: Path) -> None:
     served = worker_from_environment(
         {
             "WORKER_TOKEN": TOKEN,
-            "WORDCRAFT_CLI": str(stand_in(tmp_path)),
-            "WORDCRAFT_VERSION": "0.7.0",
+            "WORKER_CLI": str(stand_in(tmp_path)),
+            "WORKER_VERSION": "0.7.0",
             "WORKER_BUILD": "sha256:abc",
             "WORKER_LIMITS": '{"edit": 5}',
         }
@@ -316,6 +321,57 @@ def test_the_environment_says_which_wordcraft_it_runs(tmp_path: Path) -> None:
         "/render",
         "/commands",
     ]
+
+
+@pytest.mark.parametrize("name", sorted(ADAPTERS))
+async def test_the_environment_says_which_app_it_runs_under_the_limits(
+    tmp_path: Path, name: str
+) -> None:
+    hostile = cli(tmp_path, f"{name}-cli", "open('big', 'wb').write(bytes(2 << 20)); input()")
+    environ = {"WORKER_APP": name, "WORKER_CLI": str(hostile), "WORKER_VERSION": "1.2.3"}
+    app = app_from_environment(environ, Limits(files=1 << 20))
+    assert (app.name, app.version) == (name, "1.2.3")
+    with pytest.raises(AppFailed, match="File too large") as crashed:
+        await app.apply(None, [], deadline=20)
+    assert crashed.value.failure == "crashed"
+
+
+def test_a_short_token_or_wordcrafts_old_names_are_refused(tmp_path: Path) -> None:
+    cli = {"WORKER_CLI": str(stand_in(tmp_path)), "WORKER_VERSION": "0.7.0"}
+    with pytest.raises(ValueError, match="at least 32 characters"):
+        worker_from_environment({**cli, "WORKER_TOKEN": "s3cret"})
+    with pytest.raises(ValueError, match="are now WORKER_CLI and WORKER_VERSION"):
+        worker_from_environment({"WORKER_TOKEN": TOKEN, "WORDCRAFT_CLI": "x"})
+
+
+def test_empty_limits_are_the_defaults(tmp_path: Path) -> None:
+    environ = {"WORKER_TOKEN": TOKEN, "WORKER_CLI": str(stand_in(tmp_path)), "WORKER_LIMITS": ""}
+    assert worker_from_environment({**environ, "WORKER_VERSION": "0.7.0"}).routes
+
+
+def test_a_worker_runs_every_app_whose_files_lattice_keeps_trusting_only_its_own_confinement() -> (
+    None
+):
+    kept = {name for name, craft in CRAFTS.items() if craft.reach == "file"}
+    assert set(ADAPTERS) == kept
+    for name, adapter in ADAPTERS.items():
+        assert isinstance(adapter, partial) == (CRAFTS[name].roots == "none"), name
+
+
+def test_a_worker_runs_no_app_it_has_no_adapter_for() -> None:
+    environ = {"WORKER_APP": "filmcraft", "WORKER_CLI": "x", "WORKER_VERSION": "1"}
+    with pytest.raises(ValueError, match="'filmcraft', and a worker runs one of wordcraft"):
+        app_from_environment(environ, LIMITS)
+
+
+async def test_a_worker_built_before_its_loop_is_opened_as_the_application_starts() -> None:
+    served = worker_app(FakeApp(), token=TOKEN, limits=LIMITS, build="sha256:abc")
+    worker = Worker.at("http://worker", token=TOKEN, transport=httpx.ASGITransport(app=served))
+    with pytest.raises(RuntimeError, match="isn't open"):
+        _ = worker.integration
+    await worker.open()
+    assert (worker.name, worker.build, worker.integration) == ("fake", "sha256:abc", "files:fake")
+    await worker.aclose()
 
 
 def _replying(reply: httpx.Response) -> Worker:
@@ -404,8 +460,8 @@ def test_the_module_serves_the_worker_on_loopback(
     served: list[tuple[str, int]] = []
     monkeypatch.setattr(uvicorn, "run", lambda _app, host, port, **_: served.append((host, port)))
     monkeypatch.setenv("WORKER_TOKEN", TOKEN)
-    monkeypatch.setenv("WORDCRAFT_CLI", str(stand_in(tmp_path)))
-    monkeypatch.setenv("WORDCRAFT_VERSION", "0.7.0")
+    monkeypatch.setenv("WORKER_CLI", str(stand_in(tmp_path)))
+    monkeypatch.setenv("WORKER_VERSION", "0.7.0")
     monkeypatch.delitem(sys.modules, "artifactr.files.worker.__main__")
     runpy.run_module("artifactr.files.worker", run_name="__main__")
     assert served == [("127.0.0.1", 8080)]

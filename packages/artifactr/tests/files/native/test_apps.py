@@ -112,7 +112,7 @@ def test_native_files_need_an_app() -> None:
 async def test_an_upload_the_app_reads_as_another_format_is_refused() -> None:
     files = NativeFiles(InMemoryBlobs(), InMemoryCheckouts(), Reads(PDF))
     ws = await opened()
-    with pytest.raises(ValidationFailed, match="the file is application/pdf, not "):
+    with pytest.raises(ValidationFailed, match="another format than its kind's"):
         await files.upload(ws, WordDocument, "a.docx", once(FakeApp.file("A")), media_type=DOCX)
 
 

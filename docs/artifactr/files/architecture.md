@@ -26,9 +26,9 @@
 | `effectcraft` | EffectCraft's adapter, `Subprocess`, whether bytes are an `.ecproj`, and its footage, read from its JSON | `manifest`, `app`, `craft`, pydantic |
 | `soundcraft` | SoundCraft's adapter, `Subprocess`, whether bytes are a `.scraft`, and its audio, video and other makers' plugins, read from its JSON | `manifest`, `app`, `craft`, pydantic |
 | `worker` | `worker_app`, the worker that runs an app on hostile files under `Limits`, and `Worker`, the `App` that calls it | `app`, `wordcraft` (its entry point), pydantic, `anyio`, Starlette, uvicorn, httpx |
-| `native` | `NativeFiles`: uploads, check-out and check-in, agents' edits, reads, renders and collection, behind the app's switch | `manifest`, `blobs`, `checkouts`, `app`, artifactr, `lattice_core.integrations` |
+| `native` | `NativeFiles`: uploads, told by their first bytes (`FORMATS`), check-out and check-in, agents' edits, reads, renders and collection, behind the app's switch, with each tenant's readings counted | `manifest`, `blobs`, `checkouts`, `app`, artifactr, `lattice_core.integrations` |
 | `tools` | `native_file_tools`, the agent's toolset | `app`, `native`, artifactr and its agent, pydantic-ai |
-| `fastapi` | `files_router`, people's check-out and check-in over HTTP, and `editor_app`, the app's browser build on an origin of its own | every layer but `sql` and `tools`, artifactr and its router, FastAPI |
+| `fastapi` | `files_router`, people's uploads, check-out and check-in over HTTP, each person's pace of uploads, and `editor_app`, the app's browser build on an origin of its own | every layer but `sql` and `tools`, artifactr and its router, FastAPI |
 | `sql` | `SqlBlobs`, `SqlCheckouts`, their tables and migrations | `manifest`, `blobs`, `checkouts`, SQLAlchemy, Alembic, `lattice_core.sql` |
 
 ## A write
@@ -51,7 +51,7 @@ An agent's edit and a person's check-in end the same way. The bytes, the text an
 
 ## The blob store
 
-A blob is keyed by its tenant, workspace and artifact, then its digest: its access is its artifact's, revisions of one artifact share unchanged bytes, and bytes are never shared across artifacts or tenants. The digest and size are computed as the bytes arrive, up to the store's limit. In SQL, `artifactr_files_blobs` holds the bytes as `bytea`, stored `EXTERNAL` since zipped formats don't compress, or SQLite's `BLOB`; the bytes are loaded only when read, so putting bytes already there marks them as put without reading them. On PostgreSQL, both tables keep each row to its tenant by row-level security, through `lattice_core.sql.tenancy` (artifactr ADR-0066).
+A blob is keyed by its tenant, workspace and artifact, then its digest: its access is its artifact's, revisions of one artifact share unchanged bytes, and bytes are never shared across artifacts or tenants. The digest and size are computed as the bytes arrive, up to the store's limit. In SQL, `artifactr_files_blobs` holds the bytes as `bytea`, stored `EXTERNAL` since zipped formats don't compress, or SQLite's `BLOB`; the bytes are loaded only when read, so putting bytes already there marks them as put without reading them. A store given quotas counts a workspace's and a tenant's bytes and files as it inserts new bytes, under a lock on the tenant's row of `artifactr_files_tenants` ([ADR-0017](adr/0017-a-persons-upload-told-by-its-bytes-read-before-it-is-committed.md)). On PostgreSQL, every table keeps each row to its tenant by row-level security, through `lattice_core.sql.tenancy` (artifactr ADR-0066).
 
 Collection runs per workspace. It reads every revision of a native file, archived ones too, and every pending proposal, and deletes the blobs last put before a cutoff that none names, in batches, each statement checking again that the blob is still that old ([ADR-0002](adr/0002-blobs-in-a-port-of-the-package.md)).
 
@@ -82,6 +82,8 @@ Each app is an integration of its own, named by its `integration` key, such as `
 ## People: check-out and check-in over HTTP
 
 WordCraft's browser build only opens and saves files, so a person checks a file out, downloads it, edits it in the build, saves it and uploads it. `files_router`, beside artifactr's router and with its `resolve_actor`, has the routes: a file's status and lease, check-out, extension, check-in, a version's bytes, words or pages, and a proposal's words or pages, which a reviewer reads beside the head. Each names an artifact and a version, a check-out or a proposal, and resolves it through the workspace, as the actor, before any bytes move ([ADR-0008](adr/0008-what-portalr-reads-of-a-native-file.md)). `editor_app` serves the build as released on an origin of its own, under a policy that runs its own code only and reaches no other origin ([ADR-0007](adr/0007-check-out-over-http-and-the-editor-on-its-own-origin.md)). For a build with a host surface, it also serves the shim, lattice's page beside the build, which the portal frames and which frames the build, relaying open, save and dirty between them with every message's window and origin checked: talk level 1+, `bridged` ([ADR-0010](adr/0010-a-shim-beside-the-build-and-talk-level-one-plus.md)). A check-in in another format than the one checked out, by its `Content-Type` or as its app reads it, is refused as `FormatChanged`, and never converted.
+
+A person adds a file by an upload: `POST /workspaces/{w}/files`, naming the native type, the file as the body. It asks `authorize` for `artifactr:create_native_file` and holds the person to a pace before a byte is read; the format is told by the first bytes, never the `Content-Type`; the app reads the file before anything is committed; and a client hears how the app failed in the route's words, never the app's, on every route ([ADR-0017](adr/0017-a-persons-upload-told-by-its-bytes-read-before-it-is-committed.md)).
 
 ## What it adds to the log
 

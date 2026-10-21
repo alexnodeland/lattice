@@ -137,6 +137,8 @@ ACTIONS: Final = frozenset(
         "artifactr:answer_deferred",
         "artifactr:give_feedback",
         "artifactr:stop_run",
+        # what a person does beside the workspace's commands: a native file's upload over HTTP
+        "artifactr:create_native_file",
         # what the agent does beside the workspace, for the person it acts for
         "artifactr:run_connected_code",
         # the agent's runs, and consumers of the log

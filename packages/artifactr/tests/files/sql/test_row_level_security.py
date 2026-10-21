@@ -15,7 +15,7 @@ from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 
 from artifactr.core import UserActor
-from artifactr.files.blobs import once
+from artifactr.files.blobs import Quota, once
 from artifactr.files.checkouts import Checkout
 from artifactr.files.manifest import DOCX
 from artifactr.files.sql import SqlBlobs, SqlCheckouts, migrate
@@ -24,14 +24,14 @@ from lattice_core.sql.tenancy import TENANT_KEY, TenantSession
 from tests.databases import empty_database, row_level_security
 from tests.files.files_of import digest
 
-TABLES = ("artifactr_files_blobs", "artifactr_files_checkouts")
+TABLES = ("artifactr_files_blobs", "artifactr_files_checkouts", "artifactr_files_tenants")
 
 
 @pytest.fixture
 async def engines() -> AsyncIterator[tuple[AsyncEngine, AsyncEngine]]:
     """The owner's engine and the application's, with a blob and a check-out in each tenant."""
     async with row_level_security(migrate) as (owner, application):
-        blobs = SqlBlobs(application, row_level_security=True)
+        blobs = SqlBlobs(application, row_level_security=True, tenant_quota=Quota(files=10))
         checkouts = SqlCheckouts(application, row_level_security=True)
         for tenant in ("acme", "globex"):
             scope = Scope(tenant, "w1")

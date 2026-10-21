@@ -14,7 +14,7 @@ This is the native files' own series, inside artifactr's section since `artifact
 | [0004](0004-an-app-is-a-port-of-stateless-calls.md) | An app is a port of stateless calls | Accepted; amended by [0005](0005-wordcraft-headless-pinned-by-checksum.md) |
 | [0005](0005-wordcraft-headless-pinned-by-checksum.md) | WordCraft headless, pinned by checksum, and what each app declares | Accepted; amended by [0009](0009-each-crafting-app-declared-once-on-one-of-two-dialects.md) |
 | [0006](0006-the-agents-tools-behind-each-apps-switch.md) | The agent's tools, behind each app's switch | Accepted; amended by [0012](0012-an-app-for-each-type-and-no-format-changed-by-a-check-in.md) |
-| [0007](0007-check-out-over-http-and-the-editor-on-its-own-origin.md) | Check-out over HTTP, and the editor on an origin of its own | Accepted; amended by [0008](0008-what-portalr-reads-of-a-native-file.md), [0010](0010-a-shim-beside-the-build-and-talk-level-one-plus.md) and [0012](0012-an-app-for-each-type-and-no-format-changed-by-a-check-in.md) |
+| [0007](0007-check-out-over-http-and-the-editor-on-its-own-origin.md) | Check-out over HTTP, and the editor on an origin of its own | Accepted; amended by [0008](0008-what-portalr-reads-of-a-native-file.md), [0010](0010-a-shim-beside-the-build-and-talk-level-one-plus.md), [0012](0012-an-app-for-each-type-and-no-format-changed-by-a-check-in.md) and [0017](0017-a-persons-upload-told-by-its-bytes-read-before-it-is-committed.md) |
 | [0008](0008-what-portalr-reads-of-a-native-file.md) | What portalr reads of a native file: its words, its own check-out, its limit, and a proposal | Accepted |
 | [0009](0009-each-crafting-app-declared-once-on-one-of-two-dialects.md) | Each crafting app declared once, on one of two dialects, pinned on its own | Accepted; amended by [0014](0014-freecad-on-a-third-dialect-and-no-python-a-file-or-an-agent-brings.md) and [0016](0016-a-project-that-holds-its-own-media-is-a-native-file.md) |
 | [0010](0010-a-shim-beside-the-build-and-talk-level-one-plus.md) | A shim beside the build, on the editor's origin, and talk level 1+ | Accepted |
@@ -24,5 +24,6 @@ This is the native files' own series, inside artifactr's section since `artifact
 | [0014](0014-freecad-on-a-third-dialect-and-no-python-a-file-or-an-agent-brings.md) | FreeCAD on a third dialect, a script it runs, and no Python a file or an agent brings | Accepted |
 | [0015](0015-blender-on-the-script-dialect-and-no-file-that-may-run-python.md) | Blender on the script dialect, its files read block by block, and none that may run Python | Accepted |
 | [0016](0016-a-project-that-holds-its-own-media-is-a-native-file.md) | A project that holds its own media is a native file, and an export is not kept | Accepted |
+| [0017](0017-a-persons-upload-told-by-its-bytes-read-before-it-is-committed.md) | A person's upload, told by its bytes, read by the app before it is committed, and held to quotas | Accepted |
 
 To add a record, copy lattice's [ADR template](../../../adr/template.md) to the next number and add a row above.

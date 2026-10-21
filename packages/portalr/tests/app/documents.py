@@ -66,6 +66,7 @@ def document_tools(workspaces: Workspaces, files: NativeFiles) -> FunctionToolse
             media_type=DOCX,
             thread_id=ctx.deps.thread_id,
         )
+        assert made is not None, "an upload under a new id is always made"
         return describe_outcome(made)
 
     return toolset

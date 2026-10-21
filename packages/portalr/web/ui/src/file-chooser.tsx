@@ -13,6 +13,7 @@ export function FileChooser({
   label,
   hint,
   accept,
+  multiple = false,
   disabled = false,
   onFile,
   className,
@@ -23,8 +24,13 @@ export function FileChooser({
   hint?: ReactNode;
   /** The types the input offers, such as `.docx`; a dropped file of another is still given. */
   accept?: string | undefined;
+  /** Whether several files may be chosen or dropped at once. */
+  multiple?: boolean;
   disabled?: boolean;
-  /** Called with the file chosen or dropped: the first, if several are dropped. */
+  /**
+   * Called with the file chosen or dropped: the first, if several are dropped; or, `multiple`,
+   * with each in turn.
+   */
   onFile: (file: File) => void;
   className?: string;
 }) {
@@ -41,8 +47,12 @@ export function FileChooser({
   const dropped = (event: DragEvent) => {
     event.preventDefault();
     setDepth(0);
-    const [file] = event.dataTransfer.files;
-    if (file && !disabled) {
+    if (!disabled) {
+      given(event.dataTransfer.files);
+    }
+  };
+  const given = (files: FileList | null) => {
+    for (const file of Array.from(files ?? []).slice(0, multiple ? undefined : 1)) {
       onFile(file);
     }
   };
@@ -69,6 +79,7 @@ export function FileChooser({
         id={input}
         type="file"
         accept={accept}
+        multiple={multiple}
         disabled={disabled}
         aria-describedby={described}
         // Cleared as the picker opens, so choosing the same file again is a change too, and the
@@ -76,17 +87,12 @@ export function FileChooser({
         onClick={(event) => {
           event.currentTarget.value = "";
         }}
-        onChange={(event) => {
-          const [file] = event.currentTarget.files ?? [];
-          if (file) {
-            onFile(file);
-          }
-        }}
+        onChange={(event) => given(event.currentTarget.files)}
         className="max-w-full text-muted text-sm outline-offset-(--focus-offset) file:mr-3 file:cursor-pointer file:rounded-md file:border file:border-edge file:border-solid file:bg-surface file:px-3 file:py-1.5 file:font-sans file:font-semibold file:text-fg file:text-sm focus-visible:outline-(length:--focus-width) focus-visible:outline-focus disabled:file:cursor-not-allowed disabled:file:border-line disabled:file:bg-line disabled:file:text-muted"
       />
       <p id={described} className="text-muted">
         {hint}
-        {hint && " "}Or drop it here.
+        {hint && " "}Or drop {multiple ? "them" : "it"} here.
       </p>
     </fieldset>
   );

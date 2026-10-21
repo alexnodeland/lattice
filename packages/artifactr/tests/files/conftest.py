@@ -5,12 +5,13 @@ policies hold.
 """
 
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import pytest
 
-from artifactr.files.blobs import Blobs, InMemoryBlobs
+from artifactr.files.blobs import Blobs, InMemoryBlobs, Quota
 from artifactr.files.checkouts import Checkouts, InMemoryCheckouts
 from artifactr.files.sql import SqlBlobs, SqlCheckouts, create_schema, migrate
 from tests.databases import (
@@ -41,20 +42,44 @@ def clock() -> FakeClock:
 async def stores(
     request: pytest.FixtureRequest, tmp_path: Path, clock: FakeClock
 ) -> AsyncIterator[Stores]:
-    if request.param == "memory":
-        yield Stores(InMemoryBlobs(clock=clock), InMemoryCheckouts())
+    async with stores_on(request.param, tmp_path, clock) as opened:
+        yield opened
+
+
+@asynccontextmanager
+async def stores_on(
+    backend: str,
+    directory: Path,
+    clock: FakeClock,
+    *,
+    workspace_quota: Quota | None = None,
+    tenant_quota: Quota | None = None,
+) -> AsyncIterator[Stores]:
+    """The stores on a backend, the blob store held to the quotas given."""
+    if backend == "memory":
+        blobs = InMemoryBlobs(
+            clock=clock, workspace_quota=workspace_quota, tenant_quota=tenant_quota
+        )
+        yield Stores(blobs, InMemoryCheckouts())
         return
-    if request.param == "postgres-rls":
+    if backend == "postgres-rls":
         async with row_level_security(migrate) as (_, application):
-            yield Stores(
-                SqlBlobs(application, clock=clock, row_level_security=True),
-                SqlCheckouts(application, row_level_security=True),
+            blobs = SqlBlobs(
+                application,
+                clock=clock,
+                row_level_security=True,
+                workspace_quota=workspace_quota,
+                tenant_quota=tenant_quota,
             )
+            yield Stores(blobs, SqlCheckouts(application, row_level_security=True))
         return
-    async with empty_database(request.param, tmp_path) as database:
+    async with empty_database(backend, directory) as database:
         engine = database.engine()
         await create_schema(engine)
-        yield Stores(SqlBlobs(engine, clock=clock), SqlCheckouts(engine))
+        blobs = SqlBlobs(
+            engine, clock=clock, workspace_quota=workspace_quota, tenant_quota=tenant_quota
+        )
+        yield Stores(blobs, SqlCheckouts(engine))
 
 
 @dataclass

@@ -81,9 +81,18 @@ test("the item the keyboard is on is ringed and coloured, 3:1 or more from the s
   const screen = await render(<Rendered />);
   await userEvent.tab();
   await userEvent.keyboard("{Enter}");
+  // The menu opens on the item the reader is in, with the focus in it: only then does the next
+  // key move the highlight. A key pressed before the menu has the focus goes to the button.
+  const here = screen.getByRole("menuitemradio", { name: "notes 4 threads" });
+  await expect.element(here).toHaveAttribute("data-highlighted");
+  await expect
+    .poll(() => screen.getByRole("menu").element().contains(document.activeElement))
+    .toBe(true);
   await userEvent.keyboard("{ArrowDown}");
   const item = screen.getByRole("menuitemradio", { name: "support 12 threads" });
   await expect.element(item).toHaveAttribute("data-highlighted");
+  // Read once its colours have settled: a transition, however short, is never read mid-flight.
+  await expect.poll(() => getComputedStyle(item.element()).color).toBe(token("accent"));
   const style = getComputedStyle(item.element());
   const shadows = style.boxShadow.match(/rgba?\([^)]*\)/g) ?? [];
   expect(shadows).toContain(token("focus"));

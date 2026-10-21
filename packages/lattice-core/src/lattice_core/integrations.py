@@ -143,22 +143,34 @@ KNOWN: Final = registry(
     Integration(
         "files:filmcraft",
         default=False,
-        description="FilmCraft: video projects rendered and exported, one file at a time.",
+        description=(
+            "FilmCraft: video projects that hold their own media, kept as native files, edited "
+            "by people and agents."
+        ),
     ),
     Integration(
         "files:effectcraft",
         default=False,
-        description="EffectCraft: motion graphics rendered and exported, one file at a time.",
+        description=(
+            "EffectCraft: motion graphics projects that hold no footage, kept as native files, "
+            "edited by people and agents."
+        ),
     ),
     Integration(
         "files:soundcraft",
         default=False,
-        description="SoundCraft: audio sessions mixed down and exported, one file at a time.",
+        description=(
+            "SoundCraft: audio sessions of MIDI and its own instruments, kept as native files, "
+            "edited by people and agents."
+        ),
     ),
     Integration(
         "files:lightcraft",
         default=False,
-        description="LightCraft: photos developed and exported, one file at a time.",
+        description=(
+            "LightCraft: photos developed in a library of its own, which keeps no file lattice "
+            "can hold yet."
+        ),
     ),
     Integration(
         "ui:forms",

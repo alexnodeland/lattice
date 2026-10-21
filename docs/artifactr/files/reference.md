@@ -114,6 +114,27 @@ The reference is generated from `artifactr.files`' docstrings and type annotatio
       show_root_heading: false
       show_root_toc_entry: false
 
+## artifactr.files.filmcraft
+
+::: artifactr.files.filmcraft
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+
+## artifactr.files.effectcraft
+
+::: artifactr.files.effectcraft
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+
+## artifactr.files.soundcraft
+
+::: artifactr.files.soundcraft
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+
 ## artifactr.files.worker
 
 ::: artifactr.files.worker

@@ -8,8 +8,10 @@ from pathlib import Path
 import pytest
 
 from portalr.brand.colour import Rgba, contrast, delta_e2000, distance, mix
+from portalr.brand.inventory import ROWS
 from portalr.brand.kit import FONT_BYTES, FONTS_BYTES, PNG_BYTES, SVG_BYTES, load, svg_faults
-from portalr.brand.tokens import BrandError, resolved
+from portalr.brand.tokens import SWAPPED, BrandError, layered, resolved
+from portalr.brand.validate import PAIRS, colour
 
 EXAMPLES = Path(__file__).parents[1] / "src" / "portalr" / "brand" / "examples"
 MARK = (
@@ -85,7 +87,21 @@ def test_words_hold_no_control_bidi_or_line_break(kit: Path, text: str) -> None:
     data = brand(kit)
     data["copy"]["tagline"] = text
     write(kit, data)
-    assert "a control, format or line-break character" in faults(kit)
+    assert "a control, format, blank or line-break character" in faults(kit)
+
+
+def test_a_name_of_spaces_alone_is_refused(kit: Path) -> None:
+    data = brand(kit)
+    data["identity"]["app"] = "   "
+    write(kit, data)
+    assert "is only spaces" in faults(kit)
+
+
+def test_a_version_is_a_whole_number_not_true(kit: Path) -> None:
+    data = brand(kit)
+    data["version"] = True
+    write(kit, data)
+    assert "brand.json: version: Input should be a valid integer" in faults(kit)
 
 
 def test_a_kit_for_another_inventory_is_refused(kit: Path) -> None:
@@ -146,7 +162,7 @@ def test_motion_past_its_guard_rails_is_refused(kit: Path) -> None:
     assert "component.button.press-shift: a press moves 24px at most" in said
 
 
-def test_under_an_accessibility_floor_is_refused(kit: Path) -> None:
+def test_under_an_accessibility_floor_in_either_scheme_is_refused(kit: Path) -> None:
     write(
         kit,
         {
@@ -156,30 +172,58 @@ def test_under_an_accessibility_floor_is_refused(kit: Path) -> None:
         "tokens.light.json",
     )
     said = faults(kit)
-    assert "component.focus.width: a focus ring is 2px wide or more" in said
-    assert "font.leading.normal: body text's leading is 1.4 or more" in said
+    assert "light: component.focus.width: a focus ring is 2px wide or more" in said
+    assert "light: font.leading.normal: body text's leading is 1.4 or more" in said
 
 
-def test_an_asset_the_kit_doesnt_hold_or_that_leaves_it_is_refused(kit: Path) -> None:
+def test_a_floor_broken_in_dark_alone_is_refused(kit: Path) -> None:
+    dark = json.loads((kit / "tokens.dark.json").read_text())
+    dark["component"] = {"icon-button": {"size": {"$value": {"value": 12, "unit": "px"}}}}
+    write(kit, dark, "tokens.dark.json")
+    said = faults(kit)
+    assert "dark: component.icon-button.size: an icon button is a target 24px or more" in said
+    assert "light: component.icon-button.size" not in said
+
+
+def test_an_asset_the_kit_doesnt_hold_is_refused(kit: Path) -> None:
     data = brand(kit)
     data["assets"]["mark"]["light"] = "assets/missing.svg"
-    data["assets"]["favicon"] = "assets/..svg"
     write(kit, data)
-    said = faults(kit)
-    assert "assets/missing.svg: no such file in the kit" in said
-    assert "assets/..svg: no such file in the kit" in said
+    assert "assets/missing.svg: no such file in the kit" in faults(kit)
+
+
+def test_an_asset_linked_from_outside_the_kit_is_refused(kit: Path, tmp_path: Path) -> None:
+    outside = tmp_path / "outside.svg"
+    outside.write_bytes(MARK)
+    (kit / "assets" / "escape.svg").symlink_to(outside)
+    data = brand(kit)
+    data["assets"]["favicon"] = "assets/escape.svg"
+    write(kit, data)
+    assert "assets/escape.svg: no such file in the kit" in faults(kit)
+
+
+def test_an_asset_is_served_by_what_it_is_not_what_it_is_named(kit: Path) -> None:
+    (kit / "assets" / "page.html").write_text("<script>alert(1)</script>")
+    (kit / "assets" / "page.svg").symlink_to(kit / "assets" / "page.html")
+    data = brand(kit)
+    data["assets"]["favicon"] = "assets/page.svg"
+    write(kit, data)
+    assert "assets/page.svg: a kit serves .css, .png, .svg, .txt, .woff2 files" in faults(kit)
 
 
 def test_a_favicon_is_an_svg_or_a_png(kit: Path) -> None:
     data = brand(kit)
     (kit / "assets" / "favicon.ico").write_bytes(b"\0\0\1\0")
     (kit / "assets" / "big.png").write_bytes(b"\x89PNG\r\n\x1a\n" + b"\0" * PNG_BYTES)
+    (kit / "assets" / "fake.png").write_bytes(b"GIF89a")
     data["assets"]["favicon"] = "assets/favicon.ico"
     data["assets"]["mark"]["dark"] = "assets/big.png"
+    data["assets"]["mark"]["light"] = "assets/fake.png"
     write(kit, data)
     said = faults(kit)
-    assert "assets/favicon.ico: a mark is an SVG, a favicon an SVG or a PNG" in said
-    assert "assets/big.png: a PNG of 128 KB at most" in said
+    assert "assets/favicon.ico: a mark or a favicon is an SVG or a PNG" in said
+    assert "assets/big.png: larger than 128 KB" in said
+    assert "assets/fake.png: not a PNG" in said
 
 
 def test_a_png_favicon_is_served(kit: Path) -> None:
@@ -190,37 +234,64 @@ def test_a_png_favicon_is_served(kit: Path) -> None:
     assert "assets/favicon.png" in load(kit).files
 
 
+SVG = b"<svg xmlns='http://www.w3.org/2000/svg'"
+
+
 @pytest.mark.parametrize(
     ("svg", "fault"),
     [
-        (b"<svg xmlns='http://www.w3.org/2000/svg'><script>alert(1)</script></svg>", "<script>"),
-        (b"<svg xmlns='http://www.w3.org/2000/svg' onload='alert(1)'/>", "onload"),
-        (b"<svg xmlns='http://www.w3.org/2000/svg'><style>a{}</style></svg>", "<style>"),
+        (SVG + b"><script>alert(1)</script></svg>", "script> isn't allowed"),
+        (SVG + b" onload='alert(1)'/>", "the attribute onload"),
+        (SVG + b"><style>a{}</style></svg>", "style> isn't allowed"),
+        (SVG + b"><foreignObject/></svg>", "foreignObject> isn't allowed"),
+        (SVG + b"><use href='#a'/></svg>", "use> isn't allowed"),
+        (SVG + b"><image href='x.png'/></svg>", "image> isn't allowed"),
         (
-            b"<svg xmlns='http://www.w3.org/2000/svg'><rect fill='url(https://x/y)'/></svg>",
-            "url() names something outside the mark",
+            SVG + b" xmlns:x='http://www.w3.org/1999/xlink'><rect x:href='javascript:1'/></svg>",
+            "the attribute {http://www.w3.org/1999/xlink}href",
         ),
-        (b"<!DOCTYPE svg [<!ENTITY a 'b'>]><svg/>", "no DOCTYPE or entities"),
+        (SVG + b"><rect fill='url(https://x/y)'/></svg>", "fill names something outside"),
+        (SVG + b"><rect fill='URL(https://x/y)'/></svg>", "fill names something outside"),
+        (SVG + b"><rect fill='\\75rl(https://x)'/></svg>", "fill holds a backslash"),
+        (SVG + b"><rect fill='javascript:alert(1)'/></svg>", "fill names something outside"),
+        (b"<!DOCTYPE svg [<!ENTITY a 'b'>]>" + SVG + b"/>", "an SVG declares nothing"),
+        (b"<?xml-stylesheet href='https://x/y.css'?>" + SVG + b"/>", "an SVG declares nothing"),
+        (SVG + b"><![CDATA[x]]></svg>", "an SVG declares nothing"),
+        ("<svg/>".encode("utf-16"), "UTF-8 with no byte-order mark"),
+        (b"\xef\xbb\xbf" + SVG + b"/>", "UTF-8 with no byte-order mark"),
+        (b"<svg>\xff</svg>", "an SVG is UTF-8"),
+        (b"<svg/>", "an <svg> in the SVG namespace"),
+        (b"<html xmlns='http://www.w3.org/2000/svg'/>", "an <svg> in the SVG namespace"),
+        (SVG + b"><x:rect xmlns:x='urn:other'/></svg>", "{urn:other}rect> isn't allowed"),
         (b"<svg", "not well-formed XML"),
         (b"<svg>" + b" " * SVG_BYTES + b"</svg>", "an SVG is 64 KB at most"),
     ],
 )
 def test_an_svg_is_held_to_an_allow_list(svg: bytes, fault: str) -> None:
-    assert any(fault in each for each in svg_faults("mark.svg", svg))
+    assert any(fault in each for each in svg_faults("mark.svg", svg)), svg_faults("mark.svg", svg)
 
 
-def test_a_fragment_url_is_allowed_in_an_svg() -> None:
+def test_a_fragment_url_a_comment_and_the_declaration_are_allowed_in_an_svg() -> None:
     svg = (
-        b"<svg xmlns='http://www.w3.org/2000/svg'><defs><linearGradient id='g'/></defs>"
-        b"<rect fill='url(#g)'/></svg>"
+        b"<?xml version='1.0' encoding='UTF-8'?><!-- a mark -->" + SVG + b"><defs>"
+        b"<linearGradient id='g'/></defs><rect fill='url(#g)'/></svg>"
     )
     assert svg_faults("mark.svg", svg) == []
 
 
-def font(kit: Path, files: list[dict], spdx: str = "OFL-1.1") -> None:
+def woff2(size: int = 64) -> bytes:
+    """A WOFF2 header that describes a file of `size` bytes, one table and a font."""
+    header = b"wOF2" + b"\0\1\0\0" + size.to_bytes(4, "big") + (1).to_bytes(2, "big")
+    header += b"\0\0" + (1024).to_bytes(4, "big")
+    return header + b"\0" * (size - len(header))
+
+
+def font(
+    kit: Path, files: list[dict], spdx: str = "OFL-1.1", licence: str = "fonts/OFL.txt"
+) -> None:
     data = brand(kit)
     data["fonts"] = [
-        {"family": "Inter", "files": files, "licence": {"spdx": spdx, "file": "fonts/OFL.txt"}}
+        {"family": "Inter", "files": files, "licence": {"spdx": spdx, "file": licence}}
     ]
     write(kit, data)
 
@@ -228,7 +299,7 @@ def font(kit: Path, files: list[dict], spdx: str = "OFL-1.1") -> None:
 def test_a_face_is_built_into_font_face_rules_and_served(kit: Path) -> None:
     (kit / "fonts").mkdir()
     (kit / "fonts" / "OFL.txt").write_text("SIL Open Font License")
-    (kit / "fonts" / "inter.woff2").write_bytes(b"wOF2" + b"\0" * 16)
+    (kit / "fonts" / "inter.woff2").write_bytes(woff2())
     font(kit, [{"path": "fonts/inter.woff2", "weight": "100 900", "unicode_range": "U+0000-00FF"}])
     built = load(kit)
     assert '@font-face {\n  font-family: "Inter";\n  src: url("fonts/inter.woff2")' in (
@@ -241,34 +312,50 @@ def test_a_face_is_built_into_font_face_rules_and_served(kit: Path) -> None:
 def test_a_face_is_woff2_within_its_caps_under_a_known_licence(kit: Path) -> None:
     (kit / "fonts").mkdir()
     (kit / "fonts" / "a.ttf").write_bytes(b"\0\1\0\0")
-    (kit / "fonts" / "big.woff2").write_bytes(b"wOF2" + b"\0" * FONT_BYTES)
-    font(kit, [{"path": "fonts/a.ttf"}, {"path": "fonts/big.woff2"}], spdx="GPL-3.0")
+    (kit / "fonts" / "big.woff2").write_bytes(woff2(FONT_BYTES + 64))
+    (kit / "fonts" / "magic.woff2").write_bytes(b"wOF2" + b"\0" * 60)
+    (kit / "fonts" / "short.woff2").write_bytes(b"wOF2")
+    font(
+        kit,
+        [
+            {"path": "fonts/a.ttf"},
+            {"path": "fonts/big.woff2"},
+            {"path": "fonts/magic.woff2"},
+            {"path": "fonts/short.woff2"},
+        ],
+        spdx="GPL-3.0",
+    )
     said = faults(kit)
     assert "Inter: its licence is one of" in said
     assert "fonts/OFL.txt: no such file in the kit" in said
-    assert "fonts/a.ttf: a face is a WOFF2 file" in said
-    assert "fonts/big.woff2: a face's file is 400 KB at most" in said
+    assert "fonts/a.ttf: a face is a .woff2 file" in said
+    assert "fonts/big.woff2: larger than 400 KB" in said
+    assert "fonts/magic.woff2: a WOFF2 header that doesn't describe its file" in said
+    assert "fonts/short.woff2: a face is a WOFF2 file" in said
 
 
-def test_a_kits_faces_are_capped_in_all(kit: Path) -> None:
+def test_a_licence_is_a_capped_txt_file(kit: Path) -> None:
+    (kit / "fonts").mkdir()
+    (kit / "fonts" / "inter.woff2").write_bytes(woff2())
+    (kit / "fonts" / "OFL.svg").write_bytes(MARK)
+    font(kit, [{"path": "fonts/inter.woff2"}], licence="fonts/OFL.svg")
+    assert "fonts/OFL.svg: a licence is a .txt file" in faults(kit)
+    (kit / "fonts" / "OFL.txt").write_text("x" * (65 * 1024))
+    font(kit, [{"path": "fonts/inter.woff2"}])
+    assert "fonts/OFL.txt: larger than 64 KB" in faults(kit)
+
+
+def test_a_kits_faces_are_capped_in_number_and_in_all(kit: Path) -> None:
     (kit / "fonts").mkdir()
     (kit / "fonts" / "OFL.txt").write_text("licence")
     files = []
     for at in range(FONTS_BYTES // FONT_BYTES + 1):
-        (kit / "fonts" / f"f{at}.woff2").write_bytes(b"wOF2" + b"\0" * (FONT_BYTES - 8))
+        (kit / "fonts" / f"f{at}.woff2").write_bytes(woff2(FONT_BYTES - 64))
         files.append({"path": f"fonts/f{at}.woff2"})
     font(kit, files)
-    assert "fonts: a kit's faces are 1536 KB at most in all" in faults(kit)
-
-
-def test_the_colour_arithmetic_is_wcags_and_sharma_wu_and_dalals() -> None:
-    assert contrast(Rgba.hex("#000000"), Rgba.hex("#ffffff")) == pytest.approx(21)
-    assert delta_e2000((50, 2.6772, -79.7751), (50, 0, -82.7485)) == pytest.approx(2.0425, abs=1e-3)
-    assert delta_e2000((50, 2.5, 0), (73, 25, -18)) == pytest.approx(27.1492, abs=1e-3)
-    assert delta_e2000((50, 0, 0), (50, 0, 0)) == 0
-    assert mix(Rgba(0, 0, 0, 0), 0.5, Rgba(0, 0, 0, 0)) == Rgba(0, 0, 0, 0)
-    red, green = Rgba.hex("#ff0000"), Rgba.hex("#00ff00")
-    assert distance(red, green) > distance(red, green, "deuteranopia")
+    assert "fonts: a kit's faces and licences are 1536 KB at most" in faults(kit)
+    font(kit, [{"path": "fonts/f0.woff2"}] * 17)
+    assert "fonts: a kit brings 16 face files at most" in faults(kit)
 
 
 def test_a_face_whose_file_is_missing_is_refused(kit: Path) -> None:
@@ -276,6 +363,58 @@ def test_a_face_whose_file_is_missing_is_refused(kit: Path) -> None:
     (kit / "fonts" / "OFL.txt").write_text("licence")
     font(kit, [{"path": "fonts/missing.woff2"}])
     assert "fonts/missing.woff2: no such file in the kit" in faults(kit)
+
+
+def test_a_json_file_is_capped_and_the_kits_own(kit: Path, tmp_path: Path) -> None:
+    (kit / "tokens.dark.json").write_text(" " * (257 * 1024))
+    assert "tokens.dark.json: a file of the kit's own, 256 KB at most" in faults(kit)
+    (kit / "tokens.dark.json").unlink()
+    (tmp_path / "elsewhere.json").write_text("{}")
+    (kit / "tokens.dark.json").symlink_to(tmp_path / "elsewhere.json")
+    assert "tokens.dark.json: a file of the kit's own" in faults(kit)
+
+
+def test_what_colour_blind_mode_swaps_is_declared_outside_it(kit: Path) -> None:
+    css = load(kit).stylesheet
+    block = css.split(":root:not([data-cvd]) {", 1)[1].split("}", 1)[0]
+    assert {line.split(":")[0].strip() for line in block.strip().splitlines()} == set(SWAPPED)
+    root = css.split(":root {", 1)[1].split("\n}", 1)[0]
+    assert "--chart-1:" not in root
+
+
+def test_the_swapped_tokens_are_base_csss_colour_blind_ones() -> None:
+    base = (Path(__file__).parents[1] / "web" / "ui" / "src" / "base.css").read_text()
+    block = base.split("[data-cvd] {", 1)[1].split("\n}", 1)[0]
+    declared = set(re.findall(r"^\s*(--[a-z0-9-]+):", block, re.M))
+    tokens = {row.prop for row in ROWS.values()}
+    assert declared & tokens == set(SWAPPED)
+
+
+def test_a_danger_on_its_wash_is_held_over_each_backdrop() -> None:
+    pairs = json.loads(PAIRS.read_text())["pairs"]
+    backdrops = {
+        p.get("backdrop") for p in pairs if (p["fg"], p["bg"]) == ("danger", "danger-wash")
+    }
+    assert backdrops == {"paper", "surface"}
+    light, _ = layered()
+    assert colour("danger-wash", light, "surface") != colour("danger-wash", light, "paper")
+
+
+def test_the_colour_arithmetic_is_wcags_and_sharma_wu_and_dalals() -> None:
+    assert contrast(Rgba.hex("#000000"), Rgba.hex("#ffffff")) == pytest.approx(21)
+    assert contrast(Rgba.hex("#767676"), Rgba.hex("#ffffff")) == pytest.approx(4.54, abs=0.01)
+    assert delta_e2000((50, 2.6772, -79.7751), (50, 0, -82.7485)) == pytest.approx(2.0425, abs=1e-3)
+    assert delta_e2000((50, 2.5, 0), (73, 25, -18)) == pytest.approx(27.1492, abs=1e-3)
+    # Sharma, Wu and Dalal's pairs where the hues wrap around 0 and 360 degrees.
+    assert delta_e2000((50, 2.5, 0), (50, 0, -2.5)) == pytest.approx(4.3065, abs=1e-3)
+    assert delta_e2000((50, 2.49, -0.001), (50, -2.49, 0.0009)) == pytest.approx(7.1792, abs=1e-3)
+    assert delta_e2000((50, -0.001, 2.49), (50, 0.0009, -2.49)) == pytest.approx(4.8045, abs=1e-3)
+    assert delta_e2000((50, 0, 0), (50, 0, 0)) == 0
+    assert mix(Rgba(0, 0, 0, 0), 0.5, Rgba(0, 0, 0, 0)) == Rgba(0, 0, 0, 0)
+    red, green = Rgba.hex("#ff0000"), Rgba.hex("#00ff00")
+    assert distance(red, green) > distance(red, green, "deuteranopia")
+    # Machado's protanopia moves pure red to a dark yellow-brown (their published simulation).
+    assert distance(red, Rgba.hex("#6e5e00"), "protanopia") < distance(red, Rgba.hex("#6e5e00"))
 
 
 def test_an_alias_cycle_is_refused_where_it_is_resolved() -> None:

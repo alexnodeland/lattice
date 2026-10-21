@@ -1,5 +1,5 @@
 {
-  "$comment": "Each pair a kit's colours must hold in both schemes, by WCAG's contrast ratio: a foreground custom property, the background it is read on, and the least ratio (lattice RFC-0007). The validator reads it, with --wash, --accent-hover and --danger-hover mixed as base.css mixes them.",
+  "$comment": "Each pair a kit's colours must hold in both schemes, by WCAG's contrast ratio: a foreground custom property, the background it is read on, the least ratio, and, where either is clear, the backdrop it is drawn over (the paper unless named) (lattice RFC-0007). The validator reads it, with --wash, --accent-hover, --danger-hover and --danger-wash mixed as base.css mixes them.",
   "pairs": [
     {
       "fg": "fg",
@@ -390,6 +390,38 @@
       "bg": "surface",
       "min": 4.5,
       "why": "code's words"
+    },
+    {
+      "fg": "code-foreground",
+      "bg": "paper",
+      "min": 4.5,
+      "why": "code's words"
+    },
+    {
+      "fg": "code-foreground",
+      "bg": "surface",
+      "min": 4.5,
+      "why": "code's words"
+    },
+    {
+      "fg": "danger",
+      "bg": "danger-wash",
+      "min": 4.5,
+      "backdrop": "paper",
+      "why": "a destructive action offered, hovered"
+    },
+    {
+      "fg": "danger",
+      "bg": "danger-wash",
+      "min": 4.5,
+      "backdrop": "surface",
+      "why": "a destructive action offered, hovered"
+    },
+    {
+      "fg": "muted",
+      "bg": "line",
+      "min": 3,
+      "why": "a disabled control's words on its fill"
     }
   ]
 }

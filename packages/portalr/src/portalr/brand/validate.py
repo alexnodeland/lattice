@@ -27,6 +27,7 @@ ROOT_PX = 16.0
 BY_PROP: dict[str, Row] = {row.prop.removeprefix("--"): row for row in ROWS.values()}
 
 _DERIVED = {
+    "danger-wash": ("danger", 0.12, "transparent"),
     "wash": ("accent", 0.10, "paper"),
     "accent-hover": ("accent", 0.88, "on-accent"),
     "danger-hover": ("danger", 0.88, "on-danger"),
@@ -45,17 +46,21 @@ def _rgba(value: object) -> Rgba:
     return Rgba.hex(str(colour["hex"]), float(alpha) if isinstance(alpha, int | float) else 1.0)
 
 
-def colour(name: str, tokens: Mapping[str, object]) -> Rgba:
-    """A role's colour as the page draws it: mixed as base.css mixes it, over the paper if clear."""
+def colour(name: str, tokens: Mapping[str, object], backdrop: str = "paper") -> Rgba:
+    """A role's colour as the page draws it: mixed as base.css mixes it, over its backdrop."""
     if name in _DERIVED:
         one, share, other = _DERIVED[name]
-        drawn = mix(colour(one, tokens), share, colour(other, tokens))
+        drawn = mix(colour(one, tokens, backdrop), share, _clear(other, tokens))
     else:
         drawn = _rgba(resolved(BY_PROP[name].path, tokens))
     if drawn.a < 1:
-        paper = _rgba(resolved(BY_PROP["paper"].path, tokens))
-        drawn = drawn.over(paper)
+        drawn = drawn.over(colour(backdrop, tokens))
     return drawn
+
+
+def _clear(name: str, tokens: Mapping[str, object]) -> Rgba:
+    """A mix's second colour as base.css names it, clear where it is `transparent`."""
+    return Rgba(0, 0, 0, 0) if name == "transparent" else colour(name, tokens)
 
 
 def _px(path: str, tokens: Mapping[str, object]) -> float:
@@ -78,7 +83,10 @@ def contrast_faults(schemes: Mapping[str, Mapping[str, object]]) -> list[str]:
     faults: list[str] = []
     for scheme, tokens in schemes.items():
         for pair in pairs:
-            ratio = contrast(colour(pair["fg"], tokens), colour(pair["bg"], tokens))
+            backdrop = pair.get("backdrop", "paper")
+            ratio = contrast(
+                colour(pair["fg"], tokens, backdrop), colour(pair["bg"], tokens, backdrop)
+            )
             if ratio < pair["min"]:
                 faults.append(
                     f"{scheme}: --{pair['fg']} on --{pair['bg']} is {ratio:.2f}:1, under "
@@ -138,11 +146,7 @@ FLOORS: tuple[tuple[str, float, str], ...] = (
 
 def floor_faults(tokens: Mapping[str, object]) -> list[str]:
     """The accessibility floors a kit can't go under (lattice RFC-0007)."""
-    faults = [
-        f"{path}: {said}"
-        for path, least, said in FLOORS
-        if path in ROWS and _px(path, tokens) < least
-    ]
+    faults = [f"{path}: {said}" for path, least, said in FLOORS if _px(path, tokens) < least]
     if _number("font.leading.normal", tokens) < 1.4:
         faults.append("font.leading.normal: body text's leading is 1.4 or more")
     return faults
@@ -156,5 +160,6 @@ def token_faults(light: Mapping[str, object], dark: Mapping[str, object]) -> lis
         *distance_faults(schemes),
         *motion_faults(light),
         *motion_faults(dark),
-        *floor_faults(light),
+        *(f"light: {fault}" for fault in floor_faults(light)),
+        *(f"dark: {fault}" for fault in floor_faults(dark)),
     ]

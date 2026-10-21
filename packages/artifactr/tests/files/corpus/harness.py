@@ -49,6 +49,10 @@ class Corpus:
     """The features the pinned release is known not to keep, which the matrix says and Nightly
     expects to fail: a feature that fails outside them, or passes inside them, turns it red."""
 
+    made_by_app: bool = False
+    """Whether its makers run the app itself, which stamps each new file anew: its files are then
+    held to what its makers make by each feature's value, in the live tests, not by their bytes."""
+
     hostile: Mapping[str, Callable[[], bytes]] = field(
         default_factory=dict[str, Callable[[], bytes]]
     )
@@ -77,4 +81,4 @@ class Corpus:
 
 def pinned(app: str) -> str:
     """The version of the release `scripts/craft` pins for an app, which its CLI must be."""
-    return re.findall(rf"{app}-web-(\S+)\.zip", (PINS / f"{app}.sha256").read_text())[0]
+    return re.findall(r"[-_](\d+\.\d+\.\d+)[-.]", (PINS / f"{app}.sha256").read_text())[0]

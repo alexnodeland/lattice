@@ -48,6 +48,7 @@ test.each([
   ["image/svg+xml", "Vector image"],
   ["application/vnd.adobe.indesign-idml-package", "Page layout"],
   ["application/x-figcraft", "Design"],
+  ["application/x-extension-fcstd", "3D model"],
 ])("a %s file is called a %s", (mediaType, type) => {
   expect(factsOf({ content: { media_type: mediaType } }).type).toBe(type);
 });

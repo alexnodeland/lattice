@@ -7,6 +7,8 @@ import pytest
 from artifactr.files.craft import CRAFTS, Craft
 from artifactr.files.manifest import (
     DOCX,
+    FCSTD,
+    CadModel,
     Design,
     Drawing,
     LayeredImage,
@@ -40,6 +42,7 @@ def test_a_cli_that_confines_nothing_is_never_on_by_default() -> None:
         "deckcraft",
         "cadcraft",
         "figcraft",
+        "freecad",
         "filmcraft",
         "lightcraft",
     }
@@ -50,8 +53,11 @@ def test_each_app_is_pinned() -> None:
     assert sorted(path.stem for path in PINS.glob("*.sha256")) == sorted(CRAFTS)
 
 
-@pytest.mark.parametrize("craft", CRAFTS.values(), ids=list(CRAFTS))
-def test_each_app_is_named_as_its_release_is(craft: Craft) -> None:
+STORYTOLDS = [craft for craft in CRAFTS.values() if craft.name != "freecad"]
+
+
+@pytest.mark.parametrize("craft", STORYTOLDS, ids=[craft.name for craft in STORYTOLDS])
+def test_each_storytold_app_is_named_as_its_release_is(craft: Craft) -> None:
     assert craft.name == craft.title.lower()
     assert (craft.key, craft.cli, craft.repository) == (
         f"files:{craft.name}",
@@ -63,6 +69,19 @@ def test_each_app_is_named_as_its_release_is(craft: Craft) -> None:
     assert BRAND not in f"{craft.title} {description}".lower()
     for notice in craft.notices:
         assert BRAND not in f"{notice.material} {notice.attribution}".lower()
+
+
+def test_freecad_is_a_third_partys_run_by_a_script_its_console_runs() -> None:
+    """FreeCAD is the FreeCAD project's, under no brand licence, named plainly (ADR-0014)."""
+    freecad = CRAFTS["freecad"]
+    assert (freecad.key, freecad.cli, freecad.repository) == (
+        "files:freecad",
+        "freecadcmd",
+        "FreeCAD/FreeCAD",
+    )
+    assert (freecad.dialect, freecad.roots, freecad.formats) == ("script", "none", {FCSTD})
+    assert freecad.integration.description.startswith("FreeCAD: ")
+    assert [c.name for c in CRAFTS.values() if c.dialect == "script"] == ["freecad"]
 
 
 def test_no_two_apps_keep_one_format_and_an_app_that_exports_keeps_none() -> None:
@@ -98,6 +117,7 @@ def test_wordcraft_is_its_descriptors() -> None:
         ("vectorcraft", VectorImage),
         ("designcraft", PageLayout),
         ("figcraft", Design),
+        ("freecad", CadModel),
     ],
 )
 def test_an_apps_formats_are_its_native_types(app: str, native: type[NativeFile]) -> None:

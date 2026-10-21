@@ -129,8 +129,11 @@ ASSET = re.compile(
 )
 
 
-@pytest.mark.parametrize("path", sorted(PINS.glob("*.sha256")), ids=lambda path: path.stem)
-def test_each_pin_names_four_assets_of_one_release(path: Path) -> None:
+STORYTOLDS = sorted(path for path in PINS.glob("*.sha256") if path.stem != "freecad")
+
+
+@pytest.mark.parametrize("path", STORYTOLDS, ids=lambda path: path.stem)
+def test_each_storytold_pin_names_four_assets_of_one_release(path: Path) -> None:
     lines = [line.split("  ") for line in path.read_text().splitlines()]
     assert all(re.fullmatch(r"[0-9a-f]{64}", digest) for digest, _ in lines), "SHA-256s"
     found = [match for _, name in lines if (match := ASSET.fullmatch(name))]
@@ -143,6 +146,63 @@ def test_each_pin_names_four_assets_of_one_release(path: Path) -> None:
         ("cli", "-macos-universal.zip"),
         ("web", ".zip"),
     ]
+
+
+def test_freecads_pin_is_its_releases_two_linux_appimages() -> None:
+    lines = (PINS / "freecad.sha256").read_text().splitlines()
+    names = [line.split("  ")[1] for line in lines]
+    assert all(re.fullmatch(r"[0-9a-f]{64}", line.split("  ")[0]) for line in lines)
+    assert [re.sub(r"\d+\.\d+\.\d+", "V", name) for name in names] == [
+        "FreeCAD_V-Linux-aarch64-py311.AppImage",
+        "FreeCAD_V-Linux-x86_64-py311.AppImage",
+    ]
+    assert len({re.findall(r"\d+\.\d+\.\d+", name)[0] for name in names}) == 1, "one release"
+
+
+APPIMAGE = b"""#!/bin/sh
+# An AppImage that unpacks itself as FreeCAD's does, beside where it is run.
+[ "$1" = --appimage-extract ] || exit 1
+mkdir -p squashfs-root/usr/bin squashfs-root/usr/share/licenses/FreeCAD
+printf '#!/bin/sh\n' >squashfs-root/usr/bin/freecadcmd
+chmod +x squashfs-root/usr/bin/freecadcmd
+touch squashfs-root/usr/share/licenses/FreeCAD/LICENSE
+"""
+
+
+@pytest.fixture
+def freecad(scripts: Path) -> Path:
+    """scripts/craft, pinning FreeCAD's AppImages to `APPIMAGE`."""
+    (scripts / "crafts" / "freecad.sha256").write_text(
+        pin(
+            (APPIMAGE, "FreeCAD_9.9.9-Linux-aarch64-py311.AppImage"),
+            (APPIMAGE, "FreeCAD_9.9.9-Linux-x86_64-py311.AppImage"),
+        )
+    )
+    return scripts
+
+
+@pytest.mark.parametrize("machine", ["x86_64", "aarch64"])
+def test_freecads_cli_is_its_appimages_freecadcmd(freecad: Path, machine: str) -> None:
+    run = craft(freecad, "cli", APPIMAGE, app="freecad", machine=("Linux", machine))
+    code, out, err = finished(run)
+    assert code == 0, err
+    assert out.strip().endswith("squashfs-root/usr/bin/freecadcmd")
+    assert os.access(out.strip(), os.X_OK)
+    code, out, _ = finished(
+        craft(freecad, "notices", APPIMAGE, app="freecad", machine=("Linux", machine))
+    )
+    assert out.strip().endswith("usr/share/licenses/FreeCAD/LICENSE")
+
+
+@pytest.mark.parametrize(
+    ("what", "machine"), [("cli", ("Darwin", "arm64")), ("web", ("Linux", "x86_64"))]
+)
+def test_freecad_has_no_macos_cli_and_no_browser_build(
+    freecad: Path, what: str, machine: tuple[str, str]
+) -> None:
+    code, _, err = finished(craft(freecad, what, APPIMAGE, app="freecad", machine=machine))
+    assert code == 2
+    assert f"FreeCAD has no {what} for {machine[0]}" in err
 
 
 def test_runs_at_once_on_a_cold_cache_each_find_the_whole_cli(scripts: Path) -> None:

@@ -240,6 +240,21 @@ Each step is one PR, reviewable alone.
 
 The polish PRs, approved by the owner (links and breadcrumbs, list rows, icon buttons and the inline artifact header, badges and headings, disclosures, the shell, empty and error states), follow the foundation and land on its tokens.
 
+## Foundation PR as built
+
+The foundation PR (#452) departs from the design above in these ways, each reviewed there:
+
+- **Derived colours stay `color-mix()`** in `base.css`: `--wash`, `--accent-hover`, `--danger-hover`, `--danger-wash` and `--chart-grid`. Computing them in Python risks a rounding difference from the browser's own mix, and `--wash` and `--accent-hover` are declared again under `[data-brand]`, where the accent changes. The loader PR computes them for a kit other than the default, and holds their pairs.
+- **The literal-value guard rail** exempts `tokens.css`, `base.css` and `styles.css`, not only the generated stylesheet. A few layout measures remain, listed in the test by count, including the editor's and the mini apps' frame heights, which stay as they are.
+- **The scales are as wide as today's values:** corners `--radius-0` to `--radius-6` and `--radius-full`, and shadows `--shadow-1` to `--shadow-3`, since a zero-change refactor can't snap a value to a nearer step. Tailwind's spacing utilities (`p-3`, `gap-2`) keep Tailwind's `--spacing` and are not on the `--space-*` scale; a component's token is.
+- **Motion's scale multiplies durations only.** Shifts and scale offsets are not multiplied: with every duration 0 they move nothing. Every duration token is declared on the root, where `--motion-scale` is already 0 under reduced motion, so an element can't undo it below, and no kit can declare `--motion-scale` or `--motion-loop`, which the tests hold.
+- **Not tokens yet:** `--button-shadow`, `--button-lift` and `--button-press-scale`, which have no value today; adding them changes a computed value. The polish pass adds them where a look needs them.
+- **Some component tokens are literals,** not primitives: `--dialog-pad`, `--dialog-scrim-blur`, `--segmented-item-pad-x`, `--popover-item-pad-x`, `--switch-width`, `--switch-height` and `--focus-offset`, as no primitive has their value. `--switch-thumb` and `--switch-travel` are separate tokens: a kit that changes one changes the other, which the loader PR checks.
+- **Colour ramps** come with the loader PR.
+- **The reduced-motion test** lays the generated stylesheet, every duration at 600ms, over the default, and opens a dialog, a menu, a select's list and the drawer; the guard rails' validation of a kit's motion is the loader PR's.
+- **Sizes** are read by a test of each size token where it is used, and by the screenshot suites; the computed-style snapshots read what a declaration sets and leave sizes, margins and transforms out.
+- **The style census** reports in the test's annotations, not yet in the CI step summary.
+
 ## Drawbacks
 
 - Hundreds of custom properties, and a refactor that touches every component. The zero-diff gate and the per-component commits are what make it reviewable.

@@ -15,6 +15,10 @@
 - **Reduced motion is structural.** Every component multiplies its durations, shifts and scale offsets by `--motion-scale`, and loops read `--motion-loop`. Under `prefers-reduced-motion: reduce` the base stylesheet, after `brand.css`, sets `--motion-scale: 0 !important` and `--motion-loop: paused !important`; neither is in the kit's grammar. Infinite animations have a defined still state, and script-driven motion reads the same query and tokens. A test renders a worst-case kit under reduced motion and asserts every computed transition and animation duration is 0s or paused. A kit that wants no motion anywhere takes the `none` preset.
 - **Tokens are the only override in v0.2** (the owner's decision). A kit brings no CSS: no `parts.css`, no selectors, no class names. What a kit can't reach with tokens it can't change. A free-form layer may be proposed for v0.3, with its own review of what it can break.
 
+## As built
+
+The foundation PR (#452): motion's scale multiplies durations, not shifts or scale offsets, since with every duration 0 they move nothing. Every duration token is declared on the root, where the scale is already 0 under reduced motion, so an element can't undo it below; `--motion-scale` and `--motion-loop` are base.css's and in no kit's grammar. `!important` on `:root` would not beat an element's own declaration, which is why neither is a token. A placeholder's pulse and a working status's spin are loops, which `--motion-loop` pauses. The thinking dots' stagger is a delay, which a pause holds. `--button-press-scale` and `--button-lift` are not tokens yet: they have no value today.
+
 ## Options considered
 
 | Choice | Option | For | Against |

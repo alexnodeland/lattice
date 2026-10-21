@@ -20,6 +20,10 @@
 - **Security chrome is outside the grammar:** the mini app's label and frame, host dialogs, the skip link, the colour-blind patterns and forced-colours styles read a pinned set of chrome tokens derived from validated roles, with their own pairs in the manifest (including against the kit's surfaces), and the default's values where a pair fails. `brand.css` never sets `color-scheme` or `forced-color-adjust`, has no `@import` and no `url()` but its fonts, and precedes the base stylesheet. App frame sizing and the mini-app bridge are untouched.
 - **Guard rails keep components on tokens:** Biome's `noRestrictedElements` for raw `a`, `button`, `table`, `select`, `details`, `summary` and `ins` outside the kit's own components; a test refusing hex, `rgb()`, arbitrary px or rem and `color-mix()` outside `tokens.css` and `styles.css`; a style census in the screenshot suites, which reports at first and fails the build once the polish PRs have landed; the other two fail from the start.
 
+## As built
+
+The foundation PR (#452) departs from this decision as [lattice RFC-0007](../../rfcs/0007-portalr-brand-kits.md#foundation-pr-as-built) lists: derived colours stay `color-mix()` in `base.css` until the loader PR computes them; the literal-value test exempts `tokens.css`, `base.css` and `styles.css`; the corner and shadow scales are as wide as today's values; some component tokens are literals; colour ramps come later.
+
 ## Options considered
 
 | Choice | Option | For | Against |

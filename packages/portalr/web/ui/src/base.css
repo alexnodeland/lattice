@@ -30,8 +30,8 @@
   --chart-marker-corner-3: 0.5;
   --chart-marker-turn-3: 0deg;
   /*
-   * Motion's scale: every component's duration, shift and scale offset is multiplied by it, and a
-   * loop plays as `--motion-loop` says. Reduced motion sets both below, and no kit can.
+   * Motion's scale: every duration token is multiplied by it on the root, and a loop plays as
+   * `--motion-loop` says. Reduced motion sets both below, and no kit can (portalr ADR-0057).
    */
   --motion-scale: 1;
   --motion-loop: running;

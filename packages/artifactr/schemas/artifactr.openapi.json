@@ -2043,6 +2043,18 @@
           "artifact_id": {
             "$ref": "#/components/schemas/ArtifactId"
           },
+          "at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
           "data": {
             "additionalProperties": {
               "$ref": "#/components/schemas/JsonValue"

@@ -61,7 +61,7 @@ from artifactr.sql.tables import (
     ThreadRow,
     WorkspaceRow,
 )
-from artifactr.workspace import HistoryChunk, Scope, seal
+from artifactr.workspace import HistoryChunk, Scope, dated, seal
 from lattice_core.sql.sessions import awaited_to_the_end, lock_row, to_the_end
 from lattice_core.sql.tenancy import TENANT_KEY, TenantSession
 
@@ -125,12 +125,14 @@ class _Transaction:
         self, result: CommitResult, *, actor: Actor, traceparent: str | None = None
     ) -> list[Envelope]:
         head = self._workspace.head_seq
+        ts = self._clock()
+        result = dated(result, ts)
         envelopes = seal(
             result.events,
             after_seq=head,
             scope=self._scope,
             actor=actor,
-            ts=self._clock(),
+            ts=ts,
             traceparent=traceparent,
         )
         self._workspace.head_seq = head + len(envelopes)

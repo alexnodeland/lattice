@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { BOUND, changes } from "./diff";
+import { BOUND, changes, LONGEST } from "./diff";
 
 test("prose changes by word", () => {
   expect(changes("Launch on Monday.", "Launch on Tuesday.", "words")).toEqual([
@@ -26,4 +26,10 @@ test("changes too large to find are none, rather than a stall", () => {
   const words = (prefix: string) =>
     Array.from({ length: BOUND.maxEditLength + 10 }, (_, n) => `${prefix}${n}`).join(" ");
   expect(changes(words("a"), words("b"), "words")).toBeNull();
+});
+
+test("a version longer than LONGEST is too large to compare, however quick it would be", () => {
+  const long = "a".repeat(LONGEST + 1);
+  expect(changes(long, "a", "lines")).toBeNull();
+  expect(changes("a", long, "words")).toBeNull();
 });

@@ -269,6 +269,7 @@ function Comments({ comments }: { comments: readonly Comment[] }) {
           cell: (comment) => (
             <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <TextLink
+                variant="subtle"
                 render={
                   <Link
                     to="/t/$tenant/traces/$trace"
@@ -280,9 +281,8 @@ function Comments({ comments }: { comments: readonly Comment[] }) {
               </TextLink>
               {template && (
                 <TextLink
+                  variant="external"
                   href={template.replace(TEMPLATE, encodeURIComponent(comment.trace_id))}
-                  target="_blank"
-                  rel="noreferrer"
                 >
                   Langfuse
                 </TextLink>

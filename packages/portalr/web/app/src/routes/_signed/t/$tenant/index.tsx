@@ -66,7 +66,7 @@ function Workspaces() {
                 {AREAS.map(({ to, label }) => (
                   <li key={label}>
                     <TextLink
-                      className="text-sm"
+                      variant="nav"
                       render={<Link to={to} params={{ tenant, workspace }} />}
                     >
                       {label}

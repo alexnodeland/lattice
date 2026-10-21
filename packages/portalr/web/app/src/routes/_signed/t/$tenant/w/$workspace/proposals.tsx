@@ -45,6 +45,7 @@ function Proposals() {
             stream.send({ type: "respond_to_proposal", proposal_id: proposal.id, decision });
           const link = artifact && (
             <TextLink
+              variant="subtle"
               render={
                 <Link
                   to="/t/$tenant/w/$workspace/artifacts/$artifact"

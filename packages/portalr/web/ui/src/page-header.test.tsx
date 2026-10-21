@@ -6,7 +6,7 @@ test("a page header's title is the page's one heading, with its way back, its li
   const screen = await render(
     <PageHeader
       title="Launch plan"
-      crumb={<a href="#threads">Threads</a>}
+      breadcrumbs={[{ label: "Threads", href: "#threads" }]}
       meta="Started by you"
       actions={<button type="button">More</button>}
     />,
@@ -21,7 +21,7 @@ test("a page header's title is the page's one heading, with its way back, its li
 
 test("a page header without extras is its heading alone", async () => {
   const screen = await render(<PageHeader title="Runs" />);
-  expect(screen.container.querySelectorAll("a, button, p")).toHaveLength(0);
+  expect(screen.container.querySelectorAll("a, button, nav, p")).toHaveLength(0);
 });
 
 test("a page header's heading can name the region around it", async () => {

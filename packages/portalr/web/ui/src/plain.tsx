@@ -29,7 +29,7 @@ export function Plain({
     props: {
       "aria-label": ui === "admin" ? "portalr admin" : "portalr",
       className:
-        "inline-flex rounded-md outline-offset-2 focus-visible:outline-2 focus-visible:outline-focus",
+        "inline-flex rounded-md outline-offset-(--focus-offset) focus-visible:outline-(length:--focus-width) focus-visible:outline-focus",
       children: <Lockup ui={ui} />,
     },
   });

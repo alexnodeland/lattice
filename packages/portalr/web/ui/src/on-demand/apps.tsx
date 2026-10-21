@@ -281,7 +281,7 @@ export function Running({
     <>
       <a
         href={`#${CSS.escape(after)}`}
-        className="sr-only text-accent underline focus-visible:not-sr-only focus-visible:outline-2 focus-visible:outline-focus"
+        className="sr-only text-accent underline focus-visible:not-sr-only focus-visible:outline-(length:--focus-width) focus-visible:outline-focus"
       >
         Skip past {app.title}
       </a>

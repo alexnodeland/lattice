@@ -65,7 +65,7 @@ function Item({ item }: { item: TrackerItem }) {
       rel="noopener noreferrer"
       // Its name first, as it is shown, then where it goes.
       aria-label={`${item.name}, in ${where}, opens in a new tab`}
-      className="inline-flex items-center gap-1 font-mono text-accent underline underline-offset-2 outline-offset-2 focus-visible:outline-2 focus-visible:outline-focus"
+      className="inline-flex items-center gap-1 font-mono text-accent underline underline-offset-2 outline-offset-(--focus-offset) focus-visible:outline-(length:--focus-width) focus-visible:outline-focus"
     >
       {item.name}
       <Icon icon={ExternalLink} className="size-3" />

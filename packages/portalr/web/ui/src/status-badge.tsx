@@ -13,7 +13,7 @@ const TONE = {
   working: {
     badge: "border-line bg-surface text-fg",
     glyph:
-      "rounded-full border-2 border-current border-r-transparent animate-spin motion-reduce:animate-none",
+      "rounded-full border-2 border-current border-r-transparent animate-spin [animation-play-state:var(--motion-loop)] motion-reduce:animate-none",
   },
   waiting: {
     badge: "border-accent bg-accent text-on-accent",
@@ -59,7 +59,7 @@ export function StatusBadge({ tone, children, live = false, className }: Props) 
     <span
       role={live ? "status" : undefined}
       className={cn(
-        "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border py-0.5 pr-2 pl-1.5 font-semibold text-xs",
+        "inline-flex items-center gap-1.5 whitespace-nowrap rounded-(--badge-radius) border py-(--badge-pad-y) pr-(--badge-pad-end) pl-(--badge-pad-start) font-semibold text-xs",
         TONE[tone].badge,
         className,
       )}

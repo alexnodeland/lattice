@@ -173,7 +173,7 @@ function RulePage() {
         </form>
       ) : (
         <section aria-label="The rule, as reflexr's JSON">
-          <pre className="whitespace-pre-wrap break-words rounded-lg border border-line bg-surface p-4 font-mono text-sm">
+          <pre className="whitespace-pre-wrap break-words rounded-(--card-radius) border border-line bg-surface p-4 font-mono text-sm">
             {shown(held.rule)}
           </pre>
         </section>

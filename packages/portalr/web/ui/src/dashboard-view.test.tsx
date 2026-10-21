@@ -205,7 +205,7 @@ test("text is Markdown, with no HTML", async () => {
   const screen = await render(<DashboardView dashboard={SUPPORT} />);
   const words = screen.getByText("up", { exact: true });
   await expect.element(words).toHaveClass("font-semibold");
-  const card = words.element().closest(".shadow-raised") as Element;
+  const card = words.element().closest("[class*='--card-shadow']") as Element;
   expect(card.textContent).toContain("<b>Raw HTML</b>");
   expect(card.querySelector("b")).toBeNull();
 });

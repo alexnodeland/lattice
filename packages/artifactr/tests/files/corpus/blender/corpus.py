@@ -281,9 +281,13 @@ HOSTILE: Final[dict[str, Callable[[], bytes]]] = {
         changed, "materials", written("bNode", "idname", b"ShaderNodeTexImage\0")
     ),
     "node_number": partial(changed, "materials", written("bNode", "type", b"\x22\x00")),
-    # Half a million node sockets, every pointer of each set: more work than a scan may take.
+    # A subdivision modifier saying it is of another type, which Blender would read it as.
+    "modifier_type": partial(
+        changed, "modifiers", written("SubsurfModifierData", "modifier.type", b"\x39\x00\x00\x00")
+    ),
+    # A million node links, every pointer of each set, in 56 MiB: more work than a scan may take.
     "dense_records": lambda: changed(
-        "materials", inserted("bNodeSocket", b"\x11" * size_of("bNodeSocket") * 500_000)
+        "materials", inserted("bNodeLink", b"\x11" * size_of("bNodeLink") * 1_000_000)
     ),
     # The cube, its own parent: the scan allows a parent, and the script refuses the cycle.
     "cycle": partial(changed, "transforms", pointed("Object", "parent", "Object")),

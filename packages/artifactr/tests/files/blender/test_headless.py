@@ -10,15 +10,16 @@ import sys
 import time
 from pathlib import Path
 
+import anyio
 import pytest
 from pydantic import JsonValue
 
 from artifactr.files.app import App, AppCommand, AppFailed
-from artifactr.files.blender import COMMANDS, Subprocess, fingerprint, scan
+from artifactr.files.blender import COMMANDS, Scanned, Subprocess, fingerprint, scan
 from artifactr.files.blender.headless import SCRIPT
 from artifactr.files.craft import Ran
 from artifactr.files.manifest import BLEND
-from tests.files.corpus.blender.corpus import CORPUS, HOSTILE, plain
+from tests.files.corpus.blender.corpus import CORPUS, HOSTILE, changed, inserted, plain
 
 FAKE = Path(__file__).with_name("fake_cli.py")
 PNG = b"\x89PNG\r\n\x1a\n"
@@ -147,13 +148,49 @@ async def test_a_batch_past_its_most_commands_or_a_scale_that_isnt_a_number_is_r
             await blender.render(SOURCE, 1, scale=scale, deadline=10)
 
 
-async def test_a_scan_past_the_deadline_is_a_timeout(
+def slow() -> bytes:
+    """A file of 400,000 node links, every pointer set: about a second of scanning, in budget."""
+    return changed("materials", inserted("bNodeLink", b"\x11" * 56 * 400_000))
+
+
+async def test_a_scan_past_the_deadline_stops_itself_and_none_overlaps_another(
     blender: Subprocess, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    def slow(*_: object) -> None:
-        time.sleep(0.5)
+    running, most = 0, 0
 
-    monkeypatch.setattr("artifactr.files.blender.headless.scan", slow)
-    with pytest.raises(AppFailed, match="the scan took more than") as failed:
-        await blender.inspect(SOURCE, deadline=0.05)
+    def counted(source: bytes, limit: int, *, until: float) -> Scanned:
+        nonlocal running, most
+        running += 1
+        most = max(most, running)
+        try:
+            return scan(source, limit, until=until)
+        finally:
+            running -= 1
+
+    monkeypatch.setattr("artifactr.files.blender.headless.scan", counted)
+    source = slow()
+    started = time.monotonic()
+    with pytest.raises(AppFailed, match="past its deadline") as failed:
+        await blender.inspect(source, deadline=0.05)
     assert failed.value.failure == "timeout"
+    assert time.monotonic() - started < 0.5, "the scan's thread stopped itself, and was waited for"
+
+    failures: list[str] = []
+
+    async def inspected() -> None:
+        try:
+            await blender.inspect(source, deadline=0.2)
+        except AppFailed as error:
+            failures.append(error.failure)
+
+    async with anyio.create_task_group() as calls:
+        for _ in range(3):
+            calls.start_soon(inspected)
+    assert failures == ["timeout"] * 3
+    assert most == 1, "one scan at a time"
+
+
+def test_a_scan_looks_at_its_deadline_while_it_inflates_and_reads_blocks() -> None:
+    for content in (SOURCE, bytes(plain("primitives"))):
+        with pytest.raises(AppFailed, match="past its deadline"):
+            scan(content, until=time.monotonic() - 1)

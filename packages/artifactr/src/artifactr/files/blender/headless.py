@@ -8,6 +8,8 @@ made only with `trusted=True`.
 """
 
 import math
+import threading
+import time
 from collections.abc import Sequence
 from pathlib import Path
 from typing import ClassVar, Final
@@ -138,6 +140,20 @@ COMMANDS: Final = (
 """The commands an agent may run: lattice's own, none of them Python."""
 
 
+SCANNING: Final = threading.Lock()
+"""Held by the one scan running in this process."""
+
+
+def _scanned(source: bytes, limit: int, until: float) -> Scanned:
+    """A scan, once no other is running, refused as a timeout past `until`."""
+    if not SCANNING.acquire(timeout=max(0.0, until - time.monotonic())):
+        raise AppFailed("timeout", "another scan ran past this one's deadline")
+    try:
+        return scan(source, limit, until=until)
+    finally:
+        SCANNING.release()
+
+
 class _Object(BaseModel):
     name: str
     type: str
@@ -163,7 +179,7 @@ class Subprocess:
         cli: `blender`.
         version: The version it must be, which provenance records.
         trusted: Whether its files are trusted, or this process confined: required.
-        limit: The most bytes a file may hold, saved or inflated: 256 MiB by default.
+        limit: The most bytes a file may hold, saved or inflated: 128 MiB by default.
         launcher: The command the CLI is started under; none by default.
 
     Raises:
@@ -268,22 +284,18 @@ class Subprocess:
         return found[:FOUND]
 
     async def _scan(self, source: bytes, deadline: float) -> tuple[Scanned, float]:
-        """The source, scanned in a thread under the call's deadline, and what is left of it.
+        """The source, scanned in a thread, and what is left of the call's deadline.
 
-        The scan's work is bounded, so a thread left behind past the deadline ends soon after.
+        The scan looks at the deadline as it goes and stops itself past it, so the call waits for
+        its thread, which never outlives the call by more than a moment; and one scan runs at a
+        time in this process, so none overlaps another.
 
         Raises:
             AppFailed: `timeout` past the deadline, and whatever the scan refuses.
         """
-        started = anyio.current_time()
-        try:
-            with anyio.fail_after(deadline):
-                scanned = await anyio.to_thread.run_sync(
-                    scan, source, self.limit, abandon_on_cancel=True
-                )
-        except TimeoutError:
-            raise AppFailed("timeout", f"the scan took more than {deadline:.3g}s") from None
-        return scanned, deadline - (anyio.current_time() - started)
+        until = time.monotonic() + deadline
+        scanned = await anyio.to_thread.run_sync(_scanned, source, self.limit, until)
+        return scanned, until - time.monotonic()
 
     async def _inspection(self, content: bytes, result: JsonValue) -> Inspection:
         """The objects as the outline, a line each, with the collections they are in."""

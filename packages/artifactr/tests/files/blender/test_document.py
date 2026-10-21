@@ -99,6 +99,7 @@ def test_a_fingerprint_leaves_out_what_each_save_stamps() -> None:
             "a node that isn't allowed: b'ShaderNodeBsdfPrincipled' \\(34\\)",
         ),
         ("dense_records", "too_large", "would take too long to scan"),
+        ("modifier_type", "refused", "a SubsurfModifierData says it is a modifier of type 57"),
         ("library_link", "refused", "a link to another file"),
         ("packed_image", "refused", "an image"),
         ("external_image", "refused", "an image"),

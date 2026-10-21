@@ -4,7 +4,8 @@ A `.blend` is Blender's memory written out: a header, then blocks, each a head (
 index of its struct in the file's own catalogue of structs, `DNA1`, the address it had, its length
 and its count) and its bytes, to `ENDB`; Blender compresses the whole with zstd by default. Blender
 reads a block through a pointer by checking its size alone, not its struct, so a file can make a
-block of the right size be read as another struct.
+block of the right size be read as another struct (read in Blender's source on `main`, to verify at
+the `v5.2.2` tag: `blo_verify_data_address`, `newlibadr`, `read_data_into_datamap`).
 
 [`scan`][artifactr.files.blender.scan] inflates the file against the limit and refuses one that
 isn't written by the pinned release's header, versions and catalogue. It refuses a block whose code
@@ -25,6 +26,7 @@ import io
 import math
 import re
 import struct
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 from functools import cache
@@ -142,6 +144,13 @@ DATA_BLOCKS: Final = {
 each by its struct and its field, and the data-blocks it may point at: any other is null. Blender
 reads such a pointer as whatever its context says, an object's data by the object's type."""
 
+MODIFIER_TYPES: Final = {
+    "SubsurfModifierData": 1, "MirrorModifierData": 5, "ArrayModifierData": 12,
+    "BevelModifierData": 24, "SolidifyModifierData": 33,
+}  # fmt: skip
+"""Each allowed modifier's struct, and the number its `type` holds, as 5.2.2 writes it: Blender
+reads a modifier by its type, so one whose type isn't its struct's is refused."""
+
 OBJECTS: Final = {0: None, 1: "Mesh", 10: "Lamp", 11: "Camera"}
 """The objects' types the commands make, by Blender's number, and the data-block each one's data
 is: an empty's none, a mesh's a mesh, a light's a light and a camera's a camera."""
@@ -229,14 +238,19 @@ SCRIPT_NODES: Final = (b"ShaderNodeScript", b"NodeShaderScript")
 """A script node's names, which Cycles compiles from a text or a file: refused in any block's
 bytes, whatever struct the block claims to be."""
 
-LIMIT: Final = 256 << 20
-"""The most bytes a file may inflate to, by default. A scan holds the file sent, its inflated
-bytes and the file it writes at once: about three times this, at its peak."""
+LIMIT: Final = 128 << 20
+"""The most bytes a file may inflate to, by default: a corpus file is about 0.5 MiB inflated. A
+scan holds the file sent, its inflated bytes and the file it writes at once: about three times
+this, at its peak."""
 
 WORK: Final = 4_000_000
-"""The most records and pointers a scan reads, past which a file is refused as too large: about
-1.3 seconds of the densest records on an Apple M-series core, where a scene of every command
-takes about 12,500."""
+"""The most work a scan does, past which a file is refused as too large: a unit for each record and
+each pointer, and `RESOLVED` more for each pointer that resolves. At it, about 2.1 seconds on an
+Apple M-series core for the slowest file we made (306,000 node links, each with two pointers that
+resolve), where a scene of every command takes about 12,500 units. Not measured natively."""
+
+RESOLVED: Final = 3
+"""What a pointer that resolves costs of the work, beside the one every pointer costs."""
 
 CHUNK: Final = 1 << 20
 ARRAY: Final = re.compile(rb"\[(\d+)\]")
@@ -308,28 +322,34 @@ class Blend:
     catalogue: "Catalogue"
 
 
-def read(content: bytes, limit: int = LIMIT) -> Blend:
+CHECKED: Final = 4096
+"""How many blocks or records a scan reads between looks at its clock."""
+
+
+def read(content: bytes, limit: int = LIMIT, until: float = math.inf) -> Blend:
     """A file's blocks and catalogue, refused if it isn't one Blender 5.2 wrote.
 
     Raises:
         AppFailed: `refused` if its header, a block's head or its catalogue isn't Blender 5.2's;
-            `too_large` if it inflates past the limit.
+            `too_large` if it inflates past the limit; `timeout` once `time.monotonic()` passes
+            `until`.
     """
-    data, compressed = _inflated(content, limit)
-    blocks = _blocks(data)
+    data, compressed = _inflated(content, limit, until)
+    blocks = _blocks(data, until)
     return Blend(data, compressed, blocks, _catalogue(data, blocks))
 
 
-def scan(content: bytes, limit: int = LIMIT, work: int = WORK) -> Scanned:
+def scan(content: bytes, limit: int = LIMIT, work: int = WORK, until: float = math.inf) -> Scanned:
     """Refuse what isn't a Blender 5.2 file, or holds what isn't allowed, and write it again.
 
     Raises:
         AppFailed: `refused` if it isn't a file Blender 5.2 wrote, or holds a block, a struct or
             a pointer that isn't allowed; `too_large` if it inflates past the limit, or would take
-            more than `work` records and pointers to read.
+            more than `work` records and pointers to read; `timeout` once `time.monotonic()` passes
+            `until`, which it looks at as it goes, so a scan left behind by its caller stops.
     """
-    blend = read(content, limit)
-    _Scan(blend, work).check()
+    blend = read(content, limit, until)
+    _Scan(blend, work, until).check()
     kept = (block for block in blend.blocks if block.code != THUMBNAIL)
     return Scanned(HEADER + b"".join(blend.data[b.start : b.end] for b in kept), blend.compressed)
 
@@ -362,7 +382,13 @@ def fingerprint(content: bytes, limit: int = LIMIT) -> str:
     return digest.hexdigest()
 
 
-def _inflated(content: bytes, limit: int) -> tuple[bytes, bool]:
+def _in_time(until: float) -> None:
+    """Refuse to go on past the deadline."""
+    if time.monotonic() > until:
+        raise AppFailed("timeout", "the scan ran past its deadline")
+
+
+def _inflated(content: bytes, limit: int, until: float = math.inf) -> tuple[bytes, bool]:
     """The file's bytes, inflated a chunk at a time if compressed, refused past the limit."""
     if content.startswith(GZIP):
         raise AppFailed(
@@ -379,6 +405,7 @@ def _inflated(content: bytes, limit: int) -> tuple[bytes, bool]:
             io.BytesIO(content), read_across_frames=True
         ) as stream:
             while chunk := stream.read(CHUNK):
+                _in_time(until)
                 read += len(chunk)
                 if read > limit:
                     raise AppFailed("too_large", f"the file inflates past {limit} bytes")
@@ -388,7 +415,7 @@ def _inflated(content: bytes, limit: int) -> tuple[bytes, bool]:
     return b"".join(chunks), True
 
 
-def _blocks(data: bytes) -> list[Block]:
+def _blocks(data: bytes, until: float = math.inf) -> list[Block]:
     """The file's blocks, to `ENDB`, refused if its header isn't 5.2's, or a head lies."""
     if not data.startswith(b"BLENDER"):
         raise AppFailed("refused", "not a Blender file")
@@ -398,6 +425,8 @@ def _blocks(data: bytes) -> list[Block]:
     blocks: list[Block] = []
     at = len(HEADER)
     while True:
+        if len(blocks) % CHECKED == 0:
+            _in_time(until)
         if len(blocks) >= BLOCKS:
             raise AppFailed("refused", f"the file holds more than {BLOCKS} blocks")
         if at + HEAD.size > len(data):
@@ -442,7 +471,8 @@ class _Scan:
     resolves to in each map it is found in.
     """
 
-    def __init__(self, blend: Blend, work: int) -> None:
+    def __init__(self, blend: Blend, work: int, until: float) -> None:
+        self.until = until
         self.data = blend.data
         self.blocks = blend.blocks
         self.catalogue = blend.catalogue
@@ -467,6 +497,7 @@ class _Scan:
                 self._records(block, scope)
 
     def _spend(self, work: int) -> None:
+        _in_time(self.until)
         self.left -= work
         if self.left < 0:
             raise AppFailed("too_large", "the file would take too long to scan")
@@ -531,13 +562,15 @@ class _Scan:
         slots = catalogue.slots(block.index)
         self._spend(block.count * (1 + len(slots)))
         for each in range(block.count):
+            if each % CHECKED == CHECKED - 1:
+                _in_time(self.until)
             record = block.bytes_start + each * size
             for slot in slots:
                 (value,) = struct.unpack_from("<Q", self.data, record + slot.offset)
                 if value:
                     self._pointer(name, slot, value, scope)
             if name in self.catalogue.records:
-                self.catalogue.records[name](self, record, scope)
+                self.catalogue.records[name](self, name, record, scope)
 
     def hits(self, value: int, scope: int) -> list[str | None]:
         """What an address resolves to, in each map Blender may resolve it in."""
@@ -550,6 +583,9 @@ class _Scan:
 
     def _pointer(self, name: str, slot: Slot, value: int, scope: int) -> None:
         hits = self.hits(value, scope)
+        if hits:
+            # A pointer that resolves is read further than one that doesn't.
+            self._spend(RESOLVED)
         where = f"{name}.{slot.path}"
         if slot.kind == "struct":
             if slot.pointed not in self.catalogue.pointable:
@@ -587,7 +623,7 @@ class _Scan:
                 raise AppFailed("refused", f"{where} holds a pointer at {_named(hits)}")
 
 
-def _object(scan: _Scan, record: int, scope: int) -> None:
+def _object(scan: _Scan, _: str, record: int, scope: int) -> None:
     """Refuse an object of a type the commands don't make, or whose data isn't its type's."""
     kind_at, data_at = scan.catalogue.object_fields
     (kind,) = struct.unpack_from("<h", scan.data, record + kind_at)
@@ -598,7 +634,7 @@ def _object(scan: _Scan, record: int, scope: int) -> None:
         raise AppFailed("refused", f"an object of type {kind} holds data of another type")
 
 
-def _node(scan: _Scan, record: int, _: int) -> None:
+def _node(scan: _Scan, _: str, record: int, __: int) -> None:
     """Refuse a node other than those `NODES` names, or whose number isn't its name's."""
     (name_at, name_size), type_at = scan.catalogue.node_fields
     idname = scan.data[record + name_at : record + name_at + name_size].split(b"\0")[0]
@@ -607,7 +643,14 @@ def _node(scan: _Scan, record: int, _: int) -> None:
         raise AppFailed("refused", f"the file holds a node that isn't allowed: {idname!r} ({kind})")
 
 
-def _globals(scan: _Scan, record: int, _: int) -> None:
+def _modifier(scan: _Scan, held: str, record: int, _: int) -> None:
+    """Refuse a modifier whose type isn't its struct's: Blender reads a modifier by its type."""
+    (kind,) = struct.unpack_from("<i", scan.data, record + scan.catalogue.modifier_type)
+    if MODIFIER_TYPES[held] != kind:
+        raise AppFailed("refused", f"a {held} says it is a modifier of type {kind}")
+
+
+def _globals(scan: _Scan, _: str, record: int, __: int) -> None:
     """Refuse a file whose versions aren't those 5.2.2 writes."""
     found = tuple(
         struct.unpack_from("<h", scan.data, record + at)[0] for at in scan.catalogue.versions
@@ -649,13 +692,15 @@ class Catalogue:
         self.object_fields = (self.field(objects, b"type")[0], self.field(objects, b"data")[0])
         nodes = self.index("bNode")
         self.node_fields = (self.field(nodes, b"idname"), self.field(nodes, b"type")[0])
+        self.modifier_type = self.field(self.index("ModifierData"), b"type")[0]
         globals_ = self.index("FileGlobal")
         self.versions = tuple(
             self.field(globals_, name)[0]
             for name in (b"subversion", b"minversion", b"minsubversion")
         )
-        self.records: dict[str, Callable[[_Scan, int, int], None]] = {
+        self.records: dict[str, Callable[[_Scan, str, int, int], None]] = {
             "Object": _object, "bNode": _node, "FileGlobal": _globals,
+            **dict.fromkeys(MODIFIER_TYPES, _modifier),
         }  # fmt: skip
         """What else each record of a struct is held to, beside its pointers."""
 

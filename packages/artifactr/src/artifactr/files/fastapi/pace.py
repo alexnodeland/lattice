@@ -38,6 +38,11 @@ class Pace:
         started.append(now)
         return None
 
+    @property
+    def kept(self) -> int:
+        """How many people's windows are kept."""
+        return len(self._started)
+
     def _let_go(self, now: float) -> None:
         """Forget everyone who started nothing in the last minute."""
         for who in [w for w, s in self._started.items() if not s or s[-1] <= now - MINUTE]:

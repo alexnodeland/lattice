@@ -41,7 +41,7 @@ def test_those_who_started_nothing_lately_are_let_go() -> None:
     clock.now += 61
     pace.admit(("acme", "user:new"))
     assert pace.admit(("acme", "user:0")) is None
-    assert len(pace._started) == 2  # pyright: ignore[reportPrivateUsage]
+    assert pace.kept == 2
 
 
 def test_a_gauge_refuses_past_its_most_and_gives_places_back() -> None:

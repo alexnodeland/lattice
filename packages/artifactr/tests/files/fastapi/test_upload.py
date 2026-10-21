@@ -15,13 +15,14 @@ import threading
 import time
 from collections.abc import AsyncIterator, Iterator
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any
 
 import anyio
 import pytest
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
 from starlette.requests import HTTPConnection
@@ -32,13 +33,7 @@ from artifactr.files.app import AppFailed, FakeApp, Inspection
 from artifactr.files.blobs import InMemoryBlobs, Quota
 from artifactr.files.checkouts import InMemoryCheckouts
 from artifactr.files.fastapi import files_router
-from artifactr.files.fastapi.router import (  # pyright: ignore[reportPrivateUsage]
-    Body,
-    TooSlow,
-    Uploaded,
-    _answered,
-    _Meter,
-)
+from artifactr.files.fastapi.router import Body, Meter, TooSlow
 from artifactr.files.manifest import DOCX, NativeFile, WordDocument
 from artifactr.files.native import CREATE_NATIVE_FILE, FORMATS, Format, NativeFiles
 from artifactr.files.worker import Limits, Worker, worker_app
@@ -294,24 +289,15 @@ async def test_a_body_that_pauses_or_trickles_is_refused() -> None:
             await asyncio.sleep(pause)
             yield b"x" * 10
 
-    async def read(meter: _Meter) -> int:
+    async def read(meter: Meter) -> int:
         return sum([len(chunk) async for chunk in meter])
 
     pace = Body(pause=0.2, floor=100)
-    assert await read(_Meter(body(0, 0.1, 0.1), pace)) == 30
+    assert await read(Meter(body(0, 0.1, 0.1), pace)) == 30
     with pytest.raises(TooSlow):
-        await read(_Meter(body(0, 0.3), pace))
+        await read(Meter(body(0, 0.3), pace))
     with pytest.raises(TooSlow):
-        await read(_Meter(body(*[0.15] * 4), pace))  # past its pause, under its floor
-
-
-def test_a_slow_body_is_refused_with_408(world: World) -> None:
-    async def slow() -> Uploaded:
-        raise TooSlow
-
-    with pytest.raises(HTTPException) as raised:
-        asyncio.run(_answered(slow()))
-    assert (raised.value.status_code, raised.value.detail) == (408, {"type": "too_slow"})
+        await read(Meter(body(*[0.15] * 4), pace))  # past its pause, under its floor
 
 
 def test_the_process_takes_only_so_many_uploads_at_once() -> None:
@@ -428,8 +414,9 @@ async def test_through_the_worker_a_crash_is_told_in_the_routes_words() -> None:
     assert await ws.artifacts(NativeFile) == []
 
 
-def test_a_real_server_closes_the_connection_after_refusing_an_unread_body() -> None:
-    world = world_of()
+@contextmanager
+def served(world: World) -> Iterator[tuple[str, int]]:
+    """The world's application, served by uvicorn on loopback."""
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
         server = uvicorn.Server(uvicorn.Config(world.client.app, http="h11", log_level="warning"))
@@ -438,15 +425,40 @@ def test_a_real_server_closes_the_connection_after_refusing_an_unread_body() -> 
         while not server.started:
             time.sleep(0.01)
         try:
-            with socket.create_connection(sock.getsockname(), timeout=10) as client:
-                client.sendall(
-                    b"POST /workspaces/w1/files?kind=word_document&name=t HTTP/1.1\r\n"
-                    b"Host: app\r\nContent-Length: 1000000000\r\n\r\n" + b"{" * 1024
-                )
-                answered = b""
-                while chunk := client.recv(65536):
-                    answered += chunk
-            assert answered.startswith(b"HTTP/1.1 413"), "and the read ended: it was closed"
+            yield sock.getsockname()
         finally:
             server.should_exit = True
             serving.join()
+
+
+def answer(
+    address: tuple[str, int], *sent: bytes, pause: float = 0, until_closed: bool = True
+) -> bytes:
+    """What the server answers a request sent in parts: until it closes, or its first reply."""
+    with socket.create_connection(address, timeout=10) as client:
+        for part in sent:
+            client.sendall(part)
+            time.sleep(pause)
+        answered = client.recv(65536)
+        while until_closed and (chunk := client.recv(65536)):
+            answered += chunk
+    return answered
+
+
+HEAD = b"POST /workspaces/w1/files?kind=word_document&name=t HTTP/1.1\r\nHost: app\r\n"
+
+
+def test_a_real_server_closes_the_connection_after_refusing_an_unread_body() -> None:
+    with served(world_of()) as address:
+        answered = answer(address, HEAD + b"Content-Length: 1000000000\r\n\r\n" + b"{" * 1024)
+    assert answered.startswith(b"HTTP/1.1 413"), "and the read ended: it was closed"
+
+
+def test_a_body_that_pauses_too_long_is_refused_with_408() -> None:
+    world = world_of(body=Body(pause=0.2))
+    with served(world) as address:
+        sent = (HEAD + b"Content-Length: 2\r\n\r\n{", b"}")
+        answered = answer(address, *sent, pause=0.6, until_closed=False)
+    assert answered.startswith(b"HTTP/1.1 408")
+    assert b"too_slow" in answered
+    assert asyncio.run(world.committed()) == []

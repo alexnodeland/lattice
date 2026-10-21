@@ -200,7 +200,7 @@ export function Uploader({
   useEffect(() => () => stop.current?.abort(), []);
 
   // One file at a time, in the order chosen: the next waits until the last has its answer.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `send` is this render's, and reads the same state
+  // `send` is each render's own, so this runs after every render; a file going stops it at once.
   useEffect(() => {
     if (offered === undefined || going.current !== null) {
       return;
@@ -209,7 +209,7 @@ export function Uploader({
     if (next !== undefined) {
       void send(next, offered.limit);
     }
-  }, [items, offered]);
+  }, [items, offered, send]);
 
   if (offered === undefined || !offered.allowed) {
     return null;

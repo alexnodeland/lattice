@@ -272,7 +272,7 @@ def files_router(
         `artifact_id` to send it again safely: a file already there with these bytes is
         `unchanged`, and one with others is refused.
         """
-        meter = _Meter(request.stream(), pacing)
+        meter = Meter(request.stream(), pacing)
         record: dict[str, object] = {"kind": kind, "workspace_id": workspace_id}
         outcome = "error"
         try:
@@ -299,7 +299,7 @@ def files_router(
         name: str,
         artifact_id: ArtifactId,
         thread_id: str | None,
-        meter: "_Meter",
+        meter: "Meter",
     ) -> Uploaded:
         await ws.check(Access(action=CREATE_NATIVE_FILE))
         file_type = _native_types_by_kind().get(kind)
@@ -463,7 +463,7 @@ def files_router(
     return router
 
 
-class _Meter:
+class Meter:
     """An upload's bytes as they stream through, held to a pace, counted for the record."""
 
     def __init__(self, data: AsyncIterable[bytes], body: Body) -> None:
@@ -498,7 +498,7 @@ class _Meter:
         return self._digest.hexdigest() if self.whole else None
 
 
-def _audit(record: dict[str, object], meter: _Meter) -> None:
+def _audit(record: dict[str, object], meter: Meter) -> None:
     """Record an upload: who, where, what and how it ended (native files ADR-0017).
 
     A line on the `artifactr.files.uploads` logger, its fields in `extra`, which the

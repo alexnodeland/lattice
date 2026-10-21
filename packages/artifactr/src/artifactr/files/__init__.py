@@ -29,11 +29,13 @@ from artifactr.files.blobs import Blobs, InMemoryBlobs, TooLarge
 from artifactr.files.checkouts import Checkout, Checkouts, InMemoryCheckouts
 from artifactr.files.manifest import (
     DOCX,
+    AudioSession,
     Blob,
     CadModel,
     Design,
     Drawing,
     LayeredImage,
+    MotionGraphics,
     NativeFile,
     PageLayout,
     PdfDocument,
@@ -41,6 +43,7 @@ from artifactr.files.manifest import (
     Provenance,
     Scene,
     VectorImage,
+    VideoProject,
     WordDocument,
     Workbook,
 )
@@ -51,6 +54,7 @@ __all__ = [
     "App",
     "AppCommand",
     "AppFailed",
+    "AudioSession",
     "Blob",
     "Blobs",
     "CadModel",
@@ -63,6 +67,7 @@ __all__ = [
     "InMemoryBlobs",
     "InMemoryCheckouts",
     "LayeredImage",
+    "MotionGraphics",
     "NativeFile",
     "NativeFiles",
     "PageLayout",
@@ -72,6 +77,7 @@ __all__ = [
     "Scene",
     "TooLarge",
     "VectorImage",
+    "VideoProject",
     "WordDocument",
     "Workbook",
 ]

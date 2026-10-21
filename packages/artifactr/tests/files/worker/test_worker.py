@@ -360,8 +360,8 @@ def test_a_worker_runs_every_app_whose_files_lattice_keeps_trusting_only_its_own
 
 
 def test_a_worker_runs_no_app_it_has_no_adapter_for() -> None:
-    environ = {"WORKER_APP": "filmcraft", "WORKER_CLI": "x", "WORKER_VERSION": "1"}
-    with pytest.raises(ValueError, match="'filmcraft', and a worker runs one of wordcraft"):
+    environ = {"WORKER_APP": "lightcraft", "WORKER_CLI": "x", "WORKER_VERSION": "1"}
+    with pytest.raises(ValueError, match="'lightcraft', and a worker runs one of wordcraft"):
         app_from_environment(environ, LIMITS)
 
 

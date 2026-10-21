@@ -27,11 +27,14 @@ from artifactr.files.blender import Subprocess as Blender
 from artifactr.files.cadcraft import Subprocess as CadCraft
 from artifactr.files.deckcraft import Subprocess as DeckCraft
 from artifactr.files.designcraft import Subprocess as DesignCraft
+from artifactr.files.effectcraft import Subprocess as EffectCraft
 from artifactr.files.figcraft import Subprocess as FigCraft
+from artifactr.files.filmcraft import Subprocess as FilmCraft
 from artifactr.files.freecad import Subprocess as FreeCad
 from artifactr.files.gridcraft import Subprocess as GridCraft
 from artifactr.files.pdfcraft import Subprocess as PdfCraft
 from artifactr.files.photocraft import Subprocess as PhotoCraft
+from artifactr.files.soundcraft import Subprocess as SoundCraft
 from artifactr.files.vectorcraft import Subprocess as VectorCraft
 from artifactr.files.wordcraft import Subprocess as WordCraft
 from artifactr.files.worker.limits import Limits
@@ -61,6 +64,8 @@ ADAPTERS: Final[Mapping[str, Adapter]] = MappingProxyType(
         "photocraft": PhotoCraft,
         "vectorcraft": VectorCraft,
         "designcraft": DesignCraft,
+        "effectcraft": EffectCraft,
+        "soundcraft": SoundCraft,
         # Their CLIs confine nothing: the worker is their confinement.
         "gridcraft": partial(GridCraft, trusted=True),
         "deckcraft": partial(DeckCraft, trusted=True),
@@ -68,6 +73,7 @@ ADAPTERS: Final[Mapping[str, Adapter]] = MappingProxyType(
         "figcraft": partial(FigCraft, trusted=True),
         "freecad": partial(FreeCad, trusted=True),
         "blender": partial(Blender, trusted=True),
+        "filmcraft": partial(FilmCraft, trusted=True),
     }
 )
 """The apps a worker runs, by name: each app whose files lattice keeps."""

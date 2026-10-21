@@ -27,17 +27,22 @@ from mathutils import Vector
 DOCUMENT = "document.blend"
 NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,62}")
 SEGMENTS = 32
-MODIFIERS = {
-    "subdivision": ("SUBSURF", {"levels": (int, 0, 4)}),
-    "bevel": ("BEVEL", {"width": (float, 0, 1e6), "segments": (int, 1, 16)}),
-    "array": ("ARRAY", {"count": (int, 1, 1000)}),
-    "mirror": ("MIRROR", {}),
-    "solidify": ("SOLIDIFY", {"thickness": (float, -1e6, 1e6)}),
-}
-"""Each modifier an agent may add: Blender's type, and the numbers it may set, with their bounds."""
 LIGHTS = {"point": "POINT", "sun": "SUN", "spot": "SPOT", "area": "AREA"}
 ENGINES = {"workbench": "BLENDER_WORKBENCH", "cycles": "CYCLES"}
 SETTABLE = {"name": str, "hide_render": bool, "hide_viewport": bool}
+LEVELS = 4
+"""The most levels a subdivision may have, in the viewport and in a render."""
+MODIFIERS_EACH = 8
+"""The most modifiers an object may have."""
+COPIES = 1000
+"""The most copies an object's arrays may make, all of them multiplied."""
+SEGMENTS_MOST = 16
+"""The most segments a bevel may have."""
+DATA = frozenset({
+    "objects", "meshes", "materials", "cameras", "lights", "scenes", "collections", "screens",
+    "window_managers", "workspaces",
+})  # fmt: skip
+"""The data-blocks a file may hold once Blender has opened it: those the scan allows."""
 
 
 class Refused(Exception):
@@ -201,29 +206,75 @@ def assign(args):
         obj.data.materials.append(given)
 
 
+def subdivision(added, args):
+    """Its levels, the same in the viewport and in a render."""
+    added.levels = added.render_levels = whole(args, "levels", low=0, high=LEVELS, default=1)
+
+
+def bevel(added, args):
+    """Its width and its segments."""
+    added.width = number(args, "width", low=0, high=1e6, default=0.1)
+    added.segments = whole(args, "segments", low=1, high=SEGMENTS_MOST, default=1)
+
+
+def array(added, args):
+    """Its count of copies."""
+    added.count = whole(args, "count", low=1, high=COPIES, default=2)
+
+
+def mirror(added, args):
+    """The axes it mirrors across."""
+    axes = args.get("axes", [True, False, False])
+    if not isinstance(axes, list) or len(axes) != 3 or not all(isinstance(a, bool) for a in axes):
+        raise Refused("axes must be 3 booleans")
+    added.use_axis = axes
+
+
+def solidify(added, args):
+    """Its thickness."""
+    added.thickness = number(args, "thickness", low=-1e6, high=1e6, default=0.01)
+
+
+MODIFIERS = {
+    "subdivision": ("SUBSURF", ("levels",), subdivision),
+    "bevel": ("BEVEL", ("width", "segments"), bevel),
+    "array": ("ARRAY", ("count",), array),
+    "mirror": ("MIRROR", ("axes",), mirror),
+    "solidify": ("SOLIDIFY", ("thickness",), solidify),
+}
+"""Each modifier an agent may add: Blender's type, its arguments, and what sets them."""
+
+
 def modifier(args):
     """Add a modifier to a mesh object, of an allowed type, with its numbers."""
     if not isinstance(args, dict) or args.get("type") not in MODIFIERS:
         raise Refused(f"type must be one of {sorted(MODIFIERS)}")
-    blender, numbers = MODIFIERS[args["type"]]
-    take(args, ("name", *numbers, *(("axes",) if blender == "MIRROR" else ())), ("object", "type"))
+    blender, allowed, setting = MODIFIERS[args["type"]]
+    take(args, ("name", *allowed), ("object", "type"))
     obj = found(bpy.data.objects, args, "object")
     if obj.type != "MESH":
         raise Refused(f"{obj.name} is not a mesh")
-    added = obj.modifiers.new(name(args, args["type"].capitalize()), blender)
-    for key, (cast, low, high) in numbers.items():
-        if key in args:
-            given = whole if cast is int else number
-            setattr(added, key, given(args, key, low=low, high=high))
-    if "axes" in args:
-        axes = args["axes"]
-        if (
-            not isinstance(axes, list)
-            or len(axes) != 3
-            or not all(isinstance(a, bool) for a in axes)
-        ):
-            raise Refused("axes must be 3 booleans")
-        added.use_axis = axes
+    if len(obj.modifiers) >= MODIFIERS_EACH:
+        raise Refused(f"{obj.name} has {MODIFIERS_EACH} modifiers, the most it may have")
+    setting(obj.modifiers.new(name(args, args["type"].capitalize()), blender), args)
+    bounded(obj)
+
+
+def bounded(obj):
+    """Refuse an object whose modifiers would make more than the commands allow."""
+    if len(obj.modifiers) > MODIFIERS_EACH:
+        raise Refused(f"{obj.name} has more than {MODIFIERS_EACH} modifiers")
+    arrays = [each for each in obj.modifiers if each.type == "ARRAY"]
+    if any(each.fit_type != "FIXED_COUNT" for each in arrays):
+        raise Refused(f"{obj.name}'s array copies to a length or a curve, not a count")
+    copies = math.prod(each.count for each in arrays)
+    if copies > COPIES:
+        raise Refused(f"{obj.name}'s arrays make {copies} copies, more than {COPIES}")
+    for each in obj.modifiers:
+        if each.type == "SUBSURF" and max(each.levels, each.render_levels) > LEVELS:
+            raise Refused(f"{obj.name}'s subdivision has more than {LEVELS} levels")
+        if each.type == "BEVEL" and each.segments > SEGMENTS_MOST:
+            raise Refused(f"{obj.name}'s bevel has more than {SEGMENTS_MOST} segments")
 
 
 def aimed(obj, args):
@@ -305,7 +356,12 @@ def set_property(args):
         raise Refused(f"property must be one of {sorted(SETTABLE)}")
     if not isinstance(value, kind) or (prop == "name" and not NAME.fullmatch(value)):
         raise Refused(f"{prop} must be a {kind.__name__}" + (", a name" if kind is str else ""))
-    setattr(obj, prop, value)
+    if prop == "name":
+        obj.name = value
+    elif prop == "hide_render":
+        obj.hide_render = value
+    else:
+        obj.hide_viewport = value
 
 
 def remove(args):
@@ -355,14 +411,44 @@ def opened(here):
     inert()
 
 
+def collections():
+    """Every collection of data-blocks Blender holds, by its name in `bpy.data`."""
+    data = bpy.data
+    return {
+        "actions": data.actions, "annotations": data.annotations, "armatures": data.armatures,
+        "brushes": data.brushes, "cache_files": data.cache_files, "cameras": data.cameras,
+        "collections": data.collections, "curves": data.curves, "fonts": data.fonts,
+        "grease_pencils": data.grease_pencils, "hair_curves": data.hair_curves,
+        "images": data.images, "lattices": data.lattices, "libraries": data.libraries,
+        "lightprobes": data.lightprobes, "lights": data.lights, "linestyles": data.linestyles,
+        "masks": data.masks, "materials": data.materials, "meshes": data.meshes,
+        "metaballs": data.metaballs, "movieclips": data.movieclips,
+        "node_groups": data.node_groups, "objects": data.objects,
+        "paint_curves": data.paint_curves, "palettes": data.palettes,
+        "particles": data.particles, "pointclouds": data.pointclouds, "scenes": data.scenes,
+        "screens": data.screens, "shape_keys": data.shape_keys, "sounds": data.sounds,
+        "speakers": data.speakers, "texts": data.texts, "textures": data.textures,
+        "volumes": data.volumes, "window_managers": data.window_managers,
+        "workspaces": data.workspaces, "worlds": data.worlds,
+    }  # fmt: skip
+
+
 def inert():
     """Refuse what the scan refuses, as Blender read it: a second line, never the first."""
-    if bpy.data.texts or bpy.data.libraries or bpy.data.images:
-        raise Refused("it holds a text, a link to another file or an image")
-    held = (bpy.data.objects, bpy.data.meshes, bpy.data.materials, bpy.data.cameras,
-            bpy.data.lights, bpy.data.scenes, bpy.data.collections)  # fmt: skip
-    if any(getattr(each, "animation_data", None) for blocks in held for each in blocks):
+    if held := sorted(
+        kind for kind, blocks in collections().items() if blocks and kind not in DATA
+    ):
+        raise Refused(f"it holds data-blocks that aren't allowed: {', '.join(held)}")
+    owners = [*bpy.data.objects, *bpy.data.meshes, *bpy.data.materials, *bpy.data.cameras,
+              *bpy.data.lights, *bpy.data.scenes]  # fmt: skip
+    trees = [
+        owner.node_tree for owner in [*bpy.data.materials, *bpy.data.lights] if owner.node_tree
+    ]
+    if any(each.animation_data for each in [*owners, *trees]):
         raise Refused("it holds animation or a driver")
+    for obj in bpy.data.objects:
+        if obj.type == "MESH":
+            bounded(obj)
     parents = {obj.name: obj.parent.name if obj.parent else None for obj in bpy.data.objects}
     for start in parents:
         seen, at = set(), start
@@ -383,7 +469,14 @@ def apply(commands):
             run(command.get("args", {}))
         except Refused as refused:
             raise Refused(f"command {index + 1}, {command['name']}: {refused}") from None
-        except (TypeError, ValueError, RuntimeError) as error:
+        except (
+            TypeError,
+            ValueError,
+            RuntimeError,
+            OverflowError,
+            KeyError,
+            AttributeError,
+        ) as error:
             raise Refused(f"command {index + 1}, {command['name']}: {error}") from None
 
 
@@ -416,10 +509,15 @@ def draw(width, path):
     if scene.camera is None:
         raise Refused("nothing to draw: the scene has no camera")
     settings = scene.render
-    aspect = settings.resolution_y / settings.resolution_x
+    if settings.resolution_x <= 0 or settings.resolution_y <= 0:
+        raise Refused("nothing to draw: the scene's render has no size")
+    aspect = min(8, max(1 / 8, settings.resolution_y / settings.resolution_x))
     settings.engine = "BLENDER_WORKBENCH"
-    # Neither a compositor's nodes nor the sequencer's strips run, nor write files of their own.
-    settings.use_compositing = settings.use_sequencer = False
+    # Neither a compositor's nodes, the sequencer's strips nor Freestyle, which runs Blender's own
+    # Python, runs, nor writes files of its own.
+    settings.use_compositing = settings.use_sequencer = settings.use_freestyle = False
+    for layer in scene.view_layers:
+        layer.use_freestyle = False
     settings.resolution_x, settings.resolution_y = width, max(16, round(width * aspect))
     settings.resolution_percentage = 100
     settings.image_settings.file_format = "PNG"

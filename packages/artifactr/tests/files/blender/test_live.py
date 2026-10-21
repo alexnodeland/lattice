@@ -6,6 +6,7 @@ fidelity report is the corpus harness's, `tests/files/corpus/test_fidelity.py`. 
 every command and every step of `script.py` runs, which no pull request's coverage measures.
 """
 
+import ast
 import os
 import subprocess
 from pathlib import Path
@@ -14,7 +15,7 @@ import pytest
 
 from artifactr.files.app import AppCommand, AppFailed
 from artifactr.files.blender import COMMANDS, Subprocess, scan
-from artifactr.files.blender.headless import ARGUMENTS
+from artifactr.files.blender.headless import ARGUMENTS, SCRIPT
 from artifactr.files.manifest import BLEND
 from tests.files.corpus.blender.corpus import CORPUS
 from tests.files.corpus.harness import pinned
@@ -51,6 +52,8 @@ EVERY = [
     command("camera", at=[8, -8, 6], lens=35),
     command("light", type="sun", energy=3, at=[0, 0, 10]),
     command("light", type="point", energy=500, at=[4, -2, 4], color=[1, 0.9, 0.8]),
+    command("light", type="spot", energy=800, at=[-4, -4, 5], look_at=[0, 0, 1]),
+    command("light", type="area", energy=300, at=[0, -5, 3]),
     command("collection", name="Props"),
     command("collection", name="Small", parent="Props"),
     command("link", object="Sphere", collection="Small"),
@@ -138,3 +141,33 @@ def test_blender_itself_runs_no_script_a_file_holds(tmp_path: Path, name: str) -
         check=True,
     )
     assert not (tmp_path / "ran").exists()
+
+
+def test_the_script_checks_every_collection_of_data_blocks_blender_has(tmp_path: Path) -> None:
+    """The script's post-open check names each collection; one Blender adds must be added."""
+    script = tmp_path / "list.py"
+    script.write_text(
+        "import bpy\n"
+        "kinds = sorted(p.identifier for p in bpy.types.BlendData.bl_rna.properties\n"
+        "               if p.type == 'COLLECTION' and p.identifier != 'all_ids')\n"
+        f"open({str(tmp_path / 'kinds.txt')!r}, 'w').write(' '.join(kinds))\n"
+    )
+    subprocess.run(
+        [os.environ["ARTIFACTR_TEST_CRAFT_CLI"], *ARGUMENTS, str(script)],
+        env={"HOME": str(tmp_path), "LANG": "C.UTF-8", "PATH": "/usr/bin:/bin"},
+        capture_output=True,
+        timeout=120,
+        check=True,
+    )
+    named = set(ast.literal_eval(_collections_source()))
+    assert set((tmp_path / "kinds.txt").read_text().split()) == named
+
+
+def _collections_source() -> str:
+    """The keys of the script's `collections()`, read from its source."""
+    tree = ast.parse(SCRIPT.read_text())
+    (function,) = [
+        n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "collections"
+    ]
+    (returned,) = [n for n in ast.walk(function) if isinstance(n, ast.Dict)]
+    return repr([ast.literal_eval(key) for key in returned.keys if key])

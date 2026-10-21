@@ -82,3 +82,10 @@ class Corpus:
 def pinned(app: str) -> str:
     """The version of the release `scripts/craft` pins for an app, which its CLI must be."""
     return re.findall(r"[-_](\d+\.\d+\.\d+)[-.]", (PINS / f"{app}.sha256").read_text())[0]
+
+
+def dense(head: bytes, tail: bytes, limit: int) -> bytes:
+    """A project's `head`, then a list of zeros, then its `tail`, `limit` bytes in all: the most
+    values its size holds, the most work for its adapter to read before it refuses it."""
+    zeros = (limit - len(head) - len(tail) - 3) // 2
+    return head + b"[" + b"0," * zeros + b"0]" + tail

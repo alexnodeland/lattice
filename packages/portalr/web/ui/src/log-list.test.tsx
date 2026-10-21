@@ -125,7 +125,10 @@ test("a thousand records draw a screenful; the list keeps a tab stop when the ch
     )
     .toBe(false);
   expect((list.element() as HTMLElement).tabIndex).toBe(0);
-  (list.element() as HTMLElement).focus();
+  // Tabbed into, as a keyboard reaches it: what the test before did with the mouse or by events
+  // of its own doesn't matter.
+  (document.activeElement as HTMLElement | null)?.blur();
+  await userEvent.tab();
   await expect.element(option(screen, 1)).toHaveFocus();
   await userEvent.keyboard("{End}");
   await expect.element(option(screen, 1000)).toHaveFocus();
@@ -197,4 +200,21 @@ test("a level that is a property of every object is not a level", async () => {
       .element(screen.getByRole("listbox").getByText(word, { exact: true }))
       .toBeVisible();
   }
+});
+
+test("End then Home, faster than a frame, leave the list at its top: no scroll is retried later", async () => {
+  await viewport(1280, 900);
+  const many = Array.from({ length: 40 }, (_, at) => record(at + 1));
+  const screen = await render(<LogList records={many} complete reveal={revealing().reveal} />);
+  await option(screen, 1).click();
+  const list = screen.getByRole("listbox").element() as HTMLElement;
+  // Both keys in one task, as a busy machine delivers them: before End's scroll is read back.
+  for (const key of ["End", "Home"]) {
+    document.activeElement?.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+  }
+  for (let frame = 0; frame < 12; frame += 1) {
+    await new Promise((done) => requestAnimationFrame(done));
+  }
+  expect(list.scrollTop).toBe(0);
+  await expect.element(option(screen, 1)).toHaveFocus();
 });

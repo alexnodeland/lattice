@@ -13,8 +13,9 @@ export const Route = createRootRouteWithContext<Context>()({
   component: () => (
     <>
       <HeadContent />
-      <NewVersionOffer ui="admin" page={import.meta.env.BASE_URL} />
       <Outlet />
+      {/* After the page, so its skip link stays the first stop of the keyboard. */}
+      <NewVersionOffer ui="admin" page={import.meta.env.BASE_URL} />
     </>
   ),
   errorComponent: Failed,

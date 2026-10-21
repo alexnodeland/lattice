@@ -132,9 +132,11 @@ def test_the_gate_on_uis_imports_passes_types_alone(source: str) -> None:
     assert client_value_imports(source) == []
 
 
-CONFLICT = re.compile(r"^(?:<{7}|\|{7}|>{7})(?: |$)|^={7}$", re.MULTILINE)
+CONFLICT = re.compile(r"^(?:<{7}|\|{7}|>{7})(?: |$)", re.MULTILINE)
 """A merge's conflict markers, diff3's base marker (``|||||||``) among them, which pre-commit's
-``check-merge-conflict`` doesn't know: each at the start of a line, as git writes them."""
+``check-merge-conflict`` doesn't know: each at the start of a line, as git writes them. The
+``=======`` between them is left out: a conflict always has the other two, and Markdown and
+reStructuredText underline a heading with it."""
 
 
 def _tracked_text() -> list[Path]:
@@ -145,9 +147,9 @@ def _tracked_text() -> list[Path]:
 
 
 def test_a_conflict_marker_is_seen_whichever_git_wrote() -> None:
-    for marker in ("<<<<<<< HEAD", "||||||| 92290709", "=======", ">>>>>>> 2ca041e2"):
+    for marker in ("<<<<<<< HEAD", "||||||| 92290709", ">>>>>>> 2ca041e2"):
         assert CONFLICT.search(f"a line\n{marker}\nanother\n"), marker
-    for text in ("======== a longer rule", "a ||||||| in a line", "`=======`"):
+    for text in ("=======", "Title\n=======", "a ||||||| in a line", "`<<<<<<<`"):
         assert not CONFLICT.search(text), text
 
 

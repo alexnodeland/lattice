@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { buildOf, NewVersion, NewVersionOffer } from "./new-version";
 
@@ -195,6 +196,38 @@ test("Reload is the person's to choose, by the keyboard too", async () => {
   const reload = screen.getByRole("button", { name: "Reload" });
   (reload.element() as HTMLButtonElement).focus();
   await expect.element(reload).toHaveFocus();
-  await reload.click();
+  await userEvent.keyboard("{Enter}");
   expect(onReload).toHaveBeenCalledOnce();
+});
+
+test("Not now, chosen by the keyboard, leaves the focus in the offer's region, not lost", async () => {
+  serving(html(`${PAGE}assets/index-New.js`));
+  const screen = await render(<NewVersionOffer ui="app" page={PAGE} />);
+  shown();
+  shown();
+  const notNow = screen.getByRole("button", { name: "Not now" });
+  await expect.element(notNow).toBeVisible();
+  (notNow.element() as HTMLButtonElement).focus();
+  await userEvent.keyboard("{Enter}");
+  await expect.element(offered(screen)).not.toBeInTheDocument();
+  expect(document.activeElement).toBe(screen.container.querySelector('[aria-live="polite"]'));
+});
+
+test("a page with no built entry, as in development, shows nothing and reads nothing", async () => {
+  entry.remove();
+  const fetched = serving(html(`${PAGE}assets/index-New.js`));
+  const screen = await render(<NewVersionOffer ui="app" page={PAGE} every={20} />);
+  shown();
+  await new Promise((settled) => setTimeout(settled, 100));
+  expect(screen.container.innerHTML).toBe("");
+  expect(fetched).not.toHaveBeenCalled();
+});
+
+test("a hidden tab isn't read", async () => {
+  const fetched = serving(html(`${PAGE}assets/index-New.js`));
+  vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+  await render(<NewVersionOffer ui="app" page={PAGE} every={20} />);
+  shown();
+  await new Promise((settled) => setTimeout(settled, 100));
+  expect(fetched).not.toHaveBeenCalled();
 });

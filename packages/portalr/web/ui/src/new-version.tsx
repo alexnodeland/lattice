@@ -8,7 +8,7 @@
  */
 
 import { RefreshCw } from "lucide-react";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Button } from "./button";
 import { Icon } from "./icon";
 import { UI_NAME, type Ui } from "./marks";
@@ -122,7 +122,7 @@ export function NewVersion({
   onDismiss: () => void;
 }) {
   return (
-    <div className="pointer-events-auto mx-auto flex max-w-md flex-wrap items-center gap-3 rounded-lg border border-line bg-surface p-3 text-fg text-sm shadow-lg">
+    <div className="pointer-events-auto mx-auto flex max-w-(--notice-width) flex-wrap items-center gap-3 rounded-(--notice-radius) border border-line bg-surface p-(--notice-pad) text-fg text-sm shadow-(--notice-shadow)">
       <Icon icon={RefreshCw} className="size-4 shrink-0" />
       <p className="min-w-0 flex-1">A new version of {UI_NAME[ui]} is ready. Reload to use it.</p>
       <span className="flex gap-2">
@@ -151,6 +151,7 @@ export function NewVersionOffer({
 }) {
   const newer = useNewVersion(page, every);
   const [dismissed, dismiss] = useDismissed(page);
+  const region = useRef<HTMLDivElement>(null);
   // A page with no build of its own, as in development, has nothing to offer, and no region.
   const [built] = useState(() => buildOf(document, page) !== null);
   if (!built) {
@@ -160,10 +161,19 @@ export function NewVersionOffer({
     <div
       // A polite live region, not a `status`, so the page's own statuses stay the only ones.
       aria-live="polite"
-      className="pointer-events-none fixed inset-x-4 top-16 z-50"
+      ref={region}
+      tabIndex={-1}
+      className="pointer-events-none fixed inset-x-(--notice-inset) top-(--notice-top) z-50 outline-none"
     >
       {newer !== null && newer !== dismissed && (
-        <NewVersion ui={ui} onDismiss={() => dismiss(newer)} />
+        <NewVersion
+          ui={ui}
+          onDismiss={() => {
+            // The button pressed goes with the offer: the region it was in keeps the focus.
+            region.current?.focus();
+            dismiss(newer);
+          }}
+        />
       )}
     </div>
   );

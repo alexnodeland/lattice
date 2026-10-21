@@ -95,7 +95,7 @@ export function ItemTable<T>({
         {items.map((item, index) => (
           <li key={keyOf(item)} {...name(item, index, "card")}>
             <Card className="flex flex-col gap-2">
-              <Heading id={id(index, "card")} level={3} look="label">
+              <Heading id={id(index, "card")} level={3} look="subsection">
                 {first.cell(item)}
               </Heading>
               {rest.length > 0 && (

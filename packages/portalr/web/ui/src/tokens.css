@@ -331,10 +331,13 @@
   --code-panel-pad: var(--space-3);
 
   /*
-   * Links: how far an underline sits below its words; and a breadcrumb's least height, so a crumb
-   * is a target 24px tall or more, and the gap between crumbs.
+   * Links: how far an underline sits below its words, and the size of an external link's mark and
+   * its gap; a breadcrumb's least height, so a crumb is a target 24px tall or more, and the gap
+   * between crumbs (portalr ADR-0059).
    */
   --link-underline-offset: 2px;
+  --link-mark-size: 0.75rem;
+  --link-mark-gap: var(--space-1);
   --breadcrumb-target: 1.5rem;
   --breadcrumb-gap: var(--space-1-5);
 }

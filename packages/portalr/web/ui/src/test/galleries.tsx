@@ -579,11 +579,7 @@ export function Kit() {
       </TabNav>
       <TextArea label="Note" error="It can't be empty." defaultValue="" />
       <p>
-        Read <TextLink href="#more">more about it</TextLink>, see{" "}
-        <TextLink variant="subtle" href="#trace">
-          trace_1
-        </TextLink>
-        , go to{" "}
+        Read <TextLink href="#more">more about it</TextLink>, go to{" "}
         <TextLink variant="nav" href="#runs">
           Runs
         </TextLink>{" "}
@@ -593,6 +589,9 @@ export function Kit() {
         </TextLink>
         .
       </p>
+      <TextLink variant="subtle" href="#trace">
+        trace_1
+      </TextLink>
       <Breadcrumbs
         trail={[
           { label: "Workspace", href: "#notes" },

@@ -67,7 +67,6 @@ function Workspaces() {
                   <li key={label}>
                     <TextLink
                       variant="nav"
-                      className="text-sm"
                       render={<Link to={to} params={{ tenant, workspace }} />}
                     >
                       {label}

@@ -1031,6 +1031,15 @@
           "value": 2,
           "unit": "px"
         }
+      },
+      "mark-size": {
+        "$value": {
+          "value": 0.75,
+          "unit": "rem"
+        }
+      },
+      "mark-gap": {
+        "$value": "{space.1}"
       }
     },
     "breadcrumb": {

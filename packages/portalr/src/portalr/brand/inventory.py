@@ -386,10 +386,13 @@ COMPONENTS: tuple[Group, ...] = (
         (Row("component.code-panel.pad", "--code-panel-pad", "dimension"),),
     ),
     Group(
-        "Links: how far an underline sits below its words; and a breadcrumb's least height, so"
-        " a crumb is a target 24px tall or more, and the gap between crumbs.",
+        "Links: how far an underline sits below its words, and the size of an external link's"
+        " mark and its gap; a breadcrumb's least height, so a crumb is a target 24px tall or"
+        " more, and the gap between crumbs (portalr ADR-0059).",
         (
             Row("component.link.underline-offset", "--link-underline-offset", "dimension"),
+            Row("component.link.mark-size", "--link-mark-size", "dimension"),
+            Row("component.link.mark-gap", "--link-mark-gap", "dimension"),
             Row("component.breadcrumb.target", "--breadcrumb-target", "dimension"),
             Row("component.breadcrumb.gap", "--breadcrumb-gap", "dimension"),
         ),

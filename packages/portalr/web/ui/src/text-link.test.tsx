@@ -50,6 +50,8 @@ test("a subtle link is in the text's colour, its underline quiet until hovered",
   const link = screen.getByRole("link", { name: "trace_1" }).element();
   expect(getComputedStyle(link).color).toBe(token("fg"));
   expect(getComputedStyle(link).textDecorationColor).toBe(token("edge"));
+  // Its underline is a mark, 3:1 or more on the paper; it stands alone, never in running text.
+  expect(contrast(token("edge"), token("paper"))).toBeGreaterThanOrEqual(3);
   await userEvent.hover(link);
   expect(getComputedStyle(link).color).toBe(token("accent"));
 });
@@ -76,4 +78,33 @@ test("an external link opens a new tab, safely, and says so", async () => {
   expect(link.getAttribute("target")).toBe("_blank");
   expect(link.getAttribute("rel")).toBe("noopener noreferrer");
   expect(link.querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
+  expect(getComputedStyle(link).display).toBe("inline");
+});
+
+test("a caller can't weaken an external link's new tab", async () => {
+  const screen = await render(
+    <TextLink variant="external" href="https://example.com" target="_self" rel="opener">
+      Grafana
+    </TextLink>,
+  );
+  const link = screen.getByRole("link", { name: "Grafana (opens in a new tab)" }).element();
+  expect(link.getAttribute("target")).toBe("_blank");
+  expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+});
+
+test("a long external link wraps, and its mark stays with its last word", async () => {
+  const screen = await render(
+    <p style={{ width: "10rem" }}>
+      <TextLink variant="external" href="https://example.com">
+        The tenant's traces in Grafana, from Tempo
+      </TextLink>
+    </p>,
+  );
+  const link = screen.getByRole("link").element();
+  expect(link.getClientRects().length).toBeGreaterThan(1);
+  const mark = link.querySelector("svg") as Element;
+  const lines = [...link.getClientRects()];
+  expect(Math.round(mark.getBoundingClientRect().bottom)).toBeLessThanOrEqual(
+    Math.round((lines.at(-1) as DOMRect).bottom),
+  );
 });

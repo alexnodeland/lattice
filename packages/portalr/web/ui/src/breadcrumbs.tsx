@@ -6,16 +6,17 @@ import { TYPE } from "./type";
 export type Crumb = { label: string } & ({ render: ReactElement } | { href: string });
 
 /**
- * The way back up (portalr ADR-0058): the places above this page, outermost first, each a quiet
+ * The way back up (portalr ADR-0059): the places above this page, outermost first, each a quiet
  * link 24px tall or more, so it is a target on a phone. The page itself is its heading, not a
  * crumb. Named "Breadcrumb", as assistive technology expects.
  */
 export function Breadcrumbs({ trail }: { trail: readonly Crumb[] }) {
+  if (trail.length === 0) return null;
   return (
     <nav aria-label="Breadcrumb" className={TYPE.meta}>
       <ol className="flex flex-wrap items-center gap-x-(--breadcrumb-gap)">
         {trail.map(({ label, ...to }, at) => (
-          <li key={label} className="flex items-center gap-x-(--breadcrumb-gap)">
+          <li key={`${at}:${label}`} className="flex items-center gap-x-(--breadcrumb-gap)">
             {at > 0 && <span aria-hidden="true">/</span>}
             <TextLink
               variant="subtle"

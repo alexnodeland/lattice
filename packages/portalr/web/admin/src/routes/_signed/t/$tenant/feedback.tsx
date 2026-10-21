@@ -281,9 +281,8 @@ function Comments({ comments }: { comments: readonly Comment[] }) {
               </TextLink>
               {template && (
                 <TextLink
+                  variant="external"
                   href={template.replace(TEMPLATE, encodeURIComponent(comment.trace_id))}
-                  target="_blank"
-                  rel="noreferrer"
                 >
                   Langfuse
                 </TextLink>

@@ -1,15 +1,18 @@
 """What the adapter reads from a video project itself: its format, and what it draws from outside.
 
-A `.fcproj` is JSON that says it is one by its `format`. Its media are its own when FilmCraft
-generates them (bars, mattes, demo footage); an imported file, a proxy, or a LUT from a file or
-the user's library is named by path, outside the project, so a project that holds one isn't a
-whole file: its frames would depend on files lattice doesn't keep (native files ADR-0016).
+A `.fcproj` is JSON that says it is one by its `format`. Its items are of the kinds a project
+holds itself, sequences, graphics and media, and anything else is refused. Its media are its own
+when FilmCraft generates them (bars, mattes, demo footage); an imported file, a proxy, or a LUT
+from a file or the user's library is named by path, outside the project, so a project that holds
+one isn't a whole file: its frames would depend on files lattice doesn't keep (native files
+ADR-0016). Of FilmCraft 0.8.0's 303 effects, only its colour effect's two LUTs take a path, as
+its `effects.list` says of their parameters' types.
 """
 
 from collections.abc import Iterator
 from typing import Final
 
-from pydantic import BaseModel, Field, JsonValue, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, ValidationError
 
 from artifactr.files.app import AppFailed
 from artifactr.files.craft.project import project
@@ -41,6 +44,7 @@ class _Track(BaseModel):
 
 class _Sequence(BaseModel):
     video_tracks: list[_Track] = []
+    audio_tracks: list[_Track] = []
 
 
 class _Media(BaseModel):
@@ -51,8 +55,13 @@ class _Media(BaseModel):
 
 
 class _Kind(BaseModel):
+    """What an item is: one of the kinds a project holds itself, and anything else is extra."""
+
+    model_config = ConfigDict(extra="allow")
+
     media: _Media | None = Field(default=None, alias="Media")
     sequence: _Sequence | None = Field(default=None, alias="Sequence")
+    graphic: JsonValue = Field(default=None, alias="Graphic")
 
 
 class _Item(BaseModel):
@@ -90,9 +99,17 @@ def outside(content: bytes) -> list[str]:
 
 
 def _outside(item: _Item) -> Iterator[str]:
-    if (media := item.kind.media) and (set(media.media) != {"Generator"} or media.proxy):
+    """What an item draws from outside, by name.
+
+    The item itself, if it is of a kind no project holds itself, or a medium that isn't
+    FilmCraft's generator's; and each LUT one of its clips names.
+    """
+    if item.kind.model_extra or (
+        (media := item.kind.media) and (set(media.media) != {"Generator"} or media.proxy)
+    ):
         yield item.name
-    for track in item.kind.sequence.video_tracks if item.kind.sequence else []:
+    sequence = item.kind.sequence
+    for track in [*sequence.video_tracks, *sequence.audio_tracks] if sequence else []:
         for clip in track.items:
             for effect in clip.effects:
                 for lut in LUTS:

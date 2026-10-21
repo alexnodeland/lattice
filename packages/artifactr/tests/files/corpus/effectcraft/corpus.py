@@ -10,7 +10,7 @@ from artifactr.files.craft.project import LIMIT
 from artifactr.files.effectcraft import Subprocess
 from tests.files.corpus.effectcraft.features import read
 from tests.files.corpus.effectcraft.make import HERE, MADE
-from tests.files.corpus.harness import Corpus
+from tests.files.corpus.harness import Corpus, dense
 
 SAID = b'{"savedBy": "0.11.1", "schema": 2'
 """How an `.ecproj` starts, saying which release saved it."""
@@ -106,6 +106,7 @@ CORPUS = Corpus(
         "not_json": not_json,
         "too_large": too_large,
         "nested": nested,
+        "dense": partial(dense, b'{"savedBy": "0.11.1", "schema": 2, "items": ', b"}", LIMIT),
         "no_items": no_items,
         "footage_at_a_path": partial(footage, "/etc/hosts"),
         "footage_up_the_tree": partial(footage, "../../../etc/hosts"),

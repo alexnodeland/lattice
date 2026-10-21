@@ -10,7 +10,7 @@ from artifactr.files.craft.project import LIMIT
 from artifactr.files.filmcraft import Subprocess
 from tests.files.corpus.filmcraft.features import read
 from tests.files.corpus.filmcraft.make import HERE, MADE
-from tests.files.corpus.harness import Corpus
+from tests.files.corpus.harness import Corpus, dense
 
 
 def kept(content: bytes) -> bytes:
@@ -101,6 +101,9 @@ CORPUS = Corpus(
         "not_json": not_json,
         "too_large": too_large,
         "nested": nested,
+        "dense": partial(
+            dense, b'{"format": "filmcraft.project", "project": {"items": ', b"}}", LIMIT
+        ),
         "no_items": no_items,
         "media_at_a_path": partial(media, "/etc/hosts"),
         "media_up_the_tree": partial(media, "../../../etc/hosts"),

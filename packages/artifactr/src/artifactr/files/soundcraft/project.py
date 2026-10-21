@@ -20,6 +20,9 @@ from artifactr.files.manifest import SCRAFT
 PLUGINS: Final = ("vst3:", "clap:", "au:")
 """How SoundCraft names a plugin of another maker's: its format, then its id."""
 
+NAMED: Final = frozenset({"plugin", "instrument"})
+"""The fields that name a plugin: a session's and a command's (`track.new`'s `instrument`)."""
+
 
 class _Medium(BaseModel):
     name: str = ""
@@ -58,12 +61,17 @@ def outside(content: bytes) -> list[str]:
 
 
 def plugins(node: JsonValue) -> Iterator[str]:
-    """Every plugin of another maker's that JSON names, wherever it is, by its id."""
-    if isinstance(node, str) and node.startswith(PLUGINS):
-        yield node
-    elif isinstance(node, dict):
-        for value in node.values():
-            yield from plugins(value)
-    elif isinstance(node, list):
-        for value in node:
-            yield from plugins(value)
+    """Every plugin of another maker's that JSON names, by its id, however it is cased.
+
+    A plugin is named by a `plugin` or an `instrument` field; the JSON is walked without recursion.
+    """
+    stack: list[JsonValue] = [node]
+    while stack:
+        found = stack.pop()
+        if isinstance(found, dict):
+            for key, value in found.items():
+                if key in NAMED and isinstance(value, str) and value.casefold().startswith(PLUGINS):
+                    yield value
+                stack.append(value)
+        elif isinstance(found, list):
+            stack.extend(found)

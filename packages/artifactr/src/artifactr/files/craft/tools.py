@@ -46,20 +46,6 @@ class ToolsDialect(Headless):
     list_tool: ClassVar[str] = "list_commands"
     list_argument: ClassVar[str] = "query"
     """The list tool's argument that it matches commands by."""
-    denied: ClassVar[tuple[str, ...]] = ()
-    """The prefixes of the commands no batch may run, such as `file.`, which reach past the open
-    file: refused before any command runs, and never found."""
-
-    def allowed(self, commands: Sequence[AppCommand]) -> None:
-        """Refuse a batch that holds a denied command, before any runs.
-
-        Raises:
-            AppFailed: `refused`, naming the command.
-        """
-        if found := next((c.name for c in commands if c.name.startswith(self.denied)), None):
-            raise AppFailed(
-                "refused", f"{found}: {self.craft.title}'s adapter runs no such command"
-            )
 
     @override
     async def open(self, server: Server, source: bytes | None) -> JsonValue:

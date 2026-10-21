@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from artifactr.files.app import App, AppFailed
+from artifactr.files.app import App, AppCommand, AppFailed
 from artifactr.files.filmcraft import Subprocess
 from artifactr.files.manifest import FCPROJ
 from tests.files.corpus.made import step
@@ -89,7 +89,7 @@ async def test_an_empty_sequence_has_a_page(filmcraft: Subprocess) -> None:
 
 
 async def test_a_batch_that_brings_in_a_file_is_refused(filmcraft: Subprocess) -> None:
-    importing = step("file.importMedia", name="clip.mov", path="/etc/hosts")
+    importing = step("project.addMedia", name="clip.mov", at="/etc/hosts")
     with pytest.raises(AppFailed, match=r"draws on what it doesn't hold: clip\.mov") as refused:
         await filmcraft.apply(None, [step("file.newBin", name="In"), importing], deadline=20)
     assert refused.value.failure == "refused"
@@ -141,3 +141,22 @@ async def test_it_finds_ten_commands_at_most(filmcraft: Subprocess) -> None:
     found = await filmcraft.commands("razor")
     assert len(found) == 6, "the stand-in repeats each match six times"
     assert (found[0].name, found[0].description) == ("timeline.razor", "Razor")
+
+
+@pytest.mark.parametrize(
+    ("command", "message"),
+    [
+        (step("export.quick", preset="H.264"), "export.quick: FilmCraft's adapter runs no such"),
+        (
+            step("file.saveAs", path="/tmp/a.fcproj"),
+            "file.saveAs: FilmCraft's adapter runs no such",
+        ),
+        (step("captions.import", path="/etc/hosts"), "captions.import: FilmCraft's adapter gives"),
+    ],
+)
+async def test_a_batch_that_reaches_past_the_project_is_refused_before_it_runs(
+    filmcraft: Subprocess, command: AppCommand, message: str
+) -> None:
+    with pytest.raises(AppFailed, match=message) as refused:
+        await filmcraft.apply(None, [SEQUENCE, command], deadline=20)
+    assert refused.value.failure == "refused"

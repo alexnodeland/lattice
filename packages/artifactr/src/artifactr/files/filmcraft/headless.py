@@ -9,13 +9,12 @@ the adapter is made only with `trusted=True`.
 """
 
 import hashlib
-import math
 from collections.abc import Sequence
 from typing import ClassVar, Final, override
 
 from pydantic import BaseModel, Field, JsonValue
 
-from artifactr.files.app import AppFailed, Inspection
+from artifactr.files.app import AppCommand, AppFailed, Inspection
 from artifactr.files.craft import CRAFTS, PREVIEW, CommandsDialect, Craft, Server
 from artifactr.files.craft.project import whole
 from artifactr.files.filmcraft.project import media_type, outside
@@ -23,6 +22,12 @@ from artifactr.files.manifest import OUTLINE_LIMIT
 
 TICKS: Final = 254_016_000_000
 """FilmCraft's ticks in a second, by which it times a sequence."""
+
+PAGES: Final = 10_000
+"""The most pages a project has: its first seconds, ten thousand at most."""
+
+PATHS: Final = frozenset({"path", "paths", "file", "folder", "dir"})
+"""The parameters by which a command names a file or a folder."""
 
 
 class _Node(BaseModel):
@@ -57,8 +62,8 @@ class _Sequence(BaseModel):
 
     @property
     def pages(self) -> int:
-        """A page a second it lasts, one at least."""
-        return max(1, math.ceil(self.duration / TICKS))
+        """A page a second it lasts, one at least, `PAGES` at most."""
+        return min(PAGES, max(1, -(-self.duration // TICKS)))
 
 
 class _Project(BaseModel):
@@ -105,6 +110,30 @@ class Subprocess(CommandsDialect):
     new_command: ClassVar[str | None] = "file.newProject"
     save_command: ClassVar[str] = "file.saveCopy"
     handle: ClassVar[str | None] = None
+    denied: ClassVar[tuple[str, ...]] = (
+        *("file.open", "file.save", "file.close", "file.revert", "file.recover", "file.importAaf"),
+        *("file.export", "file.autoSave", "file.listAutoSaves", "file.discardRecovery"),
+        *("export.", "mediaBrowser.", "media.", "lut.", "presets.", "shortcuts.", "labels."),
+        *("graphics.template.", "graphics.newFromFile", "tts.", "app."),
+        *(
+            "file.projectSettings.scratchDisks",
+            "file.newProjectFromTemplate",
+            "file.newOfflineFile",
+        ),
+    )
+    """The commands that read or write a file, or reach past the project: its CLI confines
+    nothing, so no batch runs them."""
+
+    @override
+    def allowed(self, commands: Sequence[AppCommand]) -> None:
+        """Refuse a batch that holds a denied command, or a command given a path.
+
+        Raises:
+            AppFailed: `refused`, naming the command.
+        """
+        super().allowed(commands)
+        if found := next((c.name for c in commands if PATHS & set(c.args)), None):
+            raise AppFailed("refused", f"{found}: FilmCraft's adapter gives no command a path")
 
     @override
     async def open(self, server: Server, source: bytes | None) -> JsonValue:

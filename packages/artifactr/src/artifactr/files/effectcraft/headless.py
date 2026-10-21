@@ -20,6 +20,9 @@ from artifactr.files.craft.project import whole
 from artifactr.files.effectcraft.project import media_type, outside
 from artifactr.files.manifest import OUTLINE_LIMIT
 
+PAGES: Final = 10_000
+"""The most pages a project has: its first seconds, ten thousand at most."""
+
 SOURCE_TEXT: Final = "text/sourceText"
 """The property that holds a text layer's words."""
 
@@ -42,13 +45,13 @@ class _Layer(BaseModel):
 
 class _Comp(BaseModel):
     name: str
-    duration: float = 0.0
+    duration: float = Field(default=0.0, ge=0, allow_inf_nan=False)
     layers: list[_Layer] = []
 
     @property
     def pages(self) -> int:
-        """A page a second it lasts, one at least."""
-        return max(1, math.ceil(self.duration))
+        """A page a second it lasts, one at least, `PAGES` at most."""
+        return min(PAGES, max(1, math.ceil(min(self.duration, PAGES))))
 
 
 class _Project(BaseModel):

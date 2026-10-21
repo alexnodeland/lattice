@@ -8,7 +8,7 @@ from typing import Any
 from artifactr.files.app import App
 from artifactr.files.craft.project import LIMIT
 from artifactr.files.soundcraft import Subprocess
-from tests.files.corpus.harness import Corpus
+from tests.files.corpus.harness import Corpus, dense
 from tests.files.corpus.soundcraft.features import read
 from tests.files.corpus.soundcraft.make import HERE, MADE
 
@@ -101,6 +101,7 @@ CORPUS = Corpus(
         "not_json": not_json,
         "too_large": too_large,
         "nested": nested,
+        "dense": partial(dense, b'{"format_version": 1, "sources": [], "tracks": ', b"}", LIMIT),
         "no_sources": no_sources,
         "audio_at_a_path": partial(audio, "/etc/hosts"),
         "audio_up_the_tree": partial(audio, "../../../etc/hosts"),

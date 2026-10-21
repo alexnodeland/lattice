@@ -55,10 +55,10 @@ def main() -> None:
         if command == "file.newBin":
             project["bins"].append({"name": params["name"], "children": []})
             return {"bin": len(project["bins"])}
-        if command == "file.importMedia" and project["bins"]:
+        if command == "project.addMedia" and project["bins"]:
             item = {"name": params["name"], "type": "Movie"}
             project["bins"][-1]["children"].append(item)
-            media = {"File": {"path": params["path"]}}
+            media = {"File": {"path": params["at"]}}
             project["project"]["items"]["8"] = {
                 "name": params["name"],
                 "kind": {"Media": {"media": media}},

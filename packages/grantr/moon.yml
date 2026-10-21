@@ -38,7 +38,7 @@ tasks:
   # them.
   test-pg:
     description: 'Run the tests on PostgreSQL as well as SQLite (after pg-up)'
-    command: 'uv run pytest --cov --cov-report=term-missing'
+    command: 'uv run pytest --cov --cov-report=term-missing --durations=10'
     env:
       GRANTR_TEST_POSTGRES_URL: 'postgresql+asyncpg://postgres:grantr@localhost:54331/postgres'
     options:

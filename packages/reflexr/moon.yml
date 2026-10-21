@@ -66,7 +66,7 @@ tasks:
 
   test-pg:
     description: 'Run the tests on PostgreSQL as well as SQLite (after pg-up)'
-    command: 'uv run pytest --cov --cov-report=term-missing'
+    command: 'uv run pytest --cov --cov-report=term-missing --durations=10'
     env:
       REFLEXR_TEST_POSTGRES_URL: 'postgresql+asyncpg://postgres:reflexr@localhost:54330/postgres'
     options:

@@ -13,10 +13,11 @@ import { appOf, kindsOf, uploadRefused } from "./upload";
 
 const PAGE = "/t/acme/w/notes/artifacts";
 const KINDS = [
-  { kind: "word_document", extensions: [".docx"], enabled: true },
-  { kind: "workbook", extensions: [".xlsx"], enabled: false },
-  { kind: "drawing", extensions: [".dwg", ".dxf"], enabled: true },
-  { kind: "other_drawing", extensions: [".DXF"], enabled: true },
+  { kind: "word_document", extensions: [".docx"], enabled: true, limit: 1000 },
+  { kind: "workbook", extensions: [".xlsx"], enabled: false, limit: 1000 },
+  { kind: "drawing", extensions: [".dwg", ".dxf"], enabled: true, limit: 1000 },
+  { kind: "other_drawing", extensions: [".DXF"], enabled: true, limit: 1000 },
+  { kind: "video_project", extensions: [".fcproj"], enabled: true, limit: 500 },
 ];
 
 function serving(uploads: unknown) {
@@ -42,10 +43,12 @@ test("files chosen together are sent one after another, each of its kind, and sa
   vi.stubGlobal("XMLHttpRequest", Upload);
   const { screen } = await open(PAGE, serving(offered()));
   const input = screen.getByLabelText("Upload files");
-  await expect.element(input).toHaveAttribute("accept", ".docx,.dwg,.dxf,.DXF");
+  await expect.element(input).toHaveAttribute("accept", ".docx,.dwg,.dxf,.DXF,.fcproj");
   await expect
     .element(input)
-    .toHaveAccessibleDescription(".docx, .dwg, .dxf, .DXF, up to 1 kB each. Or drop them here.");
+    .toHaveAccessibleDescription(
+      ".docx, .dwg, .dxf, .DXF, .fcproj, up to 1 kB each. Or drop them here.",
+    );
   await input.upload([new File(["one"], "brief.docx"), new File(["two"], "plan.dwg")]);
   const first = await sent(1);
   expect(first.url).toMatch(/^\/artifactr\/v1\/workspaces\/notes\/files\?/);
@@ -88,12 +91,14 @@ test("a file of no kind, of several, of an app that is off, or too large is neve
       new File(["x"], "plan.dxf"),
       new File(["x"], "sums.xlsx"),
       new File(["x".repeat(1001)], "big.docx"),
+      new File(["x".repeat(600)], "cut.fcproj"),
     ]);
   for (const said of [
     "notes.txt isn't a kind of file this workspace takes.",
     "plan.dxf could be several kinds of file, so it can't be told which to make.",
     "GridCraft is off in this workspace, so sums.xlsx can't be uploaded.",
-    "big.docx is 1 kB: the largest file an upload takes is 1 kB.",
+    "big.docx is 1 kB: the largest file of its kind an upload takes is 1 kB.",
+    "cut.fcproj is 600 bytes: the largest file of its kind an upload takes is 500 bytes.",
   ]) {
     await expect.element(screen.getByText(said, { exact: true }).first()).toBeVisible();
   }

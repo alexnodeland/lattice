@@ -61,6 +61,7 @@ export function UploadList({
                 {item.state === "sending" ? (
                   <Progress
                     label={`Uploading ${plainName(item.name)}`}
+                    shown="Uploading"
                     value={item.sent ?? 0}
                     max={item.size}
                     valueText={`${fileSize(item.sent ?? 0)} of ${fileSize(item.size)}`}

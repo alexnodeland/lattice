@@ -10,8 +10,9 @@ import pytest
 
 from artifactr.core import Applied, InvalidState, Proposed, UserActor, ValidationFailed
 from artifactr.files.app import AppFailed, Failure, FakeApp, Inspection
-from artifactr.files.blobs import InMemoryBlobs, Quota, TooLarge, once
+from artifactr.files.blobs import DEFAULT_LIMIT, InMemoryBlobs, Quota, TooLarge, once
 from artifactr.files.checkouts import InMemoryCheckouts
+from artifactr.files.craft.project import LIMIT
 from artifactr.files.manifest import (
     DOCX,
     FCPROJ,
@@ -23,6 +24,7 @@ from artifactr.files.manifest import (
     Workbook,
 )
 from artifactr.files.native import FORMATS, Busy, Format, NativeFiles
+from artifactr.files.native.formats import PROJECT
 from artifactr.workspace import InMemoryStorage, Workspace, Workspaces
 from tests.files.conftest import Stores
 
@@ -230,3 +232,31 @@ async def test_a_project_past_what_its_app_reads_is_refused_as_it_streams(stores
     with pytest.raises(TooLarge):
         await files.upload(await workspace(), VideoProject, "cut.fcproj", big())
     assert len(read) < 64, "refused before it was all read"
+
+
+async def test_a_project_of_exactly_its_most_is_taken(stores: Stores) -> None:
+    files = NativeFiles(stores.blobs, stores.checkouts, Names(FCPROJ))
+    whole = b"{" + b" " * (PROJECT - 2) + b"}"
+    uploaded = await files.upload(await workspace(), VideoProject, "cut.fcproj", once(whole))
+    assert isinstance(uploaded, Applied)
+
+
+async def test_a_format_with_no_most_of_its_own_takes_the_stores() -> None:
+    files = NativeFiles(InMemoryBlobs(), InMemoryCheckouts(), Names(DOCX))
+    zipped = once(b"PK\x03\x04" + b"\x00" * (PROJECT + 1))
+    assert await files.upload(await workspace(), WordDocument, "w.docx", zipped)
+    assert files.most(WordDocument) == DEFAULT_LIMIT
+    assert files.most(VideoProject) == PROJECT
+
+
+async def test_a_check_in_past_its_formats_most_is_refused_as_it_streams() -> None:
+    files = NativeFiles(InMemoryBlobs(), InMemoryCheckouts(), Names(FCPROJ))
+    ws = await workspace()
+    await files.upload(ws, VideoProject, "cut.fcproj", once(b"{}"), artifact_id="a1")
+    checkout = await files.check_out(ws, "a1")
+    with pytest.raises(TooLarge):
+        await files.check_in(ws, checkout.id, once(b"{" + b" " * PROJECT + b"}"))
+
+
+def test_a_projects_most_is_what_its_adapter_reads() -> None:
+    assert PROJECT == LIMIT

@@ -101,8 +101,10 @@ export function LogList({
       setChosen(next.id);
       // One scroll, to where the row's fixed height puts it: `scrollToIndex` retries over the
       // frames that follow, and a retry left from an earlier key scrolls back to its row.
-      const [offset] = virtual.getOffsetForIndex(clamped, "auto") ?? [0];
-      virtual.scrollToOffset(offset);
+      const placed = virtual.getOffsetForIndex(clamped, "auto");
+      if (placed) {
+        virtual.scrollToOffset(placed[0]);
+      }
     }
   }
 

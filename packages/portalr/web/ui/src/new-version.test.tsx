@@ -49,9 +49,9 @@ async function answered(fetched: ReturnType<typeof serving>, reads: number) {
   await new Promise((settled) => setTimeout(settled, 0));
 }
 
-/** The offer's Reload, in its region. */
+/** The offer's Reload. */
 const offered = (screen: Awaited<ReturnType<typeof render>>) =>
-  screen.getByRole("status", { name: "A new version" }).getByRole("button", { name: "Reload" });
+  screen.getByRole("button", { name: "Reload" });
 
 test("a page's build is its entry under the UI's assets, whatever module script comes first", () => {
   const parsed = new DOMParser().parseFromString(page(`${PAGE}assets/index-Ab12.js`), "text/html");
@@ -63,9 +63,10 @@ test("a page's build is its entry under the UI's assets, whatever module script 
 test("the live region is there before anything is offered in it", async () => {
   serving(html(RUNNING));
   const screen = await render(<NewVersionOffer ui="app" page={PAGE} />);
-  const region = screen.getByRole("status", { name: "A new version" });
-  await expect.element(region).toBeInTheDocument();
-  await expect.element(region).toBeEmptyDOMElement();
+  const region = screen.container.querySelector('[aria-live="polite"]');
+  expect(region).not.toBeNull();
+  expect(region?.childElementCount).toBe(0);
+  expect(document.querySelector('[role="status"]')).toBeNull();
 });
 
 test("a new build, read twice running, is offered when the tab is shown again", async () => {

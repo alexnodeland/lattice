@@ -52,4 +52,4 @@ The shim is the only route above level 1 that changes no build and puts none on 
 
 1. [x] `shim_page`, `shim_policy`, and `editor_app(build, craft=, portal=, methods=)`.
 2. [x] `bridged`, and `Headless.talk` by the build's surface.
-3. [ ] portalr: frame the shim, open the check-out in it, and check in its saves.
+3. [x] portalr: frame the shim, open the check-out in it, and check in its saves ([portalr ADR-0055](../../../portalr/adr/0055-every-kind-inline-and-a-native-file-read-and-edited-in-its-thread.md)).

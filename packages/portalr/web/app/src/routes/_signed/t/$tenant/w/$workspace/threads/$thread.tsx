@@ -126,7 +126,8 @@ function Chat() {
       Threads
     </TextLink>
   );
-  const { queries, queryClient, user, config } = Route.useRouteContext();
+  const context = Route.useRouteContext();
+  const { queries, queryClient, user, config } = context;
   const me = useMe(queries, user, tenant);
   const checks = useMemo(
     () => allowedIn(queries, tenant, threadOf(workspace, id), ACTIONS),
@@ -289,7 +290,8 @@ function Chat() {
               return (
                 <ThreadArtifact
                   key={entry.artifact.id}
-                  context={{ config, queries }}
+                  context={context}
+                  me={me}
                   tenant={tenant}
                   workspace={workspace}
                   artifact={entry.artifact}

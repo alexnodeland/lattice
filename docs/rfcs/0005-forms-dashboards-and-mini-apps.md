@@ -356,6 +356,16 @@ Beside phase 3, the owner asked for `ask_user` to ask as Claude Code's AskUserQu
 - **The string form is gone,** pre-release: a request asked before is answered by a reply.
 - **`ask_form` is unchanged:** a schema, a date, a number or a note is still a form's. The protocol's schema carries the shapes as `ask_user` and `ask_user_answer`, and portalr draws them as a card of radio and checkbox groups ([portalr ADR-0053](../portalr/adr/0053-the-chats-questions-tool-calls-sides-failures-and-streaming.md)).
 
+## Amendment (2026-10-20): every kind in its thread, a native file too
+
+[portalr ADR-0052](../portalr/adr/0052-artifacts-inline-in-their-thread.md) showed a mini app in the thread it was made in; [portalr ADR-0055](../portalr/adr/0055-every-kind-inline-and-a-native-file-read-and-edited-in-its-thread.md) shows every kind the app draws there. It is a phase of its own, beside phase 3, which is unchanged:
+
+| Phase | Deliverable | Exit criteria |
+|---|---|---|
+| 3a. Every kind in its thread | `inline` on every kit renderer; the entry's kind and full view; a form sent from its thread; a native file a page at a time, a workbook's cells, its outline and text, its download, its check-out, and, where its build hands the file over (talk level 1+), one box that flips between the preview and the app's editor, which tries to let the check-out go on the way back | Each kind shows where it was made, at its latest version, without a remount that loses what was entered; a form sent from a thread is one submission; a file's pages are its app's renders, never the browser's reading of the file; a file whose app is off is only read; flipping keeps the preview's state, asks before discarding unsaved work, and, once back, holds no check-out unless letting it go was refused, which it says; the editor is heard from its own frame and origin alone, and only a save in the file's own format is checked in; screenshots of each kind, wide and narrow, in each scheme |
+
+What stays on its page: a revision's changes, a proposal's pages compared, and the feedback on a version. A tracker item is a run's ([portalr ADR-0046](../portalr/adr/0046-tracker-links-on-runs.md)), and a proposal is the thread's already; neither is an artifact.
+
 [a-adr-0002]: ../artifactr/adr/0002-single-write-path.md
 [a-adr-0003]: ../artifactr/adr/0003-artifact-types-as-pydantic-subclasses.md
 [a-adr-0010]: ../artifactr/adr/0010-pausing-with-deferred-tools.md

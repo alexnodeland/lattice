@@ -13,6 +13,7 @@ import {
   RunStatus,
   Streaming,
   Thumbs,
+  unhidden,
 } from "./chat";
 import { IntegrationsContext } from "./integrations";
 import { contrast, token } from "./test/colours";
@@ -270,6 +271,37 @@ test("a connected app's code is shown whole, with what it runs as and what a sca
   await expect.element(card.getByText(/with your own privileges/)).toBeVisible();
   await expect.element(card.getByRole("button", { name: "Copy the code" })).toBeVisible();
   await expect.element(card.getByText("line 1: imports os")).toBeVisible();
+});
+
+test("a scan that found nothing says it can't find everything, and long code says so", async () => {
+  const code = Array.from({ length: 50 }, (_, n) => `x${n} = ${n}`).join("\n");
+  const request: ArtifactrV1.DeferredRequest = {
+    kind: "approval",
+    tool_call_id: "t1",
+    tool_name: "blender_execute_blender_code",
+    args: { code },
+    review: {
+      app: "Blender",
+      risk: "code",
+      runs: "Runs code.",
+      holds: "An approval holds.",
+      code,
+      findings: [],
+    },
+  };
+  const screen = await render(<Request request={request} onAnswer={sent()} />);
+  await expect
+    .element(screen.getByText("A quick scan found nothing; it can't find everything."))
+    .toBeVisible();
+  await expect.element(screen.getByText(/It is 50 lines long/)).toBeVisible();
+  await expect.element(screen.getByText("An approval holds.")).toBeVisible();
+});
+
+test("a character a reader wouldn't see is shown as its code point", () => {
+  expect(unhidden("a\u202eb\u200bc\u0000")).toBe(
+    "a\u27e6U+202E\u27e7b\u27e6U+200B\u27e7c\u27e6U+0000\u27e7",
+  );
+  expect(unhidden("plain\tcode\n")).toBe("plain\tcode\n");
 });
 
 test("a call can be denied", async () => {

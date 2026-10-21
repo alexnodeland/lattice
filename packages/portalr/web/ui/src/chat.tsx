@@ -29,7 +29,7 @@ import { Markdown } from "./markdown";
 import { Questions, type QuestionsAnswer } from "./questions";
 import { SchemaForm } from "./schema-form";
 import { type Sent, Unsent, useSending } from "./sending";
-import { SourceView } from "./source-view";
+import { FOLDED_LINES, SourceView } from "./source-view";
 import { StatusBadge, type Tone } from "./status-badge";
 import { TextField } from "./text-field";
 import { TYPE } from "./type";
@@ -556,11 +556,12 @@ function Question({
  * and copy; and what a scan found in it, which is advisory: the person reading is the gate.
  */
 function Review({ review }: { review: Record<string, unknown> }) {
-  const { app, risk, runs, code, findings } = review;
+  const { app, risk, runs, holds, code, findings } = review;
   if (typeof app !== "string" || typeof runs !== "string") {
     return null;
   }
   const found = Array.isArray(findings) ? findings.filter((f) => typeof f === "string") : [];
+  const lines = typeof code === "string" ? code.split("\n").length : 0;
   return (
     <div className="flex flex-col gap-2">
       <StatusBadge tone="retrying" className="self-start">
@@ -569,19 +570,56 @@ function Review({ review }: { review: Record<string, unknown> }) {
           : `Runs code in your ${app}`}
       </StatusBadge>
       <p>{runs}</p>
-      {typeof code === "string" && <SourceView code={code} language="python" name="code" />}
-      {found.length > 0 && (
-        <div>
-          <p>A quick scan found these. It can't find everything: read the code.</p>
-          <ul className="list-disc ps-5">
-            {found.map((finding) => (
-              <li key={finding}>{finding}</li>
-            ))}
-          </ul>
-        </div>
+      {typeof holds === "string" && <p>{holds}</p>}
+      {typeof code === "string" && (
+        <>
+          {lines > FOLDED_LINES && (
+            <p>{`It is ${lines} lines long: show all of it, and read to the end.`}</p>
+          )}
+          <SourceView code={unhidden(code)} language="python" name="code" />
+          {found.length > 0 ? (
+            <div>
+              <p>A quick scan found these. It can't find everything: read the code.</p>
+              <ul className="list-disc ps-5">
+                {found.map((finding) => (
+                  <li key={finding}>{finding}</li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <p>A quick scan found nothing; it can't find everything.</p>
+          )}
+        </>
       )}
     </div>
   );
+}
+
+/** The ranges of characters a reader wouldn't see, as artifactr's scan finds them: controls but
+ * tabs and newlines, zero-width and direction-changing ones, and lone surrogates. */
+const HIDDEN: readonly (readonly [number, number])[] = [
+  [0x00, 0x08],
+  [0x0b, 0x0c],
+  [0x0e, 0x1f],
+  [0x7f, 0x9f],
+  [0x200b, 0x200f],
+  [0x202a, 0x202e],
+  [0x2060, 0x2064],
+  [0x2066, 0x2069],
+  [0xfeff, 0xfeff],
+  [0xd800, 0xdfff],
+];
+
+/** Code with each character a reader wouldn't see shown as its code point, so what is read is
+ * what runs; Copy copies it so too. */
+export function unhidden(code: string): string {
+  let shown = "";
+  for (const c of code) {
+    const point = c.codePointAt(0) ?? 0;
+    const hidden = HIDDEN.some(([low, high]) => point >= low && point <= high);
+    shown += hidden ? `\u27e6U+${point.toString(16).toUpperCase().padStart(4, "0")}\u27e7` : c;
+  }
+  return shown;
 }
 
 /** The artifact a proposal would change, if it names one: a new one's is chosen when accepted. */

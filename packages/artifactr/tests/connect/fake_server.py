@@ -12,6 +12,7 @@ import base64
 import hashlib
 import os
 import sys
+import time
 
 from mcp.server.mcpserver import Context, Image, MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
@@ -33,7 +34,11 @@ def main() -> None:
     parser.add_argument("--host", required=True)
     parser.add_argument("--port", default="9875")
     where = parser.parse_args()
+    if pidfile := os.environ.get("FAKE_PIDFILE"):
+        with open(pidfile, "w") as written:
+            written.write(str(os.getpid()))
     if os.environ.get("FAKE_MODE") == "garbage":
+        sys.stderr.write(f"leaked {os.environ.get('FAKE_TOKEN')}\n")
         sys.stdout.write("this is not JSON-RPC\n")
         sys.stdout.flush()
         return
@@ -75,6 +80,24 @@ def main() -> None:
     def unvetted() -> str:
         """A tool no entry names."""
         return "should never be called"
+
+    @server.tool()
+    async def stamp() -> str:
+        """When it began and ended."""
+        began = time.time()
+        await asyncio.sleep(0.3)
+        return f"{began} {time.time()}"
+
+    @server.tool()
+    def environ() -> str:
+        """The names in its environment, and whether its home is where it runs."""
+        home = os.path.realpath(os.environ["HOME"])
+        return f"{sorted(os.environ)} home-is-cwd={home == os.getcwd()}"
+
+    @server.tool()
+    def many() -> CallToolResult:
+        """Forty parts."""
+        return CallToolResult(content=[TextContent(text=f"part {n}") for n in range(40)])
 
     @server.tool()
     def huge() -> str:

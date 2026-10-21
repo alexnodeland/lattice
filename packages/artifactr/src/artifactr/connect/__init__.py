@@ -7,7 +7,13 @@ every level and approved by a person on every call, its code and network tools. 
 opens a file for anyone: a file the operator saves is uploaded as a native file, and scanned.
 """
 
-from artifactr.connect.connection import LOOPBACK, Connection, ConnectionFailed
+from artifactr.connect.connection import (
+    LOOPBACK,
+    RETRY_AFTER,
+    TAILNET,
+    Connection,
+    ConnectionFailed,
+)
 from artifactr.connect.registry import (
     BLENDER,
     FREECAD,
@@ -23,6 +29,7 @@ from artifactr.connect.tools import (
     DESCRIPTION_CHARS,
     IMAGE_BYTES,
     IMAGES,
+    PARTS,
     REPLY_CHARS,
     RUN_CODE,
     connected_app_tools,
@@ -36,9 +43,12 @@ __all__ = [
     "IMAGES",
     "IMAGE_BYTES",
     "LOOPBACK",
+    "PARTS",
     "PROTECTED",
     "REPLY_CHARS",
+    "RETRY_AFTER",
     "RUN_CODE",
+    "TAILNET",
     "ConnectedServer",
     "Connection",
     "ConnectionFailed",

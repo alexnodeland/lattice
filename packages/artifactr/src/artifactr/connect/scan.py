@@ -2,12 +2,15 @@
 
 The code is parsed, never run, and walked for what most often reaches past the app: modules with
 the process, the file system or the network in them, the builtins that run or open anything, a
-dunder that climbs out of an object, a name looked up at run time, and a loop with no end. It is
-not a sandbox and can't be one: the app's own modules (`FreeCAD`, `bpy`) reach all of it, by ways
-no list catches (ADR-0085). The approval is the gate; this only helps the person read.
+dunder that climbs out of an object, a name looked up at run time, a loop with no end, and a
+character the reader doesn't see. It is not a sandbox and can't be one: an alias, a module the
+app already imported, code built as a string and handed to the app, and the app's own modules
+(`FreeCAD`, `bpy`), which open files and reach the system, pass it unseen (ADR-0085). The
+approval is the gate; this only helps the person read.
 """
 
 import ast
+import re
 from collections.abc import Iterable
 from typing import Final
 
@@ -38,18 +41,34 @@ DUNDERS: Final = frozenset(
 """Attributes whose use is a finding: each climbs from an object to what it was made from."""
 
 
+HIDDEN: Final = re.compile(
+    "[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f\u200b-\u200f\u202a-\u202e\u2060-\u2064"
+    "\u2066-\u2069\ufeff\ud800-\udfff]"
+)
+"""Characters a reader doesn't see as they run: controls, zero-width and direction-changing
+ones, and lone surrogates, which no encoding takes."""
+
+
 def scan(code: str) -> list[str]:
-    """What the code holds that reaches past the app, each a line for the approver, in order."""
+    """What the code holds that reaches past the app, or hides, each a line for the approver."""
+    hidden = [
+        f"line {code.count(chr(10), 0, m.start()) + 1}: holds an unseen character, "
+        f"U+{ord(m.group()):04X}"
+        for m in HIDDEN.finditer(code)
+    ]
     try:
         tree = ast.parse(code)
     except SyntaxError as error:
-        return [f"line {error.lineno}: it isn't Python that parses ({error.msg})"]
+        where = f"line {error.lineno}: " if error.lineno else ""
+        return [*hidden, f"{where}it isn't Python that parses ({error.msg})"]
+    except (ValueError, RecursionError, MemoryError) as error:
+        return [*hidden, f"it can't be analysed ({type(error).__name__})"]
     found = {
         (getattr(node, "lineno", 0), finding)
         for node in ast.walk(tree)
         if (finding := _finding(node)) is not None
     }
-    return [f"line {line}: {finding}" for line, finding in sorted(found)]
+    return [*hidden, *(f"line {line}: {finding}" for line, finding in sorted(found))]
 
 
 def _finding(node: ast.AST) -> str | None:

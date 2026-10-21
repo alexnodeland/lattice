@@ -36,9 +36,12 @@ class Vetted(NamedTuple):
 
 
 def digest(name: str, description: str | None, input_schema: Mapping[str, Any]) -> str:
-    """The SHA-256 of a tool's name, description and input schema, as canonical JSON."""
+    """The SHA-256 of a tool's name, description and input schema, as canonical JSON.
+
+    Escaped to ASCII, so text no encoding takes, a lone surrogate, digests too, and can't match.
+    """
     told = {"name": name, "description": description or "", "input_schema": input_schema}
-    canonical = json.dumps(told, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    canonical = json.dumps(told, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode()).hexdigest()
 
 
@@ -47,8 +50,8 @@ class ConnectedServer:
     """A vetted server: its app, the version vetted, and every tool it may offer.
 
     Raises:
-        ValueError: If the app isn't a lowercase name, or a tool's code argument names a tool
-            that isn't `code`.
+        ValueError: If the app isn't a lowercase ASCII name, or a code tool names no code
+            argument, or another tool names one.
     """
 
     app: str
@@ -63,6 +66,10 @@ class ConnectedServer:
     version: str
     """The release vetted, as an installer names it: `freecad-mcp==0.1.27`."""
 
+    reported_version: str
+    """The version that release says it is as it starts, which a server must say: its own, and
+    not always its release's (FreeCAD's says none), so it catches an accident, not a forgery."""
+
     tools: Mapping[str, Vetted]
     """Every tool it may offer, by the server's own name."""
 
@@ -75,12 +82,15 @@ class ConnectedServer:
     env: Mapping[str, str] = field(default_factory=dict[str, str])
     """What the server is always given in its environment."""
 
+    ports: bool = False
+    """Whether the server takes the app's port as `--port`, as well as its host as `--host`."""
+
     def __post_init__(self) -> None:
-        if not self.app.isalpha() or not self.app.islower():
+        if not (self.app.isascii() and self.app.isalpha() and self.app.islower()):
             raise ValueError(f"an app is a lowercase name, not {self.app!r}")
-        risks = {name: tool.risk for name, tool in self.tools.items()}
-        if wrong := sorted(name for name in self.code if risks.get(name) != "code"):
-            raise ValueError(f"only a code tool names its code: {', '.join(wrong)}")
+        coded = {name for name, tool in self.tools.items() if tool.risk == "code"}
+        if wrong := sorted(set(self.code) ^ coded):
+            raise ValueError(f"each code tool, and only one, names its code: {', '.join(wrong)}")
 
     @property
     def key(self) -> str:
@@ -98,6 +108,7 @@ FREECAD: Final = ConnectedServer(
     title="FreeCAD",
     source="https://github.com/neka-nat/freecad-mcp",
     version="freecad-mcp==0.1.27",
+    reported_version="",
     tools=MappingProxyType(
         {
             "list_documents": Vetted(
@@ -145,7 +156,7 @@ FREECAD: Final = ConnectedServer(
             ),
             # Reopen a document from, or copy a part in from, the runner's disk.
             "reload_document": Vetted(
-                "host", "f4dce0a887f617edac1d4326b7a4487b050162d7a28c1bfea5b39437e3a187ae"
+                "host", "d6b38dc6375e621f12c8e4a8eb1bb1150162ca0ca46ff401da0172ebfbcb776c"
             ),
             "insert_part_from_library": Vetted(
                 "host", "0c9adfd8243c3100d07e6b9e47097d627c8066b10e9649f2d6d0f7a9a2c50d74"
@@ -166,6 +177,7 @@ BLENDER: Final = ConnectedServer(
     title="Blender",
     source="https://github.com/ahujasid/blender-mcp",
     version="mcp-for-blender==2.2.2",
+    reported_version="1.30.0",
     tools=MappingProxyType(
         {
             "get_scene_info": Vetted(
@@ -200,6 +212,7 @@ BLENDER: Final = ConnectedServer(
     ),
     code=MappingProxyType({"execute_blender_code": "code"}),
     env=MappingProxyType({"DISABLE_TELEMETRY": "true"}),
+    ports=True,
 )
 """ahujasid's Blender server: an add-on's socket in Blender, on port 9876, with no token, sending
 no telemetry."""

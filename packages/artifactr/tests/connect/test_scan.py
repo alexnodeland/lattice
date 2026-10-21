@@ -21,6 +21,17 @@ from artifactr.connect import BLENDER, FREECAD, scan
         ("while True:\n    pass", ["line 1: loops with no end of its own"]),
         ("while 1:\n    pass", ["line 1: loops with no end of its own"]),
         ("def f(:", ["line 1: it isn't Python that parses (invalid syntax)"]),
+        ("-" * 200_000 + "1", ["it can't be analysed (MemoryError)"]),
+        ("a" + ".b" * 200_000, ["it can't be analysed (RecursionError)"]),
+        (
+            "x = 1\0",
+            [
+                "line 1: holds an unseen character, U+0000",
+                "it isn't Python that parses (source code string cannot contain null bytes)",
+            ],
+        ),
+        ("ok = 1  # \u202e evil", ["line 1: holds an unseen character, U+202E"]),
+        ("a\nb = '\u200b'", ["line 2: holds an unseen character, U+200B"]),
     ],
 )
 def test_each_finding_is_a_line_for_the_approver(code: str, found: list[str]) -> None:

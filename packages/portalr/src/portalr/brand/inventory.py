@@ -336,6 +336,23 @@ COMPONENTS: tuple[Group, ...] = (
             Row("component.code-block.pad-y", "--code-block-pad-y", "dimension"),
         ),
     ),
+    Group(
+        "The chat's tool calls and questions: a tool call's corners, its summary's padding and "
+        "its result's corners; a question card's corners and padding, an option's corners and "
+        "padding, and a chip's corners (portalr ADR-0053).",
+        (
+            Row("component.tool-call.radius", "--tool-call-radius", "dimension"),
+            Row("component.tool-call.pad-x", "--tool-call-pad-x", "dimension"),
+            Row("component.tool-call.pad-y", "--tool-call-pad-y", "dimension"),
+            Row("component.tool-call.result-radius", "--tool-call-result-radius", "dimension"),
+            Row("component.question.radius", "--question-radius", "dimension"),
+            Row("component.question.pad", "--question-pad", "dimension"),
+            Row("component.question.option-radius", "--question-option-radius", "dimension"),
+            Row("component.question.option-pad-x", "--question-option-pad-x", "dimension"),
+            Row("component.question.option-pad-y", "--question-option-pad-y", "dimension"),
+            Row("component.question.chip-radius", "--question-chip-radius", "dimension"),
+        ),
+    ),
 )
 """Each component's tokens, defaulting to a role or a primitive (portalr ADR-0056)."""
 

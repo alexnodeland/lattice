@@ -55,7 +55,7 @@ function Part({
       </div>
       <ScrollRegion
         aria-label={what.charAt(0).toUpperCase() + what.slice(1)}
-        className="max-h-64 overflow-y-auto rounded-md border border-line bg-paper"
+        className="max-h-64 overflow-y-auto rounded-(--tool-call-result-radius) border border-line bg-paper"
       >
         <pre className="whitespace-pre-wrap break-words p-3 font-mono text-xs">{text}</pre>
       </ScrollRegion>
@@ -71,8 +71,8 @@ export function ToolCall({ tool }: { tool: Artifactr.Tool }) {
   const line = failed ? tool.result : tool.args;
   return (
     <li>
-      <details className="group rounded-lg border border-line bg-surface text-sm open:border-edge">
-        <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-lg px-3 py-2 outline-offset-(--focus-offset) focus-visible:outline-(length:--focus-width) focus-visible:outline-focus [&::-webkit-details-marker]:hidden">
+      <details className="group rounded-(--tool-call-radius) border border-line bg-surface text-sm open:border-edge">
+        <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-(--tool-call-radius) px-(--tool-call-pad-x) py-(--tool-call-pad-y) outline-offset-(--focus-offset) focus-visible:outline-(length:--focus-width) focus-visible:outline-focus [&::-webkit-details-marker]:hidden">
           <Icon
             icon={ChevronRight}
             className="size-3.5 shrink-0 text-muted motion-safe:transition-transform group-open:rotate-90 rtl:-scale-x-100 rtl:group-open:rotate-90"

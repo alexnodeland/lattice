@@ -106,7 +106,7 @@ export function Questions({
     <section
       aria-label={given === null ? "The agent asks" : "The agent asked"}
       className={cn(
-        "flex flex-col gap-4 rounded-lg border bg-surface p-4 text-sm",
+        "flex flex-col gap-4 rounded-(--question-radius) border bg-surface p-(--question-pad) text-sm",
         given === null ? "border-accent" : "border-line",
       )}
     >
@@ -206,7 +206,7 @@ function Asking({
 /** A question's header, as a chip. */
 function Header({ children }: { children: ReactNode }) {
   return (
-    <span className="inline-flex max-w-full shrink-0 items-center truncate rounded-full border border-line bg-wash px-2 py-0.5 font-semibold text-fg text-xs">
+    <span className="inline-flex max-w-full shrink-0 items-center truncate rounded-(--question-chip-radius) border border-line bg-wash px-2 py-0.5 font-semibold text-fg text-xs">
       {children}
     </span>
   );
@@ -304,7 +304,7 @@ function Asked({
 
 /** An option's row, which is its control: checked, it is edged and washed in the working colour. */
 const ROW =
-  "group flex w-full cursor-pointer items-start gap-3 rounded-md border border-line bg-surface px-3 py-2.5 text-start outline-offset-(--focus-offset) hover:border-edge focus-visible:outline-(length:--focus-width) focus-visible:outline-focus data-checked:border-accent data-checked:bg-wash data-disabled:cursor-not-allowed data-disabled:hover:border-line";
+  "group flex w-full cursor-pointer items-start gap-3 rounded-(--question-option-radius) border border-line bg-surface px-(--question-option-pad-x) py-(--question-option-pad-y) text-start outline-offset-(--focus-offset) hover:border-edge focus-visible:outline-(length:--focus-width) focus-visible:outline-focus data-checked:border-accent data-checked:bg-wash data-disabled:cursor-not-allowed data-disabled:hover:border-line";
 
 /** The mark in an option's row: a ring, or a box, filled in the working colour once checked. */
 const MARK =

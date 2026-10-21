@@ -902,6 +902,43 @@
       "pad-y": {
         "$value": "{space.2}"
       }
+    },
+    "tool-call": {
+      "radius": {
+        "$value": "{radius.4}"
+      },
+      "pad-x": {
+        "$value": "{space.3}"
+      },
+      "pad-y": {
+        "$value": "{space.2}"
+      },
+      "result-radius": {
+        "$value": "{radius.3}"
+      }
+    },
+    "question": {
+      "radius": {
+        "$value": "{radius.4}"
+      },
+      "pad": {
+        "$value": "{space.4}"
+      },
+      "option-radius": {
+        "$value": "{radius.3}"
+      },
+      "option-pad-x": {
+        "$value": "{space.3}"
+      },
+      "option-pad-y": {
+        "$value": {
+          "value": 0.625,
+          "unit": "rem"
+        }
+      },
+      "chip-radius": {
+        "$value": "{radius.full}"
+      }
     }
   }
 }

@@ -285,4 +285,20 @@
   --code-block-radius: var(--radius-3);
   --code-block-pad-x: var(--space-3);
   --code-block-pad-y: var(--space-2);
+
+  /*
+   * The chat's tool calls and questions: a tool call's corners, its summary's padding and its
+   * result's corners; a question card's corners and padding, an option's corners and padding, and
+   * a chip's corners (portalr ADR-0053).
+   */
+  --tool-call-radius: var(--radius-4);
+  --tool-call-pad-x: var(--space-3);
+  --tool-call-pad-y: var(--space-2);
+  --tool-call-result-radius: var(--radius-3);
+  --question-radius: var(--radius-4);
+  --question-pad: var(--space-4);
+  --question-option-radius: var(--radius-3);
+  --question-option-pad-x: var(--space-3);
+  --question-option-pad-y: 0.625rem;
+  --question-chip-radius: var(--radius-full);
 }

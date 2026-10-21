@@ -10,6 +10,9 @@ import { cn } from "./cn";
 /** Which UI a mark is for. */
 export type Ui = "app" | "admin";
 
+/** The UI's name, which its mark pictures and its messages say. */
+export const UI_NAME: Record<Ui, string> = { app: "portalr", admin: "portalr admin" };
+
 /** Each side of the cell, and the two overlaps, on lattice's 64-unit grid: [fill, points]. */
 const SIDES: Record<Ui, readonly (readonly [string, string])[]> = {
   app: [

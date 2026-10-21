@@ -6,6 +6,7 @@ for a person, the full code in the request and the scan's findings beside it; an
 server's replies reach the model capped and framed as data.
 """
 
+import ast
 import hashlib
 import json
 import os
@@ -649,7 +650,9 @@ async def test_the_server_sees_only_a_minimal_environment_and_its_named_secrets(
     script = Script(call("fake_environ"), say("Done."))
     await world.run(script, connected(secrets=("FAKE_TOKEN",)))
     told = seen(script)
-    names = set(json.loads(re.search(r"\[.*?\]", told).group().replace("'", '"')))  # type: ignore[union-attr]
+    listed = re.search(r"\[.*?\]", told)
+    assert listed is not None
+    names = set(ast.literal_eval(listed.group()))
     assert "OPENAI_API_KEY" not in names
     assert {"FAKE_TOKEN", "HOME"} <= names
     assert names <= {
@@ -749,7 +752,9 @@ async def test_a_blocking_deployment_still_asks_about_a_download(world: World) -
     script = Script(call("fake_search_assets", "n1", query="import os"), say("Done."))
     _, run_id = await world.pause(script, connection)
     [request] = await world.pending(run_id)
-    assert request.review["runs"].startswith("Downloads from the internet into your Fake")  # type: ignore[union-attr]
+    runs = request.review["runs"]
+    assert isinstance(runs, str)
+    assert runs.startswith("Downloads from the internet into your Fake")
 
 
 async def test_a_tool_called_outside_what_was_offered_is_refused(world: World) -> None:

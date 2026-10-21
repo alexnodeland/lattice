@@ -18,7 +18,7 @@ import os
 import tempfile
 import time
 from collections.abc import Awaitable, Callable, Sequence
-from typing import Any, Final, Literal, cast
+from typing import Any, Final, Literal, TextIO, cast
 
 import anyio
 from mcp import ClientSession, StdioServerParameters
@@ -217,7 +217,7 @@ class Connection:
         command, *arguments = self._command
         with (
             tempfile.TemporaryDirectory(prefix=f"connect-{server.app}-") as directory,
-            open(os.devnull, "w") as nowhere,  # noqa: ASYNC230 (opening /dev/null never blocks)
+            _nowhere() as nowhere,
         ):
             env = {**server.env, **{n: v for n, v in named.items() if v}, "HOME": directory}
             parameters = StdioServerParameters(
@@ -250,6 +250,11 @@ class Connection:
                 raise ConnectionFailed(
                     f"{server.title}'s server ended, or replied with what isn't MCP"
                 ) from error
+
+
+def _nowhere() -> TextIO:
+    """Where the server's stderr goes: nowhere, so none of its words reach the model or a log."""
+    return open(os.devnull, "w")
 
 
 def _tailnet(host: str) -> bool:

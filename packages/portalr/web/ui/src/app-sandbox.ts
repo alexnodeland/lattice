@@ -60,9 +60,108 @@ const SIZED = [
   "});",
 ].join("\n");
 
-/** The app's document: its own policy, no DNS prefetching, no WebRTC and its size first. */
+/**
+ * `window.host`, the bridge's shapes as the app's to use, so an app gets them right by default.
+ *
+ * - `host.connect()`, once however often it is called, asks `ui/initialize`, says
+ *   `initialized`, and keeps the host's theme on the document: its `color-scheme`, `data-theme`,
+ *   and its colours as CSS variables, a colour no longer given removed.
+ * - `host.call(name, args)` resolves to a tool's `structuredContent`; it rejects with an `Error`
+ *   on a refusal (`isError: true` on the error), a JSON-RPC error (its `code`), or no answer in
+ *   `ANSWER_WITHIN` ms (`code` `"timeout"`), as past the app's messages a minute. `submit` and
+ *   `ui/open-link` have no time limit: they wait for the person, whose answer, either way, the
+ *   host gives.
+ * - `host.request(method, params)` asks anything else, as `call` does; `host.notify` says.
+ * - `host.onAnswer(fn)` runs after every answer, refusal or timeout, a task later, so after the
+ *   app's own code that awaited it: a safety net, since the app still renders after its own
+ *   changes. `host.onContext(fn)` runs after every theme the host gives, the first, as
+ *   `connect()` receives it, included, for colours drawn by script.
+ *
+ * Its ids are its own (`host:1`), so an app's own requests never meet its answers; it hears its
+ * parent, the sandbox, alone. Like the measure, it is the app document's inline script, under
+ * the same policy: nothing is loaded.
+ */
+const ANSWER_WITHIN = 10_000;
+
+const HOST = [
+  "(() => {",
+  "  let next = 0, connecting = null, applied = [];",
+  "  const waiting = new Map(), answered = [], themed = [];",
+  '  const post = (message) => parent.postMessage({ jsonrpc: "2.0", ...message }, "*");',
+  "  const later = (hooks) => setTimeout(() => {",
+  "    for (const hook of hooks) { try { hook(); } catch (error) { console.error(error); } }",
+  "  }, 0);",
+  "  const failure = (said, more) => Object.assign(new Error(said), more);",
+  "  const theme = (context) => {",
+  '    if (!context || typeof context !== "object") return;',
+  "    const root = document.documentElement;",
+  '    if (context.theme === "light" || context.theme === "dark") {',
+  "      root.style.colorScheme = context.theme;",
+  "      root.dataset.theme = context.theme;",
+  "    }",
+  "    const colours = context.styles && context.styles.variables;",
+  '    if (colours && typeof colours === "object") {',
+  '      const names = Object.keys(colours).filter((name) => name.startsWith("--") && typeof colours[name] === "string");',
+  "      for (const name of applied) if (!names.includes(name)) root.style.removeProperty(name);",
+  "      for (const name of names) root.style.setProperty(name, colours[name]);",
+  "      applied = names;",
+  "    }",
+  "    later(themed);",
+  "  };",
+  "  const settle = (id, finish) => {",
+  "    const pending = waiting.get(id);",
+  "    if (!pending) return;",
+  "    waiting.delete(id);",
+  "    clearTimeout(pending.timer);",
+  "    finish(pending);",
+  "    later(answered);",
+  "  };",
+  '  addEventListener("message", (event) => {',
+  "    if (event.source !== parent) return;",
+  "    const message = event.data;",
+  '    if (!message || message.jsonrpc !== "2.0") return;',
+  '    if (message.method === "ui/notifications/host-context-changed") theme(message.params);',
+  "    if (message.id == null) return;",
+  "    settle(message.id, ({ answer, refuse }) => {",
+  "      const result = message.result;",
+  '      if (message.error) refuse(failure(message.error.message || "refused", { code: message.error.code }));',
+  "      else if (result && result.isError) {",
+  "        const said = result.content && result.content[0] && result.content[0].text;",
+  '        refuse(failure(said || "refused", { isError: true }));',
+  "      } else answer(result && result.structuredContent !== undefined ? result.structuredContent : result);",
+  "    });",
+  "  });",
+  "  const request = (method, params = {}) => new Promise((answer, refuse) => {",
+  '    const id = "host:" + ++next;',
+  '    const person = method === "ui/open-link" || (method === "tools/call" && params.name === "submit");',
+  "    const timer = person ? 0 : setTimeout(",
+  '      () => settle(id, (pending) => pending.refuse(failure("the host did not answer", { code: "timeout" }))),',
+  `      ${ANSWER_WITHIN},`,
+  "    );",
+  "    waiting.set(id, { answer, refuse, timer });",
+  "    post({ id, method, params });",
+  "  });",
+  "  window.host = {",
+  "    request,",
+  '    call: (name, args = {}) => request("tools/call", { name, arguments: args }),',
+  "    notify: (method, params = {}) => post({ method, params }),",
+  "    onAnswer: (hook) => { answered.push(hook); },",
+  "    onContext: (hook) => { themed.push(hook); },",
+  '    connect: () => connecting ||= request("ui/initialize", {}).then(',
+  "      (result) => {",
+  "        theme(result && result.hostContext);",
+  '        post({ method: "ui/notifications/initialized", params: {} });',
+  "        return result;",
+  "      },",
+  "      (error) => { connecting = null; throw error; },",
+  "    ),",
+  "  };",
+  "})();",
+].join("\n");
+
+/** The app's document: its own policy, no DNS prefetching, no WebRTC, its size and `host` first. */
 export const appDocument = (html: string): string =>
-  `<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${APP_POLICY}"><meta http-equiv="x-dns-prefetch-control" content="off"><script>${NO_WEBRTC}\n${SIZED}</script>${html}`;
+  `<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${APP_POLICY}"><meta http-equiv="x-dns-prefetch-control" content="off"><script>${NO_WEBRTC}\n${SIZED}\n${HOST}</script>${html}`;
 
 /** What the app's frame may do: run its scripts, and nothing else. */
 export const APP_SANDBOX = "allow-scripts";

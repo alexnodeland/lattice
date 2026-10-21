@@ -90,7 +90,7 @@ function Rules() {
           <Row
             key={rule.rule}
             aria-label={`Rule ${rule.rule}`}
-            title={
+            name={
               <RowLink
                 className="font-mono"
                 render={
@@ -137,7 +137,7 @@ function Rules() {
               <Row
                 key={schedule.schedule}
                 aria-label={`Schedule ${schedule.schedule}`}
-                title={<code className="font-mono">{schedule.schedule}</code>}
+                name={<code className="font-mono">{schedule.schedule}</code>}
                 meta={
                   <>
                     next <When at={schedule.next_tick} />, last <When at={schedule.last_tick} />

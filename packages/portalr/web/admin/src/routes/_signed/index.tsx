@@ -55,7 +55,7 @@ function Tenants() {
               {lands.tenants.map((tenant) => (
                 <Row
                   key={tenant}
-                  title={
+                  name={
                     <RowLink render={<Link to="/t/$tenant" params={{ tenant }} />}>
                       {tenant}
                     </RowLink>
@@ -63,7 +63,7 @@ function Tenants() {
                 />
               ))}
               {lands.operator && (
-                <Row title={<RowLink render={<Link to="/deployment" />}>All tenants</RowLink>} />
+                <Row name={<RowLink render={<Link to="/deployment" />}>All tenants</RowLink>} />
               )}
             </Rows>
           </nav>

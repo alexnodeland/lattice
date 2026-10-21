@@ -55,7 +55,7 @@ function Workspaces() {
           {workspaces.map((workspace) => (
             <Row
               key={workspace}
-              title={
+              name={
                 <RowLink
                   render={<Link to="/t/$tenant/w/$workspace" params={{ tenant, workspace }} />}
                 >

@@ -13,31 +13,32 @@ export function Rows({ label, children }: { label: string; children: ReactNode }
 }
 
 /**
- * One row (portalr ADR-0060): what it is, on its first line, then what is said about it, quieter, on
- * its second, and at its end what it is doing or what can be done to it. Its `RowLink`, if its
- * title is one, is the whole row's target; what is at its end stays its own target, above it.
+ * One row (portalr ADR-0060): what it is, its `name`, on its first line, then what is said about it,
+ * quieter, beneath, and at its end what it is doing or what can be done to it. Where the row is
+ * narrow, its end goes under its meta, so a long end never squeezes its name. Its `RowLink`, if its
+ * name is one, is the whole row's target; what is at its end stays its own target, above it.
  */
 export function Row({
-  title,
+  name,
   meta,
   end,
   ...props
-}: Omit<ComponentProps<"li">, "className" | "title" | "children"> & {
-  title: ReactNode;
+}: Omit<ComponentProps<"li">, "className" | "children"> & {
+  name: ReactNode;
   meta?: ReactNode;
   end?: ReactNode;
 }) {
   return (
     <li
-      className="relative grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-(--list-row-gap) px-(--list-row-pad-x) py-(--list-row-pad-y) text-sm has-[a:hover]:bg-wash has-[a:focus-visible]:bg-wash"
+      className="relative grid grid-cols-1 items-center gap-x-(--list-row-gap) gap-y-(--list-row-line-gap) px-(--list-row-pad-x) py-(--list-row-pad-y) text-sm has-[a:hover]:bg-wash has-[a:focus-visible]:bg-wash sm:grid-cols-[minmax(0,1fr)_auto]"
       {...props}
     >
       <div className="flex min-w-0 flex-col gap-(--list-row-line-gap)">
-        <span className="min-w-0 truncate">{title}</span>
-        {meta && <span className="min-w-0 truncate text-muted">{meta}</span>}
+        <span className="line-clamp-2 min-w-0 break-words">{name}</span>
+        {meta && <span className="min-w-0 break-words text-muted">{meta}</span>}
       </div>
       {end && (
-        <div className="relative z-10 flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
+        <div className="relative z-10 flex flex-wrap items-center gap-x-3 gap-y-1 sm:max-w-1/2 sm:justify-end">
           {end}
         </div>
       )}
@@ -51,7 +52,11 @@ type RowLinkProps = Omit<ComponentProps<"a">, "className"> & {
   className?: string;
 };
 
-/** A row's link, stretched over the row, so the whole row takes the pointer. */
+/**
+ * A row's link, stretched over the row, so the whole row takes the pointer: in the text's colour
+ * with the quiet underline of a subtle link (ADR-0059), so it reads as a link on a touch screen too,
+ * taking the working colour when hovered or reached from the keyboard.
+ */
 export function RowLink({ render, className, ...props }: RowLinkProps) {
   return useRender({
     defaultTagName: "a",
@@ -59,7 +64,7 @@ export function RowLink({ render, className, ...props }: RowLinkProps) {
     props: mergeProps<"a">(
       {
         className: cn(
-          "font-semibold text-fg underline-offset-(--link-underline-offset) outline-none after:absolute hover:text-accent hover:underline after:inset-0 after:content-[''] focus-visible:after:outline-(length:--focus-width) focus-visible:after:outline-focus focus-visible:after:-outline-offset-(--focus-offset)",
+          "font-semibold text-fg underline decoration-edge underline-offset-(--link-underline-offset) outline-none after:absolute hover:text-accent hover:decoration-accent focus-visible:text-accent focus-visible:decoration-accent after:inset-0 after:content-[''] focus-visible:after:outline-(length:--focus-width) focus-visible:after:outline-focus focus-visible:after:-outline-offset-(--focus-offset)",
           className,
         ),
       },

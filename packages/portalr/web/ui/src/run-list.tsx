@@ -7,6 +7,7 @@
 import type { Reflexr } from "@portalr/client";
 import type { ReactNode } from "react";
 import { Num } from "./num";
+import { Row, Rows } from "./rows";
 import { StatusBadge, type Tone } from "./status-badge";
 import { Table } from "./table";
 
@@ -94,27 +95,31 @@ export function RunList({
           </tbody>
         </Table>
       </div>
-      <ul aria-label={caption} className="flex flex-col gap-3 sm:hidden">
-        {runs.map((run) => (
-          <li
-            key={run.key}
-            aria-label={run.name}
-            className="flex flex-col gap-3 rounded-(--card-radius) border border-line bg-surface p-4"
-          >
-            <span className="flex flex-wrap items-center gap-2">
-              {run.status}
-              {run.title}
-            </span>
-            {(attempts || feedback) && (
-              <span className="flex flex-wrap items-center gap-3 text-sm">
-                {attempts && <span className="text-muted">Attempt {run.attempts}</span>}
-                {feedback && run.feedback}
-              </span>
-            )}
-            {run.actions && <span className="flex flex-wrap gap-2">{run.actions}</span>}
-          </li>
-        ))}
-      </ul>
+      <div className="sm:hidden">
+        <Rows label={caption}>
+          {runs.map((run) => (
+            <Row
+              key={run.key}
+              aria-label={run.name}
+              name={run.title}
+              meta={
+                (attempts || feedback) && (
+                  <span className="flex flex-wrap items-center gap-3">
+                    {attempts && <span>Attempt {run.attempts}</span>}
+                    {feedback && run.feedback}
+                  </span>
+                )
+              }
+              end={
+                <>
+                  {run.status}
+                  {run.actions}
+                </>
+              }
+            />
+          ))}
+        </Rows>
+      </div>
     </>
   );
 }

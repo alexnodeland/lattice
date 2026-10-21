@@ -75,7 +75,7 @@ function Threads() {
             return (
               <Row
                 key={thread.id}
-                title={
+                name={
                   <RowLink
                     render={
                       <Link

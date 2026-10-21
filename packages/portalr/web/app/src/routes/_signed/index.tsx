@@ -35,7 +35,7 @@ function Tenants() {
           {lands.tenants.map((tenant) => (
             <Row
               key={tenant}
-              title={
+              name={
                 <RowLink render={<Link to="/t/$tenant" params={{ tenant }} />}>{tenant}</RowLink>
               }
             />

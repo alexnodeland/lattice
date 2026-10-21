@@ -6,9 +6,8 @@
  * through it.
  */
 
-import { ExternalLink } from "lucide-react";
-import { Icon } from "./icon";
 import { safeHref } from "./safe-href";
+import { TextLink } from "./text-link";
 
 /** An item in a task tracker: what people call it, which tracker it is in, and its address. */
 export interface TrackerItem {
@@ -58,17 +57,15 @@ function Item({ item }: { item: TrackerItem }) {
       </span>
     );
   }
+  // Named aloud with its name first, as it is shown, then where it goes and that it opens a tab.
   return (
-    <a
+    <TextLink
+      variant="external"
       href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      // Its name first, as it is shown, then where it goes.
-      aria-label={`${item.name}, in ${where}, opens in a new tab`}
-      className="inline-flex items-center gap-1 font-mono text-accent underline underline-offset-2 outline-offset-(--focus-offset) focus-visible:outline-(length:--focus-width) focus-visible:outline-focus"
+      className="font-mono"
+      aria-label={`${item.name}, in ${where} (opens in a new tab)`}
     >
       {item.name}
-      <Icon icon={ExternalLink} className="size-3" />
-    </a>
+    </TextLink>
   );
 }

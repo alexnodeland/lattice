@@ -94,7 +94,7 @@ export function ShareDialog({
           {grants.map((each) => (
             <Row
               key={`${identity(each.to)}:${each.role}`}
-              title={
+              name={
                 each.to.kind === "user" ? (
                   <span title={each.to.id}>{named(each.to, names)}</span>
                 ) : (

@@ -1,6 +1,6 @@
-# ADR-0060: List rows: a title, a quieter line beneath it, and an end
+# ADR-0060: List rows: a name, a quieter line beneath it, and an end
 
-**Status:** Accepted
+**Status:** Proposed
 **Date:** 2026-10-21
 **Deciders:** Alex Nodeland
 
@@ -10,11 +10,11 @@ The UI audit of 2026-10-20 found the app's lists (threads, artifacts, rules, a t
 
 ## Decision
 
-- **A row has three parts:** its `title`, on the first line; its `meta`, what is said about it, quieter (`--muted`), on the line beneath; and its `end`, what it is doing or what can be done to it (a status, a badge, an action, links of its own), aligned to the row's end. Each part truncates rather than wraps the next under it.
-- **A row's title, when it is a link, is in the text's colour and not underlined,** and takes the working colour and an underline when hovered or reached from the keyboard. It still stretches over the whole row, so the row is its target, as before. What is at the row's end sits above the stretched link and stays a target of its own.
+- **A row has three parts:** its `name`, on the first line, two lines at most; its `meta`, what is said about it, quieter (`--muted`), on the line beneath, wrapping rather than cut, so nothing in it is hidden; and its `end`, what it is doing or what can be done to it (a status, a badge, an action, links of its own). From the small breakpoint the end is aligned to the row's end and takes at most half the row; below it, the end goes under the meta, so a long end never squeezes the name. The prop is `name`, not `title`, which is an HTML attribute.
+- **A row's name, when it is a link (`RowLink`), looks like a subtle link (ADR-0059):** the text's colour with a quiet `--edge` underline, so it reads as a link on a touch screen too, taking the working colour when hovered or reached from the keyboard. It still stretches over the whole row, so the row is its target, as before. What is at the row's end sits above the stretched link and stays a target of its own.
 - **Tokens:** `--list-row-pad-x`, `--list-row-pad-y`, `--list-row-gap` and `--list-row-line-gap`. The hairlines and the hover wash are unchanged.
-- **`Row`'s API breaks inside portalr's UIs:** `title`, `meta` and `end` replace free children. Every list moves onto it: tenants (app and admin), a tenant's workspaces, threads, artifacts, rules and schedules, and people with access.
-- **Left for later:** the runs list and the tracker items are not `Row`s yet; they move when the link variants (ADR-0059) are on main, as their links need the `subtle` and `external` variants.
+- **`Row`'s API breaks inside portalr's UIs:** `name`, `meta` and `end` replace free children. The app's and admin's lists move onto it: tenants (app and admin), a tenant's workspaces, threads, artifacts, rules and schedules, people with access, and a phone's run cards, which become rows of a list. A tracker item's link becomes an `external` link (ADR-0059).
+- **Not rows:** the runs table from the small breakpoint and admin's tables (`ItemTable`) stay tables, as their rows have columns to compare, and admin's compact density is exempt from the kit floors (RFC-0007). A revision is a disclosure, and admin's runs page has disclosures too; both move with the disclosures PR, and stay on Biome's raw-element list until then.
 
 ## Options considered
 
@@ -29,4 +29,4 @@ The UI audit of 2026-10-20 found the app's lists (threads, artifacts, rules, a t
 
 - Easier: a new list is a `Row` with three slots, and a kit restyles every list by four tokens.
 - Harder: a row that needs more than three parts has to choose what goes in its meta.
-- To revisit: the runs list and the tracker items, once ADR-0059 is on main.
+- To revisit: the revisions' and admin runs' disclosures, with the disclosures PR.

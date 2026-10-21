@@ -64,6 +64,6 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0056](0056-brand-kits-token-layers-loading-and-validation.md) | Brand kits: three token layers, a kit loaded per deployment, and validation in Python | Proposed |
 | [0057](0057-brand-kits-motion-and-tokens-as-the-only-override.md) | Brand kits: a motion system with guard rails, and tokens as the only override | Proposed |
 | [0059](0059-link-variants-breadcrumbs-and-the-skip-link.md) | Link variants, breadcrumbs, and the skip link | Accepted |
-| [0060](0060-list-rows.md) | List rows: a title, a quieter line beneath it, and an end | Accepted |
+| [0060](0060-list-rows.md) | List rows: a name, a quieter line beneath it, and an end | Proposed |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

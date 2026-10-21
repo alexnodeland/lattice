@@ -44,7 +44,7 @@ function Artifacts() {
           {listed.map((artifact) => (
             <Row
               key={artifact.id}
-              title={
+              name={
                 <RowLink
                   aria-describedby={`${artifact.id}-meta`}
                   render={

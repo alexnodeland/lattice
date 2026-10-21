@@ -458,7 +458,8 @@ def test_a_body_that_pauses_too_long_is_refused_with_408() -> None:
     world = world_of(body=Body(pause=0.2))
     with served(world) as address:
         sent = (HEAD + b"Content-Length: 2\r\n\r\n{", b"}")
-        answered = answer(address, *sent, pause=0.6, until_closed=False)
+        # Long past the pause, so even a slow runner has begun reading before the rest comes.
+        answered = answer(address, *sent, pause=5, until_closed=False)
     assert answered.startswith(b"HTTP/1.1 408")
     assert b"too_slow" in answered
     assert asyncio.run(world.committed()) == []

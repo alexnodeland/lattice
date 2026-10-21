@@ -37,6 +37,9 @@ ADAPTED = (
     "figcraft",
     "freecad",
     "blender",
+    "filmcraft",
+    "effectcraft",
+    "soundcraft",
 )
 """The apps with an adapter of their own, each a layer."""
 
@@ -83,6 +86,9 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         },
         {"pydantic", "anyio", "zstandard", "bpy", "bmesh", "mathutils"},
     ),
+    "filmcraft": _adapter("filmcraft"),
+    "effectcraft": _adapter("effectcraft"),
+    "soundcraft": _adapter("soundcraft"),
     # The worker, over any app, and the App that calls it; its entry point runs each app's adapter.
     # It holds an app's limits to what its CLI needs, as the registry says.
     "worker": (

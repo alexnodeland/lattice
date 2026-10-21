@@ -38,8 +38,8 @@ def test_the_shim_names_the_app_its_surface_and_the_portal() -> None:
 
 
 def test_a_javascript_apis_shim_calls_only_the_methods_allowed() -> None:
-    page = shim_page(CRAFTS["filmcraft"], PORTAL, ["inspect", "openProject"])
-    assert 'data-surface="global" data-methods="inspect openProject"' in page
+    page = shim_page(CRAFTS["effectcraft"], PORTAL, ["info", "request"])
+    assert 'data-surface="global" data-methods="info request"' in page
 
 
 def test_the_shims_policy_runs_its_own_code_frames_its_origin_and_is_framed_by_the_portal() -> None:
@@ -62,7 +62,7 @@ def test_the_shims_policy_runs_its_own_code_frames_its_origin_and_is_framed_by_t
         ("gridcraft", "https://portal.example/app", [], "the portal is an origin"),
         ("gridcraft", "javascript:alert(1)", [], "the portal is an origin"),
         ("gridcraft", PORTAL, ["open"], "GridCraft's build has no JavaScript API"),
-        ("filmcraft", PORTAL, ["inspect openProject"], "a method is named as JavaScript names one"),
+        ("effectcraft", PORTAL, ["info request"], "a method is named as JavaScript names one"),
     ],
 )
 def test_a_shim_that_cant_reach_or_be_reached_is_refused(

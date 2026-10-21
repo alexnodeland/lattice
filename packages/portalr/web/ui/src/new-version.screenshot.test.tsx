@@ -18,14 +18,15 @@ for (const [name, width] of [
     onTestFinished(() => page.viewport(414, 896));
     const screen = await render(
       <div className="h-40 bg-paper">
-        <NewVersion build="b" onReload={() => {}} onDismiss={() => {}} />
+        <NewVersion ui="app" onReload={() => {}} onDismiss={() => {}} />
       </div>,
     );
     await document.fonts.ready;
     await commands.pointerAway();
-    await expect(screen.getByRole("status", { name: "A new version" })).toMatchScreenshot(
-      `new-version-${name}-${dark ? "dark" : "light"}`,
-      { screenshotOptions: { animations: "disabled" } },
-    );
+    await expect(
+      page.elementLocator(screen.container.firstElementChild?.firstElementChild as Element),
+    ).toMatchScreenshot(`new-version-${name}-${dark ? "dark" : "light"}`, {
+      screenshotOptions: { animations: "disabled" },
+    });
   });
 }

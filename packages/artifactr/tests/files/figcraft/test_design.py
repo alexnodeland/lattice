@@ -7,12 +7,13 @@ import pytest
 
 from artifactr.files.figcraft import media_type
 from artifactr.files.manifest import FIGCRAFT
+from tests.files.corpus.package import TIME
 
 
 def zipped(name: str, content: bytes) -> bytes:
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
-        archive.writestr(name, content)
+        archive.writestr(zipfile.ZipInfo(name, TIME), content, zipfile.ZIP_DEFLATED)
     return buffer.getvalue()
 
 

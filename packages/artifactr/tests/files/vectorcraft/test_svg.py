@@ -24,7 +24,7 @@ ROOT = b'<svg xmlns="http://www.w3.org/2000/svg"/>'
         (b'<svg:svg xmlns:svg="http://www.w3.org/2000/svg"/>', SVG),
         (b'<html><svg xmlns="http://www.w3.org/2000/svg"/></html>', None),
         (b"<svgx/>", None),
-        (gzip.compress(ROOT), None),
+        (gzip.compress(ROOT, mtime=0), None),
         (b"%PDF-1.7", None),
         (b"", None),
     ],

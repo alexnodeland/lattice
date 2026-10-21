@@ -18,6 +18,8 @@ tasks:
       - '/examples/docplan/**/*'
 
   test:
+    # A worker for each of the runner's cores, sharing nothing (lattice ADR-0010).
+    args: ['--numprocesses', 'auto']
     inputs:
       # The layering test holds docplan, the reference implementation, to the public API.
       - '/examples/docplan/src/**/*'

@@ -9,9 +9,10 @@
 
 import { RefreshCw } from "lucide-react";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useUiName } from "./brand";
 import { Button } from "./button";
 import { Icon } from "./icon";
-import { UI_NAME, type Ui } from "./marks";
+import type { Ui } from "./marks";
 
 /** How often the page is read again, in milliseconds, while the tab is open. */
 const EVERY = 5 * 60_000;
@@ -121,10 +122,11 @@ export function NewVersion({
   onReload?: () => void;
   onDismiss: () => void;
 }) {
+  const name = useUiName(ui);
   return (
     <div className="pointer-events-auto mx-auto flex max-w-(--notice-width) flex-wrap items-center gap-3 rounded-(--notice-radius) border border-line bg-surface p-(--notice-pad) text-fg text-sm shadow-(--notice-shadow)">
       <Icon icon={RefreshCw} className="size-4 shrink-0" />
-      <p className="min-w-0 flex-1">A new version of {UI_NAME[ui]} is ready. Reload to use it.</p>
+      <p className="min-w-0 flex-1">A new version of {name} is ready. Reload to use it.</p>
       <span className="flex gap-2">
         <Button variant="secondary" onClick={onDismiss}>
           Not now

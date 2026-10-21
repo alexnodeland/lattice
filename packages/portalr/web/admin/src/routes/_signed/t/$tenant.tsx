@@ -23,7 +23,9 @@ import { remember } from "../../../last";
  * area shows only where grantr allows its reads.
  */
 export const Route = createFileRoute("/_signed/t/$tenant")({
-  head: ({ params }) => ({ meta: [{ title: `${params.tenant} · portalr admin` }] }),
+  head: ({ params, match }) => ({
+    meta: [{ title: match.context.title(`${params.tenant}`) }],
+  }),
   beforeLoad: async ({ context, params }) => {
     const { queries, queryClient, user } = context;
     const memberships = await queryClient.ensureQueryData(queries.grantr.memberships(user));

@@ -15,7 +15,9 @@ const HEADER = <PageHeader title="Trace" />;
  * it, is read for that span alone, when it asks, and let go (portalr ADR-0030).
  */
 export const Route = createFileRoute("/_signed/t/$tenant/traces/$trace")({
-  head: ({ params }) => ({ meta: [{ title: `Trace · ${params.tenant} · portalr admin` }] }),
+  head: ({ params, match }) => ({
+    meta: [{ title: match.context.title(`Trace · ${params.tenant}`) }],
+  }),
   beforeLoad: ({ context, params }) => opening(context, params.tenant, "portalr:read_telemetry"),
   // An id portalr wouldn't take isn't read: there is no such trace.
   loader: async ({ context, params }) => {

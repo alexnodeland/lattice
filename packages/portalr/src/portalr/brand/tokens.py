@@ -75,6 +75,8 @@ def read(path: Path) -> dict[str, object]:
         tree = _mapping(json.loads(path.read_text(encoding="utf-8")))
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
         raise BrandError(f"{path.name}: not JSON in UTF-8 ({error})") from error
+    except RecursionError:
+        raise BrandError(f"{path.name}: nested too deep") from None
     if tree is None:
         raise BrandError(f"{path.name}: a token file is an object")
     tokens: dict[str, object] = {}

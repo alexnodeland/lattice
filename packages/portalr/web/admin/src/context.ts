@@ -12,4 +12,6 @@ export interface Context {
   readonly queries: ReturnType<typeof createQueries>;
   readonly commands: ReturnType<typeof createCommands>;
   readonly queryClient: QueryClient;
+  /** A page's title: what it is, outermost last, then the UI's name, the kit's or portalr's. */
+  readonly title: (...parts: string[]) => string;
 }

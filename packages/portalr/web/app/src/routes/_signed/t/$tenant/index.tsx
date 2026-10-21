@@ -8,7 +8,9 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
  * read per workspace; the frame's switcher names the tenant alone.
  */
 export const Route = createFileRoute("/_signed/t/$tenant/")({
-  head: ({ params }) => ({ meta: [{ title: `Workspaces · ${params.tenant} · portalr` }] }),
+  head: ({ params, match }) => ({
+    meta: [{ title: match.context.title(`Workspaces · ${params.tenant}`) }],
+  }),
   loader: ({ context }) =>
     context.queryClient.ensureQueryData(context.queries.grantr.memberships(context.user)),
   component: Workspaces,

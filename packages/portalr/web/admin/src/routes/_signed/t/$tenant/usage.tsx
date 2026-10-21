@@ -46,7 +46,9 @@ const DAY = { key: "day", name: "Day (UTC)" } as const;
  * tag the libraries' gateways send. The window is in the address (portalr ADR-0028).
  */
 export const Route = createFileRoute("/_signed/t/$tenant/usage")({
-  head: ({ params }) => ({ meta: [{ title: `Usage · ${params.tenant} · portalr admin` }] }),
+  head: ({ params, match }) => ({
+    meta: [{ title: match.context.title(`Usage · ${params.tenant}`) }],
+  }),
   // What a link may give, optional; what the address gives, read with `shownOf`.
   validateSearch: (search: Shown & SearchSchemaInput): Required<Shown> => shownOf(search),
   beforeLoad: ({ context, params }) => opening(context, params.tenant, "portalr:read_spend"),

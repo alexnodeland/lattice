@@ -35,7 +35,9 @@ const HEADER = <PageHeader title="Audit" meta="Every change to who may see and d
  * a filtered log can be linked to. grantr filters it (grantr ADR-0030, ADR-0032; portalr ADR-0026).
  */
 export const Route = createFileRoute("/_signed/t/$tenant/audit")({
-  head: ({ params }) => ({ meta: [{ title: `Audit · ${params.tenant} · portalr admin` }] }),
+  head: ({ params, match }) => ({
+    meta: [{ title: match.context.title(`Audit · ${params.tenant}`) }],
+  }),
   validateSearch: searchOf,
   beforeLoad: ({ context, params }) => opening(context, params.tenant, "grantr:read_audit"),
   loaderDeps: ({ search }) => search,

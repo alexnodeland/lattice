@@ -10,6 +10,7 @@ import subprocess
 import tarfile
 import zipfile
 from pathlib import Path
+from typing import Literal
 
 import pytest
 
@@ -17,7 +18,9 @@ ROOT = Path(__file__).parent.parent
 PINS = ROOT / "scripts" / "crafts"
 
 CURL = """#!/usr/bin/env bash
-# Writes $FAKE_DOWNLOAD's file to --output, slowly, so two runs' downloads overlap.
+# Writes $FAKE_DOWNLOAD's file to --output, slowly, so two runs' downloads overlap, and the URL
+# it was asked for beside it.
+echo "${@: -1}" >"$FAKE_DOWNLOAD.url"
 while [[ $# -gt 0 ]]; do [[ $1 == --output ]] && out=$2; shift; done
 head -c 5 "$FAKE_DOWNLOAD" >"$out"
 sleep 0.3
@@ -38,9 +41,9 @@ def archive(*names: str) -> bytes:
     return buffer.getvalue()
 
 
-def tarball(*names: str) -> bytes:
+def tarball(*names: str, mode: Literal["w:gz", "w:xz"] = "w:gz") -> bytes:
     buffer = io.BytesIO()
-    with tarfile.open(fileobj=buffer, mode="w:gz") as made:
+    with tarfile.open(fileobj=buffer, mode=mode) as made:
         for name in names:
             info = tarfile.TarInfo(name)
             info.mode, info.size = 0o755, 10
@@ -129,7 +132,9 @@ ASSET = re.compile(
 )
 
 
-STORYTOLDS = sorted(path for path in PINS.glob("*.sha256") if path.stem != "freecad")
+STORYTOLDS = sorted(
+    path for path in PINS.glob("*.sha256") if path.stem not in {"freecad", "blender"}
+)
 
 
 @pytest.mark.parametrize("path", STORYTOLDS, ids=lambda path: path.stem)
@@ -203,6 +208,63 @@ def test_freecad_has_no_macos_cli_and_no_browser_build(
     code, _, err = finished(craft(freecad, what, APPIMAGE, app="freecad", machine=machine))
     assert code == 2
     assert f"FreeCAD has no {what} for {machine[0]}" in err
+
+
+def test_blenders_pin_is_its_releases_linux_x86_64_tarball() -> None:
+    (line,) = (PINS / "blender.sha256").read_text().splitlines()
+    digest, name = line.split("  ")
+    assert re.fullmatch(r"[0-9a-f]{64}", digest)
+    assert re.fullmatch(r"blender-\d+\.\d+\.\d+-linux-x64\.tar\.xz", name)
+
+
+BLENDER = tarball(
+    "blender-9.9.9-linux-x64/blender",
+    "blender-9.9.9-linux-x64/blender-launcher",
+    "blender-9.9.9-linux-x64/copyright.txt",
+    "blender-9.9.9-linux-x64/license/license.md",
+    "blender-9.9.9-linux-x64/9.9/datafiles/assets/LICENSE",
+    mode="w:xz",
+)
+
+
+@pytest.fixture
+def blender(scripts: Path) -> Path:
+    """scripts/craft, pinning Blender's tarball to `BLENDER`."""
+    (scripts / "crafts" / "blender.sha256").write_text(
+        pin((BLENDER, "blender-9.9.9-linux-x64.tar.xz"))
+    )
+    return scripts
+
+
+def test_blenders_cli_is_its_tarballs_blender_from_its_own_site(blender: Path) -> None:
+    code, out, err = finished(
+        craft(blender, "cli", BLENDER, app="blender", machine=("Linux", "x86_64"))
+    )
+    assert code == 0, err
+    assert out.strip().endswith("blender-9.9.9-linux-x64/blender")
+    url = (blender.parent / f"download-{hashlib.sha256(BLENDER).hexdigest()}.url").read_text()
+    assert url.strip() == (
+        "https://download.blender.org/release/Blender9.9/blender-9.9.9-linux-x64.tar.xz"
+    )
+    code, out, _ = finished(
+        craft(blender, "notices", BLENDER, app="blender", machine=("Linux", "x86_64"))
+    )
+    assert [line.rsplit("/", 2)[-2:] for line in out.split()] == [
+        ["blender-9.9.9-linux-x64", "copyright.txt"],
+        ["license", "license.md"],
+    ]
+
+
+@pytest.mark.parametrize(
+    ("what", "machine"),
+    [("cli", ("Linux", "aarch64")), ("cli", ("Darwin", "arm64")), ("web", ("Linux", "x86_64"))],
+)
+def test_blender_has_no_aarch64_or_macos_cli_and_no_browser_build(
+    blender: Path, what: str, machine: tuple[str, str]
+) -> None:
+    code, _, err = finished(craft(blender, what, BLENDER, app="blender", machine=machine))
+    assert code == 2
+    assert f"Blender has no {what} for {machine[0]} {machine[1]}" in err
 
 
 def test_runs_at_once_on_a_cold_cache_each_find_the_whole_cli(scripts: Path) -> None:

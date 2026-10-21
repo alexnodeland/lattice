@@ -58,6 +58,16 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         },
         {"pydantic", "FreeCAD", "Part", "Sketcher", "TechDraw", "PIL"},
     ),
+    # Blender's scan inflates zstd; its script runs in Blender's own interpreter, on its modules.
+    "blender": (
+        {
+            "artifactr.files.manifest",
+            "artifactr.files.app",
+            "artifactr.files.craft",
+            "artifactr.files.blender",
+        },
+        {"pydantic", "zstandard", "bpy", "bmesh", "mathutils"},
+    ),
     # The worker, over any app, and the App that calls it; its entry point runs WordCraft's.
     "worker": (
         {

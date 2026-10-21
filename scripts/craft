@@ -11,6 +11,11 @@
 # itself once its checksum holds, since CI has no FUSE (native files ADR-0014). It has no macOS
 # CLI and no browser build.
 #
+# Blender, the Blender Foundation's, is pinned by its Linux x86_64 tarball alone, the line of its
+# release's own blender-X.Y.Z.sha256 on download.blender.org; Blender releases no Linux aarch64
+# build, and its macOS one is a disk image, so it has no CLI there, and no browser build. Its
+# notices are its tarball's license/ folder and copyright.txt (native files ADR-0015).
+#
 # Each asset is the storytold/APP release's, with the SHA-256 the pin records, which is the
 # release's own SHA256SUMS.txt line; upstream signs nothing, so the checksum is the pin (RFC-0003's
 # D8). A pin names one asset for each of cli on Linux x86_64 and aarch64 and on macOS, and web: the
@@ -31,7 +36,14 @@ readonly PIN
 
 release='[0-9]+\.[0-9]+\.[0-9]+'
 repository=storytold/$app tag=v cli=$app-cli
-if [[ $app == freecad ]]; then
+if [[ $app == blender ]]; then
+  cli=blender
+  case "$what:$(uname -s):$(uname -m)" in
+    cli:Linux:x86_64 | notices:Linux:x86_64) ;;
+    *) echo "craft: Blender has no $what for $(uname -s) $(uname -m)" >&2; exit 2 ;;
+  esac
+  pattern="blender-$release-linux-x64\.tar\.xz"
+elif [[ $app == freecad ]]; then
   repository=FreeCAD/FreeCAD tag='' cli=freecadcmd
   case "$what:$(uname -s):$(uname -m)" in
     cli:Linux:x86_64 | notices:Linux:x86_64) arch=x86_64 ;;
@@ -58,7 +70,11 @@ fi
 read -r SHA256 NAME <<<"$pinned"
 VERSION=$(grep -oE "$release" <<<"$NAME")
 readonly SHA256 NAME VERSION
-readonly URL="https://github.com/$repository/releases/download/$tag$VERSION/$NAME"
+if [[ $app == blender ]]; then
+  readonly URL="https://download.blender.org/release/Blender${VERSION%.*}/$NAME"
+else
+  readonly URL="https://github.com/$repository/releases/download/$tag$VERSION/$NAME"
+fi
 
 cache=${CRAFT_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/lattice-craft}
 asset="$cache/$NAME"
@@ -89,6 +105,7 @@ if [[ ! -e $unpacked ]]; then
   case $NAME in
     *.zip) unzip -q "$asset" -d "$part" ;;
     *.tar.gz) tar -xzf "$asset" -C "$part" ;;
+    *.tar.xz) tar -xJf "$asset" -C "$part" ;;
     *.AppImage) chmod u+x "$asset" && (cd "$part" && "$asset" --appimage-extract >/dev/null) ;;
   esac
   # A link is made whole or not at all, and only by the first run: the others' unpacking goes.
@@ -98,9 +115,13 @@ fi
 case $what in
   cli) found=$(find "$unpacked/" -type f -name "$cli" -perm -u+x -print -quit) ;;
   web) found=$(find "$unpacked/" -type f -name index.html -print -quit) && found=${found%/*} ;;
-  notices)
+  notices) if [[ $app == blender ]]; then
+    found=$(find "$unpacked/" -maxdepth 3 -type f \( -path '*/license/*' -o -name copyright.txt \) \
+      | sort)
+  else
     found=$(find "$unpacked/" -type f \( -name 'LICEN[CS]E*' -o -name '*.LICEN[CS]E*' \
-      -o -name 'NOTICE*' -o -name 'ATTRIBUTION*' -o -name 'OFL*' \) | sort) ;;
+      -o -name 'NOTICE*' -o -name 'ATTRIBUTION*' -o -name 'OFL*' \) | sort)
+  fi ;;
 esac
 [[ -n $found ]] || { echo "craft: $NAME holds no $what" >&2; exit 1; }
 echo "$found"

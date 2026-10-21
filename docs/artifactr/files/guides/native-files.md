@@ -163,7 +163,7 @@ An agent's commands are PdfCraft's own, run through its command registry, such a
 
 ## The other crafting apps
 
-`artifactr.files.craft.CRAFTS` declares every crafting app, as its pinned release offers it, and FreeCAD, below; each is an integration of its own, `files:<name>`, off by default but WordCraft's:
+`artifactr.files.craft.CRAFTS` declares every crafting app, as its pinned release offers it, and FreeCAD and Blender, below; each is an integration of its own, `files:<name>`, off by default but WordCraft's:
 
 | App | Its dialect | Its CLI confines files to | Kept as | Key |
 |---|---|---|---|---|
@@ -177,6 +177,7 @@ An agent's commands are PdfCraft's own, run through its command registry, such a
 | DesignCraft | tools | a read and a write root | `.idml` | `files:designcraft` |
 | FigCraft | tools | nothing | `.figcraft` | `files:figcraft` |
 | FreeCAD | script | nothing | `.FCStd` | `files:freecad` |
+| Blender | script | nothing | `.blend` | `files:blender` |
 | FilmCraft | commands | nothing | exports only | `files:filmcraft` |
 | EffectCraft | commands | a read and a write root | exports only | `files:effectcraft` |
 | SoundCraft | tools | a read and a write root | exports only | `files:soundcraft` |
@@ -236,6 +237,26 @@ files = NativeFiles(blobs, checkouts, {WordDocument: wordcraft, CadModel: freeca
 **What a save keeps.** A document is saved under the label it had, with no recompute when no command ran, so its shapes' bytes are kept; the console drops `GuiDocument.xml`, which holds colours and visibility, so the adapter puts the source's back, and the thumbnail is dropped. The fingerprint is every part's bytes, with the time each save writes left out. The outline is each object's label and type, a line each, and the text is the sheets' cells. Page 1 is the model drawn isometrically, its visible edges in black; a model with no shape is refused. Its corpus is nine features made by FreeCAD itself, each kept by 1.1.4.
 
 `scripts/craft freecad cli` fetches FreeCAD's Linux AppImage for this machine, checks it against `scripts/crafts/freecad.sha256`, unpacks it, and prints its `freecadcmd`; there is no macOS CLI and no browser build, so a person edits a model in their own FreeCAD, and downloads and uploads it. `notices` lists the licence files the AppImage carries.
+
+## Blender
+
+Blender is the Blender Foundation's 3D creation suite, under GPL-3.0, not one of the crafting apps, and its key is `files:blender`, off by default. It keeps 3D scenes, `Scene`, `.blend`, under `BLEND`, `application/x-blender`, the shared MIME-info database's name for it ([ADR-0015](../adr/0015-blender-on-the-script-dialect-and-no-file-that-may-run-python.md)). lattice runs Blender only as a separate process, and never imports `bpy`: its adapter starts `blender --background` on a script of its own for every call, as FreeCAD's does, with no user setting or startup file (`--factory-startup`), no script a file holds (`--disable-autoexec`) and no network (`--offline-mode`). The script reads and writes wherever your user can, so the adapter is made with `trusted=True`: run it in the worker where files aren't trusted, with an address space of at least 4 GiB (`Limits(memory=4 << 30)`), since Blender crashed under the worker's default 2 GiB. Whoever ships Blender in an image ships it under the GPL-3.0.
+
+```python
+from artifactr.files import Scene
+from artifactr.files.blender import Subprocess as Blender
+
+blender = Blender(cli, version="5.2.2", trusted=True)  # cli: from scripts/craft blender cli
+files = NativeFiles(blobs, checkouts, {WordDocument: wordcraft, Scene: blender})
+```
+
+**What Blender is given.** A `.blend` is Blender's memory written out, block by block, and Blender reads a block through a pointer by its size alone, whatever struct it is. So before Blender starts, the adapter inflates the file's zstd against the limit, holds its header and its catalogue of structs to Blender 5.2's own, and reads every block: it refuses a text, a library, an image, a font, a sound, a node group or any data-block but cameras, collections, lights, materials, meshes, objects, scenes and the windows every file holds; a block of a struct outside those 5.2 saves for what the commands make, so a driver, animation or a packed file; any pointer from an allowed struct to another; a script node's name in any block; and a head that lies, too many blocks, or bytes after the end. Blender is given the blocks it read, written again uncompressed without the thumbnail, never the bytes it was sent, and the script refuses again what Blender opened with a text, a library, an image, animation or a cycle of parents. That refuses most files with animation, images or node groups: keep such a file as an upload. The scan isn't Blender's reader, which still reads every allowed struct.
+
+**The commands are lattice's.** An agent's commands are a fixed set the script carries out through Blender's data API, none of them Python: `cube`, `sphere`, `cylinder`, `cone`, `plane`, `move`, `material`, `assign`, `modifier` (`subdivision`, `bevel`, `array`, `mirror`, `solidify`), `camera`, `light`, `collection`, `link`, `render`, `set` and `remove`, such as `{"name": "cube", "args": {"size": 2, "at": [0, 0, 1]}}`. `app.commands("material")` finds them with no CLI started. Each argument is checked by its type and its bounds, and a batch is saved as a reopened file is, so its next save is a fixpoint.
+
+**What a save keeps.** A file is saved compressed if it came compressed, and a blank one compressed, as Blender's GUI saves. The fingerprint is every block but the thumbnail, uncompressed, with the three fields each save stamps (the file's path, the file browser's folder and a profile's counter) left out. The outline is each object's name, type and collections, a line each, and the text is the materials. Page 1 is the scene drawn through its camera by Workbench, with no GPU; a scene with no camera is refused. Its corpus is seven features made by Blender itself, each kept by 5.2.2.
+
+`scripts/craft blender cli` fetches Blender's Linux x86_64 tarball from download.blender.org, checks it against `scripts/crafts/blender.sha256`, unpacks it, and prints its `blender`. Blender releases no Linux aarch64 build, and its macOS one is a disk image, so there is no CLI on either and no browser build: a person edits a scene in their own Blender, and downloads and uploads it. `notices` lists the tarball's `license/` and `copyright.txt`.
 
 ## Switching an app on and off
 

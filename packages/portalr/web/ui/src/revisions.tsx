@@ -382,7 +382,7 @@ function Revision({
   return (
     <li
       aria-label={`Version ${revision.version}`}
-      className="rounded-lg border border-line bg-surface"
+      className="rounded-(--card-radius) border border-line bg-surface"
     >
       <details open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
         <summary className="flex cursor-pointer list-none items-start gap-2 rounded-lg px-4 py-3 outline-offset-(--focus-offset) hover:bg-wash focus-visible:outline-(length:--focus-width) focus-visible:outline-focus [&::-webkit-details-marker]:hidden">

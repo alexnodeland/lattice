@@ -86,7 +86,7 @@ function Branch({
  */
 export function JsonView({ data, name = "JSON" }: { data: unknown; name?: string }) {
   return (
-    <div className="flex min-w-0 flex-col rounded-md border border-line bg-paper">
+    <div className="flex min-w-0 flex-col rounded-(--code-block-radius) border border-line bg-paper">
       <div className="flex items-center justify-between gap-2 border-line border-b py-1 ps-3 pe-1">
         <span className="font-mono text-muted text-xs">json</span>
         <CopyButton text={JSON.stringify(data, null, 2)} what={`the ${name}`} />

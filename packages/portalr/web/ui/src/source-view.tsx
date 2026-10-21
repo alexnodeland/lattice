@@ -48,7 +48,7 @@ export function SourceView({
   const shown = folded ? FOLDED_LINES : count;
   const digits = String(count).length;
   return (
-    <div className="flex min-w-0 flex-col rounded-md border border-line bg-paper">
+    <div className="flex min-w-0 flex-col rounded-(--code-block-radius) border border-line bg-paper">
       <div className="flex flex-wrap items-center justify-between gap-2 border-line border-b py-1 ps-3 pe-1">
         <span className="text-xs">
           <span className="inline-block font-semibold text-fg first-letter:uppercase">{name}</span>

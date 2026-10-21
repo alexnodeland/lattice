@@ -150,7 +150,7 @@ export function LogList({
             }
           }}
           onKeyDown={walk}
-          className="max-h-[30rem] min-h-24 overflow-auto rounded-lg border border-line bg-surface"
+          className="max-h-[30rem] min-h-24 overflow-auto rounded-(--card-radius) border border-line bg-surface"
         >
           <div style={{ height: virtual.getTotalSize() }} className="relative w-full">
             {items.map((item) => {
@@ -228,7 +228,7 @@ function Details({ record, reveal }: { record: LogRecord; reveal: LineReveal }) 
   return (
     <section
       aria-labelledby={`${base}-record`}
-      className="flex min-w-0 flex-col gap-3 rounded-lg border border-line bg-surface p-4"
+      className="flex min-w-0 flex-col gap-3 rounded-(--card-radius) border border-line bg-surface p-4"
     >
       <h3 id={`${base}-record`} className="font-semibold text-fg">
         {moment(record.time_ns)}
@@ -292,7 +292,7 @@ function LineNow({ record, reveal }: { record: LogRecord; reveal: LineReveal }) 
       return line === null ? (
         <p className="text-muted text-sm">The read returned no such record.</p>
       ) : (
-        <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md bg-paper p-3 font-mono text-fg text-xs">
+        <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-(--code-block-radius) bg-paper p-(--code-block-pad-x) font-mono text-fg text-xs">
           <AnsiText line={line} />
         </pre>
       );

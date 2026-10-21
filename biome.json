@@ -45,7 +45,7 @@
         "packages/portalr/web/ui/src/table.tsx",
         "packages/portalr/web/ui/src/markdown.tsx",
         "packages/portalr/web/ui/src/line-diff.tsx",
-        "packages/portalr/web/ui/src/app-shell.tsx",
+        "packages/portalr/web/ui/src/skip-link.tsx",
         "packages/portalr/web/ui/src/on-demand/apps.tsx"
       ],
       "linter": {
@@ -59,7 +59,6 @@
     {
       "includes": [
         "packages/portalr/web/admin/src/main.tsx",
-        "packages/portalr/web/admin/src/routes/_signed/deployment/tools.tsx",
         "packages/portalr/web/admin/src/routes/_signed/t/$tenant/runs.tsx",
         "packages/portalr/web/app/src/main.tsx",
         "packages/portalr/web/app/src/native-file.tsx",

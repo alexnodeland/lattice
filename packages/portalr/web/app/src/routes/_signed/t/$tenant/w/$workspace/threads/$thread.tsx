@@ -24,7 +24,6 @@ import {
   RunStatus,
   rendererFor,
   Streaming,
-  TextLink,
   ToolCall,
   ToolCalls,
 } from "@portalr/ui";
@@ -121,11 +120,12 @@ function readsFor(
 
 function Chat() {
   const { tenant, workspace, thread: id } = Route.useParams();
-  const crumb = (
-    <TextLink render={<Link to="/t/$tenant/w/$workspace" params={{ tenant, workspace }} />}>
-      Threads
-    </TextLink>
-  );
+  const crumbs = [
+    {
+      label: "Threads",
+      render: <Link to="/t/$tenant/w/$workspace" params={{ tenant, workspace }} />,
+    },
+  ];
   const context = Route.useRouteContext();
   const { queries, queryClient, user, config } = context;
   const me = useMe(queries, user, tenant);
@@ -170,7 +170,7 @@ function Chat() {
   if (thread === undefined) {
     return snapshot.status === "live" ? (
       <>
-        <PageHeader title="Thread not found" crumb={crumb} />
+        <PageHeader title="Thread not found" breadcrumbs={crumbs} />
         <p>There's no thread here by that name, or it isn't one you can see.</p>
       </>
     ) : (
@@ -180,7 +180,7 @@ function Chat() {
   if (!allowed.has("artifactr:read_threads")) {
     return (
       <>
-        <PageHeader title={thread.title || "Untitled"} crumb={crumb} />
+        <PageHeader title={thread.title || "Untitled"} breadcrumbs={crumbs} />
         <Alert tone="error">This isn't available to you any more.</Alert>
       </>
     );
@@ -232,7 +232,7 @@ function Chat() {
     <section aria-labelledby="thread" className="flex max-w-190 flex-col gap-6">
       <PageHeader
         title={thread.title || "Untitled"}
-        crumb={crumb}
+        breadcrumbs={crumbs}
         id="thread"
         actions={
           (allowed.has("grantr:grant") || allowed.has("grantr:restrict")) && (

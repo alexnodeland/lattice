@@ -25,6 +25,7 @@ export {
   type RevisionPart,
   rendererFor,
 } from "./artifacts";
+export { Breadcrumbs, type Crumb } from "./breadcrumbs";
 export { Button, type ButtonSize, type ButtonVariant } from "./button";
 export { Card } from "./card";
 export {
@@ -112,7 +113,7 @@ export { TabLink, TabNav } from "./tab-nav";
 export { Table } from "./table";
 export { TextArea } from "./text-area";
 export { TextField } from "./text-field";
-export { TextLink } from "./text-link";
+export { type LinkVariant, TextLink } from "./text-link";
 export { ToolCall, ToolCalls } from "./tool-call";
 export { duration, type Reveal, type Standing, TraceView } from "./trace-view";
 export { type Block, type Level, Tracker } from "./tracker";

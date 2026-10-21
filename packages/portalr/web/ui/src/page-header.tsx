@@ -1,14 +1,15 @@
 import type { ReactNode } from "react";
+import { Breadcrumbs, type Crumb } from "./breadcrumbs";
 import { cn } from "./cn";
 import { TYPE } from "./type";
 
 /**
- * The top of a page: where it is, its one heading, a line about it, and its actions, which wrap
+ * The top of a page: the places above it, its one heading, a line about it, and its actions, which wrap
  * beneath the heading on a narrow screen.
  */
 export function PageHeader({
   title,
-  crumb,
+  breadcrumbs,
   meta,
   actions,
   id,
@@ -19,15 +20,15 @@ export function PageHeader({
   mono?: boolean;
   /** The heading's id, for a region it names. */
   id?: string;
-  /** The way back, such as a link to the area. */
-  crumb?: ReactNode;
+  /** The places above this page, outermost first: the way back up. */
+  breadcrumbs?: readonly Crumb[];
   meta?: ReactNode;
   actions?: ReactNode;
 }) {
   return (
     <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 pb-1">
       <div className="flex min-w-0 flex-col gap-1">
-        {crumb && <div className={TYPE.note}>{crumb}</div>}
+        {breadcrumbs && breadcrumbs.length > 0 && <Breadcrumbs trail={breadcrumbs} />}
         <h1 id={id} className={cn(TYPE.page, mono && "font-mono")}>
           {title}
         </h1>

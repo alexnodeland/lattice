@@ -18,6 +18,9 @@ import { AppFrame } from "../src/app-frame";
 import { byDefault } from "../src/integrations";
 import { SUPPORT } from "../src/test/dashboards";
 
+/** The characters a stream renders, one at a time, before it yields. */
+const STEP = 25;
+
 const root = createRoot(document.getElementById("root") as HTMLElement);
 const asked = new URLSearchParams(location.search);
 
@@ -40,13 +43,20 @@ if (text !== null) {
     document.documentElement.dataset.drawn = "whole";
   };
   if (asked.has("stream")) {
-    // A character at a time, each its own render, as a stream's frames arrive, in one task of the
-    // page's own once it has loaded: so a navigation isn't held up by it, and the add-ons a
-    // message loads arrive once it is whole, as they did when a test drew it.
+    // A character at a time, each its own render, as a stream's frames arrive, from the page's
+    // own tasks once it has loaded, so a navigation isn't held up by it. It yields every few
+    // characters, as a stream does between frames, and says how far it has come on the root
+    // (`data-streamed`), so a test waits on its progress rather than on a guess at its time.
+    let end = 1;
     const stream = () => {
       try {
-        for (let end = 1; end < text.length; end += 1) {
+        for (const until = Math.min(end + STEP, text.length); end < until; end += 1) {
           show(text.slice(0, end), true);
+        }
+        document.documentElement.dataset.streamed = String(end);
+        if (end < text.length) {
+          setTimeout(stream);
+          return;
         }
         drawn();
       } catch (error) {

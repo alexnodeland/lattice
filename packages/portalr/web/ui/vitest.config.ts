@@ -69,8 +69,10 @@ export default defineConfig({
           include: ["csp/**/*.test.ts"],
           environment: "node",
           globalSetup: ["./csp/serve.ts"],
-          // A test renders a page, and some stream a message into it a character at a time.
-          testTimeout: 60_000,
+          // A test renders a page, and some stream a message into it a character at a time, which
+          // takes a loaded runner a minute and more: a stream fails sooner if it stops making
+          // progress (`csp/markdown.test.ts`'s `STALLED`), and this is the backstop.
+          testTimeout: 300_000,
         },
       },
     ],

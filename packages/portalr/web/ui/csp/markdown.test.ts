@@ -6,7 +6,7 @@
  * and draws each from its own task, where a string it evaluated would be refused (ADR-0047).
  */
 
-import { type Browser, chromium } from "playwright";
+import { type Browser, chromium, type Page } from "playwright";
 import { afterAll, beforeAll, expect, test } from "vitest";
 import { GALLERY, HOSTILE } from "../src/test/markdown";
 import { open } from "./harness";
@@ -18,6 +18,30 @@ beforeAll(async () => {
 });
 
 afterAll(() => browser.close());
+
+/** How long a page may go without drawing more before it is said to be stuck, in milliseconds. */
+const STALLED = 30_000;
+
+/** How the page's drawing ended, "whole" or its error, waiting while it makes progress. */
+async function drawn(page: Page): Promise<string> {
+  let seen = "";
+  for (;;) {
+    const handle = await page.waitForFunction(
+      (before) => {
+        const root = document.documentElement.dataset;
+        const streamed = root.streamed ?? "";
+        return root.drawn ?? root.error ?? (streamed !== before ? `+${streamed}` : null);
+      },
+      seen,
+      { timeout: STALLED },
+    );
+    const now = String(await handle.jsonValue());
+    if (!now.startsWith("+")) {
+      return now;
+    }
+    seen = now.slice(1);
+  }
+}
 
 /** The harness's page, drawing `text` from its own task, streamed or whole, as `options` say. */
 async function shown(
@@ -35,16 +59,10 @@ async function shown(
     search.set("off", off.join(","));
   }
   const harness = await open(browser, `?${search}`);
-  // Drawn whole, or stopped by an error, which the page says on its root; a stream takes a slow
-  // runner a while. Either way that it didn't finish says why, with what the page reported.
-  const ended = await harness.page
-    .waitForFunction(
-      () => document.documentElement.dataset.drawn ?? document.documentElement.dataset.error,
-      null,
-      { timeout: 50_000 },
-    )
-    .then((handle) => handle.jsonValue())
-    .catch((error: unknown) => `not drawn: ${String(error)}`);
+  // Drawn whole, or stopped by an error, which the page says on its root. A stream takes a slow
+  // runner a while, a minute and more under load: it is waited on while it makes progress, and
+  // fails only once it has made none for `STALLED` milliseconds.
+  const ended = await drawn(harness.page).catch((error: unknown) => `not drawn: ${String(error)}`);
   if (ended !== "whole") {
     throw new Error(`${ended}\n${(await harness.reported()).join("\n")}`);
   }

@@ -2,10 +2,11 @@ import { Dialog } from "@base-ui/react/dialog";
 import { useRender } from "@base-ui/react/use-render";
 import { Menu as MenuGlyph, X } from "lucide-react";
 import { type MouseEvent, type ReactElement, type ReactNode, useEffect, useState } from "react";
-import { brandName, useBrand } from "./brand";
+import { useBrand, useUiName } from "./brand";
+import { cn } from "./cn";
 import { backdrop } from "./dialog";
 import { Icon } from "./icon";
-import { Lockup, Mark, UI_NAME, type Ui } from "./marks";
+import { Lockup, Mark, type Ui } from "./marks";
 import { SkipLink } from "./skip-link";
 
 /** From this width the frame is a rail, and the drawer has no place. */
@@ -13,14 +14,19 @@ const WIDE = "(min-width: 1024px)";
 
 /** The mark, as a link home named for the UI. */
 function Home({ ui, home, children }: { ui: Ui; home: ReactElement; children: ReactNode }) {
-  const brand = useBrand();
+  const name = useUiName(ui);
+  // A kit's name may be long: it is cut to the room, and said whole on hover.
+  const kit = useBrand() !== null;
   return useRender({
     defaultTagName: "a",
     render: home,
     props: {
-      "aria-label": brand ? brandName(brand, ui) : UI_NAME[ui],
-      className:
-        "inline-flex shrink-0 rounded-(--header-trigger-radius) outline-offset-(--focus-offset) focus-visible:outline-(length:--focus-width) focus-visible:outline-focus",
+      "aria-label": name,
+      title: kit ? name : undefined,
+      className: cn(
+        "inline-flex rounded-(--header-trigger-radius) outline-offset-(--focus-offset) focus-visible:outline-(length:--focus-width) focus-visible:outline-focus",
+        kit ? "min-w-0 max-w-full" : "shrink-0",
+      ),
       children,
     },
   });

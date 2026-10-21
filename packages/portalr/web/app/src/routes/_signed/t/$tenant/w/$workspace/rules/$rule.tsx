@@ -1,5 +1,5 @@
 import { allowedIn, keys, Refused, refusal } from "@portalr/client";
-import { Alert, Button, ConfirmDialog, PageHeader, TextField } from "@portalr/ui";
+import { Alert, Button, ConfirmDialog, PageHeader, pageTitle, TextField } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import { useActionState, useMemo, useState } from "react";
@@ -17,7 +17,13 @@ const resource = (workspace: string, rule: string) =>
  * replaces, so one made over someone else's is refused, not lost.
  */
 export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/rules/$rule")({
-  head: ({ params }) => ({ meta: [{ title: `${params.rule} · ${params.workspace} · portalr` }] }),
+  head: ({ params, match }) => ({
+    meta: [
+      {
+        title: pageTitle(match.context.config.brand, "app", `${params.rule} · ${params.workspace}`),
+      },
+    ],
+  }),
   // Another rule's page starts its editor afresh.
   remountDeps: ({ params }) => params.rule,
   loader: async ({ context, params }) => {

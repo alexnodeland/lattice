@@ -34,11 +34,17 @@ export function SignIn({
   return (
     <main id="main" className="grid min-h-dvh place-items-center bg-paper px-4 py-10 text-fg">
       <div className="flex w-full max-w-sm flex-col gap-2 rounded-(--sign-in-radius) border border-line bg-surface p-(--sign-in-pad)">
-        <Lockup ui={ui} className="mb-6 h-9" />
-        {brand?.copy.tagline && (
-          <p className="-mt-4 mb-4 text-muted text-sm">{brand.copy.tagline}</p>
-        )}
-        <h1 className={TYPE.page}>{brand?.copy.signIn ?? "Sign in"}</h1>
+        <div className="mb-6 flex flex-col gap-1">
+          <Lockup ui={ui} className="h-9" />
+          {brand?.copy?.tagline && (
+            <p dir="auto" className="text-muted text-sm">
+              {brand.copy.tagline}
+            </p>
+          )}
+        </div>
+        <h1 dir="auto" className={TYPE.page}>
+          {brand?.copy?.signIn ?? "Sign in"}
+        </h1>
         <p className="mb-4 text-muted text-sm">with your email and password</p>
         <form className="flex flex-col gap-4" action={signIn}>
           <TextField

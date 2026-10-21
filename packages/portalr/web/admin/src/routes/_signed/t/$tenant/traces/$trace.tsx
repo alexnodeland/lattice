@@ -1,5 +1,13 @@
 import { outline, said, type Trace, wholeTrace } from "@portalr/client";
-import { Alert, EmptyState, PageHeader, type Reveal, type Standing, TraceView } from "@portalr/ui";
+import {
+  Alert,
+  EmptyState,
+  PageHeader,
+  pageTitle,
+  type Reveal,
+  type Standing,
+  TraceView,
+} from "@portalr/ui";
 import { useQueries, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, type ErrorComponentProps, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
@@ -15,7 +23,9 @@ const HEADER = <PageHeader title="Trace" />;
  * it, is read for that span alone, when it asks, and let go (portalr ADR-0030).
  */
 export const Route = createFileRoute("/_signed/t/$tenant/traces/$trace")({
-  head: ({ params }) => ({ meta: [{ title: `Trace · ${params.tenant} · portalr admin` }] }),
+  head: ({ params, match }) => ({
+    meta: [{ title: pageTitle(match.context.config.brand, "admin", `Trace · ${params.tenant}`) }],
+  }),
   beforeLoad: ({ context, params }) => opening(context, params.tenant, "portalr:read_telemetry"),
   // An id portalr wouldn't take isn't read: there is no such trace.
   loader: async ({ context, params }) => {

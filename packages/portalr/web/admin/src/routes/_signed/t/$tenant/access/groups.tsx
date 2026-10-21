@@ -1,5 +1,5 @@
 import { type Names, orThrow } from "@portalr/client";
-import { Alert, Button, ConfirmDialog, ItemTable } from "@portalr/ui";
+import { Alert, Button, ConfirmDialog, ItemTable, pageTitle } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
@@ -38,7 +38,9 @@ const named = (key: string, names: Names) => {
  * the last to save wins (portalr ADR-0024).
  */
 export const Route = createFileRoute("/_signed/t/$tenant/access/groups")({
-  head: ({ params }) => ({ meta: [{ title: `Groups · ${params.tenant} · portalr admin` }] }),
+  head: ({ params, match }) => ({
+    meta: [{ title: pageTitle(match.context.config.brand, "admin", `Groups · ${params.tenant}`) }],
+  }),
   beforeLoad: ({ context, params }) => opening(context, params.tenant, "grantr:manage_groups"),
   loader: async ({ context, params }) => {
     const { queries, queryClient } = context;

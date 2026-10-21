@@ -1,4 +1,4 @@
-import { Alert, failureSaid, NewVersionOffer, Plain, TextLink } from "@portalr/ui";
+import { Alert, failureSaid, NewVersionOffer, Plain, pageTitle, TextLink } from "@portalr/ui";
 import {
   createRootRouteWithContext,
   type ErrorComponentProps,
@@ -9,7 +9,7 @@ import {
 import type { Context } from "../context";
 
 export const Route = createRootRouteWithContext<Context>()({
-  head: () => ({ meta: [{ title: "portalr admin" }] }),
+  head: ({ match }) => ({ meta: [{ title: pageTitle(match.context.config.brand, "admin") }] }),
   component: () => (
     <>
       <HeadContent />

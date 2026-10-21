@@ -1,4 +1,4 @@
-import { EmptyState, PageHeader, TabLink, TabNav } from "@portalr/ui";
+import { EmptyState, PageHeader, pageTitle, TabLink, TabNav } from "@portalr/ui";
 import { createFileRoute, type ErrorComponentProps, Link, Outlet } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { PARTS, useAccess } from "../../../../access";
@@ -10,7 +10,9 @@ import { ReadFailed } from "../../../../read-failed";
  * part that isn't allowed, or whose read failed, says so here, in the tenant's frame.
  */
 export const Route = createFileRoute("/_signed/t/$tenant/access")({
-  head: ({ params }) => ({ meta: [{ title: `Access · ${params.tenant} · portalr admin` }] }),
+  head: ({ params, match }) => ({
+    meta: [{ title: pageTitle(match.context.config.brand, "admin", `Access · ${params.tenant}`) }],
+  }),
   component: () => (
     <Parts>
       <Outlet />

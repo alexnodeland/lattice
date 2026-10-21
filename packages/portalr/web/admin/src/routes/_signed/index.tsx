@@ -1,5 +1,5 @@
 import { adminLanding } from "@portalr/client";
-import { Account, Plain, Row, RowLink, Rows } from "@portalr/ui";
+import { Account, Plain, pageTitle, Row, RowLink, Rows } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, Navigate, redirect } from "@tanstack/react-router";
 import { lastChoice } from "../../last";
@@ -9,7 +9,9 @@ import { lastChoice } from "../../last";
  * for an operator with none, a choice of those, or no access.
  */
 export const Route = createFileRoute("/_signed/")({
-  head: () => ({ meta: [{ title: "Tenants · portalr admin" }] }),
+  head: ({ match }) => ({
+    meta: [{ title: pageTitle(match.context.config.brand, "admin", "Tenants") }],
+  }),
   loader: async ({ context }) => {
     const { queries, queryClient, user } = context;
     const [memberships, every] = await Promise.all([

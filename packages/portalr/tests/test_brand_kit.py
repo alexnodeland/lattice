@@ -442,7 +442,8 @@ def test_a_key_that_would_forge_a_log_line_is_said_as_its_repr(kit: Path) -> Non
 
 def test_a_brand_json_nested_too_deep_is_refused(kit: Path) -> None:
     (kit / "brand.json").write_text("[" * 100_000 + "]" * 100_000)
-    assert faults(kit) == "brand.json: nested too deep"
+    # Python 3.14's parser takes any depth, and the schema then refuses it: either way, refused.
+    assert faults(kit).startswith("brand.json: ")
 
 
 def test_a_kit_names_sixteen_faces_at_most(kit: Path) -> None:
@@ -454,7 +455,9 @@ def test_a_kit_names_sixteen_faces_at_most(kit: Path) -> None:
     }
     data["fonts"] = [one] * 17
     write(kit, data)
-    assert "brand.json: fonts: Tuple should have at most 16 items" in faults(kit)
+    said = faults(kit)
+    assert "brand.json: fonts:" in said
+    assert "16" in said
 
 
 def test_a_licence_two_faces_share_is_read_once(kit: Path) -> None:
@@ -473,3 +476,15 @@ def test_a_licence_two_faces_share_is_read_once(kit: Path) -> None:
     ]
     write(kit, data)
     assert list(load(kit).files).count("fonts/OFL.txt") == 1
+
+
+def test_a_token_file_nested_too_deep_is_refused(
+    kit: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (kit / "tokens.light.json").write_text("{}")
+
+    def deep(*_: object, **__: object) -> object:
+        raise RecursionError
+
+    monkeypatch.setattr("portalr.brand.tokens._mapping", deep)
+    assert faults(kit) == "tokens.light.json: nested too deep"

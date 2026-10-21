@@ -10,6 +10,7 @@ import {
   MAX_SERIES,
   Moment,
   PageHeader,
+  pageTitle,
   SegmentedFilter,
   SelectField,
   StatusBadge,
@@ -59,7 +60,11 @@ const TEMPLATE = "portalr-trace";
  * and a workspace are in the address, so a view can be linked to (portalr ADR-0027).
  */
 export const Route = createFileRoute("/_signed/t/$tenant/feedback")({
-  head: ({ params }) => ({ meta: [{ title: `Feedback · ${params.tenant} · portalr admin` }] }),
+  head: ({ params, match }) => ({
+    meta: [
+      { title: pageTitle(match.context.config.brand, "admin", `Feedback · ${params.tenant}`) },
+    ],
+  }),
   // What a link may give, each of it optional; what the address gives, read with `shownOf`.
   validateSearch: (search: Shown & SearchSchemaInput): Required<Shown> => shownOf(search),
   beforeLoad: ({ context, params }) => opening(context, params.tenant, "portalr:read_telemetry"),

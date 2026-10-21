@@ -7,6 +7,7 @@ import {
   type LineReveal,
   LogList,
   PageHeader,
+  pageTitle,
   SectionTitle,
   SegmentedFilter,
   TextField,
@@ -33,7 +34,9 @@ const HEADER = <PageHeader title="Logs" meta="What the application wrote, and ho
  * filters are in the address, so a view can be linked to.
  */
 export const Route = createFileRoute("/_signed/t/$tenant/logs")({
-  head: ({ params }) => ({ meta: [{ title: `Logs · ${params.tenant} · portalr admin` }] }),
+  head: ({ params, match }) => ({
+    meta: [{ title: pageTitle(match.context.config.brand, "admin", `Logs · ${params.tenant}`) }],
+  }),
   // What a link may give, each of it optional; what the address gives, read with `shownOf`.
   validateSearch: (search: Shown & SearchSchemaInput): Required<Shown> => shownOf(search),
   beforeLoad: ({ context, params }) => opening(context, params.tenant, "portalr:read_telemetry"),

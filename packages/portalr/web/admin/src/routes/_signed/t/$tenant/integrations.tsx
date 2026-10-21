@@ -5,6 +5,7 @@ import {
   IntegrationList,
   type IntegrationRow,
   PageHeader,
+  pageTitle,
   SelectField,
   TextLink,
 } from "@portalr/ui";
@@ -35,7 +36,11 @@ const HEADER = (
  * ADR-0034, portalr ADR-0045).
  */
 export const Route = createFileRoute("/_signed/t/$tenant/integrations")({
-  head: ({ params }) => ({ meta: [{ title: `Integrations · ${params.tenant} · portalr admin` }] }),
+  head: ({ params, match }) => ({
+    meta: [
+      { title: pageTitle(match.context.config.brand, "admin", `Integrations · ${params.tenant}`) },
+    ],
+  }),
   validateSearch: (search: Level & SearchSchemaInput): Level => levelOf(search),
   beforeLoad: ({ context, params }) =>
     opening(context, params.tenant, "grantr:manage_integrations"),

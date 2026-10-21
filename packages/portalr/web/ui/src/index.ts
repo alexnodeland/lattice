@@ -25,7 +25,7 @@ export {
   type RevisionPart,
   rendererFor,
 } from "./artifacts";
-export { type Brand, BrandContext, brandName, useBrand } from "./brand";
+export { type Brand, BrandContext, brandName, pageTitle, useBrand, useUiName } from "./brand";
 export { Breadcrumbs, type Crumb } from "./breadcrumbs";
 export { Button, type ButtonSize, type ButtonVariant } from "./button";
 export { Card } from "./card";

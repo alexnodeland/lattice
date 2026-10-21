@@ -68,9 +68,12 @@ export function Lockup({ ui = "app", className }: { ui?: Ui; className?: string 
   const brand = useBrand();
   if (brand) {
     return (
-      <span className={cn("inline-flex h-7 items-center gap-2", className)}>
-        <BrandMark brand={brand} className="h-full w-auto" />
-        <span className="font-semibold text-fg text-lg">{brandName(brand, ui)}</span>
+      <span className={cn("inline-flex h-7 min-w-0 max-w-full items-center gap-2", className)}>
+        <BrandMark brand={brand} className="size-7" />
+        {/* A long name is cut to the room, and said whole by the link around it. */}
+        <span dir="auto" className="min-w-0 truncate font-semibold text-fg text-lg">
+          {brandName(brand, ui)}
+        </span>
       </span>
     );
   }

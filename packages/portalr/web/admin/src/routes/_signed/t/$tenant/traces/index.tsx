@@ -8,6 +8,7 @@ import {
   ItemTable,
   Moment,
   PageHeader,
+  pageTitle,
   SectionTitle,
   SegmentedFilter,
   TextField,
@@ -40,7 +41,9 @@ const HEADER = <PageHeader title="Traces" meta="What the agents did, step by ste
  * window and the filters are in the address, so a view can be linked to (portalr ADR-0030).
  */
 export const Route = createFileRoute("/_signed/t/$tenant/traces/")({
-  head: ({ params }) => ({ meta: [{ title: `Traces · ${params.tenant} · portalr admin` }] }),
+  head: ({ params, match }) => ({
+    meta: [{ title: pageTitle(match.context.config.brand, "admin", `Traces · ${params.tenant}`) }],
+  }),
   // What a link may give, each of it optional; what the address gives, read with `shownOf`.
   validateSearch: (search: Shown & SearchSchemaInput): Required<Shown> => shownOf(search),
   beforeLoad: ({ context, params }) => opening(context, params.tenant, "portalr:read_telemetry"),

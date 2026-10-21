@@ -7,6 +7,7 @@ import {
   ConfirmDialog,
   EmptyState,
   ItemTable,
+  pageTitle,
   SectionTitle,
   SelectField,
   TextField,
@@ -76,7 +77,9 @@ const none = queryOptions({
  * as grantr refuses anyone else (ADR-0025).
  */
 export const Route = createFileRoute("/_signed/t/$tenant/access/grants")({
-  head: ({ params }) => ({ meta: [{ title: `Grants · ${params.tenant} · portalr admin` }] }),
+  head: ({ params, match }) => ({
+    meta: [{ title: pageTitle(match.context.config.brand, "admin", `Grants · ${params.tenant}`) }],
+  }),
   beforeLoad: ({ context, params }) => opening(context, params.tenant, "grantr:grant"),
   loader: async ({ context, params }) => {
     const { queries, queryClient } = context;

@@ -6,6 +6,7 @@ import {
   ConfirmDialog,
   ItemTable,
   PageHeader,
+  pageTitle,
   SectionTitle,
   TextField,
 } from "@portalr/ui";
@@ -24,7 +25,9 @@ const HEADER = <PageHeader title="Tenants" meta="Every tenant in grantr, and wha
  * ADR-0034). Tenants are not entered from here: admin opens a tenant to its own owners and admins.
  */
 export const Route = createFileRoute("/_signed/deployment/tenants")({
-  head: () => ({ meta: [{ title: "Tenants · portalr admin" }] }),
+  head: ({ match }) => ({
+    meta: [{ title: pageTitle(match.context.config.brand, "admin", "Tenants") }],
+  }),
   // The deployment's layout read it before letting an operator in.
   loader: ({ context }) =>
     context.queryClient.ensureQueryData(context.queries.portalr.tenants(context.user)),

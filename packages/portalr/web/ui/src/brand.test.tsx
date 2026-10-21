@@ -1,9 +1,12 @@
 import type { ReactNode } from "react";
 import { expect, onTestFinished, test } from "vitest";
+import { page } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { AppShell } from "./app-shell";
-import { type Brand, BrandContext } from "./brand";
-import { Lockup } from "./marks";
+import { type Brand, BrandContext, pageTitle } from "./brand";
+import { Lockup, Mark } from "./marks";
+import { NewVersion } from "./new-version";
+import { Plain } from "./plain";
 import { SignIn } from "./sign-in";
 
 const BRAND: Brand = {
@@ -77,4 +80,124 @@ test("without a kit, the lockup is portalr's", async () => {
   const screen = await render(<Lockup />);
   expect(screen.container.querySelector("img")).toBeNull();
   expect(screen.container.querySelector("svg")).not.toBeNull();
+});
+
+const LONG = "Supercalifragilisticexpialidocious-and-a-great-deal-more-than-that";
+const EMOJI =
+  "Nightshade \u{1F319}\u{1F319}\u{1F319} \u{1F468}\u200d\u{1F469}\u200d\u{1F467} for everyone, every day";
+
+/** The marks a person sees: those drawn, with every box around them drawn too. */
+const shown = (within: ParentNode) =>
+  [...within.querySelectorAll("img")].filter((mark) => mark.checkVisibility());
+
+for (const scheme of ["light", "dark"] as const) {
+  test(`in the frame, wide and ${scheme}, the kit's mark is drawn once`, async () => {
+    await page.viewport(1280, 900);
+    onTestFinished(() => page.viewport(414, 896));
+    document.documentElement.dataset.theme = scheme;
+    onTestFinished(() => {
+      delete document.documentElement.dataset.theme;
+    });
+    const screen = await render(
+      branded(
+        <AppShell home={<a href="#home" />} switcher={<span>acme</span>} account={<span>a</span>}>
+          Content
+        </AppShell>,
+      ),
+    );
+    const marks = shown(screen.container);
+    expect(marks).toHaveLength(1);
+    expect(marks[0]?.getAttribute("src")).toContain(`mark-${scheme}.svg`);
+  });
+}
+
+test("on a phone, the frame's mark is the kit's mark alone", async () => {
+  await page.viewport(390, 800);
+  onTestFinished(() => page.viewport(414, 896));
+  const screen = await render(branded(<Mark />));
+  expect(shown(screen.container)).toHaveLength(1);
+  expect(screen.container.textContent).toBe("");
+});
+
+test("a plain page's way home is named for the product, as it shows", async () => {
+  const screen = await render(
+    branded(<Plain ui="admin" home={<a href="#home" />} title="Tenants" />),
+  );
+  await expect.element(screen.getByRole("link", { name: "Nightshade admin" })).toBeVisible();
+});
+
+test("a new version is offered by the product's name", async () => {
+  const screen = await render(branded(<NewVersion ui="app" onDismiss={() => undefined} />));
+  await expect
+    .element(screen.getByText("A new version of Nightshade is ready.", { exact: false }))
+    .toBeVisible();
+});
+
+test("a page's title is what it is, then the UI's name: the kit's, or portalr's", () => {
+  expect(pageTitle(BRAND, "admin", "Runs", "acme")).toBe("Runs · acme · Nightshade admin");
+  expect(pageTitle(null, "app", "Runs")).toBe("Runs · portalr");
+  expect(pageTitle(undefined, "admin")).toBe("portalr admin");
+});
+
+for (const name of [LONG, EMOJI]) {
+  const long = { ...BRAND, identity: { product: name, app: name, admin: name } };
+  test(`a long name (${name.slice(0, 12)}…) fits the rail and the drawer, and is said whole`, async () => {
+    for (const [width, open] of [
+      [1280, false],
+      [390, true],
+    ] as const) {
+      await page.viewport(width, 900);
+      onTestFinished(() => page.viewport(414, 896));
+      const screen = await render(
+        branded(
+          <AppShell home={<a href="#home" />} switcher={<span>acme</span>} account={<span>a</span>}>
+            Content
+          </AppShell>,
+          long,
+        ),
+      );
+      if (open) {
+        await screen.getByRole("button", { name: "Menu" }).click();
+      }
+      const home = [...document.querySelectorAll(`a[title="${name}"]`)].at(-1) as Element;
+      expect(home.getAttribute("aria-label")).toBe(name);
+      const box = home.getBoundingClientRect();
+      const within = (home.closest("header, [role='dialog']") as Element).getBoundingClientRect();
+      expect(box.right).toBeLessThanOrEqual(within.right + 0.5);
+      if (open) {
+        await expect.element(page.getByRole("button", { name: "Close" })).toBeInViewport();
+      }
+      await screen.unmount();
+    }
+  });
+
+  test(`a long name (${name.slice(0, 12)}…) fits a plain page and signing in`, async () => {
+    await page.viewport(390, 900);
+    onTestFinished(() => page.viewport(414, 896));
+    for (const view of [
+      <Plain key="plain" home={<a href="#home" />} title="Tenants" />,
+      <SignIn key="sign-in" ui="admin" onSignIn={async () => null} />,
+    ]) {
+      const screen = await render(branded(view, long));
+      const lockup = screen.container.querySelector(".truncate");
+      expect(lockup?.textContent).toBe(name);
+      expect(lockup?.getBoundingClientRect().right).toBeLessThanOrEqual(window.innerWidth);
+      await screen.unmount();
+    }
+  });
+}
+
+test("admin's sign-in is named for admin, with the kit's words", async () => {
+  const screen = await render(branded(<SignIn ui="admin" onSignIn={async () => null} />));
+  await expect.element(screen.getByText("Nightshade admin")).toBeVisible();
+  await expect
+    .element(screen.getByRole("heading", { level: 1, name: "Sign in to Nightshade" }))
+    .toBeVisible();
+});
+
+test("a right-to-left name is set in its own direction", async () => {
+  const screen = await render(
+    branded(<Lockup />, { ...BRAND, identity: { product: "ليل", app: "ليل", admin: "ليل" } }),
+  );
+  expect(screen.getByText("ليل").element().getAttribute("dir")).toBe("auto");
 });

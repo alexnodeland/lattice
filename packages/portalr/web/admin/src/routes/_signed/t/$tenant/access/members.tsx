@@ -5,6 +5,7 @@ import {
   Card,
   ConfirmDialog,
   ItemTable,
+  pageTitle,
   SectionTitle,
   TextField,
 } from "@portalr/ui";
@@ -29,7 +30,9 @@ type Member = GrantrApi.components["schemas"]["Member"];
  * confirmed. No one is offered their own removal.
  */
 export const Route = createFileRoute("/_signed/t/$tenant/access/members")({
-  head: ({ params }) => ({ meta: [{ title: `Members · ${params.tenant} · portalr admin` }] }),
+  head: ({ params, match }) => ({
+    meta: [{ title: pageTitle(match.context.config.brand, "admin", `Members · ${params.tenant}`) }],
+  }),
   beforeLoad: ({ context, params }) => opening(context, params.tenant, "grantr:add_member"),
   loader: ({ context, params }) =>
     context.queryClient.ensureQueryData(context.queries.grantr.members(params.tenant)),

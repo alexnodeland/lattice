@@ -1,8 +1,10 @@
-import { SignIn } from "@portalr/ui";
+import { pageTitle, SignIn } from "@portalr/ui";
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/sign-in")({
-  head: () => ({ meta: [{ title: "Sign in · portalr" }] }),
+  head: ({ match }) => ({
+    meta: [{ title: pageTitle(match.context.config.brand, "app", "Sign in") }],
+  }),
   beforeLoad: async ({ context }) => {
     if ((await context.signed.signedIn()) !== null) {
       throw redirect({ to: "/" });

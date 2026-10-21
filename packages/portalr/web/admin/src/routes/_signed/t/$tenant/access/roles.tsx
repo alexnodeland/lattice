@@ -1,5 +1,5 @@
 import { orThrow } from "@portalr/client";
-import { Alert, Button, ConfirmDialog, ItemTable } from "@portalr/ui";
+import { Alert, Button, ConfirmDialog, ItemTable, pageTitle } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
@@ -25,7 +25,9 @@ const WORDS = {
  * once confirmed. grantr replaces a role's actions whole: the last to save wins (ADR-0025).
  */
 export const Route = createFileRoute("/_signed/t/$tenant/access/roles")({
-  head: ({ params }) => ({ meta: [{ title: `Roles · ${params.tenant} · portalr admin` }] }),
+  head: ({ params, match }) => ({
+    meta: [{ title: pageTitle(match.context.config.brand, "admin", `Roles · ${params.tenant}`) }],
+  }),
   beforeLoad: ({ context, params }) => opening(context, params.tenant, "grantr:define_role"),
   loader: ({ context, params }) => {
     const { queries, queryClient } = context;

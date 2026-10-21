@@ -18,6 +18,7 @@ import {
   Messages,
   PageHeader,
   ProposalCard,
+  pageTitle,
   Questions,
   Request,
   RunFailed,
@@ -73,7 +74,9 @@ const TENANT = { kind: "tenant" } as const;
  * thread restricted while it's open says so.
  */
 export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/threads/$thread")({
-  head: ({ params }) => ({ meta: [{ title: `Thread · ${params.workspace} · portalr` }] }),
+  head: ({ params, match }) => ({
+    meta: [{ title: pageTitle(match.context.config.brand, "app", `Thread · ${params.workspace}`) }],
+  }),
   loader: async ({ context, params }) => {
     const { tenant, workspace, thread } = params;
     const { queries, queryClient } = context;

@@ -1,4 +1,4 @@
-import { Account, AppShell, NavLink, SideNav, Switcher } from "@portalr/ui";
+import { Account, AppShell, NavLink, pageTitle, SideNav, Switcher } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, Outlet, useMatchRoute, useNavigate } from "@tanstack/react-router";
 import { FileText, MessageSquare, Play, Workflow, Zap } from "lucide-react";
@@ -10,7 +10,17 @@ import { useWorkspace, WorkspaceAddons, WorkspaceStreams } from "../../../../../
  * and the account. Integrations that can't be read are their defaults, never a failed page.
  */
 export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace")({
-  head: ({ params }) => ({ meta: [{ title: `${params.workspace} · ${params.tenant} · portalr` }] }),
+  head: ({ params, match }) => ({
+    meta: [
+      {
+        title: pageTitle(
+          match.context.config.brand,
+          "app",
+          `${params.workspace} · ${params.tenant}`,
+        ),
+      },
+    ],
+  }),
   loader: ({ context, params }) => {
     // Started, not waited on: the page opens on each integration's default while grantr answers.
     void context.queryClient.prefetchQuery(

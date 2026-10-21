@@ -1,5 +1,5 @@
 import { administered } from "@portalr/client";
-import { NavLink, SideNav } from "@portalr/ui";
+import { NavLink, pageTitle, SideNav } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, Outlet, redirect } from "@tanstack/react-router";
 import { Building2, House, ScrollText, Wrench } from "lucide-react";
@@ -11,7 +11,9 @@ import { remember } from "../../last";
  * (portalr ADR-0021). Anyone else is sent to where admin opens for them.
  */
 export const Route = createFileRoute("/_signed/deployment")({
-  head: () => ({ meta: [{ title: "All tenants · portalr admin" }] }),
+  head: ({ match }) => ({
+    meta: [{ title: pageTitle(match.context.config.brand, "admin", "All tenants") }],
+  }),
   beforeLoad: async ({ context }) => {
     const { queries, queryClient, user } = context;
     const [, every] = await Promise.all([

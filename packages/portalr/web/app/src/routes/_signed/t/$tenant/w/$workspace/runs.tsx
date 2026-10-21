@@ -2,6 +2,7 @@ import { allowedIn, filedBy, thumbs, useMe, workspaceOf } from "@portalr/client"
 import {
   CommandButton,
   PageHeader,
+  pageTitle,
   RuleRunStatus,
   RunList,
   type RunParts,
@@ -40,7 +41,9 @@ const ACTIONS = [
  * chain filed, and to those whose changes fired it (lattice RFC-0004).
  */
 export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/runs")({
-  head: ({ params }) => ({ meta: [{ title: `Runs · ${params.workspace} · portalr` }] }),
+  head: ({ params, match }) => ({
+    meta: [{ title: pageTitle(match.context.config.brand, "app", `Runs · ${params.workspace}`) }],
+  }),
   loader: ({ context, params }) =>
     context.queryClient.ensureQueryData(
       allowedIn(context.queries, params.tenant, workspaceOf(params.workspace), ACTIONS),

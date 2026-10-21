@@ -276,6 +276,19 @@ COMPONENTS: tuple[Group, ...] = (
         ),
     ),
     Group(
+        "A notice that floats over the page, as a new version's: where it sits, below a narrow "
+        "window's bar, how far it keeps from the window's edges, its width, corners, padding and "
+        "what it casts (portalr ADR-0058).",
+        (
+            Row("component.notice.top", "--notice-top", "dimension"),
+            Row("component.notice.inset", "--notice-inset", "dimension"),
+            Row("component.notice.width", "--notice-width", "dimension"),
+            Row("component.notice.radius", "--notice-radius", "dimension"),
+            Row("component.notice.pad", "--notice-pad", "dimension"),
+            Row("component.notice.shadow", "--notice-shadow", "shadow"),
+        ),
+    ),
+    Group(
         "The frame's navigation: a nav link's corners and padding, its count's pill, the "
         "header's triggers (the switcher, the account menu, the home link), and the drawer's "
         "width, shadow and slide.",

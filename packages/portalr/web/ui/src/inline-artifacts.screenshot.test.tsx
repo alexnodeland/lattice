@@ -146,7 +146,9 @@ async function shown(width: number) {
   await document.fonts.ready;
   await expect.element(screen.getByRole("img", { name: "Page 1 of 4" })).toBeVisible();
   // The note's code once it is highlighted, which is an add-on that loads as it is asked for.
-  await expect.poll(() => document.querySelector('[aria-label="ts code"] span')).not.toBeNull();
+  await expect
+    .poll(() => document.querySelectorAll('[aria-label="ts code"] span[style]').length)
+    .toBeGreaterThan(3);
   // The dashboard's bar chart names its series once its labels are measured.
   await expect
     .poll(() => [...document.querySelectorAll("svg text")].some((t) => t.textContent === "Phone"))

@@ -201,4 +201,10 @@
   --segmented-item-radius: var(--radius-2);
   --segmented-item-pad-x: 0.625rem;
   --segmented-item-pad-y: var(--space-1);
+
+  /* A card, and an empty state, which is one: corners, padding and what it casts. */
+  --card-radius: var(--radius-4);
+  --card-pad: var(--space-4);
+  --card-shadow: var(--shadow-1);
+  --empty-state-pad: var(--space-6);
 }

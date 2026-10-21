@@ -236,6 +236,15 @@ COMPONENTS: tuple[Group, ...] = (
             Row("component.segmented.item-pad-y", "--segmented-item-pad-y", "dimension"),
         ),
     ),
+    Group(
+        "A card, and an empty state, which is one: corners, padding and what it casts.",
+        (
+            Row("component.card.radius", "--card-radius", "dimension"),
+            Row("component.card.pad", "--card-pad", "dimension"),
+            Row("component.card.shadow", "--card-shadow", "shadow"),
+            Row("component.empty-state.pad", "--empty-state-pad", "dimension"),
+        ),
+    ),
 )
 """Each component's tokens, defaulting to a role or a primitive (portalr ADR-0056)."""
 

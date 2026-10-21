@@ -720,6 +720,22 @@
       "item-pad-y": {
         "$value": "{space.1}"
       }
+    },
+    "card": {
+      "radius": {
+        "$value": "{radius.4}"
+      },
+      "pad": {
+        "$value": "{space.4}"
+      },
+      "shadow": {
+        "$value": "{shadow.1}"
+      }
+    },
+    "empty-state": {
+      "pad": {
+        "$value": "{space.6}"
+      }
     }
   }
 }

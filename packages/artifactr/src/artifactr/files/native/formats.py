@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from typing import Final
 
 from artifactr.files.manifest import (
+    BLEND,
     DOCX,
     DWG,
     DXF,
@@ -88,6 +89,10 @@ FORMATS: Final[Mapping[str, Format]] = {
     DWG: Format(".dwg", lambda head: re.match(rb"AC10[0-3][0-9]", head) is not None),
     DXF: Format(".dxf", _dxf),
     SVG: Format(".svg", _svg),
+    # Blender's own header, or zstd's frame, which Blender compresses with: the app tells them.
+    BLEND: Format(
+        ".blend", lambda head: head.startswith((b"BLENDER", b"\x28\xb5\x2f\xfd")), told=False
+    ),
 }
 """Each native type's format, by its media type. An application with a native type of its own
 gives [`NativeFiles`][artifactr.files.native.NativeFiles] these and its format's."""

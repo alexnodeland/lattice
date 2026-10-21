@@ -5,6 +5,7 @@ from collections.abc import AsyncIterator
 import pytest
 
 from artifactr.files.manifest import (
+    BLEND,
     DOCX,
     DWG,
     DXF,
@@ -44,6 +45,8 @@ async def joined(stream: AsyncIterator[bytes]) -> bytes:
         (FIGCRAFT, ZIP),
         (FCSTD, ZIP),
         (PDF, b"%PDF-1.7\n"),
+        (BLEND, b"BLENDER17-01v0502"),
+        (BLEND, b"\x28\xb5\x2f\xfd\x00"),
         (PSD, b"8BPS\x00\x01"),
         (DWG, b"AC1032\x00"),
         (DXF, b"  0\r\nSECTION\r\n  2\r\nHEADER"),

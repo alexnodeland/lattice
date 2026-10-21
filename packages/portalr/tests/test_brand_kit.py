@@ -440,10 +440,15 @@ def test_a_key_that_would_forge_a_log_line_is_said_as_its_repr(kit: Path) -> Non
     assert "\nERROR forged" not in said
 
 
-def test_a_brand_json_nested_too_deep_is_refused(kit: Path) -> None:
-    (kit / "brand.json").write_text("[" * 100_000 + "]" * 100_000)
-    # Python 3.14's parser takes any depth, and the schema then refuses it: either way, refused.
-    assert faults(kit).startswith("brand.json: ")
+def test_a_brand_json_nested_too_deep_is_refused(
+    kit: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Python 3.14's parser takes any depth, so the depth is forced, as on 3.12 and 3.13.
+    def deep(*_: object, **__: object) -> object:
+        raise RecursionError
+
+    monkeypatch.setattr("portalr.brand.kit.Brand.model_validate", deep)
+    assert faults(kit) == "brand.json: nested too deep"
 
 
 def test_a_kit_names_sixteen_faces_at_most(kit: Path) -> None:

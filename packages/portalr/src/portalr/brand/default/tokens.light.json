@@ -624,6 +624,37 @@
           "unit": "px"
         }
       }
+    },
+    "button": {
+      "radius": {
+        "$value": "{radius.3}"
+      },
+      "pad-x": {
+        "$value": "{space.3}"
+      },
+      "pad-y": {
+        "$value": "{space.1-5}"
+      },
+      "sm": {
+        "pad-x": {
+          "$value": "{space.2}"
+        },
+        "pad-y": {
+          "$value": "{space.1}"
+        }
+      },
+      "weight": {
+        "$value": "{font.weight.semibold}"
+      },
+      "press-shift": {
+        "$value": "{space.px}"
+      },
+      "duration": {
+        "$value": "{motion.duration.fast}"
+      },
+      "ease": {
+        "$value": "{motion.ease.in-out}"
+      }
     }
   }
 }

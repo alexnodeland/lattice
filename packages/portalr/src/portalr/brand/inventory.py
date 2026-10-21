@@ -198,6 +198,21 @@ COMPONENTS: tuple[Group, ...] = (
             ("component.focus.offset", "--focus-offset"),
         ),
     ),
+    Group(
+        "A button: its corners, its padding at each size, its words' weight, how far it moves"
+        " down when pressed, and how its colours change (portalr ADR-0037).",
+        (
+            Row("component.button.radius", "--button-radius", "dimension"),
+            Row("component.button.pad-x", "--button-pad-x", "dimension"),
+            Row("component.button.pad-y", "--button-pad-y", "dimension"),
+            Row("component.button.sm.pad-x", "--button-sm-pad-x", "dimension"),
+            Row("component.button.sm.pad-y", "--button-sm-pad-y", "dimension"),
+            Row("component.button.weight", "--button-weight", "fontWeight"),
+            Row("component.button.press-shift", "--button-press-shift", "dimension"),
+            Row("component.button.duration", "--button-duration", "duration"),
+            Row("component.button.ease", "--button-ease", "cubicBezier"),
+        ),
+    ),
 )
 """Each component's tokens, defaulting to a role or a primitive (portalr ADR-0056)."""
 

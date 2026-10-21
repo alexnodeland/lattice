@@ -38,6 +38,7 @@
   --color-status-warn: var(--status-warn);
   --color-on-danger: var(--on-danger);
   --color-danger-hover: var(--danger-hover);
+  --color-danger-wash: var(--danger-wash);
   --color-wash: var(--wash);
   --color-accent-hover: var(--accent-hover);
   /* The system's colours, for a control under forced colours (base.css). */

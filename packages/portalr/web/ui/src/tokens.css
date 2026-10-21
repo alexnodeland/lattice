@@ -166,4 +166,18 @@
    */
   --focus-width: var(--border-width-2);
   --focus-offset: 2px;
+
+  /*
+   * A button: its corners, its padding at each size, its words' weight, how far it moves down when
+   * pressed, and how its colours change (portalr ADR-0037).
+   */
+  --button-radius: var(--radius-3);
+  --button-pad-x: var(--space-3);
+  --button-pad-y: var(--space-1-5);
+  --button-sm-pad-x: var(--space-2);
+  --button-sm-pad-y: var(--space-1);
+  --button-weight: var(--weight-semibold);
+  --button-press-shift: var(--space-px);
+  --button-duration: var(--duration-fast);
+  --button-ease: var(--ease-in-out);
 }

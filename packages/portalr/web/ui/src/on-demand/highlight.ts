@@ -75,6 +75,11 @@ export async function tokenizer(language: Language): Promise<Tokenize> {
       theme: THEME,
       // A longer line, such as minified code, is shown as it is, rather than holding the page.
       tokenizeMaxLineLength: 1000,
+      // No time limit: Shiki's half a second stopped a line on a busy machine, or a grammar's
+      // first, cold run, and gave the rest of it as one plain token, which a block keeps, since
+      // it tokenizes each line once. What bounds the work is the line's length, above, and the
+      // block's (`LONGEST` in highlighting.tsx).
+      tokenizeTimeLimit: 0,
       ...(after && { grammarState: after }),
     });
     return { lines: tokens, after: grammarState };

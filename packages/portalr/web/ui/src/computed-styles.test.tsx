@@ -324,12 +324,36 @@ const OPENED: Record<string, () => Promise<void>> = {
 const CONTROLS =
   "a[href], button, input, textarea, select, summary, [role='combobox'], [role='switch'], [role='checkbox'], [role='radio'], [role='tab'], [tabindex='0']";
 
+/** The media the test has asked the browser for: forced colours, and reduced motion (the default). */
+const asked = { forced: false, reduced: true };
+
+async function forcedColors(active: boolean) {
+  asked.forced = active;
+  await commands.forcedColors(active);
+}
+
+async function reduceMotion(reduce: boolean) {
+  asked.reduced = reduce;
+  await commands.reduceMotion(reduce);
+}
+
 async function shown(scene: string, width: number) {
   await page.viewport(width, 900);
   onTestFinished(() => page.viewport(414, 896));
+  // The page's media are what the test asked for before anything is read: the browser applies an
+  // emulated media change a moment after it is asked for.
+  await expect.poll(() => matchMedia("(forced-colors: active)").matches).toBe(asked.forced);
+  await expect
+    .poll(() => matchMedia("(prefers-reduced-motion: reduce)").matches)
+    .toBe(asked.reduced);
   const screen = await render(SCENES[scene]?.());
   await OPENED[scene]?.();
+  // An opened list or menu is read once it has finished opening, not while it enters.
+  await expect
+    .poll(() => document.querySelector("[data-starting-style], [data-ending-style]"))
+    .toBeNull();
   await commands.pointerAway();
+  await frames();
   return screen;
 }
 
@@ -337,8 +361,8 @@ afterEach(async () => {
   // Whatever a test left, so the next starts on an empty page with the button up.
   cleanup();
   await commands.pointAt("");
-  await commands.forcedColors(false);
-  await commands.reduceMotion(true);
+  await forcedColors(false);
+  await reduceMotion(true);
 });
 
 for (const scene of Object.keys(SCENES)) {
@@ -349,12 +373,12 @@ for (const scene of Object.keys(SCENES)) {
     await shown(scene, 390);
     const narrow = read(document.body, LOOK);
     cleanup();
-    await commands.forcedColors(true);
+    await forcedColors(true);
     await shown(scene, 1280);
     const forced = read(document.body, LOOK);
     cleanup();
-    await commands.forcedColors(false);
-    await commands.reduceMotion(false);
+    await forcedColors(false);
+    await reduceMotion(false);
     await shown(scene, 1280);
     const moving = read(document.body, MOTION);
     await expect(

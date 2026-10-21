@@ -13,7 +13,7 @@ export const Route = createRootRouteWithContext<Context>()({
   component: () => (
     <>
       <HeadContent />
-      <NewVersionOffer page={import.meta.env.BASE_URL} />
+      <NewVersionOffer ui="app" page={import.meta.env.BASE_URL} />
       <Outlet />
     </>
   ),

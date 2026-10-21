@@ -1,103 +1,132 @@
 /**
  * A new version, offered to a tab that outlived it (portalr ADR-0058). The page a UI is served
- * as names its build by its entry script, whose name is its content's hash: read again every
- * few minutes, and when the tab comes back into view, a different one is a new build. The
- * person is told, politely, in a live region, and chooses: "Reload", or "Not now", which holds
- * for that build. Nothing reloads by itself, so nothing typed is lost.
+ * as names its build by its entry script, `<page>assets/index-<hash>.js`, whose name is its
+ * content's hash: read again every few minutes, and when the tab is shown again, a different one,
+ * read twice running, is a new build. The person is told, politely, in a live region that is
+ * always there, and chooses: "Reload", or "Not now", which holds for that build in that UI.
+ * Nothing reloads by itself.
  */
 
 import { RefreshCw } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { Button } from "./button";
 import { Icon } from "./icon";
+import { UI_NAME, type Ui } from "./marks";
 
 /** How often the page is read again, in milliseconds, while the tab is open. */
 const EVERY = 5 * 60_000;
 
-/** Where a build the person said "Not now" to is kept, for this browser. */
-const DISMISSED = "portalr:not-now";
+/** Where a build the person said "Not now" to is kept, per UI, for this browser. */
+const dismissedKey = (page: string) => `portalr:not-now:${page}`;
 
-/** A page's build: its entry module script's address, or null where it names none. */
-export function buildOf(html: string): string | null {
-  const page = new DOMParser().parseFromString(html, "text/html");
-  return page.querySelector('script[type="module"][src]')?.getAttribute("src") ?? null;
+/** A page's build: its first module script whose address is under `page`'s assets, or null. */
+export function buildOf(root: ParentNode, page: string): string | null {
+  for (const script of root.querySelectorAll('script[type="module"][src]')) {
+    const src = script.getAttribute("src") ?? "";
+    if (src.startsWith(`${page}assets/`)) {
+      return src;
+    }
+  }
+  return null;
 }
 
-const dismissed = () => {
+/** The build a page served as `page` names, read afresh, or null for anything but that page. */
+async function served(page: string, signal: AbortSignal): Promise<string | null> {
+  const asked = new Request(new URL(page, location.href), { cache: "no-store", signal });
+  const answer = await fetch(asked);
+  // A sign-in page, a captive portal or a server failing is no build.
+  if (!answer.ok || answer.redirected || !answer.headers.get("content-type")?.includes("html")) {
+    return null;
+  }
+  return buildOf(new DOMParser().parseFromString(await answer.text(), "text/html"), page);
+}
+
+const read = (key: string) => {
   try {
-    return localStorage.getItem(DISMISSED);
+    return localStorage.getItem(key);
   } catch {
     return null; // storage refused: the offer is made again
   }
 };
 
+/** The build "Not now" holds for in this UI, kept in step with the browser's other tabs. */
+function useDismissed(page: string): [string | null, (build: string) => void] {
+  const key = dismissedKey(page);
+  const [here, setHere] = useState<string | null>(null);
+  const stored = useSyncExternalStore(
+    (changed) => {
+      addEventListener("storage", changed);
+      return () => removeEventListener("storage", changed);
+    },
+    () => read(key),
+  );
+  const dismiss = (build: string) => {
+    setHere(build);
+    try {
+      localStorage.setItem(key, build);
+    } catch {
+      // storage refused: dismissed for this page alone
+    }
+  };
+  return [here ?? stored, dismiss];
+}
+
 /**
  * The newer build the tab's page has been replaced by, or null: `page` is the UI's own address,
- * read again every `every` milliseconds, on focus, and when the tab is shown again.
+ * read again every `every` milliseconds and whenever the tab is shown again; a build is newer
+ * once it is read twice running, so a rolling deploy or a rollback isn't offered mid-flight.
  */
-function useNewVersion(page: string, every = EVERY): string | null {
+function useNewVersion(page: string, every: number): string | null {
   const [newer, setNewer] = useState<string | null>(null);
   useEffect(() => {
-    const running = buildOf(document.documentElement.outerHTML);
+    // In development the entry is the source (`src/main.tsx`), under no `assets/`: no build.
+    const running = buildOf(document, page);
     if (running === null) {
-      return; // a page with no built entry, as in development: nothing to compare
+      return;
     }
-    let stopped = false;
+    const stop = new AbortController();
+    let last: string | null = null;
     const check = async () => {
-      if (document.visibilityState === "hidden") {
+      if (stop.signal.aborted || document.visibilityState === "hidden") {
         return;
       }
       try {
-        const asked = new Request(new URL(page, location.href), { cache: "no-store" });
-        const served = buildOf(await (await fetch(asked)).text());
-        if (!stopped && served !== null && served !== running && served !== dismissed()) {
-          setNewer(served);
+        const build = await served(page, stop.signal);
+        if (build !== null && build !== running && build === last) {
+          setNewer(build);
         }
+        last = build;
       } catch {
-        // offline, or the server is restarting: asked again at the next turn
+        // offline, aborted, or the server is restarting: asked again at the next turn
       }
     };
     const timer = setInterval(check, every);
-    addEventListener("focus", check);
     document.addEventListener("visibilitychange", check);
     return () => {
-      stopped = true;
+      stop.abort();
       clearInterval(timer);
-      removeEventListener("focus", check);
       document.removeEventListener("visibilitychange", check);
     };
   }, [page, every]);
   return newer;
 }
 
-/** The offer of a new build, `build`: "Reload", or "Not now" for that build. */
+/** The offer of a new build of the UI `ui`: "Reload", or "Not now" for it. */
 export function NewVersion({
-  build,
+  ui,
   onReload = () => location.reload(),
   onDismiss,
 }: {
-  build: string;
+  ui: Ui;
   onReload?: () => void;
   onDismiss: () => void;
 }) {
-  const notNow = () => {
-    try {
-      localStorage.setItem(DISMISSED, build);
-    } catch {
-      // storage refused: dismissed for this page alone
-    }
-    onDismiss();
-  };
   return (
-    <div
-      role="status"
-      aria-label="A new version"
-      className="fixed inset-x-4 top-4 z-50 mx-auto flex max-w-md flex-wrap items-center gap-3 rounded-lg border border-line bg-surface p-3 text-fg text-sm shadow-lg"
-    >
+    <div className="pointer-events-auto mx-auto flex max-w-md flex-wrap items-center gap-3 rounded-lg border border-line bg-surface p-3 text-fg text-sm shadow-lg">
       <Icon icon={RefreshCw} className="size-4 shrink-0" />
-      <p className="min-w-0 flex-1">A new version of portalr is ready. Reload to use it.</p>
+      <p className="min-w-0 flex-1">A new version of {UI_NAME[ui]} is ready. Reload to use it.</p>
       <span className="flex gap-2">
-        <Button variant="secondary" onClick={notNow}>
+        <Button variant="secondary" onClick={onDismiss}>
           Not now
         </Button>
         <Button onClick={onReload}>Reload</Button>
@@ -106,10 +135,36 @@ export function NewVersion({
   );
 }
 
-/** The offer, made in a UI served at `page` once its build is replaced. */
-export function NewVersionOffer({ page }: { page: string }) {
-  const newer = useNewVersion(page);
-  const [shown, setShown] = useState<string | null>(null);
-  useEffect(() => setShown(newer), [newer]);
-  return shown === null ? null : <NewVersion build={shown} onDismiss={() => setShown(null)} />;
+/**
+ * The offer, made in the UI `ui` served at `page` once its build is replaced, in a live region
+ * that is always there, so what appears in it is announced. It sits below a narrow window's bar
+ * and the skip link, and passes clicks through where it draws nothing.
+ */
+export function NewVersionOffer({
+  ui,
+  page,
+  every = EVERY,
+}: {
+  ui: Ui;
+  page: string;
+  every?: number;
+}) {
+  const newer = useNewVersion(page, every);
+  const [dismissed, dismiss] = useDismissed(page);
+  // A page with no build of its own, as in development, has nothing to offer, and no region.
+  const [built] = useState(() => buildOf(document, page) !== null);
+  if (!built) {
+    return null;
+  }
+  return (
+    <div
+      role="status"
+      aria-label="A new version"
+      className="pointer-events-none fixed inset-x-4 top-16 z-50"
+    >
+      {newer !== null && newer !== dismissed && (
+        <NewVersion ui={ui} onDismiss={() => dismiss(newer)} />
+      )}
+    </div>
+  );
 }

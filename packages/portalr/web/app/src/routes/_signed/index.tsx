@@ -33,9 +33,12 @@ function Tenants() {
       <nav aria-label="Tenants">
         <Rows label="Tenants">
           {lands.tenants.map((tenant) => (
-            <Row key={tenant}>
-              <RowLink render={<Link to="/t/$tenant" params={{ tenant }} />}>{tenant}</RowLink>
-            </Row>
+            <Row
+              key={tenant}
+              name={
+                <RowLink render={<Link to="/t/$tenant" params={{ tenant }} />}>{tenant}</RowLink>
+              }
+            />
           ))}
         </Rows>
       </nav>

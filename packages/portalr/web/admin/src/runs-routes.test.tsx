@@ -156,7 +156,7 @@ test("a run links to what its chain filed in the tracker, where the application 
   };
   const { screen } = await opened("/t/acme/runs", EVERY, filed, ["acme"], relayr);
   const link = row(screen, "run_dead").getByRole("link", {
-    name: "OPS-12, in Plane, opens in a new tab",
+    name: "OPS-12, in Plane (opens in a new tab)",
   });
   await expect.element(link).toHaveAttribute("href", "https://plane.example/acme/browse/OPS-12/");
   await expect.element(row(screen, "run_dead").getByText("Filed as")).toBeVisible();

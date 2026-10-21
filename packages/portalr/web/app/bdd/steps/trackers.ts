@@ -10,7 +10,7 @@ const PATIENCE = { timeout: 15_000 };
 
 Then("its run links to the item it was filed as, in Plane", async ({ page, scenario }) => {
   const filed = runOf(page, scenario.run)
-    .getByRole("link", { name: /^OPS-\d+, in Plane, opens in a new tab$/ })
+    .getByRole("link", { name: /^OPS-\d+, in Plane\s\(opens in a new tab\)$/ })
     .first();
   await expect(filed).toBeVisible(PATIENCE);
   await expect(filed).toHaveAttribute("href", new RegExp(`^${TRACKER}\\d+$`));
@@ -34,11 +34,11 @@ Then("a follow-up run links to the item it came from", async ({ page, scenario }
     .getByRole("table", { name: "Rules' runs" })
     .getByRole("row")
     .filter({ hasText: "portalr:follow-up" })
-    .filter({ has: page.getByRole("link", { name: `${name}, in Plane, opens in a new tab` }) });
+    .filter({ has: page.getByRole("link", { name: `${name}, in Plane (opens in a new tab)` }) });
   await expect(followUp).toHaveCount(1, PATIENCE);
   await expect(followUp.getByText("From")).toBeVisible();
   // Its "From" comes first; its chain, the filing run's, files it too.
   await expect(
-    followUp.getByRole("link", { name: `${name}, in Plane, opens in a new tab` }).first(),
+    followUp.getByRole("link", { name: `${name}, in Plane (opens in a new tab)` }).first(),
   ).toHaveAttribute("href", new RegExp(`^${TRACKER}\\d+$`));
 });

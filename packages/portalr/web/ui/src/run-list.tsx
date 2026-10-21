@@ -1,12 +1,14 @@
 /**
  * A workspace's runs: a table from the small breakpoint, named by its caption, and below it a
- * card for each, its status and title on top, then its attempts and feedback, and its actions in
- * reach. What a run's cells hold is its caller's, as the app's and admin's runs differ.
+ * list of rows (portalr ADR-0060), each its title, then its attempts and feedback, and at its end
+ * its status and its actions. What a run's cells hold is its caller's, as the app's and admin's
+ * runs differ.
  */
 
 import type { Reflexr } from "@portalr/client";
 import type { ReactNode } from "react";
 import { Num } from "./num";
+import { Row, Rows } from "./rows";
 import { StatusBadge, type Tone } from "./status-badge";
 import { Table } from "./table";
 
@@ -31,10 +33,10 @@ export function RuleRunStatus({ status }: { status: Reflexr.Run["status"] }) {
   );
 }
 
-/** A run's parts, as the table's cells and a phone's card both show them. */
+/** A run's parts, as the table's cells and a phone's row both show them. */
 export interface RunParts {
   readonly key: string;
-  /** The row's or card's name. */
+  /** The row's name, for assistive technology. */
   readonly name: string;
   readonly status: ReactNode;
   readonly title: ReactNode;
@@ -44,8 +46,8 @@ export interface RunParts {
 }
 
 /**
- * Runs as a table, named by its caption, from the small breakpoint; below it, a card for each, its
- * status and title on top, then its attempts and feedback, and its actions in reach.
+ * Runs as a table, named by its caption, from the small breakpoint; below it, a row for each, its
+ * title, then its attempts and feedback, and at its end its status and its actions.
  */
 export function RunList({
   caption,
@@ -94,27 +96,31 @@ export function RunList({
           </tbody>
         </Table>
       </div>
-      <ul aria-label={caption} className="flex flex-col gap-3 sm:hidden">
-        {runs.map((run) => (
-          <li
-            key={run.key}
-            aria-label={run.name}
-            className="flex flex-col gap-3 rounded-(--card-radius) border border-line bg-surface p-4"
-          >
-            <span className="flex flex-wrap items-center gap-2">
-              {run.status}
-              {run.title}
-            </span>
-            {(attempts || feedback) && (
-              <span className="flex flex-wrap items-center gap-3 text-sm">
-                {attempts && <span className="text-muted">Attempt {run.attempts}</span>}
-                {feedback && run.feedback}
-              </span>
-            )}
-            {run.actions && <span className="flex flex-wrap gap-2">{run.actions}</span>}
-          </li>
-        ))}
-      </ul>
+      <div className="sm:hidden">
+        <Rows label={caption}>
+          {runs.map((run) => (
+            <Row
+              key={run.key}
+              aria-label={run.name}
+              name={run.title}
+              meta={
+                (attempts || feedback) && (
+                  <span className="flex flex-wrap items-center gap-3">
+                    {attempts && <span>Attempt {run.attempts}</span>}
+                    {feedback && run.feedback}
+                  </span>
+                )
+              }
+              end={
+                <>
+                  {run.status}
+                  {run.actions}
+                </>
+              }
+            />
+          ))}
+        </Rows>
+      </div>
     </>
   );
 }

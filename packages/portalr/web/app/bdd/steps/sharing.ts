@@ -12,12 +12,13 @@ async function threads(page: Page) {
 
 const dialog = (page: Page) => page.getByRole("dialog", { name: "Share the thread" });
 
-/** Who holds a role on the thread, in its sharing dialog, by what the item says: their email. */
+/** Who holds a role on the thread, in its sharing dialog, by what the item says: their email and the role. */
 const holder = (page: Page, person: string, role: string) =>
   dialog(page)
     .getByRole("list", { name: "People with access" })
     .getByRole("listitem")
-    .filter({ hasText: `${email(person)} ${role}` });
+    .filter({ hasText: email(person) })
+    .filter({ hasText: role });
 
 async function act(page: Page, item: string) {
   await page.getByRole("button", { name: "Thread actions" }).click();

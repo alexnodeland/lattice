@@ -8,12 +8,12 @@ import { TrackerItems, trackerName } from "./tracker-items";
 
 test("each item opens in its tracker, in a new tab, named aloud with where it goes", async () => {
   const screen = await render(<TrackerItems label="Filed as" items={FILED} />);
-  const plane = screen.getByRole("link", { name: "OPS-12, in Plane, opens in a new tab" });
+  const plane = screen.getByRole("link", { name: "OPS-12, in Plane (opens in a new tab)" });
   await expect.element(plane).toHaveAttribute("href", "https://plane.example/acme/browse/OPS-12/");
   await expect.element(plane).toHaveAttribute("target", "_blank");
   await expect.element(plane).toHaveAttribute("rel", "noopener noreferrer");
   await expect
-    .element(screen.getByRole("link", { name: "#41, in Vikunja, opens in a new tab" }))
+    .element(screen.getByRole("link", { name: "#41, in Vikunja (opens in a new tab)" }))
     .toHaveAttribute("href", "https://vikunja.example/tasks/41");
   await expect.element(screen.getByText("Filed as")).toBeVisible();
   expect(await axeViolations(screen.container)).toEqual([]);

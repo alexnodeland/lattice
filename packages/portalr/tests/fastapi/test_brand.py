@@ -112,11 +112,11 @@ async def test_the_index_has_the_kit_before_the_first_paint(
     base = f"/portalr/brand/{kit().hash}/"
     assert "<title>Nightshade</title>" in response.text
     assert f'<link rel="stylesheet" href="{base}brand.css" />' in response.text
-    assert f'<link rel="icon" href="{base}assets/favicon.svg" />' in response.text
+    assert f'<link rel="icon" href="{base}assets/favicon.png" />' in response.text
     # After the UI's own stylesheet, so the kit's tokens are the page's.
     assert response.text.index("index.css") < response.text.index("brand.css")
     assert 'media="(prefers-color-scheme: light)" content="#f4f7f7"' in response.text
-    assert 'media="(prefers-color-scheme: dark)" content="#101818"' in response.text
+    assert 'media="(prefers-color-scheme: dark)" content="#0f1717"' in response.text
 
 
 async def test_the_index_by_its_name_is_branded_too(branded_client: httpx.AsyncClient) -> None:
@@ -151,7 +151,7 @@ async def test_config_carries_the_kits_block(branded_client: httpx.AsyncClient) 
             "light": f"brand/{kit().hash}/assets/mark-light.svg",
             "dark": f"brand/{kit().hash}/assets/mark-dark.svg",
         },
-        "favicon": f"brand/{kit().hash}/assets/favicon.svg",
+        "favicon": f"brand/{kit().hash}/assets/favicon.png",
     }
 
 

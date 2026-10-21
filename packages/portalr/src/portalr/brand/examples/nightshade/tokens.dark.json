@@ -1,16 +1,31 @@
 {
   "color": {
+    "paper": {
+      "$value": "#0f1717"
+    },
+    "surface": {
+      "$value": "#162121"
+    },
+    "fg": {
+      "$value": "#ecf3f2"
+    },
+    "muted": {
+      "$value": "#a9bdbb"
+    },
+    "line": {
+      "$value": "#2b3a3a"
+    },
+    "edge": {
+      "$value": "#6e8785"
+    },
     "accent": {
       "$value": "#7fd8cf"
     },
     "focus": {
       "$value": "#7fd8cf"
     },
-    "paper": {
-      "$value": "#101818"
-    },
     "on-accent": {
-      "$value": "#101818"
+      "$value": "#0f1717"
     }
   }
 }

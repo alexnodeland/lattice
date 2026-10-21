@@ -44,7 +44,7 @@ def faults(kit: Path) -> str:
 @pytest.mark.parametrize("name", ["nightshade", "calm"])
 def test_the_example_kits_load(name: str) -> None:
     built = load(EXAMPLES / name)
-    assert set(built.files) >= {"brand.css", "assets/mark-light.svg", "assets/favicon.svg"}
+    assert set(built.files) >= {"brand.css", "assets/mark-light.svg", "assets/favicon.png"}
     assert re.fullmatch(r"[0-9a-f]{16}", built.hash)
     assert built.files["brand.css"].decode() == built.stylesheet
     assert built.stylesheet.startswith("/*\n * A brand kit's tokens over portalr's default kit")
@@ -59,7 +59,7 @@ def test_brand_json_may_name_its_schema(kit: Path) -> None:
 
 def test_the_hash_changes_with_any_file(kit: Path) -> None:
     before = load(kit).hash
-    (kit / "assets" / "favicon.svg").write_bytes(MARK)
+    (kit / "assets" / "mark-dark.svg").write_bytes(MARK)
     assert load(kit).hash != before
 
 

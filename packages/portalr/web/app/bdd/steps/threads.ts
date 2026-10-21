@@ -31,11 +31,12 @@ Then("the agent asks {string}", async ({ page }, question: string) => {
 /** An option of the agent's questions, by its label: a radio, which may be recommended, or a box. */
 When("they choose {string}", async ({ page }, label: string) => {
   const asked = page.getByRole("form", { name: "The agent asks" });
-  const choice = asked.getByRole("radio", { name: new RegExp(`^${label}( Recommended)?$`) });
-  await ((await choice.count()) > 0
-    ? choice
-    : asked.getByRole("checkbox", { name: label })
-  ).click();
+  // One locator for either, so the click waits for the card: a count, which doesn't wait, read
+  // before the card came found no radio and chose a checkbox that isn't there.
+  await asked
+    .getByRole("radio", { name: new RegExp(`^${label}( Recommended)?$`) })
+    .or(asked.getByRole("checkbox", { name: label, exact: true }))
+    .click();
 });
 
 When("they write {string}", async ({ page }, words: string) => {

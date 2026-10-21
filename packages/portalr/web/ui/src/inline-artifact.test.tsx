@@ -1,9 +1,11 @@
+import { Maximize2 } from "lucide-react";
 import { useState } from "react";
 import { expect, test } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { json, markdown } from "./artifacts";
 import { InlineArtifact, Messages } from "./chat";
+import { IconButton } from "./icon-button";
 import { nativeFile } from "./native-file";
 import { axeViolations } from "./test/axe";
 import { UI_RENDERERS } from "./ui-renderers";
@@ -130,6 +132,39 @@ test("in the full view, the back button's tooltip shows above it, and one Escape
   expect(tip.element().contains(hit)).toBe(true);
   await userEvent.keyboard("{Escape}");
   await expect.element(screen.getByRole("dialog")).not.toBeInTheDocument();
+});
+
+test("in the full view, Escape on another icon button's tooltip closes the tooltip alone", async () => {
+  const screen = await render(
+    <Messages>
+      <InlineArtifact name="Plan" kind="Note" open={null}>
+        <Draft />
+        <IconButton label="Zoom in" icon={Maximize2} />
+      </InlineArtifact>
+    </Messages>,
+  );
+  await screen.getByRole("button", { name: "Full view" }).click();
+  const full = screen.getByRole("dialog", { name: "Plan" });
+  await full.getByRole("textbox", { name: "Draft" }).click();
+  await userEvent.hover(full.getByRole("button", { name: "Zoom in" }));
+  const tip = page.getByText("Zoom in", { exact: true });
+  await expect.element(tip).toBeVisible();
+  await userEvent.keyboard("{Escape}");
+  await expect.element(tip).not.toBeInTheDocument();
+  await expect.element(full).toBeVisible();
+});
+
+test("in the full view, Escape with a field focused and the back button hovered keeps the full view", async () => {
+  // The back button passes Escape on, but the Escape is the field's, not the back button's:
+  // the full view leaves only on an Escape at its back button, or one nothing inside took.
+  const screen = await render(<InThread kind="Form" />);
+  await screen.getByRole("button", { name: "Full view" }).click();
+  const full = screen.getByRole("dialog", { name: "Plan" });
+  await full.getByRole("textbox", { name: "Draft" }).click();
+  await userEvent.hover(full.getByRole("button", { name: "Back to the page" }));
+  await expect.element(page.getByText("Back to the page", { exact: true })).toBeVisible();
+  await userEvent.keyboard("{Escape}");
+  await expect.element(full).toBeVisible();
 });
 
 test("every kind the kit draws is shown in its thread; one shown as JSON isn't", () => {

@@ -122,7 +122,9 @@ export function EditorFrame({
   useEffect(() => () => stopEditing(artifact), [artifact]);
   // Leaving for another page of the app with unsaved changes is asked about, as closing is.
   const leaving = useBlocker({
-    shouldBlockFn: () => latest.current.dirtyNow,
+    // Another page, not another view of this one: a search or a hash leaves the editor in place.
+    shouldBlockFn: ({ current, next }) =>
+      latest.current.dirtyNow && current.pathname !== next.pathname,
     enableBeforeUnload: false,
     withResolver: true,
   });
@@ -313,6 +315,8 @@ export function EditorFrame({
             title={flipped ? `Back to the preview without saving?` : `Close ${app} without saving?`}
             confirm={flipped ? "Discard and go back" : "Close without saving"}
             dismiss="Keep editing"
+            // Not while a save is being checked in: it would race the save on the same check-out.
+            disabled={saving}
             onConfirm={async () => onClose()}
           >
             Your changes to {status.name} in {app} haven't been saved, so they aren't checked in.
@@ -321,7 +325,13 @@ export function EditorFrame({
               : " Closing loses them."}
           </ConfirmDialog>
         ) : (
-          <Button variant="secondary" size="sm" className="ms-auto" onClick={onClose}>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="ms-auto"
+            disabled={saving}
+            onClick={onClose}
+          >
             {flipped ? "Back to preview" : `Close ${app}`}
           </Button>
         )}

@@ -161,7 +161,7 @@ export function FileControls({
   // What came of an action is focused as it is said: the control that did it may be gone.
   const told = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (said !== null) {
+    if (said !== null && !said.quiet) {
       told.current?.focus();
     }
   }, [said]);

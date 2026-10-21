@@ -39,6 +39,8 @@ export interface Place {
 export interface Said {
   readonly tone: "info" | "warn" | "error";
   readonly text: ReactNode;
+  /** Said where the focus has gone elsewhere, as a flip moves it: announced, not focused. */
+  readonly quiet?: boolean;
 }
 
 /**
@@ -174,11 +176,19 @@ export function CheckOut({
    * Back to the preview, the check-out let go: the version checked out is checked in again as it
    * was, which changes nothing and ends the check-out, so a file isn't held by a closed editor.
    */
-  const release = async (held: string, version: number) => {
-    setEditing(false);
+  const release = async (held: string) => {
+    if (pending) {
+      return;
+    }
+    // Held, with the editor in place, until the check-out is let go: the switch to edit waits.
+    setPending(true);
+    // The head, not the version opened: checked in as it is, it is unchanged even where the file
+    // moved on after the lease lapsed, so it never proposes the version opened over a newer one.
+    const head = status.version;
+    let ended = false;
     try {
       const blob = await queryClient.fetchQuery(
-        context.queries.files.content(tenant, workspace, artifact, version),
+        context.queries.files.content(tenant, workspace, artifact, head),
       );
       const answer = await checkIn({
         surface: context.config.surfaces.artifactr,
@@ -190,22 +200,29 @@ export function CheckOut({
         unsigned: () => void context.signed.signOut(),
       });
       reread(answer.outcome === "done" ? null : answer.status);
-      if (answer.outcome === "done") {
-        keep(null);
-        onSaid({
-          tone: "info",
-          text: `Back to the preview: ${status.name} is no longer checked out.`,
-        });
-        return;
-      }
+      // Checked in already, by a save that answered late or another tab: it has ended too.
+      ended =
+        answer.outcome === "done" || (answer.status === 409 && answer.type === "invalid_state");
     } catch {
       // Said below: the check-out stays, until it is checked in or runs out.
+    }
+    setPending(false);
+    setEditing(false);
+    if (ended) {
+      keep(null);
+      onSaid({
+        tone: "info",
+        text: `Back to the preview: ${status.name} is no longer checked out.`,
+      });
+      return;
     }
     onSaid({
       tone: "warn",
       text: `Back to the preview. Your check-out couldn't be let go, so it holds until it runs out, or you check the file in.`,
+      quiet: true,
     });
   };
+
   const lease = status.lease;
   // The lease names the reader's check-out while it holds, made in this tab or another.
   const leased = lease?.checkout_id ?? null;
@@ -254,7 +271,11 @@ export function CheckOut({
     });
     if (here) {
       setBase(checkout.base_version);
-      onSaid({ tone: "info", text: `Checked out until ${until}. ${app} is opening here.` });
+      onSaid({
+        tone: "info",
+        text: `Checked out until ${until}. ${app} is opening here.`,
+        quiet: flips,
+      });
       return;
     }
     // Opened once it is checked out, while the click still counts. With `noopener` nothing says
@@ -331,7 +352,7 @@ export function CheckOut({
         keep(null);
       }}
       onAnswered={reread}
-      onClose={() => (flips ? void release(checkout, opened) : setEditing(false))}
+      onClose={() => (flips ? void release(checkout) : setEditing(false))}
     />
   );
   return (

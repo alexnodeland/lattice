@@ -18,7 +18,7 @@ import {
   sheetsOf,
 } from "@portalr/ui";
 import { useQuery } from "@tanstack/react-query";
-import { type ReactNode, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { editorAt, type Place } from "./check-out";
 import { useEditing } from "./editing";
 import { DownloadButton, FileControls, type Native, useDownload } from "./native-file";
@@ -190,6 +190,18 @@ function FileView({
   const [viewport, setViewport] = useState<HTMLElement | null>(null);
   const [toggle, setToggle] = useState<HTMLElement | null>(null);
   const slots = useMemo(() => ({ viewport, toggle }), [viewport, toggle]);
+  // A flip turns, and moves the focus to the side turned to; the box's first drawing doesn't.
+  const preview = useRef<HTMLDivElement>(null);
+  const was = useRef(editing);
+  const [turned, setTurned] = useState(false);
+  useEffect(() => {
+    if (was.current === editing) {
+      return;
+    }
+    was.current = editing;
+    setTurned(true);
+    (editing ? viewport : preview.current)?.focus();
+  }, [editing, viewport]);
   if (error instanceof Refused && error.status === 404) {
     return unserved;
   }
@@ -240,9 +252,12 @@ function FileView({
       </div>
       <div className={editable ? "h-[min(80dvh,48rem)]" : undefined}>
         {/* Hidden, not taken down, while it is edited: its page, its zoom and its view are kept. */}
-        <div
+        <section
+          ref={preview}
           hidden={editing}
-          className={`flip-in flex flex-col gap-3 ${editable ? "h-full overflow-auto" : ""}`}
+          tabIndex={-1}
+          aria-label={`Preview of ${status.name}`}
+          className={`flex flex-col gap-3 outline-none ${turned ? "flip-in" : ""} ${editable ? "h-full overflow-auto" : ""}`}
         >
           {view === "pages" && (
             <Pages place={place} version={status.version} total={pages} name={status.name} />
@@ -279,8 +294,14 @@ function FileView({
               )}
             </Words>
           )}
-        </div>
-        <div ref={setViewport} hidden={!editing} className="flip-in h-full" />
+        </section>
+        <section
+          ref={setViewport}
+          hidden={!editing}
+          tabIndex={-1}
+          aria-label={`${status.name} in ${native.app}`}
+          className={`h-full outline-none ${turned ? "flip-in" : ""}`}
+        />
       </div>
       <ViewSlotsContext value={slots}>
         <FileControls

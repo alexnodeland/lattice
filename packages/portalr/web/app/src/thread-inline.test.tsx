@@ -544,6 +544,9 @@ test("closing with unsaved changes is confirmed, and leaving the page is guarded
     .getByRole("alertdialog")
     .getByRole("button", { name: "Discard and go back" })
     .click();
+  // The editor stays until the check-out is let go.
+  await expect.poll(() => Upload.sent.length).toBe(1);
+  (Upload.sent[0] as Upload).answer(200, { outcome: "unchanged" });
   await expect.element(editor).not.toBeInTheDocument();
   await expect.poll(() => guards(removed)).toContain(guard);
 });
@@ -738,6 +741,9 @@ test("the preview flips to the editor in the same box and back, keeping its view
   expect(box?.contains(planned)).toBe(true);
   expect(planned.closest("[hidden]")).not.toBeNull();
   expect(book.getByRole("radio", { name: "Cells" }).elements()).toHaveLength(0);
+  await expect
+    .poll(() => document.activeElement?.getAttribute("aria-label"))
+    .toBe("figures.xlsx in GridCraft");
   // Motion is reduced here: the flip turns nothing.
   expect(getComputedStyle(frame.closest(".flip-in") as Element).animationName).toBe("none");
   fromShim(frame, { type: "lattice:ready" });
@@ -746,28 +752,66 @@ test("the preview flips to the editor in the same box and back, keeping its view
     .toBeVisible();
   // Back, clean: the version checked out is checked in again, unchanged, which ends the check-out.
   await book.getByRole("button", { name: "Back to preview" }).click();
-  await expect.element(editor).not.toBeInTheDocument();
-  await expect.element(plan).toBeVisible();
-  expect(plan.element()).toBe(planned);
+  // The editor stays in place while the check-out is let go, and the switch waits for it.
   await expect.poll(() => Upload.sent.length).toBe(1);
+  await expect.element(editor).toBeInTheDocument();
   expect((Upload.sent[0] as Upload).url).toBe("/artifactr/v1/workspaces/notes/checkouts/co_1/file");
   held.lease = null;
   (Upload.sent[0] as Upload).answer(200, { outcome: "unchanged" });
+  await expect.element(editor).not.toBeInTheDocument();
+  await expect.element(plan).toBeVisible();
+  expect(plan.element()).toBe(planned);
+  // The focus is on the side turned to.
+  await expect
+    .poll(() => document.activeElement?.getAttribute("aria-label"))
+    .toBe("Preview of figures.xlsx");
   await expect
     .element(book.getByText("Back to the preview: figures.xlsx is no longer checked out."))
     .toBeVisible();
   await expect.element(book.getByRole("button", { name: "Edit in GridCraft" })).toBeVisible();
 });
 
-test("back to the preview, a check-out that can't be let go says it holds until it runs out", async () => {
+test("back to the preview, a check-out that can't be let go says it holds; one checked in already has ended", async () => {
   const { screen } = await editingIn();
   const { book } = await ready(screen, "figures.xlsx");
   await book.getByRole("button", { name: "Back to preview" }).click();
   await expect.poll(() => Upload.sent.length).toBe(1);
-  (Upload.sent[0] as Upload).answer(409, { detail: { type: "invalid_state", message: "no" } });
+  (Upload.sent[0] as Upload).answer(403, { detail: { type: "forbidden", message: "not yours" } });
   await expect
     .element(book.getByText(/^Back to the preview\. Your check-out couldn't be let go/))
     .toBeVisible();
+  await ready(screen, "figures.xlsx");
+  await book.getByRole("button", { name: "Back to preview" }).click();
+  await expect.poll(() => Upload.sent.length).toBe(2);
+  (Upload.sent[1] as Upload).answer(409, {
+    detail: { type: "invalid_state", message: "checked in already" },
+  });
+  await expect
+    .element(book.getByText("Back to the preview: figures.xlsx is no longer checked out."))
+    .toBeVisible();
+});
+
+test("while a save is being checked in, going back isn't offered", async () => {
+  const { screen } = await editingIn();
+  const { book, frame } = await ready(screen, "figures.xlsx");
+  fromShim(frame, { type: "lattice:save", name: "figures.xlsx", bytes: new ArrayBuffer(8) });
+  await expect.element(book.getByText("Checking in your save")).toBeVisible();
+  await expect.element(book.getByRole("button", { name: "Back to preview" })).toBeDisabled();
+  fromShim(frame, { type: "lattice:dirty", dirty: true });
+  await expect.element(book.getByRole("button", { name: "Back to preview" })).toBeDisabled();
+});
+
+test("a change of search or hash isn't asked about: only another page is", async () => {
+  // The browser's own back and forward go through the same blocker in its history; the tests'
+  // memory history moves without asking, so they are checked in the browser (see the PR).
+  const { screen, router } = await editingIn();
+  const { book, frame, editor } = await ready(screen, "figures.xlsx");
+  fromShim(frame, { type: "lattice:dirty", dirty: true });
+  await expect.element(book.getByText("Unsaved changes in GridCraft")).toBeVisible();
+  router.history.push(`${THREAD}#later`);
+  await expect.poll(() => router.state.location.hash).toBe("later");
+  expect(screen.getByRole("dialog").elements()).toHaveLength(0);
+  await expect.element(editor).toBeInTheDocument();
 });
 
 test("a file whose app has no hosted editor keeps its preview, with no switch", async () => {

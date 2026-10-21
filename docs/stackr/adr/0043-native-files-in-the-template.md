@@ -74,13 +74,18 @@ Three things settled the shape:
 
 ### The proof
 
-`scripts/check-files [APP...]`, `moon run stackr:files`, generates an application at `HEAD`, builds the workers and editors of WordCraft, GridCraft, PdfCraft, CADCraft and FreeCAD by default, starts them with the application's own `compose.yaml`, and checks:
+`scripts/check-files [APP...]`, `moon run stackr:files`, generates an application at `HEAD`, builds the workers of every app a worker runs, and the editors of the three bridged ones, starts them with the application's own `compose.yaml`, and checks, for each:
 
-- each worker's posture as Docker runs it: read-only, user 10002, `[ALL]` capabilities dropped, `no-new-privileges`, its memory, CPU and process limits, no port, and the internal `files` network alone;
-- that a connection to a public address and a lookup of a public name, from inside the worker, both fail;
-- that its image carries its release's licences, and PdfCraft's its OCR models' attribution;
-- from a probe on the `files` network, in the worker's image: a request without the token is refused; the app is the pinned version; a new file is made, read back as the app's format and, where it renders, rendered; and a zip bomb, a file past the limit and bytes of no format each end within the deadline, in a typed failure;
-- that each editor is published on 127.0.0.1 alone, and serves the shim with `frame-ancestors` naming the portal.
+- **Its posture as Docker reports it, value by value against what `compose.yaml` configures:** read-only; user 10002; not privileged; no capability added and all dropped; `no-new-privileges` and no other security option, so seccomp and AppArmor are Docker's defaults; an init; 3 GiB of memory and as much with swap; 2 CPUs; 128 processes; the host's PID namespace not shared; no mount and no device; `/tmp` a 1 GiB `tmpfs` with `noexec,nosuid,nodev`; and its own network alone, internal, made with no address for the host on it, with no port published. Each editor's the same way, as user 10003, 256 MiB and 64 processes, on `editors`, published on 127.0.0.1 alone.
+- **That it reaches nothing outside its network,** from inside it: `github.com` and `host.docker.internal` don't resolve; TCP to 1.1.1.1:443, TCP to [2606:4700:4700::1111]:443, UDP DNS to 1.1.1.1:53 and TCP to 169.254.169.254:80 each fail, as `Network is unreachable`. That the host has no address on the network is Docker's configuration (`inhibit_ipv4`), which the check reads, not a connection it tries. ICMP can't be tried, since the worker has no `CAP_NET_RAW`.
+- **From a probe on its network, in its image:**
+  - the release's licence files, and each notice `CRAFTS` declares, PdfCraft's OCR models' attribution and licences among them, are in the image;
+  - a request without its token is refused;
+  - the worker runs the app at its pinned version;
+  - a new file is made, read back as the app's format, and rendered (FreeCAD and FigCraft are given a shape first);
+  - a zip whose one part inflates to 1 GiB, a file past the 256 MiB limit and bytes of no format each end within the deadline, in a typed failure. The zip is a bomb to an app whose files are zips; one whose files aren't (PDF, DXF, PSD, SVG, FreeCAD's) refuses it at its first bytes, so for those it shows only that refusal, and their own hostile files are each app's corpus's ([files ADR-0011](../../artifactr/files/adr/0011-a-gate-for-each-app.md)'s second action item).
+- **That nothing outlives a call:** a process its user left running and a file left in `/tmp`, before the probe's calls, are gone after them.
+- **Each editor's shim** has `frame-ancestors` naming the portal it was given.
 
 CI's "Native files" job runs it on amd64 and arm64 runners, when stackr or a project it depends on changes.
 
@@ -104,24 +109,31 @@ CI's "Native files" job runs it on amd64 and arm64 runners, when stackr or a pro
 
 ### Option D: The editors on the application's own server, by `Host`, as mini apps' sandbox is
 
-**Cons:** the builds, tens of megabytes each, in the application's image; and the application's process serving them. A static server of their own is simpler, and reaches nothing.
+**Cons:** the builds, tens of megabytes each, in the application's image; and the application's process serving them. A static server of their own is simpler, and holds nothing.
+
+### Option E: One network and one token for every worker
+
+**Cons:** a worker that runs code could call its siblings, some of them trusting the worker for their confinement, with hostile input of its own. A network and a token for each cost a line of `.env` each.
 
 ## Trade-off analysis
 
-Building the worker from the application's own Dockerfile costs image size, a few hundred megabytes for each app, and buys one artifactr on both ends of the wire with nothing to release. A worker per app costs a container each, and keeps one app's hostile file from sharing another's limits.
+Building the worker from the application's own Dockerfile costs image size, a few hundred megabytes for each app, and buys one artifactr on both ends of the wire with nothing to release. A worker per app, each on its own network with its own token, costs a container, a network and a token each, and keeps one app's hostile file from sharing another's limits or reaching another's worker.
 
 ## What is not isolated
 
 - **The kernel.** A worker is a container on the host's kernel, under Docker's default seccomp profile, and AppArmor's where the host has it, with no gVisor or VM between it and the host.
-- **The application, from the worker.** The application joins `files`, so a worker can open a connection to it there, on its own port, where every route asks for a person's token or a service's key. Workers can reach each other on `files`, where each asks for the token; the token is one for all of them.
-- **Names on `files`.** Docker's embedded DNS answers the names of the containers on it; it resolves nothing outside.
-- **What the token gives.** Whoever has `FILES_WORKER_TOKEN`, and a place on `files`, can have any worker read any file.
+- **The application, from a worker.** The application joins each worker's network, so a worker can open a connection to the application's own port there. Most of its routes ask for a person's token or a service's key, but not all: `/healthz`, the portal's `config.json` and UIs, its sign-in passthrough (`/auth/v1/token`, `/auth/v1/user`, `/auth/v1/logout`, which pass a password or a refresh token on to Supabase Auth, as from a browser), and the mini apps' sandbox origin answer anyone who reaches them. A worker that runs code could make those calls, from inside the deployment, as any visitor to the application could from outside it. A relay as the only member of both networks would close it, and isn't built.
+- **One call from the next, within a worker.** Every tenant's calls go to the same worker. What the sweep removes after each call is its user's processes and `/tmp`; a process started as another user (none can be: no capabilities, no new privileges) or state the CLI keeps in memory across calls (none does: a CLI is started for each call) is outside it. Between the CLI's end and the sweep, a process that left the CLI's session could run alongside the worker for the rest of that call.
+- **The token in the environment.** Each worker's token, like every setting, is in its container's environment, which `docker inspect` and `docker compose config` show to whoever may run Docker. A worker holds only its own; the application holds every one.
+- **What a token gives.** Whoever holds an app's token, and a place on its network, can have its worker read files they send it. A worker keeps no file, so a token gives no stored file, only the worker's work.
+- **Names.** Docker's embedded DNS answers the names of the containers on a worker's network, the application's among them; it resolves nothing outside.
 - **A crash's message.** A `crashed` failure carries the end of what the CLI printed, which a hostile file can shape; the application logs it, and must not show it to people or agents (ADR-0013).
-- **The editor in the browser.** It is the app's build, as released, on its own origin, under a policy that reaches nothing; its isolation from the portal is the browser's same-origin policy.
+- **The editor.** It is the app's build, as released, on its own origin, under a policy that keeps it to that origin; its isolation from the portal is the browser's same-origin policy. Its container holds no secret, and its network has a route out, which nothing in it uses.
+- **The worker's virtual environment** is the application's, whole: its code and every library it installs, in each worker, which a slimmer one, `artifactr-ai[files]` alone, would cut. It runs none of it but artifactr's worker.
 
 ## Consequences
 
-- Easier: `make up FILES="wordcraft gridcraft"` in a generated application, with `make env`'s token, runs native files' routes, the agent's tools and each app's worker; with the portal, GridCraft's, PdfCraft's and CADCraft's editors too.
+- Easier: `make up FILES="wordcraft gridcraft"` in a generated application, with `make env`'s tokens, runs native files' routes, the agent's tools and each app's worker; with the portal, GridCraft's, PdfCraft's and CADCraft's editors too.
 - Harder: each app is an image to build, from a download; a worker's first build fetches its release from GitHub.
 - Not done: **an upload route.** Nothing in lattice makes a native file from an upload: `files_router` names existing artifacts, and portalr has no control for one. A generated application's files arrive through `NativeFiles.upload` in code. The route is artifactr's to add, with portalr's control after.
 - Not done: **the image's digest in provenance.** `WORKER_BUILD` is unset, since only the built image knows its digest, so a revision records the app and its version, and no image.
@@ -129,9 +141,11 @@ Building the worker from the application's own Dockerfile costs image size, a fe
 
 ## Action items
 
-1. [x] `native_files` in the template, `Files` and `editor.py`, the worker's and editor's targets, the `files` network, the containers' limits, the token and `make up FILES=...`.
+1. [x] `native_files` in the template, `Files` and `editor.py`, the worker's and editor's targets, a network and a token for each worker, the containers' limits, the sweep after each call, and `make up FILES=...`.
 2. [x] The release-pin check in `scripts/check-template`.
 3. [x] `scripts/check-files`, and CI's "Native files" job.
 4. [ ] An upload route for a new native file, in artifactr, and portalr's control.
 5. [ ] The image's digest as `WORKER_BUILD`.
 6. [ ] The editors on a single host's edge, on host names of their own.
+7. [ ] A relay between the application and the workers, so no worker reaches the application's unauthenticated routes.
+8. [ ] A slimmer worker image: `artifactr-ai[files]` alone, at the application's lock.

@@ -12,8 +12,8 @@
 #   device, no port published, and on its own internal network alone
 # - reaches nothing outside it: no name resolves, host.docker.internal included; and TCP to a
 #   public IPv4 and IPv6 address, UDP to a public resolver and the cloud metadata address each
-#   fail; and the network has no gateway, so the host has no address on it. (ICMP can't be
-#   tried: the worker has no CAP_NET_RAW.)
+#   fail; and the network is made with no address for the host on it (inhibit_ipv4). (ICMP
+#   can't be tried: the worker has no CAP_NET_RAW.)
 # - answers a probe on its network (scripts/_files_probe.py): its release's licences and notices
 #   in its image; the app at its pinned version, behind its own token; a new file made, read and
 #   rendered; and hostile files refused within their deadline
@@ -114,10 +114,9 @@ posture() {
 }
 setting() { docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$1" | sed -n "s/^$2=//p"; }
 
-# Run inside the worker, given its network's gateway: nothing outside the network answers.
+# Run inside the worker: nothing outside its network answers.
 egress='
 import socket, sys
-gateway = sys.argv[1]
 def refused(what, attempt):
     try:
         attempt()
@@ -143,16 +142,6 @@ results = [
     refused("UDP DNS to 1.1.1.1:53", udp_dns),
     refused("TCP to 169.254.169.254:80", lambda: tcp(socket.AF_INET, "169.254.169.254", 80)),
 ]
-def unanswered(host, port):
-    try:
-        tcp(socket.AF_INET, host, port)
-    except ConnectionRefusedError as answered:
-        raise RuntimeError(f"{host} answered: {answered}") from None
-try:
-    results.append(refused(f"TCP to where the host would be, {gateway}:80", lambda: unanswered(gateway, 80)))
-except RuntimeError as answered:
-    print(f"  REACHED: {answered}")
-    results.append(False)
 sys.exit(0 if all(results) else 1)
 '
 # Run inside the worker after the probe's calls: what was planted before them is gone.
@@ -175,11 +164,8 @@ for app in "${apps[@]}"; do
     same "$(docker inspect --format '{{len .HostConfig.PortBindings}}' "$container")" 0
   check "$app's network gives the host no address on it" same \
     "$(docker network inspect --format '{{index .Options "com.docker.network.bridge.inhibit_ipv4"}}' "$network")" true
-  # Where the host's address would be: the subnet's first.
-  subnet=$(docker network inspect --format '{{range .IPAM.Config}}{{.Subnet}}{{end}}' "$network")
-  gateway="${subnet%.*/*}.1"
   check "$app's worker reaches nothing outside its network" \
-    docker exec "$container" python -I -c "$egress" "$gateway"
+    docker exec "$container" python -I -c "$egress"
 
   # A process its user leaves, and a file for the next call, before the probe's calls.
   docker exec --detach --user 10002 "$container" sleep 600

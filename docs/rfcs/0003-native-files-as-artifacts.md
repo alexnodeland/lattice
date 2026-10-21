@@ -344,7 +344,7 @@ Decided by the owner on 2026-10-16:
 - [x] artifactr-files: the package, its `pyproject.toml`, a `moon.yml` that depends on artifactr and lattice-core, and its entry in `release-please-config.json` and the manifest
 - [x] artifactr-files: blobs, check-outs, migrations and row-level security
 - [x] artifactr-files: the WordCraft adapter, the corpus and the nightly fidelity report
-- [x] The worker (phase 3): artifactr-files' worker, limits, `Worker` app and hostile corpus (native files ADR-0013); stackr's image, recipe, network, release pin check and the egress test, in the template, with a worker for each app (stackr ADR-0043)
+- [x] The worker (phase 3): artifactr-files' worker, limits, `Worker` app and hostile corpus (native files ADR-0013); stackr's image, recipe, network, release pin check and the egress test, in the template, with a worker for each app (stackr ADR-0043). Each app's own corpus and hostile files, its gate (native files ADR-0011's second action item), are still open for all but WordCraft
 - [x] artifactr-files: `NativeFileTools`, as `native_file_tools`
 - [x] artifactr-files: `files_router`, check-out and check-in over HTTP, and the hosted editor's policy
 - [x] portalr: the renderer, previews, diffs, check-out and check-in screens

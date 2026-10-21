@@ -296,6 +296,7 @@ const SCENES: Record<string, () => ReactNode> = {
   kit: () => <Kit />,
   menu: () => <Gallery />,
   select: () => <Controls />,
+  drawer: () => <Gallery />,
 };
 
 /** What a scene opens once it is shown: a menu, with the keyboard on an item, or a select's list. */
@@ -303,6 +304,14 @@ const OPENED: Record<string, () => Promise<void>> = {
   menu: async () => {
     await page.getByRole("button", { name: "Workspace: acme, notes" }).click();
     await userEvent.keyboard("{ArrowDown}");
+  },
+  // The drawer opens where the frame is narrow, and isn't there to open where it is wide.
+  drawer: async () => {
+    const menu = page.getByRole("button", { name: "Menu" });
+    if (menu.query()?.checkVisibility()) {
+      await menu.click();
+      await expect.element(page.getByRole("dialog", { name: "Navigation" })).toBeVisible();
+    }
   },
   select: async () => {
     await page.getByRole("combobox", { name: "Role" }).click();

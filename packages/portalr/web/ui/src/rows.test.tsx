@@ -117,11 +117,61 @@ test("on a phone, a row's end goes under its meta, and its name keeps the width"
     </Rows>,
   );
   // The name's line is the row's width, less its padding: nothing at its end takes from it.
+  const row = screen.getByRole("listitem").element().getBoundingClientRect();
   const name = (
     screen.getByRole("link").element().parentElement as Element
   ).getBoundingClientRect();
   const end = screen.getByText("12 behind, 3 dead letters").element().getBoundingClientRect();
   const meta = screen.getByText("stored, version 3").element().getBoundingClientRect();
   expect(end.top).toBeGreaterThanOrEqual(meta.bottom - 1);
-  expect(name.width).toBeGreaterThanOrEqual(320 - 16);
+  expect(name.width).toBeGreaterThanOrEqual(row.width - 16);
+});
+
+test("on a phone, a row's name of several blocks is all there: none of it is clipped", async () => {
+  await page.viewport(320, 800);
+  onTestFinished(() => page.viewport(414, 896));
+  const screen = await render(
+    <Rows label="Runs">
+      <Row
+        name={
+          <>
+            <code>portalr:triage</code>, retried three times.{" "}
+            <span>last failure: the tracker refused the item, after three tries.</span> Filed as{" "}
+            <a href="#ops-12">OPS-12</a>
+          </>
+        }
+        end={<span>Dead-lettered</span>}
+      />
+    </Rows>,
+  );
+  const row = screen.getByRole("listitem").element().getBoundingClientRect();
+  for (const part of [
+    screen.getByText(/last failure/).element(),
+    screen.getByRole("link", { name: "OPS-12" }).element(),
+  ]) {
+    const box = part.getBoundingClientRect();
+    expect(box.top).toBeGreaterThanOrEqual(row.top);
+    expect(box.bottom).toBeLessThanOrEqual(row.bottom);
+    // And drawn there: what is at its middle is it, not what a clip would leave.
+    const hit = document.elementFromPoint(box.left + 4, box.top + box.height / 2);
+    expect(part.contains(hit)).toBe(true);
+  }
+});
+
+test("wider, a row's end takes half the row at most", async () => {
+  await page.viewport(700, 800);
+  onTestFinished(() => page.viewport(414, 896));
+  const screen = await render(
+    <Rows label="Rules">
+      <Row
+        name={<RowLink href="#r">digest</RowLink>}
+        end={<span>{"12 behind, 3 dead letters, ".repeat(6)}</span>}
+      />
+    </Rows>,
+  );
+  const row = screen.getByRole("listitem").element().getBoundingClientRect();
+  const end = (
+    screen.getByText(/12 behind/).element().parentElement as Element
+  ).getBoundingClientRect();
+  expect(end.width).toBeLessThanOrEqual(row.width / 2 + 1);
 });

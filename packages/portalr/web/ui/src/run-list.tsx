@@ -1,7 +1,8 @@
 /**
  * A workspace's runs: a table from the small breakpoint, named by its caption, and below it a
- * card for each, its status and title on top, then its attempts and feedback, and its actions in
- * reach. What a run's cells hold is its caller's, as the app's and admin's runs differ.
+ * list of rows (portalr ADR-0060), each its title, then its attempts and feedback, and at its end
+ * its status and its actions. What a run's cells hold is its caller's, as the app's and admin's
+ * runs differ.
  */
 
 import type { Reflexr } from "@portalr/client";
@@ -32,10 +33,10 @@ export function RuleRunStatus({ status }: { status: Reflexr.Run["status"] }) {
   );
 }
 
-/** A run's parts, as the table's cells and a phone's card both show them. */
+/** A run's parts, as the table's cells and a phone's row both show them. */
 export interface RunParts {
   readonly key: string;
-  /** The row's or card's name. */
+  /** The row's name, for assistive technology. */
   readonly name: string;
   readonly status: ReactNode;
   readonly title: ReactNode;
@@ -45,8 +46,8 @@ export interface RunParts {
 }
 
 /**
- * Runs as a table, named by its caption, from the small breakpoint; below it, a card for each, its
- * status and title on top, then its attempts and feedback, and its actions in reach.
+ * Runs as a table, named by its caption, from the small breakpoint; below it, a row for each, its
+ * title, then its attempts and feedback, and at its end its status and its actions.
  */
 export function RunList({
   caption,

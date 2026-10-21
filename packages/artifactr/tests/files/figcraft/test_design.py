@@ -8,11 +8,14 @@ import pytest
 from artifactr.files.figcraft import media_type
 from artifactr.files.manifest import FIGCRAFT
 
+TIME = (1980, 1, 1, 0, 0, 0)
+"""Every entry's time, so a design, and a test's id from it, is the same in every process."""
+
 
 def zipped(name: str, content: bytes) -> bytes:
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
-        archive.writestr(name, content)
+        archive.writestr(zipfile.ZipInfo(name, TIME), content, zipfile.ZIP_DEFLATED)
     return buffer.getvalue()
 
 

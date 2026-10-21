@@ -8,12 +8,15 @@ import pytest
 from artifactr.files.designcraft import media_type
 from artifactr.files.manifest import IDML
 
+TIME = (1980, 1, 1, 0, 0, 0)
+"""Every entry's time, so a package, and a test's id from it, is the same in every process."""
+
 
 def package(**parts: bytes) -> bytes:
     made = io.BytesIO()
     with zipfile.ZipFile(made, "w") as archive:
         for name, part in parts.items():
-            archive.writestr(name, part)
+            archive.writestr(zipfile.ZipInfo(name, TIME), part)
     return made.getvalue()
 
 

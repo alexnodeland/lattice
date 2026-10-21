@@ -133,3 +133,11 @@ test("an element that declares motion's scale itself still doesn't move", async 
     kit.remove();
   }
 });
+
+test("under reduced motion, a placeholder rests at its resting look", async () => {
+  await commands.reduceMotion(true);
+  const screen = await render(<Kit />);
+  const placeholder = screen.container.querySelector("[class*='--skeleton-radius']") as Element;
+  expect(getComputedStyle(placeholder).animationName).toBe("none");
+  expect(getComputedStyle(placeholder).opacity).toBe("1");
+});

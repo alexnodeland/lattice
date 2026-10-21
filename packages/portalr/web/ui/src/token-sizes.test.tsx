@@ -1,8 +1,9 @@
 /**
- * What the computed-style snapshots don't read (portalr ADR-0056): sizes, which layout decides for
- * most elements, and the scale a dialog or a menu enters and leaves at, which lasts a frame. Each
- * size token is read where it is used, so a misspelt token, which computes to nothing, fails here;
- * the screenshot suites guard every other size.
+ * What the computed-style snapshots don't read (portalr ADR-0056): the size tokens that set a box's
+ * width or height, the dialog's width and margin, the drawer's width, the switch, the check, the
+ * progress bar and a row, each read where it is used, so a misspelt one fails here; and the scale a
+ * dialog or a menu enters and leaves at, which lasts a frame. Corners and padding are read by the
+ * computed-style snapshots; the screenshot suites guard every other size.
  */
 
 import { expect, onTestFinished, test } from "vitest";

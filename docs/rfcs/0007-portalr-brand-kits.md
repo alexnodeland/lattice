@@ -177,7 +177,7 @@ A closed set of entry and exit patterns (above), a duration scale and an easing 
 }
 ```
 
-`--motion-scale` and `--motion-loop` are not in the kit's grammar. Infinite animations (the pulse) read `animation-play-state: var(--motion-loop)` and have a defined still state (the placeholder at its resting opacity). Motion driven from script reads the same media query and tokens. A test renders a worst-case kit (every duration at 600ms, the `lively` preset) under reduced motion and asserts every computed `transition-duration` and `animation-duration` is 0s or the animation is paused at its still state. A kit that wants no motion at all takes the `none` preset.
+`--motion-scale` and `--motion-loop` are not in the kit's grammar. Infinite animations (the pulse) read `animation-play-state: var(--motion-loop)` and stop at rest, at their resting opacity (the placeholder at its resting opacity). Motion driven from script reads the same media query and tokens. A test renders a worst-case kit (every duration at 600ms, the `lively` preset) under reduced motion and asserts every computed `transition-duration` and `animation-duration` is 0s or the animation is paused at its still state. A kit that wants no motion at all takes the `none` preset.
 
 ### What a kit can't brand
 
@@ -252,7 +252,7 @@ The foundation PR (#452) departs from the design above in these ways, each revie
 - **Some component tokens are literals,** not primitives: `--dialog-pad`, `--dialog-scrim-blur`, `--segmented-item-pad-x`, `--popover-item-pad-x`, `--switch-width`, `--switch-height` and `--focus-offset`, as no primitive has their value. `--switch-thumb` and `--switch-travel` are separate tokens: a kit that changes one changes the other, which the loader PR checks.
 - **Colour ramps** come with the loader PR.
 - **The reduced-motion test** lays the generated stylesheet, every duration at 600ms, over the default, and opens a dialog, a menu, a select's list and the drawer; the guard rails' validation of a kit's motion is the loader PR's.
-- **Sizes** are read by a test of each size token where it is used, and by the screenshot suites; the computed-style snapshots read what a declaration sets and leave sizes, margins and transforms out.
+- **Sizes** are read where a size token sets a box's width or height (the dialog's width and margin, the drawer's width, the switch, the checkbox, the progress bar and a row's height) and the enter and exit scales, by `token-sizes.test.tsx`; corners and padding are read by the computed-style snapshots; every other size by the screenshot suites; the computed-style snapshots read what a declaration sets and leave sizes, margins and transforms out.
 - **The style census** reports in the test's annotations, not yet in the CI step summary.
 
 ## Drawbacks

@@ -1,6 +1,9 @@
 """The default brand kit, and the grammar a kit's tokens are read by (lattice RFC-0007)."""
 
 import json
+import re
+import runpy
+import sys
 from pathlib import Path
 
 import pytest
@@ -67,6 +70,53 @@ def test_an_alias_is_its_tokens_custom_property(tmp_path: Path) -> None:
     assert "  --accent: var(--chart-3);" in css
 
 
+def test_a_described_group_an_opaque_colour_and_a_shadow_of_a_colour(tmp_path: Path) -> None:
+    light = {
+        "$description": "A kit's notes are its own.",
+        "color": {"paper": {"$value": {"colorSpace": "srgb", "hex": "#ffffff", "alpha": 1}}},
+        "shadow": {
+            "1": {
+                "$value": {
+                    "color": "#000000",
+                    "offsetX": {"value": 0, "unit": "px"},
+                    "offsetY": {"value": 1, "unit": "px"},
+                    "blur": {"value": 2, "unit": "px"},
+                    "spread": {"value": 0, "unit": "px"},
+                }
+            }
+        },
+    }
+    css = compile_kit(kit(tmp_path, light))
+    assert "  --paper: #ffffff;" in css
+    assert "  --shadow-1: 0 1px 2px #000000;" in css
+
+
+def test_a_token_file_is_an_object(tmp_path: Path) -> None:
+    (tmp_path / "tokens.light.json").write_text("[]")
+    with pytest.raises(BrandError, match=re.escape("tokens.light.json: a token file is an object")):
+        compile_kit(tmp_path)
+
+
+def test_the_default_kit_holds_every_token(tmp_path: Path) -> None:
+    (tmp_path / "tokens.light.json").write_text("{}")
+    with pytest.raises(
+        BrandError, match=re.escape("color.paper: the default kit has no value for it")
+    ):
+        compile_kit(tmp_path, default=tmp_path)
+
+
+def test_the_module_writes_the_default_kits_stylesheet(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    out = tmp_path / "tokens.css"
+    monkeypatch.setattr(sys, "argv", ["portalr.brand", str(out)])
+    runpy.run_module("portalr.brand", run_name="__main__")
+    assert out.read_text() == compile_kit()
+    monkeypatch.setattr(sys, "argv", ["portalr.brand"])
+    with pytest.raises(SystemExit, match=re.escape("usage: python -m portalr.brand <tokens.css>")):
+        runpy.run_module("portalr.brand", run_name="__main__")
+
+
 @pytest.mark.parametrize(
     ("light", "fault"),
     [
@@ -80,6 +130,17 @@ def test_an_alias_is_its_tokens_custom_property(tmp_path: Path) -> None:
         ({"font": {"family": {"sans": {"$value": ["Inter"]}}}}, "ends in a generic family"),
         ({"motion": {"ease": {"in": {"$value": [2, 0, 1, 1]}}}}, "x values are from 0 to 1"),
         ({"font": {"weight": {"medium": {"$value": 550}}}}, "a weight is 100 to 900"),
+        ({"color": {"paper": "#ffffff"}}, "color.paper: a token is an object with a \\$value"),
+        ({"font": {"leading": {"tight": {"$value": "1"}}}}, "'1' is not a number"),
+        ({"radius": {"2": {"$value": 2}}}, "a dimension is {value, unit}"),
+        ({"color": {"paper": {"$value": {"colorSpace": "srgb", "hex": "red"}}}}, "not a colour"),
+        (
+            {"color": {"paper": {"$value": {"colorSpace": "srgb", "hex": "#ffffff", "alpha": 2}}}},
+            "an alpha is from 0 to 1",
+        ),
+        ({"font": {"family": {"sans": {"$value": "Inter"}}}}, "a font family is a list of names"),
+        ({"shadow": {"1": {"$value": {"color": "#000000"}}}}, "a shadow is"),
+        ({"motion": {"ease": {"in": {"$value": [0, 0, 1]}}}}, "an easing is four numbers"),
     ],
 )
 def test_a_kit_the_grammar_refuses(tmp_path: Path, light: dict, fault: str) -> None:

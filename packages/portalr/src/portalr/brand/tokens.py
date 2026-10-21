@@ -184,7 +184,7 @@ def _printed(row: Row, value: object, tokens: Mapping[str, object], depth: int =
             return _family(value, row.path)
         case "cubicBezier":
             return _ease(value, row.path)
-        case "shadow":
+        case "shadow":  # pragma: no branch, the last of the types
             return _shadow(value, row.path, resolve)
 
 

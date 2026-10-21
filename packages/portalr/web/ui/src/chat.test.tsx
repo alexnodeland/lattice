@@ -13,6 +13,7 @@ import {
   RunStatus,
   Streaming,
   Thumbs,
+  unhidden,
 } from "./chat";
 import { IntegrationsContext } from "./integrations";
 import { contrast, token } from "./test/colours";
@@ -246,6 +247,64 @@ test("a call to approve takes the focus, and is approved or denied once", async 
   await expect.element(approve).toBeDisabled();
   await expect.element(card.getByRole("button", { name: "Deny" })).toBeDisabled();
   expect(onAnswer.mock.calls).toEqual([[{ approved: true }]]);
+});
+
+test("a connected app's code is shown whole, with what it runs as and what a scan found", async () => {
+  const onAnswer = sent();
+  const code = "import os\nos.listdir('.')\n";
+  const request: ArtifactrV1.DeferredRequest = {
+    kind: "approval",
+    tool_call_id: "t1",
+    tool_name: "freecad_execute_code",
+    args: { code },
+    review: {
+      app: "FreeCAD",
+      risk: "code",
+      runs: "Runs code in your FreeCAD, in the session you have open, with your own privileges.",
+      code,
+      findings: ["line 1: imports os"],
+    },
+  };
+  const screen = await render(<Request request={request} onAnswer={onAnswer} />);
+  const card = screen.getByRole("region", { name: "Approve freecad_execute_code?" });
+  await expect.element(card.getByText("Runs code in your FreeCAD", { exact: true })).toBeVisible();
+  await expect.element(card.getByText(/with your own privileges/)).toBeVisible();
+  await expect.element(card.getByRole("button", { name: "Copy the code" })).toBeVisible();
+  await expect.element(card.getByText("line 1: imports os")).toBeVisible();
+});
+
+test("a scan that found nothing says it can't find everything, and long code says so", async () => {
+  const code = Array.from({ length: 50 }, (_, n) => `x${n} = ${n}`).join("\n");
+  const request: ArtifactrV1.DeferredRequest = {
+    kind: "approval",
+    tool_call_id: "t1",
+    tool_name: "blender_execute_blender_code",
+    args: { code },
+    review: {
+      app: "Blender",
+      risk: "code",
+      runs: "Runs code.",
+      holds: "An approval holds.",
+      code,
+      findings: [],
+    },
+  };
+  const screen = await render(<Request request={request} onAnswer={sent()} />);
+  await expect
+    .element(screen.getByText("A quick scan found nothing; it can't find everything."))
+    .toBeVisible();
+  await expect.element(screen.getByText(/It is 50 lines long/)).toBeVisible();
+  await expect.element(screen.getByText("An approval holds.")).toBeVisible();
+});
+
+test("a character a reader wouldn't see is shown as its code point", () => {
+  expect(unhidden("a\u202eb\u200bc\u0000")).toBe(
+    "a\u27e6U+202E\u27e7b\u27e6U+200B\u27e7c\u27e6U+0000\u27e7",
+  );
+  expect(unhidden("plain\tcode\n")).toBe("plain\tcode\n");
+  expect(unhidden("\u061c\u2028\u00ad\u{e0041}\ufe0f")).toBe(
+    "\u27e6U+061C\u27e7\u27e6U+2028\u27e7\u27e6U+00AD\u27e7\u27e6U+E0041\u27e7\u27e6U+FE0F\u27e7",
+  );
 });
 
 test("a call can be denied", async () => {

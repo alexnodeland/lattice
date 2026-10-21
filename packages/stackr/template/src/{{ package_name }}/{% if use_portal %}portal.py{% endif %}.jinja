@@ -194,6 +194,9 @@ class Portal:
                 surfaces=Surfaces(relayr=""),
 {%- endif %}
                 apps=portal.apps_url,
+{%- if use_files %}
+                editors=dict(self._settings.files.editors),
+{%- endif %}
             )
         return None
 

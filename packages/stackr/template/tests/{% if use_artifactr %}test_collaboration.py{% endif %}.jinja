@@ -13,11 +13,15 @@ from pydantic_ai import ToolReturnPart
 {%- endif %}
 
 from artifactr import new_id
-{%- if use_ui %}
+{%- if use_ui or use_files %}
 from lattice_core.integrations import Defaults
 {%- endif %}
 
 from {{ package_name }}.collaboration import Collaboration
+{%- if use_files %}
+from {{ package_name }}.files import Files
+from {{ package_name }}.settings import FilesSettings
+{%- endif %}
 
 from conftest import TENANT, TENANT_KEY, Script, bearer, call, nobody, say, settings, wait_for
 
@@ -106,8 +110,11 @@ async def test_mcp_clients_in_process_are_refused(script: Script) -> None:
         name="{{ project_slug }}",
         authenticate=nobody,
         identify=nobody,
-{%- if use_ui %}
+{%- if use_ui or use_files %}
         integrations=Defaults(),
+{%- endif %}
+{%- if use_files %}
+        files=Files(FilesSettings(), integrations=Defaults()),
 {%- endif %}
         model=script.model,
         gateway=config.gateway,

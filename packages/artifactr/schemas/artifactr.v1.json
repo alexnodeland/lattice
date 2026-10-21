@@ -866,6 +866,14 @@
           "title": "Kind",
           "type": "string"
         },
+        "review": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "default": {},
+          "title": "Review",
+          "type": "object"
+        },
         "tool_call_id": {
           "title": "Tool Call Id",
           "type": "string"

@@ -25,6 +25,21 @@ def _adapter(app: str) -> tuple[set[str], set[str]]:
     return {*own, f"artifactr.files.{app}"}, {"pydantic"}
 
 
+ADAPTED = (
+    "wordcraft",
+    "gridcraft",
+    "deckcraft",
+    "pdfcraft",
+    "cadcraft",
+    "photocraft",
+    "vectorcraft",
+    "designcraft",
+    "figcraft",
+    "freecad",
+    "blender",
+)
+"""The apps with an adapter of their own, each a layer."""
+
 LAYERS: dict[str, tuple[set[str], set[str]]] = {
     # layer: (artifactr.files packages it may import, the others it may import)
     "manifest": ({"artifactr.files.manifest"}, {*LIBRARY, "pydantic"}),
@@ -68,18 +83,17 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         },
         {"pydantic", "anyio", "zstandard", "bpy", "bmesh", "mathutils"},
     ),
-    # The worker, over any app, and the App that calls it; its entry point runs WordCraft's. It
-    # holds an app's limits to what its CLI needs, as the registry says.
     "filmcraft": _adapter("filmcraft"),
     "effectcraft": _adapter("effectcraft"),
     "soundcraft": _adapter("soundcraft"),
-    # The worker, over any app, and the App that calls it; its entry point runs WordCraft's.
+    # The worker, over any app, and the App that calls it; its entry point runs each app's adapter.
+    # It holds an app's limits to what its CLI needs, as the registry says.
     "worker": (
         {
             "artifactr.files.app",
             "artifactr.files.craft",
-            "artifactr.files.wordcraft",
             "artifactr.files.worker",
+            *(f"artifactr.files.{app}" for app in ADAPTED),
         },
         {"pydantic", "anyio", "starlette", "uvicorn", "httpx"},
     ),

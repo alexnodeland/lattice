@@ -110,6 +110,10 @@ The reference is generated from `artifactr.files`' docstrings and type annotatio
 ## artifactr.files.blender
 
 ::: artifactr.files.blender
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+
 ## artifactr.files.filmcraft
 
 ::: artifactr.files.filmcraft

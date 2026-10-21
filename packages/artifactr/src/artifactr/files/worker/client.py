@@ -35,15 +35,32 @@ class Worker:
     """An [`App`][artifactr.files.app.App] that the worker runs: every call is a request to it.
 
     Made by [`connect`][artifactr.files.worker.Worker.connect], which asks the worker which app
-    it runs; its name, version and image's digest are the worker's, and provenance records them.
-    A failure the worker reports is raised as the same [`AppFailed`][artifactr.files.app.AppFailed];
-    a worker that doesn't reply in time is `timeout`, and one that can't be reached, or replies
-    with anything but what a call's reply is, is `crashed`.
+    it runs; or by [`at`][artifactr.files.worker.Worker.at], which asks nothing until
+    [`open`][artifactr.files.worker.Worker.open], for an application that builds its parts before
+    its event loop runs and opens the worker as it starts. Its name, version and image's digest
+    are the worker's, and provenance records them. A failure the worker reports is raised as the
+    same [`AppFailed`][artifactr.files.app.AppFailed]; a worker that doesn't reply in time is
+    `timeout`, and one that can't be reached, or replies with anything but what a call's reply is,
+    is `crashed`.
     """
 
-    def __init__(self, client: httpx.AsyncClient, hello: Hello) -> None:
+    def __init__(self, client: httpx.AsyncClient, hello: Hello | None = None) -> None:
         self._client = client
         self._hello = hello
+
+    @classmethod
+    def at(cls, url: str, *, token: str, transport: httpx.AsyncBaseTransport | None = None) -> Self:
+        """The worker at `url`, not yet asked which app it runs: `open` it before any call.
+
+        Args:
+            url: The worker's base URL, on the deployment's internal network.
+            token: The token the deployment generated for it.
+            transport: How requests are sent, for tests; HTTP by default.
+        """
+        client = httpx.AsyncClient(
+            base_url=url, headers={"Authorization": f"Bearer {token}"}, transport=transport
+        )
+        return cls(client)
 
     @classmethod
     async def connect(
@@ -59,41 +76,55 @@ class Worker:
         Raises:
             httpx.HTTPError: If the worker can't be reached, or refuses the token.
         """
-        client = httpx.AsyncClient(
-            base_url=url, headers={"Authorization": f"Bearer {token}"}, transport=transport
-        )
-        reply = await client.get("/", timeout=GRACE)
+        worker = cls.at(url, token=token, transport=transport)
+        await worker.open()
+        return worker
+
+    async def open(self) -> None:
+        """Ask the worker which app it runs.
+
+        Raises:
+            httpx.HTTPError: If the worker can't be reached, or refuses the token.
+        """
+        reply = await self._client.get("/", timeout=GRACE)
         reply.raise_for_status()
-        return cls(client, Hello.model_validate_json(reply.content))
+        self._hello = Hello.model_validate_json(reply.content)
 
     async def aclose(self) -> None:
         """Close the connections to the worker."""
         await self._client.aclose()
 
     @property
+    def _app(self) -> Hello:
+        """The app the worker runs, as it said when opened."""
+        if self._hello is None:
+            raise RuntimeError("the worker isn't open: await its open() first")
+        return self._hello
+
+    @property
     def name(self) -> str:
         """The app's name, which provenance records."""
-        return self._hello.name
+        return self._app.name
 
     @property
     def version(self) -> str:
         """The app's version, which provenance records."""
-        return self._hello.version
+        return self._app.version
 
     @property
     def build(self) -> str | None:
         """The digest of the worker's image, which provenance records."""
-        return self._hello.build
+        return self._app.build
 
     @property
     def talk(self) -> Talk:
         """How much the app talks to the host while a person edits in it."""
-        return self._hello.talk
+        return self._app.talk
 
     @property
     def integration(self) -> str:
         """The key that switches the app in a workspace."""
-        return self._hello.integration
+        return self._app.integration
 
     async def apply(
         self, source: bytes | None, commands: Sequence[AppCommand], *, deadline: float

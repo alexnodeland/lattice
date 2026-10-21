@@ -2,6 +2,7 @@
 writes again, and its fingerprint."""
 
 import struct
+import time
 
 import pytest
 import zstandard
@@ -9,6 +10,7 @@ import zstandard
 from artifactr.files.app import AppFailed
 from artifactr.files.blender import fingerprint, scan
 from artifactr.files.blender.document import (
+    CHECKED,
     HEAD,
     HEADER,
     RAW,
@@ -299,3 +301,10 @@ def test_the_catalogue_is_read_as_blender_lays_its_structs_out() -> None:
 def test_a_compressed_file_and_its_bytes_have_one_fingerprint() -> None:
     data = bytes(plain("primitives"))
     assert fingerprint(zstandard.ZstdCompressor().compress(data)) == fingerprint(data)
+
+
+def test_a_scan_looks_at_its_clock_as_it_reads_a_long_block() -> None:
+    """A block of more records than a scan reads between looks at its clock, read in its time:
+    the look itself, whatever a busy machine does to the deadline tests' timing."""
+    links = changed("materials", inserted("bNodeLink", b"\x11" * 56 * (CHECKED + 1)))
+    assert not scan(links, 1 << 30, until=time.monotonic() + 60).compressed

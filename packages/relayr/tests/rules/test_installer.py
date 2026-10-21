@@ -537,6 +537,10 @@ async def test_a_rule_whose_artifact_is_archived_drifts_alone(ledger: Ledger, st
     assert await proposals(chat_) == []
 
 
+# 1,040 installs on each of four ledgers: 2 s alone, 15 s on a loaded machine, and past the suite's
+# 60 s on CI's four cores shared by several projects' workers and PostgreSQL, where the timeout's
+# thread ended the worker ("worker crashed", its coverage lost). Five minutes, as grantr's machine.
+@pytest.mark.timeout(300)
 async def test_an_install_however_far_back_is_still_relayrs(ledger: Ledger, stack: Stack) -> None:
     chat_ = await chat(stack, ledger)
     artifact_id, proposal_id = await chat_.drafted()

@@ -352,4 +352,13 @@
   --link-mark-gap: var(--space-1);
   --breadcrumb-target: 1.5rem;
   --breadcrumb-gap: var(--space-1-5);
+
+  /*
+   * A list's row: its padding, the gap between what it is and its end, and between its title's
+   * line and its meta's (portalr ADR-0060).
+   */
+  --list-row-pad-x: var(--space-2);
+  --list-row-pad-y: var(--space-3);
+  --list-row-gap: var(--space-3);
+  --list-row-line-gap: var(--space-half);
 }

@@ -73,7 +73,6 @@
         "packages/portalr/web/ui/src/run-failed.tsx",
         "packages/portalr/web/ui/src/tool-call.tsx",
         "packages/portalr/web/ui/src/trace-view.tsx",
-        "packages/portalr/web/ui/src/tracker-items.tsx",
         "packages/portalr/web/ui/src/tracker.tsx"
       ],
       "linter": {

@@ -73,19 +73,22 @@ function Threads() {
           {listed.map((thread) => {
             const status = going.get(thread.id);
             return (
-              <Row key={thread.id}>
-                <RowLink
-                  render={
-                    <Link
-                      to="/t/$tenant/w/$workspace/threads/$thread"
-                      params={{ tenant, workspace, thread: thread.id }}
-                    />
-                  }
-                >
-                  {thread.title || "Untitled"}
-                </RowLink>
-                {status && <RunStatus status={status} />}
-              </Row>
+              <Row
+                key={thread.id}
+                name={
+                  <RowLink
+                    render={
+                      <Link
+                        to="/t/$tenant/w/$workspace/threads/$thread"
+                        params={{ tenant, workspace, thread: thread.id }}
+                      />
+                    }
+                  >
+                    {thread.title || "Untitled"}
+                  </RowLink>
+                }
+                end={status && <RunStatus status={status} />}
+              />
             );
           })}
         </Rows>

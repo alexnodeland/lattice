@@ -93,10 +93,10 @@ test("a run links to the item that fired it, and to the one its chain filed", as
     surfaces: { relayr: "" },
   });
   await expect
-    .element(run(screen).getByRole("link", { name: "OPS-7, in Plane, opens in a new tab" }))
+    .element(run(screen).getByRole("link", { name: "OPS-7, in Plane (opens in a new tab)" }))
     .toHaveAttribute("href", "https://plane.example/acme/browse/OPS-7/");
   await expect
-    .element(run(screen).getByRole("link", { name: "OPS-12, in Plane, opens in a new tab" }))
+    .element(run(screen).getByRole("link", { name: "OPS-12, in Plane (opens in a new tab)" }))
     .toHaveAttribute("href", "https://plane.example/acme/browse/OPS-12/");
   await expect.element(run(screen).getByText("From")).toBeVisible();
   await expect.element(run(screen).getByText("Filed as")).toBeVisible();
@@ -109,7 +109,7 @@ test("with no tracker, relayr is never asked, and the run still links to what fi
     reflexrLog: LOG,
   });
   await expect
-    .element(run(screen).getByRole("link", { name: "OPS-7, in Plane, opens in a new tab" }))
+    .element(run(screen).getByRole("link", { name: "OPS-7, in Plane (opens in a new tab)" }))
     .toBeVisible();
   await expect.element(screen.getByText("Filed as")).not.toBeInTheDocument();
   const asked = fetched.mock.calls.map(([input]) => new URL((input as Request).url).pathname);

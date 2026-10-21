@@ -1078,6 +1078,20 @@
       "gap": {
         "$value": "{space.1-5}"
       }
+    },
+    "list-row": {
+      "pad-x": {
+        "$value": "{space.2}"
+      },
+      "pad-y": {
+        "$value": "{space.3}"
+      },
+      "gap": {
+        "$value": "{space.3}"
+      },
+      "line-gap": {
+        "$value": "{space.half}"
+      }
     }
   }
 }

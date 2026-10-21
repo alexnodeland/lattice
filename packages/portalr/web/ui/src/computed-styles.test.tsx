@@ -246,6 +246,20 @@ const SCENES: Record<string, () => ReactNode> = {
   "rowed-app": () => <Rowed ui="app" />,
   "rowed-admin": () => <Rowed ui="admin" />,
   kit: () => <Kit />,
+  menu: () => <Gallery />,
+  select: () => <Controls />,
+};
+
+/** What a scene opens once it is shown: a menu, with the keyboard on an item, or a select's list. */
+const OPENED: Record<string, () => Promise<void>> = {
+  menu: async () => {
+    await page.getByRole("button", { name: "Workspace: acme, notes" }).click();
+    await userEvent.keyboard("{ArrowDown}");
+  },
+  select: async () => {
+    await page.getByRole("combobox", { name: "Role" }).click();
+    await expect.element(page.getByRole("listbox")).toBeVisible();
+  },
 };
 
 /** What a person can point at, press or reach with the keyboard. */
@@ -256,6 +270,7 @@ async function shown(scene: string, width: number) {
   await page.viewport(width, 900);
   onTestFinished(() => page.viewport(414, 896));
   const screen = await render(SCENES[scene]?.());
+  await OPENED[scene]?.();
   await commands.pointerAway();
   return screen;
 }
@@ -295,35 +310,41 @@ for (const scene of Object.keys(SCENES)) {
     ).toMatchFileSnapshot(`./__computed__/${scene}.rest.${scheme}.txt`);
   });
 
-  test(`${scene}: each control hovered, focused from the keyboard, and held down`, async () => {
-    await shown(scene, 1280);
-    const count = document.body.querySelectorAll(CONTROLS).length;
-    // A state's lines are those it changes from the scene at rest.
-    const rest = read(document.body, LOOK);
-    cleanup();
-    const states: string[] = [];
-    for (let at = 0; at < count; at++) {
-      for (const state of ["hover", "focus-visible", "active"] as const) {
-        await shown(scene, 1280);
-        const control = document.body.querySelectorAll(CONTROLS)[at];
-        if (!(control instanceof HTMLElement) || control.getClientRects().length === 0) {
+  // An open menu or list holds the page's focus and pointer, so its scene is read at rest alone.
+  test.skipIf(scene in OPENED)(
+    `${scene}: each control hovered, focused from the keyboard, and held down`,
+    async () => {
+      await shown(scene, 1280);
+      const count = document.body.querySelectorAll(CONTROLS).length;
+      // A state's lines are those it changes from the scene at rest.
+      const rest = read(document.body, LOOK);
+      cleanup();
+      const states: string[] = [];
+      for (let at = 0; at < count; at++) {
+        for (const state of ["hover", "focus-visible", "active"] as const) {
+          await shown(scene, 1280);
+          const control = document.body.querySelectorAll(CONTROLS)[at];
+          if (!(control instanceof HTMLElement) || control.getClientRects().length === 0) {
+            cleanup();
+            continue;
+          }
+          control.dataset.probe = "";
+          if (state === "hover") await commands.pointAt("[data-probe]");
+          if (state === "focus-visible") {
+            await userEvent.keyboard("{Shift}");
+            control.focus();
+          }
+          if (state === "active") await commands.pointAt("[data-probe]", true);
+          delete control.dataset.probe;
+          await frames();
+          states.push(`# ${pathOf(control)} ${state}`, unlike(read(control, LOOK), rest));
+          if (state === "active") await commands.pointAt("");
           cleanup();
-          continue;
         }
-        control.dataset.probe = "";
-        if (state === "hover") await commands.pointAt("[data-probe]");
-        if (state === "focus-visible") {
-          await userEvent.keyboard("{Shift}");
-          control.focus();
-        }
-        if (state === "active") await commands.pointAt("[data-probe]", true);
-        delete control.dataset.probe;
-        await frames();
-        states.push(`# ${pathOf(control)} ${state}`, unlike(read(control, LOOK), rest));
-        if (state === "active") await commands.pointAt("");
-        cleanup();
       }
-    }
-    await expect(file(states)).toMatchFileSnapshot(`./__computed__/${scene}.states.${scheme}.txt`);
-  });
+      await expect(file(states)).toMatchFileSnapshot(
+        `./__computed__/${scene}.states.${scheme}.txt`,
+      );
+    },
+  );
 }

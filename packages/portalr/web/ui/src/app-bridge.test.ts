@@ -198,7 +198,9 @@ test("a state past its limit is refused before anything is written", async () =>
 const SANDBOX = { name: "the sandbox's window" };
 
 /** A bridge over a scripted host, and what it posted. */
-function bridged(answers: { ask?: boolean; submitted?: string | null } = {}) {
+function bridged(
+  answers: { ask?: boolean; submitted?: string | null; submitsNothing?: string } = {},
+) {
   const posted: JsonObject[] = [];
   const asked: unknown[] = [];
   const opened: string[] = [];
@@ -212,6 +214,7 @@ function bridged(answers: { ask?: boolean; submitted?: string | null } = {}) {
       return Promise.resolve(answers.ask ?? true);
     },
     submit: () => Promise.resolve(answers.submitted === undefined ? "sub_1" : answers.submitted),
+    submitsNothing: () => answers.submitsNothing,
     open: (url) => opened.push(url),
     resize: (height) => sized.push(height),
     quieted: () => {
@@ -308,6 +311,15 @@ test("a submission is sent only once the person confirms it, and said if it wasn
   const refused = bridged({ submitted: null });
   await refused.hear(call(1));
   expect(refused.posted[0]).toMatchObject({ result: { isError: true } });
+});
+
+test("where nothing is submitted, as in a preview, the app is told so before anyone is asked", async () => {
+  const preview = bridged({ submitsNothing: "A preview sends nothing." });
+  await preview.hear(request(1, "tools/call", { name: "submit", arguments: { values: { a: 1 } } }));
+  expect(preview.asked).toEqual([]);
+  expect(preview.posted[0]).toMatchObject({
+    result: { isError: true, content: [{ text: "A preview sends nothing." }] },
+  });
 });
 
 test("a link opens only once the person confirms it, and only a web or mail address", async () => {

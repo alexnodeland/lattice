@@ -1,5 +1,5 @@
 import type { GrammarState, ThemedToken } from "@shikijs/core";
-import { Fragment, type ReactNode, useRef } from "react";
+import { Fragment, type ReactNode, useMemo, useRef } from "react";
 import { cn } from "./cn";
 import { type Language, languageNamed } from "./languages";
 import { useOnDemand } from "./on-demand";
@@ -39,7 +39,8 @@ const FONT_STYLES = [
   [8, "line-through"],
 ] as const;
 
-function Token({ token }: { token: ThemedToken }) {
+/** A token of highlighted code, in its colour and its font style. */
+export function Token({ token }: { token: ThemedToken }) {
   const style = token.fontStyle ?? 0;
   return (
     // The colour is a custom property's name, which tokens.css sets, given through the CSS object
@@ -102,5 +103,19 @@ export function useHighlighted(code: string, name: string, complete: boolean): R
       {so.lines.length > 0 && arriving && "\n"}
       {arriving}
     </>
+  );
+}
+
+/**
+ * Whole code, highlighted line by line, for a view that numbers its lines: each line's tokens, or
+ * null while its language isn't one `ui` highlights, its grammar is loading, or the code is longer
+ * than is highlighted. Tokenized once for each code.
+ */
+export function useHighlightedLines(code: string, name: string): readonly ThemedToken[][] | null {
+  const language = languageNamed(name);
+  const tokenize = useOnDemand(language && tokenizerOf(language));
+  return useMemo(
+    () => (tokenize && code.length <= LONGEST ? tokenize(code).lines : null),
+    [tokenize, code],
   );
 }

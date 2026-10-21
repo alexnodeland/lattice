@@ -199,6 +199,7 @@ erDiagram
 - **Messages are events, not entities** ([ADR-0037](adr/0037-feedback-targets-and-evaluators.md)). Each workspace also records the message ids it has used, so core can refuse a message id that is already used without reading the log ([ADR-0045](adr/0045-a-message-id-is-used-once.md)).
 - **Model history** (pydantic-ai `ModelMessage`s, serialized with `ModelMessagesTypeAdapter`) is stored per thread next to the log, not reconstructed from it.
 - **Trace links.** A run records the OpenTelemetry trace id of each attempt (`Run.trace_ids`, from the `trace_id` of each `run_started`), since a run that pauses and resumes runs once per attempt. A revision records the trace it was committed in (`Revision.trace_id`), stamped by the workspace, and an envelope the W3C trace context of the span it was committed in (`traceparent`, as on reflexr's envelopes). They let feedback on a turn or an artifact version find the trace it is about, and what an event causes elsewhere link back to it. All are stored in JSON, so they need no schema change ([ADR-0033](adr/0033-trace-links-on-runs-and-revisions.md)).
+- **Dated revisions.** A revision records when it was committed (`Revision.at`): the `ts` of the events committed with it, stamped by the storage as it saves them (`dated`, beside `seal`). Like the trace links it is stored in the revision's JSON, so a revision saved before it has none ([portalr ADR-0054](../portalr/adr/0054-readable-revisions.md)).
 
 ## The write path
 

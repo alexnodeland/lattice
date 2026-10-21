@@ -15,13 +15,20 @@ export interface Change {
 }
 
 /**
- * How far jsdiff looks before it gives up: an edit of more than this many words or lines, or a
- * comparison of more than this many milliseconds, is too large to compare (portalr ADR-0017).
+ * How far jsdiff looks before it gives up: an edit of more than this many words or lines is too
+ * large to compare (portalr ADR-0017). Bounded by size alone, never by time, so the same versions
+ * are compared alike on every machine (portalr ADR-0054).
  */
-export const BOUND = { maxEditLength: 2000, timeout: 200 } as const;
+export const BOUND = { maxEditLength: 2000 } as const;
+
+/** The longest text compared, in characters: either version longer is too large to compare. */
+export const LONGEST = 200_000;
 
 /** The changes that make `after` from `before`, in order; null if they are too large to find. */
 export function changes(before: string, after: string, by: Granularity): Change[] | null {
+  if (before.length > LONGEST || after.length > LONGEST) {
+    return null;
+  }
   const parts = by === "words" ? diffWords(before, after, BOUND) : diffLines(before, after, BOUND);
   if (parts === undefined) {
     return null;

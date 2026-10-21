@@ -58,8 +58,11 @@ Then("they see the page {string}", async ({ page }, title: string) => {
 Then(
   "they see the workspaces {string} and {string}",
   async ({ page }, one: string, other: string) => {
-    // Each workspace is a row whose own link is its name; the links to its areas are in a list of their own.
-    const workspaces = page.getByRole("list", { name: "Workspaces" }).locator(":scope > li > a");
+    // Each workspace is a row whose title is a link with its name; the links to its areas are at
+    // the row's end, in a list of their own.
+    const workspaces = page
+      .getByRole("list", { name: "Workspaces" })
+      .locator(":scope > li > div:first-child a");
     await expect(workspaces).toHaveText([one, other]);
   },
 );

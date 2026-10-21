@@ -10,7 +10,13 @@ import { useWorkspace, WorkspaceAddons, WorkspaceStreams } from "../../../../../
  * and the account. Integrations that can't be read are their defaults, never a failed page.
  */
 export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace")({
-  head: ({ params }) => ({ meta: [{ title: `${params.workspace} · ${params.tenant} · portalr` }] }),
+  head: ({ params, match }) => ({
+    meta: [
+      {
+        title: match.context.title(`${params.workspace} · ${params.tenant}`),
+      },
+    ],
+  }),
   loader: ({ context, params }) => {
     // Started, not waited on: the page opens on each integration's default while grantr answers.
     void context.queryClient.prefetchQuery(

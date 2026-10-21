@@ -24,7 +24,7 @@
 
 The foundation PR (#452) departs from this decision as [lattice RFC-0007](../../rfcs/0007-portalr-brand-kits.md#foundation-pr-as-built) lists: derived colours stay `color-mix()` in `base.css` until the loader PR computes them; the literal-value test exempts `tokens.css`, `base.css` and `styles.css`; the corner and shadow scales are as wide as today's values; some component tokens are literals; colour ramps come later.
 
-The loader PR (#519) departs from the decision above as RFC-0007's "Loader PR as built" lists: `brand.css` comes after the UI's stylesheet, and what colour-blind mode swaps is declared outside it; the pair manifest names a backdrop for clear colours; faces are checked by header, with the browser's sanitiser as the real defence; nothing in the UIs reads the `config.json` block yet; and the chrome tokens, presets and `oklch()` are not built.
+The loader PR (#519) departs from the decision above as RFC-0007's "Loader PR as built" lists: `brand.css` comes after the UI's stylesheet, and what colour-blind mode swaps is declared outside it; the pair manifest names a backdrop for clear colours; faces are checked by header, with the browser's sanitiser as the real defence; the UIs read the `config.json` block, after the loader, for the header's mark and name and the sign-in words; and the chrome tokens, presets and `oklch()` are not built.
 
 ## Options considered
 

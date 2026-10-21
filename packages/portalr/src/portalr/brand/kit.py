@@ -125,7 +125,7 @@ class Font(BaseModel):
 
     model_config = ConfigDict(frozen=True, extra="forbid")
     family: Annotated[str, StringConstraints(pattern=_FAMILY.pattern)]
-    files: tuple[FontFile, ...]
+    files: Annotated[tuple[FontFile, ...], Field(min_length=1, max_length=FONT_FILES)]
     licence: Licence
 
 
@@ -140,7 +140,7 @@ class Brand(BaseModel):
     identity: Identity
     copy_: Words = Field(default=Words(), alias="copy")
     assets: Assets
-    fonts: tuple[Font, ...] = ()
+    fonts: Annotated[tuple[Font, ...], Field(max_length=FONT_FILES)] = ()
 
 
 @dataclass(frozen=True)
@@ -288,17 +288,17 @@ def svg_faults(name: str, data: bytes) -> list[str]:
     faults: list[str] = []
     for element in root.iter():
         if element.tag not in SVG_ELEMENTS:
-            faults.append(f"{name}: <{element.tag}> isn't allowed in a mark")
+            faults.append(f"{name}: <{element.tag!r}> isn't allowed in a mark")
         for attribute, value in element.attrib.items():
             if attribute not in SVG_ATTRIBUTES:
-                faults.append(f"{name}: the attribute {attribute} isn't allowed in a mark")
+                faults.append(f"{name}: the attribute {attribute!r} isn't allowed in a mark")
             if "\\" in value:
-                faults.append(f"{name}: {attribute} holds a backslash")
+                faults.append(f"{name}: {attribute!r} holds a backslash")
             lowered = value.lower()
             if ("url" in lowered or ":" in value) and not (
                 _FRAGMENT.fullmatch(value.strip()) or attribute in {"viewBox", "d", "points"}
             ):
-                faults.append(f"{name}: {attribute} names something outside the mark")
+                faults.append(f"{name}: {attribute!r} names something outside the mark")
     return faults
 
 
@@ -356,7 +356,7 @@ def _fonts(kit: Path, brand: Brand, files: dict[str, bytes], faults: list[str]) 
     """Each face's files, checked as WOFF2 within the caps, and its ``@font-face`` rules."""
     rules: list[str] = []
     total = 0
-    if sum(len(font.files) for font in brand.fonts) > FONT_FILES:
+    if len(brand.fonts) > FONT_FILES or sum(len(f.files) for f in brand.fonts) > FONT_FILES:
         faults.append(f"fonts: a kit brings {FONT_FILES} face files at most")
         return rules
     for font in brand.fonts:
@@ -364,7 +364,7 @@ def _fonts(kit: Path, brand: Brand, files: dict[str, bytes], faults: list[str]) 
             faults.append(f"{font.family}: its licence is one of {', '.join(sorted(LICENCES))}")
         if not font.licence.file.endswith(".txt"):
             faults.append(f"{font.licence.file}: a licence is a .txt file")
-        else:
+        elif font.licence.file not in files:
             licence = _file(kit, font.licence.file, faults, LICENCE_BYTES)
             if licence is not None:
                 total += len(licence)
@@ -391,6 +391,12 @@ def _fonts(kit: Path, brand: Brand, files: dict[str, bytes], faults: list[str]) 
     return rules
 
 
+def _said(part: str | int) -> str:
+    """A part of a path into brand.json, as a log may print it: a name as it is, else its repr."""
+    text = str(part)
+    return text if re.fullmatch(r"[A-Za-z0-9_$-]{1,64}", text) else repr(text)
+
+
 def load(kit: Path) -> Kit:
     """Read a kit and check all of it: its brand.json, its tokens, its marks and its faces.
 
@@ -409,10 +415,12 @@ def load(kit: Path) -> Kit:
         brand = Brand.model_validate(raw)
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
         raise BrandError(f"brand.json: not JSON in UTF-8 ({error})") from error
+    except RecursionError:
+        raise BrandError("brand.json: nested too deep") from None
     except ValidationError as error:
         raise BrandError(
             "\n".join(
-                f"brand.json: {'.'.join(map(str, e['loc']))}: {e['msg']}" for e in error.errors()
+                f"brand.json: {'.'.join(map(_said, e['loc']))}: {e['msg']}" for e in error.errors()
             )
         ) from error
     for text in (

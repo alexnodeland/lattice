@@ -38,7 +38,9 @@ const named = (key: string, names: Names) => {
  * the last to save wins (portalr ADR-0024).
  */
 export const Route = createFileRoute("/_signed/t/$tenant/access/groups")({
-  head: ({ params }) => ({ meta: [{ title: `Groups · ${params.tenant} · portalr admin` }] }),
+  head: ({ params, match }) => ({
+    meta: [{ title: match.context.title(`Groups · ${params.tenant}`) }],
+  }),
   beforeLoad: ({ context, params }) => opening(context, params.tenant, "grantr:manage_groups"),
   loader: async ({ context, params }) => {
     const { queries, queryClient } = context;

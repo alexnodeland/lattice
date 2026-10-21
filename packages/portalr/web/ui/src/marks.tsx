@@ -5,6 +5,7 @@
  * gets its file's colours. Both are pictures of a name the link around them gives.
  */
 
+import { BrandMark, brandName, useBrand } from "./brand";
 import { cn } from "./cn";
 
 /** Which UI a mark is for. */
@@ -41,8 +42,12 @@ function Sides({ ui }: { ui: Ui }) {
   ));
 }
 
-/** The mark alone, for 24 pixels and under. */
+/** The mark alone, for 24 pixels and under: the kit's, where the deployment has one. */
 export function Mark({ ui = "app", className }: { ui?: Ui; className?: string }) {
+  const brand = useBrand();
+  if (brand) {
+    return <BrandMark brand={brand} className={cn("size-7", className)} />;
+  }
   return (
     <svg
       viewBox="0 0 64 64"
@@ -55,8 +60,23 @@ export function Mark({ ui = "app", className }: { ui?: Ui; className?: string })
   );
 }
 
-/** The mark and the wordmark, set as the brand's lockup. */
+/**
+ * The mark and the wordmark, set as the brand's lockup; where the deployment has a kit, its mark
+ * and the product's name in the UI, in words.
+ */
 export function Lockup({ ui = "app", className }: { ui?: Ui; className?: string }) {
+  const brand = useBrand();
+  if (brand) {
+    return (
+      <span className={cn("inline-flex h-7 min-w-0 max-w-full items-center gap-2", className)}>
+        <BrandMark brand={brand} className="size-7" />
+        {/* A long name is cut to the room, and said whole by the link around it. */}
+        <span dir="auto" className="min-w-0 truncate font-semibold text-fg text-lg">
+          {brandName(brand, ui)}
+        </span>
+      </span>
+    );
+  }
   return (
     <svg
       viewBox="0 0 294.32 79.39"

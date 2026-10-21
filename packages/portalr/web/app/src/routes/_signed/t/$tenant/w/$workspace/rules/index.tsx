@@ -24,7 +24,9 @@ const ACTIONS = ["reflexr:install_rule"] as const;
  * schedules that tick into it; and, where grantr allows, a stored rule installed from its JSON.
  */
 export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/rules/")({
-  head: ({ params }) => ({ meta: [{ title: `Rules · ${params.workspace} · portalr` }] }),
+  head: ({ params, match }) => ({
+    meta: [{ title: match.context.title(`Rules · ${params.workspace}`) }],
+  }),
   loader: ({ context, params }) =>
     Promise.all([
       context.queryClient.ensureQueryData(

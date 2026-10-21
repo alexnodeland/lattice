@@ -5,7 +5,9 @@ import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 
 /** Where a signed-in person lands: their one tenant, a choice of several, or no access. */
 export const Route = createFileRoute("/_signed/")({
-  head: () => ({ meta: [{ title: "Tenants · portalr" }] }),
+  head: ({ match }) => ({
+    meta: [{ title: match.context.title("Tenants") }],
+  }),
   loader: async ({ context }) => {
     const memberships = context.queries.grantr.memberships(context.user);
     const lands = landing(await context.queryClient.ensureQueryData(memberships));

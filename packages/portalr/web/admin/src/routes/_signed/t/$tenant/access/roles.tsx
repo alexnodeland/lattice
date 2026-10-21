@@ -25,7 +25,9 @@ const WORDS = {
  * once confirmed. grantr replaces a role's actions whole: the last to save wins (ADR-0025).
  */
 export const Route = createFileRoute("/_signed/t/$tenant/access/roles")({
-  head: ({ params }) => ({ meta: [{ title: `Roles · ${params.tenant} · portalr admin` }] }),
+  head: ({ params, match }) => ({
+    meta: [{ title: match.context.title(`Roles · ${params.tenant}`) }],
+  }),
   beforeLoad: ({ context, params }) => opening(context, params.tenant, "grantr:define_role"),
   loader: ({ context, params }) => {
     const { queries, queryClient } = context;

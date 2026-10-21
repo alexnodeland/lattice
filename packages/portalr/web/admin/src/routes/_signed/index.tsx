@@ -9,7 +9,9 @@ import { lastChoice } from "../../last";
  * for an operator with none, a choice of those, or no access.
  */
 export const Route = createFileRoute("/_signed/")({
-  head: () => ({ meta: [{ title: "Tenants · portalr admin" }] }),
+  head: ({ match }) => ({
+    meta: [{ title: match.context.title("Tenants") }],
+  }),
   loader: async ({ context }) => {
     const { queries, queryClient, user } = context;
     const [memberships, every] = await Promise.all([

@@ -2,6 +2,7 @@ import { Dialog } from "@base-ui/react/dialog";
 import { useRender } from "@base-ui/react/use-render";
 import { Menu as MenuGlyph, X } from "lucide-react";
 import { type MouseEvent, type ReactElement, type ReactNode, useEffect, useState } from "react";
+import { brandName, useBrand } from "./brand";
 import { backdrop } from "./dialog";
 import { Icon } from "./icon";
 import { Lockup, Mark, UI_NAME, type Ui } from "./marks";
@@ -12,11 +13,12 @@ const WIDE = "(min-width: 1024px)";
 
 /** The mark, as a link home named for the UI. */
 function Home({ ui, home, children }: { ui: Ui; home: ReactElement; children: ReactNode }) {
+  const brand = useBrand();
   return useRender({
     defaultTagName: "a",
     render: home,
     props: {
-      "aria-label": UI_NAME[ui],
+      "aria-label": brand ? brandName(brand, ui) : UI_NAME[ui],
       className:
         "inline-flex shrink-0 rounded-(--header-trigger-radius) outline-offset-(--focus-offset) focus-visible:outline-(length:--focus-width) focus-visible:outline-focus",
       children,

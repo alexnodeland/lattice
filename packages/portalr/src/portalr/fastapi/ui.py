@@ -111,6 +111,13 @@ def _brand(router: APIRouter, kit: Kit) -> None:
         return Response(data, media_type=TYPES[suffix], headers=headers)
 
 
+def _matches(asked: str | None, tag: str) -> bool:
+    """Whether an ``If-None-Match`` names this tag: ``*``, or a list, weak tags compared weakly."""
+    if asked is None:
+        return False
+    return any(each.strip().removeprefix("W/") in ("*", tag) for each in asked.split(","))
+
+
 class UnbrandableIndex(ValueError):
     """A built UI's index the kit can't be put in: it has no ``<title>`` or no ``</head>``."""
 
@@ -124,11 +131,12 @@ def branded(index: str, kit: Kit, ui: str) -> str:
     escaped, and placed as text, never read as a pattern.
 
     Raises:
-        UnbrandableIndex: If the index has no ``<title>`` or no ``</head>``.
+        UnbrandableIndex: If the index hasn't one ``<title>`` and one ``</head>``, as a comment or a
+            script holding either could put the kit where the page never reads it.
     """
     title = re.search(r"<title>[^<]*</title>", index)
-    if title is None or "</head>" not in index:
-        raise UnbrandableIndex(f"the {ui} UI's index has no <title> or no </head>")
+    if title is None or index.count("<title>") != 1 or index.count("</head>") != 1:
+        raise UnbrandableIndex(f"the {ui} UI's index has no single <title> and </head>")
     base = f"{MOUNT}/{kit.base}"
     name = html.escape(kit.brand.identity.admin if ui == "admin" else kit.brand.identity.app)
     light, dark = kit.theme
@@ -184,6 +192,6 @@ def _serve(
             return file(index, NO_CACHE)
         text, tag = page
         cached = {**headers, "Cache-Control": NO_CACHE, "ETag": tag}
-        if request.headers.get("if-none-match") == tag:
+        if _matches(request.headers.get("if-none-match"), tag):
             return Response(status_code=304, headers=cached)
         return Response(text, media_type="text/html; charset=utf-8", headers=cached)

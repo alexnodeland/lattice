@@ -4,12 +4,14 @@
 run against FreeCAD itself by its live tests.
 """
 
+import os
 import stat
 import sys
 import time
 from dataclasses import replace
 from pathlib import Path
 
+import anyio
 import pytest
 from pydantic import JsonValue
 
@@ -100,6 +102,23 @@ async def test_a_script_past_its_deadline_is_killed_with_the_call(cli: Path) -> 
         await script(cli).run(0.5, {"do": "hang"}, None, ".txt")
     assert failed.value.failure == "timeout"
     assert time.monotonic() - started < 5
+
+
+async def test_nothing_the_cli_leaves_in_its_group_outlives_the_call(cli: Path) -> None:
+    ran = await script(cli).run(10, {"do": "linger"}, None, ".txt", wanted={"lingering"})
+    lingering = int(ran.files["lingering"])
+    deadline = time.monotonic() + 5
+    while _alive(lingering):
+        assert time.monotonic() < deadline, f"{lingering} outlived the call"
+        await anyio.sleep(0.05)
+
+
+def _alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    return True
 
 
 async def test_it_starts_under_the_launcher(cli: Path, tmp_path: Path) -> None:

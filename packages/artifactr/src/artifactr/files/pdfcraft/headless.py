@@ -7,6 +7,7 @@ PdfCraft's server is the `commands` dialect's first: what is PdfCraft's own here
 document is made, which no command does headless, and how a document is read.
 """
 
+from collections.abc import Sequence
 from pathlib import Path
 from typing import ClassVar, override
 
@@ -49,15 +50,23 @@ class Subprocess(CommandsDialect):
         limit: The most bytes a file may hold, saved or its object streams inflated: 256 MiB by
             default.
         lookup: How long, in seconds, finding commands may take: 10 by default.
+        launcher: The command the CLI is started under, given the CLI and its arguments, such
+            as the worker's `Limits.launcher()`; none by default.
     """
 
     craft: ClassVar[Craft] = CRAFTS["pdfcraft"]
     extension: ClassVar[str] = ".pdf"
 
     def __init__(
-        self, cli: str | Path, *, version: str, limit: int = 256 << 20, lookup: float = 10.0
+        self,
+        cli: str | Path,
+        *,
+        version: str,
+        limit: int = 256 << 20,
+        lookup: float = 10.0,
+        launcher: Sequence[str] = (),
     ) -> None:
-        super().__init__(cli, version=version, limit=limit, lookup=lookup)
+        super().__init__(cli, version=version, limit=limit, lookup=lookup, launcher=launcher)
 
     @override
     async def open(self, server: Server, source: bytes | None) -> JsonValue:

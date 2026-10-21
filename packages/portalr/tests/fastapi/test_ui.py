@@ -96,6 +96,7 @@ async def test_config_names_supabase_the_surfaces_and_the_tools(client: httpx.As
         "people": False,
         "editors": {},
         "apps": None,
+        "brand": None,
     }
 
 

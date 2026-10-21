@@ -1,0 +1,168 @@
+{
+  "color": {
+    "paper": {
+      "$value": "#faf7f2"
+    },
+    "surface": {
+      "$value": "#fffdf9"
+    },
+    "fg": {
+      "$value": "#2b2a28"
+    },
+    "muted": {
+      "$value": "#5f5a52"
+    },
+    "line": {
+      "$value": "#e4ddd2"
+    },
+    "edge": {
+      "$value": "#8a8275"
+    },
+    "accent": {
+      "$value": "#2f6046"
+    },
+    "focus": {
+      "$value": "#2f6046"
+    }
+  },
+  "radius": {
+    "2": {
+      "$value": {
+        "value": 0.5,
+        "unit": "rem"
+      }
+    },
+    "3": {
+      "$value": {
+        "value": 0.75,
+        "unit": "rem"
+      }
+    },
+    "4": {
+      "$value": {
+        "value": 1,
+        "unit": "rem"
+      }
+    },
+    "5": {
+      "$value": {
+        "value": 1.25,
+        "unit": "rem"
+      }
+    },
+    "6": {
+      "$value": {
+        "value": 1.5,
+        "unit": "rem"
+      }
+    }
+  },
+  "shadow": {
+    "1": {
+      "$value": {
+        "color": {
+          "colorSpace": "srgb",
+          "components": [
+            0,
+            0,
+            0
+          ],
+          "hex": "#000000",
+          "alpha": 0
+        },
+        "offsetX": {
+          "value": 0,
+          "unit": "px"
+        },
+        "offsetY": {
+          "value": 0,
+          "unit": "px"
+        },
+        "blur": {
+          "value": 0,
+          "unit": "px"
+        }
+      }
+    },
+    "2": {
+      "$value": {
+        "color": {
+          "colorSpace": "srgb",
+          "components": [
+            0,
+            0,
+            0
+          ],
+          "hex": "#000000",
+          "alpha": 0
+        },
+        "offsetX": {
+          "value": 0,
+          "unit": "px"
+        },
+        "offsetY": {
+          "value": 0,
+          "unit": "px"
+        },
+        "blur": {
+          "value": 0,
+          "unit": "px"
+        }
+      }
+    },
+    "3": {
+      "$value": {
+        "color": {
+          "colorSpace": "srgb",
+          "components": [
+            0,
+            0,
+            0
+          ],
+          "hex": "#000000",
+          "alpha": 0
+        },
+        "offsetX": {
+          "value": 0,
+          "unit": "px"
+        },
+        "offsetY": {
+          "value": 0,
+          "unit": "px"
+        },
+        "blur": {
+          "value": 0,
+          "unit": "px"
+        }
+      }
+    }
+  },
+  "motion": {
+    "duration": {
+      "fast": {
+        "$value": {
+          "value": 0,
+          "unit": "ms"
+        }
+      },
+      "moderate": {
+        "$value": {
+          "value": 0,
+          "unit": "ms"
+        }
+      }
+    }
+  },
+  "font": {
+    "family": {
+      "sans": {
+        "$value": [
+          "Iowan Old Style",
+          "Georgia",
+          "ui-serif",
+          "serif"
+        ]
+      }
+    }
+  }
+}

@@ -1,6 +1,114 @@
 {
   "components": {
     "schemas": {
+      "Brand": {
+        "description": "The deployment's brand kit, as the UIs read it (lattice RFC-0007).\n\nWho it is, and where its stylesheet and marks are, each under a hash of the kit, relative to\nthe portal's mount.",
+        "properties": {
+          "copy": {
+            "$ref": "#/components/schemas/BrandCopy"
+          },
+          "favicon": {
+            "title": "Favicon",
+            "type": "string"
+          },
+          "hash": {
+            "title": "Hash",
+            "type": "string"
+          },
+          "identity": {
+            "$ref": "#/components/schemas/BrandIdentity"
+          },
+          "mark": {
+            "$ref": "#/components/schemas/BrandMarks"
+          },
+          "stylesheet": {
+            "title": "Stylesheet",
+            "type": "string"
+          }
+        },
+        "required": [
+          "hash",
+          "identity",
+          "copy",
+          "stylesheet",
+          "mark",
+          "favicon"
+        ],
+        "title": "Brand",
+        "type": "object"
+      },
+      "BrandCopy": {
+        "description": "The words a kit sets; each absent where the kit leaves portalr's.",
+        "properties": {
+          "signIn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signin"
+          },
+          "tagline": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tagline"
+          }
+        },
+        "title": "BrandCopy",
+        "type": "object"
+      },
+      "BrandIdentity": {
+        "description": "What the product is called: in the tab, the app's header, and admin's.",
+        "properties": {
+          "admin": {
+            "title": "Admin",
+            "type": "string"
+          },
+          "app": {
+            "title": "App",
+            "type": "string"
+          },
+          "product": {
+            "title": "Product",
+            "type": "string"
+          }
+        },
+        "required": [
+          "product",
+          "app",
+          "admin"
+        ],
+        "title": "BrandIdentity",
+        "type": "object"
+      },
+      "BrandMarks": {
+        "description": "A kit's header mark, in each scheme, by its path under the portal's mount.",
+        "properties": {
+          "dark": {
+            "title": "Dark",
+            "type": "string"
+          },
+          "light": {
+            "title": "Light",
+            "type": "string"
+          }
+        },
+        "required": [
+          "light",
+          "dark"
+        ],
+        "title": "BrandMarks",
+        "type": "object"
+      },
       "Comment": {
         "description": "What a person wrote, on which trace, in which workspace, and when.",
         "properties": {
@@ -56,6 +164,16 @@
               }
             ],
             "title": "Apps"
+          },
+          "brand": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Brand"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "editors": {
             "additionalProperties": {

@@ -1,0 +1,27 @@
+{
+  "color": {
+    "accent": {
+      "$value": "#0f6e6a"
+    },
+    "focus": {
+      "$value": "#0f6e6a"
+    },
+    "paper": {
+      "$value": "#f4f7f7"
+    }
+  },
+  "radius": {
+    "3": {
+      "$value": {
+        "value": 0.25,
+        "unit": "rem"
+      }
+    },
+    "4": {
+      "$value": {
+        "value": 0.375,
+        "unit": "rem"
+      }
+    }
+  }
+}

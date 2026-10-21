@@ -1,0 +1,16 @@
+{
+  "color": {
+    "accent": {
+      "$value": "#7fd8cf"
+    },
+    "focus": {
+      "$value": "#7fd8cf"
+    },
+    "paper": {
+      "$value": "#101818"
+    },
+    "on-accent": {
+      "$value": "#101818"
+    }
+  }
+}

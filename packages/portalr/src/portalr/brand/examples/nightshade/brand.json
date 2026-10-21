@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "name": "nightshade",
+  "identity": {
+    "product": "Nightshade",
+    "app": "Nightshade",
+    "admin": "Nightshade admin"
+  },
+  "copy": {
+    "tagline": "Ask, and it is drafted.",
+    "signIn": "Sign in to Nightshade"
+  },
+  "assets": {
+    "mark": {
+      "light": "assets/mark-light.svg",
+      "dark": "assets/mark-dark.svg"
+    },
+    "favicon": "assets/favicon.svg"
+  }
+}

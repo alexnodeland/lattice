@@ -206,6 +206,9 @@ async def _collect(shared: Shared, puts: list[Put], named: list[int]) -> None:
         assert (found is None) == ((artifact, digest) in doomed)
 
 
+# 100 examples: 2.3 s alone on PostgreSQL, 53 s with every core busy beside xdist's other
+# workers, near the minute a test may take (lattice ADR-0028). Five minutes.
+@pytest.mark.timeout(300)
 @settings(
     max_examples=100,
     deadline=None,

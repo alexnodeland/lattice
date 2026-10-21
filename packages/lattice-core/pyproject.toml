@@ -91,9 +91,10 @@ venv = ".venv"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = ["--strict-markers", "--strict-config", "-ra"]
-# A test that runs for a minute is stuck: fail it, with every thread's stack.
+# A test that runs for a minute is stuck: fail it with its stack, as a failure of its own, by
+# SIGALRM, so the xdist worker running it carries on (lattice ADR-0007).
 timeout = 60
-timeout_method = "thread"
+timeout_method = "signal"
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 filterwarnings = [

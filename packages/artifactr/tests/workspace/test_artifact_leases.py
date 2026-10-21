@@ -253,6 +253,9 @@ async def _agree(shared: Shared, steps: list[Step]) -> None:
         )
 
 
+# 100 examples: 4.5 s alone on PostgreSQL, 72 s with every core busy beside xdist's other
+# workers, past the minute a test may take (lattice ADR-0028). Five minutes.
+@pytest.mark.timeout(300)
 @settings(
     max_examples=100,
     deadline=None,

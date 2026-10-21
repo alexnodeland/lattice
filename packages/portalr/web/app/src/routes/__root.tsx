@@ -1,4 +1,4 @@
-import { Alert, failureSaid, Plain, TextLink } from "@portalr/ui";
+import { Alert, failureSaid, NewVersionOffer, Plain, TextLink } from "@portalr/ui";
 import {
   createRootRouteWithContext,
   type ErrorComponentProps,
@@ -13,6 +13,7 @@ export const Route = createRootRouteWithContext<Context>()({
   component: () => (
     <>
       <HeadContent />
+      <NewVersionOffer page={import.meta.env.BASE_URL} />
       <Outlet />
     </>
   ),

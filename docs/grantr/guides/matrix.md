@@ -30,6 +30,7 @@ An application's own, with its custom roles, is in its `access.md` ([Roles and g
 | `artifactr:read_workspaces` |  | ✓ | ✓ | ✓ | ✓ |  |  |  |  |
 | `artifactr:record` |  | ✓ | ✓ | ✓ |  | ✓ | ✓ |  |  |
 | `artifactr:respond_to_proposal` |  |  | ✓ | ✓ |  | ✓ | ✓ |  |  |
+| `artifactr:run_connected_code` |  |  | ✓ | ✓ |  | ✓ |  |  |  |
 | `artifactr:save_cursor` |  | ✓ |  |  |  |  |  |  |  |
 | `artifactr:set_focus` |  |  | ✓ | ✓ |  | ✓ | ✓ |  |  |
 | `artifactr:set_thread_mode` |  |  | ✓ | ✓ |  | ✓ | ✓ |  |  |

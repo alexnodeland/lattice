@@ -5,6 +5,7 @@ import { type MouseEvent, type ReactElement, type ReactNode, useEffect, useState
 import { backdrop } from "./dialog";
 import { Icon } from "./icon";
 import { Lockup, Mark, type Ui } from "./marks";
+import { SkipLink } from "./skip-link";
 
 /** The UI's name, which its mark pictures. */
 const NAME: Record<Ui, string> = { app: "portalr", admin: "portalr admin" };
@@ -77,12 +78,7 @@ export function AppShell({
       data-density={ui === "admin" ? "compact" : undefined}
       className="min-h-dvh lg:grid lg:grid-cols-[15.5rem_minmax(0,1fr)]"
     >
-      <a
-        href="#main"
-        className="fixed top-2 left-2 z-50 -translate-y-16 rounded-md bg-surface px-3 py-2 font-semibold text-sm focus:translate-y-0 focus-visible:outline-(length:--focus-width) focus-visible:outline-focus"
-      >
-        Skip to content
-      </a>
+      <SkipLink />
       <header className="sticky top-0 z-20 flex items-center gap-1 border-line border-b bg-surface px-3 py-2 lg:h-dvh lg:flex-col lg:items-stretch lg:gap-4 lg:border-r lg:border-b-0 lg:p-3">
         <Dialog.Root open={open} onOpenChange={setOpen}>
           <Dialog.Trigger className={`${button} lg:hidden`}>

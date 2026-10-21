@@ -78,6 +78,7 @@ function Runs() {
     status: <RunStatus status={run.status} />,
     title: (
       <TextLink
+        variant="subtle"
         render={
           <Link
             to="/t/$tenant/w/$workspace/threads/$thread"

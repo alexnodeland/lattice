@@ -842,6 +842,17 @@
       "duration": {
         "$value": "{motion.duration.moderate}"
       }
+    },
+    "tabs": {
+      "pad-x": {
+        "$value": "{space.3}"
+      },
+      "pad-y": {
+        "$value": "{space.2}"
+      },
+      "indicator": {
+        "$value": "{border.width.2}"
+      }
     }
   }
 }

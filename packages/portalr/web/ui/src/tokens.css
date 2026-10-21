@@ -250,4 +250,9 @@
   --drawer-width: 19rem;
   --drawer-shadow: var(--shadow-3);
   --drawer-duration: var(--duration-moderate);
+
+  /* Tabs: a tab's padding, and the width of the line under the current one. */
+  --tabs-pad-x: var(--space-3);
+  --tabs-pad-y: var(--space-2);
+  --tabs-indicator: var(--border-width-2);
 }

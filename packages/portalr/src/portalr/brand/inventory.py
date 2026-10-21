@@ -291,6 +291,14 @@ COMPONENTS: tuple[Group, ...] = (
             Row("component.drawer.duration", "--drawer-duration", "duration"),
         ),
     ),
+    Group(
+        "Tabs: a tab's padding, and the width of the line under the current one.",
+        (
+            Row("component.tabs.pad-x", "--tabs-pad-x", "dimension"),
+            Row("component.tabs.pad-y", "--tabs-pad-y", "dimension"),
+            Row("component.tabs.indicator", "--tabs-indicator", "dimension"),
+        ),
+    ),
 )
 """Each component's tokens, defaulting to a role or a primitive (portalr ADR-0056)."""
 

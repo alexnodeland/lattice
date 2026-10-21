@@ -31,7 +31,7 @@ export function TabLink({
     props: mergeProps<"a">(
       {
         className:
-          "-mb-px shrink-0 whitespace-nowrap border-transparent border-b-2 px-3 py-2 font-medium text-muted text-sm -outline-offset-(--focus-offset) hover:text-fg focus-visible:outline-(length:--focus-width) focus-visible:outline-focus aria-[current=page]:border-accent aria-[current=page]:text-fg",
+          "-mb-px shrink-0 whitespace-nowrap border-transparent border-b-(length:--tabs-indicator) px-(--tabs-pad-x) py-(--tabs-pad-y) font-medium text-muted text-sm -outline-offset-(--focus-offset) hover:text-fg focus-visible:outline-(length:--focus-width) focus-visible:outline-focus aria-[current=page]:border-accent aria-[current=page]:text-fg",
         children,
       },
       props,

@@ -1,0 +1,95 @@
+"""The default brand kit, and the grammar a kit's tokens are read by (lattice RFC-0007)."""
+
+import json
+from pathlib import Path
+
+import pytest
+
+from portalr.brand import DEFAULT, BrandError, compile_kit
+from portalr.brand.inventory import ROWS
+
+TOKENS = Path(__file__).parent.parent / "web" / "ui" / "src" / "tokens.css"
+
+
+def test_tokens_css_is_the_default_kit_compiled() -> None:
+    """The UIs' tokens are generated: `moon run portalr:brand` writes them again after a change."""
+    assert TOKENS.read_text() == compile_kit(), "run `moon run portalr:brand`"
+
+
+def test_the_default_kit_sets_every_token_and_no_other() -> None:
+    light = json.loads((DEFAULT / "tokens.light.json").read_text())
+
+    def paths(tree: dict, at: str = "") -> set[str]:
+        found: set[str] = set()
+        for key, node in tree.items():
+            if key.startswith("$"):
+                continue
+            path = f"{at}.{key}" if at else key
+            found |= {path} if "$value" in node else paths(node, path)
+        return found
+
+    assert paths(light) == set(ROWS)
+
+
+def kit(tmp_path: Path, light: dict, dark: dict | None = None) -> Path:
+    (tmp_path / "tokens.light.json").write_text(json.dumps(light))
+    if dark is not None:
+        (tmp_path / "tokens.dark.json").write_text(json.dumps(dark))
+    return tmp_path
+
+
+def test_a_kit_sets_only_what_it_changes(tmp_path: Path) -> None:
+    css = compile_kit(kit(tmp_path, {"radius": {"3": {"$value": {"value": 0, "unit": "rem"}}}}))
+    assert "  --radius-3: 0;" in css
+    assert "  --paper: light-dark(#f7f4fb, #17111f);" in css
+
+
+def test_light_holds_in_dark_unless_dark_says_otherwise(tmp_path: Path) -> None:
+    """A kit's light tokens are both schemes'; its dark file holds only what differs."""
+    css = compile_kit(
+        kit(
+            tmp_path,
+            {"color": {"paper": {"$value": "#ffffff"}, "surface": {"$value": "#fefefe"}}},
+            {
+                "color": {"surface": {"$value": "#000000"}},
+                "radius": {"2": {"$value": {"value": 1, "unit": "px"}}},
+            },
+        )
+    )
+    assert "  --paper: #ffffff;" in css
+    assert "  --surface: light-dark(#fefefe, #000000);" in css
+    assert '  :root:not([data-theme="light"]) {\n    --radius-2: 1px;' in css
+    assert ':root[data-theme="dark"] {\n  --radius-2: 1px;' in css
+
+
+def test_an_alias_is_its_tokens_custom_property(tmp_path: Path) -> None:
+    css = compile_kit(kit(tmp_path, {"color": {"accent": {"$value": "{color.chart.3}"}}}))
+    assert "  --accent: var(--chart-3);" in css
+
+
+@pytest.mark.parametrize(
+    ("light", "fault"),
+    [
+        ({"color": {"nope": {"$value": "#ffffff"}}}, "color.nope: no token has this path"),
+        ({"color": {"paper": {"$value": "red"}}}, "color.paper: a colour is #rrggbb"),
+        ({"color": {"paper": {"$value": "#fff;}"}}}, "color.paper: a colour is #rrggbb"),
+        ({"color": {"paper": {"$value": "{radius.2}"}}}, "is a dimension, not a color"),
+        ({"color": {"paper": {"$value": "{color.nope}"}}}, "names no token"),
+        ({"radius": {"2": {"$value": {"value": 1, "unit": "em"}}}}, "is in rem or px"),
+        ({"font": {"family": {"sans": {"$value": ['A"; } x {', "serif"]}}}}, "more than letters"),
+        ({"font": {"family": {"sans": {"$value": ["Inter"]}}}}, "ends in a generic family"),
+        ({"motion": {"ease": {"in": {"$value": [2, 0, 1, 1]}}}}, "x values are from 0 to 1"),
+        ({"font": {"weight": {"medium": {"$value": 550}}}}, "a weight is 100 to 900"),
+    ],
+)
+def test_a_kit_the_grammar_refuses(tmp_path: Path, light: dict, fault: str) -> None:
+    with pytest.raises(BrandError, match=fault.replace("(", r"\(").replace(")", r"\)")):
+        compile_kit(kit(tmp_path, light))
+
+
+def test_an_alias_cycle_is_refused(tmp_path: Path) -> None:
+    light = {
+        "color": {"paper": {"$value": "{color.surface}"}, "surface": {"$value": "{color.paper}"}}
+    }
+    with pytest.raises(BrandError, match="aliases deep, or a cycle"):
+        compile_kit(kit(tmp_path, light))

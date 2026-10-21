@@ -1,21 +1,81 @@
 /*
- * portalr's tokens (lattice ADR-0014), as CSS custom properties. The brand's inks keep their
- * package's name; the roles the components use are brand-neutral, so a screen can re-skin them,
- * as in `[data-brand="grantr"] { --accent: var(--grantr-gold) }`. Each token is one light-dark()
- * pair: the system's scheme chooses, unless the page sets data-theme="light" or "dark".
- * styles.css hands the roles to Tailwind's @theme.
+ * Generated from portalr's default brand kit (src/portalr/brand/default) by `moon run
+ * portalr:brand`: edit the kit, not this file (lattice RFC-0007, portalr ADR-0056).
+ * What a kit can't set, and what is mixed from these, is in base.css.
  */
 
 :root {
-  color-scheme: light dark;
-
-  /* The inks: the mark's three plates, and the overprint where they cross. */
+  /* The inks: the mark's three plates, and the overprint where they cross (lattice ADR-0014). */
   --portalr-cyan: light-dark(#009fe3, #38c6f4);
   --portalr-magenta: light-dark(#e4007c, #ff4da6);
   --portalr-yellow: light-dark(#ffc400, #ffd54a);
   --portalr-violet: light-dark(#6b2fa0, #e2ccf5);
 
-  /* The roles. */
+  /* Space: steps of a quarter rem, and a hairline and a half step below them. */
+  --space-px: 1px;
+  --space-half: 0.125rem;
+  --space-1: 0.25rem;
+  --space-1-5: 0.375rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+
+  /* Corners, from square to round: each a component's radius defaults to one of these. */
+  --radius-0: 0;
+  --radius-1: 0.125rem;
+  --radius-2: 0.25rem;
+  --radius-3: 0.375rem;
+  --radius-4: 0.5rem;
+  --radius-5: 0.75rem;
+  --radius-6: 1rem;
+  --radius-full: 2147483647px;
+
+  /* Type: the faces, the sizes, the weights (none past 600, ADR-0039) and the leading. */
+  --font-family-sans: "Schibsted Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-family-mono: "Fragment Mono", ui-monospace, monospace;
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.5rem;
+  --weight-normal: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --leading-tight: 1.25;
+  --leading-snug: 1.375;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.625;
+
+  /* Edges: a hairline, and the focus ring's width. */
+  --border-width-1: 1px;
+  --border-width-2: 2px;
+
+  /*
+   * Elevation: a card's, a menu's or a tooltip's, and a dialog's or a drawer's (ADR-0039), each
+   * cast in --shadow-color.
+   */
+  --shadow-1: 0 1px 2px var(--shadow-color);
+  --shadow-2: 0 4px 12px -2px var(--shadow-color), 0 1px 3px var(--shadow-color);
+  --shadow-3: 0 16px 40px -8px var(--shadow-color), 0 2px 6px var(--shadow-color);
+
+  /*
+   * Motion: how long a change takes, and how it eases; a placeholder's pulse is a loop (portalr
+   * ADR-0057).
+   */
+  --duration-fast: 150ms;
+  --duration-moderate: 200ms;
+  --duration-pulse: 2000ms;
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-pulse: cubic-bezier(0.4, 0, 0.6, 1);
+
+  /*
+   * The roles the components use: the paper, a surface on it, the text, the quiet text, a line,
+   * and the working colour and what is written on it.
+   */
   --paper: light-dark(#f7f4fb, #17111f);
   --surface: light-dark(#ffffff, #1f1829);
   --fg: light-dark(#1c1d26, #f1eef6);
@@ -23,58 +83,39 @@
   --line: light-dark(#dcd5e6, #3a3247);
   --accent: var(--portalr-violet);
   --on-accent: light-dark(#ffffff, #17111f);
-  /* The focus ring: the brand's violet in both schemes, lighter in the dark, never another ink. */
+
+  /*
+   * The focus ring: the brand's violet in both schemes, lighter in the dark, never another ink. A
+   * control's boundary: 3:1 or more on every surface, as WCAG asks of one.
+   */
   --focus: light-dark(#6b2fa0, #a77bdf);
-  /* A control's boundary: 3:1 or more on every surface, as WCAG asks of one. */
   --edge: light-dark(#857a97, #7d7091);
+
   /*
    * Status, as marks and never as text: a rose red for what failed, was dead-lettered or is an
-   * error, and a gold for what is retrying or a warning; what succeeded stays neutral (--muted).
-   * Each is 3:1 or more on the paper and the surface, the pair differ in lightness as well as hue,
-   * and each is 20 or more, to CIEDE2000, from the other and from the chart accent, to a reader who
-   * sees every colour and to one who does not (a token test holds all of it). A status is always
-   * a shape and a word as well (portalr ADR-0039).
+   * error, and a gold for what is retrying or a warning; what succeeded stays neutral. Each is 3:1
+   * or more on the paper and the surface, the pair differ in lightness as well as hue, and each is
+   * 20 or more, to CIEDE2000, from the other and from the chart accent, to every reader (portalr
+   * ADR-0039). What a destructive action is in: the same red.
    */
   --status-failed: light-dark(#8a0f2c, #f391b1);
   --status-warn: light-dark(#9c821c, #f9e890);
-  /* What a destructive action is in: the same red, so a failed run and a delete read as one thing. */
   --danger: var(--status-failed);
   --on-danger: light-dark(#ffffff, #17111f);
-  --danger-hover: color-mix(in srgb, var(--danger) 88%, var(--on-danger));
+
   /*
    * A chart's series, in this order and no more: tints of the brand violet, then one accent, a
    * teal, as marks and never as text (ADR-0021, ADR-0036). Each is 3:1 or more on the paper and
-   * the surface in its scheme, and the pairs are 20 or more apart, to CIEDE2000, to a reader who
-   * sees every colour and to one who sees no red, no green or no blue, which a token test holds.
-   * The teal is clear of the status colours, the danger colour now and the amber to come, by hue
-   * and lightness. A hue is never a series' only cue.
+   * the surface, and the pairs are 20 or more apart, to CIEDE2000, to every reader. A hue is never
+   * a series' only cue.
    */
   --chart-1: light-dark(#6b2fa0, #c8aaf2);
   --chart-2: light-dark(#a570e1, #864fc4);
   --chart-3: light-dark(#0b8478, #347969);
-  /* The gridlines: very light, and horizontal only. Not text, and no more than a guide. */
-  --chart-grid: color-mix(in srgb, var(--line) 55%, transparent);
-  /*
-   * How a series is told apart from the next beyond its hue: a hatch laid over its fill, a dash
-   * in its line, and the shape of its markers. A chart reads these and decides nothing of its
-   * own, so they are the one place a mode changes them (see `[data-cvd]` below). By default the
-   * fills are solid and the lines unbroken, and a mark that touches another, a stacked or a
-   * diverging bar, or a day over its budget, takes `--chart-hatched` of its own.
-   */
-  --chart-hatched: 0.55;
-  --chart-hatch: 0;
-  --chart-dash-1: none;
-  --chart-dash-2: none;
-  --chart-dash-3: none;
-  /* A marker's size, and how round it is: its corner is that fraction of its size, so a half is a circle. */
-  --chart-marker-size: 5px;
-  --chart-marker-corner-1: 0.5;
-  --chart-marker-corner-2: 0.5;
-  --chart-marker-corner-3: 0.5;
-  --chart-marker-turn-3: 0deg;
+
   /*
    * A log line's eight ANSI colours, as text: 4.5:1 or more on the paper and the surface in each
-   * scheme, which a token test holds. A line may only choose among these (portalr ADR-0031).
+   * scheme (portalr ADR-0031).
    */
   --ansi-0: light-dark(#1c1d26, #bdb2cc);
   --ansi-1: light-dark(#b3261e, #ff8a80);
@@ -84,14 +125,14 @@
   --ansi-5: light-dark(#a3187a, #f08ad0);
   --ansi-6: light-dark(#0b6a7a, #5fd3e6);
   --ansi-7: light-dark(#5e5470, #f1eef6);
+
   /*
-   * Code's colours, which highlighting's theme names (`--code-token-keyword` and the rest), each
-   * text on the paper a block sits on: the working colour for keywords, a log line's colours for the
-   * rest, the quiet ink for comments, which are italic too. Each is 4.5:1 or more on the paper and
-   * the surface, which a token test holds (portalr ADR-0044).
+   * Code's colours, which highlighting's theme names: the working colour for keywords, a log
+   * line's colours for the rest, the quiet ink for comments. Each is 4.5:1 or more on the paper
+   * and the surface (portalr ADR-0044).
    */
   --code-foreground: var(--fg);
-  --code-background: transparent;
+  --code-background: rgb(0 0 0 / 0%);
   --code-token-keyword: var(--accent);
   --code-token-link: var(--accent);
   --code-token-string: var(--ansi-2);
@@ -101,116 +142,20 @@
   --code-token-parameter: var(--ansi-6);
   --code-token-punctuation: var(--fg);
   --code-token-comment: var(--muted);
-  /* How wide a page's content is, at most: a wide screen centres it, and has no dead gutter at its right. */
-  --page-width: 75rem;
+
   /*
-   * A table row's least height: every row of every table is this tall, whatever its cells hold,
-   * so a row with a small action matches one without. Admin's compact density changes this alone.
+   * How wide a page's content is, at most; a table row's least height, its padding and its words
+   * (admin's compact density changes the last three, ADR-0039).
    */
+  --page-width: 75rem;
   --row-height: 2.75rem;
   --row-pad: 0.5rem;
   --table-text: 0.875rem;
-  /* Behind a drawer or a dialog. */
+
+  /*
+   * Behind a drawer or a dialog; and what a raised thing casts, faint in light and, to be seen on
+   * the dark paper, black and heavier in dark.
+   */
   --scrim: light-dark(rgb(28 29 38 / 45%), rgb(0 0 0 / 60%));
-  /*
-   * What a raised thing casts: a card a little, a menu or a tooltip more, a dialog or a drawer the
-   * most (`shadow-raised`, `shadow-md`, `shadow-lg`, in styles.css). A shadow on the paper is faint
-   * in light and, to be seen at all on the dark paper, black and heavier in dark.
-   */
   --shadow-color: light-dark(rgb(40 20 70 / 16%), rgb(0 0 0 / 65%));
-}
-
-/*
- * Admin's density: compact, for a screen of tables and logs read down (portalr ADR-0039). The frame
- * sets `data-density="compact"` for admin and leaves the app comfortable; a table's rows then are 36px
- * and its words 13px, which a small action still fits.
- */
-[data-density="compact"] {
-  --row-height: 2.25rem;
-  --row-pad: 0.25rem;
-  --table-text: 0.8125rem;
-}
-
-/*
- * Mixed from the working colour: a tint for hover, the current place, and what is selected or
- * added; and the working colour, hovered. A custom property is resolved where it is declared, so
- * these are declared again wherever a screen re-skins --accent.
- */
-:root,
-[data-brand] {
-  --wash: color-mix(in srgb, var(--accent) 10%, var(--paper));
-  --accent-hover: color-mix(in srgb, var(--accent) 88%, var(--on-accent));
-}
-
-:root[data-theme="light"] {
-  color-scheme: light;
-}
-
-:root[data-theme="dark"] {
-  color-scheme: dark;
-}
-
-/*
- * Colour-blind mode, which a page asks for as it asks for a scheme: `data-cvd` on the root, with
- * any value, or on any element to take it there alone. It swaps the series' inks for ones chosen from
- * Okabe and Ito's hues (a blue, a vermillion or a yellow, and a purple), their lightness and
- * saturation set so that each holds 3:1 on the paper and the surface in each scheme and the three
- * stay 20 or more apart, to CIEDE2000, under each deficiency, and turns
- * every pattern on: each series past the first is hatched, dashed in a line, and has a marker of
- * its own shape, so no series relies on its hue; and it draws code in three inks. The account menu's "Colour-blind friendly charts" sets it, per browser (portalr ADR-0036).
- */
-[data-cvd] {
-  --chart-1: light-dark(#0a85ff, #0ac6ff);
-  --chart-2: light-dark(#e06029, #ffe057);
-  --chart-3: light-dark(#6f2057, #cd1d6a);
-  --chart-hatch: var(--chart-hatched);
-  --chart-dash-2: 6 4;
-  --chart-dash-3: 2 3;
-  --chart-marker-size: 8px;
-  --chart-marker-corner-2: 0;
-  --chart-marker-corner-3: 0;
-  --chart-marker-turn-3: 45deg;
-  /*
-   * Code in three inks: keywords a blue, strings an orange, and the rest the text's own, 20 or more
-   * apart under each deficiency; comments keep the quiet ink, and their italics.
-   */
-  --code-token-keyword: light-dark(#0a5fb4, #78b8ff);
-  --code-token-link: var(--code-token-keyword);
-  --code-token-string: light-dark(#a64400, #ff9a5c);
-  --code-token-string-expression: var(--code-token-string);
-  --code-token-function: var(--fg);
-  --code-token-constant: var(--fg);
-  --code-token-parameter: var(--fg);
-}
-
-/*
- * The system's colours, by role, for a control that keeps its own colours under forced colours
- * (`forced-color-adjust: none`), so its state still shows where the fills it is told by are
- * dropped: the page, its text, a chosen thing and its text, and what can't be used. Each is a
- * system colour, the same keyword in both schemes, so none is a light-dark() pair: the system
- * chooses it.
- */
-:root {
-  --system-canvas: Canvas;
-  --system-text: CanvasText;
-  --system-highlight: Highlight;
-  --system-on-highlight: HighlightText;
-  --system-disabled: GrayText;
-}
-
-/*
- * Under forced colours (a high-contrast mode), a hue is not the page's to give: the system's
- * colours replace it. So every pattern, dash and marker shape is on as in colour-blind mode, whether
- * or not it was chosen; the inks themselves are the system's.
- */
-@media (forced-colors: active) {
-  :root {
-    --chart-hatch: var(--chart-hatched);
-    --chart-dash-2: 6 4;
-    --chart-dash-3: 2 3;
-    --chart-marker-size: 8px;
-    --chart-marker-corner-2: 0;
-    --chart-marker-corner-3: 0;
-    --chart-marker-turn-3: 45deg;
-  }
 }

@@ -1,0 +1,144 @@
+/*
+ * What a brand kit can't set (lattice RFC-0007, portalr ADR-0056 and ADR-0057), read after the
+ * kit's tokens (tokens.css, generated): the scheme, the colours mixed from the kit's, the charts'
+ * patterns, admin's density, colour-blind mode, the system's colours under forced colours, and
+ * motion's scale, which reduced motion stops whatever a kit says.
+ */
+
+:root {
+  color-scheme: light dark;
+  /* What a destructive action's hover is: the red, a little toward what is written on it. */
+  --danger-hover: color-mix(in srgb, var(--danger) 88%, var(--on-danger));
+  /* The gridlines: very light, and horizontal only. Not text, and no more than a guide. */
+  --chart-grid: color-mix(in srgb, var(--line) 55%, transparent);
+  /*
+   * How a series is told apart from the next beyond its hue: a hatch laid over its fill, a dash
+   * in its line, and the shape of its markers. A chart reads these and decides nothing of its
+   * own, so they are the one place a mode changes them (see `[data-cvd]` below). By default the
+   * fills are solid and the lines unbroken, and a mark that touches another, a stacked or a
+   * diverging bar, or a day over its budget, takes `--chart-hatched` of its own.
+   */
+  --chart-hatched: 0.55;
+  --chart-hatch: 0;
+  --chart-dash-1: none;
+  --chart-dash-2: none;
+  --chart-dash-3: none;
+  /* A marker's size, and how round it is: its corner is that fraction of its size, so a half is a circle. */
+  --chart-marker-size: 5px;
+  --chart-marker-corner-1: 0.5;
+  --chart-marker-corner-2: 0.5;
+  --chart-marker-corner-3: 0.5;
+  --chart-marker-turn-3: 0deg;
+  /*
+   * Motion's scale: every component's duration, shift and scale offset is multiplied by it, and a
+   * loop plays as `--motion-loop` says. Reduced motion sets both below, and no kit can.
+   */
+  --motion-scale: 1;
+  --motion-loop: running;
+}
+
+/*
+ * Admin's density: compact, for a screen of tables and logs read down (portalr ADR-0039). The frame
+ * sets `data-density="compact"` for admin and leaves the app comfortable; a table's rows then are 36px
+ * and its words 13px, which a small action still fits.
+ */
+[data-density="compact"] {
+  --row-height: 2.25rem;
+  --row-pad: 0.25rem;
+  --table-text: 0.8125rem;
+}
+
+/*
+ * Mixed from the working colour: a tint for hover, the current place, and what is selected or
+ * added; and the working colour, hovered. A custom property is resolved where it is declared, so
+ * these are declared again wherever a screen re-skins --accent.
+ */
+:root,
+[data-brand] {
+  --wash: color-mix(in srgb, var(--accent) 10%, var(--paper));
+  --accent-hover: color-mix(in srgb, var(--accent) 88%, var(--on-accent));
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+/*
+ * Colour-blind mode, which a page asks for as it asks for a scheme: `data-cvd` on the root, with
+ * any value, or on any element to take it there alone. It swaps the series' inks for ones chosen from
+ * Okabe and Ito's hues (a blue, a vermillion or a yellow, and a purple), their lightness and
+ * saturation set so that each holds 3:1 on the paper and the surface in each scheme and the three
+ * stay 20 or more apart, to CIEDE2000, under each deficiency, and turns
+ * every pattern on: each series past the first is hatched, dashed in a line, and has a marker of
+ * its own shape, so no series relies on its hue; and it draws code in three inks. The account menu's "Colour-blind friendly charts" sets it, per browser (portalr ADR-0036).
+ */
+[data-cvd] {
+  --chart-1: light-dark(#0a85ff, #0ac6ff);
+  --chart-2: light-dark(#e06029, #ffe057);
+  --chart-3: light-dark(#6f2057, #cd1d6a);
+  --chart-hatch: var(--chart-hatched);
+  --chart-dash-2: 6 4;
+  --chart-dash-3: 2 3;
+  --chart-marker-size: 8px;
+  --chart-marker-corner-2: 0;
+  --chart-marker-corner-3: 0;
+  --chart-marker-turn-3: 45deg;
+  /*
+   * Code in three inks: keywords a blue, strings an orange, and the rest the text's own, 20 or more
+   * apart under each deficiency; comments keep the quiet ink, and their italics.
+   */
+  --code-token-keyword: light-dark(#0a5fb4, #78b8ff);
+  --code-token-link: var(--code-token-keyword);
+  --code-token-string: light-dark(#a64400, #ff9a5c);
+  --code-token-string-expression: var(--code-token-string);
+  --code-token-function: var(--fg);
+  --code-token-constant: var(--fg);
+  --code-token-parameter: var(--fg);
+}
+
+/*
+ * The system's colours, by role, for a control that keeps its own colours under forced colours
+ * (`forced-color-adjust: none`), so its state still shows where the fills it is told by are
+ * dropped: the page, its text, a chosen thing and its text, and what can't be used. Each is a
+ * system colour, the same keyword in both schemes, so none is a light-dark() pair: the system
+ * chooses it.
+ */
+:root {
+  --system-canvas: Canvas;
+  --system-text: CanvasText;
+  --system-highlight: Highlight;
+  --system-on-highlight: HighlightText;
+  --system-disabled: GrayText;
+}
+
+/*
+ * Under forced colours (a high-contrast mode), a hue is not the page's to give: the system's
+ * colours replace it. So every pattern, dash and marker shape is on as in colour-blind mode, whether
+ * or not it was chosen; the inks themselves are the system's.
+ */
+@media (forced-colors: active) {
+  :root {
+    --chart-hatch: var(--chart-hatched);
+    --chart-dash-2: 6 4;
+    --chart-dash-3: 2 3;
+    --chart-marker-size: 8px;
+    --chart-marker-corner-2: 0;
+    --chart-marker-corner-3: 0;
+    --chart-marker-turn-3: 45deg;
+  }
+}
+
+/*
+ * Reduced motion is structural (portalr ADR-0057): important custom properties, which nothing a
+ * kit's tokens declare can undo, so every transition is instant and every loop still.
+ */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-scale: 0 !important;
+    --motion-loop: paused !important;
+  }
+}

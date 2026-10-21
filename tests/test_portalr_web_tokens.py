@@ -1,4 +1,4 @@
-"""portalr's web sources hold no colour literal: a colour is a token, kept in tokens.css."""
+"""portalr's web sources hold no colour literal: a colour is a token, in tokens.css or base.css."""
 
 import re
 from pathlib import Path
@@ -20,7 +20,7 @@ def sources() -> list[Path]:
         for path in paths
         if ".test." not in path.name
         and "test" not in path.relative_to(WEB).parts
-        and path.name not in {"tokens.css", "fonts.css", "routeTree.gen.ts"}
+        and path.name not in {"tokens.css", "base.css", "fonts.css", "routeTree.gen.ts"}
     ]
 
 

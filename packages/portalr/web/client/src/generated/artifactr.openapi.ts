@@ -951,6 +951,8 @@ export interface components {
              */
             archived: boolean;
             artifact_id: components["schemas"]["ArtifactId"];
+            /** At */
+            at?: string | null;
             /** Data */
             data: {
                 [key: string]: components["schemas"]["JsonValue"];

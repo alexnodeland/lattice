@@ -7,6 +7,7 @@ command, loads it into a :class:`State`, calls :func:`artifactr.core.commit`, an
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from datetime import datetime
 from types import MappingProxyType
 from typing import Annotated, Any, Literal
 
@@ -102,6 +103,9 @@ class Revision(BaseModel):
     trace_id: TraceId | None = None
     """The OpenTelemetry trace the change was committed in, if it was traced; set by the
     workspace (ADR-0033)."""
+    at: datetime | None = None
+    """When it was committed: its events' ``ts``, set by the storage that saves it. A revision
+    saved before artifactr stamped one has none."""
 
 
 # ─── outcomes ─────────────────────────────────────────────────────────────────

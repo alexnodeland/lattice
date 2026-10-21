@@ -140,6 +140,25 @@ test("a submission is shown in the host's own dialog, and sent as the person onc
   await expect.element(dialog).not.toBeInTheDocument();
 });
 
+test("a preview's submission is refused at once: no one is asked, and nothing is sent", async () => {
+  const host = hosted();
+  const screen = await render(
+    <IntegrationsContext value={allOn}>
+      <AppHostContext value={host}>
+        <AppFrame app={DICE} shown={SHOWN} preview />
+      </AppHostContext>
+    </IntegrationsContext>,
+  );
+  fromFrame(await frameIn(screen), {
+    id: 1,
+    method: "tools/call",
+    params: { name: "submit", arguments: { values: { rolled: 6 } } },
+  });
+  await new Promise((settled) => setTimeout(settled, 200));
+  expect(screen.getByRole("alertdialog").elements()).toHaveLength(0);
+  expect(host.submit).not.toHaveBeenCalled();
+});
+
 test("a link is opened only once the person agrees to its full address", async () => {
   const opened = vi.spyOn(window, "open").mockReturnValue(null);
   const screen = await shown();
@@ -237,10 +256,12 @@ test("Escape leaves a question open in the full view alone", async () => {
   await expect.element(screen.getByRole("dialog", { name: "Dice" })).toBeVisible();
 });
 
-test("a tall app's frame fits the window, below the page's chrome and above a pinned composer", async () => {
+test("an app is shown whole, as tall as it asks, up to twice the window", async () => {
   const screen = await shown();
   const frame = await frameIn(screen);
+  fromFrame(frame, { method: "ui/notifications/size-changed", params: { height: 700 } });
+  await vi.waitFor(() => expect(frame.getBoundingClientRect().height).toBe(700));
   fromFrame(frame, { method: "ui/notifications/size-changed", params: { height: 2000 } });
   await vi.waitFor(() => expect(frame.style.height).toBe("2000px"));
-  expect(frame.getBoundingClientRect().height).toBeLessThanOrEqual(innerHeight - 240);
+  expect(frame.getBoundingClientRect().height).toBe(Math.min(2000, innerHeight * 2));
 });

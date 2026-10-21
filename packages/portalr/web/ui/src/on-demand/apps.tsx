@@ -14,7 +14,6 @@ import {
   Bridge,
   CALLS_A_MINUTE,
   type JsonObject,
-  LEAST_HEIGHT,
   type Question,
   StateKeeper,
   type Written,
@@ -33,12 +32,12 @@ import { submissionId } from "../submission-id";
 import { TYPE } from "../type";
 
 /**
- * The most an app's frame is in the page: the window's height less the page's chrome above it and
- * a composer pinned below, so the whole frame can be seen at once, on a phone too; never less than
- * the least an app may ask for. A taller app scrolls inside its frame, or opens its full view.
+ * The most an app's frame is in the page: twice the window's height. An app is shown whole, as
+ * tall as it is, the page scrolling past it, and a scroll over it passing on to the page, since
+ * the frame has nothing to scroll; only a truly large app scrolls inside its frame, or opens its
+ * full view.
  */
-// 15rem: a narrow page's bar above (3.5rem), the composer pinned below (9rem), and room between.
-const FITS = `max(${LEAST_HEIGHT}px, calc(100dvh - 15rem))`;
+const FITS = "200dvh";
 
 /** The height a frame starts at, in pixels, until its app asks for another. */
 const FIRST_HEIGHT = 360;
@@ -140,12 +139,15 @@ export function Running({
   origin,
   after,
   label,
+  submitsNothing,
 }: {
   app: ReadApp;
   shown: Shown;
   host: AppHost;
   origin: string;
   after: string;
+  /** Why nothing is submitted from it, as from a preview; said to the app before asking anyone. */
+  submitsNothing?: string;
   /** What the host says of the app, which its full view shows outside the frame too. */
   label: string;
 }) {
@@ -163,8 +165,8 @@ export function Running({
     setRun({ html: app.html, count: run.count + 1 });
   }
   const keeper = useRef<StateKeeper | null>(null);
-  const head = useRef({ app, shown });
-  head.current = { app, shown };
+  const head = useRef({ app, shown, submitsNothing });
+  head.current = { app, shown, submitsNothing };
   // Filling the window, or in the page: the frame stays where it is, so the app runs on.
   const [full, setFull] = useState(false);
   const mode = useRef<DisplayMode>("inline");
@@ -217,6 +219,7 @@ export function Running({
       state: kept,
       host: {
         app: () => ({ title: head.current.app.title, html: head.current.app.html }),
+        submitsNothing: () => head.current.submitsNothing,
         context: () => hostContext(element, mode.current),
         ask: (question) =>
           new Promise<boolean>((settle) => {

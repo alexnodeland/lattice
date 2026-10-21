@@ -125,6 +125,9 @@ export function nativeFile(): Renderer {
   return {
     render: (data) => <Summary facts={factsOf(data)} />,
     text: (data) => factsOf(data).outline,
+    parts: (data) => [
+      { name: "contents", text: factsOf(data).outline, diff: "lines", language: "text" },
+    ],
     title: (data) => capped(factsOf(data).name),
     diff: "lines",
     inline: true,

@@ -42,7 +42,7 @@ A native file can't be drawn by the browser: its bytes are an office or a design
 - **What going back does to the check-out:** back with no unsaved changes ends the editing and lets the check-out go, by checking the version it holds back in unchanged, which ends it without a version; a file isn't held by a closed editor for the eight hours a lease runs. Where that is refused, it says the check-out holds until it runs out or is checked in. Back with unsaved changes asks: "Keep editing", or "Discard and go back". There is no "Save and go back": at talk level 1+ the page can't tell the build to save, so it says to save in the app first. The router blocker, the `beforeunload` guard and one editor at a time stay as they are.
 - **The portal frames each editor's origin:** `policy()` adds the origins of `Site.editors` to `frame-src`, beside the apps' origin. The shim answers only the portal it was made for, and the build's page is framed only by its own origin and the portal ([files ADR-0010](../../artifactr/files/adr/0010-a-shim-beside-the-build-and-talk-level-one-plus.md)).
 - **A file is read once it comes near the window,** 600 pixels out, and its status polled only while it is near; a page is read only when it is shown, and the next only when asked for. An entry not yet near holds a placeholder, so printing the thread or finding in it doesn't reach a file's outline until it has been scrolled to.
-- **It is the thread's route chunk,** not an add-on: the app's bundle stays within its budget (initial 191.5 of 200 kB, total 489.3 of 520 kB, on a fresh build).
+- **It is the thread's route chunk,** not an add-on: the app's bundle stays within its budget (initial 191.8 of 200 kB, total 497.6 of 520 kB, on a fresh build).
 
 ## Options considered
 

@@ -1,6 +1,7 @@
-import { EmptyState, PageHeader, Row, RowLink, Rows } from "@portalr/ui";
+import { ago, EmptyState, PageHeader, Row, RowLink, Rows } from "@portalr/ui";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { kindWords } from "../../../../../../../thread-artifact";
 import { titlesOf } from "../../../../../../../titles";
 import { Uploader } from "../../../../../../../upload";
 import { Connection, useWorkspace } from "../../../../../../../workspace";
@@ -30,6 +31,7 @@ function Artifacts() {
   // Titles are read from the artifacts' data, which the log doesn't carry; the loader has them.
   const { data: read } = useQuery(queries.artifactr.artifacts(tenant, workspace));
   const titles = titlesOf(read);
+  const now = new Date();
   const listed = Object.values(snapshot.state.artifacts)
     .filter((artifact) => !artifact.archived)
     .sort((a, b) => a.id.localeCompare(b.id));
@@ -67,13 +69,12 @@ function Artifacts() {
                 </RowLink>
               }
               meta={
+                // Its kind, its version and when it was made: its id is on its page, to copy.
                 <span id={`${artifact.id}-meta`}>
-                  {titles.has(artifact.id) && (
-                    <>
-                      <span className="font-mono">{artifact.id}</span>,{" "}
-                    </>
-                  )}
-                  {artifact.kind}, version {artifact.version}
+                  {kindWords(artifact.kind)} · version {artifact.version} ·{" "}
+                  <time dateTime={artifact.changedAt}>
+                    {ago(new Date(artifact.changedAt), now)}
+                  </time>
                 </span>
               }
             />

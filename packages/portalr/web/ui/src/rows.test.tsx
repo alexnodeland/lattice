@@ -1,6 +1,7 @@
 import { expect, onTestFinished, test } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
+import { RunStatus } from "./chat";
 import { Row, RowLink, Rows } from "./rows";
 import { contrast, token } from "./test/colours";
 
@@ -174,4 +175,28 @@ test("wider, a row's end takes half the row at most", async () => {
     screen.getByText(/12 behind/).element().parentElement as Element
   ).getBoundingClientRect();
   expect(end.width).toBeLessThanOrEqual(row.width / 2 + 1);
+});
+
+test("what is at a row's end sits against the row's end, however wide the row", async () => {
+  await page.viewport(1280, 800);
+  onTestFinished(() => page.viewport(414, 896));
+  for (const width of [1100, 700]) {
+    const screen = await render(
+      <div style={{ width }}>
+        <Rows label={`Threads ${width}`}>
+          <Row name={<RowLink href="#a">A tour</RowLink>} end={<RunStatus status="paused" />} />
+        </Rows>
+      </div>,
+    );
+    const list = screen.getByRole("list", { name: `Threads ${width}` });
+    const row = list.getByRole("listitem").element();
+    const status = row.querySelector("[role=status]") as HTMLElement;
+    const badge = status.getBoundingClientRect();
+    const end =
+      row.getBoundingClientRect().right - Number.parseFloat(getComputedStyle(row).paddingRight);
+    expect(Math.abs(badge.right - end)).toBeLessThan(1);
+    // And it is within its column, not spilling out of it towards the name.
+    const column = (status.parentElement as HTMLElement).getBoundingClientRect();
+    expect(badge.left).toBeGreaterThanOrEqual(column.left - 0.5);
+  }
 });

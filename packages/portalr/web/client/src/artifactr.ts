@@ -41,6 +41,8 @@ export interface Thread {
   readonly messages: readonly Message[];
   /** The `seq` of its latest message, or of its start: how recently it was active. */
   readonly active: number;
+  /** When that was, as its event says, or null for a thread the store hasn't seen begin. */
+  readonly activeAt: string | null;
 }
 
 export interface Artifact {
@@ -54,6 +56,8 @@ export interface Artifact {
   readonly seq: number;
   /** The feedback given on its latest version, oldest first: each version is judged anew. */
   readonly feedback: readonly Feedback[];
+  /** When its latest version was made, as its event says. */
+  readonly changedAt: string;
 }
 
 export interface Proposal {
@@ -151,7 +155,17 @@ type Handlers = {
 };
 
 function thread(state: Workspace, id: v1.ThreadId): Thread {
-  return state.threads[id] ?? { id, title: "", mode: "edit", focus: [], messages: [], active: 0 };
+  return (
+    state.threads[id] ?? {
+      id,
+      title: "",
+      mode: "edit",
+      focus: [],
+      messages: [],
+      active: 0,
+      activeAt: null,
+    }
+  );
 }
 
 function withThread(state: Workspace, id: v1.ThreadId, change: Partial<Thread>): Workspace {
@@ -165,20 +179,26 @@ function withThread(state: Workspace, id: v1.ThreadId, change: Partial<Thread>):
 const madeAt = (event: { thread_id?: v1.ThreadId | null }, envelope: v1.EventFrame) => ({
   threadId: event.thread_id ?? null,
   seq: envelope.seq,
+  at: envelope.ts,
 });
 
 /** An artifact's event: where it was made is kept from its first, as `madeAt` reads it. */
 function withArtifact(
   state: Workspace,
-  artifact: Omit<Artifact, "feedback" | "threadId" | "seq">,
-  made: { threadId: v1.ThreadId | null; seq: number },
+  artifact: Omit<Artifact, "feedback" | "threadId" | "seq" | "changedAt">,
+  made: { threadId: v1.ThreadId | null; seq: number; at: string },
 ): Workspace {
   const before = state.artifacts[artifact.id];
   const feedback = before?.version === artifact.version ? before.feedback : [];
-  const where = before ? { threadId: before.threadId, seq: before.seq } : made;
+  const where = before
+    ? { threadId: before.threadId, seq: before.seq }
+    : { threadId: made.threadId, seq: made.seq };
   return {
     ...state,
-    artifacts: { ...state.artifacts, [artifact.id]: { ...artifact, ...where, feedback } },
+    artifacts: {
+      ...state.artifacts,
+      [artifact.id]: { ...artifact, ...where, feedback, changedAt: made.at },
+    },
   };
 }
 
@@ -213,7 +233,11 @@ function ignore(state: Workspace): Workspace {
 
 const handlers: Handlers = {
   thread_created: (state, event, envelope) =>
-    withThread(state, event.thread_id, { title: event.title, active: envelope.seq }),
+    withThread(state, event.thread_id, {
+      title: event.title,
+      active: envelope.seq,
+      activeAt: envelope.ts,
+    }),
   thread_mode_changed: (state, event) => withThread(state, event.thread_id, { mode: event.mode }),
   focus_changed: (state, event) =>
     withThread(state, event.thread_id, { focus: event.artifact_ids }),
@@ -230,6 +254,7 @@ const handlers: Handlers = {
     const next = withThread(state, event.thread_id, {
       messages: [...thread(state, event.thread_id).messages, message],
       active: envelope.seq,
+      activeAt: envelope.ts,
     });
     // The posted message is the authoritative text of what the run streamed.
     return event.run_id ? withRun(next, event.run_id, { text: "" }) : next;

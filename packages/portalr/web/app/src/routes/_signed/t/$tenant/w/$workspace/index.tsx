@@ -1,7 +1,10 @@
+import { useMe } from "@portalr/client";
 import {
+  ago,
   Button,
   EmptyState,
   PageHeader,
+  plainTitle,
   Row,
   RowLink,
   Rows,
@@ -10,6 +13,7 @@ import {
 } from "@portalr/ui";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useActionState } from "react";
+import { author } from "../../../../../../author";
 import { Connection, useStream, useWorkspace } from "../../../../../../workspace";
 
 /** The workspace's threads, the most recently active first, and a new one. */
@@ -17,6 +21,9 @@ export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/")({ compo
 
 function Threads() {
   const { tenant, workspace } = Route.useParams();
+  const { queries, user } = Route.useRouteContext();
+  const me = useMe(queries, user, tenant);
+  const now = new Date();
   const stream = useStream();
   const snapshot = useWorkspace();
   const navigate = useNavigate();
@@ -72,11 +79,27 @@ function Threads() {
         <Rows label="Threads">
           {listed.map((thread) => {
             const status = going.get(thread.id);
+            const last = thread.messages.at(-1);
+            // Who spoke last and what they said, and when: what tells two threads of one title apart.
+            const said = last && `${author(last.actor, me)}: ${plainTitle(last.content) ?? "…"}`;
+            const when = thread.activeAt && (
+              <time dateTime={thread.activeAt}>{ago(new Date(thread.activeAt), now)}</time>
+            );
             return (
               <Row
                 key={thread.id}
+                meta={
+                  (said || when) && (
+                    <span id={`${thread.id}-meta`} className="line-clamp-2">
+                      {said}
+                      {said && when && " · "}
+                      {when}
+                    </span>
+                  )
+                }
                 name={
                   <RowLink
+                    aria-describedby={`${thread.id}-meta`}
                     render={
                       <Link
                         to="/t/$tenant/w/$workspace/threads/$thread"

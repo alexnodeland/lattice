@@ -63,6 +63,7 @@ test("a thread holds its title, mode, focus and messages", () => {
       },
     ],
     active: 5,
+    activeAt: "2026-10-12T00:00:00Z",
   });
 });
 
@@ -341,6 +342,7 @@ test("artifacts keep their kind, latest version, whether they are archived, and 
     threadId: "thr_1",
     seq: 1,
     feedback: [],
+    changedAt: "2026-10-12T00:00:00Z",
   });
 });
 

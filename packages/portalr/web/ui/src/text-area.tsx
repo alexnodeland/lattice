@@ -22,7 +22,7 @@ export function TextArea({ label, hint, error = null, rows = 4, className, ...pr
     <FormField label={label} hint={hint} error={error} className={className}>
       <Field.Control
         render={<textarea rows={rows} />}
-        className="min-h-16 resize-y rounded-md border border-edge bg-surface px-3 py-1.5 text-fg text-sm leading-normal outline-offset-(--focus-offset) placeholder:text-muted focus-visible:outline-(length:--focus-width) focus-visible:outline-focus data-disabled:cursor-not-allowed data-disabled:resize-none data-disabled:border-line data-disabled:bg-line data-disabled:text-muted data-invalid:border-fg"
+        className="min-h-16 resize-y rounded-(--input-radius) border border-edge bg-surface px-(--input-pad-x) py-(--input-pad-y) text-fg text-sm leading-normal outline-offset-(--focus-offset) placeholder:text-muted focus-visible:outline-(length:--focus-width) focus-visible:outline-focus data-disabled:cursor-not-allowed data-disabled:resize-none data-disabled:border-line data-disabled:bg-line data-disabled:text-muted data-invalid:border-fg"
         {...props}
       />
     </FormField>

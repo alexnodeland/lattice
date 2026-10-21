@@ -180,4 +180,25 @@
   --button-press-shift: var(--space-px);
   --button-duration: var(--duration-fast);
   --button-ease: var(--ease-in-out);
+
+  /*
+   * A field, a select's trigger, a check, a switch and a segmented filter: their corners and
+   * padding, a check's size, and a switch's track, thumb and travel (portalr ADR-0037).
+   */
+  --input-radius: var(--radius-3);
+  --input-pad-x: var(--space-3);
+  --input-pad-y: var(--space-1-5);
+  --checkbox-radius: var(--radius-2);
+  --checkbox-size: var(--space-4);
+  --switch-width: 2.25rem;
+  --switch-height: 1.25rem;
+  --switch-pad: var(--space-half);
+  --switch-thumb: var(--space-4);
+  --switch-travel: var(--space-4);
+  --switch-duration: var(--duration-fast);
+  --segmented-radius: var(--radius-3);
+  --segmented-pad: var(--space-half);
+  --segmented-item-radius: var(--radius-2);
+  --segmented-item-pad-x: 0.625rem;
+  --segmented-item-pad-y: var(--space-1);
 }

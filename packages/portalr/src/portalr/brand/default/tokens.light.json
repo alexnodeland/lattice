@@ -655,6 +655,71 @@
       "ease": {
         "$value": "{motion.ease.in-out}"
       }
+    },
+    "input": {
+      "radius": {
+        "$value": "{radius.3}"
+      },
+      "pad-x": {
+        "$value": "{space.3}"
+      },
+      "pad-y": {
+        "$value": "{space.1-5}"
+      }
+    },
+    "checkbox": {
+      "radius": {
+        "$value": "{radius.2}"
+      },
+      "size": {
+        "$value": "{space.4}"
+      }
+    },
+    "switch": {
+      "width": {
+        "$value": {
+          "value": 2.25,
+          "unit": "rem"
+        }
+      },
+      "height": {
+        "$value": {
+          "value": 1.25,
+          "unit": "rem"
+        }
+      },
+      "pad": {
+        "$value": "{space.half}"
+      },
+      "thumb": {
+        "$value": "{space.4}"
+      },
+      "travel": {
+        "$value": "{space.4}"
+      },
+      "duration": {
+        "$value": "{motion.duration.fast}"
+      }
+    },
+    "segmented": {
+      "radius": {
+        "$value": "{radius.3}"
+      },
+      "pad": {
+        "$value": "{space.half}"
+      },
+      "item-radius": {
+        "$value": "{radius.2}"
+      },
+      "item-pad-x": {
+        "$value": {
+          "value": 0.625,
+          "unit": "rem"
+        }
+      },
+      "item-pad-y": {
+        "$value": "{space.1}"
+      }
     }
   }
 }

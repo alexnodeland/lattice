@@ -213,6 +213,29 @@ COMPONENTS: tuple[Group, ...] = (
             Row("component.button.ease", "--button-ease", "cubicBezier"),
         ),
     ),
+    Group(
+        "A field, a select's trigger, a check, a switch and a segmented filter: their corners "
+        "and padding, a check's size, and a switch's track, thumb and travel (portalr "
+        "ADR-0037).",
+        (
+            Row("component.input.radius", "--input-radius", "dimension"),
+            Row("component.input.pad-x", "--input-pad-x", "dimension"),
+            Row("component.input.pad-y", "--input-pad-y", "dimension"),
+            Row("component.checkbox.radius", "--checkbox-radius", "dimension"),
+            Row("component.checkbox.size", "--checkbox-size", "dimension"),
+            Row("component.switch.width", "--switch-width", "dimension"),
+            Row("component.switch.height", "--switch-height", "dimension"),
+            Row("component.switch.pad", "--switch-pad", "dimension"),
+            Row("component.switch.thumb", "--switch-thumb", "dimension"),
+            Row("component.switch.travel", "--switch-travel", "dimension"),
+            Row("component.switch.duration", "--switch-duration", "duration"),
+            Row("component.segmented.radius", "--segmented-radius", "dimension"),
+            Row("component.segmented.pad", "--segmented-pad", "dimension"),
+            Row("component.segmented.item-radius", "--segmented-item-radius", "dimension"),
+            Row("component.segmented.item-pad-x", "--segmented-item-pad-x", "dimension"),
+            Row("component.segmented.item-pad-y", "--segmented-item-pad-y", "dimension"),
+        ),
+    ),
 )
 """Each component's tokens, defaulting to a role or a primitive (portalr ADR-0056)."""
 

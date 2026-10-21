@@ -44,6 +44,15 @@ its document as JSON."""
 FCSTD: Final = "application/x-extension-fcstd"
 """The media type of a FreeCAD document, `.FCStd`, as FreeCAD's own MIME file names it, since it
 has no registered one: a zip holding its document as XML and its shapes."""
+FCPROJ: Final = "application/x-fcproj"
+"""The media type of a FilmCraft video project, `.fcproj`, which has no registered one: JSON."""
+
+ECPROJ: Final = "application/x-ecproj"
+"""The media type of an EffectCraft motion graphics project, `.ecproj`, which has no registered
+one: JSON."""
+
+SCRAFT: Final = "application/x-scraft"
+"""The media type of a SoundCraft audio session, `.scraft`, which has no registered one: JSON."""
 
 BLEND: Final = "application/x-blender"
 """The media type of a Blender file, `.blend`, as the shared MIME-info database names it, since it
@@ -208,3 +217,21 @@ class Scene(NativeFile):
     """A 3D scene, `.blend`: registered as `scene`."""
 
     formats: ClassVar[frozenset[str]] = frozenset({BLEND})
+
+
+class VideoProject(NativeFile):
+    """A video project, `.fcproj`: registered as `video_project`."""
+
+    formats: ClassVar[frozenset[str]] = frozenset({FCPROJ})
+
+
+class MotionGraphics(NativeFile):
+    """A motion graphics project, `.ecproj`: registered as `motion_graphics`."""
+
+    formats: ClassVar[frozenset[str]] = frozenset({ECPROJ})
+
+
+class AudioSession(NativeFile):
+    """An audio session, `.scraft`: registered as `audio_session`."""
+
+    formats: ClassVar[frozenset[str]] = frozenset({SCRAFT})

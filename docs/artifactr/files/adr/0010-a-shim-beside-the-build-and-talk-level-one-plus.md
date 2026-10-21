@@ -7,7 +7,7 @@
 
 ## Context
 
-[ADR-0007](0007-check-out-over-http-and-the-editor-on-its-own-origin.md) serves an app's browser build, as released, on an origin of its own, with `frame-ancestors 'none'`: a person downloads the checked-out file, opens it in the build, saves it and uploads it. Three released builds have more: GridCraft 0.8.0, PdfCraft 0.8.0 and CADCraft 0.8.0 take `?host=parent`, a `postMessage` bridge on which the page that frames the build opens a file in it (`<app>:open`) and hears when it is ready, each file it would download (`<app>:save`), and whether it has unsaved changes (`<app>:dirty`). FilmCraft, EffectCraft and LightCraft put a JavaScript API on the build's window instead.
+[ADR-0007](0007-check-out-over-http-and-the-editor-on-its-own-origin.md) serves an app's browser build, as released, on an origin of its own, with `frame-ancestors 'none'`: a person downloads the checked-out file, opens it in the build, saves it and uploads it. Three released builds have more: GridCraft 0.8.0, PdfCraft 0.8.0 and CADCraft 0.8.0 take `?host=parent`, a `postMessage` bridge on which the page that frames the build opens a file in it (`<app>:open`) and hears when it is ready, each file it would download (`<app>:save`), and whether it has unsaved changes (`<app>:dirty`). EffectCraft and LightCraft put a JavaScript API on the build's window instead (FilmCraft's 0.8.0 build has none, corrected 2026-10-20 by [ADR-0016](0016-a-project-that-holds-its-own-media-is-a-native-file.md)).
 
 Each surface answers only a page of the build's own origin: the bridge hears and answers only its parent window on that origin, and the API is a global of the build's page. The portal is on another origin, and lattice neither forks the builds nor contributes to them.
 
@@ -46,7 +46,7 @@ The shim is the only route above level 1 that changes no build and puts none on 
 
 - Easier: portalr can open a check-out in the editor, show whether it has unsaved changes, and check in each save, for GridCraft, PdfCraft and CADCraft.
 - Harder: the editor's origin serves our code as well as the build's, so its policy and its messages' checks are ours to keep.
-- Revisit: a JavaScript API's level, with each of FilmCraft's, EffectCraft's and LightCraft's pilots; a build whose bridge gains commands; portalr's frame and policy for the editor, its own work.
+- Revisit: a JavaScript API's level, with each of EffectCraft's and LightCraft's pilots; a build whose bridge gains commands; portalr's frame and policy for the editor, its own work.
 
 ## Action items
 

@@ -4,10 +4,7 @@ import { Menu as MenuGlyph, X } from "lucide-react";
 import { type MouseEvent, type ReactElement, type ReactNode, useEffect, useState } from "react";
 import { backdrop } from "./dialog";
 import { Icon } from "./icon";
-import { Lockup, Mark, type Ui } from "./marks";
-
-/** The UI's name, which its mark pictures. */
-const NAME: Record<Ui, string> = { app: "portalr", admin: "portalr admin" };
+import { Lockup, Mark, UI_NAME, type Ui } from "./marks";
 
 /** From this width the frame is a rail, and the drawer has no place. */
 const WIDE = "(min-width: 1024px)";
@@ -18,7 +15,7 @@ function Home({ ui, home, children }: { ui: Ui; home: ReactElement; children: Re
     defaultTagName: "a",
     render: home,
     props: {
-      "aria-label": NAME[ui],
+      "aria-label": UI_NAME[ui],
       className:
         "inline-flex shrink-0 rounded-md outline-offset-2 focus-visible:outline-2 focus-visible:outline-focus",
       children,

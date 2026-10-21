@@ -63,6 +63,6 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0055](0055-every-kind-inline-and-a-native-file-read-and-edited-in-its-thread.md) | Every kind inline in its thread, and a native file read and edited there | Accepted |
 | [0056](0056-brand-kits-token-layers-loading-and-validation.md) | Brand kits: three token layers, a kit loaded per deployment, and validation in Python | Proposed |
 | [0057](0057-brand-kits-motion-and-tokens-as-the-only-override.md) | Brand kits: a motion system with guard rails, and tokens as the only override | Proposed |
-||||||| 92290709
+| [0058](0058-a-new-version-offered-to-a-stale-tab.md) | A new version offered to a stale tab | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

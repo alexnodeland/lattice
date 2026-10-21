@@ -7,6 +7,7 @@ that first tests the digest it was made from ([`revise`][artifactr.files.manifes
 
 from artifactr.files.manifest.revisions import REVISED, revise
 from artifactr.files.manifest.types import (
+    BLEND,
     DOCX,
     DWG,
     DXF,
@@ -29,6 +30,7 @@ from artifactr.files.manifest.types import (
     PdfDocument,
     Presentation,
     Provenance,
+    Scene,
     Sha256,
     Source,
     VectorImage,
@@ -37,6 +39,7 @@ from artifactr.files.manifest.types import (
 )
 
 __all__ = [
+    "BLEND",
     "DOCX",
     "DWG",
     "DXF",
@@ -60,6 +63,7 @@ __all__ = [
     "PdfDocument",
     "Presentation",
     "Provenance",
+    "Scene",
     "Sha256",
     "Source",
     "VectorImage",

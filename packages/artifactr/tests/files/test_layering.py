@@ -58,10 +58,22 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         },
         {"pydantic", "FreeCAD", "Part", "Sketcher", "TechDraw", "PIL"},
     ),
-    # The worker, over any app, and the App that calls it; its entry point runs WordCraft's.
+    # Blender's scan inflates zstd, in a thread; its script runs in Blender's own interpreter.
+    "blender": (
+        {
+            "artifactr.files.manifest",
+            "artifactr.files.app",
+            "artifactr.files.craft",
+            "artifactr.files.blender",
+        },
+        {"pydantic", "anyio", "zstandard", "bpy", "bmesh", "mathutils"},
+    ),
+    # The worker, over any app, and the App that calls it; its entry point runs WordCraft's. It
+    # holds an app's limits to what its CLI needs, as the registry says.
     "worker": (
         {
             "artifactr.files.app",
+            "artifactr.files.craft",
             "artifactr.files.wordcraft",
             "artifactr.files.worker",
         },

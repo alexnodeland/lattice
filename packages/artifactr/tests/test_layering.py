@@ -114,7 +114,8 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     # the switch lattice-core declares, and people's check-out over artifactr's router's auth.
     # The worker serves an app with Starlette and uvicorn, and the application calls it with
     # httpx. FreeCAD's script runs in FreeCAD's own interpreter, on its modules and the Pillow it
-    # ships. tests/files/test_layering.py holds its own layers.
+    # ships, and Blender's in Blender's, on its modules; Blender's scan inflates zstd.
+    # tests/files/test_layering.py holds its own layers.
     "files": (
         {
             *("artifactr.core", "artifactr.workspace", "artifactr.agent", "artifactr.fastapi"),
@@ -126,6 +127,7 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
             *("fastapi", "starlette", "uvicorn", "httpx"),
             *("lattice_core.sql", "lattice_core.integrations", "lattice_core.refusals"),
             *("FreeCAD", "Part", "Sketcher", "TechDraw", "PIL"),
+            *("zstandard", "bpy", "bmesh", "mathutils"),
         },
     ),
 }

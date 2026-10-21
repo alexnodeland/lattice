@@ -45,6 +45,10 @@ FCSTD: Final = "application/x-extension-fcstd"
 """The media type of a FreeCAD document, `.FCStd`, as FreeCAD's own MIME file names it, since it
 has no registered one: a zip holding its document as XML and its shapes."""
 
+BLEND: Final = "application/x-blender"
+"""The media type of a Blender file, `.blend`, as the shared MIME-info database names it, since it
+has no registered one: Blender's memory, written out in blocks."""
+
 OUTLINE_LIMIT: Final = 4_000
 """The most characters an outline holds: what the agent sees of a file by default."""
 
@@ -198,3 +202,9 @@ class CadModel(NativeFile):
     """A 3D model, `.FCStd`: registered as `cad_model`."""
 
     formats: ClassVar[frozenset[str]] = frozenset({FCSTD})
+
+
+class Scene(NativeFile):
+    """A 3D scene, `.blend`: registered as `scene`."""
+
+    formats: ClassVar[frozenset[str]] = frozenset({BLEND})

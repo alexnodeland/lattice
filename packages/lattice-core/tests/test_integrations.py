@@ -21,6 +21,7 @@ def test_lattices_integrations_are_declared_once_each() -> None:
         "files:designcraft",
         "files:figcraft",
         "files:freecad",
+        "files:blender",
         "files:filmcraft",
         "files:effectcraft",
         "files:soundcraft",
@@ -42,7 +43,7 @@ def test_mini_apps_mermaid_and_every_crafting_app_but_wordcraft_are_off_by_defau
         "markdown:mermaid",
         *crafts,
     }
-    assert len(crafts) == 13
+    assert len(crafts) == 14
 
 
 @pytest.mark.parametrize("key", ["excalidraw", "ui:mini-apps", "files:word-craft2", "a:b"])

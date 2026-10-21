@@ -74,7 +74,7 @@ export function Disclosure({
       </Collapsible.Trigger>
       <Collapsible.Panel
         hiddenUntilFound
-        className={cn("pt-(--disclosure-panel-gap)", panelClassName)}
+        className={cn("data-open:pt-(--disclosure-panel-gap)", panelClassName)}
       >
         {children}
       </Collapsible.Panel>

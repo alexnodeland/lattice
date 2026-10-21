@@ -76,7 +76,7 @@ export function ToolCall({ tool }: { tool: Artifactr.Tool }) {
         look="block"
         className="rounded-(--tool-call-radius) border border-line bg-surface text-sm data-open:border-edge"
         triggerClassName="min-h-10 items-center rounded-(--tool-call-radius) px-(--tool-call-pad-x) py-(--tool-call-pad-y) hover:bg-transparent"
-        panelClassName="pt-0"
+        panelClassName="data-open:pt-0"
         summary={
           <>
             <Icon icon={Wrench} className="size-3.5 shrink-0 text-muted" />

@@ -390,7 +390,7 @@ function Revision({
         open={open}
         onOpenChange={setOpen}
         triggerClassName="rounded-(--card-radius) px-4 py-3"
-        panelClassName="pt-0"
+        panelClassName="data-open:pt-0"
         summary={
           <>
             <span className="flex min-w-0 flex-col gap-0.5">

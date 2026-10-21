@@ -77,7 +77,7 @@ function Branch({
       defaultOpen={depth < OPEN_DEPTH}
       className="inline-block w-full align-top"
       triggerClassName="w-fit text-xs"
-      panelClassName="pt-0"
+      panelClassName="data-open:pt-0"
     >
       {list}
     </Disclosure>

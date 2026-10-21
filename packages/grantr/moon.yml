@@ -7,6 +7,10 @@ dependsOn:
   - 'lattice-core'
 
 tasks:
+  test:
+    # A worker for each of the runner's cores, sharing nothing (lattice ADR-0010).
+    args: ['--numprocesses', 'auto']
+
   schema:
     description: "Regenerate the admin API's OpenAPI document from the router"
     script: 'uv run python -m grantr.fastapi.openapi > schemas/grantr.openapi.json'

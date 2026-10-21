@@ -108,7 +108,7 @@ Building the worker from the application's own Dockerfile costs image size, a fe
 
 ## What is not isolated
 
-- **The kernel.** A worker is a container on the host's kernel, under Docker's default seccomp profile and AppArmor, with no gVisor or VM between it and the host.
+- **The kernel.** A worker is a container on the host's kernel, under Docker's default seccomp profile, and AppArmor's where the host has it, with no gVisor or VM between it and the host.
 - **The application, from the worker.** The application joins `files`, so a worker can open a connection to it there, on its own port, where every route asks for a person's token or a service's key. Workers can reach each other on `files`, where each asks for the token; the token is one for all of them.
 - **Names on `files`.** Docker's embedded DNS answers the names of the containers on it; it resolves nothing outside.
 - **What the token gives.** Whoever has `FILES_WORKER_TOKEN`, and a place on `files`, can have any worker read any file.

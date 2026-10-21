@@ -272,9 +272,11 @@ test("every element, together, has nothing axe finds wrong", async () => {
   expect(await axeViolations(screen.container)).toEqual([]);
 });
 
-// About 1,400 renders, each awaited: the time is the renders', not a wait.
+// About 1,400 renders, each awaited: the time is the renders', not a wait. They took a loaded CI
+// runner 48 s of a 60 s budget, so the budget is a backstop five times that: a render that never
+// finishes still fails, one slow runner doesn't.
 test("streamed a character at a time, it never shows a half-written mark or a stray link", {
-  timeout: 60_000,
+  timeout: 300_000,
 }, async () => {
   const screen = await render(<Markdown streaming>{""}</Markdown>);
   for (let end = 1; end <= GALLERY.length; end += 1) {

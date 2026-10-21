@@ -71,7 +71,8 @@ async def refused(worker: Worker, what: str, call: Awaitable[object], kinds: set
         took = time.monotonic() - started
         report(
             failed.failure in kinds and took < DEADLINE + 5,
-            f"{worker.name}: {what} is {failed.failure}, in {took:.1f}s",
+            f"{worker.name}: {what} is {failed.failure}, in {took:.1f}s"
+            + ("" if failed.failure in kinds else f": {str(failed)[:300]}"),
         )
     else:
         report(False, f"{worker.name}: {what} was read")

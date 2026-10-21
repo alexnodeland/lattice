@@ -138,6 +138,23 @@ People are added, given roles and issued keys through grantr's API at `/grantr/v
 {%- endif %}
 
 {% endif -%}
+{% if use_files -%}
+## Native files
+
+Files in an app's own format, a Word document or a workbook, are kept as artifacts, read and edited by the app's pinned CLI ([`files.py`](src/{{ package_name }}/files.py), [native files](https://lattice.alexnodeland.com/artifactr/files/)). No app runs until `FILES_CRAFTS` names it, in `.env` or for one run:
+
+```bash
+make up FILES="wordcraft gridcraft pdfcraft"
+```
+
+- **Each app runs in a worker of its own,** `files-<app>`, built from its release as `scripts/crafts/` pins it, checked against its SHA-256 before it is unpacked. A worker is read-only, isn't root, and is alone on a network of its own, `files-<app>`, which has no route out; only this application reaches it, with the worker's own token, `FILES_<APP>_TOKEN`, which `make env` generates. Nothing a call starts outlives it. Native files need `make up` (Compose 2.20 or later): `make serve` can't reach the workers.
+- **Each app is switched per workspace,** as `files:<app>`, installed only while it runs: WordCraft, once `FILES_CRAFTS` names it, is on in every workspace of every tenant until an admin switches it off; the others are off until an admin switches them on.
+{%- if use_portal %}
+- **People edit in the app's browser build,** on an origin of its own: GridCraft's, PdfCraft's and CADCraft's are served as released on this machine's loopback, ports {{ app_port + 2 }}, {{ app_port + 3 }} and {{ app_port + 4 }}, with lattice's shim, which only `PORTAL_URL` may frame. Elsewhere, such as on a tailnet, serve each on a port of its own and name it in `FILES_EDITORS` ([the template's guide](https://lattice.alexnodeland.com/stackr/guides/template/#native-files)).
+{%- endif %}
+- **Files arrive through `NativeFiles.upload`, in code:** nothing in lattice makes one from an upload over HTTP yet. People check a file out and back in from the portal.
+
+{% endif -%}
 ## How it is wired
 
 It talks to stackr's ports only, through the settings in `.env` ([`settings.py`](src/{{ package_name }}/settings.py)). Pointing them at other services (hosted Supabase, another OTLP backend, another OpenAI-compatible gateway) changes settings, never code.

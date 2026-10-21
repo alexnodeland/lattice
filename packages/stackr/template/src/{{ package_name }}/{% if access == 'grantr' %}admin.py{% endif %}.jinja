@@ -310,7 +310,11 @@ async def run(
             row_level_security=database.row_level_security,
             across_tenants=database.owner,
         )
+{%- if use_files %}
+        grants = build_grants(storage, name=settings.service_name, files=settings.files.crafts)
+{%- else %}
         grants = build_grants(storage, name=settings.service_name)
+{%- endif %}
         users = Users(
             settings.auth.admin_url or settings.auth.issuer, settings.auth.service_role_key
         )

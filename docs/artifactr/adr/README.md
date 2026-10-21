@@ -88,5 +88,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0082](0082-mini-apps-the-agents-tools-and-html-that-loads-nothing.md) | Mini apps: the agent's tools, and HTML that loads nothing | Accepted |
 | [0083](0083-ask-user-asks-questions-with-options.md) | `ask_user` asks questions with options, and takes answers per question | Accepted |
 | [0084](0084-what-a-run-records-of-its-calls-and-who-reads-it.md) | What a run records of its calls and its failure, and who reads it | Accepted |
+| [0085](0085-connected-apps-an-operators-own-freecad-or-blender-through-a-vetted-mcp-server.md) | Connected apps: an operator's own FreeCAD or Blender, through a vetted MCP server | Proposed |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

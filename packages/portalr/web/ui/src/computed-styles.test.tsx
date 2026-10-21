@@ -4,7 +4,7 @@
  * suites shoot are read at rest wide and narrow, under forced colours, and with motion allowed, and
  * each control is read hovered, focused from the keyboard, and held down. Only what a declaration
  * sets is read, never a size the face's metrics decide, so the snapshots are the same on every
- * system. A change to a component's look changes its snapshot, which a reviewer sees as text.
+ * system; margins are left out, as an automatic one is read as the space it takes. A change to a component's look changes its snapshot, which a reviewer sees as text.
  */
 
 import type { ReactNode } from "react";
@@ -34,7 +34,6 @@ const LOOK = [
     `border-${side}-style`,
     `border-${side}-width`,
     `padding-${side}`,
-    `margin-${side}`,
   ]),
   "border-top-left-radius",
   "border-top-right-radius",
@@ -151,7 +150,7 @@ function said(style: CSSStyleDeclaration, property: string, value: string) {
   if (property.startsWith("animation-") && property !== "animation-name") {
     return style.animationName !== "none";
   }
-  if (/^(padding|margin)-/.test(property) || property === "text-underline-offset") {
+  if (property.startsWith("padding-") || property === "text-underline-offset") {
     return value !== "0px" && value !== "auto";
   }
   if (property.startsWith("text-decoration-") && property !== "text-decoration-line") {

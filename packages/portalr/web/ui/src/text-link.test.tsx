@@ -92,7 +92,7 @@ test("a caller can't weaken an external link's new tab", async () => {
   expect(link.getAttribute("rel")).toBe("noopener noreferrer");
 });
 
-test("a long external link wraps, and its mark stays with its last word", async () => {
+test("a long external link wraps, and its mark stays on the line of its last word", async () => {
   const screen = await render(
     <p style={{ width: "10rem" }}>
       <TextLink variant="external" href="https://example.com">
@@ -102,9 +102,11 @@ test("a long external link wraps, and its mark stays with its last word", async 
   );
   const link = screen.getByRole("link").element();
   expect(link.getClientRects().length).toBeGreaterThan(1);
-  const mark = link.querySelector("svg") as Element;
-  const lines = [...link.getClientRects()];
-  expect(Math.round(mark.getBoundingClientRect().bottom)).toBeLessThanOrEqual(
-    Math.round((lines.at(-1) as DOMRect).bottom),
-  );
+  const mark = (link.querySelector("svg") as Element).getBoundingClientRect();
+  const last = [...link.querySelectorAll("span")].find((span) => span.textContent === "Tempo");
+  const word = (last as Element).getClientRects()[0] as DOMRect;
+  // On the same line: the mark's middle is inside the last word's line box.
+  const middle = (mark.top + mark.bottom) / 2;
+  expect(middle).toBeGreaterThan(word.top);
+  expect(middle).toBeLessThan(word.bottom);
 });

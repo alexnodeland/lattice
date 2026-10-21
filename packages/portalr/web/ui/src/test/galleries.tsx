@@ -579,11 +579,7 @@ export function Kit() {
       </TabNav>
       <TextArea label="Note" error="It can't be empty." defaultValue="" />
       <p>
-        Read <TextLink href="#more">more about it</TextLink>, go to{" "}
-        <TextLink variant="nav" href="#runs">
-          Runs
-        </TextLink>{" "}
-        or open{" "}
+        Read <TextLink href="#more">more about it</TextLink> or open{" "}
         <TextLink variant="external" href="https://example.com">
           Langfuse
         </TextLink>
@@ -591,6 +587,9 @@ export function Kit() {
       </p>
       <TextLink variant="subtle" href="#trace">
         trace_1
+      </TextLink>
+      <TextLink variant="nav" href="#runs">
+        Runs
       </TextLink>
       <Breadcrumbs
         trail={[

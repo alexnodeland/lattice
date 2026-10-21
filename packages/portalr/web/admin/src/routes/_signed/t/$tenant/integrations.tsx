@@ -157,7 +157,6 @@ function Settings({ tenant, workspace }: { tenant: string; workspace: string | u
           allowed.has("grantr:read_audit") && (
             <TextLink
               variant="subtle"
-              className="text-xs"
               render={
                 <Link
                   to="/t/$tenant/audit"

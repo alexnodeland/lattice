@@ -21,13 +21,16 @@ test("the skip link is the first stop, hidden until focused, and leads to the co
   expect(link.getBoundingClientRect().top).toBeGreaterThanOrEqual(0);
 });
 
-test("the frame's content is where the skip link leads, and takes the focus", async () => {
+test("in the frame, the skip link is the first stop, and following it focuses the content", async () => {
   const { AppShell } = await import("./app-shell");
   const screen = await render(
     <AppShell home={<a href="#home" />} switcher={<span>acme</span>} account={<span>alice</span>}>
       Content
     </AppShell>,
   );
-  const main = screen.container.querySelector("#main");
-  expect(main?.getAttribute("tabindex")).toBe("-1");
+  await userEvent.tab();
+  const link = screen.getByRole("link", { name: "Skip to content" }).element();
+  expect(document.activeElement).toBe(link);
+  await userEvent.keyboard("{Enter}");
+  expect(document.activeElement?.id).toBe("main");
 });

@@ -43,9 +43,10 @@ type Props = Omit<ComponentProps<"a">, "className"> & {
  * last word and the mark are kept together; otherwise the mark follows what was given.
  */
 function withMark(children: ReactNode) {
-  const words = typeof children === "string" ? children.lastIndexOf(" ") : -1;
-  const head = words < 0 ? null : (children as string).slice(0, words + 1);
-  const tail = words < 0 ? children : (children as string).slice(words + 1);
+  const text = typeof children === "string" ? children.trimEnd() : null;
+  const words = text === null ? -1 : text.lastIndexOf(" ");
+  const head = text === null || words < 0 ? null : text.slice(0, words + 1);
+  const tail = text === null ? children : text.slice(words + 1);
   return (
     <>
       {head}

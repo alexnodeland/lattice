@@ -5,7 +5,7 @@
 **Deciders:** Alex Nodeland
 **Amends:** [ADR-0005](0005-wordcraft-headless-pinned-by-checksum.md), whose pin, script and fidelity report were WordCraft's alone
 
-Groundwork for the crafting apps after WordCraft, in [lattice RFC-0003](../../../rfcs/0003-native-files-as-artifacts.md). Nine are integrated as native files (WordCraft, GridCraft, DeckCraft, PdfCraft, CADCraft, PhotoCraft, VectorCraft, DesignCraft, FigCraft), and four as export only (FilmCraft, EffectCraft, SoundCraft, LightCraft), whose projects point at media outside them.
+Groundwork for the crafting apps after WordCraft, in [lattice RFC-0003](../../../rfcs/0003-native-files-as-artifacts.md). Nine are integrated as native files (WordCraft, GridCraft, DeckCraft, PdfCraft, CADCraft, PhotoCraft, VectorCraft, DesignCraft, FigCraft), and four as export only (FilmCraft, EffectCraft, SoundCraft, LightCraft), whose projects point at media outside them. [ADR-0016](0016-a-project-that-holds-its-own-media-is-a-native-file.md) keeps FilmCraft's, EffectCraft's and SoundCraft's projects that hold their own media as native files, and LightCraft as export only (corrected 2026-10-20).
 
 ## Context
 
@@ -72,3 +72,4 @@ The dialect bases hold what is the same and leave what isn't to each app; the re
 
 - 2026-10-20: GridCraft's, DeckCraft's and PdfCraft's adapters, types and corpora. Each corpus covers only what it generates; not covered: GridCraft's charts, pivots, images, sparklines and data bars; DeckCraft's charts, its masters and layouts beyond one, embedded media and animations; PdfCraft's signatures (which its full rewrite on save invalidates), annotations beyond text notes and links, encryption, XFA and incremental updates. What the adapters read in-process is bounded: a package's inflated parts by `limit`; a canonical package's XML parts (DeckCraft's) at 16 MiB each, 500,000 elements in all and 256 deep; a PDF's object streams by `limit`, read in one pass.
 - 2026-10-20: PdfCraft's adapter refuses any PDF that PdfCraft had to repair to read, such as one cut short, since its save would be the repair and not the file; real-world files with small cross-reference damage are refused with them. A later option is to keep such a file's original bytes, read-only, and refuse only its edits.
+- 2026-10-20: FilmCraft's browser build, 0.8.0, has no JavaScript API a host can call, only its loader's hooks, so its `bridge` is none; EffectCraft's (`window.effectcraft`) and LightCraft's (`globalThis.lightcraft`) have one ([ADR-0016](0016-a-project-that-holds-its-own-media-is-a-native-file.md)).

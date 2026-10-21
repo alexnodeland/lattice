@@ -56,9 +56,12 @@ test("newest first, the latest open and the rest closed, each saying who, when a
   const first = list.getByRole("listitem").nth(1);
   await expect.element(latest).toHaveAccessibleName("Version 2");
   await expect.element(first).toHaveAccessibleName("Version 1");
-  const [open, closed] = screen.container.querySelectorAll("[aria-expanded]");
-  expect(open?.getAttribute("aria-expanded")).toBe("true");
-  expect(closed?.getAttribute("aria-expanded")).toBe("false");
+  await expect
+    .element(latest.getByRole("button", { name: /^Version 2/ }))
+    .toHaveAttribute("aria-expanded", "true");
+  await expect
+    .element(first.getByRole("button", { name: /^Version 1/ }))
+    .toHaveAttribute("aria-expanded", "false");
   await expect
     .element(latest.getByText("Changed the title, the summary and the HTML (+3 −2)"))
     .toBeVisible();

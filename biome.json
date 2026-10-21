@@ -59,7 +59,6 @@
     {
       "includes": [
         "packages/portalr/web/admin/src/main.tsx",
-        "packages/portalr/web/admin/src/routes/_signed/t/$tenant/runs.tsx",
         "packages/portalr/web/app/src/main.tsx",
         "packages/portalr/web/ui/src/artifacts.tsx",
         "packages/portalr/web/ui/src/file-preview.tsx",

@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 /**
  * A dashboard's figures, as text, from its panels alone: each chart's "Show the figures" and a
  * table's rows before, or without, the dashboards add-on. Built from the panel, never from what
@@ -72,8 +73,16 @@ export function Figures({
   panel: Extract<Panel, { type: "bar" | "line" | "donut" }>;
   open?: boolean;
 }) {
+  // Opened by the person, or by the page once the chart can't be drawn: `open` may turn true after
+  // the first render, when the charts' add-on fails to load.
+  const [shown, setShown] = useState(open);
+  useEffect(() => {
+    if (open) {
+      setShown(true);
+    }
+  }, [open]);
   return (
-    <Disclosure summary="Show the figures" className="text-sm" defaultOpen={open}>
+    <Disclosure summary="Show the figures" className="text-sm" open={shown} onOpenChange={setShown}>
       {panel.type === "donut" ? (
         <Rows
           caption={panel.label}

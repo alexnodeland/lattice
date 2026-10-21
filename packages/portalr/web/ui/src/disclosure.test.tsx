@@ -1,5 +1,5 @@
-import { expect, test } from "vitest";
-import { userEvent } from "vitest/browser";
+import { expect, onTestFinished, test } from "vitest";
+import { commands, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { Disclosure } from "./disclosure";
 import { contrast, token } from "./test/colours";
@@ -8,7 +8,6 @@ test("a disclosure is a button that says whether it is open, and, open, what it 
   const screen = await render(<Disclosure summary="Show the figures">The figures</Disclosure>);
   const trigger = screen.getByRole("button", { name: "Show the figures" });
   await expect.element(trigger).toHaveAttribute("aria-expanded", "false");
-  // Closed, what it opens is hidden until found, as a `details` element's is.
   expect(screen.getByText("The figures").element().closest("[hidden]")).not.toBeNull();
   await userEvent.tab();
   await expect.element(trigger).toHaveFocus();
@@ -51,4 +50,59 @@ test("whatever the look, a link's or a block's, it is the same button", async ()
   await expect
     .element(screen.getByRole("button", { name: "Version 2" }))
     .toHaveAttribute("aria-expanded", "true");
+});
+
+test("closed, what it holds is hidden until found, and a find in the page opens it", async () => {
+  const screen = await render(<Disclosure summary="Show the figures">Forty-two</Disclosure>);
+  const hidden = screen.getByText("Forty-two").element().closest("[hidden]");
+  expect(hidden?.getAttribute("hidden")).toBe("until-found");
+  hidden?.dispatchEvent(new Event("beforematch", { bubbles: true }));
+  await expect
+    .element(screen.getByRole("button", { name: "Show the figures" }))
+    .toHaveAttribute("aria-expanded", "true");
+});
+
+test("its chevron turns in the kit's time where motion is wanted", async () => {
+  await commands.reduceMotion(false);
+  onTestFinished(() => commands.reduceMotion(true));
+  await expect.poll(() => matchMedia("(prefers-reduced-motion: reduce)").matches).toBe(false);
+  const screen = await render(<Disclosure summary="Details">Why</Disclosure>);
+  const chevron = screen.getByRole("button", { name: "Details" }).element().querySelector("svg");
+  const style = getComputedStyle(chevron as SVGElement);
+  // The token, resolved as the browser resolves it.
+  const probe = document.createElement("span");
+  probe.style.transitionDuration = "var(--disclosure-duration)";
+  document.body.append(probe);
+  const kit = getComputedStyle(probe).transitionDuration;
+  probe.remove();
+  expect(style.transitionProperty).toContain("transform");
+  expect(Number.parseFloat(kit)).toBeGreaterThan(0);
+  expect(style.transitionDuration).toBe(kit);
+});
+
+test("held open by its caller, opened at first, and each look a target at least 24px tall", async () => {
+  const opened: boolean[] = [];
+  const screen = await render(
+    <>
+      <Disclosure summary="Held" open={false} onOpenChange={(next) => opened.push(next)}>
+        Held content
+      </Disclosure>
+      <Disclosure summary="At first" defaultOpen>
+        First content
+      </Disclosure>
+      <Disclosure summary="A link" look="link">
+        Linked
+      </Disclosure>
+    </>,
+  );
+  await screen.getByRole("button", { name: "Held" }).click();
+  expect(opened).toEqual([true]);
+  await expect
+    .element(screen.getByRole("button", { name: "Held" }))
+    .toHaveAttribute("aria-expanded", "false");
+  await expect.element(screen.getByText("First content")).toBeVisible();
+  for (const name of ["Held", "A link"]) {
+    const height = screen.getByRole("button", { name }).element().getBoundingClientRect().height;
+    expect(height).toBeGreaterThanOrEqual(24);
+  }
 });

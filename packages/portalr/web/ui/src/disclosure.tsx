@@ -20,11 +20,13 @@ const LOOK = {
  * A part that opens and closes: its summary on a button that says whether it is open
  * (`aria-expanded`) and what it opens (`aria-controls`), by the keyboard as by a pointer, with the
  * kit's focus ring and a target at least `--disclosure-target` tall, and a chevron that turns as
- * fast as the kit's motion allows, not at all under reduced motion. What it opens stays in the page
- * while closed, hidden until found, as a `details` element's does, so a find in the page reaches it.
+ * fast as the kit's motion allows, not at all under reduced motion. The panel is hidden until
+ * found while closed, so a find in the page reaches what it holds and opens it; a caller that
+ * renders its children only while open, to read them only when asked, has nothing to find.
  */
 export function Disclosure({
   summary,
+  name,
   look = "quiet",
   open,
   defaultOpen,
@@ -35,6 +37,8 @@ export function Disclosure({
   children,
 }: {
   summary: ReactNode;
+  /** The trigger's name where its summary alone wouldn't tell it from its neighbours'. */
+  name?: string;
   look?: keyof typeof LOOK;
   /** Open or not, where the caller holds it; or open at first, where the disclosure does. */
   open?: boolean;
@@ -56,6 +60,7 @@ export function Disclosure({
       className={className}
     >
       <Collapsible.Trigger
+        aria-label={name}
         className={cn(
           "group flex min-h-(--disclosure-target) cursor-pointer gap-(--disclosure-gap) rounded-(--disclosure-radius) outline-offset-(--focus-offset) focus-visible:outline-(length:--focus-width) focus-visible:outline-focus",
           look !== "block" && "items-center",

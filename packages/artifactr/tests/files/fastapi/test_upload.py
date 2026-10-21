@@ -10,15 +10,18 @@ its readings and quotas; makes nothing twice when sent again; and records every 
 import asyncio
 import hashlib
 import logging
+import socket
 import threading
-from collections.abc import Iterator
+import time
+from collections.abc import AsyncIterator, Iterator
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any
 
 import anyio
 import pytest
-from fastapi import FastAPI
+import uvicorn
+from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
 from starlette.requests import HTTPConnection
@@ -29,6 +32,13 @@ from artifactr.files.app import AppFailed, FakeApp, Inspection
 from artifactr.files.blobs import InMemoryBlobs, Quota
 from artifactr.files.checkouts import InMemoryCheckouts
 from artifactr.files.fastapi import files_router
+from artifactr.files.fastapi.router import (  # pyright: ignore[reportPrivateUsage]
+    Body,
+    TooSlow,
+    Uploaded,
+    _answered,
+    _Meter,
+)
 from artifactr.files.manifest import DOCX, NativeFile, WordDocument
 from artifactr.files.native import CREATE_NATIVE_FILE, FORMATS, Format, NativeFiles
 from artifactr.files.worker import Limits, Worker, worker_app
@@ -89,7 +99,9 @@ class World:
         return [artifact.id for artifact in await self.ws.artifacts(NativeFile)]
 
 
-def world_of(*, per_minute: int = 20, readings: int | None = None) -> World:
+def world_of(
+    *, per_minute: int = 20, readings: int | None = None, at_once: int = 8, body: Body | None = None
+) -> World:
     switch, app = Switch(), Gated()
     blobs = InMemoryBlobs(limit=2 * LIMIT, workspace_quota=Quota(files=3))
     files = NativeFiles(
@@ -106,6 +118,8 @@ def world_of(*, per_minute: int = 20, readings: int | None = None) -> World:
             resolve_actor=resolve_actor,
             limit=LIMIT,
             uploads_per_minute=per_minute,
+            uploads_at_once=at_once,
+            body=body,
         )
     )
     ws = asyncio.run(workspaces.open("acme", "w1", actor=UserActor(id="alice")))
@@ -269,6 +283,55 @@ def test_each_person_uploads_at_a_pace() -> None:
     assert refused.json()["detail"]["type"] == "rate_limited"
     assert 1 <= int(refused.headers["retry-after"]) <= 60
     assert world.upload(FakeApp.file("3"), user="bob").status_code == 201, "Bob has his own"
+    assert world.upload(FakeApp.file("3"), tenant="globex").status_code == 201, (
+        "Alice of another tenant has hers"
+    )
+
+
+async def test_a_body_that_pauses_or_trickles_is_refused() -> None:
+    async def body(*pauses: float) -> AsyncIterator[bytes]:
+        for pause in pauses:
+            await asyncio.sleep(pause)
+            yield b"x" * 10
+
+    async def read(meter: _Meter) -> int:
+        return sum([len(chunk) async for chunk in meter])
+
+    pace = Body(pause=0.2, floor=100)
+    assert await read(_Meter(body(0, 0.1, 0.1), pace)) == 30
+    with pytest.raises(TooSlow):
+        await read(_Meter(body(0, 0.3), pace))
+    with pytest.raises(TooSlow):
+        await read(_Meter(body(*[0.15] * 4), pace))  # past its pause, under its floor
+
+
+def test_a_slow_body_is_refused_with_408(world: World) -> None:
+    async def slow() -> Uploaded:
+        raise TooSlow
+
+    with pytest.raises(HTTPException) as raised:
+        asyncio.run(_answered(slow()))
+    assert (raised.value.status_code, raised.value.detail) == (408, {"type": "too_slow"})
+
+
+def test_the_process_takes_only_so_many_uploads_at_once() -> None:
+    world = world_of(at_once=1)
+    world.app.through.clear()
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        first = pool.submit(world.upload, FakeApp.file("1"))
+        assert world.app.inspecting.wait(timeout=10)
+        refused = world.upload(FakeApp.file("2"), tenant="globex")
+        world.app.through.set()
+        assert first.result(timeout=10).status_code == 201
+    assert (refused.status_code, refused.json()["detail"]["type"]) == (429, "busy")
+
+
+def test_the_routers_limit_is_never_past_the_stores() -> None:
+    files = NativeFiles(InMemoryBlobs(limit=10), InMemoryCheckouts(), FakeApp())
+    with pytest.raises(ValueError, match="past the blob store's"):
+        files_router(Workspaces(InMemoryStorage()), files, resolve_actor=resolve_actor, limit=11)
+    router = files_router(Workspaces(InMemoryStorage()), files, resolve_actor=resolve_actor)
+    assert router.routes
 
 
 def test_a_tenant_whose_files_are_all_being_read_is_told_to_wait() -> None:
@@ -310,7 +373,21 @@ def test_every_upload_is_recorded(world: World, caplog: pytest.LogCaptureFixture
         world.upload(file, artifact_id="a1")
         world.upload(b"junk")
         world.upload(file, user="vic")
-    applied, unchanged, junk, forbidden = recorded(caplog)
+        world.client.post(
+            UPLOAD,
+            params={"kind": "word_document", "name": "t"},
+            content=file,
+            headers={"x-token": "bad"},
+        )
+    applied, unchanged, junk, forbidden, unknown = recorded(caplog)
+    assert unknown == {
+        "kind": "word_document",
+        "workspace_id": "w1",
+        "outcome": "refused",
+        "status": 401,
+        "sha256": None,
+        "size": 0,
+    }
     assert applied == {
         "kind": "word_document",
         "outcome": "applied",
@@ -349,3 +426,27 @@ async def test_through_the_worker_a_crash_is_told_in_the_routes_words() -> None:
     assert "onerror" not in refused.text
     ws = await workspaces.open("acme", "w1", actor=UserActor(id="alice"))
     assert await ws.artifacts(NativeFile) == []
+
+
+def test_a_real_server_closes_the_connection_after_refusing_an_unread_body() -> None:
+    world = world_of()
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        server = uvicorn.Server(uvicorn.Config(world.client.app, http="h11", log_level="warning"))
+        serving = threading.Thread(target=server.run, kwargs={"sockets": [sock]})
+        serving.start()
+        while not server.started:
+            time.sleep(0.01)
+        try:
+            with socket.create_connection(sock.getsockname(), timeout=10) as client:
+                client.sendall(
+                    b"POST /workspaces/w1/files?kind=word_document&name=t HTTP/1.1\r\n"
+                    b"Host: app\r\nContent-Length: 1000000000\r\n\r\n" + b"{" * 1024
+                )
+                answered = b""
+                while chunk := client.recv(65536):
+                    answered += chunk
+            assert answered.startswith(b"HTTP/1.1 413"), "and the read ended: it was closed"
+        finally:
+            server.should_exit = True
+            serving.join()

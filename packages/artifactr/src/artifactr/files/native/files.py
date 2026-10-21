@@ -7,6 +7,7 @@ one revision through the workspace, which a failure before the commit never reac
 """
 
 import contextlib
+import hashlib
 import json
 import uuid
 from collections import Counter
@@ -39,7 +40,7 @@ from artifactr.core import (
 )
 from artifactr.files.app import App, AppCommand, AppFailed, Inspection
 from artifactr.files.blobs import Blobs, Clock, once
-from artifactr.files.blobs.port import utc_now
+from artifactr.files.blobs.port import spool, utc_now
 from artifactr.files.checkouts import Checkout, Checkouts, holder_of
 from artifactr.files.manifest import Blob, NativeFile, Provenance, revise
 from artifactr.files.native.formats import FORMATS, Format, file_name, sniffed
@@ -135,8 +136,8 @@ class NativeFiles:
             native types' by default. An application with a native type of its own adds its
             format's.
         readings: How many files, uploaded or checked in, each tenant may have the app read at
-            once, past which another is refused with `Busy`: no limit by default. It is this
-            process's count, so each replica of an application counts its own.
+            once, past which another is refused with `Busy`: two by default, None for no limit.
+            It is this process's count, so each replica of an application counts its own.
 
     Raises:
         ValueError: If an edit's lease would end before the apps' deadline, or no app is given.
@@ -155,7 +156,7 @@ class NativeFiles:
         clock: Clock = utc_now,
         integrations: Integrations | None = None,
         formats: Mapping[str, Format] = FORMATS,
-        readings: int | None = None,
+        readings: int | None = 2,
     ) -> None:
         if edit_ttl.total_seconds() <= deadline:
             raise ValueError("an edit's lease must outlast the app's deadline, and the commit")
@@ -175,6 +176,11 @@ class NativeFiles:
         self._formats = formats
         self._readings = readings
         self._reading: Counter[str] = Counter()
+
+    @property
+    def limit(self) -> int:
+        """The largest file, in bytes, that the blob store keeps."""
+        return self._blobs.limit
 
     def app_of(self, file_type: type[NativeFile]) -> App:
         """The app that reads a native type: its own, or else its nearest base's.
@@ -277,28 +283,48 @@ class NativeFiles:
             Busy: If the tenant has as many files being read as it may.
         """
         app = await self._switched_on(ws, file_type)
+        told = media_type is None
         if media_type is None:
             media_type, data = await sniffed(data, self._formats, file_type.formats)
             if media_type is None:
                 raise AppFailed("refused", f"the file is not a {file_type.kind}")
         if media_type not in file_type.formats:
             raise ValidationFailed(f"a {file_type.kind} holds {sorted(file_type.formats)}", [])
-        uploaded = None if artifact_id is None else await _existing(ws, artifact_id)
-        artifact_id = artifact_id or new_artifact_id()
-        scope = _scope(ws)
-        content = await self._blobs.put(scope, artifact_id, data, media_type)
-        if uploaded is not None:
-            if uploaded.data.content.sha256 != content.sha256:
+        content = await spool(data, self._blobs.limit)
+        if artifact_id is not None and (uploaded := await _existing(ws, artifact_id)):
+            if uploaded.data.content.sha256 != hashlib.sha256(content).hexdigest():
                 raise InvalidState(f"artifact {artifact_id} already exists")
             return None
-        inspection = await self._inspect(app, scope, artifact_id, content)
-        if inspection.media_type not in (None, media_type):
-            raise ValidationFailed(f"the file is {inspection.media_type}, not {media_type}", [])
+        async with self._turn(ws.tenant_id):
+            inspection = await app.inspect(content, deadline=self._deadline)
+        if inspection.media_type != media_type and (
+            inspection.media_type is not None or (told and not self._formats[media_type].told)
+        ):
+            # Never the format the app named: it is the worker's text, which a file can shape.
+            raise ValidationFailed("the app read the file as another format than its kind's", [])
         known = self._formats.get(media_type)
         name = file_name(name, "" if known is None else known.extension, self._formats)
-        made = Provenance(source="upload")
-        manifest = await self._manifest(
-            scope, artifact_id, file_type, name, content, inspection, made
+        # The file and what was read from it, stored whole or not at all, only once it was read,
+        # so a refused upload holds nothing against a quota.
+        artifact_id = artifact_id or new_artifact_id()
+        stored, text, review = await self._blobs.put_all(
+            _scope(ws),
+            artifact_id,
+            [
+                (content, media_type),
+                (inspection.text.encode(), TEXT),
+                (_canonical(inspection.review), JSON),
+            ],
+        )
+        manifest = file_type(
+            name=name,
+            content=stored,
+            fingerprint=inspection.fingerprint,
+            text=text,
+            review=review,
+            outline=inspection.outline,
+            pages=inspection.pages,
+            provenance=Provenance(source="upload"),
         )
         return await ws.commit(
             create_artifact(manifest, artifact_id=artifact_id, thread_id=thread_id)
@@ -406,9 +432,10 @@ class NativeFiles:
         content = await self._blobs.put(scope, artifact_id, data, checked_out)
         inspection = await self._inspect(app, scope, artifact_id, content)
         if inspection.media_type not in (None, checked_out):
-            raise FormatChanged(
-                artifact_id, checked_out=checked_out, checked_in=inspection.media_type
-            )
+            # The app's name for a format is the worker's text: only one known is told.
+            read = inspection.media_type
+            told = read if read in self._formats else "another format"
+            raise FormatChanged(artifact_id, checked_out=checked_out, checked_in=told)
         if inspection.fingerprint == head.data.fingerprint:
             await self._close(ws, checkout)
             return None
@@ -673,8 +700,6 @@ class NativeFiles:
             yield
         finally:
             self._reading[tenant_id] -= 1
-            if not self._reading[tenant_id]:
-                del self._reading[tenant_id]
 
     async def _manifest[F: NativeFile](
         self,
@@ -700,8 +725,7 @@ class NativeFiles:
         )
 
     async def _put_json(self, scope: Scope, artifact_id: ArtifactId, value: JsonValue) -> Blob:
-        canonical = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
-        return await self._blobs.put(scope, artifact_id, once(canonical.encode()), JSON)
+        return await self._blobs.put(scope, artifact_id, once(_canonical(value)), JSON)
 
     async def _bytes(
         self, scope: Scope, artifact_id: ArtifactId, blob: Blob | None, part: Part
@@ -710,6 +734,11 @@ class NativeFiles:
         if found is None:
             raise ContentUnavailable(artifact_id, part)
         return found
+
+
+def _canonical(value: JsonValue) -> bytes:
+    """A value as canonical JSON: keys sorted, no spaces."""
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
 
 
 def digests(value: JsonValue) -> set[str]:

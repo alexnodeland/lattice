@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import { render } from "vitest-browser-react";
 import { axeViolations } from "./test/axe";
-import { type UploadItem, UploadList } from "./upload-list";
+import { plainName, type UploadItem, UploadList } from "./upload-list";
 
 const ITEMS: UploadItem[] = [
   { id: "1", name: "brief.docx", size: 48_000, state: "done", said: "Uploaded brief.docx." },
@@ -64,4 +64,18 @@ test("a file sent with no bytes counted yet is at nothing, and no list is no lis
     />,
   );
   expect(screen.container.querySelector("ul")).toBeNull();
+});
+
+test("a name is shown isolated, without the controls that would reorder what is around it", async () => {
+  expect(plainName("a\u202Eb\u2066c\u200Fd.docx")).toBe("abcd.docx");
+  const screen = await render(
+    <UploadList
+      items={[{ id: "1", name: "gpj\u202Ecod.exe", size: 4, state: "waiting" }]}
+      onStop={() => undefined}
+      onRemove={() => undefined}
+      onRetry={() => undefined}
+    />,
+  );
+  const shown = screen.container.querySelector("bdi");
+  expect(shown?.textContent).toBe("gpjcod.exe");
 });

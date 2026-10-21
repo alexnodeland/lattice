@@ -681,6 +681,16 @@
             },
             "description": "Refused"
           },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
           "409": {
             "content": {
               "application/json": {
@@ -819,6 +829,16 @@
             },
             "description": "Refused"
           },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
           "409": {
             "content": {
               "application/json": {
@@ -875,7 +895,7 @@
     },
     "/workspaces/{workspace_id}/files": {
       "post": {
-        "description": "Upload a file as a new native file of `kind`: its bytes are the body, streamed.\n\nIts `Content-Type` is never read: the format is the one of the kind's that its first\nbytes are, and the app reads the file before anything is committed. Give an\n`artifact_id` to send it again safely: a file already there with these bytes is\n`unchanged`, and one with others is refused.",
+        "description": "Upload a file as a new native file of `kind`: its bytes are the body, streamed.\n\nIts `Content-Type` is never read: the format is the one of the kind's that its first\nbytes are, and the app reads the file before anything is stored or committed. Give an\n`artifact_id` to send it again safely: a file already there with these bytes is\n`unchanged`, and one with others is refused.",
         "operationId": "upload_workspaces__workspace_id__files_post",
         "parameters": [
           {
@@ -893,7 +913,7 @@
             "name": "kind",
             "required": true,
             "schema": {
-              "minLength": 1,
+              "pattern": "^[a-z][a-z0-9_]{0,63}$",
               "title": "Kind",
               "type": "string"
             }
@@ -993,6 +1013,16 @@
             "description": "Refused"
           },
           "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "408": {
             "content": {
               "application/json": {
                 "schema": {
@@ -1133,6 +1163,16 @@
             },
             "description": "Refused"
           },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
           "409": {
             "content": {
               "application/json": {
@@ -1255,6 +1295,16 @@
             "description": "Refused"
           },
           "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "408": {
             "content": {
               "application/json": {
                 "schema": {
@@ -1392,6 +1442,16 @@
             "description": "Refused"
           },
           "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "408": {
             "content": {
               "application/json": {
                 "schema": {
@@ -1548,6 +1608,16 @@
             },
             "description": "Refused"
           },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
           "409": {
             "content": {
               "application/json": {
@@ -1676,6 +1746,16 @@
             "description": "Refused"
           },
           "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "408": {
             "content": {
               "application/json": {
                 "schema": {
@@ -1822,6 +1902,16 @@
             },
             "description": "Refused"
           },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
           "409": {
             "content": {
               "application/json": {
@@ -1949,6 +2039,16 @@
             },
             "description": "Refused"
           },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
           "409": {
             "content": {
               "application/json": {
@@ -2061,6 +2161,16 @@
             "description": "Refused"
           },
           "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "408": {
             "content": {
               "application/json": {
                 "schema": {

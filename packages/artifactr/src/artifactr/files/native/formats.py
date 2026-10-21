@@ -33,6 +33,14 @@ HEAD: Final = 4096
 NAME_LIMIT: Final = 200
 """The most characters a file's name keeps, with its extension."""
 
+NAME_BYTES: Final = 255
+"""The most bytes, in UTF-8, a file's name keeps: what most file systems take."""
+
+RESERVED: Final = frozenset(
+    {"CON", "PRN", "AUX", "NUL", *(f"{d}{n}" for d in ("COM", "LPT") for n in range(1, 10))}
+)
+"""The names Windows reserves for devices, whatever their extension, which a name is kept from."""
+
 
 @dataclass(frozen=True)
 class Format:
@@ -42,6 +50,9 @@ class Format:
     """The extension a file of it is named with, such as `.docx`."""
     matches: Callable[[bytes], bool]
     """Whether the first bytes, up to `HEAD`, may be a file of it."""
+    told: bool = True
+    """Whether its first bytes tell it from every other format: not for one packaged in a zip,
+    which an upload's app must then name, or the upload is refused."""
 
 
 def _zip(head: bytes) -> bool:
@@ -66,12 +77,12 @@ def _dxf(head: bytes) -> bool:
 
 
 FORMATS: Final[Mapping[str, Format]] = {
-    DOCX: Format(".docx", _zip),
-    XLSX: Format(".xlsx", _zip),
-    PPTX: Format(".pptx", _zip),
-    IDML: Format(".idml", _zip),
-    FIGCRAFT: Format(".figcraft", _zip),
-    FCSTD: Format(".FCStd", _zip),
+    DOCX: Format(".docx", _zip, told=False),
+    XLSX: Format(".xlsx", _zip, told=False),
+    PPTX: Format(".pptx", _zip, told=False),
+    IDML: Format(".idml", _zip, told=False),
+    FIGCRAFT: Format(".figcraft", _zip, told=False),
+    FCSTD: Format(".FCStd", _zip, told=False),
     PDF: Format(".pdf", lambda head: head.startswith(b"%PDF-")),
     PSD: Format(".psd", lambda head: head.startswith(b"8BPS")),
     DWG: Format(".dwg", lambda head: re.match(rb"AC10[0-3][0-9]", head) is not None),
@@ -117,9 +128,9 @@ def file_name(given: str, extension: str, formats: Mapping[str, Format]) -> str:
 
     What a client gives is the last part of any path, normalized (NFC), with every control or
     format character, such as a right-to-left override, and every one a file system refuses
-    replaced by `_`. Its extension is the
-    format's: one of another format's is replaced, and any other kept before it. An empty
-    name is `file`.
+    replaced by `_`; a name Windows reserves, such as `CON`, is prefixed with `_`. Its
+    extension is the format's: one of another format's is replaced, and any other kept before
+    it. An empty name is `file`. It is capped in characters and in UTF-8 bytes.
     """
     last = re.split(r"[/\\]", unicodedata.normalize("NFC", given))[-1]
     kept = (c if unicodedata.category(c)[0] != "C" and c not in REFUSED else "_" for c in last)
@@ -129,4 +140,9 @@ def file_name(given: str, extension: str, formats: Mapping[str, Format]) -> str:
     if dot and f".{suffix.lower()}" in known:
         name = stem
     name = name.strip(" .") or "file"
-    return name[: NAME_LIMIT - len(extension)] + extension
+    if name.partition(".")[0].upper() in RESERVED:
+        name = f"_{name}"
+    name = name[: NAME_LIMIT - len(extension)]
+    while len((name + extension).encode()) > NAME_BYTES:
+        name = name[:-1]
+    return name + extension

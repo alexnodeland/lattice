@@ -9,7 +9,8 @@ import pytest
 
 from artifactr.core import Applied, InvalidState, Proposed, UserActor, ValidationFailed
 from artifactr.files.app import AppFailed, Failure, FakeApp, Inspection
-from artifactr.files.blobs import once
+from artifactr.files.blobs import InMemoryBlobs, Quota, once
+from artifactr.files.checkouts import InMemoryCheckouts
 from artifactr.files.manifest import DOCX, NativeFile, WordDocument, Workbook
 from artifactr.files.native import FORMATS, Busy, Format, NativeFiles
 from artifactr.workspace import InMemoryStorage, Workspace, Workspaces
@@ -81,12 +82,38 @@ async def test_a_file_the_app_reads_as_another_format_is_refused(stores: Stores)
     class Other(FakeApp):
         async def inspect(self, source: bytes, *, deadline: float) -> Inspection:
             read = await super().inspect(source, deadline=deadline)
-            return read.model_copy(update={"media_type": "application/pdf"})
+            return read.model_copy(update={"media_type": "text/x-<b>shaped</b>"})
 
     ws, files = await workspace(), native(stores, Other())
-    with pytest.raises(ValidationFailed, match="application/pdf"):
+    with pytest.raises(ValidationFailed) as raised:
         await files.upload(ws, WordDocument, "w.docx", once(FakeApp.file("x")))
+    assert "shaped" not in str(raised.value.payload()), "the worker's text is never told"
     assert await committed(ws) == []
+
+
+async def test_a_zip_the_app_names_no_format_of_is_refused(stores: Stores) -> None:
+    class Silent(FakeApp):
+        async def inspect(self, source: bytes, *, deadline: float) -> Inspection:
+            return Inspection(fingerprint="0" * 64)
+
+    files = NativeFiles(stores.blobs, stores.checkouts, Silent())
+    ws = await workspace()
+    zipped = once(b"PK\x03\x04" + b"\x00" * 64)
+    with pytest.raises(ValidationFailed, match="another format"):
+        await files.upload(ws, WordDocument, "w.docx", zipped)
+    assert await committed(ws) == []
+
+
+async def test_a_refused_upload_holds_nothing_against_a_quota() -> None:
+    blobs = InMemoryBlobs(workspace_quota=Quota(bytes=10_000, files=1))
+    files = NativeFiles(blobs, InMemoryCheckouts(), FakeApp(fails="refused"), formats=JSON_DOCX)
+    ws = await workspace()
+    for i in range(3):
+        with pytest.raises(AppFailed):
+            await files.upload(ws, WordDocument, "w.docx", once(FakeApp.file(str(i))))
+    files = NativeFiles(blobs, InMemoryCheckouts(), FakeApp(), formats=JSON_DOCX)
+    uploaded = await files.upload(ws, WordDocument, "w.docx", once(FakeApp.file("ok")))
+    assert isinstance(uploaded, Applied), "the quota's one file was never taken"
 
 
 async def test_an_upload_sent_again_makes_nothing_twice(stores: Stores) -> None:

@@ -12,6 +12,12 @@ import { Button } from "./button";
 import { fileSize } from "./native-file";
 import { Progress } from "./progress";
 
+/** The bidirectional controls a name could reorder the words around it with. */
+const BIDI = /[\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/g;
+
+/** A file's name as shown: without the controls that would reorder what is said around it. */
+export const plainName = (name: string) => name.replace(BIDI, "");
+
 /** One file on the list, as the list shows it. */
 export interface UploadItem {
   readonly id: string;
@@ -47,14 +53,14 @@ export function UploadList({
         <li key={item.id} className="flex min-w-0 flex-col gap-2 text-sm">
           {item.state === "sending" ? (
             <Progress
-              label={`Uploading ${item.name}`}
+              label={`Uploading ${plainName(item.name)}`}
               value={item.sent ?? 0}
               max={item.size}
               valueText={`${fileSize(item.sent ?? 0)} of ${fileSize(item.size)}`}
             />
           ) : (
             <p className="flex flex-wrap gap-x-2">
-              <span className="break-all font-mono">{item.name}</span>
+              <bdi className="break-all font-mono">{plainName(item.name)}</bdi>
               <span className="text-muted">
                 {fileSize(item.size)}
                 {item.state === "waiting" && ", waiting"}
@@ -69,18 +75,29 @@ export function UploadList({
           <div className="flex flex-wrap gap-2">
             {item.state === "sending" && (
               <Button variant="secondary" size="sm" onClick={() => onStop(item.id)}>
-                Stop<span className="sr-only"> uploading {item.name}</span>
+                Stop
+                <span className="sr-only">
+                  {" "}
+                  uploading <bdi>{plainName(item.name)}</bdi>
+                </span>
               </Button>
             )}
             {item.state === "failed" && item.again && (
               <Button size="sm" onClick={() => onRetry(item.id)}>
-                Try again<span className="sr-only"> to upload {item.name}</span>
+                Try again
+                <span className="sr-only">
+                  {" "}
+                  to upload <bdi>{plainName(item.name)}</bdi>
+                </span>
               </Button>
             )}
             {item.state !== "sending" && (
               <Button variant="secondary" size="sm" onClick={() => onRemove(item.id)}>
                 {item.state === "waiting" ? "Don't upload" : "Dismiss"}
-                <span className="sr-only"> {item.name}</span>
+                <span className="sr-only">
+                  {" "}
+                  <bdi>{plainName(item.name)}</bdi>
+                </span>
               </Button>
             )}
           </div>

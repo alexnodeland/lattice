@@ -1,6 +1,6 @@
 """Blobs in memory, for tests, examples and single-process prototypes."""
 
-from collections.abc import AsyncIterable, Set
+from collections.abc import AsyncIterable, Sequence, Set
 from datetime import datetime
 
 from artifactr.core import ArtifactId
@@ -11,6 +11,7 @@ from artifactr.files.blobs.port import (
     Usage,
     check_limit,
     check_quota,
+    named,
     spool,
     utc_now,
 )
@@ -43,22 +44,39 @@ class InMemoryBlobs:
         self._quotas = (workspace_quota or Quota(), tenant_quota or Quota())
         self._blobs: dict[_Key, tuple[bytes, datetime]] = {}
 
+    @property
+    def limit(self) -> int:
+        """The largest blob, in bytes."""
+        return self._limit
+
     async def put(
         self, scope: Scope, artifact_id: ArtifactId, data: AsyncIterable[bytes], media_type: str
     ) -> Blob:
         """Store bytes for an artifact, and name them, as `Blobs.put` does."""
-        content, sha256 = await spool(data, self._limit)
-        key = (scope.tenant_id, scope.workspace_id, artifact_id, sha256)
-        if key not in self._blobs:
+        content = await spool(data, self._limit)
+        [blob] = await self.put_all(scope, artifact_id, [(content, media_type)])
+        return blob
+
+    async def put_all(
+        self, scope: Scope, artifact_id: ArtifactId, parts: Sequence[tuple[bytes, str]]
+    ) -> list[Blob]:
+        """Store several bytes for an artifact at once, as `Blobs.put_all` does."""
+        blobs = named(parts, self._limit)
+        prefix = (scope.tenant_id, scope.workspace_id, artifact_id)
+        held = {k[3] for k in self._blobs if k[:3] == prefix}
+        new = {blob.sha256: blob.size for blob in blobs if blob.sha256 not in held}
+        if new:
             workspace, tenant = self._quotas
             check_quota(
-                (workspace, self._usage(key[:2])),
-                (tenant, self._usage(key[:1])),
-                size=len(content),
-                new_file=not any(k[:3] == key[:3] for k in self._blobs),
+                (workspace, self._usage(prefix[:2])),
+                (tenant, self._usage(prefix[:1])),
+                size=sum(new.values()),
+                new_file=not held,
             )
-        self._blobs[key] = (content, self._clock())
-        return Blob(sha256=sha256, size=len(content), media_type=media_type)
+        now = self._clock()
+        for blob, (content, _) in zip(blobs, parts, strict=True):
+            self._blobs[(*prefix, blob.sha256)] = (content, now)
+        return blobs
 
     def _usage(self, prefix: tuple[str, ...]) -> Usage:
         """What the blobs whose keys start with `prefix` hold: a workspace's, or a tenant's."""

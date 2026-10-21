@@ -54,7 +54,8 @@ def rendered() -> str:
         f"{{% {'if' if i == 0 else 'elif'} libraries == '{choice}' -%}}\n" + with_portal(catalogs)
         for i, (choice, catalogs) in enumerate(CATALOGS.items())
     ]
-    return "".join(blocks) + "{% endif %}"
+    # The file ends in a newline, as every file does; the tag's `-` keeps it out of what renders.
+    return "".join(blocks) + "{% endif -%}\n"
 
 
 def main() -> int:

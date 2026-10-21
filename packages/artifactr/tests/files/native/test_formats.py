@@ -114,6 +114,9 @@ async def test_a_format_no_table_knows_is_never_found() -> None:
         ("invoice\u202excod.docx", "invoice_xcod.docx"),
         ("a<b>c:d|e?.docx", "a_b_c_d_e_.docx"),
         ("  . ", "file.docx"),
+        ("con.txt", "_con.txt.docx"),
+        ("NUL", "_NUL.docx"),
+        ("COM10", "COM10.docx"),
         ("/", "file.docx"),
         ("e\u0301te\u0301.docx", "\u00e9t\u00e9.docx"),
     ],
@@ -128,3 +131,9 @@ def test_a_name_is_capped_with_its_extension() -> None:
     kept = file_name("x" * 1000, ".FCStd", FORMATS)
     assert len(kept) == NAME_LIMIT
     assert kept.endswith("x.FCStd")
+
+
+def test_a_name_is_capped_in_bytes_too() -> None:
+    kept = file_name("é" * 199, ".pdf", FORMATS)
+    assert len(kept.encode()) <= 255
+    assert kept.endswith("é.pdf")

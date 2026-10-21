@@ -8,7 +8,7 @@ has a file.
 """
 
 import hashlib
-from collections.abc import AsyncIterable, Callable, Set
+from collections.abc import AsyncIterable, Callable, Sequence, Set
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Final, Literal, Protocol, cast
@@ -103,6 +103,11 @@ def check_quota(
 class Blobs(Protocol):
     """Where the bytes of native files are kept, by artifact and digest."""
 
+    @property
+    def limit(self) -> int:
+        """The largest blob, in bytes."""
+        ...
+
     async def put(
         self, scope: Scope, artifact_id: ArtifactId, data: AsyncIterable[bytes], media_type: str
     ) -> Blob:
@@ -115,6 +120,20 @@ class Blobs(Protocol):
         Raises:
             TooLarge: If the bytes are larger than the store's limit.
             OverQuota: If new bytes would take the workspace or the tenant past a quota.
+        """
+        ...
+
+    async def put_all(
+        self, scope: Scope, artifact_id: ArtifactId, parts: Sequence[tuple[bytes, str]]
+    ) -> list[Blob]:
+        """Store several bytes for an artifact at once, each with its media type: all or none.
+
+        The new bytes among them are counted against the quotas together, so a file and what
+        was read from it are stored whole, or not at all.
+
+        Raises:
+            TooLarge: If any is larger than the store's limit.
+            OverQuota: If the new bytes would take the workspace or the tenant past a quota.
         """
         ...
 
@@ -151,22 +170,32 @@ def check_limit(limit: int) -> int:
     return limit
 
 
-async def spool(data: AsyncIterable[bytes], limit: int) -> tuple[bytes, str]:
-    """Read bytes as they arrive, and return them with their SHA-256.
+async def spool(data: AsyncIterable[bytes], limit: int) -> bytes:
+    """Read bytes as they arrive, into one buffer.
 
     Raises:
-        TooLarge: As soon as more than `limit` bytes have arrived.
+        TooLarge: As soon as more than `limit` bytes have arrived, before they are kept.
     """
-    digest = hashlib.sha256()
-    chunks: list[bytes] = []
-    size = 0
+    spooled = bytearray()
     async for chunk in data:
-        size += len(chunk)
-        if size > limit:
+        if len(spooled) + len(chunk) > limit:
             raise TooLarge(limit)
-        digest.update(chunk)
-        chunks.append(chunk)
-    return b"".join(chunks), digest.hexdigest()
+        spooled += chunk
+    return bytes(spooled)
+
+
+def named(parts: Sequence[tuple[bytes, str]], limit: int) -> list[Blob]:
+    """Each of the bytes named by its digest, size and media type.
+
+    Raises:
+        TooLarge: If any is larger than `limit`.
+    """
+    if any(len(content) > limit for content, _ in parts):
+        raise TooLarge(limit)
+    return [
+        Blob(sha256=hashlib.sha256(content).hexdigest(), size=len(content), media_type=media_type)
+        for content, media_type in parts
+    ]
 
 
 async def once(data: bytes) -> AsyncIterable[bytes]:

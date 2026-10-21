@@ -11,7 +11,14 @@
  */
 
 import { newArtifactId, type UploadAnswer, uploadFile } from "@portalr/client";
-import { FileChooser, fileSize, TextLink, type UploadItem, UploadList } from "@portalr/ui";
+import {
+  FileChooser,
+  fileSize,
+  plainName,
+  TextLink,
+  type UploadItem,
+  UploadList,
+} from "@portalr/ui";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
@@ -26,7 +33,12 @@ interface Queued extends UploadItem {
   readonly kind: string;
   /** The id it is made with, chosen once, so that sending it again makes nothing twice. */
   readonly artifact: string;
+  /** How many times it was sent again. */
+  readonly tries: number;
 }
+
+/** How many times a file the app couldn't finish is offered to be sent again. */
+export const RETRIES = 2;
 
 /** The app that reads a kind, as people call it, such as "WordCraft". */
 export const appOf = (kind: string) => NATIVE.get(kind)?.app ?? kind;
@@ -54,7 +66,7 @@ export function uploadRefused(
   switch (answer.status) {
     case 0:
       return {
-        text: `${name} wasn't uploaded: ${answer.reasons.join(" ")} Try again.`,
+        text: `${name} wasn't uploaded: the connection ended, or it was stopped, before the server answered. It may have arrived: trying again never makes it twice.`,
         again: true,
       };
     case 401:
@@ -66,6 +78,11 @@ export function uploadRefused(
       return {
         text: `${name} wasn't uploaded: you can't upload files in this workspace.`,
         again: false,
+      };
+    case 408:
+      return {
+        text: `${name} wasn't uploaded: the upload was too slow and was stopped. Try again.`,
+        again: true,
       };
     case 409:
       return answer.type === "not_enabled"
@@ -89,7 +106,7 @@ export function uploadRefused(
     case 429:
       return answer.type === "busy"
         ? {
-            text: `${name} wasn't uploaded: your organisation's files are being read just now. Try again in a few seconds.`,
+            text: `${name} wasn't uploaded: the server is busy with other files just now. Try again in a few seconds.`,
             again: true,
           }
         : {
@@ -102,7 +119,7 @@ export function uploadRefused(
         again: true,
       };
     default:
-      return { text: `${name} wasn't uploaded: ${answer.reasons.join(" ")}`, again: false };
+      return { text: `${name} wasn't uploaded: the server refused it.`, again: false };
   }
 }
 
@@ -149,7 +166,9 @@ export function Uploader({
     const app = appOf(item.kind);
     if (answer.outcome === "refused") {
       const { text, again } = uploadRefused(answer, item.name, app, limit);
-      update(item.id, { state: "failed", said: text, tone: "error", again });
+      // The app crashing or timing out again and again is the file, not a blip: offered twice.
+      const more = answer.status !== 503 || item.tries < RETRIES;
+      update(item.id, { state: "failed", said: text, tone: "error", again: again && more });
       setAnnounced(text);
       return;
     }
@@ -177,7 +196,11 @@ export function Uploader({
       text
     );
 
+  // Leaving the page stops the file going: the server may still have taken what was sent.
+  useEffect(() => () => stop.current?.abort(), []);
+
   // One file at a time, in the order chosen: the next waits until the last has its answer.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `send` is this render's, and reads the same state
   useEffect(() => {
     if (offered === undefined || going.current !== null) {
       return;
@@ -186,32 +209,34 @@ export function Uploader({
     if (next !== undefined) {
       void send(next, offered.limit);
     }
-  });
+  }, [items, offered]);
 
   if (offered === undefined || !offered.allowed) {
     return null;
   }
   const on = offered.kinds.filter((kind) => kind.enabled);
   const choose = (file: File) => {
+    const name = plainName(file.name);
     const kinds = kindsOf(file.name, offered.kinds);
     const [kind] = kinds;
     const problem =
       kind === undefined
-        ? `${file.name} isn't a kind of file this workspace takes.`
+        ? `${name} isn't a kind of file this workspace takes.`
         : kinds.length > 1
-          ? `${file.name} could be several kinds of file, so it can't be told which to make.`
+          ? `${name} could be several kinds of file, so it can't be told which to make.`
           : !on.some((k) => k.kind === kind)
-            ? `${appOf(kind)} is off in this workspace, so ${file.name} can't be uploaded.`
+            ? `${appOf(kind)} is off in this workspace, so ${name} can't be uploaded.`
             : file.size > offered.limit
-              ? `${file.name} is ${fileSize(file.size)}: the largest file an upload takes is ${fileSize(offered.limit)}.`
+              ? `${name} is ${fileSize(file.size)}: the largest file an upload takes is ${fileSize(offered.limit)}.`
               : null;
     const item: Queued = {
       id: newArtifactId(),
-      name: file.name,
+      name,
       size: file.size,
       file,
       kind: kind ?? "",
       artifact: newArtifactId(),
+      tries: 0,
       ...(problem === null
         ? { state: "waiting" }
         : { state: "failed", said: problem, tone: "error", again: false }),
@@ -240,7 +265,15 @@ export function Uploader({
         items={items}
         onStop={() => stop.current?.abort()}
         onRemove={(id) => setItems((now) => now.filter((item) => item.id !== id))}
-        onRetry={(id) => update(id, { state: "waiting", said: undefined })}
+        onRetry={(id) =>
+          setItems((now) =>
+            now.map((item) =>
+              item.id === id
+                ? { ...item, state: "waiting", said: undefined, tries: item.tries + 1 }
+                : item,
+            ),
+          )
+        }
       />
       <p role="status" className="sr-only">
         {announced}

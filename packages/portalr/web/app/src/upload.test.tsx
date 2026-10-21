@@ -109,7 +109,11 @@ test("one stopped, or whose answer never came, is sent again with the same id", 
   const first = await sent(1);
   await screen.getByRole("button", { name: "Stop uploading brief.docx" }).click();
   await expect
-    .element(screen.getByText(/^brief\.docx wasn't uploaded: The upload was stopped/).first())
+    .element(
+      screen
+        .getByText(/^brief\.docx wasn't uploaded: the connection ended, or it was stopped/)
+        .first(),
+    )
     .toBeVisible();
   await screen.getByRole("button", { name: "Try again to upload brief.docx" }).click();
   const again = await sent(2);
@@ -181,7 +185,14 @@ test("each refusal is said in the portal's words, and those worth sending again 
       "WordCraft",
       2000,
     );
-  expect(said(0)).toEqual({ text: "a.docx wasn't uploaded: Why. Try again.", again: true });
+  expect(said(0, { reasons: ["<b>server text</b>"] })).toEqual({
+    text: "a.docx wasn't uploaded: the connection ended, or it was stopped, before the server answered. It may have arrived: trying again never makes it twice.",
+    again: true,
+  });
+  expect(said(408, { type: "too_slow" })).toEqual({
+    text: "a.docx wasn't uploaded: the upload was too slow and was stopped. Try again.",
+    again: true,
+  });
   expect(said(401).text).toBe(
     "a.docx wasn't uploaded: you're signed out. Sign in, then try again.",
   );
@@ -200,11 +211,55 @@ test("each refusal is said in the portal's words, and those worth sending again 
   expect(said(422, { reasons: ["the app said <script>"] }).text).toBe(
     "WordCraft couldn't read a.docx: it may be damaged, or not the kind of file its name says.",
   );
-  expect(said(429, { type: "busy" })).toMatchObject({ again: true });
+  expect(said(429, { type: "busy" })).toEqual({
+    text: "a.docx wasn't uploaded: the server is busy with other files just now. Try again in a few seconds.",
+    again: true,
+  });
   expect(said(429, { type: "rate_limited" }).text).toMatch(/many uploads in the last minute/);
   expect(said(503)).toEqual({
     text: "WordCraft couldn't finish reading a.docx. Try again in a moment.",
     again: true,
   });
-  expect(said(500)).toEqual({ text: "a.docx wasn't uploaded: Why.", again: false });
+  expect(said(500, { reasons: ["<b>server text</b>"] })).toEqual({
+    text: "a.docx wasn't uploaded: the server refused it.",
+    again: false,
+  });
+});
+
+test("a file the app can't finish is offered again twice, and no more", async () => {
+  vi.stubGlobal("XMLHttpRequest", Upload);
+  const { screen } = await open(PAGE, serving(offered()));
+  await screen.getByLabelText("Upload files").upload(new File(["x"], "brief.docx"));
+  const crash = { detail: { type: "app_failed", failure: "crashed", message: "fixed" } };
+  for (const count of [1, 2, 3]) {
+    (await sent(count)).answer(503, crash);
+    const retry = screen.getByRole("button", { name: "Try again to upload brief.docx" });
+    if (count < 3) {
+      await retry.click();
+    } else {
+      await expect
+        .element(screen.getByRole("button", { name: "Dismiss brief.docx" }))
+        .toBeVisible();
+      expect(retry.elements()).toEqual([]);
+    }
+  }
+});
+
+test("leaving the page stops the file going", async () => {
+  vi.stubGlobal("XMLHttpRequest", Upload);
+  const { screen } = await open(PAGE, serving(offered()));
+  await screen.getByLabelText("Upload files").upload(new File(["x"], "brief.docx"));
+  const going = await sent(1);
+  const aborted = vi.spyOn(going, "abort");
+  screen.unmount();
+  expect(aborted).toHaveBeenCalled();
+});
+
+test("a name's bidirectional controls are dropped from what is said of it", async () => {
+  vi.stubGlobal("XMLHttpRequest", Upload);
+  const { screen } = await open(PAGE, serving(offered()));
+  await screen.getByLabelText("Upload files").upload(new File(["x"], "evil\u202Excod.txt"));
+  await expect
+    .element(screen.getByText("evilxcod.txt isn't a kind of file this workspace takes.").first())
+    .toBeVisible();
 });

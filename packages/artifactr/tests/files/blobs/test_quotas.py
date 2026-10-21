@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from artifactr.files.blobs import Blobs, OverQuota, Quota, once
+from artifactr.files.blobs import Blobs, OverQuota, Quota, TooLarge, once
 from artifactr.files.manifest import DOCX
 from artifactr.workspace import Scope
 from tests.files.clock import FakeClock
@@ -69,3 +69,11 @@ async def test_puts_at_once_never_pass_a_quota_together(blobs: Blobs) -> None:
     outcomes = await asyncio.gather(*puts, return_exceptions=True)
     assert sum(not isinstance(o, BaseException) for o in outcomes) == 2
     assert all(isinstance(o, OverQuota) for o in outcomes if isinstance(o, BaseException))
+
+
+async def test_bytes_put_together_are_stored_whole_or_not_at_all(blobs: Blobs) -> None:
+    with pytest.raises(OverQuota):
+        await blobs.put_all(ACME, "a1", [(b"123456", DOCX), (b"12345", "text/plain")])
+    assert await blobs.put_all(ACME, "a1", [(b"1234567890", DOCX)]), "nothing of it was kept"
+    with pytest.raises(TooLarge):
+        await blobs.put_all(ACME, "a2", [(b"x" * (blobs.limit + 1), DOCX)])

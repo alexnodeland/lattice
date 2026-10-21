@@ -8,11 +8,14 @@ upload names the workspace and the native type it makes (native files ADR-0017).
 
 import hashlib
 import logging
+import time
 from collections.abc import AsyncIterable, AsyncIterator, Awaitable
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Annotated, Any, Final, Literal
 from urllib.parse import quote
 
+import anyio
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response
 from pydantic import BaseModel
 from starlette.requests import HTTPConnection
@@ -30,9 +33,9 @@ from artifactr.core import (
 )
 from artifactr.fastapi import STATUS_CODES, ResolveActor, Unauthorized
 from artifactr.files.app import AppFailed, Failure, Talk
-from artifactr.files.blobs import DEFAULT_LIMIT, OverQuota, TooLarge
+from artifactr.files.blobs import OverQuota, TooLarge
 from artifactr.files.checkouts import Checkout
-from artifactr.files.fastapi.pace import Pace
+from artifactr.files.fastapi.pace import Gauge, Pace
 from artifactr.files.manifest import NativeFile
 from artifactr.files.native import CREATE_NATIVE_FILE, Busy, NativeFiles
 from artifactr.telemetry import annotate, attribution
@@ -66,7 +69,7 @@ SAID: Final[dict[Failure, str]] = {
 """What a client is told of each failure, in place of the app's own message, which a hostile
 file can shape (native files ADR-0013): that message is the operator's, in the log."""
 
-REFUSALS: Final = refusals(400, 401, 403, 404, 409, 413, 422, 429, 503)
+REFUSALS: Final = refusals(400, 401, 403, 404, 408, 409, 413, 422, 429, 503)
 """The refused responses every route documents: artifactr's, a file too large or past a quota,
 the app's refusal, too many uploads or readings at once, and the app that couldn't finish."""
 
@@ -169,13 +172,29 @@ class CheckedIn(BaseModel):
     proposal_id: str | None = None
 
 
+class TooSlow(Exception):
+    """An upload's body arrived too slowly, and was refused."""
+
+
+@dataclass(frozen=True)
+class Body:
+    """How slowly an upload's body may arrive: a pause, and an average from its start."""
+
+    pause: float = 30.0
+    """The most seconds between two chunks."""
+    floor: int = 32 * 1024
+    """The fewest bytes a second, on average, after the first `pause`."""
+
+
 def files_router(
     workspaces: Workspaces,
     files: NativeFiles,
     *,
     resolve_actor: ResolveActor,
-    limit: int = DEFAULT_LIMIT,
+    limit: int | None = None,
     uploads_per_minute: int = 20,
+    uploads_at_once: int = 8,
+    body: Body | None = None,
 ) -> APIRouter:
     """Build the router for native files' uploads, check-out and check-in, downloads and pages.
 
@@ -186,14 +205,27 @@ def files_router(
         files: The native files, their stores and their app.
         resolve_actor: Authenticates each request, as for artifactr's router.
         limit: The largest upload or check-in, in bytes, refused from its `Content-Length`
-            before any of it is read: give it the blob store's limit, which is 25 MiB unless
-            the store is given another. A body that grows past the store's own limit as it
-            streams, whatever its `Content-Length` said, is refused there.
-        uploads_per_minute: How many uploads each person may start in a minute, in this
-            process, past which one is refused with 429 until the minute has passed.
+            before any of it is read: the blob store's limit unless given a smaller one. A
+            body that grows past the store's limit as it streams, whatever its
+            `Content-Length` said, is refused there.
+        uploads_per_minute: How many uploads each person of a tenant may start in a minute,
+            in this process, past which one is refused with 429 until the minute has passed.
+        uploads_at_once: How many uploads this process takes at once, from every tenant,
+            past which another is refused with 429 at once: each holds its file in memory.
+        body: How slowly an upload's body may arrive before it is refused with 408: a pause
+            of 30 seconds, and 32 KiB a second on average, by default.
+
+    Raises:
+        ValueError: If `limit` is larger than the blob store's.
     """
+    if limit is None:
+        limit = files.limit
+    if limit > files.limit:
+        raise ValueError(f"the router's limit, {limit}, is past the blob store's, {files.limit}")
     router = APIRouter(responses=REFUSALS)
     pace = Pace(uploads_per_minute)
+    taking = Gauge(uploads_at_once)
+    pacing = body or Body()
 
     async def workspace_of(request: Request, workspace_id: PathId) -> Workspace:
         async def open_it() -> Workspace:
@@ -227,31 +259,35 @@ def files_router(
     async def upload(
         request: Request,
         response: Response,
-        kind: Annotated[str, Query(min_length=1)],
+        workspace_id: PathId,
+        kind: Annotated[str, Query(pattern=r"^[a-z][a-z0-9_]{0,63}$")],
         name: Annotated[str, Query(min_length=1, max_length=1024)],
         artifact_id: ClientId = None,
         thread_id: ClientId = None,
-        ws: Workspace = current_workspace,
     ) -> Uploaded:
         """Upload a file as a new native file of `kind`: its bytes are the body, streamed.
 
         Its `Content-Type` is never read: the format is the one of the kind's that its first
-        bytes are, and the app reads the file before anything is committed. Give an
+        bytes are, and the app reads the file before anything is stored or committed. Give an
         `artifact_id` to send it again safely: a file already there with these bytes is
         `unchanged`, and one with others is refused.
         """
-        meter = _Meter(request.stream())
-        record: dict[str, object] = {"kind": kind, "outcome": "refused"}
+        meter = _Meter(request.stream(), pacing)
+        record: dict[str, object] = {"kind": kind, "workspace_id": workspace_id}
+        outcome = "error"
         try:
+            ws = await workspace_of(request, workspace_id)
+            record |= {"actor": ws.actor.participant, "tenant_id": ws.tenant_id}
             uploaded = await _answered(
                 create(ws, request, kind, name, artifact_id or new_artifact_id(), thread_id, meter)
             )
-            record["outcome"] = uploaded.outcome
+            outcome = uploaded.outcome
         except HTTPException as refused:
+            outcome = "refused"
             record["status"] = refused.status_code
             raise
         finally:
-            _audit(ws, record, meter)
+            _audit({**record, "outcome": outcome}, meter)
         if uploaded.outcome == "unchanged":
             response.status_code = 200
         return uploaded
@@ -272,15 +308,14 @@ def files_router(
         declared = request.headers.get("content-length", "")
         if declared.isdigit() and int(declared) > limit:
             raise HTTPException(status_code=413, detail=f"the file is larger than {limit} bytes")
-        if (wait := pace.admit(ws.actor.participant)) is not None:
-            raise HTTPException(
-                status_code=429,
-                detail={"type": "rate_limited", "retry_after": wait},
-                headers={"Retry-After": str(wait)},
+        if (wait := pace.admit((ws.tenant_id, ws.actor.participant))) is not None:
+            raise _too_many("rate_limited", wait)
+        with taking.held() as held:
+            if not held:
+                raise _too_many("busy", BUSY)
+            outcome = await files.upload(
+                ws, file_type, name, meter, artifact_id=artifact_id, thread_id=thread_id
             )
-        outcome = await files.upload(
-            ws, file_type, name, meter, artifact_id=artifact_id, thread_id=thread_id
-        )
         if isinstance(outcome, Applied):
             return Uploaded(outcome="applied", artifact_id=artifact_id, version=outcome.version)
         if isinstance(outcome, Proposed):
@@ -361,7 +396,11 @@ def files_router(
             data = await files.read(ws, artifact_id, version=version)
             # A revision keeps the file's name and type, so the head's are every version's.
             head = await ws.get(NativeFile, artifact_id)
-            disposition = f"attachment; filename*=UTF-8''{quote(head.data.name, safe='')}"
+            name = head.data.name
+            plain = name.encode("ascii", "replace").decode().replace('"', "_").replace("\\", "_")
+            disposition = (
+                f"attachment; filename=\"{plain}\"; filename*=UTF-8''{quote(name, safe='')}"
+            )
             return Response(
                 data,
                 media_type=head.data.content.media_type,
@@ -425,16 +464,29 @@ def files_router(
 
 
 class _Meter:
-    """An upload's bytes as they stream through: how many, and their digest, for the record."""
+    """An upload's bytes as they stream through, held to a pace, counted for the record."""
 
-    def __init__(self, data: AsyncIterable[bytes]) -> None:
+    def __init__(self, data: AsyncIterable[bytes], body: Body) -> None:
         self._data = data
+        self._body = body
         self._digest = hashlib.sha256()
         self.size = 0
         self.whole = False
 
     async def __aiter__(self) -> AsyncIterator[bytes]:
-        async for chunk in self._data:
+        started = time.monotonic()
+        chunks = aiter(self._data)
+        while True:
+            # By now, the body has had its pause, and its floor's bytes for each second after it.
+            allowed = self._body.pause + self.size / self._body.floor
+            left = min(self._body.pause, started + allowed - time.monotonic())
+            try:
+                with anyio.fail_after(max(left, 0)):
+                    chunk = await anext(chunks)
+            except StopAsyncIteration:
+                break
+            except TimeoutError:
+                raise TooSlow from None
             self.size += len(chunk)
             self._digest.update(chunk)
             yield chunk
@@ -446,22 +498,20 @@ class _Meter:
         return self._digest.hexdigest() if self.whole else None
 
 
-def _audit(ws: Workspace, record: dict[str, object], meter: _Meter) -> None:
-    """Record an upload: who, where, what and how it ended (native files ADR-0017)."""
-    audit.info(
-        "upload %s",
-        record["outcome"],
-        extra={
-            "upload": {
-                **record,
-                "actor": ws.actor.participant,
-                "tenant_id": ws.tenant_id,
-                "workspace_id": ws.workspace_id,
-                "sha256": meter.sha256,
-                "size": meter.size,
-            }
-        },
-    )
+def _audit(record: dict[str, object], meter: _Meter) -> None:
+    """Record an upload: who, where, what and how it ended (native files ADR-0017).
+
+    A line on the `artifactr.files.uploads` logger, its fields in `extra`, which the
+    application's handler keeps: the client's `kind` is held to a pattern, so no field
+    carries a newline.
+    """
+    upload = {**record, "sha256": meter.sha256, "size": meter.size}
+    audit.info("upload %s", record["outcome"], extra={"upload": upload})
+
+
+def _too_many(why: str, wait: int) -> HTTPException:
+    detail = {"type": why, "retry_after": wait}
+    return HTTPException(status_code=429, detail=detail, headers={"Retry-After": str(wait)})
 
 
 def _native_types() -> list[type[NativeFile]]:
@@ -518,10 +568,12 @@ async def _answered[T](awaitable: Awaitable[T]) -> T:
         detail = {"type": "over_quota", "quota": over.over, "limit": over.limit}
         raise HTTPException(status_code=413, detail=detail) from over
     except Busy as busy:
-        detail = {"type": "busy", "retry_after": BUSY}
-        headers = {"Retry-After": str(BUSY)}
-        raise HTTPException(status_code=429, detail=detail, headers=headers) from busy
+        raise _too_many("busy", BUSY) from busy
+    except TooSlow as slow:
+        detail = {"type": "too_slow"}
+        raise HTTPException(status_code=408, detail=detail) from slow
     except AppFailed as failed:
-        logger.warning("the app failed: %s", failed)
+        # As a repr, so a message a file shaped can't forge a line of the log.
+        logger.warning("the app failed: %r", str(failed))
         detail = {"type": "app_failed", "failure": failed.failure, "message": SAID[failed.failure]}
         raise HTTPException(status_code=FAILURES[failed.failure], detail=detail) from failed

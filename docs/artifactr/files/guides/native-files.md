@@ -40,7 +40,7 @@ files = NativeFiles(
 
 The tables are `artifactr_files_blobs`, `artifactr_files_checkouts` and `artifactr_files_tenants`, with their own Alembic version table, `artifactr_files_alembic_version`. A blob is 25 MiB at most unless the store is given a `limit`, up to 100 MiB, and larger bytes are refused with `TooLarge` as they arrive.
 
-Either store holds each workspace and each tenant to a quota, if given one, of bytes and of files (artifacts with bytes in the store, an upload not yet committed too, until it is collected). A put of new bytes past one is refused with `OverQuota`, which names the quota; `SqlBlobs` counts in the transaction that inserts, under a lock on the tenant's row, so puts at once never pass a quota together:
+Either store holds each workspace and each tenant to a quota, if given one, of bytes and of files (artifacts with bytes in the store); none by default. A put of new bytes past one is refused with `OverQuota`, which names the quota; `SqlBlobs` counts in the transaction that inserts, under a lock on the tenant's row, so puts at once never pass a quota together:
 
 ```python
 from artifactr.files.blobs import Quota
@@ -65,7 +65,7 @@ outcome = await files.upload(
 
 The bytes are put first, the app reads their outline, text, review and fingerprint, and then one `create_artifact` is committed. `upload` takes any async iterable of bytes, such as a request body. An agent's upload is a proposal, under the type's write policy.
 
-Without `media_type`, as for a person's upload, the format is told by the first bytes, never by what a client says: of the type's formats, the one whose signature they match (`FORMATS`), else `AppFailed("refused")` before anything is stored. Either way the name keeps no path or control character and takes the format's extension. Give an `artifact_id` to make a retry safe: an upload whose file with that id is already these bytes commits nothing and returns None. `NativeFiles(readings=2)` lets each tenant have two files read by the app at once, refusing a third with `Busy` ([ADR-0017](../adr/0017-a-persons-upload-told-by-its-bytes-read-before-it-is-committed.md)).
+Without `media_type`, as for a person's upload, the format is told by the first bytes, never by what a client says: of the type's formats, the one whose signature they match (`FORMATS`), else `AppFailed("refused")` before anything is stored. Either way the name keeps no path or control character and takes the format's extension. Give an `artifact_id` to make a retry safe: an upload whose file with that id is already these bytes commits nothing and returns None. The app reads the file before anything is stored, and the file and what was read from it are then put together (`Blobs.put_all`), so a refused upload holds nothing against a quota. `NativeFiles(readings=2)`, the default, lets each tenant have two files read by the app at once, refusing a third with `Busy` ([ADR-0017](../adr/0017-a-persons-upload-told-by-its-bytes-read-before-it-is-committed.md)).
 
 ## A person's check-out and check-in
 
@@ -339,7 +339,7 @@ app.include_router(files_router(workspaces, files, resolve_actor=resolve_actor),
 | `GET /workspaces/{w}/proposals/{p}/text` | The words a proposal would give the file, such as a stale check-in's |
 | `GET /workspaces/{w}/proposals/{p}/pages/{n}` | A page of what a proposal would make of the file, as a PNG |
 
-An upload or a check-in larger than `limit` (`files_router(..., limit=)`: give it your blob store's, 25 MiB by default) is refused from its `Content-Length` with 413, before it is read, and as it streams, whatever its `Content-Length` said. The app's failures are 422 for a file or a page it refuses, 413 for a file too large, and 503 for a timeout or a crash, each with a sentence of the route's, never the app's own message, which goes to the `artifactr.files` log; a quota passed is 413, `over_quota`; a person past their pace (`uploads_per_minute`, 20 by default) or a tenant with all its readings is 429, with `Retry-After`; everything else is artifactr's statuses, so a busy file and an app switched off are 409.
+An upload or a check-in larger than `limit` (`files_router(..., limit=)`: the blob store's unless smaller, 25 MiB by default) is refused from its `Content-Length` with 413, before it is read, and as it streams, whatever its `Content-Length` said. The app's failures are 422 for a file or a page it refuses, 413 for a file too large, and 503 for a timeout or a crash, each with a sentence of the route's, never the app's own message, which goes to the `artifactr.files` log; a quota passed is 413, `over_quota`; a body slower than `Body` allows (a 30-second pause, 32 KiB a second) is 408; a person past their pace (`uploads_per_minute`, 20 by default), a tenant with all its readings, or a process with `uploads_at_once` (8) running is 429, with `Retry-After`; everything else is artifactr's statuses, so a busy file and an app switched off are 409.
 
 An upload asks `authorize` for `artifactr:create_native_file`, an editor's in grantr, before it reads a byte; its `Content-Type` is never read. Every upload is recorded on the `artifactr.files.uploads` logger, as `extra={"upload": {...}}`: the actor, tenant, workspace, kind, digest and size, and how it ended.
 

@@ -1,6 +1,7 @@
 import { type ReactNode, useId } from "react";
 import { Card } from "./card";
 import { EmptyState } from "./empty-state";
+import { Heading } from "./heading";
 import { Table } from "./table";
 
 /**
@@ -94,9 +95,9 @@ export function ItemTable<T>({
         {items.map((item, index) => (
           <li key={keyOf(item)} {...name(item, index, "card")}>
             <Card className="flex flex-col gap-2">
-              <h3 id={id(index, "card")} className="font-semibold">
+              <Heading id={id(index, "card")} level={3} look="subsection">
                 {first.cell(item)}
-              </h3>
+              </Heading>
               {rest.length > 0 && (
                 <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
                   {rest.map((column) => (

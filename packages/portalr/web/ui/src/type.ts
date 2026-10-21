@@ -10,6 +10,8 @@ export const TYPE = {
   page: "font-semibold text-2xl text-fg tracking-tight",
   /** A section's heading, under the page's. */
   section: "font-semibold text-fg text-lg tracking-tight",
+  /** A part of a section, or a pane beside the main one: between the section's and a label. */
+  subsection: "font-semibold text-base text-fg",
   /** A label over a field, or the title of a card. */
   label: "font-semibold text-fg text-sm",
   /** A label that is quiet: a card's title, over the figure it names. */

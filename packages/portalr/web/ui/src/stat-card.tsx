@@ -1,5 +1,6 @@
 import { type ReactNode, useId } from "react";
 import { Card } from "./card";
+import { Heading } from "./heading";
 import { Num } from "./num";
 import { TYPE } from "./type";
 
@@ -35,9 +36,9 @@ export function StatCard({
       className="flex h-full flex-col gap-1"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 id={heading} className={TYPE.labelQuiet}>
+        <Heading id={heading} level={2} look="labelQuiet">
           {title}
-        </h2>
+        </Heading>
         {badge}
       </div>
       {figure !== null && (

@@ -16,6 +16,7 @@ import type { JsonObject } from "./app-bridge";
 import type { Submission } from "./artifactr-ui";
 import type { Shown } from "./artifacts";
 import { cn } from "./cn";
+import { Heading } from "./heading";
 import { Icon } from "./icon";
 import { IntegrationsContext, offSaid } from "./integrations";
 import { useLoaded } from "./on-demand";
@@ -104,9 +105,9 @@ export function AppFrame({
     >
       <div className="flex flex-col gap-1">
         {titled && (
-          <h3 id={named} className={TYPE.label}>
+          <Heading id={named} level={3} look="label">
             {app.title}
-          </h3>
+          </Heading>
         )}
         <p className={cn(TYPE.note, "inline-flex items-center gap-1.5")}>
           <Icon icon={Bot} className="size-3.5 shrink-0" />

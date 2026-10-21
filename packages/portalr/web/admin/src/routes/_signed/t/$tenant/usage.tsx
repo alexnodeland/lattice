@@ -5,6 +5,7 @@ import {
   DonutChart,
   EmptyState,
   formatDay,
+  Heading,
   ItemTable,
   Num,
   PageHeader,
@@ -173,9 +174,9 @@ function Workspaces({ usage, listed, more }: { usage: Usage; listed: boolean; mo
   const parts = partsOf(usage);
   return (
     <section aria-labelledby="by-workspace" className="flex flex-col gap-3">
-      <h2 id="by-workspace" className="font-semibold text-fg">
+      <Heading id="by-workspace" level={2} look="subsection">
         By workspace
-      </h2>
+      </Heading>
       {usage.workspaces.length > 0 && (
         <DonutChart label="Spend by workspace" parts={parts} format={dollars} />
       )}

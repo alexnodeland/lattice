@@ -13,6 +13,7 @@ import type { ArtifactrV1 } from "@portalr/client";
 import { Bot, Check } from "lucide-react";
 import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { Alert } from "./alert";
+import { Badge } from "./badge";
 import { Button } from "./button";
 import { cn } from "./cn";
 import { FieldGroup } from "./field-group";
@@ -333,12 +334,9 @@ function OptionRow({
           {option.label}
         </span>
         {option.recommended && (
-          <span
-            id={`${id}-recommended`}
-            className="rounded-full bg-accent px-1.5 py-px font-semibold text-on-accent text-xs"
-          >
+          <Badge tone="accent" id={`${id}-recommended`}>
             Recommended
-          </span>
+          </Badge>
         )}
       </span>
       {option.description && (

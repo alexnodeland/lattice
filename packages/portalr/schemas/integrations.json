@@ -77,7 +77,7 @@
   {
     "key": "files:lightcraft",
     "default": false,
-    "description": "LightCraft: photos developed and exported, one file at a time."
+    "description": "LightCraft: photos developed in a library of its own, which keeps no file lattice can hold yet."
   },
   {
     "key": "ui:forms",

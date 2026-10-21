@@ -162,7 +162,10 @@ KNOWN: Final = registry(
     Integration(
         "files:lightcraft",
         default=False,
-        description="LightCraft: photos developed and exported, one file at a time.",
+        description=(
+            "LightCraft: photos developed in a library of its own, which keeps no file lattice "
+            "can hold yet."
+        ),
     ),
     Integration(
         "ui:forms",

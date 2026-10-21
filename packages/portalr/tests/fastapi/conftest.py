@@ -137,6 +137,7 @@ def app_for(
     invite: Invite | None,
     ui: Path,
     people: People | None = None,
+    site: Site = SITE,
 ) -> FastAPI:
     app = FastAPI()
     router = portalr_router(
@@ -144,7 +145,7 @@ def app_for(
         grants=grants,
         readers=readers,
         invite=invite,
-        site=SITE,
+        site=site,
         ui=ui,
         people=people,
     )

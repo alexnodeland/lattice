@@ -193,13 +193,14 @@ The UIs read this first. It is public, so it holds no secret:
 | `people` | Whether the router names people by email: true where `people` was passed |
 | `editors` | Each native file's app's hosted editor, by its integration, such as `files:wordcraft`: pass `editors={...}` in `Site` where you serve one on an origin of its own ([ADR-0049](adr/0049-checking-a-native-file-out-and-in.md)). Empty by default |
 | `apps` | The origin mini apps run on: pass `apps=` in `Site` where you serve their sandbox, below. `null` by default, and apps are then shown as their label and summary |
+| `brand` | The deployment's brand kit: its hash, identity, words, and where its stylesheet and marks are served. Pass `brand=Path(...)` in `Site` to point at a kit's folder ([lattice RFC-0007](../rfcs/0007-portalr-brand-kits.md)); it is read and checked as the site is made. `null` by default, for portalr's own look. The UIs don't read the block yet: the kit's look and the tab's title and icon apply, and the header's mark and the words don't until a later release |
 
 ```python
 from httpx import ASGITransport, AsyncClient
 
 async with AsyncClient(transport=ASGITransport(app=app), base_url="http://app") as client:
     config = (await client.get("/portalr/config.json")).json()
-    assert sorted(config) == ["apps", "editors", "people", "readers", "supabase", "surfaces"]
+    assert sorted(config) == ["apps", "brand", "editors", "people", "readers", "supabase", "surfaces"]
     assert config["readers"]["tempo"] is False
     assert config["people"] is True
 ```

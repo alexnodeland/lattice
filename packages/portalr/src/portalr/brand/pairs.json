@@ -1,0 +1,427 @@
+{
+  "$comment": "Each pair a kit's colours must hold in both schemes, by WCAG's contrast ratio: a foreground custom property, the background it is read on, the least ratio, and, where either is clear, the backdrop it is drawn over (the paper unless named) (lattice RFC-0007). The validator reads it, with --wash, --accent-hover, --danger-hover and --danger-wash mixed as base.css mixes them.",
+  "pairs": [
+    {
+      "fg": "fg",
+      "bg": "paper",
+      "min": 4.5,
+      "why": "text"
+    },
+    {
+      "fg": "fg",
+      "bg": "surface",
+      "min": 4.5,
+      "why": "text"
+    },
+    {
+      "fg": "fg",
+      "bg": "wash",
+      "min": 4.5,
+      "why": "text"
+    },
+    {
+      "fg": "muted",
+      "bg": "paper",
+      "min": 4.5,
+      "why": "quiet text"
+    },
+    {
+      "fg": "muted",
+      "bg": "surface",
+      "min": 4.5,
+      "why": "quiet text"
+    },
+    {
+      "fg": "muted",
+      "bg": "wash",
+      "min": 4.5,
+      "why": "quiet text"
+    },
+    {
+      "fg": "accent",
+      "bg": "paper",
+      "min": 4.5,
+      "why": "a link's words"
+    },
+    {
+      "fg": "accent",
+      "bg": "surface",
+      "min": 4.5,
+      "why": "a link's words"
+    },
+    {
+      "fg": "accent",
+      "bg": "wash",
+      "min": 4.5,
+      "why": "a link's words"
+    },
+    {
+      "fg": "on-accent",
+      "bg": "accent",
+      "min": 4.5,
+      "why": "words on the working colour"
+    },
+    {
+      "fg": "on-accent",
+      "bg": "accent-hover",
+      "min": 4.5,
+      "why": "words on the working colour"
+    },
+    {
+      "fg": "focus",
+      "bg": "paper",
+      "min": 3,
+      "why": "the focus ring"
+    },
+    {
+      "fg": "focus",
+      "bg": "surface",
+      "min": 3,
+      "why": "the focus ring"
+    },
+    {
+      "fg": "focus",
+      "bg": "wash",
+      "min": 3,
+      "why": "the focus ring"
+    },
+    {
+      "fg": "edge",
+      "bg": "paper",
+      "min": 3,
+      "why": "a control's boundary, and a subtle link's underline"
+    },
+    {
+      "fg": "edge",
+      "bg": "surface",
+      "min": 3,
+      "why": "a control's boundary, and a subtle link's underline"
+    },
+    {
+      "fg": "edge",
+      "bg": "wash",
+      "min": 3,
+      "why": "a control's boundary, and a subtle link's underline"
+    },
+    {
+      "fg": "danger",
+      "bg": "paper",
+      "min": 4.5,
+      "why": "a destructive action's words"
+    },
+    {
+      "fg": "danger",
+      "bg": "surface",
+      "min": 4.5,
+      "why": "a destructive action's words"
+    },
+    {
+      "fg": "on-danger",
+      "bg": "danger",
+      "min": 4.5,
+      "why": "words on the danger colour"
+    },
+    {
+      "fg": "on-danger",
+      "bg": "danger-hover",
+      "min": 4.5,
+      "why": "words on the danger colour"
+    },
+    {
+      "fg": "chart-1",
+      "bg": "paper",
+      "min": 3,
+      "why": "a mark"
+    },
+    {
+      "fg": "chart-1",
+      "bg": "surface",
+      "min": 3,
+      "why": "a mark"
+    },
+    {
+      "fg": "chart-2",
+      "bg": "paper",
+      "min": 3,
+      "why": "a mark"
+    },
+    {
+      "fg": "chart-2",
+      "bg": "surface",
+      "min": 3,
+      "why": "a mark"
+    },
+    {
+      "fg": "chart-3",
+      "bg": "paper",
+      "min": 3,
+      "why": "a mark"
+    },
+    {
+      "fg": "chart-3",
+      "bg": "surface",
+      "min": 3,
+      "why": "a mark"
+    },
+    {
+      "fg": "status-failed",
+      "bg": "paper",
+      "min": 3,
+      "why": "a mark"
+    },
+    {
+      "fg": "status-failed",
+      "bg": "surface",
+      "min": 3,
+      "why": "a mark"
+    },
+    {
+      "fg": "status-warn",
+      "bg": "paper",
+      "min": 3,
+      "why": "a mark"
+    },
+    {
+      "fg": "status-warn",
+      "bg": "surface",
+      "min": 3,
+      "why": "a mark"
+    },
+    {
+      "fg": "ansi-0",
+      "bg": "paper",
+      "min": 4.5,
+      "why": "a log line's words"
+    },
+    {
+      "fg": "ansi-0",
+      "bg": "surface",
+      "min": 4.5,
+      "why": "a log line's words"
+    },
+    {
+      "fg": "ansi-1",
+      "bg": "paper",
+      "min": 4.5,
+      "why": "a log line's words"
+    },
+    {
+      "fg": "ansi-1",
+      "bg": "surface",
+      "min": 4.5,
+      "why": "a log line's words"
+    },
+    {
+      "fg": "ansi-2",
+      "bg": "paper",
+      "min": 4.5,
+      "why": "a log line's words"
+    },
+    {
+      "fg": "ansi-2",
+      "bg": "surface",
+      "min": 4.5,
+      "why": "a log line's words"
+    },
+    {
+      "fg": "ansi-3",
+      "bg": "paper",
+      "min": 4.5,
+      "why": "a log line's words"
+    },
+    {
+      "fg": "ansi-3",
+      "bg": "surface",
+      "min": 4.5,
+      "why": "a log line's words"
+    },
+    {
+      "fg": "ansi-4",
+      "bg": "paper",
+      "min": 4.5,
+      "why": "a log line's words"
+    },
+    {
+      "fg": "ansi-4",
+      "bg": "surface",
+      "min": 4.5,
+      "why": "a log line's words"
+    },
+    {
+      "fg": "ansi-5",
+      "bg": "paper",
+      "min": 4.5,
+      "why": "a log line's words"
+    },
+    {
+      "fg": "ansi-5",
+      "bg": "surface",
+      "min": 4.5,
+      "why": "a log line's words"
+    },
+    {
+      "fg": "ansi-6",
+      "bg": "paper",
+      "min": 4.5,
+      "why": "a log line's words"
+    },
+    {
+      "fg": "ansi-6",
+      "bg": "surface",
+      "min": 4.5,
+      "why": "a log line's words"
+    },
+    {
+      "fg": "ansi-7",
+      "bg": "paper",
+      "min": 4.5,
+      "why": "a log line's words"
+    },
+    {
+      "fg": "ansi-7",
+      "bg": "surface",
+      "min": 4.5,
+      "why": "a log line's words"
+    },
+    {
+      "fg": "code-token-keyword",
+      "bg": "paper",
+      "min": 4.5,
+      "why": "code's words"
+    },
+    {
+      "fg": "code-token-keyword",
+      "bg": "surface",
+      "min": 4.5,
+      "why": "code's words"
+    },
+    {
+      "fg": "code-token-link",
+      "bg": "paper",
+      "min": 4.5,
+      "why": "code's words"
+    },
+    {
+      "fg": "code-token-link",
+      "bg": "surface",
+      "min": 4.5,
+      "why": "code's words"
+    },
+    {
+      "fg": "code-token-string",
+      "bg": "paper",
+      "min": 4.5,
+      "why": "code's words"
+    },
+    {
+      "fg": "code-token-string",
+      "bg": "surface",
+      "min": 4.5,
+      "why": "code's words"
+    },
+    {
+      "fg": "code-token-string-expression",
+      "bg": "paper",
+      "min": 4.5,
+      "why": "code's words"
+    },
+    {
+      "fg": "code-token-string-expression",
+      "bg": "surface",
+      "min": 4.5,
+      "why": "code's words"
+    },
+    {
+      "fg": "code-token-function",
+      "bg": "paper",
+      "min": 4.5,
+      "why": "code's words"
+    },
+    {
+      "fg": "code-token-function",
+      "bg": "surface",
+      "min": 4.5,
+      "why": "code's words"
+    },
+    {
+      "fg": "code-token-constant",
+      "bg": "paper",
+      "min": 4.5,
+      "why": "code's words"
+    },
+    {
+      "fg": "code-token-constant",
+      "bg": "surface",
+      "min": 4.5,
+      "why": "code's words"
+    },
+    {
+      "fg": "code-token-parameter",
+      "bg": "paper",
+      "min": 4.5,
+      "why": "code's words"
+    },
+    {
+      "fg": "code-token-parameter",
+      "bg": "surface",
+      "min": 4.5,
+      "why": "code's words"
+    },
+    {
+      "fg": "code-token-punctuation",
+      "bg": "paper",
+      "min": 4.5,
+      "why": "code's words"
+    },
+    {
+      "fg": "code-token-punctuation",
+      "bg": "surface",
+      "min": 4.5,
+      "why": "code's words"
+    },
+    {
+      "fg": "code-token-comment",
+      "bg": "paper",
+      "min": 4.5,
+      "why": "code's words"
+    },
+    {
+      "fg": "code-token-comment",
+      "bg": "surface",
+      "min": 4.5,
+      "why": "code's words"
+    },
+    {
+      "fg": "code-foreground",
+      "bg": "paper",
+      "min": 4.5,
+      "why": "code's words"
+    },
+    {
+      "fg": "code-foreground",
+      "bg": "surface",
+      "min": 4.5,
+      "why": "code's words"
+    },
+    {
+      "fg": "danger",
+      "bg": "danger-wash",
+      "min": 4.5,
+      "backdrop": "paper",
+      "why": "a destructive action offered, hovered"
+    },
+    {
+      "fg": "danger",
+      "bg": "danger-wash",
+      "min": 4.5,
+      "backdrop": "surface",
+      "why": "a destructive action offered, hovered"
+    },
+    {
+      "fg": "muted",
+      "bg": "line",
+      "min": 3,
+      "why": "a disabled control's words on its fill"
+    }
+  ]
+}

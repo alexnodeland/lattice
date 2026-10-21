@@ -1,5 +1,5 @@
 import { allowedIn, keys, Refused, refusal } from "@portalr/client";
-import { Alert, Button, ConfirmDialog, PageHeader, TextField, TextLink } from "@portalr/ui";
+import { Alert, Button, ConfirmDialog, PageHeader, TextField } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import { useActionState, useMemo, useState } from "react";
@@ -110,13 +110,12 @@ function RulePage() {
         id="rule"
         title={name}
         mono
-        crumb={
-          <TextLink
-            render={<Link to="/t/$tenant/w/$workspace/rules" params={{ tenant, workspace }} />}
-          >
-            Rules
-          </TextLink>
-        }
+        breadcrumbs={[
+          {
+            label: "Rules",
+            render: <Link to="/t/$tenant/w/$workspace/rules" params={{ tenant, workspace }} />,
+          },
+        ]}
         meta={
           stored
             ? `Stored in this workspace, version ${held.version}.`

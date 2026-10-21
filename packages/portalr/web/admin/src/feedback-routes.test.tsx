@@ -167,7 +167,9 @@ test("the week's thumbs, evaluations and workspaces, from portalr's summary", as
   await expect
     .element(said.getByRole("link", { name: "t_1" }))
     .toHaveAttribute("href", "/t/acme/traces/t_1");
-  await expect.element(said.getByRole("link", { name: "Langfuse" })).not.toBeInTheDocument();
+  await expect
+    .element(said.getByRole("link", { name: "Langfuse (opens in a new tab)" }))
+    .not.toBeInTheDocument();
   const asked = reads.at(-1);
   expect(asked?.has("workspace")).toBe(false);
   expect(new Date(asked?.get("start") ?? "").getUTCHours()).toBe(0);
@@ -196,7 +198,7 @@ test("for an operator, each comment's trace opens in Langfuse too, beside the on
     .element(said.getByRole("link", { name: "t_1" }))
     .toHaveAttribute("href", "/t/acme/traces/t_1");
   await expect
-    .element(said.getByRole("link", { name: "Langfuse" }))
+    .element(said.getByRole("link", { name: "Langfuse (opens in a new tab)" }))
     .toHaveAttribute("href", "http://langfuse.test/traces/t_1");
   expect(links).toBe(1);
 });

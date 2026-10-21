@@ -255,6 +255,16 @@ The foundation PR (#452) departs from the design above in these ways, each revie
 - **Sizes** are read where a size token sets a box's width or height (the dialog's width and margin, the drawer's width, the switch, the checkbox, the progress bar and a row's height) and the enter and exit scales, by `token-sizes.test.tsx`; corners and padding are read by the computed-style snapshots; every other size by the screenshot suites; the computed-style snapshots read what a declaration sets and leave sizes, margins and transforms out.
 - **The style census** reports in the test's annotations, not yet in the CI step summary.
 
+## Loader PR as built
+
+The loader PR departs from or defers parts of the design above:
+
+- **Derived colours stay `color-mix()` in base.css.** The validator mixes `--wash`, `--accent-hover` and `--danger-hover` the same way in Python (sRGB, at base.css's shares) to hold their pairs, so a kit's colours are checked as the page draws them, and `[data-brand]` re-skinning still re-mixes them.
+- **The pair manifest** is `src/portalr/brand/pairs.json`: 65 pairs, each with its floor and why. The UI's token tests still hold the default kit by their own list; moving them onto the manifest is a follow-up.
+- **Colour-vision distances** are held for two sets, as the default's tests hold them: the three chart series, and the two status colours with the chart's teal.
+- **Not yet:** the pinned chrome tokens (`--chrome-*`), so the skip link and the mini app's chrome still read the kit's roles, held by the same pairs; presets (`brand.json` refuses a `presets` key until they exist); an `oklch()` colour; an "instant" duration class; the UIs reading `config.json`'s brand block for the header's mark and the sign-in words, which the tab's title and icon already show from the rewritten index; and the stackr template's `PORTAL_BRAND_DIR`, with the CLI.
+- **A kit is read when the `Site` is made,** at the application's start: `Site(brand=Path(...))`, and `site.kit` is the kit, read. Its files are served at `/portalr/brand/<hash>/`, the hash over every file and `brand.json`.
+
 ## Drawbacks
 
 - Hundreds of custom properties, and a refactor that touches every component. The zero-diff gate and the per-component commits are what make it reviewable.

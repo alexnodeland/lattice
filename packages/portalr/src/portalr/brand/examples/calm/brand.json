@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "name": "calm",
+  "identity": {
+    "product": "Calm",
+    "app": "Calm",
+    "admin": "Calm admin"
+  },
+  "assets": {
+    "mark": {
+      "light": "assets/mark-light.svg",
+      "dark": "assets/mark-dark.svg"
+    },
+    "favicon": "assets/favicon.svg"
+  }
+}

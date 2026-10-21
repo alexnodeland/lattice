@@ -322,6 +322,56 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /**
+         * Brand
+         * @description The deployment's brand kit, as the UIs read it (lattice RFC-0007).
+         *
+         *     Who it is, and where its stylesheet and marks are, each under a hash of the kit, relative to
+         *     the portal's mount.
+         */
+        Brand: {
+            copy: components["schemas"]["BrandCopy"];
+            /** Favicon */
+            favicon: string;
+            /** Hash */
+            hash: string;
+            identity: components["schemas"]["BrandIdentity"];
+            mark: components["schemas"]["BrandMarks"];
+            /** Stylesheet */
+            stylesheet: string;
+        };
+        /**
+         * BrandCopy
+         * @description The words a kit sets; each absent where the kit leaves portalr's.
+         */
+        BrandCopy: {
+            /** Signin */
+            signIn?: string | null;
+            /** Tagline */
+            tagline?: string | null;
+        };
+        /**
+         * BrandIdentity
+         * @description What the product is called: in the tab, the app's header, and admin's.
+         */
+        BrandIdentity: {
+            /** Admin */
+            admin: string;
+            /** App */
+            app: string;
+            /** Product */
+            product: string;
+        };
+        /**
+         * BrandMarks
+         * @description A kit's header mark, in each scheme, by its path under the portal's mount.
+         */
+        BrandMarks: {
+            /** Dark */
+            dark: string;
+            /** Light */
+            light: string;
+        };
+        /**
          * Comment
          * @description What a person wrote, on which trace, in which workspace, and when.
          */
@@ -347,6 +397,7 @@ export interface components {
         Config: {
             /** Apps */
             apps: string | null;
+            brand?: components["schemas"]["Brand"] | null;
             /** Editors */
             editors: {
                 [key: string]: string;

@@ -227,19 +227,43 @@ def _note(text: str) -> list[str]:
     return ["  /*", *(f"   * {line}" for line in lines), "   */"]
 
 
-def compile_kit(kit: Path = DEFAULT, *, default: Path = DEFAULT) -> str:
-    """A kit's tokens as a stylesheet: each in `:root`, a colour that differs as a pair."""
+def layered(kit: Path = DEFAULT, *, default: Path = DEFAULT) -> tuple[dict[str, object], ...]:
+    """A kit's tokens in each scheme, light then dark, laid over the default's, as written."""
     light = read(default / "tokens.light.json")
     dark = {**light, **read(default / "tokens.dark.json")}
     if kit != default:
         light = {**light, **read(kit / "tokens.light.json")}
         dark = {**dark, **read(kit / "tokens.light.json"), **read(kit / "tokens.dark.json")}
+    return light, dark
+
+
+def resolved(path: str, tokens: Mapping[str, object]) -> object:
+    """A token's value as written at the end of its aliases (which `compile_kit` has checked)."""
+    value = tokens[path]
+    for _ in range(MAX_ALIAS_DEPTH + 1):
+        if not (isinstance(value, str) and (match := _ALIAS.match(value))):
+            return value
+        value = tokens[match[1]]
+    raise BrandError(f"{path}: more than {MAX_ALIAS_DEPTH} aliases deep, or a cycle")
+
+
+def compile_kit(kit: Path = DEFAULT, *, default: Path = DEFAULT) -> str:
+    """A kit's tokens as a stylesheet: each in `:root`, a colour that differs as a pair."""
+    light, dark = layered(kit, default=default)
     faults: list[str] = []
+    header = (
+        [
+            " * Generated from portalr's default brand kit (src/portalr/brand/default) by `moon"
+            " run",
+            " * portalr:brand`: edit the kit, not this file (lattice RFC-0007, portalr ADR-0056).",
+            " * What a kit can't set, and what is mixed from these, is in base.css.",
+        ]
+        if kit == default
+        else [" * A brand kit's tokens over portalr's default kit (lattice RFC-0007)."]
+    )
     lines = [
         "/*",
-        " * Generated from portalr's default brand kit (src/portalr/brand/default) by `moon run",
-        " * portalr:brand`: edit the kit, not this file (lattice RFC-0007, portalr ADR-0056).",
-        " * What a kit can't set, and what is mixed from these, is in base.css.",
+        *header,
         " */",
         "",
         ":root {",

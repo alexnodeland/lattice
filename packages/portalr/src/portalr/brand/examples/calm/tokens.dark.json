@@ -1,0 +1,31 @@
+{
+  "color": {
+    "paper": {
+      "$value": "#1c1b19"
+    },
+    "surface": {
+      "$value": "#201e1b"
+    },
+    "fg": {
+      "$value": "#f2eee6"
+    },
+    "muted": {
+      "$value": "#c2bbb0"
+    },
+    "line": {
+      "$value": "#3a3732"
+    },
+    "edge": {
+      "$value": "#8f877b"
+    },
+    "accent": {
+      "$value": "#9fd3b2"
+    },
+    "focus": {
+      "$value": "#9fd3b2"
+    },
+    "on-accent": {
+      "$value": "#1c1b19"
+    }
+  }
+}

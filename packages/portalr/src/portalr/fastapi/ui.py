@@ -1,5 +1,8 @@
 """Serving the two built UIs: their files, an index for client-side routes, and their headers."""
 
+import hashlib
+import html
+import re
 from pathlib import Path
 from typing import Final
 from urllib.parse import urlsplit
@@ -7,6 +10,7 @@ from urllib.parse import urlsplit
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, RedirectResponse, Response
 
+from portalr.brand.kit import Kit
 from portalr.fastapi.site import Site
 
 UIS: Final = ("app", "admin")
@@ -68,11 +72,75 @@ def ui_router(site: Site, root: Path) -> APIRouter:
         "Referrer-Policy": "no-referrer",
     }
     for name in UIS:
-        _serve(router, name, (root / name).resolve(), headers)
+        _serve(router, name, (root / name).resolve(), headers, site.kit)
+    if site.kit is not None:
+        _brand(router, site.kit)
     return router
 
 
-def _serve(router: APIRouter, name: str, built: Path, headers: dict[str, str]) -> None:
+MOUNT: Final = "/portalr"
+"""Where an application mounts portalr's router, which the UIs' builds are made for."""
+
+TYPES: Final = {
+    ".css": "text/css; charset=utf-8",
+    ".svg": "image/svg+xml",
+    ".png": "image/png",
+    ".woff2": "font/woff2",
+    ".txt": "text/plain; charset=utf-8",
+}
+
+SVG_POLICY: Final = "default-src 'none'; style-src 'unsafe-inline'; sandbox"
+"""What an SVG of a kit may do opened on its own: draw itself, and nothing else."""
+
+
+def _brand(router: APIRouter, kit: Kit) -> None:
+    """Serve a kit's files under its hash, and nothing else: an unknown path or hash is 404."""
+
+    @router.get("/brand/{version}/{path:path}")
+    async def brand(version: str, path: str) -> Response:
+        data = kit.files.get(path) if version == kit.hash else None
+        if data is None:
+            raise HTTPException(status_code=404, detail="no such file in the brand kit")
+        suffix = Path(path).suffix
+        headers = {
+            "Cache-Control": IMMUTABLE,
+            "X-Content-Type-Options": "nosniff",
+            **({"Content-Security-Policy": SVG_POLICY} if suffix == ".svg" else {}),
+        }
+        return Response(data, media_type=TYPES[suffix], headers=headers)
+
+
+def branded(index: str, kit: Kit, ui: str) -> str:
+    """A UI's index with the kit in place before the first paint.
+
+    Its name in the tab, its icon, its theme colour in each scheme, and its stylesheet after the
+    UI's own. Every word is escaped.
+    """
+    base = f"{MOUNT}/{kit.base}"
+    name = html.escape(kit.brand.identity.admin if ui == "admin" else kit.brand.identity.app)
+    light, dark = kit.theme
+    head = "\n".join(
+        (
+            f'    <link rel="icon" href="{base}{html.escape(kit.brand.assets.favicon)}" />',
+            *(
+                f'    <meta name="theme-color" media="(prefers-color-scheme: {scheme})"'
+                f' content="{paper}" />'
+                for scheme, paper in (("light", light), ("dark", dark))
+            ),
+            f'    <link rel="stylesheet" href="{base}brand.css" />',
+        )
+    )
+    titled = f"<title>{name}</title>"
+    index = re.sub(r"<title>[^<]*</title>", titled, index, count=1)
+    # In the head, before its end, or after the title where a page leaves the end implied.
+    if "</head>" in index:
+        return index.replace("</head>", f"{head}\n  </head>", 1)
+    return index.replace(titled, f"{titled}\n{head}", 1)
+
+
+def _serve(
+    router: APIRouter, name: str, built: Path, headers: dict[str, str], kit: Kit | None
+) -> None:
     def file(path: Path, cache: str) -> Response:
         return FileResponse(path, headers={**headers, "Cache-Control": cache})
 
@@ -95,5 +163,13 @@ def _serve(router: APIRouter, name: str, built: Path, headers: dict[str, str]) -
         index = built / "index.html"
         if not index.is_file():
             raise HTTPException(status_code=404, detail="this UI isn't built")
-        # A client-side route: the UI's index renders it.
-        return file(index, NO_CACHE)
+        # A client-side route: the UI's index renders it, with the brand kit's, if any, in place.
+        if kit is None:
+            return file(index, NO_CACHE)
+        page = branded(index.read_text(), kit, name)
+        tag = '"' + hashlib.sha256(page.encode()).hexdigest()[:32] + '"'
+        return Response(
+            page,
+            media_type="text/html; charset=utf-8",
+            headers={**headers, "Cache-Control": NO_CACHE, "ETag": tag},
+        )

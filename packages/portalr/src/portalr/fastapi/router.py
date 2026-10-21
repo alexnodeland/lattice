@@ -79,6 +79,51 @@ class Supabase(BaseModel):
     """Its publishable key."""
 
 
+class BrandMarks(BaseModel):
+    """A kit's header mark, in each scheme, by its path under the portal's mount."""
+
+    model_config = ConfigDict(frozen=True)
+
+    light: str
+    dark: str
+
+
+class BrandIdentity(BaseModel):
+    """What the product is called: in the tab, the app's header, and admin's."""
+
+    model_config = ConfigDict(frozen=True)
+
+    product: str
+    app: str
+    admin: str
+
+
+class BrandCopy(BaseModel):
+    """The words a kit sets; each absent where the kit leaves portalr's."""
+
+    model_config = ConfigDict(frozen=True)
+
+    tagline: str | None = None
+    sign_in: str | None = Field(default=None, alias="signIn")
+
+
+class Brand(BaseModel):
+    """The deployment's brand kit, as the UIs read it (lattice RFC-0007).
+
+    Who it is, and where its stylesheet and marks are, each under a hash of the kit, relative to
+    the portal's mount.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    hash: str
+    identity: BrandIdentity
+    copy_: BrandCopy = Field(alias="copy", serialization_alias="copy")
+    stylesheet: str
+    mark: BrandMarks
+    favicon: str
+
+
 class Config(BaseModel):
     """``config.json``: what the UIs need of the deployment they run in."""
 
@@ -93,6 +138,8 @@ class Config(BaseModel):
     """Each native file's hosted editor, by its app's integration."""
     apps: str | None
     """The origin mini apps run on, or None where the deployment runs none."""
+    brand: Brand | None = None
+    """The deployment's brand kit, or None for portalr's own look."""
 
 
 class NewInvite(BaseModel):
@@ -261,6 +308,7 @@ def portalr_router(
             people=people is not None,
             editors=site.editors,
             apps=site.apps,
+            brand=Brand.model_validate(site.kit.config()) if site.kit else None,
         )
 
     @api.get("/v1/traces", response_model=reading(list[TraceSummary]))

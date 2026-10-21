@@ -84,6 +84,7 @@ export {
   type PageShown,
   PageStrip,
 } from "./native-file";
+export { NewVersion, NewVersionOffer } from "./new-version";
 export { Num } from "./num";
 export { PageHeader } from "./page-header";
 export { Plain } from "./plain";

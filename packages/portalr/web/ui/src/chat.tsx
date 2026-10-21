@@ -564,7 +564,9 @@ function Review({ review }: { review: Record<string, unknown> }) {
   return (
     <div className="flex flex-col gap-2">
       <StatusBadge tone="retrying" className="self-start">
-        {risk === "network" ? `Fetches into your ${app}` : `Runs code in your ${app}`}
+        {risk === "network"
+          ? `Downloads from the internet into your ${app}`
+          : `Runs code in your ${app}`}
       </StatusBadge>
       <p>{runs}</p>
       {typeof code === "string" && <SourceView code={code} language="python" name="code" />}

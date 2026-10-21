@@ -43,7 +43,7 @@ export function AccountMenu({
     <Menu.Root>
       <Menu.Trigger
         aria-label={`Account: ${name}`}
-        className="inline-flex min-w-0 items-center gap-2 rounded-md p-1 pr-2 font-medium text-fg text-sm outline-offset-(--focus-offset) hover:bg-wash focus-visible:outline-(length:--focus-width) focus-visible:outline-focus"
+        className="inline-flex min-w-0 items-center gap-2 rounded-(--header-trigger-radius) p-1 pr-2 font-medium text-fg text-sm outline-offset-(--focus-offset) hover:bg-wash focus-visible:outline-(length:--focus-width) focus-visible:outline-focus"
       >
         <span
           aria-hidden="true"

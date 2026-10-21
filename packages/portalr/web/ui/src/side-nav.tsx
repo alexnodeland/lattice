@@ -35,7 +35,7 @@ export function NavLink({ render, icon, count, children, ...props }: NavLinkProp
       {
         "aria-label": count ? `${children}, ${count} waiting for you` : undefined,
         className:
-          "flex items-center gap-2.5 rounded-md px-3 py-2 font-medium text-fg text-sm outline-offset-(--focus-offset) hover:bg-wash focus-visible:outline-(length:--focus-width) focus-visible:outline-focus aria-[current=page]:bg-wash aria-[current=page]:font-semibold aria-[current=page]:text-accent aria-[current=true]:bg-wash aria-[current=true]:font-semibold aria-[current=true]:text-accent",
+          "flex items-center gap-2.5 rounded-(--nav-radius) px-(--nav-pad-x) py-(--nav-pad-y) font-medium text-fg text-sm outline-offset-(--focus-offset) hover:bg-wash focus-visible:outline-(length:--focus-width) focus-visible:outline-focus aria-[current=page]:bg-wash aria-[current=page]:font-semibold aria-[current=page]:text-accent aria-[current=true]:bg-wash aria-[current=true]:font-semibold aria-[current=true]:text-accent",
         children: (
           <>
             {icon && <Icon icon={icon} />}
@@ -43,7 +43,7 @@ export function NavLink({ render, icon, count, children, ...props }: NavLinkProp
             {count ? (
               <span
                 aria-hidden="true"
-                className="ml-auto grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1.5 font-semibold text-on-accent text-xs"
+                className="ml-auto grid h-5 min-w-5 place-items-center rounded-(--nav-count-radius) bg-accent px-1.5 font-semibold text-on-accent text-xs"
               >
                 {count}
               </span>

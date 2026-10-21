@@ -803,6 +803,45 @@
       "enter-scale": {
         "$value": 0.98
       }
+    },
+    "nav": {
+      "radius": {
+        "$value": "{radius.3}"
+      },
+      "pad-x": {
+        "$value": "{space.3}"
+      },
+      "pad-y": {
+        "$value": "{space.2}"
+      },
+      "count-radius": {
+        "$value": "{radius.full}"
+      }
+    },
+    "header": {
+      "trigger-radius": {
+        "$value": "{radius.3}"
+      },
+      "trigger-pad-x": {
+        "$value": "{space.3}"
+      },
+      "trigger-pad-y": {
+        "$value": "{space.1-5}"
+      }
+    },
+    "drawer": {
+      "width": {
+        "$value": {
+          "value": 19,
+          "unit": "rem"
+        }
+      },
+      "shadow": {
+        "$value": "{shadow.3}"
+      },
+      "duration": {
+        "$value": "{motion.duration.moderate}"
+      }
     }
   }
 }

@@ -20,14 +20,14 @@ function Home({ ui, home, children }: { ui: Ui; home: ReactElement; children: Re
     props: {
       "aria-label": NAME[ui],
       className:
-        "inline-flex shrink-0 rounded-md outline-offset-(--focus-offset) focus-visible:outline-(length:--focus-width) focus-visible:outline-focus",
+        "inline-flex shrink-0 rounded-(--header-trigger-radius) outline-offset-(--focus-offset) focus-visible:outline-(length:--focus-width) focus-visible:outline-focus",
       children,
     },
   });
 }
 
 const button =
-  "inline-flex items-center gap-2 rounded-md px-2 py-1.5 font-semibold text-fg text-sm outline-offset-(--focus-offset) hover:bg-wash focus-visible:outline-(length:--focus-width) focus-visible:outline-focus";
+  "inline-flex items-center gap-2 rounded-(--header-trigger-radius) px-2 py-(--header-trigger-pad-y) font-semibold text-fg text-sm outline-offset-(--focus-offset) hover:bg-wash focus-visible:outline-(length:--focus-width) focus-visible:outline-focus";
 
 /**
  * The frame of every signed-in screen. One header holds the mark, the switcher, the navigation
@@ -94,7 +94,7 @@ export function AppShell({
             <Dialog.Popup
               aria-modal="true"
               onClick={followed}
-              className="fixed inset-y-0 left-0 z-50 flex w-[min(19rem,85vw)] flex-col gap-4 border-line border-r bg-surface p-3 text-fg shadow-lg outline-none transition-transform duration-200 data-ending-style:-translate-x-full data-starting-style:-translate-x-full motion-reduce:transition-none"
+              className="fixed inset-y-0 left-0 z-50 flex w-[min(var(--drawer-width),85vw)] flex-col gap-4 border-line border-r bg-surface p-3 text-fg shadow-(--drawer-shadow) outline-none transition-transform duration-(--drawer-duration) data-ending-style:-translate-x-full data-starting-style:-translate-x-full motion-reduce:transition-none"
             >
               <div className="flex items-center justify-between pl-2">
                 <Dialog.Title className="sr-only">Navigation</Dialog.Title>

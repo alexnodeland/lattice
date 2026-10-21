@@ -260,7 +260,10 @@ test("a kind without a renderer: its JSON as a tree, its long strings unescaped"
   const latest = screen.getByRole("listitem", { name: "Version 2" });
   await expect.element(latest.getByText("Changed the JSON (+2 −1)")).toBeVisible();
   await userEvent.click(latest.getByRole("tab", { name: "Preview" }));
-  const tree = latest.getByRole("region", { name: "JSON" });
+  // In the Preview's panel: the Changes panel, leaving, holds a part named JSON of its own.
+  const tree = latest
+    .getByRole("tabpanel", { name: "Preview" })
+    .getByRole("region", { name: "JSON" });
   await expect.element(tree.getByText('First line Second "quoted" line')).toBeVisible();
   expect(tree.element().textContent).not.toContain("\\n");
 });

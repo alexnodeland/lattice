@@ -494,7 +494,7 @@ test("a traces read names its window, its limit and its filter; a trace read, wh
   expect(revealed?.url.searchParams.get("span")).toBe("83db6fcbe8c81dba");
   // One trace is one read, however its id is written; a span's withheld attributes are another,
   // let go as soon as nothing shows them.
-  const whole = "0".repeat(24) + "c029eec9";
+  const whole = `${"0".repeat(24)}c029eec9`;
   expect(queries.portalr.trace("acme", "c029eec9").queryKey).toEqual(
     keys.portalr.trace("acme", whole, null),
   );

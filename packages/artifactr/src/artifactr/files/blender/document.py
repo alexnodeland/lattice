@@ -7,7 +7,8 @@ reads a block through a pointer by checking its size alone, not its struct, so a
 block of the right size be read as anything. [`scan`][artifactr.files.blender.scan] inflates the
 file against the limit, and refuses one that isn't written by the pinned release's format and
 catalogue, holds a block whose code or struct is outside the allowed sets below, which fail closed,
-points at a struct outside them from one inside them, or names a script node anywhere; so a text,
+has a pointer that points at a block of another struct than its type's, or names a script node
+anywhere; so a text,
 a driver, a link to another file, an image, a packed file and any animation are refused before
 Blender starts. Blender is never given the bytes it was sent: it is given the blocks the scan read,
 uncompressed, without the thumbnail, in a file the scan writes (native files ADR-0015).
@@ -117,6 +118,27 @@ NAMED: Final = {
 }
 """Why some of the structs outside `STRUCTS` are refused, for a clearer refusal."""
 
+REPEATED: Final = frozenset({"SpaceLink"})
+"""The structs whose fields others repeat first, by name, rather than embed: every space repeats
+`SpaceLink`'s, so a pointer at a `SpaceLink` points at a space."""
+
+DATA_BLOCKS: Final = {
+    ("Object", "data"): frozenset({"Mesh", "Camera", "Lamp"}),
+    ("Collection", "owner_id"): frozenset({"Scene"}),
+    ("bNodeTree", "owner_id"): frozenset({"Material", "Lamp"}),
+    ("IDViewerPathElem", "id"): frozenset({"Object"}),
+    ("SpaceAction", "ads.source"): frozenset({"Scene"}),
+    ("SpaceNode", "id"): frozenset({"Scene"}),
+    ("SpaceNode", "from"): frozenset({"Object"}),
+}
+"""The pointers at any data-block, `ID *`, that Blender 5.2 saved for the commands and the corpus,
+each by its struct and its field, and the data-blocks it may point at: any other is null. Blender
+reads such a pointer as whatever its context says, an object's data by the object's type."""
+
+OBJECTS: Final = {0: None, 1: "Mesh", 10: "Lamp", 11: "Camera"}
+"""The objects' types the commands make, by Blender's number, and the data-block each one's data
+is: an empty's none, a mesh's a mesh, a light's a light and a camera's a camera."""
+
 SCRIPT_NODES: Final = (b"ShaderNodeScript", b"NodeShaderScript")
 """A script node's names, which Cycles compiles from a text or a file: refused in any block's
 bytes, whatever struct the block claims to be."""
@@ -191,6 +213,15 @@ def scan(content: bytes, limit: int = LIMIT) -> Scanned:
     blend = read(content, limit)
     for block in blend.blocks:
         _check(blend.data, block, blend.catalogue)
+    # What each block's address names: its struct, or None for raw data.
+    targets = {
+        block.address: None if block.index == RAW else blend.catalogue.name(block.index)
+        for block in blend.blocks
+        if block.code not in {b"DNA1", b"ENDB"}
+    }
+    for block in blend.blocks:
+        if block.index != RAW and block.code not in {b"DNA1", b"ENDB"}:
+            _check_pointers(blend.data, block, blend.catalogue, targets)
     kept = (block for block in blend.blocks if block.code != THUMBNAIL)
     return Scanned(HEADER + b"".join(blend.data[b.start : b.end] for b in kept), blend.compressed)
 
@@ -310,14 +341,57 @@ def _check(data: bytes, block: Block, catalogue: "Catalogue") -> None:
     if name not in STRUCTS:
         why = NAMED.get(name, "a struct that isn't allowed")
         raise AppFailed("refused", f"the file holds {why}: {name}")
-    size = catalogue.size(block.index)
-    if block.end - start != size * block.count:
+    if block.end - start != catalogue.size(block.index) * block.count:
         raise AppFailed("refused", f"a {name} block's size isn't its count's")
+
+
+def _check_pointers(
+    data: bytes, block: Block, catalogue: "Catalogue", targets: dict[int, str | None]
+) -> None:
+    """Refuse a block that points at what its pointers' types don't allow.
+
+    Blender reads a pointed block by its size alone, so the scan reads each pointer's type: one at
+    a struct outside `STRUCTS` must be null; one at a data-block, any data-block, must point where
+    `DATA_BLOCKS` says, or be null; one at an allowed struct must point at a block of that struct,
+    or of one that begins with it, or at no block's start, which Blender reads as null.
+    """
+    name = catalogue.name(block.index)
+    size = catalogue.size(block.index)
     for each in range(block.count):
-        for offset, pointed in catalogue.pointers(block.index):
-            if struct.unpack_from("<Q", data, start + each * size + offset)[0]:
+        record = block.bytes_start + each * size
+        for offset, path, pointed in catalogue.pointers(block.index):
+            (value,) = struct.unpack_from("<Q", data, record + offset)
+            if not value:
+                continue
+            if pointed not in catalogue.pointable:
                 why = NAMED.get(pointed, "a struct that isn't allowed")
-                raise AppFailed("refused", f"a {name} points at {why}: {pointed}")
+                raise AppFailed("refused", f"{name}.{path} points at {why}: {pointed}")
+            target = targets.get(value, "")
+            if pointed == "ID":
+                allowed = DATA_BLOCKS.get((name, path), frozenset())
+                refused = target not in allowed
+            else:
+                refused = target != "" and pointed not in catalogue.begins(target)
+            if refused:
+                found = {None: "raw data", "": "no block"}.get(target, target)
+                raise AppFailed("refused", f"{name}.{path} points at {found}, not {pointed}")
+        if name == "Object":
+            _check_object(data, record, catalogue, targets)
+
+
+def _check_object(
+    data: bytes, record: int, catalogue: "Catalogue", targets: dict[int, str | None]
+) -> None:
+    """Refuse an object of a type the commands don't make, or whose data isn't its type's."""
+    index = catalogue.index("Object")
+    kind_at, _ = catalogue.field(index, b"type")
+    data_at, _ = catalogue.field(index, b"data")
+    (kind,) = struct.unpack_from("<h", data, record + kind_at)
+    (held,) = struct.unpack_from("<Q", data, record + data_at)
+    if kind not in OBJECTS:
+        raise AppFailed("refused", f"the file holds an object of type {kind}, which isn't allowed")
+    if (targets.get(held, "") if held else None) != OBJECTS[kind]:
+        raise AppFailed("refused", f"an object of type {kind} holds data of another type")
 
 
 class Catalogue:
@@ -338,19 +412,10 @@ class Catalogue:
             self.structs.append((kind, tuple(zip(pairs[::2], pairs[1::2], strict=True))))
             at += 4 + 4 * fields
         self.by_type = {kind: index for index, (kind, _) in enumerate(self.structs)}
-        self._pointers: dict[int, tuple[tuple[int, str], ...]] = {}
-        self.pointable = {*STRUCTS, "SpaceLink"}
-        """The structs a pointer may name: those allowed, and those one of them begins with, as
-        Blender's structs inherit, by embedding their base first (an `ID`, a `ModifierData`),
-        and `SpaceLink`, the head every space repeats, field by field, rather than embeds."""
-        for name in STRUCTS:
-            index: int | None = self.index(name)
-            while index is not None and (fields := self.structs[index][1]):
-                kind, first = fields[0]
-                if self.names[first].startswith((b"*", b"(")):
-                    break
-                self.pointable.add(self.types[kind].decode())
-                index = self.by_type.get(kind)
+        self._pointers: dict[int, tuple[tuple[int, str, str], ...]] = {}
+        self._begins: dict[str, frozenset[str]] = {}
+        self.pointable = {*REPEATED, *(base for name in STRUCTS for base in self.begins(name))}
+        """The structs a pointer may name: those allowed, and those one of them begins with."""
 
     def name(self, index: int) -> str:
         """A struct's name, by its index."""
@@ -384,28 +449,59 @@ class Catalogue:
             if field.lstrip(b"*").split(b"[")[0] == name
         )
 
-    def pointers(self, index: int) -> tuple[tuple[int, str], ...]:
-        """Where a struct, and each struct it holds, points at a struct outside `STRUCTS`."""
+    def begins(self, name: str | None) -> frozenset[str]:
+        """The structs a block of a struct may be read as, through a pointer.
+
+        Itself, the struct it embeds first, as Blender's structs inherit (an `ID`, a
+        `ModifierData`), and so on, and any of `REPEATED` whose fields it repeats first. Raw data,
+        `None`, is none.
+        """
+        if name is None:
+            return frozenset()
+        if name not in self._begins:
+            self._begins[name] = self._began(name)
+        return self._begins[name]
+
+    def _began(self, name: str) -> frozenset[str]:
+        found = {name}
+        index: int | None = self.index(name)
+        while index is not None and (fields := self.structs[index][1]):
+            kind, first = fields[0]
+            if self.names[first].startswith((b"*", b"(")):
+                break
+            found.add(self.types[kind].decode())
+            index = self.by_type.get(kind)
+        own = [field for _, _, field, _ in self.fields(self.index(name))]
+        for repeated in REPEATED:
+            heads = [field for _, _, field, _ in self.fields(self.index(repeated))]
+            if own[: len(heads)] == heads:
+                found.add(repeated)
+        return frozenset(found)
+
+    def pointers(self, index: int) -> tuple[tuple[int, str, str], ...]:
+        """Each pointer at a struct in a struct, and in each struct it holds.
+
+        Each is its offset, its field's path, such as `ads.source`, and the struct it points at.
+        """
         if index not in self._pointers:
             self._pointers[index] = self._pointed(index)
         return self._pointers[index]
 
-    def _pointed(self, index: int) -> tuple[tuple[int, str], ...]:
-        found: list[tuple[int, str]] = []
+    def _pointed(self, index: int) -> tuple[tuple[int, str, str], ...]:
+        found: list[tuple[int, str, str]] = []
         for offset, kind, field, size in self.fields(index):
-            pointed = self.types[kind].decode()
             inner = self.by_type.get(kind)
+            path = field.lstrip(b"*").split(b"[")[0].decode()
             if inner is None:
                 continue
             if field.startswith(b"*") and not field.startswith(b"**"):
-                if pointed not in self.pointable:
-                    found += [(offset + at, pointed) for at in range(0, size, 8)]
+                pointed = self.types[kind].decode()
+                found += [(offset + at, path, pointed) for at in range(0, size, 8)]
             elif not field.startswith((b"*", b"(")):
-                each = self.sizes[kind]
                 found += [
-                    (offset + at + inner_offset, inner_pointed)
-                    for at in range(0, size, each)
-                    for inner_offset, inner_pointed in self.pointers(inner)
+                    (offset + at + inner_offset, f"{path}.{inner_path}", inner_pointed)
+                    for at in range(0, size, self.sizes[kind])
+                    for inner_offset, inner_path, inner_pointed in self.pointers(inner)
                 ]
         return tuple(found)
 

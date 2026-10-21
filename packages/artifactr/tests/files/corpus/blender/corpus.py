@@ -158,6 +158,11 @@ HOSTILE: Final[dict[str, Callable[[], bytes]]] = {
     # An object's animation, pointed at a camera's block: Blender checks a pointed block's size
     # alone, so any block large enough would be read as animation.
     "confused_pointer": partial(changed, "camera_light", pointed("Object", b"adt", "Camera")),
+    # A light's parent pointed at a camera's block, a light's data at a mesh's, and a material's
+    # node's data-block, which Blender reads by the node's kind, at an object.
+    "confused_parent": partial(changed, "camera_light", pointed("Object", b"parent", "Camera")),
+    "confused_data": partial(changed, "camera_light", pointed("Object", b"data", "Mesh")),
+    "node_data_block": partial(changed, "materials", pointed("bNode", b"id", "Object")),
     # The cube, its own parent: the scan allows a parent, and the script refuses the cycle.
     "cycle": partial(changed, "transforms", pointed("Object", b"parent", "Object")),
 }

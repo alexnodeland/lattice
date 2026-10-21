@@ -67,10 +67,13 @@ def test_a_fingerprint_leaves_out_what_each_save_stamps() -> None:
     ("name", "failure", "why"),
     [
         ("text_block", "refused", "a text, which may be a script"),
-        ("python_driver", "refused", "points at animation or a driver"),
-        ("simple_driver", "refused", "points at animation or a driver"),
-        ("animation", "refused", "points at animation or a driver"),
-        ("confused_pointer", "refused", "points at animation or a driver"),
+        ("python_driver", "refused", "animation or a driver, which may run Python: AnimData"),
+        ("simple_driver", "refused", "animation or a driver, which may run Python: AnimData"),
+        ("animation", "refused", "animation or a driver, which may run Python: AnimData"),
+        ("confused_pointer", "refused", "Object.adt points at animation or a driver"),
+        ("confused_parent", "refused", "Object.parent points at Camera, not Object"),
+        ("confused_data", "refused", "an object of type 10 holds data of another type"),
+        ("node_data_block", "refused", "bNode.id points at Object, not ID"),
         ("library_link", "refused", "a link to another file"),
         ("packed_image", "refused", "an image"),
         ("external_image", "refused", "an image"),
@@ -164,8 +167,28 @@ def test_raw_data_is_allowed_but_a_script_nodes_name_in_it_isnt() -> None:
 
 
 def test_a_pointer_at_a_struct_outside_the_allowed_ones_is_refused_with_why() -> None:
-    with pytest.raises(AppFailed, match="a Mesh points at a struct that isn't allowed: Key"):
+    with pytest.raises(AppFailed, match=r"Mesh\.key points at a struct that isn't allowed: Key"):
         scan(changed("primitives", pointed("Mesh", b"key", "Object")))
+
+
+def test_a_pointer_at_raw_data_as_a_struct_is_refused() -> None:
+    def at_raw(data: bytearray) -> None:
+        blend = read(bytes(data))
+        raw = next(b for b in blend.blocks if b.code == b"DATA" and b.index == RAW)
+        offset, _ = blend.catalogue.field(index_of("Object"), b"parent")
+        struct.pack_into("<Q", data, first(data, "Object")[1] + offset, raw.address)
+
+    with pytest.raises(AppFailed, match=r"Object\.parent points at raw data, not Object"):
+        scan(changed("primitives", at_raw))
+
+
+def test_an_object_of_a_type_the_commands_dont_make_is_refused() -> None:
+    def curve(data: bytearray) -> None:
+        offset, _ = read(bytes(data)).catalogue.field(index_of("Object"), b"type")
+        struct.pack_into("<h", data, first(data, "Object")[1] + offset, 2)
+
+    with pytest.raises(AppFailed, match="an object of type 2, which isn't allowed"):
+        scan(changed("primitives", curve))
 
 
 def test_the_catalogue_is_read_as_blender_lays_its_structs_out() -> None:

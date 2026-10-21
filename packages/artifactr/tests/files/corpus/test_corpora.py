@@ -14,11 +14,25 @@ NIGHTLY = Path(__file__).parents[5] / ".github" / "workflows" / "nightly.yml"
 
 
 @pytest.mark.parametrize("corpus", CORPORA.values(), ids=list(CORPORA))
-def test_each_corpus_is_what_its_maker_makes(corpus: Corpus) -> None:
+def test_each_corpus_holds_a_file_for_each_feature(corpus: Corpus) -> None:
     files = sorted(path.name for path in corpus.folder.glob(f"*{corpus.extension}"))
     assert files == sorted(f"{feature}{corpus.extension}" for feature in corpus.makers)
+
+
+@pytest.mark.parametrize(
+    "corpus",
+    [
+        pytest.param(corpus, id=app, marks=[pytest.mark.craft(app)] if corpus.made_by_app else [])
+        for app, corpus in CORPORA.items()
+    ],
+)
+def test_each_corpus_is_what_its_maker_makes(corpus: Corpus) -> None:
+    """Byte for byte, or, where the app makes the files, feature by feature, with the app."""
     for feature, make in corpus.makers.items():
-        assert corpus.source(feature) == make(), f"{feature}{corpus.extension} drifted: make it"
+        made, source = make(), corpus.source(feature)
+        if corpus.made_by_app:
+            made, source = corpus.read(feature, made), corpus.read(feature, source)
+        assert source == made, f"{feature}{corpus.extension} drifted: make it"
 
 
 @pytest.mark.parametrize(

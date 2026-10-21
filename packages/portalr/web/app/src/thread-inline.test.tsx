@@ -79,6 +79,10 @@ const manifest = (name: string, mediaType: string, outline: string, pages: numbe
 const DATA: Record<string, readonly [string, Record<string, unknown>]> = {
   note_1: ["note", { text: "# Plan\n\nShip the **brief** on Friday." }],
   form_1: ["form", POLL],
+  cad_1: [
+    "cad_model",
+    manifest("bracket.FCStd", "application/x-extension-fcstd", "Body\n  Pad", 1),
+  ],
   sub_1: ["submission", { form_id: "form_1", version: 1, values: { dish: "Soup" } }],
   dash_1: [
     "dashboard",
@@ -184,6 +188,16 @@ afterEach(() => {
   vi.restoreAllMocks();
   Upload.sent = [];
   sessionStorage.clear();
+});
+
+test("a FreeCAD model is read inline as any native file is, a page at a time", async () => {
+  const { screen } = await open(THREAD, serving({ flags: { "files:freecad": true } }), undefined, {
+    artifactrLog: thread([["cad_1", "cad_model"]]),
+  });
+  const model = screen.getByRole("listitem", { name: "bracket.FCStd" });
+  await expect.element(model.getByText("3D model", { exact: true })).toBeVisible();
+  await model.getByRole("radio", { name: "Outline" }).click();
+  await expect.element(model.getByRole("list", { name: "Outline of bracket.FCStd" })).toBeVisible();
 });
 
 test("a kind is named as people say it: a native file by its type", () => {

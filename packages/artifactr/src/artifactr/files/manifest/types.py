@@ -41,6 +41,10 @@ FIGCRAFT: Final = "application/x-figcraft"
 """The media type of a FigCraft design, `.figcraft`, which has no registered one: a zip holding
 its document as JSON."""
 
+FCSTD: Final = "application/x-extension-fcstd"
+"""The media type of a FreeCAD document, `.FCStd`, as FreeCAD's own MIME file names it, since it
+has no registered one: a zip holding its document as XML and its shapes."""
+
 OUTLINE_LIMIT: Final = 4_000
 """The most characters an outline holds: what the agent sees of a file by default."""
 
@@ -188,3 +192,9 @@ class Design(NativeFile):
     """A design, `.figcraft`: registered as `design`."""
 
     formats: ClassVar[frozenset[str]] = frozenset({FIGCRAFT})
+
+
+class CadModel(NativeFile):
+    """A 3D model, `.FCStd`: registered as `cad_model`."""
+
+    formats: ClassVar[frozenset[str]] = frozenset({FCSTD})

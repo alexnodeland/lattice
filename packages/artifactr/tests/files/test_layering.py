@@ -48,6 +48,16 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     "vectorcraft": _adapter("vectorcraft"),
     "designcraft": _adapter("designcraft"),
     "figcraft": _adapter("figcraft"),
+    # FreeCAD's script runs in FreeCAD's own interpreter, on its modules and the Pillow it ships.
+    "freecad": (
+        {
+            "artifactr.files.manifest",
+            "artifactr.files.app",
+            "artifactr.files.craft",
+            "artifactr.files.freecad",
+        },
+        {"pydantic", "FreeCAD", "Part", "Sketcher", "TechDraw", "PIL"},
+    ),
     # The worker, over any app, and the App that calls it; its entry point runs WordCraft's.
     "worker": (
         {

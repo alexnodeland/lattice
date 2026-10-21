@@ -1,6 +1,6 @@
 # RFC-0003: Native files as artifacts
 
-**Status:** Draft, amended by [portalr ADR-0041](../portalr/adr/0041-first-party-webassembly-in-the-apps-policy.md), [lattice ADR-0026](../adr/0026-a-distribution-needs-a-reason-integrations-are-extras.md) and [lattice ADR-0027](../adr/0027-integrations-switched-per-workspace-through-one-port.md), and by native files [ADR-0010](../artifactr/files/adr/0010-a-shim-beside-the-build-and-talk-level-one-plus.md), [ADR-0011](../artifactr/files/adr/0011-a-gate-for-each-app.md) and [ADR-0012](../artifactr/files/adr/0012-an-app-for-each-type-and-no-format-changed-by-a-check-in.md)
+**Status:** Draft, amended by [portalr ADR-0041](../portalr/adr/0041-first-party-webassembly-in-the-apps-policy.md), [lattice ADR-0026](../adr/0026-a-distribution-needs-a-reason-integrations-are-extras.md) and [lattice ADR-0027](../adr/0027-integrations-switched-per-workspace-through-one-port.md), and by native files [ADR-0010](../artifactr/files/adr/0010-a-shim-beside-the-build-and-talk-level-one-plus.md), [ADR-0011](../artifactr/files/adr/0011-a-gate-for-each-app.md), [ADR-0012](../artifactr/files/adr/0012-an-app-for-each-type-and-no-format-changed-by-a-check-in.md) and [ADR-0014](../artifactr/files/adr/0014-freecad-on-a-third-dialect-and-no-python-a-file-or-an-agent-brings.md)
 **Author:** Alex Nodeland
 **Created:** 2026-10-16
 **Discussion:** [#248](https://github.com/alexnodeland/lattice/pull/248)
@@ -192,6 +192,8 @@ class App(Protocol):
 
 - **Stateless calls over MCP on stdio.** WordCraft's `wordcraft-cli mcp` speaks only stdio, and confines file access to a read root and a write root. stdio needs no listening port, which is what makes a sandbox with no network possible. Each call is bytes in and bytes out, so no document stays open between calls.
 - **One adapter per app,** since the apps' control channels and MCP tools differ. WordCraft's has two: `Subprocess` spawns the CLI locally, for tests and trusted files, and is not a sandbox; `Worker` sends the call to the worker.
+
+> **Amended (2026-10-20) by native files [ADR-0014](../artifactr/files/adr/0014-freecad-on-a-third-dialect-and-no-python-a-file-or-an-agent-brings.md):** an app with no MCP server is driven by a third dialect, `script`: for each call its CLI runs a script of the adapter's, given the call as JSON in a file and writing its result as JSON beside it, in the same empty directory, under the same deadline and launcher. FreeCAD, a third party's app under LGPL-2.1-or-later and no brand licence, is the first, integration `files:freecad`, off by default and run only with `trusted=True`, so in the worker. A document holding a Python feature or proxy, a link to another file, or an object outside FreeCAD's C++ workbenches is refused before FreeCAD starts, and an agent's commands are a fixed set of lattice's own, never Python.
 
 The worker treats every file as hostile: a zip bomb, deeply nested XML, an enormous image.
 

@@ -113,7 +113,8 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     # MCP client the files extra brings, and the agent's tools on the agent's public API, behind
     # the switch lattice-core declares, and people's check-out over artifactr's router's auth.
     # The worker serves an app with Starlette and uvicorn, and the application calls it with
-    # httpx. tests/files/test_layering.py holds its own layers.
+    # httpx. FreeCAD's script runs in FreeCAD's own interpreter, on its modules and the Pillow it
+    # ships. tests/files/test_layering.py holds its own layers.
     "files": (
         {
             *("artifactr.core", "artifactr.workspace", "artifactr.agent", "artifactr.fastapi"),
@@ -124,6 +125,7 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
             *("pydantic", "pydantic_ai", "sqlalchemy", "alembic", "mcp", "anyio"),
             *("fastapi", "starlette", "uvicorn", "httpx"),
             *("lattice_core.sql", "lattice_core.integrations", "lattice_core.refusals"),
+            *("FreeCAD", "Part", "Sketcher", "TechDraw", "PIL"),
         },
     ),
 }

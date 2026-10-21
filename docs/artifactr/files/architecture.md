@@ -6,7 +6,7 @@
 
 | Layer | What it is | It may import |
 |---|---|---|
-| `manifest` | `Blob`, `Provenance`, `NativeFile`, a type for each app's files (`WordDocument`, `Workbook`, `Presentation`, `PdfDocument`, `Drawing`, `LayeredImage`, `VectorImage`, `PageLayout`, `Design`), and `revise`, the patch that tests its base | artifactr, pydantic |
+| `manifest` | `Blob`, `Provenance`, `NativeFile`, a type for each app's files (`WordDocument`, `Workbook`, `Presentation`, `PdfDocument`, `Drawing`, `LayeredImage`, `VectorImage`, `PageLayout`, `Design`, `CadModel`), and `revise`, the patch that tests its base | artifactr, pydantic |
 | `blobs` | The `Blobs` port, its size limit and digest, and `InMemoryBlobs` | `manifest`, artifactr |
 | `checkouts` | `Checkout`, the record behind a person's lease, the `Checkouts` port, and `InMemoryCheckouts` | `manifest`, artifactr, pydantic |
 | `app` | The `App` port and `FakeApp` | `manifest`, pydantic |
@@ -20,6 +20,7 @@
 | `vectorcraft` | VectorCraft's adapter, `Subprocess`, and whether bytes are an SVG, read from their root element | `manifest`, `app`, `craft`, pydantic |
 | `designcraft` | DesignCraft's adapter, `Subprocess`, and a layout's format, IDML, read from its package's `mimetype` | `manifest`, `app`, `craft`, pydantic |
 | `figcraft` | FigCraft's adapter, `Subprocess`, and whether bytes are a `.figcraft`, read from its document | `manifest`, `app`, `craft`, pydantic |
+| `freecad` | FreeCAD's adapter, `Subprocess`; the scan that refuses a document holding Python before FreeCAD starts, and its fingerprint; and `console/script.py`, which `freecadcmd` runs, in FreeCAD's own interpreter | `manifest`, `app`, `craft`, pydantic; its script FreeCAD's modules and Pillow |
 | `worker` | `worker_app`, the worker that runs an app on hostile files under `Limits`, and `Worker`, the `App` that calls it | `app`, `wordcraft` (its entry point), pydantic, `anyio`, Starlette, uvicorn, httpx |
 | `native` | `NativeFiles`: uploads, check-out and check-in, agents' edits, reads, renders and collection, behind the app's switch | `manifest`, `blobs`, `checkouts`, `app`, artifactr, `lattice_core.integrations` |
 | `tools` | `native_file_tools`, the agent's toolset | `app`, `native`, artifactr and its agent, pydantic-ai |

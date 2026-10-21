@@ -6,6 +6,11 @@
 #        scripts/craft APP web       the browser build's directory, unmodified
 #        scripts/craft APP notices   the licence and notice files in this machine's CLI asset
 #
+# FreeCAD, the FreeCAD project's, not storytold's, is pinned by its Linux AppImages alone, its
+# release's own -SHA256.txt lines: `cli` is the AppImage's freecadcmd, unpacked by the AppImage
+# itself once its checksum holds, since CI has no FUSE (native files ADR-0014). It has no macOS
+# CLI and no browser build.
+#
 # Each asset is the storytold/APP release's, with the SHA-256 the pin records, which is the
 # release's own SHA256SUMS.txt line; upstream signs nothing, so the checksum is the pin (RFC-0003's
 # D8). A pin names one asset for each of cli on Linux x86_64 and aarch64 and on macOS, and web: the
@@ -25,14 +30,26 @@ readonly PIN
 [[ $app =~ ^[a-z]+$ && -f $PIN ]] || { echo "craft: no pin for $app" >&2; exit 2; }
 
 release='[0-9]+\.[0-9]+\.[0-9]+'
-case "$what:$(uname -s):$(uname -m)" in
-  cli:Linux:x86_64 | notices:Linux:x86_64) pattern="$app(-cli)?-$release-linux-x86_64\.tar\.gz" ;;
-  cli:Linux:aarch64 | cli:Linux:arm64 | notices:Linux:aarch64 | notices:Linux:arm64)
-    pattern="$app(-cli)?-$release-linux-aarch64\.tar\.gz" ;;
-  cli:Darwin:* | notices:Darwin:*) pattern="$app-cli-$release-macos-universal\.zip" ;;
-  web:*) pattern="$app-web-$release\.zip" ;;
-  *) echo "craft: no $what for $(uname -s) $(uname -m)" >&2; exit 2 ;;
-esac
+repository=storytold/$app tag=v cli=$app-cli
+if [[ $app == freecad ]]; then
+  repository=FreeCAD/FreeCAD tag='' cli=freecadcmd
+  case "$what:$(uname -s):$(uname -m)" in
+    cli:Linux:x86_64 | notices:Linux:x86_64) arch=x86_64 ;;
+    cli:Linux:aarch64 | cli:Linux:arm64 | notices:Linux:aarch64 | notices:Linux:arm64)
+      arch=aarch64 ;;
+    *) echo "craft: FreeCAD has no $what for $(uname -s) $(uname -m)" >&2; exit 2 ;;
+  esac
+  pattern="FreeCAD_$release-Linux-$arch-py[0-9]+\.AppImage"
+else
+  case "$what:$(uname -s):$(uname -m)" in
+    cli:Linux:x86_64 | notices:Linux:x86_64) pattern="$app(-cli)?-$release-linux-x86_64\.tar\.gz" ;;
+    cli:Linux:aarch64 | cli:Linux:arm64 | notices:Linux:aarch64 | notices:Linux:arm64)
+      pattern="$app(-cli)?-$release-linux-aarch64\.tar\.gz" ;;
+    cli:Darwin:* | notices:Darwin:*) pattern="$app-cli-$release-macos-universal\.zip" ;;
+    web:*) pattern="$app-web-$release\.zip" ;;
+    *) echo "craft: no $what for $(uname -s) $(uname -m)" >&2; exit 2 ;;
+  esac
+fi
 pinned=$(grep -E "^[0-9a-f]{64}  $pattern\$" "$PIN" || true)
 if [[ $(grep -c . <<<"$pinned") -ne 1 ]]; then
   echo "craft: $PIN must pin one asset like $pattern" >&2
@@ -41,7 +58,7 @@ fi
 read -r SHA256 NAME <<<"$pinned"
 VERSION=$(grep -oE "$release" <<<"$NAME")
 readonly SHA256 NAME VERSION
-readonly URL="https://github.com/storytold/$app/releases/download/v$VERSION/$NAME"
+readonly URL="https://github.com/$repository/releases/download/$tag$VERSION/$NAME"
 
 cache=${CRAFT_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/lattice-craft}
 asset="$cache/$NAME"
@@ -72,13 +89,14 @@ if [[ ! -e $unpacked ]]; then
   case $NAME in
     *.zip) unzip -q "$asset" -d "$part" ;;
     *.tar.gz) tar -xzf "$asset" -C "$part" ;;
+    *.AppImage) chmod u+x "$asset" && (cd "$part" && "$asset" --appimage-extract >/dev/null) ;;
   esac
   # A link is made whole or not at all, and only by the first run: the others' unpacking goes.
   if ln -sn "$(basename "$part")" "$unpacked" 2>/dev/null; then part=""; fi
 fi
 
 case $what in
-  cli) found=$(find "$unpacked/" -type f -name "$app-cli" -perm -u+x -print -quit) ;;
+  cli) found=$(find "$unpacked/" -type f -name "$cli" -perm -u+x -print -quit) ;;
   web) found=$(find "$unpacked/" -type f -name index.html -print -quit) && found=${found%/*} ;;
   notices)
     found=$(find "$unpacked/" -type f \( -name 'LICEN[CS]E*' -o -name '*.LICEN[CS]E*' \

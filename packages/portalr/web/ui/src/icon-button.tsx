@@ -20,24 +20,31 @@ type Props = Omit<ComponentProps<typeof Button>, "children" | "variant" | "size"
  * choice.
  */
 export function IconButton({ label, icon, render, className, ...props }: Props) {
+  const square = cn(
+    "size-(--icon-button-size) shrink-0 rounded-(--icon-button-radius) p-0",
+    className,
+  );
   return (
     <Tooltip.Root>
-      <Tooltip.Trigger
-        render={
-          <Button
-            variant="ghost"
-            aria-label={label}
-            className={cn(
-              "size-(--icon-button-size) shrink-0 rounded-(--icon-button-radius) p-0",
-              className,
-            )}
-            {...(render ? { render, nativeButton: false } : {})}
-            {...props}
-          />
-        }
-      >
-        <Icon icon={icon} className="size-(--icon-button-icon)" />
-      </Tooltip.Trigger>
+      {render ? (
+        // A link: the link's own element, in the button's ghost look, named by the label.
+        <Tooltip.Trigger
+          render={render}
+          aria-label={label}
+          className={cn(
+            "inline-flex items-center justify-center text-fg outline-offset-(--focus-offset) hover:bg-wash focus-visible:outline-(length:--focus-width) focus-visible:outline-focus",
+            square,
+          )}
+        >
+          <Icon icon={icon} className="size-(--icon-button-icon)" />
+        </Tooltip.Trigger>
+      ) : (
+        <Tooltip.Trigger
+          render={<Button variant="ghost" aria-label={label} className={square} {...props} />}
+        >
+          <Icon icon={icon} className="size-(--icon-button-icon)" />
+        </Tooltip.Trigger>
+      )}
       <Tooltip.Portal>
         <Tooltip.Positioner sideOffset={6}>
           <Tooltip.Popup className="rounded-(--tooltip-radius) border border-edge bg-surface px-(--tooltip-pad-x) py-(--tooltip-pad-y) text-fg text-xs shadow-(--tooltip-shadow)">

@@ -70,6 +70,7 @@ nav:
   - adr/0058-a-new-version-offered-to-a-stale-tab.md
   - adr/0059-link-variants-breadcrumbs-and-the-skip-link.md
   - adr/0060-list-rows.md
+  - adr/0061-icon-buttons-and-the-inline-artifacts-header.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

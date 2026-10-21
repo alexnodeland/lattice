@@ -71,7 +71,7 @@ test("its full view fills the window as a modal, keeps what was entered, and ret
   await expect
     .element(screen.getByRole("textbox", { name: "Draft" }))
     .toHaveValue("half an answer");
-  await expect.poll(() => document.activeElement?.textContent).toContain("Full view");
+  await expect.poll(() => document.activeElement?.getAttribute("aria-label")).toBe("Full view");
 });
 
 test("Escape returns a full view, unless something inside took it first", async () => {

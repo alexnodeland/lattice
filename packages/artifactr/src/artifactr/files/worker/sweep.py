@@ -9,13 +9,23 @@ process of its user killed, and the temporary directory, where each call's files
 
 import contextlib
 import os
-import shutil
 import signal
+import stat
 import tempfile
 from collections.abc import Callable
 from pathlib import Path
+from typing import Final
 
 PROC = Path("/proc")
+
+
+PASSES: Final = 10
+"""How many times the processes are listed, at most, until a listing finds none to kill: strays
+that start each other again as they are killed are killed again, or the sweep fails."""
+
+
+class SweepFailed(RuntimeError):
+    """The sweep left something behind: the worker must take no other call."""
 
 
 def sweep(
@@ -33,23 +43,55 @@ def sweep(
 
     Returns:
         The processes killed.
+
+    Raises:
+        SweepFailed: If processes were still starting after `PASSES` listings, or anything is
+            left in `temporary`.
     """
     kept = _ancestors(proc, os.getpid())
     user = os.getuid()
     killed: list[int] = []
-    for entry in proc.iterdir():
-        if not entry.name.isdigit() or int(entry.name) in kept:
-            continue
-        with contextlib.suppress(OSError):
-            if entry.stat().st_uid == user:
-                kill(int(entry.name), signal.SIGKILL)
-                killed.append(int(entry.name))
-    for left in Path(temporary or tempfile.gettempdir()).iterdir():
-        if left.is_dir() and not left.is_symlink():
-            shutil.rmtree(left, ignore_errors=True)
-        else:
-            left.unlink(missing_ok=True)
+    for _ in range(PASSES):
+        found = [pid for pid in _users(proc, user) if pid not in kept and pid not in killed]
+        if not found:
+            break
+        for pid in found:
+            with contextlib.suppress(OSError):
+                kill(pid, signal.SIGKILL)
+            killed.append(pid)
+    else:
+        raise SweepFailed(f"processes were still starting after {PASSES} sweeps")
+    directory = Path(temporary or tempfile.gettempdir())
+    for left in directory.iterdir():
+        _remove(left)
+    if remaining := sorted(left.name for left in directory.iterdir()):
+        raise SweepFailed(f"{directory} still holds {', '.join(remaining)}")
     return killed
+
+
+def _users(proc: Path, user: int) -> list[int]:
+    """The processes of this user, as `proc` lists them now."""
+    found: list[int] = []
+    for entry in proc.iterdir():
+        with contextlib.suppress(OSError):
+            if entry.name.isdigit() and entry.stat().st_uid == user:
+                found.append(int(entry.name))
+    return found
+
+
+def _remove(path: Path) -> None:
+    """Remove a file, or a directory and all it holds, whatever its mode: its owner may."""
+    if path.is_symlink() or not path.is_dir():
+        with contextlib.suppress(OSError):
+            path.unlink()
+        return
+    with contextlib.suppress(OSError):
+        path.chmod(stat.S_IRWXU)
+    with contextlib.suppress(OSError):
+        for child in path.iterdir():
+            _remove(child)
+    with contextlib.suppress(OSError):
+        path.rmdir()
 
 
 def _ancestors(proc: Path, pid: int) -> set[int]:

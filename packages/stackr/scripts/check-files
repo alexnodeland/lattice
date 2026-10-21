@@ -114,9 +114,11 @@ posture() {
 }
 setting() { docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$1" | sed -n "s/^$2=//p"; }
 
-# Run inside the worker: nothing outside its network answers.
+# Run inside the worker, given where the host's address would be on its network, and the
+# worker's own: nothing outside the network answers, nor the host on it.
 egress='
 import socket, sys
+host, own = sys.argv[1], sys.argv[2]
 def refused(what, attempt):
     try:
         attempt()
@@ -142,15 +144,26 @@ results = [
     refused("UDP DNS to 1.1.1.1:53", udp_dns),
     refused("TCP to 169.254.169.254:80", lambda: tcp(socket.AF_INET, "169.254.169.254", 80)),
 ]
+if host == own:
+    print(f"  passed over: {host}, where the host would be, is the worker itself")
+else:
+    try:
+        tcp(socket.AF_INET, host, 80)
+    except ConnectionRefusedError as answered:
+        print(f"  REACHED: {host}, where the host would be, answered: {answered}")
+        results.append(False)
+    except OSError as error:
+        print(f"  refused: TCP to {host}:80, where the host would be: {error}")
 sys.exit(0 if all(results) else 1)
 '
-# Run inside the worker after the probe's calls: what was planted before them is gone.
+# Run inside the worker: what was planted is there (`there`), or gone (`gone`).
 left='
 import os, sys
 strays = [p for p in os.listdir("/proc") if p.isdigit() and open(f"/proc/{p}/cmdline", "rb").read().split(b"\0")[0] == b"sleep"]
-planted = os.listdir("/tmp")
-print(f"  processes left: {strays}; in /tmp: {planted}")
-sys.exit(1 if strays or planted else 0)
+planted = sorted(os.listdir("/tmp"))
+print(f"  processes: {strays}; in /tmp: {planted}")
+there = bool(strays) and planted == ["planted", "sealed"]
+sys.exit(0 if there == (sys.argv[1] == "there") and (there or not strays and not planted) else 1)
 '
 
 for app in "${apps[@]}"; do
@@ -164,12 +177,23 @@ for app in "${apps[@]}"; do
     same "$(docker inspect --format '{{len .HostConfig.PortBindings}}' "$container")" 0
   check "$app's network gives the host no address on it" same \
     "$(docker network inspect --format '{{index .Options "com.docker.network.bridge.inhibit_ipv4"}}' "$network")" true
-  check "$app's worker reaches nothing outside its network" \
-    docker exec "$container" python -I -c "$egress"
+  # Where the host's address would be: Docker's gateway, or else the subnet's first address.
+  host=$(docker network inspect --format '{{range .IPAM.Config}}{{.Gateway}}{{end}}' "$network")
+  if [[ ! $host =~ ^[0-9.]+$ ]]; then
+    subnet=$(docker network inspect --format '{{range .IPAM.Config}}{{.Subnet}}{{end}}' "$network")
+    host="${subnet%.*/*}.1"
+  fi
+  own=$(docker inspect --format "{{(index .NetworkSettings.Networks \"$network\").IPAddress}}" "$container")
+  check "$app's worker reaches nothing outside its network, nor the host on it" \
+    docker exec "$container" python -I -c "$egress" "$host" "$own"
 
-  # A process its user leaves, and a file for the next call, before the probe's calls.
-  docker exec --detach --user 10002 "$container" sleep 600
-  docker exec --user 10002 "$container" sh -c 'echo planted >/tmp/planted'
+  # A process its user leaves in a session of its own, a file for the next call, and a
+  # directory none may list, before the probe's calls.
+  docker exec --detach --user 10002 "$container" setsid sleep 600
+  docker exec --user 10002 "$container" sh -c \
+    'echo planted >/tmp/planted && mkdir /tmp/sealed && echo filler >/tmp/sealed/f && chmod 000 /tmp/sealed'
+  check "$app's worker holds what was planted, before the probe's calls" \
+    docker exec "$container" python -I -c "$left" there
   WORKER_TOKEN=$(setting "$container" WORKER_TOKEN)
   export WORKER_TOKEN
   version=$(version_of "$app")
@@ -179,7 +203,7 @@ for app in "${apps[@]}"; do
     "$name-files-$app:local" -I /probe.py "http://files-$app:8080" "$app" "$version"
   unset WORKER_TOKEN
   check "$app's worker kept nothing of one call for the next" \
-    docker exec "$container" python -I -c "$left"
+    docker exec "$container" python -I -c "$left" gone
 
   if [[ " ${services[*]} " == *" files-$app-editor "* ]]; then
     editor=$(compose ps --quiet "files-$app-editor")

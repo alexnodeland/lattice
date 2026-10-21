@@ -49,7 +49,9 @@ def worker_app(
         limits: The deadlines and sizes each call is held to.
         build: The digest of the image the worker runs in, which provenance records.
         sweep: What clears the worker's container after each call, before the next is taken:
-            `artifactr.files.worker.sweep.sweep`, where the worker is alone in it.
+            `artifactr.files.worker.sweep.sweep`, where the worker is alone in it. If it fails,
+            the call fails as `crashed`, and the worker answers every request after it, its
+            health check's too, with 503: it takes no other call until it is restarted.
 
     Raises:
         ValueError: If the token is empty, which would admit anyone.
@@ -64,11 +66,17 @@ def worker_app(
         integration=app.integration,
     )
     turn = anyio.Lock()
+    broken: list[str] = []
+    """Why the sweep failed, once it has: then the worker serves nothing more."""
 
     def guarded(
         handle: Callable[[Request], Awaitable[Response]],
     ) -> Callable[[Request], Awaitable[Response]]:
         async def endpoint(request: Request) -> Response:
+            if broken:
+                return JSONResponse(
+                    Failed(failure="crashed", message=broken[0]).model_dump(), status_code=503
+                )
             scheme, _, given = request.headers.get("authorization", "").partition(" ")
             if scheme.lower() != "bearer" or not hmac.compare_digest(
                 given.encode(), token.encode()
@@ -101,6 +109,9 @@ def worker_app(
                     if sweep is not None:
                         with anyio.CancelScope(shield=True):
                             await anyio.to_thread.run_sync(sweep)
+                except Exception as error:
+                    broken.append(f"the worker couldn't clear itself after a call: {error}")
+                    raise AppFailed("crashed", broken[0]) from error
                 finally:
                     turn.release()
 

@@ -1,12 +1,15 @@
 """What the UIs need to know about the application they run in, as ``config.json`` serves it."""
 
 import base64
+from pathlib import Path
 from typing import Final
 from urllib.parse import urlsplit
 
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, PrivateAttr, field_validator, model_validator
 
 from lattice_core.integrations import KEY
+from portalr.brand.kit import Kit, load
+from portalr.brand.tokens import BrandError
 
 
 class Surfaces(BaseModel):
@@ -42,12 +45,33 @@ class Site(BaseModel):
     the app's browser build, served over https on an origin of its own, for which the portal sets
     no cookies (lattice RFC-0003); http only on loopback, for tests. The app opens it in a new tab
     when a person checks a file out, and opens none that is on its own origin."""
+    brand: Path | None = None
+    """The folder of the deployment's brand kit (lattice RFC-0007), which is read and checked when
+    the site is made, as the application starts, so a kit with a fault fails the start with every
+    fault listed; None for portalr's own look. The kit, read, is :attr:`kit`."""
+    _kit: Kit | None = PrivateAttr(default=None)
     apps: str | None = None
     """The origin mini apps run on (lattice RFC-0005), such as ``https://apps.example.com``: a
     host of its own, the same site as the portal's, for which nothing sets or reads a cookie,
     serving the sandbox and nothing else (:class:`~portalr.fastapi.SandboxOrigin`); http only on
     loopback, for development and tests. The portal frames it alone. None where the deployment
     runs no apps: each is shown as its label and summary."""
+
+    @model_validator(mode="after")
+    def _read_kit(self) -> "Site":
+        """Read and check the brand kit, or refuse the site with every fault the kit has."""
+        if self.brand is not None:
+            try:
+                self._kit = load(self.brand)
+            except BrandError as error:
+                message = f"the brand kit at {self.brand} isn't one portalr can serve:\n{error}"
+                raise ValueError(message) from error
+        return self
+
+    @property
+    def kit(self) -> Kit | None:
+        """The deployment's brand kit, read and checked; None for portalr's own look."""
+        return self._kit
 
     @field_validator("apps")
     @classmethod

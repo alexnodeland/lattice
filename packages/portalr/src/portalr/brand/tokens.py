@@ -110,7 +110,7 @@ def _measure(value: object, path: str, type_: str) -> str:
 
 def _color(value: object, path: str) -> str:
     """A colour: `#rrggbb`, or DTCG's srgb object, whose components and hex must agree."""
-    if isinstance(value, str) and _HEX.match(value):
+    if isinstance(value, str) and _HEX.fullmatch(value):
         return value
     color = _mapping(value)
     if color is None or color.get("colorSpace") != "srgb":
@@ -120,7 +120,7 @@ def _color(value: object, path: str) -> str:
         color.get("alpha", 1),
         _list(color.get("components")),
     )
-    if not (isinstance(hex_, str) and _HEX.match(hex_)):
+    if not (isinstance(hex_, str) and _HEX.fullmatch(hex_)):
         raise BrandError(f"{path}: {hex_!r} is not a colour in #rrggbb")
     channels = [int(hex_[at : at + 2], 16) for at in (1, 3, 5)]
     if components is None or len(components) != 3:
@@ -145,7 +145,7 @@ def _family(value: object, path: str) -> str:
     if names[-1] not in _GENERIC:
         raise BrandError(f"{path}: a font family ends in a generic family, such as sans-serif")
     for name in names:
-        if not _FAMILY.match(name):
+        if not _FAMILY.fullmatch(name):
             raise BrandError(f"{path}: {name!r} has more than letters, digits, spaces and hyphens")
     return ", ".join(name if name in _GENERIC else f'"{name}"' for name in names)
 
@@ -227,24 +227,66 @@ def _note(text: str) -> list[str]:
     return ["  /*", *(f"   * {line}" for line in lines), "   */"]
 
 
-def compile_kit(kit: Path = DEFAULT, *, default: Path = DEFAULT) -> str:
-    """A kit's tokens as a stylesheet: each in `:root`, a colour that differs as a pair."""
+SWAPPED = frozenset(
+    {
+        "--chart-1",
+        "--chart-2",
+        "--chart-3",
+        "--code-token-keyword",
+        "--code-token-link",
+        "--code-token-string",
+        "--code-token-string-expression",
+        "--code-token-function",
+        "--code-token-constant",
+        "--code-token-parameter",
+    }
+)
+"""The tokens base.css's colour-blind mode declares again under ``[data-cvd]`` (ADR-0036)."""
+
+
+def layered(kit: Path = DEFAULT, *, default: Path = DEFAULT) -> tuple[dict[str, object], ...]:
+    """A kit's tokens in each scheme, light then dark, laid over the default's, as written."""
     light = read(default / "tokens.light.json")
     dark = {**light, **read(default / "tokens.dark.json")}
     if kit != default:
         light = {**light, **read(kit / "tokens.light.json")}
         dark = {**dark, **read(kit / "tokens.light.json"), **read(kit / "tokens.dark.json")}
+    return light, dark
+
+
+def resolved(path: str, tokens: Mapping[str, object]) -> object:
+    """A token's value as written at the end of its aliases (which `compile_kit` has checked)."""
+    value = tokens[path]
+    for _ in range(MAX_ALIAS_DEPTH + 1):
+        if not (isinstance(value, str) and (match := _ALIAS.match(value))):
+            return value
+        value = tokens[match[1]]
+    raise BrandError(f"{path}: more than {MAX_ALIAS_DEPTH} aliases deep, or a cycle")
+
+
+def compile_kit(kit: Path = DEFAULT, *, default: Path = DEFAULT) -> str:
+    """A kit's tokens as a stylesheet: each in `:root`, a colour that differs as a pair."""
+    light, dark = layered(kit, default=default)
     faults: list[str] = []
+    header = (
+        [
+            " * Generated from portalr's default brand kit (src/portalr/brand/default) by `moon"
+            " run",
+            " * portalr:brand`: edit the kit, not this file (lattice RFC-0007, portalr ADR-0056).",
+            " * What a kit can't set, and what is mixed from these, is in base.css.",
+        ]
+        if kit == default
+        else [" * A brand kit's tokens over portalr's default kit (lattice RFC-0007)."]
+    )
     lines = [
         "/*",
-        " * Generated from portalr's default brand kit (src/portalr/brand/default) by `moon run",
-        " * portalr:brand`: edit the kit, not this file (lattice RFC-0007, portalr ADR-0056).",
-        " * What a kit can't set, and what is mixed from these, is in base.css.",
+        *header,
         " */",
         "",
         ":root {",
     ]
     differs: list[str] = []
+    unswapped: list[str] = []
     for group in GROUPS:
         lines.extend(_note(group.note))
         for row in group.rows:
@@ -260,16 +302,22 @@ def compile_kit(kit: Path = DEFAULT, *, default: Path = DEFAULT) -> str:
                 faults.append(str(error))
                 continue
             if lit == unlit:
-                lines.append(f"  {row.prop}: {lit};")
+                declared = f"  {row.prop}: {lit};"
             elif row.type == "color":
-                lines.append(f"  {row.prop}: light-dark({lit}, {unlit});")
+                declared = f"  {row.prop}: light-dark({lit}, {unlit});"
             else:
-                lines.append(f"  {row.prop}: {lit};")
+                declared = f"  {row.prop}: {lit};"
                 differs.append(f"  {row.prop}: {unlit};")
+            # A kit's stylesheet comes after base.css, so what colour-blind mode swaps on the
+            # root is declared where the mode isn't asked for, and the mode's palette still wins.
+            (unswapped if kit != default and row.prop in SWAPPED else lines).append(declared)
         lines.append("")
     if faults:
         raise BrandError("\n".join(faults))
     lines[-1] = "}"
+    if unswapped:
+        lines += ["", "/* What colour-blind mode swaps (base.css), where it isn't asked for. */"]
+        lines += [":root:not([data-cvd]) {", *unswapped, "}"]
     if differs:
         lines += ["", ':root[data-theme="dark"] {', *differs, "}", ""]
         lines += ["@media (prefers-color-scheme: dark) {", '  :root:not([data-theme="light"]) {']

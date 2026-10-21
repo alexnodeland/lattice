@@ -103,6 +103,7 @@ def test_config_json_is_what_the_page_says() -> None:
         "people",
         "editors",
         "apps",
+        "brand",
     ]
     for field, default in Surfaces().model_dump().items():
         shown = "null" if default is None else default or chr(34) * 2

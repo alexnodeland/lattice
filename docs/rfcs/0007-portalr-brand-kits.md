@@ -255,6 +255,23 @@ The foundation PR (#452) departs from the design above in these ways, each revie
 - **Sizes** are read where a size token sets a box's width or height (the dialog's width and margin, the drawer's width, the switch, the checkbox, the progress bar and a row's height) and the enter and exit scales, by `token-sizes.test.tsx`; corners and padding are read by the computed-style snapshots; every other size by the screenshot suites; the computed-style snapshots read what a declaration sets and leave sizes, margins and transforms out.
 - **The style census** reports in the test's annotations, not yet in the CI step summary.
 
+## Loader PR as built
+
+The loader PR departs from or defers parts of the design above:
+
+- **`brand.css` comes after the UI's own stylesheet**, not before base.css as written above: before it, the UI's generated `tokens.css` would undo the kit. Where base.css declares a token again under a selector, it must still win: admin's density is declared on an element below the root, so it does; colour-blind mode is declared on the root, so a kit declares what that mode swaps (the chart series and code's colours) under `:root:not([data-cvd])`, and the mode's palette wins where it is asked for. The reduced-motion block wins by `!important`, as designed. A test holds that the swapped set is base.css's.
+- **Derived colours stay `color-mix()` in base.css.** The validator mixes `--wash`, `--accent-hover`, `--danger-hover` and `--danger-wash` the same way in Python (sRGB, at base.css's shares) to hold their pairs, so a kit's colours are checked as the page draws them.
+- **The pair manifest** is `src/portalr/brand/pairs.json`: 70 pairs, each with its floor, why, and, where a colour is clear, the backdrop it is drawn over (the paper unless named). Status colours are held as marks (3:1), since the badges' words are in the ink. The UI's token tests still hold the default kit by their own list; moving them onto the manifest is a follow-up.
+- **Colour-vision distances** are held for two sets, as the default's tests hold them: the three chart series, and the two status colours with the chart's teal.
+- **Floors are held in both schemes.**
+- **Marks** are held to an allow-list by namespaced name: an `<svg>` in the SVG namespace, no attribute in another namespace, UTF-8 with no byte-order mark, nothing declared (no DOCTYPE, entity, CDATA or processing instruction but the XML declaration), no backslash in an attribute, and a `url()` only to a fragment of the mark. Every served file's suffix is one the portal has a type for, judged by the file a link resolves to.
+- **Faces** are checked by their WOFF2 header (signature, length, tables, size), not parsed: the browser's own sanitiser (OTS) is the real defence against a malformed font. `LicenseRef-commercial` admits any commercial licence with its text, so the licence check is an attestation, not a gate. A licence is a `.txt` file of 64 KB at most, counted in the faces' budget; a kit brings 16 face files at most; `brand.json` and the token files are 256 KB at most and the kit's own, not links.
+- **The index** is read and branded once, as the application starts; a build with no `<title>` or no `</head>` fails the start, as a kit with a fault does. The name is HTML-escaped and placed as text. The page carries an ETag and answers `If-None-Match` with 304.
+- **Not yet:** the pinned chrome tokens (`--chrome-*`), so the skip link and the mini app's chrome still read the kit's roles, held by the same pairs; presets (`brand.json` refuses a `presets` key until they exist); an `oklch()` colour; an "instant" duration class; and the stackr template's `PORTAL_BRAND_DIR`, with the CLI.
+- **Nothing in the UIs reads `config.json`'s brand block yet.** The tab's title and icon and the kit's look come from the rewritten index and `brand.css`; the header's mark, the product's name in the header, the tagline and the sign-in words have no visible effect until the follow-up PR that reads them, which comes before the CLI PR.
+- **A kit is read when the `Site` is made,** at the application's start: `Site(brand=Path(...))`, and `site.kit` is the kit, read. Its files are served at `/portalr/brand/<hash>/`, the hash over every file and `brand.json`.
+- **A kit's version** must be the inventory's, 1; when a later inventory comes, a version-1 kit keeps working by the defaults of what it doesn't name, and the loader will accept it.
+
 ## Drawbacks
 
 - Hundreds of custom properties, and a refactor that touches every component. The zero-diff gate and the per-component commits are what make it reviewable.

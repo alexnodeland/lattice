@@ -99,8 +99,8 @@ jobs:
       fail-fast: false
       matrix:
         app:
-          [cadcraft, deckcraft, designcraft, effectcraft, figcraft, filmcraft, freecad, gridcraft,
-           pdfcraft, photocraft, soundcraft, vectorcraft, wordcraft]
+          [blender, cadcraft, deckcraft, designcraft, effectcraft, figcraft, filmcraft, freecad,
+           gridcraft, pdfcraft, photocraft, soundcraft, vectorcraft, wordcraft]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

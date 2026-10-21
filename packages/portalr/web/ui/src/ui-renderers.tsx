@@ -141,8 +141,11 @@ function Unreadable({ kind, data }: { kind: string; data: Data }) {
   );
 }
 
-/** A renderer of a kind whose data are JSON, changed line by line, titled by its `title`. */
-const ofJson = (render: (data: Data) => ReactNode): Renderer => ({ ...json, render });
+/**
+ * A renderer of a kind whose data are JSON, changed line by line, titled by its `title`, and shown
+ * in the thread it was made in.
+ */
+const ofJson = (render: (data: Data) => ReactNode): Renderer => ({ ...json, render, inline: true });
 
 /** A `form`: its fields, to fill in and send as the viewer. */
 const form = ofJson((data) => {

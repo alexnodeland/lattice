@@ -1,4 +1,7 @@
-/** A Word document on its artifact's page, as the server answers for it, for the app's tests. */
+/**
+ * A Word document on its artifact's page, as the server answers for it, and an upload a test
+ * answers, for the app's tests.
+ */
 
 export const AT = "/artifactr/v1/workspaces/notes";
 export const FILE = `${AT}/files/doc_1`;
@@ -40,3 +43,36 @@ export const status = (lease: unknown, enabled = true) => ({
   enabled,
   limit: 26_214_400,
 });
+
+/** An upload the test answers: each one sent is kept, in order. */
+export class Upload {
+  static sent: Upload[] = [];
+  url = "";
+  body: unknown = null;
+  status = 0;
+  responseText = "";
+  upload: { onprogress: ((progress: { loaded: number; total: number }) => void) | null } = {
+    onprogress: null,
+  };
+  onload: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  onabort: (() => void) | null = null;
+  constructor() {
+    Upload.sent.push(this);
+  }
+  open(_method: string, url: string) {
+    this.url = url;
+  }
+  setRequestHeader() {}
+  send(body?: unknown) {
+    this.body = body ?? null;
+  }
+  abort() {
+    this.onabort?.();
+  }
+  answer(status: number, body: unknown) {
+    this.status = status;
+    this.responseText = JSON.stringify(body);
+    this.onload?.();
+  }
+}

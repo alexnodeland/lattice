@@ -1,8 +1,10 @@
 /**
- * Checking a native file out and in, at the app's talk level 1, save only (lattice RFC-0003,
- * portalr ADR-0049): checking out holds the file, downloads its head, and opens its app's hosted
- * editor in a new tab, on an origin of its own; the person edits there and saves to their disk;
- * checking in uploads that file here, with how far it has gone, and says what it made.
+ * Checking a native file out and in (lattice RFC-0003, portalr ADR-0049). At the app's talk level
+ * 1, save only, checking out holds the file, downloads its head, and opens its app's hosted editor
+ * in a new tab, on an origin of its own; the person edits there and saves to their disk; checking
+ * in uploads that file here, with how far it has gone, and says what it made. At level 1+
+ * (`bridged`), the editor opens here instead, framed, with the file in it, and each save is
+ * checked in as it is made (portalr ADR-0055); the download and the upload stay beneath it.
  */
 
 import {
@@ -16,8 +18,12 @@ import {
 import { Button, FileChooser, fileSize, Moment, Progress, TextLink } from "@portalr/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { type ReactNode, useRef, useState } from "react";
+import { type ReactNode, use, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { Context } from "./context";
+import { startEditing, stopEditing, useEditing } from "./editing";
+import { EditorFrame } from "./editor-frame";
+import { ViewSlotsContext } from "./view-slots";
 
 type Status = FilesApi.components["schemas"]["FileStatus"];
 
@@ -33,6 +39,8 @@ export interface Place {
 export interface Said {
   readonly tone: "info" | "warn" | "error";
   readonly text: ReactNode;
+  /** Said where the focus has gone elsewhere, as a flip moves it: announced, not focused. */
+  readonly quiet?: boolean;
 }
 
 /**
@@ -141,6 +149,80 @@ export function CheckOut({
   const queryClient = useQueryClient();
   const [pending, setPending] = useState(false);
   const [own, keep] = useOwnCheckout(place);
+  // Its build hands the file over and back where its editor is hosted: it is edited here.
+  const here = editor !== null && status.talk === "bridged";
+  // One file is edited in place on a page at a time; the version checked out is what it opens,
+  // which, once the page is loaded again, is the head the lease still holds.
+  const editing = useEditing()?.artifact === artifact;
+  const [base, setBase] = useState<number | null>(null);
+  const setEditing = (on: boolean) => {
+    if (!on) {
+      stopEditing(artifact);
+      return true;
+    }
+    const busy = startEditing(artifact, status.name);
+    if (busy !== null) {
+      onSaid({
+        tone: "warn",
+        text: `${busy.name} is open in its editor with unsaved changes: save or close it first. One file is edited here at a time.`,
+      });
+    }
+    return busy === null;
+  };
+  // In a thread, the editor takes the preview's box, and the switch to it sits above it.
+  const slots = here ? use(ViewSlotsContext) : null;
+  const flips = slots?.viewport != null && slots.toggle != null;
+  /**
+   * Back to the preview, the check-out let go: the version checked out is checked in again as it
+   * was, which changes nothing and ends the check-out, so a file isn't held by a closed editor.
+   */
+  const release = async (held: string) => {
+    if (pending) {
+      return;
+    }
+    // Held, with the editor in place, until the check-out is let go: the switch to edit waits.
+    setPending(true);
+    // The head, not the version opened: checked in as it is, it is unchanged even where the file
+    // moved on after the lease lapsed, so it never proposes the version opened over a newer one.
+    const head = status.version;
+    let ended = false;
+    try {
+      const blob = await queryClient.fetchQuery(
+        context.queries.files.content(tenant, workspace, artifact, head),
+      );
+      const answer = await checkIn({
+        surface: context.config.surfaces.artifactr,
+        session: context.signed.session(),
+        tenant,
+        workspace,
+        checkout: held,
+        file: new File([blob], status.name),
+        unsigned: () => void context.signed.signOut(),
+      });
+      reread(answer.outcome === "done" ? null : answer.status);
+      // Checked in already, by a save that answered late or another tab: it has ended too.
+      ended =
+        answer.outcome === "done" || (answer.status === 409 && answer.type === "invalid_state");
+    } catch {
+      // Said below: the check-out stays, until it is checked in or runs out.
+    }
+    setPending(false);
+    setEditing(false);
+    if (ended) {
+      keep(null);
+      onSaid({
+        tone: "info",
+        text: `Back to the preview: ${status.name} is no longer checked out.`,
+      });
+      return;
+    }
+    onSaid({
+      tone: "warn",
+      text: `Back to the preview. Your check-out couldn't be let go, so it holds until it runs out, or you check the file in.`,
+      quiet: true,
+    });
+  };
+
   const lease = status.lease;
   // The lease names the reader's check-out while it holds, made in this tab or another.
   const leased = lease?.checkout_id ?? null;
@@ -168,24 +250,40 @@ export function CheckOut({
     return null;
   };
   const checkOut = async () => {
+    // The editor's place is asked for first: a file isn't held for an editor that can't open.
+    if (here && !setEditing(true)) {
+      return;
+    }
     const checkout = await run(
       context.commands.files.checkOut(tenant, workspace, artifact),
       "It wasn't checked out",
     );
     if (checkout === null) {
+      if (here) {
+        setEditing(false);
+      }
       return;
     }
     keep(checkout.id);
+    const until = new Date(checkout.expires_at).toLocaleTimeString(undefined, {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+    if (here) {
+      setBase(checkout.base_version);
+      onSaid({
+        tone: "info",
+        text: `Checked out until ${until}. ${app} is opening here.`,
+        quiet: flips,
+      });
+      return;
+    }
     // Opened once it is checked out, while the click still counts. With `noopener` nothing says
     // whether a blocker took it, so "Open" stays beside the check-out, and the reader is told so.
     // The editor holds no handle on this window, nor this one on it (its `same-origin` policy).
     if (editor !== null) {
       window.open(editor, "_blank", "noopener,noreferrer");
     }
-    const until = new Date(checkout.expires_at).toLocaleTimeString(undefined, {
-      hour: "numeric",
-      minute: "2-digit",
-    });
     const opened =
       editor === null ? "" : ` ${app} opened in a new tab: if it didn't, use "Open ${app}".`;
     onSaid({ tone: "info", text: `Checked out until ${until}, and downloading.${opened}` });
@@ -202,21 +300,73 @@ export function CheckOut({
   };
   const checkout = leased ?? own;
   if (checkout === null) {
+    if (lease === null && flips && slots?.toggle) {
+      return (
+        <>
+          {createPortal(
+            <Button size="sm" disabled={pending} onClick={checkOut}>
+              Edit in {app}
+            </Button>,
+            slots.toggle,
+          )}
+          <p className="text-muted text-sm">
+            Editing checks it out, so no one else changes it meanwhile, and turns the preview into{" "}
+            {app}, on a site of its own that can't see your session. When you save there, it is
+            checked in; back to the preview, the check-out ends.
+          </p>
+        </>
+      );
+    }
     return lease === null ? (
       <div className="flex flex-col items-start gap-2">
         <Button disabled={pending} onClick={checkOut}>
-          {editor === null ? "Check out and download" : `Check out and open ${app}`}
+          {here
+            ? `Edit here in ${app}`
+            : editor === null
+              ? "Check out and download"
+              : `Check out and open ${app}`}
         </Button>
         <p className="text-muted text-sm">
-          {editor === null
-            ? `Checking it out holds it for you and downloads it. No editor is hosted here: open it in ${app} yourself.`
-            : `Checking it out holds it for you, downloads it, and opens ${app} in a new tab, on a site of its own that can't see your session. Open the downloaded file there.`}
+          {here
+            ? `Editing checks it out, so no one else changes it meanwhile, and opens it in ${app} here, on a site of its own that can't see your session. When you save there, it is checked in, and your check-out ends.`
+            : editor === null
+              ? `Checking it out holds it for you and downloads it. No editor is hosted here: open it in ${app} yourself.`
+              : `Checking it out holds it for you, downloads it, and opens ${app} in a new tab, on a site of its own that can't see your session. Open the downloaded file there.`}
         </p>
       </div>
     ) : null; // someone else's, or an agent's: who has it says so
   }
+  const opened = base ?? status.version;
+  const frame = here && editing && (
+    <EditorFrame
+      place={place}
+      status={status}
+      app={app}
+      editor={editor}
+      checkout={checkout}
+      version={opened}
+      flipped={flips}
+      onSaid={onSaid}
+      onEnded={() => {
+        setEditing(false);
+        keep(null);
+      }}
+      onAnswered={reread}
+      onClose={() => (flips ? void release(checkout) : setEditing(false))}
+    />
+  );
   return (
     <div className="flex flex-col gap-3">
+      {flips && slots?.viewport ? frame && createPortal(frame, slots.viewport) : frame}
+      {flips &&
+        slots?.toggle &&
+        !editing &&
+        createPortal(
+          <Button size="sm" disabled={pending} onClick={() => setEditing(true)}>
+            Edit in {app}
+          </Button>,
+          slots.toggle,
+        )}
       <p className="text-sm">
         {lease !== null && leased !== null ? (
           <>
@@ -225,10 +375,17 @@ export function CheckOut({
         ) : (
           "Your check-out ran out. You can still check it in: if the file changed meanwhile, it becomes a proposal. "
         )}
-        Edit it in {app}, save it to this computer, then check it in here.
+        {here
+          ? `Edit it in ${app} here, or save it to this computer from ${app} and check it in below.`
+          : `Edit it in ${app}, save it to this computer, then check it in here.`}
       </p>
       <div className="flex flex-wrap items-center gap-2">
-        {editor !== null && (
+        {here && !editing && !flips && (
+          <Button size="sm" disabled={pending} onClick={() => setEditing(true)}>
+            Edit here in {app}
+          </Button>
+        )}
+        {editor !== null && !here && (
           <TextLink href={editor} target="_blank" rel="noopener noreferrer">
             Open {app}
           </TextLink>

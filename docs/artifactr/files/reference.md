@@ -107,6 +107,9 @@ The reference is generated from `artifactr.files`' docstrings and type annotatio
       show_root_heading: false
       show_root_toc_entry: false
 
+## artifactr.files.blender
+
+::: artifactr.files.blender
 ## artifactr.files.filmcraft
 
 ::: artifactr.files.filmcraft

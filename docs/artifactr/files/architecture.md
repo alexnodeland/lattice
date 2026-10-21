@@ -6,7 +6,7 @@
 
 | Layer | What it is | It may import |
 |---|---|---|
-| `manifest` | `Blob`, `Provenance`, `NativeFile`, a type for each app's files (`WordDocument`, `Workbook`, `Presentation`, `PdfDocument`, `Drawing`, `LayeredImage`, `VectorImage`, `PageLayout`, `Design`, `CadModel`, `VideoProject`, `MotionGraphics`, `AudioSession`), and `revise`, the patch that tests its base | artifactr, pydantic |
+| `manifest` | `Blob`, `Provenance`, `NativeFile`, a type for each app's files (`WordDocument`, `Workbook`, `Presentation`, `PdfDocument`, `Drawing`, `LayeredImage`, `VectorImage`, `PageLayout`, `Design`, `CadModel`, `Scene`, `VideoProject`, `MotionGraphics`, `AudioSession`), and `revise`, the patch that tests its base | artifactr, pydantic |
 | `blobs` | The `Blobs` port, its size limit and digest, and `InMemoryBlobs` | `manifest`, artifactr |
 | `checkouts` | `Checkout`, the record behind a person's lease, the `Checkouts` port, and `InMemoryCheckouts` | `manifest`, artifactr, pydantic |
 | `app` | The `App` port and `FakeApp` | `manifest`, pydantic |
@@ -21,6 +21,7 @@
 | `designcraft` | DesignCraft's adapter, `Subprocess`, and a layout's format, IDML, read from its package's `mimetype` | `manifest`, `app`, `craft`, pydantic |
 | `figcraft` | FigCraft's adapter, `Subprocess`, and whether bytes are a `.figcraft`, read from its document | `manifest`, `app`, `craft`, pydantic |
 | `freecad` | FreeCAD's adapter, `Subprocess`; the scan that refuses a document holding Python before FreeCAD starts, and its fingerprint; and `console/script.py`, which `freecadcmd` runs, in FreeCAD's own interpreter | `manifest`, `app`, `craft`, pydantic; its script FreeCAD's modules and Pillow |
+| `blender` | Blender's adapter, `Subprocess`; the scan that reads a `.blend` block by block, holds it to Blender 5.2's catalogue and refuses one that may run Python before Blender starts, and its fingerprint; and `console/script.py`, which Blender runs, in its own interpreter | `manifest`, `app`, `craft`, pydantic, `zstandard`; its script Blender's modules |
 | `filmcraft` | FilmCraft's adapter, `Subprocess`, whether bytes are a `.fcproj`, and what one draws from outside it, read from its JSON | `manifest`, `app`, `craft`, pydantic |
 | `effectcraft` | EffectCraft's adapter, `Subprocess`, whether bytes are an `.ecproj`, and its footage, read from its JSON | `manifest`, `app`, `craft`, pydantic |
 | `soundcraft` | SoundCraft's adapter, `Subprocess`, whether bytes are a `.scraft`, and its audio, video and other makers' plugins, read from its JSON | `manifest`, `app`, `craft`, pydantic |

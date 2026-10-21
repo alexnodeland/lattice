@@ -28,6 +28,7 @@ lattice declares its integrations in one registry, `lattice_core.integrations.KN
 | `files:wordcraft` | On | Native files edited in WordCraft ([RFC-0003](../../rfcs/0003-native-files-as-artifacts.md)) |
 | `files:gridcraft`, `files:deckcraft`, `files:pdfcraft`, `files:cadcraft`, `files:photocraft`, `files:vectorcraft`, `files:designcraft`, `files:figcraft`, `files:filmcraft`, `files:effectcraft`, `files:soundcraft` | Off | Native files edited in each of the other crafting apps, each on its own ([native files ADR-0009](../../artifactr/files/adr/0009-each-crafting-app-declared-once-on-one-of-two-dialects.md)) |
 | `files:freecad` | Off | Native 3D models edited in FreeCAD, a third party's app ([native files ADR-0014](../../artifactr/files/adr/0014-freecad-on-a-third-dialect-and-no-python-a-file-or-an-agent-brings.md)) |
+| `files:blender` | Off | Native 3D scenes edited in Blender, a third party's app ([native files ADR-0015](../../artifactr/files/adr/0015-blender-on-the-script-dialect-and-no-file-that-may-run-python.md)) |
 | `files:lightcraft` | Off | Nothing yet: LightCraft keeps its edits in a library, not in a file ([native files ADR-0016](../../artifactr/files/adr/0016-a-project-that-holds-its-own-media-is-a-native-file.md)) |
 | `ui:forms`, `ui:dashboards` | On | Forms and dashboards in the chat ([RFC-0005](../../rfcs/0005-forms-dashboards-and-mini-apps.md)) |
 | `ui:mini-apps` | Off | Mini apps, RFC-0005's second phase |

@@ -54,6 +54,10 @@ one: JSON."""
 SCRAFT: Final = "application/x-scraft"
 """The media type of a SoundCraft audio session, `.scraft`, which has no registered one: JSON."""
 
+BLEND: Final = "application/x-blender"
+"""The media type of a Blender file, `.blend`, as the shared MIME-info database names it, since it
+has no registered one: Blender's memory, written out in blocks."""
+
 OUTLINE_LIMIT: Final = 4_000
 """The most characters an outline holds: what the agent sees of a file by default."""
 
@@ -207,6 +211,12 @@ class CadModel(NativeFile):
     """A 3D model, `.FCStd`: registered as `cad_model`."""
 
     formats: ClassVar[frozenset[str]] = frozenset({FCSTD})
+
+
+class Scene(NativeFile):
+    """A 3D scene, `.blend`: registered as `scene`."""
+
+    formats: ClassVar[frozenset[str]] = frozenset({BLEND})
 
 
 class VideoProject(NativeFile):

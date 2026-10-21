@@ -5,7 +5,7 @@
 
 import { Field } from "@base-ui/react/field";
 import type { Artifactr, ArtifactrV1, Thumb } from "@portalr/client";
-import { Bot, ThumbsDown, ThumbsUp } from "lucide-react";
+import { Bot, Maximize2, Minimize2, ThumbsDown, ThumbsUp } from "lucide-react";
 import {
   type FormEvent,
   type KeyboardEvent,
@@ -22,6 +22,7 @@ import { Button } from "./button";
 import { cn } from "./cn";
 import { CopyButton } from "./copy-button";
 import { endedBy, readAskForm } from "./form-schema";
+import { useFullView } from "./full-view";
 import { Icon } from "./icon";
 import { FeatureOff, useFormLock } from "./integrations";
 import { Markdown } from "./markdown";
@@ -237,22 +238,61 @@ export function Messages({ children, className }: { children: ReactNode; classNa
 
 /**
  * An artifact shown in the thread it was made in, where it was made, as its kind's renderer draws
- * it, with a way to its own page (`open`): one per artifact, at its latest version.
+ * it, with a way to its own page (`open`): one per artifact, at its latest version. With `kind`,
+ * it is named above what it draws, and has a full view of its own, which fills the window as a
+ * modal dialog and keeps what is drawn as it is, a form's answers included; an app, which names
+ * itself and has its own, takes neither (portalr ADR-0055).
  */
 export function InlineArtifact({
   name,
+  kind,
   open,
   children,
 }: {
   /** What it is called, which names it in the log. */
   name: string;
+  /** What kind of thing it is, as people say it, such as "Note" or "Word document". */
+  kind?: string;
   /** A link to its own page, where it has its full view and its history. */
   open: ReactNode;
   children: ReactNode;
 }) {
+  const { full, setFull, box, back } = useFullView();
+  if (kind === undefined) {
+    return (
+      <li aria-label={name} className={card}>
+        {children}
+        <span className="self-start text-xs">{open}</span>
+      </li>
+    );
+  }
   return (
     <li aria-label={name} className={card}>
-      {children}
+      <div
+        ref={box}
+        className={cn(
+          "flex min-w-0 flex-col gap-3",
+          full && "fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-paper p-4 sm:p-6",
+        )}
+        {...(full && { role: "dialog", "aria-modal": true, "aria-label": name })}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <p className="flex min-w-0 flex-col gap-0.5">
+            <span className={TYPE.note}>{kind}</span>
+            <span className={cn(TYPE.label, "break-words")}>{name}</span>
+          </p>
+          <Button
+            ref={back}
+            variant="ghost"
+            className="shrink-0 border-line px-2 py-1 text-xs"
+            onClick={() => setFull(!full)}
+          >
+            <Icon icon={full ? Minimize2 : Maximize2} className="size-3.5" />
+            {full ? "Back to the page" : "Full view"}
+          </Button>
+        </div>
+        <div className={cn("min-w-0", full && "mx-auto w-full max-w-5xl")}>{children}</div>
+      </div>
       <span className="self-start text-xs">{open}</span>
     </li>
   );

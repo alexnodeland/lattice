@@ -49,6 +49,7 @@ test.each([
   ["application/vnd.adobe.indesign-idml-package", "Page layout"],
   ["application/x-figcraft", "Design"],
   ["application/x-extension-fcstd", "3D model"],
+  ["application/x-blender", "3D scene"],
   ["application/x-fcproj", "Video project"],
   ["application/x-ecproj", "Motion graphics"],
   ["application/x-scraft", "Audio session"],

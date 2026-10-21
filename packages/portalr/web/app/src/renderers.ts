@@ -23,6 +23,7 @@ export const NATIVE: ReadonlyMap<string, Native> = new Map([
   ["page_layout", { app: "DesignCraft", integration: "files:designcraft" }],
   ["design", { app: "FigCraft", integration: "files:figcraft" }],
   ["cad_model", { app: "FreeCAD", integration: "files:freecad" }],
+  ["scene", { app: "Blender", integration: "files:blender" }],
   ["video_project", { app: "FilmCraft", integration: "files:filmcraft" }],
   ["motion_graphics", { app: "EffectCraft", integration: "files:effectcraft" }],
   ["audio_session", { app: "SoundCraft", integration: "files:soundcraft" }],

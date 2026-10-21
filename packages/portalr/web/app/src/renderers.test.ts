@@ -14,6 +14,7 @@ test("each native file's kind is shown as a native file, and switched by its app
     "page_layout",
     "design",
     "cad_model",
+    "scene",
     "video_project",
     "motion_graphics",
     "audio_session",

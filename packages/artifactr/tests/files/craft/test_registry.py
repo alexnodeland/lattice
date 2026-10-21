@@ -6,6 +6,7 @@ import pytest
 
 from artifactr.files.craft import CRAFTS, Craft
 from artifactr.files.manifest import (
+    BLEND,
     DOCX,
     FCSTD,
     AudioSession,
@@ -16,6 +17,7 @@ from artifactr.files.manifest import (
     MotionGraphics,
     NativeFile,
     PageLayout,
+    Scene,
     VectorImage,
     VideoProject,
     WordDocument,
@@ -46,6 +48,7 @@ def test_a_cli_that_confines_nothing_is_never_on_by_default() -> None:
         "cadcraft",
         "figcraft",
         "freecad",
+        "blender",
         "filmcraft",
         "lightcraft",
     }
@@ -56,7 +59,8 @@ def test_each_app_is_pinned() -> None:
     assert sorted(path.stem for path in PINS.glob("*.sha256")) == sorted(CRAFTS)
 
 
-STORYTOLDS = [craft for craft in CRAFTS.values() if craft.name != "freecad"]
+THIRD_PARTIES = {"freecad", "blender"}
+STORYTOLDS = [craft for craft in CRAFTS.values() if craft.name not in THIRD_PARTIES]
 
 
 @pytest.mark.parametrize("craft", STORYTOLDS, ids=[craft.name for craft in STORYTOLDS])
@@ -84,7 +88,19 @@ def test_freecad_is_a_third_partys_run_by_a_script_its_console_runs() -> None:
     )
     assert (freecad.dialect, freecad.roots, freecad.formats) == ("script", "none", {FCSTD})
     assert freecad.integration.description.startswith("FreeCAD: ")
-    assert [c.name for c in CRAFTS.values() if c.dialect == "script"] == ["freecad"]
+    assert [c.name for c in CRAFTS.values() if c.dialect == "script"] == ["freecad", "blender"]
+
+
+def test_blender_is_a_third_partys_run_by_a_script_in_its_background_mode() -> None:
+    """Blender is the Blender Foundation's, under no brand licence, named plainly (ADR-0015)."""
+    blender = CRAFTS["blender"]
+    assert (blender.key, blender.cli, blender.repository) == (
+        "files:blender",
+        "blender",
+        "blender/blender",
+    )
+    assert (blender.dialect, blender.roots, blender.formats) == ("script", "none", {BLEND})
+    assert blender.integration.description.startswith("Blender: ")
 
 
 def test_no_two_apps_keep_one_format_and_an_app_that_exports_keeps_none() -> None:
@@ -116,6 +132,7 @@ def test_wordcraft_is_its_descriptors() -> None:
         ("designcraft", PageLayout),
         ("figcraft", Design),
         ("freecad", CadModel),
+        ("blender", Scene),
         ("filmcraft", VideoProject),
         ("effectcraft", MotionGraphics),
         ("soundcraft", AudioSession),

@@ -60,3 +60,20 @@
   --font-sans: "Schibsted Grotesk", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Fragment Mono", ui-monospace, monospace;
 }
+
+/*
+ * A native file's box turning from its preview to its editor and back (portalr ADR-0055): a
+ * short turn into place, and none where motion is reduced.
+ */
+@keyframes flip-in {
+  from {
+    opacity: 0;
+    transform: perspective(1600px) rotateY(-8deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .flip-in:not([hidden]) {
+    animation: flip-in 200ms ease-out;
+  }
+}

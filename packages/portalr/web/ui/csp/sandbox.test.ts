@@ -243,3 +243,175 @@ test("a tall app is shown whole up to twice the window, and scrolls inside its f
   await expect.poll(() => drawn(page), SETTLED).toBe(twice);
   await page.close();
 });
+
+test("an app plays through the sandbox's host: its answers, a refusal, and a render after each", async () => {
+  // As create_app's description now teaches: `host.connect`, `host.call`, `host.onAnswer`.
+  const page = await running(
+    `<body><button id="play" disabled>Play</button><output id="moves">0</output><output id="said"></output><output id="theme"></output><script>
+let state = { moves: 0 }, waiting = true, renders = 0;
+const render = () => {
+  renders += 1;
+  document.getElementById("moves").textContent = String(state.moves);
+  document.getElementById("play").disabled = waiting;
+};
+host.onAnswer(render);
+document.getElementById("play").addEventListener("click", async () => {
+  waiting = true; render();
+  await host.call("set_state", { patch: [{ op: "add", path: "/moves", value: state.moves + 1 }] });
+  state = (await host.call("get_state")).state;
+  waiting = false; render();
+});
+host.connect().then(async () => {
+  document.getElementById("theme").textContent = getComputedStyle(document.documentElement).colorScheme;
+  await host.call("nope").catch((error) => { document.getElementById("said").textContent = "refused: " + error.message; });
+  state = (await host.call("get_state")).state ?? { moves: 0 };
+  state.moves = state.moves ?? 0;
+  waiting = false; render();
+});
+</script>`,
+  );
+  const app = () => appFrame(page);
+  await expect.poll(() => app()?.isEnabled("#play"), SETTLED).toBe(true);
+  expect(await app()?.textContent("#said")).toMatch(/^refused: /);
+  expect(await app()?.textContent("#theme")).toMatch(/^(light|dark)$/);
+  for (const turn of ["1", "2", "3"]) {
+    await app()?.click("#play");
+    await expect.poll(() => app()?.textContent("#moves"), SETTLED).toBe(turn);
+  }
+  await page.close();
+});
+
+/** What the app wrote in `#said`, once it has. */
+const said = (page: Page) => appFrame(page)?.textContent("#said");
+
+test("a call the host never answers rejects, and the app's controls come back", async () => {
+  // A message past 64 KB is dropped, unanswered, as one past the app's limit would be.
+  const page = await running(
+    `<body><button id="play" disabled>Play</button><output id="said"></output><script>
+const play = document.getElementById("play");
+host.connect().then(async () => {
+  try {
+    await host.call("set_state", { patch: [{ op: "add", path: "/big", value: "x".repeat(70000) }] });
+  } catch (error) {
+    document.getElementById("said").textContent = error.code + ": " + error.message;
+  } finally {
+    play.disabled = false;
+  }
+});
+</script>`,
+  );
+  await expect.poll(() => said(page), { timeout: 30_000 }).toBe("timeout: the host did not answer");
+  expect(await appFrame(page)?.isEnabled("#play")).toBe(true);
+  await page.close();
+});
+
+test("a refusal rejects with isError, and an app's own requests are answered beside host's", async () => {
+  const page = await running(
+    `<body><output id="said"></output><script>
+const lines = [];
+addEventListener("message", (e) => {
+  if (e.data && e.data.id === 7) lines.push("raw: " + JSON.stringify(e.data.result.structuredContent.state));
+});
+host.connect().then(async () => {
+  await host.call("set_state", { patch: "not a patch" }).catch((error) => lines.push("refused: " + error.isError));
+  parent.postMessage({ jsonrpc: "2.0", id: 7, method: "tools/call", params: { name: "get_state", arguments: {} } }, "*");
+  const read = await host.call("get_state");
+  lines.push("host: " + JSON.stringify(read.state));
+  setTimeout(() => { document.getElementById("said").textContent = lines.join(" | "); }, 300);
+});
+</script>`,
+  );
+  await expect.poll(() => said(page), SETTLED).toBe("refused: true | raw: {} | host: {}");
+  await page.close();
+});
+
+test("with host deleted, the frame and the bridge keep working by hand", async () => {
+  const page = await running(
+    `<body style="margin:0"><output id="said"></output><script>
+delete window.host;
+const lines = [];
+addEventListener("message", (e) => {
+  if (e.data && e.data.id === 1) lines.push("initialized");
+  if (e.data && e.data.id === 2) lines.push("state " + JSON.stringify(e.data.result.structuredContent.state));
+  document.getElementById("said").textContent = [typeof window.host, ...lines].join(" ");
+});
+const ask = (id, method, params) => parent.postMessage({ jsonrpc: "2.0", id, method, params }, "*");
+ask(1, "ui/initialize", {});
+ask(2, "tools/call", { name: "set_state", arguments: { patch: [{ op: "add", path: "/x", value: 1 }] } });
+parent.postMessage({ jsonrpc: "2.0", method: "ui/notifications/size-changed", params: { height: 432 } }, "*");
+</script>`,
+  );
+  await expect.poll(() => said(page), SETTLED).toBe('undefined initialized state {"x":1}');
+  await expect.poll(() => drawn(page), SETTLED).toBe(432);
+  await page.close();
+});
+
+test("a submission waits for the person however long, and gets their answer, once", async () => {
+  const page = await running(
+    `<body><output id="said"></output><script>
+const lines = [];
+const say = () => { document.getElementById("said").textContent = lines.join(" | "); };
+host.connect().then(async () => {
+  try { const sent = await host.call("submit", { values: { roll: 6 } }); lines.push("sent " + sent.submitted); }
+  catch (error) { lines.push("failed " + (error.code || error.isError)); }
+  say();
+  try { await host.call("submit", { values: { roll: 1 } }); lines.push("sent again"); }
+  catch (error) { lines.push("refused " + error.isError); }
+  say();
+});
+</script>`,
+  );
+  const dialog = page.getByRole("alertdialog", { name: "Send this from Probe?" });
+  await dialog.waitFor({ timeout: 15_000 });
+  // Held past the 10 seconds a call that the host answers at once may take.
+  await page.waitForTimeout(11_000);
+  await dialog.getByRole("button", { name: "Send it", exact: true }).click();
+  await expect.poll(() => said(page), SETTLED).toBe("sent true");
+  await dialog.waitFor({ timeout: 15_000 });
+  await dialog.getByRole("button", { name: "Don't send it" }).click();
+  await expect.poll(() => said(page), SETTLED).toBe("sent true | refused true");
+  await page.close();
+});
+
+test("host.onAnswer runs after the app's own code that awaited the answer", async () => {
+  // An app that changes its state in an async function of its own, and leaves drawing to the hook.
+  const page = await running(
+    `<body><output id="moves">0</output><script>
+let moves = 0;
+host.onAnswer(() => { document.getElementById("moves").textContent = String(moves); });
+async function move() {
+  await host.call("set_state", { patch: [{ op: "add", path: "/moves", value: moves + 1 }] });
+  await Promise.resolve();
+  moves += 1;
+}
+host.connect().then(() => move()).then(() => move());
+</script>`,
+  );
+  await expect.poll(() => appFrame(page)?.textContent("#moves"), SETTLED).toBe("2");
+  await page.close();
+});
+
+test("the host's theme is kept on the app's document, and onContext hears it change", async () => {
+  const page = await running(
+    `<body><output id="said"></output><script>
+let heard = 0;
+const say = () => {
+  const root = document.documentElement;
+  document.getElementById("said").textContent = [
+    root.dataset.theme,
+    getComputedStyle(root).colorScheme,
+    root.style.getPropertyValue("--color-background-primary") ? "coloured" : "plain",
+    heard,
+  ].join(" ");
+};
+host.onContext(() => { heard += 1; say(); });
+host.connect().then(say);
+</script>`,
+  );
+  await expect.poll(() => said(page), SETTLED).toMatch(/^light light coloured \d+$/);
+  await page.evaluate(() => {
+    document.documentElement.dataset.theme = "dark";
+  });
+  await expect.poll(() => said(page), SETTLED).toMatch(/^dark dark coloured [1-9]\d*$/);
+  await page.close();
+});

@@ -13,8 +13,9 @@ The layers: [`artifactr.files.manifest`][artifactr.files.manifest], the types an
 [`artifactr.files.craft`][artifactr.files.craft], the crafting apps and their two dialects;
 [`artifactr.files.wordcraft`][artifactr.files.wordcraft], WordCraft's adapter, and each
 crafting app's beside it, such as [`artifactr.files.gridcraft`][artifactr.files.gridcraft] or
-[`artifactr.files.cadcraft`][artifactr.files.cadcraft], and FreeCAD's,
-[`artifactr.files.freecad`][artifactr.files.freecad];
+[`artifactr.files.cadcraft`][artifactr.files.cadcraft], and FreeCAD's and Blender's,
+[`artifactr.files.freecad`][artifactr.files.freecad] and
+[`artifactr.files.blender`][artifactr.files.blender];
 [`artifactr.files.worker`][artifactr.files.worker], the worker that runs an app on hostile
 files, and the app that calls it;
 [`artifactr.files.native`][artifactr.files.native], native files in a workspace;
@@ -40,6 +41,7 @@ from artifactr.files.manifest import (
     PdfDocument,
     Presentation,
     Provenance,
+    Scene,
     VectorImage,
     VideoProject,
     WordDocument,
@@ -72,6 +74,7 @@ __all__ = [
     "PdfDocument",
     "Presentation",
     "Provenance",
+    "Scene",
     "TooLarge",
     "VectorImage",
     "VideoProject",

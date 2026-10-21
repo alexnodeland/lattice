@@ -303,8 +303,22 @@ def test_a_compressed_file_and_its_bytes_have_one_fingerprint() -> None:
     assert fingerprint(zstandard.ZstdCompressor().compress(data)) == fingerprint(data)
 
 
-def test_a_scan_looks_at_its_clock_as_it_reads_a_long_block() -> None:
-    """A block of more records than a scan reads between looks at its clock, read in its time:
-    the look itself, whatever a busy machine does to the deadline tests' timing."""
-    links = changed("materials", inserted("bNodeLink", b"\x11" * 56 * (CHECKED + 1)))
-    assert not scan(links, 1 << 30, until=time.monotonic() + 60).compressed
+def test_a_scan_looks_at_its_clock_as_it_reads_a_long_block(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A block of more records than a scan reads between looks at its clock is read with one
+    look more than one of fewer: whatever a busy machine does to the deadline tests' timing."""
+    looks: list[float] = []
+
+    def looked(until: float) -> None:
+        looks.append(until)
+
+    monkeypatch.setattr("artifactr.files.blender.document._in_time", looked)
+
+    def counted(records: int) -> int:
+        looks.clear()
+        links = changed("materials", inserted("bNodeLink", b"\x11" * 56 * records))
+        scan(links, 1 << 30, until=time.monotonic() + 60)
+        return len(looks)
+
+    assert counted(CHECKED + 1) == counted(CHECKED - 1) + 1

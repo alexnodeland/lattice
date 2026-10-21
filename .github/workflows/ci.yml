@@ -23,8 +23,8 @@ jobs:
   check:
     name: Check
     runs-on: ubuntu-latest
-    # artifactr's tests, on SQLite and PostgreSQL, take some 15 minutes of a change that reaches
-    # them, and the job's setup and other tasks run beside them: 30 leaves room until they run
+    # A change that reaches every package takes some 17 minutes, artifactr's and reflexr's tests
+    # the longest, on SQLite and PostgreSQL: 30 leaves room as they grow, and for a slow runner.
     # in parallel.
     timeout-minutes: 30
     permissions:

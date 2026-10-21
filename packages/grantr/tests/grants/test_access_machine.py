@@ -345,5 +345,6 @@ class AccessMachine(RuleBasedStateMachine):
 AccessMachine.TestCase.settings = settings(max_examples=200, stateful_step_count=30, deadline=None)
 
 TestAccessMachine = pytest.mark.timeout(300)(AccessMachine.TestCase)
-"""Its 200 examples take most of a minute alone, and longer on a runner whose every core runs
-another worker's tests: five minutes, rather than the suite's one."""
+"""Its 200 examples take 4 s on a laptop's core, but on CI's four cores, against PostgreSQL and
+beside three other workers, they ran past the suite's 60 s (run 39555510568, which ended its
+worker): five minutes, five times what ended it."""

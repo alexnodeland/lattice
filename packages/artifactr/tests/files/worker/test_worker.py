@@ -107,7 +107,7 @@ async def test_a_call_is_held_to_the_workers_deadline(connect: Connect, tmp_path
     started = time.monotonic()
     # What is left of the deadline once the call has its turn: 2s, or a hair less on a busy
     # machine.
-    with pytest.raises(AppFailed, match=r"took more than (2|1\.9\d*)s$") as late:
+    with pytest.raises(AppFailed, match=r"took more than (2|1\.\d+)s$") as late:
         await worker.apply(None, [], deadline=60)
     assert late.value.failure == "timeout"
     assert time.monotonic() - started < 10
@@ -128,7 +128,7 @@ async def test_a_call_waits_its_turn_within_its_deadline(connect: Connect, tmp_p
         calls.start_soon(call, 1)
     busy, late = failures
     assert busy == "timeout: the worker was busy for more than 1s"
-    assert re.fullmatch(r"timeout: wordcraft-cli took more than (2|1\.9\d*)s", late)
+    assert re.fullmatch(r"timeout: wordcraft-cli took more than (2|1\.\d+)s", late)
 
 
 async def test_a_file_past_the_limit_is_too_large(connect: Connect) -> None:

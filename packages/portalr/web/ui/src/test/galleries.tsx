@@ -252,14 +252,14 @@ export function AdminGallery() {
   );
 }
 
-export const VARIANTS: readonly ButtonVariant[] = [
+const VARIANTS: readonly ButtonVariant[] = [
   "primary",
   "secondary",
   "ghost",
   "danger",
   "danger-soft",
 ];
-export const ROLES = [
+const ROLES = [
   { value: "", label: "Choose a role…" },
   { value: "viewer", label: "viewer" },
   { value: "editor", label: "editor" },
@@ -354,9 +354,9 @@ export function Controls() {
   );
 }
 
-export const sent = async () => ({ outcome: "done" }) as const;
+const sent = async () => ({ outcome: "done" }) as const;
 
-export const message = (id: string, content: string, user: boolean): Artifactr.Message => ({
+const message = (id: string, content: string, user: boolean): Artifactr.Message => ({
   id,
   seq: 1,
   actor: user ? { kind: "user", id: "alice" } : { kind: "agent", thread_id: "t", run_id: "r" },
@@ -366,7 +366,7 @@ export const message = (id: string, content: string, user: boolean): Artifactr.M
   feedback: [],
 });
 
-export const ASKED: ArtifactrV1.DeferredRequest = {
+const ASKED: ArtifactrV1.DeferredRequest = {
   kind: "question",
   tool_call_id: "q1",
   tool_name: "ask_user",
@@ -395,7 +395,7 @@ export const ASKED: ArtifactrV1.DeferredRequest = {
   } as ArtifactrV1.Args,
 };
 
-export const tool = (name: string, status: string, result: string): Artifactr.Tool => ({
+const tool = (name: string, status: string, result: string): Artifactr.Tool => ({
   name,
   status,
   args: '{"kind": "note", "data": {"text": "Launching next week."}}',
@@ -456,7 +456,7 @@ export function Ended() {
   );
 }
 
-export const TONES: readonly [Tone, string][] = [
+const TONES: readonly [Tone, string][] = [
   ["working", "Running"],
   ["waiting", "Waiting for you"],
   ["done", "Succeeded"],

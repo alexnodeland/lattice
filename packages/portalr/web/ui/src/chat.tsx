@@ -342,7 +342,7 @@ export function Composer({
   }
   return (
     <form
-      className="flex flex-col gap-1 rounded-lg border border-edge bg-surface p-1 outline-offset-2 has-[textarea:focus-visible]:outline-2 has-[textarea:focus-visible]:outline-focus"
+      className="flex flex-col gap-1 rounded-lg border border-edge bg-surface p-1 outline-offset-(--focus-offset) has-[textarea:focus-visible]:outline-(length:--focus-width) has-[textarea:focus-visible]:outline-focus"
       onSubmit={submit}
     >
       <Field.Root className="flex flex-col" disabled={disabled}>

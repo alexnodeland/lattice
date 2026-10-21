@@ -15,7 +15,7 @@ export function Switch({ className, ...props }: Props) {
   return (
     <BaseSwitch.Root
       className={cn(
-        "inline-flex h-5 w-9 items-center rounded-full border border-edge bg-paper p-0.5 outline-offset-2 focus-visible:outline-2 focus-visible:outline-focus data-checked:border-accent data-checked:bg-accent data-disabled:cursor-not-allowed data-disabled:border-line data-disabled:bg-wash forced-color-adjust-none forced-colors:border-system-text forced-colors:bg-system-canvas forced-colors:outline-system-text forced-colors:data-checked:border-system-highlight forced-colors:data-checked:bg-system-highlight forced-colors:data-disabled:border-system-disabled forced-colors:data-checked:data-disabled:bg-system-disabled",
+        "inline-flex h-5 w-9 items-center rounded-full border border-edge bg-paper p-0.5 outline-offset-(--focus-offset) focus-visible:outline-(length:--focus-width) focus-visible:outline-focus data-checked:border-accent data-checked:bg-accent data-disabled:cursor-not-allowed data-disabled:border-line data-disabled:bg-wash forced-color-adjust-none forced-colors:border-system-text forced-colors:bg-system-canvas forced-colors:outline-system-text forced-colors:data-checked:border-system-highlight forced-colors:data-checked:bg-system-highlight forced-colors:data-disabled:border-system-disabled forced-colors:data-checked:data-disabled:bg-system-disabled",
         className,
       )}
       {...props}

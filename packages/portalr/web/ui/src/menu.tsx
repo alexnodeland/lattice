@@ -16,7 +16,7 @@ export const popup = `${popover} min-w-56 p-1.5 outline-none transition-[opacity
 export const groupLabel = "px-2.5 pt-1.5 pb-1 font-semibold text-muted text-xs";
 
 export const item =
-  "flex cursor-default items-center justify-between gap-3 rounded-md px-2.5 py-1.5 outline-none data-highlighted:bg-wash data-highlighted:text-accent data-highlighted:ring-2 data-highlighted:ring-focus data-highlighted:ring-inset data-disabled:cursor-not-allowed data-disabled:text-muted";
+  "flex cursor-default items-center justify-between gap-3 rounded-md px-2.5 py-1.5 outline-none data-highlighted:bg-wash data-highlighted:text-accent data-highlighted:ring-(length:--focus-width) data-highlighted:ring-focus data-highlighted:ring-inset data-disabled:cursor-not-allowed data-disabled:text-muted";
 
 export const separator = "my-1.5 h-px bg-line";
 

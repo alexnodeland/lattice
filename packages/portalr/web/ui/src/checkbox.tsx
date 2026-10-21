@@ -19,7 +19,7 @@ export interface CheckboxChoice {
 export function Checkbox(props: Omit<ComponentProps<typeof BaseCheckbox.Root>, "className">) {
   return (
     <BaseCheckbox.Root
-      className="grid size-4 shrink-0 place-items-center rounded border border-edge bg-surface outline-offset-2 focus-visible:outline-2 focus-visible:outline-focus data-checked:border-accent data-checked:bg-accent data-disabled:cursor-not-allowed data-disabled:border-line data-disabled:bg-wash"
+      className="grid size-4 shrink-0 place-items-center rounded border border-edge bg-surface outline-offset-(--focus-offset) focus-visible:outline-(length:--focus-width) focus-visible:outline-focus data-checked:border-accent data-checked:bg-accent data-disabled:cursor-not-allowed data-disabled:border-line data-disabled:bg-wash"
       {...props}
     >
       <BaseCheckbox.Indicator className="text-on-accent">

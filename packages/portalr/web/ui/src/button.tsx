@@ -40,7 +40,7 @@ export function Button({ variant = "primary", size: big = "md", className, ...pr
   return (
     <BaseButton
       className={cn(
-        "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border font-sans font-semibold outline-offset-2 transition-[color,background-color,border-color] focus-visible:outline-2 focus-visible:outline-focus active:not-data-disabled:translate-y-px motion-reduce:transition-none aria-pressed:border-accent aria-pressed:bg-wash aria-pressed:text-accent data-disabled:cursor-not-allowed data-disabled:border-line data-disabled:bg-line data-disabled:text-muted",
+        "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border font-sans font-semibold outline-offset-(--focus-offset) transition-[color,background-color,border-color] focus-visible:outline-(length:--focus-width) focus-visible:outline-focus active:not-data-disabled:translate-y-px motion-reduce:transition-none aria-pressed:border-accent aria-pressed:bg-wash aria-pressed:text-accent data-disabled:cursor-not-allowed data-disabled:border-line data-disabled:bg-line data-disabled:text-muted",
         size[big],
         look[variant],
         className,

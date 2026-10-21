@@ -216,7 +216,7 @@ export type More = (revision: RevisionShown, before: number | null) => ReactNode
 
 /** Each open revision's tab panel: its focus ring drawn inside, as a tab's is. */
 const PANEL =
-  "rounded-sm pt-3 -outline-offset-2 focus-visible:outline-2 focus-visible:outline-focus";
+  "rounded-sm pt-3 -outline-offset-(--focus-offset) focus-visible:outline-(length:--focus-width) focus-visible:outline-focus";
 
 /** A revision's preview: its content through its kind's renderer, read-only. */
 function Preview({ id, revision, renderer, runs }: Previewed & { runs: boolean }) {
@@ -266,7 +266,7 @@ function Changes({ changed }: { changed: readonly Changed[] }) {
 type Tab = "preview" | "source" | "changes";
 
 const TAB =
-  "-mb-px shrink-0 cursor-default whitespace-nowrap border-transparent border-b-2 px-3 py-1.5 font-medium text-muted text-sm -outline-offset-2 hover:text-fg focus-visible:outline-2 focus-visible:outline-focus aria-selected:border-accent aria-selected:text-fg forced-colors:border-system-canvas forced-colors:aria-selected:border-system-highlight";
+  "-mb-px shrink-0 cursor-default whitespace-nowrap border-transparent border-b-2 px-3 py-1.5 font-medium text-muted text-sm -outline-offset-(--focus-offset) hover:text-fg focus-visible:outline-(length:--focus-width) focus-visible:outline-focus aria-selected:border-accent aria-selected:text-fg forced-colors:border-system-canvas forced-colors:aria-selected:border-system-highlight";
 
 /** An open revision: its title and summary, where its kind has them, and its tabs. */
 function Opened({
@@ -385,7 +385,7 @@ function Revision({
       className="rounded-lg border border-line bg-surface"
     >
       <details open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
-        <summary className="flex cursor-pointer list-none items-start gap-2 rounded-lg px-4 py-3 outline-offset-2 hover:bg-wash focus-visible:outline-2 focus-visible:outline-focus [&::-webkit-details-marker]:hidden">
+        <summary className="flex cursor-pointer list-none items-start gap-2 rounded-lg px-4 py-3 outline-offset-(--focus-offset) hover:bg-wash focus-visible:outline-(length:--focus-width) focus-visible:outline-focus [&::-webkit-details-marker]:hidden">
           <Icon
             icon={ChevronRight}
             className={cn(

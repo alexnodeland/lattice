@@ -265,7 +265,7 @@ export function TraceView({ outline, reveal }: { outline: Outline; reveal: Revea
                   onFocus={() => setChosen(row.id)}
                   style={{ height: ROW, transform: `translateY(${item.start}px)` }}
                   className={cn(
-                    "absolute inset-x-0 top-0 grid cursor-default grid-cols-[minmax(0,1fr)_4.5rem] items-center gap-3 border-line border-b px-2 text-sm outline-offset-[-2px] focus-visible:outline-2 focus-visible:outline-focus @xl:grid-cols-[minmax(11rem,2fr)_minmax(8rem,3fr)_4.5rem]",
+                    "absolute inset-x-0 top-0 grid cursor-default grid-cols-[minmax(0,1fr)_4.5rem] items-center gap-3 border-line border-b px-2 text-sm -outline-offset-(--focus-offset) focus-visible:outline-(length:--focus-width) focus-visible:outline-focus @xl:grid-cols-[minmax(11rem,2fr)_minmax(8rem,3fr)_4.5rem]",
                     on ? "bg-wash" : "hover:bg-wash/60",
                   )}
                 >

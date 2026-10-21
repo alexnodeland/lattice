@@ -71,7 +71,7 @@ export function SourceView({
           <CopyButton text={code} what={what} />
         </span>
       </div>
-      <ScrollRegion aria-label={`${name} source`} className="outline-offset-[-2px]">
+      <ScrollRegion aria-label={`${name} source`} className="-outline-offset-(--focus-offset)">
         <pre
           id={region}
           // Left to right whatever the page's direction: code reads that way.

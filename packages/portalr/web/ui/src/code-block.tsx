@@ -44,7 +44,7 @@ export function CodeBlock({ code, language, note, children }: Props) {
           <CopyButton text={code} what={what} />
         </span>
       </div>
-      <ScrollRegion aria-label={named} className="outline-offset-[-2px]">
+      <ScrollRegion aria-label={named} className="-outline-offset-(--focus-offset)">
         <pre
           className={cn(
             "m-0 px-3 py-2 font-mono text-fg text-sm [font-variant-ligatures:none]",

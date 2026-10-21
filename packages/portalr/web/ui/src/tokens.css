@@ -159,4 +159,11 @@
    */
   --scrim: light-dark(rgb(28 29 38 / 45%), rgb(0 0 0 / 60%));
   --shadow-color: light-dark(rgb(40 20 70 / 16%), rgb(0 0 0 / 65%));
+
+  /*
+   * The focus ring: how wide it is, and how far from what it rings (inside a row, the same
+   * distance in); its colour is --focus (portalr ADR-0029).
+   */
+  --focus-width: var(--border-width-2);
+  --focus-offset: 2px;
 }

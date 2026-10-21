@@ -69,7 +69,7 @@ export function Switcher({
     <Menu.Root>
       <Menu.Trigger
         aria-label={where ? `Workspace: ${tenant}, ${where.workspace}` : `Tenant: ${tenant}`}
-        className="inline-flex min-w-0 items-center gap-1.5 rounded-md border border-edge bg-paper px-3 py-1.5 font-semibold text-fg text-sm outline-offset-2 hover:bg-wash focus-visible:outline-2 focus-visible:outline-focus"
+        className="inline-flex min-w-0 items-center gap-1.5 rounded-md border border-edge bg-paper px-3 py-1.5 font-semibold text-fg text-sm outline-offset-(--focus-offset) hover:bg-wash focus-visible:outline-(length:--focus-width) focus-visible:outline-focus"
       >
         {where ? (
           <>
@@ -136,7 +136,7 @@ export function TenantSwitcher({
     <Menu.Root>
       <Menu.Trigger
         aria-label={`Tenant: ${named}`}
-        className="inline-flex min-w-0 items-center gap-1.5 rounded-md border border-edge bg-paper px-3 py-1.5 font-semibold text-fg text-sm outline-offset-2 hover:bg-wash focus-visible:outline-2 focus-visible:outline-focus"
+        className="inline-flex min-w-0 items-center gap-1.5 rounded-md border border-edge bg-paper px-3 py-1.5 font-semibold text-fg text-sm outline-offset-(--focus-offset) hover:bg-wash focus-visible:outline-(length:--focus-width) focus-visible:outline-focus"
       >
         <span aria-hidden="true" className="truncate">
           {named}

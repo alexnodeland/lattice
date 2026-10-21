@@ -20,14 +20,14 @@ function Home({ ui, home, children }: { ui: Ui; home: ReactElement; children: Re
     props: {
       "aria-label": NAME[ui],
       className:
-        "inline-flex shrink-0 rounded-md outline-offset-2 focus-visible:outline-2 focus-visible:outline-focus",
+        "inline-flex shrink-0 rounded-md outline-offset-(--focus-offset) focus-visible:outline-(length:--focus-width) focus-visible:outline-focus",
       children,
     },
   });
 }
 
 const button =
-  "inline-flex items-center gap-2 rounded-md px-2 py-1.5 font-semibold text-fg text-sm outline-offset-2 hover:bg-wash focus-visible:outline-2 focus-visible:outline-focus";
+  "inline-flex items-center gap-2 rounded-md px-2 py-1.5 font-semibold text-fg text-sm outline-offset-(--focus-offset) hover:bg-wash focus-visible:outline-(length:--focus-width) focus-visible:outline-focus";
 
 /**
  * The frame of every signed-in screen. One header holds the mark, the switcher, the navigation
@@ -79,7 +79,7 @@ export function AppShell({
     >
       <a
         href="#main"
-        className="fixed top-2 left-2 z-50 -translate-y-16 rounded-md bg-surface px-3 py-2 font-semibold text-sm focus:translate-y-0 focus-visible:outline-2 focus-visible:outline-focus"
+        className="fixed top-2 left-2 z-50 -translate-y-16 rounded-md bg-surface px-3 py-2 font-semibold text-sm focus:translate-y-0 focus-visible:outline-(length:--focus-width) focus-visible:outline-focus"
       >
         Skip to content
       </a>

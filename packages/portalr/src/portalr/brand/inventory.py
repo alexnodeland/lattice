@@ -188,7 +188,17 @@ ROLES: tuple[Group, ...] = (
     ),
 )
 
-COMPONENTS: tuple[Group, ...] = ()
+COMPONENTS: tuple[Group, ...] = (
+    Group(
+        "The focus ring: how wide it is, and how far from what it rings (inside a row, the same"
+        " distance in); its colour is --focus (portalr ADR-0029).",
+        _rows(
+            "dimension",
+            ("component.focus.width", "--focus-width"),
+            ("component.focus.offset", "--focus-offset"),
+        ),
+    ),
+)
 """Each component's tokens, defaulting to a role or a primitive (portalr ADR-0056)."""
 
 GROUPS: tuple[Group, ...] = (*PRIMITIVES, *ROLES, *COMPONENTS)

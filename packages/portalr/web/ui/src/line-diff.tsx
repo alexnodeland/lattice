@@ -131,7 +131,10 @@ function LineRow({ line, focused = false }: { line: Line; focused?: boolean }) {
         </del>
       ) : (
         <span
-          className={cn(mark, "focus-visible:outline-2 focus-visible:outline-focus")}
+          className={cn(
+            mark,
+            "focus-visible:outline-(length:--focus-width) focus-visible:outline-focus",
+          )}
           ref={text}
           {...(focused && { tabIndex: -1 })}
         >

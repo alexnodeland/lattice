@@ -612,5 +612,18 @@
       },
       "$type": "dimension"
     }
+  },
+  "component": {
+    "focus": {
+      "width": {
+        "$value": "{border.width.2}"
+      },
+      "offset": {
+        "$value": {
+          "value": 2,
+          "unit": "px"
+        }
+      }
+    }
   }
 }

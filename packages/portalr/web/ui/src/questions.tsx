@@ -304,7 +304,7 @@ function Asked({
 
 /** An option's row, which is its control: checked, it is edged and washed in the working colour. */
 const ROW =
-  "group flex w-full cursor-pointer items-start gap-3 rounded-md border border-line bg-surface px-3 py-2.5 text-start outline-offset-2 hover:border-edge focus-visible:outline-2 focus-visible:outline-focus data-checked:border-accent data-checked:bg-wash data-disabled:cursor-not-allowed data-disabled:hover:border-line";
+  "group flex w-full cursor-pointer items-start gap-3 rounded-md border border-line bg-surface px-3 py-2.5 text-start outline-offset-(--focus-offset) hover:border-edge focus-visible:outline-(length:--focus-width) focus-visible:outline-focus data-checked:border-accent data-checked:bg-wash data-disabled:cursor-not-allowed data-disabled:hover:border-line";
 
 /** The mark in an option's row: a ring, or a box, filled in the working colour once checked. */
 const MARK =

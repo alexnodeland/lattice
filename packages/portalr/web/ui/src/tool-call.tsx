@@ -72,7 +72,7 @@ export function ToolCall({ tool }: { tool: Artifactr.Tool }) {
   return (
     <li>
       <details className="group rounded-lg border border-line bg-surface text-sm open:border-edge">
-        <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-lg px-3 py-2 outline-offset-2 focus-visible:outline-2 focus-visible:outline-focus [&::-webkit-details-marker]:hidden">
+        <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-lg px-3 py-2 outline-offset-(--focus-offset) focus-visible:outline-(length:--focus-width) focus-visible:outline-focus [&::-webkit-details-marker]:hidden">
           <Icon
             icon={ChevronRight}
             className="size-3.5 shrink-0 text-muted motion-safe:transition-transform group-open:rotate-90 rtl:-scale-x-100 rtl:group-open:rotate-90"

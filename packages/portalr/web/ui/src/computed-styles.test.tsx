@@ -179,8 +179,56 @@ function file(readings: readonly string[]) {
   return `${readings.join("\n").split("\n").filter(Boolean).join("\n")}\n`;
 }
 
+/**
+ * The colours the system chooses, which differ from one system to the next: the browser's own
+ * focus ring always, and, under forced colours, where every colour is the system's, each system
+ * colour. Each is written by its name, so a snapshot is the same on every system.
+ */
+const SYSTEM = [
+  "Canvas",
+  "CanvasText",
+  "LinkText",
+  "VisitedText",
+  "ActiveText",
+  "ButtonFace",
+  "ButtonText",
+  "ButtonBorder",
+  "Field",
+  "FieldText",
+  "Highlight",
+  "HighlightText",
+  "SelectedItem",
+  "SelectedItemText",
+  "Mark",
+  "MarkText",
+  "GrayText",
+  "AccentColor",
+  "AccentColorText",
+] as const;
+
+function systemColours(forced: boolean) {
+  const probe = document.createElement("span");
+  document.body.append(probe);
+  const named = new Map<string, string>();
+  probe.style.outlineColor = "-webkit-focus-ring-color";
+  named.set(getComputedStyle(probe).outlineColor, "FocusRing");
+  for (const name of forced ? SYSTEM : []) {
+    probe.style.color = name;
+    const value = getComputedStyle(probe).color;
+    if (!named.has(value)) named.set(value, name);
+  }
+  probe.remove();
+  return named;
+}
+
+/** `value` with each colour the system chose written by its name. */
+function named(value: string, system: ReadonlyMap<string, string>) {
+  return value.replace(/(?:rgba?|color)\([^)]*\)/g, (colour) => system.get(colour) ?? colour);
+}
+
 /** One line per element in `root` and below: its place, and what its look sets. */
 function read(root: Element, properties: readonly string[]) {
+  const system = systemColours(matchMedia("(forced-colors: active)").matches);
   const lines: string[] = [];
   for (const element of [root, ...root.querySelectorAll("*")]) {
     if (element.closest("script, style, template")) continue;
@@ -189,7 +237,7 @@ function read(root: Element, properties: readonly string[]) {
     const set = properties.flatMap((property) => {
       const value = style.getPropertyValue(property);
       if (INHERITED.has(property) && parent?.getPropertyValue(property) === value) return [];
-      return said(style, property, value) ? [`${property}: ${value}`] : [];
+      return said(style, property, value) ? [`${property}: ${named(value, system)}`] : [];
     });
     lines.push(entry(pathOf(element), set));
     for (const pseudo of ["::before", "::after", "::placeholder", "::marker"] as const) {
@@ -207,7 +255,7 @@ function read(root: Element, properties: readonly string[]) {
       const values = properties
         .map((property) => [property, of.getPropertyValue(property)] as const)
         .filter(([property, value]) => said(of, property, value))
-        .map(([property, value]) => `${property}: ${value}`);
+        .map(([property, value]) => `${property}: ${named(value, system)}`);
       lines.push(entry(`${pathOf(element)}${pseudo}`, values));
     }
   }

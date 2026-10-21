@@ -102,6 +102,9 @@ class Craft:
     repository: str = field(default="", kw_only=True)
     """Where it is released on GitHub: `storytold/<name>` unless given."""
 
+    memory: int = field(default=0, kw_only=True)
+    """The least address space, in bytes, its CLI needs: the worker refuses limits below it."""
+
     def __post_init__(self) -> None:
         object.__setattr__(self, "cli", self.cli or f"{self.name}-cli")
         object.__setattr__(self, "repository", self.repository or f"storytold/{self.name}")
@@ -242,6 +245,8 @@ CRAFTS: Final = _registry(
         reach="file",
         cli="blender",
         repository="blender/blender",
+        # It crashed creating its GPU context under 2 GiB, and drew under 4 (ADR-0015).
+        memory=4 << 30,
     ),
     Craft(
         name="filmcraft",

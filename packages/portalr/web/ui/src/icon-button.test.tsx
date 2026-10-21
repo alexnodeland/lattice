@@ -1,5 +1,6 @@
 import { Maximize2 } from "lucide-react";
-import { expect, test } from "vitest";
+import type { ComponentProps } from "react";
+import { expect, onTestFinished, test } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { IconButton } from "./icon-button";
@@ -93,4 +94,49 @@ test("a pending icon button stays in reach of the keyboard, disabled", async () 
   const button = screen.getByRole("button", { name: "Helpful" }).element();
   expect(document.activeElement).toBe(button);
   expect(button.getAttribute("aria-disabled")).toBe("true");
+});
+
+test("Enter and Space on a disabled icon button in reach of the keyboard do nothing", async () => {
+  let pressed = 0;
+  await render(
+    <IconButton
+      label="Helpful"
+      icon={Maximize2}
+      disabled
+      focusableWhenDisabled
+      onClick={() => (pressed += 1)}
+    />,
+  );
+  await userEvent.tab();
+  await userEvent.keyboard("{Enter}");
+  await userEvent.keyboard(" ");
+  expect(pressed).toBe(0);
+});
+
+/** A router's link, as TanStack's renders one: an anchor with its own click. */
+function RouterLink(props: ComponentProps<"a">) {
+  return <a {...props}>{props.children}</a>;
+}
+
+test("a link icon button's own click runs, as a router's does to follow it", async () => {
+  onTestFinished(() => history.replaceState(null, "", location.pathname + location.search));
+  let followed = "";
+  const screen = await render(
+    <IconButton
+      label="Open its page"
+      icon={Maximize2}
+      render={
+        <RouterLink
+          href="#page"
+          onClick={(event) => {
+            event.preventDefault();
+            followed = "page";
+          }}
+        />
+      }
+    />,
+  );
+  await screen.getByRole("link", { name: "Open its page" }).click();
+  expect(followed).toBe("page");
+  expect(location.hash).not.toBe("#page");
 });

@@ -65,23 +65,37 @@ export type Tokens = { readonly lines: ThemedToken[][]; readonly after: GrammarS
 /** Tokenize whole lines of code, from where an earlier call left the grammar, if one did. */
 export type Tokenize = (code: string, after?: GrammarState) => Tokens;
 
-/** A tokenizer for a language, once its grammar has loaded. */
+/**
+ * How long one line may take, in milliseconds, before Shiki stops it and gives the rest of the
+ * line as one plain token, which a block keeps, since it tokenizes each line once (portalr
+ * ADR-0044). Shiki's own half a second cut lines on a busy machine; this is a backstop for a
+ * grammar's regular expression that runs away, which JavaScript can't otherwise stop, on a
+ * render that waits for it. A line is also never longer than `LONGEST_LINE`.
+ */
+export const LINE_TIME_LIMIT = 5000;
+
+/** The longest line tokenized: a longer one, such as minified code, is shown as it is. */
+const LONGEST_LINE = 1000;
+
+/** What a grammar is given once as it loads, so its regular expressions are compiled then. */
+const WARM = "a = 1 # x\n";
+
+/** A tokenizer for a language, once its grammar has loaded, and run once to warm it. */
 export async function tokenizer(language: Language): Promise<Tokenize> {
   const loaded = await highlighter;
   await loaded.loadLanguage(GRAMMARS[language]);
-  return (code, after) => {
+  const tokenize: Tokenize = (code, after) => {
     const { tokens, grammarState } = loaded.codeToTokens(code, {
       lang: language,
       theme: THEME,
-      // A longer line, such as minified code, is shown as it is, rather than holding the page.
-      tokenizeMaxLineLength: 1000,
-      // No time limit: Shiki's half a second stopped a line on a busy machine, or a grammar's
-      // first, cold run, and gave the rest of it as one plain token, which a block keeps, since
-      // it tokenizes each line once. What bounds the work is the line's length, above, and the
-      // block's (`LONGEST` in highlighting.tsx).
-      tokenizeTimeLimit: 0,
+      tokenizeMaxLineLength: LONGEST_LINE,
+      tokenizeTimeLimit: LINE_TIME_LIMIT,
       ...(after && { grammarState: after }),
     });
     return { lines: tokens, after: grammarState };
   };
+  // The grammar's first, cold run compiles its expressions: done here, where nothing is kept, so
+  // no block's line pays for it.
+  tokenize(WARM);
+  return tokenize;
 }

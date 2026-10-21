@@ -58,10 +58,12 @@ ENV CRAFT=${CRAFT} CRAFT_CACHE=/cache
 COPY scripts/craft scripts/
 COPY scripts/crafts/${CRAFT}.sha256 scripts/crafts/
 
-# Its CLI's tarball, for this build's Linux, x86_64 or aarch64, whole: its licences and notices
-# travel with the CLI.
+# Its CLI, for this build's Linux, x86_64 or aarch64, with all its release unpacked beside it:
+# its libraries, and its licences and notices, which travel with it. /opt/craft/cli is the CLI.
 FROM craft AS craft-cli
-RUN cli=$(scripts/craft "${CRAFT}" cli) && cp -R "${cli%/bin/*}" /opt/craft
+RUN cli=$(scripts/craft "${CRAFT}" cli) \
+    && cp -R "${cli%/bin/*}" /opt/craft \
+    && ln -s "bin/${cli##*/}" /opt/craft/cli
 {%- if use_portal %}
 
 # Its browser build, unmodified, as its brand's licence asks.
@@ -82,7 +84,7 @@ ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     WORKER_APP=${CRAFT} \
-    WORKER_CLI=/opt/craft/bin/${CRAFT}-cli \
+    WORKER_CLI=/opt/craft/cli \
     WORKER_VERSION=${VERSION} \
     WORKER_HOST=0.0.0.0 \
     WORKER_PORT=8080

@@ -117,11 +117,12 @@ for app in "${apps[@]}"; do
     test "$ports $networks" = "0 $network"
   check "$app's worker reaches nothing outside its network" \
     docker exec "$container" python -I -c "$egress"
-  notices=(share/doc/"$app")
-  if [[ $app == pdfcraft ]]; then notices+=(share/pdfcraft/models/ATTRIBUTION.txt); fi
-  for notice in "${notices[@]}"; do
-    check "$app's image carries its release's $notice" docker exec "$container" test -e "/opt/craft/$notice"
-  done
+  check "$app's image carries its release's licences" \
+    docker exec "$container" sh -c 'find -L /opt/craft -iname "LICEN[CS]E*" | grep -q .'
+  if [[ $app == pdfcraft ]]; then
+    check "pdfcraft's image carries its OCR models' attribution and licences" \
+      docker exec "$container" test -e /opt/craft/share/pdfcraft/models/ATTRIBUTION.txt
+  fi
   check "$app's worker answers its probe" \
     docker run --rm --name "$name-probe-$app" --network "$network" --read-only --tmpfs /tmp --env "WORKER_TOKEN=$token" \
     --volume "$PWD/scripts/_files_probe.py:/probe.py:ro" --entrypoint python "$image" \

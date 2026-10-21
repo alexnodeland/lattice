@@ -188,9 +188,9 @@ use_integrations:
   default: "{{ use_ui or use_files or use_tracker }}"
   when: false
 
-# The crafting apps a worker runs (lattice RFC-0003): each one's release, as lattice's
-# scripts/crafts pins it, which scripts/check-template holds this to; its native type; and, for an
-# app whose browser build hands a file over (`bridge`), the port its editor is published on.
+# The apps a worker runs (lattice RFC-0003): each one's release, as lattice's scripts/crafts pins
+# it, which scripts/check-template holds this to; its native type; and, for an app whose browser
+# build hands a file over, the port its editor is published on.
 crafts:
   type: yaml
   default:
@@ -203,6 +203,7 @@ crafts:
     vectorcraft: {version: "0.12.0", type: VectorImage}
     designcraft: {version: "0.9.0", type: PageLayout}
     figcraft: {version: "0.6.0", type: Design}
+    freecad: {version: "1.1.4", type: CadModel}
   when: false
 
 use_portal:

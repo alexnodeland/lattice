@@ -15,6 +15,7 @@ import sys
 import threading
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
+from functools import partial
 from pathlib import Path
 from typing import cast
 
@@ -25,6 +26,7 @@ import uvicorn
 from starlette.routing import Route
 
 from artifactr.files.app import App, AppCommand, AppFailed, Applied, FakeApp, Inspection
+from artifactr.files.craft import CRAFTS
 from artifactr.files.wordcraft import Subprocess
 from artifactr.files.worker import Limits, Worker, worker_app
 from artifactr.files.worker.__main__ import (
@@ -322,13 +324,22 @@ async def test_the_environment_says_which_app_it_runs_under_the_limits(
     app = app_from_environment(environ, Limits(files=1 << 20))
     assert (app.name, app.version) == (name, "1.2.3")
     with pytest.raises(AppFailed, match="File too large") as crashed:
-        await app.commands("text")
+        await app.apply(None, [], deadline=20)
     assert crashed.value.failure == "crashed"
 
 
 def test_empty_limits_are_the_defaults(tmp_path: Path) -> None:
     environ = {"WORKER_TOKEN": TOKEN, "WORKER_CLI": str(stand_in(tmp_path)), "WORKER_LIMITS": ""}
     assert worker_from_environment({**environ, "WORKER_VERSION": "0.7.0"}).routes
+
+
+def test_a_worker_runs_every_app_whose_files_lattice_keeps_trusting_only_its_own_confinement() -> (
+    None
+):
+    kept = {name for name, craft in CRAFTS.items() if craft.reach == "file"}
+    assert set(ADAPTERS) == kept
+    for name, adapter in ADAPTERS.items():
+        assert isinstance(adapter, partial) == (CRAFTS[name].roots == "none"), name
 
 
 def test_a_worker_runs_no_app_it_has_no_adapter_for() -> None:

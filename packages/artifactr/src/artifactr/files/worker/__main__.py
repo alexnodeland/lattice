@@ -12,9 +12,10 @@ worker is its confinement (native files ADR-0013).
 """
 
 import os
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
+from functools import partial
 from types import MappingProxyType
-from typing import Final
+from typing import Final, Protocol
 
 import uvicorn
 from starlette.applications import Starlette
@@ -24,13 +25,14 @@ from artifactr.files import (
     deckcraft,
     designcraft,
     figcraft,
+    freecad,
     gridcraft,
     pdfcraft,
     photocraft,
     vectorcraft,
     wordcraft,
 )
-from artifactr.files.craft import Headless
+from artifactr.files.app import App
 from artifactr.files.worker.limits import Limits
 from artifactr.files.worker.service import worker_app
 from artifactr.files.worker.wire import CALL_LIMIT
@@ -39,25 +41,33 @@ HEAD: Final = CALL_LIMIT + (16 << 10)
 """The most bytes the server reads of a request's head: the longest call, and the other headers."""
 
 
-def _by_name(*adapters: type[Headless]) -> Mapping[str, type[Headless]]:
-    return MappingProxyType({adapter.craft.name: adapter for adapter in adapters})
+class Adapter(Protocol):
+    """How the worker makes an app: its adapter, given the CLI, its version and the limits."""
+
+    def __call__(self, cli: str, /, *, version: str, limit: int, launcher: Sequence[str]) -> App:
+        """Make the app."""
+        ...
 
 
-ADAPTERS: Final = _by_name(
-    wordcraft.Subprocess,
-    gridcraft.Subprocess,
-    deckcraft.Subprocess,
-    pdfcraft.Subprocess,
-    cadcraft.Subprocess,
-    photocraft.Subprocess,
-    vectorcraft.Subprocess,
-    designcraft.Subprocess,
-    figcraft.Subprocess,
+ADAPTERS: Final[Mapping[str, Adapter]] = MappingProxyType(
+    {
+        "wordcraft": wordcraft.Subprocess,
+        "pdfcraft": pdfcraft.Subprocess,
+        "photocraft": photocraft.Subprocess,
+        "vectorcraft": vectorcraft.Subprocess,
+        "designcraft": designcraft.Subprocess,
+        # Their CLIs confine nothing: the worker is their confinement.
+        "gridcraft": partial(gridcraft.Subprocess, trusted=True),
+        "deckcraft": partial(deckcraft.Subprocess, trusted=True),
+        "cadcraft": partial(cadcraft.Subprocess, trusted=True),
+        "figcraft": partial(figcraft.Subprocess, trusted=True),
+        "freecad": partial(freecad.Subprocess, trusted=True),
+    }
 )
-"""The apps a worker runs, by name: each crafting app whose files lattice keeps."""
+"""The apps a worker runs, by name: each app whose files lattice keeps."""
 
 
-def app_from_environment(environ: Mapping[str, str], limits: Limits) -> Headless:
+def app_from_environment(environ: Mapping[str, str], limits: Limits) -> App:
     """The app the environment names, its CLI started under the limits.
 
     Raises:
@@ -66,11 +76,12 @@ def app_from_environment(environ: Mapping[str, str], limits: Limits) -> Headless
     name = environ.get("WORKER_APP", "wordcraft")
     if (adapter := ADAPTERS.get(name)) is None:
         raise ValueError(f"WORKER_APP is {name!r}, and a worker runs one of {', '.join(ADAPTERS)}")
-    cli, version = environ["WORKER_CLI"], environ["WORKER_VERSION"]
-    launcher = limits.launcher()
-    if adapter.craft.roots == "none":
-        return adapter(cli, version=version, trusted=True, limit=limits.files, launcher=launcher)
-    return adapter(cli, version=version, limit=limits.files, launcher=launcher)
+    return adapter(
+        environ["WORKER_CLI"],
+        version=environ["WORKER_VERSION"],
+        limit=limits.files,
+        launcher=limits.launcher(),
+    )
 
 
 def worker_from_environment(environ: Mapping[str, str]) -> Starlette:

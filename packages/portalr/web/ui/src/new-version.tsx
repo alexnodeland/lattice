@@ -158,8 +158,8 @@ export function NewVersionOffer({
   }
   return (
     <div
-      role="status"
-      aria-label="A new version"
+      // A polite live region, not a `status`, so the page's own statuses stay the only ones.
+      aria-live="polite"
       className="pointer-events-none fixed inset-x-4 top-16 z-50"
     >
       {newer !== null && newer !== dismissed && (

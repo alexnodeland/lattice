@@ -99,7 +99,10 @@ export function LogList({
     if (next) {
       pending.current = next.id;
       setChosen(next.id);
-      virtual.scrollToIndex(clamped, { align: "auto" });
+      // One scroll, to where the row's fixed height puts it: `scrollToIndex` retries over the
+      // frames that follow, and a retry left from an earlier key scrolls back to its row.
+      const [offset] = virtual.getOffsetForIndex(clamped, "auto") ?? [0];
+      virtual.scrollToOffset(offset);
     }
   }
 

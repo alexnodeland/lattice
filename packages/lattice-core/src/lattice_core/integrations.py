@@ -131,6 +131,11 @@ KNOWN: Final = registry(
         ),
     ),
     Integration(
+        "files:freecad",
+        default=False,
+        description="FreeCAD: 3D models kept as native files, edited by people and agents.",
+    ),
+    Integration(
         "files:filmcraft",
         default=False,
         description="FilmCraft: video projects rendered and exported, one file at a time.",

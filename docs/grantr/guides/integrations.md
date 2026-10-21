@@ -27,6 +27,7 @@ lattice declares its integrations in one registry, `lattice_core.integrations.KN
 | `tracker:plane`, `tracker:vikunja` | On | relayr's trackers ([RFC-0004](../../rfcs/0004-relayr-and-task-trackers.md)) |
 | `files:wordcraft` | On | Native files edited in WordCraft ([RFC-0003](../../rfcs/0003-native-files-as-artifacts.md)) |
 | `files:gridcraft`, `files:deckcraft`, `files:pdfcraft`, `files:cadcraft`, `files:photocraft`, `files:vectorcraft`, `files:designcraft`, `files:figcraft` | Off | Native files edited in each of the other crafting apps, each on its own ([native files ADR-0009](../../artifactr/files/adr/0009-each-crafting-app-declared-once-on-one-of-two-dialects.md)) |
+| `files:freecad` | Off | Native 3D models edited in FreeCAD, a third party's app ([native files ADR-0014](../../artifactr/files/adr/0014-freecad-on-a-third-dialect-and-no-python-a-file-or-an-agent-brings.md)) |
 | `files:filmcraft`, `files:effectcraft`, `files:soundcraft`, `files:lightcraft` | Off | What each of four crafting apps renders or exports, one file at a time |
 | `ui:forms`, `ui:dashboards` | On | Forms and dashboards in the chat ([RFC-0005](../../rfcs/0005-forms-dashboards-and-mini-apps.md)) |
 | `ui:mini-apps` | Off | Mini apps, RFC-0005's second phase |

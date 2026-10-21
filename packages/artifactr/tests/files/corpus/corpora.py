@@ -9,6 +9,7 @@ from tests.files.corpus.cadcraft.corpus import CORPUS as CADCRAFT
 from tests.files.corpus.deckcraft.corpus import CORPUS as DECKCRAFT
 from tests.files.corpus.designcraft.corpus import CORPUS as DESIGNCRAFT
 from tests.files.corpus.figcraft.corpus import CORPUS as FIGCRAFT
+from tests.files.corpus.freecad.corpus import CORPUS as FREECAD
 from tests.files.corpus.gridcraft.corpus import CORPUS as GRIDCRAFT
 from tests.files.corpus.harness import Corpus
 from tests.files.corpus.pdfcraft.corpus import CORPUS as PDFCRAFT
@@ -20,6 +21,6 @@ CORPORA: Final[dict[str, Corpus]] = {
     corpus.app: corpus
     for corpus in (
         *(WORDCRAFT, GRIDCRAFT, DECKCRAFT, PDFCRAFT),
-        *(CADCRAFT, PHOTOCRAFT, VECTORCRAFT, DESIGNCRAFT, FIGCRAFT),
+        *(CADCRAFT, PHOTOCRAFT, VECTORCRAFT, DESIGNCRAFT, FIGCRAFT, FREECAD),
     )
 }

@@ -102,6 +102,11 @@ module-name = "artifactr"
 [tool.deptry.package_module_name_map]
 lattice-core-ai = "lattice_core"
 
+# FreeCAD's script runs in FreeCAD's own interpreter, on its modules and the Pillow it ships
+# (native files ADR-0014).
+[tool.deptry.per_rule_ignores]
+DEP001 = ["FreeCAD", "Part", "Sketcher", "TechDraw", "PIL"]
+
 # ─── types ────────────────────────────────────────────────────────────────────
 
 [tool.pyright]
@@ -138,6 +143,9 @@ branch = true
 source = ["src/artifactr"]
 # SQLAlchemy runs run_sync callables in a greenlet, which coverage follows only when told.
 concurrency = ["greenlet", "thread"]
+# FreeCAD's script runs in FreeCAD's own interpreter, which pull requests don't have; Nightly's
+# fidelity job runs it live (native files ADR-0014).
+omit = ["src/artifactr/files/freecad/console/script.py"]
 
 [tool.coverage.report]
 fail_under = 100

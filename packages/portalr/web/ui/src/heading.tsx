@@ -30,7 +30,10 @@ export function Heading({
 }: Omit<ComponentProps<"h2">, "className"> & {
   level: Level;
   look: keyof typeof LOOK;
-  /** Layout only, such as breaking a long word: never the heading's type. */
+  /**
+   * Layout only, such as breaking a long word: never the heading's type. A convention, not a
+   * check: merged after the look's classes, a size or weight here would win over it.
+   */
   className?: string;
 }) {
   const Tag = `h${level}` as const;

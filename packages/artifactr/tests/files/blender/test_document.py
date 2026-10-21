@@ -16,7 +16,17 @@ from artifactr.files.blender.document import (
     THUMBNAIL,
     read,
 )
-from tests.files.corpus.blender.corpus import CORPUS, HOSTILE, changed, first, plain, pointed
+from tests.files.corpus.blender.corpus import (
+    CORPUS,
+    HOSTILE,
+    changed,
+    first,
+    inserted,
+    offset_of,
+    plain,
+    pointed,
+    written,
+)
 
 SOURCE = CORPUS.source("primitives")
 
@@ -74,6 +84,21 @@ def test_a_fingerprint_leaves_out_what_each_save_stamps() -> None:
         ("confused_parent", "refused", "Object.parent points at Camera, not Object"),
         ("confused_data", "refused", "an object of type 10 holds data of another type"),
         ("node_data_block", "refused", "bNode.id points at Object, not ID"),
+        ("same_address", "refused", "two blocks of one data-block's are at"),
+        ("same_data_block_address", "refused", "two data-blocks are at"),
+        ("code_and_struct", "refused", "block holds a Camera"),
+        ("embedded_object", "refused", "holds a Object as its data"),
+        ("freestyle_module", "refused", "freestyle_config.modules points at Object"),
+        ("node_storage", "refused", "bNode.storage points at Object, not void"),
+        ("material_array", "refused", "Mesh.mat holds a pointer at Object"),
+        ("older_file", "refused", r"its versions are \(45, 257, 85\)"),
+        ("image_node", "refused", "a node that isn't allowed: b'ShaderNodeTexImage'"),
+        (
+            "node_number",
+            "refused",
+            "a node that isn't allowed: b'ShaderNodeBsdfPrincipled' \\(34\\)",
+        ),
+        ("dense_records", "too_large", "would take too long to scan"),
         ("library_link", "refused", "a link to another file"),
         ("packed_image", "refused", "an image"),
         ("external_image", "refused", "an image"),
@@ -168,18 +193,88 @@ def test_raw_data_is_allowed_but_a_script_nodes_name_in_it_isnt() -> None:
 
 def test_a_pointer_at_a_struct_outside_the_allowed_ones_is_refused_with_why() -> None:
     with pytest.raises(AppFailed, match=r"Mesh\.key points at a struct that isn't allowed: Key"):
-        scan(changed("primitives", pointed("Mesh", b"key", "Object")))
+        scan(changed("primitives", pointed("Mesh", "key", "Object")))
 
 
-def test_a_pointer_at_raw_data_as_a_struct_is_refused() -> None:
+def test_a_pointer_at_raw_data_as_a_struct_or_plain_data_at_a_struct_is_refused() -> None:
     def at_raw(data: bytearray) -> None:
-        blend = read(bytes(data))
-        raw = next(b for b in blend.blocks if b.code == b"DATA" and b.index == RAW)
-        offset, _ = blend.catalogue.field(index_of("Object"), b"parent")
-        struct.pack_into("<Q", data, first(data, "Object")[1] + offset, raw.address)
+        inserted(None, b"raw bytes", 0x10)(data)
+        at = first(data, "Object")[1] + offset_of(data, "Object", "parent")
+        struct.pack_into("<Q", data, at, 0x10)
 
     with pytest.raises(AppFailed, match=r"Object\.parent points at raw data, not Object"):
         scan(changed("primitives", at_raw))
+    with pytest.raises(AppFailed, match=r"Mesh\.poly_offset_indices points at Object, not int"):
+        scan(changed("primitives", pointed("Mesh", "poly_offset_indices", "Object")))
+    with pytest.raises(AppFailed, match=r"Object\.runtime points at Object"):
+        scan(changed("primitives", pointed("Object", "runtime", "Object")))
+
+
+def test_a_data_block_pointer_where_blender_saves_none_is_refused() -> None:
+    with pytest.raises(AppFailed, match=r"Object\.data points at no block, not ID|another type"):
+        scan(changed("primitives", written("Object", "data", (0x99).to_bytes(8, "little"))))
+
+
+def test_data_before_any_block_it_belongs_to_is_refused() -> None:
+    data = plain("primitives")
+    raw = HEAD.pack(b"DATA", RAW, 0x10, 0, 1)
+    with pytest.raises(AppFailed, match="data before any block"):
+        scan(bytes(data[: len(HEADER)] + raw + data[len(HEADER) :]))
+
+
+def test_a_data_block_or_the_thumbnail_of_another_struct_than_its_code_is_refused() -> None:
+    data = plain("primitives")
+    blend = read(bytes(data))
+    for code in (b"OB\0\0", b"TEST"):
+        block = next(b for b in blend.blocks if b.code == code)
+        changed_data = bytearray(data)
+        values = list(HEAD.unpack_from(changed_data, block.start))
+        values[1] = RAW if code != b"TEST" else index_of("Object")
+        HEAD.pack_into(changed_data, block.start, *values)
+        with pytest.raises(AppFailed, match=r"is raw data|block holds a Object"):
+            scan(bytes(changed_data))
+
+
+def test_a_scans_work_is_bounded() -> None:
+    with pytest.raises(AppFailed, match="too long to scan") as failed:
+        scan(SOURCE, work=100)
+    assert failed.value.failure == "too_large"
+
+
+def test_a_mesh_array_of_pointers_is_read_entry_by_entry() -> None:
+    assert scan(CORPUS.source("materials")), "its material, a pointer at a material"
+
+
+@pytest.mark.parametrize(
+    ("frames", "kept"),
+    [
+        ("split", True),
+        # zstandard reads no frame past a leading skippable one: refused, never misread.
+        ("leading_skippable", False),
+        ("skippable_only", False),
+        ("dictionary", False),
+        ("trailing_garbage", False),
+    ],
+)
+def test_zstd_is_read_frame_by_frame_and_nothing_else(frames: str, kept: bool) -> None:
+    data = bytes(plain("primitives"))
+    compressor = zstandard.ZstdCompressor()
+    skippable = (0x184D2A50).to_bytes(4, "little") + (4).to_bytes(4, "little") + b"skip"
+    half = len(data) // 2
+    content = {
+        "split": compressor.compress(data[:half]) + compressor.compress(data[half:]),
+        "leading_skippable": skippable + compressor.compress(data),
+        "skippable_only": skippable,
+        "dictionary": zstandard.ZstdCompressor(
+            dict_data=zstandard.ZstdCompressionDict(b"BLENDER" * 64)
+        ).compress(data),
+        "trailing_garbage": compressor.compress(data) + b"\xff" * 16,
+    }[frames]
+    if kept:
+        assert scan(content).content == scan(data).content
+    else:
+        with pytest.raises(AppFailed):
+            scan(content)
 
 
 def test_an_object_of_a_type_the_commands_dont_make_is_refused() -> None:

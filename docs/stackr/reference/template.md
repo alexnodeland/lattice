@@ -16,11 +16,12 @@ The application template's questions are in stackr's `copier.yml`, which the `co
 | `bridge` | bool | yes |  | `libraries == 'both'` | Bridge them with relayr (chats and artifacts become events for rules, and rules' runs act back as proposals and notices; with an incident timeline example)? |
 | `tracker` | str | `none` | `none`, `plane`, `vikunja` | `libraries == 'both' and bridge` | A task tracker for relayr (rules' runs file items there, and people's changes come back as events; with a dead-letter example)? It runs beside the stack from stackr's recipe for it, with each tenant provisioned as stackr's tracker guide says. |
 | `ui` | bool | yes |  | `libraries in ['artifactr', 'both']` | Include artifactr's forms and dashboards (the agent asks people forms and shows them dashboards in its chat; what they send is checked before it commits and, with the bridge, becomes an event for rules)? |
+| `native_files` | bool | yes |  | `libraries in ['artifactr', 'both']` | Include native files (Word, Excel, PowerPoint, PDF, CAD, 3D, image and design files kept as artifacts, each read and edited by its app's pinned CLI in a worker of its own with no route out, and by people in the app's browser build)? No app runs until FILES_CRAFTS names it: `make up FILES="wordcraft gridcraft"`. Each builds an image from its pinned release. |
 | `access` | str | `grantr` | `grantr`, `none` | always | Who may do what |
 | `portal` | bool | yes |  | `access == 'grantr'` | Include portalr (an app UI to chat with the agents and see their work, and an admin UI for access, feedback, traces and spend)? It signs people in through a Supabase project, which the application is told of in PORTAL_SUPABASE_URL and PORTAL_SUPABASE_KEY: without one it is off. It adds a Bun build and a network fetch to the image. |
 | `hosting` | str | `none` | `none`, `host` | always | Where it is hosted, beside stackr's recipe for it (stackr RFC-0004) |
 | `python_version` | str | `3.12` | `3.12`, `3.13`, `3.14` | always | The Python version it runs on |
-| `app_port` | int | `8800` |  | always | The port it is published on, on this machine |
+| `app_port` | int | `8800` |  | always | The port it is published on, on this machine; the next four are its mini apps' and editors' |
 
 <!-- end generated -->
 
@@ -41,7 +42,9 @@ These are computed from the answers, apart from `libraries_path`, which `scripts
 | `use_relayr` | bool | `{{ libraries == 'both' and bridge }}` |
 | `use_tracker` | bool | `{{ libraries == 'both' and bridge and tracker != 'none' }}` |
 | `use_ui` | bool | `{{ libraries in ['artifactr', 'both'] and ui }}` |
-| `use_integrations` | bool | `{{ use_ui or use_tracker }}` |
+| `use_files` | bool | `{{ libraries in ['artifactr', 'both'] and native_files }}` |
+| `use_integrations` | bool | `{{ use_ui or use_files or use_tracker }}` |
+| `crafts` | yaml | `{'wordcraft': {'version': '0.7.0', 'type': 'WordDocument'}, 'gridcraft': {'version': '0.8.0', 'type': 'Workbook', 'editor': 2}, 'deckcraft': {'version': '0.7.0', 'type': 'Presentation'}, 'pdfcraft': {'version': '0.8.0', 'type': 'PdfDocument', 'editor': 3}, 'cadcraft': {'version': '0.8.0', 'type': 'Drawing', 'editor': 4}, 'photocraft': {'version': '0.9.0', 'type': 'LayeredImage'}, 'vectorcraft': {'version': '0.12.0', 'type': 'VectorImage'}, 'designcraft': {'version': '0.9.0', 'type': 'PageLayout'}, 'figcraft': {'version': '0.6.0', 'type': 'Design'}, 'freecad': {'version': '1.1.4', 'type': 'CadModel'}}` |
 | `use_portal` | bool | `{{ access == 'grantr' and portal }}` |
 
 | Copier setting | Value |
@@ -92,6 +95,8 @@ A file whose name ends in `.jinja` in `template/` is rendered with the answers; 
 | `src/<package>/admin.py` | `access == 'grantr'` | rendered |
 | `src/<package>/collaboration.py` | `use_artifactr` | rendered |
 | `src/<package>/notes.py` | `use_artifactr` | rendered |
+| `src/<package>/files.py` | `use_files` | rendered |
+| `src/<package>/editor.py` | `use_files and use_portal` | rendered |
 | `src/<package>/portal.py` | `use_portal` | rendered |
 | `src/<package>/automation.py` | `use_reflexr` | rendered |
 | `src/<package>/tickets.py` | `use_reflexr` | rendered |
@@ -110,6 +115,7 @@ A file whose name ends in `.jinja` in `template/` is rendered with the answers; 
 | `tests/test_admin.py` | `access == 'grantr'` | rendered |
 | `tests/test_evals.py` | `evals` | rendered |
 | `tests/test_collaboration.py` | `use_artifactr` | rendered |
+| `tests/test_files.py` | `use_files` | rendered |
 | `tests/test_portal.py` | `use_portal` | rendered |
 | `tests/test_automation.py` | `use_reflexr` | rendered |
 | `tests/test_bridge.py` | `use_relayr` | rendered |
@@ -120,6 +126,17 @@ A file whose name ends in `.jinja` in `template/` is rendered with the answers; 
 | `evals/__main__.py` | `evals` | copied |
 | `evals/experiments.py` | `evals` | rendered |
 | `deploy/host/compose.prod.yaml` | `hosting == 'host'` | rendered |
+| `scripts/craft` | `use_files` | copied |
+| `scripts/crafts/cadcraft.sha256` | `use_files` | copied |
+| `scripts/crafts/deckcraft.sha256` | `use_files` | copied |
+| `scripts/crafts/designcraft.sha256` | `use_files` | copied |
+| `scripts/crafts/figcraft.sha256` | `use_files` | copied |
+| `scripts/crafts/freecad.sha256` | `use_files` | copied |
+| `scripts/crafts/gridcraft.sha256` | `use_files` | copied |
+| `scripts/crafts/pdfcraft.sha256` | `use_files` | copied |
+| `scripts/crafts/photocraft.sha256` | `use_files` | copied |
+| `scripts/crafts/vectorcraft.sha256` | `use_files` | copied |
+| `scripts/crafts/wordcraft.sha256` | `use_files` | copied |
 | `scripts/build-portal-ui.sh` | `use_portal` | copied |
 | `scripts/tailnet.sh` | `use_portal` | copied |
 

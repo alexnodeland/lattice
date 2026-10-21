@@ -1,0 +1,129 @@
+#!/usr/bin/env bash
+# Fetches a crafting app at the release crafts/<app>.sha256, beside this script, pins, and prints a
+# path (lattice RFC-0003; native files ADR-0009).
+#
+# Usage: scripts/craft APP cli       APP-cli for this machine (Linux x86_64 or aarch64, or macOS)
+#        scripts/craft APP web       the browser build's directory, unmodified
+#        scripts/craft APP notices   the licence and notice files in this machine's CLI asset
+#
+# FreeCAD, the FreeCAD project's, not storytold's, is pinned by its Linux AppImages alone, its
+# release's own -SHA256.txt lines: `cli` is the AppImage's freecadcmd, unpacked by the AppImage
+# itself once its checksum holds, since CI has no FUSE (native files ADR-0014). It has no macOS
+# CLI and no browser build.
+#
+# Blender, the Blender Foundation's, is pinned by its Linux x86_64 tarball alone, the line of its
+# release's own blender-X.Y.Z.sha256 on download.blender.org; Blender releases no Linux aarch64
+# build, and its macOS one is a disk image, so it has no CLI there, and no browser build. Its
+# notices are its tarball's license/ folder and copyright.txt (native files ADR-0015).
+#
+# Each asset is the storytold/APP release's, with the SHA-256 the pin records, which is the
+# release's own SHA256SUMS.txt line; upstream signs nothing, so the checksum is the pin (RFC-0003's
+# D8). A pin names one asset for each of cli on Linux x86_64 and aarch64 and on macOS, and web: the
+# release's full Linux tarball, or its CLI-only one, holding APP-cli. An asset is downloaded once,
+# when it is first asked for, into CRAFT_CACHE: to a temporary file of the run's own, checked, then
+# renamed into place, so runs at once never see each other's partial download, and bytes that
+# aren't the pin's are never unpacked. Each is unpacked once, into a directory that a link named by
+# its checksum points to; later runs check the downloaded asset again, not the unpacked tree.
+
+set -euo pipefail
+
+usage='usage: scripts/craft APP cli|web|notices'
+app=${1:?$usage}
+what=${2:?$usage}
+PIN="$(dirname "${BASH_SOURCE[0]}")/crafts/$app.sha256"
+readonly PIN
+[[ $app =~ ^[a-z]+$ && -f $PIN ]] || { echo "craft: no pin for $app" >&2; exit 2; }
+
+release='[0-9]+\.[0-9]+\.[0-9]+'
+repository=storytold/$app tag=v cli=$app-cli
+depth=''
+if [[ $app == blender ]]; then
+  cli=blender depth=2
+  case "$what:$(uname -s):$(uname -m)" in
+    cli:Linux:x86_64 | notices:Linux:x86_64) ;;
+    *) echo "craft: Blender has no $what for $(uname -s) $(uname -m)" >&2; exit 2 ;;
+  esac
+  pattern="blender-$release-linux-x64\.tar\.xz"
+elif [[ $app == freecad ]]; then
+  repository=FreeCAD/FreeCAD tag='' cli=freecadcmd
+  case "$what:$(uname -s):$(uname -m)" in
+    cli:Linux:x86_64 | notices:Linux:x86_64) arch=x86_64 ;;
+    cli:Linux:aarch64 | cli:Linux:arm64 | notices:Linux:aarch64 | notices:Linux:arm64)
+      arch=aarch64 ;;
+    *) echo "craft: FreeCAD has no $what for $(uname -s) $(uname -m)" >&2; exit 2 ;;
+  esac
+  pattern="FreeCAD_$release-Linux-$arch-py[0-9]+\.AppImage"
+else
+  case "$what:$(uname -s):$(uname -m)" in
+    cli:Linux:x86_64 | notices:Linux:x86_64) pattern="$app(-cli)?-$release-linux-x86_64\.tar\.gz" ;;
+    cli:Linux:aarch64 | cli:Linux:arm64 | notices:Linux:aarch64 | notices:Linux:arm64)
+      pattern="$app(-cli)?-$release-linux-aarch64\.tar\.gz" ;;
+    cli:Darwin:* | notices:Darwin:*) pattern="$app-cli-$release-macos-universal\.zip" ;;
+    web:*) pattern="$app-web-$release\.zip" ;;
+    *) echo "craft: no $what for $(uname -s) $(uname -m)" >&2; exit 2 ;;
+  esac
+fi
+pinned=$(grep -E "^[0-9a-f]{64}  $pattern\$" "$PIN" || true)
+if [[ $(grep -c . <<<"$pinned") -ne 1 ]]; then
+  echo "craft: $PIN must pin one asset like $pattern" >&2
+  exit 1
+fi
+read -r SHA256 NAME <<<"$pinned"
+VERSION=$(grep -oE "$release" <<<"$NAME")
+readonly SHA256 NAME VERSION
+if [[ $app == blender ]]; then
+  readonly URL="https://download.blender.org/release/Blender${VERSION%.*}/$NAME"
+else
+  readonly URL="https://github.com/$repository/releases/download/$tag$VERSION/$NAME"
+fi
+
+cache=${CRAFT_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/lattice-craft}
+asset="$cache/$NAME"
+unpacked="$cache/$SHA256"
+mkdir -p "$cache"
+part=""
+trap 'rm -rf ${part:+"$part"}' EXIT
+
+verified() {
+  local sum
+  if command -v sha256sum >/dev/null; then sum=$(sha256sum "$1"); else sum=$(shasum -a 256 "$1"); fi
+  if [[ ${sum%% *} != "$SHA256" ]]; then
+    echo "craft: $1 is not $NAME (sha256 ${sum%% *}); remove it to download it again" >&2
+    return 1
+  fi
+}
+
+if [[ ! -f $asset ]]; then
+  part=$(mktemp "$asset.XXXXXX")
+  curl --fail --silent --show-error --location --retry 5 --retry-all-errors --output "$part" "$URL"
+  verified "$part"
+  mv -f "$part" "$asset"
+  part=""
+fi
+if [[ ! -e $unpacked ]]; then
+  verified "$asset"
+  part=$(mktemp -d "$cache/unpacking.XXXXXX")
+  case $NAME in
+    *.zip) unzip -q "$asset" -d "$part" ;;
+    *.tar.gz) tar -xzf "$asset" -C "$part" ;;
+    *.tar.xz) tar -xJf "$asset" -C "$part" ;;
+    *.AppImage) chmod u+x "$asset" && (cd "$part" && "$asset" --appimage-extract >/dev/null) ;;
+  esac
+  # A link is made whole or not at all, and only by the first run: the others' unpacking goes.
+  if ln -sn "$(basename "$part")" "$unpacked" 2>/dev/null; then part=""; fi
+fi
+
+case $what in
+  # Blender's executable is at its tarball's root, where no other file of its name may stand in.
+  cli) found=$(find "$unpacked/" ${depth:+-maxdepth "$depth"} -type f -name "$cli" -perm -u+x -print -quit) ;;
+  web) found=$(find "$unpacked/" -type f -name index.html -print -quit) && found=${found%/*} ;;
+  notices) if [[ $app == blender ]]; then
+    found=$(find "$unpacked/" -maxdepth 3 -type f \( -path '*/license/*' -o -name copyright.txt \) \
+      | sort)
+  else
+    found=$(find "$unpacked/" -type f \( -name 'LICEN[CS]E*' -o -name '*.LICEN[CS]E*' \
+      -o -name 'NOTICE*' -o -name 'ATTRIBUTION*' -o -name 'OFL*' \) | sort)
+  fi ;;
+esac
+[[ -n $found ]] || { echo "craft: $NAME holds no $what" >&2; exit 1; }
+echo "$found"

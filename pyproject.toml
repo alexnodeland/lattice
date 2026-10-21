@@ -11,7 +11,7 @@ dependencies = []
 # lattice's own checks: the root tests, lint and types for the root's Python, and deptry over
 # each package's shipped code. pytest-randomly runs every project's tests in a random order, since
 # every project's tests run in this one environment. griffe finds the breaks in the packages'
-# public APIs.
+# public APIs. pytest-xdist runs the largest projects' tests on every core.
 dev = [
     "actionlint-py>=1.7.12",
     "deptry>=0.25",
@@ -21,6 +21,7 @@ dev = [
     "pytest>=9.1",
     "pytest-randomly>=5.0",
     "pytest-timeout>=2.4",
+    "pytest-xdist>=3.8",
     "pyyaml>=6.0.3",
     "ruff>=0.16",
     "zizmor>=1.30",

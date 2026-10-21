@@ -7,13 +7,14 @@ import pytest
 
 from artifactr.files.designcraft import media_type
 from artifactr.files.manifest import IDML
+from tests.files.corpus.package import TIME
 
 
 def package(**parts: bytes) -> bytes:
     made = io.BytesIO()
     with zipfile.ZipFile(made, "w") as archive:
         for name, part in parts.items():
-            archive.writestr(name, part)
+            archive.writestr(zipfile.ZipInfo(name, TIME), part)
     return made.getvalue()
 
 

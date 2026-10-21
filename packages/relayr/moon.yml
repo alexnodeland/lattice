@@ -9,6 +9,10 @@ dependsOn:
   - 'reflexr'
 
 tasks:
+  test:
+    # A worker for each of the runner's cores, sharing nothing (lattice ADR-0010).
+    args: ['--numprocesses', 'auto']
+
   schema:
     description: "Regenerate the OpenAPI document of relayr's routes, which portalr's client is typed from"
     script: 'uv run python -m relayr.fastapi.openapi > schemas/relayr.openapi.json'

@@ -35,3 +35,36 @@ test("an icon button can be a link, such as the router's", async () => {
   const link = screen.getByRole("link", { name: "Open its page" }).element();
   expect(link.getAttribute("href")).toBe("#page");
 });
+
+test("a link icon button has the button's look, named by its label, not its element's words", async () => {
+  const screen = await render(
+    <IconButton
+      label="Open its page"
+      icon={Maximize2}
+      render={<a href="#page" aria-label="x" />}
+    />,
+  );
+  const link = screen.getByRole("link", { name: "Open its page" }).element();
+  expect(getComputedStyle(link).borderTopStyle).toBe("solid");
+  expect(getComputedStyle(link).color).toBe(token("fg"));
+});
+
+test("Escape dismisses its tooltip", async () => {
+  await render(<IconButton label="Full view" icon={Maximize2} />);
+  await userEvent.tab();
+  await expect.element(page.getByText("Full view", { exact: true })).toBeVisible();
+  await userEvent.keyboard("{Escape}");
+  await expect.element(page.getByText("Full view", { exact: true })).not.toBeInTheDocument();
+});
+
+test("a disabled icon button keeps its name, and isn't a stop for the keyboard", async () => {
+  const screen = await render(
+    <>
+      <IconButton label="Helpful" icon={Maximize2} disabled />
+      <button type="button">After</button>
+    </>,
+  );
+  await expect.element(screen.getByRole("button", { name: "Helpful" })).toBeDisabled();
+  await userEvent.tab();
+  expect(document.activeElement?.textContent).toBe("After");
+});

@@ -422,8 +422,8 @@ COMPONENTS: tuple[Group, ...] = (
     ),
     Group(
         "An icon button, an action named by its icon and a tooltip: its size, a target 24px or "
-        "more, its corners and its icon's size; and a tooltip's padding, corners and shadow "
-        "(portalr ADR-0061).",
+        "more, its corners and its icon's size; and a tooltip's padding, corners, shadow and "
+        "layer, above a full view's (portalr ADR-0061).",
         (
             Row("component.icon-button.size", "--icon-button-size", "dimension"),
             Row("component.icon-button.radius", "--icon-button-radius", "dimension"),
@@ -432,6 +432,7 @@ COMPONENTS: tuple[Group, ...] = (
             Row("component.tooltip.pad-y", "--tooltip-pad-y", "dimension"),
             Row("component.tooltip.radius", "--tooltip-radius", "dimension"),
             Row("component.tooltip.shadow", "--tooltip-shadow", "shadow"),
+            Row("component.tooltip.layer", "--tooltip-layer", "number"),
         ),
     ),
 )

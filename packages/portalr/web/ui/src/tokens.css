@@ -364,8 +364,8 @@
 
   /*
    * An icon button, an action named by its icon and a tooltip: its size, a target 24px or more,
-   * its corners and its icon's size; and a tooltip's padding, corners and shadow (portalr
-   * ADR-0061).
+   * its corners and its icon's size; and a tooltip's padding, corners, shadow and layer, above a
+   * full view's (portalr ADR-0061).
    */
   --icon-button-size: 2rem;
   --icon-button-radius: var(--radius-3);
@@ -374,4 +374,5 @@
   --tooltip-pad-y: var(--space-1);
   --tooltip-radius: var(--radius-3);
   --tooltip-shadow: var(--shadow-2);
+  --tooltip-layer: 60;
 }

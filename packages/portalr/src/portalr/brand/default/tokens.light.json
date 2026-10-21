@@ -1122,6 +1122,9 @@
       },
       "shadow": {
         "$value": "{shadow.2}"
+      },
+      "layer": {
+        "$value": 60
       }
     }
   }

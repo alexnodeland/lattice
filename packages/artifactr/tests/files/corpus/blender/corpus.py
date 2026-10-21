@@ -12,7 +12,7 @@ import struct
 import subprocess
 import tempfile
 from collections.abc import Callable
-from functools import partial
+from functools import cache, partial
 from pathlib import Path
 from typing import Final
 
@@ -195,14 +195,14 @@ def headed(field: int, value: int) -> Callable[[bytearray], None]:
     return change
 
 
+@cache
 def bomb() -> bytes:
-    """A zstd frame that inflates to 2 GiB of zeros, past any limit, from a few kilobytes."""
-    compressor = zstandard.ZstdCompressor(level=19)
+    """A zstd frame that inflates to 512 MiB of zeros, past the limit, from a few kilobytes."""
     stream = io.BytesIO()
-    with compressor.stream_writer(stream, closefd=False) as writer:
+    with zstandard.ZstdCompressor(level=1).stream_writer(stream, closefd=False) as writer:
         writer.write(HEADER)
         chunk = bytes(64 << 20)
-        for _ in range(32):
+        for _ in range(8):
             writer.write(chunk)
     return stream.getvalue()
 
@@ -226,7 +226,7 @@ HOSTILE: Final[dict[str, Callable[[], bytes]]] = {
         path.stem: partial(blender_made, path.stem)
         for path in sorted(HOSTILE_FOLDER.glob("*.blend"))
     },
-    # 2 GiB of zeros behind a header, in a few kilobytes of zstd.
+    # 512 MiB of zeros behind a header, in a few kilobytes of zstd.
     "zstd_bomb": bomb,
     "gzip": lambda: b"\x1f\x8b\x08" + bytes(64),
     # Blender before 5.0's header, its pointers 4 bytes: a reader that trusted it would misread

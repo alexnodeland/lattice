@@ -299,6 +299,14 @@ COMPONENTS: tuple[Group, ...] = (
             Row("component.tabs.indicator", "--tabs-indicator", "dimension"),
         ),
     ),
+    Group(
+        "A table: its frame's corners, and a cell's padding across; its rows' height, padding "
+        "and words are the roles above, which admin's compact density sets.",
+        (
+            Row("component.table.radius", "--table-radius", "dimension"),
+            Row("component.table.cell-pad-x", "--table-cell-pad-x", "dimension"),
+        ),
+    ),
 )
 """Each component's tokens, defaulting to a role or a primitive (portalr ADR-0056)."""
 

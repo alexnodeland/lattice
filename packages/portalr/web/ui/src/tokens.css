@@ -255,4 +255,11 @@
   --tabs-pad-x: var(--space-3);
   --tabs-pad-y: var(--space-2);
   --tabs-indicator: var(--border-width-2);
+
+  /*
+   * A table: its frame's corners, and a cell's padding across; its rows' height, padding and words
+   * are the roles above, which admin's compact density sets.
+   */
+  --table-radius: var(--radius-4);
+  --table-cell-pad-x: var(--space-3);
 }

@@ -853,6 +853,14 @@
       "indicator": {
         "$value": "{border.width.2}"
       }
+    },
+    "table": {
+      "radius": {
+        "$value": "{radius.4}"
+      },
+      "cell-pad-x": {
+        "$value": "{space.3}"
+      }
     }
   }
 }

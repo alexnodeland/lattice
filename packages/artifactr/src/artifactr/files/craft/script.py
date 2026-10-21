@@ -57,6 +57,8 @@ class Script:
         script: The script the CLI runs, given `--pass` and the call's path.
         version: The version it must be, which the script reports: another is refused.
         arguments: What the CLI is given before the script.
+        ending: What it is given after the script, before `--pass`: Blender's `--`, after which
+            it leaves its arguments to the script.
         trusted: Whether the files are trusted, or this process confined: required of an app
             that confines nothing.
         limit: The most bytes a file it writes may hold.
@@ -74,6 +76,7 @@ class Script:
         *,
         version: str,
         arguments: Sequence[str] = (),
+        ending: Sequence[str] = (),
         trusted: bool = False,
         limit: int,
         launcher: Sequence[str] = (),
@@ -85,7 +88,7 @@ class Script:
             )
         self.craft = craft
         self.version = version
-        self._command = (*launcher, str(cli), *arguments, str(script))
+        self._command = (*launcher, str(cli), *arguments, str(script), *ending)
         self._limit = limit
 
     async def run(

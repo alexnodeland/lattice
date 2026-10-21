@@ -26,6 +26,27 @@ const pointerAway: BrowserCommand<[]> = async ({ page }) => {
   await page.mouse.move(size.width - 1, size.height - 1);
 };
 
+/**
+ * Put the pointer on what a test marked, holding the main button down if asked, so its `:hover` or
+ * `:active` look can be read; or, given "", let go away from there, so letting go clicks nothing.
+ */
+const pointAt: BrowserCommand<[selector: string, hold?: boolean]> = async (
+  { page, frame },
+  selector,
+  hold = false,
+) => {
+  if (selector === "") {
+    const size = page.viewportSize() ?? { width: 414, height: 896 };
+    await page.mouse.move(size.width - 1, size.height - 1);
+    await page.mouse.up();
+    return;
+  }
+  const box = await (await frame()).locator(selector).boundingBox();
+  if (box === null) throw new Error(`nothing to point at at ${selector}`);
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  if (hold) await page.mouse.down();
+};
+
 // The screenshots' baselines are Linux's, made in CI (portalr ADR-0019): they run where CI is.
 const screenshots = "src/**/*.screenshot.test.tsx";
 
@@ -56,7 +77,7 @@ export default defineConfig({
             headless: true,
             provider: playwright(),
             instances: [scheme("light"), scheme("dark")],
-            commands: { forcedColors, pointerAway, reduceMotion },
+            commands: { forcedColors, pointAt, pointerAway, reduceMotion },
           },
         },
       },

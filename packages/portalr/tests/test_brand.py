@@ -75,7 +75,16 @@ def test_an_alias_is_its_tokens_custom_property(tmp_path: Path) -> None:
 def test_a_described_group_an_opaque_colour_and_a_shadow_of_a_colour(tmp_path: Path) -> None:
     light = {
         "$description": "A kit's notes are its own.",
-        "color": {"paper": {"$value": {"colorSpace": "srgb", "hex": "#ffffff", "alpha": 1}}},
+        "color": {
+            "paper": {
+                "$value": {
+                    "colorSpace": "srgb",
+                    "components": [1, 1, 1],
+                    "hex": "#ffffff",
+                    "alpha": 1,
+                }
+            }
+        },
         "shadow": {
             "1": {
                 "$value": {
@@ -91,6 +100,43 @@ def test_a_described_group_an_opaque_colour_and_a_shadow_of_a_colour(tmp_path: P
     css = compile_kit(kit(tmp_path, light))
     assert "  --paper: #ffffff;" in css
     assert "  --shadow-1: 0 1px 2px #000000;" in css
+
+
+def test_a_token_file_is_json_in_utf8(tmp_path: Path) -> None:
+    (tmp_path / "tokens.light.json").write_text("{")
+    with pytest.raises(BrandError, match=re.escape("tokens.light.json: not JSON in UTF-8")):
+        compile_kit(tmp_path)
+    (tmp_path / "tokens.light.json").write_bytes(b'{"\xff": 1}')
+    with pytest.raises(BrandError, match=re.escape("tokens.light.json: not JSON in UTF-8")):
+        compile_kit(tmp_path)
+
+
+CHAIN = (
+    "paper",
+    "surface",
+    "fg",
+    "muted",
+    "line",
+    "on-accent",
+    "focus",
+    "edge",
+    "on-danger",
+    "scrim",
+)
+
+
+def chain(depth: int) -> dict:
+    """`depth` aliases, one to the next, the last naming a colour."""
+    links = {
+        name: {"$value": f"{{color.{CHAIN[at + 1]}}}"} for at, name in enumerate(CHAIN[:depth])
+    }
+    return {"color": {**links, CHAIN[depth]: {"$value": "#000000"}}}
+
+
+def test_an_alias_chain_is_eight_deep_at_most(tmp_path: Path) -> None:
+    assert "  --paper: var(--surface);" in compile_kit(kit(tmp_path, chain(8)))
+    with pytest.raises(BrandError, match="more than 8 aliases deep"):
+        compile_kit(kit(tmp_path, chain(9)))
 
 
 def test_a_token_file_is_an_object(tmp_path: Path) -> None:
@@ -144,12 +190,57 @@ def test_the_module_imports_without_writing() -> None:
         ({"radius": {"2": {"$value": 2}}}, "a dimension is {value, unit}"),
         ({"color": {"paper": {"$value": {"colorSpace": "srgb", "hex": "red"}}}}, "not a colour"),
         (
-            {"color": {"paper": {"$value": {"colorSpace": "srgb", "hex": "#ffffff", "alpha": 2}}}},
+            {
+                "color": {
+                    "paper": {
+                        "$value": {
+                            "colorSpace": "srgb",
+                            "components": [1, 1, 1],
+                            "hex": "#ffffff",
+                            "alpha": 2,
+                        }
+                    }
+                }
+            },
             "an alpha is from 0 to 1",
         ),
         ({"font": {"family": {"sans": {"$value": "Inter"}}}}, "a font family is a list of names"),
         ({"shadow": {"1": {"$value": {"color": "#000000"}}}}, "a shadow is"),
         ({"motion": {"ease": {"in": {"$value": [0, 0, 1]}}}}, "an easing is four numbers"),
+        (
+            {"color": {"paper": {"$value": "#ffffff", "$type": "dimension"}}},
+            "a color, not a dimension",
+        ),
+        ({"radius": {"$type": "color", "2": {"$value": "#ffffff"}}}, "a dimension, not a color"),
+        (
+            {"color": {"paper": {"$value": {"colorSpace": "srgb", "hex": "#ffffff"}}}},
+            "has three components",
+        ),
+        (
+            {
+                "color": {
+                    "paper": {
+                        "$value": {
+                            "colorSpace": "srgb",
+                            "components": [0, 0, "x"],
+                            "hex": "#000000",
+                        }
+                    }
+                }
+            },
+            "has three components",
+        ),
+        (
+            {
+                "color": {
+                    "paper": {
+                        "$value": {"colorSpace": "srgb", "components": [0, 0, 0], "hex": "#ffffff"}
+                    }
+                }
+            },
+            "its components and its hex are different colours",
+        ),
+        ({"color": {"paper": {"$value": {"colorSpace": "display-p3"}}}}, "or an srgb object"),
     ],
 )
 def test_a_kit_the_grammar_refuses(tmp_path: Path, light: dict, fault: str) -> None:

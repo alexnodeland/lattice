@@ -45,7 +45,11 @@ def _list(value: object) -> list[object] | None:
     return cast("list[object]", value) if isinstance(value, list) else None
 
 
-def _flatten(tree: dict[str, object], at: str) -> Iterator[tuple[str, object]]:
+def _flatten(
+    tree: dict[str, object], at: str, inherited: object
+) -> Iterator[tuple[str, object, object]]:
+    """Each token in a DTCG tree: its path, its value, and its `$type`, its own or its group's."""
+    type_ = tree.get("$type", inherited)
     for key, node in tree.items():
         if key.startswith("$"):
             continue
@@ -54,21 +58,36 @@ def _flatten(tree: dict[str, object], at: str) -> Iterator[tuple[str, object]]:
         if group is None:
             raise BrandError(f"{path}: a token is an object with a $value")
         if "$value" in group:
-            yield path, group["$value"]
+            yield path, group["$value"], group.get("$type", type_)
         else:
-            yield from _flatten(group, path)
+            yield from _flatten(group, path, type_)
 
 
 def read(path: Path) -> dict[str, object]:
-    """A DTCG file's tokens, by path, each still as the kit wrote it; a missing file has none."""
+    """A DTCG file's tokens, by path, each still as the kit wrote it; a missing file has none.
+
+    A token's `$type`, where the kit gives one, is its row's, or the kit is refused: a type is the
+    inventory's to say, and one that disagrees is a mistake, not a choice.
+    """
     if not path.exists():
         return {}
-    tree = _mapping(json.loads(path.read_text()))
+    try:
+        tree = _mapping(json.loads(path.read_text(encoding="utf-8")))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise BrandError(f"{path.name}: not JSON in UTF-8 ({error})") from error
     if tree is None:
         raise BrandError(f"{path.name}: a token file is an object")
-    tokens = dict(_flatten(tree, ""))
-    if unknown := sorted(set(tokens) - set(ROWS)):
-        raise BrandError("\n".join(f"{name}: no token has this path" for name in unknown))
+    tokens: dict[str, object] = {}
+    faults: list[str] = []
+    for name, value, type_ in _flatten(tree, "", None):
+        row = ROWS.get(name)
+        if row is None:
+            faults.append(f"{name}: no token has this path")
+        elif type_ is not None and type_ != row.type:
+            faults.append(f"{name}: a {row.type}, not a {type_}")
+        tokens[name] = value
+    if faults:
+        raise BrandError("\n".join(sorted(faults)))
     return tokens
 
 
@@ -90,20 +109,33 @@ def _measure(value: object, path: str, type_: str) -> str:
 
 
 def _color(value: object, path: str) -> str:
+    """A colour: `#rrggbb`, or DTCG's srgb object, whose components and hex must agree."""
     if isinstance(value, str) and _HEX.match(value):
         return value
     color = _mapping(value)
-    if color is not None and color.get("colorSpace") == "srgb" and "hex" in color:
-        hex_, alpha = color["hex"], color.get("alpha", 1)
-        if not (isinstance(hex_, str) and _HEX.match(hex_)):
-            raise BrandError(f"{path}: {hex_!r} is not a colour in #rrggbb")
-        if isinstance(alpha, bool) or not isinstance(alpha, int | float) or not 0 <= alpha <= 1:
-            raise BrandError(f"{path}: an alpha is from 0 to 1")
-        if alpha == 1:
-            return hex_
-        red, green, blue = (int(hex_[at : at + 2], 16) for at in (1, 3, 5))
-        return f"rgb({red} {green} {blue} / {_number(round(alpha * 100, 4), path)}%)"
-    raise BrandError(f"{path}: a colour is #rrggbb in lower case, or an srgb object with its hex")
+    if color is None or color.get("colorSpace") != "srgb":
+        raise BrandError(f"{path}: a colour is #rrggbb in lower case, or an srgb object")
+    hex_, alpha, components = (
+        color.get("hex"),
+        color.get("alpha", 1),
+        _list(color.get("components")),
+    )
+    if not (isinstance(hex_, str) and _HEX.match(hex_)):
+        raise BrandError(f"{path}: {hex_!r} is not a colour in #rrggbb")
+    channels = [int(hex_[at : at + 2], 16) for at in (1, 3, 5)]
+    if components is None or len(components) != 3:
+        raise BrandError(f"{path}: an srgb colour has three components, from 0 to 1")
+    for component, channel in zip(components, channels, strict=True):
+        if isinstance(component, bool) or not isinstance(component, int | float):
+            raise BrandError(f"{path}: an srgb colour has three components, from 0 to 1")
+        if round(component * 255) != channel:
+            raise BrandError(f"{path}: its components and its hex are different colours")
+    if isinstance(alpha, bool) or not isinstance(alpha, int | float) or not 0 <= alpha <= 1:
+        raise BrandError(f"{path}: an alpha is from 0 to 1")
+    if alpha == 1:
+        return hex_
+    red, green, blue = channels
+    return f"rgb({red} {green} {blue} / {_number(round(alpha * 100, 4), path)}%)"
 
 
 def _family(value: object, path: str) -> str:

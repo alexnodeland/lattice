@@ -131,7 +131,12 @@
         "$value": {
           "colorSpace": "srgb",
           "hex": "#000000",
-          "alpha": 0
+          "alpha": 0,
+          "components": [
+            0.0,
+            0.0,
+            0.0
+          ]
         },
         "$type": "color"
       },
@@ -178,7 +183,12 @@
       "$value": {
         "colorSpace": "srgb",
         "hex": "#1c1d26",
-        "alpha": 0.45
+        "alpha": 0.45,
+        "components": [
+          0.1098,
+          0.1137,
+          0.149
+        ]
       },
       "$type": "color"
     },
@@ -186,7 +196,12 @@
       "$value": {
         "colorSpace": "srgb",
         "hex": "#281446",
-        "alpha": 0.16
+        "alpha": 0.16,
+        "components": [
+          0.1569,
+          0.0784,
+          0.2745
+        ]
       },
       "$type": "color"
     }

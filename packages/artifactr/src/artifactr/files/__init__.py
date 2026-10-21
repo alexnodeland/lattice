@@ -28,6 +28,7 @@ from artifactr.files.blobs import Blobs, InMemoryBlobs, TooLarge
 from artifactr.files.checkouts import Checkout, Checkouts, InMemoryCheckouts
 from artifactr.files.manifest import (
     DOCX,
+    AudioSession,
     Blob,
     CadModel,
     Design,
@@ -51,6 +52,7 @@ __all__ = [
     "App",
     "AppCommand",
     "AppFailed",
+    "AudioSession",
     "Blob",
     "Blobs",
     "CadModel",

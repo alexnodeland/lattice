@@ -154,7 +154,10 @@ KNOWN: Final = registry(
     Integration(
         "files:soundcraft",
         default=False,
-        description="SoundCraft: audio sessions mixed down and exported, one file at a time.",
+        description=(
+            "SoundCraft: audio sessions of MIDI and its own instruments, kept as native files, "
+            "edited by people and agents."
+        ),
     ),
     Integration(
         "files:lightcraft",

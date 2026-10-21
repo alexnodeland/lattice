@@ -90,7 +90,7 @@ async def test_an_empty_sequence_has_a_page(filmcraft: Subprocess) -> None:
 
 async def test_a_batch_that_brings_in_a_file_is_refused(filmcraft: Subprocess) -> None:
     importing = step("file.importMedia", name="clip.mov", path="/etc/hosts")
-    with pytest.raises(AppFailed, match=r"draws on files outside it: clip\.mov") as refused:
+    with pytest.raises(AppFailed, match=r"draws on what it doesn't hold: clip\.mov") as refused:
         await filmcraft.apply(None, [step("file.newBin", name="In"), importing], deadline=20)
     assert refused.value.failure == "refused"
 
@@ -119,7 +119,7 @@ async def test_a_project_filmcraft_would_change_on_opening_is_refused(
         (
             b'{"format": "filmcraft.project", "project": {"items": {"1": {"name": "a.mov", '
             b'"kind": {"Media": {"media": {"File": {"path": "a.mov"}}}}}}}}',
-            r"draws on files outside it: a\.mov",
+            r"draws on what it doesn't hold: a\.mov",
         ),
     ],
 )

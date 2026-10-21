@@ -25,6 +25,7 @@ from artifactr.files.manifest import (
     PDF,
     PPTX,
     PSD,
+    SCRAFT,
     SVG,
     XLSX,
 )
@@ -258,9 +259,9 @@ CRAFTS: Final = _registry(
         title="SoundCraft",
         dialect="tools",
         roots="split",
-        formats=frozenset(),
+        formats=frozenset({SCRAFT}),
         render=False,
-        reach="export",
+        reach="file",
     ),
     Craft(
         name="lightcraft",

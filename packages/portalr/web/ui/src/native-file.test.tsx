@@ -51,6 +51,7 @@ test.each([
   ["application/x-extension-fcstd", "3D model"],
   ["application/x-fcproj", "Video project"],
   ["application/x-ecproj", "Motion graphics"],
+  ["application/x-scraft", "Audio session"],
 ])("a %s file is called a %s", (mediaType, type) => {
   expect(factsOf({ content: { media_type: mediaType } }).type).toBe(type);
 });

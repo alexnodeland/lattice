@@ -16,6 +16,7 @@ from tests.files.corpus.gridcraft.corpus import CORPUS as GRIDCRAFT
 from tests.files.corpus.harness import Corpus
 from tests.files.corpus.pdfcraft.corpus import CORPUS as PDFCRAFT
 from tests.files.corpus.photocraft.corpus import CORPUS as PHOTOCRAFT
+from tests.files.corpus.soundcraft.corpus import CORPUS as SOUNDCRAFT
 from tests.files.corpus.vectorcraft.corpus import CORPUS as VECTORCRAFT
 from tests.files.corpus.wordcraft.corpus import CORPUS as WORDCRAFT
 
@@ -24,6 +25,6 @@ CORPORA: Final[dict[str, Corpus]] = {
     for corpus in (
         *(WORDCRAFT, GRIDCRAFT, DECKCRAFT, PDFCRAFT),
         *(CADCRAFT, PHOTOCRAFT, VECTORCRAFT, DESIGNCRAFT, FIGCRAFT, FREECAD),
-        *(FILMCRAFT, EFFECTCRAFT),
+        *(FILMCRAFT, EFFECTCRAFT, SOUNDCRAFT),
     )
 }

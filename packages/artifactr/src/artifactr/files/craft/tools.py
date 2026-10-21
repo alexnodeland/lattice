@@ -40,6 +40,8 @@ class ToolsDialect(Headless):
     open_tool: ClassVar[str]
     save_tool: ClassVar[str]
     batch_tool: ClassVar[str] = "batch"
+    batch_argument: ClassVar[str] = "commands"
+    """The batch tool's argument that it takes the commands by."""
     render_tool: ClassVar[str] = "render_page"
     list_tool: ClassVar[str] = "list_commands"
     list_argument: ClassVar[str] = "query"
@@ -81,7 +83,7 @@ class ToolsDialect(Headless):
         steps: list[JsonValue] = [
             {"command": command.name, "params": command.args} for command in commands
         ]
-        reply = await server.session.call_tool(self.batch_tool, {"commands": steps})
+        reply = await server.session.call_tool(self.batch_tool, {self.batch_argument: steps})
         if reply.is_error:
             raise AppFailed("refused", _failed_step(reply_text(reply)))
 

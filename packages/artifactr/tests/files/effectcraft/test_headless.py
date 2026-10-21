@@ -99,7 +99,7 @@ async def test_a_page_is_a_second_of_the_composition(effectcraft: Subprocess) ->
 
 async def test_a_batch_that_brings_in_footage_is_refused(effectcraft: Subprocess) -> None:
     importing = step("file.import", path="shot.mov")
-    with pytest.raises(AppFailed, match=r"draws on files outside it: shot\.mov") as refused:
+    with pytest.raises(AppFailed, match=r"draws on what it doesn't hold: shot\.mov") as refused:
         await effectcraft.apply(None, [importing], deadline=20)
     assert refused.value.failure == "refused"
 
@@ -120,7 +120,7 @@ async def test_a_project_effectcraft_repairs_to_open_is_refused(effectcraft: Sub
         (
             b'{"savedBy": "0.11.1", "schema": 2, "items": '
             b'{"1": {"name": "a.mov", "kind": {"type": "Footage", "path": "a.mov"}}}}',
-            r"draws on files outside it: a\.mov",
+            r"draws on what it doesn't hold: a\.mov",
         ),
     ],
 )

@@ -60,6 +60,7 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     ),
     "filmcraft": _adapter("filmcraft"),
     "effectcraft": _adapter("effectcraft"),
+    "soundcraft": _adapter("soundcraft"),
     # The worker, over any app, and the App that calls it; its entry point runs WordCraft's.
     "worker": (
         {

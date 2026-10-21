@@ -27,6 +27,7 @@ const TYPES: Readonly<Record<string, string>> = {
   "application/x-extension-fcstd": "3D model",
   "application/x-fcproj": "Video project",
   "application/x-ecproj": "Motion graphics",
+  "application/x-scraft": "Audio session",
 };
 
 const UNITS = ["bytes", "kB", "MB", "GB"] as const;

@@ -51,6 +51,9 @@ ECPROJ: Final = "application/x-ecproj"
 """The media type of an EffectCraft motion graphics project, `.ecproj`, which has no registered
 one: JSON."""
 
+SCRAFT: Final = "application/x-scraft"
+"""The media type of a SoundCraft audio session, `.scraft`, which has no registered one: JSON."""
+
 OUTLINE_LIMIT: Final = 4_000
 """The most characters an outline holds: what the agent sees of a file by default."""
 
@@ -216,3 +219,9 @@ class MotionGraphics(NativeFile):
     """A motion graphics project, `.ecproj`: registered as `motion_graphics`."""
 
     formats: ClassVar[frozenset[str]] = frozenset({ECPROJ})
+
+
+class AudioSession(NativeFile):
+    """An audio session, `.scraft`: registered as `audio_session`."""
+
+    formats: ClassVar[frozenset[str]] = frozenset({SCRAFT})

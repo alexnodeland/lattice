@@ -52,4 +52,4 @@ def whole(
     if media_type(content) is None:
         raise AppFailed("refused", f"not a project its app saves as {extension}")
     if found := outside(content):
-        raise AppFailed("refused", f"the project draws on files outside it: {', '.join(found)}")
+        raise AppFailed("refused", f"the project draws on what it doesn't hold: {', '.join(found)}")

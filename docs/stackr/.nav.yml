@@ -72,6 +72,7 @@ nav:
     - adr/0040-forms-and-dashboards-in-the-template.md
     - adr/0041-integrations-switched-per-workspace-in-the-template.md
     - adr/0042-a-generated-application-as-a-local-product.md
+    - adr/0043-native-files-in-the-template.md
   - RFCs:
     - rfcs/README.md
     - rfcs/0001-v0.1-implementation-plan.md

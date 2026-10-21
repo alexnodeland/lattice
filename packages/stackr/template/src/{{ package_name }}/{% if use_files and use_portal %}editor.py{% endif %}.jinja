@@ -1,0 +1,46 @@
+"""A crafting app's editor: its browser build, as released, on an origin of its own.
+
+Lattice's shim is served beside the build, and the portal frames it, to open a checked-out file in
+the app and hear its saves (lattice RFC-0003).
+
+compose.yaml's ``files-<app>-editor`` runs it, as this module: the app is ``EDITOR_APP``, its
+build ``EDITOR_BUILD``, and the portal that alone may frame it ``PORTAL_URL``. It listens on
+``EDITOR_HOST``:``EDITOR_PORT``, 0.0.0.0:8000 in its container, which compose.yaml publishes on
+this machine's loopback alone. It sets no cookie and reads none, so it never sees a token.
+"""
+
+import os
+from collections.abc import Mapping
+from pathlib import Path
+
+import uvicorn
+from starlette.types import ASGIApp
+
+from artifactr.files.craft import CRAFTS
+from artifactr.files.fastapi import editor_app
+
+
+def editor_from_environment(environ: Mapping[str, str]) -> ASGIApp:
+    """The editor the environment names.
+
+    Raises:
+        KeyError: If it names no app, build or portal.
+    """
+    return editor_app(
+        Path(environ["EDITOR_BUILD"]),
+        craft=CRAFTS[environ["EDITOR_APP"]],
+        portal=environ["PORTAL_URL"],
+    )
+
+
+def main() -> None:
+    """Serve the editor."""
+    uvicorn.run(
+        editor_from_environment(os.environ),
+        host=os.environ.get("EDITOR_HOST", "0.0.0.0"),
+        port=int(os.environ.get("EDITOR_PORT", "8000")),
+    )
+
+
+if __name__ == "__main__":
+    main()

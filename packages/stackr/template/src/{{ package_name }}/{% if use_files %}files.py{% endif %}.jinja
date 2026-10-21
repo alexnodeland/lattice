@@ -1,0 +1,149 @@
+"""Native files: files in an app's own format, kept as artifacts (lattice RFC-0003).
+
+Each app ``FILES_CRAFTS`` names runs in a worker of its own, ``files-<app>`` in the app profile:
+its pinned CLI, under the worker's limits, in a read-only container on a network of its own,
+``files-<app>``, which has no route out (stackr ADR-0043). This application joins each, and calls
+the worker there, by its name, with its own token, ``FILES_<APP>_TOKEN``. With no app named,
+native files are off: no route is mounted, and the agent has no tools for them.
+
+- ``/artifactr/v1/workspaces/{w}/files/...``: a file's head, check-out and check-in, and each
+  version's bytes, words and pages, beside artifactr's routes
+- the agent's tools: ``read_native``, ``read_review``, ``find_commands`` and ``edit_native``
+
+Each app is an integration of its own, ``files:<app>``, switched per workspace like any other.
+"""
+
+import contextlib
+from collections.abc import AsyncGenerator, Mapping
+from typing import Any, Final
+
+import httpx
+from fastapi import FastAPI
+from pydantic import JsonValue, ValidationError
+from pydantic_ai.toolsets import AbstractToolset
+
+from artifactr import Session, Workspaces
+from artifactr.fastapi import ResolveActor
+from artifactr.files import (
+{%- for name in ((crafts.values() | map(attribute='type') | list) + ['App', 'Blobs', 'Checkouts', 'InMemoryBlobs', 'InMemoryCheckouts', 'NativeFile', 'NativeFiles']) | sort %}
+    {{ name }},
+{%- endfor %}
+)
+from artifactr.files.fastapi import files_router
+from artifactr.files.sql import SqlBlobs, SqlCheckouts, migrate
+from artifactr.files.tools import native_file_tools
+from artifactr.files.worker import Worker
+from lattice_core.integrations import Integrations
+
+from {{ package_name }}.database import Database
+from {{ package_name }}.settings import CRAFTS, FilesSettings
+
+TYPES: Final[Mapping[str, type[NativeFile]]] = {
+{%- for name, craft in crafts.items() %}
+    "{{ name }}": {{ craft.type }},
+{%- endfor %}
+}
+"""The native type each app keeps."""
+
+
+def worker_url(craft: str) -> str:
+    """Where an app's worker answers, on its network: its service's name."""
+    return f"http://files-{craft}:8080"
+
+
+class Files:
+    """Native files in the application: each app's worker, the files' stores, routes and tools.
+
+    Args:
+        settings: Which apps run, and the token their workers let in.
+        integrations: Whether each app is on in a workspace.
+        database: The database; without one, the files' bytes and check-outs live in memory.
+        transport: How requests reach the workers; HTTP by default. Tests pass the workers
+            themselves.
+    """
+
+    def __init__(
+        self,
+        settings: FilesSettings,
+        *,
+        integrations: Integrations,
+        database: Database | None = None,
+        transport: httpx.AsyncBaseTransport | None = None,
+    ) -> None:
+        self._workers = {
+            craft: Worker.at(worker_url(craft), token=settings.tokens[craft], transport=transport)
+            for craft in settings.crafts
+        }
+        self.native: NativeFiles | None = None
+        if self._workers:
+            apps: dict[type[NativeFile], App] = {
+                TYPES[craft]: worker for craft, worker in self._workers.items()
+            }
+            self.native = NativeFiles(*_stores(database), apps, integrations=integrations)
+
+    @property
+    def types(self) -> list[type[NativeFile]]:
+        """The native types of the apps that run."""
+        return [TYPES[craft] for craft in self._workers]
+
+    def key_of(self, kind: str, data: Mapping[str, JsonValue]) -> str | None:
+        """The integration that governs an artifact: its app's, for a native file."""
+        return self.native.key_of(kind, data) if self.native else None
+
+    def toolsets(self) -> list[AbstractToolset[Session[Any]]]:
+        """The agent's tools for native files, while any app runs."""
+        return [native_file_tools(self.native)] if self.native else []
+
+    async def migrate(self, database: Database) -> None:
+        """Upgrade the database to native files' tables, as its owner, even with no app running.
+
+        Starting a worker later then needs no migration.
+        """
+        await migrate(database.owner, application_role=database.role)
+
+    @contextlib.asynccontextmanager
+    async def lifespan(self) -> AsyncGenerator[None]:
+        """Ask each worker which app it runs, as the application starts; close them as it stops.
+
+        Raises:
+            RuntimeError: If a worker can't be reached, refuses the token, or runs another app, or
+                another version, than its pin names.
+        """
+        async with contextlib.AsyncExitStack() as stack:
+            for craft, worker in self._workers.items():
+                stack.push_async_callback(worker.aclose)
+                try:
+                    await worker.open()
+                except (httpx.HTTPError, ValidationError) as error:
+                    raise RuntimeError(
+                        f"files-{craft}, the worker FILES_CRAFTS names, didn't answer: start it "
+                        f"with the application, `make up`, or leave {craft} out ({error!r})"
+                    ) from error
+                if (worker.name, worker.version) != (craft, CRAFTS[craft]):
+                    raise RuntimeError(
+                        f"files-{craft} runs {worker.name} {worker.version}, not {craft} "
+                        f"{CRAFTS[craft]}, as scripts/crafts pins it: rebuild it, `make up`"
+                    )
+            yield
+
+    def mount(
+        self, app: FastAPI, workspaces: Workspaces, *, resolve_actor: ResolveActor, prefix: str
+    ) -> None:
+        """Add native files' routes beside artifactr's, while any app runs."""
+        if self.native is not None:
+            router = files_router(workspaces, self.native, resolve_actor=resolve_actor)
+            app.include_router(router, prefix=prefix)
+
+
+def _stores(database: Database | None) -> tuple[Blobs, Checkouts]:
+    """The files' bytes and check-outs: in the database, or in memory without one.
+
+    In the database, they are kept apart by tenant as artifactr's tables are.
+    """
+    if database is None:
+        return InMemoryBlobs(), InMemoryCheckouts()
+    rls = database.row_level_security
+    return (
+        SqlBlobs(database.engine, row_level_security=rls),
+        SqlCheckouts(database.engine, row_level_security=rls),
+    )

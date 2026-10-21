@@ -35,9 +35,9 @@ from artifactr.ui import UI_TYPES, ui_checks, ui_key_of
 from artifactr.ui.checks import IsAdmin
 {%- endif %}
 {%- endif %}
-from artifactr.workspace import Authorize, Hidden{% if use_ui %}, integration_gate{% endif %}
+from artifactr.workspace import Authorize, Hidden{% if use_ui or use_files %}, integration_gate{% endif %}
 from evalr.langfuse import LangfuseScoreConfigStore, LangfuseScoreSink
-{%- if use_ui %}
+{%- if use_ui or use_files %}
 from lattice_core.integrations import Integrations
 {%- endif %}
 {%- if use_relayr %}
@@ -49,6 +49,9 @@ from {{ package_name }}.access import Refused
 {% endif -%}
 from {{ package_name }}.auth import Authenticate, RequireToken, Unauthenticated
 from {{ package_name }}.database import Database
+{%- if use_files %}
+from {{ package_name }}.files import Files
+{%- endif %}
 from {{ package_name }}.gateway import Guardrails, TenantKeys
 {%- if use_relayr %}
 from {{ package_name }}.incidents import Postmortem, Timeline
@@ -74,9 +77,18 @@ class Collaboration:
         is_admin: Who may change or close any form, as its author may; without one, only its
             author.
 {%- endif %}
-{%- if use_ui %}
+{%- if use_ui and use_files %}
+        integrations: Whether forms, dashboards and each native file's app are on in a
+            workspace: off, they are refused there, and the agent isn't offered their tools.
+{%- elif use_ui %}
         integrations: Whether forms and dashboards are on in a workspace: off, they are refused
             there, and the agent isn't offered their tools.
+{%- elif use_files %}
+        integrations: Whether each native file's app is on in a workspace: off, its files are
+            refused there, and the agent isn't offered its tools.
+{%- endif %}
+{%- if use_files %}
+        files: Native files: their types, routes and the agent's tools, while any app runs.
 {%- endif %}
         model: The agent's model.
         gateway: The gateway's settings: tenant keys and guardrails.
@@ -100,8 +112,11 @@ class Collaboration:
 {%- if use_ui and access == 'grantr' %}
         is_admin: IsAdmin | None = None,
 {%- endif %}
-{%- if use_ui %}
+{%- if use_ui or use_files %}
         integrations: Integrations,
+{%- endif %}
+{%- if use_files %}
+        files: Files,
 {%- endif %}
         model: Model,
         gateway: GatewaySettings,
@@ -115,6 +130,9 @@ class Collaboration:
     ) -> None:
         self._authenticate = authenticate
         self._identify = identify
+{%- if use_files %}
+        self._files = files
+{%- endif %}
         tracer_provider = telemetry.tracer_provider if telemetry else None
         meter_provider = telemetry.meter_provider if telemetry else None
         langfuse = telemetry.langfuse if telemetry else None
@@ -132,10 +150,18 @@ class Collaboration:
             SqlStorage(database.engine, row_level_security=database.row_level_security)
             if database
             else InMemoryStorage(),
-            types=[Note{% if use_ui %}, *UI_TYPES{% endif %}{% if use_relayr %}, Timeline, Postmortem, RuleDraft{% endif %}],
+            types=[Note{% if use_ui %}, *UI_TYPES{% endif %}{% if use_relayr %}, Timeline, Postmortem, RuleDraft{% endif %}{% if use_files %}, *files.types{% endif %}],
 {%- if use_ui %}
             checks=ui_checks({% if access == 'grantr' %}is_admin=is_admin, {% endif %}integrations=integrations),
+{%- endif %}
+{%- if use_ui and use_files %}
+            gate=integration_gate(
+                integrations, lambda kind, data: ui_key_of(kind, data) or files.key_of(kind, data)
+            ),
+{%- elif use_ui %}
             gate=integration_gate(integrations, ui_key_of),
+{%- elif use_files %}
+            gate=integration_gate(integrations, files.key_of),
 {%- endif %}
             authorize=authorize,
             hidden=hidden,
@@ -157,7 +183,16 @@ class Collaboration:
             capabilities.append(drafting)
 {%- endif %}
         self.runner = Runner[None](
-            build_note_agent(model, capabilities=capabilities{% if use_ui %}, integrations=integrations{% endif %}),
+            build_note_agent(
+                model,
+                capabilities=capabilities,
+{%- if use_ui %}
+                integrations=integrations,
+{%- endif %}
+{%- if use_files %}
+                toolsets=files.toolsets(),
+{%- endif %}
+            ),
             app=None,
             agent_name="assistant",
             turn_context={% if use_relayr %}turn_context{% else %}langfuse_turn if langfuse else None{% endif %},
@@ -176,6 +211,9 @@ class Collaboration:
     async def migrate(self, database: Database) -> None:
         """Upgrade the database to artifactr's schema, as its owner, granting the app's role it."""
         await migrate(database.owner, application_role=database.role)
+{%- if use_files %}
+        await self._files.migrate(database)
+{%- endif %}
 
     @contextlib.asynccontextmanager
     async def lifespan(self) -> AsyncGenerator[None]:
@@ -188,7 +226,7 @@ class Collaboration:
             configs = LangfuseScoreConfigStore(self._langfuse)
             await sync_configs(sync_score_configs(configs, [Rating]))
         try:
-            async with self.mcp.lifespan():
+            async with {% if use_files %}self._files.lifespan(), {% endif %}self.mcp.lifespan():
                 yield
         finally:
             await self.runner.aclose()
@@ -205,6 +243,11 @@ class Collaboration:
             meter_provider=self._meter_provider,
         )
         app.include_router(router, prefix=f"{PREFIX}/v1")
+{%- if use_files %}
+        self._files.mount(
+            app, self.workspaces, resolve_actor=self._resolve_actor, prefix=f"{PREFIX}/v1"
+        )
+{%- endif %}
         mcp = self.mcp.http_app(streamable_http_path="/")
         app.mount(f"{PREFIX}/mcp", RequireToken(mcp, self._identify))
 

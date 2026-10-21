@@ -4,6 +4,7 @@ Every request goes through httpx's ASGI transport, so no socket is opened. `test
 the hostile corpus through the same worker, over WordCraft itself.
 """
 
+import contextlib
 import os
 import re
 import resource
@@ -24,6 +25,7 @@ import httpx
 import pytest
 import uvicorn
 from starlette.routing import Route
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from artifactr.files.app import App, AppCommand, AppFailed, Applied, FakeApp, Inspection
 from artifactr.files.craft import CRAFTS
@@ -154,25 +156,51 @@ async def test_a_reply_past_the_limit_is_too_large(connect: Connect) -> None:
     assert large.value.failure == "too_large"
 
 
-@pytest.fixture
-def listening() -> Iterator[str]:
-    """A worker over the fake app, served by uvicorn as the entry point serves it, on loopback."""
+@contextlib.contextmanager
+def serving(app: ASGIApp) -> Iterator[str]:
+    """An app served by uvicorn as the entry point serves the worker, on loopback."""
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
         config = uvicorn.Config(
-            worker_app(FakeApp(), token=TOKEN, limits=LIMITS),
-            http="h11",
-            h11_max_incomplete_event_size=HEAD,
-            log_level="warning",
+            app, http="h11", h11_max_incomplete_event_size=HEAD, log_level="warning"
         )
         server = uvicorn.Server(config)
-        serving = threading.Thread(target=server.run, kwargs={"sockets": [sock]})
-        serving.start()
+        thread = threading.Thread(target=server.run, kwargs={"sockets": [sock]})
+        thread.start()
+        deadline = time.monotonic() + 10
         while not server.started:
+            assert thread.is_alive(), "the server ended before it started"
+            assert time.monotonic() < deadline, "the server didn't start within 10 s"
             time.sleep(0.01)
         yield f"http://127.0.0.1:{sock.getsockname()[1]}"
         server.should_exit = True
-        serving.join()
+        thread.join()
+
+
+@pytest.fixture
+def listening() -> Iterator[str]:
+    """A worker over the fake app, served as the entry point serves it, on loopback."""
+    with serving(worker_app(FakeApp(), token=TOKEN, limits=LIMITS)) as url:
+        yield url
+
+
+async def test_each_call_has_a_connection_of_its_own_which_no_idle_close_can_cut() -> None:
+    """A kept connection the worker's server closes as idle, just as a call is sent on it, fails
+    the call as `ReadError`: so none is kept, and each call's connection is its own."""
+    peers: list[tuple[str, int]] = []
+    served = worker_app(FakeApp(), token=TOKEN, limits=LIMITS)
+
+    async def recorded(scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "http":
+            peers.append(scope["client"])
+        await served(scope, receive, send)
+
+    with serving(recorded) as url:
+        worker = await Worker.connect(url, token=TOKEN)
+        made = await worker.apply(None, [], deadline=10)
+        await worker.inspect(made.content, deadline=10)
+        await worker.aclose()
+    assert len(peers) == len(set(peers)) == 3, "hello, apply and inspect, each on its own"
 
 
 async def test_a_call_in_any_language_reaches_the_app_over_http(listening: str) -> None:

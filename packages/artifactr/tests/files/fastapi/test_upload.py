@@ -8,6 +8,7 @@ its readings and quotas; makes nothing twice when sent again; and records every 
 """
 
 import asyncio
+import contextlib
 import hashlib
 import logging
 import socket
@@ -95,7 +96,12 @@ class World:
 
 
 def world_of(
-    *, per_minute: int = 20, readings: int | None = None, at_once: int = 8, body: Body | None = None
+    *,
+    per_minute: int = 20,
+    readings: int | None = None,
+    at_once: int = 8,
+    each: int = 1,
+    body: Body | None = None,
 ) -> World:
     switch, app = Switch(), Gated()
     blobs = InMemoryBlobs(limit=2 * LIMIT, workspace_quota=Quota(files=3))
@@ -114,6 +120,7 @@ def world_of(
             limit=LIMIT,
             uploads_per_minute=per_minute,
             uploads_at_once=at_once,
+            uploads_each=each,
             body=body,
         )
     )
@@ -300,6 +307,18 @@ async def test_a_body_that_pauses_or_trickles_is_refused() -> None:
         await read(Meter(body(*[0.15] * 4), pace))  # past its pause, under its floor
 
 
+def test_one_persons_slow_files_never_hold_every_place() -> None:
+    world = world_of(at_once=3, each=1)
+    world.app.through.clear()
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        first = pool.submit(world.upload, FakeApp.file("1"))
+        assert world.app.inspecting.wait(timeout=10)
+        refused = world.upload(FakeApp.file("2"))
+        world.app.through.set()
+        assert first.result(timeout=10).status_code == 201
+    assert (refused.status_code, refused.json()["detail"]["type"]) == (429, "busy")
+
+
 def test_the_process_takes_only_so_many_uploads_at_once() -> None:
     world = world_of(at_once=1)
     world.app.through.clear()
@@ -326,7 +345,7 @@ def test_a_tenant_whose_files_are_all_being_read_is_told_to_wait() -> None:
     with ThreadPoolExecutor(max_workers=1) as pool:
         first = pool.submit(world.upload, FakeApp.file("1"))
         assert world.app.inspecting.wait(timeout=10)
-        refused = world.upload(FakeApp.file("2"))
+        refused = world.upload(FakeApp.file("2"), user="bob")
         world.app.through.set()
         assert first.result(timeout=10).status_code == 201
     assert refused.status_code == 429
@@ -368,7 +387,7 @@ def test_every_upload_is_recorded(world: World, caplog: pytest.LogCaptureFixture
     applied, unchanged, junk, forbidden, unknown = recorded(caplog)
     assert unknown == {
         "kind": "word_document",
-        "workspace_id": "w1",
+        "workspace_id": "'w1'",
         "outcome": "refused",
         "status": 401,
         "sha256": None,
@@ -379,7 +398,7 @@ def test_every_upload_is_recorded(world: World, caplog: pytest.LogCaptureFixture
         "outcome": "applied",
         "actor": "user:alice",
         "tenant_id": "acme",
-        "workspace_id": "w1",
+        "workspace_id": "'w1'",
         "sha256": hashlib.sha256(file).hexdigest(),
         "size": len(file),
     }
@@ -422,7 +441,9 @@ def served(world: World) -> Iterator[tuple[str, int]]:
         server = uvicorn.Server(uvicorn.Config(world.client.app, http="h11", log_level="warning"))
         serving = threading.Thread(target=server.run, kwargs={"sockets": [sock]})
         serving.start()
+        started = time.monotonic()
         while not server.started:
+            assert time.monotonic() - started < 10, "the server never started"
             time.sleep(0.01)
         try:
             yield sock.getsockname()
@@ -437,7 +458,9 @@ def answer(
     """What the server answers a request sent in parts: until it closes, or its first reply."""
     with socket.create_connection(address, timeout=10) as client:
         for part in sent:
-            client.sendall(part)
+            # The server may have answered, and closed, before the rest is sent.
+            with contextlib.suppress(OSError):
+                client.sendall(part)
             time.sleep(pause)
         answered = client.recv(65536)
         while until_closed and (chunk := client.recv(65536)):

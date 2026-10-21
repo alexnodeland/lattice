@@ -9,7 +9,8 @@ upload names the workspace and the native type it makes (native files ADR-0017).
 import hashlib
 import logging
 import time
-from collections.abc import AsyncIterable, AsyncIterator, Awaitable
+from collections.abc import AsyncGenerator, AsyncIterable, AsyncIterator, Awaitable
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Annotated, Any, Final, Literal
@@ -194,6 +195,7 @@ def files_router(
     limit: int | None = None,
     uploads_per_minute: int = 20,
     uploads_at_once: int = 8,
+    uploads_each: int = 2,
     body: Body | None = None,
 ) -> APIRouter:
     """Build the router for native files' uploads, check-out and check-in, downloads and pages.
@@ -210,8 +212,11 @@ def files_router(
             `Content-Length` said, is refused there.
         uploads_per_minute: How many uploads each person of a tenant may start in a minute,
             in this process, past which one is refused with 429 until the minute has passed.
-        uploads_at_once: How many uploads this process takes at once, from every tenant,
-            past which another is refused with 429 at once: each holds its file in memory.
+        uploads_at_once: How many uploads and check-ins this process takes at once, from every
+            tenant, past which another is refused with 429 at once: each holds its file in
+            memory.
+        uploads_each: How many of them one person may have at once, so that one person's slow
+            bodies never hold every place.
         body: How slowly an upload's body may arrive before it is refused with 408: a pause
             of 30 seconds, and 32 KiB a second on average, by default.
 
@@ -224,7 +229,7 @@ def files_router(
         raise ValueError(f"the router's limit, {limit}, is past the blob store's, {files.limit}")
     router = APIRouter(responses=REFUSALS)
     pace = Pace(uploads_per_minute)
-    taking = Gauge(uploads_at_once)
+    taking = Gauge(uploads_at_once, each=uploads_each)
     pacing = body or Body()
 
     async def workspace_of(request: Request, workspace_id: PathId) -> Workspace:
@@ -273,7 +278,7 @@ def files_router(
         `unchanged`, and one with others is refused.
         """
         meter = Meter(request.stream(), pacing)
-        record: dict[str, object] = {"kind": kind, "workspace_id": workspace_id}
+        record: dict[str, object] = {"kind": kind, "workspace_id": repr(workspace_id)}
         outcome = "error"
         try:
             ws = await workspace_of(request, workspace_id)
@@ -292,6 +297,21 @@ def files_router(
             response.status_code = 200
         return uploaded
 
+    @asynccontextmanager
+    async def admitted(ws: Workspace) -> AsyncGenerator[None]:
+        """Hold a place for a person's file while it is read, within their pace and share.
+
+        Raises:
+            HTTPException: 429, if they are past their pace, or no place is theirs to take.
+        """
+        who = (ws.tenant_id, ws.actor.participant)
+        if (wait := pace.admit(who)) is not None:
+            raise _too_many("rate_limited", wait)
+        with taking.held(who) as held:
+            if not held:
+                raise _too_many("busy", BUSY)
+            yield
+
     async def create(
         ws: Workspace,
         request: Request,
@@ -308,11 +328,7 @@ def files_router(
         declared = request.headers.get("content-length", "")
         if declared.isdigit() and int(declared) > limit:
             raise HTTPException(status_code=413, detail=f"the file is larger than {limit} bytes")
-        if (wait := pace.admit((ws.tenant_id, ws.actor.participant))) is not None:
-            raise _too_many("rate_limited", wait)
-        with taking.held() as held:
-            if not held:
-                raise _too_many("busy", BUSY)
+        async with admitted(ws):
             outcome = await files.upload(
                 ws, file_type, name, meter, artifact_id=artifact_id, thread_id=thread_id
             )
@@ -373,9 +389,9 @@ def files_router(
             raise HTTPException(status_code=413, detail=f"the file is larger than {limit} bytes")
         given = request.headers.get("content-type", "").partition(";")[0].strip().lower()
         media_type = None if given in UNSAID else given
-        outcome = await _answered(
-            files.check_in(ws, checkout_id, request.stream(), media_type=media_type)
-        )
+        async with admitted(ws):
+            body = Meter(request.stream(), pacing)
+            outcome = await _answered(files.check_in(ws, checkout_id, body, media_type=media_type))
         if isinstance(outcome, Applied):
             return CheckedIn(outcome="applied", version=outcome.version)
         if isinstance(outcome, Proposed):
@@ -502,8 +518,9 @@ def _audit(record: dict[str, object], meter: Meter) -> None:
     """Record an upload: who, where, what and how it ended (native files ADR-0017).
 
     A line on the `artifactr.files.uploads` logger, its fields in `extra`, which the
-    application's handler keeps: the client's `kind` is held to a pattern, so no field
-    carries a newline.
+    application's handler keeps. Of what the client says, `kind` is held to a pattern and the
+    workspace's id is kept as its `repr`, so neither carries a newline; the rest is the
+    server's.
     """
     upload = {**record, "sha256": meter.sha256, "size": meter.size}
     audit.info("upload %s", record["outcome"], extra={"upload": upload})

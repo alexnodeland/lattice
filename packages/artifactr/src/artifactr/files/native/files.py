@@ -295,8 +295,7 @@ class NativeFiles:
             if uploaded.data.content.sha256 != hashlib.sha256(content).hexdigest():
                 raise InvalidState(f"artifact {artifact_id} already exists")
             return None
-        async with self._turn(ws.tenant_id):
-            inspection = await app.inspect(content, deadline=self._deadline)
+        inspection = await self._read(ws, app, content)
         if inspection.media_type != media_type and (
             inspection.media_type is not None or (told and not self._formats[media_type].told)
         ):
@@ -304,27 +303,10 @@ class NativeFiles:
             raise ValidationFailed("the app read the file as another format than its kind's", [])
         known = self._formats.get(media_type)
         name = file_name(name, "" if known is None else known.extension, self._formats)
-        # The file and what was read from it, stored whole or not at all, only once it was read,
-        # so a refused upload holds nothing against a quota.
         artifact_id = artifact_id or new_artifact_id()
-        stored, text, review = await self._blobs.put_all(
-            _scope(ws),
-            artifact_id,
-            [
-                (content, media_type),
-                (inspection.text.encode(), TEXT),
-                (_canonical(inspection.review), JSON),
-            ],
-        )
-        manifest = file_type(
-            name=name,
-            content=stored,
-            fingerprint=inspection.fingerprint,
-            text=text,
-            review=review,
-            outline=inspection.outline,
-            pages=inspection.pages,
-            provenance=Provenance(source="upload"),
+        made = Provenance(source="upload")
+        manifest = await self._stored(
+            ws, artifact_id, file_type, name, (content, media_type), inspection, made
         )
         return await ws.commit(
             create_artifact(manifest, artifact_id=artifact_id, thread_id=thread_id)
@@ -428,9 +410,8 @@ class NativeFiles:
         checked_out = head.data.content.media_type
         if media_type not in (None, checked_out):
             raise FormatChanged(artifact_id, checked_out=checked_out, checked_in=media_type)
-        scope = _scope(ws)
-        content = await self._blobs.put(scope, artifact_id, data, checked_out)
-        inspection = await self._inspect(app, scope, artifact_id, content)
+        content = await spool(data, self._blobs.limit)
+        inspection = await self._read(ws, app, content)
         if inspection.media_type not in (None, checked_out):
             # The app's name for a format is the worker's text: only one known is told.
             read = inspection.media_type
@@ -442,8 +423,14 @@ class NativeFiles:
         if checkout.checked_in:
             raise InvalidState(f"checkout {checkout_id} was checked in: check the file out again")
         made = Provenance(source="check_in", base=checkout.base_sha256)
-        after = await self._manifest(
-            scope, artifact_id, type(head.data), head.data.name, content, inspection, made
+        after = await self._stored(
+            ws,
+            artifact_id,
+            type(head.data),
+            head.data.name,
+            (content, checked_out),
+            inspection,
+            made,
         )
         summary = summary or f"Checked in {head.data.name}"
         edit = revise(
@@ -679,12 +666,40 @@ class NativeFiles:
 
     # ─── what every write shares ──────────────────────────────────────────────
 
-    async def _inspect(
-        self, app: App, scope: Scope, artifact_id: ArtifactId, content: Blob
-    ) -> Inspection:
-        source = await self._bytes(scope, artifact_id, content, "content")
-        async with self._turn(scope.tenant_id):
-            return await app.inspect(source, deadline=self._deadline)
+    async def _read(self, ws: Workspace, app: App, content: bytes) -> Inspection:
+        """What the app reads of a file not yet stored, in one of the tenant's readings."""
+        async with self._turn(ws.tenant_id):
+            return await app.inspect(content, deadline=self._deadline)
+
+    async def _stored[F: NativeFile](
+        self,
+        ws: Workspace,
+        artifact_id: ArtifactId,
+        file_type: type[F],
+        name: str,
+        content: tuple[bytes, str],
+        inspection: Inspection,
+        provenance: Provenance,
+    ) -> F:
+        """Store a file the app has read, with its words and review, whole or not at all.
+
+        Only a file the app read is stored, so one refused before holds nothing against a quota.
+        """
+        stored, text, review = await self._blobs.put_all(
+            _scope(ws),
+            artifact_id,
+            [content, (inspection.text.encode(), TEXT), (_canonical(inspection.review), JSON)],
+        )
+        return file_type(
+            name=name,
+            content=stored,
+            fingerprint=inspection.fingerprint,
+            text=text,
+            review=review,
+            outline=inspection.outline,
+            pages=inspection.pages,
+            provenance=provenance,
+        )
 
     @contextlib.asynccontextmanager
     async def _turn(self, tenant_id: str) -> AsyncGenerator[None]:

@@ -44,11 +44,20 @@ def test_those_who_started_nothing_lately_are_let_go() -> None:
     assert pace.kept == 2
 
 
-def test_a_gauge_refuses_past_its_most_and_gives_places_back() -> None:
-    gauge = Gauge(1)
-    with gauge.held() as first, gauge.held() as second:
-        assert (first, second) == (True, False)
-    with gauge.held() as again:
-        assert again
+def test_a_gauge_refuses_past_its_most_or_a_persons_share_and_gives_places_back() -> None:
+    gauge = Gauge(2, each=1)
+    alice, bob, carol = (("acme", f"user:{n}") for n in ("alice", "bob", "carol"))
+    with (
+        gauge.held(alice) as first,
+        gauge.held(alice) as again,
+        gauge.held(bob) as second,
+        gauge.held(carol) as third,
+    ):
+        assert (first, again, second, third) == (True, False, True, False)
+    with gauge.held(alice) as after:
+        assert after
+    shared = Gauge(2, each=2)
+    with shared.held(alice), shared.held(alice) as twice:
+        assert twice
     with pytest.raises(ValueError, match="at least one"):
-        Gauge(0)
+        Gauge(1, each=2)

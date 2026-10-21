@@ -2,7 +2,7 @@
 
 import math
 import time
-from collections import defaultdict, deque
+from collections import Counter, defaultdict, deque
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from typing import Final
@@ -50,22 +50,28 @@ class Pace:
 
 
 class Gauge:
-    """At most `most` at once, refusing another at once rather than queueing it."""
+    """At most `most` at once, and `each` of them anyone's: another is refused, never queued."""
 
-    def __init__(self, most: int) -> None:
-        if most < 1:
-            raise ValueError("a gauge lets at least one through")
+    def __init__(self, most: int, *, each: int) -> None:
+        if not 1 <= each <= most:
+            raise ValueError("a gauge lets at least one through, and each no more than all")
         self._most = most
-        self._held = 0
+        self._each = each
+        self._held: Counter[tuple[str, str]] = Counter()
 
     @contextmanager
-    def held(self) -> Generator[bool]:
-        """Hold a place while the block runs, yielding True; or yield False, if none is free."""
-        if self._held >= self._most:
+    def held(self, who: tuple[str, str]) -> Generator[bool]:
+        """Hold a place for a tenant's participant while the block runs, yielding True.
+
+        Yields False instead if no place is free, or they hold their share.
+        """
+        if self._held.total() >= self._most or self._held[who] >= self._each:
             yield False
             return
-        self._held += 1
+        self._held[who] += 1
         try:
             yield True
         finally:
-            self._held -= 1
+            self._held[who] -= 1
+            if not self._held[who]:
+                del self._held[who]

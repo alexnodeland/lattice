@@ -11,7 +11,16 @@ from artifactr.core import Applied, InvalidState, Proposed, UserActor, Validatio
 from artifactr.files.app import AppFailed, Failure, FakeApp, Inspection
 from artifactr.files.blobs import InMemoryBlobs, Quota, once
 from artifactr.files.checkouts import InMemoryCheckouts
-from artifactr.files.manifest import DOCX, NativeFile, WordDocument, Workbook
+from artifactr.files.manifest import (
+    DOCX,
+    FCPROJ,
+    AudioSession,
+    MotionGraphics,
+    NativeFile,
+    VideoProject,
+    WordDocument,
+    Workbook,
+)
 from artifactr.files.native import FORMATS, Busy, Format, NativeFiles
 from artifactr.workspace import InMemoryStorage, Workspace, Workspaces
 from tests.files.conftest import Stores
@@ -158,3 +167,51 @@ def test_a_type_is_uploaded_by_its_formats_extensions(stores: Stores) -> None:
     files = NativeFiles(stores.blobs, stores.checkouts, {WordDocument: FakeApp()})
     assert files.extensions(WordDocument) == [".docx"]
     assert files.extensions(Workbook) == [], "no app reads it"
+
+
+class Names(FakeApp):
+    """A fake app that reads every file as one format, as a crafting app names its own."""
+
+    def __init__(self, media_type: str) -> None:
+        super().__init__()
+        self.media_type = media_type
+
+    async def inspect(self, source: bytes, *, deadline: float) -> Inspection:
+        return Inspection(fingerprint="0" * 64, media_type=self.media_type)
+
+
+@pytest.mark.parametrize("file_type", [MotionGraphics, AudioSession])
+async def test_a_project_of_one_crafting_app_is_refused_as_anothers(
+    stores: Stores, file_type: type[NativeFile]
+) -> None:
+    files = NativeFiles(stores.blobs, stores.checkouts, Names(FCPROJ))
+    ws = await workspace()
+    with pytest.raises(ValidationFailed, match="another format"):
+        await files.upload(ws, file_type, "cut.fcproj", once(b'{"tracks": []}'))
+    uploaded = await files.upload(ws, VideoProject, "cut.fcproj", once(b'{"tracks": []}'))
+    assert isinstance(uploaded, Applied)
+
+
+async def test_a_bare_object_no_app_names_is_refused(stores: Stores) -> None:
+    class Silent(FakeApp):
+        async def inspect(self, source: bytes, *, deadline: float) -> Inspection:
+            return Inspection(fingerprint="0" * 64)
+
+    files = NativeFiles(stores.blobs, stores.checkouts, Silent())
+    with pytest.raises(ValidationFailed, match="another format"):
+        await files.upload(await workspace(), VideoProject, "x.fcproj", once(b"{}"))
+
+
+async def test_a_refused_check_in_holds_nothing_against_a_quota() -> None:
+    blobs = InMemoryBlobs(workspace_quota=Quota(bytes=4_000))
+    app = FakeApp()
+    files = NativeFiles(blobs, InMemoryCheckouts(), app, formats=JSON_DOCX)
+    ws = await workspace()
+    await files.upload(ws, WordDocument, "w.docx", once(FakeApp.file("x")), artifact_id="a1")
+    checkout = await files.check_out(ws, "a1")
+    app.fails = "refused"
+    for _ in range(5):
+        with pytest.raises(AppFailed):
+            await files.check_in(ws, checkout.id, once(FakeApp.file("y" * 800)))
+    app.fails = None
+    assert await files.check_in(ws, checkout.id, once(FakeApp.file("z"))), "room was kept"

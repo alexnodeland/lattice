@@ -160,3 +160,8 @@ def test_every_native_types_format_is_told_by_its_bytes() -> None:
         for media_type in artifact_type.formats
     }
     assert formats <= FORMATS.keys(), "a native type a person can't upload"
+
+
+def test_no_two_formats_share_an_extension() -> None:
+    extensions = [f.extension.lower() for f in FORMATS.values()]
+    assert len(extensions) == len(set(extensions)), "a file's kind must follow from its name"

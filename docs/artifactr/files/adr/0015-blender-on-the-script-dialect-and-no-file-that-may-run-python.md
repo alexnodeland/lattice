@@ -1,0 +1,109 @@
+# ADR-0015: Blender on the script dialect, its files read block by block, and none that may run Python
+
+**Status:** Accepted
+**Date:** 2026-10-20
+**Deciders:** Alex Nodeland
+**Builds on:** [ADR-0014](0014-freecad-on-a-third-dialect-and-no-python-a-file-or-an-agent-brings.md), whose `script` dialect it runs on, and whose stance on Python it keeps
+
+Adds Blender as an app for native files, under lattice [RFC-0003](../../../rfcs/0003-native-files-as-artifacts.md): its scenes, `.blend`, kept as native files, edited by people in Blender and by agents through a set of commands of lattice's own.
+
+## Context
+
+Blender is a 3D creation suite released by the Blender Foundation under GPL-3.0 ("Blender as a whole is licensed under the GNU General Public License, Version 3", its README); it is not storytold's, and no brand licence binds its name. On 2026-10-20 its latest release was 5.2.2, which is also the 5.2 LTS (blender.org's LTS page lists 5.2.2 beside 4.5.14, 4.2.23 and 3.6.22). We ran 5.2.2 from its official Linux x86_64 tarball, whose SHA-256 matched the release's own `blender-5.2.2.sha256`, in a Linux container (`docker run --network none --platform linux/amd64`), which on this Apple silicon machine is x86_64 emulated:
+
+- **No server of its own, a background mode.** `blender --background --python SCRIPT -- ARGS` runs a script in Blender's own interpreter with no window and gives it `ARGS` in `sys.argv` after `--`. A script reads, edits and saves scenes through Blender's data API (`bpy.data`, `bmesh`) and opens a file itself with `bpy.ops.wm.open_mainfile(filepath, load_ui, use_scripts)`, both of which 5.2.2 has. `--factory-startup` reads no user setting or startup file, `--disable-autoexec` runs no script a file holds, `--offline-mode` reaches no network, and `--python-exit-code 1` ends a script that raises with an error.
+- **The format.** A `.blend` is Blender's memory written out: a 17-byte header (`BLENDER17-01v0502`: its size, format 1, little-endian with 8-byte pointers, file version 5.02), then blocks, each a 32-byte head (a code, the index of its struct in the file's catalogue, the address it had in memory, its length and its count) and its bytes, ending at `ENDB`. `DNA1` is the catalogue: every struct's name, fields and size. A data-block, such as an object (`OB`), is a block of its struct; the rest of its data are `DATA` blocks, typed or raw. Blender before 5.0 wrote a 12-byte header naming the pointers' size and the byte order; 5.0 removed big-endian files. Read in Blender's source on `main` (`blenloader_core/BLO_core_bhead.hh`, `writefile.cc`) on 2026-10-20 and in every file 5.2.2 wrote for us. The shared MIME-info database names the type `application/x-blender`.
+- **Compressed by default.** 5.2.2's own preference compresses every save with zstd (`use_file_compression` is on), so each file our corpus and Blender's GUI save starts with zstd's magic, not `BLENDER`. Blender before 3.0 used gzip.
+- **What a save changes.** One process saving the same scene twice wrote the same bytes; a block's address is the same for the same scene, across processes. Each save writes the file's own path (`FileGlobal.filename`), the folder the file browser last showed (`FileSelectParams.dir`), which is the file's, and a curve profile's change counter (`CurveProfile.changed_timestamp`). A file from a blank scene, opened and saved again, differs once in its data-blocks' session ids and the window manager; from then on, every save is the same but for those three fields.
+- **What a file can run, and when.** Read in Blender's source on `main` on 2026-10-20 (`creator_args.cc`, `wm_files.cc`, `bpy_interface.cc`, `bpy_driver.cc`, `fcurve_driver.cc`, `cycles/blender/shader.cpp`, `readfile.cc`):
+  - A text data-block marked to register runs when the file opens, only if scripts may run; `-Y`/`--disable-autoexec` says they may not, as do the default preferences, which `--factory-startup` keeps.
+  - A driver's expression is tried first by Blender's own evaluator, which runs whatever autoexec says; one it can't parse goes to Python, which, with scripts off, still runs an expression whose bytecode passes Blender's test of allowed names and opcodes. Our live test opened files whose registered text and driver would each touch a file in `$HOME`, and neither did.
+  - A Cycles script node compiles OSL from a text or from a file it names, with no check of autoexec.
+  - Libraries, images, fonts, sounds, movie clips, caches and volumes name files, by absolute or `//` relative paths; an image or a font may be packed in the file.
+  - Blender reads a block through a pointer by checking only that the block is large enough (`blo_verify_data_address`), not that its struct is the one the pointer names: any block of the right size can be read as, say, a driver.
+  - CVE-2026-60103, an out-of-bounds read in the reading of a file's catalogue, affected 3.0 to 5.1.2.
+- **Headless pages.** Workbench, Blender's viewport renderer, drew a 1024-pixel page in the container with no GPU, through Mesa's software EGL, in about 11 seconds emulated; Cycles on the CPU drew one too. Under an address-space limit of 2 GiB, Blender crashed creating its GPU context; under 4 GiB it drew.
+- **Releases.** download.blender.org holds, for 5.2.2, a Linux x86_64 tarball, a macOS arm64 disk image, Windows packages and their `.sha256` and `.md5`, none signed. There is no Linux aarch64 build (a request for `blender-5.2.2-linux-arm64.tar.xz` is a 404), and 5.2 has no macOS x86_64 image. The `bpy` module on PyPI is Blender built as a module, under GPL-3.0, for Python 3.13 only, with no Linux aarch64 wheel.
+
+## Decision
+
+- **Blender is `CRAFTS["blender"]`,** key `files:blender`, off by default, its title and description plain: `Blender: 3D scenes kept as native files, edited by people and agents.` Its `cli` is `blender` and its `repository` `blender/blender`. It keeps `.blend` under `BLEND`, `application/x-blender`, as a `Scene`, registered as `scene`, which portalr calls a 3D scene; its `roots` are `none`, since its script reads and writes wherever its user can, so its adapter is made only with `trusted=True`. It is meant to run in the worker; until stackr's image has Blender (action item 4), nothing runs it there.
+- **It runs only as a separate process.** lattice never imports `bpy`, and ships no part of Blender. Blender's own interpreter runs the adapter's script, `artifactr/files/blender/console/script.py`, which imports Blender's modules and the standard library alone, is shipped in the package under its MIT licence, which the GPL-3.0 allows beside it, and is run by path, in a folder that isn't a package, as FreeCAD's is. Whoever ships Blender in an image ships it under the GPL-3.0, with its source offered, as the tarball's `license/` and `copyright.txt` say; `notices` lists them.
+- **On the `script` dialect.** Blender is started as `blender --background --factory-startup --disable-autoexec --offline-mode -noaudio --python-exit-code 1 --python script.py -- --pass call.json`; `Script` gains `ending`, what a CLI is given after the script, which for Blender is `--`. The script, not the command line, opens the file, with `use_scripts=False` and `load_ui=False`, and a blank file is Blender's empty factory scene, saved and opened as a source is.
+- **Blender is given only the blocks the scan read, written again.** Before Blender starts, the adapter inflates a file's zstd a megabyte at a time, counting against the limit whatever its frames say, and refuses gzip; it reads the header and walks the blocks to `ENDB`, and writes Blender a file of the same header and those blocks, uncompressed and without the thumbnail (`TEST`), never the bytes it was sent. It refuses, as `refused`:
+  - a header other than 5.2's, so a 4-byte pointer, a big-endian file, a file of Blender before 5.0 or of another version;
+  - a head whose length is negative or past the file's end, a typed block whose length isn't its count of its struct's size, more than 200,000 blocks, a missing `ENDB`, and bytes after it;
+  - a catalogue other than 5.2's own, by its SHA-256, so the structs Blender reads are those it wrote, and no catalogue a file makes up reaches its reader;
+  - and, as `too_large`, a file that inflates past the limit, 256 MiB by default.
+- **What the scan allows, it lists; the rest is refused.**
+  - A data-block's code is one of cameras, collections, lights, materials, meshes, objects and scenes, and the window manager, screens and workspaces every saved file holds; a text, a library, an image, a font, a sound, a movie clip, a cache file, a volume, an action and a node group are each refused by name, and any other code fails closed.
+  - A typed block's struct is one of those 5.2.2 saved for what the commands and the corpus make (89, in `STRUCTS`), so a driver, an F-curve, animation data, a packed file and a Freestyle module are refused by their structs, and a release with other structs fails closed.
+  - **Pointers are checked by type,** since Blender checks only size: every pointer field of every allowed struct, and of the structs embedded in it, that names a struct outside the allowed ones (or the bases they embed first, such as `ID` and `ModifierData`, and `SpaceLink`, which every space repeats) must be null. So an object's animation data, which holds its drivers, is refused whatever block it points at, and a confused pointer at a camera's block too.
+  - A script node's names, `ShaderNodeScript` and `NodeShaderScript`, are refused in any block's bytes, typed or raw.
+  - A raw block's bytes are passed on unread: they are a mesh's attributes and the like, read only through the pointers of allowed structs.
+  - This refuses every file with a script, a driver, any animation, a linked or appended library, an image, packed data or a node group: most files from Blender's GUI that do more than model, light and shade. It is what the scan proves of what Blender is given; it is not an audit of Blender's reader, which still reads every allowed struct's fields and every raw block.
+- **Behind the scan, the script refuses again.** Once Blender has opened a file, the script refuses one with a text, a library, an image, or animation data on an object, mesh, material, camera, light, scene or collection, and objects whose parents make a cycle, which the scan allows, since a parent is an object. When it draws, it turns off compositing and the sequencer.
+- **An agent's commands are lattice's, never Python.** Sixteen commands the script carries out through the data API: primitives built by `bmesh` (`cube`, `sphere`, `cylinder`, `cone`, `plane`), `move` (place, rotation in degrees, scale), `material` (colour, metallic, roughness) and `assign`, `modifier` (`subdivision`, `bevel`, `array`, `mirror`, `solidify`, each with its bounded numbers), `camera` and `light` (`point`, `sun`, `spot`, `area`) aimed at a point, `collection` and `link`, `render` (Workbench or Cycles, size, samples), `set` (a name, `hide_render`, `hide_viewport`) and `remove`. Each argument is checked by type and bound; none runs Python, makes a text, a driver, a node group, an image or a link, or reads or writes a path. `commands(query)` finds them with no CLI started. No command runs Python, and none will without a decision of its own: this keeps ADR-0014's stance.
+- **What a save keeps.** A file keeps whether it came compressed: the script saves with `compress` as the source was, and a blank file compressed, as Blender's GUI saves one. A batch is saved, opened again and saved, as FreeCAD's is, so its next save is a fixpoint.
+- **The fingerprint is the file's, without what a save stamps:** the SHA-256 of the header and every block but the thumbnail, uncompressed, with the three stamped fields zeroed in every record of their structs. Two saves in a row have the same fingerprint, which the fidelity report holds; a blank scene's first save isn't a fixpoint, and costs one revision.
+- **A page is the scene through its camera.** `render` draws page 1 by Workbench, `PREVIEW` times `scale` pixels wide, at the scene's aspect; a scene with no camera is refused.
+- **Pinned to 5.2.2 LTS, by its Linux x86_64 tarball.** `scripts/crafts/blender.sha256` holds the release's own line; `scripts/craft blender cli` fetches it from download.blender.org, checks it, unpacks it and prints its `blender`. Blender has no Linux aarch64 build, and its macOS one is a disk image, so on Linux aarch64 and macOS, and for `web`, it says so and fails. `notices` lists the tarball's `license/` and `copyright.txt`. The LTS rather than a later stable keeps the pin, and the catalogue the scan holds files to, for 5.2's two years of fixes.
+- **The corpus is Blender's own.** One `.blend` per feature, made by `make.py` running in Blender in a Linux container, compressed as Blender saves, each about 86 KiB (most of it the workspaces every file holds); its drift test runs with the live tests, and compares each feature's value, read from the blocks through the catalogue. Its hostile files are, made by Blender, a registered text, a driver in Python, a driver Blender's own evaluator runs, a linked library, a packed and an external image, a script node naming a file, and an animation; and, made from the corpus, a zstd bomb of 2 GiB, gzip, a 4-byte-pointer header, a big-endian header, another version, a head whose length lies past the file and one negative, a count of a million records in the bytes of one, a struct index that isn't one, bytes after `ENDB`, a catalogue one byte changed, an object's animation pointed at a camera's block, and an object that is its own parent. Every one but the last is refused before Blender starts, and the last by the script. Each ended within its deadline; on x86_64 emulated on aarch64, an apply took about 6 seconds and a page about 11. The x86_64 Linux pin line, the corpus and the live tests have run only in that emulation; Nightly's job, on x86_64 runners, has never run.
+
+## Options considered
+
+### Option A: A script run by `blender --background`, curated commands, and a block-level scan that refuses files that may run Python (chosen)
+
+| Dimension | Assessment |
+|---|---|
+| Fit | The App port's four calls, each one process, on the `script` dialect FreeCAD added |
+| Safety | No command runs Python; Blender is given only blocks of allowed codes and structs, under its own catalogue, with pointers checked by type; `--disable-autoexec` and the script's own checks stay behind them; the worker is meant to confine the rest |
+| Cost | A pure-Python reader of Blender's format, a zstd dependency, a corpus that can be made only by Blender, and most GUI files with animation or images refused |
+
+### Option B: Trust `--disable-autoexec`, and the worker
+
+**Pros:** every file opens, drivers, images and animation included.
+
+**Cons:** Blender's own evaluator runs simple driver expressions whatever autoexec says, and Python ones whose bytecode passes its test; a script node compiles OSL with no check; and Blender's reader takes any block of the right size as any struct. We can't say a hostile file can't reach those, only that we didn't. The worker would be the only line.
+
+### Option C: Expose Python to the agent, as every community server does
+
+**Pros:** everything Blender can do.
+
+**Cons:** an agent writing Python in Blender's interpreter is code execution, confined only by the worker, and a prompt in a file could write it. That is the owner's to decide, if ever, in a record of its own, as ADR-0014 says of FreeCAD.
+
+### Option D: Accept files with drivers, images or animation behind narrower checks
+
+Allowing animation without drivers, or images that are packed but not external, means reading fields, not only structs: an F-curve's driver pointer, an image's source and path. It is possible, and it is the owner's to want, since each widens what Blender reads of a hostile file. Not now; see Revisit.
+
+### Option E: A community Blender MCP server
+
+Checked on 2026-10-20 by reading their repositories, not by running them. `ahujasid/blender-mcp` (MIT, about 32,000 stars): an addon inside a running GUI Blender listens on a TCP socket, and an MCP server sends it JSON; its tools are `get_scene_info`, `look`, asset search and import from Poly Haven and Sketchfab, generation through Hyper3D, and at its core `execute_blender_code`, Python in Blender. It has no headless mode. The Blender Foundation's own, Blender Lab's `blender_mcp` (projects.blender.org/lab/blender_mcp, GPL-3.0, six releases, pushed 2026-09-29), has the same shape, an addon and a socket, plus `*_for_cli` tools that run `blender -b` on a file, some of them summaries rather than code; but `execute_blender_code` and `execute_blender_code_for_cli` are among them, and its CLI tools open the file given with nothing in front. Others (`llm-use/Blender-MCP-Server`, `ssoj13/blender-mcp-rs`) we only saw listed.
+
+**Pros:** many more operations, screenshots from the GUI, the Foundation's own maintainers for one.
+
+**Cons:** each is a long-lived Blender with a listener, where ADR-0004 wants a stateless call and RFC-0003's worker no listener; each makes arbitrary Python a tool, which is Option C; and none reads a file before Blender does. Not adopted. Blender Lab's summary tools are worth reading when the commands grow.
+
+## Trade-off analysis
+
+A block-level scan is Blender-specific code that FreeCAD's XML allowlist didn't need, and it costs a zstd dependency, since Python 3.12's standard library has none. In exchange the scan holds a hostile file to Blender's own catalogue and to structs we have seen it write, and checks every pointer's type, which Blender doesn't; the narrow set of allowed structs is what lets that check be complete. Refusing animation, images and node groups costs most real scenes beyond modelling and shading, which a person can still keep as an upload; it buys a reader whose every refusal is by name, and a stance the owner can widen one feature at a time.
+
+## Consequences
+
+- Easier: a modelled, lit and shaded scene is kept, diffed by fingerprint and drawn, by people and agents.
+- Easier: the `script` dialect now carries two apps, and `ending` lets the next one keep its own argument convention.
+- Harder: `console/script.py` needs Blender's modules, so its coverage isn't measured on pull requests; its pure checks are tested there against stand-ins, and its live tests, in Nightly's fidelity job, run every command and step.
+- Harder: the scan is not an audit of Blender's reader. A raw block is passed unread, an allowed struct's fields are Blender's to read, and the catalogue's digest pins the reader to 5.2's; CVE-2026-60103's class of bug, in a catalogue, can't reach it, but another in an allowed struct's reading could.
+- Harder: the allowed structs are those 5.2.2 saved for the commands and the corpus, headless; a file from Blender's GUI holding another (a brush, a palette, a struct of an editor we didn't open) is refused, never read loosely, and the set grows with evidence. We haven't yet had a GUI-made file to test.
+- Harder: a pin raised to another release fails closed until its catalogue's digest, header and structs are read again.
+- Harder: Blender needs more address space than the worker's default 2 GiB, under which it crashed creating its GPU context; run it with `Limits(memory=4 << 30)` or more. That was measured emulated, and nothing yet measures what a hostile allowed scene can take.
+- Harder: x86_64 only. Blender releases no Linux aarch64 build, so an aarch64 worker can't run it, and on Apple silicon it runs in x86_64 emulation, as our evidence did.
+- Harder: a call holds the file sent, its inflated bytes and the file written for Blender at once: about three times its inflated size at its peak.
+- Revisit: animation without drivers, packed images and node groups, under Option D, each with its own fields read; a GUI-made corpus file; exporting glTF, OBJ or STL, which the App port has no call for; text objects, whose font is a data-block that may name a file; each new LTS's catalogue and structs before the pin is raised.
+
+## Action items
+
+1. [x] `Script.ending`; Blender's adapter, `artifactr.files.blender`, its scan, its fingerprint and its script; `BLEND` and `Scene`; `zstandard` in the `files` extra.
+2. [x] The key in lattice-core's registry, portalr's generated copies, and portalr's `scene` kind, called a 3D scene.
+3. [x] The pin, `scripts/craft`'s tarball, the corpus, the hostile files and Nightly's fidelity entry; every command, the corpus' drift, the fidelity report and every hostile file ran live against 5.2.2 in x86_64 emulation. Nightly's first Blender run, on x86_64, is still to come.
+4. [ ] stackr: Blender in a worker image of its own, x86_64, from the pinned tarball, with its GPL-3.0 notices and source offer, under a memory limit of at least 4 GiB.

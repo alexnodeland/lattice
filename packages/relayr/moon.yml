@@ -40,7 +40,7 @@ tasks:
   # them.
   test-pg:
     description: 'Run the tests on PostgreSQL as well as SQLite (after pg-up)'
-    command: 'uv run pytest --cov --cov-report=term-missing'
+    command: 'uv run pytest --cov --cov-report=term-missing --durations=10'
     env:
       RELAYR_TEST_POSTGRES_URL: 'postgresql+asyncpg://postgres:relayr@localhost:54332/postgres'
     options:
@@ -57,7 +57,7 @@ tasks:
   # With RELAYR_RECORD=1 as well, the live exchanges replace tests/trackers/fixtures/vikunja.
   test-vikunja:
     description: 'Run the tracker contract test against Vikunja, live (after vikunja-up)'
-    command: 'uv run pytest tests/trackers/test_contract.py'
+    command: 'uv run pytest --durations=10 tests/trackers/test_contract.py'
     env:
       RELAYR_TEST_VIKUNJA_URL: 'http://localhost:54333'
     options:

@@ -12,7 +12,7 @@ Outside its own series, a record is named with its package, as in "reflexr ADR-0
 | [0004](0004-one-github-app-for-release-please-and-renovate.md) | One GitHub App for release-please and Renovate | Accepted |
 | [0005](0005-renovate-runs-in-lattices-own-actions.md) | Renovate runs in lattice's own Actions | Accepted |
 | [0006](0006-release-please-first-versions-pre-1-0-bumps-and-what-releases.md) | release-please: first versions, pre-1.0 bumps, and what releases | Accepted, amended by [0023](0023-publishing-to-pypi-from-the-release-workflow.md) |
-| [0007](0007-a-timeout-on-every-test-and-every-job.md) | A timeout on every test and every job | Accepted |
+| [0007](0007-a-timeout-on-every-test-and-every-job.md) | A timeout on every test and every job | Accepted; amended by [0028](0028-a-stuck-test-fails-by-a-signal-and-its-worker-carries-on.md) |
 | [0008](0008-one-resolution-litellm-held-at-1-83-0.md) | One resolution, with litellm held at 1.83.0 | Accepted |
 | [0009](0009-one-dev-container-at-the-root.md) | One dev container, at the root | Accepted |
 | [0010](0010-every-projects-tests-run-in-a-random-order.md) | Every project's tests run in a random order | Accepted |
@@ -33,5 +33,6 @@ Outside its own series, a record is named with its package, as in "reflexr ADR-0
 | [0025](0025-formal-specs-in-tla-and-lean.md) | Formal specs in TLA+ and Lean | Accepted |
 | [0026](0026-a-distribution-needs-a-reason-integrations-are-extras.md) | A distribution needs a reason; integrations are extras | Accepted |
 | [0027](0027-integrations-switched-per-workspace-through-one-port.md) | Integrations switched per workspace, through one port | Accepted |
+| [0028](0028-a-stuck-test-fails-by-a-signal-and-its-worker-carries-on.md) | A stuck test fails by a signal, and its worker carries on | Accepted |
 
 To add a record, copy [`template.md`](template.md) to the next number and add a row above. Each package's series uses the same template.

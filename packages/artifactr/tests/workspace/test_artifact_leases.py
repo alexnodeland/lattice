@@ -253,6 +253,10 @@ async def _agree(shared: Shared, steps: list[Step]) -> None:
         )
 
 
+# 100 examples: 4.5 s alone on PostgreSQL, 72 s with every core busy beside xdist's other
+# workers, past the minute a test may take: five minutes. A Hypothesis test keeps the thread
+# method: Hypothesis replays a failure, and a signal's timer is spent by then (lattice ADR-0028).
+@pytest.mark.timeout(300, method="thread")
 @settings(
     max_examples=100,
     deadline=None,

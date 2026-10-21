@@ -19,7 +19,8 @@ tasks:
 
   test:
     description: 'Run the tests with the 100% branch-coverage gate'
-    command: 'uv run pytest --cov --cov-report=term-missing'
+    # The ten slowest, each run: how near any is to the minute a test may take (lattice ADR-0028).
+    command: 'uv run pytest --cov --cov-report=term-missing --durations=10'
     inputs:
       - '**/*'
 

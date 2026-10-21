@@ -8,7 +8,7 @@ import { FAILED, MANIFEST, NOW, PAGES, UNTIL } from "./test/native-file";
 const renderer = nativeFile();
 
 test("a native file shows its name, type, size, pages and outline", async () => {
-  const screen = await render(<>{renderer.render(MANIFEST)}</>);
+  const screen = await render(renderer.render(MANIFEST));
   await expect.element(screen.getByText("launch-brief.docx")).toBeVisible();
   await expect.element(screen.getByText("Word document · 48 kB · 4 pages")).toBeVisible();
   const outline = screen.getByRole("region", { name: "Outline" });
@@ -32,7 +32,7 @@ test("a manifest of any shape is shown as far as it goes", async () => {
   expect(factsOf({ content: { media_type: "text/plain", size: 1 }, pages: 1 }).type).toBe(
     "text/plain",
   );
-  const screen = await render(<>{renderer.render({ pages: 1 })}</>);
+  const screen = await render(renderer.render({ pages: 1 }));
   await expect.element(screen.getByText("Unnamed file")).toBeVisible();
   await expect.element(screen.getByText("File · 1 page")).toBeVisible();
   await expect.element(screen.getByText("The app read no outline from this file.")).toBeVisible();

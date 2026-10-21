@@ -197,11 +197,12 @@ def test_the_deployment_audit_shows_tenant_creations_as_the_runbook_says() -> No
 
 def test_the_look_the_guides_describe_is_the_kits() -> None:
     tokens = (WEB / "ui" / "src" / "tokens.css").read_text()
+    base = (WEB / "ui" / "src" / "base.css").read_text()
     shell = (WEB / "ui" / "src" / "app-shell.tsx").read_text()
     admin = text("guides/admin.md")
     # Admin is compact, and the app is not: 2.25rem and 2.75rem rows, at 16px to the rem.
     assert 'data-density={ui === "admin" ? "compact" : undefined}' in shell
-    assert re.search(r"\[data-density=\"compact\"\] \{\n  --row-height: 2\.25rem;", tokens)
+    assert re.search(r"\[data-density=\"compact\"\] \{\n  --row-height: 2\.25rem;", base)
     assert "  --row-height: 2.75rem;" in tokens
     assert "rows are 36px high, where the app's are 44px" in admin
     # Status colours: a red and a gold, with a shape and a word.
@@ -222,7 +223,7 @@ def test_the_look_the_guides_describe_is_the_kits() -> None:
 def test_colour_blind_mode_is_a_setting_of_the_browser_in_the_account_menu() -> None:
     """The guides say where the setting lives, and the code is where they say."""
     ui = WEB / "ui"
-    assert "[data-cvd] {" in (ui / "src" / "tokens.css").read_text()
+    assert "[data-cvd] {" in (ui / "src" / "base.css").read_text()
     hook = (ui / "src" / "colour-blind.ts").read_text()
     assert 'key: "portalr-colour-blind"' in hook
     assert "dataset.cvd" in hook

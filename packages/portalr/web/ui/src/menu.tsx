@@ -9,14 +9,15 @@ import { Button } from "./button";
  */
 
 /** The surface everything that floats over the page shares: a menu, a select's list of choices, and a chart's tooltip. */
-export const popover = "rounded-lg border border-edge bg-surface text-fg text-sm shadow-lg";
+export const popover =
+  "rounded-(--popover-radius) border border-edge bg-surface text-fg text-sm shadow-(--popover-shadow)";
 
-export const popup = `${popover} min-w-56 p-1.5 outline-none transition-[opacity,scale] duration-150 data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0 motion-reduce:transition-none`;
+export const popup = `${popover} min-w-56 p-(--popover-pad) outline-none transition-[opacity,scale] duration-(--popover-duration) data-ending-style:scale-(--popover-enter-scale) data-starting-style:scale-(--popover-enter-scale) data-ending-style:opacity-0 data-starting-style:opacity-0 motion-reduce:transition-none`;
 
-export const groupLabel = "px-2.5 pt-1.5 pb-1 font-semibold text-muted text-xs";
+export const groupLabel = "px-(--popover-item-pad-x) pt-1.5 pb-1 font-semibold text-muted text-xs";
 
 export const item =
-  "flex cursor-default items-center justify-between gap-3 rounded-md px-2.5 py-1.5 outline-none data-highlighted:bg-wash data-highlighted:text-accent data-highlighted:ring-2 data-highlighted:ring-focus data-highlighted:ring-inset data-disabled:cursor-not-allowed data-disabled:text-muted";
+  "flex cursor-default items-center justify-between gap-3 rounded-(--popover-item-radius) px-(--popover-item-pad-x) py-(--popover-item-pad-y) outline-none data-highlighted:bg-wash data-highlighted:text-accent data-highlighted:ring-(length:--focus-width) data-highlighted:ring-focus data-highlighted:ring-inset data-disabled:cursor-not-allowed data-disabled:text-muted";
 
 export const separator = "my-1.5 h-px bg-line";
 

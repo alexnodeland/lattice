@@ -99,7 +99,7 @@ export function RunList({
           <li
             key={run.key}
             aria-label={run.name}
-            className="flex flex-col gap-3 rounded-lg border border-line bg-surface p-4"
+            className="flex flex-col gap-3 rounded-(--card-radius) border border-line bg-surface p-4"
           >
             <span className="flex flex-wrap items-center gap-2">
               {run.status}

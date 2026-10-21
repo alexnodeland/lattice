@@ -29,11 +29,13 @@ import { Markdown } from "./markdown";
 import { Questions, type QuestionsAnswer } from "./questions";
 import { SchemaForm } from "./schema-form";
 import { type Sent, Unsent, useSending } from "./sending";
+import { FOLDED_LINES, SourceView } from "./source-view";
 import { StatusBadge, type Tone } from "./status-badge";
 import { TextField } from "./text-field";
 import { TYPE } from "./type";
 
-const card = "flex flex-col gap-2 rounded-lg border border-line bg-surface p-4 text-sm";
+const card =
+  "flex flex-col gap-2 rounded-(--card-radius) border border-line bg-surface p-(--card-pad) text-sm";
 
 /** A button that sends one command, waits while it is in flight, and says why one wasn't done. */
 export function CommandButton({
@@ -135,8 +137,10 @@ type MessageProps = {
 /** A message's bubble: the reader's at the end of the line, everyone else's at its start. */
 const bubble = (mine: boolean) =>
   cn(
-    "min-w-0 max-w-full rounded-2xl border px-3.5 py-2",
-    mine ? "rounded-se-sm border-line bg-wash" : "rounded-ss-sm border-line bg-surface",
+    "min-w-0 max-w-full rounded-(--bubble-radius) border px-(--bubble-pad-x) py-(--bubble-pad-y)",
+    mine
+      ? "rounded-se-(--bubble-tail-radius) border-line bg-wash"
+      : "rounded-ss-(--bubble-tail-radius) border-line bg-surface",
   );
 
 /**
@@ -215,11 +219,12 @@ export function Streaming({ text, author }: { text: string; author: string }) {
 function Thinking() {
   return (
     <span className="flex h-6 items-center gap-1 text-muted">
+      {/* Each dot a beat behind the last: a delay, not a duration, so reduced motion's pause holds. */}
       {[0, 150, 300].map((delay) => (
         <span
           key={delay}
           style={{ animationDelay: `${delay}ms` }}
-          className="size-1.5 rounded-full bg-current motion-safe:animate-pulse"
+          className="size-1.5 rounded-full bg-current [animation-play-state:var(--motion-loop)] motion-safe:animate-pulse"
         />
       ))}
       <span className="sr-only">Thinking</span>
@@ -342,7 +347,7 @@ export function Composer({
   }
   return (
     <form
-      className="flex flex-col gap-1 rounded-lg border border-edge bg-surface p-1 outline-offset-2 has-[textarea:focus-visible]:outline-2 has-[textarea:focus-visible]:outline-focus"
+      className="flex flex-col gap-1 rounded-(--composer-radius) border border-edge bg-surface p-(--composer-pad) outline-offset-(--focus-offset) has-[textarea:focus-visible]:outline-(length:--focus-width) has-[textarea:focus-visible]:outline-focus"
       onSubmit={submit}
     >
       <Field.Root className="flex flex-col" disabled={disabled}>
@@ -510,9 +515,10 @@ function Question({
         <p>
           The agent wants to run <code className="font-mono">{request.tool_name}</code>.
         </p>
+        <Review review={request.review ?? {}} />
         {args && (
-          <pre className="overflow-x-auto rounded-md border border-line bg-paper p-3 font-mono text-xs">
-            {JSON.stringify(request.args, null, 2)}
+          <pre className="overflow-x-auto rounded-(--code-block-radius) border border-line bg-paper p-(--code-panel-pad) font-mono text-xs">
+            {unhidden(JSON.stringify(request.args, null, 2))}
           </pre>
         )}
         <span className="flex gap-2">
@@ -546,6 +552,85 @@ function Question({
       <Unsent reason={unsent} />
     </form>
   );
+}
+
+/**
+ * What a connected app's call does, beside its arguments (artifactr ADR-0085): that it runs code,
+ * or fetches, in the operator's own app, with their privileges; the code itself, whole, to read
+ * and copy; and what a scan found in it, which is advisory: the person reading is the gate.
+ */
+function Review({ review }: { review: Record<string, unknown> }) {
+  const { app, risk, runs, holds, code, findings } = review;
+  if (typeof app !== "string" || typeof runs !== "string") {
+    return null;
+  }
+  const found = Array.isArray(findings) ? findings.filter((f) => typeof f === "string") : [];
+  const lines = typeof code === "string" ? code.split("\n").length : 0;
+  return (
+    <div className="flex flex-col gap-2">
+      <StatusBadge tone="retrying" className="self-start">
+        {risk === "network"
+          ? `Downloads from the internet into your ${app}`
+          : `Runs code in your ${app}`}
+      </StatusBadge>
+      <p>{runs}</p>
+      {typeof holds === "string" && <p>{holds}</p>}
+      {typeof code === "string" && (
+        <>
+          {lines > FOLDED_LINES && (
+            <p>{`It is ${lines} lines long: show all of it, and read to the end.`}</p>
+          )}
+          <SourceView code={unhidden(code)} language="python" name="code" />
+          {found.length > 0 ? (
+            <div>
+              <p>A quick scan found these. It can't find everything: read the code.</p>
+              <ul className="list-disc ps-5">
+                {found.map((finding) => (
+                  <li key={finding}>{finding}</li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <p>A quick scan found nothing; it can't find everything.</p>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+/** The ranges of characters a reader wouldn't see, as artifactr's scan finds them, kept in step
+ * with its `HIDDEN`: controls but tabs and newlines, separators, soft hyphens, zero-width,
+ * direction-changing and tag characters, variation selectors, and lone surrogates. */
+const HIDDEN: readonly (readonly [number, number])[] = [
+  [0x00, 0x08],
+  [0x0b, 0x0c],
+  [0x0e, 0x1f],
+  [0x7f, 0x9f],
+  [0xad, 0xad],
+  [0x61c, 0x61c],
+  [0x180e, 0x180e],
+  [0x200b, 0x200f],
+  [0x2028, 0x202e],
+  [0x2060, 0x2064],
+  [0x2066, 0x2069],
+  [0xfe00, 0xfe0f],
+  [0xfeff, 0xfeff],
+  [0xd800, 0xdfff],
+  [0xe0000, 0xe007f],
+  [0xe0100, 0xe01ef],
+];
+
+/** Code with each character a reader wouldn't see shown as its code point, so what is read is
+ * what runs; Copy copies it so too. */
+export function unhidden(code: string): string {
+  let shown = "";
+  for (const c of code) {
+    const point = c.codePointAt(0) ?? 0;
+    const hidden = HIDDEN.some(([low, high]) => point >= low && point <= high);
+    shown += hidden ? `\u27e6U+${point.toString(16).toUpperCase().padStart(4, "0")}\u27e7` : c;
+  }
+  return shown;
 }
 
 /** The artifact a proposal would change, if it names one: a new one's is chosen when accepted. */

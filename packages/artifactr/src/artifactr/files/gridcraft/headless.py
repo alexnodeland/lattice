@@ -48,6 +48,8 @@ class Subprocess(ToolsDialect):
         trusted: Whether its files are trusted, or this process confined: required.
         limit: The most bytes a file may hold, saved or inflated: 256 MiB by default.
         lookup: How long, in seconds, finding commands may take: 10 by default.
+        launcher: The command the CLI is started under, given the CLI and its arguments, such
+            as the worker's `Limits.launcher()`; none by default.
 
     Raises:
         ValueError: If `trusted` isn't given.
@@ -69,8 +71,11 @@ class Subprocess(ToolsDialect):
         trusted: bool = False,
         limit: int = 256 << 20,
         lookup: float = 10.0,
+        launcher: Sequence[str] = (),
     ) -> None:
-        super().__init__(cli, version=version, trusted=trusted, limit=limit, lookup=lookup)
+        super().__init__(
+            cli, version=version, trusted=trusted, limit=limit, lookup=lookup, launcher=launcher
+        )
 
     @override
     async def open(self, server: Server, source: bytes | None) -> JsonValue:

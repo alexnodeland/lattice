@@ -775,6 +775,14 @@
             "title": "Kind",
             "type": "string"
           },
+          "review": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "default": {},
+            "title": "Review",
+            "type": "object"
+          },
           "tool_call_id": {
             "title": "Tool Call Id",
             "type": "string"

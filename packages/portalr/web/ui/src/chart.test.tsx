@@ -168,9 +168,11 @@ test("a tooltip is on the menus' surface, with each series' mark, name and align
     page.elementLocator(document.querySelectorAll(".recharts-bar-rectangle")[1] as Element),
   );
   await expect
-    .poll(() => document.querySelector(".recharts-tooltip-wrapper .shadow-lg"))
+    .poll(() => document.querySelector(".recharts-tooltip-wrapper [class*='--popover-shadow']"))
     .not.toBeNull();
-  const card = document.querySelector(".recharts-tooltip-wrapper .shadow-lg") as HTMLElement;
+  const card = document.querySelector(
+    ".recharts-tooltip-wrapper [class*='--popover-shadow']",
+  ) as HTMLElement;
   expect(card.textContent).toBe("2026-10-13Spend$30.00");
   // The menus' surface: a border, a raised shadow and the surface's colour.
   expect(getComputedStyle(card).borderTopWidth).toBe("1px");

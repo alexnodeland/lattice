@@ -10,13 +10,13 @@ const look = {
   danger: "border-transparent bg-danger text-on-danger hover:not-data-disabled:bg-danger-hover",
   /** A destructive action offered, not yet confirmed: the danger colour as words, bare until hovered, then tinted with it. */
   "danger-soft":
-    "border-transparent bg-transparent text-danger hover:not-data-disabled:bg-[color-mix(in_srgb,var(--danger)_12%,transparent)]",
+    "border-transparent bg-transparent text-danger hover:not-data-disabled:bg-danger-wash",
 } as const;
 
 const size = {
-  md: "px-3 py-1.5 text-sm",
+  md: "px-(--button-pad-x) py-(--button-pad-y) text-sm",
   /** For an action in a row, where the row's own words are the larger. */
-  sm: "px-2 py-1 text-xs",
+  sm: "px-(--button-sm-pad-x) py-(--button-sm-pad-y) text-xs",
 } as const;
 
 /** The variants a button comes in. */
@@ -40,7 +40,7 @@ export function Button({ variant = "primary", size: big = "md", className, ...pr
   return (
     <BaseButton
       className={cn(
-        "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border font-sans font-semibold outline-offset-2 transition-[color,background-color,border-color] focus-visible:outline-2 focus-visible:outline-focus active:not-data-disabled:translate-y-px motion-reduce:transition-none aria-pressed:border-accent aria-pressed:bg-wash aria-pressed:text-accent data-disabled:cursor-not-allowed data-disabled:border-line data-disabled:bg-line data-disabled:text-muted",
+        "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-(--button-radius) border font-(--button-weight) font-sans outline-offset-(--focus-offset) transition-[color,background-color,border-color] duration-(--button-duration) ease-(--button-ease) focus-visible:outline-(length:--focus-width) focus-visible:outline-focus active:not-data-disabled:translate-y-(--button-press-shift) motion-reduce:transition-none aria-pressed:border-accent aria-pressed:bg-wash aria-pressed:text-accent data-disabled:cursor-not-allowed data-disabled:border-line data-disabled:bg-line data-disabled:text-muted",
         size[big],
         look[variant],
         className,

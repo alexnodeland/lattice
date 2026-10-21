@@ -12,6 +12,9 @@ from pydantic import Field
 from pydantic_ai import Agent, DeferredToolRequests
 from pydantic_ai.capabilities import AbstractCapability
 from pydantic_ai.models import Model
+{%- if use_files %}
+from pydantic_ai.toolsets import AbstractToolset
+{%- endif %}
 
 from artifactr import ArtifactWorkspace, Feedback, MarkdownArtifact, Session
 {%- if use_ui %}
@@ -56,12 +59,18 @@ def build_note_agent(
 {%- if use_ui %}
     integrations: Integrations | None = None,
 {%- endif %}
+{%- if use_files %}
+    toolsets: Sequence[AbstractToolset[Session[None]]] = (),
+{%- endif %}
 ) -> Agent[Session[None], str | DeferredToolRequests]:
     """Build the notes agent.
 
     Args:
         model: The model: the gateway's model group, or a scripted one in tests.
         capabilities: More capabilities: the gateway's and telemetry's.
+{%- if use_files %}
+        toolsets: More tools: native files', while any app runs.
+{%- endif %}
 {%- if use_ui %}
         integrations: Whether forms and dashboards are on in a run's workspace; each one's
             default if omitted, as the evals' agent has it.
@@ -75,9 +84,12 @@ def build_note_agent(
         # A model that fills a tool's arguments wrongly is told why, and tries again this often.
         retries=3,
 {%- if use_ui %}
-        toolsets=[ui_tools(integrations=integrations)],
+        toolsets=[ui_tools(integrations=integrations){% if use_files %}, *toolsets{% endif %}],
         capabilities=[ArtifactWorkspace(types=[Note, *AGENT_TYPES], ask=True), *capabilities],
 {%- else %}
+{%- if use_files %}
+        toolsets=toolsets,
+{%- endif %}
         capabilities=[ArtifactWorkspace(types=[Note], ask=True), *capabilities],
 {%- endif %}
     )

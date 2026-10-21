@@ -17,7 +17,7 @@ export function TextLink({ render, className, ...props }: Props) {
     props: mergeProps<"a">(
       {
         className: cn(
-          "text-accent underline underline-offset-2 outline-offset-2 focus-visible:outline-2 focus-visible:outline-focus",
+          "text-accent underline underline-offset-2 outline-offset-(--focus-offset) focus-visible:outline-(length:--focus-width) focus-visible:outline-focus",
           className,
         ),
       },

@@ -16,7 +16,7 @@ from pydantic import JsonValue
 
 from artifactr.files.app import App, AppCommand, AppFailed
 from artifactr.files.blender import COMMANDS, Scanned, Subprocess, fingerprint, scan
-from artifactr.files.blender.headless import SCRIPT
+from artifactr.files.blender.headless import SCANNING, SCRIPT, _scanned
 from artifactr.files.craft import Ran
 from artifactr.files.manifest import BLEND
 from tests.files.corpus.blender.corpus import CORPUS, HOSTILE, changed, inserted, plain
@@ -194,3 +194,11 @@ def test_a_scan_looks_at_its_deadline_while_it_inflates_and_reads_blocks() -> No
     for content in (SOURCE, bytes(plain("primitives"))):
         with pytest.raises(AppFailed, match="past its deadline"):
             scan(content, until=time.monotonic() - 1)
+
+
+def test_a_scan_that_cant_have_its_turn_in_time_is_a_timeout() -> None:
+    """While another scan holds the lock past this one's deadline, this one is refused: whatever
+    a busy machine does to the overlapping calls' timing above."""
+    with SCANNING, pytest.raises(AppFailed, match="another scan ran past") as late:
+        _scanned(CORPUS.source("primitives"), 1 << 30, until=time.monotonic())
+    assert late.value.failure == "timeout"

@@ -4,6 +4,7 @@
  */
 @import "tailwindcss";
 @import "./tokens.css";
+@import "./base.css";
 @import "./fonts/fonts.css";
 /*
  * ui's own classes: an app that imports this reaches ui through node_modules, which Tailwind
@@ -37,9 +38,10 @@
   --color-status-warn: var(--status-warn);
   --color-on-danger: var(--on-danger);
   --color-danger-hover: var(--danger-hover);
+  --color-danger-wash: var(--danger-wash);
   --color-wash: var(--wash);
   --color-accent-hover: var(--accent-hover);
-  /* The system's colours, for a control under forced colours (tokens.css). */
+  /* The system's colours, for a control under forced colours (base.css). */
   --color-system-canvas: var(--system-canvas);
   --color-system-text: var(--system-text);
   --color-system-highlight: var(--system-highlight);
@@ -53,12 +55,35 @@
   --color-primary: var(--accent);
   --color-primary-foreground: var(--on-accent);
   --color-sidebar: var(--surface);
-  /* Elevation: each from the one colour that suits the scheme (tokens.css). */
-  --shadow-raised: 0 1px 2px var(--shadow-color);
-  --shadow-md: 0 4px 12px -2px var(--shadow-color), 0 1px 3px var(--shadow-color);
-  --shadow-lg: 0 16px 40px -8px var(--shadow-color), 0 2px 6px var(--shadow-color);
-  --font-sans: "Schibsted Grotesk", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "Fragment Mono", ui-monospace, monospace;
+  /*
+   * Tailwind's scales, as the kit's primitives (tokens.css), so a utility such as `rounded-md` or
+   * `shadow-lg` reads the kit. The easings and the leading are the kit's under Tailwind's own
+   * names, and need no line here.
+   */
+  --shadow-raised: var(--shadow-1);
+  --shadow-md: var(--shadow-2);
+  --shadow-lg: var(--shadow-3);
+  --font-sans: var(--font-family-sans);
+  --font-mono: var(--font-family-mono);
+  --radius-xs: var(--radius-1);
+  --radius-sm: var(--radius-2);
+  --radius-md: var(--radius-3);
+  --radius-lg: var(--radius-4);
+  --radius-xl: var(--radius-5);
+  --radius-2xl: var(--radius-6);
+  --text-xs: var(--font-size-xs);
+  --text-sm: var(--font-size-sm);
+  --text-base: var(--font-size-base);
+  --text-lg: var(--font-size-lg);
+  --text-xl: var(--font-size-xl);
+  --text-2xl: var(--font-size-2xl);
+  --font-weight-normal: var(--weight-normal);
+  --font-weight-medium: var(--weight-medium);
+  --font-weight-semibold: var(--weight-semibold);
+  --default-transition-duration: var(--duration-fast);
+  --default-transition-timing-function: var(--ease-in-out);
+  --animate-pulse: pulse var(--duration-pulse) var(--ease-pulse) infinite;
+  --animate-spin: spin var(--duration-spin) linear infinite;
 }
 
 /*
@@ -74,6 +99,6 @@
 
 @media (prefers-reduced-motion: no-preference) {
   .flip-in:not([hidden]) {
-    animation: flip-in 200ms ease-out;
+    animation: flip-in var(--duration-moderate) var(--ease-out);
   }
 }

@@ -88,7 +88,7 @@ export function FileChooser({
           event.currentTarget.value = "";
         }}
         onChange={(event) => given(event.currentTarget.files)}
-        className="max-w-full text-muted text-sm outline-offset-2 file:mr-3 file:cursor-pointer file:rounded-md file:border file:border-edge file:border-solid file:bg-surface file:px-3 file:py-1.5 file:font-sans file:font-semibold file:text-fg file:text-sm focus-visible:outline-2 focus-visible:outline-focus disabled:file:cursor-not-allowed disabled:file:border-line disabled:file:bg-line disabled:file:text-muted"
+        className="max-w-full text-muted text-sm outline-offset-(--focus-offset) file:mr-3 file:cursor-pointer file:rounded-md file:border file:border-edge file:border-solid file:bg-surface file:px-3 file:py-1.5 file:font-sans file:font-semibold file:text-fg file:text-sm focus-visible:outline-(length:--focus-width) focus-visible:outline-focus disabled:file:cursor-not-allowed disabled:file:border-line disabled:file:bg-line disabled:file:text-muted"
       />
       <p id={described} className="text-muted">
         {hint}

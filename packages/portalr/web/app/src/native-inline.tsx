@@ -287,7 +287,7 @@ function FileView({
               {(text) => (
                 <ScrollRegion
                   aria-label={`Text of ${status.name}`}
-                  className="max-h-[70dvh] overflow-y-auto rounded-md border border-line bg-paper p-3"
+                  className="max-h-[70dvh] overflow-y-auto rounded-(--code-block-radius) border border-line bg-paper p-3"
                 >
                   <p className="whitespace-pre-wrap break-words text-fg text-sm">{text}</p>
                 </ScrollRegion>

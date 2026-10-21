@@ -119,22 +119,31 @@ The CLI runs as your application's user, with its network: `Subprocess` is for t
 
 ## The worker
 
-The worker runs an app on files you don't trust: one job at a time, behind a token, with each call's CLI under limits on its CPU time, address space and largest file, and limits on the deadline, the file sent and the reply. Each breach is an `AppFailed`, typed as any other. Run it in a container of its own, on a network with no route out, as stackr's recipe will (lattice RFC-0003); it reads its settings from the environment:
+The worker runs an app on files you don't trust: one job at a time, behind a token, with each call's CLI under limits on its CPU time, address space and largest file, and limits on the deadline, the file sent and the reply. Each breach is an `AppFailed`, typed as any other. Run it in a container of its own, on a network with no route out, as stackr's template does ([stackr ADR-0043](../../../stackr/adr/0043-native-files-in-the-template.md)); it runs one app, `WORKER_APP`, any whose files lattice keeps, and reads its settings from the environment:
 
 ```bash
-WORKER_TOKEN=$(openssl rand -hex 32) \
-WORDCRAFT_CLI=/opt/wordcraft/bin/wordcraft-cli WORDCRAFT_VERSION=0.7.0 \
+WORKER_TOKEN=$(openssl rand -hex 32) WORKER_APP=gridcraft \
+WORKER_CLI=/opt/gridcraft/bin/gridcraft-cli WORKER_VERSION=0.8.0 \
 WORKER_BUILD=sha256:… WORKER_LIMITS='{"render": 5}' \
 python -m artifactr.files.worker
 ```
 
-`WORKER_LIMITS` sets any of `Limits`' fields, the rest their defaults. It listens on 127.0.0.1:8080 unless `WORKER_HOST` and `WORKER_PORT` say otherwise; inside its container, set `WORKER_HOST` to its address on the internal network, and nothing else. Your application calls it through `Worker`, an `App` like any other, whose version and build are the worker's, so a revision's provenance records the image that read it:
+`WORKER_APP` is `wordcraft` unless set. The CLI starts under the limits' launcher, and an app whose CLI confines nothing runs trusted, since the worker is its confinement. `WORKER_LIMITS` sets any of `Limits`' fields, the rest their defaults. It listens on 127.0.0.1:8080 unless `WORKER_HOST` and `WORKER_PORT` say otherwise; inside its container, set `WORKER_HOST` to its address on the internal network, and nothing else. Your application calls it through `Worker`, an `App` like any other, whose version and build are the worker's, so a revision's provenance records the image that read it:
 
 ```python
 from artifactr.files.worker import Worker
 
 app = await Worker.connect("http://worker:8080", token=os.environ["WORKER_TOKEN"])
 files = NativeFiles(blobs, checkouts, app)
+```
+
+An application that builds `NativeFiles` and its routes before its event loop runs makes the app with `Worker.at`, which asks nothing yet, and opens it as it starts; until then, its name and version raise:
+
+```python
+app = Worker.at("http://worker:8080", token=os.environ["WORKER_TOKEN"])
+files = NativeFiles(blobs, checkouts, {Workbook: app})
+...
+await app.open()  # in the application's lifespan, before any request
 ```
 
 A call that arrives while another runs waits its turn within its own deadline, so add containers, not jobs, to serve more. A `crashed` failure's message ends with what the CLI printed, which a hostile file can shape: log it, but don't show it to people or pass it to an agent as it is. `worker_app(app, token=, limits=)` serves any app, if you build your own image: make the app with `launcher=limits.launcher()` and `limit=limits.files`, and pass `trusted=True` to one whose CLI confines nothing, since the worker is its confinement.

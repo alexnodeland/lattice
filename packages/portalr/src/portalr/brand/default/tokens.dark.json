@@ -1,0 +1,144 @@
+{
+  "color": {
+    "ink": {
+      "portalr": {
+        "cyan": {
+          "$value": "#38c6f4",
+          "$type": "color"
+        },
+        "magenta": {
+          "$value": "#ff4da6",
+          "$type": "color"
+        },
+        "yellow": {
+          "$value": "#ffd54a",
+          "$type": "color"
+        },
+        "violet": {
+          "$value": "#e2ccf5",
+          "$type": "color"
+        }
+      }
+    },
+    "paper": {
+      "$value": "#17111f",
+      "$type": "color"
+    },
+    "surface": {
+      "$value": "#1f1829",
+      "$type": "color"
+    },
+    "fg": {
+      "$value": "#f1eef6",
+      "$type": "color"
+    },
+    "muted": {
+      "$value": "#bdb2cc",
+      "$type": "color"
+    },
+    "line": {
+      "$value": "#3a3247",
+      "$type": "color"
+    },
+    "on-accent": {
+      "$value": "#17111f",
+      "$type": "color"
+    },
+    "focus": {
+      "$value": "#a77bdf",
+      "$type": "color"
+    },
+    "edge": {
+      "$value": "#7d7091",
+      "$type": "color"
+    },
+    "status": {
+      "failed": {
+        "$value": "#f391b1",
+        "$type": "color"
+      },
+      "warn": {
+        "$value": "#f9e890",
+        "$type": "color"
+      }
+    },
+    "on-danger": {
+      "$value": "#17111f",
+      "$type": "color"
+    },
+    "chart": {
+      "1": {
+        "$value": "#c8aaf2",
+        "$type": "color"
+      },
+      "2": {
+        "$value": "#864fc4",
+        "$type": "color"
+      },
+      "3": {
+        "$value": "#347969",
+        "$type": "color"
+      }
+    },
+    "ansi": {
+      "0": {
+        "$value": "#bdb2cc",
+        "$type": "color"
+      },
+      "1": {
+        "$value": "#ff8a80",
+        "$type": "color"
+      },
+      "2": {
+        "$value": "#7fd99a",
+        "$type": "color"
+      },
+      "3": {
+        "$value": "#e8c25a",
+        "$type": "color"
+      },
+      "4": {
+        "$value": "#82b1ff",
+        "$type": "color"
+      },
+      "5": {
+        "$value": "#f08ad0",
+        "$type": "color"
+      },
+      "6": {
+        "$value": "#5fd3e6",
+        "$type": "color"
+      },
+      "7": {
+        "$value": "#f1eef6",
+        "$type": "color"
+      }
+    },
+    "scrim": {
+      "$value": {
+        "colorSpace": "srgb",
+        "hex": "#000000",
+        "alpha": 0.6,
+        "components": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "$type": "color"
+    },
+    "shadow": {
+      "$value": {
+        "colorSpace": "srgb",
+        "hex": "#000000",
+        "alpha": 0.65,
+        "components": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "$type": "color"
+    }
+  }
+}

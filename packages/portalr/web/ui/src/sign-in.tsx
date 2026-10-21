@@ -31,7 +31,7 @@ export function SignIn({
   );
   return (
     <main id="main" className="grid min-h-dvh place-items-center bg-paper px-4 py-10 text-fg">
-      <div className="flex w-full max-w-sm flex-col gap-2 rounded-xl border border-line bg-surface p-8">
+      <div className="flex w-full max-w-sm flex-col gap-2 rounded-(--sign-in-radius) border border-line bg-surface p-(--sign-in-pad)">
         <Lockup ui={ui} className="mb-6 h-9" />
         <h1 className={TYPE.page}>Sign in</h1>
         <p className="mb-4 text-muted text-sm">with your email and password</p>

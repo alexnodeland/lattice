@@ -41,7 +41,7 @@ export function RowLink({ render, className, ...props }: RowLinkProps) {
     props: mergeProps<"a">(
       {
         className: cn(
-          "font-semibold text-accent underline underline-offset-2 outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:outline-2 focus-visible:after:outline-focus focus-visible:after:-outline-offset-2",
+          "font-semibold text-accent underline underline-offset-2 outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:outline-(length:--focus-width) focus-visible:after:outline-focus focus-visible:after:-outline-offset-(--focus-offset)",
           className,
         ),
       },

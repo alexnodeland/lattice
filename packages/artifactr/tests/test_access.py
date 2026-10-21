@@ -27,6 +27,7 @@ from pydantic_ai.models.function import AgentInfo
 from starlette.requests import HTTPConnection
 
 from artifactr.agent import ArtifactWorkspace, Runner, Session, function_model
+from artifactr.connect import RUN_CODE
 from artifactr.core import (
     Actor,
     AgentActor,
@@ -514,4 +515,5 @@ def test_the_catalog_is_every_action_asked_for_and_no_other() -> None:
     asked |= {action for _, actions in ROUTES.values() for action in actions}
     asked |= {action for _, actions in TOOLS.values() for action in actions}
     asked.add(CREATE_NATIVE_FILE)  # native files' upload route asks it (tests/files/fastapi)
+    asked.add(RUN_CODE)  # a connected app's toolset asks it beside the workspace (tests/connect)
     assert asked | {"artifactr:open"} == ACTIONS

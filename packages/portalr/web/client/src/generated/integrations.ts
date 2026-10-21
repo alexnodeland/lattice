@@ -26,4 +26,8 @@ export const INTEGRATIONS = [
   {"key":"excalidraw","default":true,"description":"Diagrams: Excalidraw drawings that people and agents draw on together."},
   {"key":"markdown:math","default":true,"description":"Math: formulas in messages and documents, typeset."},
   {"key":"markdown:mermaid","default":false,"description":"Mermaid: diagrams written as text in messages, drawn."},
+  {"key":"connect:freecad","default":false,"description":"Connected FreeCAD: the agent reads and edits the FreeCAD its operator runs."},
+  {"key":"connect-code:freecad","default":false,"description":"Code in connected FreeCAD: Python the agent writes, approved on every call."},
+  {"key":"connect:blender","default":false,"description":"Connected Blender: the agent reads the Blender its operator runs."},
+  {"key":"connect-code:blender","default":false,"description":"Code and assets in connected Blender: Python and downloads, each approved."},
 ] as const;

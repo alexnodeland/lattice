@@ -23,8 +23,8 @@ jobs:
   check:
     name: Check
     runs-on: ubuntu-latest
-    # artifactr's tests, on SQLite and PostgreSQL, take some 15 minutes of a change that reaches
-    # them, and the job's setup and other tasks run beside them: 30 leaves room until they run
+    # A change that reaches every package takes some 17 minutes, artifactr's and reflexr's tests
+    # the longest, on SQLite and PostgreSQL: 30 leaves room as they grow, and for a slow runner.
     # in parallel.
     timeout-minutes: 30
     permissions:
@@ -196,6 +196,32 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
       - run: uv run --no-project python scripts/affected.py images
+
+  # Native files' workers and editors (stackr ADR-0043), as an application from the template
+  # builds and runs them, from each app's pinned release, on each architecture: their posture, no
+  # route out, and hostile files refused. The application installs the libraries from GitHub at
+  # the pull request's merge commit, as the smoke test's does.
+  files:
+    name: Native files (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
+      - run: uv run --no-project python scripts/affected.py files
 
   # A stackr release's image path (stackr ADR-0035), short of GHCR, when the images change: each
   # architecture's OCI archives, built by deploy/image-archive on a runner of that architecture,
@@ -419,7 +445,7 @@ jobs:
   # it runs when stackr or a library changes, and checks the two together (stackr ADR-0018). The
   # matrix values aren't the task's inputs: moon counts a variable that is set as a change.
   template:
-    name: Template (${{ matrix.libraries }}${{ matrix.evals && ', evals' || '' }}${{ matrix.access == 'none' && ', no access' || '' }}${{ matrix.bridge == 'false' && ', no bridge' || '' }}${{ matrix.portal == 'false' && ', no portal' || '' }}${{ matrix.ui == 'false' && ', no ui' || '' }}${{ matrix.tracker && matrix.tracker != 'none' && format(', {0}', matrix.tracker) || '' }}, Python ${{ matrix.python }})
+    name: Template (${{ matrix.libraries }}${{ matrix.evals && ', evals' || '' }}${{ matrix.access == 'none' && ', no access' || '' }}${{ matrix.bridge == 'false' && ', no bridge' || '' }}${{ matrix.portal == 'false' && ', no portal' || '' }}${{ matrix.ui == 'false' && ', no ui' || '' }}${{ matrix.files == 'false' && ', no native files' || '' }}${{ matrix.tracker && matrix.tracker != 'none' && format(', {0}', matrix.tracker) || '' }}, Python ${{ matrix.python }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -471,6 +497,11 @@ jobs:
             python: "3.12"
             access: grantr
             ui: "false"
+          - libraries: both
+            evals: true
+            python: "3.12"
+            access: grantr
+            files: "false"
     env:
       TEMPLATE_LIBRARIES: ${{ matrix.libraries }}
       TEMPLATE_EVALS: ${{ matrix.evals }}
@@ -480,6 +511,7 @@ jobs:
       TEMPLATE_PORTAL: ${{ matrix.portal || 'true' }}
       TEMPLATE_TRACKER: ${{ matrix.tracker || 'none' }}
       TEMPLATE_UI: ${{ matrix.ui || 'true' }}
+      TEMPLATE_FILES: ${{ matrix.files || 'true' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -652,7 +684,7 @@ jobs:
   ci:
     name: CI
     if: always()
-    needs: [check, tests, images, specs, thin-images, gotrue, release-images, release-images-publish, acceptance, aws, aws-tier2-affected, aws-tier2, template, smoke, dependency-review, osv]
+    needs: [check, tests, images, specs, thin-images, files, gotrue, release-images, release-images-publish, acceptance, aws, aws-tier2-affected, aws-tier2, template, smoke, dependency-review, osv]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions: {}

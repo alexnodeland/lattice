@@ -29,10 +29,11 @@ LOOKUP: Final = 30.0
 an edit's longest by default."""
 
 FRESH: Final = httpx.Limits(max_keepalive_connections=0)
-"""A connection for each call, closed with it. A call reusing one the worker has kept open finds
-it closed, as `ReadError`, where the worker's server closed it as idle just as the call was sent:
-the more likely the longer a caller is busy between calls, as with building a large file. A call
-is seconds of a CLI's work; a connection to the worker on its own network is a millisecond's."""
+"""A connection for each call, closed with it. A kept connection races the worker's server, which
+closes it once idle for its keep-alive (uvicorn's 5 s): a call sent on it as the server closes it
+fails as `ReadError`, the more likely the closer the caller's pause between calls is to that time.
+A call is seconds of a CLI's work, beside which a new connection on the worker's network is
+small."""
 
 _SPECS = TypeAdapter(list[CommandSpec])
 
@@ -51,6 +52,7 @@ class Worker:
     """
 
     def __init__(self, client: httpx.AsyncClient, hello: Hello | None = None) -> None:
+        # A client made elsewhere, to a worker over a network, keeps no connection: `FRESH`.
         self._client = client
         self._hello = hello
 

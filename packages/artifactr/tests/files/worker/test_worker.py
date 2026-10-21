@@ -167,7 +167,10 @@ def serving(app: ASGIApp) -> Iterator[str]:
         server = uvicorn.Server(config)
         thread = threading.Thread(target=server.run, kwargs={"sockets": [sock]})
         thread.start()
+        deadline = time.monotonic() + 10
         while not server.started:
+            assert thread.is_alive(), "the server ended before it started"
+            assert time.monotonic() < deadline, "the server didn't start within 10 s"
             time.sleep(0.01)
         yield f"http://127.0.0.1:{sock.getsockname()[1]}"
         server.should_exit = True

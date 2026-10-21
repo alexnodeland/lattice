@@ -183,6 +183,10 @@ async def agree(storage: Storage, ref: WorkspaceRef, specs: list[Spec], draws: l
             )
 
 
+# 200 examples: 4 s alone on PostgreSQL, 13 s on a loaded machine, 38 s in CI's Check job: five
+# minutes. A Hypothesis test keeps the thread method: Hypothesis replays a failure, and a
+# signal's timer is spent by then (lattice ADR-0028).
+@pytest.mark.timeout(300, method="thread")
 @settings(
     max_examples=200,
     deadline=None,

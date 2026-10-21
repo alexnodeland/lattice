@@ -134,7 +134,7 @@ venv = ".venv"
 testpaths = ["tests"]
 addopts = ["--strict-markers", "--strict-config", "-ra"]
 # A test that runs for a minute is stuck: fail it with its stack, as a failure of its own, by
-# SIGALRM, so the xdist worker running it carries on (lattice ADR-0007).
+# SIGALRM, so the xdist worker running it carries on (lattice ADR-0007, ADR-0028).
 timeout = 60
 timeout_method = "signal"
 asyncio_mode = "auto"

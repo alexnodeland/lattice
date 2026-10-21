@@ -174,9 +174,10 @@ class IntegrationsMachine(RuleBasedStateMachine):
 IntegrationsMachine.TestCase.settings = settings(
     max_examples=100, stateful_step_count=30, deadline=None
 )
-TestIntegrationsMachine = pytest.mark.timeout(300)(IntegrationsMachine.TestCase)
+TestIntegrationsMachine = pytest.mark.timeout(300, method="thread")(IntegrationsMachine.TestCase)
 """2.8 s alone, 48 s with every core busy beside xdist's other workers and PostgreSQL: near the
-minute a test may take (lattice ADR-0028), so five minutes, as the access machine has."""
+minute a test may take, so five minutes, as the access machine has; and the thread method, as
+Hypothesis replays a failure once a signal's timer is spent (lattice ADR-0028)."""
 
 
 class Unreadable(InMemoryStorage):

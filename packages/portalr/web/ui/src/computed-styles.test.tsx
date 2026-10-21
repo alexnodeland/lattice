@@ -4,7 +4,8 @@
  * suites shoot are read at rest wide and narrow, under forced colours, and with motion allowed, and
  * each control is read hovered, focused from the keyboard, and held down. Only what a declaration
  * sets is read, never a size the face's metrics decide, so the snapshots are the same on every
- * system; margins are left out, as an automatic one is read as the space it takes. A change to a component's look changes its snapshot, which a reviewer sees as text.
+ * system; margins and transforms are left out, as an automatic margin is read as the space it
+ * takes and a menu is placed by a transform. A change to a component's look changes its snapshot, which a reviewer sees as text.
  */
 
 import type { ReactNode } from "react";
@@ -59,7 +60,6 @@ const LOOK = [
   "text-decoration-thickness",
   "text-underline-offset",
   "opacity",
-  "transform",
   "scale",
   "translate",
   "filter",
@@ -112,7 +112,6 @@ const UNSET: Record<string, readonly string[]> = {
   "outline-style": ["none"],
   "outline-offset": ["0px"],
   opacity: ["1"],
-  transform: ["none"],
   scale: ["none"],
   translate: ["none"],
   filter: ["none"],
@@ -210,13 +209,14 @@ function systemColours(forced: boolean) {
   const probe = document.createElement("span");
   document.body.append(probe);
   const named = new Map<string, string>();
-  probe.style.outlineColor = "-webkit-focus-ring-color";
-  named.set(getComputedStyle(probe).outlineColor, "FocusRing");
   for (const name of forced ? SYSTEM : []) {
     probe.style.color = name;
     const value = getComputedStyle(probe).color;
     if (!named.has(value)) named.set(value, name);
   }
+  probe.style.outlineColor = "-webkit-focus-ring-color";
+  const ring = getComputedStyle(probe).outlineColor;
+  if (!named.has(ring)) named.set(ring, "FocusRing");
   probe.remove();
   return named;
 }
@@ -333,6 +333,9 @@ async function shown(scene: string, width: number) {
 }
 
 afterEach(async () => {
+  // Whatever a test left, so the next starts on an empty page with the button up.
+  cleanup();
+  await commands.pointAt("");
   await commands.forcedColors(false);
   await commands.reduceMotion(true);
 });
@@ -365,7 +368,7 @@ for (const scene of Object.keys(SCENES)) {
         moving,
       ]),
     ).toMatchFileSnapshot(`./__computed__/${scene}.rest.${scheme}.txt`);
-  });
+  }, 60_000);
 
   // An open menu or list holds the page's focus and pointer, so its scene is read at rest alone.
   test.skipIf(scene in OPENED)(
@@ -403,5 +406,7 @@ for (const scene of Object.keys(SCENES)) {
         `./__computed__/${scene}.states.${scheme}.txt`,
       );
     },
+    // A scene is shown again for each control in each state: a minute or two on a slow runner.
+    240_000,
   );
 }

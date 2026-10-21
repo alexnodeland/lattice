@@ -2,12 +2,16 @@
 
 Usage: python -I _files_probe.py URL APP VERSION   (WORKER_TOKEN in the environment)
 
-It runs in the worker's own image, which has artifactr, and checks, through artifactr's `Worker`:
+It runs in the worker's own image, which has artifactr and the app's release in /opt/craft, and
+checks:
 
+- the release's licence files are there, and each notice `CRAFTS` lists, such as PdfCraft's OCR
+  models' attribution and licences
 - the worker runs the app at its pinned version, and refuses a request without its token
 - a new file is made, read back and, if the app renders, rendered
 - hostile files each end within their deadline, in a typed failure: a zip bomb, a file past the
-  worker's limit, and bytes that are no file of the app's
+  worker's limit, and bytes that are no file of the app's. The bomb is a zip: an app whose files
+  are zips reads into it, and one whose files aren't refuses it at its first bytes
 
 Each check prints `ok: ...` or `FAIL: ...`; it exits 1 if any failed.
 """
@@ -15,10 +19,12 @@ Each check prints `ok: ...` or `FAIL: ...`; it exits 1 if any failed.
 import asyncio
 import io
 import os
+import re
 import sys
 import time
 import zipfile
 from collections.abc import Awaitable
+from pathlib import Path
 
 import httpx
 from artifactr.files.app import AppCommand, AppFailed
@@ -26,6 +32,7 @@ from artifactr.files.craft import CRAFTS
 from artifactr.files.worker import Limits, Worker
 
 DEADLINE = 30.0
+LICENCE = re.compile(r"(LICEN[CS]E|COPYING)", re.IGNORECASE)
 DRAWN = {"freecad": [AppCommand(name="box", args={"length": 10, "width": 10, "height": 10})]}
 """What a new file is given, for an app whose blank file has nothing to render."""
 failed: list[str] = []
@@ -65,7 +72,18 @@ async def refused(worker: Worker, what: str, call: Awaitable[object], kinds: set
         report(False, f"{worker.name}: {what} was read")
 
 
+def notices(app: str) -> None:
+    """Check that the release's licences, and each notice the app declares, travel with its CLI."""
+    release = Path("/opt/craft")
+    licences = sorted(path.name for path in release.rglob("*") if LICENCE.match(path.name))
+    report(bool(licences), f"{app}: its release's licences are in its image: {', '.join(licences)}")
+    for notice in CRAFTS[app].notices:
+        for file in notice.files:
+            report((release / file).is_file(), f"{app}: {notice.licence} {file} is in its image")
+
+
 async def main(url: str, app: str, version: str) -> None:
+    notices(app)
     token = os.environ["WORKER_TOKEN"]
     async with httpx.AsyncClient(base_url=url) as anonymous:
         status = (await anonymous.get("/")).status_code

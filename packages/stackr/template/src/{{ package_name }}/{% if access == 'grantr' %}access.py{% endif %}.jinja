@@ -14,7 +14,7 @@ access-matrix``), which ``access.md`` holds and a test compares.
 
 import contextlib
 import sys
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator{% if use_files %}, Sequence{% endif %}
 from typing import Final
 
 from fastapi import FastAPI
@@ -120,12 +120,10 @@ INSTALLED: Final[list[str]] = [
 {%- if use_portal %}
     "markdown:math",
 {%- endif %}
-{%- for name in crafts if use_files %}
-    "files:{{ name }}",
-{%- endfor %}
 ]
 """The integrations the application ships, which its tenants' and workspaces' admins switch:
-any other of lattice's is off everywhere (grantr's ``installed``)."""
+any other of lattice's is off everywhere (grantr's ``installed``).{% if use_files %} Native files' apps are installed
+as they run, by ``build_grants``'s ``files``.{% endif %}"""
 
 
 class Refused(Exception):
@@ -143,9 +141,20 @@ class Refused(Exception):
 
 
 def build_grants(
-    storage: Storage, *, name: str, telemetry: TelemetryHandle | None = None
+    storage: Storage,
+    *,
+    name: str,
+    telemetry: TelemetryHandle | None = None,
+{%- if use_files %}
+    files: Sequence[str] = (),
+{%- endif %}
 ) -> Grants:
     """Make grantr over a storage, with the libraries' catalogs, for the application ``name``.
+{%- if use_files %}
+
+    ``files`` are the native files' apps that run, ``FILES_CRAFTS``: each is installed, and no
+    other, so an admin switches only an app that runs.
+{%- endif %}
 
     The application's own service principal is named after it, and holds the ``application``
     role once :meth:`Access.lifespan` has started.
@@ -153,7 +162,7 @@ def build_grants(
     return Grants(
         storage,
         catalogs=CATALOGS,
-        installed=INSTALLED,
+        installed={% if use_files %}[*INSTALLED, *(f"files:{craft}" for craft in files)]{% else %}INSTALLED{% endif %},
         application=ServicePrincipal(id=name),
         tracer_provider=telemetry.tracer_provider if telemetry else None,
         meter_provider=telemetry.meter_provider if telemetry else None,
@@ -169,6 +178,9 @@ class Access:
         database: The database; without one, grants live in memory.
         grants: grantr itself, when the caller has built it, as the tests do.
         telemetry: OpenTelemetry.
+{%- if use_files %}
+        files: The native files' apps that run, which grantr installs.
+{%- endif %}
     """
 
     def __init__(
@@ -179,6 +191,9 @@ class Access:
         database: Database | None = None,
         grants: Grants | None = None,
         telemetry: TelemetryHandle | None = None,
+{%- if use_files %}
+        files: Sequence[str] = (),
+{%- endif %}
     ) -> None:
         self._verifier = verifier
         self.application = ServicePrincipal(id=name)
@@ -192,7 +207,11 @@ class Access:
             if database
             else InMemoryStorage()
         )
+{%- if use_files %}
+        self.grants = grants or build_grants(storage, name=name, telemetry=telemetry, files=files)
+{%- else %}
         self.grants = grants or build_grants(storage, name=name, telemetry=telemetry)
+{%- endif %}
 
     async def migrate(self, database: Database) -> None:
         """Upgrade the database to grantr's schema, as its owner, granting the app's role it."""

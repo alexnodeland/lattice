@@ -4,7 +4,9 @@ It reads its settings from the environment: `WORKER_TOKEN`, the token the deploy
 `WORKER_APP`, the app by its name, `wordcraft` by default; `WORKER_CLI` and `WORKER_VERSION`, the
 app's pinned CLI and the version it must be; `WORKER_BUILD`, the image's digest, if it runs in
 one; `WORKER_LIMITS`, the deployment's `Limits` as JSON, any it leaves out the default, and
-every one if it is unset or empty; and `WORKER_HOST` and `WORKER_PORT`, where it listens,
+every one if it is unset or empty; `WORKER_SWEEP`, `1` where the worker is alone in its
+container, to kill every other process of its user and empty the temporary directory after each
+call; and `WORKER_HOST` and `WORKER_PORT`, where it listens,
 127.0.0.1 and 8080 by default. In its container it listens on the internal network alone.
 
 The CLI is started under the limits' launcher, and one that confines nothing runs trusted: the
@@ -33,6 +35,7 @@ from artifactr.files.vectorcraft import Subprocess as VectorCraft
 from artifactr.files.wordcraft import Subprocess as WordCraft
 from artifactr.files.worker.limits import Limits
 from artifactr.files.worker.service import worker_app
+from artifactr.files.worker.sweep import sweep
 from artifactr.files.worker.wire import CALL_LIMIT
 
 HEAD: Final = CALL_LIMIT + (16 << 10)
@@ -46,6 +49,9 @@ class Adapter(Protocol):
         """Make the app."""
         ...
 
+
+TOKEN: Final = 32
+"""The fewest characters the deployment's token may have: `openssl rand -hex 32` makes 64."""
 
 ADAPTERS: Final[Mapping[str, Adapter]] = MappingProxyType(
     {
@@ -83,13 +89,26 @@ def app_from_environment(environ: Mapping[str, str], limits: Limits) -> App:
 
 
 def worker_from_environment(environ: Mapping[str, str]) -> Starlette:
-    """The worker the environment's settings describe."""
+    """The worker the environment's settings describe.
+
+    Raises:
+        ValueError: If the token is shorter than `TOKEN`, or the environment still names WordCraft
+            the way the worker once read it.
+    """
+    if "WORKER_CLI" not in environ and "WORDCRAFT_CLI" in environ:
+        raise ValueError(
+            "WORDCRAFT_CLI and WORDCRAFT_VERSION are now WORKER_CLI and WORKER_VERSION, "
+            "with WORKER_APP=wordcraft"
+        )
+    if 0 < len(environ["WORKER_TOKEN"]) < TOKEN:
+        raise ValueError(f"WORKER_TOKEN must be at least {TOKEN} characters, such as a random hex")
     limits = Limits.model_validate_json(environ.get("WORKER_LIMITS") or "{}")
     return worker_app(
         app_from_environment(environ, limits),
         token=environ["WORKER_TOKEN"],
         limits=limits,
         build=environ.get("WORKER_BUILD"),
+        sweep=sweep if environ.get("WORKER_SWEEP") == "1" else None,
     )
 
 

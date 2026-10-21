@@ -29,18 +29,26 @@ from lattice_core.integrations import Defaults
 
 from {{ package_name }}.database import open_database
 from {{ package_name }}.files import Files
-from {{ package_name }}.settings import FilesSettings, {% if use_portal %}PortalSettings, {% endif %}Settings
+from {{ package_name }}.settings import CRAFTS, FilesSettings, {% if use_portal %}PortalSettings, {% endif %}Settings
 
 from conftest import TENANT, Script, app, bearer, settings
 
-TOKEN = "a-workers-token"
-WORDCRAFT = FilesSettings(crafts=("wordcraft",), worker_token=TOKEN)
+TOKEN = "a-workers-token-of-32-characters-or-more"
+WORDCRAFT = FilesSettings(crafts=("wordcraft",), tokens={"wordcraft": TOKEN})
 ALICE = UserActor(id="alice", name="Alice")
 
 
-def workers(token: str = TOKEN) -> httpx.ASGITransport:
+class Stand(FakeApp):
+    """The fake app, standing in for WordCraft at its pinned version."""
+
+    name = "wordcraft"
+    version = CRAFTS["wordcraft"]
+    integration = "files:wordcraft"
+
+
+def workers(token: str = TOKEN, app: FakeApp | None = None) -> httpx.ASGITransport:
     """WordCraft's worker, as the application reaches it, with the fake app for its CLI."""
-    worker = worker_app(FakeApp(integration="files:wordcraft"), token=token, limits=Limits())
+    worker = worker_app(app or Stand(), token=token, limits=Limits())
     return httpx.ASGITransport(app=worker)
 
 
@@ -86,6 +94,13 @@ async def test_a_worker_that_doesnt_answer_says_which_one() -> None:
             pass
 
 
+async def test_a_worker_that_runs_another_app_or_version_than_its_pin_is_refused() -> None:
+    files = Files(WORDCRAFT, integrations=Defaults(), transport=workers(app=FakeApp()))
+    with pytest.raises(RuntimeError, match=r"files-wordcraft runs fake 1\.0, not wordcraft"):
+        async with files.lifespan():
+            pass
+
+
 async def test_the_files_bytes_and_check_outs_live_in_the_database(tmp_path: Path) -> None:
     database = open_database(f"sqlite+aiosqlite:///{tmp_path / 'app.db'}", schema="main")
     files = Files(WORDCRAFT, integrations=Defaults(), database=database, transport=workers())
@@ -106,7 +121,8 @@ def test_the_application_mounts_native_files_while_an_app_runs(script: Script) -
     ("environ", "refusal"),
     [
         ({"FILES_CRAFTS": "wordcraft,filmcraft"}, "names filmcraft: a worker runs wordcraft"),
-        ({"FILES_CRAFTS": "wordcraft"}, "needs FILES_WORKER_TOKEN"),
+        ({"FILES_CRAFTS": "wordcraft"}, "needs FILES_WORDCRAFT_TOKEN, of at least 32"),
+        ({"FILES_CRAFTS": "wordcraft", "FILES_WORDCRAFT_TOKEN": "short"}, "of at least 32"),
     ],
 )
 def test_native_files_settings_are_refused_unless_they_hold(
@@ -122,11 +138,16 @@ def test_no_app_runs_by_default() -> None:
 
 
 def test_each_running_apps_editor_is_on_this_machine_by_default() -> None:
-    environ = {"FILES_CRAFTS": "wordcraft,gridcraft,pdfcraft", "FILES_WORKER_TOKEN": TOKEN}
+    crafts = ("wordcraft", "gridcraft", "pdfcraft")
+    environ = {"FILES_CRAFTS": ",".join(crafts)}
+    environ |= {f"FILES_{craft.upper()}_TOKEN": TOKEN for craft in crafts}
     assert Settings.from_environ(environ).files.editors == {
-        "files:gridcraft": "http://127.0.0.1:{{ crafts.gridcraft.editor }}/",
-        "files:pdfcraft": "http://127.0.0.1:{{ crafts.pdfcraft.editor }}/",
+        "files:gridcraft": "http://127.0.0.1:{{ app_port + crafts.gridcraft.editor }}/",
+        "files:pdfcraft": "http://127.0.0.1:{{ app_port + crafts.pdfcraft.editor }}/",
     }
+    environ["PDFCRAFT_EDITOR_PORT"] = "9903"
+    moved = Settings.from_environ(environ).files.editors
+    assert moved["files:pdfcraft"] == "http://127.0.0.1:9903/"
     tailnet = {"files:gridcraft": "https://my-machine.example.ts.net:8802/"}
     environ["FILES_EDITORS"] = '{"files:gridcraft": "https://my-machine.example.ts.net:8802/"}'
     assert Settings.from_environ(environ).files.editors == tailnet
@@ -139,7 +160,7 @@ def test_editors_elsewhere_are_a_json_object(editors: str) -> None:
 
 
 def test_the_portal_tells_the_app_where_each_editor_is(script: Script) -> None:
-    editors = {"files:gridcraft": "http://127.0.0.1:{{ crafts.gridcraft.editor }}/"}
+    editors = {"files:gridcraft": "http://127.0.0.1:{{ app_port + crafts.gridcraft.editor }}/"}
     portal = PortalSettings(supabase_url="http://127.0.0.1:54321", supabase_key="sb_publishable_x")
     config = replace(settings(), files=replace(WORDCRAFT, editors=editors), portal=portal)
     with TestClient(app(script, config, workers=workers())) as client:

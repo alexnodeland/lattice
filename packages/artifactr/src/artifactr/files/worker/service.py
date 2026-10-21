@@ -33,7 +33,14 @@ from artifactr.files.worker.wire import (
 _SPECS = TypeAdapter(list[CommandSpec])
 
 
-def worker_app(app: App, *, token: str, limits: Limits, build: str | None = None) -> Starlette:
+def worker_app(
+    app: App,
+    *,
+    token: str,
+    limits: Limits,
+    build: str | None = None,
+    sweep: Callable[[], object] | None = None,
+) -> Starlette:
     """The worker's HTTP application, over an app whose CLI is started under `limits`.
 
     Args:
@@ -41,6 +48,8 @@ def worker_app(app: App, *, token: str, limits: Limits, build: str | None = None
         token: What every request's `Authorization: Bearer` must be; any other is 401.
         limits: The deadlines and sizes each call is held to.
         build: The digest of the image the worker runs in, which provenance records.
+        sweep: What clears the worker's container after each call, before the next is taken:
+            [`sweep`][artifactr.files.worker.sweep.sweep], where the worker is alone in it.
 
     Raises:
         ValueError: If the token is empty, which would admit anyone.
@@ -88,7 +97,12 @@ def worker_app(app: App, *, token: str, limits: Limits, build: str | None = None
             return await work(left)
         finally:
             if not waiting.cancelled_caught:
-                turn.release()
+                try:
+                    if sweep is not None:
+                        with anyio.CancelScope(shield=True):
+                            await anyio.to_thread.run_sync(sweep)
+                finally:
+                    turn.release()
 
     async def hi(_request: Request) -> Response:
         return JSONResponse(hello.model_dump())

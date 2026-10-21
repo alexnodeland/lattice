@@ -40,9 +40,16 @@ install: ## Install the dependencies and the git hooks
 	$(UV) run pre-commit install --hook-type pre-commit --hook-type commit-msg
 
 {%- if use_files %}
-env: ## Create .env from .env.example, with the workers' token, if there is none
-	@test -f .env && echo ".env exists; compare it with .env.example" || \
-		(sed "s/^FILES_WORKER_TOKEN=$$/FILES_WORKER_TOKEN=$$(openssl rand -hex 32)/" .env.example > .env && echo "created .env")
+# Each worker's token is its own, from openssl; .env is readable by its owner alone.
+env: ## Create .env from .env.example, with each worker's token, if there is none
+	@test -f .env && echo ".env exists; compare it with .env.example" || ( \
+		command -v openssl >/dev/null || { echo "make env: the workers' tokens need openssl" >&2; exit 1; }; \
+		umask 077 && cp .env.example .env.new && \
+		for app in $$(sed -n 's/^FILES_\([A-Z]*\)_TOKEN=$$/\1/p' .env.example); do \
+			token=$$(openssl rand -hex 32) && \
+			sed "s/^FILES_$${app}_TOKEN=$$/FILES_$${app}_TOKEN=$$token/" .env.new > .env.next && \
+			mv .env.next .env.new || exit 1; \
+		done && mv .env.new .env && echo "created .env")
 {%- else %}
 env: ## Create .env from .env.example, if there is none
 	@test -f .env && echo ".env exists; compare it with .env.example" || (cp .env.example .env && echo "created .env")

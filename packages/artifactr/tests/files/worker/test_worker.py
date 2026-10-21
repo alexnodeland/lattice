@@ -39,7 +39,7 @@ from artifactr.files.worker.limits import CONFINE
 from artifactr.files.worker.wire import CALL, CALL_LIMIT, Hello
 from tests.files.wordcraft.test_headless import FAKE, PNG
 
-TOKEN = "s3cret"
+TOKEN = "a-token-for-the-tests-of-32-or-more"
 LIMITS = Limits(edit=10, render=5, files=1 << 20, reply=1 << 20)
 
 Connect = Callable[..., Awaitable[Worker]]
@@ -326,6 +326,14 @@ async def test_the_environment_says_which_app_it_runs_under_the_limits(
     with pytest.raises(AppFailed, match="File too large") as crashed:
         await app.apply(None, [], deadline=20)
     assert crashed.value.failure == "crashed"
+
+
+def test_a_short_token_or_wordcrafts_old_names_are_refused(tmp_path: Path) -> None:
+    cli = {"WORKER_CLI": str(stand_in(tmp_path)), "WORKER_VERSION": "0.7.0"}
+    with pytest.raises(ValueError, match="at least 32 characters"):
+        worker_from_environment({**cli, "WORKER_TOKEN": "s3cret"})
+    with pytest.raises(ValueError, match="are now WORKER_CLI and WORKER_VERSION"):
+        worker_from_environment({"WORKER_TOKEN": TOKEN, "WORDCRAFT_CLI": "x"})
 
 
 def test_empty_limits_are_the_defaults(tmp_path: Path) -> None:

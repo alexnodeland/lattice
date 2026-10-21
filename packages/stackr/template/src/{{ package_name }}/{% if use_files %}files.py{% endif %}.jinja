@@ -1,10 +1,10 @@
 """Native files: files in an app's own format, kept as artifacts (lattice RFC-0003).
 
 Each app ``FILES_CRAFTS`` names runs in a worker of its own, ``files-<app>`` in the app profile:
-its pinned CLI, under the worker's limits, in a read-only container on the ``files`` network,
-which has no route out (stackr ADR-0043). This application calls it there, by its name, with
-``FILES_WORKER_TOKEN``. With no app named, native files are off: no route is mounted, and the
-agent has no tools for them.
+its pinned CLI, under the worker's limits, in a read-only container on a network of its own,
+``files-<app>``, which has no route out (stackr ADR-0043). This application joins each, and calls
+the worker there, by its name, with its own token, ``FILES_<APP>_TOKEN``. With no app named,
+native files are off: no route is mounted, and the agent has no tools for them.
 
 - ``/artifactr/v1/workspaces/{w}/files/...``: a file's head, check-out and check-in, and each
   version's bytes, words and pages, beside artifactr's routes
@@ -19,7 +19,7 @@ from typing import Any, Final
 
 import httpx
 from fastapi import FastAPI
-from pydantic import JsonValue
+from pydantic import JsonValue, ValidationError
 from pydantic_ai.toolsets import AbstractToolset
 
 from artifactr import Session, Workspaces
@@ -36,7 +36,7 @@ from artifactr.files.worker import Worker
 from lattice_core.integrations import Integrations
 
 from {{ package_name }}.database import Database
-from {{ package_name }}.settings import FilesSettings
+from {{ package_name }}.settings import CRAFTS, FilesSettings
 
 TYPES: Final[Mapping[str, type[NativeFile]]] = {
 {%- for name, craft in crafts.items() %}
@@ -47,7 +47,7 @@ TYPES: Final[Mapping[str, type[NativeFile]]] = {
 
 
 def worker_url(craft: str) -> str:
-    """Where an app's worker answers, on the ``files`` network: its service's name."""
+    """Where an app's worker answers, on its network: its service's name."""
     return f"http://files-{craft}:8080"
 
 
@@ -70,9 +70,8 @@ class Files:
         database: Database | None = None,
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
-        token = settings.worker_token or ""
         self._workers = {
-            craft: Worker.at(worker_url(craft), token=token, transport=transport)
+            craft: Worker.at(worker_url(craft), token=settings.tokens[craft], transport=transport)
             for craft in settings.crafts
         }
         self.native: NativeFiles | None = None
@@ -107,18 +106,24 @@ class Files:
         """Ask each worker which app it runs, as the application starts; close them as it stops.
 
         Raises:
-            RuntimeError: If a worker can't be reached, or refuses the token.
+            RuntimeError: If a worker can't be reached, refuses the token, or runs another app, or
+                another version, than its pin names.
         """
         async with contextlib.AsyncExitStack() as stack:
             for craft, worker in self._workers.items():
                 stack.push_async_callback(worker.aclose)
                 try:
                     await worker.open()
-                except httpx.HTTPError as error:
+                except (httpx.HTTPError, ValidationError) as error:
                     raise RuntimeError(
                         f"files-{craft}, the worker FILES_CRAFTS names, didn't answer: start it "
                         f"with the application, `make up`, or leave {craft} out ({error!r})"
                     ) from error
+                if (worker.name, worker.version) != (craft, CRAFTS[craft]):
+                    raise RuntimeError(
+                        f"files-{craft} runs {worker.name} {worker.version}, not {craft} "
+                        f"{CRAFTS[craft]}, as scripts/crafts pins it: rebuild it, `make up`"
+                    )
             yield
 
     def mount(

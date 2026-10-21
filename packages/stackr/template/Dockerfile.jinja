@@ -89,7 +89,8 @@ ENV PATH="/app/.venv/bin:$PATH" \
     WORKER_CLI=/opt/craft/cli \
     WORKER_VERSION=${VERSION} \
     WORKER_HOST=0.0.0.0 \
-    WORKER_PORT=8080
+    WORKER_PORT=8080 \
+    WORKER_SWEEP=1
 USER worker
 EXPOSE 8080
 CMD ["python", "-m", "artifactr.files.worker"]

@@ -149,17 +149,17 @@ The **dev container** is built on `.devcontainer/compose.yaml`. When the stack i
 
 ### Native files
 
-With `native_files`, `make env` generates `FILES_WORKER_TOKEN`, and `FILES_CRAFTS` names the apps whose workers run, in `.env` or for one run:
+With `native_files`, `make env` generates each worker's own token, `FILES_<APP>_TOKEN`, in a `.env` only its owner may read (it needs `openssl`), and `FILES_CRAFTS` names the apps whose workers run, in `.env` or for one run:
 
 ```bash
 make up FILES="wordcraft gridcraft pdfcraft"
 ```
 
-Each app is a Compose profile, `files-<app>`, which `make up` adds, and its first build fetches its release from GitHub, checks it against the pin in `scripts/crafts/`, and unpacks it into the image. `make down` stops every worker. Native files' routes and the agent's tools are there while any app runs, and each app is switched per workspace like any other integration: WordCraft is on by default, and the others are off until a workspace's admin switches them on.
+Each app is a Compose profile, `files-<app>`, which `make up` adds, and its first build fetches its release from GitHub, checks it against the pin in `scripts/crafts/`, and unpacks it into the image. `make down` stops every worker. It needs Compose 2.20 or later, for the application's `depends_on` with `required: false`. Native files' routes and the agent's tools are there while any app runs, and each running app is installed as an integration, `files:<app>`, switched per workspace like any other: WordCraft, once `FILES_CRAFTS` names it, is on in every workspace of every tenant until an admin switches it off, and the others are off until an admin switches them on.
 
-- **The workers have no route out.** Each runs read-only, as a user that isn't root, with no capabilities, under limits on its memory, CPUs and processes (`FILES_WORKER_MEMORY`, `FILES_WORKER_CPUS`, `FILES_WORKER_TMPFS`), and on the `files` network alone, which is internal: only the application reaches it, by its name, and no port is published. Each call's own limits are artifactr's (`FILES_WORKER_LIMITS`). `make serve` can't reach them, so native files need `make up`.
-- **The editors are origins of their own.** With the portal, GridCraft's, PdfCraft's and CADCraft's browser builds are served as released, each on its own port of this machine's loopback, 8802, 8803 and 8804 (`<APP>_EDITOR_PORT`), with lattice's shim, which only `PORTAL_URL` may frame, and the portal's `config.json` names them (`Site.editors`) for its check-out.
-- **Elsewhere, name each editor.** `APP_BIND` publishes the editors where it publishes the application, so a LAN is opt-in. On a tailnet, serve each editor on a port of its own, since an origin is a host and a port, and tell the application where they are, and where the portal is:
+- **The workers have no route out.** Each runs read-only, as a user that isn't root, with no capabilities, under an init, with limits on its memory and swap, CPUs and processes (`FILES_WORKER_MEMORY`, `FILES_WORKER_CPUS`, `FILES_WORKER_TMPFS`), and alone on a network of its own, `files-<app>`, which is internal: only the application, which joins each, reaches it, by its name, and no port is published. Each call's own limits are artifactr's (`FILES_WORKER_LIMITS`); after each call the worker kills whatever its user left running and empties `/tmp`. `make serve` can't reach them, so it runs native files off.
+- **The editors are origins of their own.** With the portal, GridCraft's, PdfCraft's and CADCraft's browser builds are served as released, each on its own port of this machine's loopback, `app_port` and two, three and four (`GRIDCRAFT_EDITOR_PORT`, `PDFCRAFT_EDITOR_PORT`, `CADCRAFT_EDITOR_PORT`), with lattice's shim, which only `PORTAL_URL` may frame, and the portal's `config.json` names them (`Site.editors`) for its check-out.
+- **Elsewhere, name each editor.** `APP_BIND` publishes the editors where it publishes the application, so a LAN is opt-in, and puts them before anyone on that network. `PORTAL_URL` must be the portal's origin exactly: `http://localhost:8800` is not `http://127.0.0.1:8800`, and a shim told one refuses the other. On a tailnet, serve each editor on a port of its own, since an origin is a host and a port, and tell the application where they are, and where the portal is:
 
   ```bash
   tailscale serve --bg --https=8802 http://127.0.0.1:8802
@@ -172,7 +172,7 @@ Each app is a Compose profile, `files-<app>`, which `make up` adds, and its firs
 
 - **No upload route yet.** Nothing in lattice makes a native file from an upload over HTTP: files arrive through `NativeFiles.upload` in code, and people check them out and in from the portal ([ADR-0043](../adr/0043-native-files-in-the-template.md)).
 
-`scripts/check-files` in stackr builds the workers and editors as a generated application does, and checks their posture, that they reach nothing, and that hostile files are refused in time.
+`scripts/check-files` in stackr builds the workers and editors as a generated application does, and checks their posture, value by value, that they reach nothing outside their networks, that nothing outlives a call, and that hostile files are refused in time.
 
 ## Keeping it up to date
 

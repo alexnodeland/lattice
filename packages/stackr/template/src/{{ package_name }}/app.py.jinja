@@ -153,7 +153,7 @@ def create_app(
 {%- endif %}
 {%- if use_files %}
         workers: How requests reach native files' workers; HTTP, by their names on the
-            ``files`` network, by default. Tests pass the workers themselves.
+            networks, by default. Tests pass the workers themselves.
 {%- endif %}
     """
     settings = settings or Settings.from_environ()
@@ -175,6 +175,9 @@ def create_app(
         database=database,
         grants=grants,
         telemetry=telemetry,
+{%- if use_files %}
+        files=settings.files.crafts,
+{%- endif %}
     )
 {%- if use_artifactr %}
     artifactr_hooks = access.grants.hooks(access.artifactr_subject)

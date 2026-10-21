@@ -8,8 +8,9 @@
 {%- if use_files %}
 #
 # Native files: each crafting app FILES_CRAFTS names runs in a worker of its own, files-<app>, in
-# the profile of the same name, which `make up` adds for each (stackr ADR-0043). A worker is on the
-# `files` network alone, which has no route out: only the application reaches it, by its name.
+# the profile of the same name, which `make up` adds for each (stackr ADR-0043). A worker is alone
+# on a network of its own, files-<app>, which has no route out: the application joins each, and
+# reaches the worker by its name, with the worker's own token. Needs Compose 2.20 or later.
 {%- if use_portal %} An
 # app whose browser build hands a file over has its editor too, files-<app>-editor, published on
 # this machine's loopback, on a port of its own: an origin of its own, which the portal frames.
@@ -19,24 +20,23 @@
 name: {{ project_slug }}
 {%- if use_files %}
 
-# A worker: the app's pinned CLI behind the token, under the worker's limits on each call, and
-# the container's own, read-only, with nothing to write but its tmpfs.
+# A worker: the app's pinned CLI behind its token, under the worker's limits on each call, and
+# the container's own, read-only, with nothing to write but its tmpfs, which runs nothing. An init
+# reaps what a call leaves, and the worker kills it, and empties /tmp, after each call.
 x-files-worker: &files-worker
   restart: unless-stopped
+  init: true
   read_only: true
   tmpfs:
     # Each call's directory: the file sent, the one saved, and what the app inflates.
-    - /tmp:size=${FILES_WORKER_TMPFS:-1g},mode=1777
+    - /tmp:size=${FILES_WORKER_TMPFS:-1g},mode=1777,noexec,nosuid,nodev
   user: "10002"
   cap_drop: [ALL]
   security_opt: [no-new-privileges:true]
   mem_limit: ${FILES_WORKER_MEMORY:-3g}
+  memswap_limit: ${FILES_WORKER_MEMORY:-3g}
   cpus: ${FILES_WORKER_CPUS:-2}
   pids_limit: 128
-  environment:
-    WORKER_TOKEN: ${FILES_WORKER_TOKEN:-}
-    WORKER_LIMITS: ${FILES_WORKER_LIMITS:-}
-  networks: [files]
   healthcheck:
     test:
       - CMD
@@ -52,14 +52,17 @@ x-files-worker: &files-worker
     start_period: 10s
 {%- if use_portal %}
 
-# An editor: the app's browser build, as released, and lattice's shim; it reaches nothing.
+# An editor: the app's browser build, as released, and lattice's shim. It holds no secret; its
+# network, which publishes its port, has a route out, which nothing in it uses.
 x-files-editor: &files-editor
   restart: unless-stopped
+  init: true
   read_only: true
   user: "10003"
   cap_drop: [ALL]
   security_opt: [no-new-privileges:true]
   mem_limit: 256m
+  memswap_limit: 256m
   pids_limit: 64
   environment:
     # The portal's origin, the only one that may frame the editor.
@@ -117,11 +120,18 @@ services:
         # Plane sends webhooks only to a name with a dot in it, which stackr's recipe allows.
         aliases: [app.stackr.internal]
       supabase: {}
-{%- if use_files %}
-      files: {}
-{%- endif %}
+{%- for name in crafts if use_files %}
+      files-{{ name }}: {}
+{%- endfor %}
+{%- elif use_files %}
+    networks:
+      - stackr
+      - supabase
+{%- for name in crafts %}
+      - files-{{ name }}
+{%- endfor %}
 {%- else %}
-    networks: [stackr, supabase{% if use_files %}, files{% endif %}]
+    networks: [stackr, supabase]
 {%- endif %}
 {%- if use_files %}
     # The workers FILES_CRAFTS starts, each answering before the application asks it which app
@@ -154,6 +164,10 @@ services:
       target: files-worker
       args: {CRAFT: {{ name }}, VERSION: "{{ craft.version }}"}
     image: {{ project_slug }}-files-{{ name }}:local
+    environment:
+      WORKER_TOKEN: ${{ '{' }}FILES_{{ name | upper }}_TOKEN:-}
+      WORKER_LIMITS: ${FILES_WORKER_LIMITS:-}
+    networks: [files-{{ name }}]
 {%- if use_portal and craft.editor %}
 
   files-{{ name }}-editor:
@@ -165,7 +179,7 @@ services:
       args: {CRAFT: {{ name }}}
     image: {{ project_slug }}-files-{{ name }}-editor:local
     ports:
-      - ${APP_BIND:-127.0.0.1}:${{ '{' }}{{ name | upper }}_EDITOR_PORT:-{{ craft.editor }}}:8000
+      - ${APP_BIND:-127.0.0.1}:${{ '{' }}{{ name | upper }}_EDITOR_PORT:-{{ app_port + craft.editor }}}:8000
 {%- endif %}
 {%- endfor %}
 {%- endif %}
@@ -177,9 +191,11 @@ networks:
     name: supabase_network_stackr-supabase
     external: true
 {%- if use_files %}
-  # The workers' network: the application and the workers, with no route out of it.
-  files:
+  # Each worker's network: the worker and the application, with no route out of it.
+{%- for name in crafts %}
+  files-{{ name }}:
     internal: true
+{%- endfor %}
 {%- if use_portal %}
   # The editors': a network of their own, which only publishes their ports.
   editors: {}

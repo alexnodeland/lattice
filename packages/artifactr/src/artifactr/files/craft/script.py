@@ -8,7 +8,10 @@ the call, and the files it wrote in `out/`; the process and the directory end wi
 and failures.
 """
 
+import contextlib
 import json
+import os
+import signal
 import subprocess
 import tempfile
 from collections.abc import Collection, Mapping, Sequence
@@ -136,7 +139,11 @@ class Script:
             return Ran(ran.result, self._written(root / "out", wanted))
 
     async def _process(self, root: Path, printed: int) -> None:
-        """The CLI, run to its end, or killed with the call when its deadline passes."""
+        """The CLI, run to its end, or killed with the call when its deadline passes.
+
+        It runs in a session of its own, and whatever of its group is left when the call ends,
+        however it ends, is killed with it: nothing it started outlives the call in its group.
+        """
         process = await anyio.open_process(
             [*self._command, "--pass", str(root / "call.json")],
             cwd=root,
@@ -144,14 +151,16 @@ class Script:
             stdin=subprocess.DEVNULL,
             stdout=printed,
             stderr=printed,
+            start_new_session=True,
         )
         try:
             await process.wait()
         finally:
-            if process.returncode is None:
-                process.kill()
-                with anyio.CancelScope(shield=True):
-                    await process.wait()
+            # The group is gone already, or only its leader is left, unreaped.
+            with contextlib.suppress(ProcessLookupError, PermissionError):
+                os.killpg(process.pid, signal.SIGKILL)
+            with anyio.CancelScope(shield=True):
+                await process.wait()
 
     def _written(self, out: Path, wanted: Collection[str]) -> dict[str, bytes]:
         """Each file wanted that the script wrote, refused as too large past the limit."""

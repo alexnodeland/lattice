@@ -131,10 +131,12 @@ python_version:
 
 app_port:
   type: int
-  help: The port it is published on, on this machine
+  help: The port it is published on, on this machine; the next four are its mini apps' and editors'
   default: 8800
   validator: >-
-    {% if app_port < 1024 or app_port > 65535 %}Choose a port from 1024 to 65535{% endif %}
+    {% if app_port < 1024 or app_port > 65531 %}Choose a port from 1024 to 65531: the next four are the
+    mini apps' (APPS_PORT) and native files' editors' (GRIDCRAFT_EDITOR_PORT, PDFCRAFT_EDITOR_PORT,
+    CADCRAFT_EDITOR_PORT){% endif %}
 
 # Never asked, and not recorded in the answers. The application installs the libraries from
 # lattice at the commit the template is rendered from (ADR-0018), so `copier update` moves them
@@ -190,15 +192,15 @@ use_integrations:
 
 # The apps a worker runs (lattice RFC-0003): each one's release, as lattice's scripts/crafts pins
 # it, which scripts/check-template holds this to; its native type; and, for an app whose browser
-# build hands a file over, the port its editor is published on.
+# build hands a file over, its editor's port: app_port and this.
 crafts:
   type: yaml
   default:
     wordcraft: {version: "0.7.0", type: WordDocument}
-    gridcraft: {version: "0.8.0", type: Workbook, editor: 8802}
+    gridcraft: {version: "0.8.0", type: Workbook, editor: 2}
     deckcraft: {version: "0.7.0", type: Presentation}
-    pdfcraft: {version: "0.8.0", type: PdfDocument, editor: 8803}
-    cadcraft: {version: "0.8.0", type: Drawing, editor: 8804}
+    pdfcraft: {version: "0.8.0", type: PdfDocument, editor: 3}
+    cadcraft: {version: "0.8.0", type: Drawing, editor: 4}
     photocraft: {version: "0.9.0", type: LayeredImage}
     vectorcraft: {version: "0.12.0", type: VectorImage}
     designcraft: {version: "0.9.0", type: PageLayout}

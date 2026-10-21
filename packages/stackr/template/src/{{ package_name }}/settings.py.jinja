@@ -125,17 +125,20 @@ class TrackerSettings:
 
 {% endif -%}
 {% if use_files -%}
-CRAFTS = (
-{%- for name in crafts %}
-    "{{ name }}",
+CRAFTS = {
+{%- for name, craft in crafts.items() %}
+    "{{ name }}": "{{ craft.version }}",
 {%- endfor %}
-)
-"""The crafting apps a worker runs, as ``FILES_CRAFTS`` names them."""
+}
+"""The apps a worker runs, as ``FILES_CRAFTS`` names them, and the version each one's pin names."""
+
+TOKEN = 32
+"""The fewest characters a worker's token may have: ``make env``'s have 64."""
 {%- if use_portal %}
 
-EDITORS = { {%- for name, craft in crafts.items() if craft.editor %}"{{ name }}": {{ craft.editor }}{{ ", " if not loop.last }}{% endfor -%} }
+EDITORS = { {%- for name, craft in crafts.items() if craft.editor %}"{{ name }}": {{ app_port + craft.editor }}{{ ", " if not loop.last }}{% endfor -%} }
 """The port each app's editor is published on, on this machine, for an app whose browser build
-hands a file over: compose.yaml's ``files-<app>-editor``."""
+hands a file over, unless ``<APP>_EDITOR_PORT`` moves it: compose.yaml's ``files-<app>-editor``."""
 {%- endif %}
 
 
@@ -146,7 +149,8 @@ class FilesSettings:
     Attributes:
         crafts: The apps whose workers run, ``files-<app>`` in the app profile: none by default,
             and then native files are off.
-        worker_token: The token each worker lets in, which ``make env`` generates.
+        tokens: Each running app's worker's token, ``FILES_<APP>_TOKEN``, which ``make env``
+            generates: one for each, so no worker holds another's.
 {%- if use_portal %}
         editors: Each app's editor, by its integration, as people's browsers reach it: by default,
             for each app that runs and has one, its port on this machine.
@@ -154,7 +158,7 @@ class FilesSettings:
     """
 
     crafts: tuple[str, ...] = ()
-    worker_token: str | None = field(default=None, repr=False)
+    tokens: Mapping[str, str] = field(default_factory=dict[str, str], repr=False)
 {%- if use_portal %}
     editors: Mapping[str, str] = field(default_factory=dict[str, str])
 {%- endif %}
@@ -164,8 +168,12 @@ class FilesSettings:
             raise ValueError(
                 f"FILES_CRAFTS names {', '.join(unknown)}: a worker runs {', '.join(CRAFTS)}"
             )
-        if self.crafts and not self.worker_token:
-            raise ValueError("FILES_CRAFTS needs FILES_WORKER_TOKEN, which `make env` generates")
+        for craft in self.crafts:
+            if len(self.tokens.get(craft, "")) < TOKEN:
+                raise ValueError(
+                    f"FILES_CRAFTS needs FILES_{craft.upper()}_TOKEN, of at least {TOKEN} "
+                    "characters, which `make env` generates"
+                )
 
     @classmethod
     def from_environ(cls, env: Mapping[str, str]) -> Self:
@@ -173,9 +181,9 @@ class FilesSettings:
         crafts = _names(env.get("FILES_CRAFTS", ""))
 {%- if use_portal %}
         loopback = {
-            f"files:{name}": f"http://127.0.0.1:{EDITORS[name]}/"
-            for name in crafts
-            if name in EDITORS
+            f"files:{name}": f"http://127.0.0.1:{env.get(f'{name.upper()}_EDITOR_PORT', port)}/"
+            for name, port in EDITORS.items()
+            if name in crafts
         }
         editors = (
             _json_object(env["FILES_EDITORS"], "FILES_EDITORS")
@@ -185,7 +193,11 @@ class FilesSettings:
 {%- endif %}
         return cls(
             crafts=crafts,
-            worker_token=env.get("FILES_WORKER_TOKEN"),
+            tokens={
+                craft: token
+                for craft in crafts
+                if (token := env.get(f"FILES_{craft.upper()}_TOKEN"))
+            },
 {%- if use_portal %}
             editors={key: str(url) for key, url in editors.items()},
 {%- endif %}

@@ -344,7 +344,8 @@ class AccessMachine(RuleBasedStateMachine):
 
 AccessMachine.TestCase.settings = settings(max_examples=200, stateful_step_count=30, deadline=None)
 
-TestAccessMachine = pytest.mark.timeout(300)(AccessMachine.TestCase)
+TestAccessMachine = pytest.mark.timeout(300, method="thread")(AccessMachine.TestCase)
 """Its 200 examples take 4 s on a laptop's core, but on CI's four cores, against PostgreSQL and
 beside three other workers, they ran past the suite's 60 s (run 39555510568, which ended its
-worker): five minutes, five times what ended it."""
+worker): five minutes, five times what ended it; and the thread method, as Hypothesis replays a
+failure once a signal's timer is spent (lattice ADR-0028)."""

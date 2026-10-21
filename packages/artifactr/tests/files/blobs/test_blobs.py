@@ -129,15 +129,19 @@ async def test_collection_keeps_what_is_named_or_put_lately(blobs: Blobs, clock:
     assert await blobs.collect(ACME, referenced, before=clock.now - DAY) == 0
 
 
-async def test_collection_deletes_in_batches(tmp_path: Path) -> None:
+async def test_collection_deletes_in_batches(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Three batches and a part of one: of five, so a dozen blobs take them, not 1,201."""
+    monkeypatch.setattr("artifactr.files.sql.blobs.BATCH", 5)
     clock = FakeClock()
     async with empty_database("sqlite", tmp_path) as database:
         engine = database.engine()
         await create_schema(engine)
         blobs = SqlBlobs(engine, clock=clock)
-        for n in range(1_201):
+        for n in range(16):
             await blobs.put(ACME, "a1", once(str(n).encode()), DOCX)
-        assert await blobs.collect(ACME, set(), before=clock.now + DAY) == 1_201
+        assert await blobs.collect(ACME, set(), before=clock.now + DAY) == 16
 
 
 # ─── collection against a model of it, over every storage ────────────────────
@@ -206,6 +210,10 @@ async def _collect(shared: Shared, puts: list[Put], named: list[int]) -> None:
         assert (found is None) == ((artifact, digest) in doomed)
 
 
+# 100 examples: 2.3 s alone on PostgreSQL, 53 s with every core busy beside xdist's other
+# workers, near the minute a test may take: five minutes. A Hypothesis test keeps the thread
+# method: Hypothesis replays a failure, and a signal's timer is spent by then (lattice ADR-0028).
+@pytest.mark.timeout(300, method="thread")
 @settings(
     max_examples=100,
     deadline=None,

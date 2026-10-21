@@ -386,7 +386,7 @@ export function CheckOut({
           </Button>
         )}
         {editor !== null && !here && (
-          <TextLink href={editor} target="_blank" rel="noopener noreferrer">
+          <TextLink variant="external" href={editor}>
             Open {app}
           </TextLink>
         )}

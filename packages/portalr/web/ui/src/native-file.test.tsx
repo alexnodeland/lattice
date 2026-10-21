@@ -49,6 +49,7 @@ test.each([
   ["application/vnd.adobe.indesign-idml-package", "Page layout"],
   ["application/x-figcraft", "Design"],
   ["application/x-extension-fcstd", "3D model"],
+  ["application/x-blender", "3D scene"],
 ])("a %s file is called a %s", (mediaType, type) => {
   expect(factsOf({ content: { media_type: mediaType } }).type).toBe(type);
 });

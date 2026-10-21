@@ -106,12 +106,12 @@ tasks:
   # each file of its corpus, feature by feature, and its adapter runs live, as does WordCraft's
   # check-out pilot over HTTP with the browser build served. CRAFT names the app, wordcraft if
   # unset; Nightly runs it for each app with a corpus and publishes the matrix. It downloads the
-  # release scripts/craft pins, once. FreeCAD has no browser build.
+  # release scripts/craft pins, once. FreeCAD and Blender have no browser build.
   fidelity:
     description: "Run a crafting app's fidelity report and live tests, on its pinned CLI (CRAFT=app)"
     script: >-
       app=${CRAFT:-wordcraft} && cli=$($workspaceRoot/scripts/craft $app cli)
-      && web=$(if [ $app != freecad ]; then $workspaceRoot/scripts/craft $app web; fi)
+      && web=$(case $app in freecad | blender) ;; *) $workspaceRoot/scripts/craft $app web ;; esac)
       && ARTIFACTR_TEST_CRAFT=$app ARTIFACTR_TEST_CRAFT_CLI=$cli ARTIFACTR_TEST_CRAFT_WEB=$web
       uv run pytest -m craft -p no:cacheprovider tests/files
     # It runs in CI, where Nightly names it; no pull request's job does.

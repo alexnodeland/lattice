@@ -50,8 +50,16 @@ evals = ["evalr>=0.1.0"]
 # Native files (lattice RFC-0003): artifactr.files, with its SQL stores in the sql extra. The
 # extra names the integration, and carries the apps' adapters' dependencies: WordCraft's speaks
 # MCP on stdio, under anyio's deadlines (lattice ADR-0026); the worker serves an app over HTTP,
-# and the application calls it with httpx.
-files = ["mcp>=2.2", "anyio>=4.9", "starlette>=0.46.0", "uvicorn>=0.35", "httpx>=0.28"]
+# and the application calls it with httpx. Blender's scan inflates a file Blender compressed with
+# zstd, which Python 3.12's standard library can't (native files ADR-0015).
+files = [
+    "mcp>=2.2",
+    "anyio>=4.9",
+    "starlette>=0.46.0",
+    "uvicorn>=0.35",
+    "httpx>=0.28",
+    "zstandard>=0.25",
+]
 # Forms and dashboards in the chat, artifactr.ui (ADR-0074): what it imports beyond artifactr's own
 # dependencies, Pydantic's core, which Pydantic installs already. The name an application installs
 # the forms by, which a dependency they ever need joins.
@@ -102,10 +110,10 @@ module-name = "artifactr"
 [tool.deptry.package_module_name_map]
 lattice-core-ai = "lattice_core"
 
-# FreeCAD's script runs in FreeCAD's own interpreter, on its modules and the Pillow it ships
-# (native files ADR-0014).
+# FreeCAD's script runs in FreeCAD's own interpreter, on its modules and the Pillow it ships, and
+# Blender's in Blender's, on its modules (native files ADR-0014, ADR-0015).
 [tool.deptry.per_rule_ignores]
-DEP001 = ["FreeCAD", "Part", "Sketcher", "TechDraw", "PIL"]
+DEP001 = ["FreeCAD", "Part", "Sketcher", "TechDraw", "PIL", "bpy", "bmesh", "mathutils"]
 
 # ─── types ────────────────────────────────────────────────────────────────────
 
@@ -143,9 +151,12 @@ branch = true
 source = ["src/artifactr"]
 # SQLAlchemy runs run_sync callables in a greenlet, which coverage follows only when told.
 concurrency = ["greenlet", "thread"]
-# FreeCAD's script runs in FreeCAD's own interpreter, which pull requests don't have; Nightly's
-# fidelity job runs it live (native files ADR-0014).
-omit = ["src/artifactr/files/freecad/console/script.py"]
+# FreeCAD's and Blender's scripts run in their apps' own interpreters, which pull requests don't
+# have; Nightly's fidelity job runs them live (native files ADR-0014, ADR-0015).
+omit = [
+    "src/artifactr/files/freecad/console/script.py",
+    "src/artifactr/files/blender/console/script.py",
+]
 
 [tool.coverage.report]
 fail_under = 100

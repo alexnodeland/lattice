@@ -312,4 +312,17 @@
   --bubble-pad-y: var(--space-2);
   --composer-radius: var(--radius-4);
   --composer-pad: var(--space-1);
+
+  /*
+   * An alert's corners and padding; inline code's corners and padding; and the sign-in card's
+   * corners and padding.
+   */
+  --alert-radius: var(--radius-3);
+  --alert-pad-x: var(--space-3);
+  --alert-pad-y: var(--space-2);
+  --code-inline-radius: var(--radius-2);
+  --code-inline-pad-x: var(--space-1-5);
+  --code-inline-pad-y: var(--space-half);
+  --sign-in-radius: var(--radius-5);
+  --sign-in-pad: 2rem;
 }

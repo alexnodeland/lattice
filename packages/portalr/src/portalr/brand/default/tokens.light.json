@@ -964,6 +964,39 @@
       "pad": {
         "$value": "{space.1}"
       }
+    },
+    "alert": {
+      "radius": {
+        "$value": "{radius.3}"
+      },
+      "pad-x": {
+        "$value": "{space.3}"
+      },
+      "pad-y": {
+        "$value": "{space.2}"
+      }
+    },
+    "code-inline": {
+      "radius": {
+        "$value": "{radius.2}"
+      },
+      "pad-x": {
+        "$value": "{space.1-5}"
+      },
+      "pad-y": {
+        "$value": "{space.half}"
+      }
+    },
+    "sign-in": {
+      "radius": {
+        "$value": "{radius.5}"
+      },
+      "pad": {
+        "$value": {
+          "value": 2,
+          "unit": "rem"
+        }
+      }
     }
   }
 }

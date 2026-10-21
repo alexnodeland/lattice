@@ -365,6 +365,20 @@ COMPONENTS: tuple[Group, ...] = (
             Row("component.composer.pad", "--composer-pad", "dimension"),
         ),
     ),
+    Group(
+        "An alert's corners and padding; inline code's corners and padding; and the sign-in "
+        "card's corners and padding.",
+        (
+            Row("component.alert.radius", "--alert-radius", "dimension"),
+            Row("component.alert.pad-x", "--alert-pad-x", "dimension"),
+            Row("component.alert.pad-y", "--alert-pad-y", "dimension"),
+            Row("component.code-inline.radius", "--code-inline-radius", "dimension"),
+            Row("component.code-inline.pad-x", "--code-inline-pad-x", "dimension"),
+            Row("component.code-inline.pad-y", "--code-inline-pad-y", "dimension"),
+            Row("component.sign-in.radius", "--sign-in-radius", "dimension"),
+            Row("component.sign-in.pad", "--sign-in-pad", "dimension"),
+        ),
+    ),
 )
 """Each component's tokens, defaulting to a role or a primitive (portalr ADR-0056)."""
 

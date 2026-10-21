@@ -11,8 +11,9 @@
 #   its memory, swap, CPUs and processes limited, no mount but its tmpfs, which runs nothing, no
 #   device, no port published, and on its own internal network alone
 # - reaches nothing outside it: no name resolves, host.docker.internal included; and TCP to a
-#   public IPv4 and IPv6 address, UDP to a public resolver, the cloud metadata address and the
-#   network's gateway, each fail. (ICMP can't be tried: the worker has no CAP_NET_RAW.)
+#   public IPv4 and IPv6 address, UDP to a public resolver and the cloud metadata address each
+#   fail; and the network has no gateway, so the host has no address on it. (ICMP can't be
+#   tried: the worker has no CAP_NET_RAW.)
 # - answers a probe on its network (scripts/_files_probe.py): its release's licences and notices
 #   in its image; the app at its pinned version, behind its own token; a new file made, read and
 #   rendered; and hostile files refused within their deadline
@@ -101,14 +102,14 @@ log "ok: ${services[*]} started and answered their health checks"
 
 # A container's posture, as Docker runs it.
 posture() {
-  docker inspect --format '{{.HostConfig.ReadonlyRootfs}} {{.Config.User}} {{.HostConfig.Privileged}} cap-add={{.HostConfig.CapAdd}} cap-drop={{.HostConfig.CapDrop}} {{.HostConfig.SecurityOpt}} init={{.HostConfig.Init}} memory={{.HostConfig.Memory}} swap={{.HostConfig.MemorySwap}} cpus={{.HostConfig.NanoCpus}} pids={{.HostConfig.PidsLimit}} pid-mode={{.HostConfig.PidMode}} mounts={{len .Mounts}} devices={{len .HostConfig.Devices}} tmpfs={{range $at, $how := .HostConfig.Tmpfs}}{{$at}}:{{$how}}{{end}} network={{.HostConfig.NetworkMode}} networks={{range $net, $_ := .NetworkSettings.Networks}}{{$net}} {{end}}' "$1"
+  docker inspect --format '{{.HostConfig.ReadonlyRootfs}} {{.Config.User}} {{.HostConfig.Privileged}} cap-add={{.HostConfig.CapAdd}} cap-drop={{.HostConfig.CapDrop}} {{.HostConfig.SecurityOpt}} init={{.HostConfig.Init}} memory={{.HostConfig.Memory}} swap={{.HostConfig.MemorySwap}} cpus={{.HostConfig.NanoCpus}} pids={{.HostConfig.PidsLimit}} pid-mode={{.HostConfig.PidMode}} mounts={{len .Mounts}} devices={{if .HostConfig.Devices}}{{len .HostConfig.Devices}}{{else}}0{{end}} tmpfs={{range $at, $how := .HostConfig.Tmpfs}}{{$at}}:{{$how}}{{end}} network={{.HostConfig.NetworkMode}} networks={{range $net, $_ := .NetworkSettings.Networks}}{{$net}} {{end}}' "$1"
 }
 setting() { docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$1" | sed -n "s/^$2=//p"; }
 
 # Run inside the worker, given its network's gateway: nothing outside the network answers.
 egress='
 import socket, sys
-gateway = sys.argv[1]
+gateway = sys.argv[1] if len(sys.argv) > 1 else ""
 def refused(what, attempt):
     try:
         attempt()
@@ -133,8 +134,11 @@ results = [
     refused("TCP to [2606:4700:4700::1111]:443", lambda: tcp(socket.AF_INET6, "2606:4700:4700::1111", 443)),
     refused("UDP DNS to 1.1.1.1:53", udp_dns),
     refused("TCP to 169.254.169.254:80", lambda: tcp(socket.AF_INET, "169.254.169.254", 80)),
-    refused(f"TCP to the gateway, {gateway}:80", lambda: tcp(socket.AF_INET, gateway, 80)),
 ]
+if gateway:
+    results.append(refused(f"TCP to the gateway, {gateway}:80", lambda: tcp(socket.AF_INET, gateway, 80)))
+else:
+    print("  refused: the network has no gateway, so the host has no address on it")
 sys.exit(0 if all(results) else 1)
 '
 # Run inside the worker after the probe's calls: what was planted before them is gone.
@@ -156,8 +160,9 @@ for app in "${apps[@]}"; do
   check "$app's worker publishes no port" \
     same "$(docker inspect --format '{{len .HostConfig.PortBindings}}' "$container")" 0
   gateway=$(docker network inspect --format '{{range .IPAM.Config}}{{.Gateway}}{{end}}' "$network")
+  check "$app's network has no gateway, so the host has no address on it" same "$gateway" ""
   check "$app's worker reaches nothing outside its network" \
-    docker exec "$container" python -I -c "$egress" "$gateway"
+    docker exec "$container" python -I -c "$egress" ${gateway:+"$gateway"}
 
   # A process its user leaves, and a file for the next call, before the probe's calls.
   docker exec --detach --user 10002 "$container" sleep 600

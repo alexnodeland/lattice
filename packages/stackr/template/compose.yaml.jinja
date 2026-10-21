@@ -195,6 +195,9 @@ networks:
 {%- for name in crafts %}
   files-{{ name }}:
     internal: true
+    # No address for the host on it, so a worker reaches nothing of the host's either.
+    driver_opts:
+      com.docker.network.bridge.inhibit_ipv4: "true"
 {%- endfor %}
 {%- if use_portal %}
   # The editors': a network of their own, which only publishes their ports.

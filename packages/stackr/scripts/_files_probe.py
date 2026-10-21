@@ -33,7 +33,12 @@ from artifactr.files.worker import Limits, Worker
 
 DEADLINE = 30.0
 LICENCE = re.compile(r"(LICEN[CS]E|COPYING)", re.IGNORECASE)
-DRAWN = {"freecad": [AppCommand(name="box", args={"length": 10, "width": 10, "height": 10})]}
+DRAWN = {
+    "freecad": [AppCommand(name="box", args={"length": 10, "width": 10, "height": 10})],
+    "figcraft": [
+        AppCommand(name="frame.create", args={"x": 0, "y": 0, "width": 200, "height": 100})
+    ],
+}
 """What a new file is given, for an app whose blank file has nothing to render."""
 failed: list[str] = []
 """What failed, which the exit status tells."""

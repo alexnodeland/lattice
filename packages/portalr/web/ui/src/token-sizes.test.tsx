@@ -51,6 +51,7 @@ test("a menu enters and leaves at the popover's scale", async () => {
     <Menu label="Actions" items={[{ label: "Open", onSelect: () => undefined }]} />,
   );
   await screen.getByRole("button", { name: "Actions" }).click();
+  await expect.element(page.getByRole("menu")).toBeVisible();
   const menu = page.getByRole("menu").element();
   menu.setAttribute("data-starting-style", "");
   expect(getComputedStyle(menu).scale).toBe("0.98");

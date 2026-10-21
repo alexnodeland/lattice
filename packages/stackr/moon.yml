@@ -130,6 +130,21 @@ tasks:
     options:
       cache: false
 
+  # Online, and it builds images, so not one of check's dependencies: CI's "Native files" job runs
+  # it on each architecture (ADR-0043). Its application installs the libraries from GitHub at HEAD.
+  files:
+    description: "Build native files' workers and editors from the pinned releases, and check them"
+    command: 'scripts/check-files'
+    inputs:
+      - 'scripts/check-files'
+      - 'scripts/_files_probe.py'
+      - 'copier.yml'
+      - 'template/**/*'
+      - '/copier.yml'
+      - '/uv.lock'
+    options:
+      cache: false
+
   check:
     description: "Run the project's checks, as CI does"
     command: 'noop'

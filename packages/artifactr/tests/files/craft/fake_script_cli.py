@@ -2,12 +2,14 @@
 
 Run as `python -I fake_script_cli.py [ARGUMENTS...] SCRIPT --pass CALL`. It writes its result
 beside the call, as a script does: `echo`, the call, its arguments and its environment; `write`,
-a file in `out/` of `size` bytes; `refuse`; `other`, a result from another version; `crash`, no
-result; `hang`, never ending.
+a file in `out/` of `size` bytes; `linger`, a process left behind in its group, its id in
+`out/lingering`; `refuse`; `other`, a result from another version; `crash`, no result; `hang`,
+never ending.
 """
 
 import json
 import os
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -29,6 +31,9 @@ def main() -> None:
             }
         case "write":
             (here / "out" / "saved.txt").write_bytes(b"x" * call["size"])
+        case "linger":
+            lingering = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+            (here / "out" / "lingering").write_text(str(lingering.pid))
         case "refuse":
             result["refused"] = "no such command"
         case "other":

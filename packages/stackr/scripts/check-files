@@ -1,0 +1,224 @@
+#!/usr/bin/env bash
+# Check native files' workers and editors as an application from the template runs them (stackr
+# ADR-0043): each app's image, built from its pinned release, run by the application's own
+# compose.yaml, with nothing else of the application or the stack.
+#
+# Usage: scripts/check-files [APP...]   (default: every app a worker runs)
+#
+# For each app, its worker:
+# - runs as compose.yaml says, each value as configured: read-only, as user 10002, with no
+#   capabilities added and all dropped, no new privileges, not privileged, under an init, with
+#   its memory, swap, CPUs and processes limited, no mount but its tmpfs, which runs nothing, no
+#   device, no port published, and on its own internal network alone
+# - reaches nothing outside it: no name resolves, host.docker.internal included; and TCP to a
+#   public IPv4 and IPv6 address, UDP to a public resolver and the cloud metadata address each
+#   fail; and the network is made with no address for the host on it (inhibit_ipv4). (ICMP
+#   can't be tried: the worker has no CAP_NET_RAW.)
+# - answers a probe on its network (scripts/_files_probe.py): its release's licences and notices
+#   in its image; the app at its pinned version, behind its own token; a new file made, read and
+#   rendered; and hostile files refused within their deadline
+# - leaves nothing from one call to the next: a process its user started and a file in /tmp
+#   before the probe's calls are gone after them
+# And its editor, for an app whose build hands a file over: as configured, read-only, as user
+# 10003, published on 127.0.0.1 alone, serving the build and lattice's shim, which only the
+# portal may frame.
+#
+# The application is generated at HEAD, whose libraries its image installs from GitHub, so HEAD
+# must be pushed and the working tree clean, as `scripts/smoke app` needs. Everything it makes is
+# named stackr-files-check, and removed by that name when it ends.
+
+set -euo pipefail
+cd "$(dirname "$0")/.."
+unset DOCKER_DEFAULT_PLATFORM
+
+readonly name=stackr-files-check
+status=0
+scratch=$(mktemp -d)
+app_dir=$scratch/$name
+apps=("$@")
+if ((${#apps[@]} == 0)); then
+  read -ra apps <<<"$(uv run python -c "import yaml; print(*yaml.safe_load(open('copier.yml'))['crafts']['default'])")"
+fi
+# An app's version, as copier.yml has it from its pin.
+version_of() {
+  uv run python -c "import sys, yaml; print(yaml.safe_load(open('copier.yml'))['crafts']['default'][sys.argv[1]]['version'])" "$1"
+}
+
+log() { printf '%s\n' "$*"; }
+check() {
+  local what=$1
+  shift
+  if "$@"; then log "ok: $what"; else log "FAIL: $what"; status=1; fi
+}
+same() { [[ $1 == "$2" ]] || { log "  is:     $1"; log "  wanted: $2"; return 1; }; }
+compose() { docker compose --project-name "$name" --project-directory "$app_dir" "$@"; }
+upper() { tr '[:lower:]' '[:upper:]' <<<"$1"; }
+
+cleanup() {
+  if [[ -f $app_dir/compose.yaml ]]; then
+    compose --profile '*' down --volumes --remove-orphans --timeout 5 >/dev/null 2>&1 || true
+    for app in "${apps[@]}"; do
+      docker rm -f "$name-probe-$app" >/dev/null 2>&1 || true
+      docker image rm "$name-files-$app:local" "$name-files-$app-editor:local" >/dev/null 2>&1 || true
+    done
+  fi
+  rm -rf "$scratch"
+}
+trap cleanup EXIT
+
+log "files: Docker Engine $(docker version --format '{{.Server.Version}}'), Compose $(docker compose version --short)"
+log "files: generating $name from the template, and building ${apps[*]}"
+if ! uv run copier copy --quiet --defaults --vcs-ref HEAD --data project_name="$name" \
+  --data libraries=artifactr --data evals=false ../.. "$app_dir" 2>/dev/null ||
+  ! uv lock --quiet --directory "$app_dir"; then
+  log "FAIL: generating it from the template, with the libraries at HEAD, which must be pushed, with a clean working tree"
+  exit 1
+fi
+(
+  umask 077
+  cat "$app_dir/.env.example"
+  printf 'FILES_CRAFTS=%s\n' "$(IFS=,; printf '%s' "${apps[*]}")"
+  for app in "${apps[@]}"; do
+    printf 'FILES_%s_TOKEN=%s\n' "$(upper "$app")" "$(openssl rand -hex 32)"
+    # Each editor on a port Docker chooses, on this machine's loopback.
+    printf '%s_EDITOR_PORT=0\n' "$(upper "$app")"
+  done
+) >"$app_dir/.env"
+
+profiles=()
+services=()
+for app in "${apps[@]}"; do
+  profiles+=(--profile "files-$app")
+  services+=("files-$app")
+  if compose "${profiles[@]}" config --services | grep -qx "files-$app-editor"; then
+    services+=("files-$app-editor")
+  fi
+done
+if ! compose "${profiles[@]}" up --detach --build --wait --wait-timeout 300 "${services[@]}"; then
+  log "FAIL: the workers and editors started and answered their health checks"
+  compose "${profiles[@]}" logs --no-color --tail=100 || true
+  exit 1
+fi
+log "ok: ${services[*]} started and answered their health checks"
+
+# A container's posture, as Docker runs it.
+posture() {
+  docker inspect "$1" | jq -r '.[0] | .HostConfig as $h | [
+    "read-only=\($h.ReadonlyRootfs)", "user=\(.Config.User)", "privileged=\($h.Privileged)",
+    "cap-add=\($h.CapAdd // [] | join(","))", "cap-drop=\($h.CapDrop // [] | join(","))",
+    "security=\($h.SecurityOpt // [] | join(","))", "init=\($h.Init)",
+    "memory=\($h.Memory)", "swap=\($h.MemorySwap)", "cpus=\($h.NanoCpus)", "pids=\($h.PidsLimit)",
+    "pid-mode=\($h.PidMode)", "mounts=\(.Mounts | length)", "devices=\($h.Devices // [] | length)",
+    "tmpfs=\($h.Tmpfs // {} | to_entries | map("\(.key):\(.value)") | join(","))",
+    "network=\($h.NetworkMode)", "networks=\(.NetworkSettings.Networks | keys | join(","))"
+  ] | join(" ")'
+}
+setting() { docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$1" | sed -n "s/^$2=//p"; }
+
+# Run inside the worker, given where the host's address would be on its network, and the
+# worker's own: nothing outside the network answers, nor the host on it.
+egress='
+import socket, sys
+host, own = sys.argv[1], sys.argv[2]
+def refused(what, attempt):
+    try:
+        attempt()
+    except OSError as error:
+        print(f"  refused: {what}: {error}")
+        return True
+    print(f"  REACHED: {what}")
+    return False
+def tcp(family, host, port):
+    with socket.socket(family, socket.SOCK_STREAM) as s:
+        s.settimeout(5)
+        s.connect((host, port))
+def udp_dns():
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+        s.settimeout(5)
+        s.sendto(bytes.fromhex("abcd01000001000000000000076578616d706c6503636f6d0000010001"), ("1.1.1.1", 53))
+        s.recvfrom(512)
+results = [
+    refused("resolving github.com", lambda: socket.getaddrinfo("github.com", 443)),
+    refused("resolving host.docker.internal", lambda: socket.getaddrinfo("host.docker.internal", 80)),
+    refused("TCP to 1.1.1.1:443", lambda: tcp(socket.AF_INET, "1.1.1.1", 443)),
+    refused("TCP to [2606:4700:4700::1111]:443", lambda: tcp(socket.AF_INET6, "2606:4700:4700::1111", 443)),
+    refused("UDP DNS to 1.1.1.1:53", udp_dns),
+    refused("TCP to 169.254.169.254:80", lambda: tcp(socket.AF_INET, "169.254.169.254", 80)),
+]
+if host == own:
+    print(f"  passed over: {host}, where the host would be, is the worker itself")
+else:
+    try:
+        tcp(socket.AF_INET, host, 80)
+    except ConnectionRefusedError as answered:
+        print(f"  REACHED: {host}, where the host would be, answered: {answered}")
+        results.append(False)
+    except OSError as error:
+        print(f"  refused: TCP to {host}:80, where the host would be: {error}")
+sys.exit(0 if all(results) else 1)
+'
+# Run inside the worker: what was planted is there (`there`), or gone (`gone`).
+left='
+import os, sys
+strays = [p for p in os.listdir("/proc") if p.isdigit() and open(f"/proc/{p}/cmdline", "rb").read().split(b"\0")[0] == b"sleep"]
+planted = sorted(os.listdir("/tmp"))
+print(f"  processes: {strays}; in /tmp: {planted}")
+there = bool(strays) and planted == ["planted", "sealed"]
+sys.exit(0 if there == (sys.argv[1] == "there") and (there or not strays and not planted) else 1)
+'
+
+for app in "${apps[@]}"; do
+  container=$(compose ps --quiet "files-$app")
+  network="${name}_files-$app"
+  check "$app's network is internal" \
+    same "$(docker network inspect --format '{{.Internal}}' "$network")" true
+  check "$app's worker runs as compose.yaml says" same "$(posture "$container")" \
+    "read-only=true user=10002 privileged=false cap-add= cap-drop=ALL security=no-new-privileges:true init=true memory=3221225472 swap=3221225472 cpus=2000000000 pids=128 pid-mode= mounts=0 devices=0 tmpfs=/tmp:size=1g,mode=1777,noexec,nosuid,nodev network=$network networks=$network"
+  check "$app's worker publishes no port" \
+    same "$(docker inspect --format '{{len .HostConfig.PortBindings}}' "$container")" 0
+  check "$app's network gives the host no address on it" same \
+    "$(docker network inspect --format '{{index .Options "com.docker.network.bridge.inhibit_ipv4"}}' "$network")" true
+  # Where the host's address would be: Docker's gateway, or else the subnet's first address.
+  host=$(docker network inspect --format '{{range .IPAM.Config}}{{.Gateway}}{{end}}' "$network")
+  if [[ ! $host =~ ^[0-9.]+$ ]]; then
+    subnet=$(docker network inspect --format '{{range .IPAM.Config}}{{.Subnet}}{{end}}' "$network")
+    host="${subnet%.*/*}.1"
+  fi
+  own=$(docker inspect --format "{{(index .NetworkSettings.Networks \"$network\").IPAddress}}" "$container")
+  check "$app's worker reaches nothing outside its network, nor the host on it" \
+    docker exec "$container" python -I -c "$egress" "$host" "$own"
+
+  # A process its user leaves in a session of its own, a file for the next call, and a
+  # directory none may list, before the probe's calls.
+  docker exec --detach --user 10002 "$container" setsid sleep 600
+  docker exec --user 10002 "$container" sh -c \
+    'echo planted >/tmp/planted && mkdir /tmp/sealed && echo filler >/tmp/sealed/f && chmod 000 /tmp/sealed'
+  check "$app's worker holds what was planted, before the probe's calls" \
+    docker exec "$container" python -I -c "$left" there
+  WORKER_TOKEN=$(setting "$container" WORKER_TOKEN)
+  export WORKER_TOKEN
+  version=$(version_of "$app")
+  check "$app's worker answers its probe" \
+    docker run --rm --name "$name-probe-$app" --network "$network" --read-only --tmpfs /tmp \
+    --env WORKER_TOKEN --volume "$PWD/scripts/_files_probe.py:/probe.py:ro" --entrypoint python \
+    "$name-files-$app:local" -I /probe.py "http://files-$app:8080" "$app" "$version"
+  unset WORKER_TOKEN
+  check "$app's worker kept nothing of one call for the next" \
+    docker exec "$container" python -I -c "$left" gone
+
+  if [[ " ${services[*]} " == *" files-$app-editor "* ]]; then
+    editor=$(compose ps --quiet "files-$app-editor")
+    check "$app's editor runs as compose.yaml says" same "$(posture "$editor")" \
+      "read-only=true user=10003 privileged=false cap-add= cap-drop=ALL security=no-new-privileges:true init=true memory=268435456 swap=268435456 cpus=0 pids=64 pid-mode= mounts=0 devices=0 tmpfs= network=${name}_editors networks=${name}_editors"
+    published=$(compose port "files-$app-editor" 8000)
+    check "$app's editor is published on this machine's loopback alone ($published)" \
+      same "${published%:*}" 127.0.0.1
+    portal=$(setting "$editor" PORTAL_URL)
+    shim=$(curl --silent --show-error --fail --dump-header - --output /dev/null \
+      "http://$published/.lattice/shim.html") || shim=""
+    check "$app's editor serves lattice's shim, which only the portal, $portal, may frame" \
+      grep -qiF "frame-ancestors $portal" <<<"$shim"
+  fi
+done
+
+exit $status

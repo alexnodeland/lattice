@@ -28,6 +28,12 @@ LOOKUP: Final = 30.0
 """The seconds a lookup's reply is waited for, which the worker gives no deadline of its caller's:
 an edit's longest by default."""
 
+FRESH: Final = httpx.Limits(max_keepalive_connections=0)
+"""A connection for each call, closed with it. A call reusing one the worker has kept open finds
+it closed, as `ReadError`, where the worker's server closed it as idle just as the call was sent:
+the more likely the longer a caller is busy between calls, as with building a large file. A call
+is seconds of a CLI's work; a connection to the worker on its own network is a millisecond's."""
+
 _SPECS = TypeAdapter(list[CommandSpec])
 
 
@@ -58,7 +64,10 @@ class Worker:
             transport: How requests are sent, for tests; HTTP by default.
         """
         client = httpx.AsyncClient(
-            base_url=url, headers={"Authorization": f"Bearer {token}"}, transport=transport
+            base_url=url,
+            headers={"Authorization": f"Bearer {token}"},
+            transport=transport,
+            limits=FRESH,
         )
         return cls(client)
 

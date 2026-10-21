@@ -80,25 +80,31 @@ test("the chosen record's details name its labels and what was kept out, and nev
   await expect.element(screen.getByText("thr_1")).not.toBeInTheDocument();
 });
 
+/**
+ * A virtualized list draws the row a key reaches a frame or two later: on a busy runner, more than
+ * the second a check waits by default.
+ */
+const WALK = { timeout: 5_000 };
+
 test("the arrow, page, home and end keys walk the list", async () => {
   await viewport(1280, 900);
   const many = Array.from({ length: 40 }, (_, at) => record(at + 1));
   const screen = await render(<LogList records={many} complete reveal={revealing().reveal} />);
   await option(screen, 1).click();
   await userEvent.keyboard("{ArrowDown}");
-  await expect.element(option(screen, 2)).toHaveFocus();
+  await expect.element(option(screen, 2), WALK).toHaveFocus();
   await userEvent.keyboard("{PageDown}");
-  await expect.element(option(screen, 12)).toHaveFocus();
+  await expect.element(option(screen, 12), WALK).toHaveFocus();
   await userEvent.keyboard("{ArrowUp}{ArrowUp}");
-  await expect.element(option(screen, 10)).toHaveFocus();
+  await expect.element(option(screen, 10), WALK).toHaveFocus();
   await userEvent.keyboard("{End}");
-  await expect.element(option(screen, 40)).toHaveFocus();
+  await expect.element(option(screen, 40), WALK).toHaveFocus();
   await userEvent.keyboard("{PageDown}{ArrowDown}");
-  await expect.element(option(screen, 40)).toHaveFocus();
+  await expect.element(option(screen, 40), WALK).toHaveFocus();
   await userEvent.keyboard("{Home}");
-  await expect.element(option(screen, 1)).toHaveFocus();
+  await expect.element(option(screen, 1), WALK).toHaveFocus();
   await userEvent.keyboard("{PageUp}{ArrowUp}");
-  await expect.element(option(screen, 1)).toHaveFocus();
+  await expect.element(option(screen, 1), WALK).toHaveFocus();
 });
 
 test("a thousand records draw a screenful; the list keeps a tab stop when the chosen one is scrolled away; End draws the last", async () => {

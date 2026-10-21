@@ -7,14 +7,17 @@ anything that may run Python or read another file. Its script confines nothing, 
 made only with `trusted=True`.
 """
 
+import math
 from collections.abc import Sequence
 from pathlib import Path
 from typing import ClassVar, Final
 
+import anyio
+import anyio.to_thread
 from pydantic import BaseModel, JsonValue
 
 from artifactr.files.app import AppCommand, AppFailed, Applied, CommandSpec, Inspection, Talk
-from artifactr.files.blender.document import LIMIT, fingerprint, scan
+from artifactr.files.blender.document import LIMIT, Scanned, fingerprint, scan
 from artifactr.files.craft import CRAFTS, FOUND, PREVIEW, Craft, Script
 from artifactr.files.manifest import BLEND, OUTLINE_LIMIT
 
@@ -24,6 +27,12 @@ and nothing that imports every module of artifactr must reach it."""
 
 SAVED: Final = "document.blend"
 """What the script saves a file as, in `out/`."""
+
+BATCH: Final = 200
+"""The most commands a batch may hold."""
+
+WIDEST: Final = 4096
+"""The widest a page may be drawn, in pixels."""
 
 ARGUMENTS: Final = (
     "--background",
@@ -206,7 +215,11 @@ class Subprocess:
 
         The batch stops at the first command that fails, which refuses it whole.
         """
-        scanned = None if source is None else scan(source, self.limit)
+        if len(commands) > BATCH:
+            raise AppFailed("refused", f"a batch holds at most {BATCH} commands")
+        scanned, deadline = (
+            (None, deadline) if source is None else await self._scan(source, deadline)
+        )
         call: dict[str, JsonValue] = {
             "step": "apply",
             "compressed": True if scanned is None else scanned.compressed,
@@ -216,27 +229,30 @@ class Subprocess:
         ran = await self._script.run(deadline, call, given, self.extension, wanted={SAVED})
         if (saved := ran.files.get(SAVED)) is None:
             raise AppFailed("crashed", "Blender saved no file")
-        return Applied(content=saved, inspection=self._inspection(saved, ran.result))
+        return Applied(content=saved, inspection=await self._inspection(saved, ran.result))
 
     async def inspect(self, source: bytes, *, deadline: float) -> Inspection:
         """Read a file's objects, materials and collections, and its fingerprint."""
-        scanned = scan(source, self.limit)
+        scanned, deadline = await self._scan(source, deadline)
         ran = await self._script.run(deadline, {"step": "inspect"}, scanned.content, self.extension)
-        return self._inspection(source, ran.result)
+        return await self._inspection(source, ran.result)
 
     async def render(self, source: bytes, page: int, *, scale: float, deadline: float) -> bytes:
         """Draw the scene through its camera, by Workbench, `PREVIEW` times `scale` wide, as page 1.
 
         Raises:
-            AppFailed: `refused` too for any page but the first, or a scene with no camera.
+            AppFailed: `refused` too for any page but the first, a scale that isn't a positive
+                number, or a scene with no camera.
         """
         if page != 1:
             raise AppFailed("refused", f"no page {page}: a scene is drawn as page 1")
-        scanned = scan(source, self.limit)
+        if not math.isfinite(scale) or scale <= 0:
+            raise AppFailed("refused", f"a scale must be a positive number, not {scale}")
+        scanned, deadline = await self._scan(source, deadline)
         call: dict[str, JsonValue] = {
             "step": "render",
             "page": page,
-            "width": max(16, round(PREVIEW * scale)),
+            "width": min(WIDEST, max(16, round(PREVIEW * scale))),
         }
         ran = await self._script.run(
             deadline, call, scanned.content, self.extension, wanted={"page.png"}
@@ -251,7 +267,25 @@ class Subprocess:
         found = [c for c in COMMANDS if asked in f"{c.name} {c.description}".casefold()]
         return found[:FOUND]
 
-    def _inspection(self, content: bytes, result: JsonValue) -> Inspection:
+    async def _scan(self, source: bytes, deadline: float) -> tuple[Scanned, float]:
+        """The source, scanned in a thread under the call's deadline, and what is left of it.
+
+        The scan's work is bounded, so a thread left behind past the deadline ends soon after.
+
+        Raises:
+            AppFailed: `timeout` past the deadline, and whatever the scan refuses.
+        """
+        started = anyio.current_time()
+        try:
+            with anyio.fail_after(deadline):
+                scanned = await anyio.to_thread.run_sync(
+                    scan, source, self.limit, abandon_on_cancel=True
+                )
+        except TimeoutError:
+            raise AppFailed("timeout", f"the scan took more than {deadline:.3g}s") from None
+        return scanned, deadline - (anyio.current_time() - started)
+
+    async def _inspection(self, content: bytes, result: JsonValue) -> Inspection:
         """The objects as the outline, a line each, with the collections they are in."""
         reading = _Reading.model_validate(result)
         outline = "\n".join(
@@ -259,7 +293,7 @@ class Subprocess:
             for o in reading.objects
         )
         return Inspection(
-            fingerprint=fingerprint(content, self.limit),
+            fingerprint=await anyio.to_thread.run_sync(fingerprint, content, self.limit),
             outline=outline[:OUTLINE_LIMIT],
             text="\n".join(f"Material: {m}" for m in reading.materials),
             pages=1,

@@ -7,6 +7,7 @@ calls against Blender itself.
 import ast
 import stat
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -134,3 +135,25 @@ def test_its_commands_are_the_scripts() -> None:
     ]
     assert isinstance(table, ast.Dict)
     assert [ast.literal_eval(key) for key in table.keys if key] == [c.name for c in COMMANDS]
+
+
+async def test_a_batch_past_its_most_commands_or_a_scale_that_isnt_a_number_is_refused(
+    blender: Subprocess,
+) -> None:
+    with pytest.raises(AppFailed, match="at most 200 commands"):
+        await blender.apply(None, [cube()] * 201, deadline=10)
+    for scale in (0.0, -1.0, float("nan"), float("inf")):
+        with pytest.raises(AppFailed, match="a scale must be a positive number"):
+            await blender.render(SOURCE, 1, scale=scale, deadline=10)
+
+
+async def test_a_scan_past_the_deadline_is_a_timeout(
+    blender: Subprocess, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def slow(*_: object) -> None:
+        time.sleep(0.5)
+
+    monkeypatch.setattr("artifactr.files.blender.headless.scan", slow)
+    with pytest.raises(AppFailed, match="the scan took more than") as failed:
+        await blender.inspect(SOURCE, deadline=0.05)
+    assert failed.value.failure == "timeout"

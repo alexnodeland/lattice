@@ -48,6 +48,21 @@ class Headless(ABC):
     build: str | None = None
     """It runs on this machine, in no image."""
 
+    denied: ClassVar[tuple[str, ...]] = ()
+    """The prefixes of the commands no batch may run, such as `file.`, which reach past the open
+    file: refused before any command runs, and never found."""
+
+    def allowed(self, commands: Sequence[AppCommand]) -> None:
+        """Refuse a batch that holds a denied command, before any runs.
+
+        Raises:
+            AppFailed: `refused`, naming the command.
+        """
+        if found := next((c.name for c in commands if c.name.startswith(self.denied)), None):
+            raise AppFailed(
+                "refused", f"{found}: {self.craft.title}'s adapter runs no such command"
+            )
+
     def __init__(
         self,
         cli: str | Path,

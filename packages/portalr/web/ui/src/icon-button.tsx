@@ -28,7 +28,7 @@ type AsButton = Named &
 /** An icon link: the link `render` gives, such as the router's, which takes no button props. */
 type AsLink = Named & { render: ReactElement };
 
-/** How far the tooltip sits from what it names, in pixels, as Base UI's positioner takes it. */
+/** How far the tooltip sits from what it names, in pixels, as Base UI takes it: base.css counts it. */
 const OFFSET = 6;
 
 /**

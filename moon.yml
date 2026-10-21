@@ -32,7 +32,7 @@ tasks:
   # scripts/craft's run it.
   test:
     description: "Run lattice's tests"
-    command: 'uv run pytest'
+    command: 'uv run pytest --durations=10'
     inputs:
       - '**/*.py'
       - 'packages/*/scripts/*'

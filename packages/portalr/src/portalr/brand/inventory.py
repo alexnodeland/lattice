@@ -420,6 +420,20 @@ COMPONENTS: tuple[Group, ...] = (
             Row("component.list-row.line-gap", "--list-row-line-gap", "dimension"),
         ),
     ),
+    Group(
+        "An icon button, an action named by its icon and a tooltip: its size, a target 24px or "
+        "more, its corners and its icon's size; and a tooltip's padding, corners and shadow "
+        "(portalr ADR-0061).",
+        (
+            Row("component.icon-button.size", "--icon-button-size", "dimension"),
+            Row("component.icon-button.radius", "--icon-button-radius", "dimension"),
+            Row("component.icon-button.icon", "--icon-button-icon", "dimension"),
+            Row("component.tooltip.pad-x", "--tooltip-pad-x", "dimension"),
+            Row("component.tooltip.pad-y", "--tooltip-pad-y", "dimension"),
+            Row("component.tooltip.radius", "--tooltip-radius", "dimension"),
+            Row("component.tooltip.shadow", "--tooltip-shadow", "shadow"),
+        ),
+    ),
 )
 """Each component's tokens, defaulting to a role or a primitive (portalr ADR-0056)."""
 

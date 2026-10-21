@@ -15,7 +15,6 @@ import {
   factsOf,
   InlineArtifact,
   Reading,
-  TextLink,
 } from "@portalr/ui";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
@@ -62,16 +61,10 @@ export function ThreadArtifact({
   const name =
     (latest && titleOf(latest.kind, latest.data)) ?? kindName(artifact.kind, latest?.data ?? {});
   const open = (
-    <TextLink
-      render={
-        <Link
-          to="/t/$tenant/w/$workspace/artifacts/$artifact"
-          params={{ tenant, workspace, artifact: artifact.id }}
-        />
-      }
-    >
-      Open its page
-    </TextLink>
+    <Link
+      to="/t/$tenant/w/$workspace/artifacts/$artifact"
+      params={{ tenant, workspace, artifact: artifact.id }}
+    />
   );
   const native = NATIVE.get(artifact.kind);
   return (

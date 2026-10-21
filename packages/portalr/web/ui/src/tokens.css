@@ -361,4 +361,17 @@
   --list-row-pad-y: var(--space-3);
   --list-row-gap: var(--space-3);
   --list-row-line-gap: var(--space-half);
+
+  /*
+   * An icon button, an action named by its icon and a tooltip: its size, a target 24px or more,
+   * its corners and its icon's size; and a tooltip's padding, corners and shadow (portalr
+   * ADR-0061).
+   */
+  --icon-button-size: 2rem;
+  --icon-button-radius: var(--radius-3);
+  --icon-button-icon: 1rem;
+  --tooltip-pad-x: var(--space-2);
+  --tooltip-pad-y: var(--space-1);
+  --tooltip-radius: var(--radius-3);
+  --tooltip-shadow: var(--shadow-2);
 }

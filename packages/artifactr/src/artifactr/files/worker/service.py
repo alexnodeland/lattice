@@ -49,7 +49,7 @@ def worker_app(
         limits: The deadlines and sizes each call is held to.
         build: The digest of the image the worker runs in, which provenance records.
         sweep: What clears the worker's container after each call, before the next is taken:
-            [`sweep`][artifactr.files.worker.sweep.sweep], where the worker is alone in it.
+            `artifactr.files.worker.sweep.sweep`, where the worker is alone in it.
 
     Raises:
         ValueError: If the token is empty, which would admit anyone.

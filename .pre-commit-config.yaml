@@ -7,11 +7,12 @@ repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
-      # Each CHANGELOG.md is release-please's output, kept exactly as it writes it.
+      # Each CHANGELOG.md is release-please's output, and each corpus project a crafting app's,
+      # kept exactly as they write them.
       - id: trailing-whitespace
-        exclude: (^|/)CHANGELOG\.md$
+        exclude: (^|/)CHANGELOG\.md$|^packages/artifactr/tests/files/corpus/\w+/\w+\.(fcproj|ecproj|scraft)$
       - id: end-of-file-fixer
-        exclude: (^|/)CHANGELOG\.md$
+        exclude: (^|/)CHANGELOG\.md$|^packages/artifactr/tests/files/corpus/\w+/\w+\.(fcproj|ecproj|scraft)$
       - id: check-yaml
         # The root copier.yml includes stackr's with a tag of Copier's own.
         exclude: ^copier\.yml$

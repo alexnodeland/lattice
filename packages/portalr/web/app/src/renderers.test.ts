@@ -15,6 +15,9 @@ test("each native file's kind is shown as a native file, and switched by its app
     "design",
     "cad_model",
     "scene",
+    "video_project",
+    "motion_graphics",
+    "audio_session",
   ]);
   for (const [kind, native] of NATIVE) {
     expect(RENDERERS.has(kind)).toBe(true);

@@ -85,8 +85,11 @@ class CommandsDialect(Headless):
     ) -> None:
         """Run the commands through `command_batch`, which stops at the first that fails.
 
+        A batch that holds a denied command is refused before any runs.
+
         A step its reply says failed refuses the batch, whether the reply is an error or not.
         """
+        self.allowed(commands)
         steps: list[JsonValue] = [
             {"id": command.name, "params": self.params(document, command.args)}
             for command in commands
@@ -115,8 +118,8 @@ class CommandsDialect(Headless):
 
     @override
     async def find(self, server: Server, query: str) -> Sequence[CommandSpec]:
-        """The commands `command_list` finds for the query, ten at most."""
-        return listed("command_list", await server.json("command_list", filter=query))
+        """The commands `command_list` finds for the query, ten at most, none of them denied."""
+        return listed("command_list", await server.json("command_list", filter=query), self.denied)
 
     def named(self, step: str, opened: JsonValue) -> JsonValue:
         """What a step that opened a file, or made one, says the server calls it, by `handle`.

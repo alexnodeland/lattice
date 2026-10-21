@@ -11,6 +11,7 @@ import { Alert, type AlertTone } from "./alert";
 import { Button } from "./button";
 import { fileSize } from "./native-file";
 import { Progress } from "./progress";
+import { Row, Rows } from "./rows";
 
 /** The bidirectional controls a name could reorder the words around it with. */
 const BIDI = /[\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/g;
@@ -48,61 +49,59 @@ export function UploadList({
     return null;
   }
   return (
-    <ul aria-label="Uploads" className="flex min-w-0 flex-col gap-3">
-      {items.map((item) => (
-        <li key={item.id} className="flex min-w-0 flex-col gap-2 text-sm">
-          {item.state === "sending" ? (
-            <Progress
-              label={`Uploading ${plainName(item.name)}`}
-              value={item.sent ?? 0}
-              max={item.size}
-              valueText={`${fileSize(item.sent ?? 0)} of ${fileSize(item.size)}`}
-            />
-          ) : (
-            <p className="flex flex-wrap gap-x-2">
-              <bdi className="break-all font-mono">{plainName(item.name)}</bdi>
-              <span className="text-muted">
-                {fileSize(item.size)}
-                {item.state === "waiting" && ", waiting"}
-              </span>
-            </p>
-          )}
-          {item.said !== undefined && (
-            <Alert tone={item.tone ?? "info"} live={false}>
-              {item.said}
-            </Alert>
-          )}
-          <div className="flex flex-wrap gap-2">
-            {item.state === "sending" && (
-              <Button variant="secondary" size="sm" onClick={() => onStop(item.id)}>
-                Stop
-                <span className="sr-only">
-                  {" "}
-                  uploading <bdi>{plainName(item.name)}</bdi>
-                </span>
-              </Button>
-            )}
-            {item.state === "failed" && item.again && (
-              <Button size="sm" onClick={() => onRetry(item.id)}>
-                Try again
-                <span className="sr-only">
-                  {" "}
-                  to upload <bdi>{plainName(item.name)}</bdi>
-                </span>
-              </Button>
-            )}
-            {item.state !== "sending" && (
-              <Button variant="secondary" size="sm" onClick={() => onRemove(item.id)}>
-                {item.state === "waiting" ? "Don't upload" : "Dismiss"}
-                <span className="sr-only">
-                  {" "}
-                  <bdi>{plainName(item.name)}</bdi>
-                </span>
-              </Button>
-            )}
-          </div>
-        </li>
-      ))}
-    </ul>
+    <Rows label="Uploads">
+      {items.map((item) => {
+        const name = <bdi>{plainName(item.name)}</bdi>;
+        return (
+          <Row
+            key={item.id}
+            name={<span className="break-all font-mono">{name}</span>}
+            meta={
+              <div className="flex flex-col gap-2">
+                {item.state === "sending" ? (
+                  <Progress
+                    label={`Uploading ${plainName(item.name)}`}
+                    shown="Uploading"
+                    value={item.sent ?? 0}
+                    max={item.size}
+                    valueText={`${fileSize(item.sent ?? 0)} of ${fileSize(item.size)}`}
+                  />
+                ) : (
+                  <span>
+                    {fileSize(item.size)}
+                    {item.state === "waiting" && ", waiting"}
+                  </span>
+                )}
+                {item.said !== undefined && (
+                  <Alert tone={item.tone ?? "info"} live={false}>
+                    {item.said}
+                  </Alert>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  {item.state === "sending" && (
+                    <Button variant="secondary" size="sm" onClick={() => onStop(item.id)}>
+                      Stop
+                      <span className="sr-only"> uploading {name}</span>
+                    </Button>
+                  )}
+                  {item.state === "failed" && item.again && (
+                    <Button size="sm" onClick={() => onRetry(item.id)}>
+                      Try again
+                      <span className="sr-only"> to upload {name}</span>
+                    </Button>
+                  )}
+                  {item.state !== "sending" && (
+                    <Button variant="secondary" size="sm" onClick={() => onRemove(item.id)}>
+                      {item.state === "waiting" ? "Don't upload" : "Dismiss"}
+                      <span className="sr-only"> {name}</span>
+                    </Button>
+                  )}
+                </div>
+              </div>
+            }
+          />
+        );
+      })}
+    </Rows>
   );
 }

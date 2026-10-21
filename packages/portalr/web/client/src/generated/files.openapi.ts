@@ -446,6 +446,8 @@ export interface components {
             extensions: string[];
             /** Kind */
             kind: string;
+            /** Limit */
+            limit: number;
         };
         /**
          * Uploaded

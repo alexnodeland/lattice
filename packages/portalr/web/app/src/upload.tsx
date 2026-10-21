@@ -219,6 +219,8 @@ export function Uploader({
     const name = plainName(file.name);
     const kinds = kindsOf(file.name, offered.kinds);
     const [kind] = kinds;
+    // A kind's own limit, below the upload's where its app takes smaller files.
+    const most = offered.kinds.find((k) => k.kind === kind)?.limit ?? offered.limit;
     const problem =
       kind === undefined
         ? `${name} isn't a kind of file this workspace takes.`
@@ -226,8 +228,8 @@ export function Uploader({
           ? `${name} could be several kinds of file, so it can't be told which to make.`
           : !on.some((k) => k.kind === kind)
             ? `${appOf(kind)} is off in this workspace, so ${name} can't be uploaded.`
-            : file.size > offered.limit
-              ? `${name} is ${fileSize(file.size)}: the largest file an upload takes is ${fileSize(offered.limit)}.`
+            : file.size > most
+              ? `${name} is ${fileSize(file.size)}: the largest file of its kind an upload takes is ${fileSize(most)}.`
               : null;
     const item: Queued = {
       id: newArtifactId(),

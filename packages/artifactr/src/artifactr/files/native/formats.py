@@ -34,6 +34,9 @@ from artifactr.files.manifest import (
 HEAD: Final = 4096
 """How many of an upload's first bytes its format is told from."""
 
+PROJECT: Final = 2 << 20
+"""The most bytes a crafting app's JSON project holds, as its adapter reads it (`craft.project`)."""
+
 NAME_LIMIT: Final = 200
 """The most characters a file's name keeps, with its extension."""
 
@@ -54,6 +57,9 @@ class Format:
     """The extension a file of it is named with, such as `.docx`."""
     matches: Callable[[bytes], bool]
     """Whether the first bytes, up to `HEAD`, may be a file of it."""
+    most: int | None = None
+    """The most bytes a file of it holds, if fewer than the store keeps: past them an upload is
+    refused as it streams, rather than read whole only for the app to refuse it."""
     told: bool = True
     """Whether its first bytes tell it from every other format: not for one packaged in a zip,
     which an upload's app must then name, or the upload is refused."""
@@ -98,9 +104,9 @@ FORMATS: Final[Mapping[str, Format]] = {
     DXF: Format(".dxf", _dxf),
     SVG: Format(".svg", _svg),
     # The crafting apps' projects are JSON objects alike: the app tells them apart.
-    FCPROJ: Format(".fcproj", _json, told=False),
-    ECPROJ: Format(".ecproj", _json, told=False),
-    SCRAFT: Format(".scraft", _json, told=False),
+    FCPROJ: Format(".fcproj", _json, most=PROJECT, told=False),
+    ECPROJ: Format(".ecproj", _json, most=PROJECT, told=False),
+    SCRAFT: Format(".scraft", _json, most=PROJECT, told=False),
     # Blender's own header, or zstd's frame, which Blender compresses with: the app tells them.
     BLEND: Format(
         ".blend", lambda head: head.startswith((b"BLENDER", b"\x28\xb5\x2f\xfd")), told=False

@@ -50,12 +50,16 @@ class Pace:
 
 
 class Gauge:
-    """At most `most` at once, and `each` of them anyone's: another is refused, never queued."""
+    """At most `most` at once, `tenant` of them a tenant's, and `each` of them a person's.
 
-    def __init__(self, most: int, *, each: int) -> None:
-        if not 1 <= each <= most:
-            raise ValueError("a gauge lets at least one through, and each no more than all")
+    Past any of them, another is refused, never queued.
+    """
+
+    def __init__(self, most: int, *, tenant: int, each: int) -> None:
+        if not 1 <= each <= tenant <= most:
+            raise ValueError("a gauge lets at least one through, each person no more than a tenant")
         self._most = most
+        self._tenant = tenant
         self._each = each
         self._held: Counter[tuple[str, str]] = Counter()
 
@@ -63,9 +67,14 @@ class Gauge:
     def held(self, who: tuple[str, str]) -> Generator[bool]:
         """Hold a place for a tenant's participant while the block runs, yielding True.
 
-        Yields False instead if no place is free, or they hold their share.
+        Yields False instead if no place is free, or their tenant or they hold their share.
         """
-        if self._held.total() >= self._most or self._held[who] >= self._each:
+        tenants = sum(n for (tenant, _), n in self._held.items() if tenant == who[0])
+        if (
+            self._held.total() >= self._most
+            or tenants >= self._tenant
+            or self._held[who] >= self._each
+        ):
             yield False
             return
         self._held[who] += 1

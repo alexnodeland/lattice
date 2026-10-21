@@ -22,7 +22,7 @@ export const useBrand = () => useContext(BrandContext);
 const MOUNT = "/portalr/";
 
 /** A path of the kit's, as `config.json` gives it, as the page fetches it. */
-export const brandUrl = (path: string) => `${MOUNT}${path}`;
+const brandUrl = (path: string) => `${MOUNT}${path}`;
 
 /** The product's name in a UI: its own in the app, admin's in admin. */
 export const brandName = (brand: Brand, ui: Ui) =>

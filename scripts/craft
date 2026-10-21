@@ -36,8 +36,9 @@ readonly PIN
 
 release='[0-9]+\.[0-9]+\.[0-9]+'
 repository=storytold/$app tag=v cli=$app-cli
+depth=''
 if [[ $app == blender ]]; then
-  cli=blender
+  cli=blender depth=2
   case "$what:$(uname -s):$(uname -m)" in
     cli:Linux:x86_64 | notices:Linux:x86_64) ;;
     *) echo "craft: Blender has no $what for $(uname -s) $(uname -m)" >&2; exit 2 ;;
@@ -113,7 +114,8 @@ if [[ ! -e $unpacked ]]; then
 fi
 
 case $what in
-  cli) found=$(find "$unpacked/" -type f -name "$cli" -perm -u+x -print -quit) ;;
+  # Blender's executable is at its tarball's root, where no other file of its name may stand in.
+  cli) found=$(find "$unpacked/" ${depth:+-maxdepth "$depth"} -type f -name "$cli" -perm -u+x -print -quit) ;;
   web) found=$(find "$unpacked/" -type f -name index.html -print -quit) && found=${found%/*} ;;
   notices) if [[ $app == blender ]]; then
     found=$(find "$unpacked/" -maxdepth 3 -type f \( -path '*/license/*' -o -name copyright.txt \) \

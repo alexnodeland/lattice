@@ -127,7 +127,7 @@ class Script:
                     ran = _Result.model_validate_json((root / "result.json").read_bytes())
                 except (OSError, ValidationError):
                     # A script that ended before writing its result: what it printed says why.
-                    printed.seek(0)
+                    printed.seek(max(0, printed.seek(0, 2) - 2000))
                     said = printed.read()[-500:].strip()
                     raise AppFailed(
                         "crashed", f"{cli} wrote no result; it printed: {said}"

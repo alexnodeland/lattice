@@ -218,6 +218,8 @@ def test_blenders_pin_is_its_releases_linux_x86_64_tarball() -> None:
 
 
 BLENDER = tarball(
+    # A file of the same name deeper than the root comes first, and is never the CLI.
+    "blender-9.9.9-linux-x64/9.9/scripts/deep/blender",
     "blender-9.9.9-linux-x64/blender",
     "blender-9.9.9-linux-x64/blender-launcher",
     "blender-9.9.9-linux-x64/copyright.txt",

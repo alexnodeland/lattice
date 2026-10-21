@@ -960,10 +960,14 @@ export interface RunPaused {
 export interface DeferredRequest {
   args?: Args;
   kind: Kind17;
+  review?: Review;
   tool_call_id: ToolCallId3;
   tool_name: ToolName2;
 }
 export interface Args {
+  [k: string]: JsonValue;
+}
+export interface Review {
   [k: string]: JsonValue;
 }
 /**

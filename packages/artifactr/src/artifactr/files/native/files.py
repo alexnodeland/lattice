@@ -290,7 +290,9 @@ class NativeFiles:
                 raise AppFailed("refused", f"the file is not a {file_type.kind}")
         if media_type not in file_type.formats:
             raise ValidationFailed(f"a {file_type.kind} holds {sorted(file_type.formats)}", [])
-        content = await spool(data, self._blobs.limit)
+        known = self._formats.get(media_type)
+        most = self._blobs.limit if known is None or known.most is None else known.most
+        content = await spool(data, min(most, self._blobs.limit))
         if artifact_id is not None and (uploaded := await _existing(ws, artifact_id)):
             if uploaded.data.content.sha256 != hashlib.sha256(content).hexdigest():
                 raise InvalidState(f"artifact {artifact_id} already exists")
@@ -301,7 +303,6 @@ class NativeFiles:
         ):
             # Never the format the app named: it is the worker's text, which a file can shape.
             raise ValidationFailed("the app read the file as another format than its kind's", [])
-        known = self._formats.get(media_type)
         name = file_name(name, "" if known is None else known.extension, self._formats)
         artifact_id = artifact_id or new_artifact_id()
         made = Provenance(source="upload")

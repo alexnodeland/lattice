@@ -195,6 +195,7 @@ def files_router(
     limit: int | None = None,
     uploads_per_minute: int = 20,
     uploads_at_once: int = 8,
+    uploads_per_tenant: int = 4,
     uploads_each: int = 2,
     body: Body | None = None,
 ) -> APIRouter:
@@ -215,8 +216,10 @@ def files_router(
         uploads_at_once: How many uploads and check-ins this process takes at once, from every
             tenant, past which another is refused with 429 at once: each holds its file in
             memory.
+        uploads_per_tenant: How many of them one tenant's people may have at once, so that
+            one tenant never holds every place.
         uploads_each: How many of them one person may have at once, so that one person's slow
-            bodies never hold every place.
+            bodies never hold their tenant's places.
         body: How slowly an upload's body may arrive before it is refused with 408: a pause
             of 30 seconds, and 32 KiB a second on average, by default.
 
@@ -229,7 +232,7 @@ def files_router(
         raise ValueError(f"the router's limit, {limit}, is past the blob store's, {files.limit}")
     router = APIRouter(responses=REFUSALS)
     pace = Pace(uploads_per_minute)
-    taking = Gauge(uploads_at_once, each=uploads_each)
+    taking = Gauge(uploads_at_once, tenant=uploads_per_tenant, each=uploads_each)
     pacing = body or Body()
 
     async def workspace_of(request: Request, workspace_id: PathId) -> Workspace:

@@ -3,13 +3,14 @@ before anything is committed, named safely, sent again safely, and read a few at
 """
 
 import asyncio
+from collections.abc import AsyncIterator
 from typing import get_args
 
 import pytest
 
 from artifactr.core import Applied, InvalidState, Proposed, UserActor, ValidationFailed
 from artifactr.files.app import AppFailed, Failure, FakeApp, Inspection
-from artifactr.files.blobs import InMemoryBlobs, Quota, once
+from artifactr.files.blobs import InMemoryBlobs, Quota, TooLarge, once
 from artifactr.files.checkouts import InMemoryCheckouts
 from artifactr.files.manifest import (
     DOCX,
@@ -215,3 +216,17 @@ async def test_a_refused_check_in_holds_nothing_against_a_quota() -> None:
             await files.check_in(ws, checkout.id, once(FakeApp.file("y" * 800)))
     app.fails = None
     assert await files.check_in(ws, checkout.id, once(FakeApp.file("z"))), "room was kept"
+
+
+async def test_a_project_past_what_its_app_reads_is_refused_as_it_streams(stores: Stores) -> None:
+    files = NativeFiles(stores.blobs, stores.checkouts, Names(FCPROJ))
+    read: list[int] = []
+
+    async def big() -> AsyncIterator[bytes]:
+        for i in range(64):
+            read.append(i)
+            yield b"{" if i == 0 else b" " * (64 << 10)
+
+    with pytest.raises(TooLarge):
+        await files.upload(await workspace(), VideoProject, "cut.fcproj", big())
+    assert len(read) < 64, "refused before it was all read"

@@ -84,7 +84,9 @@ test("with no id nothing is asked for, and the page says to enter one", async ()
 
 test("the ids in the address make the links they give, each opened in a new tab without an opener", async () => {
   const { screen } = await open("/deployment/tools?trace=t1&session=thr_1&run=run_1&tenant=acme");
-  await expect.element(screen.getByRole("link", { name: "The trace in Langfuse" })).toBeVisible();
+  await expect
+    .element(screen.getByRole("link", { name: "The trace in Langfuse (opens in a new tab)" }))
+    .toBeVisible();
   expect(asks).toHaveLength(1);
   expect(Object.fromEntries(asks[0] ?? [])).toEqual({
     trace_id: "t1",
@@ -102,7 +104,7 @@ test("the ids in the address make the links they give, each opened in a new tab 
     "The tenant's traces in Grafana, from Tempo",
   ];
   for (const name of names) {
-    const link = screen.getByRole("link", { name }).element();
+    const link = screen.getByRole("link", { name: `${name} (opens in a new tab)` }).element();
     expect(link.getAttribute("target")).toBe("_blank");
     expect(link.getAttribute("rel")).toBe("noopener noreferrer");
     expect(link.getAttribute("href")).toMatch(/^http:\/\//);
@@ -112,10 +114,14 @@ test("the ids in the address make the links they give, each opened in a new tab 
 test("only the links an id gives are shown", async () => {
   const { screen } = await open("/deployment/tools?run=run_1");
   await expect
-    .element(screen.getByRole("link", { name: "The run's logs in Grafana, from Loki" }))
+    .element(
+      screen.getByRole("link", {
+        name: "The run's logs in Grafana, from Loki (opens in a new tab)",
+      }),
+    )
     .toBeVisible();
   await expect
-    .element(screen.getByRole("link", { name: "The trace in Langfuse" }))
+    .element(screen.getByRole("link", { name: "The trace in Langfuse (opens in a new tab)" }))
     .not.toBeInTheDocument();
 });
 
@@ -145,13 +151,17 @@ test("a tool that isn't configured says it has no links", async () => {
     .element(screen.getByText("Langfuse isn't configured here, so it has no links."))
     .toBeVisible();
   await expect
-    .element(screen.getByRole("link", { name: "The trace in Grafana, from Tempo" }))
+    .element(
+      screen.getByRole("link", { name: "The trace in Grafana, from Tempo (opens in a new tab)" }),
+    )
     .toBeVisible();
 });
 
 test("asking for others is another page, and each ask is a read of its own", async () => {
   const { screen, router } = await open("/deployment/tools?trace=t1");
-  await expect.element(screen.getByRole("link", { name: "The trace in Langfuse" })).toBeVisible();
+  await expect
+    .element(screen.getByRole("link", { name: "The trace in Langfuse (opens in a new tab)" }))
+    .toBeVisible();
   await screen.getByRole("textbox", { name: "Trace id" }).fill("t2");
   await choose(screen, "Tenant", "globex");
   await screen.getByRole("button", { name: "Get links" }).click();

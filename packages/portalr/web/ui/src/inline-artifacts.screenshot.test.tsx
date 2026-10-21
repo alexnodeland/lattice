@@ -147,7 +147,10 @@ async function shown(width: number) {
   await expect.element(screen.getByRole("img", { name: "Page 1 of 4" })).toBeVisible();
   // The note's code once it is highlighted, which is an add-on that loads as it is asked for.
   await expect
-    .poll(() => document.querySelectorAll('[aria-label="ts code"] span[style]').length)
+    // The first test to ask for it waits for the add-on to load, as a cold page would.
+    .poll(() => document.querySelectorAll('[aria-label="ts code"] span[style]').length, {
+      timeout: 15_000,
+    })
     .toBeGreaterThan(3);
   // The dashboard's bar chart names its series once its labels are measured.
   await expect

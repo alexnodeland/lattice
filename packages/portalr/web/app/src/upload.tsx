@@ -38,7 +38,7 @@ interface Queued extends UploadItem {
 }
 
 /** How many times a file the app couldn't finish is offered to be sent again. */
-export const RETRIES = 2;
+const RETRIES = 2;
 
 /** The app that reads a kind, as people call it, such as "WordCraft". */
 export const appOf = (kind: string) => NATIVE.get(kind)?.app ?? kind;

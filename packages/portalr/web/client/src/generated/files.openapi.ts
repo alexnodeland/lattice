@@ -60,7 +60,7 @@ export interface paths {
          * @description Upload a file as a new native file of `kind`: its bytes are the body, streamed.
          *
          *     Its `Content-Type` is never read: the format is the one of the kind's that its first
-         *     bytes are, and the app reads the file before anything is committed. Give an
+         *     bytes are, and the app reads the file before anything is stored or committed. Give an
          *     `artifact_id` to send it again safely: a file already there with these bytes is
          *     `unchanged`, and one with others is refused.
          */
@@ -557,6 +557,15 @@ export interface operations {
                 };
             };
             /** @description Refused */
+            408: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -658,6 +667,15 @@ export interface operations {
             };
             /** @description Refused */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            408: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -779,6 +797,15 @@ export interface operations {
                 };
             };
             /** @description Refused */
+            408: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -875,6 +902,15 @@ export interface operations {
             };
             /** @description Refused */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            408: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -987,6 +1023,15 @@ export interface operations {
                 };
             };
             /** @description Refused */
+            408: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -1084,6 +1129,15 @@ export interface operations {
             };
             /** @description Refused */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            408: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1198,6 +1252,15 @@ export interface operations {
                 };
             };
             /** @description Refused */
+            408: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -1295,6 +1358,15 @@ export interface operations {
             };
             /** @description Refused */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            408: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1408,6 +1480,15 @@ export interface operations {
                 };
             };
             /** @description Refused */
+            408: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -1512,6 +1593,15 @@ export interface operations {
                 };
             };
             /** @description Refused */
+            408: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -1607,6 +1697,15 @@ export interface operations {
             };
             /** @description Refused */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            408: {
                 headers: {
                     [name: string]: unknown;
                 };

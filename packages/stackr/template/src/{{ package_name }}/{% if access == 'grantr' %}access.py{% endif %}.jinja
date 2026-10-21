@@ -120,6 +120,9 @@ INSTALLED: Final[list[str]] = [
 {%- if use_portal %}
     "markdown:math",
 {%- endif %}
+{%- for name in crafts if use_files %}
+    "files:{{ name }}",
+{%- endfor %}
 ]
 """The integrations the application ships, which its tenants' and workspaces' admins switch:
 any other of lattice's is off everywhere (grantr's ``installed``)."""

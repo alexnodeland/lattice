@@ -90,7 +90,7 @@ check "the files network is internal" \
 # A container's posture as Docker runs it.
 posture() {
   docker inspect --format \
-    '{{.HostConfig.ReadonlyRootfs}} {{.Config.User}} {{.HostConfig.CapDrop}} {{.HostConfig.SecurityOpt}} {{.HostConfig.Memory}} {{.HostConfig.NanoCpus}} {{.HostConfig.PidsLimit}} {{len .NetworkSettings.Ports}} {{range $net, $_ := .NetworkSettings.Networks}}{{$net}} {{end}}' \
+    '{{.HostConfig.ReadonlyRootfs}} {{.Config.User}} {{.HostConfig.CapDrop}} {{.HostConfig.SecurityOpt}} {{.HostConfig.Memory}} {{.HostConfig.NanoCpus}} {{.HostConfig.PidsLimit}} {{len .HostConfig.PortBindings}} {{range $net, $_ := .NetworkSettings.Networks}}{{$net}} {{end}}' \
     "$1"
 }
 egress='

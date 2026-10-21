@@ -60,15 +60,17 @@ COPY scripts/crafts/${CRAFT}.sha256 scripts/crafts/
 
 # Its CLI, for this build's Linux, x86_64 or aarch64, with all its release unpacked beside it:
 # its libraries, and its licences and notices, which travel with it. /opt/craft/cli is the CLI.
+# Everyone may read it, and run what its release made runnable; no one but root may change it.
 FROM craft AS craft-cli
 RUN cli=$(scripts/craft "${CRAFT}" cli) \
     && cp -R "${cli%/bin/*}" /opt/craft \
-    && ln -s "bin/${cli##*/}" /opt/craft/cli
+    && ln -s "bin/${cli##*/}" /opt/craft/cli \
+    && chmod -R a+rX,go-w /opt/craft
 {%- if use_portal %}
 
 # Its browser build, unmodified, as its brand's licence asks.
 FROM craft AS craft-web
-RUN web=$(scripts/craft "${CRAFT}" web) && cp -R "${web}" /opt/web
+RUN web=$(scripts/craft "${CRAFT}" web) && cp -R "${web}" /opt/web && chmod -R a+rX,go-w /opt/web
 {%- endif %}
 
 
@@ -78,8 +80,8 @@ FROM python:{{ python_version }}-slim-trixie AS files-worker
 ARG CRAFT
 ARG VERSION
 RUN useradd --no-create-home --uid 10002 worker
-COPY --from=build --chmod=a=rX /app/.venv /app/.venv
-COPY --from=craft-cli --chmod=a=rX /opt/craft /opt/craft
+COPY --from=build /app/.venv /app/.venv
+COPY --from=craft-cli /opt/craft /opt/craft
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -98,8 +100,8 @@ CMD ["python", "-m", "artifactr.files.worker"]
 FROM python:{{ python_version }}-slim-trixie AS files-editor
 ARG CRAFT
 RUN useradd --no-create-home --uid 10003 editor
-COPY --from=build --chmod=a=rX /app/.venv /app/.venv
-COPY --from=craft-web --chmod=a=rX /opt/web /opt/web
+COPY --from=build /app/.venv /app/.venv
+COPY --from=craft-web /opt/web /opt/web
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \

@@ -47,6 +47,10 @@ has no registered one: a zip holding its document as XML and its shapes."""
 FCPROJ: Final = "application/x-fcproj"
 """The media type of a FilmCraft video project, `.fcproj`, which has no registered one: JSON."""
 
+ECPROJ: Final = "application/x-ecproj"
+"""The media type of an EffectCraft motion graphics project, `.ecproj`, which has no registered
+one: JSON."""
+
 OUTLINE_LIMIT: Final = 4_000
 """The most characters an outline holds: what the agent sees of a file by default."""
 
@@ -206,3 +210,9 @@ class VideoProject(NativeFile):
     """A video project, `.fcproj`: registered as `video_project`."""
 
     formats: ClassVar[frozenset[str]] = frozenset({FCPROJ})
+
+
+class MotionGraphics(NativeFile):
+    """A motion graphics project, `.ecproj`: registered as `motion_graphics`."""
+
+    formats: ClassVar[frozenset[str]] = frozenset({ECPROJ})

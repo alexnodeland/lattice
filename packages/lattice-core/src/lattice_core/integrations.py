@@ -146,7 +146,10 @@ KNOWN: Final = registry(
     Integration(
         "files:effectcraft",
         default=False,
-        description="EffectCraft: motion graphics rendered and exported, one file at a time.",
+        description=(
+            "EffectCraft: motion graphics projects that hold no footage, kept as native files, "
+            "edited by people and agents."
+        ),
     ),
     Integration(
         "files:soundcraft",

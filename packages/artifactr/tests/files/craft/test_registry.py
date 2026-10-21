@@ -12,6 +12,7 @@ from artifactr.files.manifest import (
     Design,
     Drawing,
     LayeredImage,
+    MotionGraphics,
     NativeFile,
     PageLayout,
     VectorImage,
@@ -90,7 +91,6 @@ def test_no_two_apps_keep_one_format_and_an_app_that_exports_keeps_none() -> Non
     assert len(kept) == len(set(kept))
     assert all(not craft.formats for craft in CRAFTS.values() if craft.reach == "export")
     assert {c.name for c in CRAFTS.values() if c.reach == "export"} == {
-        "effectcraft",
         "soundcraft",
         "lightcraft",
     }
@@ -119,6 +119,7 @@ def test_wordcraft_is_its_descriptors() -> None:
         ("figcraft", Design),
         ("freecad", CadModel),
         ("filmcraft", VideoProject),
+        ("effectcraft", MotionGraphics),
     ],
 )
 def test_an_apps_formats_are_its_native_types(app: str, native: type[NativeFile]) -> None:

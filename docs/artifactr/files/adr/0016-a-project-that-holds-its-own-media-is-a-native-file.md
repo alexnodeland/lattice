@@ -57,6 +57,6 @@ A project that holds its own media is a small JSON file that its app edits, rend
 ## Action items
 
 1. [x] FilmCraft's adapter, `VideoProject`, its corpus and hostile files, and its Nightly run.
-2. [ ] EffectCraft's adapter, `MotionGraphics`, its corpus and hostile files, and its Nightly run.
+2. [x] EffectCraft's adapter, `MotionGraphics`, its corpus and hostile files, and its Nightly run.
 3. [ ] SoundCraft's adapter, `AudioSession`, its corpus and hostile files, and its Nightly run.
 4. [ ] Exports as artifacts of their own.

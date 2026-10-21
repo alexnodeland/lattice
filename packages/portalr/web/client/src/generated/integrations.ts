@@ -16,7 +16,7 @@ export const INTEGRATIONS = [
   {"key":"files:figcraft","default":false,"description":"FigCraft: interface designs kept as native files, edited by people and agents."},
   {"key":"files:freecad","default":false,"description":"FreeCAD: 3D models kept as native files, edited by people and agents."},
   {"key":"files:filmcraft","default":false,"description":"FilmCraft: video projects that hold their own media, kept as native files, edited by people and agents."},
-  {"key":"files:effectcraft","default":false,"description":"EffectCraft: motion graphics rendered and exported, one file at a time."},
+  {"key":"files:effectcraft","default":false,"description":"EffectCraft: motion graphics projects that hold no footage, kept as native files, edited by people and agents."},
   {"key":"files:soundcraft","default":false,"description":"SoundCraft: audio sessions mixed down and exported, one file at a time."},
   {"key":"files:lightcraft","default":false,"description":"LightCraft: photos developed and exported, one file at a time."},
   {"key":"ui:forms","default":true,"description":"Forms: the agent asks with a form, and people fill it in the chat."},

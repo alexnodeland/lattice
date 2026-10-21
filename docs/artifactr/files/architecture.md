@@ -6,11 +6,11 @@
 
 | Layer | What it is | It may import |
 |---|---|---|
-| `manifest` | `Blob`, `Provenance`, `NativeFile`, a type for each app's files (`WordDocument`, `Workbook`, `Presentation`, `PdfDocument`, `Drawing`, `LayeredImage`, `VectorImage`, `PageLayout`, `Design`, `CadModel`, `VideoProject`), and `revise`, the patch that tests its base | artifactr, pydantic |
+| `manifest` | `Blob`, `Provenance`, `NativeFile`, a type for each app's files (`WordDocument`, `Workbook`, `Presentation`, `PdfDocument`, `Drawing`, `LayeredImage`, `VectorImage`, `PageLayout`, `Design`, `CadModel`, `VideoProject`, `MotionGraphics`), and `revise`, the patch that tests its base | artifactr, pydantic |
 | `blobs` | The `Blobs` port, its size limit and digest, and `InMemoryBlobs` | `manifest`, artifactr |
 | `checkouts` | `Checkout`, the record behind a person's lease, the `Checkouts` port, and `InMemoryCheckouts` | `manifest`, artifactr, pydantic |
 | `app` | The `App` port and `FakeApp` | `manifest`, pydantic |
-| `craft` | The crafting apps: `CRAFTS`, a `Craft` each; `Spawn`, which starts an app's CLI for a call; and the two dialects' adapters, `ToolsDialect` and `CommandsDialect`; `Package`, what an adapter reads of a zip package itself; `project`, a project its app keeps as JSON, read within bounds | `manifest`, `app`, pydantic, `mcp`, `anyio` |
+| `craft` | The crafting apps: `CRAFTS`, a `Craft` each; `Spawn`, which starts an app's CLI for a call; and the two dialects' adapters, `ToolsDialect` and `CommandsDialect`; `Package`, what an adapter reads of a zip package itself; `project`, a project its app keeps as JSON, read within bounds, and `whole`, which refuses one that draws on files outside it | `manifest`, `app`, pydantic, `mcp`, `anyio` |
 | `wordcraft` | WordCraft's adapter, `Subprocess`, and the `.docx` fingerprint and outline | `manifest`, `app`, `craft`, pydantic |
 | `gridcraft` | GridCraft's adapter, `Subprocess`, and the `.xlsx` fingerprint, outline and text | `manifest`, `app`, `craft`, pydantic |
 | `deckcraft` | DeckCraft's adapter, `Subprocess`, and the `.pptx` fingerprint, outline and text | `manifest`, `app`, `craft`, pydantic |
@@ -22,6 +22,7 @@
 | `figcraft` | FigCraft's adapter, `Subprocess`, and whether bytes are a `.figcraft`, read from its document | `manifest`, `app`, `craft`, pydantic |
 | `freecad` | FreeCAD's adapter, `Subprocess`; the scan that refuses a document holding Python before FreeCAD starts, and its fingerprint; and `console/script.py`, which `freecadcmd` runs, in FreeCAD's own interpreter | `manifest`, `app`, `craft`, pydantic; its script FreeCAD's modules and Pillow |
 | `filmcraft` | FilmCraft's adapter, `Subprocess`, whether bytes are a `.fcproj`, and what one draws from outside it, read from its JSON | `manifest`, `app`, `craft`, pydantic |
+| `effectcraft` | EffectCraft's adapter, `Subprocess`, whether bytes are an `.ecproj`, and its footage, read from its JSON | `manifest`, `app`, `craft`, pydantic |
 | `worker` | `worker_app`, the worker that runs an app on hostile files under `Limits`, and `Worker`, the `App` that calls it | `app`, `wordcraft` (its entry point), pydantic, `anyio`, Starlette, uvicorn, httpx |
 | `native` | `NativeFiles`: uploads, check-out and check-in, agents' edits, reads, renders and collection, behind the app's switch | `manifest`, `blobs`, `checkouts`, `app`, artifactr, `lattice_core.integrations` |
 | `tools` | `native_file_tools`, the agent's toolset | `app`, `native`, artifactr and its agent, pydantic-ai |

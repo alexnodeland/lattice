@@ -7,6 +7,7 @@ only within bounds: past `LIMIT` it is too large, and nested past the depth pyda
 reads, or anything but a JSON object, it is no project.
 """
 
+from collections.abc import Callable
 from typing import Final
 
 from pydantic import JsonValue, TypeAdapter, ValidationError
@@ -33,3 +34,22 @@ def project(content: bytes) -> dict[str, JsonValue] | None:
         # Not UTF-8, not JSON, or nested deeper than the parser goes.
         return None
     return found if isinstance(found, dict) else None
+
+
+def whole(
+    content: bytes,
+    extension: str,
+    media_type: Callable[[bytes], str | None],
+    outside: Callable[[bytes], list[str]],
+) -> None:
+    """Refuse bytes that aren't an app's project, or that draw on files outside it.
+
+    Its `media_type` says whether they are one, and its `outside` names what they draw on.
+
+    Raises:
+        AppFailed: `refused`, naming what it draws from outside; `too_large` past `LIMIT`.
+    """
+    if media_type(content) is None:
+        raise AppFailed("refused", f"not a project its app saves as {extension}")
+    if found := outside(content):
+        raise AppFailed("refused", f"the project draws on files outside it: {', '.join(found)}")

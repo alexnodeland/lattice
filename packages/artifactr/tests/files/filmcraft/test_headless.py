@@ -114,7 +114,7 @@ async def test_a_project_filmcraft_would_change_on_opening_is_refused(
 @pytest.mark.parametrize(
     ("content", "message"),
     [
-        (b'{"format": "fcpxml"}', "not a .fcproj: no FilmCraft project"),
+        (b'{"format": "fcpxml"}', r"not a project its app saves as \.fcproj"),
         (b'{"format": "filmcraft.project", "project": {}}', "its items aren't a project's"),
         (
             b'{"format": "filmcraft.project", "project": {"items": {"1": {"name": "a.mov", '

@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field, JsonValue
 
 from artifactr.files.app import AppFailed, Inspection
 from artifactr.files.craft import CRAFTS, PREVIEW, CommandsDialect, Craft, Server
+from artifactr.files.craft.project import whole
 from artifactr.files.filmcraft.project import media_type, outside
 from artifactr.files.manifest import OUTLINE_LIMIT
 
@@ -116,7 +117,7 @@ class Subprocess(CommandsDialect):
         if source is None:
             await server.call("command_run", id=self.new_command, params={})
             return None
-        _whole(source)
+        whole(source, self.extension, media_type, outside)
         path = server.source(source, f"source{self.extension}")
         reply = await server.json("command_run", id=self.open_command, params={"path": str(path)})
         opened = _Open.model_validate(reply)
@@ -149,7 +150,7 @@ class Subprocess(CommandsDialect):
         Raises:
             AppFailed: `refused` if what a batch made draws media from outside the project.
         """
-        _whole(content)
+        whole(content, self.extension, media_type, outside)
         found = _Opened.model_validate(await server.json("doc_inspect"))
         reply = await server.json("command_run", id="captions.list", params={})
         captions = _Captions.model_validate(reply)
@@ -162,18 +163,6 @@ class Subprocess(CommandsDialect):
             pages=sequence.pages if sequence else 0,
             media_type=media_type(content),
         )
-
-
-def _whole(content: bytes) -> None:
-    """Refuse bytes that aren't a `.fcproj`, or that draw media from outside it.
-
-    Raises:
-        AppFailed: `refused`, naming what it draws from outside.
-    """
-    if media_type(content) is None:
-        raise AppFailed("refused", "not a .fcproj: no FilmCraft project")
-    if found := outside(content):
-        raise AppFailed("refused", f"the project draws on files outside it: {', '.join(found)}")
 
 
 def _outline(nodes: Sequence[_Node], sequence: _Sequence | None, depth: int = 0) -> list[str]:

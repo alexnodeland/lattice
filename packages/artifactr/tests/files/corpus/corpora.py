@@ -8,6 +8,7 @@ from typing import Final
 from tests.files.corpus.cadcraft.corpus import CORPUS as CADCRAFT
 from tests.files.corpus.deckcraft.corpus import CORPUS as DECKCRAFT
 from tests.files.corpus.designcraft.corpus import CORPUS as DESIGNCRAFT
+from tests.files.corpus.effectcraft.corpus import CORPUS as EFFECTCRAFT
 from tests.files.corpus.figcraft.corpus import CORPUS as FIGCRAFT
 from tests.files.corpus.filmcraft.corpus import CORPUS as FILMCRAFT
 from tests.files.corpus.freecad.corpus import CORPUS as FREECAD
@@ -23,6 +24,6 @@ CORPORA: Final[dict[str, Corpus]] = {
     for corpus in (
         *(WORDCRAFT, GRIDCRAFT, DECKCRAFT, PDFCRAFT),
         *(CADCRAFT, PHOTOCRAFT, VECTORCRAFT, DESIGNCRAFT, FIGCRAFT, FREECAD),
-        FILMCRAFT,
+        *(FILMCRAFT, EFFECTCRAFT),
     )
 }

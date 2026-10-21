@@ -7,9 +7,7 @@ import pytest
 
 from artifactr.files.figcraft import media_type
 from artifactr.files.manifest import FIGCRAFT
-
-TIME = (1980, 1, 1, 0, 0, 0)
-"""Every entry's time, so a design, and a test's id from it, is the same in every process."""
+from tests.files.corpus.package import TIME
 
 
 def zipped(name: str, content: bytes) -> bytes:

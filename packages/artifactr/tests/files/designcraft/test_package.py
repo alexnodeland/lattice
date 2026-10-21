@@ -7,9 +7,7 @@ import pytest
 
 from artifactr.files.designcraft import media_type
 from artifactr.files.manifest import IDML
-
-TIME = (1980, 1, 1, 0, 0, 0)
-"""Every entry's time, so a package, and a test's id from it, is the same in every process."""
+from tests.files.corpus.package import TIME
 
 
 def package(**parts: bytes) -> bytes:

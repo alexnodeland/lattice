@@ -8,9 +8,7 @@ dependsOn:
 
 tasks:
   test:
-    # On every core the runner has, a worker each: each test opens a SQLite file in a directory
-    # of its own and a PostgreSQL schema of its own, so the workers share nothing, and coverage
-    # combines theirs.
+    # A worker for each of the runner's cores, sharing nothing (lattice ADR-0010).
     args: ['--numprocesses', 'auto']
 
   schema:

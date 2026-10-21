@@ -15,6 +15,7 @@ from artifactr.files.manifest import (
     NativeFile,
     PageLayout,
     VectorImage,
+    VideoProject,
     WordDocument,
 )
 from artifactr.files.wordcraft import Subprocess
@@ -89,7 +90,6 @@ def test_no_two_apps_keep_one_format_and_an_app_that_exports_keeps_none() -> Non
     assert len(kept) == len(set(kept))
     assert all(not craft.formats for craft in CRAFTS.values() if craft.reach == "export")
     assert {c.name for c in CRAFTS.values() if c.reach == "export"} == {
-        "filmcraft",
         "effectcraft",
         "soundcraft",
         "lightcraft",
@@ -118,6 +118,7 @@ def test_wordcraft_is_its_descriptors() -> None:
         ("designcraft", PageLayout),
         ("figcraft", Design),
         ("freecad", CadModel),
+        ("filmcraft", VideoProject),
     ],
 )
 def test_an_apps_formats_are_its_native_types(app: str, native: type[NativeFile]) -> None:

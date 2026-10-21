@@ -44,6 +44,8 @@ its document as JSON."""
 FCSTD: Final = "application/x-extension-fcstd"
 """The media type of a FreeCAD document, `.FCStd`, as FreeCAD's own MIME file names it, since it
 has no registered one: a zip holding its document as XML and its shapes."""
+FCPROJ: Final = "application/x-fcproj"
+"""The media type of a FilmCraft video project, `.fcproj`, which has no registered one: JSON."""
 
 OUTLINE_LIMIT: Final = 4_000
 """The most characters an outline holds: what the agent sees of a file by default."""
@@ -198,3 +200,9 @@ class CadModel(NativeFile):
     """A 3D model, `.FCStd`: registered as `cad_model`."""
 
     formats: ClassVar[frozenset[str]] = frozenset({FCSTD})
+
+
+class VideoProject(NativeFile):
+    """A video project, `.fcproj`: registered as `video_project`."""
+
+    formats: ClassVar[frozenset[str]] = frozenset({FCPROJ})

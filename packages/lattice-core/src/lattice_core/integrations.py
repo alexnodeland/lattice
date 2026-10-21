@@ -138,7 +138,10 @@ KNOWN: Final = registry(
     Integration(
         "files:filmcraft",
         default=False,
-        description="FilmCraft: video projects rendered and exported, one file at a time.",
+        description=(
+            "FilmCraft: video projects that hold their own media, kept as native files, edited "
+            "by people and agents."
+        ),
     ),
     Integration(
         "files:effectcraft",

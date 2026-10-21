@@ -39,6 +39,7 @@ from artifactr.files.manifest import (
     Presentation,
     Provenance,
     VectorImage,
+    VideoProject,
     WordDocument,
     Workbook,
 )
@@ -69,6 +70,7 @@ __all__ = [
     "Provenance",
     "TooLarge",
     "VectorImage",
+    "VideoProject",
     "WordDocument",
     "Workbook",
 ]

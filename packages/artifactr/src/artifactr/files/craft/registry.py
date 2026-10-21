@@ -17,6 +17,7 @@ from artifactr.files.manifest import (
     DOCX,
     DWG,
     DXF,
+    FCPROJ,
     FCSTD,
     FIGCRAFT,
     IDML,
@@ -48,8 +49,9 @@ has unsaved changes; `global`, a JavaScript API on the page's window."""
 
 Reach = Literal["file", "export"]
 """What lattice keeps of the app's work: `file`, the file itself, as a native file that people
-and agents edit; `export`, only what the app renders or exports from a project of its own, as a
-single file, since its projects point at media outside them."""
+and agents edit, which for a project is one that holds every source it draws; `export`, none of
+its files, since its work is no file of its own, only, in time, what it renders or exports
+(native files ADR-0016)."""
 
 
 @dataclass(frozen=True)
@@ -236,10 +238,9 @@ CRAFTS: Final = _registry(
         title="FilmCraft",
         dialect="commands",
         roots="none",
-        formats=frozenset(),
+        formats=frozenset({FCPROJ}),
         render=True,
-        reach="export",
-        bridge="global",
+        reach="file",
     ),
     Craft(
         name="effectcraft",

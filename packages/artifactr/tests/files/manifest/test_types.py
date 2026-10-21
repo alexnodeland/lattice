@@ -8,6 +8,7 @@ from artifactr.files.manifest import (
     DOCX,
     DWG,
     DXF,
+    FCPROJ,
     FCSTD,
     FIGCRAFT,
     IDML,
@@ -27,6 +28,7 @@ from artifactr.files.manifest import (
     Presentation,
     Provenance,
     VectorImage,
+    VideoProject,
     WordDocument,
     Workbook,
 )
@@ -55,6 +57,7 @@ def test_each_crafting_apps_type_is_registered_with_its_format() -> None:
     [
         ("drawing", Drawing, {DXF, DWG}),
         ("design", Design, {FIGCRAFT}),
+        ("video_project", VideoProject, {FCPROJ}),
         ("page_layout", PageLayout, {IDML}),
         ("vector_image", VectorImage, {SVG}),
         ("layered_image", LayeredImage, {PSD}),

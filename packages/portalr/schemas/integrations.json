@@ -62,7 +62,7 @@
   {
     "key": "files:filmcraft",
     "default": false,
-    "description": "FilmCraft: video projects rendered and exported, one file at a time."
+    "description": "FilmCraft: video projects that hold their own media, kept as native files, edited by people and agents."
   },
   {
     "key": "files:effectcraft",

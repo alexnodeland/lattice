@@ -77,29 +77,27 @@ export function UploadList({
                     {item.said}
                   </Alert>
                 )}
+                <div className="flex flex-wrap gap-2">
+                  {item.state === "sending" && (
+                    <Button variant="secondary" size="sm" onClick={() => onStop(item.id)}>
+                      Stop
+                      <span className="sr-only"> uploading {name}</span>
+                    </Button>
+                  )}
+                  {item.state === "failed" && item.again && (
+                    <Button size="sm" onClick={() => onRetry(item.id)}>
+                      Try again
+                      <span className="sr-only"> to upload {name}</span>
+                    </Button>
+                  )}
+                  {item.state !== "sending" && (
+                    <Button variant="secondary" size="sm" onClick={() => onRemove(item.id)}>
+                      {item.state === "waiting" ? "Don't upload" : "Dismiss"}
+                      <span className="sr-only"> {name}</span>
+                    </Button>
+                  )}
+                </div>
               </div>
-            }
-            end={
-              <>
-                {item.state === "sending" && (
-                  <Button variant="secondary" size="sm" onClick={() => onStop(item.id)}>
-                    Stop
-                    <span className="sr-only"> uploading {name}</span>
-                  </Button>
-                )}
-                {item.state === "failed" && item.again && (
-                  <Button size="sm" onClick={() => onRetry(item.id)}>
-                    Try again
-                    <span className="sr-only"> to upload {name}</span>
-                  </Button>
-                )}
-                {item.state !== "sending" && (
-                  <Button variant="secondary" size="sm" onClick={() => onRemove(item.id)}>
-                    {item.state === "waiting" ? "Don't upload" : "Dismiss"}
-                    <span className="sr-only"> {name}</span>
-                  </Button>
-                )}
-              </>
             }
           />
         );

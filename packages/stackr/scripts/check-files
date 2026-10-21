@@ -66,6 +66,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
+log "files: Docker Engine $(docker version --format '{{.Server.Version}}'), Compose $(docker compose version --short)"
 log "files: generating $name from the template, and building ${apps[*]}"
 if ! uv run copier copy --quiet --defaults --vcs-ref HEAD --data project_name="$name" \
   --data libraries=artifactr --data evals=false ../.. "$app_dir" 2>/dev/null ||

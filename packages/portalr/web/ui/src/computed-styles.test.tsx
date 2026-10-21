@@ -3,9 +3,10 @@
  * literals onto tokens and prove nothing changed (portalr ADR-0056). The galleries the screenshot
  * suites shoot are read at rest wide and narrow, under forced colours, and with motion allowed, and
  * each control is read hovered, focused from the keyboard, and held down. Only what a declaration
- * sets is read, never a size the face's metrics decide, so the snapshots are the same on every
- * system; margins and transforms are left out, as an automatic margin is read as the space it
- * takes and a menu is placed by a transform. A change to a component's look changes its snapshot, which a reviewer sees as text.
+ * sets is read, so the snapshots are the same on every system: sizes, which layout decides for most
+ * elements, are read by token-sizes.test.tsx and the screenshot suites; margins and transforms are
+ * left out, as an automatic margin is read as the space it takes and a menu is placed by a
+ * transform. A change to a component's look changes its snapshot, which a reviewer sees as text.
  */
 
 import type { ReactNode } from "react";

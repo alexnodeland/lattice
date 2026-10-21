@@ -218,6 +218,7 @@ export function Streaming({ text, author }: { text: string; author: string }) {
 function Thinking() {
   return (
     <span className="flex h-6 items-center gap-1 text-muted">
+      {/* Each dot a beat behind the last: a delay, not a duration, so reduced motion's pause holds. */}
       {[0, 150, 300].map((delay) => (
         <span
           key={delay}
@@ -514,7 +515,7 @@ function Question({
           The agent wants to run <code className="font-mono">{request.tool_name}</code>.
         </p>
         {args && (
-          <pre className="overflow-x-auto rounded-(--code-block-radius) border border-line bg-paper p-(--code-block-pad-x) font-mono text-xs">
+          <pre className="overflow-x-auto rounded-(--code-block-radius) border border-line bg-paper p-(--code-panel-pad) font-mono text-xs">
             {JSON.stringify(request.args, null, 2)}
           </pre>
         )}

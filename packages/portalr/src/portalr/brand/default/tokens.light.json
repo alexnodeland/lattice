@@ -542,6 +542,13 @@
           "unit": "ms"
         },
         "$type": "duration"
+      },
+      "spin": {
+        "$value": {
+          "value": 1000,
+          "unit": "ms"
+        },
+        "$type": "duration"
       }
     },
     "ease": {
@@ -996,6 +1003,11 @@
           "value": 2,
           "unit": "rem"
         }
+      }
+    },
+    "code-panel": {
+      "pad": {
+        "$value": "{space.3}"
       }
     }
   }

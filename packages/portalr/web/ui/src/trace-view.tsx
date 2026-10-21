@@ -428,7 +428,7 @@ function WithheldNow({ row, reveal }: { row: Row; reveal: Reveal }) {
         parts.map((part) => (
           <div key={part.label} className="flex flex-col gap-1">
             <span className="break-words text-muted text-xs">{part.label}</span>
-            <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-(--code-block-radius) bg-paper p-(--code-block-pad-x) font-mono text-fg text-xs">
+            <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-(--code-block-radius) bg-paper p-(--code-panel-pad) font-mono text-fg text-xs">
               {part.text}
             </pre>
           </div>

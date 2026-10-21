@@ -62,12 +62,13 @@
 
   /*
    * Motion: how long a change takes, scaled by --motion-scale, which reduced motion makes 0
-   * whatever the kit says, and how it eases; a placeholder's pulse is a loop, which reduced motion
-   * pauses (portalr ADR-0057).
+   * whatever the kit says, and how it eases; a placeholder's pulse and a working status's spin are
+   * loops, which reduced motion pauses (portalr ADR-0057).
    */
   --duration-fast: calc(150ms * var(--motion-scale));
   --duration-moderate: calc(200ms * var(--motion-scale));
   --duration-pulse: 2000ms;
+  --duration-spin: 1000ms;
   --ease-in: cubic-bezier(0.4, 0, 1, 1);
   --ease-out: cubic-bezier(0, 0, 0.2, 1);
   --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
@@ -325,4 +326,7 @@
   --code-inline-pad-y: var(--space-half);
   --sign-in-radius: var(--radius-5);
   --sign-in-pad: 2rem;
+
+  /* A panel of preformatted text, a tool's result or a span's input: its padding on every side. */
+  --code-panel-pad: var(--space-3);
 }

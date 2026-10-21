@@ -13,7 +13,7 @@ const TONE = {
   working: {
     badge: "border-line bg-surface text-fg",
     glyph:
-      "rounded-full border-2 border-current border-r-transparent animate-spin motion-reduce:animate-none",
+      "rounded-full border-2 border-current border-r-transparent animate-spin [animation-play-state:var(--motion-loop)] motion-reduce:animate-none",
   },
   waiting: {
     badge: "border-accent bg-accent text-on-accent",

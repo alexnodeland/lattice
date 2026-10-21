@@ -83,6 +83,7 @@
   --default-transition-duration: var(--duration-fast);
   --default-transition-timing-function: var(--ease-in-out);
   --animate-pulse: pulse var(--duration-pulse) var(--ease-pulse) infinite;
+  --animate-spin: spin var(--duration-spin) linear infinite;
 }
 
 /*
@@ -98,6 +99,6 @@
 
 @media (prefers-reduced-motion: no-preference) {
   .flip-in:not([hidden]) {
-    animation: flip-in 200ms ease-out;
+    animation: flip-in var(--duration-moderate) var(--ease-out);
   }
 }

@@ -292,7 +292,7 @@ function LineNow({ record, reveal }: { record: LogRecord; reveal: LineReveal }) 
       return line === null ? (
         <p className="text-muted text-sm">The read returned no such record.</p>
       ) : (
-        <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-(--code-block-radius) bg-paper p-(--code-block-pad-x) font-mono text-fg text-xs">
+        <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-(--code-block-radius) bg-paper p-(--code-panel-pad) font-mono text-fg text-xs">
           <AnsiText line={line} />
         </pre>
       );

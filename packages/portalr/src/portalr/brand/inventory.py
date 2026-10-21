@@ -89,11 +89,12 @@ PRIMITIVES: tuple[Group, ...] = (
     ),
     Group(
         "Motion: how long a change takes, scaled by --motion-scale, which reduced motion makes 0"
-        " whatever the kit says, and how it eases; a placeholder's pulse is a loop, which reduced"
-        " motion pauses (portalr ADR-0057).",
+        " whatever the kit says, and how it eases; a placeholder's pulse and a working status's"
+        " spin are loops, which reduced motion pauses (portalr ADR-0057).",
         (
             *_scale("duration", "motion.duration", "--duration", ("fast", "moderate")),
             Row("motion.duration.pulse", "--duration-pulse", "duration", loop=True),
+            Row("motion.duration.spin", "--duration-spin", "duration", loop=True),
             *_scale("cubicBezier", "motion.ease", "--ease", ("in", "out", "in-out", "pulse")),
         ),
     ),
@@ -378,6 +379,11 @@ COMPONENTS: tuple[Group, ...] = (
             Row("component.sign-in.radius", "--sign-in-radius", "dimension"),
             Row("component.sign-in.pad", "--sign-in-pad", "dimension"),
         ),
+    ),
+    Group(
+        "A panel of preformatted text, a tool's result or a span's input: its padding on every "
+        "side.",
+        (Row("component.code-panel.pad", "--code-panel-pad", "dimension"),),
     ),
 )
 """Each component's tokens, defaulting to a role or a primitive (portalr ADR-0056)."""

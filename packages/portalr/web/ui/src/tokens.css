@@ -207,4 +207,18 @@
   --card-pad: var(--space-4);
   --card-shadow: var(--shadow-1);
   --empty-state-pad: var(--space-6);
+
+  /*
+   * A dialog, and the drawer's scrim: corners, padding, width, the margin it keeps from the
+   * window's edge, what it casts, how much the scrim blurs what is behind, and how it opens
+   * (portalr ADR-0039).
+   */
+  --dialog-radius: var(--radius-4);
+  --dialog-pad: 1.25rem;
+  --dialog-width: 32rem;
+  --dialog-margin: 2rem;
+  --dialog-shadow: var(--shadow-3);
+  --dialog-scrim-blur: 3px;
+  --dialog-duration: var(--duration-moderate);
+  --dialog-enter-scale: 0.98;
 }

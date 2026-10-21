@@ -736,6 +736,44 @@
       "pad": {
         "$value": "{space.6}"
       }
+    },
+    "dialog": {
+      "radius": {
+        "$value": "{radius.4}"
+      },
+      "pad": {
+        "$value": {
+          "value": 1.25,
+          "unit": "rem"
+        }
+      },
+      "width": {
+        "$value": {
+          "value": 32,
+          "unit": "rem"
+        }
+      },
+      "margin": {
+        "$value": {
+          "value": 2,
+          "unit": "rem"
+        }
+      },
+      "shadow": {
+        "$value": "{shadow.3}"
+      },
+      "scrim-blur": {
+        "$value": {
+          "value": 3,
+          "unit": "px"
+        }
+      },
+      "duration": {
+        "$value": "{motion.duration.moderate}"
+      },
+      "enter-scale": {
+        "$value": 0.98
+      }
     }
   }
 }

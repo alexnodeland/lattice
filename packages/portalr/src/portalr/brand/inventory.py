@@ -245,6 +245,21 @@ COMPONENTS: tuple[Group, ...] = (
             Row("component.empty-state.pad", "--empty-state-pad", "dimension"),
         ),
     ),
+    Group(
+        "A dialog, and the drawer's scrim: corners, padding, width, the margin it keeps from "
+        "the window's edge, what it casts, how much the scrim blurs what is behind, and how it "
+        "opens (portalr ADR-0039).",
+        (
+            Row("component.dialog.radius", "--dialog-radius", "dimension"),
+            Row("component.dialog.pad", "--dialog-pad", "dimension"),
+            Row("component.dialog.width", "--dialog-width", "dimension"),
+            Row("component.dialog.margin", "--dialog-margin", "dimension"),
+            Row("component.dialog.shadow", "--dialog-shadow", "shadow"),
+            Row("component.dialog.scrim-blur", "--dialog-scrim-blur", "dimension"),
+            Row("component.dialog.duration", "--dialog-duration", "duration"),
+            Row("component.dialog.enter-scale", "--dialog-enter-scale", "number"),
+        ),
+    ),
 )
 """Each component's tokens, defaulting to a role or a primitive (portalr ADR-0056)."""
 

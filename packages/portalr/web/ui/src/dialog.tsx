@@ -11,10 +11,10 @@ import type { ReactNode, RefObject } from "react";
 import { Button } from "./button";
 
 export const backdrop =
-  "fixed inset-0 z-40 bg-scrim backdrop-blur-[3px] transition-[opacity,backdrop-filter] duration-200 data-ending-style:opacity-0 data-ending-style:backdrop-blur-none data-starting-style:opacity-0 data-starting-style:backdrop-blur-none motion-reduce:transition-none";
+  "fixed inset-0 z-40 bg-scrim backdrop-blur-(--dialog-scrim-blur) transition-[opacity,backdrop-filter] duration-(--dialog-duration) data-ending-style:opacity-0 data-ending-style:backdrop-blur-none data-starting-style:opacity-0 data-starting-style:backdrop-blur-none motion-reduce:transition-none";
 
 export const popup =
-  "fixed top-1/2 left-1/2 z-50 flex max-h-[85dvh] w-[min(32rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col gap-4 overflow-y-auto rounded-lg border border-line bg-surface p-5 text-fg shadow-lg outline-none transition-[opacity,scale] duration-200 data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0 motion-reduce:transition-none";
+  "fixed top-1/2 left-1/2 z-50 flex max-h-[85dvh] w-[min(var(--dialog-width),calc(100vw-var(--dialog-margin)))] -translate-x-1/2 -translate-y-1/2 flex-col gap-4 overflow-y-auto rounded-(--dialog-radius) border border-line bg-surface p-(--dialog-pad) text-fg shadow-(--dialog-shadow) outline-none transition-[opacity,scale] duration-(--dialog-duration) data-ending-style:scale-(--dialog-enter-scale) data-starting-style:scale-(--dialog-enter-scale) data-ending-style:opacity-0 data-starting-style:opacity-0 motion-reduce:transition-none";
 
 export const title = "font-semibold text-fg text-lg";
 

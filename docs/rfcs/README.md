@@ -12,5 +12,6 @@ Outside this series, an RFC is named as "lattice RFC-0001".
 | [0004](0004-relayr-and-task-trackers.md) | relayr and task trackers | Draft |
 | [0005](0005-forms-dashboards-and-mini-apps.md) | Forms, dashboards and mini apps in the chat | Draft, amended by lattice ADR-0026 |
 | [0006](0006-excalidraw-diagrams-drawn-live.md) | Excalidraw diagrams, drawn live by people and agents | Draft, amended by lattice ADR-0026 |
+| [0007](0007-portalr-brand-kits.md) | portalr brand kits | Draft |
 
 To propose one, copy [`template.md`](template.md) to the next number. Each package's series uses the same template.

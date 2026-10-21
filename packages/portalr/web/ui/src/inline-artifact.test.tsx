@@ -132,6 +132,17 @@ test("in the full view, the back button's tooltip shows above it, and one Escape
   await expect.element(screen.getByRole("dialog")).not.toBeInTheDocument();
 });
 
+test("in the full view, Escape on a hovered tooltip while a field has the focus keeps the full view", async () => {
+  const screen = await render(<InThread kind="Form" />);
+  await screen.getByRole("button", { name: "Full view" }).click();
+  const full = screen.getByRole("dialog", { name: "Plan" });
+  await full.getByRole("textbox", { name: "Draft" }).click();
+  await userEvent.hover(full.getByRole("button", { name: "Back to the page" }));
+  await expect.element(page.getByText("Back to the page", { exact: true })).toBeVisible();
+  await userEvent.keyboard("{Escape}");
+  await expect.element(full).toBeVisible();
+});
+
 test("every kind the kit draws is shown in its thread; one shown as JSON isn't", () => {
   expect(markdown().inline).toBe(true);
   expect(nativeFile().inline).toBe(true);

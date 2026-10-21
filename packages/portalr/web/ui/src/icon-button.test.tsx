@@ -66,3 +66,31 @@ test("a disabled icon button keeps its name, and isn't a stop for the keyboard",
   await userEvent.tab();
   expect(document.activeElement?.textContent).toBe("After");
 });
+
+test("a link icon button keeps the link element's own handlers", async () => {
+  let focused = false;
+  await render(
+    <IconButton
+      label="Open its page"
+      icon={Maximize2}
+      render={
+        <a href="#page" onFocus={() => (focused = true)}>
+          page
+        </a>
+      }
+    />,
+  );
+  await userEvent.tab();
+  expect(focused).toBe(true);
+  await expect.element(page.getByText("Open its page", { exact: true })).toBeVisible();
+});
+
+test("a pending icon button stays in reach of the keyboard, disabled", async () => {
+  const screen = await render(
+    <IconButton label="Helpful" icon={Maximize2} disabled focusableWhenDisabled />,
+  );
+  await userEvent.tab();
+  const button = screen.getByRole("button", { name: "Helpful" }).element();
+  expect(document.activeElement).toBe(button);
+  expect(button.getAttribute("aria-disabled")).toBe("true");
+});

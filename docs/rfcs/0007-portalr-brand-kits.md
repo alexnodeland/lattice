@@ -48,7 +48,7 @@ brand/<name>/
 
 ```json
 {
-  "$schema": "https://lattice.dev/schemas/portalr-brand-1.json",
+  "$schema": "https://lattice.dev/schemas/portalr-brand-1.json  (placeholder)",
   "version": 1,
   "name": "nightshade",
   "identity": { "product": "Nightshade", "app": "Nightshade", "admin": "Nightshade admin" },
@@ -179,13 +179,19 @@ The polish PRs (links and breadcrumbs, list rows, icon buttons and tooltips, bad
 - **Tokens as YAML or a flat CSS file:** no aliases or types (YAML), or nothing to validate (CSS). DTCG is a standard other tools export.
 - **Per tenant now:** needs the kit in the database and a stylesheet per request. The layout leaves room for it (owner's decision).
 
+## Decided in discussion
+
+The owner settled these on the pull request:
+
+- **The default marks are fully replaceable.** portalr's and grantr's marks and the lattice inks (lattice ADR-0001, ADR-0014) ship with the code under MIT, with a trademark note: the marks stay lattice's trademark and are not licensed for reuse as someone else's product, but a kit may remove or replace them. No separate licence, and no attribution is required. `portalr brand init` says so.
+- **`tokens.dark.json` holds only what differs** from `tokens.light.json`; a token absent from it is the same in both schemes.
+- **A kit's fonts are not shared with mini apps** until v0.3.
+- **The schema URL is a placeholder.** `https://lattice.dev/schemas/portalr-brand-1.json` above stands in for a URL to be chosen; no domain is claimed by it.
+- **The style census reports in the foundation PR** and fails the build once the polish PRs have landed. The Biome raw-element rule and the literal-value test fail the build from the start.
+
 ## Unresolved questions
 
-- **Licence stance for the default marks (owner decision, open).** portalr's and grantr's marks and the lattice inks (lattice ADR-0001, ADR-0014) ship in the default kit. The code is MIT. Do the marks ship under MIT with the code, under a separate licence (for instance CC BY 4.0 or "all rights reserved, no trademark grant"), or with a trademark note that a kit must replace them before a deployment is presented as someone else's product? This RFC does not decide it; the kit's `brand.json` will carry whatever licence is chosen, and `portalr brand init` will say whether the marks must be replaced.
-- Whether `tokens.dark.json` must be complete or may hold only what differs (this RFC proposes: only what differs).
-- Whether fonts a kit brings are shared with mini apps (proposed: not in v0.2; v0.3).
-- The DTCG `$schema` URL to publish `brand.json`'s schema under.
-- Whether the style census is a hard failure or a report, at first.
+- None open at this stage; new ones go here as the PRs raise them.
 
 ## Tracking
 

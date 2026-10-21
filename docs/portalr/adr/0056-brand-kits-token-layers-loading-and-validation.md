@@ -17,7 +17,7 @@
 - **Validation is in Python,** once, when the application starts and in `portalr brand validate`: a typed grammar per `$type` from which the loader builds every value it prints, so no text a kit wrote reaches CSS; contrast pairs in both schemes, the focus ring among them; CIEDE2000 distances for status and chart colours under each simulated deficiency; an SVG allow-list; WOFF2 fonts with a size cap and a licence each. A bad kit fails the start with every fault listed.
 - **Loaded per deployment.** `Site(brand=...)` names the kit's folder; `config.json` gains a `brand` block (identity, copy, hashed URLs). The compiled `brand.css` and the assets are served at `/portalr/brand/<hash>/` with an immutable cache header. The UIs' `index.html` is rewritten at serve time with the title, icons, `theme-color` and the stylesheet link, so the kit is in place before the first paint; `scheme.js` is unchanged. The stackr template takes `PORTAL_BRAND_DIR`.
 - **Security chrome is outside the grammar:** the mini app's label and frame, host dialogs, the colour-blind patterns, forced-colours styles and the skip link. App frame sizing and the mini-app bridge are untouched.
-- **Guard rails keep components on tokens:** Biome's `noRestrictedElements` for raw `a`, `button`, `table`, `select`, `details`, `summary` and `ins` outside the kit's own components; a test refusing hex, `rgb()`, arbitrary px or rem and `color-mix()` outside `tokens.css` and `styles.css`; a style census in the screenshot suites.
+- **Guard rails keep components on tokens:** Biome's `noRestrictedElements` for raw `a`, `button`, `table`, `select`, `details`, `summary` and `ins` outside the kit's own components; a test refusing hex, `rgb()`, arbitrary px or rem and `color-mix()` outside `tokens.css` and `styles.css`; a style census in the screenshot suites, which reports at first and fails the build once the polish PRs have landed; the other two fail from the start.
 
 ## Options considered
 
@@ -38,7 +38,7 @@
 
 - Easier: restyling a deployment is a folder and a setting; every component's look is a named token; a polish PR lands on tokens, not literals.
 - Harder: hundreds of custom properties to name and keep; the type grammar must be right, since it is what stands between a kit and the page.
-- To revisit: per-tenant kits; fonts shared with mini apps (v0.3); the licence of the default marks, an open owner decision in RFC-0007.
+- To revisit: per-tenant kits; fonts shared with mini apps (v0.3). The default marks ship under MIT with a trademark note and are fully replaceable in a kit (RFC-0007).
 
 ## Action items
 

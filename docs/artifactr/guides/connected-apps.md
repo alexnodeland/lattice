@@ -37,7 +37,7 @@ Each entry names every tool it may offer, with its risk and a digest of what the
 
 ## Installing the server
 
-Install it ahead, at the vetted release, from a locked requirement with hashes, into a directory of its own, so no call downloads anything:
+Install it ahead, at the vetted release, so no call downloads anything. lattice doesn't verify what you installed: it checks the version the server reports and the digest of every tool it calls. A locked requirement with hashes, in a directory of its own, is the way to get the release you mean:
 
 ```sh
 uv venv /opt/connected/freecad
@@ -65,7 +65,9 @@ agent = Agent(
 )
 ```
 
-Then switch `connect:freecad` on for the workspace in portalr's admin. The server's environment is only `PATH`, `HOME` and the like, the entry's variables and the secrets you name: your model keys stay out. It runs in an empty temporary directory, for at most 30 seconds a call.
+Then switch `connect:freecad` on for the workspace in portalr's admin. The server's environment is only `PATH`, `USER` and the like, the entry's variables and the secrets you name: your model keys stay out. A token you name must be set, or the server isn't started. It runs in an empty temporary directory, its `HOME` too, for at most 30 seconds a call, and what it prints goes nowhere: to debug it, run it yourself. None of this contains a hostile server.
+
+The host is an address: `127.0.0.1` or `::1`, not `localhost`. With `remote=True` it is your tailnet's (`100.x.y.z`, `fd7a:115c:a1e0::…` or a `.ts.net` name), and FreeCAD's token is required; a remote Blender is refused, since its add-on takes no token.
 
 ## Letting it run code
 
@@ -75,7 +77,7 @@ Running code is opt-in at every level, and every call waits for a person:
 2. Switch `connect-code:freecad` on for the workspace.
 3. Grant `artifactr:run_connected_code` to whoever may run such code and approve it: a workspace's admins hold it; give others a custom role.
 
-The approval card shows "Runs code in your FreeCAD", what that means, the code itself to read and copy, and what a quick scan found in it: imports such as `os`, `subprocess` or `socket`, calls such as `open`, `eval` or `exec`, dunder tricks, `while True`, code that doesn't parse. **The scan is advisory**: Python reaches the operating system through FreeCAD's and Blender's own modules, in ways no list catches. Read the code; the approval is the gate. `Connection(..., scan="block")` refuses code with any finding before anyone is asked. There is no "always allow", and what runs is exactly what you approved.
+The approval card shows "Runs code in your FreeCAD", what that means, the code itself to read and copy, and what a quick scan found in it: imports such as `os`, `subprocess` or `socket`, calls such as `open`, `eval` or `exec`, dunder tricks, `while True`, code that doesn't parse. **The scan is advisory**: Python reaches the operating system through FreeCAD's and Blender's own modules, in ways no list catches. Read the code; the approval is the gate. `Connection(..., scan="block")` refuses code with any finding before anyone is asked. There is no "always allow", and what runs is exactly what you approved. An approval holds for 15 minutes (`approval_ttl`), and only in the process that asked: after a restart, the agent asks again. A character you wouldn't see is shown as its code point; long code says so above its fold. Calls to one app run one at a time.
 
 A download (`blender_import_asset`) shows "Downloads from the internet into your Blender": what it fetches is as untrusted as any uploaded file, and it opens in your live app.
 
@@ -83,7 +85,7 @@ The 30 seconds end the server, not the code: a loop the agent wrote keeps your a
 
 ## What comes back
 
-Replies are data. Text is cut at 16,000 characters, and an image, a view of the part or scene, is given only as the PNG or JPEG it says it is, up to 2 MiB. The model is told the reply is the app's, not instructions, which marks where the app's words are but doesn't stop a prompt injection: the approval of every code call does. The server's own instructions are not read, and it can't ask the model or a person anything.
+Replies are data. Text is cut at 16,000 characters and stripped of terminal escapes and controls, and an image, a view of the part or scene, is given only if it starts like the PNG or JPEG it says it is, up to 2 MiB; refusals are framed the same way. The model is told the reply is the app's, not instructions, which marks where the app's words are but doesn't stop a prompt injection: the approval of every code call does. The server's own instructions are not read, and it can't ask the model or a person anything.
 
 A file you save in the app is yours. To share it, upload it as a native file: it is scanned like any other.
 

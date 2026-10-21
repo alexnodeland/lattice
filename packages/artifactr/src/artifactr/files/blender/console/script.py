@@ -37,6 +37,8 @@ MODIFIERS_EACH = 8
 COPIES = 1000
 """The most copies an object's arrays may make, all of them multiplied."""
 SEGMENTS_MOST = 16
+PIXELS = 1 << 24
+"""The most pixels a page may hold: 16 megapixels."""
 """The most segments a bevel may have."""
 DATA = frozenset({
     "objects", "meshes", "materials", "cameras", "lights", "scenes", "collections", "screens",
@@ -262,6 +264,9 @@ def modifier(args):
 
 def bounded(obj):
     """Refuse an object whose modifiers would make more than the commands allow."""
+    kinds = {blender for blender, _, _ in MODIFIERS.values()}
+    if strange := sorted({each.type for each in obj.modifiers} - kinds):
+        raise Refused(f"{obj.name} has a modifier the commands don't make: {strange[0]}")
     if len(obj.modifiers) > MODIFIERS_EACH:
         raise Refused(f"{obj.name} has more than {MODIFIERS_EACH} modifiers")
     arrays = [each for each in obj.modifiers if each.type == "ARRAY"]
@@ -518,7 +523,8 @@ def draw(width, path):
     settings.use_compositing = settings.use_sequencer = settings.use_freestyle = False
     for layer in scene.view_layers:
         layer.use_freestyle = False
-    settings.resolution_x, settings.resolution_y = width, max(16, round(width * aspect))
+    height = min(max(16, round(width * aspect)), PIXELS // width)
+    settings.resolution_x, settings.resolution_y = width, height
     settings.resolution_percentage = 100
     settings.image_settings.file_format = "PNG"
     settings.filepath = str(path)

@@ -155,12 +155,14 @@ def test_an_objects_modifiers_are_bounded_once_opened(console: ModuleType) -> No
         return SimpleNamespace(name="Cube", modifiers=list(modifiers))
 
     console.bounded(mesh(modifier("ARRAY", fit_type="FIXED_COUNT", count=10)))
+    console.bounded(mesh(modifier("MIRROR"), modifier("SOLIDIFY")))
     for given, why in (
         ([modifier("MIRROR")] * 9, "more than 8 modifiers"),
         ([modifier("ARRAY", fit_type="FIT_LENGTH", count=1)], "to a length or a curve"),
         ([modifier("ARRAY", fit_type="FIXED_COUNT", count=40)] * 2, "1600 copies"),
         ([modifier("SUBSURF", levels=1, render_levels=6)], "more than 4 levels"),
         ([modifier("BEVEL", segments=100)], "more than 16 segments"),
+        ([modifier("NODES")], "a modifier the commands don't make: NODES"),
     ):
         with pytest.raises(console.Refused, match=why):
             console.bounded(mesh(*given))
@@ -217,8 +219,8 @@ ALLOWED_OPS = {
 
 
 def test_the_script_runs_no_code_it_is_given_and_only_the_operators_it_names() -> None:
-    """No eval, exec, compile, import by name, getattr or setattr: no name an agent or a file
-    brings becomes code or an attribute; and of Blender's operators, only four."""
+    """No eval, exec, compile, import by name, getattr or setattr, and of Blender's operators only
+    four. A regression guard over the script's own text, not a proof: an alias would evade it."""
     tree = ast.parse(SCRIPT.read_text())
     called = {
         node.func.id

@@ -37,6 +37,73 @@
           }
         }
       }
+    },
+    {
+      "includes": [
+        "packages/portalr/web/**/*.test.tsx",
+        "packages/portalr/web/**/test/**",
+        "packages/portalr/web/ui/src/table.tsx",
+        "packages/portalr/web/ui/src/markdown.tsx",
+        "packages/portalr/web/ui/src/line-diff.tsx",
+        "packages/portalr/web/ui/src/app-shell.tsx",
+        "packages/portalr/web/ui/src/on-demand/apps.tsx"
+      ],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noRestrictedElements": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "packages/portalr/web/admin/src/main.tsx",
+        "packages/portalr/web/admin/src/routes/_signed/deployment/tools.tsx",
+        "packages/portalr/web/admin/src/routes/_signed/t/$tenant/runs.tsx",
+        "packages/portalr/web/app/src/main.tsx",
+        "packages/portalr/web/app/src/native-file.tsx",
+        "packages/portalr/web/app/src/native-proposal.tsx",
+        "packages/portalr/web/ui/src/artifacts.tsx",
+        "packages/portalr/web/ui/src/chart.tsx",
+        "packages/portalr/web/ui/src/dashboard-figures.tsx",
+        "packages/portalr/web/ui/src/file-preview.tsx",
+        "packages/portalr/web/ui/src/json-view.tsx",
+        "packages/portalr/web/ui/src/on-demand/dashboards.tsx",
+        "packages/portalr/web/ui/src/revisions.tsx",
+        "packages/portalr/web/ui/src/run-failed.tsx",
+        "packages/portalr/web/ui/src/tool-call.tsx",
+        "packages/portalr/web/ui/src/trace-view.tsx",
+        "packages/portalr/web/ui/src/tracker-items.tsx",
+        "packages/portalr/web/ui/src/tracker.tsx"
+      ],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noRestrictedElements": "off"
+          }
+        }
+      }
     }
-  ]
+  ],
+  "linter": {
+    "rules": {
+      "correctness": {
+        "noRestrictedElements": {
+          "level": "error",
+          "options": {
+            "elements": {
+              "a": "Use the kit's component, not a raw element (portalr ADR-0056): TextLink, RowLink, TabLink or NavLink.",
+              "button": "Use the kit's component, not a raw element (portalr ADR-0056): Button.",
+              "table": "Use the kit's component, not a raw element (portalr ADR-0056): Table.",
+              "select": "Use the kit's component, not a raw element (portalr ADR-0056): SelectField.",
+              "details": "Use the kit's component, not a raw element (portalr ADR-0056): a disclosure.",
+              "summary": "Use the kit's component, not a raw element (portalr ADR-0056): a disclosure.",
+              "ins": "Use the kit's component, not a raw element (portalr ADR-0056): the revisions' diff."
+            }
+          }
+        }
+      }
+    }
+  }
 }

@@ -72,7 +72,7 @@ export function SelectField({
       >
         <Select.Trigger
           ref={triggerRef}
-          className="inline-flex w-full items-center justify-between gap-2 rounded-md border border-edge bg-surface px-3 py-1.5 text-fg text-sm outline-offset-2 hover:not-data-disabled:bg-wash focus-visible:outline-2 focus-visible:outline-focus data-disabled:cursor-not-allowed data-disabled:border-line data-disabled:bg-line data-disabled:text-muted"
+          className="inline-flex w-full items-center justify-between gap-2 rounded-(--input-radius) border border-edge bg-surface px-(--input-pad-x) py-(--input-pad-y) text-fg text-sm outline-offset-(--focus-offset) hover:not-data-disabled:bg-wash focus-visible:outline-(length:--focus-width) focus-visible:outline-focus data-disabled:cursor-not-allowed data-disabled:border-line data-disabled:bg-line data-disabled:text-muted"
         >
           <Select.Value className="truncate" />
           <Select.Icon className="text-muted">

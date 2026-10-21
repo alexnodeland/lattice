@@ -10,7 +10,10 @@ export function Skeleton({ className }: { className?: string }) {
   return (
     <span
       aria-hidden="true"
-      className={cn("block animate-pulse rounded-md bg-line motion-reduce:animate-none", className)}
+      className={cn(
+        "block animate-pulse rounded-(--skeleton-radius) bg-line [animation-play-state:var(--motion-loop)] motion-reduce:animate-none",
+        className,
+      )}
     />
   );
 }

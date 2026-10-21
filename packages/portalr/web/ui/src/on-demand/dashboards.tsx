@@ -184,7 +184,7 @@ export function DataTable({ panel, labelledBy }: { panel: TablePanel; labelledBy
                     <button
                       type="button"
                       onClick={header.column.getToggleSortingHandler()}
-                      className="-mx-1 inline-flex items-center gap-1 rounded px-1 outline-offset-2 hover:bg-wash focus-visible:outline-2 focus-visible:outline-focus"
+                      className="-mx-1 inline-flex items-center gap-1 rounded px-1 outline-offset-(--focus-offset) hover:bg-wash focus-visible:outline-(length:--focus-width) focus-visible:outline-focus"
                     >
                       {String(header.column.columnDef.header)}
                       <Icon

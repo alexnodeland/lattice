@@ -37,10 +37,10 @@ export function Progress({
         aria-valuemax={100}
         aria-valuenow={share}
         aria-valuetext={valueText}
-        className="h-2 overflow-hidden rounded-full border border-line bg-paper forced-colors:border-system-text"
+        className="h-(--progress-height) overflow-hidden rounded-(--progress-radius) border border-line bg-paper forced-colors:border-system-text"
       >
         <div
-          className="h-full origin-left bg-accent transition-transform motion-reduce:transition-none forced-color-adjust-none forced-colors:bg-system-highlight"
+          className="h-full origin-left bg-accent transition-transform duration-(--progress-duration) motion-reduce:transition-none forced-color-adjust-none forced-colors:bg-system-highlight"
           style={{ transform: `scaleX(${share / 100})` }}
         />
       </div>

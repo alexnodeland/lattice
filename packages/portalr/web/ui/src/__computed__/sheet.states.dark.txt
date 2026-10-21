@@ -1,0 +1,4 @@
+# div0>div0>div5>article0>div3>a0 hover
+# div0>div0>div5>article0>div3>a0 focus-visible
+div0>div0>div5>article0>div3>a0 | border-top-color: rgb(241, 238, 246); border-top-style: solid; border-top-width: 0px; border-right-color: rgb(241, 238, 246); border-right-style: solid; border-right-width: 0px; border-bottom-color: rgb(241, 238, 246); border-bottom-style: solid; border-bottom-width: 0px; border-left-color: rgb(241, 238, 246); border-left-style: solid; border-left-width: 0px; border-top-left-radius: 0px; border-top-right-radius: 0px; border-bottom-right-radius: 0px; border-bottom-left-radius: 0px; outline-color: FocusRing; outline-style: auto; outline-width: 1px; outline-offset: 1px; cursor: pointer
+# div0>div0>div5>article0>div3>a0 active

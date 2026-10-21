@@ -131,7 +131,10 @@ function LineRow({ line, focused = false }: { line: Line; focused?: boolean }) {
         </del>
       ) : (
         <span
-          className={cn(mark, "focus-visible:outline-2 focus-visible:outline-focus")}
+          className={cn(
+            mark,
+            "focus-visible:outline-(length:--focus-width) focus-visible:outline-focus",
+          )}
           ref={text}
           {...(focused && { tabIndex: -1 })}
         >
@@ -216,7 +219,7 @@ export function LineDiff({ changes, name }: { changes: readonly Change[] | null;
     <div className="flex flex-col gap-1">
       <ScrollRegion
         aria-label={`Changes to the ${name}`}
-        className="max-h-[32rem] overflow-y-auto rounded-md border border-line bg-paper"
+        className="max-h-[32rem] overflow-y-auto rounded-(--code-block-radius) border border-line bg-paper"
       >
         <div
           dir="ltr"

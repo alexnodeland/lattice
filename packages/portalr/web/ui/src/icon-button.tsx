@@ -47,10 +47,13 @@ export function IconButton(props: AsButton | AsLink) {
       }}
     >
       {render ? (
-        // Named by the label, over whatever the link element was named.
-        <Tooltip.Trigger render={cloneElement(render, { "aria-label": label })} className={square}>
-          {glyph}
-        </Tooltip.Trigger>
+        // Named by the label and drawn as the icon, over whatever the link element held.
+        <Tooltip.Trigger
+          render={(merged) =>
+            cloneElement(render, { ...merged, "aria-label": label, children: glyph })
+          }
+          className={square}
+        />
       ) : (
         <Tooltip.Trigger
           render={<Button {...rest} variant="ghost" aria-label={label} className={square} />}

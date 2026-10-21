@@ -38,14 +38,12 @@ test("an icon button can be a link, such as the router's", async () => {
 
 test("a link icon button has the button's look, named by its label, not its element's words", async () => {
   const screen = await render(
-    <IconButton
-      label="Open its page"
-      icon={Maximize2}
-      render={<a href="#page" aria-label="x" />}
-    />,
+    <IconButton label="Open its page" icon={Maximize2} render={<a href="#page">its words</a>} />,
   );
   const link = screen.getByRole("link", { name: "Open its page" }).element();
   expect(getComputedStyle(link).borderTopStyle).toBe("solid");
+  // The element's own words are replaced by the icon: the square holds nothing else.
+  expect(link.textContent).toBe("");
   expect(getComputedStyle(link).color).toBe(token("fg"));
 });
 

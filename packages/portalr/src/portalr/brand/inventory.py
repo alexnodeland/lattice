@@ -307,6 +307,17 @@ COMPONENTS: tuple[Group, ...] = (
             Row("component.table.cell-pad-x", "--table-cell-pad-x", "dimension"),
         ),
     ),
+    Group(
+        "A status badge: its pill's corners and padding. Its shapes are status marks, which "
+        "tell each status apart for every reader, and are not a kit's to change (portalr "
+        "ADR-0039).",
+        (
+            Row("component.badge.radius", "--badge-radius", "dimension"),
+            Row("component.badge.pad-y", "--badge-pad-y", "dimension"),
+            Row("component.badge.pad-start", "--badge-pad-start", "dimension"),
+            Row("component.badge.pad-end", "--badge-pad-end", "dimension"),
+        ),
+    ),
 )
 """Each component's tokens, defaulting to a role or a primitive (portalr ADR-0056)."""
 

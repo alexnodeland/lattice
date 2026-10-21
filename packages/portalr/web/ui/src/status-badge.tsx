@@ -59,7 +59,7 @@ export function StatusBadge({ tone, children, live = false, className }: Props) 
     <span
       role={live ? "status" : undefined}
       className={cn(
-        "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border py-0.5 pr-2 pl-1.5 font-semibold text-xs",
+        "inline-flex items-center gap-1.5 whitespace-nowrap rounded-(--badge-radius) border py-(--badge-pad-y) pr-(--badge-pad-end) pl-(--badge-pad-start) font-semibold text-xs",
         TONE[tone].badge,
         className,
       )}

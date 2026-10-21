@@ -861,6 +861,20 @@
       "cell-pad-x": {
         "$value": "{space.3}"
       }
+    },
+    "badge": {
+      "radius": {
+        "$value": "{radius.full}"
+      },
+      "pad-y": {
+        "$value": "{space.half}"
+      },
+      "pad-start": {
+        "$value": "{space.1-5}"
+      },
+      "pad-end": {
+        "$value": "{space.2}"
+      }
     }
   }
 }

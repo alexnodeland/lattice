@@ -262,4 +262,13 @@
    */
   --table-radius: var(--radius-4);
   --table-cell-pad-x: var(--space-3);
+
+  /*
+   * A status badge: its pill's corners and padding. Its shapes are status marks, which tell each
+   * status apart for every reader, and are not a kit's to change (portalr ADR-0039).
+   */
+  --badge-radius: var(--radius-full);
+  --badge-pad-y: var(--space-half);
+  --badge-pad-start: var(--space-1-5);
+  --badge-pad-end: var(--space-2);
 }

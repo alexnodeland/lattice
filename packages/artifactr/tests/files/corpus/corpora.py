@@ -5,6 +5,7 @@ Nightly's fidelity job runs one app of `CORPORA` each, and a test holds its list
 
 from typing import Final
 
+from tests.files.corpus.blender.corpus import CORPUS as BLENDER
 from tests.files.corpus.cadcraft.corpus import CORPUS as CADCRAFT
 from tests.files.corpus.deckcraft.corpus import CORPUS as DECKCRAFT
 from tests.files.corpus.designcraft.corpus import CORPUS as DESIGNCRAFT
@@ -21,6 +22,6 @@ CORPORA: Final[dict[str, Corpus]] = {
     corpus.app: corpus
     for corpus in (
         *(WORDCRAFT, GRIDCRAFT, DECKCRAFT, PDFCRAFT),
-        *(CADCRAFT, PHOTOCRAFT, VECTORCRAFT, DESIGNCRAFT, FIGCRAFT, FREECAD),
+        *(CADCRAFT, PHOTOCRAFT, VECTORCRAFT, DESIGNCRAFT, FIGCRAFT, FREECAD, BLENDER),
     )
 }

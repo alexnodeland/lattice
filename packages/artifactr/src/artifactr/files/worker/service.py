@@ -18,6 +18,7 @@ from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 
 from artifactr.files.app import App, AppFailed, CommandSpec
+from artifactr.files.craft import CRAFTS
 from artifactr.files.worker.limits import Limits
 from artifactr.files.worker.wire import (
     CALL,
@@ -43,10 +44,16 @@ def worker_app(app: App, *, token: str, limits: Limits, build: str | None = None
         build: The digest of the image the worker runs in, which provenance records.
 
     Raises:
-        ValueError: If the token is empty, which would admit anyone.
+        ValueError: If the token is empty, which would admit anyone, or the limits give the app's
+            CLI less address space than it needs.
     """
     if not token:
         raise ValueError("the worker needs a token: an empty one would admit anyone")
+    needed = CRAFTS[app.name].memory if app.name in CRAFTS else 0
+    if limits.memory < needed:
+        raise ValueError(
+            f"{app.name} needs an address space of {needed} bytes; the limits give {limits.memory}"
+        )
     hello = Hello(
         name=app.name,
         version=app.version,

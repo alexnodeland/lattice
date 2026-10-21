@@ -353,6 +353,18 @@ COMPONENTS: tuple[Group, ...] = (
             Row("component.question.chip-radius", "--question-chip-radius", "dimension"),
         ),
     ),
+    Group(
+        "The chat: a message's bubble, its corners and the smaller corner it points from, and "
+        "its padding; and the composer's corners and padding (portalr ADR-0053).",
+        (
+            Row("component.bubble.radius", "--bubble-radius", "dimension"),
+            Row("component.bubble.tail-radius", "--bubble-tail-radius", "dimension"),
+            Row("component.bubble.pad-x", "--bubble-pad-x", "dimension"),
+            Row("component.bubble.pad-y", "--bubble-pad-y", "dimension"),
+            Row("component.composer.radius", "--composer-radius", "dimension"),
+            Row("component.composer.pad", "--composer-pad", "dimension"),
+        ),
+    ),
 )
 """Each component's tokens, defaulting to a role or a primitive (portalr ADR-0056)."""
 

@@ -301,4 +301,15 @@
   --question-option-pad-x: var(--space-3);
   --question-option-pad-y: 0.625rem;
   --question-chip-radius: var(--radius-full);
+
+  /*
+   * The chat: a message's bubble, its corners and the smaller corner it points from, and its
+   * padding; and the composer's corners and padding (portalr ADR-0053).
+   */
+  --bubble-radius: var(--radius-6);
+  --bubble-tail-radius: var(--radius-2);
+  --bubble-pad-x: 0.875rem;
+  --bubble-pad-y: var(--space-2);
+  --composer-radius: var(--radius-4);
+  --composer-pad: var(--space-1);
 }

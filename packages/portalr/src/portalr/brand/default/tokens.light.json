@@ -939,6 +939,31 @@
       "chip-radius": {
         "$value": "{radius.full}"
       }
+    },
+    "bubble": {
+      "radius": {
+        "$value": "{radius.6}"
+      },
+      "tail-radius": {
+        "$value": "{radius.2}"
+      },
+      "pad-x": {
+        "$value": {
+          "value": 0.875,
+          "unit": "rem"
+        }
+      },
+      "pad-y": {
+        "$value": "{space.2}"
+      }
+    },
+    "composer": {
+      "radius": {
+        "$value": "{radius.4}"
+      },
+      "pad": {
+        "$value": "{space.1}"
+      }
     }
   }
 }

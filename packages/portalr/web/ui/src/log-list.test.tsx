@@ -80,31 +80,25 @@ test("the chosen record's details name its labels and what was kept out, and nev
   await expect.element(screen.getByText("thr_1")).not.toBeInTheDocument();
 });
 
-/**
- * A virtualized list draws the row a key reaches a frame or two later: on a busy runner, more than
- * the second a check waits by default.
- */
-const WALK = { timeout: 5_000 };
-
 test("the arrow, page, home and end keys walk the list", async () => {
   await viewport(1280, 900);
   const many = Array.from({ length: 40 }, (_, at) => record(at + 1));
   const screen = await render(<LogList records={many} complete reveal={revealing().reveal} />);
   await option(screen, 1).click();
   await userEvent.keyboard("{ArrowDown}");
-  await expect.element(option(screen, 2), WALK).toHaveFocus();
+  await expect.element(option(screen, 2)).toHaveFocus();
   await userEvent.keyboard("{PageDown}");
-  await expect.element(option(screen, 12), WALK).toHaveFocus();
+  await expect.element(option(screen, 12)).toHaveFocus();
   await userEvent.keyboard("{ArrowUp}{ArrowUp}");
-  await expect.element(option(screen, 10), WALK).toHaveFocus();
+  await expect.element(option(screen, 10)).toHaveFocus();
   await userEvent.keyboard("{End}");
-  await expect.element(option(screen, 40), WALK).toHaveFocus();
+  await expect.element(option(screen, 40)).toHaveFocus();
   await userEvent.keyboard("{PageDown}{ArrowDown}");
-  await expect.element(option(screen, 40), WALK).toHaveFocus();
+  await expect.element(option(screen, 40)).toHaveFocus();
   await userEvent.keyboard("{Home}");
-  await expect.element(option(screen, 1), WALK).toHaveFocus();
+  await expect.element(option(screen, 1)).toHaveFocus();
   await userEvent.keyboard("{PageUp}{ArrowUp}");
-  await expect.element(option(screen, 1), WALK).toHaveFocus();
+  await expect.element(option(screen, 1)).toHaveFocus();
 });
 
 test("a thousand records draw a screenful; the list keeps a tab stop when the chosen one is scrolled away; End draws the last", async () => {
@@ -208,10 +202,13 @@ test("End then Home, faster than a frame, leave the list at its top: no scroll i
   const screen = await render(<LogList records={many} complete reveal={revealing().reveal} />);
   await option(screen, 1).click();
   const list = screen.getByRole("listbox").element() as HTMLElement;
-  // Both keys in one task, as a busy machine delivers them: before End's scroll is read back.
-  for (const key of ["End", "Home"]) {
+  // Both keys in one task, as a busy machine delivers them, before End's scroll is read back:
+  // `userEvent.keyboard` would give each key a task of its own, and the frames between them.
+  const press = (key: string) =>
     document.activeElement?.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
-  }
+  press("End");
+  expect(list.scrollTop).toBeGreaterThan(0);
+  press("Home");
   for (let frame = 0; frame < 12; frame += 1) {
     await new Promise((done) => requestAnimationFrame(done));
   }

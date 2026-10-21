@@ -875,6 +875,22 @@
       "pad-end": {
         "$value": "{space.2}"
       }
+    },
+    "skeleton": {
+      "radius": {
+        "$value": "{radius.3}"
+      }
+    },
+    "progress": {
+      "radius": {
+        "$value": "{radius.full}"
+      },
+      "height": {
+        "$value": "{space.2}"
+      },
+      "duration": {
+        "$value": "{motion.duration.fast}"
+      }
     }
   }
 }

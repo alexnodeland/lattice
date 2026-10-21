@@ -271,4 +271,13 @@
   --badge-pad-y: var(--space-half);
   --badge-pad-start: var(--space-1-5);
   --badge-pad-end: var(--space-2);
+
+  /*
+   * What is being read and what is going: a placeholder's corners, whose pulse is a loop that
+   * reduced motion stills, and a progress bar's track and how its bar moves.
+   */
+  --skeleton-radius: var(--radius-3);
+  --progress-radius: var(--radius-full);
+  --progress-height: var(--space-2);
+  --progress-duration: var(--duration-fast);
 }

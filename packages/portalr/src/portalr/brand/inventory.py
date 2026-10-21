@@ -318,6 +318,16 @@ COMPONENTS: tuple[Group, ...] = (
             Row("component.badge.pad-end", "--badge-pad-end", "dimension"),
         ),
     ),
+    Group(
+        "What is being read and what is going: a placeholder's corners, whose pulse is a loop "
+        "that reduced motion stills, and a progress bar's track and how its bar moves.",
+        (
+            Row("component.skeleton.radius", "--skeleton-radius", "dimension"),
+            Row("component.progress.radius", "--progress-radius", "dimension"),
+            Row("component.progress.height", "--progress-height", "dimension"),
+            Row("component.progress.duration", "--progress-duration", "duration"),
+        ),
+    ),
 )
 """Each component's tokens, defaulting to a role or a primitive (portalr ADR-0056)."""
 

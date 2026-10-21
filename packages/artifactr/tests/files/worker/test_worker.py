@@ -105,7 +105,9 @@ async def test_what_the_app_refuses_the_worker_refuses(connect: Connect, tmp_pat
 async def test_a_call_is_held_to_the_workers_deadline(connect: Connect, tmp_path: Path) -> None:
     worker = await connect(wordcraft(stand_in(tmp_path, "hang")), limits=Limits(edit=2))
     started = time.monotonic()
-    with pytest.raises(AppFailed, match="more than 2s") as late:
+    # What is left of the deadline once the call has its turn: 2s, or a hair less on a busy
+    # machine.
+    with pytest.raises(AppFailed, match=r"took more than (2|1\.9\d*)s$") as late:
         await worker.apply(None, [], deadline=60)
     assert late.value.failure == "timeout"
     assert time.monotonic() - started < 10
@@ -124,10 +126,9 @@ async def test_a_call_waits_its_turn_within_its_deadline(connect: Connect, tmp_p
         calls.start_soon(call, 2)
         await anyio.sleep(0.5)
         calls.start_soon(call, 1)
-    assert failures == [
-        "timeout: the worker was busy for more than 1s",
-        "timeout: wordcraft-cli took more than 2s",
-    ]
+    busy, late = failures
+    assert busy == "timeout: the worker was busy for more than 1s"
+    assert re.fullmatch(r"timeout: wordcraft-cli took more than (2|1\.9\d*)s", late)
 
 
 async def test_a_file_past_the_limit_is_too_large(connect: Connect) -> None:

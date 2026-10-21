@@ -343,4 +343,7 @@ class AccessMachine(RuleBasedStateMachine):
 
 
 AccessMachine.TestCase.settings = settings(max_examples=200, stateful_step_count=30, deadline=None)
-TestAccessMachine = AccessMachine.TestCase
+
+TestAccessMachine = pytest.mark.timeout(300)(AccessMachine.TestCase)
+"""Its 200 examples take most of a minute alone, and longer on a runner whose every core runs
+another worker's tests: five minutes, rather than the suite's one."""

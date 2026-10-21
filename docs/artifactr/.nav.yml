@@ -34,6 +34,7 @@ nav:
   - artifactr.litellm: reference/litellm.md
   - artifactr.evals: reference/evals.md
   - artifactr.ui: reference/ui.md
+  - artifactr.connect: reference/connect.md
   - Thread protocol: protocol.md
   - Protocol JSON Schema: reference/schema.md
 - Design:

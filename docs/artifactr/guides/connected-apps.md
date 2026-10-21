@@ -65,9 +65,9 @@ agent = Agent(
 )
 ```
 
-Then switch `connect:freecad` on for the workspace in portalr's admin. The server's environment is only `PATH`, `USER` and the like, the entry's variables and the secrets you name: your model keys stay out. A token you name must be set, or the server isn't started. It runs in an empty temporary directory, its `HOME` too, for at most 30 seconds a call, and what it prints goes nowhere: to debug it, run it yourself. None of this contains a hostile server.
+Then switch `connect:freecad` on for the workspace in portalr's admin. The server's environment is only `PATH`, `USER` and the like, the entry's variables and the secrets you name: your model keys stay out. A token you name must be set, or the server isn't started. It runs in an empty temporary directory, its `HOME` too on Linux and macOS, for at most 30 seconds a call, and what it prints goes nowhere: a failure is logged as a warning in lattice's words; to debug the server, run it yourself. None of this contains a hostile server.
 
-The host is an address: `127.0.0.1` or `::1`, not `localhost`. With `remote=True` it is your tailnet's (`100.x.y.z`, `fd7a:115c:a1e0::…` or a `.ts.net` name), and FreeCAD's token is required; a remote Blender is refused, since its add-on takes no token.
+The host is an address: `127.0.0.1` or `::1`, not `localhost`. With `remote=True` it is your tailnet's: prefer its address (`100.x.y.z` or `fd7a:115c:a1e0::…`). A `.ts.net` name is accepted as a name, without checking where it resolves: a Funnel name resolves publicly, and the tailnet encrypts the add-on's RPC only when the runner is on the tailnet too. FreeCAD's token is required; a remote Blender is refused, since its add-on takes no token.
 
 ## Letting it run code
 
@@ -77,7 +77,7 @@ Running code is opt-in at every level, and every call waits for a person:
 2. Switch `connect-code:freecad` on for the workspace.
 3. Grant `artifactr:run_connected_code` to whoever may run such code and approve it: a workspace's admins hold it; give others a custom role.
 
-The approval card shows "Runs code in your FreeCAD", what that means, the code itself to read and copy, and what a quick scan found in it: imports such as `os`, `subprocess` or `socket`, calls such as `open`, `eval` or `exec`, dunder tricks, `while True`, code that doesn't parse. **The scan is advisory**: Python reaches the operating system through FreeCAD's and Blender's own modules, in ways no list catches. Read the code; the approval is the gate. `Connection(..., scan="block")` refuses code with any finding before anyone is asked. There is no "always allow", and what runs is exactly what you approved. An approval holds for 15 minutes (`approval_ttl`), and only in the process that asked: after a restart, the agent asks again. A character you wouldn't see is shown as its code point; long code says so above its fold. Calls to one app run one at a time.
+The approval card shows "Runs code in your FreeCAD", what that means, the code itself to read and copy, and what a quick scan found in it: imports such as `os`, `subprocess` or `socket`, calls such as `open`, `eval` or `exec`, dunder tricks, `while True`, code that doesn't parse. **The scan is advisory**: Python reaches the operating system through FreeCAD's and Blender's own modules, in ways no list catches. Read the code; the approval is the gate. `Connection(..., scan="block")` refuses code with any finding before anyone is asked. There is no "always allow", and what runs is exactly what you approved. An approval holds for 15 minutes (`approval_ttl`), counted to the call, for the arguments it was asked with, and only in the process that asked: after a restart, the agent asks again. Only owners and admins hold `artifactr:run_connected_code`. A character you wouldn't see is shown as its code point; long code says so above its fold. Calls to one app run one at a time.
 
 A download (`blender_import_asset`) shows "Downloads from the internet into your Blender": what it fetches is as untrusted as any uploaded file, and it opens in your live app.
 

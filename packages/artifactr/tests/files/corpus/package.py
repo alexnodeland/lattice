@@ -16,6 +16,9 @@ from typing import Final
 from xml.etree import ElementTree
 
 TIME: Final = (2026, 10, 17, 0, 0, 0)
+"""Every entry's time: so a package, and a test's id made of it, is the same bytes in every
+process, as xdist's workers collect them."""
+
 XML: Final = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
 RELS: Final = "application/vnd.openxmlformats-package.relationships+xml"
 PKG: Final = "http://schemas.openxmlformats.org/package/2006/relationships"

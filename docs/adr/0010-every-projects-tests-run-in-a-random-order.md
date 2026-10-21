@@ -35,3 +35,7 @@ A package's tests run only from a lattice checkout, in the workspace's environme
 - Easier: a test that leans on another's leftovers fails in some run, which prints the seed that reproduces it: `uv run pytest --randomly-seed=N`.
 - Harder: two runs of the same commit can differ. A failure that only one run shows is reproduced with its seed, not dismissed as a flake.
 - A new project's tests are shuffled as soon as it joins the workspace.
+
+## Notes
+
+- 2026-10-21: artifactr's, relayr's and grantr's moon `test` tasks run on every core through pytest-xdist, in the root's `dev` group beside pytest-randomly. Each test opens a SQLite file in a directory of its own and a PostgreSQL schema of its own, so the workers share nothing, and pytest-cov combines their coverage under the same 100% gate. Each worker collects the tests itself, so a test's id is the same in every process; and each shuffles its share, so a seed reproduces an order with the same number of workers, `-n N --randomly-seed=S`.

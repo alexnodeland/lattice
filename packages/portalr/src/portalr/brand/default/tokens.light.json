@@ -1092,6 +1092,40 @@
       "line-gap": {
         "$value": "{space.half}"
       }
+    },
+    "icon-button": {
+      "size": {
+        "$value": {
+          "value": 2,
+          "unit": "rem"
+        }
+      },
+      "radius": {
+        "$value": "{radius.3}"
+      },
+      "icon": {
+        "$value": {
+          "value": 1,
+          "unit": "rem"
+        }
+      }
+    },
+    "tooltip": {
+      "pad-x": {
+        "$value": "{space.2}"
+      },
+      "pad-y": {
+        "$value": "{space.1}"
+      },
+      "radius": {
+        "$value": "{radius.3}"
+      },
+      "shadow": {
+        "$value": "{shadow.2}"
+      },
+      "layer": {
+        "$value": 60
+      }
     }
   }
 }

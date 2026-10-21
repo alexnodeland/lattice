@@ -5,10 +5,11 @@
 
 import { Field } from "@base-ui/react/field";
 import type { Artifactr, ArtifactrV1, Thumb } from "@portalr/client";
-import { Bot, Maximize2, Minimize2, ThumbsDown, ThumbsUp } from "lucide-react";
+import { ArrowUpRight, Bot, Maximize2, Minimize2, ThumbsDown, ThumbsUp } from "lucide-react";
 import {
   type FormEvent,
   type KeyboardEvent,
+  type ReactElement,
   type ReactNode,
   useEffect,
   useId,
@@ -24,6 +25,7 @@ import { CopyButton } from "./copy-button";
 import { endedBy, readAskForm } from "./form-schema";
 import { useFullView } from "./full-view";
 import { Icon } from "./icon";
+import { IconButton } from "./icon-button";
 import { FeatureOff, useFormLock } from "./integrations";
 import { Markdown } from "./markdown";
 import { Questions, type QuestionsAnswer } from "./questions";
@@ -32,6 +34,7 @@ import { type Sent, Unsent, useSending } from "./sending";
 import { FOLDED_LINES, SourceView } from "./source-view";
 import { StatusBadge, type Tone } from "./status-badge";
 import { TextField } from "./text-field";
+import { TextLink } from "./text-link";
 import { TYPE } from "./type";
 
 const card =
@@ -83,26 +86,20 @@ export function Thumbs({ given, onThumbs }: { given: Thumb | null; onThumbs: Giv
   return (
     <fieldset aria-label="Feedback" className="m-0 flex min-w-0 flex-col gap-1 border-0 p-0">
       <span className="flex gap-1">
-        <Button
-          variant="ghost"
-          className="border-line px-2 py-1 text-xs"
+        <IconButton
+          label="Helpful"
+          icon={ThumbsUp}
           aria-pressed={given?.up === true}
           disabled={pending}
           onClick={() => thumb(true)}
-        >
-          <Icon icon={ThumbsUp} className="size-3.5" />
-          Helpful
-        </Button>
-        <Button
-          variant="ghost"
-          className="border-line px-2 py-1 text-xs"
+        />
+        <IconButton
+          label="Not helpful"
+          icon={ThumbsDown}
           aria-pressed={given?.up === false}
           disabled={pending}
           onClick={() => thumb(false)}
-        >
-          <Icon icon={ThumbsDown} className="size-3.5" />
-          Not helpful
-        </Button>
+        />
       </span>
       {given?.comment && <p className="text-muted text-xs">You said: {given.comment}</p>}
       {chosen !== null && (
@@ -258,8 +255,11 @@ export function InlineArtifact({
   name: string;
   /** What kind of thing it is, as people say it, such as "Note" or "Word document". */
   kind?: string;
-  /** A link to its own page, where it has its full view and its history. */
-  open: ReactNode;
+  /**
+   * The link to its own page, where it has its history, such as the router's: drawn as the card's
+   * "Open its page", in its header with its kind, or under it without (portalr ADR-0061).
+   */
+  open: ReactElement | null;
   children: ReactNode;
 }) {
   const { full, setFull, box, back } = useFullView();
@@ -267,7 +267,11 @@ export function InlineArtifact({
     return (
       <li aria-label={name} className={card}>
         {children}
-        <span className="self-start text-xs">{open}</span>
+        {open && (
+          <span className="self-start text-xs">
+            <TextLink render={open}>Open its page</TextLink>
+          </span>
+        )}
       </li>
     );
   }
@@ -286,19 +290,20 @@ export function InlineArtifact({
             <span className={TYPE.note}>{kind}</span>
             <span className={cn(TYPE.label, "break-words")}>{name}</span>
           </p>
-          <Button
-            ref={back}
-            variant="ghost"
-            className="shrink-0 border-line px-2 py-1 text-xs"
-            onClick={() => setFull(!full)}
-          >
-            <Icon icon={full ? Minimize2 : Maximize2} className="size-3.5" />
-            {full ? "Back to the page" : "Full view"}
-          </Button>
+          <span className="flex shrink-0 items-center gap-1">
+            {open && !full && (
+              <IconButton label="Open its page" icon={ArrowUpRight} render={open} />
+            )}
+            <IconButton
+              ref={back}
+              label={full ? "Back to the page" : "Full view"}
+              icon={full ? Minimize2 : Maximize2}
+              onClick={() => setFull(!full)}
+            />
+          </span>
         </div>
         <div className={cn("min-w-0", full && "mx-auto w-full max-w-5xl")}>{children}</div>
       </div>
-      <span className="self-start text-xs">{open}</span>
     </li>
   );
 }

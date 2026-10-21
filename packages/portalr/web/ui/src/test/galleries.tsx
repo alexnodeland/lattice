@@ -4,7 +4,17 @@
  */
 
 import type { Artifactr, ArtifactrV1 } from "@portalr/client";
-import { House, KeyRound, MessageSquare, Play, Plus, ScrollText, Zap } from "lucide-react";
+import {
+  House,
+  KeyRound,
+  Maximize2,
+  MessageSquare,
+  Play,
+  Plus,
+  ScrollText,
+  ThumbsUp,
+  Zap,
+} from "lucide-react";
 import { AccountMenu } from "../account-menu";
 import { Alert } from "../alert";
 import { AppShell } from "../app-shell";
@@ -19,6 +29,7 @@ import { CopyButton } from "../copy-button";
 import { Dialog } from "../dialog";
 import { EmptyState } from "../empty-state";
 import { Icon } from "../icon";
+import { IconButton } from "../icon-button";
 import { Menu } from "../menu";
 import { PageHeader } from "../page-header";
 import { Progress } from "../progress";
@@ -609,6 +620,10 @@ export function Kit() {
       <Progress label="Checking in brief.docx" value={21} max={48} />
       <Menu label="Actions" items={[{ label: "Open", onSelect: () => undefined }]} />
       <CopyButton text="portalr" what="the name" />
+      <span className="flex gap-1">
+        <IconButton label="Helpful" icon={ThumbsUp} aria-pressed />
+        <IconButton label="Full view" icon={Maximize2} />
+      </span>
       <CodeBlock code={'const a = "b";'} language="text" />
     </div>
   );

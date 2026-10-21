@@ -50,7 +50,9 @@ export function useFullView() {
     const restore = inertOutside(within);
     back.current?.focus();
     const leave = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !event.defaultPrevented) {
+      // Something inside that took Escape keeps it, but the back button's own tooltip, which
+      // takes it to close itself, doesn't: one Escape leaves (portalr ADR-0061).
+      if (event.key === "Escape" && (!event.defaultPrevented || event.target === back.current)) {
         setFull(false);
       }
     };

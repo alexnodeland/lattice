@@ -290,7 +290,7 @@ class NativeFiles:
                 raise AppFailed("refused", f"the file is not a {file_type.kind}")
         if media_type not in file_type.formats:
             raise ValidationFailed(f"a {file_type.kind} holds {sorted(file_type.formats)}", [])
-        content = await spool(data, self._blobs.limit)
+        content = await spool(data, self._most(media_type))
         if artifact_id is not None and (uploaded := await _existing(ws, artifact_id)):
             if uploaded.data.content.sha256 != hashlib.sha256(content).hexdigest():
                 raise InvalidState(f"artifact {artifact_id} already exists")
@@ -410,7 +410,7 @@ class NativeFiles:
         checked_out = head.data.content.media_type
         if media_type not in (None, checked_out):
             raise FormatChanged(artifact_id, checked_out=checked_out, checked_in=media_type)
-        content = await spool(data, self._blobs.limit)
+        content = await spool(data, self._most(checked_out))
         inspection = await self._read(ws, app, content)
         if inspection.media_type not in (None, checked_out):
             # The app's name for a format is the worker's text: only one known is told.
@@ -665,6 +665,16 @@ class NativeFiles:
         return await self._blobs.collect(_scope(ws), referenced, before=before)
 
     # ─── what every write shares ──────────────────────────────────────────────
+
+    def most(self, file_type: type[NativeFile]) -> int:
+        """The most bytes a file of a native type holds, of any of its formats."""
+        return max(self._most(media_type) for media_type in file_type.formats)
+
+    def _most(self, media_type: str) -> int:
+        """The most bytes a file of a format holds: its own most, if fewer than the store's."""
+        known = self._formats.get(media_type)
+        most = None if known is None else known.most
+        return self._blobs.limit if most is None else min(most, self._blobs.limit)
 
     async def _read(self, ws: Workspace, app: App, content: bytes) -> Inspection:
         """What the app reads of a file not yet stored, in one of the tenant's readings."""

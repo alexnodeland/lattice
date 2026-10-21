@@ -8,6 +8,7 @@ import { cn } from "./cn";
 
 export function Progress({
   label,
+  shown = label,
   value,
   max,
   valueText,
@@ -15,6 +16,8 @@ export function Progress({
 }: {
   /** What is going, such as "Checking in brief.docx". */
   label: string;
+  /** What is shown of it, where what is going is said beside it already: the label by default. */
+  shown?: string;
   value: number;
   max: number;
   /** How far it has gone, in words, such as "21 kB of 48 kB", for assistive technology. */
@@ -25,7 +28,7 @@ export function Progress({
   return (
     <div className={cn("flex flex-col gap-1 text-sm", className)}>
       <div className="flex justify-between gap-3">
-        <span className="text-fg">{label}</span>
+        <span className="text-fg">{shown}</span>
         <span aria-hidden="true" className="text-muted tabular-nums">
           {share}%
         </span>

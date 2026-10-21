@@ -45,7 +45,7 @@ def test_those_who_started_nothing_lately_are_let_go() -> None:
 
 
 def test_a_gauge_refuses_past_its_most_or_a_persons_share_and_gives_places_back() -> None:
-    gauge = Gauge(2, each=1)
+    gauge = Gauge(2, tenant=2, each=1)
     alice, bob, carol = (("acme", f"user:{n}") for n in ("alice", "bob", "carol"))
     with (
         gauge.held(alice) as first,
@@ -56,8 +56,19 @@ def test_a_gauge_refuses_past_its_most_or_a_persons_share_and_gives_places_back(
         assert (first, again, second, third) == (True, False, True, False)
     with gauge.held(alice) as after:
         assert after
-    shared = Gauge(2, each=2)
+    shared = Gauge(2, tenant=2, each=2)
     with shared.held(alice), shared.held(alice) as twice:
         assert twice
     with pytest.raises(ValueError, match="at least one"):
-        Gauge(1, each=2)
+        Gauge(1, tenant=1, each=2)
+
+
+def test_a_gauge_holds_each_tenant_to_its_share() -> None:
+    gauge = Gauge(3, tenant=2, each=1)
+    with (
+        gauge.held(("acme", "user:a")) as a,
+        gauge.held(("acme", "user:b")) as b,
+        gauge.held(("acme", "user:c")) as c,
+        gauge.held(("globex", "user:a")) as g,
+    ):
+        assert (a, b, c, g) == (True, True, False, True)

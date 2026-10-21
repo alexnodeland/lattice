@@ -1,5 +1,6 @@
 """The default brand kit, and the grammar a kit's tokens are read by (lattice RFC-0007)."""
 
+import importlib
 import json
 import re
 import runpy
@@ -9,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from portalr.brand import DEFAULT, BrandError, compile_kit
+from portalr.brand.__main__ import main
 from portalr.brand.inventory import ROWS
 
 TOKENS = Path(__file__).parent.parent / "web" / "ui" / "src" / "tokens.css"
@@ -110,11 +112,18 @@ def test_the_module_writes_the_default_kits_stylesheet(
 ) -> None:
     out = tmp_path / "tokens.css"
     monkeypatch.setattr(sys, "argv", ["portalr.brand", str(out)])
+    # Run afresh, as `python -m` runs it, not as the module this test imported.
+    monkeypatch.delitem(sys.modules, "portalr.brand.__main__")
     runpy.run_module("portalr.brand", run_name="__main__")
     assert out.read_text() == compile_kit()
-    monkeypatch.setattr(sys, "argv", ["portalr.brand"])
     with pytest.raises(SystemExit, match=re.escape("usage: python -m portalr.brand <tokens.css>")):
-        runpy.run_module("portalr.brand", run_name="__main__")
+        main(["portalr.brand"])
+
+
+def test_the_module_imports_without_writing() -> None:
+    """Importing it, as the standalone check imports every module, writes nothing."""
+    module = importlib.import_module("portalr.brand.__main__")
+    assert module.main is main
 
 
 @pytest.mark.parametrize(

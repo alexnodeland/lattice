@@ -320,6 +320,16 @@ export function Composer({
 }) {
   const [text, setText] = useState("");
   const { pending, unsent, send: sending } = useSending();
+  // A draft not yet sent: leaving the page, or reloading it, asks first.
+  const drafted = text.trim() !== "";
+  useEffect(() => {
+    if (!drafted) {
+      return;
+    }
+    const ask = (event: BeforeUnloadEvent) => event.preventDefault();
+    addEventListener("beforeunload", ask);
+    return () => removeEventListener("beforeunload", ask);
+  }, [drafted]);
   async function send() {
     const message = text.trim();
     if (message && !pending) {

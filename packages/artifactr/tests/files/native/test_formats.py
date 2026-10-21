@@ -4,20 +4,25 @@ from collections.abc import AsyncIterator
 
 import pytest
 
+from artifactr.core import artifact_types
 from artifactr.files.manifest import (
     BLEND,
     DOCX,
     DWG,
     DXF,
+    ECPROJ,
+    FCPROJ,
     FCSTD,
     FIGCRAFT,
     IDML,
     PDF,
     PPTX,
     PSD,
+    SCRAFT,
     SVG,
     XLSX,
     Drawing,
+    NativeFile,
     VectorImage,
 )
 from artifactr.files.native import FORMATS
@@ -46,6 +51,9 @@ async def joined(stream: AsyncIterator[bytes]) -> bytes:
         (FCSTD, ZIP),
         (PDF, b"%PDF-1.7\n"),
         (BLEND, b"BLENDER17-01v0502"),
+        (FCPROJ, b'{"tracks": []}'),
+        (ECPROJ, b'\xef\xbb\xbf  {"layers": []}'),
+        (SCRAFT, b'\n{"session": {}}'),
         (BLEND, b"\x28\xb5\x2f\xfd\x00"),
         (PSD, b"8BPS\x00\x01"),
         (DWG, b"AC1032\x00"),
@@ -69,6 +77,8 @@ def test_each_format_is_told_by_its_first_bytes(media_type: str, head: bytes) ->
         (DXF, b"SECTION"),
         (SVG, b"<html><body>no image here</body></html>"),
         (SVG, b"#!/bin/sh\n<svg>"),
+        (FCPROJ, b'["not", "an", "object"]'),
+        (SCRAFT, ZIP),
     ],
 )
 def test_no_format_is_told_by_anothers_bytes(media_type: str, head: bytes) -> None:
@@ -140,3 +150,13 @@ def test_a_name_is_capped_in_bytes_too() -> None:
     kept = file_name("é" * 199, ".pdf", FORMATS)
     assert len(kept.encode()) <= 255
     assert kept.endswith("é.pdf")
+
+
+def test_every_native_types_format_is_told_by_its_bytes() -> None:
+    formats = {
+        media_type
+        for artifact_type in artifact_types().values()
+        if issubclass(artifact_type, NativeFile)
+        for media_type in artifact_type.formats
+    }
+    assert formats <= FORMATS.keys(), "a native type a person can't upload"

@@ -18,12 +18,15 @@ from artifactr.files.manifest import (
     DOCX,
     DWG,
     DXF,
+    ECPROJ,
+    FCPROJ,
     FCSTD,
     FIGCRAFT,
     IDML,
     PDF,
     PPTX,
     PSD,
+    SCRAFT,
     SVG,
     XLSX,
 )
@@ -65,6 +68,11 @@ def _text(head: bytes) -> str:
     return head.removeprefix(b"\xef\xbb\xbf").decode("utf-8", "replace").lstrip()
 
 
+def _json(head: bytes) -> bool:
+    """A JSON object, after any byte order mark or whitespace."""
+    return _text(head).startswith("{")
+
+
 def _svg(head: bytes) -> bool:
     """Markup, with an `<svg` element in its first bytes, after any declaration or comment."""
     text = _text(head)
@@ -89,6 +97,10 @@ FORMATS: Final[Mapping[str, Format]] = {
     DWG: Format(".dwg", lambda head: re.match(rb"AC10[0-3][0-9]", head) is not None),
     DXF: Format(".dxf", _dxf),
     SVG: Format(".svg", _svg),
+    # The crafting apps' projects are JSON objects alike: the app tells them apart.
+    FCPROJ: Format(".fcproj", _json, told=False),
+    ECPROJ: Format(".ecproj", _json, told=False),
+    SCRAFT: Format(".scraft", _json, told=False),
     # Blender's own header, or zstd's frame, which Blender compresses with: the app tells them.
     BLEND: Format(
         ".blend", lambda head: head.startswith((b"BLENDER", b"\x28\xb5\x2f\xfd")), told=False

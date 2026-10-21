@@ -48,7 +48,7 @@ brand/<name>/
 
 ```json
 {
-  "$schema": "https://lattice.dev/schemas/portalr-brand-1.json  (placeholder)",
+  "$schema": "https://lattice.dev/schemas/portalr-brand-1.json",
   "version": 1,
   "name": "nightshade",
   "identity": { "product": "Nightshade", "app": "Nightshade", "admin": "Nightshade admin" },
@@ -69,6 +69,8 @@ brand/<name>/
   "presets": { "shape": "soft", "motion": "subtle", "elevation": "shadow" }
 }
 ```
+
+The `$schema` URL is a placeholder: no domain is claimed for it yet.
 
 Copy keys are a closed set the UIs read; an unknown key is an error, not ignored. Strings are text, never markup.
 

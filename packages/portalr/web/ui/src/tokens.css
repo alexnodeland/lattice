@@ -238,12 +238,13 @@
 
   /*
    * A notice that floats over the page, as a new version's: where it sits, below a narrow window's
-   * bar, how far it keeps from the window's edges, its width, corners, padding and what it casts.
+   * bar, how far it keeps from the window's edges, its width, corners, padding and what it casts
+   * (portalr ADR-0058).
    */
   --notice-top: 4rem;
   --notice-inset: var(--space-4);
   --notice-width: 28rem;
-  --notice-radius: var(--card-radius);
+  --notice-radius: var(--radius-4);
   --notice-pad: var(--space-3);
   --notice-shadow: var(--shadow-3);
 

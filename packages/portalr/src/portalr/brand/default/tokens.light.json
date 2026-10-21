@@ -826,6 +826,32 @@
         "$value": 0.98
       }
     },
+    "notice": {
+      "top": {
+        "$value": {
+          "value": 4,
+          "unit": "rem"
+        }
+      },
+      "inset": {
+        "$value": "{space.4}"
+      },
+      "width": {
+        "$value": {
+          "value": 28,
+          "unit": "rem"
+        }
+      },
+      "radius": {
+        "$value": "{radius.4}"
+      },
+      "pad": {
+        "$value": "{space.3}"
+      },
+      "shadow": {
+        "$value": "{shadow.3}"
+      }
+    },
     "nav": {
       "radius": {
         "$value": "{radius.3}"

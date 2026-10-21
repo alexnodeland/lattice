@@ -221,4 +221,17 @@
   --dialog-scrim-blur: 3px;
   --dialog-duration: var(--duration-moderate);
   --dialog-enter-scale: 0.98;
+
+  /*
+   * What floats over the page, a menu, a select's choices and a chart's tooltip: corners, what it
+   * casts, its padding, an item's corners and padding, and how it opens.
+   */
+  --popover-radius: var(--radius-4);
+  --popover-shadow: var(--shadow-3);
+  --popover-pad: var(--space-1-5);
+  --popover-item-radius: var(--radius-3);
+  --popover-item-pad-x: 0.625rem;
+  --popover-item-pad-y: var(--space-1-5);
+  --popover-duration: var(--duration-fast);
+  --popover-enter-scale: 0.98;
 }

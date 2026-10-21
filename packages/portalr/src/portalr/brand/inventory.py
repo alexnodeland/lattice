@@ -260,6 +260,20 @@ COMPONENTS: tuple[Group, ...] = (
             Row("component.dialog.enter-scale", "--dialog-enter-scale", "number"),
         ),
     ),
+    Group(
+        "What floats over the page, a menu, a select's choices and a chart's tooltip: corners, "
+        "what it casts, its padding, an item's corners and padding, and how it opens.",
+        (
+            Row("component.popover.radius", "--popover-radius", "dimension"),
+            Row("component.popover.shadow", "--popover-shadow", "shadow"),
+            Row("component.popover.pad", "--popover-pad", "dimension"),
+            Row("component.popover.item-radius", "--popover-item-radius", "dimension"),
+            Row("component.popover.item-pad-x", "--popover-item-pad-x", "dimension"),
+            Row("component.popover.item-pad-y", "--popover-item-pad-y", "dimension"),
+            Row("component.popover.duration", "--popover-duration", "duration"),
+            Row("component.popover.enter-scale", "--popover-enter-scale", "number"),
+        ),
+    ),
 )
 """Each component's tokens, defaulting to a role or a primitive (portalr ADR-0056)."""
 

@@ -97,7 +97,12 @@
               "select": "Use the kit's component, not a raw element (portalr ADR-0056): SelectField.",
               "details": "Use the kit's component, not a raw element (portalr ADR-0056): a disclosure.",
               "summary": "Use the kit's component, not a raw element (portalr ADR-0056): a disclosure.",
-              "ins": "Use the kit's component, not a raw element (portalr ADR-0056): the revisions' diff."
+              "ins": "Use the kit's component, not a raw element (portalr ADR-0056): the revisions' diff.",
+              "h2": "Use the kit's component, not a raw element (portalr ADR-0062): Heading or SectionTitle; the page's one h1 is PageHeader's.",
+              "h3": "Use the kit's component, not a raw element (portalr ADR-0062): Heading or SectionTitle; the page's one h1 is PageHeader's.",
+              "h4": "Use the kit's component, not a raw element (portalr ADR-0062): Heading or SectionTitle; the page's one h1 is PageHeader's.",
+              "h5": "Use the kit's component, not a raw element (portalr ADR-0062): Heading or SectionTitle; the page's one h1 is PageHeader's.",
+              "h6": "Use the kit's component, not a raw element (portalr ADR-0062): Heading or SectionTitle; the page's one h1 is PageHeader's."
             }
           }
         }

@@ -26,6 +26,7 @@ import { type KeyboardEvent, type ReactNode, useId, useMemo, useRef, useState } 
 import { Alert } from "./alert";
 import { Button } from "./button";
 import { cn } from "./cn";
+import { Heading } from "./heading";
 import { Icon } from "./icon";
 import { Num } from "./num";
 import { Reading } from "./skeleton";
@@ -205,9 +206,9 @@ export function TraceView({ outline, reveal }: { outline: Outline; reveal: Revea
     <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
       <section aria-labelledby={`${base}-spans`} className="flex min-w-0 flex-col gap-2">
         <div className="flex items-baseline justify-between gap-3">
-          <h2 id={`${base}-spans`} className="font-semibold text-fg text-sm">
+          <Heading id={`${base}-spans`} level={2} look="label">
             Spans
-          </h2>
+          </Heading>
           <span className="text-muted text-xs">
             {outline.rows.length} {outline.rows.length === 1 ? "span" : "spans"} in{" "}
             {duration(outline.duration)}
@@ -344,9 +345,9 @@ function Details({ row, reveal }: { row: Row; reveal: Reveal }) {
       className="flex min-w-0 flex-col gap-3 rounded-(--card-radius) border border-line bg-surface p-4"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 id={`${base}-span`} className="min-w-0 break-words font-semibold text-fg">
+        <Heading id={`${base}-span`} level={2} look="subsection" className="min-w-0 break-words">
           {row.name}
-        </h2>
+        </Heading>
         {row.error && <StatusBadge tone="failed">Failed</StatusBadge>}
       </div>
       <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 text-sm">
@@ -363,9 +364,9 @@ function Details({ row, reveal }: { row: Row; reveal: Reveal }) {
       </dl>
       {row.withheld.length > 0 && <Withheld row={row} reveal={reveal} />}
       <section aria-labelledby={`${base}-attributes`} className="flex flex-col gap-1">
-        <h3 id={`${base}-attributes`} className="font-semibold text-fg text-sm">
+        <Heading id={`${base}-attributes`} level={3} look="label">
           Attributes
-        </h3>
+        </Heading>
         {attributes.length === 0 ? (
           <p className="text-muted text-sm">None.</p>
         ) : (
@@ -388,9 +389,9 @@ function Withheld({ row, reveal }: { row: Row; reveal: Reveal }) {
   const heading = useId();
   return (
     <section aria-labelledby={heading} className="flex flex-col gap-2">
-      <h3 id={heading} className="font-semibold text-fg text-sm">
+      <Heading id={heading} level={3} look="label">
         Withheld
-      </h3>
+      </Heading>
       <WithheldNow row={row} reveal={reveal} />
     </section>
   );

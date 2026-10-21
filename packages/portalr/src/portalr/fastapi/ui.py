@@ -26,13 +26,17 @@ def policy(site: Site) -> str:
     Supabase project on a path of the application's own origin is already ``'self'``.
     ``'wasm-unsafe-eval'`` lets either UI compile WebAssembly, and ``eval`` stays refused;
     ``scripts/check_wasm.py`` holds what each build ships to ``web/wasm-allowlist.json`` (ADR-0041).
-    Where the deployment runs mini apps, ``frame-src`` names their origin alone, so the UIs frame
-    nothing else, and their own pages are still framed by no one (lattice RFC-0005).
+    Where the deployment runs mini apps, ``frame-src`` names their origin, and where it hosts
+    native files' editors, each editor's origin, whose shim frames the app's build there (portalr
+    ADR-0055): the UIs frame nothing else, and their own pages are still framed by no one
+    (lattice RFC-0005).
     """
     supabase = urlsplit(site.supabase_url)
     connect = " ".join(
         ["'self'", *([site.supabase_url] if supabase.scheme in ("http", "https") else [])]
     )
+    named: list[str] = [*([site.apps] if site.apps else []), *_origins(site.editors)]
+    frames = list(dict.fromkeys(named))
     return "; ".join(
         (
             "default-src 'self'",
@@ -41,13 +45,18 @@ def policy(site: Site) -> str:
             "img-src 'self' data:",
             "font-src 'self'",
             f"connect-src {connect}",
-            *([f"frame-src {site.apps}"] if site.apps else []),
+            *([f"frame-src {' '.join(frames)}"] if frames else []),
             "object-src 'none'",
             "base-uri 'self'",
             "form-action 'self'",
             "frame-ancestors 'none'",
         )
     )
+
+
+def _origins(editors: dict[str, str]) -> list[str]:
+    """Each editor's origin, once, in the order they are named."""
+    return [f"{parts.scheme}://{parts.netloc}" for parts in map(urlsplit, editors.values())]
 
 
 def ui_router(site: Site, root: Path) -> APIRouter:

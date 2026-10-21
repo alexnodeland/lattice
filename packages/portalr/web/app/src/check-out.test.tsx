@@ -9,7 +9,7 @@
 import { afterEach, expect, test, vi } from "vitest";
 import { checkedIn, editorAt, refused } from "./check-out";
 import { open } from "./test/app";
-import { AT, FILE, FLAGS, REVISIONS, status } from "./test/files";
+import { AT, FILE, FLAGS, REVISIONS, status, Upload } from "./test/files";
 
 const EDITOR = "https://wordcraft.example.test/";
 const PAGE = "/t/acme/w/notes/artifacts/doc_1";
@@ -63,36 +63,6 @@ function serving(held: Held) {
         return undefined;
     }
   };
-}
-
-/** An upload the test answers: each one sent is kept, in order. */
-class Upload {
-  static sent: Upload[] = [];
-  url = "";
-  status = 0;
-  responseText = "";
-  upload: { onprogress: ((progress: { loaded: number; total: number }) => void) | null } = {
-    onprogress: null,
-  };
-  onload: (() => void) | null = null;
-  onerror: (() => void) | null = null;
-  onabort: (() => void) | null = null;
-  constructor() {
-    Upload.sent.push(this);
-  }
-  open(_method: string, url: string) {
-    this.url = url;
-  }
-  setRequestHeader() {}
-  send() {}
-  abort() {
-    this.onabort?.();
-  }
-  answer(status: number, body: unknown) {
-    this.status = status;
-    this.responseText = JSON.stringify(body);
-    this.onload?.();
-  }
 }
 
 type Screen = Awaited<ReturnType<typeof open>>["screen"];

@@ -17,7 +17,13 @@ const resource = (workspace: string, rule: string) =>
  * replaces, so one made over someone else's is refused, not lost.
  */
 export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/rules/$rule")({
-  head: ({ params }) => ({ meta: [{ title: `${params.rule} · ${params.workspace} · portalr` }] }),
+  head: ({ params, match }) => ({
+    meta: [
+      {
+        title: match.context.title(`${params.rule} · ${params.workspace}`),
+      },
+    ],
+  }),
   // Another rule's page starts its editor afresh.
   remountDeps: ({ params }) => params.rule,
   loader: async ({ context, params }) => {

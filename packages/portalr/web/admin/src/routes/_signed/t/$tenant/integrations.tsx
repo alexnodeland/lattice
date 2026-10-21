@@ -35,7 +35,9 @@ const HEADER = (
  * ADR-0034, portalr ADR-0045).
  */
 export const Route = createFileRoute("/_signed/t/$tenant/integrations")({
-  head: ({ params }) => ({ meta: [{ title: `Integrations · ${params.tenant} · portalr admin` }] }),
+  head: ({ params, match }) => ({
+    meta: [{ title: match.context.title(`Integrations · ${params.tenant}`) }],
+  }),
   validateSearch: (search: Level & SearchSchemaInput): Level => levelOf(search),
   beforeLoad: ({ context, params }) =>
     opening(context, params.tenant, "grantr:manage_integrations"),

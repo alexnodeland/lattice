@@ -240,20 +240,20 @@ SVG = b"<svg xmlns='http://www.w3.org/2000/svg'"
 @pytest.mark.parametrize(
     ("svg", "fault"),
     [
-        (SVG + b"><script>alert(1)</script></svg>", "script> isn't allowed"),
-        (SVG + b" onload='alert(1)'/>", "the attribute onload"),
-        (SVG + b"><style>a{}</style></svg>", "style> isn't allowed"),
-        (SVG + b"><foreignObject/></svg>", "foreignObject> isn't allowed"),
-        (SVG + b"><use href='#a'/></svg>", "use> isn't allowed"),
-        (SVG + b"><image href='x.png'/></svg>", "image> isn't allowed"),
+        (SVG + b"><script>alert(1)</script></svg>", "script'> isn't allowed"),
+        (SVG + b" onload='alert(1)'/>", "the attribute 'onload'"),
+        (SVG + b"><style>a{}</style></svg>", "style'> isn't allowed"),
+        (SVG + b"><foreignObject/></svg>", "foreignObject'> isn't allowed"),
+        (SVG + b"><use href='#a'/></svg>", "use'> isn't allowed"),
+        (SVG + b"><image href='x.png'/></svg>", "image'> isn't allowed"),
         (
             SVG + b" xmlns:x='http://www.w3.org/1999/xlink'><rect x:href='javascript:1'/></svg>",
-            "the attribute {http://www.w3.org/1999/xlink}href",
+            "the attribute '{http://www.w3.org/1999/xlink}href'",
         ),
-        (SVG + b"><rect fill='url(https://x/y)'/></svg>", "fill names something outside"),
-        (SVG + b"><rect fill='URL(https://x/y)'/></svg>", "fill names something outside"),
-        (SVG + b"><rect fill='\\75rl(https://x)'/></svg>", "fill holds a backslash"),
-        (SVG + b"><rect fill='javascript:alert(1)'/></svg>", "fill names something outside"),
+        (SVG + b"><rect fill='url(https://x/y)'/></svg>", "'fill' names something outside"),
+        (SVG + b"><rect fill='URL(https://x/y)'/></svg>", "'fill' names something outside"),
+        (SVG + b"><rect fill='\\75rl(https://x)'/></svg>", "'fill' holds a backslash"),
+        (SVG + b"><rect fill='javascript:alert(1)'/></svg>", "'fill' names something outside"),
         (b"<!DOCTYPE svg [<!ENTITY a 'b'>]>" + SVG + b"/>", "an SVG declares nothing"),
         (b"<?xml-stylesheet href='https://x/y.css'?>" + SVG + b"/>", "an SVG declares nothing"),
         (SVG + b"><![CDATA[x]]></svg>", "an SVG declares nothing"),
@@ -262,7 +262,7 @@ SVG = b"<svg xmlns='http://www.w3.org/2000/svg'"
         (b"<svg>\xff</svg>", "an SVG is UTF-8"),
         (b"<svg/>", "an <svg> in the SVG namespace"),
         (b"<html xmlns='http://www.w3.org/2000/svg'/>", "an <svg> in the SVG namespace"),
-        (SVG + b"><x:rect xmlns:x='urn:other'/></svg>", "{urn:other}rect> isn't allowed"),
+        (SVG + b"><x:rect xmlns:x='urn:other'/></svg>", "{urn:other}rect'> isn't allowed"),
         (b"<svg", "not well-formed XML"),
         (b"<svg>" + b" " * SVG_BYTES + b"</svg>", "an SVG is 64 KB at most"),
     ],
@@ -354,7 +354,15 @@ def test_a_kits_faces_are_capped_in_number_and_in_all(kit: Path) -> None:
         files.append({"path": f"fonts/f{at}.woff2"})
     font(kit, files)
     assert "fonts: a kit's faces and licences are 1536 KB at most" in faults(kit)
-    font(kit, [{"path": "fonts/f0.woff2"}] * 17)
+    data = brand(kit)
+    data["fonts"] = [
+        {
+            "family": "Inter",
+            "files": [{"path": "fonts/f0.woff2"}] * 9,
+            "licence": {"spdx": "MIT", "file": "fonts/OFL.txt"},
+        }
+    ] * 2
+    write(kit, data)
     assert "fonts: a kit brings 16 face files at most" in faults(kit)
 
 
@@ -421,3 +429,67 @@ def test_an_alias_cycle_is_refused_where_it_is_resolved() -> None:
     cycle = {"color.paper": "{color.surface}", "color.surface": "{color.paper}"}
     with pytest.raises(BrandError, match="aliases deep, or a cycle"):
         resolved("color.paper", cycle)
+
+
+def test_a_key_that_would_forge_a_log_line_is_said_as_its_repr(kit: Path) -> None:
+    data = brand(kit)
+    data["identity"]["x\nERROR forged\x1b[0m"] = "y"
+    write(kit, data)
+    said = faults(kit)
+    assert "identity.'x\\nERROR forged\\x1b[0m'" in said
+    assert "\nERROR forged" not in said
+
+
+def test_a_brand_json_nested_too_deep_is_refused(
+    kit: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Python 3.14's parser takes any depth, so the depth is forced, as on 3.12 and 3.13.
+    def deep(*_: object, **__: object) -> object:
+        raise RecursionError
+
+    monkeypatch.setattr("portalr.brand.kit.Brand.model_validate", deep)
+    assert faults(kit) == "brand.json: nested too deep"
+
+
+def test_a_kit_names_sixteen_faces_at_most(kit: Path) -> None:
+    data = brand(kit)
+    one = {
+        "family": "Inter",
+        "files": [{"path": "fonts/a.woff2"}],
+        "licence": {"spdx": "MIT", "file": "fonts/L.txt"},
+    }
+    data["fonts"] = [one] * 17
+    write(kit, data)
+    said = faults(kit)
+    assert "brand.json: fonts:" in said
+    assert "16" in said
+
+
+def test_a_licence_two_faces_share_is_read_once(kit: Path) -> None:
+    (kit / "fonts").mkdir()
+    (kit / "fonts" / "OFL.txt").write_text("licence")
+    (kit / "fonts" / "a.woff2").write_bytes(woff2())
+    (kit / "fonts" / "b.woff2").write_bytes(woff2())
+    data = brand(kit)
+    data["fonts"] = [
+        {
+            "family": family,
+            "files": [{"path": path}],
+            "licence": {"spdx": "OFL-1.1", "file": "fonts/OFL.txt"},
+        }
+        for family, path in (("Inter", "fonts/a.woff2"), ("Inter Display", "fonts/b.woff2"))
+    ]
+    write(kit, data)
+    assert list(load(kit).files).count("fonts/OFL.txt") == 1
+
+
+def test_a_token_file_nested_too_deep_is_refused(
+    kit: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (kit / "tokens.light.json").write_text("{}")
+
+    def deep(*_: object, **__: object) -> object:
+        raise RecursionError
+
+    monkeypatch.setattr("portalr.brand.tokens._mapping", deep)
+    assert faults(kit) == "tokens.light.json: nested too deep"

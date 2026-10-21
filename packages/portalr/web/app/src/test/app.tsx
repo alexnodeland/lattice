@@ -1,3 +1,4 @@
+import { pageTitle } from "@portalr/ui";
 /**
  * The app as a route, over a stubbed server and a stubbed artifactr stream, for route-level tests:
  * alice is signed in, a member of acme who can open notes; a test's own `serve` answers the rest,
@@ -148,6 +149,7 @@ export async function open(
       queries: createQueries(api),
       commands: createCommands(api, () => undefined),
       queryClient,
+      title: (...parts: string[]) => pageTitle(config.brand, "app", ...parts),
     },
   });
   const screen = await render(

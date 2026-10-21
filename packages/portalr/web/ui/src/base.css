@@ -144,3 +144,29 @@
     --motion-loop: paused !important;
   }
 }
+
+/*
+ * A brand kit's mark (lattice RFC-0007): its light file where the page is light, its dark file
+ * where it is dark, whether the system's scheme or the person's choice says so.
+ */
+.brand-dark {
+  display: none;
+}
+
+:root[data-theme="dark"] .brand-light {
+  display: none;
+}
+
+:root[data-theme="dark"] .brand-dark {
+  display: revert;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .brand-light {
+    display: none;
+  }
+
+  :root:not([data-theme="light"]) .brand-dark {
+    display: revert;
+  }
+}

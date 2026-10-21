@@ -1,6 +1,7 @@
 /** Signing in, as app and admin both open: a card with the UI's lockup, an email and a password. */
 
 import { useActionState } from "react";
+import { useBrand } from "./brand";
 import { Button } from "./button";
 import { Lockup, type Ui } from "./marks";
 import { TextField } from "./text-field";
@@ -22,6 +23,7 @@ export function SignIn({
   ui?: Ui;
   onSignIn: (email: string, password: string) => Promise<string | null>;
 }) {
+  const brand = useBrand();
   const [attempt, signIn, pending] = useActionState(
     async (_last: Attempt, form: FormData): Promise<Attempt> => {
       const email = String(form.get("email"));
@@ -32,8 +34,17 @@ export function SignIn({
   return (
     <main id="main" className="grid min-h-dvh place-items-center bg-paper px-4 py-10 text-fg">
       <div className="flex w-full max-w-sm flex-col gap-2 rounded-(--sign-in-radius) border border-line bg-surface p-(--sign-in-pad)">
-        <Lockup ui={ui} className="mb-6 h-9" />
-        <h1 className={TYPE.page}>Sign in</h1>
+        <div className="mb-6 flex flex-col gap-1">
+          <Lockup ui={ui} className="h-9" />
+          {brand?.copy?.tagline && (
+            <p dir="auto" className="text-muted text-sm">
+              {brand.copy.tagline}
+            </p>
+          )}
+        </div>
+        <h1 dir="auto" className={TYPE.page}>
+          {brand?.copy?.signIn ?? "Sign in"}
+        </h1>
         <p className="mb-4 text-muted text-sm">with your email and password</p>
         <form className="flex flex-col gap-4" action={signIn}>
           <TextField

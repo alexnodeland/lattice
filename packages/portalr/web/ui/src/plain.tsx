@@ -1,5 +1,7 @@
 import { useRender } from "@base-ui/react/use-render";
 import type { ReactElement, ReactNode } from "react";
+import { useBrand, useUiName } from "./brand";
+import { cn } from "./cn";
 import { Lockup, type Ui } from "./marks";
 import { PageHeader } from "./page-header";
 
@@ -23,13 +25,18 @@ export function Plain({
   account?: ReactNode;
   children?: ReactNode;
 }) {
+  const name = useUiName(ui);
+  const kit = useBrand() !== null;
   const link = useRender({
     defaultTagName: "a",
     render: home,
     props: {
-      "aria-label": ui === "admin" ? "portalr admin" : "portalr",
-      className:
+      "aria-label": name,
+      title: kit ? name : undefined,
+      className: cn(
         "inline-flex rounded-md outline-offset-(--focus-offset) focus-visible:outline-(length:--focus-width) focus-visible:outline-focus",
+        kit && "min-w-0 max-w-full",
+      ),
       children: <Lockup ui={ui} />,
     },
   });

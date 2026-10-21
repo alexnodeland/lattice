@@ -11,7 +11,9 @@ import { remember } from "../../last";
  * (portalr ADR-0021). Anyone else is sent to where admin opens for them.
  */
 export const Route = createFileRoute("/_signed/deployment")({
-  head: () => ({ meta: [{ title: "All tenants · portalr admin" }] }),
+  head: ({ match }) => ({
+    meta: [{ title: match.context.title("All tenants") }],
+  }),
   beforeLoad: async ({ context }) => {
     const { queries, queryClient, user } = context;
     const [, every] = await Promise.all([

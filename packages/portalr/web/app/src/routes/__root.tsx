@@ -9,7 +9,7 @@ import {
 import type { Context } from "../context";
 
 export const Route = createRootRouteWithContext<Context>()({
-  head: () => ({ meta: [{ title: "portalr" }] }),
+  head: ({ match }) => ({ meta: [{ title: match.context.title() }] }),
   component: () => (
     <>
       <HeadContent />

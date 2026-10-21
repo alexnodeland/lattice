@@ -27,7 +27,9 @@ interface Issued {
  * revocation, and kept nowhere, and a key revoked, once confirmed, where grantr allows.
  */
 export const Route = createFileRoute("/_signed/t/$tenant/access/keys")({
-  head: ({ params }) => ({ meta: [{ title: `Keys · ${params.tenant} · portalr admin` }] }),
+  head: ({ params, match }) => ({
+    meta: [{ title: match.context.title(`Keys · ${params.tenant}`) }],
+  }),
   beforeLoad: ({ context, params }) => opening(context, params.tenant, "grantr:issue_key"),
   loader: async ({ context, params }) => {
     const { queries, queryClient } = context;

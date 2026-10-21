@@ -8,7 +8,7 @@ in one storage transaction.
 
 from artifactr.workspace.gate import KeyOf, integration_gate
 from artifactr.workspace.memory import InMemoryStorage
-from artifactr.workspace.storage import HistoryChunk, Scope, Storage, Transaction, seal
+from artifactr.workspace.storage import HistoryChunk, Scope, Storage, Transaction, dated, seal
 from artifactr.workspace.workspace import (
     ACTIONS,
     MAX_COUNT,
@@ -47,6 +47,7 @@ __all__ = [
     "Transaction",
     "Workspace",
     "Workspaces",
+    "dated",
     "integration_gate",
     "seal",
 ]

@@ -2,16 +2,32 @@
  * Artifacts, by kind: a registry of renderers an application extends with its own kinds, and
  * formatted JSON for any kind without one, so a new kind is never invisible (lattice RFC-0002).
  * Text renders through `Markdown`, never as HTML. A kind's renderer also says what of its data
- * a revision's changes are read from, and how finely (portalr ADR-0017).
+ * a revision's changes are read from, and how finely (portalr ADR-0017), and, part by part, what
+ * a revision shows as its source and its changes (portalr ADR-0054).
  */
 
 import type { Change, Granularity } from "@portalr/client";
 import { createContext, type ReactNode } from "react";
 import { cn } from "./cn";
+import { JsonView } from "./json-view";
 import { Markdown } from "./markdown";
 
 /** An artifact's data, as artifactr holds it. */
 export type Data = Readonly<Record<string, unknown>>;
+
+/**
+ * A part of a kind's data, as its revisions are read and compared: a title, a summary, a page's
+ * HTML. One with a language is a source, which a revision shows, numbered and highlighted.
+ */
+export interface RevisionPart {
+  /** What it is, in a sentence's words: "title", "HTML". */
+  readonly name: string;
+  readonly text: string;
+  /** How finely its changes are cut. */
+  readonly diff: Granularity;
+  /** Its language, as a fence names one, where it is a source to read. */
+  readonly language?: string;
+}
 
 export interface Renderer {
   /** The artifact's data, shown. */
@@ -30,6 +46,17 @@ export interface Renderer {
    * version. A kind without it is reached from its own page alone.
    */
   readonly inline?: boolean;
+  /** Its data in parts, as a revision reads and compares them; by default, its `text`, whole. */
+  parts?(data: Data): readonly RevisionPart[];
+  /** What a revision's preview shows of it; by default, what `render` does. */
+  preview?(data: Data): ReactNode;
+  /** A line about it, beside its title in a revision, such as an app's summary; or null. */
+  about?(data: Data): string | null;
+  /**
+   * Whether showing it runs what it holds, as an app does: a list of its revisions runs one at a
+   * time, when asked, and only where it may run.
+   */
+  readonly runs?: boolean;
 }
 
 /** The application's renderers, by artifact kind. */
@@ -81,14 +108,16 @@ export function plainTitle(text: string): string | null {
   );
 }
 
-/** Any kind without a renderer: its data as JSON, changed line by line; titled by its `title`. */
+const pretty = (data: Data) => JSON.stringify(data, null, 2);
+
+/**
+ * Any kind without a renderer: its data as JSON, read as a tree, its strings unescaped; changed
+ * line by line; titled by its `title`.
+ */
 export const json: Renderer = {
-  render: (data) => (
-    <pre className="overflow-x-auto rounded-md bg-paper p-3 font-mono text-fg text-xs">
-      {JSON.stringify(data, null, 2)}
-    </pre>
-  ),
-  text: (data) => JSON.stringify(data, null, 2),
+  render: (data) => <JsonView data={data} />,
+  text: pretty,
+  parts: (data) => [{ name: "JSON", text: pretty(data), diff: "lines", language: "json" }],
   // A JSON title is plain text, as written: only its white space and its length are ours.
   title: (data) => (typeof data.title === "string" ? capped(data.title.slice(0, READ)) : null),
   diff: "lines",
@@ -103,10 +132,15 @@ export function markdown(field = "text"): Renderer {
   return {
     render: (data) => <Markdown>{text(data)}</Markdown>,
     text,
+    parts: (data) => [{ name: "Markdown", text: text(data), diff: "words", language: "markdown" }],
     title: (data) => plainTitle(text(data)),
     diff: "words",
   };
 }
+
+/** A kind's data in parts, as its revisions are read and compared. */
+export const partsOf = (renderer: Renderer, data: Data): readonly RevisionPart[] =>
+  renderer.parts?.(data) ?? [{ name: "content", text: renderer.text(data), diff: renderer.diff }];
 
 /** The renderer for a kind: the application's, or JSON. */
 export function rendererFor(kind: string, renderers: Renderers): Renderer {

@@ -26,9 +26,9 @@ test("a kind without one shows its data as JSON, so it is never invisible", asyn
   const screen = await render(
     <ArtifactContent kind="plan" data={{ steps: ["draft", "ship"] }} renderers={renderers} />,
   );
-  expect(screen.container.querySelector("pre")?.textContent).toBe(
-    JSON.stringify({ steps: ["draft", "ship"] }, null, 2),
-  );
+  const tree = screen.getByRole("region", { name: "JSON" });
+  await expect.element(tree.getByText("steps")).toBeVisible();
+  await expect.element(tree.getByText('"ship"')).toBeVisible();
 });
 
 test("a kind named for something every object has still falls back", () => {

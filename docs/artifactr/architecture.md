@@ -14,6 +14,7 @@
 | `artifactr.otel`, `artifactr.langfuse`, `artifactr.litellm` | Implemented: the OpenTelemetry SDK, Langfuse and LiteLLM adapters |
 | `artifactr.evals` | Implemented: datasets from the log, experiments, online evaluation and the end-to-end measures, over evalr |
 | `artifactr.files` | Phase 1 of [lattice RFC-0003](../rfcs/0003-native-files-as-artifacts.md): native files' types, blobs, check-outs and the app port, unreleased ([its section](files/index.md)) |
+| `artifactr.connect` | Implemented: connected apps, an operator's own FreeCAD or Blender through a vetted MCP server, off by default ([ADR-0085](adr/0085-connected-apps-an-operators-own-freecad-or-blender-through-a-vetted-mcp-server.md)) |
 | `examples/docplan` | Implemented: server, terminal client and tests; observed, rated and routed when configured |
 
 ## What artifactr is
@@ -92,6 +93,7 @@ The inner layers (core, telemetry, workspace, agent) form a hexagon of ports and
 | `artifactr.fastapi` (extra) | agent, FastAPI | Driving adapter | The thread protocol over WebSocket, and REST commands. |
 | `artifactr.mcp` (extra) | agent, mcp, lattice-core's `logs` | Driving adapter | Artifacts as MCP resources, commands and reads as MCP tools. |
 | `artifactr.files` (extra) | the public API of core and workspace; its `sql` layer SQLAlchemy 2 async, Alembic and lattice-core's `sql` | A domain built on artifactr, with ports of its own: `Blobs`, `Checkouts` and `App` | Native files as artifacts: manifests over a blob store, check-outs and agents' edits under one lease, and its own tables and migrations ([its architecture](files/architecture.md), [lattice ADR-0026](../adr/0026-a-distribution-needs-a-reason-integrations-are-extras.md)). |
+| `artifactr.connect` (extra `connect`) | the public API of core, workspace and agent; the MCP SDK's client and anyio | A toolset, with lattice-core's switches and the workspace's `authorize` as its gates | Connected apps: a vetted server's tools, filtered by risk, code and network calls approved by a person every call ([the guide](guides/connected-apps.md)) |
 | `artifactr.ui` (extra `forms`) | the public API of core, workspace and agent | A domain built on artifactr, filling its check hook | Forms, dashboards and mini apps in the chat: the schema subset, its types, checks and agent toolset ([Forms and dashboards](#forms-and-dashboards)) |
 
 ### `artifactr.core`: sans-IO

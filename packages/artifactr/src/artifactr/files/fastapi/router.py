@@ -1,32 +1,52 @@
-"""The routes for people's check-out and check-in, beside artifactr's own router.
+"""The routes for people's uploads, check-outs and check-ins, beside artifactr's own router.
 
 Every route names a workspace, then an artifact and a version, a check-out or a proposal, never a
 bare digest: the artifact is resolved through the workspace first, as the actor, so `authorize`,
-the hiding of restricted artifacts and the app's switch all apply before any bytes move.
+the hiding of restricted artifacts and the app's switch all apply before any bytes move. An
+upload names the workspace and the native type it makes (native files ADR-0017).
 """
 
-from collections.abc import Awaitable
+import hashlib
+import logging
+from collections.abc import AsyncIterable, AsyncIterator, Awaitable
 from datetime import datetime
-from typing import Annotated, Final, Literal
+from typing import Annotated, Any, Final, Literal
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response
 from pydantic import BaseModel
 from starlette.requests import HTTPConnection
 
-from artifactr.core import Actor, Applied, ArtifactId, Proposed, Rejection, TenantId
+from artifactr.core import (
+    Actor,
+    Applied,
+    ArtifactId,
+    Forbidden,
+    Proposed,
+    Rejection,
+    TenantId,
+    artifact_types,
+    new_artifact_id,
+)
 from artifactr.fastapi import STATUS_CODES, ResolveActor, Unauthorized
 from artifactr.files.app import AppFailed, Failure, Talk
-from artifactr.files.blobs import DEFAULT_LIMIT, TooLarge
+from artifactr.files.blobs import DEFAULT_LIMIT, OverQuota, TooLarge
 from artifactr.files.checkouts import Checkout
+from artifactr.files.fastapi.pace import Pace
 from artifactr.files.manifest import NativeFile
-from artifactr.files.native import NativeFiles
+from artifactr.files.native import CREATE_NATIVE_FILE, Busy, NativeFiles
 from artifactr.telemetry import annotate, attribution
-from artifactr.workspace import ArtifactLease, Workspace, Workspaces
+from artifactr.workspace import Access, ArtifactLease, Workspace, Workspaces
 from lattice_core.refusals import refusals
+
+logger = logging.getLogger("artifactr.files")
+audit = logging.getLogger("artifactr.files.uploads")
+"""Where every upload is recorded, whatever its outcome (native files ADR-0017)."""
 
 PathId = Annotated[str, Path(min_length=1)]
 Version = Annotated[int, Path(ge=1)]
+ClientId = Annotated[str | None, Query(pattern=r"^[A-Za-z0-9_-]{1,128}$")]
+"""An id the client chooses, so that an upload it sends again makes nothing twice."""
 
 FAILURES: Final[dict[Failure, int]] = {
     "refused": 422,
@@ -37,9 +57,21 @@ FAILURES: Final[dict[Failure, int]] = {
 """The HTTP status for each way the app can fail: the file's fault, or the app's. A page past
 the file's end is the app's refusal too, so 422."""
 
-REFUSALS: Final = refusals(400, 401, 403, 404, 409, 413, 422, 503)
-"""The refused responses every route documents: artifactr's, a file too large, the app's
-refusal, and the app that couldn't finish."""
+SAID: Final[dict[Failure, str]] = {
+    "refused": "the app can't read the file: it may be damaged, or of another format",
+    "too_large": "the file is past what the app reads",
+    "timeout": "the app took too long to read the file",
+    "crashed": "the app stopped before it finished",
+}
+"""What a client is told of each failure, in place of the app's own message, which a hostile
+file can shape (native files ADR-0013): that message is the operator's, in the log."""
+
+REFUSALS: Final = refusals(400, 401, 403, 404, 409, 413, 422, 429, 503)
+"""The refused responses every route documents: artifactr's, a file too large or past a quota,
+the app's refusal, too many uploads or readings at once, and the app that couldn't finish."""
+
+BUSY: Final = 5
+"""The seconds a client is told to wait when the tenant's files are all being read."""
 
 DOWNLOAD: Final = {
     "X-Content-Type-Options": "nosniff",
@@ -61,6 +93,10 @@ UNSAID: Final = frozenset(
 )
 """The `Content-Type`s that say nothing of a check-in's format: those clients send by default."""
 TEXT: Final = "text/plain; charset=utf-8"
+BODY: Final[dict[str, Any]] = {
+    "requestBody": {"required": True, "content": {"application/octet-stream": {}, "*/*": {}}}
+}
+"""A file's bytes as a request's whole body, of any `Content-Type`."""
 
 
 class Lease(BaseModel):
@@ -95,6 +131,36 @@ class FileStatus(BaseModel):
     """The largest file, in bytes, that a check-in takes."""
 
 
+class Uploaded(BaseModel):
+    """What an upload made: a native file, a proposal of one, or nothing, if it was there."""
+
+    outcome: Literal["applied", "proposed", "unchanged"]
+    artifact_id: ArtifactId
+    version: int | None = None
+    proposal_id: str | None = None
+
+
+class UploadKind(BaseModel):
+    """A native type a person may upload a file as."""
+
+    kind: str
+    """Its artifact kind, such as `word_document`, which an upload names."""
+    extensions: list[str]
+    """The extensions of its formats, such as `.docx`, for a file picker to offer."""
+    enabled: bool
+    """Whether its app is on in the workspace: off, no file of it is uploaded."""
+
+
+class Uploads(BaseModel):
+    """What a person may upload in a workspace."""
+
+    allowed: bool
+    """Whether the person may upload at all: an editor's, not a viewer's."""
+    limit: int
+    """The largest file, in bytes, that an upload takes."""
+    kinds: list[UploadKind]
+
+
 class CheckedIn(BaseModel):
     """What a check-in made: a revision, a proposal if it was stale, or nothing."""
 
@@ -109,8 +175,9 @@ def files_router(
     *,
     resolve_actor: ResolveActor,
     limit: int = DEFAULT_LIMIT,
+    uploads_per_minute: int = 20,
 ) -> APIRouter:
-    """Build the router for native files' check-out and check-in, downloads and pages.
+    """Build the router for native files' uploads, check-out and check-in, downloads and pages.
 
     Mount it beside `artifactr_router`, with the same `resolve_actor` and workspaces.
 
@@ -118,12 +185,15 @@ def files_router(
         workspaces: Opens tenant-scoped workspaces, and asks their `authorize` hook.
         files: The native files, their stores and their app.
         resolve_actor: Authenticates each request, as for artifactr's router.
-        limit: The largest check-in, in bytes, refused from its `Content-Length` before any of
-            it is read: give it the blob store's limit, which is 25 MiB unless the store is
-            given another. A body that grows past the store's own limit as it streams is
-            refused there.
+        limit: The largest upload or check-in, in bytes, refused from its `Content-Length`
+            before any of it is read: give it the blob store's limit, which is 25 MiB unless
+            the store is given another. A body that grows past the store's own limit as it
+            streams, whatever its `Content-Length` said, is refused there.
+        uploads_per_minute: How many uploads each person may start in a minute, in this
+            process, past which one is refused with 429 until the minute has passed.
     """
     router = APIRouter(responses=REFUSALS)
+    pace = Pace(uploads_per_minute)
 
     async def workspace_of(request: Request, workspace_id: PathId) -> Workspace:
         async def open_it() -> Workspace:
@@ -134,6 +204,90 @@ def files_router(
         return await _answered(open_it())
 
     current_workspace = Depends(workspace_of)
+
+    @router.get("/workspaces/{workspace_id}/uploads")
+    async def uploads(ws: Workspace = current_workspace) -> Uploads:
+        """What the person may upload here: whether at all, how large, and of which types."""
+
+        async def offered() -> Uploads:
+            kinds = [
+                UploadKind(
+                    kind=file_type.kind,
+                    extensions=files.extensions(file_type),
+                    enabled=await files.enabled(ws, file_type),
+                )
+                for file_type in _native_types()
+                if files.extensions(file_type)
+            ]
+            return Uploads(allowed=await _allowed(ws), limit=limit, kinds=kinds)
+
+        return await _answered(offered())
+
+    @router.post("/workspaces/{workspace_id}/files", status_code=201, openapi_extra=BODY)
+    async def upload(
+        request: Request,
+        response: Response,
+        kind: Annotated[str, Query(min_length=1)],
+        name: Annotated[str, Query(min_length=1, max_length=1024)],
+        artifact_id: ClientId = None,
+        thread_id: ClientId = None,
+        ws: Workspace = current_workspace,
+    ) -> Uploaded:
+        """Upload a file as a new native file of `kind`: its bytes are the body, streamed.
+
+        Its `Content-Type` is never read: the format is the one of the kind's that its first
+        bytes are, and the app reads the file before anything is committed. Give an
+        `artifact_id` to send it again safely: a file already there with these bytes is
+        `unchanged`, and one with others is refused.
+        """
+        meter = _Meter(request.stream())
+        record: dict[str, object] = {"kind": kind, "outcome": "refused"}
+        try:
+            uploaded = await _answered(
+                create(ws, request, kind, name, artifact_id or new_artifact_id(), thread_id, meter)
+            )
+            record["outcome"] = uploaded.outcome
+        except HTTPException as refused:
+            record["status"] = refused.status_code
+            raise
+        finally:
+            _audit(ws, record, meter)
+        if uploaded.outcome == "unchanged":
+            response.status_code = 200
+        return uploaded
+
+    async def create(
+        ws: Workspace,
+        request: Request,
+        kind: str,
+        name: str,
+        artifact_id: ArtifactId,
+        thread_id: str | None,
+        meter: "_Meter",
+    ) -> Uploaded:
+        await ws.check(Access(action=CREATE_NATIVE_FILE))
+        file_type = _native_types_by_kind().get(kind)
+        if file_type is None:
+            raise HTTPException(status_code=422, detail=f"{kind} is no native type")
+        declared = request.headers.get("content-length", "")
+        if declared.isdigit() and int(declared) > limit:
+            raise HTTPException(status_code=413, detail=f"the file is larger than {limit} bytes")
+        if (wait := pace.admit(ws.actor.participant)) is not None:
+            raise HTTPException(
+                status_code=429,
+                detail={"type": "rate_limited", "retry_after": wait},
+                headers={"Retry-After": str(wait)},
+            )
+        outcome = await files.upload(
+            ws, file_type, name, meter, artifact_id=artifact_id, thread_id=thread_id
+        )
+        if isinstance(outcome, Applied):
+            return Uploaded(outcome="applied", artifact_id=artifact_id, version=outcome.version)
+        if isinstance(outcome, Proposed):
+            return Uploaded(
+                outcome="proposed", artifact_id=artifact_id, proposal_id=outcome.proposal_id
+            )
+        return Uploaded(outcome="unchanged", artifact_id=artifact_id)
 
     @router.get("/workspaces/{workspace_id}/files/{artifact_id}")
     async def get_file(artifact_id: PathId, ws: Workspace = current_workspace) -> FileStatus:
@@ -169,15 +323,7 @@ def files_router(
         """Extend a check-out by its whole length again, from now."""
         return await _answered(files.extend(ws, checkout_id))
 
-    @router.put(
-        "/workspaces/{workspace_id}/checkouts/{checkout_id}/file",
-        openapi_extra={
-            "requestBody": {
-                "required": True,
-                "content": {"application/octet-stream": {}, "*/*": {}},
-            }
-        },
-    )
+    @router.put("/workspaces/{workspace_id}/checkouts/{checkout_id}/file", openapi_extra=BODY)
     async def check_in(
         checkout_id: PathId, request: Request, ws: Workspace = current_workspace
     ) -> CheckedIn:
@@ -278,6 +424,67 @@ def files_router(
     return router
 
 
+class _Meter:
+    """An upload's bytes as they stream through: how many, and their digest, for the record."""
+
+    def __init__(self, data: AsyncIterable[bytes]) -> None:
+        self._data = data
+        self._digest = hashlib.sha256()
+        self.size = 0
+        self.whole = False
+
+    async def __aiter__(self) -> AsyncIterator[bytes]:
+        async for chunk in self._data:
+            self.size += len(chunk)
+            self._digest.update(chunk)
+            yield chunk
+        self.whole = True
+
+    @property
+    def sha256(self) -> str | None:
+        """The digest of the whole upload, or None if it wasn't all read."""
+        return self._digest.hexdigest() if self.whole else None
+
+
+def _audit(ws: Workspace, record: dict[str, object], meter: _Meter) -> None:
+    """Record an upload: who, where, what and how it ended (native files ADR-0017)."""
+    audit.info(
+        "upload %s",
+        record["outcome"],
+        extra={
+            "upload": {
+                **record,
+                "actor": ws.actor.participant,
+                "tenant_id": ws.tenant_id,
+                "workspace_id": ws.workspace_id,
+                "sha256": meter.sha256,
+                "size": meter.size,
+            }
+        },
+    )
+
+
+def _native_types() -> list[type[NativeFile]]:
+    """Every native type registered, by kind."""
+    return sorted(_native_types_by_kind().values(), key=lambda file_type: file_type.kind)
+
+
+def _native_types_by_kind() -> dict[str, type[NativeFile]]:
+    return {
+        kind: artifact_type
+        for kind, artifact_type in artifact_types().items()
+        if issubclass(artifact_type, NativeFile)
+    }
+
+
+async def _allowed(ws: Workspace) -> bool:
+    try:
+        await ws.check(Access(action=CREATE_NATIVE_FILE))
+    except Forbidden:
+        return False
+    return True
+
+
 def _lease(lease: ArtifactLease, actor: Actor) -> Lease:
     """A lease as people see it: whose check-out, never the holder; its id to its own."""
     kind, _, rest = lease.holder.partition(":")
@@ -307,6 +514,14 @@ async def _answered[T](awaitable: Awaitable[T]) -> T:
         raise HTTPException(status_code=status, detail=rejection.payload()) from rejection
     except TooLarge as large:
         raise HTTPException(status_code=413, detail=str(large)) from large
+    except OverQuota as over:
+        detail = {"type": "over_quota", "quota": over.over, "limit": over.limit}
+        raise HTTPException(status_code=413, detail=detail) from over
+    except Busy as busy:
+        detail = {"type": "busy", "retry_after": BUSY}
+        headers = {"Retry-After": str(BUSY)}
+        raise HTTPException(status_code=429, detail=detail, headers=headers) from busy
     except AppFailed as failed:
-        detail = {"type": "app_failed", "failure": failed.failure, "message": str(failed)}
+        logger.warning("the app failed: %s", failed)
+        detail = {"type": "app_failed", "failure": failed.failure, "message": SAID[failed.failure]}
         raise HTTPException(status_code=FAILURES[failed.failure], detail=detail) from failed

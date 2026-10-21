@@ -62,6 +62,14 @@ class BlobRow(Base):
     """When the bytes were last put, which collection keeps them for a while after."""
 
 
+class TenantRow(Base):
+    """A tenant whose native files are held to a quota: its row is locked while a put counts."""
+
+    __tablename__ = "artifactr_files_tenants"
+
+    tenant_id: Mapped[str] = mapped_column(primary_key=True)
+
+
 class CheckoutRow(Base):
     """A check-out of a native file."""
 

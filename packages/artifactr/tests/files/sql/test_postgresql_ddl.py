@@ -16,8 +16,8 @@ from sqlalchemy.dialects import postgresql
 from artifactr.files.sql.schema import _on_postgresql
 from artifactr.files.sql.tables import metadata
 
-MIGRATION = (
-    Path(__file__).parents[3] / "src/artifactr/files/sql/migrations/versions/0001_initial.py"
+MIGRATIONS = sorted(
+    (Path(__file__).parents[3] / "src/artifactr/files/sql/migrations/versions").glob("0*.py")
 )
 
 
@@ -33,8 +33,13 @@ class Recorder:
         self.statements.append(str(statement))
 
 
-def _migration(recorder: Recorder, monkeypatch: pytest.MonkeyPatch) -> ModuleType:
-    spec = importlib.util.spec_from_file_location("migration_initial", MIGRATION)
+def _migrations(recorder: Recorder, monkeypatch: pytest.MonkeyPatch) -> list[ModuleType]:
+    """Every migration, in order, each asking the recorder."""
+    return [_migration(path, recorder, monkeypatch) for path in MIGRATIONS]
+
+
+def _migration(path: Path, recorder: Recorder, monkeypatch: pytest.MonkeyPatch) -> ModuleType:
+    spec = importlib.util.spec_from_file_location(f"migration_{path.stem}", path)
     assert spec is not None
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -52,15 +57,18 @@ def _migration(recorder: Recorder, monkeypatch: pytest.MonkeyPatch) -> ModuleTyp
 
 def test_create_schema_asks_what_the_migration_does(monkeypatch: pytest.MonkeyPatch) -> None:
     migrated = Recorder()
-    _migration(migrated, monkeypatch).upgrade()
+    migrations = _migrations(migrated, monkeypatch)
+    for migration in migrations:
+        migration.upgrade()
     created = Recorder()
     _on_postgresql(cast("Connection", created))
     assert sorted(created.statements) == sorted(migrated.statements)
-    assert set(_migration(Recorder(), monkeypatch).TABLES) == set(metadata.tables)
+    assert {table for m in migrations for table in m.TABLES} == set(metadata.tables)
 
 
 def test_the_migration_keeps_every_table_to_its_tenant(monkeypatch: pytest.MonkeyPatch) -> None:
     recorder = Recorder()
-    _migration(recorder, monkeypatch).upgrade()
+    for migration in _migrations(recorder, monkeypatch):
+        migration.upgrade()
     assert sum(s.startswith("CREATE POLICY") for s in recorder.statements) == len(metadata.tables)
     assert "SET STORAGE EXTERNAL" in recorder.statements[0]

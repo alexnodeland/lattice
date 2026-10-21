@@ -9,7 +9,8 @@ one revision through the workspace, which a failure before the commit never reac
 import contextlib
 import json
 import uuid
-from collections.abc import AsyncIterable, Mapping, Sequence
+from collections import Counter
+from collections.abc import AsyncGenerator, AsyncIterable, Mapping, Sequence
 from datetime import timedelta
 from typing import Final, Literal, cast, override
 
@@ -36,16 +37,21 @@ from artifactr.core import (
     create_artifact,
     new_artifact_id,
 )
-from artifactr.files.app import App, AppCommand, Inspection
+from artifactr.files.app import App, AppCommand, AppFailed, Inspection
 from artifactr.files.blobs import Blobs, Clock, once
 from artifactr.files.blobs.port import utc_now
 from artifactr.files.checkouts import Checkout, Checkouts, holder_of
 from artifactr.files.manifest import Blob, NativeFile, Provenance, revise
+from artifactr.files.native.formats import FORMATS, Format, file_name, sniffed
 from artifactr.workspace import ArtifactBusy, Scope, Workspace
 from lattice_core.integrations import Integrations
 
 TEXT: Final = "text/plain; charset=utf-8"
 JSON: Final = "application/json"
+
+CREATE_NATIVE_FILE: Final = "artifactr:create_native_file"
+"""The action a person's upload over HTTP asks `authorize` before any of its bytes are read:
+an editor's, as `artifactr:create_artifact` is, which its commit asks too."""
 
 Part = Literal["content", "text", "review"]
 """What of a revision to read: the file, its words, or its comments and tracked changes."""
@@ -87,6 +93,20 @@ class FormatChanged(InvalidState):
         return {"checked_out": self.checked_out, "checked_in": self.checked_in}
 
 
+class Busy(Exception):
+    """The tenant has as many files being read as it may at once; nothing was read or committed.
+
+    The worker runs one job at a time, so one person's uploads would otherwise queue everyone's.
+
+    Attributes:
+        limit: How many files a tenant may have read at once.
+    """
+
+    def __init__(self, limit: int) -> None:
+        super().__init__(f"{limit} of the tenant's files are being read: try again shortly")
+        self.limit = limit
+
+
 class NativeFiles:
     """Native files in workspaces: their bytes, their check-outs and the apps that read them.
 
@@ -111,6 +131,12 @@ class NativeFiles:
             workspace: while it is off there, none of its files is uploaded, checked out,
             extended, checked in or edited, and each refuses with `NotEnabled`; reads and
             collection go on. None, the default, is on everywhere.
+        formats: Each format an upload's first bytes are told by, by media type: lattice's
+            native types' by default. An application with a native type of its own adds its
+            format's.
+        readings: How many files, uploaded or checked in, each tenant may have the app read at
+            once, past which another is refused with `Busy`: no limit by default. It is this
+            process's count, so each replica of an application counts its own.
 
     Raises:
         ValueError: If an edit's lease would end before the apps' deadline, or no app is given.
@@ -128,6 +154,8 @@ class NativeFiles:
         keep: timedelta = timedelta(days=1),
         clock: Clock = utc_now,
         integrations: Integrations | None = None,
+        formats: Mapping[str, Format] = FORMATS,
+        readings: int | None = None,
     ) -> None:
         if edit_ttl.total_seconds() <= deadline:
             raise ValueError("an edit's lease must outlast the app's deadline, and the commit")
@@ -144,6 +172,9 @@ class NativeFiles:
         self._keep = keep
         self._clock = clock
         self._integrations = integrations
+        self._formats = formats
+        self._readings = readings
+        self._reading: Counter[str] = Counter()
 
     def app_of(self, file_type: type[NativeFile]) -> App:
         """The app that reads a native type: its own, or else its nearest base's.
@@ -155,6 +186,15 @@ class NativeFiles:
             if (app := self._apps.get(cast(type[NativeFile], base))) is not None:
                 return app
         raise ValidationFailed(f"no app reads a {file_type.kind}", [])
+
+    def extensions(self, file_type: type[NativeFile]) -> list[str]:
+        """The extensions of a native type's formats that uploads are told by; none if no app."""
+        try:
+            self.app_of(file_type)
+        except ValidationFailed:
+            return []
+        formats = self._formats
+        return sorted(formats[m].extension for m in file_type.formats if m in formats)
 
     # ─── the switch ───────────────────────────────────────────────────────────
 
@@ -210,28 +250,52 @@ class NativeFiles:
         name: str,
         data: AsyncIterable[bytes],
         *,
-        media_type: str,
+        media_type: str | None = None,
         artifact_id: ArtifactId | None = None,
         thread_id: ThreadId | None = None,
-    ) -> Applied | Proposed:
+    ) -> Applied | Proposed | None:
         """Create a native file from uploaded bytes, with a new id unless one is given.
+
+        Without a `media_type`, the format is the one of the type's that the first bytes are,
+        never what a client says; either way, the app reads the file before anything is
+        committed. The name keeps no path or control character, and takes the format's
+        extension. An upload given the id of a native file whose content is these bytes
+        commits nothing, so one retried after it succeeded makes nothing twice.
+
+        Returns:
+            The new file's outcome, or None if the file with this id is already these bytes.
 
         Raises:
             NotEnabled: If the app's integration is off in the workspace.
             ValidationFailed: If the type doesn't hold files of `media_type`, no app reads it,
                 or its app reads the file as another format.
+            InvalidState: If an artifact with this id exists, and isn't these bytes.
             TooLarge: If the file is larger than the blob store's limit.
-            AppFailed: If the app can't read it.
+            OverQuota: If the file would take the workspace or the tenant past a quota.
+            AppFailed: `refused` if the first bytes are of none of the type's formats, or the
+                app can't read the file.
+            Busy: If the tenant has as many files being read as it may.
         """
         app = await self._switched_on(ws, file_type)
+        if media_type is None:
+            media_type, data = await sniffed(data, self._formats, file_type.formats)
+            if media_type is None:
+                raise AppFailed("refused", f"the file is not a {file_type.kind}")
         if media_type not in file_type.formats:
             raise ValidationFailed(f"a {file_type.kind} holds {sorted(file_type.formats)}", [])
+        uploaded = None if artifact_id is None else await _existing(ws, artifact_id)
         artifact_id = artifact_id or new_artifact_id()
         scope = _scope(ws)
         content = await self._blobs.put(scope, artifact_id, data, media_type)
+        if uploaded is not None:
+            if uploaded.data.content.sha256 != content.sha256:
+                raise InvalidState(f"artifact {artifact_id} already exists")
+            return None
         inspection = await self._inspect(app, scope, artifact_id, content)
         if inspection.media_type not in (None, media_type):
             raise ValidationFailed(f"the file is {inspection.media_type}, not {media_type}", [])
+        known = self._formats.get(media_type)
+        name = file_name(name, "" if known is None else known.extension, self._formats)
         made = Provenance(source="upload")
         manifest = await self._manifest(
             scope, artifact_id, file_type, name, content, inspection, made
@@ -592,7 +656,25 @@ class NativeFiles:
         self, app: App, scope: Scope, artifact_id: ArtifactId, content: Blob
     ) -> Inspection:
         source = await self._bytes(scope, artifact_id, content, "content")
-        return await app.inspect(source, deadline=self._deadline)
+        async with self._turn(scope.tenant_id):
+            return await app.inspect(source, deadline=self._deadline)
+
+    @contextlib.asynccontextmanager
+    async def _turn(self, tenant_id: str) -> AsyncGenerator[None]:
+        """Hold one of the tenant's readings while the app reads a file, or refuse at once.
+
+        Raises:
+            Busy: If the tenant has all of its readings.
+        """
+        if self._readings is not None and self._reading[tenant_id] >= self._readings:
+            raise Busy(self._readings)
+        self._reading[tenant_id] += 1
+        try:
+            yield
+        finally:
+            self._reading[tenant_id] -= 1
+            if not self._reading[tenant_id]:
+                del self._reading[tenant_id]
 
     async def _manifest[F: NativeFile](
         self,
@@ -657,6 +739,14 @@ def _replaced(patch: Patch, part: Part) -> Blob | None:
             value = op.get("value")
             return None if value is None else Blob.model_validate(value)
     return None
+
+
+async def _existing(ws: Workspace, artifact_id: ArtifactId) -> Versioned[NativeFile] | None:
+    """The native file with this id, if there is one the actor sees."""
+    try:
+        return await ws.get(NativeFile, artifact_id)
+    except NotFound:
+        return None
 
 
 def _scope(ws: Workspace) -> Scope:

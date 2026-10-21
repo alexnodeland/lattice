@@ -2,7 +2,7 @@ import { QueryClient } from "@tanstack/react-query";
 import type { Server } from "bun";
 import { afterAll, afterEach, beforeAll, expect, test, vi } from "vitest";
 import { createCommands } from "./commands";
-import { checkIn, pngDataUrl } from "./files";
+import { checkIn, newArtifactId, pngDataUrl, uploadFile } from "./files";
 import { createQueries, keys, Refused } from "./queries";
 import { createApi } from "./rest";
 
@@ -20,6 +20,12 @@ const STATUS = {
   talk: "save",
   enabled: true,
   limit: 26_214_400,
+};
+
+const UPLOADS = {
+  allowed: true,
+  limit: 26_214_400,
+  kinds: [{ kind: "word_document", extensions: [".docx"], enabled: true }],
 };
 
 const seen: URL[] = [];
@@ -58,6 +64,10 @@ beforeAll(() => {
           return new Response(PNG, { headers: { "content-type": "application/octet-stream" } });
         case `${AT}/files/doc_1/versions/1/content`:
           return new Response("the file's bytes");
+        case `${AT}/uploads`:
+          return Response.json(UPLOADS);
+        case "/artifactr/v1/workspaces/ws_2/uploads":
+          return Response.json({ detail: "not found" }, { status: 404 });
         case `${AT}/files/doc_1/checkouts`:
           return Response.json(CHECKOUT, { status: 201 });
         case `${AT}/checkouts/co_1/extension`:
@@ -294,4 +304,89 @@ test("a check-in refused says its rejection's type, and one refused unsigned end
   Upload.last.answer(401, { detail: "sign in" });
   expect(await answer).toMatchObject({ outcome: "refused", status: 401 });
   expect(unsigned).toBe(1);
+});
+
+test("what may be uploaded is read beside artifactr's routes, every half minute, under the integrations", async () => {
+  const client = new QueryClient();
+  const options = queries.files.uploads("acme", "ws_1");
+  expect(options.queryKey).toEqual([...keys.grantr.integrations("acme"), "uploads", "ws_1"]);
+  expect(await client.fetchQuery(options)).toEqual(UPLOADS);
+  const interval = options.refetchInterval as (query: unknown) => number | false;
+  expect(interval({ state: { status: "success" } })).toBe(30_000);
+  expect(interval({ state: { status: "error" } })).toBe(false);
+  await expect(client.fetchQuery(queries.files.uploads("acme", "ws_2"))).rejects.toBeInstanceOf(
+    Refused,
+  );
+});
+
+const uploading = (thread?: string) =>
+  uploadFile({
+    surface: "/artifactr/v1",
+    session: { token: "t0k3n" },
+    tenant: "acme",
+    workspace: "ws 1",
+    kind: "word_document",
+    name: "brief & co.docx",
+    artifact: "art_1",
+    ...(thread !== undefined && { thread }),
+    file: new File(["new"], "brief.docx"),
+  });
+
+test("an upload posts the file to the workspace, of its kind and named, with the id it chose", async () => {
+  vi.stubGlobal("XMLHttpRequest", Upload);
+  const answer = uploading("t 1");
+  const xhr = Upload.last;
+  expect([xhr.method, xhr.url]).toEqual([
+    "POST",
+    "/artifactr/v1/workspaces/ws%201/files?kind=word_document&name=brief+%26+co.docx&artifact_id=art_1&thread_id=t+1",
+  ]);
+  expect(xhr.body).toBeInstanceOf(File);
+  xhr.answer(201, { outcome: "applied", artifact_id: "art_1", version: 1, proposal_id: null });
+  expect(await answer).toMatchObject({ outcome: "done", result: { outcome: "applied" } });
+  uploading();
+  expect(Upload.last.url).not.toContain("thread_id");
+});
+
+test("an upload refused past a quota says which, and one stopped says it may have landed", async () => {
+  vi.stubGlobal("XMLHttpRequest", Upload);
+  const full = uploading();
+  Upload.last.answer(413, {
+    detail: { type: "over_quota", quota: "workspace_files", limit: 3 },
+  });
+  expect(await full).toEqual({
+    outcome: "refused",
+    status: 413,
+    reasons: ["The server answered 413."],
+    type: "over_quota",
+    quota: "workspace_files",
+  });
+  const odd = uploading();
+  Upload.last.answer(429, { detail: { type: 7, quota: null } });
+  expect(await odd).toEqual({
+    outcome: "refused",
+    status: 429,
+    reasons: ["The server answered 429."],
+  });
+  const stop = new AbortController();
+  stop.abort();
+  const stopped = await uploadFile({
+    surface: "/artifactr/v1",
+    session: { token: "t0k3n" },
+    tenant: "acme",
+    workspace: "ws_1",
+    kind: "word_document",
+    name: "brief.docx",
+    artifact: "art_1",
+    file: new Blob(["new"]),
+    signal: stop.signal,
+  });
+  expect(stopped).toMatchObject({
+    reasons: ["The upload was stopped: what was sent may still have been uploaded."],
+  });
+});
+
+test("an upload's id is new each time, of artifactr's form", () => {
+  const id = newArtifactId();
+  expect(id).toMatch(/^art_[0-9a-f]{16}$/);
+  expect(newArtifactId()).not.toBe(id);
 });

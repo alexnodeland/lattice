@@ -9,8 +9,9 @@ has a file.
 
 import hashlib
 from collections.abc import AsyncIterable, Callable, Set
+from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Final, Protocol
+from typing import Final, Literal, Protocol, cast
 
 from artifactr.core import ArtifactId
 from artifactr.files.manifest import Blob
@@ -22,7 +23,8 @@ DEFAULT_LIMIT: Final = 25 * MIB
 """How large a blob may be unless the store is told otherwise."""
 
 MOST: Final = 100 * MIB
-"""The largest limit a store may be given."""
+"""The largest limit a store may be given: below the most a file sent to the worker may hold,
+256 MiB by default, so the store refuses a file before the worker would."""
 
 Clock = Callable[[], datetime]
 """Returns the current time; injectable, so that tests control when a blob was put."""
@@ -45,6 +47,59 @@ class TooLarge(Exception):
         self.limit = limit
 
 
+@dataclass(frozen=True)
+class Quota:
+    """The most a workspace's native files may hold, or a tenant's: bytes, and files.
+
+    A file is an artifact with bytes in the store, so an upload counts from its put, before it
+    is committed, until collection deletes the bytes that nothing names. None is no limit.
+    """
+
+    bytes: int | None = None
+    files: int | None = None
+
+
+Over = Literal["workspace_bytes", "workspace_files", "tenant_bytes", "tenant_files"]
+"""Which quota a put would pass."""
+
+
+@dataclass(frozen=True)
+class Usage:
+    """What a workspace's native files hold, or a tenant's, in the store."""
+
+    bytes: int
+    files: int
+
+
+class OverQuota(Exception):
+    """New bytes would take a workspace or a tenant past its quota; nothing was stored.
+
+    Attributes:
+        over: Which quota.
+        limit: The quota, in bytes or files.
+    """
+
+    def __init__(self, over: Over, limit: int) -> None:
+        super().__init__(f"the {over.replace('_', ' ')} quota of {limit} would be passed")
+        self.over: Over = over
+        self.limit = limit
+
+
+def check_quota(
+    workspace: tuple[Quota, Usage], tenant: tuple[Quota, Usage], *, size: int, new_file: bool
+) -> None:
+    """Refuse new bytes that would take the workspace or the tenant past a quota.
+
+    Raises:
+        OverQuota: For the first quota passed: the workspace's before the tenant's, bytes first.
+    """
+    for level, (quota, usage) in (("workspace", workspace), ("tenant", tenant)):
+        if quota.bytes is not None and usage.bytes + size > quota.bytes:
+            raise OverQuota(cast(Over, f"{level}_bytes"), quota.bytes)
+        if new_file and quota.files is not None and usage.files >= quota.files:
+            raise OverQuota(cast(Over, f"{level}_files"), quota.files)
+
+
 class Blobs(Protocol):
     """Where the bytes of native files are kept, by artifact and digest."""
 
@@ -59,6 +114,7 @@ class Blobs(Protocol):
 
         Raises:
             TooLarge: If the bytes are larger than the store's limit.
+            OverQuota: If new bytes would take the workspace or the tenant past a quota.
         """
         ...
 

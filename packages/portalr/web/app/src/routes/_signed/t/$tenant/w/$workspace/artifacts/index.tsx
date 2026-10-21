@@ -2,6 +2,7 @@ import { EmptyState, PageHeader, Row, RowLink, Rows } from "@portalr/ui";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { titlesOf } from "../../../../../../../titles";
+import { Uploader } from "../../../../../../../upload";
 import { Connection, useWorkspace } from "../../../../../../../workspace";
 
 /** The workspace's artifacts, as its log holds them: each by kind, and its latest version. */
@@ -21,7 +22,8 @@ export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/artifacts/
 
 function Artifacts() {
   const { tenant, workspace } = Route.useParams();
-  const { queries } = Route.useRouteContext();
+  const context = Route.useRouteContext();
+  const { queries } = context;
   const snapshot = useWorkspace();
   // Titles are read from the artifacts' data, which the log doesn't carry; the loader has them.
   const { data: read } = useQuery(queries.artifactr.artifacts(tenant, workspace));
@@ -33,10 +35,11 @@ function Artifacts() {
     <>
       <PageHeader title="Artifacts" meta={`What the agent and people make in ${workspace}`} />
       <Connection snapshot={snapshot} waiting="the workspace" />
+      <Uploader context={context} tenant={tenant} workspace={workspace} />
       {snapshot.status === "live" && listed.length === 0 && (
         <EmptyState title="No artifacts yet">
-          An artifact appears here when the agent makes one in a thread, or when someone accepts a
-          proposal that creates one.
+          An artifact appears here when the agent makes one in a thread, when someone accepts a
+          proposal that creates one, or when someone uploads a file.
         </EmptyState>
       )}
       {listed.length > 0 && (

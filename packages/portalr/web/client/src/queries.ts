@@ -90,6 +90,9 @@ export const keys = {
       ["files", tenant, ws, "version", artifact, version] as const,
     proposal: (tenant: string, ws: string, proposal: string) =>
       ["files", tenant, ws, "proposal", proposal] as const,
+    /** What may be uploaded, under the tenant's integrations: switching an app makes it stale. */
+    uploads: (tenant: string, ws: string) =>
+      [...keys.grantr.integrations(tenant), "uploads", ws] as const,
   },
   reflexr: {
     workspace: (tenant: string, ws: string) => ["reflexr", tenant, "workspace", ws] as const,
@@ -384,6 +387,18 @@ export function createQueries(api: Api) {
             }
             return query.state.data?.lease?.checked_out_by === null ? 2_000 : 30_000;
           },
+        }),
+      /**
+       * What the reader may upload in a workspace: whether at all, how large, and each native
+       * kind with its app's switch, read again every half minute, as the kill switch reads the
+       * workspace's integrations; once refused, not again until asked.
+       */
+      uploads: (tenant: string, ws: string) =>
+        queryOptions({
+          queryKey: keys.files.uploads(tenant, ws),
+          queryFn: () =>
+            body(api.files.GET("/workspaces/{workspace_id}/uploads", workspace(tenant, ws))),
+          refetchInterval: (query) => (query.state.status === "error" ? false : 30_000),
         }),
       /**
        * A version's bytes, for the app to save, as `fetchQuery` reads it: never kept, since a file

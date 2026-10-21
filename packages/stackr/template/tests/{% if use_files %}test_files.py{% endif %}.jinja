@@ -1,0 +1,183 @@
+"""Native files: each app's worker, called over HTTP, here in process, with the fake app standing
+in for a crafting app's CLI."""
+
+{% if use_portal -%}
+import runpy
+import sys
+{% endif -%}
+from dataclasses import replace
+from pathlib import Path
+{%- if use_portal %}
+from typing import Any
+{%- endif %}
+
+import httpx
+import pytest
+{%- if use_portal %}
+import uvicorn
+{%- endif %}
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from starlette.requests import HTTPConnection
+
+from artifactr import InMemoryStorage, UserActor, Workspaces
+from artifactr.core import Actor, TenantId
+from artifactr.files import DOCX, FakeApp, WordDocument
+from artifactr.files.blobs import once
+from artifactr.files.worker import Limits, worker_app
+from lattice_core.integrations import Defaults
+
+from {{ package_name }}.database import open_database
+from {{ package_name }}.files import Files
+from {{ package_name }}.settings import FilesSettings, {% if use_portal %}PortalSettings, {% endif %}Settings
+
+from conftest import TENANT, Script, app, bearer, settings
+
+TOKEN = "a-workers-token"
+WORDCRAFT = FilesSettings(crafts=("wordcraft",), worker_token=TOKEN)
+ALICE = UserActor(id="alice", name="Alice")
+
+
+def workers(token: str = TOKEN) -> httpx.ASGITransport:
+    """WordCraft's worker, as the application reaches it, with the fake app for its CLI."""
+    worker = worker_app(FakeApp(integration="files:wordcraft"), token=token, limits=Limits())
+    return httpx.ASGITransport(app=worker)
+
+
+async def resolve_actor(_connection: HTTPConnection) -> tuple[TenantId, Actor]:
+    return TENANT, ALICE
+
+
+def test_native_files_are_off_until_an_app_runs() -> None:
+    files = Files(FilesSettings(), integrations=Defaults())
+    assert (files.native, files.types, files.toolsets()) == (None, [], [])
+    assert files.key_of("word_document", {}) is None
+    application = FastAPI()
+    files.mount(application, Workspaces(InMemoryStorage()), resolve_actor=resolve_actor, prefix="")
+    assert not application.routes[4:], "only FastAPI's own routes"
+
+
+async def test_a_file_is_read_by_its_apps_worker_and_served_beside_artifactr() -> None:
+    files = Files(WORDCRAFT, integrations=Defaults(), transport=workers())
+    assert files.types == [WordDocument]
+    assert files.native is not None
+    workspaces = Workspaces(InMemoryStorage(), types=files.types)
+    application = FastAPI()
+    files.mount(application, workspaces, resolve_actor=resolve_actor, prefix="/artifactr/v1")
+    async with files.lifespan():
+        assert files.key_of("word_document", {}) == "files:wordcraft"
+        assert [toolset.id for toolset in files.toolsets()] == [None]
+        ws = await workspaces.open(TENANT, "main", actor=ALICE)
+        made = await FakeApp().apply(None, [], deadline=5)
+        await files.native.upload(
+            ws, WordDocument, "brief.docx", once(made.content), media_type=DOCX, artifact_id="a1"
+        )
+        transport = httpx.ASGITransport(app=application)
+        async with httpx.AsyncClient(transport=transport, base_url="http://app") as client:
+            head = await client.get("/artifactr/v1/workspaces/main/files/a1")
+    assert head.status_code == 200
+    assert (head.json()["name"], head.json()["enabled"]) == ("brief.docx", True)
+
+
+async def test_a_worker_that_doesnt_answer_says_which_one() -> None:
+    files = Files(WORDCRAFT, integrations=Defaults(), transport=workers(token="another"))
+    with pytest.raises(RuntimeError, match="files-wordcraft, the worker FILES_CRAFTS names"):
+        async with files.lifespan():
+            pass
+
+
+async def test_the_files_bytes_and_check_outs_live_in_the_database(tmp_path: Path) -> None:
+    database = open_database(f"sqlite+aiosqlite:///{tmp_path / 'app.db'}", schema="main")
+    files = Files(WORDCRAFT, integrations=Defaults(), database=database, transport=workers())
+    await files.migrate(database)
+    assert files.native is not None
+    await database.dispose()
+
+
+def test_the_application_mounts_native_files_while_an_app_runs(script: Script) -> None:
+    config = replace(settings(), files=WORDCRAFT)
+    with TestClient(app(script, config, workers=workers()), headers=bearer()) as client:
+        missing = client.get("/artifactr/v1/workspaces/main/files/a_missing")
+    assert missing.status_code == 404
+    assert missing.json() != {"detail": "Not Found"}, "artifactr's refusal, not a missing route"
+
+
+@pytest.mark.parametrize(
+    ("environ", "refusal"),
+    [
+        ({"FILES_CRAFTS": "wordcraft,filmcraft"}, "names filmcraft: a worker runs wordcraft"),
+        ({"FILES_CRAFTS": "wordcraft"}, "needs FILES_WORKER_TOKEN"),
+    ],
+)
+def test_native_files_settings_are_refused_unless_they_hold(
+    environ: dict[str, str], refusal: str
+) -> None:
+    with pytest.raises(ValueError, match=refusal):
+        Settings.from_environ(environ)
+
+
+def test_no_app_runs_by_default() -> None:
+    assert Settings.from_environ({}).files == FilesSettings()
+{%- if use_portal %}
+
+
+def test_each_running_apps_editor_is_on_this_machine_by_default() -> None:
+    environ = {"FILES_CRAFTS": "wordcraft,gridcraft,pdfcraft", "FILES_WORKER_TOKEN": TOKEN}
+    assert Settings.from_environ(environ).files.editors == {
+        "files:gridcraft": "http://127.0.0.1:{{ crafts.gridcraft.editor }}/",
+        "files:pdfcraft": "http://127.0.0.1:{{ crafts.pdfcraft.editor }}/",
+    }
+    tailnet = {"files:gridcraft": "https://my-machine.example.ts.net:8802/"}
+    environ["FILES_EDITORS"] = '{"files:gridcraft": "https://my-machine.example.ts.net:8802/"}'
+    assert Settings.from_environ(environ).files.editors == tailnet
+
+
+@pytest.mark.parametrize("editors", ["https://my-machine.example.ts.net:8802/", "[]"])
+def test_editors_elsewhere_are_a_json_object(editors: str) -> None:
+    with pytest.raises(ValueError, match="FILES_EDITORS must be a JSON object"):
+        Settings.from_environ({"FILES_EDITORS": editors})
+
+
+def test_the_portal_tells_the_app_where_each_editor_is(script: Script) -> None:
+    editors = {"files:gridcraft": "http://127.0.0.1:{{ crafts.gridcraft.editor }}/"}
+    portal = PortalSettings(supabase_url="http://127.0.0.1:54321", supabase_key="sb_publishable_x")
+    config = replace(settings(), files=replace(WORDCRAFT, editors=editors), portal=portal)
+    with TestClient(app(script, config, workers=workers())) as client:
+        assert client.get("/portalr/config.json").json()["editors"] == editors
+
+
+def build(tmp_path: Path) -> Path:
+    """A browser build's directory, as small as one can be."""
+    (tmp_path / "index.html").write_text("<!doctype html><title>GridCraft</title>")
+    return tmp_path
+
+
+def test_an_editor_serves_the_build_and_lattices_shim(tmp_path: Path) -> None:
+    from {{ package_name }}.editor import editor_from_environment
+
+    environ = {
+        "EDITOR_APP": "gridcraft",
+        "EDITOR_BUILD": str(build(tmp_path)),
+        "PORTAL_URL": "http://127.0.0.1:{{ app_port }}",
+    }
+    with TestClient(editor_from_environment(environ)) as client:
+        page = client.get("/")
+        shim = client.get("/.lattice/shim.html")
+    assert page.status_code == shim.status_code == 200
+    assert "frame-ancestors" in page.headers["content-security-policy"]
+
+
+def test_the_editors_module_serves_it(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    served: list[tuple[str, int]] = []
+
+    def run(_app: Any, *, host: str, port: int) -> None:
+        served.append((host, port))
+
+    monkeypatch.setattr(uvicorn, "run", run)
+    monkeypatch.setenv("EDITOR_APP", "gridcraft")
+    monkeypatch.setenv("EDITOR_BUILD", str(build(tmp_path)))
+    monkeypatch.setenv("PORTAL_URL", "http://127.0.0.1:{{ app_port }}")
+    monkeypatch.delitem(sys.modules, "{{ package_name }}.editor", raising=False)
+    runpy.run_module("{{ package_name }}.editor", run_name="__main__")
+    assert served == [("0.0.0.0", 8000)]
+{%- endif %}

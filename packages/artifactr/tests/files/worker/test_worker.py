@@ -326,6 +326,11 @@ async def test_the_environment_says_which_app_it_runs_under_the_limits(
     assert crashed.value.failure == "crashed"
 
 
+def test_empty_limits_are_the_defaults(tmp_path: Path) -> None:
+    environ = {"WORKER_TOKEN": TOKEN, "WORKER_CLI": str(stand_in(tmp_path)), "WORKER_LIMITS": ""}
+    assert worker_from_environment({**environ, "WORKER_VERSION": "0.7.0"}).routes
+
+
 def test_a_worker_runs_no_app_it_has_no_adapter_for() -> None:
     environ = {"WORKER_APP": "filmcraft", "WORKER_CLI": "x", "WORKER_VERSION": "1"}
     with pytest.raises(ValueError, match="'filmcraft', and a worker runs one of wordcraft"):

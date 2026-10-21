@@ -87,6 +87,16 @@ ui:
   default: true
   when: "{{ libraries in ['artifactr', 'both'] }}"
 
+native_files:
+  type: bool
+  help: >-
+    Include native files (Word, Excel, PowerPoint, PDF, CAD and design files kept as artifacts,
+    each read and edited by its crafting app's pinned CLI in a worker of its own, with no route
+    out, and edited by people in the app's browser build)? No app runs until FILES_CRAFTS names
+    it: `make up FILES="wordcraft gridcraft"`. Each adds an image built from its pinned release.
+  default: true
+  when: "{{ libraries in ['artifactr', 'both'] }}"
+
 access:
   type: str
   help: Who may do what
@@ -166,11 +176,33 @@ use_ui:
   default: "{{ libraries in ['artifactr', 'both'] and ui }}"
   when: false
 
+use_files:
+  type: bool
+  default: "{{ libraries in ['artifactr', 'both'] and native_files }}"
+  when: false
+
 # Whether the application asks lattice-core's port of integrations itself: forms and dashboards,
-# or a tracker, are switched per workspace.
+# native files' apps, or a tracker, are switched per workspace.
 use_integrations:
   type: bool
-  default: "{{ use_ui or use_tracker }}"
+  default: "{{ use_ui or use_files or use_tracker }}"
+  when: false
+
+# The crafting apps a worker runs (lattice RFC-0003): each one's release, as lattice's
+# scripts/crafts pins it, which scripts/check-template holds this to; its native type; and, for an
+# app whose browser build hands a file over (`bridge`), the port its editor is published on.
+crafts:
+  type: yaml
+  default:
+    wordcraft: {version: "0.7.0", type: WordDocument}
+    gridcraft: {version: "0.8.0", type: Workbook, editor: 8802}
+    deckcraft: {version: "0.7.0", type: Presentation}
+    pdfcraft: {version: "0.8.0", type: PdfDocument, editor: 8803}
+    cadcraft: {version: "0.8.0", type: Drawing, editor: 8804}
+    photocraft: {version: "0.9.0", type: LayeredImage}
+    vectorcraft: {version: "0.12.0", type: VectorImage}
+    designcraft: {version: "0.9.0", type: PageLayout}
+    figcraft: {version: "0.6.0", type: Design}
   when: false
 
 use_portal:

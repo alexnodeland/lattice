@@ -17,6 +17,10 @@ principal's key, and names its tenant (``access.py``){% endif %}.
 
 - ``/grantr/v1``: grantr's admin API: tenants, members, groups, roles, grants and keys
 {%- endif %}
+{%- if use_files %}
+- ``/artifactr/v1/workspaces/{w}/files``: native files, while ``FILES_CRAFTS`` names an app
+  (``files.py``)
+{%- endif %}
 {%- if use_portal %}
 - ``/portalr``: portalr's app and admin UIs, and the reads behind them (``portal.py``)
 {%- endif %}
@@ -34,6 +38,8 @@ from datetime import timedelta
 from importlib.metadata import metadata
 from typing import Protocol
 
+{% if use_files %}import httpx
+{% endif -%}
 import uvicorn
 from fastapi import FastAPI
 from pydantic_ai.models import Model
@@ -62,6 +68,9 @@ from {{ package_name }}.bridge import Bridge
 from {{ package_name }}.collaboration import Collaboration
 {%- endif %}
 from {{ package_name }}.database import Database, create_schema, open_database
+{%- if use_files %}
+from {{ package_name }}.files import Files
+{%- endif %}
 from {{ package_name }}.gateway import gateway_model
 {%- if use_portal %}
 from {{ package_name }}.portal import Portal
@@ -117,6 +126,9 @@ def create_app(
 {%- if use_tracker %}
     tracker: Connect | None = None,
 {%- endif %}
+{%- if use_files %}
+    workers: httpx.AsyncBaseTransport | None = None,
+{%- endif %}
 ) -> FastAPI:
     """Build the application.
 
@@ -138,6 +150,10 @@ def create_app(
 {%- if use_tracker %}
         tracker: The task tracker's adapter; {% if tracker == 'plane' %}Plane{% else %}Vikunja{% endif %}'s, over HTTP, by default. Tests pass
             relayr's ``FakeTracker``'s.
+{%- endif %}
+{%- if use_files %}
+        workers: How requests reach native files' workers; HTTP, by their names on the
+            ``files`` network, by default. Tests pass the workers themselves.
 {%- endif %}
     """
     settings = settings or Settings.from_environ()
@@ -167,6 +183,9 @@ def create_app(
 {%- if use_integrations %}
     # Whether each integration is on in a workspace: {% if access == 'grantr' %}as grantr's switches say{% else %}each one's default, everywhere{% endif %}.
     integrations = {% if access == 'grantr' %}access.grants{% else %}Defaults(){% endif %}
+{%- endif %}
+{%- if use_files %}
+    files = Files(settings.files, integrations=integrations, database=database, transport=workers)
 {%- endif %}
 {%- if use_relayr %}
     bridge = Bridge(database=database, telemetry=telemetry{% if access == 'grantr' %}, grants=access.grants{% endif %})
@@ -223,8 +242,11 @@ def create_app(
         authenticate=verifier.authenticate,
         identify=verifier.authenticate,
 {%- endif %}
-{%- if use_ui %}
+{%- if use_ui or use_files %}
         integrations=integrations,
+{%- endif %}
+{%- if use_files %}
+        files=files,
 {%- endif %}
         model=model,
         gateway=settings.gateway,

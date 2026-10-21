@@ -2,6 +2,12 @@
 #
 # lattice's libraries come from GitHub at the revisions uv.lock pins, so the build needs git
 # and the network. The runtime image holds only the virtual environment{% if use_portal %} and portalr's UIs{% endif %}.
+{%- if use_files %}
+#
+# Native files add two targets, built for one crafting app each (CRAFT, and the VERSION its pin
+# names), which compose.yaml's files-<app> services build: `files-worker`, the app's CLI behind
+# the worker, and `files-editor`, its browser build on an origin of its own.
+{%- endif %}
 
 {% if use_portal -%}
 # portalr's UIs, which its wheel carries and a git install of it does not: built from the lattice
@@ -37,6 +43,71 @@ COPY README.md ./
 COPY src ./src
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev --no-editable
+
+{%- if use_files %}
+
+
+# A crafting app's release, fetched as scripts/crafts pins it and checked against its SHA-256
+# before anything of it is unpacked (scripts/craft).
+FROM python:{{ python_version }}-slim-trixie AS craft
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends ca-certificates curl unzip \
+    && rm -rf /var/lib/apt/lists/*
+ARG CRAFT
+ENV CRAFT=${CRAFT} CRAFT_CACHE=/cache
+COPY scripts/craft scripts/
+COPY scripts/crafts/${CRAFT}.sha256 scripts/crafts/
+
+# Its CLI's tarball, for this build's Linux, x86_64 or aarch64, whole: its licences and notices
+# travel with the CLI.
+FROM craft AS craft-cli
+RUN cli=$(scripts/craft "${CRAFT}" cli) && cp -R "${cli%/bin/*}" /opt/craft
+{%- if use_portal %}
+
+# Its browser build, unmodified, as its brand's licence asks.
+FROM craft AS craft-web
+RUN web=$(scripts/craft "${CRAFT}" web) && cp -R "${web}" /opt/web
+{%- endif %}
+
+
+# The worker: the app's four calls over HTTP, one at a time, its CLI under the worker's limits.
+# compose.yaml runs it read-only, on a network with no route out.
+FROM python:{{ python_version }}-slim-trixie AS files-worker
+ARG CRAFT
+ARG VERSION
+RUN useradd --no-create-home --uid 10002 worker
+COPY --from=build --chmod=a=rX /app/.venv /app/.venv
+COPY --from=craft-cli --chmod=a=rX /opt/craft /opt/craft
+ENV PATH="/app/.venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    WORKER_APP=${CRAFT} \
+    WORKER_CLI=/opt/craft/bin/${CRAFT}-cli \
+    WORKER_VERSION=${VERSION} \
+    WORKER_HOST=0.0.0.0 \
+    WORKER_PORT=8080
+USER worker
+EXPOSE 8080
+CMD ["python", "-m", "artifactr.files.worker"]
+{%- if use_portal %}
+
+
+# The editor: the app's browser build, as released, with lattice's shim, which the portal frames.
+FROM python:{{ python_version }}-slim-trixie AS files-editor
+ARG CRAFT
+RUN useradd --no-create-home --uid 10003 editor
+COPY --from=build --chmod=a=rX /app/.venv /app/.venv
+COPY --from=craft-web --chmod=a=rX /opt/web /opt/web
+ENV PATH="/app/.venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    EDITOR_APP=${CRAFT} \
+    EDITOR_BUILD=/opt/web
+USER editor
+EXPOSE 8000
+CMD ["python", "-m", "{{ package_name }}.editor"]
+{%- endif %}
+{%- endif %}
 
 
 FROM python:{{ python_version }}-slim-trixie

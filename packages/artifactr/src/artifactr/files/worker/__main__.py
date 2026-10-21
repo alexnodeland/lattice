@@ -3,9 +3,9 @@
 It reads its settings from the environment: `WORKER_TOKEN`, the token the deployment generated;
 `WORKER_APP`, the app by its name, `wordcraft` by default; `WORKER_CLI` and `WORKER_VERSION`, the
 app's pinned CLI and the version it must be; `WORKER_BUILD`, the image's digest, if it runs in
-one; `WORKER_LIMITS`, the deployment's `Limits` as JSON, any it leaves out the default; and
-`WORKER_HOST` and `WORKER_PORT`, where it listens, 127.0.0.1 and 8080 by default. In its
-container it listens on the internal network alone.
+one; `WORKER_LIMITS`, the deployment's `Limits` as JSON, any it leaves out the default, and
+every one if it is unset or empty; and `WORKER_HOST` and `WORKER_PORT`, where it listens,
+127.0.0.1 and 8080 by default. In its container it listens on the internal network alone.
 
 The CLI is started under the limits' launcher, and one that confines nothing runs trusted: the
 worker is its confinement (native files ADR-0013).
@@ -75,7 +75,7 @@ def app_from_environment(environ: Mapping[str, str], limits: Limits) -> Headless
 
 def worker_from_environment(environ: Mapping[str, str]) -> Starlette:
     """The worker the environment's settings describe."""
-    limits = Limits.model_validate_json(environ.get("WORKER_LIMITS", "{}"))
+    limits = Limits.model_validate_json(environ.get("WORKER_LIMITS") or "{}")
     return worker_app(
         app_from_environment(environ, limits),
         token=environ["WORKER_TOKEN"],

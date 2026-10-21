@@ -124,6 +124,75 @@ class TrackerSettings:
 
 
 {% endif -%}
+{% if use_files -%}
+CRAFTS = (
+{%- for name in crafts %}
+    "{{ name }}",
+{%- endfor %}
+)
+"""The crafting apps a worker runs, as ``FILES_CRAFTS`` names them."""
+{%- if use_portal %}
+
+EDITORS = { {%- for name, craft in crafts.items() if craft.editor %}"{{ name }}": {{ craft.editor }}{{ ", " if not loop.last }}{% endfor -%} }
+"""The port each app's editor is published on, on this machine, for an app whose browser build
+hands a file over: compose.yaml's ``files-<app>-editor``."""
+{%- endif %}
+
+
+@dataclass(frozen=True)
+class FilesSettings:
+    """Native files: which crafting apps run, each in its worker{% if use_portal %}, and where people edit in them{% endif %}.
+
+    Attributes:
+        crafts: The apps whose workers run, ``files-<app>`` in the app profile: none by default,
+            and then native files are off.
+        worker_token: The token each worker lets in, which ``make env`` generates.
+{%- if use_portal %}
+        editors: Each app's editor, by its integration, as people's browsers reach it: by default,
+            for each app that runs and has one, its port on this machine.
+{%- endif %}
+    """
+
+    crafts: tuple[str, ...] = ()
+    worker_token: str | None = field(default=None, repr=False)
+{%- if use_portal %}
+    editors: Mapping[str, str] = field(default_factory=dict[str, str])
+{%- endif %}
+
+    def __post_init__(self) -> None:
+        if unknown := sorted(set(self.crafts) - set(CRAFTS)):
+            raise ValueError(
+                f"FILES_CRAFTS names {', '.join(unknown)}: a worker runs {', '.join(CRAFTS)}"
+            )
+        if self.crafts and not self.worker_token:
+            raise ValueError("FILES_CRAFTS needs FILES_WORKER_TOKEN, which `make env` generates")
+
+    @classmethod
+    def from_environ(cls, env: Mapping[str, str]) -> Self:
+        """Read native files' settings from ``FILES_*``."""
+        crafts = _names(env.get("FILES_CRAFTS", ""))
+{%- if use_portal %}
+        loopback = {
+            f"files:{name}": f"http://127.0.0.1:{EDITORS[name]}/"
+            for name in crafts
+            if name in EDITORS
+        }
+        editors = (
+            _json_object(env["FILES_EDITORS"], "FILES_EDITORS")
+            if "FILES_EDITORS" in env
+            else loopback
+        )
+{%- endif %}
+        return cls(
+            crafts=crafts,
+            worker_token=env.get("FILES_WORKER_TOKEN"),
+{%- if use_portal %}
+            editors={key: str(url) for key, url in editors.items()},
+{%- endif %}
+        )
+
+
+{% endif -%}
 {% if use_portal -%}
 @dataclass(frozen=True)
 class PortalSettings:
@@ -217,6 +286,9 @@ class Settings:
 {%- if use_tracker %}
         tracker: Where rules' runs file work, and whose changes come back.
 {%- endif %}
+{%- if use_files %}
+        files: Native files: which crafting apps run, each in its worker.
+{%- endif %}
         telemetry: Whether to export OpenTelemetry, to ``OTEL_EXPORTER_OTLP_ENDPOINT``.
         langfuse: Whether to use Langfuse, with the ``LANGFUSE_*`` keys, for trace attributes
             and scores.
@@ -238,6 +310,9 @@ class Settings:
     gateway: GatewaySettings = field(default_factory=GatewaySettings)
 {%- if use_tracker %}
     tracker: TrackerSettings = field(default_factory=TrackerSettings)
+{%- endif %}
+{%- if use_files %}
+    files: FilesSettings = field(default_factory=FilesSettings)
 {%- endif %}
     telemetry: bool = False
     langfuse: bool = False
@@ -296,6 +371,9 @@ class Settings:
                 bindings=_tracker_bindings(env.get("TRACKER_BINDINGS", "{}")),
                 budget=int(env.get("TRACKER_BUDGET", TrackerSettings.budget)),
             ),
+{%- endif %}
+{%- if use_files %}
+            files=FilesSettings.from_environ(env),
 {%- endif %}
             telemetry="OTEL_EXPORTER_OTLP_ENDPOINT" in env,
             langfuse="LANGFUSE_PUBLIC_KEY" in env,
@@ -373,6 +451,8 @@ def _tracker_bindings(text: str) -> dict[WorkspaceKey, TrackerBinding]:
     return bindings
 
 
+{% endif -%}
+{% if use_tracker or (use_files and use_portal) -%}
 def _json_object(text: str, name: str) -> dict[str, object]:
     """Parse a setting that is a JSON object."""
     try:

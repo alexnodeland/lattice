@@ -1,0 +1,141 @@
+#!/usr/bin/env bash
+# Check native files' workers and editors as an application from the template runs them (stackr
+# ADR-0043): each app's image, built from its pinned release, run by the application's own
+# compose.yaml, with nothing else of the application or the stack.
+#
+# Usage: scripts/check-files [APP...]   (default: wordcraft gridcraft pdfcraft cadcraft)
+#
+# For each app, its worker:
+# - runs as compose.yaml says: read-only, as a user that isn't root, with no capabilities and no
+#   new privileges, under limits on its memory, CPUs and processes, on the `files` network alone,
+#   which is internal, and with no port published
+# - reaches nothing outside that network: a connection to a public address and a lookup of a
+#   public name, from inside it, both fail
+# - carries its release's licences and notices, PdfCraft's OCR models' among them
+# - answers, from a probe on its network (scripts/_files_probe.py): the app at its pinned version,
+#   behind the token; a new file made, read and rendered; and hostile files refused in time
+# And its editor, for an app whose build hands a file over: published on 127.0.0.1 alone, it
+# serves the build and lattice's shim, which only the portal may frame.
+#
+# The application is generated at HEAD, whose libraries its image installs from GitHub, so HEAD
+# must be pushed and the working tree clean, as `scripts/smoke app` needs. Everything it makes is
+# named stackr-files-check, and removed by that name when it ends.
+
+set -euo pipefail
+cd "$(dirname "$0")/.."
+unset DOCKER_DEFAULT_PLATFORM
+
+apps=("$@")
+((${#apps[@]} > 0)) || apps=(wordcraft gridcraft pdfcraft cadcraft)
+readonly name=stackr-files-check
+status=0
+scratch=$(mktemp -d)
+app_dir=$scratch/$name
+
+log() { printf '%s\n' "$*"; }
+check() {
+  local what=$1
+  shift
+  if "$@"; then log "ok: $what"; else log "FAIL: $what"; status=1; fi
+}
+compose() { docker compose --project-name "$name" --project-directory "$app_dir" "$@"; }
+
+cleanup() {
+  if [[ -f $app_dir/compose.yaml ]]; then
+    compose --profile '*' down --volumes --remove-orphans --timeout 5 >/dev/null 2>&1 || true
+    for app in "${apps[@]}"; do
+      docker image rm "$name-files-$app:local" "$name-files-$app-editor:local" >/dev/null 2>&1 || true
+    done
+  fi
+  rm -rf "$scratch"
+}
+trap cleanup EXIT
+
+log "files: generating $name from the template, and building ${apps[*]}"
+if ! uv run copier copy --quiet --defaults --vcs-ref HEAD --data project_name="$name" \
+  --data libraries=artifactr --data evals=false ../.. "$app_dir" 2>/dev/null ||
+  ! uv lock --quiet --directory "$app_dir"; then
+  log "FAIL: generating it from the template, with the libraries at HEAD, which must be pushed, with a clean working tree"
+  exit 1
+fi
+token=$(openssl rand -hex 32)
+crafts=$(IFS=,; printf '%s' "${apps[*]}")
+{
+  cat "$app_dir/.env.example"
+  # Each editor on a port Docker chooses, on this machine's loopback.
+  printf 'FILES_CRAFTS=%s\nFILES_WORKER_TOKEN=%s\n' "$crafts" "$token"
+  for app in "${apps[@]}"; do printf '%s_EDITOR_PORT=0\n' "$(tr '[:lower:]' '[:upper:]' <<<"$app")"; done
+} >"$app_dir/.env"
+
+profiles=()
+services=()
+for app in "${apps[@]}"; do
+  profiles+=(--profile "files-$app")
+  services+=("files-$app")
+  if compose "${profiles[@]}" config --services | grep -qx "files-$app-editor"; then
+    services+=("files-$app-editor")
+  fi
+done
+if ! compose "${profiles[@]}" up --detach --build --wait --wait-timeout 300 "${services[@]}"; then
+  log "FAIL: the workers and editors started and answered their health checks"
+  compose "${profiles[@]}" logs --no-color --tail=100 || true
+  exit 1
+fi
+log "ok: ${services[*]} started and answered their health checks"
+
+network="${name}_files"
+check "the files network is internal" \
+  test "$(docker network inspect --format '{{.Internal}}' "$network")" = true
+
+# A container's posture as Docker runs it.
+posture() {
+  docker inspect --format \
+    '{{.HostConfig.ReadonlyRootfs}} {{.Config.User}} {{.HostConfig.CapDrop}} {{.HostConfig.SecurityOpt}} {{.HostConfig.Memory}} {{.HostConfig.NanoCpus}} {{.HostConfig.PidsLimit}} {{len .NetworkSettings.Ports}} {{range $net, $_ := .NetworkSettings.Networks}}{{$net}} {{end}}' \
+    "$1"
+}
+egress='
+import socket
+for target in (("1.1.1.1", 443), ("github.com", 443)):
+    try:
+        socket.create_connection(target, timeout=5).close()
+    except OSError as refused:
+        print(f"refused: {target[0]}: {refused}")
+    else:
+        raise SystemExit(f"reached {target[0]}")
+'
+
+for app in "${apps[@]}"; do
+  container=$(compose ps --quiet "files-$app")
+  image="$name-files-$app:local"
+  version=$(uv run python -c "import yaml; print(yaml.safe_load(open('copier.yml'))['crafts']['default']['$app']['version'])")
+  read -r read_only user caps security memory cpus pids ports networks <<<"$(posture "$container")"
+  check "$app's worker is read-only, as 10002, with no capabilities and no new privileges" \
+    test "$read_only $user $caps $security" = "true 10002 [ALL] [no-new-privileges:true]"
+  check "$app's worker is held to its memory ($memory), CPUs ($cpus) and processes ($pids)" \
+    test "$memory" -gt 0 -a "$cpus" -gt 0 -a "$pids" -gt 0
+  check "$app's worker publishes no port, and is on $network alone ($networks)" \
+    test "$ports $networks" = "0 $network"
+  check "$app's worker reaches nothing outside its network" \
+    docker exec "$container" python -I -c "$egress"
+  notices=(share/doc/"$app")
+  if [[ $app == pdfcraft ]]; then notices+=(share/pdfcraft/models/ATTRIBUTION.txt); fi
+  for notice in "${notices[@]}"; do
+    check "$app's image carries its release's $notice" docker exec "$container" test -e "/opt/craft/$notice"
+  done
+  check "$app's worker answers its probe" \
+    docker run --rm --name "$name-probe-$app" --network "$network" --read-only --tmpfs /tmp --env "WORKER_TOKEN=$token" \
+    --volume "$PWD/scripts/_files_probe.py:/probe.py:ro" --entrypoint python "$image" \
+    -I /probe.py "http://files-$app:8080" "$app" "$version"
+
+  if [[ " ${services[*]} " == *" files-$app-editor "* ]]; then
+    published=$(compose port "files-$app-editor" 8000)
+    check "$app's editor is published on this machine's loopback alone ($published)" \
+      test "${published%:*}" = 127.0.0.1
+    shim=$(curl --silent --show-error --fail --dump-header - --output /dev/null \
+      "http://$published/.lattice/shim.html") || shim=""
+    check "$app's editor serves lattice's shim, which only the portal may frame" \
+      grep -qi "^content-security-policy:.*frame-ancestors http://127.0.0.1:8800" <<<"$shim"
+  fi
+done
+
+exit $status

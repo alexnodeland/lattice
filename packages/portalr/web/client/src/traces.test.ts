@@ -128,7 +128,7 @@ test("withheld attributes are read labelled, the known ones first, their JSON in
 });
 
 test("a trace's id is 32 lowercase hex digits, wherever it is written, and anything else as it came", () => {
-  expect(wholeTrace("C029EEC9")).toBe("0".repeat(24) + "c029eec9");
+  expect(wholeTrace("C029EEC9")).toBe(`${"0".repeat(24)}c029eec9`);
   expect(wholeTrace("f".repeat(32))).toBe("f".repeat(32));
   expect(wholeTrace("zz")).toBe("zz");
   expect(wholeTrace("")).toBe("");

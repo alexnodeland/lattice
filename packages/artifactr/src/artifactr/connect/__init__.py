@@ -8,12 +8,21 @@ opens a file for anyone: a file the operator saves is uploaded as a native file,
 """
 
 from artifactr.connect.connection import LOOPBACK, Connection, ConnectionFailed
-from artifactr.connect.registry import BLENDER, FREECAD, PROTECTED, ConnectedServer, Risk
+from artifactr.connect.registry import (
+    BLENDER,
+    FREECAD,
+    PROTECTED,
+    ConnectedServer,
+    Risk,
+    Vetted,
+    digest,
+)
 from artifactr.connect.scan import scan
 from artifactr.connect.tools import (
     CODE_BYTES,
     DESCRIPTION_CHARS,
     IMAGE_BYTES,
+    IMAGES,
     REPLY_CHARS,
     RUN_CODE,
     connected_app_tools,
@@ -24,6 +33,7 @@ __all__ = [
     "CODE_BYTES",
     "DESCRIPTION_CHARS",
     "FREECAD",
+    "IMAGES",
     "IMAGE_BYTES",
     "LOOPBACK",
     "PROTECTED",
@@ -33,6 +43,8 @@ __all__ = [
     "Connection",
     "ConnectionFailed",
     "Risk",
+    "Vetted",
     "connected_app_tools",
+    "digest",
     "scan",
 ]

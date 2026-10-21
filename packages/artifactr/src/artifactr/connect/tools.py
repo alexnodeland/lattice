@@ -4,16 +4,20 @@ The toolset offers the server's `read` and `edit` tools while `connect:<app>` is
 workspace, read at each step. A `code` or `network` tool is offered only when the operator
 allows it, `connect-code:<app>` is on too, and the person the run acts for holds
 `artifactr:run_connected_code`; each call then pauses for a person's approval, with the full code
-and what a scan found in it, and is checked again before it runs. No `host` tool, and no tool the
-entry doesn't name, is ever offered (ADR-0085).
+and what a scan found in it. An answer resumes the run for whoever gave it, so the check again
+before the call runs is of the approver: one who doesn't hold the action runs nothing. Those
+calls run one at a time, in the operator's one session. No `host` tool, no tool the entry doesn't
+name, and none whose digest no longer matches its entry's, is ever offered (ADR-0085).
 
 Replies are the app's data, never instructions: capped, and framed as such for the model.
 """
 
 import base64
 import binascii
+import logging
 from typing import Any, Final
 
+import anyio
 from mcp.types import CallToolResult, ImageContent, TextContent
 from pydantic_ai import (
     AbstractToolset,
@@ -29,7 +33,7 @@ from pydantic_core import SchemaValidator, core_schema
 
 from artifactr.agent import Session
 from artifactr.connect.connection import Connection, ConnectionFailed
-from artifactr.connect.registry import PROTECTED, Risk
+from artifactr.connect.registry import PROTECTED, Risk, digest
 from artifactr.connect.scan import scan
 from artifactr.core import Forbidden
 from artifactr.workspace import Access, Workspace
@@ -38,11 +42,14 @@ from lattice_core.integrations import Integrations
 __all__ = [
     "CODE_BYTES",
     "DESCRIPTION_CHARS",
+    "IMAGES",
     "IMAGE_BYTES",
     "REPLY_CHARS",
     "RUN_CODE",
     "connected_app_tools",
 ]
+
+logger = logging.getLogger("artifactr.connect")
 
 RUN_CODE: Final = "artifactr:run_connected_code"
 """The action a person holds for the agent acting for them to run code in a connected app."""
@@ -58,6 +65,9 @@ IMAGE_BYTES: Final = 2 * 1024 * 1024
 
 DESCRIPTION_CHARS: Final = 1_000
 """The most of a tool's description, which is the server's words, the model is given."""
+
+IMAGES: Final = {"image/png": b"\x89PNG\r\n\x1a\n", "image/jpeg": b"\xff\xd8\xff"}
+"""The images the model is given, by their media type and the bytes each starts with."""
 
 _ANY: Final = SchemaValidator(core_schema.any_schema())
 """The server validates its own arguments: the model's are passed as they are."""
@@ -81,6 +91,7 @@ class _ConnectedApp(AbstractToolset[Session[Any]]):
         self._connection = connection
         self._server = connection.server
         self._integrations = integrations
+        self._one_at_a_time = anyio.Lock()
 
     @property
     def id(self) -> str:
@@ -99,9 +110,15 @@ class _ConnectedApp(AbstractToolset[Session[Any]]):
         protected = await self._protected(workspace)
         offered: dict[str, ToolsetTool[Session[Any]]] = {}
         for tool in listed:
-            risk = self._server.tools.get(tool.name)
-            if risk is None or risk == "host":
+            vetted = self._server.tools.get(tool.name)
+            if vetted is None or vetted.risk == "host":
                 continue
+            if digest(tool.name, tool.description, tool.input_schema) != vetted.digest:
+                logger.warning(
+                    "%s's %s isn't the tool that was vetted: left out", self.id, tool.name
+                )
+                continue
+            risk = vetted.risk
             if risk in PROTECTED and not (protected and tool.name in self._connection.allow):
                 continue
             name = f"{self._server.app}_{tool.name}"
@@ -135,7 +152,11 @@ class _ConnectedApp(AbstractToolset[Session[Any]]):
             if not ctx.tool_call_approved:
                 raise ApprovalRequired(metadata={"review": self._review(own, risk, tool_args)})
         try:
-            reply = await self._connection.call(own, tool_args)
+            if risk in PROTECTED:  # one at a time in the operator's one session
+                async with self._one_at_a_time:
+                    reply = await self._connection.call(own, tool_args)
+            else:
+                reply = await self._connection.call(own, tool_args)
         except ConnectionFailed as failed:
             raise ToolFailed(f"{server.title} didn't answer: {failed}") from failed
         return self._reply(reply)
@@ -157,7 +178,10 @@ class _ConnectedApp(AbstractToolset[Session[Any]]):
         """What the approver is shown beside the arguments, or a retry if it can't be offered."""
         title = self._server.title
         if risk == "network":
-            runs = f"Fetches from the internet into your {title}, with your own privileges."
+            runs = (
+                f"Downloads from the internet into your {title}, with your own privileges: what"
+                " it fetches is untrusted, as an uploaded file is, but opens in your live app."
+            )
             return {"app": title, "risk": risk, "runs": runs}
         code = args.get(self._server.code[tool])
         if not isinstance(code, str) or not code.strip():
@@ -189,6 +213,8 @@ class _ConnectedApp(AbstractToolset[Session[Any]]):
                     continue
                 if len(data) > IMAGE_BYTES:
                     texts.append(f"[an image larger than {IMAGE_BYTES} bytes, left out]")
+                elif not data.startswith(IMAGES.get(part.mime_type, b"\0none")):
+                    texts.append(f"[an image that isn't the {part.mime_type} it says, left out]")
                 else:
                     images.append(BinaryContent(data=data, media_type=part.mime_type))
             else:

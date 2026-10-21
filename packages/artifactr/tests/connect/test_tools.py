@@ -6,8 +6,9 @@ for a person, the full code in the request and the scan's findings beside it; an
 server's replies reach the model capped and framed as data.
 """
 
+import hashlib
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +23,8 @@ from artifactr.connect import (
     RUN_CODE,
     ConnectedServer,
     Connection,
+    Risk,
+    Vetted,
     connected_app_tools,
 )
 from artifactr.core import (
@@ -38,33 +41,57 @@ from lattice_core.integrations import Defaults
 from tests.agent.conftest import ALICE, Script, call, say
 from tests.artifact_types import Note
 
+BOB = UserActor(id="bob", name="Bob")
+
 FAKE_SERVER = Path(__file__).with_name("fake_server.py")
 COMMAND = (sys.executable, "-I", str(FAKE_SERVER))
 
-FAKE = ConnectedServer(
-    app="fake",
-    title="Fake",
-    source="tests/connect/fake_server.py",
-    tools={
-        "get_objects": "read",
-        "get_view": "read",
-        "create_object": "edit",
-        "execute_code": "code",
-        "search_assets": "network",
-        "execute_code_headless": "host",
-        "huge": "read",
-        "inject": "read",
-        "slow": "read",
-        "refuse": "read",
-        "odd": "read",
-    },
-    code={"execute_code": "code"},
-)
+DIGESTS = {
+    "get_objects": "87d00691f105187b0c9da09adb30e60b91d6a37ad2229c5169ec5f9c6eba9b00",
+    "get_view": "32b9cccdc840a6c433235d6a093900dd09ce04f5fbd2bf962999eca3e7dff9af",
+    "create_object": "3025210bd99070d1c52d28cf5af720e61e27f35528cd50b01b7b7171e927aba8",
+    "execute_code": "7c30b993f946832ec7c6d4652fedd5e782e0686f49f456cd291869d42c745f75",
+    "search_assets": "35f1eb943dc960fd8c0b997d29b8e3cc60baf597e7df0cc85fb35646d13db6b4",
+    "execute_code_headless": "a718fa4967bfcd7da566c6ca358453a83bca9719a4d9a324b18af519b8f143ca",
+    "huge": "6c36934e4a64710225297a7a521b481296271e5f8db02a9f54a6df24c9b63319",
+    "inject": "8967cd7b3ab3f693b6fe822ebb6087fe889fb9852669e3485be09b9f52e05ef6",
+    "slow": "6e98feb6e32f8a36b742153d242e62cd23feeab9cba952d8e87bf6e3cbd47d12",
+    "refuse": "dc7fb3506919dcc65f085e574830d18d62c34cf20e45ca98604c5ece1b41ee48",
+    "ask": "837d4d3910c15ed5568df86796ceb7a460be0b864d60518586d4379dd571e09a",
+    "odd": "c6f4ab1e2ce29b5ee061fe70990e608459075ef155168ca430e53411e2abc709",
+}
+"""What the fake server says each tool is, as vetted: `unvetted` has none."""
+
+RISKS: dict[str, Risk] = {
+    "execute_code": "code",
+    "search_assets": "network",
+    "execute_code_headless": "host",
+    "create_object": "edit",
+}
+
+
+def entry(**changed: str) -> ConnectedServer:
+    """The fake server's entry, with the digests given changed."""
+    return ConnectedServer(
+        app="fake",
+        title="Fake",
+        source="tests/connect/fake_server.py",
+        version="fake==1.0.0",
+        tools={
+            name: Vetted(RISKS.get(name, "read"), changed.get(name, vetted))
+            for name, vetted in DIGESTS.items()
+        },
+        code={"execute_code": "code"},
+        token="FAKE_TOKEN",
+    )
+
+
+FAKE = entry()
 SAFE = {
     "fake_get_objects",
     "fake_get_view",
     "fake_create_object",
-    *("fake_huge", "fake_inject", "fake_slow", "fake_refuse", "fake_odd"),
+    *("fake_huge", "fake_inject", "fake_slow", "fake_refuse", "fake_odd", "fake_ask"),
 }
 CODE = "import FreeCAD\nFreeCAD.ActiveDocument.addObject('Part::Box', 'Box')\n"
 
@@ -85,6 +112,7 @@ class World:
     thread: Thread
     switch: Switch
     holders: set[str]
+    workspaces: Workspaces
 
     def agent(self, script: Script, connection: Connection) -> Agent[Session[None], Any]:
         return Agent(
@@ -127,8 +155,9 @@ async def world() -> World:
         person = acting_for(actor)
         return access.action != RUN_CODE or (isinstance(person, UserActor) and person.id in holders)
 
-    ws = await Workspaces(InMemoryStorage(), authorize=authorize).open("acme", "w1", actor=ALICE)
-    return World(ws, await ws.create_thread("Bracket"), Switch(), holders)
+    workspaces = Workspaces(InMemoryStorage(), authorize=authorize)
+    ws = await workspaces.open("acme", "w1", actor=ALICE)
+    return World(ws, await ws.create_thread("Bracket"), Switch(), holders, workspaces)
 
 
 def connected(**options: Any) -> Connection:
@@ -138,7 +167,7 @@ def connected(**options: Any) -> Connection:
 def everything(world: World) -> Connection:
     """Every switch on, and the code and network tools allowed."""
     world.switch.on |= {FAKE.key, FAKE.code_key}
-    return connected(allow=("execute_code", "search_assets"))
+    return connected(allow=("execute_code", "search_assets"), secrets=("FAKE_TOKEN",))
 
 
 def seen(script: Script) -> str:
@@ -155,7 +184,9 @@ async def test_nothing_is_offered_by_default(world: World) -> None:
     switches = Defaults()
     for key in (FAKE.key, FAKE.code_key, "connect:freecad", "connect-code:blender"):
         assert not await switches.is_enabled("acme", "w1", key)
-    never = Connection(FAKE, command=("no-such-server",), allow=("execute_code",))
+    never = Connection(
+        FAKE, command=("no-such-server",), allow=("execute_code",), secrets=("FAKE_TOKEN",)
+    )
     script = Script(say("Done."))
     agent = Agent(
         script.model,
@@ -175,7 +206,7 @@ async def test_a_code_tool_needs_the_operator_the_code_key_and_the_persons_actio
     world: World,
 ) -> None:
     world.switch.on.add(FAKE.key)
-    allowed = connected(allow=("execute_code",))
+    allowed = connected(allow=("execute_code",), secrets=("FAKE_TOKEN",))
     assert await world.offered(connected()) == SAFE, "not allowed by the operator"
     assert await world.offered(allowed) == SAFE, "the code key is off"
     world.switch.on.add(FAKE.code_key)
@@ -227,7 +258,7 @@ async def test_two_toolsets_of_one_app_collide_loudly_and_the_prefix_keeps_other
     session = Session.start(world.ws, world.thread.id, app=None)
     with pytest.raises(UserError, match="fake_get_objects"):
         await agent.run("Go.", deps=session, toolsets=[tools])
-    other = ConnectedServer(app="other", title="Other", source="t", tools=FAKE.tools)
+    other = replace(FAKE, app="other", title="Other")
     both = Agent(
         Script(say("Done.")).model,
         deps_type=Session[None],
@@ -346,7 +377,7 @@ async def test_a_blocking_deployment_refuses_code_with_a_finding_before_anyone_i
     world: World,
 ) -> None:
     world.switch.on |= {FAKE.key, FAKE.code_key}
-    connection = connected(allow=("execute_code",), scan="block")
+    connection = connected(allow=("execute_code",), secrets=("FAKE_TOKEN",), scan="block")
     script = Script(call("fake_execute_code", code="import socket"), say("Done."))
     await world.run(script, connection)
     assert "refuses code that does this: line 1: imports socket" in seen(script)
@@ -438,6 +469,7 @@ async def test_what_cant_be_shown_is_left_out_with_a_note(world: World) -> None:
     told = seen(script)
     assert "[an image that doesn't decode, left out]" in told
     assert "[an image larger than 2097152 bytes, left out]" in told
+    assert "[an image that isn't the image/png it says, left out]" in told
     assert "[a audio part, left out]" in told
     assert "and some words" in told
 
@@ -448,16 +480,83 @@ async def test_what_cant_be_shown_is_left_out_with_a_note(world: World) -> None:
 def test_the_host_is_loopback_unless_the_operator_says_remote() -> None:
     with pytest.raises(ValueError, match="isn't loopback"):
         connected(host="192.168.1.20")
-    assert connected(host="100.64.0.7", remote=True).server is FAKE
+    assert connected(host="100.64.0.7", remote=True, secrets=("FAKE_TOKEN",)).server is FAKE
     with pytest.raises(ValueError, match="a command starts the server"):
         Connection(FAKE, command=())
 
 
 def test_an_entry_is_checked() -> None:
     with pytest.raises(ValueError, match="lowercase name"):
-        ConnectedServer(app="Free-CAD", title="x", source="x", tools={})
+        replace(FAKE, app="Free-CAD")
     with pytest.raises(ValueError, match="only a code tool names its code: get_objects"):
-        ConnectedServer(
-            app="x", title="x", source="x", tools={"get_objects": "read"}, code={"get_objects": "c"}
-        )
+        replace(FAKE, code={"get_objects": "c"})
     assert (FAKE.key, FAKE.code_key) == ("connect:fake", "connect-code:fake")
+
+
+# ─── pinned tools, tokens, and what a server may not do ───────────────────────
+
+
+async def test_a_tool_whose_digest_changed_is_left_out(world: World) -> None:
+    world.switch.on.add(FAKE.key)
+    changed = Connection(entry(get_objects="0" * 64), command=COMMAND)
+    assert await world.offered(changed) == SAFE - {"fake_get_objects"}
+
+
+async def test_a_tool_that_changed_between_the_listing_and_the_call_isnt_run(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    world.switch.on.add(FAKE.key)
+    connection = connected(secrets=("FAKE_MODE",))
+    await connection.tools()
+    monkeypatch.setenv("FAKE_MODE", "changed")
+    script = Script(call("fake_get_objects"), say("Done."))
+    await world.run(script, connection)
+    assert "get_objects isn't the tool that was vetted: it wasn't run" in seen(script)
+
+
+async def test_a_server_can_neither_drive_the_model_nor_ask_a_person(world: World) -> None:
+    world.switch.on.add(FAKE.key)
+    script = Script(call("fake_ask"), say("Done."))
+    await world.run(script, connected())
+    told = seen(script)
+    assert told.count("refused:") == 2
+    assert "it worked" not in told
+
+
+async def test_the_approver_must_hold_the_action_and_what_runs_is_what_was_shown(
+    world: World,
+) -> None:
+    connection = everything(world)
+    script = Script(
+        call("fake_execute_code", "c1", code=CODE),
+        call("fake_execute_code", "c2", code=CODE + "# again\n"),
+        say("Done."),
+    )
+    runner, run_id = await world.pause(script, connection)
+    approved = AnswerDeferred(run_id=run_id, tool_call_id="c1", approved=True)
+    handle = (await runner.answer(world.ws, approved)).run
+    assert handle is not None
+    await handle.wait()
+    shown = hashlib.sha256(CODE.encode()).hexdigest()
+    assert f"sha256 {shown}" in "\n".join(script.answers()), "byte for byte what was approved"
+    bob = await world.workspaces.open("acme", "w1", actor=BOB)
+    approved = AnswerDeferred(run_id=run_id, tool_call_id="c2", approved=True)
+    handle = (await runner.answer(bob, approved)).run
+    assert handle is not None
+    await handle.wait()
+    # The answer resumes the run for Bob, who doesn't hold the action: the tool isn't his.
+    assert "Unknown tool name: 'fake_execute_code'" in seen(script)
+    assert "\n".join(script.answers()).count("sha256 ") == 1, "only Alice's approval ran"
+
+
+def test_code_needs_the_add_ons_token_or_an_explicit_unauthenticated() -> None:
+    with pytest.raises(ValueError, match="need FAKE_TOKEN in secrets"):
+        connected(allow=("execute_code",))
+    untokened = replace(FAKE, token=None)
+    with pytest.raises(ValueError, match="takes no token"):
+        Connection(untokened, command=COMMAND, allow=("execute_code",))
+    assert Connection(untokened, command=COMMAND, allow=("execute_code",), unauthenticated=True)
+    with pytest.raises(ValueError, match="a remote Fake needs its add-on's token"):
+        connected(host="100.64.0.7", remote=True)
+    with pytest.raises(ValueError, match="a remote Fake needs its add-on's token"):
+        Connection(untokened, command=COMMAND, host="100.64.0.7", remote=True)

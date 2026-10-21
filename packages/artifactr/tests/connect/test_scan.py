@@ -47,9 +47,10 @@ def test_it_is_advisory_the_apps_own_modules_reach_past_it() -> None:
 
 def test_the_vetted_entries_offer_no_code_by_default_and_never_a_host_tool() -> None:
     for server in (FREECAD, BLENDER):
-        assert set(server.code) == {n for n, risk in server.tools.items() if risk == "code"}
+        assert set(server.code) == {n for n, tool in server.tools.items() if tool.risk == "code"}
         assert server.key == f"connect:{server.app}"
         assert server.code_key == f"connect-code:{server.app}"
-    assert FREECAD.tools["execute_code_headless"] == "host"
-    assert BLENDER.tools["import_asset"] == "network"
+    assert FREECAD.tools["execute_code_headless"].risk == "host"
+    assert BLENDER.tools["import_asset"].risk == "network"
+    assert (FREECAD.token, BLENDER.token) == ("FREECAD_MCP_TOKEN", None)
     assert BLENDER.env == {"DISABLE_TELEMETRY": "true"}

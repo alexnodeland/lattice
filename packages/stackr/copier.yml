@@ -90,10 +90,10 @@ ui:
 native_files:
   type: bool
   help: >-
-    Include native files (Word, Excel, PowerPoint, PDF, CAD and design files kept as artifacts,
-    each read and edited by its crafting app's pinned CLI in a worker of its own, with no route
-    out, and edited by people in the app's browser build)? No app runs until FILES_CRAFTS names
-    it: `make up FILES="wordcraft gridcraft"`. Each adds an image built from its pinned release.
+    Include native files (Word, Excel, PowerPoint, PDF, CAD, 3D, image and design files kept as
+    artifacts, each read and edited by its app's pinned CLI in a worker of its own with no route
+    out, and by people in the app's browser build)? No app runs until FILES_CRAFTS names it:
+    `make up FILES="wordcraft gridcraft"`. Each builds an image from its pinned release.
   default: true
   when: "{{ libraries in ['artifactr', 'both'] }}"
 

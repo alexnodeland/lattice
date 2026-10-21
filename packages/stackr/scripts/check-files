@@ -3,7 +3,7 @@
 # ADR-0043): each app's image, built from its pinned release, run by the application's own
 # compose.yaml, with nothing else of the application or the stack.
 #
-# Usage: scripts/check-files [APP...]   (default: wordcraft gridcraft pdfcraft cadcraft)
+# Usage: scripts/check-files [APP...]   (default: wordcraft gridcraft pdfcraft cadcraft freecad)
 #
 # For each app, its worker:
 # - runs as compose.yaml says: read-only, as a user that isn't root, with no capabilities and no
@@ -26,7 +26,7 @@ cd "$(dirname "$0")/.."
 unset DOCKER_DEFAULT_PLATFORM
 
 apps=("$@")
-((${#apps[@]} > 0)) || apps=(wordcraft gridcraft pdfcraft cadcraft)
+((${#apps[@]} > 0)) || apps=(wordcraft gridcraft pdfcraft cadcraft freecad)
 readonly name=stackr-files-check
 status=0
 scratch=$(mktemp -d)

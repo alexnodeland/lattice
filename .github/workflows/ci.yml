@@ -194,6 +194,32 @@ jobs:
       - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
       - run: uv run --no-project python scripts/affected.py images
 
+  # Native files' workers and editors (stackr ADR-0043), as an application from the template
+  # builds and runs them, from each app's pinned release, on each architecture: their posture, no
+  # route out, and hostile files refused. The application installs the libraries from GitHub at
+  # the pull request's merge commit, as the smoke test's does.
+  files:
+    name: Native files (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
+      - run: uv run --no-project python scripts/affected.py files
+
   # A stackr release's image path (stackr ADR-0035), short of GHCR, when the images change: each
   # architecture's OCI archives, built by deploy/image-archive on a runner of that architecture,
   # as release.yml builds them. They are kept a week.
@@ -649,7 +675,7 @@ jobs:
   ci:
     name: CI
     if: always()
-    needs: [check, tests, images, specs, thin-images, gotrue, release-images, release-images-publish, acceptance, aws, aws-tier2-affected, aws-tier2, template, smoke, dependency-review, osv]
+    needs: [check, tests, images, specs, thin-images, files, gotrue, release-images, release-images-publish, acceptance, aws, aws-tier2-affected, aws-tier2, template, smoke, dependency-review, osv]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions: {}

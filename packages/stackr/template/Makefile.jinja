@@ -64,7 +64,11 @@ test: ## Run the tests with the 100% branch-coverage gate
 
 check: lint typecheck test ## Run everything CI runs
 
-serve: ## Serve the application on this machine, with the settings in .env
+{%- if use_files %}
+# On this machine the workers, on their internal network, can't be reached: native files need `make up`.
+serve: FILES_CRAFTS =
+{%- endif %}
+serve: ## Serve the application on this machine, with the settings in .env{% if use_files %}, and native files off{% endif %}
 	$(UV) run $(ENV_FILE) {{ project_slug }}
 {%- if evals %}
 

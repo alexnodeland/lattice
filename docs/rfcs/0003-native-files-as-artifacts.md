@@ -265,6 +265,8 @@ The spike measures the cost per session and how many a host holds; the input-to-
 - **One release, two artifacts, one pin.** The worker's thin image is built from the release tarball's `wordcraft-cli`, and the editor is the same release's `wordcraft-web` archive, served as static files by the stack's edge. Both are checked against `SHA256SUMS.txt`, and the image is built as [stackr ADR-0035][s-adr-0035] has it and pinned by digest. A check, like `check-config`'s, fails CI if the two pins differ. Upstream signs nothing and publishes no SBOM. Phase 3 doesn't wait for it (D8): the checksum and digest are verified in CI, and stackr records the provenance itself, until upstream signs.
 - **Notices and marks.** Both carry WordCraft's licence files and `NOTICE`. The marks stay as supplied, in the unmodified build only, and nothing of lattice's uses the ArtCraft name or implies its endorsement, as the brand licence requires.
 
+> **Amended (2026-10-20) by [stackr ADR-0043][s-adr-0043]:** the `native_files` question is on by default, and runs no app until `FILES_CRAFTS` names it; each app has a worker of its own. The worker and the editor are targets of the generated application's own Dockerfile, built from the pin, so the worker's artifactr is the application's, rather than a thin image stackr releases and pins by digest, which waits for the AWS recipe. The release-pin check is `scripts/check-template`'s: the template's pins are lattice's, and a worker and its editor share one. The bridged apps' editors are on loopback ports of their own, not yet at a single host's edge.
+
 ### What changes in each package
 
 | Package | Changes | Breaking |
@@ -342,7 +344,7 @@ Decided by the owner on 2026-10-16:
 - [x] artifactr-files: the package, its `pyproject.toml`, a `moon.yml` that depends on artifactr and lattice-core, and its entry in `release-please-config.json` and the manifest
 - [x] artifactr-files: blobs, check-outs, migrations and row-level security
 - [x] artifactr-files: the WordCraft adapter, the corpus and the nightly fidelity report
-- [ ] The worker (phase 3): artifactr-files' worker, limits, `Worker` app and hostile corpus are built (native files ADR-0013); stackr's image, recipe, network, release pin check and the egress test are not
+- [x] The worker (phase 3): artifactr-files' worker, limits, `Worker` app and hostile corpus (native files ADR-0013); stackr's image, recipe, network, release pin check and the egress test, in the template, with a worker for each app (stackr ADR-0043)
 - [x] artifactr-files: `NativeFileTools`, as `native_file_tools`
 - [x] artifactr-files: `files_router`, check-out and check-in over HTTP, and the hosted editor's policy
 - [x] portalr: the renderer, previews, diffs, check-out and check-in screens
@@ -395,3 +397,4 @@ Gathered on 2026-10-16. Everything downloaded was treated as untrusted data, in 
 [g-adr-0004]: ../grantr/adr/0004-an-agent-turn-acts-for-its-user.md
 [s-adr-0005]: ../stackr/adr/0005-ports-and-adapters-for-the-stack.md
 [s-adr-0035]: ../stackr/adr/0035-the-thin-images.md
+[s-adr-0043]: ../stackr/adr/0043-native-files-in-the-template.md

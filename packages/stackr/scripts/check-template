@@ -100,7 +100,7 @@ VARIANTS = [
     Variant("both", True, "none", True, "none", False, True, "vikunja"),
 ]
 """Every variant of the template."""
-RELEASE = re.compile(r"-(\d+\.\d+\.\d+)-")
+RELEASE = re.compile(r"[-_](\d+\.\d+\.\d+)-")
 """A release's version, in the name of one of its assets."""
 LEFTOVER = re.compile(r"(?<!\$)\{\{|\{%|%\}")
 TEXT = {".py", ".toml", ".yaml", ".yml", ".md", ".json", ".sh", ".example", ""}

@@ -3,11 +3,10 @@
 Lattice's shim is served beside the build, and the portal frames it, to open a checked-out file in
 the app and hear its saves (lattice RFC-0003).
 
-``python -m {{ package_name }}.editor``, as compose.yaml's ``files-<app>-editor`` runs it: the
-app is ``EDITOR_APP``, its build ``EDITOR_BUILD``, and the portal that alone may frame it
-``PORTAL_URL``. It listens on ``EDITOR_HOST``:``EDITOR_PORT``, 0.0.0.0:8000 in its container,
-which compose.yaml publishes on this machine's loopback alone. It sets no cookie and reads none,
-so it never sees a token.
+compose.yaml's ``files-<app>-editor`` runs it, as this module: the app is ``EDITOR_APP``, its
+build ``EDITOR_BUILD``, and the portal that alone may frame it ``PORTAL_URL``. It listens on
+``EDITOR_HOST``:``EDITOR_PORT``, 0.0.0.0:8000 in its container, which compose.yaml publishes on
+this machine's loopback alone. It sets no cookie and reads none, so it never sees a token.
 """
 
 import os

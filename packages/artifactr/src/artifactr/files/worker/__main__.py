@@ -20,19 +20,17 @@ from typing import Final, Protocol
 import uvicorn
 from starlette.applications import Starlette
 
-from artifactr.files import (
-    cadcraft,
-    deckcraft,
-    designcraft,
-    figcraft,
-    freecad,
-    gridcraft,
-    pdfcraft,
-    photocraft,
-    vectorcraft,
-    wordcraft,
-)
 from artifactr.files.app import App
+from artifactr.files.cadcraft import Subprocess as CadCraft
+from artifactr.files.deckcraft import Subprocess as DeckCraft
+from artifactr.files.designcraft import Subprocess as DesignCraft
+from artifactr.files.figcraft import Subprocess as FigCraft
+from artifactr.files.freecad import Subprocess as FreeCad
+from artifactr.files.gridcraft import Subprocess as GridCraft
+from artifactr.files.pdfcraft import Subprocess as PdfCraft
+from artifactr.files.photocraft import Subprocess as PhotoCraft
+from artifactr.files.vectorcraft import Subprocess as VectorCraft
+from artifactr.files.wordcraft import Subprocess as WordCraft
 from artifactr.files.worker.limits import Limits
 from artifactr.files.worker.service import worker_app
 from artifactr.files.worker.wire import CALL_LIMIT
@@ -51,17 +49,17 @@ class Adapter(Protocol):
 
 ADAPTERS: Final[Mapping[str, Adapter]] = MappingProxyType(
     {
-        "wordcraft": wordcraft.Subprocess,
-        "pdfcraft": pdfcraft.Subprocess,
-        "photocraft": photocraft.Subprocess,
-        "vectorcraft": vectorcraft.Subprocess,
-        "designcraft": designcraft.Subprocess,
+        "wordcraft": WordCraft,
+        "pdfcraft": PdfCraft,
+        "photocraft": PhotoCraft,
+        "vectorcraft": VectorCraft,
+        "designcraft": DesignCraft,
         # Their CLIs confine nothing: the worker is their confinement.
-        "gridcraft": partial(gridcraft.Subprocess, trusted=True),
-        "deckcraft": partial(deckcraft.Subprocess, trusted=True),
-        "cadcraft": partial(cadcraft.Subprocess, trusted=True),
-        "figcraft": partial(figcraft.Subprocess, trusted=True),
-        "freecad": partial(freecad.Subprocess, trusted=True),
+        "gridcraft": partial(GridCraft, trusted=True),
+        "deckcraft": partial(DeckCraft, trusted=True),
+        "cadcraft": partial(CadCraft, trusted=True),
+        "figcraft": partial(FigCraft, trusted=True),
+        "freecad": partial(FreeCad, trusted=True),
     }
 )
 """The apps a worker runs, by name: each app whose files lattice keeps."""

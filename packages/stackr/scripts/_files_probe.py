@@ -21,18 +21,21 @@ import zipfile
 from collections.abc import Awaitable
 
 import httpx
-from artifactr.files.app import AppFailed
+from artifactr.files.app import AppCommand, AppFailed
 from artifactr.files.craft import CRAFTS
 from artifactr.files.worker import Limits, Worker
 
 DEADLINE = 30.0
-failures = 0
+DRAWN = {"freecad": [AppCommand(name="box", args={"length": 10, "width": 10, "height": 10})]}
+"""What a new file is given, for an app whose blank file has nothing to render."""
+failed: list[str] = []
+"""What failed, which the exit status tells."""
 
 
 def report(passed: bool, what: str) -> None:
-    global failures
     print(f"{'ok' if passed else 'FAIL'}: {what}", flush=True)
-    failures += not passed
+    if not passed:
+        failed.append(what)
 
 
 def bomb() -> bytes:
@@ -74,7 +77,7 @@ async def main(url: str, app: str, version: str) -> None:
             (worker.name, worker.version) == (app, version),
             f"{app}: the worker runs {worker.name} {worker.version}",
         )
-        made = await worker.apply(None, [], deadline=DEADLINE)
+        made = await worker.apply(None, DRAWN.get(app, []), deadline=DEADLINE)
         read = await worker.inspect(made.content, deadline=DEADLINE)
         report(
             read.media_type in CRAFTS[app].formats,
@@ -109,4 +112,4 @@ async def main(url: str, app: str, version: str) -> None:
 
 if __name__ == "__main__":
     asyncio.run(main(*sys.argv[1:4]))
-    sys.exit(1 if failures else 0)
+    sys.exit(1 if failed else 0)

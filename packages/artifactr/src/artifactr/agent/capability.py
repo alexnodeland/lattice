@@ -264,8 +264,8 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
         )
         if isinstance(output, DeferredToolRequests):
             requests = (
-                *_requests(output.calls, "question"),
-                *_requests(output.approvals, "approval"),
+                *_requests(output.calls, "question", output.metadata),
+                *_requests(output.approvals, "approval", output.metadata),
             )
             paused = RunPaused(
                 run_id=session.run_id,
@@ -457,13 +457,16 @@ def _attribution(session: Session[Any]) -> dict[str, Any]:
     )
 
 
-def _requests(calls: list[ToolCallPart], kind: Any) -> list[DeferredRequest]:
+def _requests(
+    calls: list[ToolCallPart], kind: Any, metadata: dict[str, dict[str, Any]]
+) -> list[DeferredRequest]:
     return [
         DeferredRequest(
             tool_call_id=call.tool_call_id,
             tool_name=call.tool_name,
             kind=kind,
             args=call.args_as_dict(),
+            review=metadata.get(call.tool_call_id, {}).get("review", {}),
         )
         for call in calls
     ]

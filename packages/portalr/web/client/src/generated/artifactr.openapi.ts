@@ -511,6 +511,13 @@ export interface components {
              * @enum {string}
              */
             kind: "question" | "approval";
+            /**
+             * Review
+             * @default {}
+             */
+            review: {
+                [key: string]: components["schemas"]["JsonValue"];
+            };
             /** Tool Call Id */
             tool_call_id: string;
             /** Tool Name */

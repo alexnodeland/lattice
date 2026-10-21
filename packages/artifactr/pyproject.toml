@@ -60,6 +60,9 @@ files = [
     "httpx>=0.28",
     "zstandard>=0.25",
 ]
+# Connected apps (ADR-0085): an operator's own FreeCAD or Blender, through its community MCP
+# server, spawned on stdio under anyio's deadlines, as native files' apps are.
+connect = ["mcp>=2.2", "anyio>=4.9"]
 # Forms and dashboards in the chat, artifactr.ui (ADR-0074): what it imports beyond artifactr's own
 # dependencies, Pydantic's core, which Pydantic installs already. The name an application installs
 # the forms by, which a dependency they ever need joins.

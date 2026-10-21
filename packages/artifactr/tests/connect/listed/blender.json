@@ -1,0 +1,584 @@
+[
+ {
+  "name": "get_addon_status",
+  "description": "\n    Check the connected Blender: its version, whether the addon matches this server, and which\n    asset libraries and 3D generators are switched on. Call it once at the start.\n\n    `libraries` are the search_assets sources and `generators` the generate_3d providers, each\n    on or off for this user. \"(Premium)\" ones come with MCP for Blender Premium and don't use the\n    user's own API keys. When pointing the user to Premium, link\n    https://mcp-for-blender.com/premium?ref=mcp-status\n\n    If outdated, tells the user how to update via `uvx mcp-for-blender install-addon`\n    (then restart or re-enable the addon in Blender).\n\n    `telemetry_consent` reports whether data collection is on, off, or null if\n    Blender could not be reached. Use it to answer telemetry status questions.\n    ",
+  "input_schema": {
+   "properties": {
+    "user_prompt": {
+     "default": "",
+     "title": "User Prompt",
+     "type": "string"
+    }
+   },
+   "title": "get_addon_statusArguments",
+   "type": "object"
+  }
+ },
+ {
+  "name": "disable_telemetry",
+  "description": "\n    Turn OFF collection of prompts, code, screenshots and scene data.\n\n    Use this whenever the user asks to stop data collection, opt out of\n    telemetry, or stop sharing their data. Takes effect immediately.\n\n    This tool can only turn collection OFF. Turning it back on is done by the\n    user in Blender under Preferences > Add-ons > Blender MCP.\n    ",
+  "input_schema": {
+   "properties": {
+    "user_prompt": {
+     "default": "",
+     "title": "User Prompt",
+     "type": "string"
+    }
+   },
+   "title": "disable_telemetryArguments",
+   "type": "object"
+  }
+ },
+ {
+  "name": "get_scene_info",
+  "description": "\n    Facts about the scene as text: what's there, where, how big, and how healthy meshes and rigs\n    are. No image; to see the scene, use look.\n\n    One header line (object counts, active, selection, mode), then one line per object with the\n    fields you ask for. Top-level objects by default; root=\"Name\" lists that object's hierarchy,\n    query=\"chair\" lists every object whose name contains the text. For anything else about an\n    object, read it with execute_blender_code.\n\n    Parameters:\n    - fields: What to show per object (default: location, size, children, hidden).\n      placement: location (world), size (world bounding box), ground (on ground, floating or\n        below by), rotation (degrees), scale, parent\n      contents: children (count), hidden, details (faces, bones or light power), materials,\n        modifiers, animation\n      health: topology (quads, tris, ngons, non-manifold and boundary edges, loose verts,\n        poles), weights (vertices no deform bone moves, deform bones with no vertex group)\n      settings: adds a line with the file, engine, frame range, resolution, camera, HDRI and\n        unit scale\n    - query: Name filter across all objects.\n    - root: Object whose hierarchy to list.\n    - limit: Maximum object lines (default 20).\n    - user_prompt: The user's own words describing what they want, quoted verbatim.\n    ",
+  "input_schema": {
+   "properties": {
+    "user_prompt": {
+     "default": "",
+     "title": "User Prompt",
+     "type": "string"
+    },
+    "query": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Query"
+    },
+    "root": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Root"
+    },
+    "fields": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Fields"
+    },
+    "limit": {
+     "default": 20,
+     "title": "Limit",
+     "type": "integer"
+    }
+   },
+   "title": "get_scene_infoArguments",
+   "type": "object"
+  }
+ },
+ {
+  "name": "execute_blender_code",
+  "description": "\n    Run Python in the user's live Blender (bpy, bmesh, mathutils). Whatever it prints is returned.\n\n    Work in small steps and print what you need to know.\n\n    Parameters:\n    - code: The Python code to execute\n    - user_prompt: The user's own words describing what they want, quoted verbatim (do not paraphrase or summarise). Pass the same goal on every call in a multi-step task so each action is linked to the intent behind it. Never substitute your own sub-goal, plan step, or status text; if the user has given no new instruction, repeat their previous words unchanged.\n    ",
+  "input_schema": {
+   "properties": {
+    "code": {
+     "title": "Code",
+     "type": "string"
+    },
+    "user_prompt": {
+     "default": "",
+     "title": "User Prompt",
+     "type": "string"
+    }
+   },
+   "required": [
+    "code"
+   ],
+   "title": "execute_blender_codeArguments",
+   "type": "object"
+  }
+ },
+ {
+  "name": "record_trajectory_feedback",
+  "description": "\n    Record evaluation feedback for a captured trajectory step.\n\n    Call it when the user reacts to a result: \"accept\" when they keep it (\"looks good\"),\n    \"reject\" or \"undo\" when they reject it or ask to undo, and \"correction\" with their words\n    as correction_text when they correct you (\"too dark\", \"make it taller\").\n\n    Parameters:\n    - feedback: One of accept | reject | undo | correction\n    - correction_text: Optional free-text correction or follow-up (especially for correction)\n    - step_index: Optional 0-based step index; defaults to the last recorded step\n    - user_prompt: Optional goal/prompt context for the feedback row\n    ",
+  "input_schema": {
+   "properties": {
+    "feedback": {
+     "title": "Feedback",
+     "type": "string"
+    },
+    "correction_text": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Correction Text"
+    },
+    "step_index": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Step Index"
+    },
+    "user_prompt": {
+     "default": "",
+     "title": "User Prompt",
+     "type": "string"
+    }
+   },
+   "required": [
+    "feedback"
+   ],
+   "title": "record_trajectory_feedbackArguments",
+   "type": "object"
+  }
+ },
+ {
+  "name": "look",
+  "description": "\n    See the scene as one image. For counts, sizes and positions, use get_scene_info.\n\n    Choose where from (mode) and how it's drawn (shading):\n    - mode: viewport (what the user sees; default), camera (through the scene camera, at the\n      render aspect), angles (the target from several sides, auto-framed; default front, right,\n      top, three_quarter), frames (a strip over the animation).\n    - shading: solid, material, rendered (EEVEE and Workbench only), wireframe (edges over a\n      plain surface), xray (see-through, bones in front). Default: the viewport's.\n    - image: Instead of the scene, show this image: \"Render Result\" after a render, another\n      image in the file, or a file path.\n\n    Parameters:\n    - target: Object names to frame (children included). Default: every visible object.\n    - views: For angles: up to 6 of front, back, left, right, top, three_quarter, or [x, y, z]\n      directions from the target towards the eye ([0, -1, 0.2] is front, slightly above).\n    - distance: Metres from the target's centre to the eye, for angles and frames views. Default:\n      far enough to fit it; closer for detail or to stand inside a room.\n    - frames / frame_count: For frames: explicit frame numbers, or how many to sample (2-12).\n    - view: For frames: \"camera\", an angle name or an [x, y, z] direction; default the viewport.\n    - max_size: Longest side in pixels (default 768). Images stay in the conversation, so go\n      smaller for quick checks and larger only to read fine detail.\n    - user_prompt: The user's own words describing what they want, quoted verbatim.\n\n    Every setting changed to take the picture is restored afterwards.\n    ",
+  "input_schema": {
+   "properties": {
+    "mode": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Mode"
+    },
+    "target": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Target"
+    },
+    "views": {
+     "anyOf": [
+      {
+       "items": {
+        "anyOf": [
+         {
+          "type": "string"
+         },
+         {
+          "items": {
+           "type": "number"
+          },
+          "type": "array"
+         }
+        ]
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Views"
+    },
+    "distance": {
+     "anyOf": [
+      {
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Distance"
+    },
+    "shading": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Shading"
+    },
+    "frames": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "integer"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Frames"
+    },
+    "frame_count": {
+     "default": 6,
+     "title": "Frame Count",
+     "type": "integer"
+    },
+    "view": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "items": {
+        "type": "number"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "View"
+    },
+    "image": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Image"
+    },
+    "max_size": {
+     "default": 768,
+     "title": "Max Size",
+     "type": "integer"
+    },
+    "user_prompt": {
+     "default": "",
+     "title": "User Prompt",
+     "type": "string"
+    }
+   },
+   "title": "lookArguments",
+   "type": "object"
+  }
+ },
+ {
+  "name": "generate_3d",
+  "description": "\n    Make one new textured 3D model from a text prompt or an image, and import it.\n\n    One object per call: not a whole scene, the ground, or parts to assemble. It arrives at\n    arbitrary scale and facing (meshy: real-world size, origin at the bottom). Each call can cost\n    the user money or a monthly generation, so duplicate a generated object for repeats.\n\n    Waits up to wait_seconds (at most 45), then imports. Generation usually takes 1-3 minutes: if\n    it isn't done in time you get a job handle; call generate_3d(job=..., name=...) again to keep\n    waiting. Repeating a request whose generation is still unfinished resumes it instead of paying\n    again.\n\n    Parameters:\n    - prompt: Short English description of one object (\"weathered wooden treasure chest\").\n    - image: Instead of a prompt: an absolute image file path or an http(s) URL. Images attached in\n      chat can't be passed: ask the user for a path or URL, don't fall back to text without asking.\n    - name: Object name in the scene. Defaults to one made from the prompt.\n    - provider: auto (default), tripo, hunyuan3d, hyper3d or meshy. Auto prefers the user's MCP for\n      Blender Premium generators, then their own API keys.\n    - quality: \"standard\" or \"high\" (Premium, not meshy). Omit for the user's default; \"high\" only\n      when the user asks for more detail.\n    - bbox_condition: hyper3d only: [length, width, height] proportions.\n    - job: A handle from an earlier call, to resume waiting for it.\n    - user_prompt: The user's own words describing what they want, quoted verbatim.\n    ",
+  "input_schema": {
+   "properties": {
+    "prompt": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Prompt"
+    },
+    "image": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Image"
+    },
+    "name": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Name"
+    },
+    "provider": {
+     "default": "auto",
+     "title": "Provider",
+     "type": "string"
+    },
+    "quality": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Quality"
+    },
+    "bbox_condition": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "number"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Bbox Condition"
+    },
+    "job": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Job"
+    },
+    "wait_seconds": {
+     "default": 50,
+     "title": "Wait Seconds",
+     "type": "integer"
+    },
+    "user_prompt": {
+     "default": "",
+     "title": "User Prompt",
+     "type": "string"
+    }
+   },
+   "title": "generate_3dArguments",
+   "type": "object"
+  }
+ },
+ {
+  "name": "search_assets",
+  "description": "\n    Search a library of existing assets. The sources:\n    - polyhaven: HDRIs, PBR textures and realistic models, all CC0. Search understands intent and\n      synonyms (\"couch\" finds sofas).\n    - sketchfab: a large catalogue of user-made models, realistic and specific ones included;\n      licences and face counts vary per model.\n    - polypizza: stylised low-poly models, CC0 or CC-BY (credit the creator).\n\n    Parameters:\n    - source: polyhaven, sketchfab or polypizza.\n    - query: What you're looking for, in plain words.\n    - asset_type: polyhaven only: hdris, textures, models or all.\n    - category: Optional. polyhaven: a category path (\"Metal/Sheet & Corrugated\"). sketchfab:\n      comma-separated categories. polypizza: e.g. \"Furniture & Decor\", \"Nature\", \"Animals\".\n    - attributes: polyhaven only: filters like {\"weather\": \"clear\"}; an unknown key errors with the\n      valid ones.\n    - min_size_m: polyhaven only: minimum real-world size in metres. Use 2+ for walls, floors and\n      ground so textures don't visibly repeat.\n    - licence: polypizza only: \"CC0\" or \"CC-BY\".\n    - animated: polypizza only: animated models only.\n    - limit: Number of results.\n    - previews: Attach thumbnails of the first N results (max 6; polyhaven and sketchfab). Cheaper\n      than importing the wrong asset.\n    - user_prompt: The user's own words describing what they want, quoted verbatim.\n\n    Results include each asset's id; pass it to import_asset.\n    ",
+  "input_schema": {
+   "properties": {
+    "source": {
+     "title": "Source",
+     "type": "string"
+    },
+    "query": {
+     "default": "",
+     "title": "Query",
+     "type": "string"
+    },
+    "asset_type": {
+     "default": "all",
+     "title": "Asset Type",
+     "type": "string"
+    },
+    "category": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Category"
+    },
+    "attributes": {
+     "anyOf": [
+      {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Attributes"
+    },
+    "min_size_m": {
+     "anyOf": [
+      {
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Min Size M"
+    },
+    "licence": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Licence"
+    },
+    "animated": {
+     "default": false,
+     "title": "Animated",
+     "type": "boolean"
+    },
+    "limit": {
+     "default": 20,
+     "title": "Limit",
+     "type": "integer"
+    },
+    "previews": {
+     "default": 0,
+     "title": "Previews",
+     "type": "integer"
+    },
+    "user_prompt": {
+     "default": "",
+     "title": "User Prompt",
+     "type": "string"
+    }
+   },
+   "required": [
+    "source"
+   ],
+   "title": "search_assetsArguments",
+   "type": "object"
+  }
+ },
+ {
+  "name": "import_asset",
+  "description": "\n    Download an asset found with search_assets and bring it into the scene.\n\n    Parameters:\n    - source: polyhaven, sketchfab or polypizza.\n    - id: The asset's id (UID for sketchfab) from search_assets.\n    - asset_type: polyhaven only, required: hdris (becomes the world lighting), textures (builds a\n      PBR material) or models.\n    - target_size: Size in metres of the model's largest dimension (chair 1.0, car 4.5, cup 0.12).\n      Required for sketchfab, recommended for polypizza; library models come at arbitrary scale.\n    - apply_to: polyhaven textures: object names to put the material on (replaces their materials).\n      Without it the material is created but unused, and is lost if the file is saved.\n    - resolution: polyhaven: 1k, 2k, 4k or 8k. 1k-2k for background, 4k for close-ups.\n    - file_format: polyhaven, optional: hdr/exr for HDRIs, jpg/png/exr for textures.\n    - user_prompt: The user's own words describing what they want, quoted verbatim.\n\n    Afterwards check the reported bounding box, put the object on the ground, and look at it.\n    ",
+  "input_schema": {
+   "properties": {
+    "source": {
+     "title": "Source",
+     "type": "string"
+    },
+    "id": {
+     "title": "Id",
+     "type": "string"
+    },
+    "asset_type": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Asset Type"
+    },
+    "target_size": {
+     "anyOf": [
+      {
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Target Size"
+    },
+    "apply_to": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Apply To"
+    },
+    "resolution": {
+     "default": "1k",
+     "title": "Resolution",
+     "type": "string"
+    },
+    "file_format": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "File Format"
+    },
+    "user_prompt": {
+     "default": "",
+     "title": "User Prompt",
+     "type": "string"
+    }
+   },
+   "required": [
+    "source",
+    "id"
+   ],
+   "title": "import_assetArguments",
+   "type": "object"
+  }
+ }
+]

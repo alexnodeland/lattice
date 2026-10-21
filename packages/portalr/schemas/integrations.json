@@ -60,6 +60,11 @@
     "description": "FreeCAD: 3D models kept as native files, edited by people and agents."
   },
   {
+    "key": "files:blender",
+    "default": false,
+    "description": "Blender: 3D scenes kept as native files, edited by people and agents."
+  },
+  {
     "key": "files:filmcraft",
     "default": false,
     "description": "FilmCraft: video projects rendered and exported, one file at a time."

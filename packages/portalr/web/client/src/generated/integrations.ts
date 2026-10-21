@@ -15,6 +15,7 @@ export const INTEGRATIONS = [
   {"key":"files:designcraft","default":false,"description":"DesignCraft: InDesign layouts, as IDML, kept as native files, edited by people and agents."},
   {"key":"files:figcraft","default":false,"description":"FigCraft: interface designs kept as native files, edited by people and agents."},
   {"key":"files:freecad","default":false,"description":"FreeCAD: 3D models kept as native files, edited by people and agents."},
+  {"key":"files:blender","default":false,"description":"Blender: 3D scenes kept as native files, edited by people and agents."},
   {"key":"files:filmcraft","default":false,"description":"FilmCraft: video projects rendered and exported, one file at a time."},
   {"key":"files:effectcraft","default":false,"description":"EffectCraft: motion graphics rendered and exported, one file at a time."},
   {"key":"files:soundcraft","default":false,"description":"SoundCraft: audio sessions mixed down and exported, one file at a time."},

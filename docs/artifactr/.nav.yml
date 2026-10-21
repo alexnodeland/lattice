@@ -17,6 +17,7 @@ nav:
   - The LLM gateway: guides/gateway.md
   - Testing your application: guides/testing.md
   - Forms and dashboards: guides/forms-and-dashboards.md
+  - Connected apps: guides/connected-apps.md
 - Native files: files
 - Reference:
   - reference/index.md

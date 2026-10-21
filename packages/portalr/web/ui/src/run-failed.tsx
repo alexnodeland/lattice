@@ -5,6 +5,7 @@
 
 import { Alert } from "./alert";
 import { CommandButton } from "./chat";
+import { Disclosure } from "./disclosure";
 import type { Sent } from "./sending";
 
 /** Why a run failed, in words, by the reason its `run_ended` names (artifactr ADR-0042). */
@@ -39,12 +40,11 @@ export function RunFailed({
             {(reason !== null && REASONS[reason]) || "Something went wrong before it answered."}
           </p>
           {error && (
-            <details className="text-muted">
-              <summary className="cursor-pointer">Details</summary>
-              <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-words font-mono text-xs">
+            <Disclosure summary="Details" className="text-muted">
+              <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words font-mono text-xs">
                 {error}
               </pre>
-            </details>
+            </Disclosure>
           )}
           {onRetry && (
             <span>

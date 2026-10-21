@@ -5,9 +5,10 @@
  */
 
 import type { Artifactr } from "@portalr/client";
-import { ChevronRight, Wrench } from "lucide-react";
+import { Wrench } from "lucide-react";
 import type { ReactNode } from "react";
 import { CopyButton } from "./copy-button";
+import { Disclosure } from "./disclosure";
 import { Icon } from "./icon";
 import { ScrollRegion } from "./scroll-region";
 import { StatusBadge, type Tone } from "./status-badge";
@@ -71,19 +72,22 @@ export function ToolCall({ tool }: { tool: Artifactr.Tool }) {
   const line = failed ? tool.result : tool.args;
   return (
     <li>
-      <details className="group rounded-(--tool-call-radius) border border-line bg-surface text-sm open:border-edge">
-        <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-(--tool-call-radius) px-(--tool-call-pad-x) py-(--tool-call-pad-y) outline-offset-(--focus-offset) focus-visible:outline-(length:--focus-width) focus-visible:outline-focus [&::-webkit-details-marker]:hidden">
-          <Icon
-            icon={ChevronRight}
-            className="size-3.5 shrink-0 text-muted motion-safe:transition-transform group-open:rotate-90 rtl:-scale-x-100 rtl:group-open:rotate-90"
-          />
-          <Icon icon={Wrench} className="size-3.5 shrink-0 text-muted" />
-          <code className="shrink-0 font-mono">{tool.name}</code>
-          <span className="min-w-0 flex-1 truncate text-muted text-xs">{line}</span>
-          <StatusBadge tone={tone} className="shrink-0">
-            {word}
-          </StatusBadge>
-        </summary>
+      <Disclosure
+        look="block"
+        className="rounded-(--tool-call-radius) border border-line bg-surface text-sm data-open:border-edge"
+        triggerClassName="min-h-10 items-center rounded-(--tool-call-radius) px-(--tool-call-pad-x) py-(--tool-call-pad-y) hover:bg-transparent"
+        panelClassName="pt-0"
+        summary={
+          <>
+            <Icon icon={Wrench} className="size-3.5 shrink-0 text-muted" />
+            <code className="shrink-0 font-mono">{tool.name}</code>
+            <span className="min-w-0 flex-1 truncate text-muted text-xs">{line}</span>
+            <StatusBadge tone={tone} className="shrink-0">
+              {word}
+            </StatusBadge>
+          </>
+        }
+      >
         <div className="flex flex-col gap-3 border-line border-t p-3">
           <Part
             name="Arguments"
@@ -100,7 +104,7 @@ export function ToolCall({ tool }: { tool: Artifactr.Tool }) {
             />
           )}
         </div>
-      </details>
+      </Disclosure>
     </li>
   );
 }

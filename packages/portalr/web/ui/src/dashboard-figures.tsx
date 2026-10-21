@@ -6,6 +6,7 @@
 
 import type { Keyed, Panel, Row, TablePanel, TableRow } from "./artifactr-ui";
 import { formatNumber, largestFirst } from "./chart-theme";
+import { Disclosure } from "./disclosure";
 import { type Column, ItemTable } from "./item-table";
 import { isNumber, own } from "./json";
 
@@ -72,8 +73,7 @@ export function Figures({
   open?: boolean;
 }) {
   return (
-    <details className="text-sm" open={open}>
-      <summary className="cursor-pointer text-muted">Show the figures</summary>
+    <Disclosure summary="Show the figures" className="text-sm" defaultOpen={open}>
       {panel.type === "donut" ? (
         <Rows
           caption={panel.label}
@@ -87,6 +87,6 @@ export function Figures({
       ) : (
         <Rows caption={panel.label} columns={[panel.index, ...panel.series]} rows={panel.rows} />
       )}
-    </details>
+    </Disclosure>
   );
 }

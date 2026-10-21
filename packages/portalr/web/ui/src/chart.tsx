@@ -51,6 +51,7 @@ import {
   TooltipRow,
   useLabels,
 } from "./chart-theme";
+import { Disclosure } from "./disclosure";
 import { type Column, ItemTable } from "./item-table";
 import { Num } from "./num";
 
@@ -157,8 +158,7 @@ function Figure({
         {label}
       </figcaption>
       {drawn}
-      <details className="text-sm">
-        <summary className="cursor-pointer text-muted">Show the figures</summary>
+      <Disclosure summary="Show the figures" className="text-sm">
         <ItemTable
           caption={label}
           columns={columns}
@@ -166,7 +166,7 @@ function Figure({
           keyOf={(row) => String(row[index.key])}
           empty={{ title: "No figures", body: "Nothing in this chart yet." }}
         />
-      </details>
+      </Disclosure>
     </figure>
   );
 }
@@ -680,8 +680,7 @@ export function DonutChart({
         {label}
       </figcaption>
       {drawn}
-      <details className="text-sm">
-        <summary className="cursor-pointer text-muted">Show the figures</summary>
+      <Disclosure summary="Show the figures" className="text-sm">
         <ItemTable
           caption={label}
           columns={[
@@ -693,7 +692,7 @@ export function DonutChart({
           keyOf={(part) => part.key}
           empty={{ title: "No parts", body: "Nothing in this whole yet." }}
         />
-      </details>
+      </Disclosure>
     </figure>
   );
 }

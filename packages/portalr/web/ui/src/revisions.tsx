@@ -11,7 +11,7 @@
 
 import { Tabs } from "@base-ui/react/tabs";
 import type { Change, Granularity } from "@portalr/client";
-import { ChevronRight, Play, Square } from "lucide-react";
+import { Play, Square } from "lucide-react";
 import { createContext, type ReactNode, use, useEffect, useId, useMemo, useState } from "react";
 import { type AppHost, AppHostContext, MINI_APPS, stillWhy } from "./app-frame";
 import {
@@ -26,6 +26,7 @@ import {
 } from "./artifacts";
 import { Button } from "./button";
 import { cn } from "./cn";
+import { Disclosure } from "./disclosure";
 import { Icon } from "./icon";
 import { IntegrationsContext } from "./integrations";
 import { LineDiff, lineCounts } from "./line-diff";
@@ -384,38 +385,39 @@ function Revision({
       aria-label={`Version ${revision.version}`}
       className="rounded-(--card-radius) border border-line bg-surface"
     >
-      <details open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
-        <summary className="flex cursor-pointer list-none items-start gap-2 rounded-lg px-4 py-3 outline-offset-(--focus-offset) hover:bg-wash focus-visible:outline-(length:--focus-width) focus-visible:outline-focus [&::-webkit-details-marker]:hidden">
-          <Icon
-            icon={ChevronRight}
-            className={cn(
-              "mt-0.5 size-4 shrink-0 text-muted rtl:-scale-x-100",
-              open && "rotate-90 rtl:rotate-90",
-            )}
-          />
-          <span className="flex min-w-0 flex-col gap-0.5">
-            <span className="flex flex-wrap items-baseline gap-x-2">
-              <span className={TYPE.label}>Version {revision.version}</span>
-              {latest && (
-                <span className="rounded-sm border border-line px-1.5 text-muted text-xs">
-                  Latest
-                </span>
-              )}
-              <span className={TYPE.note}>
-                by {revision.by}
-                {revision.at && (
-                  <>
-                    {", "}
-                    <When at={revision.at} now={now} />
-                  </>
+      <Disclosure
+        look="block"
+        open={open}
+        onOpenChange={setOpen}
+        triggerClassName="rounded-(--card-radius) px-4 py-3"
+        panelClassName="pt-0"
+        summary={
+          <>
+            <span className="flex min-w-0 flex-col gap-0.5">
+              <span className="flex flex-wrap items-baseline gap-x-2">
+                <span className={TYPE.label}>Version {revision.version}</span>
+                {latest && (
+                  <span className="rounded-sm border border-line px-1.5 text-muted text-xs">
+                    Latest
+                  </span>
                 )}
+                <span className={TYPE.note}>
+                  by {revision.by}
+                  {revision.at && (
+                    <>
+                      {", "}
+                      <When at={revision.at} now={now} />
+                    </>
+                  )}
+                </span>
+              </span>
+              <span className={cn(TYPE.meta, "break-words")}>
+                {changedSaid(counted ?? names?.map((part) => ({ part })) ?? null)}
               </span>
             </span>
-            <span className={cn(TYPE.meta, "break-words")}>
-              {changedSaid(counted ?? names?.map((part) => ({ part })) ?? null)}
-            </span>
-          </span>
-        </summary>
+          </>
+        }
+      >
         {open && (
           <Opened
             id={id}
@@ -427,7 +429,7 @@ function Revision({
             more={more()}
           />
         )}
-      </details>
+      </Disclosure>
     </li>
   );
 }

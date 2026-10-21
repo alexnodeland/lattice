@@ -368,6 +368,18 @@ COMPONENTS: tuple[Group, ...] = (
         ),
     ),
     Group(
+        "A disclosure, a part that opens and closes: its trigger's least height, so a pointer has "
+        "a target, the gap after its chevron, its corners, the gap before what opens, and how fast "
+        "the chevron turns (portalr ADR-0063).",
+        (
+            Row("component.disclosure.target", "--disclosure-target", "dimension"),
+            Row("component.disclosure.gap", "--disclosure-gap", "dimension"),
+            Row("component.disclosure.radius", "--disclosure-radius", "dimension"),
+            Row("component.disclosure.panel-gap", "--disclosure-panel-gap", "dimension"),
+            Row("component.disclosure.duration", "--disclosure-duration", "duration"),
+        ),
+    ),
+    Group(
         "The chat: a message's bubble, its corners and the smaller corner it points from, and "
         "its padding; and the composer's corners and padding (portalr ADR-0053).",
         (

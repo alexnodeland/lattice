@@ -104,7 +104,14 @@ test("a revision's words are compared when asked", async () => {
   expect(asked()).toBe(0);
   await disclosure.click();
   await expect
-    .poll(() => disclosure.element().closest("details")?.querySelector("ins")?.textContent)
+    .poll(() => {
+      // What this disclosure opens: the panel its button controls.
+      const controls = disclosure
+        .element()
+        .closest("[aria-controls]")
+        ?.getAttribute("aria-controls");
+      return controls ? document.getElementById(controls)?.querySelector("ins")?.textContent : null;
+    })
     .toBe("added: Fees");
   expect(asked()).toBe(2);
 });

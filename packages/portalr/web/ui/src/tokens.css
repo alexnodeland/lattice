@@ -316,6 +316,17 @@
   --question-chip-radius: var(--radius-full);
 
   /*
+   * A disclosure, a part that opens and closes: its trigger's least height, so a pointer has a
+   * target, the gap after its chevron, its corners, the gap before what opens, and how fast the
+   * chevron turns (portalr ADR-0063).
+   */
+  --disclosure-target: 1.5rem;
+  --disclosure-gap: var(--space-1-5);
+  --disclosure-radius: var(--radius-3);
+  --disclosure-panel-gap: var(--space-2);
+  --disclosure-duration: var(--duration-fast);
+
+  /*
    * The chat: a message's bubble, its corners and the smaller corner it points from, and its
    * padding; and the composer's corners and padding (portalr ADR-0053).
    */

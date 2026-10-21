@@ -101,9 +101,9 @@ test("JSON as a tree: deep values folded, empty ones as brackets, and Copy as JS
   };
   const screen = await render(<JsonView data={data} name="data" />);
   const tree = screen.getByRole("region", { name: "data" });
-  const [deep, deeper] = tree.element().querySelectorAll("details");
-  expect(deep?.open).toBe(true);
-  expect(deeper?.open).toBe(false);
+  const [deep, deeper] = tree.element().querySelectorAll("[aria-expanded]");
+  expect(deep?.getAttribute("aria-expanded")).toBe("true");
+  expect(deeper?.getAttribute("aria-expanded")).toBe("false");
   await expect.element(tree.getByText("1 key").first()).toBeVisible();
   await expect.element(tree.getByText("1 item")).toBeVisible();
   await expect.element(tree.getByText("[]")).toBeVisible();

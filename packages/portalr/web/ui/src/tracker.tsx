@@ -10,6 +10,7 @@
 import type { CSSProperties } from "react";
 import { useId } from "react";
 import { ADJACENT, ink, Legend } from "./chart-theme";
+import { Disclosure } from "./disclosure";
 import { type Column, ItemTable } from "./item-table";
 
 /** One of a tracker's levels: its key, and its name, as the legend and the table give it. */
@@ -92,8 +93,7 @@ export function Tracker({
           </div>
         ))}
       </div>
-      <details className="text-sm">
-        <summary className="cursor-pointer text-muted">Show the figures</summary>
+      <Disclosure summary="Show the figures" className="text-sm">
         <ItemTable
           caption={label}
           columns={columns}
@@ -101,7 +101,7 @@ export function Tracker({
           keyOf={(block) => block.key}
           empty={{ title: "No figures", body: "Nothing in this tracker yet." }}
         />
-      </details>
+      </Disclosure>
     </figure>
   );
 }

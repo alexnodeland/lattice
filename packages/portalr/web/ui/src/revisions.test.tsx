@@ -56,9 +56,9 @@ test("newest first, the latest open and the rest closed, each saying who, when a
   const first = list.getByRole("listitem").nth(1);
   await expect.element(latest).toHaveAccessibleName("Version 2");
   await expect.element(first).toHaveAccessibleName("Version 1");
-  const [open, closed] = screen.container.querySelectorAll("details");
-  expect(open?.open).toBe(true);
-  expect(closed?.open).toBe(false);
+  const [open, closed] = screen.container.querySelectorAll("[aria-expanded]");
+  expect(open?.getAttribute("aria-expanded")).toBe("true");
+  expect(closed?.getAttribute("aria-expanded")).toBe("false");
   await expect
     .element(latest.getByText("Changed the title, the summary and the HTML (+3 −2)"))
     .toBeVisible();
@@ -130,7 +130,7 @@ test("an app's preview runs on asking, one revision at a time, and saves nothing
     )
     .toBeVisible();
   expect(latest.getByRole("heading", { name: "Dice game" }).elements()).toHaveLength(0);
-  await userEvent.click(first.element().querySelector("summary") as HTMLElement);
+  await userEvent.click(first.element().querySelector("[aria-expanded]") as HTMLElement);
   await userEvent.click(first.getByRole("tab", { name: "Preview" }));
   await userEvent.click(first.getByRole("button", { name: "Run version 1" }));
   await expect.element(first.getByTitle("Dice: an app made by the agent")).toBeInTheDocument();
@@ -140,7 +140,7 @@ test("an app's preview runs on asking, one revision at a time, and saves nothing
   // What a preview may send is the bridge's to refuse, before anyone is asked: app-bridge.test.ts.
   // Closed and opened again, it waits to be asked to run again.
   await userEvent.click(first.getByRole("button", { name: "Run version 1" }));
-  const summary = first.element().querySelector("summary") as HTMLElement;
+  const summary = first.element().querySelector("[aria-expanded]") as HTMLElement;
   await userEvent.click(summary);
   await userEvent.click(summary);
   await userEvent.click(first.getByRole("tab", { name: "Preview" }));
@@ -224,7 +224,7 @@ test("an app's first revision, where apps don't run, opens on its Source", async
 test("a closed revision opens from the keyboard, and closes again", async () => {
   const screen = await shown(APP_REVISIONS);
   const first = screen.getByRole("listitem", { name: "Version 1" });
-  const summary = first.element().querySelector("summary") as HTMLElement;
+  const summary = first.element().querySelector("[aria-expanded]") as HTMLElement;
   summary.focus();
   await userEvent.keyboard("{Enter}");
   await expect.element(first.getByRole("tab", { name: "Preview" })).toBeVisible();

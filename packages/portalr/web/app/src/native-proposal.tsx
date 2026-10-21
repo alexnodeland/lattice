@@ -11,6 +11,7 @@ import {
   Alert,
   Button,
   Diff,
+  Disclosure,
   fileSize,
   PageCompare,
   type PagePair,
@@ -212,13 +213,15 @@ function Comparison(props: {
 }) {
   const [open, setOpen] = useState(false);
   return (
-    <details className="text-sm" onToggle={(event) => setOpen(event.currentTarget.open)}>
-      <summary className="cursor-pointer text-accent underline-offset-2 hover:underline">
-        Compare with version {props.version}
-        {props.size === null ? "" : ` (proposed: ${fileSize(props.size)})`}
-      </summary>
+    <Disclosure
+      look="link"
+      summary={`Compare with version ${props.version}${props.size === null ? "" : ` (proposed: ${fileSize(props.size)})`}`}
+      open={open}
+      onOpenChange={setOpen}
+      className="text-sm"
+    >
       {open && <Compared {...props} />}
-    </details>
+    </Disclosure>
   );
 }
 

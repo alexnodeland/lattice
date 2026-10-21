@@ -354,9 +354,12 @@ async function shown(scene: string, width: number) {
     .toBe(asked.reduced);
   const screen = await render(SCENES[scene]?.());
   await OPENED[scene]?.();
-  // An opened list or menu is read once it has finished opening, not while it enters.
+  // An opened list or menu is read once it has finished opening, not while it enters. A closed
+  // disclosure's panel, hidden until found, keeps its starting style while hidden: it isn't moving.
   await expect
-    .poll(() => document.querySelector("[data-starting-style], [data-ending-style]"))
+    .poll(() =>
+      document.querySelector(":is([data-starting-style], [data-ending-style]):not([hidden])"),
+    )
     .toBeNull();
   // The pointer moves off what a scene shows, but where it rests to show a tooltip.
   if (scene !== "tooltip") await commands.pointerAway();

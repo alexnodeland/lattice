@@ -224,7 +224,7 @@ test("a note is shown where it was made, named, with a full view that keeps it",
   document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
   await expect.element(full).not.toBeInTheDocument();
   expect(document.querySelector("[inert]")).toBeNull();
-  await expect.poll(() => document.activeElement?.textContent).toContain("Full view");
+  await expect.poll(() => document.activeElement?.getAttribute("aria-label")).toBe("Full view");
 });
 
 test("a form made in a thread is sent from it, as the reader", async () => {

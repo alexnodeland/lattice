@@ -66,6 +66,7 @@ export { failureSaid } from "./failure";
 export { FileChooser } from "./file-chooser";
 export { PageViewer, SheetTable, sheetsOf } from "./file-preview";
 export { Icon } from "./icon";
+export { IconButton } from "./icon-button";
 export { IntegrationList, type IntegrationRow, type IntegrationSource } from "./integration-list";
 export { IntegrationsContext, type IsEnabled } from "./integrations";
 export { type Column, ItemTable } from "./item-table";

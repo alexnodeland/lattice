@@ -298,6 +298,7 @@ const SCENES: Record<string, () => ReactNode> = {
   menu: () => <Gallery />,
   select: () => <Controls />,
   drawer: () => <Gallery />,
+  tooltip: () => <Kit />,
 };
 
 /** What a scene opens once it is shown: a menu, with the keyboard on an item, or a select's list. */
@@ -305,6 +306,11 @@ const OPENED: Record<string, () => Promise<void>> = {
   menu: async () => {
     await page.getByRole("button", { name: "Workspace: acme, notes" }).click();
     await userEvent.keyboard("{ArrowDown}");
+  },
+  // An icon button's tooltip, shown as the pointer rests on it.
+  tooltip: async () => {
+    await userEvent.hover(page.getByRole("button", { name: "Full view" }));
+    await expect.element(page.getByText("Full view", { exact: true })).toBeVisible();
   },
   // The drawer opens where the frame is narrow, and isn't there to open where it is wide.
   drawer: async () => {
@@ -352,7 +358,8 @@ async function shown(scene: string, width: number) {
   await expect
     .poll(() => document.querySelector("[data-starting-style], [data-ending-style]"))
     .toBeNull();
-  await commands.pointerAway();
+  // The pointer moves off what a scene shows, but where it rests to show a tooltip.
+  if (scene !== "tooltip") await commands.pointerAway();
   await frames();
   return screen;
 }

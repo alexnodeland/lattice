@@ -30,6 +30,15 @@ type Props = Omit<ComponentProps<typeof BaseButton>, "className"> & {
   className?: string;
 };
 
+/** A button's look, for what is drawn as a button but rendered as something else, such as a link. */
+export function buttonLook(variant: ButtonVariant = "primary", big: ButtonSize = "md") {
+  return cn(
+    "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-(--button-radius) border font-(--button-weight) font-sans outline-offset-(--focus-offset) transition-[color,background-color,border-color] duration-(--button-duration) ease-(--button-ease) focus-visible:outline-(length:--focus-width) focus-visible:outline-focus active:not-data-disabled:translate-y-(--button-press-shift) motion-reduce:transition-none aria-pressed:border-accent aria-pressed:bg-wash aria-pressed:text-accent data-disabled:cursor-not-allowed data-disabled:border-line data-disabled:bg-line data-disabled:text-muted",
+    size[big],
+    look[variant],
+  );
+}
+
 /**
  * A button: Base UI's, in the working colour (`primary`), on the surface (`secondary`), bare until
  * hovered (`ghost`), or in the danger colour (`danger-soft` offers a destructive action, `danger`
@@ -37,15 +46,5 @@ type Props = Omit<ComponentProps<typeof BaseButton>, "className"> & {
  * the quiet text, with the cursor that says it can't be used, rather than faded, so it still reads.
  */
 export function Button({ variant = "primary", size: big = "md", className, ...props }: Props) {
-  return (
-    <BaseButton
-      className={cn(
-        "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-(--button-radius) border font-(--button-weight) font-sans outline-offset-(--focus-offset) transition-[color,background-color,border-color] duration-(--button-duration) ease-(--button-ease) focus-visible:outline-(length:--focus-width) focus-visible:outline-focus active:not-data-disabled:translate-y-(--button-press-shift) motion-reduce:transition-none aria-pressed:border-accent aria-pressed:bg-wash aria-pressed:text-accent data-disabled:cursor-not-allowed data-disabled:border-line data-disabled:bg-line data-disabled:text-muted",
-        size[big],
-        look[variant],
-        className,
-      )}
-      {...props}
-    />
-  );
+  return <BaseButton className={cn(buttonLook(variant, big), className)} {...props} />;
 }

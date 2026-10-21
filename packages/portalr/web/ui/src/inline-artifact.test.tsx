@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { expect, test } from "vitest";
-import { userEvent } from "vitest/browser";
+import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { json, markdown } from "./artifacts";
 import { InlineArtifact, Messages } from "./chat";
@@ -27,7 +27,7 @@ function InThread({ kind }: { kind?: string }) {
         <InlineArtifact
           name="Plan"
           {...(kind !== undefined && { kind })}
-          open={<a href="#plan">Open its page</a>}
+          open={<a href="#plan" aria-label="the router's link" />}
         >
           <Draft />
         </InlineArtifact>
@@ -71,7 +71,7 @@ test("its full view fills the window as a modal, keeps what was entered, and ret
   await expect
     .element(screen.getByRole("textbox", { name: "Draft" }))
     .toHaveValue("half an answer");
-  await expect.poll(() => document.activeElement?.textContent).toContain("Full view");
+  await expect.poll(() => document.activeElement?.getAttribute("aria-label")).toBe("Full view");
 });
 
 test("Escape returns a full view, unless something inside took it first", async () => {
@@ -95,6 +95,39 @@ test("Escape returns a full view, unless something inside took it first", async 
   await expect.element(screen.getByRole("dialog", { name: "Plan" })).toBeVisible();
   await screen.getByRole("button", { name: "Back to the page" }).click();
   await screen.getByRole("button", { name: "Full view" }).click();
+  await userEvent.keyboard("{Escape}");
+  await expect.element(screen.getByRole("dialog")).not.toBeInTheDocument();
+});
+
+test("the header's actions: Open its page, then Full view; in the full view, Back to the page alone", async () => {
+  const screen = await render(<InThread kind="Note" />);
+  const entry = screen.getByRole("listitem", { name: "Plan" });
+  const actions = [...entry.element().querySelectorAll("a[aria-label], button[aria-label]")].map(
+    (each) => each.getAttribute("aria-label"),
+  );
+  expect(actions).toEqual(["Open its page", "Full view"]);
+  expect(entry.getByRole("link", { name: "Open its page" }).element().getAttribute("href")).toBe(
+    "#plan",
+  );
+  await entry.getByRole("button", { name: "Full view" }).click();
+  const full = screen.getByRole("dialog", { name: "Plan" });
+  await expect.element(full.getByRole("button", { name: "Back to the page" })).toBeVisible();
+  expect(full.getByRole("link", { name: "Open its page" }).elements()).toHaveLength(0);
+});
+
+test("in the full view, the back button's tooltip shows above it, and one Escape leaves", async () => {
+  const screen = await render(<InThread kind="Note" />);
+  screen.getByRole("button", { name: "Full view" }).element().focus();
+  await userEvent.keyboard("{Enter}");
+  const full = screen.getByRole("dialog", { name: "Plan" });
+  await expect.element(full).toBeVisible();
+  // The back button's tooltip shows above the full view, not under it.
+  await userEvent.hover(full.getByRole("button", { name: "Back to the page" }));
+  const tip = page.getByText("Back to the page", { exact: true });
+  await expect.element(tip).toBeVisible();
+  const box = tip.element().getBoundingClientRect();
+  const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+  expect(tip.element().contains(hit)).toBe(true);
   await userEvent.keyboard("{Escape}");
   await expect.element(screen.getByRole("dialog")).not.toBeInTheDocument();
 });

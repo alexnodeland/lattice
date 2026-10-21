@@ -35,7 +35,7 @@ const dismissed = () => {
  * The newer build the tab's page has been replaced by, or null: `page` is the UI's own address,
  * read again every `every` milliseconds, on focus, and when the tab is shown again.
  */
-export function useNewVersion(page: string, every = EVERY): string | null {
+function useNewVersion(page: string, every = EVERY): string | null {
   const [newer, setNewer] = useState<string | null>(null);
   useEffect(() => {
     const running = buildOf(document.documentElement.outerHTML);

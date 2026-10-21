@@ -5,7 +5,7 @@
 
 import { Field } from "@base-ui/react/field";
 import type { Artifactr, ArtifactrV1, Thumb } from "@portalr/client";
-import { ArrowUpRight, Bot, Maximize2, Minimize2, ThumbsDown, ThumbsUp } from "lucide-react";
+import { Bot, FileText, Maximize2, Minimize2, ThumbsDown, ThumbsUp } from "lucide-react";
 import {
   type FormEvent,
   type KeyboardEvent,
@@ -91,6 +91,7 @@ export function Thumbs({ given, onThumbs }: { given: Thumb | null; onThumbs: Giv
           icon={ThumbsUp}
           aria-pressed={given?.up === true}
           disabled={pending}
+          focusableWhenDisabled
           onClick={() => thumb(true)}
         />
         <IconButton
@@ -98,6 +99,7 @@ export function Thumbs({ given, onThumbs }: { given: Thumb | null; onThumbs: Giv
           icon={ThumbsDown}
           aria-pressed={given?.up === false}
           disabled={pending}
+          focusableWhenDisabled
           onClick={() => thumb(false)}
         />
       </span>
@@ -291,11 +293,10 @@ export function InlineArtifact({
             <span className={cn(TYPE.label, "break-words")}>{name}</span>
           </p>
           <span className="flex shrink-0 items-center gap-1">
-            {open && !full && (
-              <IconButton label="Open its page" icon={ArrowUpRight} render={open} />
-            )}
+            {open && !full && <IconButton label="Open its page" icon={FileText} render={open} />}
             <IconButton
               ref={back}
+              escapeThrough={full}
               label={full ? "Back to the page" : "Full view"}
               icon={full ? Minimize2 : Maximize2}
               onClick={() => setFull(!full)}

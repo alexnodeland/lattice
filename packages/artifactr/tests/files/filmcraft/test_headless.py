@@ -160,3 +160,10 @@ async def test_a_batch_that_reaches_past_the_project_is_refused_before_it_runs(
     with pytest.raises(AppFailed, match=message) as refused:
         await filmcraft.apply(None, [SEQUENCE, command], deadline=20)
     assert refused.value.failure == "refused"
+
+
+async def test_a_path_nested_in_a_commands_parameters_is_refused(filmcraft: Subprocess) -> None:
+    nested = step("graphics.set", clip=9, props=[{"image": {"url": "file:///etc/hosts"}}])
+    with pytest.raises(AppFailed, match="gives no command a path") as refused:
+        await filmcraft.apply(None, [SEQUENCE, nested], deadline=20)
+    assert refused.value.failure == "refused"

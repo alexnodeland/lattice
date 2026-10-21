@@ -37,6 +37,9 @@ ADAPTED = (
     "figcraft",
     "freecad",
     "blender",
+    "filmcraft",
+    "effectcraft",
+    "soundcraft",
 )
 """The apps with an adapter of their own, each a layer."""
 

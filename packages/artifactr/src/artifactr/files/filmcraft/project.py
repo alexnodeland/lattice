@@ -48,6 +48,12 @@ class _Sequence(BaseModel):
 
 
 class _Media(BaseModel):
+    """A medium's two fields that FilmCraft reads a file for: its source and its proxy.
+
+    Its other fields, its info and how it is interpreted, FilmCraft reads from the project
+    itself, so they are left as they are.
+    """
+
     media: dict[str, JsonValue]
     """Where its frames come from: `Generator`, FilmCraft's own, or a file, by path."""
 

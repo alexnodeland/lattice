@@ -35,9 +35,13 @@ def project(content: bytes) -> dict[str, JsonValue] | None:
     return _parsed(content)
 
 
-@lru_cache(maxsize=4)
+@lru_cache(maxsize=1)
 def _parsed(content: bytes) -> dict[str, JsonValue] | None:
-    """The bytes as a JSON object, parsed once for the calls that ask of them in turn."""
+    """The bytes as a JSON object, parsed once for the calls that ask of them in turn.
+
+    Only the last project is kept, up to some 90 MB of a project at the limit, and its callers
+    read it and never change it.
+    """
     try:
         found = _JSON.validate_json(content)
     except ValidationError:

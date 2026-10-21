@@ -26,8 +26,10 @@ TICKS: Final = 254_016_000_000
 PAGES: Final = 10_000
 """The most pages a project has: its first seconds, ten thousand at most."""
 
-PATHS: Final = frozenset({"path", "paths", "file", "folder", "dir"})
-"""The parameters by which a command names a file or a folder."""
+PATHS: Final = frozenset(
+    {"path", "paths", "file", "files", "folder", "dir", "output", "url", "src", "destination"}
+)
+"""The parameters by which a command names a file, a folder or a place to write."""
 
 
 class _Node(BaseModel):
@@ -132,7 +134,7 @@ class Subprocess(CommandsDialect):
             AppFailed: `refused`, naming the command.
         """
         super().allowed(commands)
-        if found := next((c.name for c in commands if PATHS & set(c.args)), None):
+        if found := next((c.name for c in commands if _names_a_path(c.args)), None):
             raise AppFailed("refused", f"{found}: FilmCraft's adapter gives no command a path")
 
     @override
@@ -213,3 +215,17 @@ def _outline(nodes: Sequence[_Node], sequence: _Sequence | None, depth: int = 0)
             if track.items
         ]
     return lines
+
+
+def _names_a_path(args: JsonValue) -> bool:
+    """Whether a command's parameters, however nested, give it a path, walked without recursion."""
+    stack: list[JsonValue] = [args]
+    while stack:
+        found = stack.pop()
+        if isinstance(found, dict):
+            if PATHS & set(found):
+                return True
+            stack.extend(found.values())
+        elif isinstance(found, list):
+            stack.extend(found)
+    return False

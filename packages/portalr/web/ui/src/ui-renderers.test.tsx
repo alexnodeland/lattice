@@ -316,9 +316,10 @@ describe("a form", () => {
   test("data that aren't a form say so, and show as JSON", async () => {
     const screen = await render(<Page hosted={host()} data={{ title: "Odd", schema: "none" }} />);
     await expect
-      .element(screen.getByRole("status"))
+      .element(screen.getByRole("status").filter({ hasText: "can't be shown here" }))
       .toHaveTextContent("This form can't be shown here. Its data are below.");
-    await expect.element(screen.getByText(/"schema": "none"/)).toBeVisible();
+    // Its data as a tree, each key beside its value.
+    await expect.element(screen.getByText('"none"')).toBeVisible();
   });
 
   test("is titled by its title, and changed line by line", () => {
@@ -376,7 +377,7 @@ describe("a submission", () => {
     async (data) => {
       const screen = await show(data);
       await expect
-        .element(screen.getByRole("status"))
+        .element(screen.getByRole("status").filter({ hasText: "can't be shown here" }))
         .toHaveTextContent("This submission can't be shown here. Its data are below.");
     },
   );
@@ -433,7 +434,7 @@ describe("a dashboard", () => {
       <ArtifactContent kind="dashboard" data={{ panels: 1 }} renderers={RENDERERS} />,
     );
     await expect
-      .element(screen.getByRole("status"))
+      .element(screen.getByRole("status").filter({ hasText: "can't be shown here" }))
       .toHaveTextContent("This dashboard can't be shown here. Its data are below.");
   });
 });
@@ -460,7 +461,7 @@ describe("an app", () => {
     );
     expect(screen.container.querySelector("iframe")).toBeNull();
     await expect
-      .element(screen.getByRole("status"))
+      .element(screen.getByRole("status").filter({ hasText: "can't be shown here" }))
       .toHaveTextContent("This app can't be shown here. Its data are below.");
   });
 });

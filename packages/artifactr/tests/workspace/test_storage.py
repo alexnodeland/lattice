@@ -15,12 +15,14 @@ from artifactr.core import (
     MessagePosted,
     Needs,
     PostMessage,
+    Revision,
     State,
     UserActor,
     commit,
     needs,
 )
 from artifactr.workspace import Scope, Storage, Transaction, Workspace, Workspaces
+from tests.artifact_types import Note
 from tests.workspace.conftest import StorageFactory
 
 ALICE = UserActor(id="alice")
@@ -151,6 +153,28 @@ async def test_envelopes_are_stamped_and_scoped(storage: Storage) -> None:
     )
     assert envelope.ts.tzinfo is not None
     assert envelope.traceparent is None, "saved without a trace context"
+
+
+async def test_a_revision_is_dated_as_its_events_are(storage_factory: StorageFactory) -> None:
+    times = iter([datetime(2026, 10, 1, 9, tzinfo=UTC), datetime(2026, 10, 2, 17, tzinfo=UTC)])
+    storage = storage_factory(lambda: next(times))
+    ws = await Workspaces(storage).open("tenant_a", "ws_1", actor=ALICE)
+    await ws.create(Note(text="Ship Friday"), artifact_id="n1")
+    await ws.commit((await ws.get(Note, "n1")).edit_text("Friday", "Monday"))
+    stamped = [envelope.ts for envelope in await storage.read(SCOPE)]
+    assert [revision.at for revision in await ws.revisions("n1")] == stamped
+    assert stamped == [datetime(2026, 10, 1, 9, tzinfo=UTC), datetime(2026, 10, 2, 17, tzinfo=UTC)]
+
+
+def test_a_revision_saved_before_revisions_were_dated_reads_as_undated() -> None:
+    stored = {
+        "artifact_id": "n1",
+        "version": 1,
+        "kind": "note",
+        "data": {},
+        "actor": ALICE.model_dump(),
+    }
+    assert Revision.model_validate(stored).at is None
 
 
 async def test_envelopes_keep_the_trace_context_they_were_saved_with(storage: Storage) -> None:

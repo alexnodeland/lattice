@@ -176,6 +176,8 @@ Threads, proposals, revisions and runs, as stored.
 
 ::: artifactr.core.Proposal
 
+A revision's `at` is when it was committed, its events' `ts`; one saved before revisions were dated has none.
+
 ::: artifactr.core.Revision
 
 ::: artifactr.core.Run

@@ -45,10 +45,13 @@ export interface ReadApp {
 }
 
 /** The integration that switches mini apps. */
-const MINI_APPS = "ui:mini-apps";
+export const MINI_APPS = "ui:mini-apps";
 
 /** What the label says of every app, outside anything it draws. */
 const LABEL = "Made by the agent. Runs sandboxed, apart from your session.";
+
+/** What a preview tells its app that submits: nothing is sent from a preview. */
+const PREVIEW_SENDS_NOTHING = "This is a preview of a version: nothing is sent from it.";
 
 /** The add-on that runs an app, loaded with the first app a page runs. */
 const loadApps = () => import("./on-demand/apps");
@@ -57,7 +60,7 @@ const loadApps = () => import("./on-demand/apps");
  * Why the app doesn't run here, or null where it does: archived, mini apps off, or no apps'
  * origin of its own.
  */
-function stillWhy(shown: Shown, off: boolean, host: AppHost | null): string | null {
+export function stillWhy(shown: Shown, off: boolean, host: AppHost | null): string | null {
   if (shown.archived) {
     return "This app is switched off: it was archived.";
   }
@@ -70,8 +73,23 @@ function stillWhy(shown: Shown, off: boolean, host: AppHost | null): string | nu
   return null;
 }
 
-/** A mini app: run in its sandbox, as the person viewing it, or its label and summary alone. */
-export function AppFrame({ app, shown }: { app: ReadApp; shown: Shown }) {
+/**
+ * A mini app: run in its sandbox, as the person viewing it, or its label and summary alone. A
+ * page that shows its title and summary itself, as a revision does, leaves them out (`titled`):
+ * the host's label stays.
+ */
+export function AppFrame({
+  app,
+  shown,
+  titled = true,
+  preview = false,
+}: {
+  app: ReadApp;
+  shown: Shown;
+  titled?: boolean;
+  /** A preview of a version, which writes no state and submits nothing (portalr ADR-0054). */
+  preview?: boolean;
+}) {
   const host = use(AppHostContext);
   const off = !use(IntegrationsContext)(MINI_APPS);
   const why = stillWhy(shown, off, host);
@@ -80,17 +98,24 @@ export function AppFrame({ app, shown }: { app: ReadApp; shown: Shown }) {
   const named = useId();
   const after = useId();
   return (
-    <section aria-labelledby={named} className="flex flex-col gap-3">
+    <section
+      {...(titled ? { "aria-labelledby": named } : { "aria-label": app.title })}
+      className="flex flex-col gap-3"
+    >
       <div className="flex flex-col gap-1">
-        <h3 id={named} className={TYPE.label}>
-          {app.title}
-        </h3>
+        {titled && (
+          <h3 id={named} className={TYPE.label}>
+            {app.title}
+          </h3>
+        )}
         <p className={cn(TYPE.note, "inline-flex items-center gap-1.5")}>
           <Icon icon={Bot} className="size-3.5 shrink-0" />
           {LABEL} Version {shown.version}.
         </p>
       </div>
-      <p className="whitespace-pre-wrap text-fg text-sm">{app.summary || "It has no summary."}</p>
+      {titled && (
+        <p className="whitespace-pre-wrap text-fg text-sm">{app.summary || "It has no summary."}</p>
+      )}
       {origin === null || host === null ? (
         <Alert tone="info">{why}</Alert>
       ) : failed ? (
@@ -105,6 +130,7 @@ export function AppFrame({ app, shown }: { app: ReadApp; shown: Shown }) {
           origin={origin}
           after={after}
           label={`${LABEL} Version ${shown.version}.`}
+          {...(preview && { submitsNothing: PREVIEW_SENDS_NOTHING })}
         />
       )}
     </section>

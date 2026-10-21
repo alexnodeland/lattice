@@ -104,7 +104,7 @@ test("a revision's words are compared when asked", async () => {
   expect(asked()).toBe(0);
   await disclosure.click();
   await expect
-    .poll(() => screen.container.querySelector("details ins")?.textContent)
+    .poll(() => disclosure.element().closest("details")?.querySelector("ins")?.textContent)
     .toBe("added: Fees");
   expect(asked()).toBe(2);
 });

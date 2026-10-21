@@ -127,6 +127,19 @@ def test_the_portal_frames_the_apps_origin_alone() -> None:
     assert "frame-src" not in policy(Site(supabase_url="/", supabase_key="sb_publishable_x"))
 
 
+def test_the_portal_frames_each_editors_origin_beside_the_apps() -> None:
+    editors = {
+        "files:gridcraft": "https://grid.example.com/editor/",
+        "files:pdfcraft": "https://pdf.example.com",
+        "files:cadcraft": "https://grid.example.com/other",
+    }
+    site = Site(supabase_url="/", supabase_key="sb_publishable_x", apps=APPS, editors=editors)
+    expected = f"; frame-src {APPS} https://grid.example.com https://pdf.example.com;"
+    assert expected in policy(site)
+    alone = Site(supabase_url="/", supabase_key="sb_publishable_x", editors=editors)
+    assert "; frame-src https://grid.example.com https://pdf.example.com;" in policy(alone)
+
+
 def test_the_app_policy_reaches_nothing_and_runs_no_webassembly() -> None:
     directives = APP_POLICY.split("; ")
     assert directives[0] == "default-src 'none'"

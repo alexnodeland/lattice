@@ -14,6 +14,7 @@ from types import MappingProxyType
 from typing import Final, Literal
 
 from artifactr.files.manifest import (
+    BLEND,
     DOCX,
     DWG,
     DXF,
@@ -34,7 +35,7 @@ Dialect = Literal["tools", "commands", "script"]
 every step as a command through `command_run` and `command_batch`, rendered by `render_preview`,
 as PdfCraft's and FilmCraft's (whose servers read a file through `doc_inspect`); `script`, no
 server, but a script of the adapter's that the CLI runs for each call, as FreeCAD's `freecadcmd`
-(native files ADR-0014)."""
+and Blender's `blender` (native files ADR-0014, ADR-0015)."""
 
 Roots = Literal["split", "single", "none"]
 """How the CLI confines the files it reads and writes: `split`, to a read root and a write root
@@ -100,6 +101,9 @@ class Craft:
 
     repository: str = field(default="", kw_only=True)
     """Where it is released on GitHub: `storytold/<name>` unless given."""
+
+    memory: int = field(default=0, kw_only=True)
+    """The least address space, in bytes, its CLI needs: the worker refuses limits below it."""
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "cli", self.cli or f"{self.name}-cli")
@@ -232,6 +236,19 @@ CRAFTS: Final = _registry(
         repository="FreeCAD/FreeCAD",
     ),
     Craft(
+        name="blender",
+        title="Blender",
+        dialect="script",
+        roots="none",
+        formats=frozenset({BLEND}),
+        render=True,
+        reach="file",
+        cli="blender",
+        repository="blender/blender",
+        # It crashed creating its GPU context under 2 GiB, and drew under 4 (ADR-0015).
+        memory=4 << 30,
+    ),
+    Craft(
         name="filmcraft",
         title="FilmCraft",
         dialect="commands",
@@ -273,4 +290,5 @@ CRAFTS: Final = _registry(
 )
 """The crafting apps, by name, read-only: what each pinned release offers, checked on
 2026-10-18 against its CLI's own MCP tools and options; and FreeCAD, a third party's, checked
-on 2026-10-20 against its console (native files ADR-0014)."""
+on 2026-10-20 against its console (native files ADR-0014); and Blender, checked on 2026-10-20
+against its background mode (native files ADR-0015)."""

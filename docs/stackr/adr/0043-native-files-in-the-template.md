@@ -139,6 +139,7 @@ Building the worker from the application's own Dockerfile costs image size, a fe
 - Easier: `make up FILES="wordcraft gridcraft"` in a generated application, with `make env`'s tokens, runs native files' routes, the agent's tools and each app's worker; with the portal, GridCraft's, PdfCraft's and CADCraft's editors too.
 - Harder: each app is an image to build, from a download; a worker's first build fetches its release from GitHub.
 - Not done: **an upload route.** Nothing in lattice makes a native file from an upload: `files_router` names existing artifacts, and portalr has no control for one. A generated application's files arrive through `NativeFiles.upload` in code. The route is artifactr's to add, with portalr's control after.
+- Not done: **Blender** ([files ADR-0015](../../artifactr/files/adr/0015-blender-on-the-script-dialect-and-no-file-that-may-run-python.md)). The worker runs it (`WORKER_APP=blender`), but the template builds no image for it: its release is x86_64 only, its CLI needs 4 GiB of address space, which a worker's `FILES_WORKER_LIMITS` and memory must both be raised above, and its GPL-3.0 notices and source offer must travel with it. Each is its own work.
 - Not done: **the image's digest in provenance.** `WORKER_BUILD` is unset, since only the built image knows its digest, so a revision records the app and its version, and no image.
 - Not done: the images for the AWS recipe (Option B), and the editors on a single host's edge, behind TLS, on host names of their own ([files ADR-0007](../../artifactr/files/adr/0007-check-out-over-http-and-the-editor-on-its-own-origin.md)'s fourth action item).
 
@@ -152,3 +153,4 @@ Building the worker from the application's own Dockerfile costs image size, a fe
 6. [ ] The editors on a single host's edge, on host names of their own.
 7. [ ] A relay between the application and the workers, so no worker reaches the application's unauthenticated routes.
 8. [ ] A slimmer worker image: `artifactr-ai[files]` alone, at the application's lock.
+9. [ ] Blender's worker in the template: an x86_64-only image, its 4 GiB floor in the limits and the container's memory, and its GPL notices and source offer.

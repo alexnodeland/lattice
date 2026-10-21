@@ -2,7 +2,7 @@
 
 Each record captures one decision: the context that forced it, the options considered, and the consequences we accepted. Records are immutable once accepted; a changed decision gets a new record that amends or supersedes the old one. The proposal behind these is [lattice RFC-0003](../../../rfcs/0003-native-files-as-artifacts.md); the decisions it changed in artifactr are [artifactr ADR-0071](../../adr/0071-a-lease-on-an-artifact.md) and [ADR-0072](../../adr/0072-native-files-are-manifests-over-json-patch.md).
 
-ADR-0001 to ADR-0003 record RFC-0003's D5, D2 and D3, ADR-0004 the app port it designs, ADR-0005 its phase 2, WordCraft headless, ADR-0006 the agent's tools of its phase 3, ADR-0007 the server side of its phase 4, and ADR-0008 what portalr's screens read of it. ADR-0009 to ADR-0012 are the groundwork for the crafting apps after WordCraft: how each is declared and run, the editor's shim, the gate each app passes, and an app for each type, whose check-ins keep their format. ADR-0013 is the worker of its phase 3, and ADR-0014 adds FreeCAD, a third party's app, on a third dialect.
+ADR-0001 to ADR-0003 record RFC-0003's D5, D2 and D3, ADR-0004 the app port it designs, ADR-0005 its phase 2, WordCraft headless, ADR-0006 the agent's tools of its phase 3, ADR-0007 the server side of its phase 4, and ADR-0008 what portalr's screens read of it. ADR-0009 to ADR-0012 are the groundwork for the crafting apps after WordCraft: how each is declared and run, the editor's shim, the gate each app passes, and an app for each type, whose check-ins keep their format. ADR-0013 is the worker of its phase 3, ADR-0014 adds FreeCAD, a third party's app, on a third dialect, and ADR-0015 Blender, on the same one.
 
 This is the native files' own series, inside artifactr's section since `artifactr-files` became artifactr's `files` extra ([lattice ADR-0026](../../../adr/0026-a-distribution-needs-a-reason-integrations-are-extras.md)). Its records keep their numbers, and outside the series one is named "native files ADR-0002"; artifactr's own series is [`docs/artifactr/adr/`](../../adr/README.md).
 
@@ -22,5 +22,6 @@ This is the native files' own series, inside artifactr's section since `artifact
 | [0012](0012-an-app-for-each-type-and-no-format-changed-by-a-check-in.md) | An app for each native type, and no format changed by a check-in | Accepted |
 | [0013](0013-the-worker-runs-each-call-under-limits-behind-a-token.md) | The worker runs each call under limits, behind a token, one job at a time | Accepted |
 | [0014](0014-freecad-on-a-third-dialect-and-no-python-a-file-or-an-agent-brings.md) | FreeCAD on a third dialect, a script it runs, and no Python a file or an agent brings | Accepted |
+| [0015](0015-blender-on-the-script-dialect-and-no-file-that-may-run-python.md) | Blender on the script dialect, its files read block by block, and none that may run Python | Accepted |
 
 To add a record, copy lattice's [ADR template](../../../adr/template.md) to the next number and add a row above.

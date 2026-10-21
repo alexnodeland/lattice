@@ -36,6 +36,7 @@ ADAPTED = (
     "designcraft",
     "figcraft",
     "freecad",
+    "blender",
 )
 """The apps with an adapter of their own, each a layer."""
 
@@ -72,10 +73,22 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         },
         {"pydantic", "FreeCAD", "Part", "Sketcher", "TechDraw", "PIL"},
     ),
+    # Blender's scan inflates zstd, in a thread; its script runs in Blender's own interpreter.
+    "blender": (
+        {
+            "artifactr.files.manifest",
+            "artifactr.files.app",
+            "artifactr.files.craft",
+            "artifactr.files.blender",
+        },
+        {"pydantic", "anyio", "zstandard", "bpy", "bmesh", "mathutils"},
+    ),
     # The worker, over any app, and the App that calls it; its entry point runs each app's adapter.
+    # It holds an app's limits to what its CLI needs, as the registry says.
     "worker": (
         {
             "artifactr.files.app",
+            "artifactr.files.craft",
             "artifactr.files.worker",
             *(f"artifactr.files.{app}" for app in ADAPTED),
         },

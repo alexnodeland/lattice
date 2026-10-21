@@ -23,6 +23,7 @@ import uvicorn
 from starlette.applications import Starlette
 
 from artifactr.files.app import App
+from artifactr.files.blender import Subprocess as Blender
 from artifactr.files.cadcraft import Subprocess as CadCraft
 from artifactr.files.deckcraft import Subprocess as DeckCraft
 from artifactr.files.designcraft import Subprocess as DesignCraft
@@ -66,6 +67,7 @@ ADAPTERS: Final[Mapping[str, Adapter]] = MappingProxyType(
         "cadcraft": partial(CadCraft, trusted=True),
         "figcraft": partial(FigCraft, trusted=True),
         "freecad": partial(FreeCad, trusted=True),
+        "blender": partial(Blender, trusted=True),
     }
 )
 """The apps a worker runs, by name: each app whose files lattice keeps."""

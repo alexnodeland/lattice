@@ -37,6 +37,7 @@ def script(cli: Path, *, craft: Craft = SCRIPTED, limit: int = 1 << 20) -> Scrip
         Path("script.py"),
         version="1.0.0",
         arguments=("--safe-mode",),
+        ending=("--",),
         trusted=True,
         limit=limit,
     )
@@ -51,7 +52,7 @@ async def test_a_call_runs_the_script_in_its_own_directory_with_nothing_of_this_
     assert isinstance(ran.result, dict)
     environment = ran.result.pop("environment")
     assert ran.result == {
-        "arguments": ["--safe-mode", "script.py"],
+        "arguments": ["--safe-mode", "script.py", "--"],
         "home": True,
         "source": "the source",
     }

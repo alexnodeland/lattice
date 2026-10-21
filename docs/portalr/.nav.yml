@@ -64,6 +64,9 @@ nav:
   - adr/0052-artifacts-inline-in-their-thread.md
   - adr/0053-the-chats-questions-tool-calls-sides-failures-and-streaming.md
   - adr/0054-readable-revisions.md
+  - adr/0055-every-kind-inline-and-a-native-file-read-and-edited-in-its-thread.md
+  - adr/0056-brand-kits-token-layers-loading-and-validation.md
+  - adr/0057-brand-kits-motion-and-tokens-as-the-only-override.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

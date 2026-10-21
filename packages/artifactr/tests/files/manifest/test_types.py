@@ -5,6 +5,7 @@ from pydantic import ValidationError
 
 from artifactr.core import NotFound, get_artifact_type
 from artifactr.files.manifest import (
+    BLEND,
     DOCX,
     DWG,
     DXF,
@@ -26,6 +27,7 @@ from artifactr.files.manifest import (
     PdfDocument,
     Presentation,
     Provenance,
+    Scene,
     VectorImage,
     WordDocument,
     Workbook,
@@ -59,6 +61,7 @@ def test_each_crafting_apps_type_is_registered_with_its_format() -> None:
         ("vector_image", VectorImage, {SVG}),
         ("layered_image", LayeredImage, {PSD}),
         ("cad_model", CadModel, {FCSTD}),
+        ("scene", Scene, {BLEND}),
     ],
 )
 def test_each_crafting_apps_files_are_a_type_of_their_own(

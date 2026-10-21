@@ -136,6 +136,11 @@ KNOWN: Final = registry(
         description="FreeCAD: 3D models kept as native files, edited by people and agents.",
     ),
     Integration(
+        "files:blender",
+        default=False,
+        description="Blender: 3D scenes kept as native files, edited by people and agents.",
+    ),
+    Integration(
         "files:filmcraft",
         default=False,
         description="FilmCraft: video projects rendered and exported, one file at a time.",

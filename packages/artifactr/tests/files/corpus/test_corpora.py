@@ -22,7 +22,12 @@ def test_each_corpus_holds_a_file_for_each_feature(corpus: Corpus) -> None:
 @pytest.mark.parametrize(
     "corpus",
     [
-        pytest.param(corpus, id=app, marks=[pytest.mark.craft(app)] if corpus.made_by_app else [])
+        pytest.param(
+            corpus,
+            id=app,
+            # Each file is made by the app's own CLI, one process each: minutes, not seconds.
+            marks=[pytest.mark.craft(app), pytest.mark.timeout(300)] if corpus.made_by_app else [],
+        )
         for app, corpus in CORPORA.items()
     ],
 )

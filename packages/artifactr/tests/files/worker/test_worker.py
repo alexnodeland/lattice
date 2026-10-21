@@ -238,6 +238,14 @@ async def test_only_the_bearer_token_is_let_in(authorization: str | None) -> Non
     assert reply.headers["www-authenticate"] == "Bearer"
 
 
+def test_limits_below_what_an_apps_cli_needs_are_refused() -> None:
+    blender = FakeApp()
+    blender.name = "blender"
+    with pytest.raises(ValueError, match="blender needs an address space of 4294967296 bytes"):
+        worker_app(blender, token=TOKEN, limits=Limits())
+    assert worker_app(blender, token=TOKEN, limits=Limits(memory=4 << 30))
+
+
 def test_an_empty_token_would_admit_anyone() -> None:
     with pytest.raises(ValueError, match="needs a token"):
         worker_app(FakeApp(), token="", limits=LIMITS)

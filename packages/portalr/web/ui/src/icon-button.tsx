@@ -1,3 +1,4 @@
+import { mergeProps } from "@base-ui/react/merge-props";
 import { Tooltip } from "@base-ui/react/tooltip";
 import type { LucideIcon } from "lucide-react";
 import { type ComponentProps, cloneElement, type ReactElement } from "react";
@@ -10,6 +11,12 @@ type Named = {
   label: string;
   icon: LucideIcon;
   className?: string;
+  /**
+   * Whether Escape, after it closes the tooltip, goes on to what holds the button: for a full
+   * view's own way back, so one Escape leaves it. Off by default, so a tooltip's Escape closes
+   * the tooltip alone.
+   */
+  escapeThrough?: boolean;
 };
 
 /** An icon button: a button, with a button's props. */
@@ -31,7 +38,16 @@ const OFFSET = 6;
  * the icon must be one people know, or a `Button` with its words is the better choice.
  */
 export function IconButton(props: AsButton | AsLink) {
-  const { label, icon, className, render, ...rest } = props as AsButton & { render?: ReactElement };
+  const {
+    label,
+    icon,
+    className,
+    render,
+    escapeThrough = false,
+    ...rest
+  } = props as Omit<AsButton, "render"> & {
+    render?: ReactElement<object>;
+  };
   const square = cn(
     buttonLook("ghost"),
     "size-(--icon-button-size) shrink-0 rounded-(--icon-button-radius) p-0",
@@ -41,16 +57,18 @@ export function IconButton(props: AsButton | AsLink) {
   return (
     <Tooltip.Root
       onOpenChange={(_, details) => {
-        // Escape closes the tooltip and goes on to what holds it, such as a full view, which a
-        // tooltip has no reason to keep open.
-        if (details.reason === "escape-key") details.allowPropagation();
+        if (escapeThrough && details.reason === "escape-key") details.allowPropagation();
       }}
     >
       {render ? (
-        // Named by the label and drawn as the icon, over whatever the link element held.
+        // Named by the label and drawn as the icon, over whatever the link element held; its own
+        // handlers and the tooltip's both run.
         <Tooltip.Trigger
           render={(merged) =>
-            cloneElement(render, { ...merged, "aria-label": label, children: glyph })
+            cloneElement(
+              render,
+              mergeProps(render.props, merged, { "aria-label": label, children: glyph }),
+            )
           }
           className={square}
         />

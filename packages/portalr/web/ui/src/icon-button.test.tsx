@@ -1,5 +1,6 @@
 import { Maximize2 } from "lucide-react";
-import { expect, test } from "vitest";
+import type { ComponentProps } from "react";
+import { expect, onTestFinished, test } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { IconButton } from "./icon-button";
@@ -65,4 +66,77 @@ test("a disabled icon button keeps its name, and isn't a stop for the keyboard",
   await expect.element(screen.getByRole("button", { name: "Helpful" })).toBeDisabled();
   await userEvent.tab();
   expect(document.activeElement?.textContent).toBe("After");
+});
+
+test("a link icon button keeps the link element's own handlers", async () => {
+  let focused = false;
+  await render(
+    <IconButton
+      label="Open its page"
+      icon={Maximize2}
+      render={
+        <a href="#page" onFocus={() => (focused = true)}>
+          page
+        </a>
+      }
+    />,
+  );
+  await userEvent.tab();
+  expect(focused).toBe(true);
+  await expect.element(page.getByText("Open its page", { exact: true })).toBeVisible();
+});
+
+test("a pending icon button stays in reach of the keyboard, disabled", async () => {
+  const screen = await render(
+    <IconButton label="Helpful" icon={Maximize2} disabled focusableWhenDisabled />,
+  );
+  await userEvent.tab();
+  const button = screen.getByRole("button", { name: "Helpful" }).element();
+  expect(document.activeElement).toBe(button);
+  expect(button.getAttribute("aria-disabled")).toBe("true");
+});
+
+test("Enter and Space on a disabled icon button in reach of the keyboard do nothing", async () => {
+  let pressed = 0;
+  await render(
+    <IconButton
+      label="Helpful"
+      icon={Maximize2}
+      disabled
+      focusableWhenDisabled
+      onClick={() => (pressed += 1)}
+    />,
+  );
+  await userEvent.tab();
+  await userEvent.keyboard("{Enter}");
+  await userEvent.keyboard(" ");
+  expect(pressed).toBe(0);
+});
+
+/** A router's link, as TanStack's renders one: an anchor with its own click. */
+function RouterLink(props: ComponentProps<"a">) {
+  return <a {...props}>{props.children}</a>;
+}
+
+test("a link icon button's own click runs, as a router's does to follow it", async () => {
+  onTestFinished(() => history.replaceState(null, "", location.pathname + location.search));
+  let followed = "";
+  const screen = await render(
+    <IconButton
+      label="Open its page"
+      icon={Maximize2}
+      render={
+        <RouterLink
+          href="#page"
+          onClick={(event) => {
+            event.preventDefault();
+            followed = "page";
+          }}
+        />
+      }
+    />,
+  );
+  await screen.getByRole("link", { name: "Open its page" }).click();
+  expect(followed).toBe("page");
+  expect(location.hash).not.toBe("#page");
 });

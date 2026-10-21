@@ -195,6 +195,20 @@ test("the composer sends what is written, on Enter or with the button, and clear
   expect(onSend).toHaveBeenCalledTimes(2);
 });
 
+test("a draft not yet sent asks before the page is left or reloaded", async () => {
+  const screen = await render(<Composer onSend={sent()} />);
+  const leave = () => {
+    const event = new Event("beforeunload", { cancelable: true });
+    dispatchEvent(event);
+    return event.defaultPrevented;
+  };
+  expect(leave()).toBe(false);
+  await screen.getByRole("textbox", { name: "Message" }).fill("Half a thought");
+  await vi.waitFor(() => expect(leave()).toBe(true));
+  await screen.getByRole("textbox", { name: "Message" }).fill("");
+  await vi.waitFor(() => expect(leave()).toBe(false));
+});
+
 test("Enter while an input method composes doesn't send", async () => {
   const onSend = sent();
   const screen = await render(<Composer onSend={onSend} />);

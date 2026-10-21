@@ -190,6 +190,26 @@ KNOWN: Final = registry(
         default=False,
         description="Mermaid: diagrams written as text in messages, drawn.",
     ),
+    Integration(
+        "connect:freecad",
+        default=False,
+        description="Connected FreeCAD: the agent reads and edits the FreeCAD its operator runs.",
+    ),
+    Integration(
+        "connect-code:freecad",
+        default=False,
+        description="Code in connected FreeCAD: Python the agent writes, approved on every call.",
+    ),
+    Integration(
+        "connect:blender",
+        default=False,
+        description="Connected Blender: the agent reads the Blender its operator runs.",
+    ),
+    Integration(
+        "connect-code:blender",
+        default=False,
+        description="Code and assets in connected Blender: Python and downloads, each approved.",
+    ),
 )
 """lattice's integrations, by key: one :class:`Integration` each."""
 

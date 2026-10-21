@@ -153,6 +153,9 @@ class DeferredRequest(BaseModel):
     tool_name: str
     kind: Literal["question", "approval"]
     args: dict[str, JsonValue] = {}
+    review: dict[str, JsonValue] = {}
+    """What the tool tells the person who answers, beside the call's arguments: for a connected
+    app's code, the app, what running it means, and what a scan found in it (ADR-0085)."""
 
 
 class RunUsage(BaseModel):

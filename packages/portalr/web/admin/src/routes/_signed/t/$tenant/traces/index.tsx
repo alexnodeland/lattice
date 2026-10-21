@@ -121,6 +121,7 @@ function Traces() {
             label: "Trace",
             cell: (trace) => (
               <TextLink
+                variant="subtle"
                 render={
                   <Link to="/t/$tenant/traces/$trace" params={{ tenant, trace: trace.trace_id }} />
                 }

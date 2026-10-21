@@ -40,3 +40,73 @@ test("a caller's classes override the link's own", async () => {
   expect(link.classList).toContain("no-underline");
   expect(link.classList).not.toContain("underline");
 });
+
+test("a subtle link is in the text's colour, its underline quiet until hovered", async () => {
+  const screen = await render(
+    <TextLink variant="subtle" href="#trace">
+      trace_1
+    </TextLink>,
+  );
+  const link = screen.getByRole("link", { name: "trace_1" }).element();
+  expect(getComputedStyle(link).color).toBe(token("fg"));
+  expect(getComputedStyle(link).textDecorationColor).toBe(token("edge"));
+  // Its underline is a mark, 3:1 or more on the paper; it stands alone, never in running text.
+  expect(contrast(token("edge"), token("paper"))).toBeGreaterThanOrEqual(3);
+  await userEvent.hover(link);
+  expect(getComputedStyle(link).color).toBe(token("accent"));
+});
+
+test("a nav link is underlined only when hovered", async () => {
+  const screen = await render(
+    <TextLink variant="nav" href="#runs">
+      Runs
+    </TextLink>,
+  );
+  const link = screen.getByRole("link", { name: "Runs" }).element();
+  expect(getComputedStyle(link).textDecorationLine).toBe("none");
+  await userEvent.hover(link);
+  expect(getComputedStyle(link).textDecorationLine).toBe("underline");
+});
+
+test("an external link opens a new tab, safely, and says so", async () => {
+  const screen = await render(
+    <TextLink variant="external" href="https://example.com">
+      Langfuse
+    </TextLink>,
+  );
+  const link = screen.getByRole("link", { name: "Langfuse (opens in a new tab)" }).element();
+  expect(link.getAttribute("target")).toBe("_blank");
+  expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+  expect(link.querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
+  expect(getComputedStyle(link).display).toBe("inline");
+});
+
+test("a caller can't weaken an external link's new tab", async () => {
+  const screen = await render(
+    <TextLink variant="external" href="https://example.com" target="_self" rel="opener">
+      Grafana
+    </TextLink>,
+  );
+  const link = screen.getByRole("link", { name: "Grafana (opens in a new tab)" }).element();
+  expect(link.getAttribute("target")).toBe("_blank");
+  expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+});
+
+test("a long external link wraps, and its mark stays on the line of its last word", async () => {
+  const screen = await render(
+    <p style={{ width: "10rem" }}>
+      <TextLink variant="external" href="https://example.com">
+        The tenant's traces in Grafana, from Tempo
+      </TextLink>
+    </p>,
+  );
+  const link = screen.getByRole("link").element();
+  expect(link.getClientRects().length).toBeGreaterThan(1);
+  const mark = (link.querySelector("svg") as Element).getBoundingClientRect();
+  const last = [...link.querySelectorAll("span")].find((span) => span.textContent === "Tempo");
+  const word = (last as Element).getClientRects()[0] as DOMRect;
+  // On the same line: the mark's middle is inside the last word's line box.
+  const middle = (mark.top + mark.bottom) / 2;
+  expect(middle).toBeGreaterThan(word.top);
+  expect(middle).toBeLessThan(word.bottom);
+});

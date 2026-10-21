@@ -180,15 +180,7 @@ function Links({ ids }: { ids: Required<ToolIds> }) {
         <ul className="flex flex-col gap-2">
           {made.map((door) => (
             <li key={door.field}>
-              <TextLink
-                render={
-                  <a
-                    href={safeHref(links.data[door.field]) ?? undefined}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  />
-                }
-              >
+              <TextLink variant="external" href={safeHref(links.data[door.field]) ?? undefined}>
                 {door.label}
               </TextLink>
             </li>

@@ -8,6 +8,7 @@ import { House, KeyRound, MessageSquare, Play, Plus, ScrollText, Zap } from "luc
 import { AccountMenu } from "../account-menu";
 import { Alert } from "../alert";
 import { AppShell } from "../app-shell";
+import { Breadcrumbs } from "../breadcrumbs";
 import { Button, type ButtonVariant } from "../button";
 import { Card } from "../card";
 import { Message, Messages, Streaming } from "../chat";
@@ -578,8 +579,24 @@ export function Kit() {
       </TabNav>
       <TextArea label="Note" error="It can't be empty." defaultValue="" />
       <p>
-        Read <TextLink href="#more">more about it</TextLink>.
+        Read <TextLink href="#more">more about it</TextLink> or open{" "}
+        <TextLink variant="external" href="https://example.com">
+          Langfuse
+        </TextLink>
+        .
       </p>
+      <TextLink variant="subtle" href="#trace">
+        trace_1
+      </TextLink>
+      <TextLink variant="nav" href="#runs">
+        Runs
+      </TextLink>
+      <Breadcrumbs
+        trail={[
+          { label: "Workspace", href: "#notes" },
+          { label: "Threads", href: "#threads" },
+        ]}
+      />
       <Rows label="Threads">
         <Row>
           <RowLink href="#a">Launch plan</RowLink>

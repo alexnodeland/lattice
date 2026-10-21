@@ -40,3 +40,40 @@ test("a caller's classes override the link's own", async () => {
   expect(link.classList).toContain("no-underline");
   expect(link.classList).not.toContain("underline");
 });
+
+test("a subtle link is in the text's colour, its underline quiet until hovered", async () => {
+  const screen = await render(
+    <TextLink variant="subtle" href="#trace">
+      trace_1
+    </TextLink>,
+  );
+  const link = screen.getByRole("link", { name: "trace_1" }).element();
+  expect(getComputedStyle(link).color).toBe(token("fg"));
+  expect(getComputedStyle(link).textDecorationColor).toBe(token("edge"));
+  await userEvent.hover(link);
+  expect(getComputedStyle(link).color).toBe(token("accent"));
+});
+
+test("a nav link is underlined only when hovered", async () => {
+  const screen = await render(
+    <TextLink variant="nav" href="#runs">
+      Runs
+    </TextLink>,
+  );
+  const link = screen.getByRole("link", { name: "Runs" }).element();
+  expect(getComputedStyle(link).textDecorationLine).toBe("none");
+  await userEvent.hover(link);
+  expect(getComputedStyle(link).textDecorationLine).toBe("underline");
+});
+
+test("an external link opens a new tab, safely, and says so", async () => {
+  const screen = await render(
+    <TextLink variant="external" href="https://example.com">
+      Langfuse
+    </TextLink>,
+  );
+  const link = screen.getByRole("link", { name: "Langfuse (opens in a new tab)" }).element();
+  expect(link.getAttribute("target")).toBe("_blank");
+  expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+  expect(link.querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
+});

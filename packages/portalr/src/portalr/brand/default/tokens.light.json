@@ -1024,6 +1024,25 @@
       "pad": {
         "$value": "{space.3}"
       }
+    },
+    "link": {
+      "underline-offset": {
+        "$value": {
+          "value": 2,
+          "unit": "px"
+        }
+      }
+    },
+    "breadcrumb": {
+      "target": {
+        "$value": {
+          "value": 1.5,
+          "unit": "rem"
+        }
+      },
+      "gap": {
+        "$value": "{space.1-5}"
+      }
     }
   }
 }

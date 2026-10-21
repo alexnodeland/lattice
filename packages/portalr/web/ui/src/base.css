@@ -140,7 +140,7 @@
  */
 @media (prefers-reduced-motion: reduce) {
   :root {
-    --motion-scale: 0 !important;
-    --motion-loop: paused !important;
+    --motion-scale: 0;
+    --motion-loop: paused;
   }
 }

@@ -9,7 +9,6 @@ import {
   proposedOn,
   Revisions,
   SectionTitle,
-  TextLink,
   Thumbs,
 } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
@@ -145,13 +144,12 @@ function Artifact() {
         id="artifact"
         title={title ?? id}
         mono={title === null}
-        crumb={
-          <TextLink
-            render={<Link to="/t/$tenant/w/$workspace/artifacts" params={{ tenant, workspace }} />}
-          >
-            Artifacts
-          </TextLink>
-        }
+        breadcrumbs={[
+          {
+            label: "Artifacts",
+            render: <Link to="/t/$tenant/w/$workspace/artifacts" params={{ tenant, workspace }} />,
+          },
+        ]}
         meta={[
           title === null ? null : id,
           latest.kind,

@@ -6,7 +6,6 @@ import {
   EmptyState,
   Moment,
   PageHeader,
-  pageTitle,
   Reading,
   RuleRunStatus,
   RunList,
@@ -53,7 +52,7 @@ const HEADER = <PageHeader title="Runs" meta="The rules' runs in a workspace" />
  */
 export const Route = createFileRoute("/_signed/t/$tenant/runs")({
   head: ({ params, match }) => ({
-    meta: [{ title: pageTitle(match.context.config.brand, "admin", `Runs · ${params.tenant}`) }],
+    meta: [{ title: match.context.title(`Runs · ${params.tenant}`) }],
   }),
   validateSearch: (search: Shown & SearchSchemaInput): Required<Shown> => shownOf(search),
   beforeLoad: ({ context, params }) => opening(context, params.tenant, "reflexr:read_runs"),

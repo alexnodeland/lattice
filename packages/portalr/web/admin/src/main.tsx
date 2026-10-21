@@ -8,7 +8,7 @@ import {
   readConfig,
   Signed,
 } from "@portalr/client";
-import { Alert, BrandContext, Plain } from "@portalr/ui";
+import { Alert, BrandContext, Plain, pageTitle } from "@portalr/ui";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { createRouter, RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";
@@ -37,6 +37,7 @@ function start(root: Root, config: Config) {
       // A command refused as unsigned ends the session, as a read does.
       commands: createCommands(api, () => void signed.signOut()),
       queryClient,
+      title: (...parts: string[]) => pageTitle(config.brand, "admin", ...parts),
     },
   });
   root.render(

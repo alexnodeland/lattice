@@ -4,7 +4,6 @@ import {
   Card,
   Moment,
   PageHeader,
-  pageTitle,
   Row,
   RowLink,
   Rows,
@@ -26,7 +25,7 @@ const ACTIONS = ["reflexr:install_rule"] as const;
  */
 export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/rules/")({
   head: ({ params, match }) => ({
-    meta: [{ title: pageTitle(match.context.config.brand, "app", `Rules · ${params.workspace}`) }],
+    meta: [{ title: match.context.title(`Rules · ${params.workspace}`) }],
   }),
   loader: ({ context, params }) =>
     Promise.all([

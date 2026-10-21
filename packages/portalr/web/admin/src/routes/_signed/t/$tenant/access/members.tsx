@@ -5,7 +5,6 @@ import {
   Card,
   ConfirmDialog,
   ItemTable,
-  pageTitle,
   SectionTitle,
   TextField,
 } from "@portalr/ui";
@@ -31,7 +30,7 @@ type Member = GrantrApi.components["schemas"]["Member"];
  */
 export const Route = createFileRoute("/_signed/t/$tenant/access/members")({
   head: ({ params, match }) => ({
-    meta: [{ title: pageTitle(match.context.config.brand, "admin", `Members · ${params.tenant}`) }],
+    meta: [{ title: match.context.title(`Members · ${params.tenant}`) }],
   }),
   beforeLoad: ({ context, params }) => opening(context, params.tenant, "grantr:add_member"),
   loader: ({ context, params }) =>

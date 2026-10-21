@@ -5,7 +5,6 @@ import {
   Card,
   ConfirmDialog,
   ItemTable,
-  pageTitle,
   SectionTitle,
   SelectField,
   TextField,
@@ -29,7 +28,7 @@ interface Issued {
  */
 export const Route = createFileRoute("/_signed/t/$tenant/access/keys")({
   head: ({ params, match }) => ({
-    meta: [{ title: pageTitle(match.context.config.brand, "admin", `Keys · ${params.tenant}`) }],
+    meta: [{ title: match.context.title(`Keys · ${params.tenant}`) }],
   }),
   beforeLoad: ({ context, params }) => opening(context, params.tenant, "grantr:issue_key"),
   loader: async ({ context, params }) => {

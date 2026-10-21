@@ -2,7 +2,6 @@ import { allowedIn, filedBy, thumbs, useMe, workspaceOf } from "@portalr/client"
 import {
   CommandButton,
   PageHeader,
-  pageTitle,
   RuleRunStatus,
   RunList,
   type RunParts,
@@ -42,7 +41,7 @@ const ACTIONS = [
  */
 export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/runs")({
   head: ({ params, match }) => ({
-    meta: [{ title: pageTitle(match.context.config.brand, "app", `Runs · ${params.workspace}`) }],
+    meta: [{ title: match.context.title(`Runs · ${params.workspace}`) }],
   }),
   loader: ({ context, params }) =>
     context.queryClient.ensureQueryData(

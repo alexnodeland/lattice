@@ -1,5 +1,5 @@
 import { usePeople } from "@portalr/client";
-import { Alert, Button, ItemTable, Moment, PageHeader, pageTitle } from "@portalr/ui";
+import { Alert, Button, ItemTable, Moment, PageHeader } from "@portalr/ui";
 import { useSuspenseInfiniteQuery } from "@tanstack/react-query";
 import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-router";
 import { actor, peopleOf, said } from "../../../audit";
@@ -20,7 +20,7 @@ const HEADER = (
  */
 export const Route = createFileRoute("/_signed/deployment/audit")({
   head: ({ match }) => ({
-    meta: [{ title: pageTitle(match.context.config.brand, "admin", "Audit") }],
+    meta: [{ title: match.context.title("Audit") }],
   }),
   // The deployment's layout read who is an operator before letting anyone in.
   loader: ({ context }) =>

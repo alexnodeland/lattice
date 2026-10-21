@@ -7,7 +7,6 @@ import {
   ConfirmDialog,
   EmptyState,
   ItemTable,
-  pageTitle,
   SectionTitle,
   SelectField,
   TextField,
@@ -78,7 +77,7 @@ const none = queryOptions({
  */
 export const Route = createFileRoute("/_signed/t/$tenant/access/grants")({
   head: ({ params, match }) => ({
-    meta: [{ title: pageTitle(match.context.config.brand, "admin", `Grants · ${params.tenant}`) }],
+    meta: [{ title: match.context.title(`Grants · ${params.tenant}`) }],
   }),
   beforeLoad: ({ context, params }) => opening(context, params.tenant, "grantr:grant"),
   loader: async ({ context, params }) => {

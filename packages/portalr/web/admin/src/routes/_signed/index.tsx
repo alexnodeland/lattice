@@ -1,5 +1,5 @@
 import { adminLanding } from "@portalr/client";
-import { Account, Plain, pageTitle, Row, RowLink, Rows } from "@portalr/ui";
+import { Account, Plain, Row, RowLink, Rows } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, Navigate, redirect } from "@tanstack/react-router";
 import { lastChoice } from "../../last";
@@ -10,7 +10,7 @@ import { lastChoice } from "../../last";
  */
 export const Route = createFileRoute("/_signed/")({
   head: ({ match }) => ({
-    meta: [{ title: pageTitle(match.context.config.brand, "admin", "Tenants") }],
+    meta: [{ title: match.context.title("Tenants") }],
   }),
   loader: async ({ context }) => {
     const { queries, queryClient, user } = context;

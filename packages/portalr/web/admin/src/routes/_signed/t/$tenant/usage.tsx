@@ -8,7 +8,6 @@ import {
   ItemTable,
   Num,
   PageHeader,
-  pageTitle,
   SegmentedFilter,
   StatusBadge,
   Tracker,
@@ -48,7 +47,7 @@ const DAY = { key: "day", name: "Day (UTC)" } as const;
  */
 export const Route = createFileRoute("/_signed/t/$tenant/usage")({
   head: ({ params, match }) => ({
-    meta: [{ title: pageTitle(match.context.config.brand, "admin", `Usage · ${params.tenant}`) }],
+    meta: [{ title: match.context.title(`Usage · ${params.tenant}`) }],
   }),
   // What a link may give, optional; what the address gives, read with `shownOf`.
   validateSearch: (search: Shown & SearchSchemaInput): Required<Shown> => shownOf(search),

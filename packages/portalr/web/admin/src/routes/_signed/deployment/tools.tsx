@@ -5,7 +5,6 @@ import {
   Card,
   EmptyState,
   PageHeader,
-  pageTitle,
   Reading,
   SectionTitle,
   SelectField,
@@ -41,7 +40,7 @@ const HEADER = (
  */
 export const Route = createFileRoute("/_signed/deployment/tools")({
   head: ({ match }) => ({
-    meta: [{ title: pageTitle(match.context.config.brand, "admin", "Tools") }],
+    meta: [{ title: match.context.title("Tools") }],
   }),
   validateSearch: (search: Record<string, unknown> & SearchSchemaInput) => ({
     ...shownOf(search),

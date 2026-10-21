@@ -1,5 +1,5 @@
 import { type Names, orThrow } from "@portalr/client";
-import { Alert, Button, ConfirmDialog, ItemTable, pageTitle } from "@portalr/ui";
+import { Alert, Button, ConfirmDialog, ItemTable } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
@@ -39,7 +39,7 @@ const named = (key: string, names: Names) => {
  */
 export const Route = createFileRoute("/_signed/t/$tenant/access/groups")({
   head: ({ params, match }) => ({
-    meta: [{ title: pageTitle(match.context.config.brand, "admin", `Groups · ${params.tenant}`) }],
+    meta: [{ title: match.context.title(`Groups · ${params.tenant}`) }],
   }),
   beforeLoad: ({ context, params }) => opening(context, params.tenant, "grantr:manage_groups"),
   loader: async ({ context, params }) => {

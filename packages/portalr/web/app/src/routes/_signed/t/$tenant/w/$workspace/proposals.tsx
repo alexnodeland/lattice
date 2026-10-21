@@ -1,5 +1,5 @@
 import { useMe } from "@portalr/client";
-import { EmptyState, PageHeader, ProposalCard, pageTitle, proposedOn, TextLink } from "@portalr/ui";
+import { EmptyState, PageHeader, ProposalCard, proposedOn, TextLink } from "@portalr/ui";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { NativeProposal } from "../../../../../../native-proposal";
 import { NATIVE } from "../../../../../../renderers";
@@ -12,9 +12,7 @@ import { Connection, useStream, useWorkspace } from "../../../../../../workspace
  */
 export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/proposals")({
   head: ({ params, match }) => ({
-    meta: [
-      { title: pageTitle(match.context.config.brand, "app", `Proposals · ${params.workspace}`) },
-    ],
+    meta: [{ title: match.context.title(`Proposals · ${params.workspace}`) }],
   }),
   component: Proposals,
 });

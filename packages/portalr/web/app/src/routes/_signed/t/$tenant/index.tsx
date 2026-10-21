@@ -1,14 +1,4 @@
-import {
-  Account,
-  AppShell,
-  PageHeader,
-  pageTitle,
-  Row,
-  RowLink,
-  Rows,
-  Switcher,
-  TextLink,
-} from "@portalr/ui";
+import { Account, AppShell, PageHeader, Row, RowLink, Rows, Switcher, TextLink } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 
@@ -19,9 +9,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
  */
 export const Route = createFileRoute("/_signed/t/$tenant/")({
   head: ({ params, match }) => ({
-    meta: [
-      { title: pageTitle(match.context.config.brand, "app", `Workspaces · ${params.tenant}`) },
-    ],
+    meta: [{ title: match.context.title(`Workspaces · ${params.tenant}`) }],
   }),
   loader: ({ context }) =>
     context.queryClient.ensureQueryData(context.queries.grantr.memberships(context.user)),

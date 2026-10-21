@@ -6,7 +6,6 @@ import {
   FormHostContext,
   PageHeader,
   ProposalCard,
-  pageTitle,
   proposedOn,
   Revisions,
   SectionTitle,
@@ -37,11 +36,7 @@ export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/artifacts/
   head: ({ params, match }) => ({
     meta: [
       {
-        title: pageTitle(
-          match.context.config.brand,
-          "app",
-          `${params.artifact} · ${params.workspace}`,
-        ),
+        title: match.context.title(`${params.artifact} · ${params.workspace}`),
       },
     ],
   }),

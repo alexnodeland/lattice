@@ -1,4 +1,4 @@
-import { EmptyState, PageHeader, pageTitle, Row, RowLink, Rows } from "@portalr/ui";
+import { EmptyState, PageHeader, Row, RowLink, Rows } from "@portalr/ui";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { titlesOf } from "../../../../../../../titles";
@@ -7,9 +7,7 @@ import { Connection, useWorkspace } from "../../../../../../../workspace";
 /** The workspace's artifacts, as its log holds them: each by kind, and its latest version. */
 export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/artifacts/")({
   head: ({ params, match }) => ({
-    meta: [
-      { title: pageTitle(match.context.config.brand, "app", `Artifacts · ${params.workspace}`) },
-    ],
+    meta: [{ title: match.context.title(`Artifacts · ${params.workspace}`) }],
   }),
   // The titles are read before the page shows, so no id turns into a title as it opens. They are
   // only names: where they can't be read, the page shows ids, and reads them again on the page.

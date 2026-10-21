@@ -1,5 +1,5 @@
 import { administered } from "@portalr/client";
-import { NavLink, pageTitle, SideNav } from "@portalr/ui";
+import { NavLink, SideNav } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, Outlet, redirect } from "@tanstack/react-router";
 import { Building2, House, ScrollText, Wrench } from "lucide-react";
@@ -12,7 +12,7 @@ import { remember } from "../../last";
  */
 export const Route = createFileRoute("/_signed/deployment")({
   head: ({ match }) => ({
-    meta: [{ title: pageTitle(match.context.config.brand, "admin", "All tenants") }],
+    meta: [{ title: match.context.title("All tenants") }],
   }),
   beforeLoad: async ({ context }) => {
     const { queries, queryClient, user } = context;

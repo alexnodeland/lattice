@@ -7,7 +7,6 @@ import {
   ItemTable,
   Moment,
   PageHeader,
-  pageTitle,
   SectionTitle,
   SelectField,
   TextField,
@@ -37,7 +36,7 @@ const HEADER = <PageHeader title="Audit" meta="Every change to who may see and d
  */
 export const Route = createFileRoute("/_signed/t/$tenant/audit")({
   head: ({ params, match }) => ({
-    meta: [{ title: pageTitle(match.context.config.brand, "admin", `Audit · ${params.tenant}`) }],
+    meta: [{ title: match.context.title(`Audit · ${params.tenant}`) }],
   }),
   validateSearch: searchOf,
   beforeLoad: ({ context, params }) => opening(context, params.tenant, "grantr:read_audit"),

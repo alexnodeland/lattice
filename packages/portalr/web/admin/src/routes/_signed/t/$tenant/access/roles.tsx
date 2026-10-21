@@ -1,5 +1,5 @@
 import { orThrow } from "@portalr/client";
-import { Alert, Button, ConfirmDialog, ItemTable, pageTitle } from "@portalr/ui";
+import { Alert, Button, ConfirmDialog, ItemTable } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
@@ -26,7 +26,7 @@ const WORDS = {
  */
 export const Route = createFileRoute("/_signed/t/$tenant/access/roles")({
   head: ({ params, match }) => ({
-    meta: [{ title: pageTitle(match.context.config.brand, "admin", `Roles · ${params.tenant}`) }],
+    meta: [{ title: match.context.title(`Roles · ${params.tenant}`) }],
   }),
   beforeLoad: ({ context, params }) => opening(context, params.tenant, "grantr:define_role"),
   loader: ({ context, params }) => {

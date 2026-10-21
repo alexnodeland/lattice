@@ -7,7 +7,6 @@ import {
   type LineReveal,
   LogList,
   PageHeader,
-  pageTitle,
   SectionTitle,
   SegmentedFilter,
   TextField,
@@ -35,7 +34,7 @@ const HEADER = <PageHeader title="Logs" meta="What the application wrote, and ho
  */
 export const Route = createFileRoute("/_signed/t/$tenant/logs")({
   head: ({ params, match }) => ({
-    meta: [{ title: pageTitle(match.context.config.brand, "admin", `Logs · ${params.tenant}`) }],
+    meta: [{ title: match.context.title(`Logs · ${params.tenant}`) }],
   }),
   // What a link may give, each of it optional; what the address gives, read with `shownOf`.
   validateSearch: (search: Shown & SearchSchemaInput): Required<Shown> => shownOf(search),

@@ -18,7 +18,6 @@ import {
   Messages,
   PageHeader,
   ProposalCard,
-  pageTitle,
   Questions,
   Request,
   RunFailed,
@@ -75,7 +74,7 @@ const TENANT = { kind: "tenant" } as const;
  */
 export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/threads/$thread")({
   head: ({ params, match }) => ({
-    meta: [{ title: pageTitle(match.context.config.brand, "app", `Thread · ${params.workspace}`) }],
+    meta: [{ title: match.context.title(`Thread · ${params.workspace}`) }],
   }),
   loader: async ({ context, params }) => {
     const { tenant, workspace, thread } = params;

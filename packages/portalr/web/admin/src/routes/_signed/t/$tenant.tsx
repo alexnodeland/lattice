@@ -1,5 +1,5 @@
 import { administered } from "@portalr/client";
-import { Account, NavLink, Plain, pageTitle, SideNav, TextLink } from "@portalr/ui";
+import { Account, NavLink, Plain, SideNav, TextLink } from "@portalr/ui";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, notFound, Outlet } from "@tanstack/react-router";
 import {
@@ -24,7 +24,7 @@ import { remember } from "../../../last";
  */
 export const Route = createFileRoute("/_signed/t/$tenant")({
   head: ({ params, match }) => ({
-    meta: [{ title: pageTitle(match.context.config.brand, "admin", `${params.tenant}`) }],
+    meta: [{ title: match.context.title(`${params.tenant}`) }],
   }),
   beforeLoad: async ({ context, params }) => {
     const { queries, queryClient, user } = context;

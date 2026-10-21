@@ -1,4 +1,4 @@
-import { Account, AppShell, NavLink, pageTitle, SideNav, Switcher } from "@portalr/ui";
+import { Account, AppShell, NavLink, SideNav, Switcher } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, Outlet, useMatchRoute, useNavigate } from "@tanstack/react-router";
 import { FileText, MessageSquare, Play, Workflow, Zap } from "lucide-react";
@@ -13,11 +13,7 @@ export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace")({
   head: ({ params, match }) => ({
     meta: [
       {
-        title: pageTitle(
-          match.context.config.brand,
-          "app",
-          `${params.workspace} · ${params.tenant}`,
-        ),
+        title: match.context.title(`${params.workspace} · ${params.tenant}`),
       },
     ],
   }),

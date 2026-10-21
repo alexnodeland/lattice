@@ -1,5 +1,5 @@
 import { allowedIn, keys, Refused, refusal } from "@portalr/client";
-import { Alert, Button, ConfirmDialog, PageHeader, pageTitle, TextField } from "@portalr/ui";
+import { Alert, Button, ConfirmDialog, PageHeader, TextField } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import { useActionState, useMemo, useState } from "react";
@@ -20,7 +20,7 @@ export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/rules/$rul
   head: ({ params, match }) => ({
     meta: [
       {
-        title: pageTitle(match.context.config.brand, "app", `${params.rule} · ${params.workspace}`),
+        title: match.context.title(`${params.rule} · ${params.workspace}`),
       },
     ],
   }),

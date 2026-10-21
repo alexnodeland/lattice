@@ -1,4 +1,4 @@
-import { Alert, failureSaid, Plain, TextLink } from "@portalr/ui";
+import { Alert, failureSaid, NewVersionOffer, Plain, TextLink } from "@portalr/ui";
 import {
   createRootRouteWithContext,
   type ErrorComponentProps,
@@ -14,6 +14,8 @@ export const Route = createRootRouteWithContext<Context>()({
     <>
       <HeadContent />
       <Outlet />
+      {/* After the page, so its skip link stays the first stop of the keyboard. */}
+      <NewVersionOffer ui="app" page={import.meta.env.BASE_URL} />
     </>
   ),
   errorComponent: Failed,

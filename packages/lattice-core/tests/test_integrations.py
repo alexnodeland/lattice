@@ -32,17 +32,26 @@ def test_lattices_integrations_are_declared_once_each() -> None:
         "excalidraw",
         "markdown:math",
         "markdown:mermaid",
+        "connect:freecad",
+        "connect-code:freecad",
+        "connect:blender",
+        "connect-code:blender",
     ]
     assert all(key == integration.key for key, integration in KNOWN.items())
 
 
-def test_mini_apps_mermaid_and_every_crafting_app_but_wordcraft_are_off_by_default() -> None:
+def test_mini_apps_mermaid_connected_apps_and_crafting_apps_but_wordcraft_are_off_by_default() -> (
+    None
+):
     crafts = {key for key in KNOWN if key.startswith("files:")} - {"files:wordcraft"}
+    connected = {key for key in KNOWN if key.startswith(("connect:", "connect-code:"))}
     assert {key for key, integration in KNOWN.items() if not integration.default} == {
         "ui:mini-apps",
         "markdown:mermaid",
         *crafts,
+        *connected,
     }
+    assert len(connected) == 4
     assert len(crafts) == 14
 
 

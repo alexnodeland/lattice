@@ -248,6 +248,30 @@ test("a call to approve takes the focus, and is approved or denied once", async 
   expect(onAnswer.mock.calls).toEqual([[{ approved: true }]]);
 });
 
+test("a connected app's code is shown whole, with what it runs as and what a scan found", async () => {
+  const onAnswer = sent();
+  const code = "import os\nos.listdir('.')\n";
+  const request: ArtifactrV1.DeferredRequest = {
+    kind: "approval",
+    tool_call_id: "t1",
+    tool_name: "freecad_execute_code",
+    args: { code },
+    review: {
+      app: "FreeCAD",
+      risk: "code",
+      runs: "Runs code in your FreeCAD, in the session you have open, with your own privileges.",
+      code,
+      findings: ["line 1: imports os"],
+    },
+  };
+  const screen = await render(<Request request={request} onAnswer={onAnswer} />);
+  const card = screen.getByRole("region", { name: "Approve freecad_execute_code?" });
+  await expect.element(card.getByText("Runs code in your FreeCAD", { exact: true })).toBeVisible();
+  await expect.element(card.getByText(/with your own privileges/)).toBeVisible();
+  await expect.element(card.getByRole("button", { name: "Copy the code" })).toBeVisible();
+  await expect.element(card.getByText("line 1: imports os")).toBeVisible();
+});
+
 test("a call can be denied", async () => {
   const onAnswer = sent();
   const request: ArtifactrV1.DeferredRequest = {

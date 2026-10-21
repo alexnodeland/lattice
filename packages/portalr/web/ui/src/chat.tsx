@@ -29,6 +29,7 @@ import { Markdown } from "./markdown";
 import { Questions, type QuestionsAnswer } from "./questions";
 import { SchemaForm } from "./schema-form";
 import { type Sent, Unsent, useSending } from "./sending";
+import { SourceView } from "./source-view";
 import { StatusBadge, type Tone } from "./status-badge";
 import { TextField } from "./text-field";
 import { TYPE } from "./type";
@@ -510,6 +511,7 @@ function Question({
         <p>
           The agent wants to run <code className="font-mono">{request.tool_name}</code>.
         </p>
+        <Review review={request.review ?? {}} />
         {args && (
           <pre className="overflow-x-auto rounded-md border border-line bg-paper p-3 font-mono text-xs">
             {JSON.stringify(request.args, null, 2)}
@@ -545,6 +547,38 @@ function Question({
       </Button>
       <Unsent reason={unsent} />
     </form>
+  );
+}
+
+/**
+ * What a connected app's call does, beside its arguments (artifactr ADR-0085): that it runs code,
+ * or fetches, in the operator's own app, with their privileges; the code itself, whole, to read
+ * and copy; and what a scan found in it, which is advisory: the person reading is the gate.
+ */
+function Review({ review }: { review: Record<string, unknown> }) {
+  const { app, risk, runs, code, findings } = review;
+  if (typeof app !== "string" || typeof runs !== "string") {
+    return null;
+  }
+  const found = Array.isArray(findings) ? findings.filter((f) => typeof f === "string") : [];
+  return (
+    <div className="flex flex-col gap-2">
+      <StatusBadge tone="retrying" className="self-start">
+        {risk === "network" ? `Fetches into your ${app}` : `Runs code in your ${app}`}
+      </StatusBadge>
+      <p>{runs}</p>
+      {typeof code === "string" && <SourceView code={code} language="python" name="code" />}
+      {found.length > 0 && (
+        <div>
+          <p>A quick scan found these. It can't find everything: read the code.</p>
+          <ul className="list-disc ps-5">
+            {found.map((finding) => (
+              <li key={finding}>{finding}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
   );
 }
 

@@ -164,7 +164,7 @@ export function Message({
       aria-labelledby={name}
       aria-busy={sending || undefined}
       className={cn(
-        "flex max-w-(--message-width) flex-col gap-1",
+        "flex max-w-[min(100%,var(--bubble-max-width))] flex-col gap-1",
         mine ? "items-end self-end" : "items-start self-start",
         notice && "text-muted italic",
       )}
@@ -201,7 +201,7 @@ export function Message({
 export function Streaming({ text, author }: { text: string; author: string }) {
   return (
     <li
-      className="flex max-w-(--message-width) flex-col items-start gap-1 self-start"
+      className="flex max-w-[min(100%,var(--bubble-max-width))] flex-col items-start gap-1 self-start"
       aria-busy="true"
       aria-label={text ? `${author} is writing` : `${author} is thinking`}
     >
@@ -290,14 +290,14 @@ export function InlineArtifact({
         )}
         {...(full && { role: "dialog", "aria-modal": true, "aria-label": name })}
       >
-        {/* As tall as its buttons and a tooltip below them, so none covers what follows. */}
-        <div className="flex min-h-(--tooltip-clearance) items-start justify-between gap-3">
+        <div className="flex items-start justify-between gap-3">
           <p className="flex min-w-0 flex-col gap-0.5">
             <span className={TYPE.note}>{kind}</span>
             <span className={cn(TYPE.label, "break-words")}>{name}</span>
           </p>
           <span className="flex shrink-0 items-center gap-1">
-            {actions}
+            {/* In the full view, the way back alone (portalr ADR-0061). */}
+            {!full && actions}
             {open && !full && <IconButton label="Open its page" icon={FileText} render={open} />}
             <IconButton
               ref={back}

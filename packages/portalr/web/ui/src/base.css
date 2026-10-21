@@ -35,21 +35,6 @@
    */
   --motion-scale: 1;
   --motion-loop: running;
-  /*
-   * How far below an icon button its tooltip reaches, when it can't go above: its offset (6px, as
-   * `icon-button.tsx` gives Base UI), a line of the smallest type, its padding and its border. A
-   * bar of icon buttons keeps this much clear, so a tooltip never covers the control below it.
-   */
-  /* A message's widest, as its bubble and its line of actions take it: a line read at a glance. */
-  --message-width: min(100%, 42rem);
-  --tooltip-clearance: calc(
-    var(--icon-button-size) +
-    0.375rem +
-    1rem +
-    2 *
-    var(--tooltip-pad-y) +
-    2px
-  );
 }
 
 /*

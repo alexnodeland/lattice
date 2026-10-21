@@ -13,18 +13,16 @@ import {
   ArtifactContent,
   FormHostContext,
   factsOf,
-  IconButton,
   InlineArtifact,
   Reading,
 } from "@portalr/ui";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { Download } from "lucide-react";
+import { useState } from "react";
 import { useAppHost } from "./app-host";
 import type { Context } from "./context";
 import { useFormHost } from "./form-host";
 import { KillSwitch } from "./kill-switch";
-import { useDownload } from "./native-file";
 import { NativeInline } from "./native-inline";
 import { NATIVE, RENDERERS } from "./renderers";
 import { titleOf } from "./titles";
@@ -70,26 +68,14 @@ export function ThreadArtifact({
     />
   );
   const native = NATIVE.get(artifact.kind);
-  // A native file's download is the entry's header's, beside its page and its full view.
-  const place = { context, tenant, workspace, artifact: artifact.id };
-  const downloads = useDownload(place, latest && factsOf(latest.data).name);
-  const fetching = downloads.saving === "saving";
+  // Where a native file puts its download, in the header beside its page and its full view,
+  // once it is read and served (portalr ADR-0061).
+  const [actions, setActions] = useState<HTMLElement | null>(null);
   return (
     <InlineArtifact
       name={name}
       open={open}
-      {...(native &&
-        latest && {
-          actions: (
-            <IconButton
-              label={fetching ? "Downloading…" : "Download"}
-              icon={Download}
-              disabled={fetching}
-              focusableWhenDisabled
-              onClick={() => void downloads.download(latest.version)}
-            />
-          ),
-        })}
+      {...(native && { actions: <span ref={setActions} className="contents" /> })}
       {...(artifact.kind !== "app" && latest && { kind: kindName(latest.kind, latest.data) })}
     >
       {/* A read again that fails keeps what was read, so a running app keeps running. */}
@@ -101,10 +87,10 @@ export function ThreadArtifact({
         <Reading>Loading the {artifact.kind}…</Reading>
       ) : native ? (
         <NativeInline
-          place={place}
+          place={{ context, tenant, workspace, artifact: artifact.id }}
           native={native}
           me={me}
-          downloads={downloads}
+          header={actions}
           unserved={<ArtifactContent kind={latest.kind} data={latest.data} renderers={RENDERERS} />}
         />
       ) : (

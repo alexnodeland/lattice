@@ -102,14 +102,22 @@ log "ok: ${services[*]} started and answered their health checks"
 
 # A container's posture, as Docker runs it.
 posture() {
-  docker inspect --format '{{.HostConfig.ReadonlyRootfs}} {{.Config.User}} {{.HostConfig.Privileged}} cap-add={{.HostConfig.CapAdd}} cap-drop={{.HostConfig.CapDrop}} {{.HostConfig.SecurityOpt}} init={{.HostConfig.Init}} memory={{.HostConfig.Memory}} swap={{.HostConfig.MemorySwap}} cpus={{.HostConfig.NanoCpus}} pids={{.HostConfig.PidsLimit}} pid-mode={{.HostConfig.PidMode}} mounts={{len .Mounts}} devices={{if .HostConfig.Devices}}{{len .HostConfig.Devices}}{{else}}0{{end}} tmpfs={{range $at, $how := .HostConfig.Tmpfs}}{{$at}}:{{$how}}{{end}} network={{.HostConfig.NetworkMode}} networks={{range $net, $_ := .NetworkSettings.Networks}}{{$net}} {{end}}' "$1"
+  docker inspect "$1" | jq -r '.[0] | .HostConfig as $h | [
+    "read-only=\($h.ReadonlyRootfs)", "user=\(.Config.User)", "privileged=\($h.Privileged)",
+    "cap-add=\($h.CapAdd // [] | join(","))", "cap-drop=\($h.CapDrop // [] | join(","))",
+    "security=\($h.SecurityOpt // [] | join(","))", "init=\($h.Init)",
+    "memory=\($h.Memory)", "swap=\($h.MemorySwap)", "cpus=\($h.NanoCpus)", "pids=\($h.PidsLimit)",
+    "pid-mode=\($h.PidMode)", "mounts=\(.Mounts | length)", "devices=\($h.Devices // [] | length)",
+    "tmpfs=\($h.Tmpfs // {} | to_entries | map("\(.key):\(.value)") | join(","))",
+    "network=\($h.NetworkMode)", "networks=\(.NetworkSettings.Networks | keys | join(","))"
+  ] | join(" ")'
 }
 setting() { docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$1" | sed -n "s/^$2=//p"; }
 
 # Run inside the worker, given its network's gateway: nothing outside the network answers.
 egress='
 import socket, sys
-gateway = sys.argv[1] if len(sys.argv) > 1 else ""
+gateway = sys.argv[1]
 def refused(what, attempt):
     try:
         attempt()
@@ -135,10 +143,16 @@ results = [
     refused("UDP DNS to 1.1.1.1:53", udp_dns),
     refused("TCP to 169.254.169.254:80", lambda: tcp(socket.AF_INET, "169.254.169.254", 80)),
 ]
-if gateway:
-    results.append(refused(f"TCP to the gateway, {gateway}:80", lambda: tcp(socket.AF_INET, gateway, 80)))
-else:
-    print("  refused: the network has no gateway, so the host has no address on it")
+def unanswered(host, port):
+    try:
+        tcp(socket.AF_INET, host, port)
+    except ConnectionRefusedError as answered:
+        raise RuntimeError(f"{host} answered: {answered}") from None
+try:
+    results.append(refused(f"TCP to where the host would be, {gateway}:80", lambda: unanswered(gateway, 80)))
+except RuntimeError as answered:
+    print(f"  REACHED: {answered}")
+    results.append(False)
 sys.exit(0 if all(results) else 1)
 '
 # Run inside the worker after the probe's calls: what was planted before them is gone.
@@ -156,13 +170,16 @@ for app in "${apps[@]}"; do
   check "$app's network is internal" \
     same "$(docker network inspect --format '{{.Internal}}' "$network")" true
   check "$app's worker runs as compose.yaml says" same "$(posture "$container")" \
-    "true 10002 false cap-add=[] cap-drop=[ALL] [no-new-privileges:true] init=true memory=3221225472 swap=3221225472 cpus=2000000000 pids=128 pid-mode= mounts=0 devices=0 tmpfs=/tmp:size=1g,mode=1777,noexec,nosuid,nodev network=$network networks=$network "
+    "read-only=true user=10002 privileged=false cap-add= cap-drop=ALL security=no-new-privileges:true init=true memory=3221225472 swap=3221225472 cpus=2000000000 pids=128 pid-mode= mounts=0 devices=0 tmpfs=/tmp:size=1g,mode=1777,noexec,nosuid,nodev network=$network networks=$network"
   check "$app's worker publishes no port" \
     same "$(docker inspect --format '{{len .HostConfig.PortBindings}}' "$container")" 0
-  gateway=$(docker network inspect --format '{{range .IPAM.Config}}{{.Gateway}}{{end}}' "$network")
-  check "$app's network has no gateway, so the host has no address on it" same "$gateway" ""
+  check "$app's network gives the host no address on it" same \
+    "$(docker network inspect --format '{{index .Options "com.docker.network.bridge.inhibit_ipv4"}}' "$network")" true
+  # Where the host's address would be: the subnet's first.
+  subnet=$(docker network inspect --format '{{range .IPAM.Config}}{{.Subnet}}{{end}}' "$network")
+  gateway="${subnet%.*/*}.1"
   check "$app's worker reaches nothing outside its network" \
-    docker exec "$container" python -I -c "$egress" ${gateway:+"$gateway"}
+    docker exec "$container" python -I -c "$egress" "$gateway"
 
   # A process its user leaves, and a file for the next call, before the probe's calls.
   docker exec --detach --user 10002 "$container" sleep 600
@@ -181,7 +198,7 @@ for app in "${apps[@]}"; do
   if [[ " ${services[*]} " == *" files-$app-editor "* ]]; then
     editor=$(compose ps --quiet "files-$app-editor")
     check "$app's editor runs as compose.yaml says" same "$(posture "$editor")" \
-      "true 10003 false cap-add=[] cap-drop=[ALL] [no-new-privileges:true] init=true memory=268435456 swap=268435456 cpus=0 pids=64 pid-mode= mounts=0 devices=0 tmpfs= network=${name}_editors networks=${name}_editors "
+      "read-only=true user=10003 privileged=false cap-add= cap-drop=ALL security=no-new-privileges:true init=true memory=268435456 swap=268435456 cpus=0 pids=64 pid-mode= mounts=0 devices=0 tmpfs= network=${name}_editors networks=${name}_editors"
     published=$(compose port "files-$app-editor" 8000)
     check "$app's editor is published on this machine's loopback alone ($published)" \
       same "${published%:*}" 127.0.0.1

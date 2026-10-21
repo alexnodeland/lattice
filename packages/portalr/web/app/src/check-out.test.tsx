@@ -102,7 +102,7 @@ test("checking out holds the file, opens the editor apart, downloads the head, a
   expect(opened.mock.calls).toEqual([[EDITOR, "_blank", "noopener,noreferrer"]]);
   await expect.poll(() => saved.mock.instances.length).toBe(1);
   await expect.element(screen.getByText(/^Checked out by you until/)).toBeVisible();
-  const editor = screen.getByRole("link", { name: "Open WordCraft" });
+  const editor = screen.getByRole("link", { name: "Open WordCraft (opens in a new tab)" });
   await expect.element(editor).toHaveAttribute("href", EDITOR);
   await expect.element(editor).toHaveAttribute("rel", "noopener noreferrer");
   await expect.element(editor).toHaveAttribute("target", "_blank");
@@ -116,7 +116,9 @@ test("where no editor is hosted, checking out downloads alone, and says to open 
   await screen.getByRole("button", { name: "Check out and download" }).click();
   await told(screen, /^Checked out until .*, and downloading\.$/);
   expect(opened).not.toHaveBeenCalled();
-  expect(screen.getByRole("link", { name: "Open WordCraft" }).elements()).toHaveLength(0);
+  expect(
+    screen.getByRole("link", { name: "Open WordCraft (opens in a new tab)" }).elements(),
+  ).toHaveLength(0);
 });
 
 test("a check-out refused says why, opens nothing, and reads the workspace's switches again", async () => {

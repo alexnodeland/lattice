@@ -167,6 +167,10 @@ def check_sources(app: Path, expected: dict[str, dict[str, str]]) -> list[str]:
     return [f"pyproject.toml: [tool.uv.sources] is {sources}, not {expected}"]
 
 
+SINGLE_HOST = {"APP_IMAGE": "app:checked", "STACKR_DOMAIN": "example.com"}
+"""What the single host's overlay asks for: the image to run, and the domain the edge serves."""
+
+
 def run(label: str, command: list[str], cwd: Path, env: dict[str, str] | None = None) -> list[str]:
     """Run a check, with these variables added to the environment; return its output as a problem
     if it fails."""
@@ -177,6 +181,24 @@ def run(label: str, command: list[str], cwd: Path, env: dict[str, str] | None = 
     if done.returncode == 0:
         return []
     return [f"{label}:\n{done.stdout}{done.stderr}".rstrip()]
+
+
+def check_brand_dir(app: Path, compose: list[str]) -> list[str]:
+    """Check Compose gives the application the kit .env names, in the image, and none without."""
+    problems: list[str] = []
+    wanted = {"brand/acme": "PORTAL_BRAND_DIR: /brand/acme", "": 'PORTAL_BRAND_DIR: ""'}
+    for named, said in wanted.items():
+        done = subprocess.run(
+            compose,
+            cwd=app,
+            capture_output=True,
+            text=True,
+            check=False,
+            env={**os.environ, "PORTAL_BRAND_DIR": named, **SINGLE_HOST},
+        )
+        if said not in done.stdout:
+            problems.append(f"compose: PORTAL_BRAND_DIR={named!r} doesn't give {said}")
+    return problems
 
 
 def check_bun(app: Path) -> list[str]:
@@ -240,12 +262,14 @@ def check(app: Path, sources: dict[str, dict[str, str]]) -> list[str]:
     problems += run("compose", compose, app)
     every = ["docker", "compose", "--profile", "*", "config", "--quiet"]
     problems += run("compose, with every profile", every, app)
+    if (app / "brand").is_dir():
+        problems += check_brand_dir(app, compose[:-1])
     host = app / "deploy" / "host" / "compose.prod.yaml"
     if host.exists():
         overlay = ["docker", "compose", "-f", "compose.yaml", "-f", str(host), *compose[2:]]
-        # The overlay asks for the image to run, and the domain the edge serves.
-        needs = {"APP_IMAGE": "app:checked", "STACKR_DOMAIN": "example.com"}
-        problems += run("compose, on a single host", overlay, app, needs)
+        problems += run("compose, on a single host", overlay, app, SINGLE_HOST)
+        if (app / "brand").is_dir():
+            problems += check_brand_dir(app, overlay[:-1])
     return problems
 
 

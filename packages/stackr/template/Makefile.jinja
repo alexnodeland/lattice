@@ -29,7 +29,7 @@ PROFILES := --profile app $(foreach craft,$(FILES),--profile files-$(craft))
 PROFILES := --profile app
 {%- endif %}
 
-.PHONY: help install env fmt lint typecheck test check serve {% if evals %}evals evals-langfuse {% endif %}{% if access == 'grantr' %}first-run tenant operator migrate-tenants db-roles access-matrix {% endif %}{% if use_portal %}portal-ui tailnet tailnet-off {% endif %}up down logs clean
+.PHONY: help install env fmt lint typecheck test check serve {% if evals %}evals evals-langfuse {% endif %}{% if access == 'grantr' %}first-run tenant operator migrate-tenants db-roles access-matrix {% endif %}{% if use_portal %}portal-ui brand tailnet tailnet-off {% endif %}up down logs clean
 
 help: ## List the available commands
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -114,6 +114,14 @@ access-matrix: ## Write every role against every action to access.md, to review 
 
 portal-ui: ## Build portalr's UIs, from the commit uv.lock pins it at, into .portal-ui; then set PORTAL_UI_DIR to it
 	scripts/build-portal-ui.sh .portal-ui
+
+BRAND_FROM ?= template
+brand: ## Start a brand kit in brand/kit (BRAND_FROM: template, nightshade or calm), or check the one there
+	@if [ -f brand/kit/brand.json ]; then \
+		$(UV) run portalr brand validate brand/kit; \
+	else \
+		$(UV) run portalr brand init brand/kit --from $(BRAND_FROM); \
+	fi
 
 # The tailnet: `tailscale serve` puts the application on this machine's tailnet name, over HTTPS,
 # for your tailnet only; its port stays on 127.0.0.1. The portal signs in on that origin as on

@@ -19,7 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictInt, StringConstraints,
 
 from portalr.brand.colour import Rgba
 from portalr.brand.inventory import VERSION
-from portalr.brand.tokens import DEFAULT, BrandError, compile_kit, layered
+from portalr.brand.tokens import DEFAULT, JSON_BYTES, BrandError, compile_kit, layered, own_bytes
 from portalr.brand.validate import colour, token_faults
 
 SVG_BYTES = 64 * 1024
@@ -27,12 +27,8 @@ PNG_BYTES = 128 * 1024
 FONT_BYTES = 400 * 1024
 FONTS_BYTES = 1536 * 1024
 LICENCE_BYTES = 64 * 1024
-JSON_BYTES = 256 * 1024
-"""The most brand.json or a token file may hold."""
 FONT_FILES = 16
 """The most face files a kit may bring."""
-SERVED = frozenset({".css", ".svg", ".png", ".woff2", ".txt"})
-"""The suffixes a kit's served files may have, each with its type where it is served."""
 LICENCES = frozenset({"OFL-1.1", "Apache-2.0", "MIT", "LicenseRef-commercial"})
 """The font licences a kit may name, by SPDX id; a commercial one with its own file."""
 
@@ -305,20 +301,24 @@ def svg_faults(name: str, data: bytes) -> list[str]:
 def _file(kit: Path, path: str, faults: list[str], most: int) -> bytes | None:
     """A kit's file by its path in brand.json, within its cap, read only once its size is known.
 
-    A fault if it isn't there, leaves the kit (by ``..`` or a link), is served under a suffix the
-    portal has no type for, or is larger than `most`.
+    A fault if it isn't there, leaves the kit (by a linked folder), is a link itself, or is larger
+    than `most`; each caller holds its files to their suffixes.
     """
-    resolved = (kit / path).resolve()
-    if not resolved.is_relative_to(kit.resolve()) or not resolved.is_file():
+    try:
+        inside = (kit / path).resolve().is_relative_to(kit.resolve())
+    except (OSError, RuntimeError):  # a loop of links: Python 3.12 raises, as 3.13 doesn't
+        inside = False
+    if not inside:
         faults.append(f"{path}: no such file in the kit")
         return None
-    if resolved.suffix not in SERVED:
-        faults.append(f"{path}: a kit serves {', '.join(sorted(SERVED))} files")
+    try:
+        data = own_bytes(kit / path, most, path)
+    except BrandError as error:
+        faults.append(str(error))
         return None
-    if resolved.stat().st_size > most:
-        faults.append(f"{path}: larger than {most // 1024} KB")
-        return None
-    return resolved.read_bytes()
+    if data is None:
+        faults.append(f"{path}: no such file in the kit")
+    return data
 
 
 def _asset(kit: Path, path: str, faults: list[str]) -> bytes | None:
@@ -404,17 +404,13 @@ def load(kit: Path) -> Kit:
         BrandError: With every fault, one to a line, if the kit isn't one the portal can serve.
     """
     faults: list[str] = []
-    if not (kit / "brand.json").is_file():
+    if not kit.is_dir():
+        raise BrandError(f"{str(kit)!r}: no such folder")
+    data = own_bytes(kit / "brand.json", JSON_BYTES)
+    if data is None:
         raise BrandError("brand.json: a kit has one")
-    for name in ("brand.json", "tokens.light.json", "tokens.dark.json"):
-        file = kit / name
-        if file.exists() and (file.is_symlink() or file.stat().st_size > JSON_BYTES):
-            raise BrandError(f"{name}: a file of the kit's own, {JSON_BYTES // 1024} KB at most")
     try:
-        raw = json.loads((kit / "brand.json").read_text(encoding="utf-8"))
-        brand = Brand.model_validate(raw)
-    except (UnicodeDecodeError, json.JSONDecodeError) as error:
-        raise BrandError(f"brand.json: not JSON in UTF-8 ({error})") from error
+        brand = Brand.model_validate(json.loads(data.decode("utf-8")))
     except RecursionError:
         raise BrandError("brand.json: nested too deep") from None
     except ValidationError as error:
@@ -423,6 +419,8 @@ def load(kit: Path) -> Kit:
                 f"brand.json: {'.'.join(map(_said, e['loc']))}: {e['msg']}" for e in error.errors()
             )
         ) from error
+    except ValueError as error:  # not UTF-8, not JSON, or a number too long to read
+        raise BrandError(f"brand.json: not JSON in UTF-8 ({error})") from error
     for text in (
         *brand.identity.model_dump().values(),
         *(t for t in (brand.copy_.tagline, brand.copy_.sign_in) if t is not None),

@@ -42,6 +42,9 @@ dependencies = [
     "starlette>=0.46.0",
 ]
 
+[project.scripts]
+portalr = "portalr.brand.cli:main"
+
 [project.urls]
 Homepage = "https://lattice.alexnodeland.com/portalr/"
 Documentation = "https://lattice.alexnodeland.com/portalr/"

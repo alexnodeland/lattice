@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "name": "kit",
+  "identity": {
+    "product": "Your product",
+    "app": "Your product",
+    "admin": "Your product admin"
+  },
+  "copy": {
+    "signIn": "Sign in to Your product"
+  },
+  "assets": {
+    "mark": {
+      "light": "assets/mark-light.svg",
+      "dark": "assets/mark-dark.svg"
+    },
+    "favicon": "assets/favicon.svg"
+  }
+}

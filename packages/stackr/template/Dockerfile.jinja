@@ -155,6 +155,7 @@ COPY --from=build --chown=app:app /app/.venv /app/.venv
 COPY --from=portal-ui --chown=app:app /ui /ui
 # The brand kit, which PORTAL_BRAND_DIR names: the image serves the kit it was built with, so a
 # changed kit needs a new image (`make up` builds one). Root's, so the application only reads it.
+# Nothing hidden in it is copied (.dockerignore).
 COPY brand /brand
 {%- endif %}
 

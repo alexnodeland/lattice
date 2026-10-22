@@ -37,6 +37,12 @@ async def main() -> int:
     reader = httpx.AsyncClient(
         auth=("portalr_analytics", os.environ["CLICKHOUSE_ANALYTICS_PASSWORD"])
     )
+    try:
+        pinged = (await writer.get(f"{url}/ping", timeout=10)).text.strip()
+    except httpx.HTTPError as error:
+        say(f"FAIL: ClickHouse at {url} didn't answer: {type(error).__name__}: {error}")
+        return 1
+    say(f"ok: ClickHouse at {url} answers {pinged!r}")
     analytics = Analytics(url, secrets.token_bytes(32), writer=writer, reader=reader)
     a, b = f"smoke-a-{secrets.token_hex(4)}", f"smoke-b-{secrets.token_hex(4)}"
     for tenant, times in ((a, 2), (b, 3)):

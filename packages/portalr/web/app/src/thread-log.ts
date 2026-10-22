@@ -76,13 +76,23 @@ export function threadLog(
 }
 
 /** A failed turn tried again: the messages that started it, posted again as one under `id`. */
-export interface Retry {
-  /** The failed run, whose notice offers it. */
-  readonly run: string;
-  /** Derived from the run, so a second try, from here or another tab, is the same message. */
-  readonly id: string;
-  readonly content: string;
-}
+export type Retry =
+  | {
+      /** The failed run, whose notice offers it. */
+      readonly run: string;
+      /** Derived from the run, so a second try, from here or another tab, is the same message. */
+      readonly id: string;
+      readonly content: string;
+    }
+  | {
+      readonly run: string;
+      /** Every id a try may take is someone else's message's: it can't be offered. */
+      readonly id: null;
+    };
+
+/** Why a failed turn offers no try again, when every id one may take is someone else's. */
+export const RETRY_TAKEN =
+  "It can't be tried again here: other messages hold the ids a try would use. Send it again as a new message.";
 
 /** The most ids a try again looks through for one no one else's message has. */
 const TRIES = 100;
@@ -115,7 +125,7 @@ export function retryOf(
   const content = started.map((message) => message.content).join("\n\n");
   // The first of `msg_again_<run>`, `…_2`, `…_3` that no one else's message has: the same from
   // render to render and tab to tab, so every try is the one message. Bounded: a thread whose
-  // every such id is someone else's offers no try, rather than looking for ever.
+  // every such id is someone else's says so, rather than looking for ever.
   for (let n = 1; n <= TRIES; n++) {
     const id = n === 1 ? `msg_again_${latest.id}` : `msg_again_${latest.id}_${n}`;
     const taken = byId.get(id);
@@ -126,5 +136,5 @@ export function retryOf(
       return null; // tried again already
     }
   }
-  return null;
+  return { run: latest.id, id: null };
 }

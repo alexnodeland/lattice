@@ -1,12 +1,11 @@
 import type { ReactNode } from "react";
-import { Alert } from "./alert";
 import { Button } from "./button";
 import { EmptyState } from "./empty-state";
-import { failureSaid } from "./failure";
+import { FailureAlert } from "./failure-alert";
 
 /**
  * A read that failed, where its content would be (portalr ADR-0065): a heading saying what
- * couldn't be read, the failure in the server's words, and one way on, reading it again. It
+ * couldn't be read, what failed in the kit's words (the server's go to the console), and one way on, reading it again. It
  * takes the focus, as a state that replaces the page does. `action` is for a second way on that
  * a screen has, such as clearing a filter.
  */
@@ -40,7 +39,7 @@ export function ErrorState({
         )
       }
     >
-      <Alert tone="error">{failureSaid(error)}</Alert>
+      <FailureAlert error={error} />
     </EmptyState>
   );
 }

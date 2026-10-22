@@ -386,7 +386,10 @@
       "expect": {
         "rejection": {
           "type": "invalid_state",
-          "message": "proposal prp_1 already exists"
+          "message": "proposal prp_1 already exists",
+          "reason": "already_exists",
+          "entity": "proposal",
+          "id": "prp_1"
         }
       }
     },

@@ -41,7 +41,7 @@ import { usePosting } from "../../../../../../../posting";
 import { RENDERERS } from "../../../../../../../renderers";
 import { ShareDialog } from "../../../../../../../share-dialog";
 import { ThreadArtifact } from "../../../../../../../thread-artifact";
-import { retryOf, threadLog } from "../../../../../../../thread-log";
+import { RETRY_TAKEN, retryOf, threadLog } from "../../../../../../../thread-log";
 import { ThreadMenu } from "../../../../../../../thread-menu";
 import { Uploader } from "../../../../../../../upload";
 import { Connection, useStream, useWorkspace } from "../../../../../../../workspace";
@@ -311,9 +311,10 @@ function Chat() {
                   reason={entry.run.reason}
                   // What it failed with, which may name the reader's own words, is its author's.
                   error={entry.run.actsFor === me ? entry.run.error : null}
-                  {...(retry?.run === entry.run.id && {
-                    onRetry: () => send(retry.content, retry.id),
-                  })}
+                  {...(retry?.run === entry.run.id &&
+                    (retry.id === null
+                      ? { retryRefused: RETRY_TAKEN }
+                      : { onRetry: () => send(retry.content, retry.id) }))}
                 />
               );
             default:

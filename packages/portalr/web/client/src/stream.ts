@@ -331,7 +331,8 @@ export class Stream<State, Frame, Command, R extends Result, Hello> {
     const madeEarlier =
       pending.sent > 1 &&
       this.protocol.creates(pending.command) &&
-      result.rejection?.type === "invalid_state";
+      result.rejection?.type === "invalid_state" &&
+      result.rejection.reason === "already_exists";
     const done = result.ok || madeEarlier;
     pending.settle({ outcome: done ? "done" : "refused", result });
     if (!done) {

@@ -10,7 +10,7 @@
 
 ## Decision
 
-- **A used message id is refused with `InvalidState`** ("message m1 already exists"), in any thread of the workspace, as duplicate artifact, proposal and thread ids are. Nothing is appended, and `Runner.send` raises before it acts, so no second turn starts.
+- **A used message id is refused with `InvalidState`** ("message m1 already exists"), in any thread of the workspace, as duplicate artifact, proposal and thread ids are. Since 2026-10-22 the refusal is `AlreadyExists`, whose payload adds `reason: "already_exists"`, the `entity` and its `id`, so a client tells a create sent again by its fields, not its words. Nothing is appended, and `Runner.send` raises before it acts, so no second turn starts.
 - **Core decides, through the `needs` loop** ([ADR-0018](0018-core-host-contract.md)). `needs(PostMessage)` asks for the message id; the host loads `State.messages`, whether each id is used; and `CommitResult.messages` lists the ids to record as used.
 - **Storage keeps only the ids.** `InMemoryStorage` keeps a set per workspace. SQL storage keeps a table, `artifactr_messages`, keyed by tenant, workspace and id; migration 0003 fills it from the stored `message_posted` events.
 

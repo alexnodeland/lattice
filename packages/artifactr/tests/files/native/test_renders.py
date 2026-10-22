@@ -81,9 +81,9 @@ async def test_a_flood_of_one_tenants_renders_never_times_another_tenants_upload
     stores: Stores,
 ) -> None:
     app = Serial()
-    # Two renders queued ahead of an upload fit in its deadline; twenty would not.
+    # Two renders queued ahead of an upload fit in its deadline five times over; twenty would not.
     # Every render reaches the app: none is kept.
-    files = native(stores, app, deadline=RENDER * 3.5, pages=0)
+    files = native(stores, app, deadline=RENDER * 10, pages=0)
     workspaces = Workspaces(InMemoryStorage())
     acme = await workspaces.open("acme", "w1", actor=ALICE)
     globex = await workspaces.open("globex", "w1", actor=BOB)
@@ -104,33 +104,44 @@ async def test_a_flood_of_one_tenants_renders_never_times_another_tenants_upload
 
 
 class Gated(FakeApp):
-    """A fake app whose renders wait to be let through."""
+    """A fake app whose renders wait to be let through, and say how many are waiting."""
 
     def __init__(self) -> None:
         super().__init__()
         self.through = asyncio.Event()
+        self.waiting = 0
+        self._arrived = asyncio.Event()
 
     async def render(self, source: bytes, page: int, *, scale: float, deadline: float) -> bytes:
+        self.waiting += 1
+        self._arrived.set()
         await self.through.wait()
         return await super().render(source, page, scale=scale, deadline=deadline)
+
+    async def holding(self, renders: int) -> None:
+        """Return once this many renders are in the app, each holding one of its tenant's
+        readings: not after a guess at how long their reads before it take."""
+        async with asyncio.timeout(10):
+            while self.waiting < renders:
+                self._arrived.clear()
+                await self._arrived.wait()
 
 
 async def test_a_render_holds_one_of_the_tenants_readings_and_waits_a_while_for_one(
     stores: Stores,
 ) -> None:
     app = Gated()
-    files = native(stores, app, pages=0, deadline=0.2)
+    files = native(stores, app, pages=0, deadline=0.5)
     ws = await Workspaces(InMemoryStorage()).open("acme", "w1", actor=ALICE)
     await uploaded(files, ws, "a1")
     first = [asyncio.create_task(files.render(ws, "a1", 1)) for _ in range(2)]
-    await asyncio.sleep(0)
+    await app.holding(2)
     with pytest.raises(Busy):
         await files.render(ws, "a1", 1)  # after waiting its deadline for a reading
     with pytest.raises(Busy):
         await uploaded(files, ws, "a2")  # an upload is refused at once
     waiting = asyncio.create_task(files.render(ws, "a1", 1))
-    await asyncio.sleep(0.05)
-    app.through.set()
+    app.through.set()  # the waiter has a reading free well within its deadline
     await asyncio.gather(*first)
     assert await waiting, "a page that waited was given the reading let go"
 
@@ -177,7 +188,7 @@ async def test_a_page_rendered_before_is_kept_and_never_paced(stores: Stores) ->
     files_busy = native(stores, gated, pages=0, deadline=0.05)
     await uploaded(files_busy, ws, "a3")
     held = [asyncio.create_task(files_busy.render(ws, "a3", 1)) for _ in range(2)]
-    await asyncio.sleep(0)
+    await gated.holding(2)
     paced: list[int] = []
     with pytest.raises(Busy):
         await files_busy.render(ws, "a3", 1, admit=lambda: paced.append(1))

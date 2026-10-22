@@ -153,6 +153,9 @@ def _apply(data: _Data, result: CommitResult) -> None:
 class InMemoryStorage:
     """Storage that keeps every workspace in process memory.
 
+    Use it from one event loop: its locks are asyncio's, so a caller waiting on one from another
+    loop is never woken.
+
     Args:
         clock: Returns the current time. Defaults to the system clock in UTC.
     """

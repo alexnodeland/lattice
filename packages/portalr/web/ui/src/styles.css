@@ -18,6 +18,11 @@
   html {
     background-color: var(--paper);
     color: var(--fg);
+    /*
+     * Clear of a composer pinned to the bottom of the window (`ComposerDock`), which sets how
+     * tall it is: what the keyboard reaches, or a link scrolls to, stops above it, not under it.
+     */
+    scroll-padding-bottom: var(--composer-clearance, 0px);
   }
 }
 

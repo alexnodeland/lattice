@@ -59,6 +59,7 @@ export {
 } from "./chat";
 export { Checkbox, type CheckboxChoice, CheckboxGroup } from "./checkbox";
 export { useColourBlind } from "./colour-blind";
+export { ComposerDock } from "./composer-dock";
 export { ConfirmDialog } from "./confirm-dialog";
 export { type FormOf, PANELS, type PanelProps, type PanelRenderers } from "./dashboard-panels";
 export { DashboardView } from "./dashboard-view";

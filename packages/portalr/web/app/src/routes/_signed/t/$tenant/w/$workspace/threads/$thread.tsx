@@ -14,6 +14,7 @@ import {
   ASK_FORM,
   ASK_USER,
   Composer,
+  ComposerDock,
   Message,
   Messages,
   PageHeader,
@@ -373,9 +374,9 @@ function Chat() {
         />
       ))}
       {snapshot.status !== "closed" && allowed.has("artifactr:post_message") && (
-        <div className="sticky bottom-0 z-10 bg-paper pt-2 pb-4">
+        <ComposerDock>
           <Composer disabled={snapshot.status !== "live"} onSend={send} />
-        </div>
+        </ComposerDock>
       )}
       {snapshot.status !== "closed" && (
         <Uploader context={context} tenant={tenant} workspace={workspace} thread={id} />

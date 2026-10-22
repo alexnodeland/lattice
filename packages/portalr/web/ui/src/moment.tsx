@@ -45,6 +45,20 @@ export function ago(at: Date, now: Date): string {
   return relative.format(Math.round(seconds / size), unit);
 }
 
+/**
+ * A `<time>` that says how long ago it was, and, on hover, the moment in the reader's zone: for a
+ * list read at a glance. A moment ahead of the reader's clock, as a server's a little fast is,
+ * says it is now. Worked out as it renders: a list that stays open says what it said then.
+ */
+export function Ago({ at, now = new Date() }: { at: string; now?: Date }) {
+  const when = new Date(at);
+  return (
+    <time dateTime={at} title={when.toLocaleString()}>
+      {ago(when.getTime() > now.getTime() ? now : when, now)}
+    </time>
+  );
+}
+
 /** A `<time>`: the moment in the reader's zone, and, on hover, how long ago it was. */
 export function Moment({ at, now = new Date() }: { at: string; now?: Date }) {
   const when = new Date(at);

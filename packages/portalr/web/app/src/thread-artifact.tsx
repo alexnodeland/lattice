@@ -18,6 +18,7 @@ import {
 } from "@portalr/ui";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
+import { useState } from "react";
 import { useAppHost } from "./app-host";
 import type { Context } from "./context";
 import { useFormHost } from "./form-host";
@@ -28,11 +29,17 @@ import { titleOf } from "./titles";
 
 /** What people call an artifact of a kind: a native file by its type, any other by its kind. */
 export function kindName(kind: string, data: Readonly<Record<string, unknown>>): string {
-  if (NATIVE.has(kind)) {
-    return factsOf(data).type;
-  }
-  const words = kind.replaceAll("_", " ");
-  return words.charAt(0).toUpperCase() + words.slice(1);
+  return NATIVE.has(kind) && factsOf(data).type !== "File" ? factsOf(data).type : kindWords(kind);
+}
+
+/** Words written as capitals in a kind's name. */
+const CAPITALS: Readonly<Record<string, string>> = { pdf: "PDF", cad: "CAD", svg: "SVG" };
+
+/** A kind as words, without its data: `pdf_document` as "PDF document". */
+export function kindWords(kind: string): string {
+  const words = kind.split("_").map((word) => CAPITALS[word] ?? word);
+  const first = words[0] ?? "";
+  return [first.charAt(0).toUpperCase() + first.slice(1), ...words.slice(1)].join(" ");
 }
 
 export function ThreadArtifact({
@@ -67,10 +74,14 @@ export function ThreadArtifact({
     />
   );
   const native = NATIVE.get(artifact.kind);
+  // Where a native file puts its download, in the header beside its page and its full view,
+  // once it is read and served (portalr ADR-0061).
+  const [actions, setActions] = useState<HTMLElement | null>(null);
   return (
     <InlineArtifact
       name={name}
       open={open}
+      {...(native && { actions: <span ref={setActions} className="contents" /> })}
       {...(artifact.kind !== "app" && latest && { kind: kindName(latest.kind, latest.data) })}
     >
       {/* A read again that fails keeps what was read, so a running app keeps running. */}
@@ -85,6 +96,7 @@ export function ThreadArtifact({
           place={{ context, tenant, workspace, artifact: artifact.id }}
           native={native}
           me={me}
+          header={actions}
           unserved={<ArtifactContent kind={latest.kind} data={latest.data} renderers={RENDERERS} />}
         />
       ) : (

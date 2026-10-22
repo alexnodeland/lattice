@@ -119,7 +119,7 @@ export function useDownload(place: Place, name: string | undefined) {
 }
 
 /** The download's button, and its failure, said. */
-export function DownloadButton({
+function DownloadButton({
   saving,
   onDownload,
 }: {

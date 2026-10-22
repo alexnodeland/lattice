@@ -1012,6 +1012,12 @@
       "radius": {
         "$value": "{radius.6}"
       },
+      "max-width": {
+        "$value": {
+          "value": 42,
+          "unit": "rem"
+        }
+      },
       "tail-radius": {
         "$value": "{radius.2}"
       },

@@ -49,4 +49,6 @@ services:
       # alone, doesn't have behind its private address, and its admin API is the edge's to refuse.
       # So they are off here, and say why; local Supabase's address in stackr.env is not this host's.
       PORTAL_AUTH_URL: ""
+      # The kit .env names, in the image's copy of brand/ (brand/kit there is /brand/kit here).
+      PORTAL_BRAND_DIR: ${PORTAL_BRAND_DIR:+/${PORTAL_BRAND_DIR}}
 {%- endif %}

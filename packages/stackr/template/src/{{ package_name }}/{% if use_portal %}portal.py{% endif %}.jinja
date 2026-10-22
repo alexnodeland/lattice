@@ -197,6 +197,7 @@ class Portal:
 {%- if use_files %}
                 editors=dict(self._settings.files.editors),
 {%- endif %}
+                brand=Path(portal.brand_dir) if portal.brand_dir else None,
             )
         return None
 

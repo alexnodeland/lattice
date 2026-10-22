@@ -7,6 +7,7 @@ nav:
   - The admin UI: guides/admin.md
   - An operator's runbook: guides/operators.md
   - What portalr keeps from view: guides/privacy.md
+  - White-labelling the portal: guides/white-labelling.md
 - Architecture: architecture.md
 - Decisions:
   - adr/README.md

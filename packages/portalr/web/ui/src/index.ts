@@ -59,6 +59,7 @@ export {
 } from "./chat";
 export { Checkbox, type CheckboxChoice, CheckboxGroup } from "./checkbox";
 export { useColourBlind } from "./colour-blind";
+export { ComposerDock } from "./composer-dock";
 export { ConfirmDialog } from "./confirm-dialog";
 export { type FormOf, PANELS, type PanelProps, type PanelRenderers } from "./dashboard-panels";
 export { DashboardView } from "./dashboard-view";
@@ -78,7 +79,7 @@ export { type LineReveal, LogList } from "./log-list";
 export { Markdown } from "./markdown";
 export { Lockup, Mark, type Ui } from "./marks";
 export { Menu, type MenuItem } from "./menu";
-export { ago, Moment } from "./moment";
+export { Ago, ago, Moment } from "./moment";
 export {
   FileHolder,
   factsOf,

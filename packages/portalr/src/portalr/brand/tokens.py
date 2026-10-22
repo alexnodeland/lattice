@@ -6,9 +6,12 @@ token is parsed by its type's grammar into a value this module prints, so no tex
 reaches the stylesheet; an alias, ``{path}``, becomes the custom property of the token it names.
 """
 
+import errno
 import json
 import math
+import os
 import re
+import stat
 import textwrap
 from collections.abc import Callable, Iterator, Mapping
 from pathlib import Path
@@ -56,11 +59,56 @@ def _flatten(
         path = f"{at}.{key}" if at else key
         group = _mapping(node)
         if group is None:
-            raise BrandError(f"{path}: a token is an object with a $value")
+            raise BrandError(f"{said(path)}: a token is an object with a $value")
         if "$value" in group:
             yield path, group["$value"], group.get("$type", type_)
         else:
             yield from _flatten(group, path, type_)
+
+
+def said(text: str) -> str:
+    """A name a kit wrote, as a log may print it: as it is if plainly a name, else its repr."""
+    return text if re.fullmatch(r"[A-Za-z0-9_.$-]{1,128}", text) else repr(text)
+
+
+JSON_BYTES = 256 * 1024
+"""The most a kit's brand.json or token file may be."""
+
+_OWN = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+
+
+def own_bytes(path: Path, most: int, name: str | None = None) -> bytes | None:
+    """A plain file of the kit's own, or None if it isn't there.
+
+    Opened without following a link and without waiting on a FIFO, then known by its descriptor
+    to be a plain file within `most` before a byte is read: what is checked is what is read.
+
+    Raises:
+        BrandError: If it is a link, a folder, a FIFO or a device; larger than `most`; or can't be
+            read. Said as `name`, the file's own by default.
+    """
+    said_as = name or path.name
+    try:
+        handle = os.open(path, _OWN)
+    except FileNotFoundError:
+        return None
+    except OSError as error:
+        if error.errno == errno.ELOOP:
+            raise BrandError(f"{said_as}: a plain file of the kit's own, not a link") from None
+        raise BrandError(f"{said_as}: can't be read ({error.strerror})") from None
+    try:
+        info = os.fstat(handle)
+        if not stat.S_ISREG(info.st_mode):
+            raise BrandError(f"{said_as}: a plain file of the kit's own, not a link or a folder")
+        if info.st_size > most:
+            raise BrandError(f"{said_as}: larger than {most // 1024} KB")
+        # No more than was checked: a file grown since is read as it was.
+        with os.fdopen(handle, "rb", closefd=False) as file:
+            return file.read(most)
+    except OSError as error:
+        raise BrandError(f"{said_as}: can't be read ({error.strerror})") from None
+    finally:
+        os.close(handle)
 
 
 def read(path: Path) -> dict[str, object]:
@@ -69,11 +117,12 @@ def read(path: Path) -> dict[str, object]:
     A token's `$type`, where the kit gives one, is its row's, or the kit is refused: a type is the
     inventory's to say, and one that disagrees is a mistake, not a choice.
     """
-    if not path.exists():
+    data = own_bytes(path, JSON_BYTES)
+    if data is None:
         return {}
     try:
-        tree = _mapping(json.loads(path.read_text(encoding="utf-8")))
-    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        tree = _mapping(json.loads(data.decode("utf-8")))
+    except ValueError as error:  # not UTF-8, not JSON, or a number too long to read
         raise BrandError(f"{path.name}: not JSON in UTF-8 ({error})") from error
     except RecursionError:
         raise BrandError(f"{path.name}: nested too deep") from None
@@ -84,9 +133,9 @@ def read(path: Path) -> dict[str, object]:
     for name, value, type_ in _flatten(tree, "", None):
         row = ROWS.get(name)
         if row is None:
-            faults.append(f"{name}: no token has this path")
+            faults.append(f"{said(name)}: no token has this path")
         elif type_ is not None and type_ != row.type:
-            faults.append(f"{name}: a {row.type}, not a {type_}")
+            faults.append(f"{name}: a {row.type}, not a {said(str(type_))}")
         tokens[name] = value
     if faults:
         raise BrandError("\n".join(sorted(faults)))

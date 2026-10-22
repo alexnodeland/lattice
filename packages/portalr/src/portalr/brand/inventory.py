@@ -380,10 +380,11 @@ COMPONENTS: tuple[Group, ...] = (
         ),
     ),
     Group(
-        "The chat: a message's bubble, its corners and the smaller corner it points from, and "
-        "its padding; and the composer's corners and padding (portalr ADR-0053).",
+        "The chat: a message's bubble, its corners and the smaller corner it points from, its "
+        "padding and its widest; and the composer's corners and padding (portalr ADR-0053).",
         (
             Row("component.bubble.radius", "--bubble-radius", "dimension"),
+            Row("component.bubble.max-width", "--bubble-max-width", "dimension"),
             Row("component.bubble.tail-radius", "--bubble-tail-radius", "dimension"),
             Row("component.bubble.pad-x", "--bubble-pad-x", "dimension"),
             Row("component.bubble.pad-y", "--bubble-pad-y", "dimension"),

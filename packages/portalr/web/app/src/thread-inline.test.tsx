@@ -333,6 +333,53 @@ test("where native files' routes aren't served, a file is its manifest", async (
   const file = unserved.screen.getByRole("listitem", { name: "brief.docx" });
   await expect.element(file.getByText("Word document · 48 kB · 3 pages")).toBeVisible();
   await expect.element(file.getByRole("region", { name: "Outline" })).toBeVisible();
+  // No download is offered for a file whose routes can't give it.
+  expect(file.getByRole("button", { name: "Download" }).elements()).toHaveLength(0);
+});
+
+test("a file's download is in its header, beside its page, once it is read, and not in its full view", async () => {
+  let answer: () => void = () => {};
+  const content = new Promise<void>((done) => {
+    answer = done;
+  });
+  const saved = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+  const { screen, fetched } = await open(
+    THREAD,
+    async (request, path) => {
+      if (path.endsWith("/files/doc_1/versions/1/content")) {
+        await content;
+        return new Response("the file's bytes");
+      }
+      return serving()(request, path);
+    },
+    undefined,
+    { artifactrLog: thread([["doc_1", "word_document"]]) },
+  );
+  const file = screen.getByRole("listitem", { name: "brief.docx" });
+  const download = file.getByRole("button", { name: "Download", exact: true });
+  await expect.element(download).toBeVisible();
+  // In the header's order: the download, then its page, then its full view.
+  const bar = download.element().closest("span:not(.contents)");
+  const named = [...(bar?.querySelectorAll("button, a") ?? [])].map((each) =>
+    each.getAttribute("aria-label"),
+  );
+  expect(named).toEqual(["Download", "Open its page", "Full view"]);
+  await download.click();
+  // Its name stays as it is downloaded; that it is busy is said beside it.
+  await expect.element(download).toHaveAttribute("aria-busy", "true");
+  expect(download.element().getAttribute("aria-label")).toBe("Download");
+  answer();
+  await expect.poll(() => saved.mock.instances.length).toBe(1);
+  await expect.element(download).not.toHaveAttribute("aria-busy");
+  expect(
+    fetched.mock.calls.some(([input]) =>
+      (input as Request).url.endsWith("/files/doc_1/versions/1/content"),
+    ),
+  ).toBe(true);
+  await file.getByRole("button", { name: "Full view" }).click();
+  const full = screen.getByRole("dialog", { name: "brief.docx" });
+  await expect.element(full).toBeVisible();
+  expect(full.getByRole("button", { name: "Download", exact: true }).elements()).toHaveLength(0);
 });
 
 test("a file's status that can't be read says so", async () => {

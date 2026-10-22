@@ -327,10 +327,11 @@
   --disclosure-duration: var(--duration-fast);
 
   /*
-   * The chat: a message's bubble, its corners and the smaller corner it points from, and its
-   * padding; and the composer's corners and padding (portalr ADR-0053).
+   * The chat: a message's bubble, its corners and the smaller corner it points from, its padding
+   * and its widest; and the composer's corners and padding (portalr ADR-0053).
    */
   --bubble-radius: var(--radius-6);
+  --bubble-max-width: 42rem;
   --bubble-tail-radius: var(--radius-2);
   --bubble-pad-x: 0.875rem;
   --bubble-pad-y: var(--space-2);

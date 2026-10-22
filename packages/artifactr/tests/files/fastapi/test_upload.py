@@ -329,7 +329,9 @@ def test_each_person_uploads_at_a_pace() -> None:
     assert world.upload(FakeApp.file("2")).status_code == 201
     refused = world.upload(FakeApp.file("3"))
     assert refused.status_code == 429
-    assert refused.json()["detail"]["type"] == "rate_limited"
+    detail = refused.json()["detail"]
+    assert detail["type"] == "rate_limited"
+    assert detail["message"] == f"try again in {detail['retry_after']} seconds"
     assert 1 <= int(refused.headers["retry-after"]) <= 60
     assert world.upload(FakeApp.file("3"), user="bob").status_code == 201, "Bob has his own"
     assert world.upload(FakeApp.file("3"), tenant="globex").status_code == 201, (
@@ -370,6 +372,7 @@ def test_a_check_in_is_held_to_the_pace_and_the_places_an_upload_is() -> None:
     assert (held.status_code, held.json()["detail"]["type"]) == (429, "busy")
     paced = world.client.put(url, content=FakeApp.file("z"))
     assert (paced.status_code, paced.json()["detail"]["type"]) == (429, "rate_limited")
+    assert paced.json()["detail"]["message"].startswith("try again in ")
 
 
 def test_one_tenants_people_never_hold_every_place() -> None:
@@ -590,7 +593,7 @@ def test_a_body_that_pauses_too_long_is_refused_with_408(checking_in: bool) -> N
         # Long past the pause, so even a slow runner has begun reading before the rest comes.
         answered = answer(address, *sent, pause=5, until_closed=False)
     assert answered.startswith(b"HTTP/1.1 408")
-    assert b"too_slow" in answered
+    assert b'"type":"too_slow","message":"the body arrived too slowly"' in answered
     assert asyncio.run(world.committed()) == (["a1"] if checking_in else [])
 
 

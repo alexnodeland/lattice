@@ -413,3 +413,40 @@ async def test_a_late_deletion_never_clears_a_newer_one(
     assert first is not None
     assert await relay.settle("alice", first)
     assert await relay.consent.owes("alice") is not None
+
+
+async def test_answers_drain_the_persons_pace_but_are_never_refused(
+    grants: Grants, invite: Invite, ui: Path, relay: Relay
+) -> None:
+    paced = Relay(
+        relay.analytics, relay.consent, relay.limiter, InMemoryRateLimiter(per_second=1, burst=3)
+    )
+    app = app_for(grants, Readers(analytics=paced.analytics), invite, ui, relay=paced)
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://app/portalr"
+    ) as client:
+        for _ in range(3):
+            said = await client.put("/v1/analytics/consent", json={"given": True}, headers=ALICE)
+            assert said.status_code == 200
+        assert (await client.get("/v1/analytics/consent", headers=ALICE)).status_code == 429
+
+
+async def test_a_loop_of_yes_and_no_sets_off_so_many_deletions_and_owes_the_rest(
+    client: httpx.AsyncClient, clickhouse: ClickHouse, relay: Relay
+) -> None:
+    for _ in range(15):
+        await client.put("/v1/analytics/consent", json={"given": True}, headers=ALICE)
+        await client.put("/v1/analytics/consent", json={"given": False}, headers=ALICE)
+    assert deletions(clickhouse) == 10, "the person's ten an hour"
+    assert await relay.consent.owes("alice") is not None, "the rest stays owed"
+    assert await relay.settle_owed() == 1, "the background pass isn't paced"
+    assert await relay.consent.owes("alice") is None
+    assert deletions(clickhouse) == 11
+
+
+async def test_a_pass_settles_so_many_people_at_most(clickhouse: ClickHouse, relay: Relay) -> None:
+    for person in ("alice", "bob", "carol"):
+        await relay.consent.give(person, yes=True)
+        await relay.consent.give(person, yes=False)
+    assert await relay.settle_owed(most=2) == 2
+    assert [person for person, _ in await relay.consent.owing()] == ["carol"]

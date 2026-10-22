@@ -16,6 +16,7 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
+from portalr.analytics import Relay
 from portalr.invites import InviteFailed, SupabaseInvite
 from portalr.people import SupabasePeople
 from portalr.readers import Analytics
@@ -555,3 +556,27 @@ def test_a_deletion_owed_is_done_as_the_application_starts_again(
             client.get("/healthz")
             time.sleep(0.01)
     assert "deleted the events of 1 people owed it" in caplog.text
+
+
+def test_a_pass_that_fails_is_logged_and_the_application_still_stops(
+    script: Script,
+    ui: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    async def unreadable(*_: object, **__: object) -> int:
+        raise RuntimeError("the database went away")
+
+    monkeypatch.setattr(Relay, "settle_owed", unreadable)
+    named = replace(
+        with_portal(ui_dir=str(ui), **ANALYTICS),
+        database_url=f"sqlite+aiosqlite:///{tmp_path / 'app.db'}",
+    )
+    with caplog.at_level(logging.ERROR), TestClient(app(script, named)) as client:
+        for _ in range(50):
+            if "the deletions owed weren't read" in caplog.text:
+                break
+            client.get("/healthz")
+            time.sleep(0.01)
+    assert "the deletions owed weren't read" in caplog.text

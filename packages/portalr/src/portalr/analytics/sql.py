@@ -10,8 +10,9 @@ table, and row-level security doesn't hold it. Its Alembic migrations record the
 ``portalr_alembic_version``, apart from the application's own and the libraries'.
 """
 
+from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import Final
+from typing import Any, Final
 
 from alembic import command
 from alembic.config import Config
@@ -22,6 +23,10 @@ from sqlalchemy import (
     Integer,
     MetaData,
     String,
+    and_,
+    case,
+    literal,
+    not_,
     select,
     text,
     update,
@@ -112,27 +117,65 @@ class SqlConsent:
         return bool(answer)
 
     async def give(self, user_id: str, *, yes: bool) -> int | None:
-        """Record the person's answer: the deletion now owed them, if any, by its number."""
+        """Record the person's answer: the deletion now owed them, if any, by its number.
+
+        One statement, which locks the row: a yes taken back takes the next number, a no again
+        keeps the one owed, a yes clears it; and it touches nothing else of the row's.
+        """
+        table = Answer.__table__.c
         async with self._engine.begin() as connection:
             await _as_person(connection, user_id)
-            before = await _row(connection, user_id)
-            given, owed, debts = before if before is not None else (False, 0, 0)
-            if yes:
-                owed = 0
-            elif given:
-                debts += 1
-                owed = debts
-            await _put(connection, user_id, yes, owed, debts)
+            taken_back = and_(not_(literal(yes)), table.given)
+            owed = await connection.scalar(
+                _upsert(connection)(Answer)
+                .values(
+                    user_id=user_id,
+                    given=yes,
+                    answered_at=datetime.now(UTC),
+                    delete_owed=0,
+                    debts=0,
+                )
+                .on_conflict_do_update(
+                    index_elements=[Answer.user_id],
+                    set_={
+                        "given": yes,
+                        "answered_at": datetime.now(UTC),
+                        "delete_owed": case(
+                            (literal(yes), 0),
+                            (taken_back, table.debts + 1),
+                            else_=table.delete_owed,
+                        ),
+                        "debts": case((taken_back, table.debts + 1), else_=table.debts),
+                    },
+                )
+                .returning(Answer.delete_owed)
+            )
         return owed or None
 
     async def owe(self, user_id: str) -> int:
-        """Owe the person a new deletion, whatever their answer: its number."""
+        """Owe the person a new deletion, whatever their answer: its number.
+
+        One statement, which locks the row and leaves the person's answer as it stands.
+        """
+        table = Answer.__table__.c
         async with self._engine.begin() as connection:
             await _as_person(connection, user_id)
-            before = await _row(connection, user_id)
-            given, _, debts = before if before is not None else (False, 0, 0)
-            await _put(connection, user_id, given, debts + 1, debts + 1)
-        return debts + 1
+            owed = await connection.scalar(
+                _upsert(connection)(Answer)
+                .values(
+                    user_id=user_id,
+                    given=False,
+                    answered_at=datetime.now(UTC),
+                    delete_owed=1,
+                    debts=1,
+                )
+                .on_conflict_do_update(
+                    index_elements=[Answer.user_id],
+                    set_={"delete_owed": table.debts + 1, "debts": table.debts + 1},
+                )
+                .returning(Answer.delete_owed)
+            )
+        return int(owed or 0)
 
     async def owes(self, user_id: str) -> int | None:
         """The deletion owed the person, by its number, if any."""
@@ -164,36 +207,9 @@ class SqlConsent:
             return [(row.user_id, row.delete_owed) for row in rows]
 
 
-async def _row(connection: AsyncConnection, user_id: str) -> tuple[bool, int, int] | None:
-    """The person's answer, the deletion owed them, and how many they have been owed."""
-    row = (
-        await connection.execute(
-            select(Answer.given, Answer.delete_owed, Answer.debts).where(Answer.user_id == user_id)
-        )
-    ).first()
-    return None if row is None else (bool(row.given), int(row.delete_owed), int(row.debts))
-
-
-async def _put(
-    connection: AsyncConnection, user_id: str, given: bool, owed: int, debts: int
-) -> None:
-    """Write the person's row, as it now stands."""
-    row = {
-        "user_id": user_id,
-        "given": given,
-        "answered_at": datetime.now(UTC),
-        "delete_owed": owed,
-        "debts": debts,
-    }
-    insert = (postgres_insert if connection.dialect.name == "postgresql" else sqlite_insert)(
-        Answer
-    ).values(row)
-    await connection.execute(
-        insert.on_conflict_do_update(
-            index_elements=[Answer.user_id],
-            set_={key: value for key, value in row.items() if key != "user_id"},
-        )
-    )
+def _upsert(connection: AsyncConnection) -> Callable[..., Any]:
+    """The dialect's INSERT, which has ON CONFLICT."""
+    return postgres_insert if connection.dialect.name == "postgresql" else sqlite_insert
 
 
 async def _as_person(connection: AsyncConnection, user_id: str) -> None:

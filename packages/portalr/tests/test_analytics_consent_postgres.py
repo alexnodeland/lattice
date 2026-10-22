@@ -90,3 +90,30 @@ async def test_two_replicas_migrating_at_once_both_succeed(
 ) -> None:
     owner, _ = schema
     await asyncio.gather(migrate(owner), migrate(owner))
+
+
+async def test_deletions_owed_at_once_each_take_a_number_of_their_own(
+    schema: tuple[AsyncEngine, AsyncEngine],
+) -> None:
+    owner, application = schema
+    consent = SqlConsent(application, owner=owner)
+    await consent.give("alice", yes=True)
+    numbers = await asyncio.gather(*(consent.owe("alice") for _ in range(20)))
+    assert sorted(numbers) == list(range(1, 21))
+    assert await consent.owes("alice") == 20
+
+
+async def test_a_yes_racing_a_deletion_owed_survives_with_the_debt_owed(
+    schema: tuple[AsyncEngine, AsyncEngine],
+) -> None:
+    owner, application = schema
+    consent = SqlConsent(application, owner=owner)
+    await consent.give("alice", yes=False)
+    for _ in range(10):
+        _, debt = await asyncio.gather(consent.give("alice", yes=True), consent.owe("alice"))
+        given = await consent.given("alice")
+        owed = await consent.owes("alice")
+        # Whichever ran last: a yes after the debt clears it; a debt after the yes stays owed.
+        assert given, "the yes is never lost"
+        assert owed in (None, debt)
+        await consent.give("alice", yes=False)

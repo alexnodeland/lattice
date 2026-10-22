@@ -108,6 +108,8 @@ class Relay:
         limiter: How many events a person may send, and how fast.
         requests: How many requests a person may make, events or answers, and how fast: asked
             before anything else, so even a refused or a dropped request costs only a count.
+        deletes: How many deletions a person's answers may set off, and how fast: past it, a
+            deletion stays owed for the background pass, and an answer sets off no mutation.
     """
 
     analytics: Analytics
@@ -115,6 +117,9 @@ class Relay:
     limiter: RateLimiter
     requests: RateLimiter = field(
         default_factory=lambda: InMemoryRateLimiter(per_second=1, burst=20)
+    )
+    deletes: RateLimiter = field(
+        default_factory=lambda: InMemoryRateLimiter(per_second=10 / 3600, burst=10)
     )
 
     def sign(self, user_id: str, *, now: float | None = None) -> str:
@@ -144,26 +149,29 @@ class Relay:
             return Answered(given=True)
         return Answered(given=False, deleted=await self.settle(user_id, debt) if debt else None)
 
-    async def settle(self, user_id: str, debt: int) -> bool:
+    async def settle(self, user_id: str, debt: int, *, paced: bool = True) -> bool:
         """Delete the person's events, for deletion `debt`: whether it was done.
 
         Undone, it stays owed. Done, it clears `debt` alone: a newer deletion, owed for events
-        written since this one began, stays owed.
+        written since this one began, stays owed. A person's own requests set off at most so many
+        deletions an hour (`paced`); past it, the background pass, which isn't paced, settles it.
         """
+        if paced and self.deletes.spend(user_id, 1) is not None:
+            return False
         if not await self.analytics.forget(user_id):
             return False
         await self.consent.settled(user_id, debt)
         return True
 
-    async def settle_owed(self) -> int:
-        """Delete the events of everyone a deletion is owed, one after another: how many.
+    async def settle_owed(self, *, most: int = 100) -> int:
+        """Delete the events of at most `most` people a deletion is owed, in turn: how many.
 
-        Every replica that starts runs it: two may delete the same person's events, which does
+        Every replica runs it, now and then: two may delete the same person's events, which does
         no harm, since a deletion done twice deletes nothing more.
         """
         done = 0
-        for user_id, debt in await self.consent.owing():
-            done += await self.settle(user_id, debt)
+        for user_id, debt in (await self.consent.owing())[:most]:
+            done += await self.settle(user_id, debt, paced=False)
         return done
 
     async def record(self, tenant: str, user_id: str, batch: Batch, session_id: str) -> Relayed:

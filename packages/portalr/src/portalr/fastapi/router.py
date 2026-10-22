@@ -680,7 +680,10 @@ def _analytics(router: APIRouter, grants: Grants, relay: Relay, current: Any) ->
         return user
 
     async def answering(who: Caller = current) -> str:
-        return signed_in_person(who)
+        user = signed_in_person(who)
+        # Counted, so answers drain the person's pace for the other routes; never refused.
+        relay.requests.spend(user, 1)
+        return user
 
     signed_in = Depends(person)
 

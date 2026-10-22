@@ -59,7 +59,8 @@ Option A puts each check where the fact it needs is already in hand, and keeps t
 - Harder: an application with its own native type must give `NativeFiles` its format, or its files can't be uploaded by people (the type's `extensions` are empty, and portalr offers none).
 - Harder: pace and readings multiply with replicas; a deployment with several sets them per replica, or puts its own limit in front.
 - Harder: an upload refused at its commit, such as one with an id the person can't see, leaves its bytes counted until collection, a day by default.
-- Revisit: the generated application's settings for these limits (stackr's template), which are the defaults until wired; a place is held for the whole body, so `Busy` from the tenant's readings comes after the body is spooled; the portal honouring `Retry-After`; a client's disconnect mapped to its own outcome.
+- Revisit: a place among the router's is held for the whole body and taken before it is read, but `Busy` from the tenant's readings comes only after the body is spooled, as the app is about to read it; the portal honouring `Retry-After`; a client's disconnect mapped to its own outcome.
+- Met: the generated application sets these limits and quotas from its `.env`, `FILES_UPLOADS_*`, `FILES_READINGS` and `FILES_*_QUOTA`, artifactr's defaults unless set (stackr's template).
 - Revisit: a quota per tenant's plan, read from a port, if deployments want them to differ.
 
 ## Action items

@@ -168,6 +168,20 @@ class Uploads:
     readings: int = 2
     """How many of a tenant's files its apps read at once."""
 
+    def __post_init__(self) -> None:
+        tenant = self.tenant
+        if not 1 <= self.each <= tenant <= self.at_once:
+            raise ValueError(
+                "FILES_UPLOADS_EACH, FILES_UPLOADS_PER_TENANT and FILES_UPLOADS_AT_ONCE are each "
+                f"at least the one before: not {self.each}, {tenant} and {self.at_once}"
+            )
+
+    @property
+    def tenant(self) -> int:
+        """A tenant's share, as ``files_router`` takes it: half the places, unless set."""
+        each = min(self.each, self.at_once)
+        return max(self.at_once // 2, each) if self.per_tenant is None else self.per_tenant
+
 
 @dataclass(frozen=True)
 class FilesSettings:
@@ -232,15 +246,11 @@ class FilesSettings:
         return cls(
             crafts=crafts,
             uploads=Uploads(
-                per_minute=int(env.get("FILES_UPLOADS_PER_MINUTE", Uploads.per_minute)),
-                at_once=int(env.get("FILES_UPLOADS_AT_ONCE", Uploads.at_once)),
-                per_tenant=(
-                    int(env["FILES_UPLOADS_PER_TENANT"])
-                    if env.get("FILES_UPLOADS_PER_TENANT")
-                    else None
-                ),
-                each=int(env.get("FILES_UPLOADS_EACH", Uploads.each)),
-                readings=int(env.get("FILES_READINGS", Uploads.readings)),
+                per_minute=_whole(env, "FILES_UPLOADS_PER_MINUTE", Uploads.per_minute),
+                at_once=_whole(env, "FILES_UPLOADS_AT_ONCE", Uploads.at_once),
+                per_tenant=_whole(env, "FILES_UPLOADS_PER_TENANT", None),
+                each=_whole(env, "FILES_UPLOADS_EACH", Uploads.each),
+                readings=_whole(env, "FILES_READINGS", Uploads.readings),
             ),
             workspace_quota=_quota(env.get("FILES_WORKSPACE_QUOTA", ""), "FILES_WORKSPACE_QUOTA"),
             tenant_quota=_quota(env.get("FILES_TENANT_QUOTA", ""), "FILES_TENANT_QUOTA"),
@@ -537,11 +547,28 @@ def _quota(text: str, name: str) -> Held | None:
     """
     if not text.strip():
         return None
-    held, _, files = text.partition(",")
+    held, comma, files = text.partition(",")
     try:
-        return Held(bytes=int(held), files=int(files) if files.strip() else None)
+        counts = [int(held), *([int(files)] if comma else [])]
     except ValueError:
-        raise ValueError(f"{name} is <bytes> or <bytes>,<files>, not {text!r}") from None
+        counts = []
+    if not counts or min(counts) < 0:
+        raise ValueError(f"{name} is <bytes> or <bytes>,<files>, each whole, not {text!r}")
+    return Held(*counts)
+
+
+def _whole[N: int | None](env: Mapping[str, str], name: str, default: N) -> int | N:
+    """A setting that is a whole number of at least one, or its default if unset or empty.
+
+    Raises:
+        ValueError: If it is set to anything else, named by its variable.
+    """
+    text = env.get(name, "").strip()
+    if not text:
+        return default
+    if not text.isdigit() or int(text) < 1:
+        raise ValueError(f"{name} is a whole number of at least 1, not {text!r}")
+    return int(text)
 
 
 {% endif -%}

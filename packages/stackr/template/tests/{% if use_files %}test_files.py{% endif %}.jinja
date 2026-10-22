@@ -2,8 +2,11 @@
 in for a crafting app's CLI."""
 
 {% if use_portal -%}
+import asyncio
+import hashlib
 import runpy
 import sys
+import threading
 {% endif -%}
 from dataclasses import replace
 from pathlib import Path
@@ -11,6 +14,7 @@ from pathlib import Path
 from typing import Any
 {%- endif %}
 
+import anyio
 import httpx
 import pytest
 {%- if use_portal %}
@@ -23,6 +27,7 @@ from starlette.requests import HTTPConnection
 from artifactr import InMemoryStorage, UserActor, Workspaces
 from artifactr.core import Actor, TenantId
 from artifactr.files import DOCX, FakeApp, WordDocument
+from artifactr.files.app import Inspection
 from artifactr.files.blobs import once
 from artifactr.files.worker import Limits, worker_app
 from lattice_core.integrations import Defaults
@@ -133,6 +138,19 @@ def test_the_application_mounts_native_files_while_an_app_runs(script: Script) -
         ({"FILES_CRAFTS": "wordcraft"}, "needs FILES_WORDCRAFT_TOKEN, of at least 32"),
         ({"FILES_CRAFTS": "wordcraft", "FILES_WORDCRAFT_TOKEN": "short"}, "of at least 32"),
         ({"FILES_WORKSPACE_QUOTA": "lots"}, "FILES_WORKSPACE_QUOTA is <bytes> or <bytes>,<files>"),
+        ({"FILES_TENANT_QUOTA": "1000,"}, "FILES_TENANT_QUOTA is <bytes> or <bytes>,<files>"),
+        ({"FILES_TENANT_QUOTA": "-1"}, "FILES_TENANT_QUOTA is <bytes> or <bytes>,<files>"),
+        ({"FILES_UPLOADS_AT_ONCE": "abc"}, "FILES_UPLOADS_AT_ONCE is a whole number of at least 1"),
+        ({"FILES_UPLOADS_EACH": "0"}, "FILES_UPLOADS_EACH is a whole number of at least 1"),
+        ({"FILES_READINGS": "-2"}, "FILES_READINGS is a whole number of at least 1"),
+        (
+            {"FILES_UPLOADS_PER_TENANT": "9"},
+            "FILES_UPLOADS_EACH, FILES_UPLOADS_PER_TENANT and FILES_UPLOADS_AT_ONCE",
+        ),
+        (
+            {"FILES_UPLOADS_EACH": "3", "FILES_UPLOADS_PER_TENANT": "2"},
+            "not 3, 2 and 8",
+        ),
     ],
 )
 def test_native_files_settings_are_refused_unless_they_hold(
@@ -164,17 +182,54 @@ def test_uploads_are_held_back_as_the_environment_says() -> None:
     assert (FilesSettings().workspace_quota, FilesSettings().tenant_quota) == (None, None)
 
 
-def test_the_application_takes_uploads_held_back_and_its_files_to_quotas(script: Script) -> None:
+class Reads(Stand):
+    """WordCraft standing in, reading any file as a Word document, each once let through."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.reading = threading.Event()
+        self.through = threading.Event()
+        self.through.set()
+
+    async def inspect(self, source: bytes, *, deadline: float) -> Inspection:
+        self.reading.set()
+        await anyio.to_thread.run_sync(self.through.wait)
+        return Inspection(fingerprint=hashlib.sha256(source).hexdigest(), media_type=DOCX)
+
+
+async def test_uploads_are_held_back_and_files_held_to_quotas_as_the_settings_say() -> None:
     held = replace(
         WORDCRAFT,
-        uploads=Uploads(at_once=1, each=1),
-        workspace_quota=Held(1, 1),
-        tenant_quota=Held(10),
+        uploads=Uploads(at_once=1, each=1, readings=1),
+        workspace_quota=Held(100),
     )
-    config = replace(settings(), files=held)
-    with TestClient(app(script, config, workers=workers()), headers=bearer()) as client:
-        offered = client.get("/artifactr/v1/workspaces/main/uploads")
-    assert offered.status_code == 200, offered.text
+    reads = Reads()
+    files = Files(held, integrations=Defaults(), transport=workers(app=reads))
+    assert files.native is not None
+    assert files.native.readings == 1, "FILES_READINGS reaches NativeFiles"
+    application = FastAPI()
+    workspaces = Workspaces(InMemoryStorage(), types=files.types)
+    files.mount(application, workspaces, resolve_actor=resolve_actor, prefix="/artifactr/v1")
+    upload = "/artifactr/v1/workspaces/main/files"
+    params = {"kind": "word_document", "name": "a.docx"}
+    small, large = (b"PK\x03\x04" + b"\x00" * n for n in (8, 200))
+    transport = httpx.ASGITransport(app=application)
+    async with (
+        files.lifespan(),
+        httpx.AsyncClient(transport=transport, base_url="http://a") as client,
+    ):
+        over = await client.post(upload, params=params, content=large)
+        assert over.json()["detail"]["quota"] == "workspace_bytes", "FILES_WORKSPACE_QUOTA"
+        reads.through.clear()
+        reads.reading.clear()
+        going = asyncio.create_task(client.post(upload, params=params, content=small))
+        try:
+            assert await anyio.to_thread.run_sync(reads.reading.wait, 10)
+            busy = await client.post(upload, params=params, content=small)
+        finally:
+            reads.through.set()
+        assert (await going).status_code == 201
+    assert busy.json()["detail"]["type"] == "busy", "FILES_UPLOADS_AT_ONCE"
 {%- if use_portal %}
 
 

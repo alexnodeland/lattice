@@ -63,7 +63,7 @@ export const Route = createFileRoute("/_signed/t/$tenant/logs")({
   notFoundComponent: () => (
     <>
       {HEADER}
-      <EmptyState title="Logs aren't yours to read here">
+      <EmptyState focus title="Logs aren't yours to read here">
         portalr shows a tenant's logs to those who may read its telemetry, such as its owners and
         admins.
       </EmptyState>

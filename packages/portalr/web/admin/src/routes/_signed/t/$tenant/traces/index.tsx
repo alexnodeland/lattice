@@ -63,7 +63,7 @@ export const Route = createFileRoute("/_signed/t/$tenant/traces/")({
   notFoundComponent: () => (
     <>
       {HEADER}
-      <EmptyState title="Traces aren't yours to read here">
+      <EmptyState focus title="Traces aren't yours to read here">
         portalr shows a tenant's traces to those who may read its telemetry, such as its owners and
         admins.
       </EmptyState>

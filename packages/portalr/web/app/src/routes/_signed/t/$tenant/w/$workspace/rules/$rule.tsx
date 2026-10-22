@@ -1,5 +1,13 @@
 import { allowedIn, keys, Refused, refusal } from "@portalr/client";
-import { Alert, Button, ConfirmDialog, PageHeader, TextField } from "@portalr/ui";
+import {
+  Alert,
+  Button,
+  ConfirmDialog,
+  EmptyState,
+  PageHeader,
+  TextField,
+  TextLink,
+} from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import { useActionState, useMemo, useState } from "react";
@@ -42,12 +50,7 @@ export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/rules/$rul
       throw error;
     }
   },
-  notFoundComponent: () => (
-    <>
-      <PageHeader title="Rule not found" />
-      <p>There's no rule here by that name: it may have been archived.</p>
-    </>
-  ),
+  notFoundComponent: NotFound,
   component: RulePage,
 });
 
@@ -184,5 +187,27 @@ function RulePage() {
         </section>
       )}
     </section>
+  );
+}
+
+function NotFound() {
+  const { tenant, workspace } = Route.useParams();
+  return (
+    <>
+      <PageHeader title="Rules" />
+      <EmptyState
+        focus
+        title="Rule not found"
+        action={
+          <TextLink
+            render={<Link to="/t/$tenant/w/$workspace/rules" params={{ tenant, workspace }} />}
+          >
+            All rules
+          </TextLink>
+        }
+      >
+        There's no rule here by that name: it may have been archived.
+      </EmptyState>
+    </>
   );
 }

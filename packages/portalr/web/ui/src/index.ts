@@ -66,6 +66,7 @@ export { DashboardView } from "./dashboard-view";
 export { Dialog } from "./dialog";
 export { Disclosure } from "./disclosure";
 export { EmptyState } from "./empty-state";
+export { ErrorState } from "./error-state";
 export { failureSaid } from "./failure";
 export { FileChooser } from "./file-chooser";
 export { PageViewer, SheetTable, sheetsOf } from "./file-preview";

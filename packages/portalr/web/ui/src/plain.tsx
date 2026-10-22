@@ -19,8 +19,11 @@ export function Plain({
 }: {
   /** Whose lockup it shows: `app`'s or `admin`'s. */
   ui?: Ui;
-  /** The link home, such as the router's, that the lockup renders as. */
-  home: ReactElement;
+  /**
+   * The link home, such as the router's, that the lockup renders as; or, before there is a
+   * router, such as when the app can't start, the address home.
+   */
+  home: ReactElement | string;
   title: string;
   account?: ReactNode;
   children?: ReactNode;
@@ -29,8 +32,9 @@ export function Plain({
   const kit = useBrand() !== null;
   const link = useRender({
     defaultTagName: "a",
-    render: home,
+    render: typeof home === "string" ? undefined : home,
     props: {
+      href: typeof home === "string" ? home : undefined,
       "aria-label": name,
       title: kit ? name : undefined,
       className: cn(

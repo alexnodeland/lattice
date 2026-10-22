@@ -47,7 +47,7 @@ export const Route = createFileRoute("/_signed/t/$tenant/audit")({
   notFoundComponent: () => (
     <>
       {HEADER}
-      <EmptyState title="The audit log isn't yours to read here">
+      <EmptyState focus title="The audit log isn't yours to read here">
         grantr shows a tenant's audit log to those who may read it, such as its owners.
       </EmptyState>
     </>

@@ -56,7 +56,7 @@ export const Route = createFileRoute("/_signed/t/$tenant/integrations")({
   notFoundComponent: () => (
     <>
       {HEADER}
-      <EmptyState title="Integrations aren't yours to switch here">
+      <EmptyState focus title="Integrations aren't yours to switch here">
         Integrations are switched by a tenant's owners and admins.
       </EmptyState>
     </>

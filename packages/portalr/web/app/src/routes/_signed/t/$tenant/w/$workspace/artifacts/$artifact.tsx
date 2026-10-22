@@ -3,12 +3,14 @@ import {
   AppHostContext,
   ArtifactContent,
   Card,
+  EmptyState,
   FormHostContext,
   PageHeader,
   ProposalCard,
   proposedOn,
   Revisions,
   SectionTitle,
+  TextLink,
   Thumbs,
 } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
@@ -59,12 +61,7 @@ export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/artifacts/
       throw error;
     }
   },
-  notFoundComponent: () => (
-    <>
-      <PageHeader title="Artifact not found" />
-      <p>There's no artifact here by that name, or it isn't one you can see.</p>
-    </>
-  ),
+  notFoundComponent: NotFound,
   component: Artifact,
 });
 
@@ -236,5 +233,27 @@ function Artifact() {
         </AppHostContext>
       </section>
     </section>
+  );
+}
+
+function NotFound() {
+  const { tenant, workspace } = Route.useParams();
+  return (
+    <>
+      <PageHeader title="Artifacts" />
+      <EmptyState
+        focus
+        title="Artifact not found"
+        action={
+          <TextLink
+            render={<Link to="/t/$tenant/w/$workspace/artifacts" params={{ tenant, workspace }} />}
+          >
+            All artifacts
+          </TextLink>
+        }
+      >
+        There's no artifact here by that name, or it isn't one you can see.
+      </EmptyState>
+    </>
   );
 }

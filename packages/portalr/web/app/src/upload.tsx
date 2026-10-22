@@ -215,6 +215,11 @@ export function Uploader({
     return null;
   }
   const on = offered.kinds.filter((kind) => kind.enabled);
+  const extensions = on.flatMap((kind) => kind.extensions);
+  // What a refused file is told this workspace takes instead, inline: ".docx, .pdf or .fcproj".
+  const takes = new Intl.ListFormat("en", { type: "disjunction" }).format(
+    new Set(extensions.map((extension) => extension.toLowerCase())),
+  );
   const choose = (file: File) => {
     const name = plainName(file.name);
     const kinds = kindsOf(file.name, offered.kinds);
@@ -223,7 +228,7 @@ export function Uploader({
     const most = offered.kinds.find((k) => k.kind === kind)?.limit ?? offered.limit;
     const problem =
       kind === undefined
-        ? `${name} isn't a kind of file this workspace takes.`
+        ? `${name} isn't a kind of file this workspace takes: it takes ${takes}.`
         : kinds.length > 1
           ? `${name} could be several kinds of file, so it can't be told which to make.`
           : !on.some((k) => k.kind === kind)
@@ -248,7 +253,6 @@ export function Uploader({
     }
     setItems((now) => [...now, item]);
   };
-  const extensions = on.flatMap((kind) => kind.extensions);
   // The kinds' extensions by the largest file each takes, the largest first: ".docx, .pdf up to
   // 26 MB each; .fcproj up to 2.1 MB each".
   const byLimit = new Map<number, string[]>();

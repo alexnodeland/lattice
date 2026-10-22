@@ -164,7 +164,7 @@ export function Message({
       aria-labelledby={name}
       aria-busy={sending || undefined}
       className={cn(
-        "flex max-w-[min(100%,42rem)] flex-col gap-1",
+        "flex max-w-[min(100%,var(--bubble-max-width))] flex-col gap-1",
         mine ? "items-end self-end" : "items-start self-start",
         notice && "text-muted italic",
       )}
@@ -201,7 +201,7 @@ export function Message({
 export function Streaming({ text, author }: { text: string; author: string }) {
   return (
     <li
-      className="flex max-w-[min(100%,42rem)] flex-col items-start gap-1 self-start"
+      className="flex max-w-[min(100%,var(--bubble-max-width))] flex-col items-start gap-1 self-start"
       aria-busy="true"
       aria-label={text ? `${author} is writing` : `${author} is thinking`}
     >
@@ -251,10 +251,13 @@ export function InlineArtifact({
   name,
   kind,
   open,
+  actions,
   children,
 }: {
   /** What it is called, which names it in the log. */
   name: string;
+  /** Icon buttons of its own, such as a file's download, set in its header before its page's. */
+  actions?: ReactNode;
   /** What kind of thing it is, as people say it, such as "Note" or "Word document". */
   kind?: string;
   /**
@@ -293,6 +296,8 @@ export function InlineArtifact({
             <span className={cn(TYPE.label, "break-words")}>{name}</span>
           </p>
           <span className="flex shrink-0 items-center gap-1">
+            {/* In the full view, the way back alone (portalr ADR-0061). */}
+            {!full && actions}
             {open && !full && <IconButton label="Open its page" icon={FileText} render={open} />}
             <IconButton
               ref={back}

@@ -29,6 +29,7 @@ from artifactr.files import (
     {{ name }},
 {%- endfor %}
 )
+from artifactr.files.blobs import Quota
 from artifactr.files.fastapi import files_router
 from artifactr.files.sql import SqlBlobs, SqlCheckouts, migrate
 from artifactr.files.tools import native_file_tools
@@ -36,7 +37,7 @@ from artifactr.files.worker import Worker
 from lattice_core.integrations import Integrations
 
 from {{ package_name }}.database import Database
-from {{ package_name }}.settings import CRAFTS, FilesSettings
+from {{ package_name }}.settings import CRAFTS, FilesSettings, Held
 
 TYPES: Final[Mapping[str, type[NativeFile]]] = {
 {%- for name, craft in crafts.items() %}
@@ -74,12 +75,18 @@ class Files:
             craft: Worker.at(worker_url(craft), token=settings.tokens[craft], transport=transport)
             for craft in settings.crafts
         }
+        self._uploads = settings.uploads
         self.native: NativeFiles | None = None
         if self._workers:
             apps: dict[type[NativeFile], App] = {
                 TYPES[craft]: worker for craft, worker in self._workers.items()
             }
-            self.native = NativeFiles(*_stores(database), apps, integrations=integrations)
+            self.native = NativeFiles(
+                *_stores(database, settings),
+                apps,
+                integrations=integrations,
+                readings=settings.uploads.readings,
+            )
 
     @property
     def types(self) -> list[type[NativeFile]]:
@@ -131,19 +138,39 @@ class Files:
     ) -> None:
         """Add native files' routes beside artifactr's, while any app runs."""
         if self.native is not None:
-            router = files_router(workspaces, self.native, resolve_actor=resolve_actor)
+            uploads = self._uploads
+            router = files_router(
+                workspaces,
+                self.native,
+                resolve_actor=resolve_actor,
+                uploads_per_minute=uploads.per_minute,
+                uploads_at_once=uploads.at_once,
+                uploads_per_tenant=uploads.per_tenant,
+                uploads_each=uploads.each,
+            )
             app.include_router(router, prefix=prefix)
 
 
-def _stores(database: Database | None) -> tuple[Blobs, Checkouts]:
-    """The files' bytes and check-outs: in the database, or in memory without one.
+def _stores(database: Database | None, settings: FilesSettings) -> tuple[Blobs, Checkouts]:
+    """The files' bytes, held to the quotas, and check-outs: in the database, or in memory.
 
     In the database, they are kept apart by tenant as artifactr's tables are.
     """
+    workspace, tenant = _quota(settings.workspace_quota), _quota(settings.tenant_quota)
     if database is None:
-        return InMemoryBlobs(), InMemoryCheckouts()
+        blobs = InMemoryBlobs(workspace_quota=workspace, tenant_quota=tenant)
+        return blobs, InMemoryCheckouts()
     rls = database.row_level_security
     return (
-        SqlBlobs(database.engine, row_level_security=rls),
+        SqlBlobs(
+            database.engine,
+            row_level_security=rls,
+            workspace_quota=workspace,
+            tenant_quota=tenant,
+        ),
         SqlCheckouts(database.engine, row_level_security=rls),
     )
+
+
+def _quota(held: Held | None) -> Quota | None:
+    return None if held is None else Quota(bytes=held.bytes, files=held.files)

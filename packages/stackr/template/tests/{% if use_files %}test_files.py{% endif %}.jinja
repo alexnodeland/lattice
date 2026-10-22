@@ -1,16 +1,22 @@
 """Native files: each app's worker, called over HTTP, here in process, with the fake app standing
 in for a crafting app's CLI."""
 
+import asyncio
+import contextlib
+import hashlib
 {% if use_portal -%}
 import runpy
 import sys
 {% endif -%}
+import threading
+from collections.abc import AsyncIterator
 from dataclasses import replace
 from pathlib import Path
 {%- if use_portal %}
 from typing import Any
 {%- endif %}
 
+import anyio
 import httpx
 import pytest
 {%- if use_portal %}
@@ -22,14 +28,25 @@ from starlette.requests import HTTPConnection
 
 from artifactr import InMemoryStorage, UserActor, Workspaces
 from artifactr.core import Actor, TenantId
+from artifactr.fastapi import ResolveActor
 from artifactr.files import DOCX, FakeApp, WordDocument
+from artifactr.files.app import Inspection
 from artifactr.files.blobs import once
 from artifactr.files.worker import Limits, worker_app
 from lattice_core.integrations import Defaults
 
 from {{ package_name }}.database import open_database
 from {{ package_name }}.files import Files
-from {{ package_name }}.settings import CRAFTS, FilesSettings, {% if use_portal %}PortalSettings, {% endif %}Settings
+from {{ package_name }}.settings import (
+    CRAFTS,
+    FilesSettings,
+    Held,
+{%- if use_portal %}
+    PortalSettings,
+{%- endif %}
+    Settings,
+    Uploads,
+)
 
 from conftest import TENANT, Script, app, bearer, settings
 
@@ -123,6 +140,23 @@ def test_the_application_mounts_native_files_while_an_app_runs(script: Script) -
         ({"FILES_CRAFTS": "wordcraft,filmcraft"}, "names filmcraft: a worker runs wordcraft"),
         ({"FILES_CRAFTS": "wordcraft"}, "needs FILES_WORDCRAFT_TOKEN, of at least 32"),
         ({"FILES_CRAFTS": "wordcraft", "FILES_WORDCRAFT_TOKEN": "short"}, "of at least 32"),
+        ({"FILES_WORKSPACE_QUOTA": "lots"}, "FILES_WORKSPACE_QUOTA is <bytes> or <bytes>,<files>"),
+        ({"FILES_TENANT_QUOTA": "1000,"}, "FILES_TENANT_QUOTA is <bytes> or <bytes>,<files>"),
+        ({"FILES_TENANT_QUOTA": "-1"}, "FILES_TENANT_QUOTA is <bytes> or <bytes>,<files>"),
+        ({"FILES_TENANT_QUOTA": "1_000"}, "FILES_TENANT_QUOTA is <bytes> or <bytes>,<files>"),
+        ({"FILES_TENANT_QUOTA": "1000, 10"}, "FILES_TENANT_QUOTA is <bytes> or <bytes>,<files>"),
+        ({"FILES_UPLOADS_EACH": "\u00b2"}, "FILES_UPLOADS_EACH is a whole number of at least 1"),
+        ({"FILES_UPLOADS_AT_ONCE": "abc"}, "FILES_UPLOADS_AT_ONCE is a whole number of at least 1"),
+        ({"FILES_UPLOADS_EACH": "0"}, "FILES_UPLOADS_EACH is a whole number of at least 1"),
+        ({"FILES_READINGS": "-2"}, "FILES_READINGS is a whole number of at least 1"),
+        (
+            {"FILES_UPLOADS_PER_TENANT": "9"},
+            "FILES_UPLOADS_EACH, FILES_UPLOADS_PER_TENANT and FILES_UPLOADS_AT_ONCE",
+        ),
+        (
+            {"FILES_UPLOADS_EACH": "3", "FILES_UPLOADS_PER_TENANT": "2"},
+            "not 3, 2 and 8",
+        ),
     ],
 )
 def test_native_files_settings_are_refused_unless_they_hold(
@@ -134,6 +168,131 @@ def test_native_files_settings_are_refused_unless_they_hold(
 
 def test_no_app_runs_by_default() -> None:
     assert Settings.from_environ({}).files == FilesSettings()
+
+
+def test_uploads_are_held_back_as_the_environment_says() -> None:
+    files = Settings.from_environ(
+        {
+            "FILES_UPLOADS_PER_MINUTE": "5",
+            "FILES_UPLOADS_AT_ONCE": "3",
+            "FILES_UPLOADS_PER_TENANT": "2",
+            "FILES_UPLOADS_EACH": "1",
+            "FILES_READINGS": "1",
+            "FILES_WORKSPACE_QUOTA": "1000,10",
+            "FILES_TENANT_QUOTA": "5000",
+        }
+    ).files
+    assert files.uploads == Uploads(per_minute=5, at_once=3, per_tenant=2, each=1, readings=1)
+    assert (files.workspace_quota, files.tenant_quota) == (Held(1000, 10), Held(5000))
+    assert FilesSettings().uploads == Uploads(), "artifactr's defaults"
+    assert (FilesSettings().workspace_quota, FilesSettings().tenant_quota) == (None, None)
+
+
+class Reads(Stand):
+    """WordCraft standing in, reading any file as a Word document, each once let through."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.reading = threading.Event()
+        self.through = threading.Event()
+        self.through.set()
+
+    async def inspect(self, source: bytes, *, deadline: float) -> Inspection:
+        self.reading.set()
+        await anyio.to_thread.run_sync(self.through.wait)
+        return Inspection(fingerprint=hashlib.sha256(source).hexdigest(), media_type=DOCX)
+
+
+@contextlib.asynccontextmanager
+async def served(
+    held: FilesSettings, reads: Reads, *, resolve: ResolveActor = resolve_actor
+) -> AsyncIterator[httpx.AsyncClient]:
+    """The files' routes, as the settings mount them, over a worker that reads as ``reads`` lets."""
+    files = Files(held, integrations=Defaults(), transport=workers(app=reads))
+    application = FastAPI()
+    workspaces = Workspaces(InMemoryStorage(), types=files.types)
+    files.mount(application, workspaces, resolve_actor=resolve, prefix="/artifactr/v1")
+    transport = httpx.ASGITransport(app=application)
+    async with (
+        files.lifespan(),
+        httpx.AsyncClient(transport=transport, base_url="http://a") as client,
+    ):
+        yield client
+
+
+UPLOAD = "/artifactr/v1/workspaces/main/files"
+PARAMS = {"kind": "word_document", "name": "a.docx"}
+SMALL = b"PK\x03\x04" + b"\x00" * 8
+
+
+async def test_files_are_held_to_the_workspaces_quota_and_read_as_the_settings_say() -> None:
+    held = replace(WORDCRAFT, uploads=Uploads(readings=1), workspace_quota=Held(100))
+    native = Files(held, integrations=Defaults()).native
+    assert native is not None
+    assert native.readings == 1, "FILES_READINGS reaches NativeFiles"
+    async with served(held, Reads()) as client:
+        over = await client.post(UPLOAD, params=PARAMS, content=SMALL + b"\x00" * 200)
+    assert over.json()["detail"]["quota"] == "workspace_bytes", "FILES_WORKSPACE_QUOTA"
+
+
+async def tenants(connection: HTTPConnection) -> tuple[TenantId, Actor]:
+    """Alice, of the tenant the request names in ``x-tenant``."""
+    return connection.headers.get("x-tenant", TENANT), ALICE
+
+
+async def hold(
+    client: httpx.AsyncClient, tenant: str, through: asyncio.Event
+) -> asyncio.Task[httpx.Response]:
+    """An upload, by a tenant, that holds its place while its body waits for ``through``.
+
+    The worker reads one file at a time, so places are held by bodies still arriving instead.
+    """
+    reading = asyncio.Event()
+
+    async def body() -> AsyncIterator[bytes]:
+        yield SMALL[:4]
+        reading.set()  # the route has its place, and reads on
+        await through.wait()
+        yield SMALL[4:]
+
+    headers = {"x-tenant": tenant}
+    going = asyncio.create_task(client.post(UPLOAD, params=PARAMS, content=body(), headers=headers))
+    await asyncio.wait_for(reading.wait(), 10)
+    return going
+
+
+@pytest.mark.parametrize(
+    ("uploads", "held"),
+    [
+        # Two tenants hold one place each: only the places in all, two, refuse a third.
+        (Uploads(at_once=2, per_tenant=2, each=2), ("acme", "globex")),
+        # One person holds one place, with their tenant's and the router's to spare.
+        (Uploads(at_once=3, per_tenant=3, each=1), ("acme",)),
+    ],
+    ids=["FILES_UPLOADS_AT_ONCE", "FILES_UPLOADS_EACH"],
+)
+async def test_a_file_past_its_places_is_refused_as_the_settings_say(
+    uploads: Uploads, held: tuple[str, ...]
+) -> None:
+    through = asyncio.Event()
+    async with served(replace(WORDCRAFT, uploads=uploads), Reads(), resolve=tenants) as client:
+        going = []
+        try:
+            going = [await hold(client, tenant, through) for tenant in held]
+            busy = await client.post(
+                UPLOAD, params=PARAMS, content=SMALL, headers={"x-tenant": "acme"}
+            )
+        finally:
+            through.set()
+        assert [(await g).status_code for g in going] == [201] * len(held)
+    assert busy.json()["detail"]["type"] == "busy"
+
+
+async def test_a_persons_pace_is_the_settings() -> None:
+    async with served(replace(WORDCRAFT, uploads=Uploads(per_minute=1)), Reads()) as client:
+        assert (await client.post(UPLOAD, params=PARAMS, content=SMALL)).status_code == 201
+        paced = await client.post(UPLOAD, params=PARAMS, content=SMALL)
+    assert paced.json()["detail"]["type"] == "rate_limited", "FILES_UPLOADS_PER_MINUTE"
 {%- if use_portal %}
 
 

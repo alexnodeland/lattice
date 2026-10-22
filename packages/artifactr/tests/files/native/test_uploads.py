@@ -150,6 +150,7 @@ async def test_a_tenant_has_only_so_many_files_read_at_once(stores: Stores) -> N
         data = once(FakeApp.file(artifact_id))
         return await files.upload(ws, WordDocument, "w.docx", data, artifact_id=artifact_id)
 
+    assert files.readings == 1
     first = asyncio.create_task(upload("a1"))
     await app.inspecting.wait()
     with pytest.raises(Busy, match="1 of the tenant's files are being read") as raised:

@@ -58,6 +58,10 @@ class Quota:
     bytes: int | None = None
     files: int | None = None
 
+    def __post_init__(self) -> None:
+        if any(n is not None and n < 0 for n in (self.bytes, self.files)):
+            raise ValueError(f"a quota holds no fewer than nothing: not {self}")
+
 
 Over = Literal["workspace_bytes", "workspace_files", "tenant_bytes", "tenant_files"]
 """Which quota a put would pass."""

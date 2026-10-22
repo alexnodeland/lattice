@@ -1,6 +1,6 @@
 # ADR-0062: Badges and headings
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-10-21
 **Deciders:** Alex Nodeland
 

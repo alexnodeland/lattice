@@ -1,6 +1,6 @@
 # ADR-0060: List rows: a name, a quieter line beneath it, and an end
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-10-21
 **Deciders:** Alex Nodeland
 

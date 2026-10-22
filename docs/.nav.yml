@@ -2,6 +2,7 @@
 nav:
   - Home: index.md
   - Architecture: architecture.md
+  - Upgrading to 0.2: upgrading-to-0.2.md
   - Proposals:
       - rfcs/README.md
       - rfcs/0001-grantr-identity-and-access.md

@@ -19,11 +19,13 @@ The review also found that an upload given the id of a file hidden from its uplo
 
 ## Decision
 
-- **A page the app renders takes one of the tenant's readings** (`readings`, two by default), as a file the app reads does. Past them it is refused at once with `Busy`, 429. One tenant's calls, of any kind, never queue more than its readings ahead of another tenant's.
+- **A page the app renders takes one of the tenant's readings** (`readings`, two by default), as a file the app reads does. One tenant's calls, of any kind, never queue more than its readings ahead of another tenant's at the worker.
+- **A page waits for a reading, up to the app's deadline,** in the application, not at the worker: portalr asks for four pages of a file at once, and a proposal's comparison for eight, so a viewer's own batch is served in turn rather than refused. An upload or a check-in is still refused at once, as ADR-0017 says. A page that waits past the deadline is refused with `Busy`, 429, with `Retry-After`.
+- **portalr's client asks again after a 429,** once its `Retry-After` has passed, or after a backoff, up to three times: a 429 is no longer a refusal for what was asked.
 - **A rendered page is kept** by `NativeFiles`, in this process, keyed by its app, the SHA-256 of the bytes it is of, the page and the scale, up to `pages` bytes (64 MiB by default), the least lately read let go first. The same page asked for again reaches neither the app nor any reading. It is given only after the workspace has resolved the file for its reader, so it is the page of bytes they may read.
-- **Each person's pages that reach the app are paced:** `files_router`'s `renders_per_minute`, 30 by default, past which one is refused with 429, `rate_limited`. A page that is kept counts against no pace.
-- **The response tells a browser to keep it:** `Cache-Control: private, max-age=86400`, since a version's page and a proposal's never change, with an `ETag` of its bytes. A request whose `If-None-Match` names it is answered 304.
-- **An upload to an id hidden from its uploader is refused first,** as its commit would refuse it, as a missing artifact, before its bytes are sniffed, read or stored.
+- **Each person's pages that reach the app are paced:** `files_router`'s `renders_per_minute`, 30 by default, past which one is refused with 429, `rate_limited`. A page is counted once it holds a reading, so one refused as busy spends none of the pace, and a page that is kept counts against none.
+- **The response tells a browser to keep it:** `Cache-Control: private, max-age=86400`, since a version's page and a proposal's never change, with an `ETag` of its bytes. A request whose `If-None-Match` names it is answered 304. The tag is of the PNG, so the 304 is decided after the page is had: from what is kept, or, on a miss, after a render. A browser's revalidation of a page this process no longer keeps still costs a render.
+- **An upload to an id hidden from its uploader is refused as an id they can see is,** 409, `artifact <id> already exists`, at the same point, after its bytes are spooled and before the app reads any of them or anything is stored. Status, body and cost are the same for a taken id either way. Only a visible file with the very same bytes answers otherwise (`unchanged`), which needs its bytes.
 
 ## Options considered
 

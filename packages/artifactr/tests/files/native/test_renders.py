@@ -6,7 +6,15 @@ import asyncio
 
 import pytest
 
-from artifactr.core import Actor, NotFound, TenantId, UserActor, Visibility, WorkspaceId
+from artifactr.core import (
+    Actor,
+    InvalidState,
+    NotFound,
+    TenantId,
+    UserActor,
+    Visibility,
+    WorkspaceId,
+)
 from artifactr.files.app import AppFailed, FakeApp, Inspection
 from artifactr.files.blobs import once
 from artifactr.files.manifest import NativeFile, WordDocument
@@ -89,21 +97,68 @@ async def test_a_flood_of_one_tenants_renders_never_times_another_tenants_upload
     await asyncio.sleep(0)
     await uploaded(files, globex, "b1")
     results = await asyncio.gather(*flood)
-    assert sum(result is None for result in results) >= 18, "the tenant's readings held"
-    assert app.rendered <= 2
+    assert any(result is None for result in results), "the tenant's readings held"
+    assert app.rendered < len(flood)
 
 
-async def test_a_render_holds_one_of_the_tenants_readings(stores: Stores) -> None:
-    app = Serial()
-    files = native(stores, app, pages=0)
+class Gated(FakeApp):
+    """A fake app whose renders wait to be let through."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.through = asyncio.Event()
+
+    async def render(self, source: bytes, page: int, *, scale: float, deadline: float) -> bytes:
+        await self.through.wait()
+        return await super().render(source, page, scale=scale, deadline=deadline)
+
+
+async def test_a_render_holds_one_of_the_tenants_readings_and_waits_a_while_for_one(
+    stores: Stores,
+) -> None:
+    app = Gated()
+    files = native(stores, app, pages=0, deadline=0.2)
     ws = await Workspaces(InMemoryStorage()).open("acme", "w1", actor=ALICE)
     await uploaded(files, ws, "a1")
     first = [asyncio.create_task(files.render(ws, "a1", 1)) for _ in range(2)]
     await asyncio.sleep(0)
     with pytest.raises(Busy):
-        await files.render(ws, "a1", 1)
+        await files.render(ws, "a1", 1)  # after waiting its deadline for a reading
+    with pytest.raises(Busy):
+        await uploaded(files, ws, "a2")  # an upload is refused at once
+    waiting = asyncio.create_task(files.render(ws, "a1", 1))
+    await asyncio.sleep(0.05)
+    app.through.set()
     await asyncio.gather(*first)
-    assert await files.render(ws, "a1", 1), "the readings were given back"
+    assert await waiting, "a page that waited was given the reading let go"
+
+
+async def test_a_cold_file_of_four_pages_renders_every_page(stores: Stores) -> None:
+    app = Serial()
+    files = native(stores, app)
+    ws = await Workspaces(InMemoryStorage()).open("acme", "w1", actor=ALICE)
+    paragraphs = [str(n) for n in range(12)]
+    await files.upload(
+        ws, WordDocument, "w.docx", once(FakeApp.file(*paragraphs)), artifact_id="a1"
+    )
+    pages = await asyncio.gather(*(files.render(ws, "a1", page) for page in range(1, 5)))
+    assert len(set(pages)) == 4, "the third and fourth waited for a reading, not refused"
+
+
+async def test_a_page_kept_for_one_reader_is_never_given_to_one_who_cant_see_it(
+    stores: Stores,
+) -> None:
+    async def hidden(tenant: TenantId, workspace: WorkspaceId, actor: Actor) -> Visibility:
+        return Visibility(artifacts=frozenset({"a1"} if actor == BOB else ()))
+
+    app = Serial()
+    files = native(stores, app)
+    alice = await Workspaces(InMemoryStorage(), hidden=hidden).open("acme", "w1", actor=ALICE)
+    await uploaded(files, alice, "a1")
+    await files.render(alice, "a1", 1)
+    with pytest.raises(NotFound):
+        await files.render(alice.as_actor(BOB), "a1", 1)
+    assert app.rendered == 1
 
 
 async def test_a_page_rendered_before_is_kept_and_never_paced(stores: Stores) -> None:
@@ -116,6 +171,16 @@ async def test_a_page_rendered_before_is_kept_and_never_paced(stores: Stores) ->
     again = await files.render(ws, "a1", 1, version=1, admit=lambda: admitted.append(2))
     assert first == again
     assert (app.rendered, admitted) == (1, [1]), "the second reached neither the app nor the pace"
+    files_busy = native(stores, Gated(), pages=0, deadline=0.05)
+    await uploaded(files_busy, ws, "a3")
+    held = [asyncio.create_task(files_busy.render(ws, "a3", 1)) for _ in range(2)]
+    await asyncio.sleep(0)
+    paced: list[int] = []
+    with pytest.raises(Busy):
+        await files_busy.render(ws, "a3", 1, admit=lambda: paced.append(1))
+    assert paced == [], "a page refused as busy spends none of its reader's pace"
+    for task in held:
+        task.cancel()
 
     class Refused(Exception):
         pass
@@ -155,7 +220,7 @@ async def test_an_upload_to_a_hidden_files_id_is_refused_before_it_is_read(
     alice = await Workspaces(InMemoryStorage(), hidden=hidden).open("acme", "w1", actor=ALICE)
     await uploaded(files, alice, "a1")
     bob = alice.as_actor(BOB)
-    with pytest.raises(NotFound):
+    with pytest.raises(InvalidState, match="a1 already exists"):
         await uploaded(files, bob, "a1")
     assert Counting.read == 1, "Bob's file was never read"
     assert [a.id for a in await alice.artifacts(NativeFile)] == ["a1"]

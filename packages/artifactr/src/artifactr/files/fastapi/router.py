@@ -86,6 +86,21 @@ DOWNLOAD: Final = {
 so never sniffed, never run as a page, and never kept by a cache on the way."""
 
 PNG: Final = "image/png"
+_PAGE_HEADERS: Final = {
+    "ETag": {"description": "The page's bytes, named", "schema": {"type": "string"}},
+    "Cache-Control": {
+        "description": "`private, max-age=86400`: a page never changes",
+        "schema": {"type": "string"},
+    },
+}
+PAGE_RESPONSES: Final[dict[int | str, dict[str, Any]]] = {
+    200: {"content": {PNG: {}}, "headers": _PAGE_HEADERS},
+    304: {
+        "description": "The page `If-None-Match` names: the browser has it",
+        "headers": _PAGE_HEADERS,
+    },
+}
+"""A rendered page's responses: the PNG, or 304 to a browser that has it, each tagged."""
 UNSAID: Final = frozenset(
     {
         "",
@@ -472,7 +487,7 @@ def files_router(
     @router.get(
         "/workspaces/{workspace_id}/files/{artifact_id}/versions/{version}/pages/{page}",
         response_class=Response,
-        responses={200: {"content": {PNG: {}}}},
+        responses=PAGE_RESPONSES,
     )
     async def page(
         artifact_id: PathId,
@@ -499,7 +514,7 @@ def files_router(
     @router.get(
         "/workspaces/{workspace_id}/proposals/{proposal_id}/pages/{page}",
         response_class=Response,
-        responses={200: {"content": {PNG: {}}}},
+        responses=PAGE_RESPONSES,
     )
     async def proposed_page(
         proposal_id: PathId,

@@ -4,6 +4,7 @@ A person checks a file out, downloads it, checks the edit in, fresh, unchanged, 
 large; pages are rendered; and in a workspace where the app is off, nothing is checked out.
 """
 
+import asyncio
 import io
 import json
 import runpy
@@ -34,7 +35,7 @@ from artifactr.files.checkouts import InMemoryCheckouts
 from artifactr.files.fastapi import files_router
 from artifactr.files.fastapi.openapi import openapi_app, openapi_document
 from artifactr.files.manifest import DOCX, WordDocument
-from artifactr.files.native import NativeFiles
+from artifactr.files.native import Busy, NativeFiles
 from artifactr.workspace import Access, InMemoryStorage, Workspace, Workspaces, integration_gate
 from tests.files.clock import FakeClock
 from tests.files.conftest import Switch
@@ -345,3 +346,24 @@ def test_the_module_prints_the_document() -> None:
     with redirect_stdout(output):
         runpy.run_module("artifactr.files.fastapi.openapi", run_name="__main__")
     assert json.loads(output.getvalue()) == openapi_document()
+
+
+def test_a_page_past_the_tenants_readings_is_told_to_wait() -> None:
+    class Held(FakeApp):
+        async def render(self, source: bytes, page: int, *, scale: float, deadline: float) -> bytes:
+            raise Busy(2)
+
+    files = NativeFiles(InMemoryBlobs(), InMemoryCheckouts(), Held(), deadline=0.01)
+    workspaces = Workspaces(InMemoryStorage(), authorize=authorize, hidden=hidden)
+    ws = asyncio.run(workspaces.open("acme", "w1", actor=ALICE))
+    asyncio.run(
+        files.upload(
+            ws, WordDocument, "c.docx", once(FakeApp.file("x")), media_type=DOCX, artifact_id="a1"
+        )
+    )
+    server = FastAPI()
+    server.include_router(files_router(workspaces, files, resolve_actor=resolve_actor))
+    busy = TestClient(server).get(f"{FILE}/versions/1/pages/1")
+    assert busy.status_code == 429
+    assert busy.json()["detail"]["type"] == "busy"
+    assert busy.headers["retry-after"] == "5"

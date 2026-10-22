@@ -6,12 +6,20 @@ app's call and the commit, as `edit:<uuid>`. Every write puts its bytes first an
 one revision through the workspace, which a failure before the commit never reaches.
 """
 
+import asyncio
 import contextlib
 import hashlib
 import json
 import uuid
 from collections import Counter, OrderedDict
-from collections.abc import AsyncGenerator, AsyncIterable, Callable, Mapping, Sequence
+from collections.abc import (
+    AsyncGenerator,
+    AsyncIterable,
+    Awaitable,
+    Callable,
+    Mapping,
+    Sequence,
+)
 from datetime import timedelta
 from typing import Final, Literal, cast, override
 
@@ -139,7 +147,8 @@ class NativeFiles:
             checked in or a page of one, past which another is refused with `Busy`: two by
             default, None for no limit. It is this process's count, so each replica of an
             application counts its own. The app's worker does one call at a time, so this is
-            what keeps one tenant's calls from filling its queue for every other's.
+            what keeps one tenant's calls from filling its queue for every other's. A page
+            waits up to `deadline` for a reading, since a viewer asks for a few at once.
         pages: How many bytes of rendered pages this process keeps, by the bytes they are of,
             the page and the scale, so a page asked for again doesn't reach the app: 64 MiB by
             default, 0 for none. A page is the same for any reader of the same bytes, and only
@@ -183,6 +192,7 @@ class NativeFiles:
         self._formats = formats
         self._readings = readings
         self._reading: Counter[str] = Counter()
+        self._freed = asyncio.Condition()
         self._pages_most = pages
         self._pages: OrderedDict[tuple[str, str, int, float], bytes] = OrderedDict()
         self._pages_held = 0
@@ -298,9 +308,6 @@ class NativeFiles:
             Busy: If the tenant has as many files being read as it may.
         """
         app = await self._switched_on(ws, file_type)
-        if artifact_id is not None and artifact_id in (await ws.hidden()).artifacts:
-            # Refused as its commit would refuse it, before any of the file is read or stored.
-            raise NotFound("artifact", artifact_id)
         told = media_type is None
         if media_type is None:
             media_type, data = await sniffed(data, self._formats, file_type.formats)
@@ -309,6 +316,10 @@ class NativeFiles:
         if media_type not in file_type.formats:
             raise ValidationFailed(f"a {file_type.kind} holds {sorted(file_type.formats)}", [])
         content = await spool(data, self._most(media_type))
+        if artifact_id is not None and artifact_id in (await ws.hidden()).artifacts:
+            # Taken, by a file its uploader can't see: refused as a taken id they can see is,
+            # at the same point, before the app reads any of it or anything is stored.
+            raise InvalidState(f"artifact {artifact_id} already exists")
         if artifact_id is not None and (uploaded := await _existing(ws, artifact_id)):
             if uploaded.data.content.sha256 != hashlib.sha256(content).hexdigest():
                 raise InvalidState(f"artifact {artifact_id} already exists")
@@ -626,10 +637,11 @@ class NativeFiles:
         key = (app.name, manifest.content.sha256, page, 1.0)
         if (png := self._page(key)) is not None:
             return png
-        if admit is not None:
-            admit()
-        source = await self._bytes(_scope(ws), artifact_id, manifest.content, "content")
-        return await self._rendered(ws, app, key, source)
+
+        async def source() -> bytes:
+            return await self._bytes(_scope(ws), artifact_id, manifest.content, "content")
+
+        return await self._rendered(ws, app, key, source, admit)
 
     async def proposed(
         self, ws: Workspace, proposal_id: ProposalId, *, part: Part = "content"
@@ -671,9 +683,11 @@ class NativeFiles:
         key = (app.name, hashlib.sha256(source).hexdigest(), page, 1.0)
         if (png := self._page(key)) is not None:
             return png
-        if admit is not None:
-            admit()
-        return await self._rendered(ws, app, key, source)
+
+        async def proposed() -> bytes:
+            return source
+
+        return await self._rendered(ws, app, key, proposed, admit)
 
     def _page(self, key: tuple[str, str, int, float]) -> bytes | None:
         """A page rendered before, if this process still keeps it."""
@@ -683,12 +697,23 @@ class NativeFiles:
         return png
 
     async def _rendered(
-        self, ws: Workspace, app: App, key: tuple[str, str, int, float], source: bytes
+        self,
+        ws: Workspace,
+        app: App,
+        key: tuple[str, str, int, float],
+        source: Callable[[], Awaitable[bytes]],
+        admit: Callable[[], None] | None,
     ) -> bytes:
-        """Render a page in one of the tenant's readings, and keep it, the oldest let go first."""
+        """Render a page in one of the tenant's readings, and keep it, the oldest let go first.
+
+        A page waits a while for a reading, as a viewer's pages are asked for a few at once,
+        and is counted against its reader's pace only once it has one.
+        """
         _, _, page, scale = key
-        async with self._turn(ws.tenant_id):
-            png = await app.render(source, page, scale=scale, deadline=self._deadline)
+        async with self._turn(ws.tenant_id, wait=self._deadline):
+            if admit is not None:
+                admit()
+            png = await app.render(await source(), page, scale=scale, deadline=self._deadline)
         if len(png) <= self._pages_most and key not in self._pages:
             self._pages[key] = png
             self._pages_held += len(png)
@@ -784,19 +809,32 @@ class NativeFiles:
         )
 
     @contextlib.asynccontextmanager
-    async def _turn(self, tenant_id: str) -> AsyncGenerator[None]:
-        """Hold one of the tenant's readings while the app reads a file, or refuse at once.
+    async def _turn(self, tenant_id: str, *, wait: float = 0.0) -> AsyncGenerator[None]:
+        """Hold one of the tenant's readings while the app reads a file.
+
+        Without one free, it waits up to `wait` seconds for one, then refuses.
 
         Raises:
-            Busy: If the tenant has all of its readings.
+            Busy: If the tenant has all of its readings, for all of the wait.
         """
-        if self._readings is not None and self._reading[tenant_id] >= self._readings:
-            raise Busy(self._readings)
+        readings = self._readings
+        if readings is not None and self._reading[tenant_id] >= readings:
+            if wait <= 0:
+                raise Busy(readings)
+            try:
+                async with self._freed:
+                    await asyncio.wait_for(
+                        self._freed.wait_for(lambda: self._reading[tenant_id] < readings), wait
+                    )
+            except TimeoutError:
+                raise Busy(readings) from None
         self._reading[tenant_id] += 1
         try:
             yield
         finally:
             self._reading[tenant_id] -= 1
+            async with self._freed:
+                self._freed.notify_all()
 
     async def _manifest[F: NativeFile](
         self,

@@ -13,3 +13,6 @@ htmlcov
 dist
 tests
 evals
+# A brand kit is brand.json, its tokens and its assets and fonts: nothing hidden in brand/, such
+# as an .env or an editor's file, goes into the image, which copies the folder.
+brand/**/.*

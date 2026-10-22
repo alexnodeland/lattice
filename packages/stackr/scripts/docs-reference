@@ -212,11 +212,27 @@ def depends(service: dict[str, Any]) -> str:
     return ", ".join(described)
 
 
+def mount_fields(entry: object) -> list[str]:
+    """A short volume's fields, split at the colons outside a `${...}` substitution."""
+    fields, field, depth, text = [], "", 0, str(entry)
+    for at, char in enumerate(text):
+        if text.startswith("${", at):
+            depth += 1
+        elif char == "}" and depth:
+            depth -= 1
+        elif char == ":" and not depth:
+            fields.append(field)
+            field = ""
+            continue
+        field += char
+    return [*fields, field]
+
+
 def volumes(service: dict[str, Any]) -> str:
     """A service's volumes and bind mounts."""
     mounts: list[str] = []
     for entry in service.get("volumes", []):
-        source, target, *mode = str(entry).split(":")
+        source, target, *mode = mount_fields(entry)
         read_only = " (read-only)" if mode == ["ro"] else ""
         mounts.append(f"`{source}` → `{target}`{read_only}")
     return ", ".join(mounts) if mounts else "none"
@@ -294,10 +310,10 @@ def block_compose_volumes() -> str:
     rows: list[list[str]] = []
     for volume in document.get("volumes", {}):
         users = [
-            (name, str(entry).split(":")[1])
+            (name, mount_fields(entry)[1])
             for name, service in document["services"].items()
             for entry in service.get("volumes", [])
-            if str(entry).split(":")[0] == volume
+            if mount_fields(entry)[0] == volume
         ]
         rows.append(
             [code(volume), ", ".join(f"`{name}` at `{path}`" for name, path in users) or "none"]
@@ -643,7 +659,10 @@ def all_panels(dashboard: dict[str, Any]) -> Iterator[dict[str, Any]]:
 
 
 def litellm() -> dict[str, Any]:
-    return load_yaml("deploy/litellm/config.yaml")
+    """The gateway's config, with the model groups it runs by default, the providers'."""
+    config = load_yaml("deploy/litellm/config.yaml")
+    config["model_list"] += load_yaml("deploy/litellm/groups/providers.yaml")["model_list"]
+    return config
 
 
 def block_litellm_models() -> str:

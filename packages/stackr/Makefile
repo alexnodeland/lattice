@@ -41,6 +41,10 @@ SUPABASE_RUNNING = $(shell docker ps -q --filter label=com.supabase.cli.project=
 # says: STACKR_BIND, as every other port does (127.0.0.1 unless you choose).
 STACKR_BIND ?= $(or $(shell sed -n 's/^STACKR_BIND=//p' .env 2>/dev/null),127.0.0.1)
 BINDING := com.docker.network.bridge.host_binding_ipv4
+# Some Docker engines ignore that option (Docker Desktop 29 among them) and publish on every
+# interface, where Supabase's well-known keys and its `postgres` password would be anyone's on the
+# network. So before Supabase starts, scripts/binding-probe finds where Docker publishes on its
+# network, and local Supabase starts only at STACKR_BIND alone, with no override (ADR-0045).
 
 ifeq ($(STACKR_DATABASE),supabase)
 DATABASE_PROFILES :=
@@ -55,6 +59,20 @@ DATABASE_ENV = STACKR_DB_HOST=postgres STACKR_DB_ADMIN_PASSWORD="$$(sed -n 's/^P
 START_SUPABASE :=
 else
 $(error STACKR_DATABASE must be supabase or postgres, not '$(STACKR_DATABASE)')
+endif
+
+# STACKR_GATEWAY_MODELS in .env: the gateway's model groups, deploy/litellm/groups/<it>.yaml.
+STACKR_GATEWAY_MODELS ?= $(or $(shell sed -n 's/^STACKR_GATEWAY_MODELS=//p' .env 2>/dev/null),providers)
+ifeq ($(filter providers upstream,$(STACKR_GATEWAY_MODELS)),)
+$(error STACKR_GATEWAY_MODELS must be providers or upstream, not '$(STACKR_GATEWAY_MODELS)')
+endif
+# The upstream's address and its models for the two groups, which it can't be without.
+ifeq ($(STACKR_GATEWAY_MODELS),upstream)
+UPSTREAM_NEEDS := STACKR_UPSTREAM_URL STACKR_UPSTREAM_DEFAULT_MODEL STACKR_UPSTREAM_FAST_MODEL
+UPSTREAM_MISSING := $(strip $(foreach name,$(UPSTREAM_NEEDS),$(if $(or $($(name)),$(shell sed -n 's/^$(name)=//p' .env 2>/dev/null)),,$(name))))
+ifneq ($(UPSTREAM_MISSING),)
+$(error STACKR_GATEWAY_MODELS=upstream needs $(UPSTREAM_MISSING) in .env)
+endif
 endif
 
 PROFILE_FLAGS = $(foreach profile,$(PROFILES) $(DATABASE_PROFILES),--profile $(profile))
@@ -122,6 +140,7 @@ endif
 	  exit 1; \
 	fi
 ifneq ($(strip $(START_SUPABASE)),)
+	scripts/binding-probe $(SUPABASE_NETWORK) $(STACKR_BIND)
 	$(SUPABASE) start $(SUPABASE_START_FLAGS)
 endif
 # Ten minutes: the first start pulls and builds every image. The app stack's up waits five.

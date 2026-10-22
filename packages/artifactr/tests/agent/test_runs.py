@@ -487,6 +487,12 @@ def test_history_messages_are_model_requests_first() -> None:
         ("used github_pat_11AAAAAAAAAAAAAAAAAAAAAA_b", "used [redacted]"),
         ("jwt eyJhbGci.eyJzdWIi.c2ln", "jwt [redacted]"),
         ("no artifact art_1", "no artifact art_1"),
+        ("client_secret=s3cr3t&x", "client_secret=[redacted]"),
+        ("OPENAI_API_KEY=abc123 missing", "OPENAI_API_KEY=[redacted] missing"),
+        ("SECRET_KEY: abc", "SECRET_KEY: [redacted]"),
+        ('{"refresh_token": "r1"}', '{"refresh_token": "[redacted]"}'),
+        ("db_password=hunter2", "db_password=[redacted]"),
+        ("max_tokens=1000 reached", "max_tokens=1000 reached"),
     ],
 )
 def test_what_looks_like_a_secret_is_redacted(text: str, kept: str) -> None:

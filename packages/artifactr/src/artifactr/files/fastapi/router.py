@@ -153,6 +153,8 @@ class UploadKind(BaseModel):
     """The extensions of its formats, such as `.docx`, for a file picker to offer."""
     enabled: bool
     """Whether its app is on in the workspace: off, no file of it is uploaded."""
+    limit: int
+    """The largest file of it, in bytes, that an upload takes: the router's, or its formats'."""
 
 
 class Uploads(BaseModel):
@@ -195,6 +197,7 @@ def files_router(
     limit: int | None = None,
     uploads_per_minute: int = 20,
     uploads_at_once: int = 8,
+    uploads_per_tenant: int | None = None,
     uploads_each: int = 2,
     body: Body | None = None,
 ) -> APIRouter:
@@ -215,8 +218,11 @@ def files_router(
         uploads_at_once: How many uploads and check-ins this process takes at once, from every
             tenant, past which another is refused with 429 at once: each holds its file in
             memory.
+        uploads_per_tenant: How many of them one tenant's people may have at once, so that
+            one tenant never holds every place: half of `uploads_at_once` by default, and never
+            fewer than `uploads_each`.
         uploads_each: How many of them one person may have at once, so that one person's slow
-            bodies never hold every place.
+            bodies never hold their tenant's places: never more than `uploads_at_once`.
         body: How slowly an upload's body may arrive before it is refused with 408: a pause
             of 30 seconds, and 32 KiB a second on average, by default.
 
@@ -229,7 +235,9 @@ def files_router(
         raise ValueError(f"the router's limit, {limit}, is past the blob store's, {files.limit}")
     router = APIRouter(responses=REFUSALS)
     pace = Pace(uploads_per_minute)
-    taking = Gauge(uploads_at_once, each=uploads_each)
+    each = min(uploads_each, uploads_at_once)
+    per_tenant = uploads_per_tenant or max(uploads_at_once // 2, each)
+    taking = Gauge(uploads_at_once, tenant=per_tenant, each=each)
     pacing = body or Body()
 
     async def workspace_of(request: Request, workspace_id: PathId) -> Workspace:
@@ -252,6 +260,7 @@ def files_router(
                     kind=file_type.kind,
                     extensions=files.extensions(file_type),
                     enabled=await files.enabled(ws, file_type),
+                    limit=min(limit, files.most(file_type)),
                 )
                 for file_type in _native_types()
                 if files.extensions(file_type)

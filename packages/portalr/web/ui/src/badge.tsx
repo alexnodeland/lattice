@@ -25,6 +25,8 @@ export function Badge({
   return (
     <span
       id={id}
+      // What the style census counts a badge by (portalr ADR-0066).
+      data-badge=""
       className={cn(
         "inline-flex items-center whitespace-nowrap rounded-(--badge-radius) border px-(--badge-pad-end) py-(--badge-pad-y) font-semibold text-xs",
         TONE[tone],

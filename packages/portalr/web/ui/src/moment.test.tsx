@@ -19,11 +19,11 @@ test("a moment shows its time, and how long ago it was on hover", async () => {
 });
 
 test("Ago says how long ago, with the moment on hover; one ahead of the clock is now", async () => {
-  const now = new Date("2026-10-21T12:00:00Z");
+  const noon = new Date("2026-10-21T12:00:00Z");
   const screen = await render(
     <p>
-      <Ago at="2026-10-21T11:55:00Z" now={now} />
-      <Ago at="2026-10-21T12:03:00Z" now={now} />
+      <Ago at="2026-10-21T11:55:00Z" now={noon} />
+      <Ago at="2026-10-21T12:03:00Z" now={noon} />
     </p>,
   );
   const [past, ahead] = screen.container.querySelectorAll("time");

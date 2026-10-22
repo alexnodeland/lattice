@@ -907,11 +907,15 @@ test("a download that fails is said below, in the file's controls, and announced
   await expect
     .element(file.getByText("The file wasn't downloaded. Try again in a moment."))
     .toBeVisible();
-  const announced = file
-    .getByRole("button", { name: "Download", exact: true })
-    .element()
-    .parentElement?.querySelector("[role=status]");
-  await expect.poll(() => announced?.textContent).toBe("brief.docx wasn't downloaded.");
+  await expect
+    .poll(
+      () =>
+        file
+          .getByRole("button", { name: "Download", exact: true })
+          .element()
+          .parentElement?.querySelector("[role=status]")?.textContent,
+    )
+    .toBe("brief.docx wasn't downloaded.");
 });
 
 test("while a file's status is read, or when it can't be, no download is offered", async () => {

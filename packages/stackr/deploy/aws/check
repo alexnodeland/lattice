@@ -57,7 +57,10 @@ done
 step "TFLint"
 # Its AWS ruleset, and that release's attestations, come from GitHub's API, which answers a 5xx now
 # and then (a 502 failed CI on 2026-10-22, with GITHUB_TOKEN set): three tries, 10 and 30 seconds
-# apart, then the last one's error. A ruleset that fails its attestation fails every try.
+# apart, then the last one's error. It retries any failure of `tflint --init`: one that will
+# never pass, such as a ruleset whose attestation doesn't verify, fails three times, about 40
+# seconds later. It is the only step that has failed for GitHub so far; `tofu init`, checkov,
+# promtool's image and the auth proxy's are not retried.
 for wait in 10 30 0; do
   if tflint --init --config "$PWD/.tflint.hcl" >/dev/null; then
     break

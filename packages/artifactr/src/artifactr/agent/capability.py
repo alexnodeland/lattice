@@ -485,11 +485,14 @@ _SECRETS = (
     # An Authorization header's credentials, whatever their scheme.
     (re.compile(r"(?i)\b(authorization\s*[:=]\s*\w+)\s+\S+"), r"\1 [redacted]"),
     (re.compile(r"(?i)\b(bearer|basic)\s+[\w.~+/=-]+"), r"\1 [redacted]"),
-    # A secret given by name, outside a URL: api_key=..., token: ..., "password": "...".
+    # A secret given by name, outside a URL: api_key=..., token: ..., "password": "...", and
+    # names with more around them, client_secret=..., OPENAI_API_KEY=..., SECRET_KEY: .... A
+    # name's other words are part of it, as `_` is a word's character, so they are matched with
+    # it; a count, such as max_tokens=1000, is not a secret, and stays.
     (
         re.compile(
-            r"(?i)\b((?:api[_-]?key|access[_-]?token|token|secret|password)[\"']?\s*[:=]\s*[\"']?)"
-            r"[^\s\"',}]+"
+            r"(?i)\b([\w-]*?(?:api[_-]?key|access[_-]?token|token|secret|password|passwd)[\w-]*"
+            r"[\"']?\s*[:=]\s*[\"']?)(?![\d.]+\b)[^\s\"',}]+"
         ),
         r"\1[redacted]",
     ),

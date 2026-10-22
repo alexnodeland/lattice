@@ -84,6 +84,9 @@ export interface Retry {
   readonly content: string;
 }
 
+/** The most ids a try again looks through for one no one else's message has. */
+const TRIES = 100;
+
 /**
  * What "Try again" sends for the thread's latest turn, if it failed and the reader started it:
  * the messages that started it, in order, posted again as one, under an id derived from the run,
@@ -111,8 +114,9 @@ export function retryOf(
   }
   const content = started.map((message) => message.content).join("\n\n");
   // The first of `msg_again_<run>`, `…_2`, `…_3` that no one else's message has: the same from
-  // render to render and tab to tab, so every try is the one message.
-  for (let n = 1; ; n++) {
+  // render to render and tab to tab, so every try is the one message. Bounded: a thread whose
+  // every such id is someone else's offers no try, rather than looking for ever.
+  for (let n = 1; n <= TRIES; n++) {
     const id = n === 1 ? `msg_again_${latest.id}` : `msg_again_${latest.id}_${n}`;
     const taken = byId.get(id);
     if (taken === undefined) {
@@ -122,4 +126,5 @@ export function retryOf(
       return null; // tried again already
     }
   }
+  return null;
 }

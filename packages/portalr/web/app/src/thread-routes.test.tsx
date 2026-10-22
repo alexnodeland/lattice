@@ -210,7 +210,13 @@ test("Try again refused as already posted, by another tab, says nothing went wro
     serve,
     (command) =>
       command.type === "post_message"
-        ? { type: "invalid_state", message: "message msg_again_run_2 already exists" }
+        ? {
+            type: "invalid_state",
+            message: "message msg_again_run_2 already exists",
+            reason: "already_exists",
+            entity: "message",
+            id: "msg_again_run_2",
+          }
         : null,
     { artifactrLog: LOG },
   );

@@ -72,3 +72,14 @@ test("an id someone else took first doesn't stop the try: the next is used", () 
   const after = thread(message("m1", "alice"), message("msg_again_run_1", "mallory"), tried);
   expect(retryOf(after, { run_1: run({}) }, "alice")).toBeNull();
 });
+
+test("a thread whose every try id is someone else's offers no try, rather than looking for ever", () => {
+  const taken = Array.from({ length: 100 }, (_, at) =>
+    message(at === 0 ? "msg_again_run_1" : `msg_again_run_1_${at + 1}`, "mallory"),
+  );
+  expect(retryOf(thread(message("m1", "alice"), ...taken), { run_1: run({}) }, "alice")).toBeNull();
+  // One short of that, the last id is still offered.
+  expect(
+    retryOf(thread(message("m1", "alice"), ...taken.slice(0, 99)), { run_1: run({}) }, "alice")?.id,
+  ).toBe("msg_again_run_1_100");
+});

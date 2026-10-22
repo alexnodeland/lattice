@@ -177,3 +177,13 @@ def test_main_sets_up_telemetry_from_the_environment(monkeypatch: pytest.MonkeyP
     assert [options["langfuse"] for options in configured] == [None, "traces", "scores"]
     assert {options["service_name"] for options in configured} == {"docplan"}
     assert shut_down == [True, True, True]
+
+
+def test_native_files_are_served_only_when_asked_for(monkeypatch: pytest.MonkeyPatch) -> None:
+    files = "/v1/workspaces/{workspace_id}/files"
+    assert files not in create_app(model="test").openapi()["paths"]
+    monkeypatch.setenv("DOCPLAN_FILES", "fake")
+    app = create_app(model="test")
+    assert files in app.openapi()["paths"]
+    with TestClient(app, headers={"x-user": "alice"}) as client:
+        assert client.get("/v1/workspaces/main/uploads").status_code == 200

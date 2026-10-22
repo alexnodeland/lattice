@@ -541,7 +541,7 @@ def _audit(record: dict[str, object], meter: Meter) -> None:
 
 
 def _too_many(why: str, wait: int) -> HTTPException:
-    detail = {"type": why, "retry_after": wait}
+    detail = {"type": why, "message": f"try again in {wait} seconds", "retry_after": wait}
     return HTTPException(status_code=429, detail=detail, headers={"Retry-After": str(wait)})
 
 
@@ -596,12 +596,17 @@ async def _answered[T](awaitable: Awaitable[T]) -> T:
     except TooLarge as large:
         raise HTTPException(status_code=413, detail=str(large)) from large
     except OverQuota as over:
-        detail = {"type": "over_quota", "quota": over.over, "limit": over.limit}
+        detail = {
+            "type": "over_quota",
+            "message": f"the {over.over} quota, {over.limit}, is reached",
+            "quota": over.over,
+            "limit": over.limit,
+        }
         raise HTTPException(status_code=413, detail=detail) from over
     except Busy as busy:
         raise _too_many("busy", BUSY) from busy
     except TooSlow as slow:
-        detail = {"type": "too_slow"}
+        detail = {"type": "too_slow", "message": "the body arrived too slowly"}
         raise HTTPException(status_code=408, detail=detail) from slow
     except AppFailed as failed:
         # As a repr, so a message a file shaped can't forge a line of the log.

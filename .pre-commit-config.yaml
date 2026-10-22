@@ -62,7 +62,8 @@ repos:
         files: ^packages/stackr/
       - id: shellcheck
         name: shellcheck
-        entry: uv run shellcheck
+        # Following what a script sources, as scripts/api sources compose-project.sh.
+        entry: uv run shellcheck --external-sources
         language: system
         types: [shell]
         files: ^(packages/stackr/|scripts/api$)

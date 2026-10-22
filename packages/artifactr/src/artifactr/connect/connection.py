@@ -21,7 +21,7 @@ import re
 import tempfile
 import time
 from collections.abc import AsyncGenerator, Awaitable, Callable, Sequence
-from contextlib import AbstractAsyncContextManager, asynccontextmanager
+from contextlib import AbstractAsyncContextManager, AsyncExitStack, asynccontextmanager
 from typing import Any, Final, Literal, Protocol, TextIO, cast
 
 import anyio
@@ -288,18 +288,15 @@ class Connection:
     @asynccontextmanager
     async def _turn(self) -> AsyncGenerator[None]:
         """Wait for the app's turn, for at most the call's deadline, and hold it."""
-        taken = False
-        try:
-            async with self._lock.held(self._key, wait=self._deadline):
-                taken = True
-                yield
-        except TimeoutError:
-            if taken:
-                raise
-            logger.warning("%s: another call held it past the deadline", self._server.title)
-            raise ConnectionFailed(
-                f"{self._server.title} was busy with another call past the deadline"
-            ) from None
+        async with AsyncExitStack() as stack:
+            try:
+                await stack.enter_async_context(self._lock.held(self._key, wait=self._deadline))
+            except TimeoutError:
+                logger.warning("%s: another call held it past the deadline", self._server.title)
+                raise ConnectionFailed(
+                    f"{self._server.title} was busy with another call past the deadline"
+                ) from None
+            yield
 
     async def _spawn[T](self, work: Callable[[ClientSession], Awaitable[T]]) -> T:
         """Start the server, do the work, and end it, within the deadline.

@@ -1,9 +1,16 @@
 """Calls to one app take turns: in one process, and across processes on PostgreSQL (ADR-0085)."""
 
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from pathlib import Path
+from types import SimpleNamespace
+from typing import cast
 
 import anyio
 import pytest
+from sqlalchemy.exc import DBAPIError
+from sqlalchemy.exc import TimeoutError as PoolTimeout
+from sqlalchemy.ext.asyncio import AsyncEngine
 
 from artifactr.connect import ProcessLock
 from artifactr.sql import AdvisoryLock, create_sqlite_engine
@@ -82,3 +89,80 @@ async def test_a_database_without_advisory_locks_is_refused(tmp_path: Path) -> N
     with pytest.raises(ValueError, match="sqlite has no advisory locks"):
         AdvisoryLock(engine)
     await engine.dispose()
+
+
+class _Refused(Exception):
+    def __init__(self, sqlstate: str) -> None:
+        self.sqlstate = sqlstate
+
+
+class _Connection:
+    """What `AdvisoryLock` asks of a connection, without a PostgreSQL: each statement it is sent,
+    and a lock refused as PostgreSQL refuses one, by its SQLSTATE."""
+
+    def __init__(self, refused: str | None) -> None:
+        self.refused = refused
+        self.sent: list[str] = []
+        self.invalidated = self.closed = False
+
+    @asynccontextmanager
+    async def begin(self) -> AsyncGenerator[None]:
+        yield
+
+    async def execute(self, statement: object) -> None:
+        self.sent.append(str(statement))
+        if self.refused is not None and "pg_advisory_xact_lock" in str(statement):
+            raise DBAPIError(str(statement), {}, _Refused(self.refused))
+
+    async def invalidate(self) -> None:
+        self.invalidated = True
+
+    async def close(self) -> None:
+        self.closed = True
+
+
+class _Engine:
+    """A PostgreSQL engine's face, whose pool is full when given no connection."""
+
+    def __init__(self, connection: _Connection | None) -> None:
+        self.dialect = SimpleNamespace(name="postgresql")
+        self.connection = connection
+
+    async def connect(self) -> _Connection:
+        if self.connection is None:
+            raise PoolTimeout("the pool is full")
+        return self.connection
+
+
+def _lock(connection: _Connection | None) -> AdvisoryLock:
+    return AdvisoryLock(cast("AsyncEngine", _Engine(connection)))
+
+
+async def test_a_full_pool_is_a_wait_past_its_bound() -> None:
+    with pytest.raises(TimeoutError, match="no connection was free for the lock"):
+        async with _lock(None).held("k", wait=1):
+            pass
+
+
+async def test_a_lock_not_taken_in_time_is_a_timeout_and_its_connection_thrown_away() -> None:
+    connection = _Connection(refused="55P03")
+    with pytest.raises(TimeoutError, match=r"wasn't taken within 0\.25s"):
+        async with _lock(connection).held("k", wait=0.25):
+            pass
+    assert connection.sent[0] == "SET LOCAL lock_timeout = 250"
+    assert (connection.invalidated, connection.closed) == (True, True)
+
+
+async def test_another_refusal_is_the_databases_own() -> None:
+    connection = _Connection(refused="57014")
+    with pytest.raises(DBAPIError):
+        async with _lock(connection).held("k", wait=1):
+            pass
+    assert (connection.invalidated, connection.closed) == (True, True)
+
+
+async def test_a_lock_held_and_let_go_returns_its_connection() -> None:
+    connection = _Connection(refused=None)
+    async with _lock(connection).held("k", wait=1):
+        assert any("pg_advisory_xact_lock" in sent for sent in connection.sent)
+    assert (connection.invalidated, connection.closed) == (False, True)

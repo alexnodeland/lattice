@@ -120,6 +120,13 @@ def main() -> None:
             (png(8000, 8000), "image/png"),
             (png(0, 10), "image/png"),
             (jpeg(10, 0), "image/jpeg"),
+            # A JPEG's markers before its frame: fill bytes, markers without a length, and ones
+            # that end it unread.
+            (b"\xff\xd8\xff\xff\xd0" + jpeg(32, 24)[2:], "image/jpeg"),
+            (b"\xff\xd8\xff\xe0\0\x01" + b"\0" * 8, "image/jpeg"),
+            (b"\xff\xd8\xff\xc0\0\x11\x08", "image/jpeg"),
+            (b"\xff\xd8\xff\xe0\0\x02\0\0\0\0", "image/jpeg"),
+            (b"\xff\xd8\xff\xe0\0\x04\0\0", "image/jpeg"),
             (jpeg(640, 480), "image/jpeg"),
             (b"\x89PNG\r\n\x1a\n\0", "image/png"),
             (b"\xff\xd8\xff\xd9", "image/jpeg"),

@@ -19,6 +19,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+import anyio
 import pytest
 from pydantic_ai import (
     Agent,
@@ -889,9 +890,10 @@ async def test_an_image_past_its_size_is_left_out_saying_the_limit(world: World)
     assert f"an image of 8000x8000 pixels, {limit}" in told
     assert "a image/png that says it has no width or no height" in told
     assert "a image/jpeg that says it has no width or no height" in told
+    assert told.count("a image/jpeg whose size can't be read") == 5
     assert "a image/png whose size can't be read" in told
     assert "a image/jpeg whose size can't be read" in told
-    assert told.count("BinaryContent(") == 2, "the two that fit are given"
+    assert told.count("BinaryContent(") == 3, "the three that fit are given"
 
 
 async def test_calls_take_turns_by_the_lock_the_connection_is_given(world: World) -> None:
@@ -1029,7 +1031,12 @@ class Approved:
 
 
 async def _approved(
-    workspaces: Workspaces, person: UserActor, thread_id: str, tools: Any, *, paused: bool = True
+    workspaces: Workspaces,
+    person: UserActor,
+    thread_id: str,
+    tools: Any,
+    *,
+    paused: bool = True,
 ) -> Approved:
     """An approved call, `c1`, of a run of the person's agent, paused for it unless not."""
     ws = await workspaces.open("acme", "w1", actor=person)
@@ -1092,6 +1099,10 @@ async def test_an_edit_sets_properties_by_plain_names_alone(world: World) -> Non
     ):
         with pytest.raises(ModelRetry, match="set properties by their plain names"):
             await tools.call_tool("fake_create_object", {"properties": properties}, ctx, tool)
+    # Plain names pass, at the top and in ViewObject.
+    plain = {"Length": 5, "ViewObject": {"Visibility": True}}
+    with pytest.raises(ToolFailed):  # past the guard: the fake server takes no properties
+        await tools.call_tool("fake_create_object", {"properties": plain}, ctx, tool)
     # The server reads a string as JSON for an object: none is taken but an object itself.
     for given in ('{"ExpressionEngine": [["Length", "1"]], "__class__": 1}', [["__class__", 1]], 7):
         with pytest.raises(ModelRetry, match="give properties as an object of properties"):
@@ -1101,3 +1112,70 @@ async def test_an_edit_sets_properties_by_plain_names_alone(world: World) -> Non
             "fake_create_object", {"properties": {"ViewObject": '{"_x": 1}'}}, ctx, tool
         )
     assert set(FREECAD.properties) == {"create_object", "edit_object"}
+
+
+async def test_an_app_busy_past_the_deadline_says_so(world: World) -> None:
+    class Busy:
+        @asynccontextmanager
+        async def held(self, key: str, *, wait: float) -> AsyncGenerator[None]:
+            raise TimeoutError
+            yield  # an async generator, as a lock's held is
+
+    world.switch.on.add(FAKE.key)
+    with pytest.raises(ConnectionFailed, match="was busy with another call past the deadline"):
+        await connected(lock=Busy()).tools()
+
+
+async def test_a_call_the_hours_reading_misses_is_refused(world: World) -> None:
+    # An approval that holds three hours, read two hours on: its call, just recorded, is
+    # before the hour the toolset's clock reads back.
+    world.switch.on |= {FAKE.key, FAKE.code_key}
+    connection = connected(allow=("execute_code",), secrets=("FAKE_TOKEN",), approval_ttl=3 * 3600)
+    tools = connected_app_tools(
+        connection,
+        integrations=world.switch,
+        clock=lambda: datetime.now(UTC) + timedelta(hours=2),
+    )
+    approved = await _approved(world.workspaces, ALICE, world.thread.id, tools)
+    with pytest.raises(ToolFailed, match="this call couldn't be counted"):
+        await approved.run()
+
+
+async def test_two_resumes_at_once_run_the_call_once(world: World) -> None:
+    tools = connected_app_tools(everything(world), integrations=world.switch)
+    call = await _approved(world.workspaces, ALICE, world.thread.id, tools)
+    outcomes: list[str] = []
+
+    async def run() -> None:
+        try:
+            await call.run()
+            outcomes.append("ran")
+        except ToolFailed as refused:
+            outcomes.append(str(refused))
+
+    async with anyio.create_task_group() as both:
+        both.start_soon(run)
+        both.start_soon(run)
+    assert outcomes.count("ran") == 1
+    assert any("was tried already" in outcome for outcome in outcomes)
+
+
+async def test_counting_and_approving_read_back_past_a_page(world: World) -> None:
+    tools = connected_app_tools(
+        connected(allow=("execute_code",), secrets=("FAKE_TOKEN",), per_hour=1),
+        integrations=everything_on(world),
+    )
+    call = await _approved(world.workspaces, ALICE, world.thread.id, tools)
+    for n in range(450):
+        await world.ws.record(AppEvent(name="noise", data=n))
+    await call.run()
+    again = await _approved(world.workspaces, ALICE, world.thread.id, tools)
+    for n in range(450):
+        await world.ws.record(AppEvent(name="noise", data=n))
+    with pytest.raises(ToolFailed, match="has used its 1 tries"):
+        await again.run()
+
+
+def everything_on(world: World) -> Switch:
+    world.switch.on |= {FAKE.key, FAKE.code_key}
+    return world.switch

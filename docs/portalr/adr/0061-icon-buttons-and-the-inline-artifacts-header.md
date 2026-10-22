@@ -1,6 +1,6 @@
 # ADR-0061: Icon buttons, and the inline artifact's header
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-10-21
 **Deciders:** Alex Nodeland
 

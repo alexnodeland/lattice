@@ -1,6 +1,6 @@
 # ADR-0056: Brand kits: three token layers, a kit loaded per deployment, and validation in Python
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-10-20
 **Deciders:** Alex Nodeland
 **Relocates:** the tokens of [ADR-0019](0019-the-kits-look.md), [ADR-0036](0036-the-chart-theme-and-colour-blind-mode.md) and [ADR-0039](0039-elevation-status-colour-states-and-density.md), which keep their names and values and move into the default kit
@@ -49,6 +49,6 @@ The loader PR (#519) departs from the decision above as RFC-0007's "Loader PR as
 
 ## Action items
 
-1. [ ] Foundation PR: the layers at today's values, component tokens one commit each, computed-style snapshots, guard rails; zero baseline diffs.
-2. [ ] Loader PR: parsing, validation, `brand.css`, `Site(brand=...)`, serving, `index.html` rewrite, `config.json`, the `nightshade` kit.
-3. [ ] Tooling PR: `portalr brand init/validate/preview`, presets, the stackr template, docs, the `calm` kit.
+1. [x] Foundation PR (#452): the layers at today's values, component tokens one commit each, computed-style snapshots, guard rails; zero baseline diffs.
+2. [x] Loader PR (#519, #524): parsing, validation, `brand.css`, `Site(brand=...)`, serving, `index.html` rewrite, `config.json`, the `nightshade` kit.
+3. [x] Tooling PR (#529, #547): `portalr brand init` and `validate`, the presets, the stackr template, docs, the `calm` kit. Not built: `portalr brand preview`.

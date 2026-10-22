@@ -1,6 +1,6 @@
 # ADR-0057: Brand kits: a motion system with guard rails, and tokens as the only override
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-10-20
 **Deciders:** Alex Nodeland
 
@@ -38,6 +38,6 @@ The foundation PR (#452): motion's scale multiplies durations, not shifts or sca
 
 ## Action items
 
-1. [ ] Foundation PR: motion primitives and component tokens at today's values; the structural reduced-motion block.
-2. [ ] Loader PR: the guard rails in the validator.
-3. [ ] Tooling PR: the presets and the motion playground.
+1. [x] Foundation PR (#452): motion primitives and component tokens at today's values; the structural reduced-motion block.
+2. [x] Loader PR (#519): the guard rails in the validator.
+3. [ ] Tooling PR: the presets (built, #529 and #547) and the motion playground (not built).

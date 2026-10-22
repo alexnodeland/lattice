@@ -108,6 +108,18 @@ sequenceDiagram
 > [!NOTE]
 > **Alpha.** Every library is released and on PyPI: `artifactr-ai`, `reflexr`, `evalr`, `relayr-ai`, `grantr`, `portalr` and `lattice-core-ai`. stackr is released too, and ships its images on GHCR rather than a wheel. artifactr's [0.1.0](https://github.com/alexnodeland/artifactr/releases/tag/v0.1.0) was released from its original repository; lattice keeps its tag, `artifactr-v0.1.0`. APIs may still change before 1.0.
 
+## ✨ New in 0.2
+
+- 📄 **Native files.** Word, Excel, PowerPoint, PDF, CAD, 3D and design files are kept as artifacts. Each crafting app's pinned CLI reads and edits them in a worker of its own, with no route out. This includes FreeCAD's models and Blender's scenes. People check a file out in the app's browser build and check it back in, and agents edit it through the app's commands ([guide](docs/artifactr/files/guides/native-files.md)).
+- ⬆️ **Uploads.** A person uploads a file. It is told by its first bytes and read by its app before anything is stored, under a pace, the tenant's readings and quotas ([guide](docs/artifactr/files/guides/uploads.md)).
+- 🔌 **Connected apps.** An operator connects the agent to their own running FreeCAD or Blender, through a vetted MCP server, with every call that runs code approved ([guide](docs/artifactr/guides/connected-apps.md)).
+- 🧩 **Forms, dashboards and mini apps.** The agent asks with a form, shows a dashboard, or writes a small app that runs in a sandbox of its own, inline in its thread ([guide](docs/artifactr/guides/forms-and-dashboards.md)).
+- 🎨 **Brand kits.** A deployment brands portalr with a kit: its colours, type, marks and words, validated before it is served ([guide](docs/portalr/guides/white-labelling.md)).
+- 🗂️ **Task trackers.** relayr files and follows work in Plane or Vikunja ([guide](docs/relayr/guides/trackers.md)).
+- 🔄 **A new version, offered.** portalr tells a tab that outlived a deploy that a new version is ready, and reloads only when the person chooses ([the app](docs/portalr/guides/app.md#a-new-version)).
+
+The native files' apps, connected apps, forms, dashboards, mini apps and trackers are integrations, switched per tenant and per workspace. Upgrading from 0.1: read [upgrading to 0.2](docs/upgrading-to-0.2.md).
+
 ## 🚀 Start an application
 
 <img alt="An animated terminal: copier generates my-app, make install, make env and make check pass, and make up serves it on 127.0.0.1:8800" src="docs/assets/readme/quickstart.svg" width="100%">

@@ -28,6 +28,11 @@ Every surface in lattice is an API, a WebSocket or an MCP server, so an applicat
 - **A tenant's own observability, native,** in the admin UI: its feedback, evaluations, spend, traces and logs, with deep links out to the tools for operators ([ADR-0004](https://lattice.alexnodeland.com/portalr/adr/0004-native-views-of-a-tenants-observability/), [ADR-0005](https://lattice.alexnodeland.com/portalr/adr/0005-operators-see-across-tenants/)).
 - **Every read filtered by tenant,** in one module, over the stack's shared stores ([ADR-0006](https://lattice.alexnodeland.com/portalr/adr/0006-shared-stores-every-read-filtered/)).
 - **Permissions asked, never guessed.** The UIs ask grantr what the user may do, and the server checks each command again.
+- **Native files, uploads and check-out.** A person uploads a file, reads its pages and words, and checks it out into its app's browser build, framed on an origin of its own ([ADR-0049](https://lattice.alexnodeland.com/portalr/adr/0049-checking-a-native-file-out-and-in/)).
+- **Forms, dashboards and mini apps in the chat.** A mini app runs in a sandbox on an origin of its own, inline in its thread, with a full view ([ADR-0051](https://lattice.alexnodeland.com/portalr/adr/0051-mini-apps-the-sandboxed-frame-and-its-bridge/), [ADR-0052](https://lattice.alexnodeland.com/portalr/adr/0052-artifacts-inline-in-their-thread/)).
+- **Connected apps' calls approved.** An agent's call that runs code in an operator's own FreeCAD or Blender waits on a card that shows what it would run.
+- **Brand kits.** A deployment's kit sets its colours, type, marks and words; `portalr brand init` starts one and `portalr brand validate` checks it ([white-labelling](https://lattice.alexnodeland.com/portalr/guides/white-labelling/)).
+- **A new version, offered.** A tab that outlived a deploy says a new version is ready, and reloads only when the person chooses ([ADR-0058](https://lattice.alexnodeland.com/portalr/adr/0058-a-new-version-offered-to-a-stale-tab/)).
 
 ## Documentation
 

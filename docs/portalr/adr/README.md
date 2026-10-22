@@ -61,16 +61,16 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0053](0053-the-chats-questions-tool-calls-sides-failures-and-streaming.md) | The chat's questions, tool calls, sides, failures and streaming | Accepted |
 | [0054](0054-readable-revisions.md) | Readable revisions: per kind, in parts, one preview running | Accepted |
 | [0055](0055-every-kind-inline-and-a-native-file-read-and-edited-in-its-thread.md) | Every kind inline in its thread, and a native file read and edited there | Accepted |
-| [0056](0056-brand-kits-token-layers-loading-and-validation.md) | Brand kits: three token layers, a kit loaded per deployment, and validation in Python | Proposed |
-| [0057](0057-brand-kits-motion-and-tokens-as-the-only-override.md) | Brand kits: a motion system with guard rails, and tokens as the only override | Proposed |
+| [0056](0056-brand-kits-token-layers-loading-and-validation.md) | Brand kits: three token layers, a kit loaded per deployment, and validation in Python | Accepted |
+| [0057](0057-brand-kits-motion-and-tokens-as-the-only-override.md) | Brand kits: a motion system with guard rails, and tokens as the only override | Accepted |
 | [0058](0058-a-new-version-offered-to-a-stale-tab.md) | A new version offered to a stale tab | Accepted |
 | [0059](0059-link-variants-breadcrumbs-and-the-skip-link.md) | Link variants, breadcrumbs, and the skip link | Accepted |
-| [0060](0060-list-rows.md) | List rows: a name, a quieter line beneath it, and an end | Proposed |
-| [0061](0061-icon-buttons-and-the-inline-artifacts-header.md) | Icon buttons, and the inline artifact's header | Proposed |
-| [0062](0062-badges-and-headings.md) | Badges and headings | Proposed |
-| [0063](0063-disclosures.md) | Disclosures | Proposed |
-| [0064](0064-the-frames-edges.md) | The frame's edges | Proposed |
-| [0065](0065-empty-error-and-not-found-states.md) | Empty, error and not-found states | Proposed |
-| [0066](0066-the-style-census-enforced.md) | The style census, enforced | Proposed |
+| [0060](0060-list-rows.md) | List rows: a name, a quieter line beneath it, and an end | Accepted |
+| [0061](0061-icon-buttons-and-the-inline-artifacts-header.md) | Icon buttons, and the inline artifact's header | Accepted |
+| [0062](0062-badges-and-headings.md) | Badges and headings | Accepted |
+| [0063](0063-disclosures.md) | Disclosures | Accepted |
+| [0064](0064-the-frames-edges.md) | The frame's edges | Accepted |
+| [0065](0065-empty-error-and-not-found-states.md) | Empty, error and not-found states | Accepted |
+| [0066](0066-the-style-census-enforced.md) | The style census, enforced | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

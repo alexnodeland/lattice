@@ -76,7 +76,7 @@ A relay for each worker costs one small container for each app. It buys what ADR
 
 - **The relays, from each other.** They share `files` with the application. A relay runs nothing but socat, and none reaches more than its own worker.
 - **The editors, on a host,** are on the `stackr` network, as the application is, and could reach its services. An editor runs lattice's own static server and holds no secret. Nothing in it runs code a file brings.
-- **A relay's connections** are at most 16 at once (`max-children=16`), shared by every tenant of its app, with no timeout for an idle one. Each tenant's share of its worker is bounded upstream, by its readings ([files ADR-0018](../../artifactr/files/adr/0018-a-page-takes-a-reading-is-kept-and-is-paced.md)).
+- **A relay's connections** are at most 16 at once (`max-children=16`), shared by every tenant of its app, with no timeout for an idle one. Each tenant's share of its worker is bounded upstream, by its readings, which pages take too since files ADR-0018 (lattice#565).
 - **What floats.** The base images are pinned by tag, and the worker's apt packages, Blender's libraries and Mesa among them, by name, as the template's images already are. `WORKER_BUILD` is the local image's ID, not a registry digest.
 - Everything else in ADR-0043's list stands, except "The application, from a worker", which the relay closes.
 

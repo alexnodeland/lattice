@@ -1,5 +1,13 @@
 import { outline, said, type Trace, wholeTrace } from "@portalr/client";
-import { Alert, EmptyState, PageHeader, type Reveal, type Standing, TraceView } from "@portalr/ui";
+import {
+  Alert,
+  CRUMB,
+  EmptyState,
+  PageHeader,
+  type Reveal,
+  type Standing,
+  TraceView,
+} from "@portalr/ui";
 import { useQueries, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, type ErrorComponentProps, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
@@ -76,7 +84,10 @@ function Body({ trace }: { trace: string }) {
     <PageHeader
       title="Trace"
       breadcrumbs={[
-        { label: "Traces", render: <Link to="/t/$tenant/traces" params={{ tenant }} /> },
+        {
+          label: "Traces",
+          render: <Link to="/t/$tenant/traces" params={{ tenant }} activeOptions={CRUMB} />,
+        },
       ]}
       meta={trace}
     />

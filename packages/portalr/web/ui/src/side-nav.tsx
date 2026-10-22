@@ -25,7 +25,8 @@ type NavLinkProps = Omit<ComponentProps<"a">, "className" | "children"> & {
 
 /**
  * One area: its icon, its word, and how many wait there. `aria-current="page"` marks the area
- * shown, and `aria-current="true"` the area a page inside it belongs to.
+ * shown, and `aria-current="true"` the area a page inside it belongs to. Under forced colours,
+ * where the wash and the working colour are the system's, the current one keeps an outline.
  */
 export function NavLink({ render, icon, count, children, ...props }: NavLinkProps) {
   const link = useRender({
@@ -35,7 +36,7 @@ export function NavLink({ render, icon, count, children, ...props }: NavLinkProp
       {
         "aria-label": count ? `${children}, ${count} waiting for you` : undefined,
         className:
-          "flex items-center gap-2.5 rounded-(--nav-radius) px-(--nav-pad-x) py-(--nav-pad-y) font-medium text-fg text-sm outline-offset-(--focus-offset) hover:bg-wash focus-visible:outline-(length:--focus-width) focus-visible:outline-focus aria-[current=page]:bg-wash aria-[current=page]:font-semibold aria-[current=page]:text-accent aria-[current=true]:bg-wash aria-[current=true]:font-semibold aria-[current=true]:text-accent",
+          "flex items-center gap-2.5 rounded-(--nav-radius) px-(--nav-pad-x) py-(--nav-pad-y) font-medium text-fg text-sm outline-offset-(--focus-offset) hover:bg-wash focus-visible:outline-(length:--focus-width) focus-visible:outline-focus aria-[current=page]:bg-wash aria-[current=page]:font-semibold aria-[current=page]:text-accent aria-[current=true]:bg-wash aria-[current=true]:font-semibold aria-[current=true]:text-accent forced-colors:aria-[current=page]:outline-solid forced-colors:aria-[current=page]:outline-(length:--focus-width) forced-colors:aria-[current=page]:-outline-offset-(--focus-width) forced-colors:aria-[current=true]:outline-solid forced-colors:aria-[current=true]:outline-(length:--focus-width) forced-colors:aria-[current=true]:-outline-offset-(--focus-width)",
         children: (
           <>
             {icon && <Icon icon={icon} />}

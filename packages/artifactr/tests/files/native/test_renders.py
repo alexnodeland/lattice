@@ -8,14 +8,16 @@ import pytest
 
 from artifactr.core import (
     Actor,
+    AgentActor,
     InvalidState,
     NotFound,
+    Proposed,
     TenantId,
     UserActor,
     Visibility,
     WorkspaceId,
 )
-from artifactr.files.app import AppFailed, FakeApp, Inspection
+from artifactr.files.app import AppCommand, AppFailed, FakeApp, Inspection
 from artifactr.files.blobs import once
 from artifactr.files.manifest import NativeFile, WordDocument
 from artifactr.files.native import Busy, NativeFiles
@@ -171,7 +173,8 @@ async def test_a_page_rendered_before_is_kept_and_never_paced(stores: Stores) ->
     again = await files.render(ws, "a1", 1, version=1, admit=lambda: admitted.append(2))
     assert first == again
     assert (app.rendered, admitted) == (1, [1]), "the second reached neither the app nor the pace"
-    files_busy = native(stores, Gated(), pages=0, deadline=0.05)
+    gated = Gated()
+    files_busy = native(stores, gated, pages=0, deadline=0.05)
     await uploaded(files_busy, ws, "a3")
     held = [asyncio.create_task(files_busy.render(ws, "a3", 1)) for _ in range(2)]
     await asyncio.sleep(0)
@@ -179,8 +182,8 @@ async def test_a_page_rendered_before_is_kept_and_never_paced(stores: Stores) ->
     with pytest.raises(Busy):
         await files_busy.render(ws, "a3", 1, admit=lambda: paced.append(1))
     assert paced == [], "a page refused as busy spends none of its reader's pace"
-    for task in held:
-        task.cancel()
+    gated.through.set()
+    await asyncio.gather(*held)
 
     class Refused(Exception):
         pass
@@ -201,6 +204,38 @@ async def test_the_pages_kept_are_held_to_their_bytes(stores: Stores) -> None:
     await files.render(ws, "a1", 1)
     await files.render(ws, "a1", 1)
     assert app.rendered == 2, "a page larger than the whole cache isn't kept"
+
+
+async def test_the_least_lately_read_page_is_let_go_first(stores: Stores) -> None:
+    app = Serial()
+    ws = await Workspaces(InMemoryStorage()).open("acme", "w1", actor=ALICE)
+    probe = native(stores, app)
+    await uploaded(probe, ws, "a0")
+    size = len(await probe.render(ws, "a0", 1))
+    files = native(stores, app, pages=size)  # room for one page
+    await uploaded(files, ws, "a1")
+    await files.upload(ws, WordDocument, "w.docx", once(FakeApp.file("Other")), artifact_id="a2")
+    app.rendered = 0
+    await files.render(ws, "a1", 1)
+    await files.render(ws, "a2", 1)
+    await files.render(ws, "a2", 1)
+    await files.render(ws, "a1", 1)
+    assert app.rendered == 3, "a1's page was let go for a2's"
+
+
+async def test_a_proposals_page_is_kept_too(stores: Stores) -> None:
+    app = Serial()
+    files = native(stores, app)
+    ws = await Workspaces(InMemoryStorage()).open("acme", "w1", actor=ALICE)
+    await uploaded(files, ws, "a1")
+    agent = ws.as_actor(AgentActor(thread_id="t1", on_behalf_of=ALICE))
+    add = AppCommand(name="add_paragraph", args={"text": "Fees"})
+    proposed = await files.edit(agent, "a1", base_version=1, commands=[add], summary="x")
+    assert isinstance(proposed, Proposed)
+    first = await files.render_proposed(ws, proposed.proposal_id, 1)
+    rendered = app.rendered
+    assert await files.render_proposed(ws, proposed.proposal_id, 1) == first
+    assert app.rendered == rendered
 
 
 async def test_an_upload_to_a_hidden_files_id_is_refused_before_it_is_read(

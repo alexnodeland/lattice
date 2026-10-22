@@ -9,7 +9,7 @@ upload names the workspace and the native type it makes (native files ADR-0017).
 import hashlib
 import logging
 import time
-from collections.abc import AsyncGenerator, AsyncIterable, AsyncIterator, Awaitable
+from collections.abc import AsyncGenerator, AsyncIterable, AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime
@@ -86,6 +86,21 @@ DOWNLOAD: Final = {
 so never sniffed, never run as a page, and never kept by a cache on the way."""
 
 PNG: Final = "image/png"
+_PAGE_HEADERS: Final = {
+    "ETag": {"description": "The page's bytes, named", "schema": {"type": "string"}},
+    "Cache-Control": {
+        "description": "`private, max-age=86400`: a page never changes",
+        "schema": {"type": "string"},
+    },
+}
+PAGE_RESPONSES: Final[dict[int | str, dict[str, Any]]] = {
+    200: {"content": {PNG: {}}, "headers": _PAGE_HEADERS},
+    304: {
+        "description": "The page `If-None-Match` names: the browser has it",
+        "headers": _PAGE_HEADERS,
+    },
+}
+"""A rendered page's responses: the PNG, or 304 to a browser that has it, each tagged."""
 UNSAID: Final = frozenset(
     {
         "",
@@ -199,6 +214,7 @@ def files_router(
     uploads_at_once: int = 8,
     uploads_per_tenant: int | None = None,
     uploads_each: int = 2,
+    renders_per_minute: int = 30,
     body: Body | None = None,
 ) -> APIRouter:
     """Build the router for native files' uploads, check-out and check-in, downloads and pages.
@@ -223,6 +239,9 @@ def files_router(
             fewer than `uploads_each`.
         uploads_each: How many of them one person may have at once, so that one person's slow
             bodies never hold their tenant's places: never more than `uploads_at_once`.
+        renders_per_minute: How many pages each person of a tenant may have the app render in
+            a minute, in this process, past which one is refused with 429: a page the process
+            keeps, rendered before, counts against none.
         body: How slowly an upload's body may arrive before it is refused with 408: a pause
             of 30 seconds, and 32 KiB a second on average, by default.
 
@@ -235,6 +254,7 @@ def files_router(
         raise ValueError(f"the router's limit, {limit}, is past the blob store's, {files.limit}")
     router = APIRouter(responses=REFUSALS)
     pace = Pace(uploads_per_minute)
+    rendering = Pace(renders_per_minute)
     each = min(uploads_each, uploads_at_once)
     per_tenant = (
         max(uploads_at_once // 2, each) if uploads_per_tenant is None else uploads_per_tenant
@@ -324,6 +344,19 @@ def files_router(
             if (wait := pace.admit(who)) is not None:
                 raise _too_many("rate_limited", wait)
             yield
+
+    def render_admitted(ws: Workspace) -> Callable[[], None]:
+        """Count a page the app will render against its reader's pace.
+
+        Raises:
+            HTTPException: 429, if they are past it.
+        """
+
+        def admit() -> None:
+            if (wait := rendering.admit((ws.tenant_id, ws.actor.participant))) is not None:
+                raise _too_many("rate_limited", wait)
+
+        return admit
 
     async def create(
         ws: Workspace,
@@ -454,17 +487,19 @@ def files_router(
     @router.get(
         "/workspaces/{workspace_id}/files/{artifact_id}/versions/{version}/pages/{page}",
         response_class=Response,
-        responses={200: {"content": {PNG: {}}}},
+        responses=PAGE_RESPONSES,
     )
     async def page(
         artifact_id: PathId,
         version: Version,
         page: Annotated[int, Path(ge=1)],
+        request: Request,
         ws: Workspace = current_workspace,
     ) -> Response:
         """One page of a version of the file, rendered by the app, as a PNG."""
-        png = await _answered(files.render(ws, artifact_id, page, version=version))
-        return Response(png, media_type=PNG)
+        admit = render_admitted(ws)
+        png = await _answered(files.render(ws, artifact_id, page, version=version, admit=admit))
+        return _page(png, request)
 
     @router.get(
         "/workspaces/{workspace_id}/proposals/{proposal_id}/text",
@@ -479,18 +514,32 @@ def files_router(
     @router.get(
         "/workspaces/{workspace_id}/proposals/{proposal_id}/pages/{page}",
         response_class=Response,
-        responses={200: {"content": {PNG: {}}}},
+        responses=PAGE_RESPONSES,
     )
     async def proposed_page(
         proposal_id: PathId,
         page: Annotated[int, Path(ge=1)],
+        request: Request,
         ws: Workspace = current_workspace,
     ) -> Response:
         """One page of what a proposal would make of a native file, rendered by the app."""
-        png = await _answered(files.render_proposed(ws, proposal_id, page))
-        return Response(png, media_type=PNG)
+        admit = render_admitted(ws)
+        png = await _answered(files.render_proposed(ws, proposal_id, page, admit=admit))
+        return _page(png, request)
 
     return router
+
+
+def _page(png: bytes, request: Request) -> Response:
+    """A rendered page, tagged by its bytes, which a browser keeps for itself alone, a day.
+
+    A version's page and a proposal's never change, so a browser that has it is told so (304).
+    """
+    tag = f'"{hashlib.sha256(png).hexdigest()[:32]}"'
+    headers = {**DOWNLOAD, "Cache-Control": "private, max-age=86400", "ETag": tag}
+    if tag in (part.strip() for part in request.headers.get("if-none-match", "").split(",")):
+        return Response(status_code=304, headers=headers)
+    return Response(png, media_type=PNG, headers=headers)
 
 
 class Meter:

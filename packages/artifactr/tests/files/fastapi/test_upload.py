@@ -28,7 +28,15 @@ from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
 from starlette.requests import HTTPConnection
 
-from artifactr.core import Actor, AgentActor, ArtifactCreated, TenantId, UserActor, WorkspaceId
+from artifactr.core import (
+    Actor,
+    AgentActor,
+    ArtifactCreated,
+    TenantId,
+    UserActor,
+    Visibility,
+    WorkspaceId,
+)
 from artifactr.fastapi import Unauthorized
 from artifactr.files.app import AppFailed, FakeApp, Inspection
 from artifactr.files.blobs import InMemoryBlobs, Quota
@@ -40,6 +48,7 @@ from artifactr.files.native import CREATE_NATIVE_FILE, FORMATS, Format, NativeFi
 from artifactr.files.native.formats import PROJECT
 from artifactr.files.worker import Limits, Worker, worker_app
 from artifactr.workspace import Access, InMemoryStorage, Workspace, Workspaces, integration_gate
+from artifactr.workspace.workspace import Hidden
 from tests.files.conftest import Switch
 
 LIMIT = 4096
@@ -104,6 +113,7 @@ def world_of(
     per_tenant: int | None = None,
     each: int = 1,
     body: Body | None = None,
+    hidden: Hidden | None = None,
 ) -> World:
     switch, app = Switch(), Gated()
     blobs = InMemoryBlobs(limit=2 * LIMIT, workspace_quota=Quota(files=3))
@@ -111,7 +121,10 @@ def world_of(
         blobs, InMemoryCheckouts(), app, integrations=switch, formats=JSON_DOCX, readings=readings
     )
     workspaces = Workspaces(
-        InMemoryStorage(), authorize=authorize, gate=integration_gate(switch, files.key_of)
+        InMemoryStorage(),
+        authorize=authorize,
+        gate=integration_gate(switch, files.key_of),
+        hidden=hidden,
     )
     server = FastAPI()
     server.include_router(
@@ -606,3 +619,15 @@ def test_a_kinds_own_most_is_refused_from_the_length_and_as_it_streams() -> None
 
     refused = client.post(UPLOAD, params=params, content=streamed())
     assert refused.status_code == 413
+
+
+def test_an_upload_to_a_hidden_files_id_is_refused_as_a_taken_one_is() -> None:
+    async def from_eve(tenant: TenantId, workspace: WorkspaceId, actor: Actor) -> Visibility:
+        return Visibility(artifacts=frozenset({"a1"} if actor.participant == "user:eve" else ()))
+
+    world = world_of(hidden=from_eve)
+    assert world.upload(FakeApp.file("Terms"), artifact_id="a1").status_code == 201
+    seen = world.upload(FakeApp.file("Other"), user="bob", artifact_id="a1")
+    unseen = world.upload(FakeApp.file("Other"), user="eve", artifact_id="a1")
+    assert seen.status_code == unseen.status_code == 409
+    assert seen.json() == unseen.json()

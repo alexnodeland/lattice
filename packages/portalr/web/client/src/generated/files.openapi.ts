@@ -1211,11 +1211,26 @@ export interface operations {
             /** @description Successful Response */
             200: {
                 headers: {
+                    /** @description `private, max-age=86400`: a page never changes */
+                    "Cache-Control"?: string;
+                    /** @description The page's bytes, named */
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
                     "image/png": unknown;
                 };
+            };
+            /** @description The page `If-None-Match` names: the browser has it */
+            304: {
+                headers: {
+                    /** @description `private, max-age=86400`: a page never changes */
+                    "Cache-Control"?: string;
+                    /** @description The page's bytes, named */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Refused */
             400: {
@@ -1439,11 +1454,26 @@ export interface operations {
             /** @description Successful Response */
             200: {
                 headers: {
+                    /** @description `private, max-age=86400`: a page never changes */
+                    "Cache-Control"?: string;
+                    /** @description The page's bytes, named */
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
                     "image/png": unknown;
                 };
+            };
+            /** @description The page `If-None-Match` names: the browser has it */
+            304: {
+                headers: {
+                    /** @description `private, max-age=86400`: a page never changes */
+                    "Cache-Control"?: string;
+                    /** @description The page's bytes, named */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Refused */
             400: {

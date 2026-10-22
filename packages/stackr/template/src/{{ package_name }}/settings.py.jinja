@@ -143,6 +143,33 @@ hands a file over, unless ``<APP>_EDITOR_PORT`` moves it: compose.yaml's ``files
 
 
 @dataclass(frozen=True)
+class Held:
+    """The most a workspace's native files may hold, or a tenant's: artifactr's ``Quota``."""
+
+    bytes: int
+    files: int | None = None
+
+
+@dataclass(frozen=True)
+class Uploads:
+    """How people's uploads and check-ins are held back: artifactr's defaults unless set.
+
+    ``files_router`` and ``NativeFiles`` take them.
+    """
+
+    per_minute: int = 20
+    """How many each person may start in a minute."""
+    at_once: int = 8
+    """How many the application takes at once, from every tenant: each is held in memory."""
+    per_tenant: int | None = None
+    """How many of them one tenant's people may have at once: half of ``at_once`` if unset."""
+    each: int = 2
+    """How many of them one person may have at once."""
+    readings: int = 2
+    """How many of a tenant's files its apps read at once."""
+
+
+@dataclass(frozen=True)
 class FilesSettings:
     """Native files: which crafting apps run, each in its worker{% if use_portal %}, and where people edit in them{% endif %}.
 
@@ -151,6 +178,14 @@ class FilesSettings:
             and then native files are off.
         tokens: Each running app's worker's token, ``FILES_<APP>_TOKEN``, which ``make env``
             generates: one for each, so no worker holds another's.
+        uploads: How people's uploads and check-ins are held back (native files ADR-0017):
+            each person's pace, the files read at once, the tenant's and the person's share of
+            them, and each tenant's readings by its apps, ``FILES_UPLOADS_*`` and
+            ``FILES_READINGS``.
+        workspace_quota: The most each workspace's files may hold, ``FILES_WORKSPACE_QUOTA``
+            as ``<bytes>`` or ``<bytes>,<files>``: none by default.
+        tenant_quota: The most each tenant's files may hold, ``FILES_TENANT_QUOTA``: none by
+            default.
 {%- if use_portal %}
         editors: Each app's editor, by its integration, as people's browsers reach it: by default,
             for each app that runs and has one, its port on this machine.
@@ -159,6 +194,9 @@ class FilesSettings:
 
     crafts: tuple[str, ...] = ()
     tokens: Mapping[str, str] = field(default_factory=dict[str, str], repr=False)
+    uploads: Uploads = field(default_factory=lambda: Uploads())
+    workspace_quota: Held | None = None
+    tenant_quota: Held | None = None
 {%- if use_portal %}
     editors: Mapping[str, str] = field(default_factory=dict[str, str])
 {%- endif %}
@@ -193,6 +231,19 @@ class FilesSettings:
 {%- endif %}
         return cls(
             crafts=crafts,
+            uploads=Uploads(
+                per_minute=int(env.get("FILES_UPLOADS_PER_MINUTE", Uploads.per_minute)),
+                at_once=int(env.get("FILES_UPLOADS_AT_ONCE", Uploads.at_once)),
+                per_tenant=(
+                    int(env["FILES_UPLOADS_PER_TENANT"])
+                    if env.get("FILES_UPLOADS_PER_TENANT")
+                    else None
+                ),
+                each=int(env.get("FILES_UPLOADS_EACH", Uploads.each)),
+                readings=int(env.get("FILES_READINGS", Uploads.readings)),
+            ),
+            workspace_quota=_quota(env.get("FILES_WORKSPACE_QUOTA", ""), "FILES_WORKSPACE_QUOTA"),
+            tenant_quota=_quota(env.get("FILES_TENANT_QUOTA", ""), "FILES_TENANT_QUOTA"),
             tokens={
                 craft: token
                 for craft in crafts
@@ -474,6 +525,23 @@ def _json_object(text: str, name: str) -> dict[str, object]:
     if not isinstance(parsed, dict):
         raise ValueError(f"{name} must be a JSON object")
     return {str(key): value for key, value in cast(dict[object, object], parsed).items()}
+
+
+{% endif -%}
+{% if use_files -%}
+def _quota(text: str, name: str) -> Held | None:
+    """A quota, ``<bytes>`` or ``<bytes>,<files>``, or None if empty.
+
+    Raises:
+        ValueError: If it is neither.
+    """
+    if not text.strip():
+        return None
+    held, _, files = text.partition(",")
+    try:
+        return Held(bytes=int(held), files=int(files) if files.strip() else None)
+    except ValueError:
+        raise ValueError(f"{name} is <bytes> or <bytes>,<files>, not {text!r}") from None
 
 
 {% endif -%}

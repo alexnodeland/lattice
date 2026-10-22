@@ -29,7 +29,16 @@ from lattice_core.integrations import Defaults
 
 from {{ package_name }}.database import open_database
 from {{ package_name }}.files import Files
-from {{ package_name }}.settings import CRAFTS, FilesSettings, {% if use_portal %}PortalSettings, {% endif %}Settings
+from {{ package_name }}.settings import (
+    CRAFTS,
+    FilesSettings,
+    Held,
+{%- if use_portal %}
+    PortalSettings,
+{%- endif %}
+    Settings,
+    Uploads,
+)
 
 from conftest import TENANT, Script, app, bearer, settings
 
@@ -123,6 +132,7 @@ def test_the_application_mounts_native_files_while_an_app_runs(script: Script) -
         ({"FILES_CRAFTS": "wordcraft,filmcraft"}, "names filmcraft: a worker runs wordcraft"),
         ({"FILES_CRAFTS": "wordcraft"}, "needs FILES_WORDCRAFT_TOKEN, of at least 32"),
         ({"FILES_CRAFTS": "wordcraft", "FILES_WORDCRAFT_TOKEN": "short"}, "of at least 32"),
+        ({"FILES_WORKSPACE_QUOTA": "lots"}, "FILES_WORKSPACE_QUOTA is <bytes> or <bytes>,<files>"),
     ],
 )
 def test_native_files_settings_are_refused_unless_they_hold(
@@ -134,6 +144,37 @@ def test_native_files_settings_are_refused_unless_they_hold(
 
 def test_no_app_runs_by_default() -> None:
     assert Settings.from_environ({}).files == FilesSettings()
+
+
+def test_uploads_are_held_back_as_the_environment_says() -> None:
+    files = Settings.from_environ(
+        {
+            "FILES_UPLOADS_PER_MINUTE": "5",
+            "FILES_UPLOADS_AT_ONCE": "3",
+            "FILES_UPLOADS_PER_TENANT": "2",
+            "FILES_UPLOADS_EACH": "1",
+            "FILES_READINGS": "1",
+            "FILES_WORKSPACE_QUOTA": "1000,10",
+            "FILES_TENANT_QUOTA": "5000",
+        }
+    ).files
+    assert files.uploads == Uploads(per_minute=5, at_once=3, per_tenant=2, each=1, readings=1)
+    assert (files.workspace_quota, files.tenant_quota) == (Held(1000, 10), Held(5000))
+    assert FilesSettings().uploads == Uploads(), "artifactr's defaults"
+    assert (FilesSettings().workspace_quota, FilesSettings().tenant_quota) == (None, None)
+
+
+def test_the_application_takes_uploads_held_back_and_its_files_to_quotas(script: Script) -> None:
+    held = replace(
+        WORDCRAFT,
+        uploads=Uploads(at_once=1, each=1),
+        workspace_quota=Held(1, 1),
+        tenant_quota=Held(10),
+    )
+    config = replace(settings(), files=held)
+    with TestClient(app(script, config, workers=workers()), headers=bearer()) as client:
+        offered = client.get("/artifactr/v1/workspaces/main/uploads")
+    assert offered.status_code == 200, offered.text
 {%- if use_portal %}
 
 

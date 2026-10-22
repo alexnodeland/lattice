@@ -57,7 +57,10 @@ class Gauge:
 
     def __init__(self, most: int, *, tenant: int, each: int) -> None:
         if not 1 <= each <= tenant <= most:
-            raise ValueError("a gauge lets at least one through, each person no more than a tenant")
+            raise ValueError(
+                "a gauge lets each person at least one place, no more than their tenant, and a "
+                f"tenant no more than all: not {each} each, {tenant} a tenant, {most} in all"
+            )
         self._most = most
         self._tenant = tenant
         self._each = each

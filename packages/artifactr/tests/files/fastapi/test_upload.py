@@ -37,6 +37,7 @@ from artifactr.files.fastapi import files_router
 from artifactr.files.fastapi.router import Body, Meter, TooSlow
 from artifactr.files.manifest import DOCX, NativeFile, WordDocument
 from artifactr.files.native import CREATE_NATIVE_FILE, FORMATS, Format, NativeFiles
+from artifactr.files.native.formats import PROJECT
 from artifactr.files.worker import Limits, Worker, worker_app
 from artifactr.workspace import Access, InMemoryStorage, Workspace, Workspaces, integration_gate
 from tests.files.conftest import Switch
@@ -278,6 +279,19 @@ def test_a_workspace_past_its_quota_is_refused(world: World) -> None:
     }
 
 
+def test_a_busy_refusal_counts_against_no_ones_pace() -> None:
+    world = world_of(per_minute=2, at_once=1)
+    world.app.through.clear()
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        going = pool.submit(world.upload, FakeApp.file("1"), user="bob")
+        assert world.app.inspecting.wait(timeout=10)
+        for _ in range(5):
+            assert world.upload(FakeApp.file("2")).json()["detail"]["type"] == "busy"
+        world.app.through.set()
+        assert going.result(timeout=10).status_code == 201
+    assert world.upload(FakeApp.file("2")).status_code == 201, "Alice's pace was never spent"
+
+
 def test_each_person_uploads_at_a_pace() -> None:
     world = world_of(per_minute=2)
     assert world.upload(FakeApp.file("1")).status_code == 201
@@ -310,7 +324,7 @@ async def test_a_body_that_pauses_or_trickles_is_refused() -> None:
 
 
 def test_a_check_in_is_held_to_the_pace_and_the_places_an_upload_is() -> None:
-    world = world_of(per_minute=3)
+    world = world_of(per_minute=2)
     assert world.upload(FakeApp.file("x"), artifact_id="a1").status_code == 201
     checkout = world.client.post("/workspaces/w1/files/a1/checkouts").json()["id"]
     url = f"/workspaces/w1/checkouts/{checkout}/file"
@@ -547,7 +561,37 @@ def test_a_routers_places_default_within_its_most() -> None:
     workspaces = Workspaces(InMemoryStorage())
     for at_once in (1, 2, 3):
         assert files_router(workspaces, files, resolve_actor=resolve_actor, uploads_at_once=at_once)
-    with pytest.raises(ValueError, match="no more than a tenant"):
-        files_router(
-            workspaces, files, resolve_actor=resolve_actor, uploads_per_tenant=1, uploads_each=2
-        )
+    assert files_router(workspaces, files, resolve_actor=resolve_actor, uploads_each=5), (
+        "a tenant's share is never fewer than a person's"
+    )
+    for per_tenant, each in ((1, 2), (0, 1), (9, 1)):
+        with pytest.raises(ValueError, match=f"not {each} each, {per_tenant} a tenant, 8 in all"):
+            files_router(
+                workspaces,
+                files,
+                resolve_actor=resolve_actor,
+                uploads_per_tenant=per_tenant,
+                uploads_each=each,
+            )
+
+
+def test_a_kinds_own_most_is_refused_from_the_length_and_as_it_streams() -> None:
+    files = NativeFiles(InMemoryBlobs(), InMemoryCheckouts(), FakeApp(), formats=JSON_DOCX)
+    server = FastAPI()
+    server.include_router(
+        files_router(Workspaces(InMemoryStorage()), files, resolve_actor=resolve_actor)
+    )
+    client = TestClient(server)
+    big = b"{" + b" " * PROJECT + b"}"
+    params = {"kind": "video_project", "name": "cut.fcproj"}
+    refused = client.post(UPLOAD, params=params, content=big)
+    assert (refused.status_code, refused.json()["detail"]) == (
+        413,
+        f"the file is larger than {PROJECT} bytes",
+    )
+
+    def streamed() -> Iterator[bytes]:
+        yield big
+
+    refused = client.post(UPLOAD, params=params, content=streamed())
+    assert refused.status_code == 413

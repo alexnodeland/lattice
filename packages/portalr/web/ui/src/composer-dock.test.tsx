@@ -52,7 +52,9 @@ for (const [width, height] of [
   [1280, 800],
   [390, 844],
 ] as const) {
-  test(`at the end of the page, the last message is wholly above the composer, ${width} wide`, async () => {
+  // Pins a guarantee main already met before the dock: at the end, the composer is back in its
+  // own place in the flow, below the last message.
+  test(`at the end of the page, the last message is wholly above the composer (pinned), ${width} wide`, async () => {
     await page.viewport(width, height);
     onTestFinished(() => page.viewport(414, 896));
     const screen = await render(<Thread />);
@@ -84,15 +86,39 @@ test("going back with Shift+Tab stops above the composer too", async () => {
   }
 });
 
-test("a skip link to #main lands at the top, the composer measured meanwhile", async () => {
+/**
+ * An anchor scrolls its target to the top of the window, which the padding at the foot doesn't
+ * move: a skip link to `#main` still lands at the top. The padding is what keeps a target near the
+ * end clear of the composer: one scrolled to by `scrollIntoView` at the window's foot.
+ */
+test("a skip link lands at the top; a target near the end stops above the composer", async () => {
+  onTestFinished(() => history.replaceState(null, "", location.pathname + location.search));
   const screen = await render(<Thread />);
   window.scrollTo(0, document.documentElement.scrollHeight);
   location.hash = "";
   location.hash = "#main";
   await new Promise((frame) => requestAnimationFrame(frame));
   const main = screen.container.querySelector("#main") as HTMLElement;
-  expect(Math.round(main.getBoundingClientRect().top)).toBeLessThanOrEqual(0);
-  history.replaceState(null, "", location.pathname + location.search);
+  expect(Math.round(main.getBoundingClientRect().top)).toBe(0);
+  window.scrollTo(0, 0);
+  const dock = screen.getByRole("textbox", { name: "Message" }).element()
+    .parentElement as HTMLElement;
+  const target = screen.getByRole("button", { name: "Copy message 20" }).element();
+  target.scrollIntoView({ block: "end" });
+  await new Promise((frame) => requestAnimationFrame(frame));
+  expect(target.getBoundingClientRect().bottom).toBeLessThanOrEqual(
+    dock.getBoundingClientRect().top + 1,
+  );
+});
+
+test("focusing the composer from partway down doesn't move the page", async () => {
+  const screen = await render(<Thread />);
+  window.scrollTo(0, 400);
+  await new Promise((frame) => requestAnimationFrame(frame));
+  const before = window.scrollY;
+  (screen.getByRole("textbox", { name: "Message" }).element() as HTMLElement).focus();
+  await new Promise((frame) => requestAnimationFrame(frame));
+  expect(window.scrollY).toBe(before);
 });
 
 test("a composer that grows, by lines or a row of files, says its new height", async () => {

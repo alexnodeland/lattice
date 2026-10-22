@@ -24,6 +24,14 @@
      */
     scroll-padding-bottom: var(--composer-clearance, 0px);
   }
+
+  /*
+   * Not while the focus is in the composer itself, which is already in that room: focusing it from
+   * partway down would otherwise scroll the page to where the composer sits in the flow.
+   */
+  html:has([data-composer-dock]:focus-within) {
+    scroll-padding-bottom: 0;
+  }
 }
 
 @theme inline {

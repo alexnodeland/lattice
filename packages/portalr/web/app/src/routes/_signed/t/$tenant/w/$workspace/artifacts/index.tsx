@@ -34,7 +34,8 @@ function Artifacts() {
   const listed = Object.values(snapshot.state.artifacts)
     .filter((artifact) => !artifact.archived)
     // The most recently made or changed first, as threads are by their activity.
-    .sort((a, b) => b.changedAt.localeCompare(a.changedAt) || a.id.localeCompare(b.id));
+    // Compared as moments, not as text: two offsets write one moment differently.
+    .sort((a, b) => Date.parse(b.changedAt) - Date.parse(a.changedAt) || a.id.localeCompare(b.id));
   return (
     <>
       <PageHeader title="Artifacts" meta={`What the agent and people make in ${workspace}`} />
@@ -69,7 +70,7 @@ function Artifacts() {
                 </RowLink>
               }
               meta={
-                // Its kind, its version and when it was made: its id is on its page, to copy.
+                // Its kind, its version and when it was made: its id is on its page.
                 <span id={`${artifact.id}-meta`}>
                   {kindWords(artifact.kind)} · version {artifact.version} ·{" "}
                   <Ago at={artifact.changedAt} />

@@ -75,6 +75,7 @@ nav:
     - adr/0043-native-files-in-the-template.md
     - adr/0044-clickhouse-a-profile-of-its-own-and-portalrs-analytics-users.md
     - adr/0045-local-supabase-only-where-docker-keeps-it-on-the-loopback.md
+    - adr/0046-native-files-a-relay-a-slimmer-worker-blender-and-the-editors-at-the-edge.md
     - adr/0047-an-upstream-gateway-for-the-model-groups.md
   - RFCs:
     - rfcs/README.md

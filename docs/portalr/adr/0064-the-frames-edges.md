@@ -1,6 +1,6 @@
 # ADR-0064: The frame's edges
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-10-21
 **Deciders:** Alex Nodeland
 

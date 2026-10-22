@@ -1,6 +1,6 @@
 # RFC-0003: Native files as artifacts
 
-**Status:** Draft, amended by [portalr ADR-0041](../portalr/adr/0041-first-party-webassembly-in-the-apps-policy.md), [lattice ADR-0026](../adr/0026-a-distribution-needs-a-reason-integrations-are-extras.md) and [lattice ADR-0027](../adr/0027-integrations-switched-per-workspace-through-one-port.md), and by native files [ADR-0010](../artifactr/files/adr/0010-a-shim-beside-the-build-and-talk-level-one-plus.md), [ADR-0011](../artifactr/files/adr/0011-a-gate-for-each-app.md), [ADR-0012](../artifactr/files/adr/0012-an-app-for-each-type-and-no-format-changed-by-a-check-in.md), [ADR-0014](../artifactr/files/adr/0014-freecad-on-a-third-dialect-and-no-python-a-file-or-an-agent-brings.md), [ADR-0015](../artifactr/files/adr/0015-blender-on-the-script-dialect-and-no-file-that-may-run-python.md) and [ADR-0016](../artifactr/files/adr/0016-a-project-that-holds-its-own-media-is-a-native-file.md)
+**Status:** Accepted, amended by [portalr ADR-0041](../portalr/adr/0041-first-party-webassembly-in-the-apps-policy.md), [lattice ADR-0026](../adr/0026-a-distribution-needs-a-reason-integrations-are-extras.md) and [lattice ADR-0027](../adr/0027-integrations-switched-per-workspace-through-one-port.md), and by native files [ADR-0010](../artifactr/files/adr/0010-a-shim-beside-the-build-and-talk-level-one-plus.md), [ADR-0011](../artifactr/files/adr/0011-a-gate-for-each-app.md), [ADR-0012](../artifactr/files/adr/0012-an-app-for-each-type-and-no-format-changed-by-a-check-in.md), [ADR-0014](../artifactr/files/adr/0014-freecad-on-a-third-dialect-and-no-python-a-file-or-an-agent-brings.md), [ADR-0015](../artifactr/files/adr/0015-blender-on-the-script-dialect-and-no-file-that-may-run-python.md) and [ADR-0016](../artifactr/files/adr/0016-a-project-that-holds-its-own-media-is-a-native-file.md)
 **Author:** Alex Nodeland
 **Created:** 2026-10-16
 **Discussion:** [#248](https://github.com/alexnodeland/lattice/pull/248)
@@ -353,7 +353,8 @@ Decided by the owner on 2026-10-16:
 - [x] portalr: the renderer, previews, diffs, check-out and check-in screens
 - [ ] The streamed session spike and its recommendation
 - [x] Docs: the package's section and guide
-- [ ] The four apps ADR-0009 called export only (native files ADR-0016): FilmCraft's video projects, EffectCraft's motion graphics and SoundCraft's audio sessions as native files; LightCraft stays export only, with no adapter; exports as artifacts of their own not started
+- [x] The four apps ADR-0009 called export only (native files ADR-0016): FilmCraft's video projects, EffectCraft's motion graphics and SoundCraft's audio sessions as native files; LightCraft stays export only, with no adapter
+- [ ] Exports as artifacts of their own
 
 ## Evidence
 

@@ -30,7 +30,13 @@ A thread's menu, "Thread actions", holds **Share…** and **Restrict** (or **Lif
 
 ## Artifacts
 
-The workspace's artifacts that aren't archived, each by kind and latest version. An artifact's page shows it through its kind's renderer, its **revisions** newest first with what each changed (a diff, marked for screen readers as well as by colour), and its open proposals. The app registers the template's `note` kind as Markdown, and artifactr.ui's: a `form`, to fill in and send, once in all, once a person or any number of times as it says; a `submission`, its values by field; a `dashboard`, a snapshot of figures, charts with "Show the figures", a table to sort by a column, filter and page through, and notes, as true when it says; and an `app`, which shows its label and summary and runs nothing. Where a workspace has forms or dashboards switched off, a form keeps its fields but can't be sent, and says so. An application with kinds of its own adds its renderers to `src/renderers.ts` in `web/app`. A kind with no renderer shows as formatted JSON.
+The workspace's artifacts that aren't archived, each by kind and latest version. An artifact's page shows it through its kind's renderer, its **revisions** newest first with what each changed (a diff, marked for screen readers as well as by colour), and its open proposals. The app registers the template's `note` kind as Markdown, and artifactr.ui's: a `form`, to fill in and send, once in all, once a person or any number of times as it says; a `submission`, its values by field; a `dashboard`, a snapshot of figures, charts with "Show the figures", a table to sort by a column, filter and page through, and notes, as true when it says; and an `app`, a mini app the agent wrote, which runs in a sandbox on an origin of its own where the workspace has mini apps switched on, and otherwise shows its label and summary and runs nothing. Where a workspace has forms or dashboards switched off, a form keeps its fields but can't be sent, and says so. An application with kinds of its own adds its renderers to `src/renderers.ts` in `web/app`. A kind with no renderer shows as formatted JSON.
+
+### Artifacts in their thread
+
+Every kind the app draws shows in the thread it was made in, between the messages, where it was made, at its latest version: a note, a form, which is filled in and sent there, a submission, a dashboard, a native file, read a page at a time, and a mini app. Its header names its kind and name, with "Open its page", its revisions, and **Full view**, which fills the window with it until **Back to the page** or Escape. A mini app names itself and has a full view of its own, so its "Open its page" sits under it. A kind the app shows as JSON isn't shown in the thread ([ADR-0055](../adr/0055-every-kind-inline-and-a-native-file-read-and-edited-in-its-thread.md), [ADR-0061](../adr/0061-icon-buttons-and-the-inline-artifacts-header.md)).
+
+A running mini app is shown whole, as tall as it draws, up to twice the window's height or 2,000 pixels, whichever is less, and the page scrolls past it. The app keeps running in its full view. A thread with several apps runs each at once, and the workspace's switch for mini apps stops them all ([ADR-0052](../adr/0052-artifacts-inline-in-their-thread.md)).
 
 ## Proposals
 
@@ -60,6 +66,10 @@ Where grantr allows, a **stored rule** can be installed from reflexr's JSON, edi
 !!! note "Rules from chat"
 
     A person can ask the agent for a rule in a thread; it arrives as a proposal like any other change ([stackr's template](../../stackr/guides/template.md) enables it). The Rules area is where it is then read and managed.
+
+## A new version
+
+When the application is deployed again, a tab opened before it says so: "A new version of portalr is ready. Reload to use it.", with **Not now** and **Reload**. The tab checks every five minutes, and whenever it is shown again, and offers a build only once it has read it twice running, so a rolling deploy never flaps it. Nothing reloads by itself: a message drafted and not sent, or a native file's unsaved changes, make the browser ask before they are lost. What was typed into a form isn't kept by a reload ([ADR-0058](../adr/0058-a-new-version-offered-to-a-stale-tab.md)).
 
 ## Colour-blind friendly charts
 

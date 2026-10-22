@@ -1,5 +1,6 @@
 import { cn } from "./cn";
 import { CopyButton } from "./copy-button";
+import { Disclosure } from "./disclosure";
 import { isObject } from "./json";
 import { ScrollRegion } from "./scroll-region";
 
@@ -71,10 +72,15 @@ function Branch({
     return list;
   }
   return (
-    <details open={depth < OPEN_DEPTH} className="inline-block w-full align-top">
-      <summary className="w-fit cursor-pointer text-muted text-xs">{said}</summary>
+    <Disclosure
+      summary={said}
+      defaultOpen={depth < OPEN_DEPTH}
+      className="inline-block w-full align-top"
+      triggerClassName="w-fit text-xs"
+      panelClassName="data-open:pt-0"
+    >
       {list}
-    </details>
+    </Disclosure>
   );
 }
 

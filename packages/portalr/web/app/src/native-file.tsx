@@ -19,6 +19,7 @@ import {
   Alert,
   Button,
   Diff,
+  Disclosure,
   FileHolder,
   type Holder,
   type PageShown,
@@ -312,10 +313,13 @@ export function TextChanges({
 }) {
   const [open, setOpen] = useState(false);
   return (
-    <details className="text-sm" onToggle={(event) => setOpen(event.currentTarget.open)}>
-      <summary className="cursor-pointer text-accent underline-offset-2 hover:underline">
-        Changes to its words
-      </summary>
+    <Disclosure
+      look="link"
+      summary="Changes to its words"
+      open={open}
+      onOpenChange={setOpen}
+      className="text-sm"
+    >
       {open && (
         <Compared
           queries={queries}
@@ -325,7 +329,7 @@ export function TextChanges({
           versions={versions}
         />
       )}
-    </details>
+    </Disclosure>
   );
 }
 

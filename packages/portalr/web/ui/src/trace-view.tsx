@@ -275,18 +275,19 @@ export function TraceView({ outline, reveal }: { outline: Outline; reveal: Revea
                     className="flex min-w-0 items-center gap-1"
                   >
                     {row.parent ? (
-                      <button
-                        type="button"
+                      // A pointer's shortcut: the row is the tree's item, and its keys fold it.
+                      <Button
+                        variant="ghost"
                         tabIndex={-1}
                         aria-hidden="true"
                         onClick={(event) => {
                           event.stopPropagation();
                           fold(row, open === true);
                         }}
-                        className="grid size-5 shrink-0 place-items-center rounded-sm text-muted hover:text-fg"
+                        className="size-5 shrink-0 border-0 p-0 text-muted hover:text-fg"
                       >
                         <Icon icon={open ? ChevronDown : ChevronRight} />
-                      </button>
+                      </Button>
                     ) : (
                       <span aria-hidden="true" className="size-5 shrink-0" />
                     )}

@@ -127,7 +127,7 @@ test("a check-in kept as a proposal is compared with the head, words and pages",
   expect(read()).toBe(0);
   await checkedIn.getByText("Compare with version 2 (proposed: 48 kB)").click();
   await expect
-    .poll(() => checkedIn.element().querySelector("details ins")?.textContent)
+    .poll(() => checkedIn.element().querySelector("ins")?.textContent)
     .toContain("Signed");
   const pages = checkedIn.getByRole("region", { name: "Its pages beside the head's" });
   const rows = () => [...pages.element().querySelectorAll("li > p")].map((row) => row.textContent);

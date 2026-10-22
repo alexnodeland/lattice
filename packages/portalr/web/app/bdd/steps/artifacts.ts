@@ -80,7 +80,8 @@ When("they open an artifact that isn't there", async ({ page }) => {
 });
 
 Then("they are told it isn't found", async ({ page }) => {
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Artifact not found", {
+  // The state stands in for the page, so the focus starts on its heading.
+  await expect(page.getByRole("heading", { name: "Artifact not found" })).toBeFocused({
     timeout: 2000,
   });
 });

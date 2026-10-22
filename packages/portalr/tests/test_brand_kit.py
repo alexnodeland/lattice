@@ -192,6 +192,24 @@ def test_an_asset_the_kit_doesnt_hold_is_refused(kit: Path) -> None:
     assert "assets/missing.svg: no such file in the kit" in faults(kit)
 
 
+@pytest.mark.parametrize("path", ["assets/.", "assets/..", "fonts/..", "assets/.env"])
+def test_a_path_that_is_a_folder_or_hidden_is_refused(kit: Path, path: str) -> None:
+    data = brand(kit)
+    data["assets"]["mark"]["light"] = path
+    write(kit, data)
+    assert "brand.json: assets.mark.light: String should match pattern" in faults(kit)
+
+
+@pytest.mark.parametrize("path", ["assets/mark.dark.svg", "assets/-x.svg", "assets/_mark.svg"])
+def test_a_path_with_dots_inside_or_a_dash_first_is_a_name(kit: Path, path: str) -> None:
+    data = brand(kit)
+    data["assets"]["mark"]["light"] = path
+    write(kit, data)
+    said = faults(kit)
+    assert "String should match pattern" not in said
+    assert f"{path}: no such file in the kit" in said
+
+
 def test_an_asset_linked_from_outside_the_kit_is_refused(kit: Path, tmp_path: Path) -> None:
     outside = tmp_path / "outside.svg"
     outside.write_bytes(MARK)

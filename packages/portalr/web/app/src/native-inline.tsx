@@ -10,6 +10,7 @@ import { Refused } from "@portalr/client";
 import {
   Alert,
   fileSize,
+  IconButton,
   PageViewer,
   Reading,
   ScrollRegion,
@@ -18,10 +19,12 @@ import {
   sheetsOf,
 } from "@portalr/ui";
 import { useQuery } from "@tanstack/react-query";
+import { Download } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { editorAt, type Place } from "./check-out";
 import { useEditing } from "./editing";
-import { DownloadButton, FileControls, type Native, useDownload } from "./native-file";
+import { FileControls, type Native, useDownload } from "./native-file";
 import { useNear } from "./near";
 import { ViewSlotsContext } from "./view-slots";
 
@@ -150,6 +153,8 @@ export function NativeInline(props: {
   native: Native;
   me: string;
   unserved: ReactNode;
+  /** The entry's header, where its download goes once the file is read. */
+  header?: HTMLElement | null;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const { near, seen } = useNear(box);
@@ -165,6 +170,7 @@ function FileView({
   native,
   me,
   unserved,
+  header = null,
   near,
   seen,
 }: {
@@ -172,6 +178,7 @@ function FileView({
   native: Native;
   me: string;
   unserved: ReactNode;
+  header?: HTMLElement | null;
   near: boolean;
   seen: boolean;
 }) {
@@ -230,13 +237,24 @@ function FileView({
     pages > 0 ? `${pages} ${pages === 1 ? "page" : "pages"}` : null,
     `version ${status.version}`,
   ].filter(Boolean);
+  // Its download is the header's, beside its page: the file's head, as its status reads it now,
+  // offered only once the file is read and served, where a failure is said below.
+  const downloading = saving === "saving";
+  const downloadButton = (
+    <IconButton
+      label="Download"
+      icon={Download}
+      aria-busy={downloading || undefined}
+      disabled={downloading}
+      focusableWhenDisabled
+      onClick={() => void download(status.version)}
+    />
+  );
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        {/* Its name is the entry's, above. */}
-        <p className="text-muted text-sm">{about.join(" · ")}</p>
-        <DownloadButton saving={saving} onDownload={() => void download(status.version)} />
-      </div>
+      {header && createPortal(downloadButton, header)}
+      {/* Its name and its download are the entry's header's, above. */}
+      <p className="text-muted text-sm">{about.join(" · ")}</p>
       <div className="flex flex-wrap items-center justify-between gap-2">
         {editing ? (
           <p className="text-muted text-sm">Editing in {native.app}</p>

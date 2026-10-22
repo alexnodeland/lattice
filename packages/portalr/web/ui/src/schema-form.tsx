@@ -22,6 +22,7 @@ import {
   refusalsOf,
   valuesOf,
 } from "./form-schema";
+import { Heading } from "./heading";
 import { own } from "./json";
 import { SegmentedFilter } from "./segmented-filter";
 import { SelectField } from "./select-field";
@@ -346,9 +347,9 @@ export function SchemaForm({
       {(title || layout.description) && (
         <div className="flex flex-col gap-1">
           {title && (
-            <h2 id={heading} className={TYPE.label}>
+            <Heading id={heading} level={2} look="label">
               {title}
-            </h2>
+            </Heading>
           )}
           {layout.description && <p className={TYPE.meta}>{layout.description}</p>}
         </div>

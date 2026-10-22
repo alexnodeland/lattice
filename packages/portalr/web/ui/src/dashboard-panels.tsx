@@ -15,6 +15,7 @@ import { Card } from "./card";
 import { formatNumber } from "./chart-theme";
 import type { ChartTokens } from "./chart-tokens";
 import { Figures, PlainTable } from "./dashboard-figures";
+import { Heading } from "./heading";
 import { Icon } from "./icon";
 import { DASHBOARDS, offSaid, useOff } from "./integrations";
 import { isNumber } from "./json";
@@ -77,9 +78,9 @@ function Titled({ title, children }: { title: string; children: (heading: string
   const heading = useId();
   return (
     <Card render={<section aria-labelledby={heading} />} className="flex flex-col gap-3">
-      <h2 id={heading} className={TYPE.label}>
+      <Heading id={heading} level={2} look="label">
         {title}
-      </h2>
+      </Heading>
       {children(heading)}
     </Card>
   );

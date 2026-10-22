@@ -5,6 +5,8 @@
 **Deciders:** Alex Nodeland
 **Implements:** [RFC-0006](../rfcs/0006-excalidraw-diagrams-drawn-live.md)'s shared `Integrations` port (O9, U1), for every integration alike
 
+> **Amended (2026-10-22):** `excalidraw` is off by default, as the other heavier integrations are (mini apps, Mermaid, the crafting apps but WordCraft). Its data layer exists before its canvas, and a workspace's admin turns diagrams on where they are wanted. What this record decides is unchanged.
+
 ## Context
 
 Every integration lattice adds must be switchable per workspace: trackers ([RFC-0004](../rfcs/0004-relayr-and-task-trackers.md)), native files ([RFC-0003](../rfcs/0003-native-files-as-artifacts.md)), forms, dashboards and mini apps ([RFC-0005](../rfcs/0005-forms-dashboards-and-mini-apps.md)), rich Markdown, and diagrams (RFC-0006). Two packages already ask a seam of their own before an integration acts: relayr's `Enabled`, a callable `(tenant_id, workspace_id, key) -> bool` with the keys `tracker:plane` and `tracker:vikunja`, and artifactr's forms, whose open pull request asks an `Integrations` with one method, `is_enabled(tenant_id, workspace_id, key)`, and promises it moves to a shared home unchanged. Neither has a store; each application answers it alone.

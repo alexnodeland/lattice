@@ -62,6 +62,8 @@ There are two lanes. **The durable lane** is artifactr's: a commit is an `edit_a
 
 > **Amended (2026-10-17) by [lattice ADR-0026](../adr/0026-a-distribution-needs-a-reason-integrations-are-extras.md):** diagrams are not a distribution of their own. O2 is decided as an extra of `artifactr-ai`, in the artifactr distribution, with their code a subpackage of `artifactr` that the rest of it never imports, turned on per workspace by the shared Integrations switch this RFC proposes. `artifactr-excalidraw-ai` and its release-please component are dropped; the extra's name and import path are settled where it is built. `artifactr-files` is now artifactr's `files` extra, `artifactr.files`, so `Blobs` and `Blob` come from there, within the same distribution. What else this section says holds.
 
+> **Decided (2026-10-22):** the extra is `artifactr-ai[excalidraw]`, imported as `artifactr.excalidraw` (artifactr ADR-0086). Until images land, a diagram's images keep `Blob`'s shape, as its own `DiagramFile`, so that the data layer doesn't import the `files` extra.
+
 ### The artifact (O1)
 
 ```python
@@ -333,7 +335,7 @@ Decided by the owner on 2026-10-17:
 | O8 | Outside services | None: no excalidraw.com, excalidraw-room or external infrastructure | Their relay, their storage, their MCP server |
 | O9 | Turning it off | Deployment and tenant and workspace, audited, switched per workspace from portalr's admin, through one `Integrations` port shared by every integration; checked before grants; off hides tools and refuses writes everywhere, and keeps diagrams readable | A flag per integration; template configuration; a grant |
 
-Recommended, for the maintainer to decide:
+Recommended, for the maintainer to decide, and signed off by the owner on 2026-10-22 as written. U6 holds as stated: headless Chromium, unless phase 0 shows jsdom and resvg faithful enough.
 
 | # | Question | Recommended | Instead of |
 |---|---|---|---|
@@ -365,6 +367,8 @@ Recommended, for the maintainer to decide:
 
 ## Unresolved questions
 
+Still open on 2026-10-22, since none has an obvious default: each waits for phase 0's numbers or the owner.
+
 - **CJK fonts:** ship Xiaolai's 12 MB in portalr's wheel, or let CJK text fall back to a system face.
 - **Revision growth:** whether diagrams need a retention rule for old revisions, which artifactr has for none of its types.
 - **Viewers' cursors:** whether a viewer's pointer is shown to editors, or only listed.
@@ -388,11 +392,11 @@ Each is settled in phase 0's ADR or carried as an exit criterion.
 
 - [ ] Phase 0: the spike and its ADR
 - [x] RFC-0003, RFC-0004 and RFC-0005 amended to name the shared `Integrations` port
-- [ ] Sign-off on U1 to U6
+- [x] Sign-off on U1 to U6 (2026-10-22)
 - [x] lattice-core and grantr: `Integrations`, its adapter, audit and action ([lattice ADR-0027](../adr/0027-integrations-switched-per-workspace-through-one-port.md))
-- [ ] artifactr: `Workspaces(gate=...)`, `NotEnabled`, the watch commands, presence frames and `PresenceChannel`, with ADRs
+- [ ] artifactr: `Workspaces(gate=...)` and `NotEnabled` (done, [artifactr ADR-0081](../artifactr/adr/0081-a-gate-before-access-integrations-switched-off-answer-not-enabled.md)); the watch commands, presence frames and `PresenceChannel`, with ADRs
 - [ ] artifactr-files: the collector's kinds
-- [ ] artifactr-excalidraw: the package, its type, patches, checks, toolset, converter and router
+- [ ] artifactr's `excalidraw` extra: its type, patches, checks and `render_for_agent` (done: artifactr ADR-0086, with the limits still RFC-0006's placeholders until phase 0 measures them, and `excalidraw` off by default); its toolset, converter and router
 - [ ] stackr: the worker, its image and the `excalidraw` question
 - [ ] portalr: ADR-0041's policy and allow-list test, the `canvas` budget, the renderer, the canvas, presence, the list, the overlay, admin's Integrations page
 - [ ] The `[relayr]` projections and feedback anchors

@@ -322,7 +322,7 @@ async def test_admins_switch_integrations_and_members_read_them(client: httpx.As
     notes = "/tenants/acme/workspaces/team/notes"
 
     off = await client.put(
-        "/tenants/acme/integrations/excalidraw", json={"on": False}, headers=AS_ALICE
+        "/tenants/acme/integrations/markdown:math", json={"on": False}, headers=AS_ALICE
     )
     assert off.status_code == 200
     assert (off.json()["tenant"]["on"], off.json()["tenant"]["by"]) == (False, ALICE.model_dump())
@@ -336,7 +336,7 @@ async def test_admins_switch_integrations_and_members_read_them(client: httpx.As
         True,
     )
     unset = await client.put(
-        "/tenants/acme/integrations/excalidraw", json={"on": None}, headers=AS_ALICE
+        "/tenants/acme/integrations/markdown:math", json={"on": None}, headers=AS_ALICE
     )
     assert (unset.json()["tenant"], unset.json()["enabled"]) == (None, True)
 
@@ -352,7 +352,7 @@ async def test_admins_switch_integrations_and_members_read_them(client: httpx.As
 
     enabled = await client.get(f"{notes}/enabled-integrations", headers=AS_BOB)
     assert enabled.status_code == 200
-    assert (enabled.json()["ui:mini-apps"], enabled.json()["excalidraw"]) == (True, True)
+    assert (enabled.json()["ui:mini-apps"], enabled.json()["markdown:math"]) == (True, True)
 
     refused = await client.put(
         "/tenants/acme/integrations/ui:forms", json={"on": False}, headers=AS_BOB
@@ -378,9 +378,9 @@ async def test_admins_switch_integrations_and_members_read_them(client: httpx.As
         "/tenants/acme/audit", params={"type": "integration_set"}, headers=AS_ALICE
     )
     assert [entry["event"] for entry in audit.json()] == [
-        {"type": "integration_set", "workspace": None, "key": "excalidraw", "on": False},
+        {"type": "integration_set", "workspace": None, "key": "markdown:math", "on": False},
         {"type": "integration_set", "workspace": "team/notes", "key": "ui:mini-apps", "on": True},
-        {"type": "integration_set", "workspace": None, "key": "excalidraw", "on": None},
+        {"type": "integration_set", "workspace": None, "key": "markdown:math", "on": None},
     ]
 
 

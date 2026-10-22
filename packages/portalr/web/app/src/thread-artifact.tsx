@@ -18,6 +18,7 @@ import {
 } from "@portalr/ui";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
+import { useState } from "react";
 import { useAppHost } from "./app-host";
 import type { Context } from "./context";
 import { useFormHost } from "./form-host";
@@ -67,10 +68,14 @@ export function ThreadArtifact({
     />
   );
   const native = NATIVE.get(artifact.kind);
+  // Where a native file puts its download, in the header beside its page and its full view,
+  // once it is read and served (portalr ADR-0061).
+  const [actions, setActions] = useState<HTMLElement | null>(null);
   return (
     <InlineArtifact
       name={name}
       open={open}
+      {...(native && { actions: <span ref={setActions} className="contents" /> })}
       {...(artifact.kind !== "app" && latest && { kind: kindName(latest.kind, latest.data) })}
     >
       {/* A read again that fails keeps what was read, so a running app keeps running. */}
@@ -85,6 +90,7 @@ export function ThreadArtifact({
           place={{ context, tenant, workspace, artifact: artifact.id }}
           native={native}
           me={me}
+          header={actions}
           unserved={<ArtifactContent kind={latest.kind} data={latest.data} renderers={RENDERERS} />}
         />
       ) : (

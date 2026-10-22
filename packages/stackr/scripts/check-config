@@ -192,13 +192,30 @@ ENV_REF = re.compile(r"^os\.environ/(\w+)$")
 
 def check_litellm() -> list[str]:
     """Check the gateway's config against itself and compose.yaml."""
-    config = yaml.safe_load((ROOT / "deploy" / "litellm" / "config.yaml").read_text())
+    gateway = ROOT / "deploy" / "litellm"
+    config = yaml.safe_load((gateway / "config.yaml").read_text())
     compose = yaml.safe_load((ROOT / "compose.yaml").read_text())
     environment = set(compose["services"]["litellm"].get("environment") or {})
     problems: list[str] = []
+    if config.get("include") != ["groups.yaml"]:
+        problems.append("config.yaml must include groups.yaml, which compose.yaml mounts")
 
-    models = {entry["model_name"] for entry in config.get("model_list", [])}
-    for entry in config.get("model_list", []):
+    # Each file of model groups holds the same groups, and only a model_list, which LiteLLM's
+    # include extends config.yaml's with (it replaces any other key whole).
+    groups = {path.stem: yaml.safe_load(path.read_text()) for path in gateway.glob("groups/*.yaml")}
+    if set(groups) != {"providers", "upstream"}:
+        problems.append(f"groups/ holds {sorted(groups)}, not providers and upstream")
+    for name, chosen in groups.items():
+        if set(chosen) != {"model_list"}:
+            problems.append(f"groups/{name}.yaml holds more than a model_list")
+        if not {"default", "fast"} <= {entry["model_name"] for entry in chosen["model_list"]}:
+            problems.append(f"groups/{name}.yaml doesn't define both default and fast")
+    entries = config.get("model_list", []) + [
+        entry for chosen in groups.values() for entry in chosen.get("model_list", [])
+    ]
+
+    models = {entry["model_name"] for entry in entries}
+    for entry in entries:
         params = entry.get("litellm_params") or {}
         if "model" not in params:
             problems.append(f"model {entry['model_name']!r} has no litellm_params.model")
@@ -237,7 +254,7 @@ def check_litellm() -> list[str]:
             for item in node:
                 yield from references(item)
 
-    for name in sorted(set(references(config)) - environment):
+    for name in sorted(set(references([config, *groups.values()])) - environment):
         problems.append(f"os.environ/{name} isn't set on the litellm service in compose.yaml")
     if not ENV_REF.match(str((config.get("general_settings") or {}).get("master_key", ""))):
         problems.append("general_settings.master_key must come from os.environ/")

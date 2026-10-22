@@ -36,9 +36,9 @@ yours. Any faces you add are under their own licences, which brand.json names an
 carries.
 """,
     "example": """\
-It is a copy of portalr's example kit, {start}: its name, words, marks and favicon are the
-example's, under portalr's MIT licence, and are no one's trademark. Replace them with the
-product's own before serving it as yours.
+It is a copy of portalr's example kit, {start}: its marks, favicon and tokens are under the
+MIT licence in its LICENSE.txt. Its name is made up for the example; the kit makes no trademark
+claim in it and grants none. Replace them with the product's own before serving it as yours.
 """,
 }
 

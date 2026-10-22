@@ -8,6 +8,15 @@
     },
     "paper": {
       "$value": "#f4f7f7"
+    },
+    "muted": {
+      "$value": "#4d6260"
+    },
+    "line": {
+      "$value": "#d3dfde"
+    },
+    "edge": {
+      "$value": "#718987"
     }
   },
   "radius": {

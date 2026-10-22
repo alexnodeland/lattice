@@ -63,6 +63,7 @@ test("a thread holds its title, mode, focus and messages", () => {
       },
     ],
     active: 5,
+    activeAt: "2026-10-12T00:00:00Z",
   });
 });
 
@@ -341,6 +342,7 @@ test("artifacts keep their kind, latest version, whether they are archived, and 
     threadId: "thr_1",
     seq: 1,
     feedback: [],
+    changedAt: "2026-10-12T00:00:00Z",
   });
 });
 
@@ -531,4 +533,51 @@ test("each version of an artifact is judged anew: v1's thumbs aren't v3's", () =
   expect(state.artifacts.plan_1).toMatchObject({ version: 3, feedback: [] });
   const judged = apply(state, envelope(thumbs(3), 6));
   expect(judged.artifacts.plan_1?.feedback).toHaveLength(1);
+});
+
+/** Events at the moments given, in order. */
+function at(...events: [string, Record<string, unknown>][]): Workspace {
+  return events
+    .map(([ts, event], index) => ({ ...envelope(event, index + 1), ts }))
+    .reduce(apply, artifactr.initial());
+}
+
+test("a thread and an artifact keep when they last moved; archiving isn't a change", () => {
+  const made = { artifact_id: "plan_1", kind: "plan", data: {} };
+  const state = at(
+    ["2026-10-12T09:00:00Z", { type: "thread_created", thread_id: "thr_1", title: "Launch" }],
+    ["2026-10-12T09:05:00Z", { type: "artifact_created", ...made, version: 1 }],
+    [
+      "2026-10-12T09:10:00Z",
+      {
+        type: "artifact_changed",
+        ...made,
+        version: 2,
+        patch: { kind: "json_patch", ops: [] },
+        summary: "",
+      },
+    ],
+    [
+      "2026-10-12T09:20:00Z",
+      { type: "artifact_archived", artifact_id: "plan_1", kind: "plan", version: 2 },
+    ],
+    [
+      "2026-10-12T09:30:00Z",
+      { type: "message_posted", thread_id: "thr_1", message_id: "m1", content: "Hi" },
+    ],
+    // A message in a thread whose start the store never read: when it was active is known.
+    [
+      "2026-10-12T09:40:00Z",
+      { type: "message_posted", thread_id: "thr_2", message_id: "m2", content: "Hello" },
+    ],
+  );
+  expect(state.artifacts.plan_1?.changedAt).toBe("2026-10-12T09:10:00Z");
+  expect(state.threads.thr_1?.activeAt).toBe("2026-10-12T09:30:00Z");
+  expect(state.threads.thr_2?.activeAt).toBe("2026-10-12T09:40:00Z");
+  // A thread renamed or refocused hasn't been active: its time stays.
+  const refocused = apply(state, {
+    ...envelope({ type: "focus_changed", thread_id: "thr_1", artifact_ids: [] }, 7),
+    ts: "2026-10-12T10:00:00Z",
+  });
+  expect(refocused.threads.thr_1?.activeAt).toBe("2026-10-12T09:30:00Z");
 });

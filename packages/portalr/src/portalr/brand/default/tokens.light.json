@@ -883,6 +883,14 @@
         "$value": "{space.1-5}"
       }
     },
+    "rail": {
+      "width": {
+        "$value": {
+          "value": 15.5,
+          "unit": "rem"
+        }
+      }
+    },
     "drawer": {
       "width": {
         "$value": {

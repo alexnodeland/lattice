@@ -955,6 +955,12 @@
       }
     },
     "code-block": {
+      "max-height": {
+        "$value": {
+          "value": 32,
+          "unit": "rem"
+        }
+      },
       "radius": {
         "$value": "{radius.3}"
       },

@@ -76,6 +76,7 @@ nav:
   - adr/0063-disclosures.md
   - adr/0064-the-frames-edges.md
   - adr/0065-empty-error-and-not-found-states.md
+  - adr/0066-the-style-census-enforced.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

@@ -89,7 +89,7 @@
       "fg": "edge",
       "bg": "paper",
       "min": 3,
-      "why": "a control's boundary, and a subtle link's underline"
+      "why": "a control's boundary, a subtle link's underline, and the scrollbar's thumb on the page"
     },
     {
       "fg": "edge",

@@ -177,3 +177,18 @@ test("at the rail's width, nothing is pinned above the page, so nothing is held 
   await tall(1280);
   expect(getComputedStyle(document.documentElement).scrollPaddingTop).toBe("0px");
 });
+
+test("from 1024 pixels, a focused skip link moves the rail down by its bar, and a scroll pins it again", async () => {
+  // Recorded, not compensated (portalr ADR-0064): the rail is the window's height, so while the
+  // bar shows at the top of the page the rail's foot sits below the window by the bar's height.
+  await tall(1280);
+  window.scrollTo(0, 0);
+  await userEvent.tab();
+  const bar = (document.activeElement as HTMLElement).getBoundingClientRect().height;
+  const header = document.querySelector("header") as HTMLElement;
+  expect(header.getBoundingClientRect().top).toBeCloseTo(bar, 0);
+  expect(header.getBoundingClientRect().bottom).toBeCloseTo(window.innerHeight + bar, 0);
+  window.scrollTo(0, 200);
+  expect(header.getBoundingClientRect().top).toBe(0);
+  window.scrollTo(0, 0);
+});

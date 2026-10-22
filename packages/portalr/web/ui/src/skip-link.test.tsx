@@ -55,3 +55,22 @@ test("focused, the skip link takes a room of its own above the frame, and covers
   expect(bar.height).toBeGreaterThan(0);
   expect(header.getBoundingClientRect().top).toBeGreaterThanOrEqual(before + bar.height - 1);
 });
+
+test("leaving the skip link gives its room back: the frame returns to the top", async () => {
+  const { AppShell } = await import("./app-shell");
+  await render(
+    <AppShell
+      home={<a href="#home">Home</a>}
+      switcher={<span>acme</span>}
+      account={<span>alice</span>}
+    >
+      Content
+    </AppShell>,
+  );
+  const header = document.querySelector("header") as HTMLElement;
+  const before = header.getBoundingClientRect().top;
+  await userEvent.tab();
+  expect(header.getBoundingClientRect().top).toBeGreaterThan(before);
+  await userEvent.tab();
+  expect(header.getBoundingClientRect().top).toBe(before);
+});

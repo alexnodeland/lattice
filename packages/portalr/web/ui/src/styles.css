@@ -28,8 +28,11 @@
      * scrolls to stops below it. At lg it is the rail beside the page, and takes no room above.
      */
     scroll-padding-top: var(--header-clearance);
-    /* The scrollbars in the kit's colours: the line's ink on the paper. */
-    scrollbar-color: var(--line) var(--paper);
+    /*
+     * The scrollbars in the kit's colours: a control's edge on the paper, which holds 3:1 as a
+     * control's boundary must (the pair is in the manifest).
+     */
+    scrollbar-color: var(--edge) var(--paper);
     @variant lg {
       scroll-padding-top: 0;
     }

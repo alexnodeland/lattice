@@ -12,10 +12,14 @@ import json
 import os
 import re
 import sys
+from collections.abc import AsyncGenerator, Awaitable, Callable
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field, replace
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+import anyio
 import pytest
 from pydantic_ai import (
     Agent,
@@ -35,6 +39,7 @@ from pydantic_ai.usage import RunUsage
 from artifactr.agent import ArtifactWorkspace, Runner, Session
 from artifactr.connect import (
     BLENDER,
+    CALLED,
     CODE_BYTES,
     DESCRIPTION_CHARS,
     FREECAD,
@@ -51,10 +56,13 @@ from artifactr.connect import (
 from artifactr.core import (
     Actor,
     AnswerDeferred,
+    AppEvent,
     DeferredRequest,
     RunPaused,
+    RunStarted,
     Thread,
     UserActor,
+    Visibility,
     acting_for,
 )
 from artifactr.workspace import Access, InMemoryStorage, Workspace, Workspaces
@@ -70,6 +78,7 @@ LISTED = Path(__file__).with_name("listed")
 COMMAND = (sys.executable, "-I", str(FAKE_SERVER))
 
 DIGESTS = {
+    "sizes": "a3b1b4cd64331f931db34b6d8054a5bcc28d8862e04e85fb4980f1e14ae0c3ee",
     "pictures": "165529d84d59f08d634ec9657b195e82cbeafcd7e8a550de2beb6999dead8b38",
     "many": "72085ed5a7064db4e8305105ee08310fbeee871361566502ff6291dfb5ea7970",
     "get_objects": "87d00691f105187b0c9da09adb30e60b91d6a37ad2229c5169ec5f9c6eba9b00",
@@ -110,6 +119,14 @@ def entry(**changed: str) -> ConnectedServer:
             for name, vetted in DIGESTS.items()
         },
         code={"execute_code": "code"},
+        properties={"create_object": "properties"},
+        reaches={
+            "search_assets": (
+                "source",
+                {"lib": "Lib: api.lib.example", "auto": "Lib, by default"},
+                ("near", "near a place the model names"),
+            )
+        },
         token="FAKE_TOKEN",
         ports=True,
     )
@@ -121,7 +138,7 @@ SAFE = {
     "fake_get_view",
     "fake_create_object",
     *("fake_huge", "fake_inject", "fake_slow", "fake_refuse", "fake_odd", "fake_ask"),
-    *("fake_stamp", "fake_environ", "fake_many", "fake_pictures"),
+    *("fake_stamp", "fake_environ", "fake_many", "fake_pictures", "fake_sizes"),
 }
 CODE = "import FreeCAD\nFreeCAD.ActiveDocument.addObject('Part::Box', 'Box')\n"
 
@@ -730,7 +747,25 @@ async def test_an_approval_holds_only_for_its_time(world: World) -> None:
     handle = (await runner.answer(world.ws, approved)).run
     assert handle is not None
     await handle.wait()
-    assert "the approval is too old, or was given elsewhere: ask again" in seen(script)
+    assert "the approval is too old, or not of these arguments: ask again" in seen(script)
+
+
+async def test_an_approval_holds_across_a_restart(world: World) -> None:
+    connection = everything(world)
+    script = Script(call("fake_execute_code", "c1", code=CODE), say("Done."))
+    _, run_id = await world.pause(script, connection)
+    # Another runner, as after a restart or in another process: its toolset asked nothing.
+    restarted = Runner(world.agent(script, connected(**connection_options(connection))), app=None)
+    approved = AnswerDeferred(run_id=run_id, tool_call_id="c1", approved=True)
+    handle = (await restarted.answer(world.ws, approved)).run
+    assert handle is not None
+    await handle.wait()
+    assert "ran " in seen(script)
+
+
+def connection_options(connection: Connection) -> dict[str, Any]:
+    """What `everything` connects with, for a second connection of the same app."""
+    return {"allow": tuple(connection.allow), "secrets": ("FAKE_TOKEN",)}
 
 
 async def test_code_no_encoding_takes_is_never_offered(world: World) -> None:
@@ -770,6 +805,37 @@ async def test_a_blocking_deployment_still_asks_about_a_download(world: World) -
     runs = request.review["runs"]
     assert isinstance(runs, str)
     assert runs.startswith("Downloads from the internet into your Fake")
+    assert request.review["reaches"] == "Lib, by default"
+
+
+async def test_a_download_says_where_it_reaches(world: World) -> None:
+    tools, ctx = await _direct(world, everything(world))
+    tool = (await tools.get_tools(ctx))["fake_search_assets"]
+
+    async def review(**args: Any) -> Any:
+        with pytest.raises(ApprovalRequired) as asked:
+            await tools.call_tool("fake_search_assets", {"query": "q", **args}, ctx, tool)
+        return (asked.value.metadata or {})["review"]["reaches"]
+
+    assert await review(source="lib") == "Lib: api.lib.example"
+    # What the model names itself is shown capped, and without what a reader wouldn't see.
+    far = "https://evil.example/\u202e" + "x" * 400
+    said = await review(source="lib", near=far)
+    assert said.startswith(
+        "Lib: api.lib.example; near a place the model names: https://evil.example/x"
+    )
+    assert "\u202e" not in said
+    assert said.endswith("…")
+    with pytest.raises(ModelRetry, match="source must be one of auto, lib: no other service"):
+        await tools.call_tool("fake_search_assets", {"query": "q", "source": "evil"}, ctx, tool)
+
+
+def test_every_network_tool_says_where_it_reaches() -> None:
+    for server in (FREECAD, BLENDER):
+        fetching = {name for name, tool in server.tools.items() if tool.risk == "network"}
+        assert set(server.reaches) == fetching
+    with pytest.raises(ValueError, match="each network tool, and only one, says where"):
+        entry().__class__(**{**entry().__dict__, "reaches": {}})
 
 
 async def test_a_tool_called_outside_what_was_offered_is_refused(world: World) -> None:
@@ -802,7 +868,7 @@ async def test_an_approval_binds_the_arguments_it_was_asked_with(world: World) -
     with pytest.raises(ApprovalRequired):
         await tools.call_tool("fake_execute_code", {"code": CODE}, ctx, tool)
     approved = replace(ctx, tool_call_approved=True)
-    with pytest.raises(ToolFailed, match="the approval is too old"):
+    with pytest.raises(ToolFailed, match="the approval is too old, or not of these arguments"):
         await tools.call_tool("fake_execute_code", {"code": CODE + "x = 1\n"}, approved, tool)
 
 
@@ -811,3 +877,305 @@ async def test_a_replys_images_together_are_capped_too(world: World) -> None:
     script = Script(call("fake_pictures"), say("Done."))
     await world.run(script, connected())
     assert seen(script).count("[an image past the reply's 2097152 bytes, left out]") == 1
+
+
+async def test_an_image_past_its_size_is_left_out_saying_the_limit(world: World) -> None:
+    world.switch.on.add(FAKE.key)
+    script = Script(call("fake_sizes"), say("Done."))
+    await world.run(script, connected())
+    told = seen(script)
+    limit = "past the 8000 pixels a side or 16 million pixels"
+    assert f"an image of 100000x100000 pixels, {limit}" in told
+    assert f"an image of 9000x10 pixels, {limit}" in told
+    assert f"an image of 8000x8000 pixels, {limit}" in told
+    assert "a image/png that says it has no width or no height" in told
+    assert "a image/jpeg that says it has no width or no height" in told
+    assert told.count("a image/jpeg whose size can't be read") == 5
+    assert "a image/png whose size can't be read" in told
+    assert "a image/jpeg whose size can't be read" in told
+    assert told.count("BinaryContent(") == 3, "the three that fit are given"
+
+
+async def test_calls_take_turns_by_the_lock_the_connection_is_given(world: World) -> None:
+    held: list[str] = []
+
+    class Recording:
+        @asynccontextmanager
+        async def held(self, key: str, *, wait: float) -> AsyncGenerator[None]:
+            held.append(key)
+            assert wait == 30.0, "a wait bounded by the call's deadline"
+            yield
+
+    world.switch.on.add(FAKE.key)
+    await world.run(Script(call("fake_stamp"), say("Done.")), connected(lock=Recording()))
+    assert held == ["\x00".join(("artifactr.connect", "fake", "--host", "127.0.0.1"))] * 2, (
+        "the listing and the call"
+    )
+
+
+def per_hour(limit: int, asked: list[tuple[str, str]] | None = None) -> Any:
+    async def answer(tenant_id: str, workspace_id: str) -> int:
+        if asked is not None:
+            asked.append((tenant_id, workspace_id))
+        return limit
+
+    return answer
+
+
+async def approve(world: World, runner: Runner[None], run_id: str, *ids: str) -> None:
+    for tool_call_id in ids:
+        approved = AnswerDeferred(run_id=run_id, tool_call_id=tool_call_id, approved=True)
+        handle = (await runner.answer(world.ws, approved)).run
+        if handle is not None:
+            await handle.wait()
+
+
+async def test_a_workspace_runs_so_many_code_calls_an_hour(world: World) -> None:
+    world.switch.on |= {FAKE.key, FAKE.code_key}
+    asked: list[tuple[str, str]] = []
+    connection = connected(
+        allow=("execute_code",), secrets=("FAKE_TOKEN",), per_hour=per_hour(2, asked)
+    )
+    for n in (1, 2, 3):
+        script = Script(call("fake_execute_code", f"c{n}", code=CODE), say("Done."))
+        runner, run_id = await world.pause(script, connection)
+        if n == 3:
+            assert "has used its 2 tries at code and network calls in Fake this hour" in seen(
+                script
+            )
+            assert await world.pending(run_id) == [], "nothing is asked past the limit"
+            break
+        [request] = await world.pending(run_id)
+        said = f"{n - 1} of the 2 tries at calls to Fake this workspace may make an hour are used."
+        assert request.review["hour"] == said
+        await approve(world, runner, run_id, f"c{n}")
+        assert "ran " in seen(script)
+    assert set(asked) == {("acme", "w1")}
+    called = [e for e in await world.ws.read() if isinstance(e.event, AppEvent)]
+    assert [e.event.name for e in called if isinstance(e.event, AppEvent)] == [CALLED, CALLED]
+    assert all(e.thread_id is None for e in called), "of no thread, so every reader counts it"
+
+
+async def test_calls_asked_at_once_are_held_to_the_limit_exactly(world: World) -> None:
+    world.switch.on |= {FAKE.key, FAKE.code_key}
+    connection = connected(allow=("execute_code",), secrets=("FAKE_TOKEN",), per_hour=2)
+    many = ModelResponse(
+        parts=[
+            ToolCallPart(tool_name="fake_execute_code", args={"code": CODE}, tool_call_id=f"c{n}")
+            for n in range(4)
+        ]
+    )
+    script = Script(many, say("Done."))
+    runner, run_id = await world.pause(script, connection)
+    assert len(await world.pending(run_id)) == 4, "each asked, before any ran"
+    await approve(world, runner, run_id, "c0", "c1", "c2", "c3")
+    told = seen(script)
+    assert told.count("ran ") == 2
+    assert told.count("has used its 2 tries at code and network calls in Fake this hour") == 2
+
+
+async def test_an_approval_runs_its_call_once(world: World) -> None:
+    tools = connected_app_tools(everything(world), integrations=world.switch)
+    call = await _approved(world.workspaces, ALICE, world.thread.id, tools)
+    await call.run()
+    with pytest.raises(ToolFailed, match="was tried already, whether or not it ran"):
+        await call.run()
+    tries = [e for e in await world.ws.read() if isinstance(e.event, AppEvent)]
+    assert len(tries) == 1, "a replayed approval takes no place in the hour"
+
+
+async def test_an_approval_is_its_own_runs_latest_pause(world: World) -> None:
+    tools = connected_app_tools(everything(world), integrations=world.switch)
+    asked = await _approved(world.workspaces, ALICE, world.thread.id, tools)
+    # Another run, which asked nothing, can't run what this one was approved for.
+    unasked = await _approved(world.workspaces, ALICE, world.thread.id, tools, paused=False)
+    with pytest.raises(ToolFailed, match="the approval is too old, or not of these arguments"):
+        await unasked.run()
+    # A later pause of the run, asking for another call, stands for the run from then on.
+    other = DeferredRequest(tool_call_id="c2", tool_name="fake_get_objects", kind="approval")
+    await asked.agent.record(RunStarted(run_id=asked.run_id, thread_id=world.thread.id))
+    await asked.agent.record(
+        RunPaused(run_id=asked.run_id, thread_id=world.thread.id, requests=(other,))
+    )
+    with pytest.raises(ToolFailed, match="the approval is too old, or not of these arguments"):
+        await asked.run()
+
+
+async def test_a_reader_who_cant_see_a_thread_counts_its_calls() -> None:
+    switch = Switch()
+    switch.on |= {FAKE.key, FAKE.code_key}
+    storage = InMemoryStorage()
+    secret: list[str] = []
+
+    async def hidden(_t: str, _w: str, actor: Actor) -> Visibility:
+        bobs = getattr(acting_for(actor), "id", None) == BOB.id
+        return Visibility(threads=frozenset(secret if bobs else ()))
+
+    workspaces = Workspaces(storage, hidden=hidden)
+    alices = await workspaces.open("acme", "w1", actor=ALICE)
+    secret.append((await alices.create_thread("Alice's alone")).id)
+    bobs_thread = await alices.create_thread("Everyone's")
+    connection = connected(allow=("execute_code",), secrets=("FAKE_TOKEN",), per_hour=1)
+    tools = connected_app_tools(connection, integrations=switch)
+    await (await _approved(workspaces, ALICE, secret[0], tools)).run()
+    bobs = await _approved(workspaces, BOB, bobs_thread.id, tools)
+    with pytest.raises(ToolFailed, match="has used its 1 tries at code and network calls"):
+        await bobs.run()
+
+
+@dataclass
+class Approved:
+    agent: Workspace
+    run_id: str
+    run: Callable[[], Awaitable[Any]]
+
+
+async def _approved(
+    workspaces: Workspaces,
+    person: UserActor,
+    thread_id: str,
+    tools: Any,
+    *,
+    paused: bool = True,
+) -> Approved:
+    """An approved call, `c1`, of a run of the person's agent, paused for it unless not."""
+    ws = await workspaces.open("acme", "w1", actor=person)
+    session = Session.start(ws, thread_id, app=None, on_behalf_of=person)
+    agent = session.workspace
+    await agent.record(RunStarted(run_id=session.run_id, thread_id=thread_id))
+    if paused:
+        request = DeferredRequest(
+            tool_call_id="c1", tool_name="fake_execute_code", kind="approval", args={"code": CODE}
+        )
+        await agent.record(
+            RunPaused(run_id=session.run_id, thread_id=thread_id, requests=(request,))
+        )
+    model = Script(say(".")).model
+    ctx = RunContext(
+        deps=session, model=model, usage=RunUsage(), tool_call_id="c1", tool_call_approved=True
+    )
+    offered = await tools.get_tools(ctx)
+
+    async def run() -> Any:
+        tool = offered["fake_execute_code"]
+        return await tools.call_tool("fake_execute_code", {"code": CODE}, ctx, tool)
+
+    return Approved(agent, session.run_id, run)
+
+
+async def test_calls_over_an_hour_ago_dont_count(world: World) -> None:
+    world.switch.on |= {FAKE.key, FAKE.code_key}
+    later = datetime.now(UTC) + timedelta(hours=1, minutes=1)
+    for _ in range(2):
+        await world.ws.record(AppEvent(name=CALLED, data={"app": "fake", "tool": "execute_code"}))
+    connection = connected(allow=("execute_code",), secrets=("FAKE_TOKEN",), per_hour=2)
+    tools = connected_app_tools(connection, integrations=world.switch, clock=lambda: later)
+    session = Session.start(world.ws, world.thread.id, app=None, on_behalf_of=ALICE)
+    ctx = RunContext(deps=session, model=Script(say(".")).model, usage=RunUsage())
+    offered = await tools.get_tools(ctx)
+    with pytest.raises(ApprovalRequired) as asked:
+        await tools.call_tool(
+            "fake_execute_code", {"code": CODE}, ctx, offered["fake_execute_code"]
+        )
+    review = (asked.value.metadata or {})["review"]
+    assert (
+        review["hour"]
+        == "0 of the 2 tries at calls to Fake this workspace may make an hour are used."
+    )
+    now = connected_app_tools(connection, integrations=world.switch)
+    with pytest.raises(ToolFailed, match="has used its 2 tries at code and network calls"):
+        await now.call_tool("fake_execute_code", {"code": CODE}, ctx, offered["fake_execute_code"])
+
+
+async def test_an_edit_sets_properties_by_plain_names_alone(world: World) -> None:
+    world.switch.on.add(FAKE.key)
+    tools, ctx = await _direct(world, connected())
+    tool = (await tools.get_tools(ctx))["fake_create_object"]
+    for properties in (
+        {"__class__": 1},
+        {"ExpressionEngine": [["Length", "1"]]},
+        {"Proxy": "x"},
+        {"ViewObject": {"_secret": 1}},
+    ):
+        with pytest.raises(ModelRetry, match="set properties by their plain names"):
+            await tools.call_tool("fake_create_object", {"properties": properties}, ctx, tool)
+    # Plain names pass, at the top and in ViewObject.
+    plain = {"Length": 5, "ViewObject": {"Visibility": True}}
+    with pytest.raises(ToolFailed):  # past the guard: the fake server takes no properties
+        await tools.call_tool("fake_create_object", {"properties": plain}, ctx, tool)
+    # The server reads a string as JSON for an object: none is taken but an object itself.
+    for given in ('{"ExpressionEngine": [["Length", "1"]], "__class__": 1}', [["__class__", 1]], 7):
+        with pytest.raises(ModelRetry, match="give properties as an object of properties"):
+            await tools.call_tool("fake_create_object", {"properties": given}, ctx, tool)
+    with pytest.raises(ModelRetry, match="not ViewObject"):
+        await tools.call_tool(
+            "fake_create_object", {"properties": {"ViewObject": '{"_x": 1}'}}, ctx, tool
+        )
+    assert set(FREECAD.properties) == {"create_object", "edit_object"}
+
+
+async def test_an_app_busy_past_the_deadline_says_so(world: World) -> None:
+    class Busy:
+        @asynccontextmanager
+        async def held(self, key: str, *, wait: float) -> AsyncGenerator[None]:
+            raise TimeoutError
+            yield  # an async generator, as a lock's held is
+
+    world.switch.on.add(FAKE.key)
+    with pytest.raises(ConnectionFailed, match="was busy with another call past the deadline"):
+        await connected(lock=Busy()).tools()
+
+
+async def test_a_call_the_hours_reading_misses_is_refused(world: World) -> None:
+    # An approval that holds three hours, read two hours on: its call, just recorded, is
+    # before the hour the toolset's clock reads back.
+    world.switch.on |= {FAKE.key, FAKE.code_key}
+    connection = connected(allow=("execute_code",), secrets=("FAKE_TOKEN",), approval_ttl=3 * 3600)
+    tools = connected_app_tools(
+        connection,
+        integrations=world.switch,
+        clock=lambda: datetime.now(UTC) + timedelta(hours=2),
+    )
+    approved = await _approved(world.workspaces, ALICE, world.thread.id, tools)
+    with pytest.raises(ToolFailed, match="this call couldn't be counted"):
+        await approved.run()
+
+
+async def test_two_resumes_at_once_run_the_call_once(world: World) -> None:
+    tools = connected_app_tools(everything(world), integrations=world.switch)
+    call = await _approved(world.workspaces, ALICE, world.thread.id, tools)
+    outcomes: list[str] = []
+
+    async def run() -> None:
+        try:
+            await call.run()
+            outcomes.append("ran")
+        except ToolFailed as refused:
+            outcomes.append(str(refused))
+
+    async with anyio.create_task_group() as both:
+        both.start_soon(run)
+        both.start_soon(run)
+    assert outcomes.count("ran") == 1
+    assert any("was tried already" in outcome for outcome in outcomes)
+
+
+async def test_counting_and_approving_read_back_past_a_page(world: World) -> None:
+    tools = connected_app_tools(
+        connected(allow=("execute_code",), secrets=("FAKE_TOKEN",), per_hour=1),
+        integrations=everything_on(world),
+    )
+    call = await _approved(world.workspaces, ALICE, world.thread.id, tools)
+    for n in range(450):
+        await world.ws.record(AppEvent(name="noise", data=n))
+    await call.run()
+    again = await _approved(world.workspaces, ALICE, world.thread.id, tools)
+    for n in range(450):
+        await world.ws.record(AppEvent(name="noise", data=n))
+    with pytest.raises(ToolFailed, match="has used its 1 tries"):
+        await again.run()
+
+
+def everything_on(world: World) -> Switch:
+    world.switch.on |= {FAKE.key, FAKE.code_key}
+    return world.switch

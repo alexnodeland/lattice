@@ -81,6 +81,7 @@ COPY scripts/crafts/${CRAFT}.sha256 scripts/crafts/
 FROM craft AS craft-cli
 ARG VERSION
 ARG SOURCE=""
+ARG SOURCE_SHA256=""
 # Its release's root is above the CLI's bin/, or, for one with none (Blender's), beside the CLI.
 RUN cli=$(scripts/craft "${CRAFT}" cli) \
     && root=${cli%/bin/*} && if [ "${root}" = "${cli}" ]; then root=${cli%/*}; fi \
@@ -89,7 +90,8 @@ RUN cli=$(scripts/craft "${CRAFT}" cli) \
     && if [ -n "${SOURCE}" ]; then printf '%s\n' \
       "${CRAFT} ${VERSION} is free software, which this image holds unmodified, as its release" \
       "was published, with its licence and notices beside this file. Its complete corresponding" \
-      "source code, for exactly this release, is at ${SOURCE}." >/opt/craft/SOURCE-OFFER; fi \
+      "source code, for exactly this release, is at ${SOURCE}, whose SHA-256 is" \
+      "${SOURCE_SHA256}." >/opt/craft/SOURCE-OFFER; fi \
     && chmod -R a+rX,go-w /opt/craft
 {%- if use_portal %}
 

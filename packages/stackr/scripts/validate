@@ -57,6 +57,20 @@ if docker run --rm -v "$PWD/deploy/host/Caddyfile:/etc/caddy/Caddyfile:ro" -e ST
 else
   fail "deploy/host/Caddyfile"
 fi
+# The editors' site, as Caddy reads it: only the hosts listed, each passed by its first label to
+# its app's editor, and anything else there 404.
+edge=$(docker run --rm -v "$PWD/deploy/host/Caddyfile:/etc/caddy/Caddyfile:ro" -e STACKR_DOMAIN=example.com \
+  -e STACKR_EDITOR_HOSTS=gridcraft.example.com \
+  "$(STACKR_DOMAIN=example.com docker compose -f compose.yaml -f deploy/host/compose.prod.yaml \
+    config --format json | jq -r .services.caddy.image)" \
+  caddy adapt --config /etc/caddy/Caddyfile 2>/dev/null | jq -c '.apps.http.servers.srv0.routes[]
+    | select(.match[0].host == ["gridcraft.example.com"]) | [.handle[0].routes[]
+    | [(.. | .dial? // empty), (.. | .status_code? // empty)]]') || edge=""
+if [[ $edge == '[[],["files-{http.regexp.editor.1}-editor:8000"],[404]]' ]]; then
+  echo "ok: the editors' hosts listed alone, each to its app's editor by its first label, the rest 404"
+else
+  fail "the editors at the edge: $edge"
+fi
 
 step "Grafana dashboards"
 uv run scripts/check-config dashboards || fail "dashboards"

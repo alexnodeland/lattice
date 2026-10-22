@@ -76,7 +76,15 @@ A relay for each worker costs one small container for each app. It buys what ADR
 
 - **The relays, from each other.** They share `files` with the application. A relay runs nothing but socat, and none reaches more than its own worker.
 - **The editors, on a host,** are on the `stackr` network, as the application is, and could reach its services. An editor runs lattice's own static server and holds no secret. Nothing in it runs code a file brings.
+- **A relay's connections** are at most 16 at once (`max-children=16`), shared by every tenant of its app, with no timeout for an idle one. Each tenant's share of its worker is bounded upstream, by its readings ([files ADR-0018](../../artifactr/files/adr/0018-a-page-takes-a-reading-is-kept-and-is-paced.md)).
+- **What floats.** The base images are pinned by tag, and the worker's apt packages, Blender's libraries and Mesa among them, by name, as the template's images already are. `WORKER_BUILD` is the local image's ID, not a registry digest.
 - Everything else in ADR-0043's list stands, except "The application, from a worker", which the relay closes.
+
+## The source offer's limits
+
+- **Blender's source** is named by one address, download.blender.org's tarball of exactly 5.2.2, and its SHA-256, `56a3b1ec97479ff24dce65d2f09f8a1895005cece279b701fe4fcf74bce3f77e`, which we took from it on 2026-10-22. Blender publishes only its MD5, `8fcb442090c29a4f12652dcd9d6ae1f8`, which matched. The offer points to that copy. It is not the written offer, good for three years, that GPL-3.0's section 6(b) describes: an operator who conveys the image to others and can't rely on that copy staying up gives one, or the source with it.
+- **The Debian packages** the image installs for Blender (X11, GL, Mesa) carry their own copyright files in `/usr/share/doc`, as Debian ships them. No source offer is written for them. Their source is Debian's, at the trixie versions installed, which an operator who conveys the image answers for as for any Debian-based image.
+- **The Caddyfile's editors** are the apps with an editor in `copier.yml`. `scripts/check-template` holds the two to each other, so a new app's editor is never a silent 404 at the edge.
 
 ## Consequences
 

@@ -186,6 +186,7 @@ services:
 {%- endif %}
 {%- if craft.source %}
         SOURCE: {{ craft.source }}
+        SOURCE_SHA256: {{ craft.source_sha256 }}
 {%- endif %}
 {%- if craft.platform %}
       # Its release is built for this platform alone: elsewhere it runs emulated.

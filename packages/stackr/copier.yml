@@ -220,6 +220,9 @@ crafts:
          libgl1, libegl1, libegl-mesa0, libgl1-mesa-dri]
       # GPL-3.0: its source, offered with it.
       source: https://download.blender.org/source/blender-5.2.2.tar.xz
+      # Its SHA-256, which download.blender.org doesn't publish (its MD5 is 8fcb4420...): taken
+      # from the tarball on 2026-10-22, and named in the offer.
+      source_sha256: 56a3b1ec97479ff24dce65d2f09f8a1895005cece279b701fe4fcf74bce3f77e
   when: false
 
 use_portal:

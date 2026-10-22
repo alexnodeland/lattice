@@ -47,7 +47,9 @@ def test_a_started_kit_carries_the_default_in_full_and_a_notice(tmp_path: Path) 
 def test_an_examples_notice_says_whose_it_is(tmp_path: Path) -> None:
     text = (started(tmp_path, "calm") / "NOTICE").read_text()
     assert "portalr's example kit, calm" in text
-    assert "portalr's MIT licence" in text
+    assert "MIT licence in its LICENSE.txt" in text
+    assert "makes no trademark claim in it and grants none" in " ".join(text.split())
+    assert "MIT" in (tmp_path / "kit" / "LICENSE.txt").read_text()
     assert "placeholders" not in text
 
 

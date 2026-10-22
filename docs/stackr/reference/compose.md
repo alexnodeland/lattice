@@ -463,7 +463,7 @@ The LLM gateway port: the LiteLLM proxy's OpenAI-compatible API.
 | Image | `ghcr.io/berriai/litellm-non_root`, pinned by tag and digest in `compose.yaml` |
 | Published ports | 4400 (`LITELLM_PORT`) → 4000 |
 | Networks | `stackr`, `supabase_network_stackr-supabase` |
-| Volumes | `./deploy/litellm/config.yaml` → `/etc/litellm/config.yaml` (read-only), `./deploy/litellm/groups/${STACKR_GATEWAY_MODELS` → `-providers}.yaml`, `${STACKR_UPSTREAM_CA` → `-/dev/null}` |
+| Volumes | `./deploy/litellm/config.yaml` → `/etc/litellm/config.yaml` (read-only), `./deploy/litellm/groups/${STACKR_GATEWAY_MODELS:-providers}.yaml` → `/etc/litellm/groups.yaml` (read-only), `${STACKR_UPSTREAM_CA:-/dev/null}` → `/etc/litellm/upstream-ca.pem` (read-only) |
 | Depends on | `db-init` (completed), `redis` (healthy) |
 | Runs | `--config /etc/litellm/config.yaml --port 4000` |
 | Health check | `python -c import sys, urllib.request; sys.exit(urllib.request.urlopen('http://127.0.0.1:4000/health/readiness', timeout=3).status != 200)`, every 5s |
@@ -487,7 +487,6 @@ The LLM gateway port: the LiteLLM proxy's OpenAI-compatible API.
     | `STACKR_UPSTREAM_API_KEY` | `${STACKR_UPSTREAM_API_KEY:-}` |
     | `STACKR_UPSTREAM_DEFAULT_MODEL` | `${STACKR_UPSTREAM_DEFAULT_MODEL:-}` |
     | `STACKR_UPSTREAM_FAST_MODEL` | `${STACKR_UPSTREAM_FAST_MODEL:-}` |
-    | `SSL_CERT_FILE` | `${STACKR_UPSTREAM_CA:+/etc/litellm/upstream-ca.pem}` |
     | `LITELLM_OTEL_V2` | `${STACKR_GATEWAY_TELEMETRY:-true}` |
     | `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://otel-collector:4318` |
     | `OTEL_EXPORTER_OTLP_PROTOCOL` | `http/protobuf` |

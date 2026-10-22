@@ -41,7 +41,7 @@ The proxy reaches servers on this machine through `host.docker.internal`, which 
 
 ### An upstream gateway
 
-`default` and `fast` can be another OpenAI-compatible API's models instead of the providers': a gateway of your own in front of your own models, for example ([ADR-0045](../adr/0045-local-supabase-where-docker-ignores-the-loopback-and-an-upstream-gateway.md)). Set, in `.env`:
+`default` and `fast` can be another OpenAI-compatible API's models instead of the providers': a gateway of your own in front of your own models, for example ([ADR-0047](../adr/0047-an-upstream-gateway-for-the-model-groups.md)). Set, in `.env`:
 
 | Setting | What it is |
 |---|---|

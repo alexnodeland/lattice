@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# Check what `make up` refuses, and the gateway's model groups' check, without starting anything:
+# scripts/binding-probe against a fake `docker` for each shape an engine publishes in, the
+# STACKR_GATEWAY_MODELS guard, and scripts/check-config's hold on deploy/litellm/groups/
+# (ADR-0045). scripts/validate runs it.
+
+set -euo pipefail
+cd "$(dirname "$0")/.."
+status=0
+scratch=$(mktemp -d)
+trap 'rm -rf "$scratch"' EXIT
+
+check() {
+  local what=$1
+  shift
+  if "$@"; then echo "ok: $what"; else echo "FAIL: $what"; status=1; fi
+}
+refused() { ! "$@" >"$scratch/out" 2>&1; }
+said() { grep -qF "$1" "$scratch/out"; }
+
+# A docker that runs the probe, or fails to (FAKE_RUN=fail), and says it published at FAKE_PORTS.
+mkdir "$scratch/bin"
+cat >"$scratch/bin/docker" <<'FAKE'
+#!/usr/bin/env bash
+case $1 in
+  run) [[ ${FAKE_RUN:-} != fail ]] ;;
+  inspect) printf '%b\n' "$FAKE_PORTS" ;;
+esac
+FAKE
+chmod +x "$scratch/bin/docker"
+probe() { PATH="$scratch/bin:$PATH" FAKE_PORTS=$1 FAKE_RUN=${2:-} scripts/binding-probe net 127.0.0.1; }
+
+check "the probe passes a port published at STACKR_BIND alone" probe '127.0.0.1'
+check "the probe refuses every interface, as Docker Desktop 29 publishes" refused probe '0.0.0.0\n::'
+check "and says there is no override, and the postgres adapter" said "no setting to start it anyway"
+check "the probe refuses STACKR_BIND with every IPv6 interface beside it" refused probe '127.0.0.1\n::'
+check "the probe refuses, closed, when it can't run" refused probe '' fail
+check "and says why" said "Couldn't run the probe"
+
+check "make refuses a STACKR_GATEWAY_MODELS that isn't providers or upstream" \
+  refused make --no-print-directory -n up STACKR_GATEWAY_MODELS=elsewhere
+check "and names it" said "STACKR_GATEWAY_MODELS must be providers or upstream"
+quietly() { "$@" >/dev/null 2>&1; }
+check "make takes upstream" quietly make --no-print-directory -n help STACKR_GATEWAY_MODELS=upstream
+
+# check-config on a copy whose config.yaml includes no groups, or whose groups lack `fast`.
+copy() {
+  rm -rf "$scratch/stack" && mkdir -p "$scratch/stack/scripts" "$scratch/stack/deploy"
+  cp scripts/check-config "$scratch/stack/scripts/" && cp compose.yaml "$scratch/stack/"
+  cp -R deploy/litellm "$scratch/stack/deploy/"
+}
+copy && sed -i.bak '/^include:/,/groups.yaml/d' "$scratch/stack/deploy/litellm/config.yaml"
+check "check-config refuses a config.yaml that includes no groups" \
+  refused uv run "$scratch/stack/scripts/check-config" litellm
+copy && sed -i.bak 's/model_name: fast/model_name: quick/' "$scratch/stack/deploy/litellm/groups/upstream.yaml"
+check "check-config refuses groups without fast" refused uv run "$scratch/stack/scripts/check-config" litellm
+check "and names the file" said "groups/upstream.yaml doesn't define both default and fast"
+copy
+check "check-config passes the groups as they are" uv run "$scratch/stack/scripts/check-config" litellm
+
+exit $status

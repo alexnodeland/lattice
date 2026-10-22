@@ -1,4 +1,4 @@
-# The model groups on an upstream gateway (ADR-0045): another OpenAI-compatible
+# The model groups on an upstream gateway (ADR-0047): another OpenAI-compatible
 # API, at STACKR_UPSTREAM_URL with STACKR_UPSTREAM_API_KEY, such as a gateway
 # of your own in front of your own models. `default` and `fast` are its models
 # STACKR_UPSTREAM_DEFAULT_MODEL and STACKR_UPSTREAM_FAST_MODEL, and any other

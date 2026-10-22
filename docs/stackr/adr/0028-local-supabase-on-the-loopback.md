@@ -1,10 +1,12 @@
 # ADR-0028: Local Supabase on the loopback
 
-**Status:** Accepted, amended by [ADR-0045](0045-local-supabase-where-docker-ignores-the-loopback-and-an-upstream-gateway.md)
+**Status:** Accepted, amended by [ADR-0045](0045-local-supabase-only-where-docker-keeps-it-on-the-loopback.md)
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 
 Amends [ADR-0009](0009-local-supabase-as-the-database-adapter.md): local Supabase's ports are no longer the exception to [ADR-0006](0006-networks-and-published-ports.md)'s `STACKR_BIND`.
+
+> **Amended by [ADR-0045](0045-local-supabase-only-where-docker-keeps-it-on-the-loopback.md):** some engines, Docker Desktop 29 among them, ignore `host_binding_ipv4` and publish on every interface. `make up` now probes where Docker publishes on this network before it starts Supabase, and refuses to start it anywhere but `STACKR_BIND`, with no override: on such an engine, run on the `postgres` adapter with the `auth` profile.
 
 ## Context
 

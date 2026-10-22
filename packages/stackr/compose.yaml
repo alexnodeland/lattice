@@ -466,6 +466,13 @@ services:
     profiles: [gateway]
     restart: unless-stopped
     command: ["--config", "/etc/litellm/config.yaml", "--port", "4000"]
+    # With STACKR_UPSTREAM_CA, the authority that signed the upstream's certificate, when it is
+    # your own, ca-upstream.env makes it the gateway's SSL_CERT_FILE: the gateway then trusts it
+    # alone, the providers' public ones included. Without it, ca.env doesn't exist, and nothing
+    # is set.
+    env_file:
+      - path: ./deploy/litellm/ca${STACKR_UPSTREAM_CA:+-upstream}.env
+        required: false
     environment:
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?run make env}
       # Encrypts credentials stored in the database; must never change.
@@ -480,14 +487,11 @@ services:
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       LM_STUDIO_API_BASE: ${LM_STUDIO_API_BASE:-http://host.docker.internal:1234/v1}
       OMLX_API_BASE: ${OMLX_API_BASE:-http://host.docker.internal:4243/v1}
-      # An upstream gateway, when STACKR_GATEWAY_MODELS=upstream (ADR-0045).
+      # An upstream gateway, when STACKR_GATEWAY_MODELS=upstream (ADR-0047).
       STACKR_UPSTREAM_URL: ${STACKR_UPSTREAM_URL:-}
       STACKR_UPSTREAM_API_KEY: ${STACKR_UPSTREAM_API_KEY:-}
       STACKR_UPSTREAM_DEFAULT_MODEL: ${STACKR_UPSTREAM_DEFAULT_MODEL:-}
       STACKR_UPSTREAM_FAST_MODEL: ${STACKR_UPSTREAM_FAST_MODEL:-}
-      # The authority that signed the upstream's certificate, when it is your own: the gateway
-      # then trusts it alone, the providers' public ones included.
-      SSL_CERT_FILE: ${STACKR_UPSTREAM_CA:+/etc/litellm/upstream-ca.pem}
       # Traces to the Collector, continuing the caller's `traceparent`, with
       # prompts and responses left out. `make up` turns it off when the
       # observability profile isn't running.

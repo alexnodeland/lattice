@@ -1,6 +1,6 @@
 # ADR-0010: The LLM gateway
 
-**Status:** Accepted, amended by [ADR-0045](0045-local-supabase-where-docker-ignores-the-loopback-and-an-upstream-gateway.md)
+**Status:** Accepted, amended by [ADR-0047](0047-an-upstream-gateway-for-the-model-groups.md)
 **Date:** 2026-09-28
 **Deciders:** Alex Nodeland
 

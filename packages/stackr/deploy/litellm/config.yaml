@@ -7,7 +7,7 @@
 # The model groups, what applications ask for (`default` and `fast`), are in
 # the file STACKR_GATEWAY_MODELS chooses from groups/, which compose.yaml
 # mounts as groups.yaml: providers (the default), the providers' models above,
-# or upstream, another OpenAI-compatible gateway (ADR-0045). Its model_list
+# or upstream, another OpenAI-compatible gateway (ADR-0047). Its model_list
 # extends this one.
 include:
   - groups.yaml
@@ -68,7 +68,6 @@ model_list:
       model: openai/*
       api_base: os.environ/OMLX_API_BASE
       api_key: omlx-local
-
 
 router_settings:
   routing_strategy: simple-shuffle

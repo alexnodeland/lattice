@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Find out, before local Supabase starts, where Docker publishes a port on its network (ADR-0045).
+#
+# Usage: scripts/binding-probe NETWORK BIND
+#
+# A container that runs nothing (`sleep`, in the curl image the stack pins, read-only, with no
+# capabilities) publishes one port with no address of its own on NETWORK, as the Supabase CLI
+# publishes Supabase's, and is removed. It exits 0 only if Docker published that port at BIND
+# alone, IPv4 and IPv6 both: an engine that ignores host_binding_ipv4 (Docker Desktop 29 among
+# them) publishes at 0.0.0.0 and ::, every interface. There is deliberately no setting to start
+# local Supabase anyway: the supported way on such an engine is the postgres adapter.
+
+set -euo pipefail
+network=${1:?usage: scripts/binding-probe NETWORK BIND}
+bind=${2:?usage: scripts/binding-probe NETWORK BIND}
+readonly image=curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
+readonly name=stackr-binding-probe
+
+refuse() {
+  printf '%s\n' "$@" \
+    "There is no setting to start it anyway: run on the postgres adapter, STACKR_DATABASE=postgres" \
+    "in .env, with the auth profile, whose ports are published at STACKR_BIND explicitly." >&2
+  exit 1
+}
+
+docker rm -f "$name" >/dev/null 2>&1 || true
+trap 'docker rm -f "$name" >/dev/null 2>&1 || true' EXIT
+if ! docker run --detach --rm --name "$name" --network "$network" --publish 8080 \
+  --read-only --cap-drop ALL --entrypoint sleep "$image" 60 >/dev/null 2>&1; then
+  refuse "Couldn't run the probe that finds where Docker publishes on $network (its image is" \
+    "$image: is Docker up, and the image pulled or the network reachable?), so local Supabase" \
+    "isn't started."
+fi
+published=$(docker inspect --format '{{range .NetworkSettings.Ports}}{{range .}}{{println .HostIp}}{{end}}{{end}}' "$name" |
+  grep -v '^$' | sort -u | tr '\n' ' ')
+if [[ $published != "$bind " ]]; then
+  refuse "Docker publishes on $network at ${published:-nothing}not at STACKR_BIND ($bind) alone:" \
+    "it ignores com.docker.network.bridge.host_binding_ipv4, so local Supabase, with its" \
+    "well-known keys and the password postgres, would be open to the network. Not starting it."
+fi

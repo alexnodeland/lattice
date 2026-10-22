@@ -43,23 +43,8 @@ STACKR_BIND ?= $(or $(shell sed -n 's/^STACKR_BIND=//p' .env 2>/dev/null),127.0.
 BINDING := com.docker.network.bridge.host_binding_ipv4
 # Some Docker engines ignore that option (Docker Desktop 29 among them) and publish on every
 # interface, where Supabase's well-known keys and its `postgres` password would be anyone's on the
-# network (ADR-0045). So before Supabase starts, a container that runs nothing publishes a port on
-# its network, and local Supabase starts only if that port is at STACKR_BIND alone.
-PROBE_IMAGE := curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
-PROBE_NAME := stackr-binding-probe
-define BINDING_PROBE
-docker rm -f $(PROBE_NAME) >/dev/null 2>&1 || true; \
-docker run --detach --rm --name $(PROBE_NAME) --network $(SUPABASE_NETWORK) --publish 8080 \
-  --read-only --cap-drop ALL --entrypoint sleep $(PROBE_IMAGE) 60 >/dev/null || exit 1; \
-published=$$(docker inspect --format '{{range .NetworkSettings.Ports}}{{range .}}{{println .HostIp}}{{end}}{{end}}' $(PROBE_NAME) | grep -v '^$$' | sort -u); \
-docker rm -f $(PROBE_NAME) >/dev/null; \
-if [ "$$published" != "$(STACKR_BIND)" ]; then \
-  echo "Docker publishes on $(SUPABASE_NETWORK) at $$(echo $$published), not at STACKR_BIND ($(STACKR_BIND)) alone:" >&2; \
-  echo "it ignores $(BINDING), so local Supabase would be open to the network. Not starting it." >&2; \
-  echo "Run on the postgres adapter instead: STACKR_DATABASE=postgres in .env, and the auth profile." >&2; \
-  exit 1; \
-fi
-endef
+# network. So before Supabase starts, scripts/binding-probe finds where Docker publishes on its
+# network, and local Supabase starts only at STACKR_BIND alone, with no override (ADR-0045).
 
 ifeq ($(STACKR_DATABASE),supabase)
 DATABASE_PROFILES :=
@@ -147,7 +132,7 @@ endif
 	  exit 1; \
 	fi
 ifneq ($(strip $(START_SUPABASE)),)
-	@$(BINDING_PROBE)
+	scripts/binding-probe $(SUPABASE_NETWORK) $(STACKR_BIND)
 	$(SUPABASE) start $(SUPABASE_START_FLAGS)
 endif
 # Ten minutes: the first start pulls and builds every image. The app stack's up waits five.

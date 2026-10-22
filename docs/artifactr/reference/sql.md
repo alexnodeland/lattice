@@ -20,6 +20,10 @@ The `sql`, `postgres` and `sqlite` extras. See [SQL storage](../guides/storage.m
 
 ::: artifactr.sql.create_schema
 
+## A lock across processes
+
+::: artifactr.sql.AdvisoryLock
+
 ## Row-level security
 
 ::: artifactr.sql.tenancy

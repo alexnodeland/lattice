@@ -8,11 +8,13 @@ database with :func:`migrate`, then open workspaces over a :class:`SqlStorage`::
     workspaces = Workspaces(SqlStorage(engine))
 
 For SQLite, create the engine with :func:`create_sqlite_engine`. :func:`create_schema` creates
-the tables without migrations, for tests and prototypes.
+the tables without migrations, for tests and prototypes. :class:`AdvisoryLock` is PostgreSQL's
+lock across processes, which a connected app's calls take turns by (ADR-0085).
 """
 
+from artifactr.sql.locks import AdvisoryLock
 from artifactr.sql.schema import create_schema, migrate
 from artifactr.sql.sqlite import create_sqlite_engine
 from artifactr.sql.storage import SqlStorage
 
-__all__ = ["SqlStorage", "create_schema", "create_sqlite_engine", "migrate"]
+__all__ = ["AdvisoryLock", "SqlStorage", "create_schema", "create_sqlite_engine", "migrate"]

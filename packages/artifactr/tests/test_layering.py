@@ -46,7 +46,8 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     "agent": (INNER, {"pydantic", "pydantic_ai", *OTEL_API}),
     "sql": (
         {"artifactr.core", "artifactr.workspace", "artifactr.sql"},
-        {"sqlalchemy", "alembic", "lattice_core.sql"},
+        # anyio shields the advisory lock's release from a cancellation (ADR-0085).
+        {"sqlalchemy", "alembic", "anyio", "lattice_core.sql"},
     ),
     # Feedback as scores: the mirror, on evalr's mapping and ports (ADR-0049).
     "scores": (

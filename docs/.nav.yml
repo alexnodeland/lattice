@@ -44,6 +44,7 @@ nav:
       - adr/0026-a-distribution-needs-a-reason-integrations-are-extras.md
       - adr/0027-integrations-switched-per-workspace-through-one-port.md
       - adr/0028-a-stuck-test-fails-by-a-signal-and-its-worker-carries-on.md
+      - adr/0029-each-wheel-checked-at-its-floors.md
       - Template: adr/template.md
   - Brand: assets/brand/README.md
   - artifactr: artifactr

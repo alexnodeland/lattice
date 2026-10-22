@@ -4,6 +4,7 @@ A person checks a file out, downloads it, checks the edit in, fresh, unchanged, 
 large; pages are rendered; and in a workspace where the app is off, nothing is checked out.
 """
 
+import asyncio
 import io
 import json
 import runpy
@@ -34,7 +35,7 @@ from artifactr.files.checkouts import InMemoryCheckouts
 from artifactr.files.fastapi import files_router
 from artifactr.files.fastapi.openapi import openapi_app, openapi_document
 from artifactr.files.manifest import DOCX, WordDocument
-from artifactr.files.native import NativeFiles
+from artifactr.files.native import Busy, NativeFiles
 from artifactr.workspace import Access, InMemoryStorage, Workspace, Workspaces, integration_gate
 from tests.files.clock import FakeClock
 from tests.files.conftest import Switch
@@ -231,14 +232,45 @@ async def test_a_proposal_is_read_and_rendered_beside_the_head(world: World) -> 
 
 
 def test_a_page_is_a_png_and_one_past_the_end_is_refused(world: World) -> None:
+    world.app.fails = "timeout"
+    assert world.client.get(f"{FILE}/versions/1/pages/1").status_code == 503
+    world.app.fails = None
     page = world.client.get(f"{FILE}/versions/1/pages/1")
     assert (page.status_code, page.headers["content-type"]) == (200, "image/png")
     assert page.content.startswith(b"\x89PNG")
     missing = world.client.get(f"{FILE}/versions/1/pages/9")
     assert missing.status_code == 422
     assert missing.json()["detail"]["failure"] == "refused"
-    world.app.fails = "timeout"
-    assert world.client.get(f"{FILE}/versions/1/pages/1").status_code == 503
+
+
+def test_a_page_is_kept_by_its_reader_and_told_by_its_tag(world: World) -> None:
+    page = world.client.get(f"{FILE}/versions/1/pages/1")
+    assert page.headers["cache-control"] == "private, max-age=86400"
+    tag = page.headers["etag"]
+    kept = world.client.get(f"{FILE}/versions/1/pages/1", headers={"if-none-match": tag})
+    assert (kept.status_code, kept.content, kept.headers["etag"]) == (304, b"", tag)
+    other = world.client.get(f"{FILE}/versions/1/pages/1", headers={"if-none-match": '"x"'})
+    assert other.status_code == 200
+
+
+async def test_each_persons_pages_that_reach_the_app_are_paced() -> None:
+    app = FakeApp()
+    files = NativeFiles(InMemoryBlobs(), InMemoryCheckouts(), app, pages=0)
+    workspaces = Workspaces(InMemoryStorage(), authorize=authorize, hidden=hidden)
+    ws = await workspaces.open("acme", "w1", actor=ALICE)
+    await files.upload(
+        ws, WordDocument, "c.docx", once(FakeApp.file("x")), media_type=DOCX, artifact_id="a1"
+    )
+    server = FastAPI()
+    server.include_router(
+        files_router(workspaces, files, resolve_actor=resolve_actor, renders_per_minute=2)
+    )
+    client = TestClient(server)
+    page = f"{FILE}/versions/1/pages/1"
+    assert [client.get(page).status_code for _ in range(2)] == [200, 200]
+    paced = client.get(page)
+    assert (paced.status_code, paced.json()["detail"]["type"]) == (429, "rate_limited")
+    assert client.get(page, headers={"x-user": "bob"}).status_code == 200, "another's own pace"
 
 
 def test_an_app_that_cant_read_a_check_in_says_why(world: World) -> None:
@@ -314,3 +346,24 @@ def test_the_module_prints_the_document() -> None:
     with redirect_stdout(output):
         runpy.run_module("artifactr.files.fastapi.openapi", run_name="__main__")
     assert json.loads(output.getvalue()) == openapi_document()
+
+
+def test_a_page_past_the_tenants_readings_is_told_to_wait() -> None:
+    class Held(FakeApp):
+        async def render(self, source: bytes, page: int, *, scale: float, deadline: float) -> bytes:
+            raise Busy(2)
+
+    files = NativeFiles(InMemoryBlobs(), InMemoryCheckouts(), Held(), deadline=0.01)
+    workspaces = Workspaces(InMemoryStorage(), authorize=authorize, hidden=hidden)
+    ws = asyncio.run(workspaces.open("acme", "w1", actor=ALICE))
+    asyncio.run(
+        files.upload(
+            ws, WordDocument, "c.docx", once(FakeApp.file("x")), media_type=DOCX, artifact_id="a1"
+        )
+    )
+    server = FastAPI()
+    server.include_router(files_router(workspaces, files, resolve_actor=resolve_actor))
+    busy = TestClient(server).get(f"{FILE}/versions/1/pages/1")
+    assert busy.status_code == 429
+    assert busy.json()["detail"]["type"] == "busy"
+    assert busy.headers["retry-after"] == "5"

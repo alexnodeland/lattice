@@ -76,6 +76,12 @@ class ConnectedServer:
     code: Mapping[str, str] = field(default_factory=dict[str, str])
     """The argument that holds the code, by each `code` tool."""
 
+    reaches: Mapping[str, tuple[str, Mapping[str, str]]] = field(
+        default_factory=dict[str, tuple[str, Mapping[str, str]]]
+    )
+    """Where each `network` tool fetches from, which its approver is shown: the argument that
+    names the service, and the hosts each of its values reaches, as read in the server's source."""
+
     token: str | None = None
     """The variable the server reads the add-on's token from, if the add-on takes one."""
 
@@ -91,6 +97,9 @@ class ConnectedServer:
         coded = {name for name, tool in self.tools.items() if tool.risk == "code"}
         if wrong := sorted(set(self.code) ^ coded):
             raise ValueError(f"each code tool, and only one, names its code: {', '.join(wrong)}")
+        fetching = {name for name, tool in self.tools.items() if tool.risk == "network"}
+        if wrong := sorted(set(self.reaches) ^ fetching):
+            raise ValueError(f"each network tool, and only one, says where: {', '.join(wrong)}")
 
     @property
     def key(self) -> str:
@@ -132,6 +141,12 @@ FREECAD: Final = ConnectedServer(
             "get_async_status": Vetted(
                 "read", "ab00bd59279ceeccefaa8cdf1756af20af73b8f0d93a0d1ec76e93b428ff6962"
             ),
+            # The edits, audited in the add-on's source at v0.1.27 (rpc_server.py,
+            # object_factory.py, property_mapper.py): a document's name, an object's type
+            # (`doc.addObject`, or one of FEM's `ObjectsFem.make*`), and its property values are
+            # set with `setattr`, on the object and its `ViewObject`, as XML-RPC's plain values;
+            # none reaches `exec`, `eval`, `setExpression` or a `Proxy` it builds. `exec` is
+            # only in `execute_code` and `execute_code_async`, which are `code`.
             "create_document": Vetted(
                 "edit", "e14a671226faa889ab939083e6462cd645090b3b317ed5f6712d97a4b7104c00"
             ),
@@ -172,6 +187,25 @@ FREECAD: Final = ConnectedServer(
 )
 """neka-nat's FreeCAD server: an add-on's XML-RPC server in FreeCAD's window, on port 9875."""
 
+_LIBRARIES: Final = MappingProxyType(
+    {
+        "polyhaven": "Poly Haven (api.polyhaven.com)",
+        "sketchfab": "Sketchfab (api.sketchfab.com)",
+        "polypizza": "Poly Pizza (api.poly.pizza)",
+    }
+)
+_GENERATORS: Final = MappingProxyType(
+    {
+        "hyper3d": "Hyper3D Rodin (hyperhuman.deemos.com, or fal.ai's queue.fal.run)",
+        "hunyuan3d": "Hunyuan3D (ai3d.tencentcloudapi.com)",
+        "meshy": "Meshy (api.meshy.ai)",
+        "auto": (
+            "whichever generator the add-on has set up: Hyper3D Rodin (hyperhuman.deemos.com,"
+            " or queue.fal.run), Hunyuan3D (ai3d.tencentcloudapi.com) or Meshy (api.meshy.ai)"
+        ),
+    }
+)
+
 BLENDER: Final = ConnectedServer(
     app="blender",
     title="Blender",
@@ -211,6 +245,14 @@ BLENDER: Final = ConnectedServer(
         }
     ),
     code=MappingProxyType({"execute_blender_code": "code"}),
+    # Read in the server's and the add-on's source at 2.2.2 (src/blender_mcp/server.py, addon.py).
+    reaches=MappingProxyType(
+        {
+            "search_assets": ("source", _LIBRARIES),
+            "import_asset": ("source", _LIBRARIES),
+            "generate_3d": ("provider", _GENERATORS),
+        }
+    ),
     env=MappingProxyType({"DISABLE_TELEMETRY": "true"}),
     ports=True,
 )

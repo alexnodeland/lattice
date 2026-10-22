@@ -9,10 +9,14 @@ opens a file for anyone: a file the operator saves is uploaded as a native file,
 
 from artifactr.connect.connection import (
     LOOPBACK,
+    PER_HOUR,
     RETRY_AFTER,
     TAILNET,
+    AppLock,
     Connection,
     ConnectionFailed,
+    PerHour,
+    ProcessLock,
 )
 from artifactr.connect.registry import (
     BLENDER,
@@ -25,6 +29,7 @@ from artifactr.connect.registry import (
 )
 from artifactr.connect.scan import scan
 from artifactr.connect.tools import (
+    CALLED,
     CODE_BYTES,
     DESCRIPTION_CHARS,
     IMAGE_BYTES,
@@ -37,6 +42,7 @@ from artifactr.connect.tools import (
 
 __all__ = [
     "BLENDER",
+    "CALLED",
     "CODE_BYTES",
     "DESCRIPTION_CHARS",
     "FREECAD",
@@ -44,14 +50,18 @@ __all__ = [
     "IMAGE_BYTES",
     "LOOPBACK",
     "PARTS",
+    "PER_HOUR",
     "PROTECTED",
     "REPLY_CHARS",
     "RETRY_AFTER",
     "RUN_CODE",
     "TAILNET",
+    "AppLock",
     "ConnectedServer",
     "Connection",
     "ConnectionFailed",
+    "PerHour",
+    "ProcessLock",
     "Risk",
     "Vetted",
     "connected_app_tools",

@@ -101,6 +101,8 @@ services:
       APP_PORT: "8000"
 {%- if use_portal %}
       PORTAL_UI_DIR: /ui
+      # The kit .env names, in the image's copy of brand/ (brand/kit there is /brand/kit here).
+      PORTAL_BRAND_DIR: ${PORTAL_BRAND_DIR:+/${PORTAL_BRAND_DIR}}
 {%- endif %}
 {%- if use_files %}
       # The apps `make up` starts a worker for, from .env or `make up FILES=...`.

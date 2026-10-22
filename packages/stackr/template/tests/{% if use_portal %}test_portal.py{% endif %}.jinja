@@ -2,6 +2,7 @@
 
 import json
 import logging
+import subprocess
 import threading
 from collections.abc import Iterator
 from dataclasses import replace
@@ -41,6 +42,70 @@ def with_portal(**portal: Any) -> Settings:
     """The tests' settings, with a Supabase project for the UIs to sign in to, and these more."""
     named = PortalSettings(supabase_url=SUPABASE, supabase_key=KEY, **portal)
     return replace(settings(), portal=named)
+
+
+MARK = (
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">'
+    '<rect width="32" height="32" fill="#123456"/></svg>'
+)
+MAKEFILE = Path(__file__).parents[1] / "Makefile"
+
+
+def a_kit(folder: Path) -> Path:
+    """A brand kit of the deployment's: its names, and a mark for each scheme and the tab."""
+    (folder / "assets").mkdir(parents=True)
+    for name in ("mark-light.svg", "mark-dark.svg", "favicon.svg"):
+        (folder / "assets" / name).write_text(MARK)
+    brand = {
+        "version": 1,
+        "name": "acme",
+        "identity": {"product": "Acme", "app": "Acme", "admin": "Acme admin"},
+        "assets": {
+            "mark": {"light": "assets/mark-light.svg", "dark": "assets/mark-dark.svg"},
+            "favicon": "assets/favicon.svg",
+        },
+    }
+    (folder / "brand.json").write_text(json.dumps(brand))
+    return folder
+
+
+def uis(folder: Path) -> Path:
+    """Built UIs with a head, as a kit's title and stylesheet are put in."""
+    for name in ("app", "admin"):
+        (folder / name).mkdir(parents=True)
+        (folder / name / "index.html").write_text("<head><title>portalr</title></head>")
+    return folder
+
+
+def test_portal_brand_dir_names_the_kit() -> None:
+    assert PortalSettings.from_environ({"PORTAL_BRAND_DIR": "brand/kit"}).brand_dir == "brand/kit"
+    assert not PortalSettings.from_environ({"PORTAL_BRAND_DIR": ""}).brand_dir
+
+
+def test_the_portal_serves_the_brand_kit_named(script: Script, tmp_path: Path) -> None:
+    named = with_portal(ui_dir=str(uis(tmp_path / "ui")), brand_dir=str(a_kit(tmp_path / "kit")))
+    with TestClient(app(script, named)) as client:
+        brand = client.get("/portalr/config.json").json()["brand"]
+        assert brand["identity"]["product"] == "Acme"
+        assert "<title>Acme</title>" in client.get("/portalr/app/").text
+        assert client.get(f"/portalr/{brand['stylesheet']}").status_code == 200
+
+
+def test_without_a_kit_named_the_portal_has_its_own_look(script: Script, tmp_path: Path) -> None:
+    named = with_portal(ui_dir=str(uis(tmp_path / "ui")), brand_dir="")
+    with TestClient(app(script, named)) as client:
+        assert client.get("/portalr/config.json").json()["brand"] is None
+        assert "<title>portalr</title>" in client.get("/portalr/app/").text
+
+
+def test_make_brand_starts_a_kit_then_checks_it(tmp_path: Path) -> None:
+    def brand() -> str:
+        command = ["make", "-s", "-f", str(MAKEFILE), "-C", str(tmp_path), "brand", "UV=echo"]
+        return subprocess.run(command, capture_output=True, text=True, check=True).stdout
+
+    assert brand() == "run portalr brand init brand/kit --from template\n"
+    a_kit(tmp_path / "brand" / "kit")
+    assert brand() == "run portalr brand validate brand/kit\n"
 
 
 def test_the_portal_serves_its_config_and_both_uis(script: Script, ui: Path) -> None:

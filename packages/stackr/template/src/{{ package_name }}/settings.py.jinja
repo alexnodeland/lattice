@@ -223,6 +223,9 @@ class PortalSettings:
             invitations.
         ui_dir: A directory holding the built ``app`` and ``admin`` UIs, when portalr's
             package has none of its own, as an install from a repository hasn't.
+        brand_dir: The deployment's brand kit, a folder `make brand` starts (lattice RFC-0007):
+            read and checked as the application starts, which won't start with a fault in it.
+            Without it, portalr's own look.
         url: The portal's own origin, as people's browsers reach it: the one page that may frame
             mini apps' sandbox.
         apps_url: The origin mini apps run on, an origin of its own that this application
@@ -246,6 +249,7 @@ class PortalSettings:
     supabase_key: str | None = None
     auth_url: str | None = None
     ui_dir: str | None = None
+    brand_dir: str | None = None
     url: str | None = None
     apps_url: str | None = None
     tempo_url: str | None = None
@@ -264,6 +268,7 @@ class PortalSettings:
             supabase_key=env.get("PORTAL_SUPABASE_KEY"),
             auth_url=env.get("PORTAL_AUTH_URL"),
             ui_dir=env.get("PORTAL_UI_DIR"),
+            brand_dir=env.get("PORTAL_BRAND_DIR"),
             url=env.get("PORTAL_URL"),
             apps_url=env.get("PORTAL_APPS_URL"),
             tempo_url=env.get("PORTAL_TEMPO_URL"),

@@ -137,6 +137,7 @@ A file whose name ends in `.jinja` in `template/` is rendered with the answers; 
 | `scripts/crafts/photocraft.sha256` | `use_files` | copied |
 | `scripts/crafts/vectorcraft.sha256` | `use_files` | copied |
 | `scripts/crafts/wordcraft.sha256` | `use_files` | copied |
+| `brand/README.md` | `use_portal` | copied |
 | `scripts/build-portal-ui.sh` | `use_portal` | copied |
 | `scripts/tailnet.sh` | `use_portal` | copied |
 

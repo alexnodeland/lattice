@@ -208,7 +208,7 @@ def test_an_asset_is_served_by_what_it_is_not_what_it_is_named(kit: Path) -> Non
     data = brand(kit)
     data["assets"]["favicon"] = "assets/page.svg"
     write(kit, data)
-    assert "assets/page.svg: a kit serves .css, .png, .svg, .txt, .woff2 files" in faults(kit)
+    assert "assets/page.svg: a plain file of the kit's own, not a link" in faults(kit)
 
 
 def test_a_favicon_is_an_svg_or_a_png(kit: Path) -> None:
@@ -375,11 +375,11 @@ def test_a_face_whose_file_is_missing_is_refused(kit: Path) -> None:
 
 def test_a_json_file_is_capped_and_the_kits_own(kit: Path, tmp_path: Path) -> None:
     (kit / "tokens.dark.json").write_text(" " * (257 * 1024))
-    assert "tokens.dark.json: a file of the kit's own, 256 KB at most" in faults(kit)
+    assert "tokens.dark.json: larger than 256 KB" in faults(kit)
     (kit / "tokens.dark.json").unlink()
     (tmp_path / "elsewhere.json").write_text("{}")
     (kit / "tokens.dark.json").symlink_to(tmp_path / "elsewhere.json")
-    assert "tokens.dark.json: a file of the kit's own" in faults(kit)
+    assert "tokens.dark.json: a plain file of the kit's own" in faults(kit)
 
 
 def test_what_colour_blind_mode_swaps_is_declared_outside_it(kit: Path) -> None:
@@ -493,3 +493,45 @@ def test_a_token_file_nested_too_deep_is_refused(
 
     monkeypatch.setattr("portalr.brand.tokens._mapping", deep)
     assert faults(kit) == "tokens.light.json: nested too deep"
+
+
+def test_a_loop_of_links_is_a_fault_on_every_python(kit: Path) -> None:
+    (kit / "assets" / "favicon.svg").unlink()
+    (kit / "assets" / "favicon.svg").symlink_to(kit / "assets" / "favicon.svg")
+    # 3.12's resolve() finds the loop; 3.13's leaves it to the open, which refuses the link.
+    said = faults(kit)
+    assert (
+        "assets/favicon.svg: no such file in the kit" in said
+        or "assets/favicon.svg: a plain file of the kit's own, not a link" in said
+    )
+
+
+def test_a_path_that_cant_be_resolved_is_no_file_of_the_kits(
+    kit: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Python 3.12 raises on a loop of links where 3.13 doesn't: held here on every version.
+    real = Path.resolve
+
+    def looping(self: Path, strict: bool = False) -> Path:
+        if self.name == "favicon.svg":
+            raise RuntimeError("Symlink loop")
+        return real(self, strict)
+
+    monkeypatch.setattr(Path, "resolve", looping)
+    assert "assets/favicon.svg: no such file in the kit" in faults(kit)
+
+
+def test_a_link_inside_the_kit_is_refused_too(kit: Path) -> None:
+    (kit / "assets" / "mark-light.svg").unlink()
+    (kit / "assets" / "mark-light.svg").symlink_to(kit / "assets" / "mark-dark.svg")
+    assert "assets/mark-light.svg: a plain file of the kit's own, not a link" in faults(kit)
+
+
+def test_a_file_that_fails_as_it_is_read_is_a_fault(
+    kit: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def failing(*_: object, **__: object) -> object:
+        raise OSError(5, "Input/output error")
+
+    monkeypatch.setattr("portalr.brand.tokens.os.fdopen", failing)
+    assert "brand.json: can't be read (Input/output error)" in faults(kit)

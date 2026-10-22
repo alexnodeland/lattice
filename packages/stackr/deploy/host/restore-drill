@@ -148,6 +148,12 @@ clickhouse "RESTORE DATABASE analytics AS restore_analytics FROM S3(backups, '$l
 tables_in() { clickhouse "SELECT count() FROM system.tables WHERE database = '$1'"; }
 [[ $(tables_in restore_analytics) == $(tables_in analytics) ]] ||
   fail "ClickHouse's restore of $latest lacks analytics' tables"
+# Its events are readable, and none is newer than the backup: it is the backup's, not the live table's.
+if [[ $(tables_in analytics) -gt 0 ]]; then
+  newer=$(clickhouse "SELECT count() FROM restore_analytics.events WHERE toUnixTimestamp(ts) > $taken") ||
+    fail "reading the restored analytics events"
+  [[ $newer == 0 ]] || fail "ClickHouse's restore of $latest has $newer analytics events newer than itself"
+fi
 clickhouse "RESTORE DATABASE stackr_drill AS restore_sentinel FROM S3(backups, 'drill/$sentinel') FORMAT Null"
 [[ $(clickhouse "SELECT count() FROM restore_sentinel.sentinel WHERE id = '$sentinel'") == 1 ]] ||
   fail "ClickHouse's drill backup lacks the sentinel"

@@ -522,8 +522,14 @@ smoke_analytics() {
     "analytics' reader is refused an insert"
   expect_code "$(analytics_as reader "SELECT 1 SETTINGS log_queries = 1" </dev/null || true)" 164 \
     "analytics' reader can't turn query logging on"
-  expect_code "$(analytics_as reader "SELECT 1 SETTINGS max_memory_usage = 99999999999" </dev/null || true)" 164 \
-    "analytics' reader can't lift its memory limit"
+  local setting
+  for setting in "max_memory_usage = 99999999999" "max_execution_time = 1000" "max_rows_to_read = 0" "readonly = 0"; do
+    expect_code "$(analytics_as reader "SELECT 1 SETTINGS $setting" </dev/null || true)" 164 \
+      "analytics' reader can't set ${setting%% *}"
+  done
+  expect_code "$(printf '{"tenant_id":"%s"}\n' "$a" | analytics_as writer \
+    "INSERT INTO analytics.events SETTINGS max_memory_usage = 99999999999 FORMAT JSONEachRow" || true)" 452 \
+    "analytics' writer can't lift its memory limit"
   said=$(analytics_as reader "SELECT count() FROM analytics.events WHERE tenant_id = '$a'
     SETTINGS SQL_portalr_tenant = '$b'" </dev/null || true)
   if [[ $said == 0 ]]; then
@@ -562,6 +568,28 @@ smoke_analytics() {
     log "ok: system.query_log, which Langfuse reads, holds no analytics query, failed ones included"
   else
     log "FAIL: system.query_log holds $said analytics queries"
+    status=1
+  fi
+  # Each layer on its own: no analytics user's query is logged at all, as the operators see it.
+  said=$(clickhouse_as admin "SELECT count() FROM system.query_log WHERE user LIKE 'portalr_analytics%'")
+  if [[ $said == 0 ]]; then
+    log "ok: no query of analytics' users is logged"
+  else
+    log "FAIL: system.query_log holds $said queries of analytics' users"
+    status=1
+  fi
+  # The masking, on an operator's own statement, which is logged.
+  local person
+  person=$(random_hex 16)
+  clickhouse_as admin "SELECT count() FROM analytics.events WHERE distinct_id = '$person'
+    OR tenant_id IN ('$a', '$b') OR tenant_id = '$a' SETTINGS SQL_portalr_tenant = '$a'" >/dev/null
+  clickhouse_as admin "SYSTEM FLUSH LOGS" >/dev/null
+  said=$(clickhouse_as admin "SELECT count() FROM system.query_log WHERE user = 'admin' AND
+    (position(query, '$person') > 0 OR position(query, '$a') > 0 OR position(query, '$b') > 0)")
+  if [[ $said == 0 ]]; then
+    log "ok: an operator's logged statement has its tenant ids and person masked"
+  else
+    log "FAIL: $said logged statements hold a tenant id or a person unmasked"
     status=1
   fi
   said=$(clickhouse_as langfuse "SELECT count() FROM system.query_log WHERE user != 'langfuse'")

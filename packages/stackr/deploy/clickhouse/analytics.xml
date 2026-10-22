@@ -1,18 +1,24 @@
-<!-- The server's settings for portalr's analytics (stackr ADR-0044): the custom setting a read names
-     its tenant with, which the row policy in users.xml reads, and the masking of what an analytics
-     statement would put in a log, should one be logged. -->
+<!-- The server's settings for portalr's analytics (stackr ADR-0044): the custom setting a read
+     names its tenant with, which the row policy in analytics-users.xml reads; and, in any
+     statement that is logged, the masking of the tenant setting's value and of the ids compared
+     with tenant_id or distinct_id, one or an IN list. Other literals aren't masked. -->
 <clickhouse>
   <custom_settings_prefixes>SQL_</custom_settings_prefixes>
   <query_masking_rules>
     <rule>
-      <name>analytics tenant</name>
+      <name>analytics tenant setting</name>
       <regexp>SQL_portalr_tenant\s*=\s*'[^']*'</regexp>
       <replace>SQL_portalr_tenant = '***'</replace>
     </rule>
     <rule>
-      <name>analytics distinct id</name>
-      <regexp>distinct_id\s*(=|IN|in)\s*\(?'[0-9a-f]{32}'</regexp>
-      <replace>distinct_id = '***'</replace>
+      <name>analytics ids compared</name>
+      <regexp>(tenant_id|distinct_id)\s*=\s*'[^']*'</regexp>
+      <replace>\1 = '***'</replace>
+    </rule>
+    <rule>
+      <name>analytics ids listed</name>
+      <regexp>(tenant_id|distinct_id)\s+(?i:IN)\s*\([^)]*\)</regexp>
+      <replace>\1 IN ('***')</replace>
     </rule>
   </query_masking_rules>
 </clickhouse>

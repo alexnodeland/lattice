@@ -1,9 +1,10 @@
 <!-- The user deploy/host/backup and restore-drill run as, from inside the container only: it may
      read and back up Langfuse's database and portalr's analytics (ADR-0044), make the analytics
      database empty where analytics doesn't run, so one backup statement serves both, use the
-     bucket, read the system tables the drill needs, and own the drill's four databases. It can't write Langfuse's tables: ClickHouse's `admin`
-     restores a new host (ADR-0031). Langfuse's own user can't reach the bucket. Its password is
-     kept out of the preprocessed configuration ClickHouse writes to its data volume. -->
+     bucket, read the system tables the drill needs, and own the drill's four databases. It can't
+     write Langfuse's tables: ClickHouse's `admin` restores a new host (ADR-0031). Langfuse's own
+     user can't reach the bucket. Its password is kept out of the preprocessed configuration
+     ClickHouse writes to its data volume. -->
 <clickhouse>
   <users>
     <backup>

@@ -50,22 +50,38 @@
     </portalr_analytics>
   </users>
   <profiles>
-    <!-- Inserts are gathered into parts by ClickHouse, and each waits until it is written. -->
+    <!-- Inserts are gathered into parts by ClickHouse, and each waits until it is written. Its
+         limits are fixed: an insert can't lift them, or turn logging on. -->
     <analytics_writer>
       <async_insert>1</async_insert>
       <wait_for_async_insert>1</wait_for_async_insert>
       <log_queries>0</log_queries>
+      <max_execution_time>10</max_execution_time>
+      <max_memory_usage>500000000</max_memory_usage>
+      <max_threads>2</max_threads>
+      <max_concurrent_queries_for_user>16</max_concurrent_queries_for_user>
       <constraints>
         <log_queries><readonly/></log_queries>
+        <async_insert><readonly/></async_insert>
+        <max_execution_time><readonly/></max_execution_time>
+        <max_memory_usage><readonly/></max_memory_usage>
+        <max_threads><readonly/></max_threads>
+        <max_concurrent_queries_for_user><readonly/></max_concurrent_queries_for_user>
       </constraints>
     </analytics_writer>
     <!-- Reads are read-only (readonly 1): they may change one setting, the tenant the row policy
          reads, and no other, so a read can't turn logging on or lift its own limits; no analytics
-         query reaches system.query_log, and each is cut off after ten seconds and 2 GB. -->
+         query reaches system.query_log; and each is bounded: a 90-day funnel over one tenant's
+         half a million rows took under 140 ms and ClickHouse 423 MiB in all (RFC-0008). -->
     <analytics_reader>
       <readonly>1</readonly>
       <max_execution_time>10</max_execution_time>
-      <max_memory_usage>2000000000</max_memory_usage>
+      <max_memory_usage>1000000000</max_memory_usage>
+      <max_threads>4</max_threads>
+      <max_rows_to_read>200000000</max_rows_to_read>
+      <max_bytes_to_read>20000000000</max_bytes_to_read>
+      <max_result_rows>100000</max_result_rows>
+      <max_concurrent_queries_for_user>4</max_concurrent_queries_for_user>
       <log_queries>0</log_queries>
       <constraints>
         <SQL_portalr_tenant><changeable_in_readonly/></SQL_portalr_tenant>
@@ -77,10 +93,10 @@
     <analytics>
       <interval>
         <duration>3600</duration>
-        <queries>20000</queries>
-        <errors>2000</errors>
-        <read_rows>2000000000</read_rows>
-        <execution_time>1800</execution_time>
+        <queries>5000</queries>
+        <errors>500</errors>
+        <read_rows>500000000</read_rows>
+        <execution_time>600</execution_time>
       </interval>
     </analytics>
   </quotas>

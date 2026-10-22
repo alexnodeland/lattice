@@ -9,10 +9,12 @@
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-/** What any other failure says, such as one where the server couldn't be reached. */
-export const GENERIC = "Something went wrong. Try again in a moment.";
+const AGAIN = " Try again in a moment.";
 
-const CHANGED = "It changed while you were reading it. Try again.";
+/** What any other failure says, such as one where the server couldn't be reached. */
+export const GENERIC = `Something went wrong.${AGAIN}`;
+
+const CHANGED = `It changed while you were reading it.${AGAIN}`;
 const STATE = "That can't be done as things stand.";
 const FORBIDDEN = "You may not see this.";
 const INVALID = "What was asked for isn't valid.";
@@ -34,7 +36,7 @@ const STATUSES = new Map<number, string>([
   [403, FORBIDDEN],
   [404, NOT_FOUND],
   [422, INVALID],
-  [429, "Too much was asked at once. Wait a moment, then try again."],
+  [429, `Too much was asked at once.${AGAIN}`],
 ]);
 
 /** A refusal's reason code: its `detail`'s `type`, or its rejection's. */
@@ -60,7 +62,7 @@ export function failureSaid(error: unknown): string {
     return reason;
   }
   if (error.status >= 500) {
-    return "The server had a problem. Try again in a moment.";
+    return `The server had a problem.${AGAIN}`;
   }
   return STATUSES.get(error.status) ?? GENERIC;
 }

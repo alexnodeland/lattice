@@ -34,9 +34,9 @@ The workspace's artifacts that aren't archived, each by kind and latest version.
 
 ### Artifacts in their thread
 
-An artifact whose kind's renderer is inline shows in the thread it was made in, between the messages, where it was made, at its latest version: today a mini app, an `app`. Its header names it, and "Open its page" goes to its revisions and its full view.
+Every kind the app draws shows in the thread it was made in, between the messages, where it was made, at its latest version: a note, a form, which is filled in and sent there, a submission, a dashboard, a native file, read a page at a time, and a mini app. Its header names its kind and name, with "Open its page", its revisions, and **Full view**, which fills the window with it until **Back to the page** or Escape. A mini app names itself and has a full view of its own, so its "Open its page" sits under it. A kind the app shows as JSON isn't shown in the thread ([ADR-0055](../adr/0055-every-kind-inline-and-a-native-file-read-and-edited-in-its-thread.md), [ADR-0061](../adr/0061-icon-buttons-and-the-inline-artifacts-header.md)).
 
-A running app is shown whole, as tall as it draws, up to twice the window's height or 2,000 pixels, and the page scrolls past it. **Full view** fills the window with it; **Back to the page**, or Escape outside the app, returns. The app keeps running either way. A thread with several apps runs each at once, and the workspace's switch for mini apps stops them all ([ADR-0052](../adr/0052-artifacts-inline-in-their-thread.md)).
+A running mini app is shown whole, as tall as it draws, up to twice the window's height or 2,000 pixels, whichever is less, and the page scrolls past it. The app keeps running in its full view. A thread with several apps runs each at once, and the workspace's switch for mini apps stops them all ([ADR-0052](../adr/0052-artifacts-inline-in-their-thread.md)).
 
 ## Proposals
 

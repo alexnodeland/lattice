@@ -51,4 +51,4 @@ The loader PR (#519) departs from the decision above as RFC-0007's "Loader PR as
 
 1. [x] Foundation PR (#452): the layers at today's values, component tokens one commit each, computed-style snapshots, guard rails; zero baseline diffs.
 2. [x] Loader PR (#519, #524): parsing, validation, `brand.css`, `Site(brand=...)`, serving, `index.html` rewrite, `config.json`, the `nightshade` kit.
-3. [x] Tooling PR (#529, #547): `portalr brand init` and `validate`, the presets, the stackr template, docs, the `calm` kit. Not built: `portalr brand preview`.
+3. [ ] Tooling PR: `portalr brand init` and `validate`, the stackr template, docs and the `calm` kit are built (#529, #547); `portalr brand preview` and the presets are not.

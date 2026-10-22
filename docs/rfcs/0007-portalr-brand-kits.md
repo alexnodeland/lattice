@@ -303,4 +303,4 @@ The loader PR departs from or defers parts of the design above:
 - [x] Docs: this RFC, portalr ADR-0056 and ADR-0057.
 - [x] Foundation (#452): token layers at today's values, component tokens, structural reduced motion, guard rails; zero baseline diffs.
 - [x] Loader (#519, #524): pair manifest, validation, `brand.css`, serving, `index.html` rewrite, `config.json`, `Site(brand=...)`, `nightshade`.
-- [ ] CLI and tooling: `portalr brand init` and `validate`, presets, stackr template, docs and `calm` built (#529, #547); the matrix and motion playground, and `portalr brand preview`, not built.
+- [ ] CLI and tooling: `portalr brand init` and `validate`, the stackr template, docs and `calm` built (#529, #547); the presets, the matrix and motion playground, and `portalr brand preview`, not built.

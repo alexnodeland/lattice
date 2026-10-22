@@ -262,7 +262,7 @@ Not in scope: two-way sync of artifacts, Plane's Commercial edition and its v2 w
 
 ## Tracking
 
-- [ ] Sign-off on T1 to T7
+- [ ] Sign-off on T1 to T7: not recorded on its own; each was built as the table recommends, in the ADRs below
 - [x] relayr: the port, core, fake and contract test; the ledger's new methods, its contract test, and the migration with row-level security ([relayr ADR-0033](../relayr/adr/0033-the-tracker-port-and-runs-that-write-to-it-once.md): the items table only, the followers' two with phase 2)
 - [x] relayr: the Plane and Vikunja adapters, with recorded fixtures (both recorded from the pinned releases: [relayr ADR-0035](../relayr/adr/0035-what-phase-1-settled-of-the-trackers-unknowns.md) and [ADR-0037](../relayr/adr/0037-what-a-live-plane-settled.md))
 - [x] relayr: `TrackerActions`, `TrackerCapability` and `Allowlist.trackers` ([relayr ADR-0034](../relayr/adr/0034-an-allowlist-for-the-tracker.md))

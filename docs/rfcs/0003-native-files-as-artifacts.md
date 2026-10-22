@@ -353,7 +353,8 @@ Decided by the owner on 2026-10-16:
 - [x] portalr: the renderer, previews, diffs, check-out and check-in screens
 - [ ] The streamed session spike and its recommendation
 - [x] Docs: the package's section and guide
-- [ ] The four apps ADR-0009 called export only (native files ADR-0016): FilmCraft's video projects, EffectCraft's motion graphics and SoundCraft's audio sessions as native files; LightCraft stays export only, with no adapter; exports as artifacts of their own not started
+- [x] The four apps ADR-0009 called export only (native files ADR-0016): FilmCraft's video projects, EffectCraft's motion graphics and SoundCraft's audio sessions as native files; LightCraft stays export only, with no adapter
+- [ ] Exports as artifacts of their own
 
 ## Evidence
 

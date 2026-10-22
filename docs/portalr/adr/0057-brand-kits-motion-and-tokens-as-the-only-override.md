@@ -40,4 +40,4 @@ The foundation PR (#452): motion's scale multiplies durations, not shifts or sca
 
 1. [x] Foundation PR (#452): motion primitives and component tokens at today's values; the structural reduced-motion block.
 2. [x] Loader PR (#519): the guard rails in the validator.
-3. [ ] Tooling PR: the presets (built, #529 and #547) and the motion playground (not built).
+3. [ ] Tooling PR: the presets and the motion playground, neither built yet.

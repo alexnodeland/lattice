@@ -14,11 +14,13 @@ What changes for an application on lattice's 0.1 releases, and what to do. The p
 {"reply": "Whatever you think is best"}
 ```
 
+The question changed too: `ask_user(question, choices)` is now `ask_user(questions)`, a list of `Question`s, so a client that draws a `run_paused` request's `args` reads `questions`, not `question` and `choices`.
+
 An `answer_deferred` that sends a plain string, as 0.1's clients did, is refused with `validation_failed`, over the WebSocket and REST alike. A client of artifactr's protocol of its own must send one of the two shapes; portalr's chat does. A run paused on a question asked before the upgrade, whose request still holds `question` and `choices`, is answered only by a reply: a message in its thread, or `{"reply": ...}`, so it isn't stranded.
 
 ## Migrations
 
-Each package migrates its own tables, and a generated application runs every migration as it starts. Nothing needs running by hand, but take a backup first (`make backup` in stackr).
+Each package migrates its own tables, and a generated application runs every migration as it starts. Nothing needs running by hand, but back the database up first: on a single host, `make backup` in stackr, which needs its `BACKUP_S3_*` settings ([a single host](stackr/guides/single-host.md)); elsewhere, however your database is backed up.
 
 | Package | New migrations | What they add |
 |---|---|---|
@@ -35,19 +37,20 @@ Forms, dashboards, mini apps, native files' apps, task trackers, Excalidraw, Mer
 
 An upgraded workspace has nothing set, so each integration the deployment installs is at its default:
 
-- **On:** WordCraft, forms, dashboards, math, and Plane and Vikunja; and Excalidraw's key, whose drawings aren't built yet ([RFC-0006](rfcs/0006-excalidraw-diagrams-drawn-live.md)).
+- **On:** WordCraft, forms, dashboards, math, and Plane and Vikunja.
+- `excalidraw` has a key, but its drawings aren't built yet ([RFC-0006](rfcs/0006-excalidraw-diagrams-drawn-live.md)): check its setting in the admin.
 - **Off:** every other native files' app, mini apps, Mermaid, and the connected apps and their code.
 
 An integration the deployment doesn't install is off whatever is set: a native files' app is installed only while `FILES_CRAFTS` names it, and a tracker only with its recipe. lattice-core's `KNOWN` is the list, with each default.
 
 ## New settings
 
-A generated application reads these from its `.env`. `copier update` never touches `.env`, so copy what you want from the new `.env.example`. Each one's default leaves the application as it was:
+A generated application reads these from its `.env`. `copier update` never touches `.env`, so copy what you want from the new `.env.example`. Each one's default leaves the application as it was, but for `PORTAL_SUPABASE_URL`, which an application from 0.1 must change:
 
 | Setting | Default | What it does |
 |---|---|---|
 | `FILES_CRAFTS` | empty: native files off | The apps whose workers run, such as `wordcraft,gridcraft` ([native files](artifactr/files/guides/native-files.md)) |
-| `FILES_<APP>_TOKEN` | `make env` generates them | Each worker's own token |
+| `FILES_<APP>_TOKEN` | none: required for each app `FILES_CRAFTS` names | Each worker's own token, at least 32 characters. `make env` writes them only into a new `.env`; in yours, set each with `openssl rand -hex 32` |
 | `FILES_WORKER_MEMORY`, `FILES_WORKER_CPUS`, `FILES_WORKER_TMPFS`, `FILES_WORKER_LIMITS` | 3g, 2, 1g, artifactr's | Each worker's container, and each call's limits |
 | `FILES_UPLOADS_PER_MINUTE`, `_AT_ONCE`, `_PER_TENANT`, `_EACH`, `FILES_READINGS` | 20, 8, half, 2, 2 | How people's uploads are held back ([uploads and quotas](artifactr/files/guides/uploads.md)) |
 | `FILES_WORKSPACE_QUOTA`, `FILES_TENANT_QUOTA` | none | The most a workspace's or a tenant's files may hold |
@@ -60,13 +63,13 @@ In stackr's own `.env`: `STACKR_GATEWAY_MODELS` and `STACKR_UPSTREAM_*` point th
 
 ## Local Supabase on Docker 29
 
-`make up` in stackr now checks where Docker publishes on local Supabase's network before it starts Supabase. Some engines, Docker Desktop 29 among them, ignore the setting that keeps it on the loopback and publish on every interface, where Supabase's well-known keys and the password `postgres` would be anyone's. On such an engine, `make up` refuses to start local Supabase and says why. There is deliberately no override: set `STACKR_DATABASE=postgres` in `.env` and add the `auth` profile, whose ports are published at `STACKR_BIND` explicitly ([stackr ADR-0045](stackr/adr/0045-local-supabase-only-where-docker-keeps-it-on-the-loopback.md)). `STACKR_BIND=0.0.0.0` with local Supabase is now always refused.
+`make up` in stackr now checks where Docker publishes on local Supabase's network before it starts Supabase. Some engines, Docker Desktop 29.4 among them, ignore the setting that keeps it on the loopback and publish on every interface, where Supabase's well-known keys and the password `postgres` would be anyone's. On such an engine, `make up` refuses to start local Supabase and says why. There is deliberately no override: set `STACKR_DATABASE=postgres` in `.env` and add the `auth` profile, whose ports are published at `STACKR_BIND` explicitly ([stackr ADR-0045](stackr/adr/0045-local-supabase-only-where-docker-keeps-it-on-the-loopback.md)). `STACKR_BIND=0.0.0.0` with local Supabase is now always refused.
 
 ## Updating a generated application
 
 1. Commit everything, so `copier update` can show you its changes.
 2. `uvx copier update`, and answer the new questions: `native_files` (yes adds the plumbing; no app runs until `FILES_CRAFTS` names one), and `portal` and `ui` if the application predates them ([the template](stackr/guides/template.md#the-template-copier-update)). It pins lattice's libraries at the template's own commit, so the update moves them too.
 3. `uv lock`, then `make check`.
-4. Copy the new settings you want from `.env.example` into `.env`, and run `make env` for the workers' tokens.
+4. Copy the new settings you want from `.env.example` into `.env`. `make env` leaves an existing `.env` alone, so for each app `FILES_CRAFTS` names, set `FILES_<APP>_TOKEN` yourself (`openssl rand -hex 32`): the application won't start without it.
 5. `make up`: the image is built again, the migrations run as it starts, and `FILES_CRAFTS`' workers start beside it.
 6. Switch on what each tenant and workspace should have, in the admin UI's integrations.

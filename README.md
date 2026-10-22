@@ -110,7 +110,7 @@ sequenceDiagram
 
 ## ✨ New in 0.2
 
-- 📄 **Native files.** Word, Excel, PowerPoint, PDF, CAD, 3D and design files are kept as artifacts. Each crafting app's pinned CLI reads and edits them in a worker of its own, with no route out. This includes FreeCAD's models and Blender's scenes. People check a file out in the app's browser build and check it back in, and agents edit it through the app's commands ([guide](docs/artifactr/files/guides/native-files.md)).
+- 📄 **Native files.** Word, Excel, PowerPoint, PDF, CAD, 3D and design files are kept as artifacts. Each crafting app's pinned CLI reads and edits them in a worker of its own, with no route out. FreeCAD's models among them; Blender's scenes too, where an application builds its worker. People check a file out in the app's browser build and check it back in, and agents edit it through the app's commands ([guide](docs/artifactr/files/guides/native-files.md)).
 - ⬆️ **Uploads.** A person uploads a file. It is told by its first bytes and read by its app before anything is stored, under a pace, the tenant's readings and quotas ([guide](docs/artifactr/files/guides/uploads.md)).
 - 🔌 **Connected apps.** An operator connects the agent to their own running FreeCAD or Blender, through a vetted MCP server, with every call that runs code approved ([guide](docs/artifactr/guides/connected-apps.md)).
 - 🧩 **Forms, dashboards and mini apps.** The agent asks with a form, shows a dashboard, or writes a small app that runs in a sandbox of its own, inline in its thread ([guide](docs/artifactr/guides/forms-and-dashboards.md)).

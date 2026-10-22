@@ -477,6 +477,10 @@ def test_history_messages_are_model_requests_first() -> None:
     assert ModelRequest.kind == "request"
 
 
+BOT_ID = "1" * 9
+BOT_KEY = "AA" + "x" * 33
+
+
 @pytest.mark.parametrize(
     ("text", "kept"),
     [
@@ -500,7 +504,8 @@ def test_history_messages_are_model_requests_first() -> None:
         ("password=123456", "password=[redacted]"),
         ('{"password": "123456"}', '{"password": "[redacted]"}'),
         ("api_key=1234567890123456", "api_key=[redacted]"),
-        ("token=123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw", "token=[redacted]"),
+        # A bot token's shape, a number and a key, put together here so no whole one is written.
+        (f"token={BOT_ID}:{BOT_KEY}", "token=[redacted]"),
         ("secret=123.hunter2", "secret=[redacted]"),
         ("password=1.5x", "password=[redacted]"),
         ("password=123-456", "password=[redacted]"),

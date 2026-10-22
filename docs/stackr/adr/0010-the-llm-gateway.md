@@ -1,6 +1,6 @@
 # ADR-0010: The LLM gateway
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0047](0047-an-upstream-gateway-for-the-model-groups.md)
 **Date:** 2026-09-28
 **Deciders:** Alex Nodeland
 

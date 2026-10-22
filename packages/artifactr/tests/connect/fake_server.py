@@ -101,6 +101,44 @@ def main() -> None:
         return CallToolResult(content=[ImageContent(data=png, mime_type="image/png")] * 2)
 
     @server.tool()
+    def sizes() -> CallToolResult:
+        """Images by header: too large, fitting, of no size, and whose size can't be read."""
+
+        def png(width: int, height: int) -> bytes:
+            header = width.to_bytes(4) + height.to_bytes(4) + b"\x08\x06\0\0\0"
+            return b"\x89PNG\r\n\x1a\n" + b"\0\0\0\x0dIHDR" + header
+
+        def jpeg(width: int, height: int) -> bytes:
+            app0 = b"\xff\xe0\0\x10JFIF\0\x01\x01\0\0\x01\0\x01\0\0"
+            size = height.to_bytes(2) + width.to_bytes(2)
+            return b"\xff\xd8" + app0 + b"\xff\xc0\0\x11\x08" + size + b"\x03" + b"\0" * 9
+
+        images = [
+            (png(100_000, 100_000), "image/png"),
+            (jpeg(9000, 10), "image/jpeg"),
+            (png(800, 600), "image/png"),
+            (png(8000, 8000), "image/png"),
+            (png(0, 10), "image/png"),
+            (jpeg(10, 0), "image/jpeg"),
+            # A JPEG's markers before its frame: fill bytes, markers without a length, and ones
+            # that end it unread.
+            (b"\xff\xd8\xff\xff\xd0" + jpeg(32, 24)[2:], "image/jpeg"),
+            (b"\xff\xd8\xff\xe0\0\x01" + b"\0" * 8, "image/jpeg"),
+            (b"\xff\xd8\xff\xc0\0\x11\x08", "image/jpeg"),
+            (b"\xff\xd8\xff\xe0\0\x02\0\0\0\0", "image/jpeg"),
+            (b"\xff\xd8\xff\xe0\0\x04\0\0", "image/jpeg"),
+            (jpeg(640, 480), "image/jpeg"),
+            (b"\x89PNG\r\n\x1a\n\0", "image/png"),
+            (b"\xff\xd8\xff\xd9", "image/jpeg"),
+        ]
+        return CallToolResult(
+            content=[
+                ImageContent(data=base64.b64encode(data).decode(), mime_type=media_type)
+                for data, media_type in images
+            ]
+        )
+
+    @server.tool()
     def many() -> CallToolResult:
         """Forty parts."""
         return CallToolResult(content=[TextContent(text=f"part {n}") for n in range(40)])

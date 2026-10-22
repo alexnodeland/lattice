@@ -29,11 +29,17 @@ import { titleOf } from "./titles";
 
 /** What people call an artifact of a kind: a native file by its type, any other by its kind. */
 export function kindName(kind: string, data: Readonly<Record<string, unknown>>): string {
-  if (NATIVE.has(kind)) {
-    return factsOf(data).type;
-  }
-  const words = kind.replaceAll("_", " ");
-  return words.charAt(0).toUpperCase() + words.slice(1);
+  return NATIVE.has(kind) && factsOf(data).type !== "File" ? factsOf(data).type : kindWords(kind);
+}
+
+/** Words written as capitals in a kind's name. */
+const CAPITALS: Readonly<Record<string, string>> = { pdf: "PDF", cad: "CAD", svg: "SVG" };
+
+/** A kind as words, without its data: `pdf_document` as "PDF document". */
+export function kindWords(kind: string): string {
+  const words = kind.split("_").map((word) => CAPITALS[word] ?? word);
+  const first = words[0] ?? "";
+  return [first.charAt(0).toUpperCase() + first.slice(1), ...words.slice(1)].join(" ");
 }
 
 export function ThreadArtifact({

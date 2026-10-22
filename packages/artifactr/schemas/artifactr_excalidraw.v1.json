@@ -1,0 +1,182 @@
+{
+  "$defs": {
+    "Diagram": {
+      "additionalProperties": false,
+      "description": "An Excalidraw diagram that people and agents draw on together.\n\nAgents propose changes to it by default: an application that keeps scratch diagrams may\nregister a subclass that applies them. People's edits always commit directly.",
+      "properties": {
+        "elements": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Element"
+          },
+          "title": "Elements",
+          "type": "object"
+        },
+        "files": {
+          "additionalProperties": {
+            "$ref": "#/$defs/DiagramFile"
+          },
+          "title": "Files",
+          "type": "object"
+        },
+        "name": {
+          "maxLength": 200,
+          "title": "Name",
+          "type": "string"
+        },
+        "scene": {
+          "$ref": "#/$defs/Scene",
+          "default": {
+            "grid_size": null,
+            "view_background_color": "#ffffff"
+          }
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "Diagram",
+      "type": "object"
+    },
+    "DiagramFile": {
+      "additionalProperties": false,
+      "description": "An image a diagram shows: bytes in the blob store, named by their digest.\n\nThe shape of artifactr.files' ``Blob``, so that its blob store keeps them once images land.",
+      "properties": {
+        "media_type": {
+          "minLength": 1,
+          "title": "Media Type",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size": {
+          "minimum": 0,
+          "title": "Size",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "sha256",
+        "size",
+        "media_type"
+      ],
+      "title": "DiagramFile",
+      "type": "object"
+    },
+    "Element": {
+      "additionalProperties": true,
+      "description": "One Excalidraw element, as 0.18.1 writes it; its other fields are kept as written.",
+      "properties": {
+        "id": {
+          "pattern": "^[A-Za-z0-9_-]{1,64}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "index": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Index"
+        },
+        "isDeleted": {
+          "default": false,
+          "title": "Isdeleted",
+          "type": "boolean"
+        },
+        "type": {
+          "minLength": 1,
+          "title": "Type",
+          "type": "string"
+        },
+        "updated": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Updated"
+        },
+        "version": {
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "title": "Version",
+          "type": "integer"
+        },
+        "versionNonce": {
+          "maximum": 2147483647,
+          "minimum": 0,
+          "title": "Versionnonce",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "version",
+        "versionNonce"
+      ],
+      "title": "Element",
+      "type": "object"
+    },
+    "Scene": {
+      "additionalProperties": false,
+      "description": "What every viewer of a diagram shares; zoom, scroll and tool are each viewer's own.",
+      "properties": {
+        "grid_size": {
+          "anyOf": [
+            {
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Grid Size"
+        },
+        "view_background_color": {
+          "default": "#ffffff",
+          "maxLength": 64,
+          "title": "View Background Color",
+          "type": "string"
+        }
+      },
+      "title": "Scene",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "`excalidraw_diagram`: the data of a diagram, an Excalidraw scene's elements keyed by their ids; and `integration_key`: the `integration` a `not_enabled` refusal of one names.",
+  "properties": {
+    "excalidraw_diagram": {
+      "$ref": "#/$defs/Diagram"
+    },
+    "integration_key": {
+      "const": "excalidraw",
+      "title": "Integration Key",
+      "type": "string"
+    }
+  },
+  "required": [
+    "excalidraw_diagram",
+    "integration_key"
+  ],
+  "title": "artifactr_excalidraw.v1",
+  "type": "object"
+}

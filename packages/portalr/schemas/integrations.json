@@ -101,7 +101,7 @@
   },
   {
     "key": "excalidraw",
-    "default": true,
+    "default": false,
     "description": "Diagrams: Excalidraw drawings that people and agents draw on together."
   },
   {

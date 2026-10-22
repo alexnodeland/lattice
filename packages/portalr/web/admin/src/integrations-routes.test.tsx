@@ -15,7 +15,7 @@ type Setting = { on: boolean; by: { kind: "user"; id: string }; at: string };
 const REGISTRY = [
   { key: "ui:forms", default: true, description: "Forms: the agent asks with a form." },
   { key: "markdown:mermaid", default: false, description: "Mermaid: diagrams written as text." },
-  { key: "excalidraw", default: true, description: "Diagrams: Excalidraw drawings." },
+  { key: "excalidraw", default: false, description: "Diagrams: Excalidraw drawings." },
   { key: "tracker:plane", default: true, description: "Plane: work items in Plane." },
 ];
 const INSTALLED = new Set(["ui:forms", "markdown:mermaid", "excalidraw"]);

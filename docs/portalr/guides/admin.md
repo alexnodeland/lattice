@@ -34,7 +34,7 @@ Each integration's switch says whether it is on, with a badge (a filled circle f
 
 | State | Means |
 |---|---|
-| Default | No one has set it here or on the tenant: it is what lattice's registry says. Mini apps and Mermaid are off by default; the rest are on |
+| Default | No one has set it here or on the tenant: it is what lattice's registry says. Mini apps, Mermaid, diagrams, the crafting apps but WordCraft, and connected apps are off by default; the rest are on |
 | Inherited from the tenant | The tenant's setting, which a workspace follows until it sets its own |
 | Set here | This level's own setting, with who set it and when; **Back to inherited** (on the tenant, **Back to the default**) unsets it. On the tenant, an off also says **Off in every workspace; none can turn it on**: it is the ceiling every workspace is under |
 | Off for the tenant | The tenant turned it off, so no workspace can turn it on: the switch is disabled |

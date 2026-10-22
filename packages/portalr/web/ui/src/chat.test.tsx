@@ -321,16 +321,18 @@ test("a download says where it reaches, and a call how many of the hour's it is"
       app: "Blender",
       risk: "network",
       runs: "Downloads from the internet into your Blender.",
-      reaches: "Sketchfab (api.sketchfab.com)",
+      reaches: "Sketchfab: api.sketchfab.com",
       holds: "An approval holds.",
-      hour: "Call 3 of 30 this workspace may run this hour.",
+      hour: "2 of the 30 calls to Blender this workspace may run an hour have run.",
     },
   };
   const screen = await render(<Request request={request} onAnswer={sent()} />);
   const card = screen.getByRole("region", { name: "Approve blender_import_asset?" });
-  await expect.element(card.getByText("It reaches Sketchfab (api.sketchfab.com).")).toBeVisible();
+  await expect.element(card.getByText("It reaches Sketchfab: api.sketchfab.com.")).toBeVisible();
   await expect
-    .element(card.getByText("Call 3 of 30 this workspace may run this hour."))
+    .element(
+      card.getByText("2 of the 30 calls to Blender this workspace may run an hour have run."),
+    )
     .toBeVisible();
 });
 

@@ -102,7 +102,7 @@ def main() -> None:
 
     @server.tool()
     def sizes() -> CallToolResult:
-        """Images by header: two too large a side, two that fit, two whose size can't be read."""
+        """Images by header: too large, fitting, of no size, and whose size can't be read."""
 
         def png(width: int, height: int) -> bytes:
             header = width.to_bytes(4) + height.to_bytes(4) + b"\x08\x06\0\0\0"
@@ -117,6 +117,9 @@ def main() -> None:
             (png(100_000, 100_000), "image/png"),
             (jpeg(9000, 10), "image/jpeg"),
             (png(800, 600), "image/png"),
+            (png(8000, 8000), "image/png"),
+            (png(0, 10), "image/png"),
+            (jpeg(10, 0), "image/jpeg"),
             (jpeg(640, 480), "image/jpeg"),
             (b"\x89PNG\r\n\x1a\n\0", "image/png"),
             (b"\xff\xd8\xff\xd9", "image/jpeg"),

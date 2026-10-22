@@ -18,7 +18,16 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Any, Final, Literal, NamedTuple
 
-__all__ = ["BLENDER", "FREECAD", "PROTECTED", "ConnectedServer", "Risk", "Vetted", "digest"]
+__all__ = [
+    "BLENDER",
+    "FREECAD",
+    "PROTECTED",
+    "UNSET",
+    "ConnectedServer",
+    "Risk",
+    "Vetted",
+    "digest",
+]
 
 Risk = Literal["read", "edit", "code", "network", "host"]
 """What a tool does, and so when it is offered."""
@@ -43,6 +52,16 @@ def digest(name: str, description: str | None, input_schema: Mapping[str, Any]) 
     told = {"name": name, "description": description or "", "input_schema": input_schema}
     canonical = json.dumps(told, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode()).hexdigest()
+
+
+UNSET: Final = frozenset({"ExpressionEngine", "Proxy"})
+"""Properties no edit sets by name: an expression is code FreeCAD evaluates, and a proxy is an
+object's Python."""
+
+Reach = tuple[str, Mapping[str, str], tuple[str, str] | None]
+"""Where a network tool fetches from: the argument that picks its service, what each service
+reaches, and an argument naming an address or a path of the model's choosing, with what it
+means."""
 
 
 @dataclass(frozen=True)
@@ -76,11 +95,14 @@ class ConnectedServer:
     code: Mapping[str, str] = field(default_factory=dict[str, str])
     """The argument that holds the code, by each `code` tool."""
 
-    reaches: Mapping[str, tuple[str, Mapping[str, str]]] = field(
-        default_factory=dict[str, tuple[str, Mapping[str, str]]]
-    )
+    reaches: Mapping[str, Reach] = field(default_factory=dict[str, Reach])
     """Where each `network` tool fetches from, which its approver is shown: the argument that
-    names the service, and the hosts each of its values reaches, as read in the server's source."""
+    names the service, the hosts each of its values reaches, as read in the server's source, and
+    an argument that names somewhere else of the model's choosing, if the tool takes one."""
+
+    properties: Mapping[str, str] = field(default_factory=dict[str, str])
+    """The argument of each tool that sets an object's properties by name, whose names are held
+    to plain ones: none starting with `_`, and none of `UNSET` (an expression, a proxy)."""
 
     token: str | None = None
     """The variable the server reads the add-on's token from, if the add-on takes one."""
@@ -141,12 +163,14 @@ FREECAD: Final = ConnectedServer(
             "get_async_status": Vetted(
                 "read", "ab00bd59279ceeccefaa8cdf1756af20af73b8f0d93a0d1ec76e93b428ff6962"
             ),
-            # The edits, audited in the add-on's source at v0.1.27 (rpc_server.py,
-            # object_factory.py, property_mapper.py): a document's name, an object's type
-            # (`doc.addObject`, or one of FEM's `ObjectsFem.make*`), and its property values are
-            # set with `setattr`, on the object and its `ViewObject`, as XML-RPC's plain values;
-            # none reaches `exec`, `eval`, `setExpression` or a `Proxy` it builds. `exec` is
-            # only in `execute_code` and `execute_code_async`, which are `code`.
+            # The edits, read in the add-on's source at v0.1.27 (rpc_server.py, object_factory.py,
+            # property_mapper.py): a document's name, an object's type (`doc.addObject`, or one of
+            # FEM's `ObjectsFem.make*`), and its properties, set with `setattr` on the object and
+            # on its `ViewObject` by any name, those not in its `PropertiesList` too. None runs
+            # `exec` or `eval` itself, but a name is anything: a dunder, or `ExpressionEngine`,
+            # which sets expressions as `setExpression` does. So the names are held to plain
+            # ones (`properties`, below). `exec` is only in `execute_code` and
+            # `execute_code_async`, which are `code`.
             "create_document": Vetted(
                 "edit", "e14a671226faa889ab939083e6462cd645090b3b317ed5f6712d97a4b7104c00"
             ),
@@ -183,28 +207,45 @@ FREECAD: Final = ConnectedServer(
         }
     ),
     code=MappingProxyType({"execute_code": "code", "execute_code_async": "code"}),
+    properties=MappingProxyType(
+        {"create_object": "obj_properties", "edit_object": "obj_properties"}
+    ),
     token="FREECAD_MCP_TOKEN",
 )
 """neka-nat's FreeCAD server: an add-on's XML-RPC server in FreeCAD's window, on port 9875."""
 
 _LIBRARIES: Final = MappingProxyType(
     {
-        "polyhaven": "Poly Haven (api.polyhaven.com)",
-        "sketchfab": "Sketchfab (api.sketchfab.com)",
-        "polypizza": "Poly Pizza (api.poly.pizza)",
+        "polyhaven": "Poly Haven: api.polyhaven.com, and its files from cdn.polyhaven.com",
+        "sketchfab": (
+            "Sketchfab: api.sketchfab.com, and its files from the signed download addresses the"
+            " API gives, on hosts Sketchfab chooses"
+        ),
+        "polypizza": "Poly Pizza: api.poly.pizza, and its files from the hosts the API names",
     }
 )
 _GENERATORS: Final = MappingProxyType(
     {
-        "hyper3d": "Hyper3D Rodin (hyperhuman.deemos.com, or fal.ai's queue.fal.run)",
-        "hunyuan3d": "Hunyuan3D (ai3d.tencentcloudapi.com)",
-        "meshy": "Meshy (api.meshy.ai)",
+        "hyper3d": (
+            "Hyper3D Rodin: hyperhuman.deemos.com or fal.ai's queue.fal.run, and the model from"
+            " the address it answers with"
+        ),
+        "hunyuan3d": (
+            "Hunyuan3D: ai3d.tencentcloudapi.com, and the model from the address it answers with"
+        ),
+        "meshy": "Meshy: api.meshy.ai, and the model from the address it answers with",
         "auto": (
-            "whichever generator the add-on has set up: Hyper3D Rodin (hyperhuman.deemos.com,"
-            " or queue.fal.run), Hunyuan3D (ai3d.tencentcloudapi.com) or Meshy (api.meshy.ai)"
+            "whichever generator the add-on has set up (Hyper3D Rodin, Hunyuan3D or Meshy), and"
+            " the model from the address it answers with"
         ),
     }
 )
+_IMAGE: Final = (
+    "image",
+    "with `image`, the generator is sent that image: a file it reads on your machine by its path,"
+    " or an address it fetches from anywhere",
+)
+"""generate_3d's `image`: a path or any http(s) address, which the add-on reads or fetches."""
 
 BLENDER: Final = ConnectedServer(
     app="blender",
@@ -248,9 +289,9 @@ BLENDER: Final = ConnectedServer(
     # Read in the server's and the add-on's source at 2.2.2 (src/blender_mcp/server.py, addon.py).
     reaches=MappingProxyType(
         {
-            "search_assets": ("source", _LIBRARIES),
-            "import_asset": ("source", _LIBRARIES),
-            "generate_3d": ("provider", _GENERATORS),
+            "search_assets": ("source", _LIBRARIES, None),
+            "import_asset": ("source", _LIBRARIES, None),
+            "generate_3d": ("provider", _GENERATORS, _IMAGE),
         }
     ),
     env=MappingProxyType({"DISABLE_TELEMETRY": "true"}),

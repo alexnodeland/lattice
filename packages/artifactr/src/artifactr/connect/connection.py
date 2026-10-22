@@ -77,8 +77,12 @@ its id."""
 class AppLock(Protocol):
     """What calls to one app take turns by: a lock for each app, by its server and address."""
 
-    def held(self, key: str) -> AbstractAsyncContextManager[None]:
-        """Hold the key's lock, waiting for whoever holds it."""
+    def held(self, key: str, *, wait: float) -> AbstractAsyncContextManager[None]:
+        """Hold the key's lock, waiting for whoever holds it for at most `wait` seconds.
+
+        Raises:
+            TimeoutError: If it wasn't taken within `wait`.
+        """
         ...
 
 
@@ -94,10 +98,15 @@ class ProcessLock:
         self._locks: dict[str, anyio.Lock] = {}
 
     @asynccontextmanager
-    async def held(self, key: str) -> AsyncGenerator[None]:
-        """Hold the key's lock."""
-        async with self._locks.setdefault(key, anyio.Lock()):
+    async def held(self, key: str, *, wait: float) -> AsyncGenerator[None]:
+        """Hold the key's lock, waiting at most `wait` seconds for it."""
+        lock = self._locks.setdefault(key, anyio.Lock())
+        with anyio.fail_after(wait):
+            await lock.acquire()
+        try:
             yield
+        finally:
+            lock.release()
 
 
 PROCESS: Final = ProcessLock()
@@ -250,7 +259,7 @@ class Connection:
             if self._failed_at is not None and time.monotonic() - self._failed_at < RETRY_AFTER:
                 raise ConnectionFailed(f"{self._server.title} didn't answer a moment ago")
             try:
-                async with self._lock.held(self._key):
+                async with self._turn():
                     listed = await self._spawn(lambda session: session.list_tools())
             except ConnectionFailed:
                 self._failed_at = time.monotonic()
@@ -273,8 +282,24 @@ class Connection:
                 raise ConnectionFailed(f"{name} isn't the tool that was vetted: it wasn't run")
             return await session.call_tool(name, arguments)
 
-        async with self._lock.held(self._key):
+        async with self._turn():
             return await self._spawn(checked)
+
+    @asynccontextmanager
+    async def _turn(self) -> AsyncGenerator[None]:
+        """Wait for the app's turn, for at most the call's deadline, and hold it."""
+        taken = False
+        try:
+            async with self._lock.held(self._key, wait=self._deadline):
+                taken = True
+                yield
+        except TimeoutError:
+            if taken:
+                raise
+            logger.warning("%s: another call held it past the deadline", self._server.title)
+            raise ConnectionFailed(
+                f"{self._server.title} was busy with another call past the deadline"
+            ) from None
 
     async def _spawn[T](self, work: Callable[[ClientSession], Awaitable[T]]) -> T:
         """Start the server, do the work, and end it, within the deadline.

@@ -1,6 +1,7 @@
 import { Ago, EmptyState, PageHeader, Row, RowLink, Rows } from "@portalr/ui";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { newestFirst } from "../../../../../../../order";
 import { kindWords } from "../../../../../../../thread-artifact";
 import { titlesOf } from "../../../../../../../titles";
 import { Uploader } from "../../../../../../../upload";
@@ -34,7 +35,7 @@ function Artifacts() {
   const listed = Object.values(snapshot.state.artifacts)
     .filter((artifact) => !artifact.archived)
     // The most recently made or changed first, as threads are by their activity.
-    .sort((a, b) => b.changedAt.localeCompare(a.changedAt) || a.id.localeCompare(b.id));
+    .sort(newestFirst);
   return (
     <>
       <PageHeader title="Artifacts" meta={`What the agent and people make in ${workspace}`} />
@@ -69,7 +70,7 @@ function Artifacts() {
                 </RowLink>
               }
               meta={
-                // Its kind, its version and when it was made: its id is on its page, to copy.
+                // Its kind, its version and when it was made: its id is on its page.
                 <span id={`${artifact.id}-meta`}>
                   {kindWords(artifact.kind)} · version {artifact.version} ·{" "}
                   <Ago at={artifact.changedAt} />

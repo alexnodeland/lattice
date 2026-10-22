@@ -126,3 +126,43 @@ test("the thumbs name themselves on hover and on focus, as every icon button doe
   await userEvent.keyboard("{Shift>}{Tab}{/Shift}");
   await settled("Helpful");
 });
+
+/**
+ * What a tooltip below the header does to the body, measured rather than assumed: with the entry
+ * at the top of the window, a tooltip can't go above its button, and goes below it, over the
+ * body's first line, for as long as it is shown. That is the owner's call (portalr ADR-0061): the
+ * header keeps no room for it. So a control in the body right under the header can be covered,
+ * for the moment the tooltip shows, and is in reach again once it closes.
+ */
+test("a tooltip below the header lies over the body for as long as it shows, and no longer", async () => {
+  await page.viewport(1280, 800);
+  onTestFinished(() => page.viewport(414, 896));
+  const screen = await render(
+    <Messages>
+      <InlineArtifact
+        name="atlas-brief.docx"
+        kind="Word document"
+        open={<a href="#page">page</a>}
+        actions={<IconButton label="Download" icon={Download} />}
+      >
+        <div className="flex justify-end">
+          <button type="button">Edit in GridCraft</button>
+        </div>
+      </InlineArtifact>
+    </Messages>,
+  );
+  window.scrollTo(0, 0);
+  const below = screen.getByRole("button", { name: "Edit in GridCraft" }).element();
+  const full = screen.getByRole("button", { name: "Full view" });
+  const button = full.element().getBoundingClientRect();
+  await userEvent.hover(full);
+  const tip = await settled("Full view");
+  // It went below its button, as there was no room above.
+  expect(tip.top).toBeGreaterThanOrEqual(button.bottom);
+  const covered = !reachable(below);
+  await userEvent.unhover(full);
+  await expect.poll(() => tooltip("Full view")).toBeNull();
+  expect(reachable(below)).toBe(true);
+  // What it covered while it showed, recorded so a change to the header's height is seen here.
+  expect(covered).toBe(true);
+});

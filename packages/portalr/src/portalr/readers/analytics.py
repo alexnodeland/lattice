@@ -31,13 +31,14 @@ from portalr.tenant import Tenant
 
 log = logging.getLogger("portalr.analytics")
 
-REGISTRY: Final[dict[str, frozenset[str]]] = {
-    name: frozenset(keys)
-    for name, keys in json.loads(
+REGISTRY: Final[dict[str, dict[str, frozenset[str] | None]]] = {
+    name: {key: None if values == "route" else frozenset(values) for key, values in props.items()}
+    for name, props in json.loads(
         resources.files("portalr.readers").joinpath("analytics_events.json").read_text()
     )["events"].items()
 }
-"""Each event portalr records, by its versioned name, with the ``props`` keys it may carry."""
+"""Each event portalr records, by its versioned name: each key it may carry, with the values it
+may take, or None for a route, which the relay holds to the app's router's own."""
 
 TENANT_SETTING: Final = "SQL_portalr_tenant"
 """The custom setting the row policy on ``analytics.events`` reads a query's tenant from."""
@@ -156,7 +157,11 @@ class Analytics:
             "trace_id": trace_id,
             "session_id": session_id,
             "actor_kind": actor,
-            "props": {k: v for k, v in (props or {}).items() if k in allowed},
+            "props": {
+                key: value
+                for key, value in (props or {}).items()
+                if key in allowed and ((values := allowed[key]) is None or value in values)
+            },
         }
 
     async def forget(self, user_id: str) -> bool:

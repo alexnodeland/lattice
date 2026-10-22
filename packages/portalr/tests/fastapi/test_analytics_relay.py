@@ -1,7 +1,7 @@
 """The relay: a signed-in person's events, with their yes, in their tenant, as the registry says."""
 
 import json
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from pathlib import Path
 
 import httpx
@@ -26,9 +26,12 @@ class ClickHouse:
     def __init__(self) -> None:
         self.requests: list[httpx.Request] = []
         self.status = 200
+        self.after_insert: Callable[[], Awaitable[object]] | None = None
 
-    def __call__(self, request: httpx.Request) -> httpx.Response:
+    async def __call__(self, request: httpx.Request) -> httpx.Response:
         self.requests.append(request)
+        if self.after_insert is not None and "INSERT" in request.url.params.get("query", ""):
+            await self.after_insert()
         return httpx.Response(self.status)
 
     def rows(self) -> list[dict[str, object]]:
@@ -192,17 +195,134 @@ async def test_past_the_persons_pace_a_batch_is_refused_with_when_to_try(
     assert refused.headers["retry-after"] == "10"
 
 
-async def test_saying_no_deletes_the_persons_events_at_once(
+def deletions(clickhouse: ClickHouse) -> int:
+    return sum("DELETE" in r.content.decode() for r in clickhouse.requests)
+
+
+async def test_taking_a_yes_back_deletes_the_persons_events_at_once_and_only_then(
+    client: httpx.AsyncClient, clickhouse: ClickHouse
+) -> None:
+    said = await client.put("/v1/analytics/consent", json={"given": False}, headers=ALICE)
+    assert said.json() == {"given": False, "deleted": None}, "never a yes: nothing to delete"
+    await say_yes(client)
+    said = await client.put("/v1/analytics/consent", json={"given": False}, headers=ALICE)
+    assert said.json() == {"given": False, "deleted": True}
+    (deletion,) = clickhouse.requests
+    assert deletion.url.params["param_person"] == distinct_id(KEY, "alice")
+    said = await client.put("/v1/analytics/consent", json={"given": False}, headers=ALICE)
+    assert said.json() == {"given": False, "deleted": None}, "a no again deletes nothing more"
+    assert deletions(clickhouse) == 1
+
+
+async def test_a_deletion_clickhouse_cant_take_stays_owed_until_it_can(
+    client: httpx.AsyncClient, clickhouse: ClickHouse, relay: Relay
+) -> None:
+    await say_yes(client)
+    clickhouse.status = 503
+    said = await client.put("/v1/analytics/consent", json={"given": False}, headers=ALICE)
+    assert said.json() == {"given": False, "deleted": False}
+    assert await relay.consent.owes("alice")
+    await client.get("/v1/analytics/consent", headers=ALICE)
+    assert await relay.consent.owes("alice"), "still down: still owed"
+    clickhouse.status = 200
+    await client.get("/v1/analytics/consent", headers=ALICE)
+    assert not await relay.consent.owes("alice"), "tried again on the next request"
+    assert deletions(clickhouse) == 3
+
+
+async def test_deletions_owed_are_done_as_a_replica_starts(
+    clickhouse: ClickHouse, relay: Relay
+) -> None:
+    for person in ("alice", "bob"):
+        await relay.consent.give(person, yes=True)
+    clickhouse.status = 503
+    for person in ("alice", "bob"):
+        await relay.answer(person, yes=False)
+    clickhouse.status = 200
+    assert await relay.settle_owed() == 2
+    assert await relay.consent.owing() == []
+
+
+async def test_a_no_that_lands_while_a_batch_is_written_deletes_the_batch_too(
+    client: httpx.AsyncClient, clickhouse: ClickHouse, relay: Relay
+) -> None:
+    await say_yes(client)
+    signed = await session(client)
+
+    # The person says no while their batch is in flight.
+    clickhouse.after_insert = lambda: relay.consent.give("alice", yes=False)
+    sent = await client.post(
+        "/v1/events", json={"session": signed, "events": [page()]}, headers=ALICE
+    )
+    assert sent.json() == {"recorded": 0, "dropped": 1}
+    assert [
+        ("INSERT" in r.url.params.get("query", ""), "DELETE" in r.content.decode())
+        for r in clickhouse.requests
+    ] == [(True, False), (False, True)]
+    assert not await relay.consent.owes("alice")
+
+
+async def test_a_session_that_isnt_ascii_is_refused_not_failed(client: httpx.AsyncClient) -> None:
+    await say_yes(client)
+    for signed in ("1-2.é", "é.é", "1-2.\u00ff" * 3):
+        sent = await client.post(
+            "/v1/events", json={"session": signed, "events": [page()]}, headers=ALICE
+        )
+        assert sent.status_code == 403, signed
+
+
+async def test_a_body_over_the_cap_is_refused_as_it_comes_or_as_it_is_declared(
+    client: httpx.AsyncClient,
+) -> None:
+    await say_yes(client)
+
+    async def chunks() -> AsyncIterator[bytes]:
+        for _ in range(64):
+            yield b" " * 1024
+
+    streamed = await client.post("/v1/events", content=chunks(), headers=ALICE)
+    assert streamed.status_code == 413
+    declared = await client.post(
+        "/v1/events", content=b"{}", headers={**ALICE, "content-length": str(MOST_BYTES + 1)}
+    )
+    assert declared.status_code == 413
+
+
+async def test_a_person_making_too_many_requests_is_slowed_before_anything_is_read(
+    grants: Grants, invite: Invite, ui: Path, relay: Relay
+) -> None:
+    slow = Relay(
+        relay.analytics, relay.consent, relay.limiter, InMemoryRateLimiter(per_second=1, burst=2)
+    )
+    app = app_for(grants, Readers(analytics=slow.analytics), invite, ui, relay=slow)
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://app/portalr"
+    ) as client:
+        codes = [
+            (await client.get("/v1/analytics/consent", headers=ALICE)).status_code for _ in range(3)
+        ]
+    assert codes == [200, 200, 429]
+
+
+async def test_only_the_registrys_values_are_kept_however_written(
     client: httpx.AsyncClient, clickhouse: ClickHouse
 ) -> None:
     await say_yes(client)
-    answered = await client.put("/v1/analytics/consent", json={"given": False}, headers=ALICE)
-    assert answered.json() == {"given": False, "deleted": True}
-    (deletion,) = clickhouse.requests
-    assert deletion.url.params["param_person"] == distinct_id(KEY, "alice")
-    clickhouse.status = 500
-    answered = await client.put("/v1/analytics/consent", json={"given": False}, headers=ALICE)
-    assert answered.json() == {"given": False, "deleted": False}
+    events = [
+        {"event": "app.integration.used.v1", "props": {"integration": "tracker"}},
+        {"event": "app.integration.used.v1", "props": {"integration": "someone\uff20example.com"}},
+        {"event": "app.artifact.opened.v1", "props": {"kind": "note"}},
+        {"event": "app.artifact.opened.v1", "props": {"kind": "my secret plan"}},
+    ]
+    await client.post(
+        "/v1/events", json={"session": await session(client), "events": events}, headers=ALICE
+    )
+    assert [row["props"] for row in clickhouse.rows()] == [
+        {"integration": "tracker"},
+        {},
+        {"kind": "note"},
+        {},
+    ]
 
 
 async def test_a_batch_clickhouse_doesnt_take_is_dropped_not_failed(

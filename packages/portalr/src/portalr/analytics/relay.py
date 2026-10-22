@@ -16,15 +16,15 @@ import hmac
 import json
 import secrets
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from importlib import resources
 from typing import Annotated, Final
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from portalr.analytics.consent import Consent
-from portalr.analytics.limiter import RateLimiter
-from portalr.readers.analytics import Analytics
+from portalr.analytics.limiter import InMemoryRateLimiter, RateLimiter
+from portalr.readers.analytics import REGISTRY, Analytics
 
 ROUTES: Final = frozenset(
     json.loads(resources.files("portalr.analytics").joinpath("routes.json").read_text())["routes"]
@@ -104,13 +104,18 @@ class Relay:
 
     Args:
         analytics: ClickHouse's analytics, with the deployment's key.
-        consent: People's answers, in the application's database.
-        limiter: How fast a person may send events.
+        consent: People's answers, and the deletions owed them, in the application's database.
+        limiter: How many events a person may send, and how fast.
+        requests: How many requests a person may make, events or answers, and how fast: asked
+            before anything else, so even a refused or a dropped request costs only a count.
     """
 
     analytics: Analytics
     consent: Consent
     limiter: RateLimiter
+    requests: RateLimiter = field(
+        default_factory=lambda: InMemoryRateLimiter(per_second=1, burst=20)
+    )
 
     def sign(self, user_id: str, *, now: float | None = None) -> str:
         """A new session id for the person, signed so no one else can send under it."""
@@ -120,7 +125,9 @@ class Relay:
     def session_of(self, user_id: str, signed: str, *, now: float | None = None) -> str | None:
         """The session id a signed one names, if it is the person's and still fresh; else None."""
         nonce, _, signature = signed.partition(".")
-        if not hmac.compare_digest(signature, self._signature(user_id, nonce)):
+        expected = self._signature(user_id, nonce)
+        # Bytes, so any text a browser sends is compared, never raised on.
+        if not hmac.compare_digest(signature.encode(), expected.encode()):
             return None
         started, _, _ = nonce.partition("-")
         age = (now if now is not None else time.time()) - int(started)
@@ -130,10 +137,61 @@ class Relay:
         message = f"session\0{user_id}\0{nonce}".encode()
         return hmac.new(self.analytics.key, message, hashlib.sha256).hexdigest()[:32]
 
+    async def answer(self, user_id: str, *, yes: bool) -> Answered:
+        """Record the person's answer; a yes taken back deletes their events, or owes it."""
+        owed = await self.consent.give(user_id, yes=yes)
+        if yes:
+            return Answered(given=True)
+        return Answered(given=False, deleted=await self.settle(user_id) if owed else None)
 
-def kept(event: Event, allowed: frozenset[str]) -> dict[str, str]:
-    """An event's props as recorded: the registry's keys, the app's routes, and no email."""
-    props = {k: v for k, v in event.props.items() if k in allowed and k != "route" and "@" not in v}
+    async def settle(self, user_id: str) -> bool:
+        """Delete the person's events, as owed: whether it was done. Undone, it stays owed."""
+        if not await self.analytics.forget(user_id):
+            return False
+        await self.consent.settled(user_id)
+        return True
+
+    async def settle_owed(self) -> int:
+        """Delete the events of everyone a deletion is owed, as a replica starts: how many."""
+        return sum([await self.settle(user_id) for user_id in await self.consent.owing()])
+
+    async def record(self, tenant: str, user_id: str, batch: Batch, session_id: str) -> Relayed:
+        """Keep the person's batch as the registry says, if they have said yes.
+
+        A no that lands while the batch is written deletes it too: the answer is read again
+        after the write, and if it is no longer yes, the person's events are deleted, or owed.
+        """
+        if not await self.consent.given(user_id):
+            await self.settle_if_owed(user_id)
+            return Relayed(recorded=0, dropped=len(batch.events))
+        named = [
+            (event.event, kept(event, REGISTRY[event.event]))
+            for event in batch.events
+            if event.event in REGISTRY
+        ]
+        written = bool(named) and await self.analytics.capture_many(
+            tenant, user_id, named, session_id=session_id
+        )
+        if written and not await self.consent.given(user_id):
+            await self.consent.give(user_id, yes=False)
+            await self.settle(user_id)
+            return Relayed(recorded=0, dropped=len(batch.events))
+        recorded = len(named) if written else 0
+        return Relayed(recorded=recorded, dropped=len(batch.events) - recorded)
+
+    async def settle_if_owed(self, user_id: str) -> None:
+        """Try again a deletion owed the person, on their next request."""
+        if await self.consent.owes(user_id):
+            await self.settle(user_id)
+
+
+def kept(event: Event, allowed: dict[str, frozenset[str] | None]) -> dict[str, str]:
+    """An event's props as recorded: the registry's keys and values, and the app's routes."""
+    props = {
+        key: value
+        for key, value in event.props.items()
+        if key != "route" and (values := allowed.get(key)) is not None and value in values
+    }
     if "route" in allowed and event.route is not None and event.route in ROUTES:
         props["route"] = event.route
     return props

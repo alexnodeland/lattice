@@ -47,7 +47,7 @@ env: ## Create .env from .env.example, with its secrets generated, if there is n
 	@test -f .env && echo ".env exists; compare it with .env.example" || ( \
 		command -v openssl >/dev/null || { echo "make env: the secrets need openssl" >&2; exit 1; }; \
 		umask 077 && cp .env.example .env.new && \
-		for name in $$(sed -n -e 's/^\(FILES_[A-Z]*_TOKEN\)=$$/\1/p' -e 's/^\([A-Z_]*\)=generate:hex$$/\1/p' .env.example); do \
+		for name in $$(sed -n -e 's/^\(FILES_[A-Z]*_TOKEN\)=$$/\1/p' -e 's/^\([A-Z0-9_]*\)=generate:hex$$/\1/p' .env.example); do \
 			secret=$$(openssl rand -hex 32) && \
 			sed -e "s/^$${name}=$$/$${name}=$$secret/" -e "s/^$${name}=generate:hex$$/$${name}=$$secret/" .env.new > .env.next && \
 			mv .env.next .env.new || exit 1; \

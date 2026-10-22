@@ -28,11 +28,12 @@ def test_each_person_has_their_own_bucket() -> None:
     assert limiter.spend("alice", 1) == 1.0
 
 
-def test_it_remembers_so_many_people_forgetting_the_fullest() -> None:
+def test_it_remembers_so_many_people_forgetting_the_one_seen_longest_ago() -> None:
     clock = Clock()
     limiter = InMemoryRateLimiter(per_second=1, burst=5, most_keys=2, clock=clock)
     assert limiter.spend("alice", 5) is None
-    assert limiter.spend("bob", 1) is None
-    assert limiter.spend("carol", 1) is None
-    # bob and carol were fullest; alice, spent, is still held to her empty bucket.
-    assert limiter.spend("alice", 1) == 1.0
+    assert limiter.spend("bob", 5) is None
+    assert limiter.spend("carol", 5) is None
+    # alice, seen longest ago, is forgotten: she starts again with a full bucket.
+    assert limiter.spend("alice", 5) is None
+    assert limiter.spend("carol", 1) == 1.0

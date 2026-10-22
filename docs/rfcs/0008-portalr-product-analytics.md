@@ -60,7 +60,7 @@ The `events` table, a `MergeTree`:
 
 ### P2. Capture: a same-origin relay and a server-side helper
 
-- **`POST /portalr/v1/events`** is same-origin and needs the signed-in user's token, so the CSP stays `'self'` and no third-party script loads. It caps a request's body, the events in it, and each `props` value's length, and is rate-limited per person.
+- **`POST /portalr/v1/events`** is on the portal's own origin, so the browser sends to no other and the CSP stays `'self'`; it needs the signed-in user's bearer token, not a cookie, so another site's page can't send under a person's name. It caps a request's body, the events in it, and each `props` value's length, and is rate-limited per person.
 - **The relay mints the session id,** or binds the browser's to the signed-in user with an HMAC, so a browser can't attach its events or replays to another person's session.
 - **A route is the router's template,** such as `/t/$tenant/w/$workspace/threads/$thread`, never the raw path or its query string, which can hold ids and search text.
 - **What the relay does to each event:**
@@ -248,15 +248,23 @@ Langfuse's own load wasn't run beside it here, so its memory with Langfuse on wa
     - Of each event it keeps only a registry name, the registry's keys and no value with an `@`. A route is kept only if it is one of the app's router's own (`routes.json`, which a test holds to `routeTree.gen.ts`), so a raw path or a query string never is.
     - Browser events have no workspace: the workspace isn't the session's to vouch for.
   - Only a signed-in person may use it: a service principal's key or an agent is refused (403).
-  - `GET` and `PUT /portalr/v1/analytics/consent` read and record the person's answer; a no deletes their events and says whether it did.
-- **Consent** is `portalr_analytics_consent` in the application's database, from portalr's first Alembic migration (`portalr_alembic_version`), behind a `Consent` port. Portalr's `sql` extra brings SQLAlchemy and Alembic. On PostgreSQL the application's role is granted reading and writing it.
-- **The rate limiter** is `InMemoryRateLimiter`: a token bucket per person, 60 events at once and one a second after, per replica, behind the `RateLimiter` port.
+  - `GET` and `PUT /portalr/v1/analytics/consent` read and record the person's answer.
+    - Only a yes taken back deletes the person's events; a no again, or a no never preceded by a yes, deletes nothing.
+    - A deletion ClickHouse can't take stays owed, in the consent row's `delete_pending`, and is tried again on the person's next request and as the application starts. The answer's `deleted` says whether it is done.
+    - A no that lands while a batch is being written deletes that batch too: the relay reads the answer again after each write.
+  - **Every relay request is counted first,** per person (20 at once, one a second after), before a database or ClickHouse is asked, so a refused or a dropped request costs a count, not a query. Events have their own, larger, pace.
+  - **The body is read no further than 16 KB**: a declared `Content-Length` over it, or a stream that grows past it, is refused (413).
+  - **A session id is compared as bytes,** so any text a browser sends is refused (403), never raised on.
+  - **Each prop value must be one the registry lists for its key** (an artifact's kind, an integration's key, an outcome). A route must be one of the router's own. Other values are dropped, whatever their spelling, so a lookalike `＠` doesn't get past a check for `@`.
+- **Consent** is `portalr_analytics_consent` in the application's database, with `delete_pending`, from portalr's first Alembic migration (`portalr_alembic_version`), behind a `Consent` port. Portalr's `sql` extra brings SQLAlchemy and Alembic. On PostgreSQL the application's role is granted reading and writing it, and row-level security keeps each transaction to the person it names (`portalr.user_id`). That holds for the role the application connects as with `DATABASE_ADMIN_URL`; without it, the application's role owns the table and row-level security doesn't hold it. A test on a real PostgreSQL shows one person can't read or write another's row. Replicas starting at once migrate in turn, under an advisory lock.
+- **The rate limiter** is `InMemoryRateLimiter`: a token bucket per person, 60 events at once and one a second after, per replica, behind the `RateLimiter` port. It remembers 100,000 people at most, forgetting the one seen longest ago in constant time.
 - **stackr's template** wires it all when the four settings are set:
   - `PORTAL_ANALYTICS_URL`;
   - `PORTAL_ANALYTICS_KEY`, which `make env` now generates (`generate:hex`);
   - the two users' passwords.
-  - The portal migrates the consent table on every start, and mounts the relay only with a database, since consent must persist.
-- **The writer may delete,** `GRANT ALTER DELETE ON analytics.events`, for a person's deletion. Langfuse's user now sees only `default`'s rows of `system.mutations`, since a deletion is a mutation that names the person's hash.
+  - A key that isn't 64 hex digits turns analytics off at start, and says why.
+  - The portal migrates the consent table on every start, under an advisory lock, mounts the relay only with a database, since consent must persist, and settles the deletions owed as it starts.
+- **The writer may delete,** `GRANT ALTER DELETE ON analytics.events`, for a person's deletion; the grant reaches every tenant's rows, though the writer still reads none. Langfuse's user now sees only `default`'s rows of `system.mutations`, since a deletion is a mutation that names the person's hash.
 
 **Lightweight deletes, measured on ClickHouse 26.9.20.23** (10 million events over 90 days, 20 tenants, 50,000 people, about 200 events a person):
 
@@ -335,7 +343,10 @@ Settled by the relay's slice: lightweight deletes on 26.9 (below).
 
 Still open:
 
-1. Whether grantr needs a removal hook, so a person removed from every tenant has their events deleted too; until then, it is their own no, or an operator's delete.
+1. **The OpenAPI document** lacks the relay's routes: they are mounted only when a relay is given, and `portalr.fastapi.openapi` builds the document without one. Their `413`, `422` and `429` answers and the batch's schema are declared on the routes, for when it does (the browser's slice).
+2. **Browser events carry no workspace**: the workspace isn't the session's to vouch for, and the relay doesn't ask artifactr which workspaces a person may open. A per-workspace adoption view needs that check first.
+3. **The writer's `ALTER DELETE` reaches every tenant's rows** (stackr ADR-0044): portalr deletes only by a person's hash, but the grant isn't narrower.
+4. Whether grantr needs a removal hook, so a person removed from every tenant has their events deleted too; until then, it is their own no, or an operator's delete.
 
 ## Tracking
 

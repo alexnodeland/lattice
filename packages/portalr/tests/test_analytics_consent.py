@@ -17,11 +17,23 @@ from portalr.analytics.sql import SqlConsent, migrate
 
 async def answers(consent: Consent) -> None:
     assert not await consent.given("alice")
-    await consent.give("alice", yes=True)
+    assert not await consent.give("alice", yes=False), "a no never said yes owes nothing"
+    assert not await consent.give("alice", yes=True)
     assert await consent.given("alice")
     assert not await consent.given("bob")
-    await consent.give("alice", yes=False)
+    assert await consent.give("alice", yes=False), "a yes taken back owes a deletion"
     assert not await consent.given("alice")
+    assert await consent.owes("alice")
+    assert await consent.give("alice", yes=False), "still owed until it is done"
+    assert await consent.owing() == ["alice"]
+    await consent.settled("alice")
+    assert not await consent.owes("alice")
+    assert not await consent.give("alice", yes=False), "a no again owes nothing more"
+    assert await consent.owing() == []
+    await consent.give("bob", yes=True)
+    await consent.give("bob", yes=False)
+    assert await consent.give("bob", yes=True) is False, "a yes again owes nothing"
+    assert not await consent.owes("bob")
 
 
 async def test_answers_in_memory() -> None:
@@ -71,6 +83,9 @@ async def test_on_postgresql_the_application_role_may_read_and_write_answers_alo
         async def run_sync(self, _: object) -> None:
             return None
 
+        async def execute(self, statement: object, parameters: object = None) -> None:
+            statements.append(str(statement))
+
         async def exec_driver_sql(self, statement: str) -> None:
             statements.append(statement)
 
@@ -80,7 +95,10 @@ async def test_on_postgresql_the_application_role_may_read_and_write_answers_alo
             yield Connection()
 
     await migrate(cast(AsyncEngine, Engine()), application_role="app")
-    assert statements == ['GRANT SELECT, INSERT, UPDATE ON portalr_analytics_consent TO "app"']
+    assert statements == [
+        "SELECT pg_advisory_xact_lock(:lock)",
+        'GRANT SELECT, INSERT, UPDATE ON portalr_analytics_consent TO "app"',
+    ]
 
 
 MIGRATION = "portalr.analytics.migrations.versions.0001_analytics_consent"

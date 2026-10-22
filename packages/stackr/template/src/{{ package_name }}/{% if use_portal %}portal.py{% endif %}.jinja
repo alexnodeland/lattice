@@ -19,6 +19,7 @@ stays here, for inviting people and naming them by email, and is never in what t
 
 import contextlib
 import logging
+import re
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from pathlib import Path
 from typing import Final
@@ -124,6 +125,11 @@ def analytics(settings: Settings, clients: list[httpx.AsyncClient]) -> Analytics
     writer_password, reader_password = portal.analytics_writer_password, portal.analytics_password
     if not (url and key and writer_password and reader_password):
         return None
+    if not re.fullmatch(r"[0-9a-fA-F]{64}", key):
+        LOGGER.error(
+            "analytics is off: PORTAL_ANALYTICS_KEY is 64 hex digits, as `make env` makes it"
+        )
+        return None
     writer = httpx.AsyncClient(auth=("portalr_analytics_writer", writer_password))
     reader = httpx.AsyncClient(auth=("portalr_analytics", reader_password))
     clients.extend((writer, reader))
@@ -205,6 +211,7 @@ class Portal:
         self._access = access
         self._settings = settings
         self._database = database
+        self._relay: Relay | None = None
         self._clients: list[httpx.AsyncClient] = []
 
     @property
@@ -245,7 +252,11 @@ class Portal:
 
     @contextlib.asynccontextmanager
     async def lifespan(self) -> AsyncGenerator[None]:
-        """Close the clients the portal made, when the application stops."""
+        """Settle the deletions owed as it starts; close the clients it made as it stops."""
+        if self._relay is not None:
+            settled = await self._relay.settle_owed()
+            if settled:
+                LOGGER.info("analytics: deleted the events of %d people owed it", settled)
         try:
             yield
         finally:
@@ -288,8 +299,9 @@ class Portal:
         relay = None
         if tools.analytics is not None and self._database is not None:
             # Each replica counts a person's pace apart (lattice RFC-0008).
-            consent = SqlConsent(self._database.engine)
+            consent = SqlConsent(self._database.engine, owner=self._database.owner)
             relay = Relay(tools.analytics, consent, InMemoryRateLimiter())
+            self._relay = relay
         router = portalr_router(
             resolve_actor=self._access.caller,
             grants=self.grants,

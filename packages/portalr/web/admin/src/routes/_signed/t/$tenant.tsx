@@ -24,7 +24,7 @@ import { remember } from "../../../last";
  */
 export const Route = createFileRoute("/_signed/t/$tenant")({
   head: ({ params, match }) => ({
-    meta: [{ title: match.context.title(`${params.tenant}`) }],
+    meta: [{ title: match.context.title(params.tenant) }],
   }),
   beforeLoad: async ({ context, params }) => {
     const { queries, queryClient, user } = context;

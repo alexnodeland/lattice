@@ -31,17 +31,27 @@ PACKAGES = {
 }
 """Each package that ships a wheel, by its directory, and the module it installs, in release order.
 stackr ships none."""
-EXPECTED: dict[str, str] = {
+EXPECTED: dict[str, tuple[str, str]] = {
     "artifactr": (
-        "needs lattice-core-ai>=0.2.0 (it imports lattice_core.integrations) and "
-        "pydantic-ai-slim>=2.53 (agent/runner.py imports repair_messages, new in 2.53)"
+        "lattice-core-ai 0.1.0, at its floor, has no lattice_core.integrations",
+        "No module named 'lattice_core.integrations'",
     ),
-    "grantr": "needs lattice-core-ai>=0.2.0: it imports lattice_core.integrations",
-    "relayr": "needs artifactr-ai>=0.3.0, lattice-core-ai>=0.2.0 and pydantic-ai-slim>=2.53",
-    "portalr": "needs lattice-core-ai>=0.2.0, and grantr[fastapi]>=0.2.0",
+    "grantr": (
+        "lattice-core-ai 0.1.0, at its floor, has no lattice_core.integrations",
+        "No module named 'lattice_core.integrations'",
+    ),
+    "relayr": (
+        "artifactr-ai 0.2.0 and pydantic-ai-slim 2.51, at their floors, fail to import "
+        "repair_messages, which pydantic-ai-slim has from 2.53",
+        "cannot import name 'repair_messages'",
+    ),
+    "portalr": (
+        "lattice-core-ai 0.1.0, at its floor, has no lattice_core.integrations",
+        "No module named 'lattice_core.integrations'",
+    ),
 }
-"""The packages whose floors are known to be too low (the v0.2 release audit), and why: each comes
-off as its floor is raised (lattice ADR-0029)."""
+"""The packages whose floors are known to be too low (the v0.2 release audit): why, and what the
+import says when it fails so. Each comes off as its floor is raised (lattice ADR-0029)."""
 CHECK = """
 import importlib, pkgutil, sys
 
@@ -54,44 +64,43 @@ print(f"{module}: every module imports ({len(names) + 1})")
 """
 
 
-def passes(directory: str, module: str) -> bool:
-    """Whether the package, at its lowest direct versions, installs and imports every module."""
+def checked(directory: str, module: str) -> str | None:
+    """Install the package at its lowest direct versions and import every module.
+
+    Returns:
+        None if every module imports; otherwise what the import printed to stderr.
+
+    Raises:
+        RuntimeError: If the environment couldn't be made or the package couldn't be installed,
+            as when PyPI can't be reached or nothing satisfies the ranges: never a floor's fault
+            that EXPECTED names.
+    """
     path = ROOT / "packages" / directory
-    extras = sorted(
-        tomllib.loads((path / "pyproject.toml").read_text())["project"].get(
-            "optional-dependencies", {}
-        )
-    )
+    project = tomllib.loads((path / "pyproject.toml").read_text())["project"]
+    extras = sorted(project.get("optional-dependencies", {}))
     requirement = f"{path}[{','.join(extras)}]" if extras else str(path)
+    python_version = f"{sys.version_info[0]}.{sys.version_info[1]}"
     with tempfile.TemporaryDirectory() as scratch:
         python = Path(scratch) / "bin" / "python"
-        steps = [
+        install = [
+            ["uv", "venv", "--quiet", "--python", python_version, scratch],
             [
-                "uv",
-                "venv",
-                "--quiet",
-                "--python",
-                f"{sys.version_info[0]}.{sys.version_info[1]}",
-                scratch,
+                *("uv", "pip", "install", "--quiet", "--no-sources"),
+                *("--resolution", "lowest-direct", "--python", str(python), requirement),
             ],
-            [
-                "uv",
-                "pip",
-                "install",
-                "--quiet",
-                "--no-sources",
-                "--resolution",
-                "lowest-direct",
-                "--python",
-                str(python),
-                requirement,
-            ],
-            [str(python), "-I", "-c", CHECK, module],
         ]
-        for step in steps:
+        for step in install:
             if subprocess.run(step, cwd=scratch, check=False).returncode != 0:
-                return False
-    return True
+                raise RuntimeError(f"{' '.join(step[:3])} failed")
+        done = subprocess.run(
+            [str(python), "-I", "-c", CHECK, module],
+            cwd=scratch,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        sys.stdout.write(done.stdout + done.stderr)
+        return None if done.returncode == 0 else done.stderr
 
 
 def say(line: str) -> None:
@@ -105,17 +114,29 @@ def main(names: list[str]) -> int:
     unexpected: list[str] = []
     for directory in names or list(PACKAGES):
         say(f"::group::{directory}")
-        passed = passes(directory, PACKAGES[directory])
-        say("::endgroup::")
-        if passed == (directory not in EXPECTED):
-            outcome = "passes" if passed else f"fails, as expected: {EXPECTED[directory]}"
-            say(f"ok: {directory} {outcome}")
-        elif passed:
-            unexpected.append(directory)
-            say(f"FAIL: {directory} passes now: take it off EXPECTED in scripts/lowest_direct.py")
+        try:
+            failed = checked(directory, PACKAGES[directory])
+        except RuntimeError as error:
+            failed, broke = None, str(error)
         else:
+            broke = None
+        say("::endgroup::")
+        known = EXPECTED.get(directory)
+        if broke is not None:
+            verdict = f"FAIL: {directory} couldn't be installed ({broke}), so nothing was checked"
+        elif failed is None and known is None:
+            verdict = f"ok: {directory} passes"
+        elif failed is None:
+            verdict = f"FAIL: {directory} passes now: take it off EXPECTED"
+        elif known is not None and known[1] in failed:
+            verdict = f"ok: {directory} fails, as expected: {known[0]}"
+        else:
+            verdict = f"FAIL: {directory} doesn't import at its lowest direct versions"
+            if known is not None:
+                verdict += f", and not as EXPECTED says ({known[1]!r})"
+        if verdict.startswith("FAIL"):
             unexpected.append(directory)
-            say(f"FAIL: {directory} doesn't install or import at its lowest direct versions")
+        say(verdict)
     return 1 if unexpected else 0
 
 

@@ -141,7 +141,24 @@ def world_of(
         )
     )
     ws = asyncio.run(workspaces.open("acme", "w1", actor=UserActor(id="alice")))
-    return World(TestClient(server), switch, app, ws)
+    # Every request on one event loop, the client's, as a server runs them: the in-memory stores'
+    # locks are asyncio's, which a request on a loop of its own, as a client not entered makes
+    # for each, would wait on and never be woken from another's.
+    client = OPEN.enter_context(TestClient(server))
+    return World(client, switch, app, ws)
+
+
+OPEN = contextlib.ExitStack()
+"""The clients the test's worlds entered, which it leaves when it ends."""
+
+
+@pytest.fixture(autouse=True)
+def _closed() -> Iterator[None]:
+    """Leave every client the test entered as it ends."""
+    try:
+        yield
+    finally:
+        OPEN.close()
 
 
 @pytest.fixture

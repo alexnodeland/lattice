@@ -78,7 +78,7 @@ export const Route = createFileRoute("/_signed/t/$tenant/feedback")({
   notFoundComponent: () => (
     <>
       {HEADER}
-      <EmptyState title="Feedback isn't yours to read here">
+      <EmptyState focus title="Feedback isn't yours to read here">
         portalr shows a tenant's feedback to those who may read its telemetry, such as its owners
         and admins.
       </EmptyState>

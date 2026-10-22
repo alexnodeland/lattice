@@ -51,6 +51,30 @@ export function kindsOf(name: string, kinds: Kinds): string[] {
     .map((kind) => kind.kind);
 }
 
+/** The most extensions a refusal names before it says how many more there are. */
+const NAMED = 6;
+
+/**
+ * What a refusal says a workspace takes, inline: its extensions as the server sent them, each once
+ * (the first spelling of those that differ only by case), at most `NAMED` of them and how many
+ * more, as ".docx, .pdf, or .fcproj". Null when it takes none.
+ */
+export function takenSaid(extensions: readonly string[]): string | null {
+  const seen = new Map<string, string>();
+  for (const extension of extensions) {
+    if (!seen.has(extension.toLowerCase())) {
+      seen.set(extension.toLowerCase(), extension);
+    }
+  }
+  const once = [...seen.values()];
+  if (once.length === 0) {
+    return null;
+  }
+  const named =
+    once.length > NAMED ? [...once.slice(0, NAMED - 1), `${once.length - NAMED + 1} more`] : once;
+  return new Intl.ListFormat("en", { type: "disjunction" }).format(named);
+}
+
 /**
  * Why an upload wasn't done, as the reader can act on it, and whether sending it again may do it:
  * never the app's own words, which a file can shape, nor the server's beyond its own.
@@ -215,6 +239,8 @@ export function Uploader({
     return null;
   }
   const on = offered.kinds.filter((kind) => kind.enabled);
+  const extensions = on.flatMap((kind) => kind.extensions);
+  const takes = takenSaid(extensions);
   const choose = (file: File) => {
     const name = plainName(file.name);
     const kinds = kindsOf(file.name, offered.kinds);
@@ -223,7 +249,9 @@ export function Uploader({
     const most = offered.kinds.find((k) => k.kind === kind)?.limit ?? offered.limit;
     const problem =
       kind === undefined
-        ? `${name} isn't a kind of file this workspace takes.`
+        ? takes === null
+          ? `${name} isn't a kind of file this workspace takes.`
+          : `${name} isn't a kind of file this workspace takes: it takes ${takes}.`
         : kinds.length > 1
           ? `${name} could be several kinds of file, so it can't be told which to make.`
           : !on.some((k) => k.kind === kind)
@@ -248,7 +276,6 @@ export function Uploader({
     }
     setItems((now) => [...now, item]);
   };
-  const extensions = on.flatMap((kind) => kind.extensions);
   // The kinds' extensions by the largest file each takes, the largest first: ".docx, .pdf up to
   // 26 MB each; .fcproj up to 2.1 MB each".
   const byLimit = new Map<number, string[]>();

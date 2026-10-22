@@ -75,7 +75,7 @@ export const Route = createFileRoute("/_signed/t/$tenant/runs")({
   notFoundComponent: () => (
     <>
       {HEADER}
-      <EmptyState title="Runs aren't yours to see here">
+      <EmptyState focus title="Runs aren't yours to see here">
         Runs are shown to a tenant's owners and admins.
       </EmptyState>
     </>

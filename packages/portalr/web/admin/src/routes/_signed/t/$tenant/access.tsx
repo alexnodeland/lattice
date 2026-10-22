@@ -20,7 +20,7 @@ export const Route = createFileRoute("/_signed/t/$tenant/access")({
   ),
   notFoundComponent: () => (
     <Parts>
-      <EmptyState title="There's no such part of Access here">
+      <EmptyState focus title="There's no such part of Access here">
         Each part shows where grantr allows you to read it. Choose another above.
       </EmptyState>
     </Parts>

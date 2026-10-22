@@ -27,6 +27,7 @@ function Failed({ error }: ErrorComponentProps) {
   return (
     <Plain ui="admin" home={<Link to="/" />} title="Something went wrong">
       <Alert tone="error">{failureSaid(error)}</Alert>
+      <TextLink render={<Link to="/" />}>Start again</TextLink>
     </Plain>
   );
 }

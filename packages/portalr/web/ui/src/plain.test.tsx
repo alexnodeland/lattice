@@ -25,3 +25,10 @@ test("admin's plain page links home as admin", async () => {
   const screen = await render(<Plain ui="admin" home={<a href="#home" />} title="No access" />);
   await expect.element(screen.getByRole("link", { name: "portalr admin" })).toBeVisible();
 });
+
+test("before there is a router, the lockup links home by its address", async () => {
+  const screen = await render(<Plain home="/app/" title="portalr can't start" />);
+  expect(screen.getByRole("link", { name: "portalr" }).element().getAttribute("href")).toBe(
+    "/app/",
+  );
+});

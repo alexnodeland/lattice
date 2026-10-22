@@ -102,6 +102,10 @@ afterEach(() => {
 test("Usage is on the rail where reading spend is allowed, and not found elsewhere", async () => {
   const { screen } = await open("/t/acme/usage", ["portalr:read_telemetry"]);
   await expect.element(screen.getByText("Usage isn't yours to read here")).toBeVisible();
+  // It stands in for the screen, so the focus starts on its heading.
+  await expect
+    .element(screen.getByRole("heading", { name: "Usage isn't yours to read here" }))
+    .toHaveFocus();
   const rail = screen.getByRole("navigation", { name: "Tenant" });
   await expect.element(rail.getByRole("link", { name: "Usage" })).not.toBeInTheDocument();
   expect(reads).toEqual([]);

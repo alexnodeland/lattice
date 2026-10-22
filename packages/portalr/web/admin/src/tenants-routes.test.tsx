@@ -305,6 +305,10 @@ test("the deployment's audit log not being readable is a way on", async () => {
   auditFails = true;
   const { screen } = await open("/deployment/audit");
   await expect
-    .element(screen.getByText("The deployment's audit log couldn't be read"))
-    .toBeVisible();
+    .element(screen.getByRole("heading", { name: "The deployment's audit log couldn't be read" }))
+    .toHaveFocus();
+  // Try again reads it again: once it can be, the log is there.
+  auditFails = false;
+  await screen.getByRole("button", { name: "Try again" }).click();
+  await expect.element(screen.getByText("No changes yet")).toBeVisible();
 });

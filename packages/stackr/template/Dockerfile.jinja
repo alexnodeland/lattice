@@ -66,7 +66,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # before anything of it is unpacked (scripts/craft).
 FROM python:{{ python_version }}-slim-trixie AS craft
 RUN apt-get update \
-    && apt-get install --yes --no-install-recommends ca-certificates curl unzip \
+    && apt-get install --yes --no-install-recommends ca-certificates curl unzip xz-utils \
     && rm -rf /var/lib/apt/lists/*
 ARG CRAFT
 ENV CRAFT=${CRAFT} CRAFT_CACHE=/cache

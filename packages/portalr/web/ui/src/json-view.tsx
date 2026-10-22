@@ -99,7 +99,7 @@ export function JsonView({ data, name = "JSON" }: { data: unknown; name?: string
       </div>
       <ScrollRegion
         aria-label={name}
-        className="max-h-[32rem] overflow-y-auto px-3 py-2 text-fg text-sm -outline-offset-(--focus-offset)"
+        className="max-h-(--code-block-max-height) overflow-y-auto px-3 py-2 text-fg text-sm -outline-offset-(--focus-offset)"
       >
         <Value value={data} depth={0} />
       </ScrollRegion>

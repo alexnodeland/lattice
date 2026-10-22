@@ -297,7 +297,11 @@
   --progress-height: var(--space-2);
   --progress-duration: var(--duration-fast);
 
-  /* A code block: its corners, and its code's padding. */
+  /*
+   * A code block: the most it is tall before it scrolls (a JSON view's, a diff's), its corners,
+   * and its code's padding.
+   */
+  --code-block-max-height: 32rem;
   --code-block-radius: var(--radius-3);
   --code-block-pad-x: var(--space-3);
   --code-block-pad-y: var(--space-2);

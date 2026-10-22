@@ -219,7 +219,7 @@ export function LineDiff({ changes, name }: { changes: readonly Change[] | null;
     <div className="flex flex-col gap-1">
       <ScrollRegion
         aria-label={`Changes to the ${name}`}
-        className="max-h-[32rem] overflow-y-auto rounded-(--code-block-radius) border border-line bg-paper"
+        className="max-h-(--code-block-max-height) overflow-y-auto rounded-(--code-block-radius) border border-line bg-paper"
       >
         <div
           dir="ltr"

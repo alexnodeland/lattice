@@ -344,17 +344,20 @@ def test_a_check_in_is_held_to_the_pace_and_the_places_an_upload_is() -> None:
 def test_one_tenants_people_never_hold_every_place() -> None:
     world = world_of(at_once=3, per_tenant=2, each=1)
     world.app.through.clear()
-    with ThreadPoolExecutor(max_workers=3) as pool:
-        going = []
-        for user in ("alice", "bob"):
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        try:
+            going = []
+            for user in ("alice", "bob"):
+                world.app.inspecting.clear()
+                going.append(pool.submit(world.upload, FakeApp.file(user), user=user))
+                assert world.app.inspecting.wait(timeout=10)
+            # In the pool, so that one let in by mistake fails the test rather than hangs it.
+            refused = pool.submit(world.upload, FakeApp.file("c"), user="carol").result(timeout=10)
             world.app.inspecting.clear()
-            going.append(pool.submit(world.upload, FakeApp.file(user), user=user))
-            assert world.app.inspecting.wait(timeout=10)
-        refused = world.upload(FakeApp.file("carol"), user="carol")
-        world.app.inspecting.clear()
-        other = pool.submit(world.upload, FakeApp.file("g"), tenant="globex")
-        assert world.app.inspecting.wait(timeout=10), "taken in while acme's places are held"
-        world.app.through.set()
+            other = pool.submit(world.upload, FakeApp.file("g"), tenant="globex")
+            assert world.app.inspecting.wait(timeout=10), "taken in while acme's places are held"
+        finally:
+            world.app.through.set()
         assert [g.result(timeout=10).status_code for g in going] == [201, 201]
         assert other.result(timeout=10).status_code == 201, "another tenant has a place"
     assert (refused.status_code, refused.json()["detail"]["type"]) == (429, "busy")

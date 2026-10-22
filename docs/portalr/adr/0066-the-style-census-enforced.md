@@ -1,6 +1,6 @@
 # ADR-0066: The style census, enforced
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-10-22
 **Deciders:** Alex Nodeland
 

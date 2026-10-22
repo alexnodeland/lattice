@@ -1,6 +1,6 @@
 # RFC-0004: relayr and task trackers
 
-**Status:** Draft, amended by [lattice ADR-0027](../adr/0027-integrations-switched-per-workspace-through-one-port.md)
+**Status:** Accepted, amended by [lattice ADR-0027](../adr/0027-integrations-switched-per-workspace-through-one-port.md)
 **Author:** Alex Nodeland
 **Created:** 2026-10-16
 **Discussion:** [#260](https://github.com/alexnodeland/lattice/pull/260)
@@ -262,7 +262,7 @@ Not in scope: two-way sync of artifacts, Plane's Commercial edition and its v2 w
 
 ## Tracking
 
-- [ ] Sign-off on T1 to T7
+- [ ] Sign-off on T1 to T7: not recorded on its own; each was built as the table recommends, in the ADRs below
 - [x] relayr: the port, core, fake and contract test; the ledger's new methods, its contract test, and the migration with row-level security ([relayr ADR-0033](../relayr/adr/0033-the-tracker-port-and-runs-that-write-to-it-once.md): the items table only, the followers' two with phase 2)
 - [x] relayr: the Plane and Vikunja adapters, with recorded fixtures (both recorded from the pinned releases: [relayr ADR-0035](../relayr/adr/0035-what-phase-1-settled-of-the-trackers-unknowns.md) and [ADR-0037](../relayr/adr/0037-what-a-live-plane-settled.md))
 - [x] relayr: `TrackerActions`, `TrackerCapability` and `Allowlist.trackers` ([relayr ADR-0034](../relayr/adr/0034-an-allowlist-for-the-tracker.md))
@@ -270,7 +270,7 @@ Not in scope: two-way sync of artifacts, Plane's Commercial edition and its v2 w
 - [x] The unverified items settled, in an ADR ([relayr ADR-0035](../relayr/adr/0035-what-phase-1-settled-of-the-trackers-unknowns.md) and, on a live Plane, [ADR-0037](../relayr/adr/0037-what-a-live-plane-settled.md); Vikunja's editor and its bot users remain)
 - [x] relayr: followers and their resume, `tracker:*` events and projections, nudges, the sweep and the budget ([relayr ADR-0036](../relayr/adr/0036-reading-a-tracker-back.md): snapshots in a table of their own, and resumed from the bindings)
 - [x] portalr: "filed as" and tracker links ([portalr ADR-0046](../portalr/adr/0046-tracker-links-on-runs.md), on a run's row; relayr's reads in [relayr ADR-0039](../relayr/adr/0039-the-tracker-connectors-reads-for-the-portal.md))
-- [ ] Docs: relayr's guide and ADRs, stackr's tracker guide
+- [x] Docs: relayr's guide and ADRs, stackr's tracker guide
 
 ## Evidence
 

@@ -4,6 +4,7 @@ nav:
 - Architecture: architecture.md
 - Guides:
   - Native files: guides/native-files.md
+  - Uploads and quotas, for operators: guides/uploads.md
 - Reference: reference.md
 - Decisions:
   - adr/README.md

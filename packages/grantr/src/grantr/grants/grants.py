@@ -86,7 +86,7 @@ from grantr.core.settings import wire
 from grantr.grants.storage import Reads, Storage, Transaction
 from grantr.telemetry import SLOW_CHECK, Reason, Telemetry
 from lattice_core.integrations import KNOWN, Integration
-from lattice_core.settings import KNOWN_SETTINGS, Setting, Tier, Value, floor, operator_layer
+from lattice_core.settings import KNOWN_SETTINGS, Setting, Value, floor, operator_layer
 
 logger = logging.getLogger(__name__)
 
@@ -944,9 +944,11 @@ class Grants:
         """A setting's value in a tenant's workspace: lattice-core's ``Settings`` port.
 
         It checks no one, as :meth:`is_enabled` doesn't. It reads the store each time, with no
-        cache. While the store can't be read, and for an id that names no tenant or workspace,
-        it answers the narrowest value the setting may have, so a failure never widens what a
-        workspace may do (lattice ADR-0030).
+        cache: the tenant's layer, then the workspace's, each in a read of its own. While the
+        store can't be read, and for a malformed tenant id or an empty workspace id, it answers
+        the narrowest value the setting may have, so a failure never widens what a workspace
+        may do (lattice ADR-0030). A well-formed id that names no tenant has nothing stored,
+        and answers the operator's value, or the default.
 
         Raises:
             KeyError: For a key no setting declares.
@@ -1015,19 +1017,21 @@ class Grants:
                 workspace; or the level may not set it at all: the operator's alone.
             Stale: If ``version`` isn't the setting's current one there.
         """
-        setting = self._settings_known.get(key)
-        if setting is None:
-            raise Invalid("there is no such setting")
-        tier: Tier = "tenant" if workspace is None else "workspace"
         level = _level(workspace)
-        if not setting.settable_by(tier):
-            raise Forbidden(f"{key} is set by the {setting.lowest} alone")
-        try:
-            canonical = None if value is None else setting.value(value)
-        except ValueError as error:
-            raise Invalid(f"{key} is {error}") from None
         async with self._change(tenant) as (tx, record):
+            # Who may comes first, as for an integration: a caller who may not learns nothing
+            # of which keys exist or what values they take.
             await self._require(tx, tenant, by, MANAGE_SETTINGS, level)
+            _named(key, workspace)
+            setting = self._settings_known.get(key)
+            if setting is None:
+                raise Invalid("there is no such setting")
+            if not setting.settable_by("tenant" if workspace is None else "workspace"):
+                raise Forbidden(f"{key} is set by the {setting.lowest} alone")
+            try:
+                canonical = None if value is None else setting.value(value)
+            except ValueError as error:
+                raise Invalid(f"{key} is {error}") from None
             on_tenant, in_workspace = await self._stored(tx, tenant, workspace)
             rows = on_tenant if workspace is None else in_workspace
             stored = rows.get(key)
@@ -1274,6 +1278,16 @@ def _level(workspace: WorkspaceId | None) -> Resource:
     if workspace == "":
         raise Invalid("a workspace's id isn't empty")
     return TENANT if workspace is None else Resource(kind="workspace", workspace=workspace)
+
+
+LONGEST_NAME: Final = 256
+"""The longest workspace id or setting key a setting is stored under."""
+
+
+def _named(key: str, workspace: WorkspaceId | None) -> None:
+    """Refuse a key or a workspace's id too long to store a setting under."""
+    if len(key) > LONGEST_NAME or (workspace is not None and len(workspace) > LONGEST_NAME):
+        raise Invalid(f"a setting's key and its workspace's id are at most {LONGEST_NAME} long")
 
 
 def _said(value: int | list[str]) -> str:

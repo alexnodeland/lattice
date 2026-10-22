@@ -4,8 +4,9 @@ A setting's default is the registry's, which the operator's value, in the deploy
 configuration, replaces. A tenant's admins, and then a workspace's, may each only narrow the
 layer above: a number lowered, a subset shrunk. A stored value that would widen its layer, after
 the operator lowered the ceiling under it, is kept but clamped: the narrower wins, and the value
-is shown as clamped. A stored key no registry declares any more is never applied, and is listed
-as unknown.
+is shown as clamped. A value a changed registry no longer takes is kept narrowed to it, never
+widened, and a stored key no registry declares any more is never applied, and is listed as
+unknown.
 """
 
 from datetime import datetime
@@ -113,17 +114,15 @@ class SettingsView(BaseModel):
 
 
 def stored(setting: Setting, row: SettingRow | None) -> Value | None:
-    """A row's value, if it has one of the setting's kind, as the registry reads it now.
+    """A row's value as the registry keeps it now, or ``None`` if it is unset.
 
-    A value a changed registry no longer takes, such as a name it dropped, is ignored rather
-    than applied.
+    A value an earlier registry took is never widened by a change of the registry: a number is
+    clamped into today's bounds, names it no longer knows are dropped, and a value of another
+    type is the setting's floor.
     """
     if row is None or row.value is None:
         return None
-    try:
-        return setting.value(row.value)
-    except ValueError:
-        return None
+    return setting.kept(row.value)
 
 
 def kind(setting: Setting) -> SettingKind:

@@ -35,7 +35,11 @@ Integrations are booleans, switched per tenant and workspace through one port ([
   - **At write:** a value wider than the layer above is refused (422). The refusal says how wide the value may be and which layer says so: "may be at most 20 here: the tenant's value".
   - **At read:** a stored value is narrowed again by the layers above as they are now. When the operator later lowers the ceiling, the narrower value wins at once; the stored row stays, and an admin's read shows it as `clamped`.
   - **By design:** an operator-only setting can't be written through the REST API at all.
-- **A setting removed from the registry, or a stored value it no longer takes, is never applied.** Its row stays and is listed by an admin's read as `unknown`.
+- **A change of the registry never widens a stored value.**
+  - A key removed from the registry is never applied. Its row stays and is listed by an admin's read as `unknown`.
+  - A number stored under bounds that have since tightened is clamped into the new bounds; it is not dropped, so the value can't rise.
+  - Names stored in a subset whose universe has since shrunk keep only the names still known.
+  - A value of another type is not read, and stands as the setting's floor (`Setting.kept`).
 - **Packages ask a `Settings` port,** `value(tenant_id, workspace_id, key)`, each time they act, with no cache. An implementation that can't read its store answers the setting's floor (its lowest number, or no names), so a failure never widens anything. `SettingsDefaults` answers without a store: the operator's value, or the default.
 - **grantr stores the tenant and workspace layers** ([grantr ADR-0035](../grantr/adr/0035-settings-narrowed-per-tenant-and-workspace-in-grantrs-table-versioned-audited.md)), and artifactr reads the hourly limit through the port ([artifactr ADR-0087](../artifactr/adr/0087-a-connected-apps-hourly-limit-read-from-settings.md)).
 

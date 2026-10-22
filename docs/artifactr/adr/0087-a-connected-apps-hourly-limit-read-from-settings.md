@@ -11,7 +11,7 @@ ADR-0085 limits each workspace's tries at a connected app's code and network cal
 
 ## Decision
 
-- **`per_hour_setting(settings, app)`** is a `PerHour` that reads `connect-per-hour:<app>` from a `Settings` port, such as grantr's `Grants`, on every call, with no cache. An application passes it as `Connection(per_hour=per_hour_setting(grants, "freecad"))`. The operator's value lives in grantr's `operator_settings`, and admins narrow it from there.
+- **`per_hour_setting(settings, app)`** is a `PerHour` that reads `connect-per-hour:<app>` from a `Settings` port, such as grantr's `Grants`, on every call, with no cache. Wiring it is the application's job; nothing passes it by default. In one line: `Connection(FREECAD, command=..., per_hour=per_hour_setting(grants, "freecad"))`. The operator's value lives in grantr's `operator_settings`, and admins narrow it from there.
 - **It fails closed.** Any failure to read the limit counts as a limit of 0, so the call is refused rather than run uncounted. That covers:
   - a store that raises;
   - a key the store doesn't declare;

@@ -171,6 +171,23 @@ class Setting:
             return self.kind.within(_int(value), _int(ceiling))
         return self.kind.within(_names(value), _names(ceiling))
 
+    def kept(self, stored: object) -> Value:
+        """A value stored under an earlier registry, as this one keeps it: never wider.
+
+        A number is clamped into the bounds, and names this registry doesn't know are dropped;
+        a value of another type isn't read at all, and is the setting's floor.
+        """
+        if isinstance(self.kind, IntRange):
+            if isinstance(stored, bool) or not isinstance(stored, int):
+                return floor(self)
+            return max(self.kind.low, min(self.kind.high, stored))
+        if not isinstance(stored, list | tuple):
+            return floor(self)
+        names: list[object] = list(cast("list[object] | tuple[object, ...]", stored))
+        if not all(isinstance(name, str) for name in names):
+            return floor(self)
+        return tuple(sorted({str(name) for name in names} & self.kind.universe))
+
     def settable_by(self, tier: Tier) -> bool:
         """Whether a tier may set it: it, or one above it, is the lowest that may."""
         return TIERS.index(tier) <= TIERS.index(self.lowest)

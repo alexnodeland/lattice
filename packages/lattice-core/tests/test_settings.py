@@ -127,3 +127,26 @@ def test_a_value_of_the_wrong_kind_is_never_narrowed() -> None:
         LIMIT.narrow(30, ("read",))
     with pytest.raises(TypeError, match="holds names"):
         TOOLS.within(3, ("read",))
+
+
+@pytest.mark.parametrize(
+    ("stored", "kept"),
+    [(800, 800), (5000, 1000), (-3, 0), (True, 0), ("30", 0), (None, 0), ([30], 0)],
+)
+def test_a_stored_number_is_kept_within_todays_bounds(stored: object, kept: int) -> None:
+    assert LIMIT.kept(stored) == kept
+
+
+@pytest.mark.parametrize(
+    ("stored", "kept"),
+    [
+        (["read", "run"], ("read", "run")),
+        (["read", "gone"], ("read",)),
+        (["gone"], ()),
+        ([1], ()),
+        ("read", ()),
+        (None, ()),
+    ],
+)
+def test_stored_names_are_kept_to_those_known_today(stored: object, kept: tuple[str, ...]) -> None:
+    assert TOOLS.kept(stored) == kept

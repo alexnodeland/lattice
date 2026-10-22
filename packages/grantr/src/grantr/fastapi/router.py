@@ -256,10 +256,11 @@ Kept = Annotated[AuditFilter, Depends(audit_filter)]
 
 
 TenantHeader = Annotated[TenantId | None, Header(alias="X-Tenant")]
+"""The tenant a request to ``/me`` or ``/checks`` names."""
 
 IfMatch = Annotated[str | None, Header(alias="If-Match")]
-"""The version of a setting the caller read, as an entity tag: `"3"`."""
-"""The tenant a request to ``/me`` or ``/checks`` names."""
+"""The version of a setting the caller read, as an entity tag: `"3"`. Omitted, the last write
+wins; `*` names no version, and is refused."""
 
 
 def grantr_router(grants: Grants, *, resolve_actor: ResolveActor) -> APIRouter:

@@ -442,7 +442,7 @@ async def test_admins_narrow_settings_by_version_and_are_told_why_not(
     for body in ({"value": True}, {"value": "5"}, {"value": 5.5}, {"value": {"x": 1}}, {}):
         bad = await client.put(f"{notes}/settings/{key}", json=body, headers=AS_BOB)
         assert bad.status_code == 422, body
-    for tag in ("abc", '"-1"', '"1e9"', '"9999999999"'):
+    for tag in ("abc", "*", '"-1"', '"1e9"', '"9999999999"'):
         bad = await client.put(
             f"{notes}/settings/{key}", json={"value": 4}, headers=AS_BOB | {"If-Match": tag}
         )
@@ -455,6 +455,10 @@ async def test_admins_narrow_settings_by_version_and_are_told_why_not(
         f"/tenants/acme/workspaces/other/settings/{key}", json={"value": 1}, headers=AS_BOB
     )
     assert sibling.status_code == 403
+    long = await client.put(
+        f"/tenants/acme/workspaces/{'w' * 300}/settings/{key}", json={"value": 1}, headers=AS_ALICE
+    )
+    assert (long.status_code, long.json()["detail"]["type"]) == (422, "invalid")
     for path in ("..", "team/../other", "%2E%2E", "team%2Fnotes%2F..%2Fother"):
         escaped = await client.get(f"/tenants/acme/workspaces/{path}/settings", headers=AS_BOB)
         assert escaped.status_code in (403, 404), path

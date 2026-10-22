@@ -4,6 +4,8 @@ Each test that takes ``grants`` runs against memory, SQLite, and PostgreSQL as i
 role its row-level security holds.
 """
 
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from typing import Any
 
 import pytest
@@ -206,9 +208,7 @@ async def test_one_tenants_settings_are_its_own(storage: Storage) -> None:
     assert await grants.value("acme", "w1", KEY) == 30, "a deleted tenant's settings go with it"
 
 
-async def test_a_stored_value_a_changed_registry_no_longer_takes_is_ignored(
-    storage: Storage,
-) -> None:
+async def test_a_changed_registry_never_widens_a_stored_value(storage: Storage) -> None:
     tools = Setting(
         "connect-tools:fake",
         Subset(frozenset({"read", "edit", "run"})),
@@ -216,17 +216,79 @@ async def test_a_stored_value_a_changed_registry_no_longer_takes_is_ignored(
         lowest="workspace",
         description="The fake's tools.",
     )
-    before = await _grants(storage, settings=registry(tools))
+    limit = Setting("limit", IntRange(0, 1000), 900, "workspace", "A limit.")
+    before = await _grants(storage, settings=registry(tools, limit))
     state = await before.set_setting("acme", tools.key, ["read", "run"], by=ALICE)
     assert (state.kind.type, state.kind.universe, state.effective) == (
         "subset",
         ["edit", "read", "run"],
         ["read", "run"],
     )
-    narrower = Setting(
+    await before.set_setting("acme", "limit", 800, by=ALICE)
+    # The registry drops `run`, and tightens the limit's bounds below what is stored.
+    fewer = Setting(
         tools.key, Subset(frozenset({"read", "edit"})), ("edit", "read"), "workspace", "Fewer."
     )
-    after = Grants(storage, catalogs=[ARTIFACTR], settings=registry(narrower))
+    tighter = Setting("limit", IntRange(0, 500), 500, "workspace", "Tighter.")
+    after = Grants(storage, catalogs=[ARTIFACTR], settings=registry(fewer, tighter))
+    assert await after.value("acme", "w1", tools.key) == ("read",), "not the whole default"
+    assert await after.value("acme", "w1", "limit") == 500, "clamped, not risen"
     view = await after.settings("acme", by=ALICE)
-    assert (view.settings[0].tenant, view.settings[0].effective) == (None, ["edit", "read"])
-    assert await after.value("acme", "w1", tools.key) == ("edit", "read")
+    assert [s.tenant.value if s.tenant else None for s in view.settings] == [["read"], 500]
+
+
+async def test_a_stored_value_of_another_type_is_the_floor(storage: Storage) -> None:
+    grants = await _grants(storage)
+    await grants.set_setting("acme", KEY, 20, by=ALICE)
+    row = (await storage.settings("acme"))[KEY]
+    async with storage.transaction("acme") as tx:
+        await tx.set_setting("acme", None, KEY, row.model_copy(update={"value": ["x"]}))
+    assert await grants.value("acme", "w1", KEY) == 0
+
+
+async def test_who_may_comes_before_what_is_asked(storage: Storage) -> None:
+    grants = await _grants(storage)
+    for key, value in (("nope", 1), (KEY, "not a number"), (KEY, 5000)):
+        with pytest.raises(Forbidden):
+            await grants.set_setting("acme", key, value, workspace="w1", by=CAROL)
+
+
+async def test_a_name_too_long_to_store_is_refused(storage: Storage) -> None:
+    grants = await _grants(storage)
+    with pytest.raises(Invalid, match="at most 256 long"):
+        await grants.set_setting("acme", KEY, 1, workspace="w" * 257, by=ALICE)
+    with pytest.raises(Invalid, match="at most 256 long"):
+        await grants.set_setting("acme", "k" * 257, 1, by=ALICE)
+
+
+async def test_a_tenant_no_one_made_has_the_operators_value(storage: Storage) -> None:
+    grants = await _grants(storage, operator_settings={KEY: 40})
+    assert await grants.value("nobody", "w1", KEY) == 40
+    assert await grants.value("bad~id", "w1", KEY) == 0, "a malformed id: the floor"
+
+
+async def test_a_change_that_cant_be_stored_records_nothing() -> None:
+    class RefusingTransaction:
+        """A transaction that takes everything but a setting's row."""
+
+        def __init__(self, transaction: Any) -> None:
+            self._transaction = transaction
+
+        def __getattr__(self, name: str) -> Any:
+            return getattr(self._transaction, name)
+
+        async def set_setting(self, *_: Any) -> None:
+            raise OSError("the disk is full")
+
+    class Refusing(InMemoryStorage):
+        @asynccontextmanager
+        async def transaction(self, tenant: Any) -> AsyncGenerator[Any]:
+            async with super().transaction(tenant) as transaction:
+                yield RefusingTransaction(transaction)
+
+    storage = Refusing()
+    grants = await _grants(storage)
+    with pytest.raises(OSError, match="the disk is full"):
+        await grants.set_setting("acme", KEY, 5, by=ALICE)
+    assert await grants.audit("acme", by=ALICE, keep=SET_ONLY) == [], "the entry went with it"
+    assert await grants.value("acme", "w1", KEY) == 30

@@ -14,9 +14,11 @@ export function Rows({ label, children }: { label: string; children: ReactNode }
 
 /**
  * One row (portalr ADR-0060): what it is, its `name`, first, then what is said about it, quieter,
- * beneath, each wrapping rather than cut, so nothing in a row is hidden, and at its end what it is doing or what can be done to it, against the row's end, in a column no wider than half the row. Where the row is
- * narrow, its end goes under its meta, so a long end never squeezes its name. Its `RowLink`, if its
- * name is one, is the whole row's target; what is at its end stays its own target, above it.
+ * beneath, each wrapping rather than cut, so nothing in a row is hidden; and at its end what it is
+ * doing or what can be done to it, against the row's end, in a column no wider than half the row.
+ * Where the row is narrow, its end goes under its meta, so a long end never squeezes its name. Its
+ * `RowLink`, if its name is one, is the whole row's target; what is at its end stays its own
+ * target, above it.
  */
 export function Row({
   name,

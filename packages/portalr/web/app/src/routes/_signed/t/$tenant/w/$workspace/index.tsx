@@ -1,6 +1,6 @@
 import { useMe } from "@portalr/client";
 import {
-  ago,
+  Ago,
   Button,
   EmptyState,
   PageHeader,
@@ -23,7 +23,6 @@ function Threads() {
   const { tenant, workspace } = Route.useParams();
   const { queries, user } = Route.useRouteContext();
   const me = useMe(queries, user, tenant);
-  const now = new Date();
   const stream = useStream();
   const snapshot = useWorkspace();
   const navigate = useNavigate();
@@ -82,24 +81,23 @@ function Threads() {
             const last = thread.messages.at(-1);
             // Who spoke last and what they said, and when: what tells two threads of one title apart.
             const said = last && `${author(last.actor, me)}: ${plainTitle(last.content) ?? "…"}`;
-            const when = thread.activeAt && (
-              <time dateTime={thread.activeAt}>{ago(new Date(thread.activeAt), now)}</time>
-            );
+            const when = thread.activeAt && <Ago at={thread.activeAt} />;
             return (
               <Row
                 key={thread.id}
                 meta={
                   (said || when) && (
-                    <span id={`${thread.id}-meta`} className="line-clamp-2">
-                      {said}
+                    <>
+                      {said && <span id={`${thread.id}-said`}>{said}</span>}
                       {said && when && " · "}
                       {when}
-                    </span>
+                    </>
                   )
                 }
                 name={
                   <RowLink
-                    aria-describedby={`${thread.id}-meta`}
+                    // Described by what was said last, not by a time that moves.
+                    {...(said && { "aria-describedby": `${thread.id}-said` })}
                     render={
                       <Link
                         to="/t/$tenant/w/$workspace/threads/$thread"

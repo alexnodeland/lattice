@@ -197,7 +197,13 @@ function withArtifact(
     ...state,
     artifacts: {
       ...state.artifacts,
-      [artifact.id]: { ...artifact, ...where, feedback, changedAt: made.at },
+      // Archiving changes nothing of what it holds: when it last changed stays as it was.
+      [artifact.id]: {
+        ...artifact,
+        ...where,
+        feedback,
+        changedAt: artifact.archived && before ? before.changedAt : made.at,
+      },
     },
   };
 }

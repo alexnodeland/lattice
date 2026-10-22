@@ -1,4 +1,4 @@
-import { ago, EmptyState, PageHeader, Row, RowLink, Rows } from "@portalr/ui";
+import { Ago, EmptyState, PageHeader, Row, RowLink, Rows } from "@portalr/ui";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { kindWords } from "../../../../../../../thread-artifact";
@@ -31,10 +31,10 @@ function Artifacts() {
   // Titles are read from the artifacts' data, which the log doesn't carry; the loader has them.
   const { data: read } = useQuery(queries.artifactr.artifacts(tenant, workspace));
   const titles = titlesOf(read);
-  const now = new Date();
   const listed = Object.values(snapshot.state.artifacts)
     .filter((artifact) => !artifact.archived)
-    .sort((a, b) => a.id.localeCompare(b.id));
+    // The most recently made or changed first, as threads are by their activity.
+    .sort((a, b) => b.changedAt.localeCompare(a.changedAt) || a.id.localeCompare(b.id));
   return (
     <>
       <PageHeader title="Artifacts" meta={`What the agent and people make in ${workspace}`} />
@@ -72,9 +72,7 @@ function Artifacts() {
                 // Its kind, its version and when it was made: its id is on its page, to copy.
                 <span id={`${artifact.id}-meta`}>
                   {kindWords(artifact.kind)} · version {artifact.version} ·{" "}
-                  <time dateTime={artifact.changedAt}>
-                    {ago(new Date(artifact.changedAt), now)}
-                  </time>
+                  <Ago at={artifact.changedAt} />
                 </span>
               }
             />

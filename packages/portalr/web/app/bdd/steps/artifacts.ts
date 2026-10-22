@@ -34,17 +34,15 @@ const artifactPage = (page: Page) =>
 
 When("they open the note", async ({ page, scenario }) => {
   const note = kept(scenario.note);
-  // The list names a note by its title, and gives its id beside it.
-  const row = page
+  // The list names a note by its title, and links to its page by its id; it doesn't show the id.
+  const link = page
     .getByRole("list", { name: "Artifacts" })
-    .getByRole("listitem")
-    .filter({ hasText: note });
-  const link = row.getByRole("link");
+    .locator(`a[href$="/artifacts/${note}"]`);
   const title = (await link.innerText()).trim();
   expect(title).not.toBe(note);
   await link.click();
   await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible();
-  // The id stays in view, beside the kind and the version.
+  // Its page shows the id, beside the kind and the version.
   await expect(artifactPage(page).getByText(note)).toBeVisible();
 });
 

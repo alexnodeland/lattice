@@ -22,8 +22,11 @@ services:
     networks: !override
       stackr:
         aliases: [app.stackr.internal]
+{%- if use_files %}
+      files: {}
+{%- endif %}
 {%- else %}
-    networks: !override [stackr]
+    networks: !override [stackr{% if use_files %}, files{% endif %}]
 {%- endif %}
     # GoTrue on the stack's network: its key set, and{% if access == 'grantr' %} its admin API, which the edge refuses{% else %} nothing else{% endif %}.
     environment:
@@ -51,4 +54,20 @@ services:
       PORTAL_AUTH_URL: ""
       # The kit .env names, in the image's copy of brand/ (brand/kit there is /brand/kit here).
       PORTAL_BRAND_DIR: ${PORTAL_BRAND_DIR:+/${PORTAL_BRAND_DIR}}
+{%- if use_files %}
+      # Each running app's editor at the edge, on a name of its own, <app>.<domain>, which
+      # STACKR_EDITOR_HOSTS in stackr's .env lists (stackr ADR-0046).
+      FILES_EDITOR_DOMAIN: ${STACKR_DOMAIN}
+{%- endif %}
+{%- endif %}
+{%- if use_files and use_portal %}
+{%- for name, craft in crafts.items() if craft.editor %}
+
+  # {{ name }}'s editor, which stackr's edge reaches on the stackr network: no port of its own.
+  files-{{ name }}-editor:
+    ports: !reset []
+    networks: !override [stackr]
+    environment:
+      PORTAL_URL: https://app.${STACKR_DOMAIN}
+{%- endfor %}
 {%- endif %}

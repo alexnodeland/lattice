@@ -46,9 +46,10 @@ Each record captures one decision: the context that forced it, the options consi
 | [0040](0040-forms-and-dashboards-in-the-template.md) | Forms and dashboards in the template | Accepted, amended by [0041](0041-integrations-switched-per-workspace-in-the-template.md) |
 | [0041](0041-integrations-switched-per-workspace-in-the-template.md) | Integrations switched per workspace in the template | Accepted |
 | [0042](0042-a-generated-application-as-a-local-product.md) | A generated application as a local product: one origin, a first run, and the tailnet | Accepted |
-| [0043](0043-native-files-in-the-template.md) | Native files in the template: a worker for each app, with no route out, and its editor on a loopback origin | Accepted |
+| [0043](0043-native-files-in-the-template.md) | Native files in the template: a worker for each app, with no route out, and its editor on a loopback origin | Accepted, amended by [0046](0046-native-files-a-relay-a-slimmer-worker-blender-and-the-editors-at-the-edge.md) |
 | [0044](0044-clickhouse-a-profile-of-its-own-and-portalrs-analytics-users.md) | ClickHouse, a profile of its own, and portalr's analytics users | Proposed |
 | [0045](0045-local-supabase-only-where-docker-keeps-it-on-the-loopback.md) | Local Supabase only where Docker keeps it on the loopback | Accepted |
+| [0046](0046-native-files-a-relay-a-slimmer-worker-blender-and-the-editors-at-the-edge.md) | Native files: a relay, a slimmer worker, Blender, and the editors at the edge | Accepted |
 | [0047](0047-an-upstream-gateway-for-the-model-groups.md) | An upstream gateway for the model groups | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

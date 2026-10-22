@@ -228,6 +228,12 @@ def check_crafts() -> list[str]:
     pinned = sorted(path.stem for path in (ours / "crafts").glob("*.sha256"))
     if pinned != sorted(crafts):
         problems.append(f"the template pins {pinned}, and copier.yml's crafts are {sorted(crafts)}")
+    # The single host's edge serves the editors of exactly the apps that have one.
+    caddyfile = (ROOT / "deploy" / "host" / "Caddyfile").read_text()
+    served = re.search(r"\^\(([a-z|]+)\)\\\.", caddyfile)
+    editors = sorted(name for name, craft in crafts.items() if craft.get("editor"))
+    if served is None or sorted(served[1].split("|")) != editors:
+        problems.append(f"deploy/host/Caddyfile's editors aren't copier.yml's: {editors}")
     for name, craft in crafts.items():
         pin = Path("crafts", f"{name}.sha256")
         if (ours / pin).read_bytes() != (theirs / pin).read_bytes():

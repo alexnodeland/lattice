@@ -546,12 +546,15 @@ smoke_analytics() {
   expect_code "$(stack_compose exec -T clickhouse clickhouse-client --user langfuse --password '' \
     --query "SELECT 1" </dev/null 2>&1 || true)" 516 "Langfuse's ClickHouse user is refused an empty password"
   # portalr's own reader and writer, from this machine, as an application reaches ClickHouse.
-  local writer reader
+  # Read before leaving stackr's directory, whose settings `setting` reads; on the loopback, where
+  # ClickHouse is published whatever STACKR_BIND says.
+  local writer reader url
   writer=$(setting CLICKHOUSE_ANALYTICS_WRITER_PASSWORD)
   reader=$(setting CLICKHOUSE_ANALYTICS_PASSWORD)
+  url="http://127.0.0.1:$(setting CLICKHOUSE_HTTP_PORT)"
   if (
     cd ../portalr &&
-      PORTALR_CLICKHOUSE_URL="http://$host:$(setting CLICKHOUSE_HTTP_PORT)" \
+      PORTALR_CLICKHOUSE_URL=$url \
       CLICKHOUSE_ANALYTICS_WRITER_PASSWORD=$writer CLICKHOUSE_ANALYTICS_PASSWORD=$reader \
       uv run --locked scripts/smoke_analytics.py
   ); then

@@ -184,7 +184,7 @@ One PR, with no browser capture and no UI:
   - ClickHouse runs under `profiles: [clickhouse, langfuse, analytics]`.
   - `clickhouse-init`, which `make up` runs with `docker compose run` once ClickHouse is up (so `up --wait` waits on nothing that exits), makes `analytics.events` as `admin`, from inside ClickHouse's network namespace, and sets the TTL from `ANALYTICS_RETENTION_DAYS` (395).
   - The two users are in `deploy/clickhouse/analytics-users.xml`, and the server settings (`custom_settings_prefixes`, `query_masking_rules`) in `deploy/clickhouse/analytics.xml`.
-  - ClickHouse's HTTP interface is published on `STACKR_BIND` (`CLICKHOUSE_HTTP_PORT`, 8123), for an application on this machine.
+  - ClickHouse's HTTP interface is published on `127.0.0.1` only (`CLICKHOUSE_HTTP_PORT`, 8123), whatever `STACKR_BIND` says, for an application on this machine.
 - **The row policy** is the user's own, in `analytics-users.xml` (`<databases><analytics><events><filter>`), not a `CREATE ROW POLICY` statement: it is reviewed with the code, as ADR-0031's users are.
 - **The reader's profile is `readonly = 1`,** with `SQL_portalr_tenant` its only `changeable_in_readonly` setting, and fixed limits (10 seconds, 1 GB of memory, 4 threads, 200 million rows or 20 GB read, 100,000 rows answered, 4 queries at once). A read that tries to change any of them, `log_queries` or `readonly` is refused (code 164). The writer's limits (10 seconds, 500 MB, 2 threads, 16 inserts at once) are fixed by constraints (code 452). Both share an hourly quota of 5,000 queries, 500 errors, 500 million rows read and 600 seconds.
 - **`langfuse` sees only its own rows** of `system.query_log` and `system.processes`, by a row policy on each.

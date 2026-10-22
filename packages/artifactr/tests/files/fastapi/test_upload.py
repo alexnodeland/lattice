@@ -274,6 +274,7 @@ def test_a_workspace_past_its_quota_is_refused(world: World) -> None:
     assert refused.status_code == 413
     assert refused.json()["detail"] == {
         "type": "over_quota",
+        "message": "the workspace_files quota, 3, is reached",
         "quota": "workspace_files",
         "limit": 3,
     }
@@ -405,7 +406,11 @@ def test_a_tenant_whose_files_are_all_being_read_is_told_to_wait() -> None:
         world.app.through.set()
         assert first.result(timeout=10).status_code == 201
     assert refused.status_code == 429
-    assert refused.json()["detail"] == {"type": "busy", "retry_after": 5}
+    assert refused.json()["detail"] == {
+        "type": "busy",
+        "message": "try again in 5 seconds",
+        "retry_after": 5,
+    }
     assert refused.headers["retry-after"] == "5"
     assert world.upload(FakeApp.file("2")).status_code == 201
 

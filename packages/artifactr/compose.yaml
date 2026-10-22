@@ -32,6 +32,8 @@ services:
       dockerfile: examples/docplan/Dockerfile
     environment:
       DOCPLAN_DATABASE_URL: postgresql+asyncpg://postgres:artifactr@postgres:5432/postgres
+      # Native files' REST surface, over the fake app, for the acceptance tests' fuzzing.
+      DOCPLAN_FILES: ${DOCPLAN_FILES:-}
       # Passed through from the host when set there.
       DOCPLAN_MODEL:
       ANTHROPIC_API_KEY:

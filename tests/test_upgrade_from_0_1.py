@@ -148,8 +148,12 @@ def schema_differences(connection: Connection, models: list[MetaData]) -> list[A
     def ours(name: str | None, kind: str, _: Mapping[str, Any]) -> bool:
         return not (kind == "table" and name is not None and name.endswith("alembic_version"))
 
+    together = MetaData()  # alembic compares one MetaData: the models' tables, all in one
+    for metadata in models:
+        for table in metadata.tables.values():
+            table.to_metadata(together)
     context = MigrationContext.configure(connection, opts={"include_name": ours})
-    return compare_metadata(context, models)  # pyright: ignore[reportArgumentType]
+    return compare_metadata(context, together)
 
 
 @pytest.fixture

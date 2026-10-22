@@ -1,13 +1,13 @@
 """Native files: each app's worker, called over HTTP, here in process, with the fake app standing
 in for a crafting app's CLI."""
 
-{% if use_portal -%}
 import asyncio
 import hashlib
+{% if use_portal -%}
 import runpy
 import sys
-import threading
 {% endif -%}
+import threading
 from dataclasses import replace
 from pathlib import Path
 {%- if use_portal %}

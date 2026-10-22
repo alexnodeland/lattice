@@ -362,8 +362,9 @@ export function EditorFrame({
         src={src ?? undefined}
         title={`${app}, editing ${status.name}`}
         // Its own origin, which can reach none of the portal's; it saves through the shim.
-        // Its pickers and links, and the clipboard, as the pilot builds use them.
-        sandbox="allow-scripts allow-same-origin allow-downloads allow-modals allow-forms allow-popups"
+        // Its pickers, and the clipboard, as the pilot builds use them; no popups, so a link in
+        // it can't open a window of its own.
+        sandbox="allow-scripts allow-same-origin allow-downloads allow-modals allow-forms"
         allow="clipboard-read; clipboard-write"
         referrerPolicy="no-referrer"
         className={`block w-full rounded-md border border-edge bg-paper forced-colors:border-[CanvasText] ${flipped ? "min-h-0 flex-1" : "h-[min(80dvh,48rem)]"}`}

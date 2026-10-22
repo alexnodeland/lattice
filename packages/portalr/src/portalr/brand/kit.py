@@ -38,7 +38,9 @@ _RANGE = re.compile(
     r"^U\+[0-9A-Fa-f?]{1,6}(-[0-9A-Fa-f]{1,6})?(, ?U\+[0-9A-Fa-f?]{1,6}(-[0-9A-Fa-f]{1,6})?)*$"
 )
 _WEIGHT = re.compile(r"^[1-9]00( [1-9]00)?$")
-_PATH = re.compile(r"^(assets|fonts)/[A-Za-z0-9._-]{1,64}$")
+_PATH = re.compile(r"^(assets|fonts)/[A-Za-z0-9_-][A-Za-z0-9._-]{0,63}$")
+"""A file of the kit's: in assets/ or fonts/, never `.`, `..` or hidden, as its first character
+is never a dot."""
 
 
 _REFUSED = frozenset({"Cc", "Cf", "Co", "Cs", "Cn", "Zl", "Zp"})

@@ -9,7 +9,7 @@ Each record captures one decision: the context that forced it, the options consi
 | [0003](0003-observability-and-gateway-services.md) | The observability and gateway services | Accepted, amended by [0016](0016-stackr-in-lattice.md) and [0028](0028-local-supabase-on-the-loopback.md) |
 | [0004](0004-the-application-template.md) | The application template | Accepted |
 | [0005](0005-ports-and-adapters-for-the-stack.md) | Ports and adapters for the stack | Accepted |
-| [0006](0006-networks-and-published-ports.md) | Networks and published ports | Accepted |
+| [0006](0006-networks-and-published-ports.md) | Networks and published ports | Accepted, amended by [0044](0044-clickhouse-a-profile-of-its-own-and-portalrs-analytics-users.md) |
 | [0007](0007-how-telemetry-reaches-the-backends.md) | How telemetry reaches the backends | Accepted |
 | [0008](0008-langfuse-and-its-services.md) | Langfuse and its services | Accepted |
 | [0009](0009-local-supabase-as-the-database-adapter.md) | Local Supabase as the database adapter | Accepted, amended by [0016](0016-stackr-in-lattice.md) |
@@ -34,7 +34,7 @@ Each record captures one decision: the context that forced it, the options consi
 | [0028](0028-local-supabase-on-the-loopback.md) | Local Supabase on the loopback | Accepted, amended by [0045](0045-local-supabase-only-where-docker-keeps-it-on-the-loopback.md) |
 | [0029](0029-the-aws-modules-and-tier-1.md) | The AWS modules, and tier 1 | Accepted, amended by [0034](0034-the-stack-on-aws.md) |
 | [0030](0030-the-incident-experiment-and-its-postmortem.md) | The incident experiment, and its postmortem | Accepted |
-| [0031](0031-clickhouses-admin-apart-from-langfuse.md) | ClickHouse's admin, apart from Langfuse | Accepted, amended by [0044](0044-clickhouse-a-profile-of-its-own-and-portalrs-analytics-users.md) (proposed) |
+| [0031](0031-clickhouses-admin-apart-from-langfuse.md) | ClickHouse's admin, apart from Langfuse | Accepted, amended by [0044](0044-clickhouse-a-profile-of-its-own-and-portalrs-analytics-users.md) |
 | [0032](0032-the-edge-the-services-and-the-state-host.md) | The edge, the services, and the state host | Accepted, amended by [0034](0034-the-stack-on-aws.md) and [0037](0037-the-state-hosts-clickhouse-backups.md) |
 | [0033](0033-the-combined-system-proved-in-ci.md) | The combined system, proved in CI | Accepted |
 | [0034](0034-the-stack-on-aws.md) | The stack on AWS | Accepted, amended by [0035](0035-the-thin-images.md) |
@@ -47,7 +47,7 @@ Each record captures one decision: the context that forced it, the options consi
 | [0041](0041-integrations-switched-per-workspace-in-the-template.md) | Integrations switched per workspace in the template | Accepted |
 | [0042](0042-a-generated-application-as-a-local-product.md) | A generated application as a local product: one origin, a first run, and the tailnet | Accepted |
 | [0043](0043-native-files-in-the-template.md) | Native files in the template: a worker for each app, with no route out, and its editor on a loopback origin | Accepted, amended by [0046](0046-native-files-a-relay-a-slimmer-worker-blender-and-the-editors-at-the-edge.md) |
-| [0044](0044-clickhouse-a-profile-of-its-own-and-portalrs-analytics-users.md) | ClickHouse, a profile of its own, and portalr's analytics users | Proposed |
+| [0044](0044-clickhouse-a-profile-of-its-own-and-portalrs-analytics-users.md) | ClickHouse, a profile of its own, and portalr's analytics users | Accepted |
 | [0045](0045-local-supabase-only-where-docker-keeps-it-on-the-loopback.md) | Local Supabase only where Docker keeps it on the loopback | Accepted |
 | [0046](0046-native-files-a-relay-a-slimmer-worker-blender-and-the-editors-at-the-edge.md) | Native files: a relay, a slimmer worker, Blender, and the editors at the edge | Accepted |
 | [0047](0047-an-upstream-gateway-for-the-model-groups.md) | An upstream gateway for the model groups | Accepted |

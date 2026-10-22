@@ -2,8 +2,9 @@
      the operators', from inside the container only: every privilege, and the named collections,
      such as a single host's `backups`. `langfuse` is Langfuse's: every privilege on its own
      database, where it runs its migrations, and the system tables it reads, and nothing else.
-     Their passwords come from the environment, and are kept out of the preprocessed configuration
-     ClickHouse writes to its data volume. -->
+     portalr's analytics adds two more, in analytics-users.xml (ADR-0044). Their passwords come
+     from the environment, and are kept out of the preprocessed configuration ClickHouse writes to
+     its data volume. -->
 <clickhouse>
   <users>
     <default remove="remove"/>
@@ -40,6 +41,18 @@
         <query>GRANT SELECT ON system.processes</query>
         <query>GRANT SELECT ON system.query_log</query>
       </grants>
+      <!-- Langfuse follows its own queries, and sees no other user's in either table (ADR-0044):
+           not the operators', nor portalr's analytics', should any be logged. -->
+      <databases>
+        <system>
+          <query_log>
+            <filter>user = 'langfuse'</filter>
+          </query_log>
+          <processes>
+            <filter>user = 'langfuse'</filter>
+          </processes>
+        </system>
+      </databases>
     </langfuse>
   </users>
 </clickhouse>

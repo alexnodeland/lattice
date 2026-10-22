@@ -10,6 +10,8 @@ Each profile is an **adapter set**: the services behind one or more of the ports
 |---|---|---|
 | `observability` | The OpenTelemetry Collector, Tempo, Prometheus, Loki, Pyroscope and Grafana | Telemetry (OTLP) and profiles |
 | `langfuse` | Langfuse's web server and worker, ClickHouse, MinIO, Valkey and `db-init` | Evaluation data, and object storage (S3) |
+| `analytics` | ClickHouse; `make up` then runs `clickhouse-init`, which makes portalr's `analytics` database | portalr's product analytics ([lattice RFC-0008](../../rfcs/0008-portalr-product-analytics.md)) |
+| `clickhouse` | ClickHouse alone, which `langfuse` and `analytics` both pull in ([ADR-0044](../adr/0044-clickhouse-a-profile-of-its-own-and-portalrs-analytics-users.md)) | None of its own |
 | `gateway` | The LiteLLM proxy, Valkey and `db-init` | The LLM gateway |
 | `postgres` | Plain PostgreSQL | The database, when `STACKR_DATABASE=postgres` |
 | `auth` | GoTrue, Supabase's auth server alone, and `db-init` | Identity, on the `postgres` adapter |
@@ -26,6 +28,7 @@ make up PROFILES="observability gateway"  # telemetry and the gateway, with loca
 - **Langfuse receives traces only through the Collector,** so `langfuse` without `observability` starts Langfuse with nothing sending to it. Choose both.
 - **The gateway sends telemetry only when the Collector runs.** `make up` turns the gateway's OpenTelemetry integration off without `observability`, and leaves Langfuse out of the Collector's trace exporters without `langfuse`, so neither logs export errors to a service that isn't there.
 - **`db-init` and Valkey belong to both `langfuse` and `gateway`,** and run once when both are chosen.
+- **ClickHouse belongs to `langfuse` and `analytics`,** and runs once when both are chosen. `analytics` is only started when chosen: `make up PROFILES="observability analytics"` runs analytics without Langfuse. Its HTTP interface is on `127.0.0.1` at `CLICKHOUSE_HTTP_PORT` (8123), whatever `STACKR_BIND` says, for an application `make serve` runs on this machine; analytics' two users sign in from the stack's private networks only.
 - **`auth` is only started when chosen,** and only on the `postgres` adapter: local Supabase runs its own Auth, so `make up` refuses `auth` beside it. GoTrue signs tokens with the ES256 key set `make env` generates (`AUTH_JWT_KEYS`), serves it at `/.well-known/jwks.json`, and takes `AUTH_SERVICE_ROLE_KEY`, a JWT signed with the same key, on its admin API ([ADR-0026](../adr/0026-the-single-host.md)).
 
 The application template adds a sixth profile, `app`, in the generated application's own `compose.yaml` rather than stackr's ([ADR-0011](../adr/0011-the-application-template-in-detail.md)). [The application template](template.md) covers it.

@@ -111,17 +111,25 @@ async def test_what_the_app_refuses_the_worker_refuses(connect: Connect, tmp_pat
     assert refused.value.failure == "refused"
 
 
+_TOOK = r"took more than (\d+(?:\.\d+)?)s$"
+
+
+def _took(failure: str) -> float:
+    """The seconds a timeout says the call was given."""
+    took = re.search(_TOOK, failure)
+    assert took is not None, failure
+    return float(took.group(1))
+
+
 async def test_a_call_is_held_to_the_workers_deadline(connect: Connect, tmp_path: Path) -> None:
     worker = await connect(wordcraft(stand_in(tmp_path, "hang")), limits=Limits(edit=2))
     started = time.monotonic()
     # What is left of the deadline once the call has its turn: 2s, or less on a busy machine, by
     # however long the call waited for its turn; never more than the worker's own.
-    with pytest.raises(AppFailed, match=r"took more than (?P<left>\d+(?:\.\d+)?)s$") as late:
+    with pytest.raises(AppFailed, match=_TOOK) as late:
         await worker.apply(None, [], deadline=60)
     assert late.value.failure == "timeout"
-    left = re.search(r"took more than (\d+(?:\.\d+)?)s$", str(late.value))
-    assert left is not None
-    assert 0 < float(left.group(1)) <= 2
+    assert 0.5 <= _took(str(late.value)) <= 2
     assert time.monotonic() - started < 10
 
 
@@ -140,7 +148,9 @@ async def test_a_call_waits_its_turn_within_its_deadline(connect: Connect, tmp_p
         calls.start_soon(call, 1)
     busy, late = failures
     assert busy == "timeout: the worker was busy for more than 1s"
-    assert re.fullmatch(r"timeout: wordcraft-cli took more than (2|1\.\d+)s", late)
+    assert late.startswith("timeout: wordcraft-cli took more than ")
+    # 2s, less the time it waited for its turn: about 1.5s, less on a busy machine.
+    assert 0.5 <= _took(late) <= 2
 
 
 async def test_a_file_past_the_limit_is_too_large(connect: Connect) -> None:

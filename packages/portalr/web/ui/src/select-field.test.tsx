@@ -123,10 +123,9 @@ test("Tab while it is open closes it, choosing nothing, and moves on", async () 
   const role = screen.getByRole("combobox", { name: "Role" });
   await role.click();
   await expect.element(page.getByRole("listbox")).toBeVisible();
-  // The list opens with its chosen option over the trigger, so under the pointer that clicked it:
-  // that option's hover takes the highlight back, and, while the click's release is still being
-  // read, as on a slow machine, keeps the list open through the Tab (issue #275). The pointer is
-  // moved off it, as a person's hand is, so only the keys act.
+  // The click leaves the pointer resting on an option, and while it rests there, Tab leaves the
+  // list open with that option highlighted (#275's flake). That is a bug of its own, #568. The
+  // pointer is moved off the list, so this test checks the keys alone.
   await commands.pointerAway();
   // The list takes the focus a frame after it is seen. A Tab before then leaves the trigger, and
   // the focus, arriving late, comes back into a list that stays open.

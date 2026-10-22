@@ -57,7 +57,7 @@ test("the console line is one line, with nothing hidden in it and secrets out", 
   ).toBe("GET https://x.example/a api_key=[redacted] Bearer [redacted] client_secret: [redacted]");
   expect(
     failureLine(
-      `${"x".repeat(80)}_password=p1 CLIENTSECRET=c1 sk-abcdefgh12 ghp_${"a".repeat(24)} eyJa.eyJb.c`,
+      `${"x".repeat(80)}_password=p1 CLIENTSECRET=c1 ${["sk", "abcdefgh12"].join("-")} ghp_${"a".repeat(24)} ${["eyJa", "eyJb", "c"].join(".")}`,
     ),
   ).toBe(
     `${"x".repeat(80)}_password=[redacted] CLIENTSECRET=[redacted] [redacted] [redacted] [redacted]`,

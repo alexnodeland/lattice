@@ -26,7 +26,6 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, Final, cast
 
 from mcp.types import CallToolResult, ImageContent, TextContent
-from pydantic import JsonValue
 from pydantic_ai import (
     AbstractToolset,
     ApprovalRequired,
@@ -102,6 +101,11 @@ _UNSEEN: Final = re.compile(
 )
 """Terminal escapes, controls but tabs and newlines, and zero-width and direction-changing
 characters: none is the app's words to the model."""
+
+_TRIED: Final = (
+    "this approved call was tried already, whether or not it ran: an approval is for one try,"
+    " so ask again"
+)
 
 _SHOWN: Final = 300
 """The most of a model's own words, such as an address, a card shows in a sentence of lattice's."""
@@ -200,11 +204,15 @@ class _ConnectedApp(AbstractToolset[Session[Any]]):
             raise ToolFailed(f"{name} isn't one of {server.title}'s tools here")
         if not await self._on(workspace, server.key):
             raise ToolFailed(f"{server.title} is switched off in this workspace")
-        if own in server.properties and (unset := _unplain(tool_args.get(server.properties[own]))):
-            raise ModelRetry(
-                f"set properties by their plain names: not {', '.join(unset)}, which aren't"
-                " set here"
-            )
+        if own in server.properties:
+            given = tool_args.get(server.properties[own])
+            if given is not None and not isinstance(given, dict):
+                raise ModelRetry(f"give {server.properties[own]} as an object of properties")
+            if unset := _unplain(given):
+                raise ModelRetry(
+                    f"set properties by their plain names: not {', '.join(unset)}, which aren't"
+                    " set here"
+                )
         if risk in PROTECTED:
             if own not in self._connection.allow or not await self._protected(workspace):
                 raise ToolFailed(f"running code or fetching in {server.title} isn't allowed here")
@@ -215,8 +223,8 @@ class _ConnectedApp(AbstractToolset[Session[Any]]):
                     raise ToolFailed(self._spent(limit))
                 review = self._review(own, risk, tool_args)
                 review["hour"] = (
-                    f"{used} of the {limit} calls to {server.title} this workspace may run an hour"
-                    " have run."
+                    f"{used} of the {limit} tries at calls to {server.title} this workspace may"
+                    " make an hour are used."
                 )
                 raise ApprovalRequired(metadata={"review": review})
             if not await self._fresh(ctx, tool_args):
@@ -230,8 +238,8 @@ class _ConnectedApp(AbstractToolset[Session[Any]]):
 
     def _spent(self, limit: int) -> str:
         return (
-            f"this workspace has run its {limit} code and network calls in {self._server.title}"
-            " this hour: an admin may raise the limit, or try again later"
+            f"this workspace has used its {limit} tries at code and network calls in"
+            f" {self._server.title} this hour: try again later"
         )
 
     async def _take(self, ctx: RunContext[Session[Any]], tool: str, limit: int) -> None:
@@ -244,8 +252,14 @@ class _ConnectedApp(AbstractToolset[Session[Any]]):
         holds exactly. A refused call keeps its place in the hour: the limit counts tries.
         """
         session = ctx.deps
+        ran = (session.run_id, ctx.tool_call_id or "")
+        if any(
+            (c.get("run_id"), c.get("tool_call_id")) == ran
+            for c in await self._calls(session.workspace)
+        ):
+            raise ToolFailed(_TRIED)
         slot = secrets.token_hex(8)
-        data: dict[str, JsonValue] = {
+        data: dict[str, Any] = {
             "app": self._server.app,
             "tool": tool,
             "run_id": session.run_id,
@@ -257,9 +271,8 @@ class _ConnectedApp(AbstractToolset[Session[Any]]):
         place = next((n for n, call in enumerate(calls) if call.get("slot") == slot), None)
         if place is None:  # past an hour's reading: refuse rather than run uncounted
             raise ToolFailed("this call couldn't be counted: ask again")
-        ran = (session.run_id, ctx.tool_call_id or "")
         if any((call.get("run_id"), call.get("tool_call_id")) == ran for call in calls[:place]):
-            raise ToolFailed("this approved call has run already: an approval is for one call")
+            raise ToolFailed(_TRIED)
         if place >= limit:
             raise ToolFailed(self._spent(limit))
 
@@ -440,7 +453,10 @@ class _ConnectedApp(AbstractToolset[Session[Any]]):
 
 
 def _unplain(properties: Any) -> list[str]:
-    """The names in an object's properties, its `ViewObject`'s too, that aren't plain ones."""
+    """The names in an object's properties, its `ViewObject`'s too, that aren't plain ones.
+
+    A `ViewObject` that isn't an object of properties is a name that isn't plain itself.
+    """
     if not isinstance(properties, dict):
         return []
     found: list[str] = []
@@ -448,7 +464,7 @@ def _unplain(properties: Any) -> list[str]:
         if not isinstance(name, str) or name.startswith("_") or name in UNSET:
             found.append(str(name)[:64])
         elif name == "ViewObject":
-            found.extend(_unplain(value))
+            found.extend(_unplain(value) if isinstance(value, dict) else ["ViewObject"])
     return sorted(found)
 
 

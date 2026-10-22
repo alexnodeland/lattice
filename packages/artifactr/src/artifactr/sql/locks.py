@@ -5,9 +5,11 @@ key, in a transaction of its own on a connection of its own, so runner processes
 database take turns at a connected app. The transaction's end releases it, whether it commits,
 rolls back or its connection is lost, so neither an error, a cancellation nor a process that dies
 leaves it held, and nothing is left on a pooled connection. Its wait is bounded by
-`lock_timeout`. Each waiter holds a connection while it waits: give it an engine of its own, so
-the application's commits never wait for a lock's waiters. Any other database has no such lock:
-a single runner process uses the connection's own lock instead.
+`lock_timeout`, and a wait for one of the engine's connections ends as one for the lock does. Each
+waiter holds a connection while it waits: give it an engine of its own, so the application's
+commits never wait for a lock's waiters, with a pool as large as the calls the process may make
+at once (`pool_size` and `max_overflow` together), or a call waits on the pool instead. Any
+other database has no such lock: a single runner process uses the connection's own lock.
 """
 
 import hashlib
@@ -17,6 +19,7 @@ from contextlib import asynccontextmanager
 import anyio
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import DBAPIError
+from sqlalchemy.exc import TimeoutError as PoolTimeout
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 __all__ = ["AdvisoryLock"]
@@ -49,24 +52,30 @@ class AdvisoryLock:
         """Hold the key's lock, waiting for whoever holds it, in any process, at most `wait` s.
 
         Raises:
-            TimeoutError: If it wasn't taken within `wait`.
+            TimeoutError: If it, or a connection for it, wasn't had within `wait`.
         """
         number = int.from_bytes(hashlib.sha256(key.encode()).digest()[:8], signed=True)
-        async with self._engine.connect() as connection:
-            try:
-                async with connection.begin():
-                    milliseconds = max(1, int(wait * 1000))
-                    await connection.execute(text(f"SET LOCAL lock_timeout = {milliseconds}"))
-                    try:
-                        await connection.execute(select(func.pg_advisory_xact_lock(number)))
-                    except DBAPIError as error:
-                        if getattr(error.orig, "sqlstate", None) == _LOCK_NOT_AVAILABLE:
-                            raise TimeoutError(f"the lock wasn't taken within {wait}s") from None
-                        raise
-                    yield
-            except BaseException:
-                # Cancelled or failed mid-transaction, the connection may be half-closed: it is
-                # thrown away, which ends its session, and so the lock, rather than pooled.
-                with anyio.CancelScope(shield=True):
-                    await connection.invalidate()
-                raise
+        try:
+            connection = await self._engine.connect()
+        except PoolTimeout:
+            raise TimeoutError("no connection was free for the lock") from None
+        try:
+            async with connection.begin():
+                milliseconds = max(1, int(wait * 1000))
+                await connection.execute(text(f"SET LOCAL lock_timeout = {milliseconds}"))
+                try:
+                    await connection.execute(select(func.pg_advisory_xact_lock(number)))
+                except DBAPIError as error:
+                    if getattr(error.orig, "sqlstate", None) == _LOCK_NOT_AVAILABLE:
+                        raise TimeoutError(f"the lock wasn't taken within {wait}s") from None
+                    raise
+                yield
+        except BaseException:
+            # Cancelled or failed mid-transaction, the connection may be half-closed: it is
+            # thrown away, which ends its session, and so the lock, rather than pooled.
+            with anyio.CancelScope(shield=True):
+                await connection.invalidate()
+            raise
+        finally:
+            with anyio.CancelScope(shield=True):
+                await connection.close()

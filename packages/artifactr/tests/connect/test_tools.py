@@ -938,11 +938,13 @@ async def test_a_workspace_runs_so_many_code_calls_an_hour(world: World) -> None
         script = Script(call("fake_execute_code", f"c{n}", code=CODE), say("Done."))
         runner, run_id = await world.pause(script, connection)
         if n == 3:
-            assert "has run its 2 code and network calls in Fake this hour" in seen(script)
+            assert "has used its 2 tries at code and network calls in Fake this hour" in seen(
+                script
+            )
             assert await world.pending(run_id) == [], "nothing is asked past the limit"
             break
         [request] = await world.pending(run_id)
-        said = f"{n - 1} of the 2 calls to Fake this workspace may run an hour have run."
+        said = f"{n - 1} of the 2 tries at calls to Fake this workspace may make an hour are used."
         assert request.review["hour"] == said
         await approve(world, runner, run_id, f"c{n}")
         assert "ran " in seen(script)
@@ -967,15 +969,17 @@ async def test_calls_asked_at_once_are_held_to_the_limit_exactly(world: World) -
     await approve(world, runner, run_id, "c0", "c1", "c2", "c3")
     told = seen(script)
     assert told.count("ran ") == 2
-    assert told.count("has run its 2 code and network calls in Fake this hour") == 2
+    assert told.count("has used its 2 tries at code and network calls in Fake this hour") == 2
 
 
 async def test_an_approval_runs_its_call_once(world: World) -> None:
     tools = connected_app_tools(everything(world), integrations=world.switch)
     call = await _approved(world.workspaces, ALICE, world.thread.id, tools)
     await call.run()
-    with pytest.raises(ToolFailed, match="has run already: an approval is for one call"):
+    with pytest.raises(ToolFailed, match="was tried already, whether or not it ran"):
         await call.run()
+    tries = [e for e in await world.ws.read() if isinstance(e.event, AppEvent)]
+    assert len(tries) == 1, "a replayed approval takes no place in the hour"
 
 
 async def test_an_approval_is_its_own_runs_latest_pause(world: World) -> None:
@@ -1013,7 +1017,7 @@ async def test_a_reader_who_cant_see_a_thread_counts_its_calls() -> None:
     tools = connected_app_tools(connection, integrations=switch)
     await (await _approved(workspaces, ALICE, secret[0], tools)).run()
     bobs = await _approved(workspaces, BOB, bobs_thread.id, tools)
-    with pytest.raises(ToolFailed, match="has run its 1 code and network calls"):
+    with pytest.raises(ToolFailed, match="has used its 1 tries at code and network calls"):
         await bobs.run()
 
 
@@ -1067,9 +1071,12 @@ async def test_calls_over_an_hour_ago_dont_count(world: World) -> None:
             "fake_execute_code", {"code": CODE}, ctx, offered["fake_execute_code"]
         )
     review = (asked.value.metadata or {})["review"]
-    assert review["hour"] == "0 of the 2 calls to Fake this workspace may run an hour have run."
+    assert (
+        review["hour"]
+        == "0 of the 2 tries at calls to Fake this workspace may make an hour are used."
+    )
     now = connected_app_tools(connection, integrations=world.switch)
-    with pytest.raises(ToolFailed, match="has run its 2 code and network calls"):
+    with pytest.raises(ToolFailed, match="has used its 2 tries at code and network calls"):
         await now.call_tool("fake_execute_code", {"code": CODE}, ctx, offered["fake_execute_code"])
 
 
@@ -1085,4 +1092,12 @@ async def test_an_edit_sets_properties_by_plain_names_alone(world: World) -> Non
     ):
         with pytest.raises(ModelRetry, match="set properties by their plain names"):
             await tools.call_tool("fake_create_object", {"properties": properties}, ctx, tool)
+    # The server reads a string as JSON for an object: none is taken but an object itself.
+    for given in ('{"ExpressionEngine": [["Length", "1"]], "__class__": 1}', [["__class__", 1]], 7):
+        with pytest.raises(ModelRetry, match="give properties as an object of properties"):
+            await tools.call_tool("fake_create_object", {"properties": given}, ctx, tool)
+    with pytest.raises(ModelRetry, match="not ViewObject"):
+        await tools.call_tool(
+            "fake_create_object", {"properties": {"ViewObject": '{"_x": 1}'}}, ctx, tool
+        )
     assert set(FREECAD.properties) == {"create_object", "edit_object"}

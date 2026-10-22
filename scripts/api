@@ -3,7 +3,8 @@
 # lattice ADR-0015). It starts the application from the package's compose.yaml, as a compose
 # project of its own on ports the system picks, runs the package's Bruno collection and then
 # Schemathesis over its committed OpenAPI document (configured in the root's schemathesis.toml),
-# and stops the application however they end.
+# and stops the application however they end. Schemathesis runs over each of the package's
+# documents, schemas/PACKAGE.openapi.json and schemas/PACKAGE-*.openapi.json.
 #
 # Usage, from the package's directory, as its `api` task: scripts/api SERVICE
 #   SERVICE  the reference application's compose service, docplan or oncall, which is also the
@@ -12,7 +13,7 @@ set -euo pipefail
 service=${1:?usage: scripts/api SERVICE}
 package=$(basename "$PWD")
 root=$(cd ../.. && pwd)
-# shellcheck source=compose-project.sh
+# shellcheck source-path=SCRIPTDIR source=compose-project.sh
 source "$root/scripts/compose-project.sh"
 report="$root/.api-reports/$package"
 project=$(unique_project "$package-api")
@@ -31,9 +32,14 @@ base="http://$(docker compose port "$service" 8000)/v1"
 
 (cd bruno && bun x --bun --no-install bru run --env "$service" --env-var "baseUrl=$base")
 
-uv run --locked --group acceptance schemathesis --config-file "$root/schemathesis.toml" run \
-  "schemas/$package.openapi.json" \
-  --url "$base" \
-  --header 'x-user: schemathesis' \
-  --report junit \
-  --report-dir "$report"
+# The package's document, and each of its other surfaces' (schemas/$package-*.openapi.json), such
+# as artifactr's native files, which the application serves under the same base.
+for document in "schemas/$package.openapi.json" schemas/"$package"-*.openapi.json; do
+  [[ -e $document ]] || continue
+  uv run --locked --group acceptance schemathesis --config-file "$root/schemathesis.toml" run \
+    "$document" \
+    --url "$base" \
+    --header 'x-user: schemathesis' \
+    --report junit \
+    --report-dir "$report/$(basename "$document" .openapi.json)"
+done

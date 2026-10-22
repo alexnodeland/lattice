@@ -1,5 +1,5 @@
 /**
- * What a failure says, as every screen shows it (lattice issue #552, portalr ADR-0065). A reader
+ * What a failure says, as every screen shows it (lattice issue 552, portalr ADR-0065). A reader
  * sees a sentence of the kit's own, chosen by the refusal's status and its known reason code; no
  * words of the server's reach them, as they may hold what a tenant shouldn't read. The whole
  * failure is for operators: `failureLogged` writes it to the console, once, as one line, with

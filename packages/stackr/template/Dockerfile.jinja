@@ -25,7 +25,7 @@ COPY scripts/build-portal-ui.sh scripts/
 RUN --mount=type=cache,target=/root/.bun/install/cache scripts/build-portal-ui.sh /ui
 
 {% endif -%}
-FROM ghcr.io/astral-sh/uv:0.12-python{{ python_version }}-trixie-slim AS build
+FROM ghcr.io/astral-sh/uv:0.12-python{{ python_version }}-trixie-slim AS {% if use_files %}locked{% else %}build{% endif %}
 
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends git \
@@ -33,9 +33,13 @@ RUN apt-get update \
 
 WORKDIR /app
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=0
+COPY pyproject.toml uv.lock ./
+{%- if use_files %}
+
+FROM locked AS build
+{%- endif %}
 
 # The dependencies first, so they stay cached until uv.lock changes.
-COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev --no-install-project
 
@@ -45,6 +49,17 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev --no-editable
 
 {%- if use_files %}
+
+
+# The worker's environment: artifactr's files extra alone, at the versions uv.lock pins, not the
+# application's whole.
+FROM locked AS worker-venv
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv export --locked --no-dev --no-emit-project --no-hashes --output-file /tmp/locked.txt \
+    && artifactr=$(sed -n 's/^artifactr-ai @/artifactr-ai[files] @/p' /tmp/locked.txt) \
+    && test -n "$artifactr" \
+    && uv venv /opt/worker \
+    && uv pip install --python /opt/worker/bin/python --constraint /tmp/locked.txt "$artifactr"
 
 
 # A crafting app's release, fetched as scripts/crafts pins it and checked against its SHA-256
@@ -61,10 +76,20 @@ COPY scripts/crafts/${CRAFT}.sha256 scripts/crafts/
 # Its CLI, for this build's Linux, x86_64 or aarch64, with all its release unpacked beside it:
 # its libraries, and its licences and notices, which travel with it. /opt/craft/cli is the CLI.
 # Everyone may read it, and run what its release made runnable; no one but root may change it.
+# An app under a licence that asks for its source to be offered (SOURCE, its release's source)
+# has the offer beside its notices, in SOURCE-OFFER.
 FROM craft AS craft-cli
+ARG VERSION
+ARG SOURCE=""
+# Its release's root is above the CLI's bin/, or, for one with none (Blender's), beside the CLI.
 RUN cli=$(scripts/craft "${CRAFT}" cli) \
-    && cp -R "${cli%/bin/*}" /opt/craft \
-    && ln -s "bin/${cli##*/}" /opt/craft/cli \
+    && root=${cli%/bin/*} && if [ "${root}" = "${cli}" ]; then root=${cli%/*}; fi \
+    && cp -R "${root}" /opt/craft \
+    && ln -s "${cli#"${root}"/}" /opt/craft/cli \
+    && if [ -n "${SOURCE}" ]; then printf '%s\n' \
+      "${CRAFT} ${VERSION} is free software, which this image holds unmodified, as its release" \
+      "was published, with its licence and notices beside this file. Its complete corresponding" \
+      "source code, for exactly this release, is at ${SOURCE}." >/opt/craft/SOURCE-OFFER; fi \
     && chmod -R a+rX,go-w /opt/craft
 {%- if use_portal %}
 
@@ -76,13 +101,18 @@ RUN web=$(scripts/craft "${CRAFT}" web) && cp -R "${web}" /opt/web && chmod -R a
 
 # The worker: the app's four calls over HTTP, one at a time, its CLI under the worker's limits.
 # compose.yaml runs it read-only, on a network with no route out.
+# An app whose release links system libraries (PACKAGES) has them installed.
 FROM python:{{ python_version }}-slim-trixie AS files-worker
 ARG CRAFT
 ARG VERSION
-RUN useradd --no-create-home --uid 10002 worker
-COPY --from=build /app/.venv /app/.venv
+ARG PACKAGES=""
+RUN if [ -n "${PACKAGES}" ]; then apt-get update \
+      && apt-get install --yes --no-install-recommends ${PACKAGES} \
+      && rm -rf /var/lib/apt/lists/*; fi \
+    && useradd --no-create-home --uid 10002 worker
+COPY --from=worker-venv /opt/worker /opt/worker
 COPY --from=craft-cli /opt/craft /opt/craft
-ENV PATH="/app/.venv/bin:$PATH" \
+ENV PATH="/opt/worker/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     WORKER_APP=${CRAFT} \

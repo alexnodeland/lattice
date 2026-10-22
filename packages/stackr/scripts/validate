@@ -49,6 +49,7 @@ done
 
 step "The single host's edge"
 if docker run --rm -v "$PWD/deploy/host/Caddyfile:/etc/caddy/Caddyfile:ro" -e STACKR_DOMAIN=example.com \
+  -e STACKR_EDITOR_HOSTS=gridcraft.example.com \
   "$(STACKR_DOMAIN=example.com docker compose -f compose.yaml -f deploy/host/compose.prod.yaml \
     config --format json | jq -r .services.caddy.image)" \
   caddy validate --config /etc/caddy/Caddyfile >/dev/null 2>&1; then

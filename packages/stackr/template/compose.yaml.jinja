@@ -7,10 +7,12 @@
 # settings come from .env, except the stack's addresses on its networks, from stackr.env.
 {%- if use_files %}
 #
-# Native files: each crafting app FILES_CRAFTS names runs in a worker of its own, files-<app>, in
-# the profile of the same name, which `make up` adds for each (stackr ADR-0043). A worker is alone
-# on a network of its own, files-<app>, which has no route out: the application joins each, and
-# reaches the worker by its name, with the worker's own token. Needs Compose 2.20 or later.
+# Native files: each crafting app FILES_CRAFTS names runs in a worker of its own, files-<app>-worker,
+# in the profile files-<app>, which `make up` adds for each (stackr ADR-0043). A worker is on a
+# network of its own, files-<app>, which has no route out, with its relay alone, files-<app>: the
+# application reaches the relay on the `files` network, with the worker's own token, and the relay
+# passes the connection on. A worker can reach its relay, which reaches only it, and never the
+# application (ADR-0046). Needs Compose 2.20 or later.
 {%- if use_portal %} An
 # app whose browser build hands a file over has its editor too, files-<app>-editor, published on
 # this machine's loopback, on a port of its own: an origin of its own, which the portal frames.
@@ -50,6 +52,20 @@ x-files-worker: &files-worker
     timeout: 5s
     retries: 30
     start_period: 10s
+
+# A relay: socat, passing each connection from the application on to one worker, and nothing else.
+# It holds no secret, and runs nothing of the worker's; a worker reaching it reaches only itself.
+x-files-relay: &files-relay
+  image: alpine/socat:1.8.1.1@sha256:7f9a06753033f2b7de18edc2353f2c15153413d95a039163c6db270fc7a6c3b0
+  restart: unless-stopped
+  init: true
+  read_only: true
+  user: "10004"
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  mem_limit: 64m
+  memswap_limit: 64m
+  pids_limit: 32
 {%- if use_portal %}
 
 # An editor: the app's browser build, as released, and lattice's shim. It holds no secret; its
@@ -122,26 +138,21 @@ services:
         # Plane sends webhooks only to a name with a dot in it, which stackr's recipe allows.
         aliases: [app.stackr.internal]
       supabase: {}
-{%- for name in crafts if use_files %}
-      files-{{ name }}: {}
-{%- endfor %}
+{%- if use_files %}
+      files: {}
+{%- endif %}
 {%- elif use_files %}
-    networks:
-      - stackr
-      - supabase
-{%- for name in crafts %}
-      - files-{{ name }}
-{%- endfor %}
+    networks: [stackr, supabase, files]
 {%- else %}
     networks: [stackr, supabase]
 {%- endif %}
 {%- if use_files %}
-    # The workers FILES_CRAFTS starts, each answering before the application asks it which app
-    # it runs; one that isn't started is passed over.
+    # The relays FILES_CRAFTS starts, each after its worker answers, before the application asks
+    # it which app it runs; one that isn't started is passed over.
     depends_on:
 {%- for name in crafts %}
       files-{{ name }}:
-        condition: service_healthy
+        condition: service_started
         required: false
 {%- endfor %}
 {%- endif %}
@@ -158,18 +169,52 @@ services:
 {%- if use_files %}
 {%- for name, craft in crafts.items() %}
 
-  files-{{ name }}:
+  files-{{ name }}-worker:
     <<: *files-worker
     profiles: [files-{{ name }}]
     build:
       context: .
       target: files-worker
-      args: {CRAFT: {{ name }}, VERSION: "{{ craft.version }}"}
+      args:
+        CRAFT: {{ name }}
+        VERSION: "{{ craft.version }}"
+{%- if craft.packages %}
+        PACKAGES: {{ craft.packages | join(' ') }}
+{%- endif %}
+{%- if craft.source %}
+        SOURCE: {{ craft.source }}
+{%- endif %}
+{%- if craft.platform %}
+      # Its release is built for this platform alone: elsewhere it runs emulated.
+      platforms: [{{ craft.platform }}]
+    platform: {{ craft.platform }}
+{%- endif %}
     image: {{ project_slug }}-files-{{ name }}:local
+{%- if craft.memory %}
+    # Its CLI needs {{ craft.memory }} GiB of address space, which its limits and its container's
+    # memory are raised to, above the call's tmpfs.
+    mem_limit: ${{ '{' }}FILES_{{ name | upper }}_MEMORY:-{{ craft.memory + 2 }}g}
+    memswap_limit: ${{ '{' }}FILES_{{ name | upper }}_MEMORY:-{{ craft.memory + 2 }}g}
+{%- endif %}
     environment:
       WORKER_TOKEN: ${{ '{' }}FILES_{{ name | upper }}_TOKEN:-}
+{%- if craft.memory %}
+      WORKER_LIMITS: '${{ '{' }}FILES_{{ name | upper }}_LIMITS:-{"memory": {{ craft.memory * 1073741824 }}}}'
+{%- else %}
       WORKER_LIMITS: ${FILES_WORKER_LIMITS:-}
+{%- endif %}
+      # The image the worker runs in, which each file's provenance records: `make up` sets it.
+      WORKER_BUILD: ${{ '{' }}FILES_{{ name | upper }}_BUILD:-}
     networks: [files-{{ name }}]
+
+  files-{{ name }}:
+    <<: *files-relay
+    profiles: [files-{{ name }}]
+    command: ["TCP-LISTEN:8080,fork,reuseaddr,max-children=16", "TCP:files-{{ name }}-worker:8080"]
+    depends_on:
+      files-{{ name }}-worker:
+        condition: service_healthy
+    networks: [files, files-{{ name }}]
 {%- if use_portal and craft.editor %}
 
   files-{{ name }}-editor:
@@ -193,7 +238,10 @@ networks:
     name: supabase_network_stackr-supabase
     external: true
 {%- if use_files %}
-  # Each worker's network: the worker and the application, with no route out of it.
+  # The application's side of the relays: the application and the relays alone.
+  files:
+    internal: true
+  # Each worker's network: the worker and its relay, with no route out of it.
 {%- for name in crafts %}
   files-{{ name }}:
     internal: true

@@ -18,6 +18,9 @@ services:
     environment:
       STACKR_DOMAIN: ${STACKR_DOMAIN:?set STACKR_DOMAIN in .env}
       CADDY_TLS: ${CADDY_TLS:-}
+      # The editors' names, such as `gridcraft.example.com, pdfcraft.example.com`: none by default,
+      # for which editors.localhost stands in.
+      STACKR_EDITOR_HOSTS: ${STACKR_EDITOR_HOSTS:-editors.localhost}
     volumes:
       - ./deploy/host/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data

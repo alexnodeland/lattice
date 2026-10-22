@@ -192,7 +192,10 @@ use_integrations:
 
 # The apps a worker runs (lattice RFC-0003): each one's release, as lattice's scripts/crafts pins
 # it, which scripts/check-template holds this to; its native type; and, for an app whose browser
-# build hands a file over, its editor's port: app_port and this.
+# build hands a file over, its editor's port: app_port and this. An app whose release is built
+# for one platform names it; one whose CLI needs more address space than a worker's default 2 GiB
+# names the GiB; one whose release links system libraries names their packages; and one whose
+# licence asks for its source to be offered names where it is.
 crafts:
   type: yaml
   default:
@@ -206,6 +209,17 @@ crafts:
     designcraft: {version: "0.9.0", type: PageLayout}
     figcraft: {version: "0.6.0", type: Design}
     freecad: {version: "1.1.4", type: CadModel}
+    blender:
+      version: "5.2.2"
+      type: Scene
+      platform: linux/amd64
+      memory: 4
+      # The X11 and GL libraries its tarball links, and Mesa, which draws its pages with no GPU.
+      packages:
+        [libx11-6, libxi6, libxxf86vm1, libxfixes3, libxrender1, libxkbcommon0, libgl1, libegl1,
+         libegl-mesa0, libgl1-mesa-dri]
+      # GPL-3.0: its source, offered with it.
+      source: https://download.blender.org/source/blender-5.2.2.tar.xz
   when: false
 
 use_portal:

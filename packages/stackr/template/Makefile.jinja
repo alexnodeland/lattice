@@ -25,6 +25,8 @@ space := $() $()
 FILES ?= $(subst $(comma),$(space),$(shell sed -n 's/^FILES_CRAFTS=//p' .env 2>/dev/null | tail -n 1))
 export FILES_CRAFTS := $(subst $(space),$(comma),$(strip $(FILES)))
 PROFILES := --profile app $(foreach craft,$(FILES),--profile files-$(craft))
+# Each worker is told the ID of the image it runs in, which each file's provenance records.
+WORKER_BUILDS = $(foreach craft,$(FILES),FILES_$(shell echo $(craft) | tr a-z A-Z)_BUILD=$$(docker image inspect --format '{{ '{{.Id}}' }}' {{ project_slug }}-files-$(craft):local))
 {%- else %}
 PROFILES := --profile app
 {%- endif %}
@@ -138,7 +140,12 @@ tailnet-off: ## Stop serving it on your tailnet: what `make tailnet` set up on T
 {%- endif %}
 
 up: ## Build and start the application in the app profile, beside stackr's stack{% if use_files %}, with FILES' workers{% endif %}
+{%- if use_files %}
+	$(COMPOSE) $(PROFILES) build
+	$(WORKER_BUILDS) $(COMPOSE) $(PROFILES) up --detach --wait
+{%- else %}
 	$(COMPOSE) $(PROFILES) up --detach --build --wait
+{%- endif %}
 
 down: ## Stop the application{% if use_files %}, and every worker{% endif %}
 	$(COMPOSE) --profile {% if use_files %}'*'{% else %}app{% endif %} down

@@ -1,6 +1,7 @@
-# stackr's edge on a single host (RFC-0004): the application at app.<domain>, and GoTrue at
-# auth.<domain>, each at its own root. CADDY_TLS is empty for certificates from Let's Encrypt,
-# or `tls internal` for Caddy's own CA.
+# stackr's edge on a single host (RFC-0004): the application at app.<domain>, GoTrue at
+# auth.<domain>, each at its own root, and the editors of the native files' apps the application
+# runs at <app>.<domain>, the names STACKR_EDITOR_HOSTS lists (ADR-0046). CADDY_TLS is empty for
+# certificates from Let's Encrypt, or `tls internal` for Caddy's own CA.
 {
 	servers {
 		# HTTP/1.1 and HTTP/2 only: HTTP/3 would need 443/udp published and let through ufw.
@@ -85,4 +86,20 @@ auth.{$STACKR_DOMAIN} {
 	# Caddy replaces X-Forwarded-For from clients with their address, which GoTrue's per-address
 	# rate limits read (GOTRUE_RATE_LIMIT_HEADER).
 	reverse_proxy gotrue:9999
+}
+
+# The editors: each app's browser build, which only the portal at app.<domain> may frame, as the
+# editor's own header says. Only the names listed are served, so a certificate is asked for each
+# only when its app runs; with none listed, compose.prod.yaml's editors.localhost stands in,
+# which Caddy's own CA signs and nothing asks for. An editor is reached by its app's name, its name's first label.
+{$STACKR_EDITOR_HOSTS} {
+	{$CADDY_TLS}
+	import headers
+	@editor header_regexp editor Host ^(gridcraft|pdfcraft|cadcraft)\.
+	handle @editor {
+		reverse_proxy files-{re.editor.1}-editor:8000
+	}
+	handle {
+		respond 404
+	}
 }

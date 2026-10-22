@@ -75,6 +75,10 @@ afterEach(() => {
 test("Audit is on the rail where grantr allows reading the log, and not found elsewhere", async () => {
   const { screen } = await open("/t/acme/audit", ["grantr:add_member"]);
   await expect.element(screen.getByText("The audit log isn't yours to read here")).toBeVisible();
+  // It stands in for the screen, so the focus starts on its heading.
+  await expect
+    .element(screen.getByRole("heading", { name: "The audit log isn't yours to read here" }))
+    .toHaveFocus();
   const rail = screen.getByRole("navigation", { name: "Tenant" });
   await expect.element(rail.getByRole("link", { name: "Access" })).toBeVisible();
   await expect.element(rail.getByRole("link", { name: "Audit" })).not.toBeInTheDocument();

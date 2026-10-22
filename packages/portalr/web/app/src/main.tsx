@@ -63,7 +63,7 @@ try {
   start(root, await readConfig(location.origin));
 } catch (error) {
   root.render(
-    <Plain home={<a href={import.meta.env.BASE_URL} />} title="portalr can't start">
+    <Plain home={import.meta.env.BASE_URL} title="portalr can't start">
       <Alert tone="error">
         The deployment's settings couldn't be read:{" "}
         {error instanceof Error ? error.message : String(error)}.

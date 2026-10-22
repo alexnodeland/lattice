@@ -94,7 +94,7 @@ test("a file of no kind, of several, of an app that is off, or too large is neve
       new File(["x".repeat(600)], "cut.fcproj"),
     ]);
   for (const said of [
-    "notes.txt isn't a kind of file this workspace takes.",
+    "notes.txt isn't a kind of file this workspace takes: it takes .docx, .dwg, .dxf, or .fcproj.",
     "plan.dxf could be several kinds of file, so it can't be told which to make.",
     "GridCraft is off in this workspace, so sums.xlsx can't be uploaded.",
     "big.docx is 1 kB: the largest file of its kind an upload takes is 1 kB.",
@@ -265,6 +265,12 @@ test("a name's bidirectional controls are dropped from what is said of it", asyn
   const { screen } = await open(PAGE, serving(offered()));
   await screen.getByLabelText("Upload files").upload(new File(["x"], "evil\u202Excod.txt"));
   await expect
-    .element(screen.getByText("evilxcod.txt isn't a kind of file this workspace takes.").first())
+    .element(
+      screen
+        .getByText(
+          "evilxcod.txt isn't a kind of file this workspace takes: it takes .docx, .dwg, .dxf, or .fcproj.",
+        )
+        .first(),
+    )
     .toBeVisible();
 });

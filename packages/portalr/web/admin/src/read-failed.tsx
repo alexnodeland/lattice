@@ -1,9 +1,9 @@
 /**
- * What a screen of admin shows when its read failed, in the tenant's frame: its heading, what
- * failed, a way to read it again, and any other way on, such as clearing a filter.
+ * What a screen of admin shows when its read failed, in the tenant's frame: its heading, then the
+ * kit's `ErrorState`, reading it again, and any other way on, such as clearing a filter.
  */
 
-import { Alert, Button, EmptyState, failureSaid } from "@portalr/ui";
+import { ErrorState } from "@portalr/ui";
 import { type ErrorComponentProps, useRouter } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
@@ -25,25 +25,15 @@ export function ReadFailed({
   return (
     <>
       {header}
-      <EmptyState
+      <ErrorState
         title={title}
-        action={
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="secondary"
-              onClick={() => {
-                reset();
-                void router.invalidate();
-              }}
-            >
-              Try again
-            </Button>
-            {children}
-          </div>
-        }
-      >
-        <Alert tone="error">{failureSaid(error)}</Alert>
-      </EmptyState>
+        error={error}
+        retry={() => {
+          reset();
+          void router.invalidate();
+        }}
+        action={children}
+      />
     </>
   );
 }

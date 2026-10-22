@@ -72,7 +72,7 @@ export const Route = createFileRoute("/_signed/t/$tenant/usage")({
   notFoundComponent: () => (
     <>
       {HEADER}
-      <EmptyState title="Usage isn't yours to read here">
+      <EmptyState focus title="Usage isn't yours to read here">
         portalr shows a tenant's spend to those who may read it, such as its owners and admins.
       </EmptyState>
     </>

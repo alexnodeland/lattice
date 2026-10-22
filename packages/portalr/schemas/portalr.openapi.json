@@ -1,6 +1,47 @@
 {
   "components": {
     "schemas": {
+      "Answer": {
+        "additionalProperties": false,
+        "description": "A person's answer to product analytics: yes, or no.",
+        "properties": {
+          "given": {
+            "title": "Given",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "given"
+        ],
+        "title": "Answer",
+        "type": "object"
+      },
+      "Answered": {
+        "additionalProperties": false,
+        "description": "A person's answer, recorded; on a no, whether their events were deleted.",
+        "properties": {
+          "deleted": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deleted"
+          },
+          "given": {
+            "title": "Given",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "given"
+        ],
+        "title": "Answered",
+        "type": "object"
+      },
       "Brand": {
         "description": "The deployment's brand kit, as the UIs read it (lattice RFC-0007).\n\nWho it is, and where its stylesheet and marks are, each under a hash of the kit, relative to\nthe portal's mount.",
         "properties": {
@@ -1022,6 +1063,25 @@
         "title": "RejectionDetail",
         "type": "object"
       },
+      "Relayed": {
+        "description": "What became of a batch: how many events were recorded, and how many were dropped.",
+        "properties": {
+          "dropped": {
+            "title": "Dropped",
+            "type": "integer"
+          },
+          "recorded": {
+            "title": "Recorded",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "recorded",
+          "dropped"
+        ],
+        "title": "Relayed",
+        "type": "object"
+      },
       "Score": {
         "description": "A score: a person's feedback, or an evaluator's verdict, on a trace.",
         "properties": {
@@ -1160,6 +1220,20 @@
           "complete"
         ],
         "title": "Scores",
+        "type": "object"
+      },
+      "Session": {
+        "description": "A session id portalr signed for the person; the browser sends it with every batch.",
+        "properties": {
+          "session": {
+            "title": "Session",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session"
+        ],
+        "title": "Session",
         "type": "object"
       },
       "Span": {
@@ -1657,6 +1731,211 @@
         "summary": "Config"
       }
     },
+    "/portalr/v1/analytics/consent": {
+      "get": {
+        "description": "The person's answer to product analytics: no until they say yes.",
+        "operationId": "read_consent_portalr_v1_analytics_consent_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Answer"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Past the person's pace: `too_fast`"
+          }
+        },
+        "summary": "Read Consent"
+      },
+      "put": {
+        "description": "Record the person's answer. Taking a yes back deletes their events at once.\n\nA deletion ClickHouse can't take stays owed, and is tried again on the person's next\nrequest, and by a background pass every few minutes: ``deleted`` says whether it is\ndone. A yes later doesn't cancel it. It is never refused for the person's pace: a\nwithdrawal always lands.",
+        "operationId": "answer_portalr_v1_analytics_consent_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Answer"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Answered"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          }
+        },
+        "summary": "Answer"
+      }
+    },
+    "/portalr/v1/analytics/session": {
+      "post": {
+        "description": "A session id signed for the person, which their browser sends with its events.",
+        "operationId": "session_portalr_v1_analytics_session_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Session"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Past the person's pace: `too_fast`"
+          }
+        },
+        "summary": "Session"
+      }
+    },
     "/portalr/v1/deployment/links": {
       "get": {
         "description": "Deep links into Langfuse and Grafana, which aren't tenant-scoped, for operators.\n\nWhat those tools show isn't behind portalr's gates, so each call that makes a link is\nrecorded: who, the kinds of id, and the tenant's id if one was asked for, never a trace's,\na session's or a run's, nor a URL. A tenant that doesn't exist is refused, and nothing is\nrecorded for a refusal.",
@@ -1916,6 +2195,174 @@
           }
         },
         "summary": "Create Tenant"
+      }
+    },
+    "/portalr/v1/events": {
+      "post": {
+        "description": "A batch of the person's events in a tenant they belong to, kept as the registry says.\n\nWithout the person's yes, nothing is kept, and the answer says so.",
+        "operationId": "events_portalr_v1_events_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/TenantId"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "description": "A browser's events, in the session portalr signed for it.",
+                "properties": {
+                  "events": {
+                    "items": {
+                      "additionalProperties": false,
+                      "description": "One event, as a browser sends it: its name, the route it was on, and the registry's keys.",
+                      "properties": {
+                        "event": {
+                          "maxLength": 64,
+                          "title": "Event",
+                          "type": "string"
+                        },
+                        "props": {
+                          "additionalProperties": {
+                            "maxLength": 200,
+                            "type": "string"
+                          },
+                          "default": {},
+                          "maxProperties": 10,
+                          "propertyNames": {
+                            "maxLength": 64
+                          },
+                          "title": "Props",
+                          "type": "object"
+                        },
+                        "route": {
+                          "anyOf": [
+                            {
+                              "maxLength": 200,
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "title": "Route"
+                        }
+                      },
+                      "required": [
+                        "event"
+                      ],
+                      "title": "Event",
+                      "type": "object"
+                    },
+                    "maxItems": 20,
+                    "minItems": 1,
+                    "title": "Events",
+                    "type": "array"
+                  },
+                  "session": {
+                    "maxLength": 128,
+                    "title": "Session",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "session",
+                  "events"
+                ],
+                "title": "Batch",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Relayed"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "The body is over 16 KB: `too_large`"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Not a batch the relay takes: `invalid`"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Past the person's pace: `too_fast`"
+          }
+        },
+        "summary": "Events"
       }
     },
     "/portalr/v1/feedback": {

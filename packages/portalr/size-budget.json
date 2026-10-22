@@ -8,7 +8,8 @@
       "math": { "total": 87000, "largest": 85000 },
       "math-syntax": { "total": 2500, "largest": 2500 },
       "dashboards": { "total": 150000, "largest": 130000 },
-      "apps": { "total": 9000, "largest": 9000 }
+      "apps": { "total": 9000, "largest": 9000 },
+      "analytics": { "total": 600, "largest": 600 }
     }
   },
   "admin": { "initial": 225000, "total": 670000, "largest": 160000 }

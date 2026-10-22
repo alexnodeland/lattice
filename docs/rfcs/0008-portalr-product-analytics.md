@@ -284,6 +284,21 @@ Langfuse's own load wasn't run beside it here, so its memory with Langfuse on wa
 
 So the person sees their events gone at once, and so does an operator's ordinary read. An operator who reads with the mask off, or a backup from before, can still find them until the merge or the backup's expiry.
 
+## The browser's slice as built
+
+- **The OpenAPI document** now has the relay's routes: `portalr.fastapi.openapi` builds the router with a relay. The batch's schema is written in place, so the client's types cover it.
+- **The consent switch** is in the account menu, beside colour-blind friendly charts, under "Privacy". It is shown only where `config.json`'s `readers.analytics` is true.
+  - It is a checkbox menu item, off until the person turns it on, and turned off with the same one click.
+  - Its description is read out with it (`aria-describedby`).
+  - There is no banner, no pre-ticked box, and nothing that asks again.
+  - The wording, drafted for the owner's review: **"Share how I use the app"**, described as **"Which pages and features you open, never what you write. Off deletes it."**
+- **Capture** is an add-on of its own (`ui/src/on-demand/analytics.ts`, 442 bytes gzipped, under a 600-byte ceiling). It is fetched only once the person's answer is yes, so someone who never says yes never loads it.
+  - It sends `app.page.viewed.v1` for each page the person opens in a tenant, named by the router's own `fullPath` (`/t/$tenant/w/$workspace/runs`), never the address in the bar.
+  - Events wait in memory and go ten at a time, or after five seconds, under a session id portalr signs for the person.
+  - A batch the relay doesn't take is dropped, never retried, and never fails a screen.
+- **The app's first load** grows by about 1 KB, for the consent read and the switch: 200,751 of its 202,000 bytes, with about 1.2 KB of headroom left. The capture code is outside it.
+- **Not yet:** other events than page views (threads, messages, artifacts and integrations are in the registry, for screens to send later), and admin, which sends nothing.
+
 ## Drawbacks
 
 - Langfuse and analytics share one ClickHouse's CPU, memory and disk. A heavy funnel can slow Langfuse's writes, so each user gets a quota.
@@ -347,17 +362,16 @@ Settled by the relay's slice: lightweight deletes on 26.9 (below).
 
 Still open:
 
-1. **The OpenAPI document** lacks the relay's routes: they are mounted only when a relay is given, and `portalr.fastapi.openapi` builds the document without one. Their `413`, `422` and `429` answers and the batch's schema are declared on the routes, for when it does (the browser's slice).
-2. **Browser events carry no workspace**: the workspace isn't the session's to vouch for, and the relay doesn't ask artifactr which workspaces a person may open. A per-workspace adoption view needs that check first.
-3. **The writer's `ALTER DELETE` reaches every tenant's rows** (stackr ADR-0044): portalr deletes only by a person's hash, but the grant isn't narrower.
-4. Whether grantr needs a removal hook, so a person removed from every tenant has their events deleted too; until then, it is their own no, or an operator's delete.
+1. **Browser events carry no workspace**: the workspace isn't the session's to vouch for, and the relay doesn't ask artifactr which workspaces a person may open. A per-workspace adoption view needs that check first.
+2. **The writer's `ALTER DELETE` reaches every tenant's rows** (stackr ADR-0044): portalr deletes only by a person's hash, but the grant isn't narrower.
+3. Whether grantr needs a removal hook, so a person removed from every tenant has their events deleted too; until then, it is their own no, or an operator's delete.
 
 ## Tracking
 
 - [x] Phase 0: this RFC and [stackr ADR-0044](../stackr/adr/0044-clickhouse-a-profile-of-its-own-and-portalrs-analytics-users.md)
 - [x] The first slice
 - [x] Relay and consent (the server's side)
-- [ ] Browser capture and the consent UI
+- [x] Browser capture and the consent UI
 - [ ] Grafana's datasource and dashboard
 - [ ] Adoption read and page
 - [ ] Traces both ways

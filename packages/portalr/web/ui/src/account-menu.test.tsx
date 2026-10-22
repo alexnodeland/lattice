@@ -146,3 +146,68 @@ test("the switch says what it does, as its description, and its name is the word
   await expect.element(item).toHaveAccessibleName("Colour-blind friendly charts");
   await expect.element(item).toHaveAccessibleDescription("Changes chart colours and adds patterns");
 });
+
+test("without product analytics there is no switch for it", async () => {
+  const screen = await render(
+    <AccountMenu
+      name="Alex Nodeland"
+      appearance="system"
+      onAppearance={vi.fn()}
+      colourBlind={false}
+      onColourBlind={vi.fn()}
+      onSignOut={vi.fn()}
+    />,
+  );
+  await screen.getByRole("button", { name: "Account: Alex Nodeland" }).click();
+  await expect
+    .element(screen.getByRole("menuitemcheckbox", { name: "Colour-blind friendly charts" }))
+    .toBeVisible();
+  expect(
+    screen.getByRole("menuitemcheckbox", { name: "Share how I use the app" }).elements(),
+  ).toHaveLength(0);
+});
+
+test("sharing how the app is used is off until the person turns it on, and says what it shares", async () => {
+  const onAnswer = vi.fn();
+  const screen = await render(
+    <AccountMenu
+      name="Alex Nodeland"
+      appearance="system"
+      onAppearance={vi.fn()}
+      colourBlind={false}
+      onColourBlind={vi.fn()}
+      analytics={{ given: false, onAnswer }}
+      onSignOut={vi.fn()}
+    />,
+  );
+  await screen.getByRole("button", { name: "Account: Alex Nodeland" }).click();
+  const item = screen.getByRole("menuitemcheckbox", { name: "Share how I use the app" });
+  await expect.element(item).toHaveAttribute("aria-checked", "false");
+  await expect
+    .element(item)
+    .toHaveAccessibleDescription(
+      "Which pages and features you open, never what you write. Off deletes it.",
+    );
+  await item.click();
+  expect(onAnswer).toHaveBeenCalledExactlyOnceWith(true);
+});
+
+test("turned on, a click turns sharing off, as easily as it was turned on", async () => {
+  const onAnswer = vi.fn();
+  const screen = await render(
+    <AccountMenu
+      name="Alex Nodeland"
+      appearance="system"
+      onAppearance={vi.fn()}
+      colourBlind={false}
+      onColourBlind={vi.fn()}
+      analytics={{ given: true, onAnswer }}
+      onSignOut={vi.fn()}
+    />,
+  );
+  await screen.getByRole("button", { name: "Account: Alex Nodeland" }).click();
+  const item = screen.getByRole("menuitemcheckbox", { name: "Share how I use the app" });
+  await expect.element(item).toHaveAttribute("aria-checked", "true");
+  await item.click();
+  expect(onAnswer).toHaveBeenCalledExactlyOnceWith(false);
+});

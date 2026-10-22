@@ -10,7 +10,7 @@ import re
 from collections.abc import Awaitable, Callable, Mapping
 from importlib.resources import files
 from pathlib import Path
-from typing import Annotated, Any, Final
+from typing import Annotated, Any, Final, cast
 
 from fastapi import (
     APIRouter,
@@ -716,7 +716,7 @@ def _analytics(router: APIRouter, grants: Grants, relay: Relay, current: Any) ->
         openapi_extra={
             "requestBody": {
                 "required": True,
-                "content": {"application/json": {"schema": Batch.model_json_schema()}},
+                "content": {"application/json": {"schema": _inlined(Batch.model_json_schema())}},
             }
         },
     )
@@ -746,6 +746,24 @@ def _analytics(router: APIRouter, grants: Grants, relay: Relay, current: Any) ->
 TOO_LARGE: Final = {"model": Refused, "description": "The body is over 16 KB: `too_large`"}
 TOO_FAST: Final = {"model": Refused, "description": "Past the person's pace: `too_fast`"}
 INVALID: Final = {"model": Refused, "description": "Not a batch the relay takes: `invalid`"}
+
+
+def _inlined(schema: dict[str, Any]) -> dict[str, Any]:
+    """A model's JSON Schema with its own definitions written in place, as OpenAPI takes it."""
+    definitions: dict[str, Any] = schema.pop("$defs", {})
+
+    def inline(node: object) -> object:
+        if isinstance(node, dict):
+            mapping = cast(dict[str, object], node)
+            reference = mapping.get("$ref", "")
+            if isinstance(reference, str) and reference.startswith("#/$defs/"):
+                return inline(definitions[reference.removeprefix("#/$defs/")])
+            return {key: inline(value) for key, value in mapping.items()}
+        if isinstance(node, list):
+            return [inline(item) for item in cast(list[object], node)]
+        return node
+
+    return cast(dict[str, Any], inline(schema))
 
 
 def _too_fast(wait: float) -> HTTPException:

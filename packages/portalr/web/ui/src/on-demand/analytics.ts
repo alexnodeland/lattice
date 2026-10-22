@@ -1,0 +1,89 @@
+/**
+ * Product analytics' capture (lattice RFC-0008), loaded once a person says yes: someone who never
+ * does never loads it. Their events go to portalr's relay alone.
+ *
+ * Nothing is sent until the person says yes, and nothing is captured on its own: a screen names
+ * an event, from the relay's registry, with the router's own name for the route it is on, never
+ * the address in the bar. Events wait in memory, a few at a time, and go in one batch, under a
+ * session id portalr signed for the person; a batch that fails is dropped, never retried, so
+ * analytics never slows or fails a screen.
+ */
+
+import type { Api } from "@portalr/client";
+
+/** An event a screen records: a name in the relay's registry, the route, and its props. */
+export interface AnalyticsEvent {
+  readonly event: string;
+  /** The router's name for the route, such as `/t/$tenant/w/$workspace/runs`. */
+  readonly route?: string;
+  readonly props?: Readonly<Record<string, string>>;
+}
+
+/** How many events wait before they are sent at once. */
+export const BATCH = 10;
+
+/** How long an event waits, in milliseconds, before what has gathered is sent. */
+export const WAIT = 5_000;
+
+/**
+ * A person's events, gathered and sent to the relay in the tenant `tenant`, under a session id
+ * portalr signs for them when the first batch goes. Made only after the person says yes.
+ */
+export class Capture {
+  private readonly waiting: AnalyticsEvent[] = [];
+  private session: Promise<string | null> | null = null;
+  private timer: ReturnType<typeof setTimeout> | null = null;
+
+  private readonly api: Api;
+  private readonly tenant: string;
+  private readonly wait: number;
+
+  /** `wait` is how long a few events wait before they go, `WAIT` unless a test says otherwise. */
+  constructor(api: Api, tenant: string, wait: number = WAIT) {
+    this.api = api;
+    this.tenant = tenant;
+    this.wait = wait;
+  }
+
+  /** Gather an event, sending what has gathered when there are enough, or after a while. */
+  record(event: AnalyticsEvent): void {
+    this.waiting.push(event);
+    if (this.waiting.length >= BATCH) {
+      void this.flush();
+    } else if (this.timer === null) {
+      this.timer = setTimeout(() => void this.flush(), this.wait);
+    }
+  }
+
+  /** Send what has gathered now; anything the relay doesn't take is dropped. */
+  async flush(): Promise<void> {
+    if (this.timer !== null) {
+      clearTimeout(this.timer);
+      this.timer = null;
+    }
+    const events = this.waiting.splice(0, BATCH);
+    if (events.length === 0) {
+      return;
+    }
+    this.session ??= this.api.portalr
+      .POST("/portalr/v1/analytics/session")
+      .then(({ data }) => data?.session ?? null)
+      .catch(() => null);
+    const session = await this.session;
+    if (session === null) {
+      this.session = null;
+      return;
+    }
+    try {
+      await this.api.portalr.POST("/portalr/v1/events", {
+        headers: { "X-Tenant": this.tenant },
+        body: { session, events: events.map((e) => ({ ...e, props: { ...e.props } })) },
+      });
+    } catch {
+      // Dropped: analytics never fails a screen.
+    }
+    if (this.waiting.length > 0) {
+      void this.flush();
+    }
+  }
+}

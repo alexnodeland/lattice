@@ -1,6 +1,6 @@
 /**
- * The style census (lattice RFC-0007): how many distinct looks the galleries' links, buttons and
- * headings have, at rest. The polish pass put each on the kit's few variants, so it now fails
+ * The style census (lattice RFC-0007): how many distinct looks the galleries' links, buttons,
+ * headings and badges have, at rest. The polish pass put each on the kit's few variants, so it now fails
  * unless the count is exactly what `LOOKS` accounts for: a ratchet, lowered as looks are folded
  * together, and raised only with the kit (portalr ADR-0066). Run with the screenshot suites.
  */
@@ -27,6 +27,7 @@ const KINDS = {
   links: "a[href]",
   buttons: "button, [role='button']",
   headings: "h1, h2, h3, h4, h5, h6",
+  badges: "[data-badge]",
 } as const;
 
 /**
@@ -74,9 +75,17 @@ const LOOKS = {
     "a disclosure's trigger",
   ],
   headings: ["the page's (h1)", "a section's", "a label's"],
+  badges: [
+    "StatusBadge waiting: the accent's fill",
+    "StatusBadge failed and over: the failed edge",
+    "StatusBadge done, queued and stopped: quiet, on the line",
+    "StatusBadge retrying and near: the warning edge",
+    "StatusBadge working: the text's colour, on the line",
+    "Badge accent: the accent's fill, its padding even",
+  ],
 } as const;
 
-test("the census of links, buttons and headings: exactly the looks the kit has", async ({
+test("the census of links, buttons, headings and badges: exactly the looks the kit has", async ({
   annotate,
 }) => {
   const looks = Object.fromEntries(

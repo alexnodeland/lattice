@@ -231,14 +231,45 @@ async def test_a_proposal_is_read_and_rendered_beside_the_head(world: World) -> 
 
 
 def test_a_page_is_a_png_and_one_past_the_end_is_refused(world: World) -> None:
+    world.app.fails = "timeout"
+    assert world.client.get(f"{FILE}/versions/1/pages/1").status_code == 503
+    world.app.fails = None
     page = world.client.get(f"{FILE}/versions/1/pages/1")
     assert (page.status_code, page.headers["content-type"]) == (200, "image/png")
     assert page.content.startswith(b"\x89PNG")
     missing = world.client.get(f"{FILE}/versions/1/pages/9")
     assert missing.status_code == 422
     assert missing.json()["detail"]["failure"] == "refused"
-    world.app.fails = "timeout"
-    assert world.client.get(f"{FILE}/versions/1/pages/1").status_code == 503
+
+
+def test_a_page_is_kept_by_its_reader_and_told_by_its_tag(world: World) -> None:
+    page = world.client.get(f"{FILE}/versions/1/pages/1")
+    assert page.headers["cache-control"] == "private, max-age=86400"
+    tag = page.headers["etag"]
+    kept = world.client.get(f"{FILE}/versions/1/pages/1", headers={"if-none-match": tag})
+    assert (kept.status_code, kept.content, kept.headers["etag"]) == (304, b"", tag)
+    other = world.client.get(f"{FILE}/versions/1/pages/1", headers={"if-none-match": '"x"'})
+    assert other.status_code == 200
+
+
+async def test_each_persons_pages_that_reach_the_app_are_paced() -> None:
+    app = FakeApp()
+    files = NativeFiles(InMemoryBlobs(), InMemoryCheckouts(), app, pages=0)
+    workspaces = Workspaces(InMemoryStorage(), authorize=authorize, hidden=hidden)
+    ws = await workspaces.open("acme", "w1", actor=ALICE)
+    await files.upload(
+        ws, WordDocument, "c.docx", once(FakeApp.file("x")), media_type=DOCX, artifact_id="a1"
+    )
+    server = FastAPI()
+    server.include_router(
+        files_router(workspaces, files, resolve_actor=resolve_actor, renders_per_minute=2)
+    )
+    client = TestClient(server)
+    page = f"{FILE}/versions/1/pages/1"
+    assert [client.get(page).status_code for _ in range(2)] == [200, 200]
+    paced = client.get(page)
+    assert (paced.status_code, paced.json()["detail"]["type"]) == (429, "rate_limited")
+    assert client.get(page, headers={"x-user": "bob"}).status_code == 200, "another's own pace"
 
 
 def test_an_app_that_cant_read_a_check_in_says_why(world: World) -> None:

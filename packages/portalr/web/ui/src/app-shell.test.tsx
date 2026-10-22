@@ -139,3 +139,41 @@ test("admin's frame is named for admin, and shows its own mark", async () => {
   await expect.element(adminLink).toBeVisible();
   expect(adminLink.element().innerHTML).not.toBe(appMark);
 });
+
+async function tall(width: number) {
+  await viewport(width);
+  return render(
+    <AppShell home={<a href="#home" />} switcher={<span>acme</span>} account={<span>alice</span>}>
+      <div style={{ height: "300vh" }} />
+      <p id="far">Far down</p>
+      <div style={{ height: "300vh" }} />
+    </AppShell>,
+  );
+}
+
+test("from 1024 pixels, the rail stays in the window while the page scrolls past it", async () => {
+  await tall(1280);
+  window.scrollTo(0, document.documentElement.scrollHeight);
+  const rail = (document.querySelector("header") as HTMLElement).getBoundingClientRect();
+  expect(window.scrollY).toBeGreaterThan(0);
+  expect(rail.top).toBe(0);
+  expect(rail.bottom).toBeCloseTo(window.innerHeight, 0);
+  window.scrollTo(0, 0);
+});
+
+test("narrower, what is scrolled to stops below the pinned header, not under it", async () => {
+  await tall(390);
+  const header = document.querySelector("header") as HTMLElement;
+  const room = Number.parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop);
+  expect(room).toBeGreaterThanOrEqual(header.getBoundingClientRect().height);
+  document.getElementById("far")?.scrollIntoView();
+  expect(document.getElementById("far")?.getBoundingClientRect().top).toBeGreaterThanOrEqual(
+    header.getBoundingClientRect().bottom,
+  );
+  window.scrollTo(0, 0);
+});
+
+test("at the rail's width, nothing is pinned above the page, so nothing is held clear of it", async () => {
+  await tall(1280);
+  expect(getComputedStyle(document.documentElement).scrollPaddingTop).toBe("0px");
+});

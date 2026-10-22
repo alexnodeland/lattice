@@ -867,6 +867,12 @@
       }
     },
     "header": {
+      "clearance": {
+        "$value": {
+          "value": 3.5,
+          "unit": "rem"
+        }
+      },
       "trigger-radius": {
         "$value": "{radius.3}"
       },

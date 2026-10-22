@@ -422,6 +422,12 @@
       "bg": "line",
       "min": 3,
       "why": "a disabled control's words on its fill"
+    },
+    {
+      "fg": "fg",
+      "bg": "selection",
+      "min": 4.5,
+      "why": "selected text"
     }
   ]
 }

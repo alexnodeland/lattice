@@ -290,13 +290,15 @@ COMPONENTS: tuple[Group, ...] = (
     ),
     Group(
         "The frame's navigation: a nav link's corners and padding, its count's pill, the "
-        "header's triggers (the switcher, the account menu, the home link), and the drawer's "
+        "header's triggers (the switcher, the account menu, the home link), the room a narrow "
+        "window's pinned header takes, which a scroll stops below, and the drawer's "
         "width, shadow and slide.",
         (
             Row("component.nav.radius", "--nav-radius", "dimension"),
             Row("component.nav.pad-x", "--nav-pad-x", "dimension"),
             Row("component.nav.pad-y", "--nav-pad-y", "dimension"),
             Row("component.nav.count-radius", "--nav-count-radius", "dimension"),
+            Row("component.header.clearance", "--header-clearance", "dimension"),
             Row("component.header.trigger-radius", "--header-trigger-radius", "dimension"),
             Row("component.header.trigger-pad-x", "--header-trigger-pad-x", "dimension"),
             Row("component.header.trigger-pad-y", "--header-trigger-pad-y", "dimension"),

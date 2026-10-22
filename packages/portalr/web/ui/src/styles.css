@@ -23,6 +23,21 @@
      * tall it is: what the keyboard reaches, or a link scrolls to, stops above it, not under it.
      */
     scroll-padding-bottom: var(--composer-clearance, 0px);
+    /*
+     * Below lg the header is pinned to the top of the window: what a link or the keyboard
+     * scrolls to stops below it. At lg it is the rail beside the page, and takes no room above.
+     */
+    scroll-padding-top: var(--header-clearance);
+    /* The scrollbars in the kit's colours: the line's ink on the paper. */
+    scrollbar-color: var(--line) var(--paper);
+    @variant lg {
+      scroll-padding-top: 0;
+    }
+  }
+
+  ::selection {
+    background-color: var(--selection);
+    color: var(--fg);
   }
 
   /*

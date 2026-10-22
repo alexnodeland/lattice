@@ -10,6 +10,7 @@ import asyncio
 import contextlib
 import hashlib
 import json
+import time
 import uuid
 from collections import Counter, OrderedDict
 from collections.abc import (
@@ -102,6 +103,10 @@ class FormatChanged(InvalidState):
         return {"checked_out": self.checked_out, "checked_in": self.checked_in}
 
 
+LOOK_AGAIN: Final = 0.05
+"""How often, in seconds, a page waiting for one of its tenant's readings looks again."""
+
+
 class Busy(Exception):
     """The tenant has as many files being read as it may at once; nothing was read or committed.
 
@@ -192,7 +197,6 @@ class NativeFiles:
         self._formats = formats
         self._readings = readings
         self._reading: Counter[str] = Counter()
-        self._freed = asyncio.Condition()
         self._pages_most = pages
         self._pages: OrderedDict[tuple[str, str, int, float], bytes] = OrderedDict()
         self._pages_held = 0
@@ -819,22 +823,18 @@ class NativeFiles:
         """
         readings = self._readings
         if readings is not None and self._reading[tenant_id] >= readings:
-            if wait <= 0:
-                raise Busy(readings)
-            try:
-                async with self._freed:
-                    await asyncio.wait_for(
-                        self._freed.wait_for(lambda: self._reading[tenant_id] < readings), wait
-                    )
-            except TimeoutError:
-                raise Busy(readings) from None
+            # Looked at again every so often, not woken: an application may serve requests on
+            # several event loops, and a waiter tied to one can't be woken from another.
+            until = time.monotonic() + wait
+            while self._reading[tenant_id] >= readings:
+                if time.monotonic() >= until:
+                    raise Busy(readings)
+                await asyncio.sleep(LOOK_AGAIN)
         self._reading[tenant_id] += 1
         try:
             yield
         finally:
             self._reading[tenant_id] -= 1
-            async with self._freed:
-                self._freed.notify_all()
 
     async def _manifest[F: NativeFile](
         self,

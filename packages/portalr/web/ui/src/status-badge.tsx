@@ -58,6 +58,8 @@ export function StatusBadge({ tone, children, live = false, className }: Props) 
   return (
     <span
       role={live ? "status" : undefined}
+      // What the style census counts a badge by (portalr ADR-0066).
+      data-badge=""
       className={cn(
         "inline-flex items-center gap-1.5 whitespace-nowrap rounded-(--badge-radius) border py-(--badge-pad-y) pr-(--badge-pad-end) pl-(--badge-pad-start) font-semibold text-xs",
         TONE[tone].badge,

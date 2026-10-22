@@ -1,8 +1,8 @@
 /**
  * The style census (lattice RFC-0007): how many distinct looks the galleries' links, buttons and
- * headings have, at rest. The polish pass put each on the kit's few variants, so it now fails on a
- * look past what the kit has (`MOST`): a ratchet, lowered as looks are folded together, and raised
- * only with the kit (portalr ADR-0066). Run with the screenshot suites.
+ * headings have, at rest. The polish pass put each on the kit's few variants, so it now fails
+ * unless the count is exactly what `LOOKS` accounts for: a ratchet, lowered as looks are folded
+ * together, and raised only with the kit (portalr ADR-0066). Run with the screenshot suites.
  */
 
 import { expect, test } from "vitest";
@@ -30,15 +30,53 @@ const KINDS = {
 } as const;
 
 /**
- * The looks the kit has, in light and dark alike. Links: a text link's three variants at the sizes
- * they inherit, the nav's link and its current one, the header's home, a tab and the current tab,
- * a row's link, and the skip link. Buttons: the button's variants at both sizes and disabled, an
- * icon button, the header's three triggers, a select's trigger and its placeholder, a pressed
- * toggle, and a disclosure. Headings: the page's, a section's, and a label's.
+ * Every look the galleries have, by kind, in light and dark alike: what the census counts must be
+ * exactly as many, so a look that goes and another that comes are both seen. Folding two looks
+ * together removes a line here; a new one comes only with a new kit variant, named here. The lines
+ * account for the count; they aren't matched one by one to the looks' signatures.
  */
-const MOST = { links: 12, buttons: 21, headings: 3 } as const;
+const LOOKS = {
+  links: [
+    "the skip link",
+    "the header's home (the mark)",
+    "a nav link",
+    "the current nav link",
+    "a tab",
+    "the current tab",
+    "TextLink default, in body text",
+    "TextLink subtle, in body text",
+    "TextLink subtle, in small text (a breadcrumb)",
+    "TextLink nav",
+    "a row's link (subtle, semibold)",
+    "a test gallery's raw link (the Sheet's Usage), not a product look",
+  ],
+  buttons: [
+    "the header's Menu",
+    "the header's switcher",
+    "the header's account menu",
+    "Button primary",
+    "Button secondary",
+    "Button ghost",
+    "Button danger",
+    "Button danger-soft",
+    "Button disabled",
+    "Button pressed (a toggle on)",
+    "Button primary, small",
+    "Button secondary, small",
+    "Button ghost, small",
+    "Button danger, small",
+    "Button danger-soft, small",
+    "Button disabled, small",
+    "IconButton ghost",
+    "IconButton pressed",
+    "a select's trigger",
+    "a select's trigger, disabled",
+    "a disclosure's trigger",
+  ],
+  headings: ["the page's (h1)", "a section's", "a label's"],
+} as const;
 
-test("the census of links, buttons and headings: no more looks than the kit has", async ({
+test("the census of links, buttons and headings: exactly the looks the kit has", async ({
   annotate,
 }) => {
   const looks = Object.fromEntries(
@@ -60,6 +98,11 @@ test("the census of links, buttons and headings: no more looks than the kit has"
     .join("; ");
   await annotate(`style census: ${report}`);
   for (const [kind, seen] of Object.entries(looks) as [keyof typeof KINDS, Set<string>][]) {
-    expect(seen.size, `${kind}: ${[...seen].join("\n")}`).toBeLessThanOrEqual(MOST[kind]);
+    const most = LOOKS[kind].length;
+    const said =
+      seen.size < most
+        ? `${kind}: fewer looks than the ceiling: lower LOOKS.${kind} to ${seen.size}`
+        : `${kind}: more looks than the ceiling: raise it only if the kit gained a variant, and name it in LOOKS.${kind}`;
+    expect(seen.size, `${said}\n${[...seen].join("\n")}`).toBe(most);
   }
 });

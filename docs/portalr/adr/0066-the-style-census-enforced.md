@@ -10,7 +10,7 @@ The style census ([lattice RFC-0007](../../rfcs/0007-portalr-brand-kits.md)) cou
 
 ## Decision
 
-- **The census enforces a ceiling** for each kind (`MOST`): 12 for links, 21 for buttons, 3 for headings, the same in light and dark. Each look is accounted for as a kit variant in the test's comment. It is a ratchet: lowered when looks are folded together, raised only with a new kit variant and a line in that comment. CI already runs it with the screenshot suites, so it enforces from this change.
+- **The census enforces an exact count** for each kind: 12 links, 21 buttons and 3 headings, the same in light and dark. The test's `LOOKS` table names each look, kind by kind, and its lengths are the counts. The test fails if the count is under its length ("fewer looks than the ceiling: lower `LOOKS.<kind>` to N") or over it ("more looks than the ceiling: raise it only if the kit gained a variant, and name it in `LOOKS.<kind>`"). An exact count catches a look that goes, so the ceiling comes down with it and can't later make room for a new look unnoticed. A swap in one change, one look going and another coming, still keeps the count and isn't caught; the computed-style snapshots would show it. The names account for the count; they aren't matched one by one to the computed signatures, because a look's signature names no component. CI already runs the census with the screenshot suites, so it enforces from this change.
 - **What it found that wasn't a kit variant:**
   - The disclosure's link look used a literal underline offset. It now uses `--link-underline-offset`, which is the same 2px.
   - The JSON view and the line diff used a literal `32rem` as their height before they scroll. It is now a kit token, `--code-block-max-height`, at the same 32rem.
@@ -23,4 +23,7 @@ The style census ([lattice RFC-0007](../../rfcs/0007-portalr-brand-kits.md)) cou
 ## Consequences
 
 - A new link, button or heading look fails CI until it is folded into a kit variant, or the kit gains one.
+- **What the census doesn't see.**
+  - It selects `a[href]`, `button`, `[role=button]` and `h1` to `h6`. It doesn't select `[role=link]`, tabs or menu items that aren't buttons, `summary`, or `input[type=button]`. None of these are in the galleries today, but one added would go uncounted.
+  - It counts looks at rest only. A hover, focus or pressed state that differs between two same-looking controls isn't counted; the computed-style snapshots cover those states scene by scene.
 - Badges aren't counted: `Badge` and `StatusBadge` carry no attribute the census can select. Counting them is a follow-up.

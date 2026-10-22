@@ -10,6 +10,8 @@ tasks:
   api:
     env:
       API_SERVICE: 'docplan'
+      # docplan serves native files' surface too, which artifactr-files.openapi.json describes.
+      DOCPLAN_FILES: 'fake'
       # Ports the system picks, which scripts/api reads back.
       DOCPLAN_PORT: '0'
       ARTIFACTR_PG_PORT: '0'

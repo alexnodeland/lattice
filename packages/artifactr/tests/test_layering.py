@@ -191,6 +191,8 @@ def test_the_package_root_imports_only_the_inner_layers() -> None:
 
 
 PUBLIC = {"artifactr", *(f"artifactr.{package}" for package in LAYERS)}
+# Native files' own optional surfaces, each a package's public name a level down.
+PUBLIC_SURFACES = {"artifactr.files.fastapi"}
 
 
 def test_the_reference_implementation_uses_only_the_public_api() -> None:
@@ -201,4 +203,5 @@ def test_the_reference_implementation_uses_only_the_public_api() -> None:
             if name.split(".")[0] == "artifactr":
                 where = f"{path.relative_to(EXAMPLE)} imports {name}, not a package's public name"
                 assert _within(name, PUBLIC), where
-                assert name.count(".") <= 2, where
+                surface = _within(name, PUBLIC_SURFACES)
+                assert name.count(".") <= (3 if surface else 2), where

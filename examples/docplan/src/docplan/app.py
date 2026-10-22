@@ -15,6 +15,10 @@ scores and each turn's session, user and tags.
 With ``DOCPLAN_EVAL_SAMPLE_RATE`` set, a judge judges that share of the agent's turns as they
 end, and its verdicts are feedback beside people's (see :mod:`docplan.evals`).
 
+With ``DOCPLAN_FILES=fake``, it also serves native files' REST surface at /v1, Word documents
+read by artifactr's fake app and kept in memory, which the acceptance tests fuzz (the ``api``
+task). A real application reads files with its own app and keeps them in its stores.
+
 Authentication here is a demo: the user is whatever the ``x-user`` header (or ``user`` query
 parameter) says, and every user shares one tenant. Real applications resolve actors from their
 own sessions or tokens.
@@ -38,6 +42,8 @@ from artifactr import InMemoryStorage, Runner, SystemActor, UserActor, Workspace
 from artifactr.core import Actor, ExternalAgentActor, TenantId
 from artifactr.evals import TaskCompletion
 from artifactr.fastapi import artifactr_router
+from artifactr.files import FakeApp, InMemoryBlobs, InMemoryCheckouts, NativeFiles, WordDocument
+from artifactr.files.fastapi import files_router
 from artifactr.langfuse import langfuse_turn
 from artifactr.mcp import ArtifactrMcp
 from artifactr.otel import LangfuseMode, TelemetryHandle, configure_telemetry
@@ -96,7 +102,13 @@ def create_app(
             "tracer_provider": telemetry.tracer_provider,
             "meter_provider": telemetry.meter_provider,
         }
-    workspaces = Workspaces(storage or InMemoryStorage(), types=[Doc, Plan], **providers)
+    files = (
+        NativeFiles(InMemoryBlobs(), InMemoryCheckouts(), FakeApp())
+        if os.environ.get("DOCPLAN_FILES") == "fake"
+        else None
+    )
+    types = [Doc, Plan, WordDocument] if files else [Doc, Plan]
+    workspaces = Workspaces(storage or InMemoryStorage(), types=types, **providers)
     langfuse = telemetry.langfuse if telemetry else None
     judging = online_from_environment()
     runner = Runner(
@@ -135,6 +147,10 @@ def create_app(
         artifactr_router(workspaces, runner, resolve_actor=resolve_actor, **providers),
         prefix="/v1",
     )
+    if files is not None:
+        app.include_router(
+            files_router(workspaces, files, resolve_actor=resolve_actor), prefix="/v1"
+        )
     app.mount("/mcp", mcp.http_app(streamable_http_path="/"))
     if telemetry is not None:
         telemetry.instrument_app(app)

@@ -100,6 +100,7 @@ def world_of(
     per_minute: int = 20,
     readings: int | None = None,
     at_once: int = 8,
+    per_tenant: int | None = None,
     each: int = 1,
     body: Body | None = None,
 ) -> World:
@@ -120,6 +121,7 @@ def world_of(
             limit=LIMIT,
             uploads_per_minute=per_minute,
             uploads_at_once=at_once,
+            uploads_per_tenant=per_tenant or at_once,
             uploads_each=each,
             body=body,
         )
@@ -307,6 +309,43 @@ async def test_a_body_that_pauses_or_trickles_is_refused() -> None:
         await read(Meter(body(*[0.15] * 4), pace))  # past its pause, under its floor
 
 
+def test_a_check_in_is_held_to_the_pace_and_the_places_an_upload_is() -> None:
+    world = world_of(per_minute=3)
+    assert world.upload(FakeApp.file("x"), artifact_id="a1").status_code == 201
+    checkout = world.client.post("/workspaces/w1/files/a1/checkouts").json()["id"]
+    url = f"/workspaces/w1/checkouts/{checkout}/file"
+    world.app.through.clear()
+    world.app.inspecting.clear()
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        going = pool.submit(world.client.put, url, content=FakeApp.file("y"))
+        assert world.app.inspecting.wait(timeout=10)
+        held = world.client.put(url, content=FakeApp.file("z"))
+        world.app.through.set()
+        assert going.result(timeout=10).status_code == 200
+    assert (held.status_code, held.json()["detail"]["type"]) == (429, "busy")
+    paced = world.client.put(url, content=FakeApp.file("z"))
+    assert (paced.status_code, paced.json()["detail"]["type"]) == (429, "rate_limited")
+
+
+def test_one_tenants_people_never_hold_every_place() -> None:
+    world = world_of(at_once=3, per_tenant=2, each=1)
+    world.app.through.clear()
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        going = []
+        for user in ("alice", "bob"):
+            world.app.inspecting.clear()
+            going.append(pool.submit(world.upload, FakeApp.file(user), user=user))
+            assert world.app.inspecting.wait(timeout=10)
+        refused = world.upload(FakeApp.file("carol"), user="carol")
+        world.app.inspecting.clear()
+        other = pool.submit(world.upload, FakeApp.file("g"), tenant="globex")
+        assert world.app.inspecting.wait(timeout=10), "taken in while acme's places are held"
+        world.app.through.set()
+        assert [g.result(timeout=10).status_code for g in going] == [201, 201]
+        assert other.result(timeout=10).status_code == 201, "another tenant has a place"
+    assert (refused.status_code, refused.json()["detail"]["type"]) == (429, "busy")
+
+
 def test_one_persons_slow_files_never_hold_every_place() -> None:
     world = world_of(at_once=3, each=1)
     world.app.through.clear()
@@ -363,7 +402,9 @@ def test_what_may_be_uploaded_is_told_to_the_client(world: World) -> None:
         "kind": "word_document",
         "extensions": [".docx"],
         "enabled": True,
+        "limit": LIMIT,
     }
+    assert kinds["video_project"]["limit"] == LIMIT, "the router's, below its format's"
     assert kinds["drawing"]["extensions"] == [".dwg", ".dxf"]
     world.switch.off.add(("acme", "w1", "files:fake"))
     viewer = world.client.get("/workspaces/w1/uploads", headers={"x-user": "vic"}).json()
@@ -457,32 +498,56 @@ def answer(
 ) -> bytes:
     """What the server answers a request sent in parts: until it closes, or its first reply."""
     with socket.create_connection(address, timeout=10) as client:
-        for part in sent:
+        for i, part in enumerate(sent):
+            if i:
+                time.sleep(pause)
             # The server may have answered, and closed, before the rest is sent.
             with contextlib.suppress(OSError):
                 client.sendall(part)
-            time.sleep(pause)
-        answered = client.recv(65536)
-        while until_closed and (chunk := client.recv(65536)):
-            answered += chunk
+        answered = b""
+        # A server that closed on a body it didn't read may reset the connection as it does.
+        with contextlib.suppress(ConnectionResetError):
+            answered = client.recv(65536)
+            while until_closed and (chunk := client.recv(65536)):
+                answered += chunk
     return answered
 
 
-HEAD = b"POST /workspaces/w1/files?kind=word_document&name=t HTTP/1.1\r\nHost: app\r\n"
+HEADERS = b"Host: app\r\nx-user: alice\r\nx-tenant: acme\r\n"
+HEAD = b"POST /workspaces/w1/files?kind=word_document&name=t HTTP/1.1\r\n" + HEADERS
 
 
 def test_a_real_server_closes_the_connection_after_refusing_an_unread_body() -> None:
     with served(world_of()) as address:
         answered = answer(address, HEAD + b"Content-Length: 1000000000\r\n\r\n" + b"{" * 1024)
-    assert answered.startswith(b"HTTP/1.1 413"), "and the read ended: it was closed"
+    # Its 413 is read before the close, unless the close reset the connection first, which as
+    # well shows it was closed rather than left waiting for the rest.
+    assert answered == b"" or answered.startswith(b"HTTP/1.1 413")
 
 
-def test_a_body_that_pauses_too_long_is_refused_with_408() -> None:
+@pytest.mark.parametrize("checking_in", [False, True])
+def test_a_body_that_pauses_too_long_is_refused_with_408(checking_in: bool) -> None:
     world = world_of(body=Body(pause=0.2))
+    head = HEAD
+    if checking_in:
+        world.upload(FakeApp.file("x"), artifact_id="a1")
+        checkout = world.client.post("/workspaces/w1/files/a1/checkouts").json()["id"]
+        head = f"PUT /workspaces/w1/checkouts/{checkout}/file HTTP/1.1\r\n".encode() + HEADERS
     with served(world) as address:
-        sent = (HEAD + b"Content-Length: 2\r\n\r\n{", b"}")
+        sent = (head + b"Content-Length: 2\r\n\r\n{", b"}")
         # Long past the pause, so even a slow runner has begun reading before the rest comes.
         answered = answer(address, *sent, pause=5, until_closed=False)
     assert answered.startswith(b"HTTP/1.1 408")
     assert b"too_slow" in answered
-    assert asyncio.run(world.committed()) == []
+    assert asyncio.run(world.committed()) == (["a1"] if checking_in else [])
+
+
+def test_a_routers_places_default_within_its_most() -> None:
+    files = NativeFiles(InMemoryBlobs(), InMemoryCheckouts(), FakeApp())
+    workspaces = Workspaces(InMemoryStorage())
+    for at_once in (1, 2, 3):
+        assert files_router(workspaces, files, resolve_actor=resolve_actor, uploads_at_once=at_once)
+    with pytest.raises(ValueError, match="no more than a tenant"):
+        files_router(
+            workspaces, files, resolve_actor=resolve_actor, uploads_per_tenant=1, uploads_each=2
+        )

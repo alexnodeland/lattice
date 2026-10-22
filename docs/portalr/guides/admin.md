@@ -6,7 +6,7 @@ Every area shows only where grantr allows its read, and every read names its ten
 
 !!! info "What each area needs"
 
-    `portalr:read_telemetry` for Feedback, Traces, Logs and Health; `portalr:read_spend` for Usage; for Access, the grantr action each part's changes take (`grantr:add_member`, `grantr:manage_groups`, `grantr:issue_key`, `grantr:define_role`, `grantr:grant`); `grantr:read_audit` for Audit; `grantr:manage_integrations`, on the tenant, for Integrations; `reflexr:read_runs` for Runs, and `reflexr:retry_run`, `reflexr:skip_run` and `reflexr:cancel_run` for its buttons. grantr's built-in `owner` role holds every one of these, and `admin` holds them too: it lacks only deleting the tenant. A test of these guides holds that against grantr's catalog.
+    `portalr:read_telemetry` for Feedback, Traces, Logs and Health; `portalr:read_spend` for Usage; for Access, the grantr action each part's changes take (`grantr:add_member`, `grantr:manage_groups`, `grantr:issue_key`, `grantr:define_role`, `grantr:grant`); `grantr:read_audit` for Audit; `grantr:manage_integrations`, on the tenant, for Integrations; `grantr:manage_settings`, on the tenant, for Settings; `reflexr:read_runs` for Runs, and `reflexr:retry_run`, `reflexr:skip_run` and `reflexr:cancel_run` for its buttons. grantr's built-in `owner` role holds every one of these, and `admin` holds them too: it lacks only deleting the tenant. A test of these guides holds that against grantr's catalog.
 
 ## Home
 
@@ -41,6 +41,13 @@ Each integration's switch says whether it is on, with a badge (a filled circle f
 | Not installed in this deployment | The deployment doesn't install it, so it is off everywhere: the switch is disabled |
 
 A switch is saved at once, and disabled until grantr answers; the page then says what came of it. Each change is in [Audit](#audit) as "turned … on in workspace …", by whom; **See the audit log** opens it filtered to integrations switched. grantr decides what is on, and every library checks it again before it acts ([grantr ADR-0034](../../grantr/adr/0034-integrations-switched-per-tenant-and-workspace-in-grantrs-table-audited.md), [ADR-0045](../adr/0045-integrations-in-admin-and-the-apps-read-of-them.md)). A workspace's own admins hold the action on their workspace, but admin opens for a tenant's owners and admins alone, so they switch nothing here yet.
+
+
+## Settings
+
+Limits the tenant and each of its workspaces may lower, never raise ([lattice ADR-0030](../../adr/0030-settings-typed-declared-in-lattice-core-and-only-narrowed-below.md), [ADR-0067](../adr/0067-settings-in-admin.md)). Today they are each connected app's tries at code and network calls an hour, named by the app ("FreeCAD's tries an hour"). Choose **the tenant** or one of its workspaces at the top; the address keeps the choice.
+
+Each setting says what applies, how far this level may go and which layer says so (the default, the operator's value, or the tenant's), and what is set here, by whom and when. Enter a lower number and **Save**; a higher one is refused on the field, naming the ceiling. **Use the tenant's** (on the tenant, **Use the operator's** or **Use the default**) unsets it. If someone changed it after you opened the page, the page says so, shows it as it is now, and moves you to the message; make your change again if you still want it. A value set here that no longer applies, because a layer above or the settings themselves now allow less, is said not to apply, and what applies is shown. Settings the deployment no longer has are listed, never applied.
 
 ## Audit
 

@@ -19,6 +19,7 @@ import { Route as SignedTTenantFeedbackRouteImport } from './routes/_signed/t/$t
 import { Route as SignedTTenantIntegrationsRouteImport } from './routes/_signed/t/$tenant/integrations'
 import { Route as SignedTTenantLogsRouteImport } from './routes/_signed/t/$tenant/logs'
 import { Route as SignedTTenantRunsRouteImport } from './routes/_signed/t/$tenant/runs'
+import { Route as SignedTTenantSettingsRouteImport } from './routes/_signed/t/$tenant/settings'
 import { Route as SignedTTenantUsageRouteImport } from './routes/_signed/t/$tenant/usage'
 import { Route as SignedTTenantAccessIndexRouteImport } from './routes/_signed/t/$tenant/access/index'
 import { Route as SignedTTenantAccessGrantsRouteImport } from './routes/_signed/t/$tenant/access/grants'
@@ -109,6 +110,11 @@ const SignedTTenantRunsRoute = SignedTTenantRunsRouteImport.update({
   path: '/runs',
   getParentRoute: () => SignedTTenantRoute,
 } as any)
+const SignedTTenantSettingsRoute = SignedTTenantSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => SignedTTenantRoute,
+} as any)
 const SignedTTenantUsageRoute = SignedTTenantUsageRouteImport.update({
   id: '/usage',
   path: '/usage',
@@ -177,6 +183,7 @@ export interface FileRoutesByFullPath {
   '/t/$tenant/integrations': typeof SignedTTenantIntegrationsRoute
   '/t/$tenant/logs': typeof SignedTTenantLogsRoute
   '/t/$tenant/runs': typeof SignedTTenantRunsRoute
+  '/t/$tenant/settings': typeof SignedTTenantSettingsRoute
   '/t/$tenant/usage': typeof SignedTTenantUsageRoute
   '/t/$tenant/': typeof SignedTTenantIndexRoute
   '/t/$tenant/access/grants': typeof SignedTTenantAccessGrantsRoute
@@ -200,6 +207,7 @@ export interface FileRoutesByTo {
   '/t/$tenant/integrations': typeof SignedTTenantIntegrationsRoute
   '/t/$tenant/logs': typeof SignedTTenantLogsRoute
   '/t/$tenant/runs': typeof SignedTTenantRunsRoute
+  '/t/$tenant/settings': typeof SignedTTenantSettingsRoute
   '/t/$tenant/usage': typeof SignedTTenantUsageRoute
   '/t/$tenant': typeof SignedTTenantIndexRoute
   '/t/$tenant/access/grants': typeof SignedTTenantAccessGrantsRoute
@@ -228,6 +236,7 @@ export interface FileRoutesById {
   '/_signed/t/$tenant/integrations': typeof SignedTTenantIntegrationsRoute
   '/_signed/t/$tenant/logs': typeof SignedTTenantLogsRoute
   '/_signed/t/$tenant/runs': typeof SignedTTenantRunsRoute
+  '/_signed/t/$tenant/settings': typeof SignedTTenantSettingsRoute
   '/_signed/t/$tenant/usage': typeof SignedTTenantUsageRoute
   '/_signed/t/$tenant/': typeof SignedTTenantIndexRoute
   '/_signed/t/$tenant/access/grants': typeof SignedTTenantAccessGrantsRoute
@@ -256,6 +265,7 @@ export interface FileRouteTypes {
     | '/t/$tenant/integrations'
     | '/t/$tenant/logs'
     | '/t/$tenant/runs'
+    | '/t/$tenant/settings'
     | '/t/$tenant/usage'
     | '/t/$tenant/'
     | '/t/$tenant/access/grants'
@@ -279,6 +289,7 @@ export interface FileRouteTypes {
     | '/t/$tenant/integrations'
     | '/t/$tenant/logs'
     | '/t/$tenant/runs'
+    | '/t/$tenant/settings'
     | '/t/$tenant/usage'
     | '/t/$tenant'
     | '/t/$tenant/access/grants'
@@ -306,6 +317,7 @@ export interface FileRouteTypes {
     | '/_signed/t/$tenant/integrations'
     | '/_signed/t/$tenant/logs'
     | '/_signed/t/$tenant/runs'
+    | '/_signed/t/$tenant/settings'
     | '/_signed/t/$tenant/usage'
     | '/_signed/t/$tenant/'
     | '/_signed/t/$tenant/access/grants'
@@ -437,6 +449,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignedTTenantRunsRouteImport
       parentRoute: typeof SignedTTenantRoute
     }
+    '/_signed/t/$tenant/settings': {
+      id: '/_signed/t/$tenant/settings'
+      path: '/settings'
+      fullPath: '/t/$tenant/settings'
+      preLoaderRoute: typeof SignedTTenantSettingsRouteImport
+      parentRoute: typeof SignedTTenantRoute
+    }
     '/_signed/t/$tenant/usage': {
       id: '/_signed/t/$tenant/usage'
       path: '/usage'
@@ -548,6 +567,7 @@ interface SignedTTenantRouteChildren {
   SignedTTenantIntegrationsRoute: typeof SignedTTenantIntegrationsRoute
   SignedTTenantLogsRoute: typeof SignedTTenantLogsRoute
   SignedTTenantRunsRoute: typeof SignedTTenantRunsRoute
+  SignedTTenantSettingsRoute: typeof SignedTTenantSettingsRoute
   SignedTTenantUsageRoute: typeof SignedTTenantUsageRoute
   SignedTTenantIndexRoute: typeof SignedTTenantIndexRoute
   SignedTTenantTracesTraceRoute: typeof SignedTTenantTracesTraceRoute
@@ -561,6 +581,7 @@ const SignedTTenantRouteChildren: SignedTTenantRouteChildren = {
   SignedTTenantIntegrationsRoute: SignedTTenantIntegrationsRoute,
   SignedTTenantLogsRoute: SignedTTenantLogsRoute,
   SignedTTenantRunsRoute: SignedTTenantRunsRoute,
+  SignedTTenantSettingsRoute: SignedTTenantSettingsRoute,
   SignedTTenantUsageRoute: SignedTTenantUsageRoute,
   SignedTTenantIndexRoute: SignedTTenantIndexRoute,
   SignedTTenantTracesTraceRoute: SignedTTenantTracesTraceRoute,

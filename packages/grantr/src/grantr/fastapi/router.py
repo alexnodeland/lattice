@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, StrictInt, StrictStr, TypeAdapter, V
 from starlette.requests import HTTPConnection
 
 from grantr.core import (
+    TENANT,
     Agent,
     AuditEntry,
     AuditFilter,
@@ -41,6 +42,7 @@ from grantr.core import (
     UserId,
     WorkspaceId,
 )
+from grantr.core.roles import MANAGE_SETTINGS
 from grantr.grants import Grants
 
 
@@ -582,25 +584,50 @@ def grantr_router(grants: Grants, *, resolve_actor: ResolveActor) -> APIRouter:
         """Every setting as it is narrowed on a tenant: each layer, the ceiling, the outcome."""
         return await _or_http(grants.settings(tenant, by=by(tenant, who)))
 
+    async def manages_tenant(tenant: TenantId, who: Caller = current) -> Subject:
+        """The caller, if it may narrow the tenant's settings: before its body is read."""
+        subject = by(tenant, who)
+        if not await grants.check(tenant, subject, MANAGE_SETTINGS, TENANT):
+            raise _refused(Forbidden(f"{MANAGE_SETTINGS} on the tenant is refused"))
+        return subject
+
+    async def manages_workspace(
+        tenant: TenantId, workspace: WorkspaceId, who: Caller = current
+    ) -> Subject:
+        """The caller, if it may narrow the workspace's settings: before its body is read."""
+        subject = by(tenant, who)
+        on = Resource(kind="workspace", workspace=workspace)
+        if not workspace or not await grants.check(tenant, subject, MANAGE_SETTINGS, on):
+            raise _refused(Forbidden(f"{MANAGE_SETTINGS} on the workspace is refused"))
+        return subject
+
+    def named_version(if_match: IfMatch = None) -> int | None:
+        """The version `If-Match` names: read once the caller may, so it learns nothing first."""
+        return _version(if_match)
+
+    # Each is asked before the body is validated, and in this order.
+    tenant_manager = Depends(manages_tenant)
+    workspace_manager = Depends(manages_workspace)
+    version_named = Depends(named_version)
+
     @router.put("/tenants/{tenant}/settings/{key}")
     async def set_tenant_setting(
         tenant: TenantId,
         key: str,
         body: SettingChange,
         response: Response,
-        if_match: IfMatch = None,
-        who: Caller = current,
+        subject: Subject = tenant_manager,
+        version: int | None = version_named,
     ) -> SettingState:
         """Narrow a setting on a tenant, or unset it with null.
 
         `If-Match` names the version of the tenant's setting the caller read, `"0"` for one never
-        set: another is refused with 409. A value wider than the layer above is refused with 422,
-        saying how wide it may be and which layer says so.
+        set: another is refused with 409; omitted, the last write wins. A value wider than the
+        layer above is refused with 422, saying how wide it may be and which layer says so. A
+        caller who may not is refused with 403 before its body or `If-Match` is read.
         """
         state = await _or_http(
-            grants.set_setting(
-                tenant, key, body.value, version=_version(if_match), by=by(tenant, who)
-            )
+            grants.set_setting(tenant, key, body.value, version=version, by=subject)
         )
         response.headers["ETag"] = f'"{state.version}"'
         return state
@@ -619,18 +646,13 @@ def grantr_router(grants: Grants, *, resolve_actor: ResolveActor) -> APIRouter:
         key: str,
         body: SettingChange,
         response: Response,
-        if_match: IfMatch = None,
-        who: Caller = current,
+        subject: Subject = workspace_manager,
+        version: int | None = version_named,
     ) -> SettingState:
         """Narrow a setting in a workspace, or unset it with null, as on the tenant."""
         state = await _or_http(
             grants.set_setting(
-                tenant,
-                key,
-                body.value,
-                version=_version(if_match),
-                workspace=workspace,
-                by=by(tenant, who),
+                tenant, key, body.value, version=version, workspace=workspace, by=subject
             )
         )
         response.headers["ETag"] = f'"{state.version}"'

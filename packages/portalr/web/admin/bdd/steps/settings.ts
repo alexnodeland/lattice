@@ -1,0 +1,52 @@
+import { expect } from "@playwright/test";
+import { Then, When } from "./fixtures";
+
+When("they open Settings for the tenant", async ({ page }) => {
+  await page
+    .getByRole("navigation", { name: "Tenant" })
+    .getByRole("link", { name: "Settings" })
+    .click();
+  const heading = page.getByRole("heading", { level: 1 });
+  await expect(heading).toHaveText("Settings");
+  await expect(heading).toBeFocused();
+  await expect(page.getByRole("list", { name: "Settings on the tenant" })).toBeVisible();
+});
+
+When("they lower {string} to {int}", async ({ page }, name: string, value: number) => {
+  await page.getByRole("textbox", { name }).fill(`${value}`);
+  await page.keyboard.press("Enter");
+  await expect(
+    page.getByRole("status").filter({ hasText: `${name}: ${value} applies.` }),
+  ).toBeVisible();
+});
+
+Then("{int} applies to {string}, set here", async ({ page }, value: number, name: string) => {
+  await expect(page.getByText(`Applies: ${value}.`)).toBeVisible();
+  await expect(page.getByText(new RegExp(`^Set here to ${value} by `))).toBeVisible();
+  await expect(page.getByRole("textbox", { name })).toHaveValue(`${value}`);
+});
+
+When("they try to raise {string} to {int}", async ({ page }, name: string, value: number) => {
+  await page.getByRole("textbox", { name }).fill(`${value}`);
+  await page.getByRole("button", { name: "Save FreeCAD's tries an hour" }).click();
+});
+
+Then(
+  "they are told it may be at most {int}, the default's value",
+  async ({ page }, ceiling: number) => {
+    await expect(
+      page.getByRole("textbox", { name: "FreeCAD's tries an hour" }),
+    ).toHaveAccessibleDescription(
+      new RegExp(`may be at most ${ceiling} here: the default's value`),
+    );
+  },
+);
+
+When("they set {string} back to the default", async ({ page }, name: string) => {
+  await page.getByRole("button", { name: "Use the default for FreeCAD's tries an hour" }).click();
+  await expect(page.getByRole("status").filter({ hasText: `${name}: ` })).toBeVisible();
+});
+
+Then("{int} applies to {string}", async ({ page }, value: number, _name: string) => {
+  await expect(page.getByText(`Applies: ${value}.`)).toBeVisible();
+});

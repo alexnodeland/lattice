@@ -152,6 +152,14 @@ export const keys = {
     /** Whether each integration is on in a workspace, as its members read it. */
     enabledIntegrations: (tenant: string, ws: string) =>
       [...keys.grantr.integrations(tenant), "enabled", ws] as const,
+    /**
+     * Everything read of a tenant's settings, which a change anywhere in it makes stale: a
+     * tenant's value is the ceiling of each of its workspaces'.
+     */
+    settings: (tenant: string) => [...keys.grantr.tenant(tenant), "settings"] as const,
+    /** Each setting as it is narrowed on the tenant, or with a workspace named, in it. */
+    settingStates: (tenant: string, ws?: string) =>
+      [...keys.grantr.settings(tenant), "states", ws ?? "~tenant"] as const,
   },
   portalr: {
     tenant: (tenant: string) => ["portalr", tenant] as const,
@@ -747,6 +755,28 @@ export function createQueries(api: Api) {
                       params: { path: { tenant, workspace: ws } },
                     },
                   ),
+            ),
+        }),
+      /**
+       * Each setting as it is narrowed on the tenant, or with a workspace named, in that
+       * workspace and on its tenant: every layer, the ceiling and who set it, and the keys no
+       * registry declares any more, for those who may narrow them there
+       * (`grantr:manage_settings`, lattice ADR-0030).
+       */
+      settings: (tenant: string, ws?: string) =>
+        queryOptions({
+          queryKey: keys.grantr.settingStates(tenant, ws),
+          queryFn: () =>
+            body(
+              ws === undefined
+                ? api.grantr.GET("/grantr/v1/tenants/{tenant}/settings", {
+                    ...named(tenant),
+                    params: { path: { tenant } },
+                  })
+                : api.grantr.GET("/grantr/v1/tenants/{tenant}/workspaces/{workspace}/settings", {
+                    ...named(tenant),
+                    params: { path: { tenant, workspace: ws } },
+                  }),
             ),
         }),
       /**

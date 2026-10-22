@@ -178,12 +178,17 @@ def _top(operator: Value | None) -> Literal["default", "operator"]:
 def _layer(
     setting: Setting, row: SettingRow | None, value: Value | None, above: Value
 ) -> SettingLayer | None:
-    if row is None or value is None:
+    """A level's row as an admin reads it: what was set, and whether something else applies.
+
+    It is clamped when a layer above has since narrowed below it, or when today's registry
+    keeps it as something other than what was set.
+    """
+    if row is None or row.value is None or value is None:
         return None
     return SettingLayer(
-        value=wire(value),
+        value=row.value,
         version=row.version,
         by=row.by,
         at=row.at,
-        clamped=not setting.within(value, above),
+        clamped=wire(value) != row.value or not setting.within(value, above),
     )

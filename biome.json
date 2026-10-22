@@ -59,21 +59,10 @@
     {
       "includes": [
         "packages/portalr/web/admin/src/main.tsx",
-        "packages/portalr/web/admin/src/routes/_signed/t/$tenant/runs.tsx",
         "packages/portalr/web/app/src/main.tsx",
-        "packages/portalr/web/app/src/native-file.tsx",
-        "packages/portalr/web/app/src/native-proposal.tsx",
         "packages/portalr/web/ui/src/artifacts.tsx",
-        "packages/portalr/web/ui/src/chart.tsx",
-        "packages/portalr/web/ui/src/dashboard-figures.tsx",
         "packages/portalr/web/ui/src/file-preview.tsx",
-        "packages/portalr/web/ui/src/json-view.tsx",
-        "packages/portalr/web/ui/src/on-demand/dashboards.tsx",
-        "packages/portalr/web/ui/src/revisions.tsx",
-        "packages/portalr/web/ui/src/run-failed.tsx",
-        "packages/portalr/web/ui/src/tool-call.tsx",
-        "packages/portalr/web/ui/src/trace-view.tsx",
-        "packages/portalr/web/ui/src/tracker.tsx"
+        "packages/portalr/web/ui/src/on-demand/dashboards.tsx"
       ],
       "linter": {
         "rules": {

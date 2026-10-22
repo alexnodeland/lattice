@@ -73,6 +73,7 @@ nav:
   - adr/0060-list-rows.md
   - adr/0061-icon-buttons-and-the-inline-artifacts-header.md
   - adr/0062-badges-and-headings.md
+  - adr/0063-disclosures.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

@@ -68,5 +68,6 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0060](0060-list-rows.md) | List rows: a name, a quieter line beneath it, and an end | Proposed |
 | [0061](0061-icon-buttons-and-the-inline-artifacts-header.md) | Icon buttons, and the inline artifact's header | Proposed |
 | [0062](0062-badges-and-headings.md) | Badges and headings | Proposed |
+| [0063](0063-disclosures.md) | Disclosures | Proposed |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

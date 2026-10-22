@@ -56,7 +56,7 @@ async function shown(width: number, colourBlind = false, off = false) {
   await expect
     .poll(() =>
       off
-        ? document.querySelectorAll("details[open]").length === 3
+        ? document.querySelectorAll('[aria-expanded="true"]').length === 3
         : [...document.querySelectorAll("svg text")].some((t) => t.textContent === "Phone"),
     )
     .toBe(true);

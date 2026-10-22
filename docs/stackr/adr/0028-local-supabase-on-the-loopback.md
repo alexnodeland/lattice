@@ -1,6 +1,6 @@
 # ADR-0028: Local Supabase on the loopback
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0045](0045-local-supabase-where-docker-ignores-the-loopback-and-an-upstream-gateway.md)
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 

@@ -13,7 +13,7 @@ Each record captures one decision: the context that forced it, the options consi
 | [0007](0007-how-telemetry-reaches-the-backends.md) | How telemetry reaches the backends | Accepted |
 | [0008](0008-langfuse-and-its-services.md) | Langfuse and its services | Accepted |
 | [0009](0009-local-supabase-as-the-database-adapter.md) | Local Supabase as the database adapter | Accepted, amended by [0016](0016-stackr-in-lattice.md) |
-| [0010](0010-the-llm-gateway.md) | The LLM gateway | Accepted |
+| [0010](0010-the-llm-gateway.md) | The LLM gateway | Accepted, amended by [0045](0045-local-supabase-where-docker-ignores-the-loopback-and-an-upstream-gateway.md) |
 | [0011](0011-the-application-template-in-detail.md) | The application template, in detail | Accepted; partly superseded by [0013](0013-how-the-template-pins-the-libraries.md), [0015](0015-telemetry-mirrors-shutdown-and-namespaces-in-the-template.md) and [0018](0018-the-template-pins-the-libraries-at-its-own-commit.md), and amended by [0016](0016-stackr-in-lattice.md) and [0019](0019-access-with-grantr-in-the-template.md) |
 | [0012](0012-documentation-site.md) | The documentation site, and publishing it from main | Accepted, amended by [0014](0014-one-docs-build.md), [0016](0016-stackr-in-lattice.md) and [0017](0017-one-site-for-the-family.md) |
 | [0013](0013-how-the-template-pins-the-libraries.md) | How the template pins the libraries | Superseded by [0018](0018-the-template-pins-the-libraries-at-its-own-commit.md) |
@@ -31,7 +31,7 @@ Each record captures one decision: the context that forced it, the options consi
 | [0025](0025-what-the-floci-spike-found.md) | What the Floci spike found | Accepted |
 | [0026](0026-the-single-host.md) | The single host | Accepted |
 | [0027](0027-the-single-hosts-backups.md) | The single host's backups | Accepted, amended by [0031](0031-clickhouses-admin-apart-from-langfuse.md) |
-| [0028](0028-local-supabase-on-the-loopback.md) | Local Supabase on the loopback | Accepted |
+| [0028](0028-local-supabase-on-the-loopback.md) | Local Supabase on the loopback | Accepted, amended by [0045](0045-local-supabase-where-docker-ignores-the-loopback-and-an-upstream-gateway.md) |
 | [0029](0029-the-aws-modules-and-tier-1.md) | The AWS modules, and tier 1 | Accepted, amended by [0034](0034-the-stack-on-aws.md) |
 | [0030](0030-the-incident-experiment-and-its-postmortem.md) | The incident experiment, and its postmortem | Accepted |
 | [0031](0031-clickhouses-admin-apart-from-langfuse.md) | ClickHouse's admin, apart from Langfuse | Accepted, amended by [0044](0044-clickhouse-a-profile-of-its-own-and-portalrs-analytics-users.md) (proposed) |
@@ -48,5 +48,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0042](0042-a-generated-application-as-a-local-product.md) | A generated application as a local product: one origin, a first run, and the tailnet | Accepted |
 | [0043](0043-native-files-in-the-template.md) | Native files in the template: a worker for each app, with no route out, and its editor on a loopback origin | Accepted |
 | [0044](0044-clickhouse-a-profile-of-its-own-and-portalrs-analytics-users.md) | ClickHouse, a profile of its own, and portalr's analytics users | Proposed |
+| [0045](0045-local-supabase-where-docker-ignores-the-loopback-and-an-upstream-gateway.md) | Local Supabase where Docker ignores the loopback, and an upstream gateway | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

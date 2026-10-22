@@ -74,6 +74,7 @@ nav:
     - adr/0042-a-generated-application-as-a-local-product.md
     - adr/0043-native-files-in-the-template.md
     - adr/0044-clickhouse-a-profile-of-its-own-and-portalrs-analytics-users.md
+    - adr/0045-local-supabase-where-docker-ignores-the-loopback-and-an-upstream-gateway.md
   - RFCs:
     - rfcs/README.md
     - rfcs/0001-v0.1-implementation-plan.md

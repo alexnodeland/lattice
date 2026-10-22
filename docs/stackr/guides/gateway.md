@@ -24,7 +24,7 @@ Applications ask for a **model group** or an **alias**, never a provider's model
 | `openrouter/<vendor>/<model>` | Any model on OpenRouter |
 | `lmstudio`, `omlx/<model>` | LM Studio and oMLX, on this machine |
 
-A group can hold several deployments, which the router balances (`simple-shuffle`). A failed request is retried twice, a deployment that fails three times is cooled down for 30 seconds, and a group that still fails falls back to the next group in its list. Changing what `default` means is a change to `config.yaml`, for every application at once.
+A group can hold several deployments, which the router balances (`simple-shuffle`). A failed request is retried twice, a deployment that fails three times is cooled down for 30 seconds, and a group that still fails falls back to the next group in its list. Changing what `default` means is a change to `groups/providers.yaml`, for every application at once.
 
 ### Provider keys
 
@@ -38,6 +38,20 @@ The proxy reaches servers on this machine through `host.docker.internal`, which 
 |---|---|---|
 | `lmstudio` | `LM_STUDIO_API_BASE` | `http://host.docker.internal:1234/v1`, LM Studio's server |
 | `omlx/<model>` | `OMLX_API_BASE` | `http://host.docker.internal:4243/v1`, oMLX's OpenAI-compatible server |
+
+### An upstream gateway
+
+`default` and `fast` can be another OpenAI-compatible API's models instead of the providers': a gateway of your own in front of your own models, for example ([ADR-0045](../adr/0045-local-supabase-where-docker-ignores-the-loopback-and-an-upstream-gateway.md)). Set, in `.env`:
+
+| Setting | What it is |
+|---|---|
+| `STACKR_GATEWAY_MODELS` | `upstream`, rather than `providers`: the groups in `deploy/litellm/groups/upstream.yaml` |
+| `STACKR_UPSTREAM_URL` | Its API's base, with `/v1`, as the proxy's container reaches it |
+| `STACKR_UPSTREAM_API_KEY` | Its key |
+| `STACKR_UPSTREAM_DEFAULT_MODEL`, `STACKR_UPSTREAM_FAST_MODEL` | Its models for `default` and `fast` |
+| `STACKR_UPSTREAM_CA` | If its certificate is signed by an authority of your own, that authority's PEM file, a path on this machine |
+
+Any other of its models is `upstream/<model>`. The aliases above stay, and so do the fallbacks: a group whose upstream fails falls back to the providers', which fail too without their keys. With `STACKR_UPSTREAM_CA` set, the proxy trusts that authority alone, so the providers' public certificates stop verifying: use it when the upstream is what you call. Run `make up` again after changing any of these.
 
 ## Tenants
 

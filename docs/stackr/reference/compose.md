@@ -463,7 +463,7 @@ The LLM gateway port: the LiteLLM proxy's OpenAI-compatible API.
 | Image | `ghcr.io/berriai/litellm-non_root`, pinned by tag and digest in `compose.yaml` |
 | Published ports | 4400 (`LITELLM_PORT`) → 4000 |
 | Networks | `stackr`, `supabase_network_stackr-supabase` |
-| Volumes | `./deploy/litellm/config.yaml` → `/etc/litellm/config.yaml` (read-only) |
+| Volumes | `./deploy/litellm/config.yaml` → `/etc/litellm/config.yaml` (read-only), `./deploy/litellm/groups/${STACKR_GATEWAY_MODELS` → `-providers}.yaml`, `${STACKR_UPSTREAM_CA` → `-/dev/null}` |
 | Depends on | `db-init` (completed), `redis` (healthy) |
 | Runs | `--config /etc/litellm/config.yaml --port 4000` |
 | Health check | `python -c import sys, urllib.request; sys.exit(urllib.request.urlopen('http://127.0.0.1:4000/health/readiness', timeout=3).status != 200)`, every 5s |
@@ -483,6 +483,11 @@ The LLM gateway port: the LiteLLM proxy's OpenAI-compatible API.
     | `OPENROUTER_API_KEY` | `${OPENROUTER_API_KEY:-}` |
     | `LM_STUDIO_API_BASE` | `${LM_STUDIO_API_BASE:-http://host.docker.internal:1234/v1}` |
     | `OMLX_API_BASE` | `${OMLX_API_BASE:-http://host.docker.internal:4243/v1}` |
+    | `STACKR_UPSTREAM_URL` | `${STACKR_UPSTREAM_URL:-}` |
+    | `STACKR_UPSTREAM_API_KEY` | `${STACKR_UPSTREAM_API_KEY:-}` |
+    | `STACKR_UPSTREAM_DEFAULT_MODEL` | `${STACKR_UPSTREAM_DEFAULT_MODEL:-}` |
+    | `STACKR_UPSTREAM_FAST_MODEL` | `${STACKR_UPSTREAM_FAST_MODEL:-}` |
+    | `SSL_CERT_FILE` | `${STACKR_UPSTREAM_CA:+/etc/litellm/upstream-ca.pem}` |
     | `LITELLM_OTEL_V2` | `${STACKR_GATEWAY_TELEMETRY:-true}` |
     | `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://otel-collector:4318` |
     | `OTEL_EXPORTER_OTLP_PROTOCOL` | `http/protobuf` |

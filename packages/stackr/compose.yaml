@@ -480,6 +480,14 @@ services:
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       LM_STUDIO_API_BASE: ${LM_STUDIO_API_BASE:-http://host.docker.internal:1234/v1}
       OMLX_API_BASE: ${OMLX_API_BASE:-http://host.docker.internal:4243/v1}
+      # An upstream gateway, when STACKR_GATEWAY_MODELS=upstream (ADR-0045).
+      STACKR_UPSTREAM_URL: ${STACKR_UPSTREAM_URL:-}
+      STACKR_UPSTREAM_API_KEY: ${STACKR_UPSTREAM_API_KEY:-}
+      STACKR_UPSTREAM_DEFAULT_MODEL: ${STACKR_UPSTREAM_DEFAULT_MODEL:-}
+      STACKR_UPSTREAM_FAST_MODEL: ${STACKR_UPSTREAM_FAST_MODEL:-}
+      # The authority that signed the upstream's certificate, when it is your own: the gateway
+      # then trusts it alone, the providers' public ones included.
+      SSL_CERT_FILE: ${STACKR_UPSTREAM_CA:+/etc/litellm/upstream-ca.pem}
       # Traces to the Collector, continuing the caller's `traceparent`, with
       # prompts and responses left out. `make up` turns it off when the
       # observability profile isn't running.
@@ -494,6 +502,9 @@ services:
       LITELLM_MODE: PRODUCTION
     volumes:
       - ./deploy/litellm/config.yaml:/etc/litellm/config.yaml:ro
+      # The model groups: providers or upstream.
+      - ./deploy/litellm/groups/${STACKR_GATEWAY_MODELS:-providers}.yaml:/etc/litellm/groups.yaml:ro
+      - ${STACKR_UPSTREAM_CA:-/dev/null}:/etc/litellm/upstream-ca.pem:ro
     ports:
       - ${STACKR_BIND:-127.0.0.1}:${LITELLM_PORT:-4400}:4000
     # Local model servers run on the host.

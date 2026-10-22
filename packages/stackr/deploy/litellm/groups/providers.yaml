@@ -1,0 +1,12 @@
+# The model groups, on the providers' models in config.yaml: what applications
+# ask for. A group can hold several deployments, which the router balances; on
+# errors it falls back to the groups in config.yaml's router_settings.fallbacks.
+model_list:
+  - model_name: default
+    litellm_params:
+      model: anthropic/claude-sonnet-4-6
+      api_key: os.environ/ANTHROPIC_API_KEY
+  - model_name: fast
+    litellm_params:
+      model: anthropic/claude-haiku-4-5-20251001
+      api_key: os.environ/ANTHROPIC_API_KEY

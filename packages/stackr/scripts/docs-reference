@@ -643,7 +643,10 @@ def all_panels(dashboard: dict[str, Any]) -> Iterator[dict[str, Any]]:
 
 
 def litellm() -> dict[str, Any]:
-    return load_yaml("deploy/litellm/config.yaml")
+    """The gateway's config, with the model groups it runs by default, the providers'."""
+    config = load_yaml("deploy/litellm/config.yaml")
+    config["model_list"] += load_yaml("deploy/litellm/groups/providers.yaml")["model_list"]
+    return config
 
 
 def block_litellm_models() -> str:

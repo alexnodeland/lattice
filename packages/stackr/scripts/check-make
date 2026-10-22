@@ -34,6 +34,8 @@ check "the probe passes a port published at STACKR_BIND alone" probe '127.0.0.1'
 check "the probe refuses every interface, as Docker Desktop 29 publishes" refused probe '0.0.0.0\n::'
 check "and says there is no override, and the postgres adapter" said "no setting to start it anyway"
 check "the probe refuses STACKR_BIND with every IPv6 interface beside it" refused probe '127.0.0.1\n::'
+check "the probe refuses a port published nowhere, and says so" refused probe ''
+check "and says where" said "Docker publishes on net at nothing"
 check "the probe refuses, closed, when it can't run" refused probe '' fail
 check "and says why" said "Couldn't run the probe"
 
@@ -41,7 +43,12 @@ check "make refuses a STACKR_GATEWAY_MODELS that isn't providers or upstream" \
   refused make --no-print-directory -n up STACKR_GATEWAY_MODELS=elsewhere
 check "and names it" said "STACKR_GATEWAY_MODELS must be providers or upstream"
 quietly() { "$@" >/dev/null 2>&1; }
-check "make takes upstream" quietly make --no-print-directory -n help STACKR_GATEWAY_MODELS=upstream
+check "make refuses upstream without its address and models" \
+  refused make --no-print-directory -n help STACKR_GATEWAY_MODELS=upstream STACKR_UPSTREAM_URL=
+check "and names them" said "needs STACKR_UPSTREAM_URL STACKR_UPSTREAM_DEFAULT_MODEL STACKR_UPSTREAM_FAST_MODEL"
+check "make takes upstream with them" quietly make --no-print-directory -n help \
+  STACKR_GATEWAY_MODELS=upstream STACKR_UPSTREAM_URL=http://gateway/v1 \
+  STACKR_UPSTREAM_DEFAULT_MODEL=big STACKR_UPSTREAM_FAST_MODEL=small
 
 # check-config on a copy whose config.yaml includes no groups, or whose groups lack `fast`.
 copy() {

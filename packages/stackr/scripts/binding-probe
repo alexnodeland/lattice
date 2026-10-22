@@ -32,7 +32,7 @@ if ! docker run --detach --rm --name "$name" --network "$network" --publish 8080
     "isn't started."
 fi
 published=$(docker inspect --format '{{range .NetworkSettings.Ports}}{{range .}}{{println .HostIp}}{{end}}{{end}}' "$name" |
-  grep -v '^$' | sort -u | tr '\n' ' ')
+  grep -v '^$' | sort -u | tr '\n' ' ' || true)
 if [[ $published != "$bind " ]]; then
   refuse "Docker publishes on $network at ${published:-nothing}not at STACKR_BIND ($bind) alone:" \
     "it ignores com.docker.network.bridge.host_binding_ipv4, so local Supabase, with its" \

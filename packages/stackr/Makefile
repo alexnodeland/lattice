@@ -66,6 +66,14 @@ STACKR_GATEWAY_MODELS ?= $(or $(shell sed -n 's/^STACKR_GATEWAY_MODELS=//p' .env
 ifeq ($(filter providers upstream,$(STACKR_GATEWAY_MODELS)),)
 $(error STACKR_GATEWAY_MODELS must be providers or upstream, not '$(STACKR_GATEWAY_MODELS)')
 endif
+# The upstream's address and its models for the two groups, which it can't be without.
+ifeq ($(STACKR_GATEWAY_MODELS),upstream)
+UPSTREAM_NEEDS := STACKR_UPSTREAM_URL STACKR_UPSTREAM_DEFAULT_MODEL STACKR_UPSTREAM_FAST_MODEL
+UPSTREAM_MISSING := $(strip $(foreach name,$(UPSTREAM_NEEDS),$(if $(or $($(name)),$(shell sed -n 's/^$(name)=//p' .env 2>/dev/null)),,$(name))))
+ifneq ($(UPSTREAM_MISSING),)
+$(error STACKR_GATEWAY_MODELS=upstream needs $(UPSTREAM_MISSING) in .env)
+endif
+endif
 
 PROFILE_FLAGS = $(foreach profile,$(PROFILES) $(DATABASE_PROFILES),--profile $(profile))
 

@@ -20,7 +20,7 @@ The Supabase CLI (2.118.0) still has no flag for the address. Nothing `make up` 
   - reads where Docker published the port, IPv4 and IPv6;
   - removes the container.
 - **Supabase starts only if that port is at `STACKR_BIND` alone.** Otherwise `make up` doesn't start it and says to run on the `postgres` adapter with the `auth` profile, whose ports Compose publishes at `STACKR_BIND` explicitly. A probe that can't run (Docker down, its image not pulled with no network) refuses the same way: closed, with stackr's own message.
-- **There is deliberately no override.** No setting starts local Supabase on an engine that publishes it elsewhere. The owner's rule is that local binds stay on the loopback, and the supported way on such an engine is `STACKR_DATABASE=postgres` with the `auth` profile.
+- **There is deliberately no override.** It follows that `STACKR_BIND=0.0.0.0` with local Supabase is now always refused, on every engine: the probe's port is then at `0.0.0.0` and `::`, every interface, which is what it refuses. No setting starts local Supabase on an engine that publishes it elsewhere. The owner's rule is that local binds stay on the loopback, and the supported way on such an engine is `STACKR_DATABASE=postgres` with the `auth` profile.
 - `make smoke`'s check after the fact stays. `scripts/check-make` tests the probe against a fake `docker`, for each shape an engine publishes in.
 
 ## Options considered

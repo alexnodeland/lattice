@@ -27,3 +27,16 @@ test("a read refused for what was asked isn't asked again; one that failed other
   expect(retry(3, new Error("down"))).toBe(false);
   expect(unsigned).not.toHaveBeenCalled();
 });
+
+test("a read refused as busy is asked again once the server's wait has passed", async () => {
+  const client = createQueryClient(vi.fn());
+  const read = vi
+    .fn<() => Promise<string>>()
+    .mockRejectedValueOnce(new Refused(429, { detail: { type: "busy" } }, 0))
+    .mockResolvedValueOnce("page");
+  await expect(client.fetchQuery({ queryKey: ["busy"], queryFn: read })).resolves.toBe("page");
+  expect(read).toHaveBeenCalledTimes(2);
+  const delay = client.getDefaultOptions().queries?.retryDelay as (n: number, e: unknown) => number;
+  expect(delay(0, new Refused(429, null, 5))).toBe(5000);
+  expect(delay(1, new Error("down"))).toBe(2000);
+});

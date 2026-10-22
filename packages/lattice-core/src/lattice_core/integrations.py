@@ -189,7 +189,7 @@ KNOWN: Final = registry(
     ),
     Integration(
         "excalidraw",
-        default=True,
+        default=False,
         description="Diagrams: Excalidraw drawings that people and agents draw on together.",
     ),
     Integration(

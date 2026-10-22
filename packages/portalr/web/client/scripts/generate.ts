@@ -32,6 +32,7 @@ const SCHEMAS = {
   "reflexr.v1.ts": "packages/reflexr/schemas/reflexr.v1.json",
   "reflexr.rules.v1.ts": "packages/reflexr/schemas/reflexr.rules.v1.json",
   "artifactr_ui.v1.ts": "packages/artifactr/schemas/artifactr_ui.v1.json",
+  "artifactr_excalidraw.v1.ts": "packages/artifactr/schemas/artifactr_excalidraw.v1.json",
 } as const;
 
 /** lattice's integrations, each key's default and sentence, in the registry's order (ADR-0045). */

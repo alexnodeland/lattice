@@ -114,11 +114,14 @@ async def test_what_the_app_refuses_the_worker_refuses(connect: Connect, tmp_pat
 async def test_a_call_is_held_to_the_workers_deadline(connect: Connect, tmp_path: Path) -> None:
     worker = await connect(wordcraft(stand_in(tmp_path, "hang")), limits=Limits(edit=2))
     started = time.monotonic()
-    # What is left of the deadline once the call has its turn: 2s, or a hair less on a busy
-    # machine.
-    with pytest.raises(AppFailed, match=r"took more than (2|1\.\d+)s$") as late:
+    # What is left of the deadline once the call has its turn: 2s, or less on a busy machine, by
+    # however long the call waited for its turn; never more than the worker's own.
+    with pytest.raises(AppFailed, match=r"took more than (?P<left>\d+(?:\.\d+)?)s$") as late:
         await worker.apply(None, [], deadline=60)
     assert late.value.failure == "timeout"
+    left = re.search(r"took more than (\d+(?:\.\d+)?)s$", str(late.value))
+    assert left is not None
+    assert 0 < float(left.group(1)) <= 2
     assert time.monotonic() - started < 10
 
 

@@ -7,7 +7,9 @@ import { Connection, useWorkspace } from "../../../../../../../workspace";
 
 /** The workspace's artifacts, as its log holds them: each by kind, and its latest version. */
 export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/artifacts/")({
-  head: ({ params }) => ({ meta: [{ title: `Artifacts · ${params.workspace} · portalr` }] }),
+  head: ({ params, match }) => ({
+    meta: [{ title: match.context.title(`Artifacts · ${params.workspace}`) }],
+  }),
   // The titles are read before the page shows, so no id turns into a title as it opens. They are
   // only names: where they can't be read, the page shows ids, and reads them again on the page.
   // What the log later says changed an artifact makes them stale (`client`'s `stale`), and the

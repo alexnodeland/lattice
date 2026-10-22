@@ -39,7 +39,9 @@ const HEADER = (
  * records who asked and for which kinds of id (portalr ADR-0035). The ids are in the address.
  */
 export const Route = createFileRoute("/_signed/deployment/tools")({
-  head: () => ({ meta: [{ title: "Tools · portalr admin" }] }),
+  head: ({ match }) => ({
+    meta: [{ title: match.context.title("Tools") }],
+  }),
   validateSearch: (search: Record<string, unknown> & SearchSchemaInput) => ({
     ...shownOf(search),
     ignored: ignoredOf(search),

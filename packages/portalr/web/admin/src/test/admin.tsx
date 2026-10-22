@@ -1,3 +1,4 @@
+import { pageTitle } from "@portalr/ui";
 /**
  * admin as a route, over a stubbed server, for the route-level tests: alice is signed in, owns
  * acme, and grantr allows her what a test says there; a test's own `serve` answers the rest.
@@ -85,6 +86,7 @@ export async function open(
       queries: createQueries(api),
       commands: createCommands(api, () => undefined),
       queryClient,
+      title: (...parts: string[]) => pageTitle(config.brand, "admin", ...parts),
     },
   });
   const screen = await render(

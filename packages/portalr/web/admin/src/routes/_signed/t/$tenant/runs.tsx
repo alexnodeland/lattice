@@ -52,7 +52,9 @@ const HEADER = <PageHeader title="Runs" meta="The rules' runs in a workspace" />
  * goes beyond RFC-0002's read-only row for admin (portalr ADR-0032).
  */
 export const Route = createFileRoute("/_signed/t/$tenant/runs")({
-  head: ({ params }) => ({ meta: [{ title: `Runs · ${params.tenant} · portalr admin` }] }),
+  head: ({ params, match }) => ({
+    meta: [{ title: match.context.title(`Runs · ${params.tenant}`) }],
+  }),
   validateSearch: (search: Shown & SearchSchemaInput): Required<Shown> => shownOf(search),
   beforeLoad: ({ context, params }) => opening(context, params.tenant, "reflexr:read_runs"),
   loaderDeps: ({ search }: { search: Required<Shown> }) => ({ workspace: search.workspace }),

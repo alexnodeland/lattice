@@ -111,14 +111,14 @@ tasks:
       app=${CRAFT:-wordcraft} && cli=$($workspaceRoot/scripts/craft $app cli)
       && web=$(case $app in freecad | blender) ;; *) $workspaceRoot/scripts/craft $app web ;; esac)
       && ARTIFACTR_TEST_CRAFT=$app ARTIFACTR_TEST_CRAFT_CLI=$cli ARTIFACTR_TEST_CRAFT_WEB=$web
-      uv run pytest -m craft -p no:cacheprovider tests/files
+      uv run pytest -m craft -p no:cacheprovider --durations=10 tests/files
     # It runs in CI, where Nightly names it; no pull request's job does.
     options:
       cache: false
 
   test-pg:
     description: 'Run the tests on PostgreSQL as well as SQLite (after pg-up)'
-    command: 'uv run pytest --cov --cov-report=term-missing'
+    command: 'uv run pytest --cov --cov-report=term-missing --durations=10'
     env:
       ARTIFACTR_TEST_POSTGRES_URL: 'postgresql+asyncpg://postgres:artifactr@localhost:54329/postgres'
     options:

@@ -16,6 +16,7 @@ import { Alert } from "./alert";
 import { AnsiText } from "./ansi";
 import { Button } from "./button";
 import { cn } from "./cn";
+import { Heading } from "./heading";
 import { Reading } from "./skeleton";
 import { StatusBadge, type Tone } from "./status-badge";
 import type { Standing } from "./trace-view";
@@ -130,9 +131,9 @@ export function LogList({
   return (
     <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
       <section aria-labelledby={`${base}-records`} className="flex min-w-0 flex-col gap-2">
-        <h3 id={`${base}-records`} className="font-semibold text-fg text-sm">
+        <Heading id={`${base}-records`} level={3} look="label">
           {records.length} {records.length === 1 ? "record" : "records"}, newest first
-        </h3>
+        </Heading>
         {!complete && (
           <Alert tone="warn">
             These are the newest: there may be more. A shorter window, or a thread or a run, finds
@@ -235,9 +236,9 @@ function Details({ record, reveal }: { record: LogRecord; reveal: LineReveal }) 
       aria-labelledby={`${base}-record`}
       className="flex min-w-0 flex-col gap-3 rounded-(--card-radius) border border-line bg-surface p-4"
     >
-      <h3 id={`${base}-record`} className="font-semibold text-fg">
+      <Heading id={`${base}-record`} level={3} look="subsection">
         {moment(record.time_ns)}
-      </h3>
+      </Heading>
       <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 text-sm">
         {record.level && <Fact term="Level">{record.level}</Fact>}
         {record.service && <Fact term="Service">{record.service}</Fact>}
@@ -246,9 +247,9 @@ function Details({ record, reveal }: { record: LogRecord; reveal: LineReveal }) 
         <Fact term="Line">{record.length} characters</Fact>
       </dl>
       <section aria-labelledby={`${base}-line`} className="flex flex-col gap-2">
-        <h4 id={`${base}-line`} className="font-semibold text-fg text-sm">
+        <Heading id={`${base}-line`} level={4} look="label">
           Line
-        </h4>
+        </Heading>
         <LineNow record={record} reveal={reveal} />
       </section>
       {record.withheld.length > 0 && (
@@ -257,9 +258,9 @@ function Details({ record, reveal }: { record: LogRecord; reveal: LineReveal }) 
         </p>
       )}
       <section aria-labelledby={`${base}-labels`} className="flex flex-col gap-1">
-        <h4 id={`${base}-labels`} className="font-semibold text-fg text-sm">
+        <Heading id={`${base}-labels`} level={4} look="label">
           Labels
-        </h4>
+        </Heading>
         <dl className="flex flex-col gap-2 text-xs">
           {labels.map(([key, value]) => (
             <div key={key} className="flex min-w-0 flex-col">

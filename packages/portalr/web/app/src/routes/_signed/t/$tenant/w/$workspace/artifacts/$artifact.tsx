@@ -33,8 +33,12 @@ import { Connection, useStream, useWorkspace } from "../../../../../../../worksp
 const ACTIONS = ["artifactr:give_feedback"] as const;
 
 export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/artifacts/$artifact")({
-  head: ({ params }) => ({
-    meta: [{ title: `${params.artifact} · ${params.workspace} · portalr` }],
+  head: ({ params, match }) => ({
+    meta: [
+      {
+        title: match.context.title(`${params.artifact} · ${params.workspace}`),
+      },
+    ],
   }),
   loader: async ({ context, params }) => {
     const { tenant, workspace, artifact } = params;

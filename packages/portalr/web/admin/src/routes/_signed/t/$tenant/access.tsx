@@ -10,7 +10,9 @@ import { ReadFailed } from "../../../../read-failed";
  * part that isn't allowed, or whose read failed, says so here, in the tenant's frame.
  */
 export const Route = createFileRoute("/_signed/t/$tenant/access")({
-  head: ({ params }) => ({ meta: [{ title: `Access · ${params.tenant} · portalr admin` }] }),
+  head: ({ params, match }) => ({
+    meta: [{ title: match.context.title(`Access · ${params.tenant}`) }],
+  }),
   component: () => (
     <Parts>
       <Outlet />

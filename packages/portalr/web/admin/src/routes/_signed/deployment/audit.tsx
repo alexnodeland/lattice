@@ -19,7 +19,9 @@ const HEADER = (
  * `grantr:grant_operator`). A tenant's own changes are in its Audit (portalr ADR-0034).
  */
 export const Route = createFileRoute("/_signed/deployment/audit")({
-  head: () => ({ meta: [{ title: "Audit · portalr admin" }] }),
+  head: ({ match }) => ({
+    meta: [{ title: match.context.title("Audit") }],
+  }),
   // The deployment's layout read who is an operator before letting anyone in.
   loader: ({ context }) =>
     context.queryClient.ensureInfiniteQueryData(

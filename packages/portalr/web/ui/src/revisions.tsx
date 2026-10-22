@@ -24,9 +24,11 @@ import {
   rendererFor,
   ShownContext,
 } from "./artifacts";
+import { Badge } from "./badge";
 import { Button } from "./button";
 import { cn } from "./cn";
 import { Disclosure } from "./disclosure";
+import { Heading } from "./heading";
 import { Icon } from "./icon";
 import { IntegrationsContext } from "./integrations";
 import { LineDiff, lineCounts } from "./line-diff";
@@ -236,9 +238,9 @@ function PartChanges({ part, changes }: Changed) {
   const named = useId();
   return (
     <section aria-labelledby={named} className="flex flex-col gap-1.5">
-      <h4 id={named} className={cn(TYPE.labelQuiet, "first-letter:uppercase")}>
+      <Heading id={named} level={4} look="labelQuiet" className="first-letter:uppercase">
         {part.name}
-      </h4>
+      </Heading>
       {part.diff === "lines" ? (
         <LineDiff changes={changes} name={part.name} />
       ) : (
@@ -392,30 +394,24 @@ function Revision({
         triggerClassName="rounded-(--card-radius) px-4 py-3"
         panelClassName="data-open:pt-0"
         summary={
-          <>
-            <span className="flex min-w-0 flex-col gap-0.5">
-              <span className="flex flex-wrap items-baseline gap-x-2">
-                <span className={TYPE.label}>Version {revision.version}</span>
-                {latest && (
-                  <span className="rounded-sm border border-line px-1.5 text-muted text-xs">
-                    Latest
-                  </span>
+          <span className="flex min-w-0 flex-col gap-0.5">
+            <span className="flex flex-wrap items-baseline gap-x-2">
+              <span className={TYPE.label}>Version {revision.version}</span>
+              {latest && <Badge>Latest</Badge>}
+              <span className={TYPE.note}>
+                by {revision.by}
+                {revision.at && (
+                  <>
+                    {", "}
+                    <When at={revision.at} now={now} />
+                  </>
                 )}
-                <span className={TYPE.note}>
-                  by {revision.by}
-                  {revision.at && (
-                    <>
-                      {", "}
-                      <When at={revision.at} now={now} />
-                    </>
-                  )}
-                </span>
-              </span>
-              <span className={cn(TYPE.meta, "break-words")}>
-                {changedSaid(counted ?? names?.map((part) => ({ part })) ?? null)}
               </span>
             </span>
-          </>
+            <span className={cn(TYPE.meta, "break-words")}>
+              {changedSaid(counted ?? names?.map((part) => ({ part })) ?? null)}
+            </span>
+          </span>
         }
       >
         {open && (

@@ -11,7 +11,9 @@ import { Connection, useStream, useWorkspace } from "../../../../../../workspace
  * head's (portalr ADR-0050).
  */
 export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/proposals")({
-  head: ({ params }) => ({ meta: [{ title: `Proposals · ${params.workspace} · portalr` }] }),
+  head: ({ params, match }) => ({
+    meta: [{ title: match.context.title(`Proposals · ${params.workspace}`) }],
+  }),
   component: Proposals,
 });
 

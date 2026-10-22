@@ -25,6 +25,8 @@ export {
   type RevisionPart,
   rendererFor,
 } from "./artifacts";
+export { Badge } from "./badge";
+export { type Brand, BrandContext, brandName, pageTitle, useBrand, useUiName } from "./brand";
 export { Breadcrumbs, type Crumb } from "./breadcrumbs";
 export { Button, type ButtonSize, type ButtonVariant } from "./button";
 export { Card } from "./card";
@@ -66,6 +68,7 @@ export { EmptyState } from "./empty-state";
 export { failureSaid } from "./failure";
 export { FileChooser } from "./file-chooser";
 export { PageViewer, SheetTable, sheetsOf } from "./file-preview";
+export { Heading } from "./heading";
 export { Icon } from "./icon";
 export { IconButton } from "./icon-button";
 export { IntegrationList, type IntegrationRow, type IntegrationSource } from "./integration-list";

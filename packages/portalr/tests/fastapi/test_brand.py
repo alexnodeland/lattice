@@ -124,11 +124,20 @@ async def test_the_index_by_its_name_is_branded_too(branded_client: httpx.AsyncC
     assert "<title>Nightshade</title>" in response.text
 
 
-async def test_an_unchanged_index_is_not_sent_again(branded_client: httpx.AsyncClient) -> None:
+@pytest.mark.parametrize("asked", ["{tag}", "W/{tag}", '"other", {tag}', "*"])
+async def test_an_unchanged_index_is_not_sent_again(
+    branded_client: httpx.AsyncClient, asked: str
+) -> None:
     first = await branded_client.get("/app/")
-    again = await branded_client.get("/app/", headers={"If-None-Match": first.headers["etag"]})
+    header = asked.format(tag=first.headers["etag"])
+    again = await branded_client.get("/app/", headers={"If-None-Match": header})
     assert again.status_code == 304
     assert again.content == b""
+
+
+async def test_another_tag_gets_the_index(branded_client: httpx.AsyncClient) -> None:
+    again = await branded_client.get("/app/", headers={"If-None-Match": '"other"'})
+    assert again.status_code == 200
 
 
 async def test_config_carries_the_kits_block(branded_client: httpx.AsyncClient) -> None:
@@ -171,7 +180,15 @@ def test_a_hostile_name_is_escaped_and_never_read_as_a_pattern(tmp_path: Path) -
     assert page.count("<title>") == 1
 
 
-@pytest.mark.parametrize("index", ["<!doctype html><title>x</title>", "<head></head>"])
+@pytest.mark.parametrize(
+    "index",
+    [
+        "<!doctype html><title>x</title>",
+        "<head></head>",
+        "<head><!-- <title>x</title> --><title>y</title></head>",
+        "<head><title>x</title><script>'</head>'</script></head>",
+    ],
+)
 def test_an_index_the_kit_cant_be_put_in_fails_the_start(index: str) -> None:
     with pytest.raises(UnbrandableIndex):
         branded(index, kit(), "app")

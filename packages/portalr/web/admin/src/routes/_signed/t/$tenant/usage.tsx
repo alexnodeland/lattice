@@ -5,6 +5,7 @@ import {
   DonutChart,
   EmptyState,
   formatDay,
+  Heading,
   ItemTable,
   Num,
   PageHeader,
@@ -46,7 +47,9 @@ const DAY = { key: "day", name: "Day (UTC)" } as const;
  * tag the libraries' gateways send. The window is in the address (portalr ADR-0028).
  */
 export const Route = createFileRoute("/_signed/t/$tenant/usage")({
-  head: ({ params }) => ({ meta: [{ title: `Usage · ${params.tenant} · portalr admin` }] }),
+  head: ({ params, match }) => ({
+    meta: [{ title: match.context.title(`Usage · ${params.tenant}`) }],
+  }),
   // What a link may give, optional; what the address gives, read with `shownOf`.
   validateSearch: (search: Shown & SearchSchemaInput): Required<Shown> => shownOf(search),
   beforeLoad: ({ context, params }) => opening(context, params.tenant, "portalr:read_spend"),
@@ -173,9 +176,9 @@ function Workspaces({ usage, listed, more }: { usage: Usage; listed: boolean; mo
   const parts = partsOf(usage);
   return (
     <section aria-labelledby="by-workspace" className="flex flex-col gap-3">
-      <h2 id="by-workspace" className="font-semibold text-fg">
+      <Heading id="by-workspace" level={2} look="subsection">
         By workspace
-      </h2>
+      </Heading>
       {usage.workspaces.length > 0 && (
         <DonutChart label="Spend by workspace" parts={parts} format={dollars} />
       )}

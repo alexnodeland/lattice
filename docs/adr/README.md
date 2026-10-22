@@ -34,5 +34,6 @@ Outside its own series, a record is named with its package, as in "reflexr ADR-0
 | [0026](0026-a-distribution-needs-a-reason-integrations-are-extras.md) | A distribution needs a reason; integrations are extras | Accepted |
 | [0027](0027-integrations-switched-per-workspace-through-one-port.md) | Integrations switched per workspace, through one port | Accepted |
 | [0028](0028-a-stuck-test-fails-by-a-signal-and-its-worker-carries-on.md) | A stuck test fails by a signal, and its worker carries on | Accepted |
+| [0029](0029-each-wheel-checked-at-its-floors.md) | Each wheel checked at its floors | Accepted |
 
 To add a record, copy [`template.md`](template.md) to the next number and add a row above. Each package's series uses the same template.

@@ -35,6 +35,11 @@ DEADLINE = 30.0
 LICENCE = re.compile(r"(LICEN[CS]E|COPYING)", re.IGNORECASE)
 DRAWN = {
     "freecad": [AppCommand(name="box", args={"length": 10, "width": 10, "height": 10})],
+    "blender": [
+        AppCommand(name="cube", args={"size": 2}),
+        AppCommand(name="camera", args={"at": [6, -6, 4]}),
+        AppCommand(name="light", args={"type": "sun", "energy": 3, "at": [4, -4, 8]}),
+    ],
     "figcraft": [
         AppCommand(name="frame.create", args={"x": 0, "y": 0, "width": 200, "height": 100})
     ],

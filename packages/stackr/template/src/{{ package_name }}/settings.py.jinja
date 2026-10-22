@@ -202,7 +202,8 @@ class FilesSettings:
             default.
 {%- if use_portal %}
         editors: Each app's editor, by its integration, as people's browsers reach it: by default,
-            for each app that runs and has one, its port on this machine.
+            for each app that runs and has one, its port on this machine, or, with
+            ``FILES_EDITOR_DOMAIN``, ``https://<app>.<domain>/``, its name at a single host's edge.
 {%- endif %}
     """
 
@@ -232,15 +233,21 @@ class FilesSettings:
         """Read native files' settings from ``FILES_*``."""
         crafts = _names(env.get("FILES_CRAFTS", ""))
 {%- if use_portal %}
-        loopback = {
-            f"files:{name}": f"http://127.0.0.1:{env.get(f'{name.upper()}_EDITOR_PORT', port)}/"
+        # On a single host, each editor at the edge, on a name of its own: <app>.<domain>.
+        domain = env.get("FILES_EDITOR_DOMAIN", "")
+        default = {
+            f"files:{name}": (
+                f"https://{name}.{domain}/"
+                if domain
+                else f"http://127.0.0.1:{env.get(f'{name.upper()}_EDITOR_PORT', port)}/"
+            )
             for name, port in EDITORS.items()
             if name in crafts
         }
         editors = (
             _json_object(env["FILES_EDITORS"], "FILES_EDITORS")
             if "FILES_EDITORS" in env
-            else loopback
+            else default
         )
 {%- endif %}
         return cls(

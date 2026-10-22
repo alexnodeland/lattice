@@ -56,6 +56,8 @@
 :root,
 [data-brand] {
   --wash: color-mix(in srgb, var(--accent) 10%, var(--paper));
+  /* What a reader has selected: a deeper tint than the wash, so it reads over a washed row too. */
+  --selection: color-mix(in srgb, var(--accent) 22%, var(--paper));
   /* A destructive action offered, hovered: a tint of the danger colour. */
   --danger-wash: color-mix(in srgb, var(--danger) 12%, transparent);
   --accent-hover: color-mix(in srgb, var(--accent) 88%, var(--on-accent));

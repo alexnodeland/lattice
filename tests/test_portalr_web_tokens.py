@@ -50,7 +50,6 @@ STYLESHEETS = {"tokens.css", "base.css", "styles.css"}
 REMAINING = (
     ("app/src/editor-frame.tsx", "h-[min(80dvh,48rem)]"),
     ("app/src/native-inline.tsx", "h-[min(80dvh,48rem)]"),
-    ("ui/src/app-shell.tsx", "lg:grid-cols-[15.5rem_minmax(0,1fr)]"),
     ("ui/src/dashboard-view.tsx", "grid-cols-[repeat(auto-fit,minmax(9rem,1fr))]"),
     ("ui/src/file-preview.tsx", "h-[min(70dvh,32rem)]"),
     ("ui/src/json-view.tsx", "max-h-[32rem]"),

@@ -867,6 +867,12 @@
       }
     },
     "header": {
+      "clearance": {
+        "$value": {
+          "value": 3.5,
+          "unit": "rem"
+        }
+      },
       "trigger-radius": {
         "$value": "{radius.3}"
       },
@@ -875,6 +881,14 @@
       },
       "trigger-pad-y": {
         "$value": "{space.1-5}"
+      }
+    },
+    "rail": {
+      "width": {
+        "$value": {
+          "value": 15.5,
+          "unit": "rem"
+        }
       }
     },
     "drawer": {

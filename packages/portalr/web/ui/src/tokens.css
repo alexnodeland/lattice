@@ -250,16 +250,19 @@
 
   /*
    * The frame's navigation: a nav link's corners and padding, its count's pill, the header's
-   * triggers (the switcher, the account menu, the home link), and the drawer's width, shadow and
+   * triggers (the switcher, the account menu, the home link), the room a narrow window's pinned
+   * header takes, which a scroll stops below, the rail's width, and the drawer's width, shadow and
    * slide.
    */
   --nav-radius: var(--radius-3);
   --nav-pad-x: var(--space-3);
   --nav-pad-y: var(--space-2);
   --nav-count-radius: var(--radius-full);
+  --header-clearance: 3.5rem;
   --header-trigger-radius: var(--radius-3);
   --header-trigger-pad-x: var(--space-3);
   --header-trigger-pad-y: var(--space-1-5);
+  --rail-width: 15.5rem;
   --drawer-width: 19rem;
   --drawer-shadow: var(--shadow-3);
   --drawer-duration: var(--duration-moderate);

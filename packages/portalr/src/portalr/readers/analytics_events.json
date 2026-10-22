@@ -1,6 +1,41 @@
 {
-  "$comment": "The events portalr records in its analytics (lattice RFC-0008, P6): each by a namespaced, versioned name, with the props keys it may carry. A key not listed is dropped; content, emails and free text are never listed.",
+  "$comment": "The events portalr records in its analytics (lattice RFC-0008, P6): each by a namespaced, versioned name, with the props it may carry, each key with the values it may take, or \"route\", one of the app's router's routes, which the relay checks. A key or a value not listed is dropped: content, emails and free text never are.",
   "events": {
-    "member.invited.v1": ["outcome"]
+    "member.invited.v1": {
+      "outcome": [
+        "invited"
+      ]
+    },
+    "app.page.viewed.v1": {
+      "route": "route"
+    },
+    "app.thread.opened.v1": {
+      "route": "route"
+    },
+    "app.message.sent.v1": {
+      "route": "route"
+    },
+    "app.artifact.opened.v1": {
+      "route": "route",
+      "kind": [
+        "note",
+        "form",
+        "dashboard",
+        "app",
+        "diagram",
+        "native"
+      ]
+    },
+    "app.integration.used.v1": {
+      "route": "route",
+      "integration": [
+        "tracker",
+        "files",
+        "forms",
+        "dashboards",
+        "excalidraw",
+        "markdown"
+      ]
+    }
   }
 }

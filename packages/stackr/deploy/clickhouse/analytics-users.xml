@@ -1,5 +1,6 @@
 <!-- portalr's analytics users (stackr ADR-0044, lattice RFC-0008), from the stack's private
-     networks only. `portalr_analytics_writer` may insert into analytics.events and nothing else.
+     networks only. `portalr_analytics_writer` may insert into analytics.events, and delete a
+     person's events there when they take back their yes, and nothing else.
      `portalr_analytics` may read it, behind a row policy that keeps each query to the tenant its
      SQL_portalr_tenant setting names. Neither's queries reach system.query_log, which Langfuse's
      user reads, and each has a quota, since analytics shares ClickHouse with Langfuse. Their
@@ -21,6 +22,8 @@
       <quota>analytics</quota>
       <grants>
         <query>GRANT INSERT ON analytics.events</query>
+        <!-- A person's events are deleted when they take back their yes (lattice RFC-0008, P5). -->
+        <query>GRANT ALTER DELETE ON analytics.events</query>
       </grants>
     </portalr_analytics_writer>
     <portalr_analytics>

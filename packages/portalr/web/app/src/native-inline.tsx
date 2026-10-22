@@ -238,17 +238,23 @@ function FileView({
     `version ${status.version}`,
   ].filter(Boolean);
   // Its download is the header's, beside its page: the file's head, as its status reads it now,
-  // offered only once the file is read and served, where a failure is said below.
+  // offered only once the file is read and served. A failure is said below, in its controls, and
+  // announced beside the button, since a tall preview can put what is said below out of sight.
   const downloading = saving === "saving";
   const downloadButton = (
-    <IconButton
-      label="Download"
-      icon={Download}
-      aria-busy={downloading || undefined}
-      disabled={downloading}
-      focusableWhenDisabled
-      onClick={() => void download(status.version)}
-    />
+    <>
+      <IconButton
+        label="Download"
+        icon={Download}
+        aria-busy={downloading || undefined}
+        disabled={downloading}
+        focusableWhenDisabled
+        onClick={() => void download(status.version)}
+      />
+      <span role="status" className="sr-only">
+        {saving === "failed" ? `${status.name} wasn't downloaded.` : ""}
+      </span>
+    </>
   );
   return (
     <div className="flex flex-col gap-3">

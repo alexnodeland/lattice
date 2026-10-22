@@ -42,8 +42,13 @@ def test_an_element_id_is_excalidraws_shape() -> None:
 
 
 def test_a_diagram_holds_at_most_its_elements() -> None:
+    assert (MAX_ELEMENTS, MAX_DIAGRAM_BYTES) == (2_000, 1024 * 1024), "phase 0's limits"
+    full = {f"e{i}": element(f"e{i}", isDeleted=i % 2 == 0) for i in range(MAX_ELEMENTS)}
+    assert len(Diagram(name="Plan", elements=full).elements) == MAX_ELEMENTS
     many = {f"e{i}": element(f"e{i}") for i in range(MAX_ELEMENTS + 1)}
-    with pytest.raises(ValidationError, match=f"at most {MAX_ELEMENTS} elements"):
+    with pytest.raises(
+        ValidationError, match=f"at most {MAX_ELEMENTS} elements, deleted ones included"
+    ):
         Diagram(name="Plan", elements=many)
 
 

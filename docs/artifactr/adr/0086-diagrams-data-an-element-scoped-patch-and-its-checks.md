@@ -19,7 +19,16 @@ RFC-0006 makes an Excalidraw diagram an ordinary JSON artifact, edited by JSON P
   - `scene`, what every viewer shares.
 
   An `Element` validates only `id`, `type`, `version`, `versionNonce`, `isDeleted`, `index` and `updated`, and keeps every other field as written, under Excalidraw's own camel-case names. An image is a `DiagramFile` with `Blob`'s shape (`sha256`, `size`, `media_type`). It is kept apart from `Blob` so the data layer doesn't import the `files` extra; images through `Blobs` come with the worker.
-- **The type refuses** an element kept under another's id, an image kept under another's digest, more than 5,000 elements, and more than 1 MiB of JSON. Those two limits are RFC-0006's placeholders, awaiting phase 0's measurements.
+- **The type refuses** an element kept under another's id, an image kept under another's digest, more than 2,000 elements (tombstones included), and more than 1 MiB of JSON. The owner set these limits from phase 0's measurements. Every commit validates and stores the whole document, so its cost grows linearly with the scene. Each edit was one element's `test` and `replace`:
+
+  | Elements | JSON | Edit in memory (median / max) | Edit on SQLite (median / max) | Storage a revision |
+  |---|---|---|---|---|
+  | 26 | 0.02 MB | 0.7 / 1 ms | 5.6 / 10 ms | 24 kB |
+  | 1,334 | 0.76 MB | 30 / 72 ms | 67 / 135 ms | 899 kB |
+  | 6,667 | 3.80 MB | 190 / 297 ms | 391 / 441 ms | 4.5 MB |
+  | 26,667 | 15.2 MB | 967 / 1,787 ms | 2,317 / 3,513 ms | 18 MB |
+
+  At the limits, an edit takes about 40 ms in memory or 90 ms on SQLite, for a revision of about 1.2 MB. The RFC's 5,000 elements would be about 2.9 MB and 200 to 400 ms a commit. PostgreSQL wasn't measured.
 - **The patch builder, `element_patch(base, elements, files)`:**
   - a changed element is `test` of its base version, then `replace`;
   - a new element is `add`;

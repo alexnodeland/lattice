@@ -8,9 +8,10 @@ them, the images it shows by their digests, and what every viewer shares of its 
   ``isDeleted``, ``index`` and ``updated`` are validated; every other field is kept as written,
   so a newer Excalidraw's fields survive, and its client migrates them on load.
 - **A key is its element's id**, and an image's key is its digest.
-- **Limits** hold every revision small, since each stores its whole data and relayr bridges it.
-  They are RFC-0006's placeholders, :data:`MAX_ELEMENTS` and :data:`MAX_DIAGRAM_BYTES`, until
-  its phase 0 measures where artifactr slows.
+- **Limits** hold every revision small, since each stores its whole data and relayr bridges it:
+  :data:`MAX_ELEMENTS` and :data:`MAX_DIAGRAM_BYTES`, as RFC-0006's phase 0 measured them. A
+  commit's cost grows with the whole scene, about 40 ms in memory and 90 ms on SQLite at the
+  limits, for a revision of about 1.2 MB.
 """
 
 import json
@@ -34,13 +35,12 @@ __all__ = [
     "Scene",
 ]
 
-MAX_ELEMENTS: Final = 5_000
-"""The most elements a diagram holds, deleted ones included: RFC-0006's placeholder, awaiting
-its phase 0's measurements."""
+MAX_ELEMENTS: Final = 2_000
+"""The most elements a diagram holds, tombstones included. RFC-0006's phase 0 measured a commit
+at 5,000 at 200 to 400 ms, too slow for its cadence."""
 
 MAX_DIAGRAM_BYTES: Final = 1024 * 1024
-"""The largest diagram, in the UTF-8 bytes of its compact JSON: RFC-0006's placeholder, awaiting
-its phase 0's measurements."""
+"""The largest diagram, in the UTF-8 bytes of its compact JSON, as RFC-0006's phase 0 set it."""
 
 MAX_NAME: Final = 200
 """The longest name of a diagram, in characters."""

@@ -1,6 +1,7 @@
 import { expect, onTestFinished, test } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
+import { RunStatus } from "./chat";
 import { Row, RowLink, Rows } from "./rows";
 import { contrast, token } from "./test/colours";
 
@@ -174,4 +175,70 @@ test("wider, a row's end takes half the row at most", async () => {
     screen.getByText(/12 behind/).element().parentElement as Element
   ).getBoundingClientRect();
   expect(end.width).toBeLessThanOrEqual(row.width / 2 + 1);
+});
+
+test("what is at a row's end sits against the row's end, however wide the row", async () => {
+  await page.viewport(1280, 800);
+  onTestFinished(() => page.viewport(414, 896));
+  for (const width of [1100, 700]) {
+    const screen = await render(
+      <div style={{ width }}>
+        <Rows label={`Threads ${width}`}>
+          <Row name={<RowLink href="#a">A tour</RowLink>} end={<RunStatus status="paused" />} />
+        </Rows>
+      </div>,
+    );
+    const list = screen.getByRole("list", { name: `Threads ${width}` });
+    const row = list.getByRole("listitem").element();
+    const status = row.querySelector("[role=status]") as HTMLElement;
+    const badge = status.getBoundingClientRect();
+    const end =
+      row.getBoundingClientRect().right - Number.parseFloat(getComputedStyle(row).paddingRight);
+    expect(Math.abs(badge.right - end)).toBeLessThan(1);
+    // And it is within its column, not spilling out of it towards the name.
+    const column = (status.parentElement as HTMLElement).getBoundingClientRect();
+    expect(badge.left).toBeGreaterThanOrEqual(column.left - 0.5);
+  }
+});
+
+test("an end of several controls sits against the row's end, and wraps within half the row", async () => {
+  await page.viewport(1280, 800);
+  onTestFinished(() => page.viewport(414, 896));
+  const screen = await render(
+    <div style={{ width: 900 }}>
+      <Rows label="Uploads">
+        <Row
+          name={<RowLink href="#u">brief.docx</RowLink>}
+          meta="Word document, 48 kB"
+          end={
+            <>
+              <span>Uploaded</span>
+              <button type="button">Open</button>
+              <button type="button">Remove</button>
+            </>
+          }
+        />
+        <Row
+          name={<RowLink href="#w">a-very-long-name-that-takes-the-row.xlsx</RowLink>}
+          end={<span>{"3 sheets, 12 tables, 2 charts, ".repeat(5)}</span>}
+        />
+      </Rows>
+    </div>,
+  );
+  const rows = screen.getByRole("listitem").elements();
+  const [first, second] = rows as [HTMLElement, HTMLElement];
+  const edge = (row: HTMLElement) =>
+    row.getBoundingClientRect().right - Number.parseFloat(getComputedStyle(row).paddingRight);
+  const remove = screen.getByRole("button", { name: "Remove" }).element().getBoundingClientRect();
+  expect(Math.abs(remove.right - edge(first))).toBeLessThan(1);
+  // Each control keeps its own target, above the row's link.
+  const open = screen.getByRole("button", { name: "Open" }).element();
+  const box = open.getBoundingClientRect();
+  expect(document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)).toBe(open);
+  // A long end wraps within half the row, and the name keeps the other half.
+  const end = (
+    screen.getByText(/3 sheets/).element().parentElement as HTMLElement
+  ).getBoundingClientRect();
+  expect(end.width).toBeLessThanOrEqual(second.getBoundingClientRect().width / 2 + 1);
+  expect(Math.abs(end.right - edge(second))).toBeLessThan(1);
 });

@@ -38,6 +38,7 @@ const thread = (...messages: Artifactr.Message[]): Artifactr.Thread => ({
   focus: [],
   messages,
   active: 1,
+  activeAt: null,
 });
 
 test("a failed turn is tried again with the message that started it, under the run's own id", () => {

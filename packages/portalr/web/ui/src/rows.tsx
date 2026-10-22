@@ -14,9 +14,11 @@ export function Rows({ label, children }: { label: string; children: ReactNode }
 
 /**
  * One row (portalr ADR-0060): what it is, its `name`, first, then what is said about it, quieter,
- * beneath, each wrapping rather than cut, so nothing in a row is hidden, and at its end what it is doing or what can be done to it. Where the row is
- * narrow, its end goes under its meta, so a long end never squeezes its name. Its `RowLink`, if its
- * name is one, is the whole row's target; what is at its end stays its own target, above it.
+ * beneath, each wrapping rather than cut, so nothing in a row is hidden; and at its end what it is
+ * doing or what can be done to it, against the row's end, in a column no wider than half the row.
+ * Where the row is narrow, its end goes under its meta, so a long end never squeezes its name. Its
+ * `RowLink`, if its name is one, is the whole row's target; what is at its end stays its own
+ * target, above it.
  */
 export function Row({
   name,
@@ -30,7 +32,7 @@ export function Row({
 }) {
   return (
     <li
-      className="relative grid grid-cols-1 items-center gap-x-(--list-row-gap) gap-y-(--list-row-line-gap) px-(--list-row-pad-x) py-(--list-row-pad-y) text-sm has-[a:hover]:bg-wash has-[a:focus-visible]:bg-wash sm:grid-cols-[minmax(0,1fr)_auto]"
+      className="relative grid grid-cols-1 items-center gap-x-(--list-row-gap) gap-y-(--list-row-line-gap) px-(--list-row-pad-x) py-(--list-row-pad-y) text-sm has-[a:hover]:bg-wash has-[a:focus-visible]:bg-wash sm:grid-cols-[minmax(0,1fr)_fit-content(50%)]"
       {...props}
     >
       <div className="flex min-w-0 flex-col gap-(--list-row-line-gap)">
@@ -38,7 +40,7 @@ export function Row({
         {meta && <div className="min-w-0 break-words text-muted">{meta}</div>}
       </div>
       {end && (
-        <div className="relative z-10 flex flex-wrap items-center gap-x-3 gap-y-1 sm:max-w-1/2 sm:justify-end">
+        <div className="relative z-10 flex flex-wrap items-center gap-x-3 gap-y-1 sm:justify-end">
           {end}
         </div>
       )}

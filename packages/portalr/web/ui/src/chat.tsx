@@ -577,11 +577,12 @@ function Question({
 
 /**
  * What a connected app's call does, beside its arguments (artifactr ADR-0085): that it runs code,
- * or fetches, in the operator's own app, with their privileges; the code itself, whole, to read
- * and copy; and what a scan found in it, which is advisory: the person reading is the gate.
+ * or fetches, in the operator's own app, with their privileges, and from where; the code itself,
+ * whole, to read and copy; what a scan found in it, which is advisory: the person reading is the
+ * gate; and how many of the workspace's calls an hour this one is.
  */
 function Review({ review }: { review: Record<string, unknown> }) {
-  const { app, risk, runs, holds, code, findings } = review;
+  const { app, risk, runs, reaches, holds, hour, code, findings } = review;
   if (typeof app !== "string" || typeof runs !== "string") {
     return null;
   }
@@ -595,7 +596,9 @@ function Review({ review }: { review: Record<string, unknown> }) {
           : `Runs code in your ${app}`}
       </StatusBadge>
       <p>{runs}</p>
+      {typeof reaches === "string" && <p>{`It reaches ${reaches}.`}</p>}
       {typeof holds === "string" && <p>{holds}</p>}
+      {typeof hour === "string" && <p>{hour}</p>}
       {typeof code === "string" && (
         <>
           {lines > FOLDED_LINES && (

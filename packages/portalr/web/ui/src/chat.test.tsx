@@ -311,6 +311,31 @@ test("a scan that found nothing says it can't find everything, and long code say
   await expect.element(screen.getByText("An approval holds.")).toBeVisible();
 });
 
+test("a download says where it reaches, and a call how many of the hour's it is", async () => {
+  const request: ArtifactrV1.DeferredRequest = {
+    kind: "approval",
+    tool_call_id: "t1",
+    tool_name: "blender_import_asset",
+    args: { source: "sketchfab", id: "abc" },
+    review: {
+      app: "Blender",
+      risk: "network",
+      runs: "Downloads from the internet into your Blender.",
+      reaches: "Sketchfab: api.sketchfab.com",
+      holds: "An approval holds.",
+      hour: "2 of the 30 calls to Blender this workspace may run an hour have run.",
+    },
+  };
+  const screen = await render(<Request request={request} onAnswer={sent()} />);
+  const card = screen.getByRole("region", { name: "Approve blender_import_asset?" });
+  await expect.element(card.getByText("It reaches Sketchfab: api.sketchfab.com.")).toBeVisible();
+  await expect
+    .element(
+      card.getByText("2 of the 30 calls to Blender this workspace may run an hour have run."),
+    )
+    .toBeVisible();
+});
+
 test("a character a reader wouldn't see is shown as its code point", () => {
   expect(unhidden("a\u202eb\u200bc\u0000")).toBe(
     "a\u27e6U+202E\u27e7b\u27e6U+200B\u27e7c\u27e6U+0000\u27e7",

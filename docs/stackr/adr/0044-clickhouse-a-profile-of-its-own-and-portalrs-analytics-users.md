@@ -17,11 +17,11 @@ The owner decided on 2026-10-22 that ClickHouse gets a profile of its own, pulle
 
 ## Decision
 
-- **ClickHouse is listed under `profiles: [clickhouse, langfuse, analytics]`.** Compose starts a service when any of its profiles is active, as PostgreSQL's several profiles already do, so:
+- **ClickHouse is listed under `profiles: [clickhouse, langfuse, analytics]`.** Compose starts a service when any of its profiles is active, as `db-init`'s `[langfuse, gateway, auth]` already does, so:
   - `langfuse` alone still starts ClickHouse, and Langfuse is unchanged;
   - `analytics` alone starts it without Langfuse's containers;
   - `clickhouse` alone is there for an operator.
-- **`CLICKHOUSE_PASSWORD`, Langfuse's password, is asked for only where Langfuse runs.** ClickHouse's own environment no longer requires it when Langfuse is off. The exact Compose expression is for the first slice.
+- **`CLICKHOUSE_PASSWORD`, Langfuse's password, is asked for only where Langfuse runs, and the `langfuse` user is never left with an empty password.** `langfuse` signs in from `::/0`, so an empty password would open ClickHouse to the stack's network. The invariant: where Langfuse is off, either the `langfuse` user isn't made, or it has a generated password no one is given; never an empty one. The first slice picks the Compose expression that keeps it, and the smoke test signs in as `langfuse` with an empty password and is refused, with and without Langfuse.
 - **Two users join ADR-0031's, in `users.xml`:**
   - `portalr_analytics_writer`:
     - `INSERT` on `analytics.events`, and nothing else: no `SELECT`, no other database, no system table;
@@ -31,11 +31,16 @@ The owner decided on 2026-10-22 that ClickHouse gets a profile of its own, pulle
     - a readonly profile;
     - its password is `CLICKHOUSE_ANALYTICS_PASSWORD`.
   - Like ADR-0031's, both passwords are marked `hide_in_preprocessed`, and each user has a quota, so a heavy read can't starve Langfuse.
+  - Both sign in only from the stack's internal network, where the application runs: the Compose network's range locally, the state host's private subnet on AWS. Not `::/0`, as `langfuse` does.
 - **`langfuse` still reaches only `default`.** It has no grant on `analytics`, and the analytics users have none on `default`.
 - **The `analytics` database and its table are made by the first slice,** as `admin`, from an init step that runs before portalr's application starts. portalr's users can't make or alter a table.
-- **The backups take `analytics`:** `BACKUP DATABASE default, DATABASE analytics, DATABASE stackr_drill`, on the single host and the state host. The restore drill restores `analytics` too, and checks a row count. A database that doesn't exist yet, where analytics is off, is made empty first, so one statement serves both.
+- **The backups take `analytics`:** `BACKUP DATABASE default, DATABASE analytics, DATABASE stackr_drill`, on the single host and the state host. A database that doesn't exist yet, where analytics is off, is made empty first, so one statement serves both.
+- **The `backup` user's grants grow,** in `deploy/host/clickhouse/backup-user.xml`, which the state host mounts too: `SELECT, BACKUP ON analytics.*` beside today's `SELECT, BACKUP ON default.*`, or the backup statement is refused. That is part of the first slice.
+- **The drill restores `analytics` and checks a row count.** Today the drill backs up and restores only `stackr_drill` (`deploy/host/restore-drill`). Restoring `analytics` from the nightly backup into a scratch database needs `backup` to have `ALL` on that scratch database (as it has on `restore_drill` and `restore_sentinel`), and `SELECT` there to count.
+- **`langfuse` keeps `SELECT` on `system.query_log`,** which ADR-0031 gave it, so it could read analytics' query text. `query_masking_rules` redact the literals of any statement on `analytics.`, and portalr sends inserts' rows in the request body, not the query text. A test reads `system.query_log` as `langfuse` after an analytics read and insert, and finds no tenant id and no `distinct_id`.
 - **Grafana's ClickHouse datasource** is a later phase (RFC-0008, phase 3). Whether the plugin is baked into the image or installed at start is still open there. When it lands, it reads as a `grafana_analytics` user with `SELECT` on `analytics.events` and no row policy, since operators read across tenants (portalr ADR-0005).
 - **The smoke test grows:**
+  - `langfuse` with an empty password is refused, with Langfuse on and off;
   - with `analytics` alone, ClickHouse starts and Langfuse's containers don't;
   - the writer can insert and can't select;
   - the reader can't read without its tenant setting;

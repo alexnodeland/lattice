@@ -33,15 +33,16 @@ The constraints are lattice's own: a customer admin must never see another tenan
 
 ### P1. The store: a database of portalr's own, on a ClickHouse of its own profile
 
-- **ClickHouse gets its own profile**, `clickhouse`, which both `langfuse` and `analytics` pull in. The service is listed under all three (`profiles: [clickhouse, langfuse, analytics]`), as PostgreSQL is listed under several today. Analytics works without Langfuse, and Langfuse is unchanged (owner, 2026-10-22).
+- **ClickHouse gets its own profile**, `clickhouse`, which both `langfuse` and `analytics` pull in. The service is listed under all three (`profiles: [clickhouse, langfuse, analytics]`), as `db-init` is listed under `[langfuse, gateway, auth]` today. Analytics works without Langfuse, and Langfuse is unchanged (owner, 2026-10-22).
 - **ClickHouse is the source of truth.** Umami, when it runs, is a second consumer of the relay's events, never the record.
 - **One database, `analytics`, holds one table to start, `events`,** partitioned by `toYYYYMM(ts)`, ordered by `(tenant_id, workspace_id, event, ts)`, with a `TTL` (P5).
 - **Two users join `admin` and `langfuse`:**
   - `portalr_analytics_writer`: `INSERT` on `analytics.events` and nothing else.
   - `portalr_analytics`: `SELECT` on `analytics.events`, behind a row policy (P4).
+  - Both sign in only from the stack's internal network, where the application runs, not from `::/0` as `langfuse` does, and not from outside.
   - Neither reaches `default` or Langfuse's tables, and `langfuse` doesn't reach `analytics`.
 - **Writes are batched,** with ClickHouse's async inserts or a small buffer in the relay. Which one is for phase 0, from measurements.
-- **Backups name `analytics`** beside `default` and the drill's database, on the single host and the state host, and the drill restores it too.
+- **Backups name `analytics`** beside `default` and the drill's database, on the single host and the state host. The `backup` user's grants (`deploy/host/clickhouse/backup-user.xml`, today `SELECT, BACKUP ON default.*`) grow to `analytics.*`, or the scripts' statement is refused. The drill restoring it needs grants on the databases it restores into (stackr ADR-0044).
 
 The `events` table, a `MergeTree`:
 
@@ -59,7 +60,7 @@ The `events` table, a `MergeTree`:
 
 ### P2. Capture: a same-origin relay and a server-side helper
 
-- **`POST /portalr/v1/events`** is same-origin and needs the signed-in user's token, so the CSP stays `'self'` and no third-party script loads.
+- **`POST /portalr/v1/events`** is same-origin and needs the signed-in user's token, so the CSP stays `'self'` and no third-party script loads. It caps a request's body and the events in it, and is rate-limited per person.
 - **What the relay does to each event:**
   - checks consent (P3) and drops the event without it;
   - checks the name against the registry (P6) and drops any key the registry doesn't allow;
@@ -88,8 +89,9 @@ The `events` table, a `MergeTree`:
      - a query with the setting for tenant A sees only A's rows;
      - with no setting, it sees none, or fails;
      - it can't change the setting by `SET` within a readonly profile, if `readonly=2` allows only the query-level setting (to measure);
-     - `system.query_log` shows the setting, for audit.
+     - `system.query_log` shows the setting, for audit; see P4's note on who else reads that log.
 - **If the pattern fails,** the fallback is a ClickHouse user per tenant made by portalr (heavier), or the reader alone, with the decision recorded.
+- **`system.query_log` is readable by `langfuse`** (ADR-0031 granted it, to follow its own queries' progress), so it could read analytics' query text: tenant ids, `distinct_id` hashes, and an insert's values where they are inline. stackr ADR-0044 picks masking: ClickHouse's `query_masking_rules` redact the literals in any statement on `analytics.`, and the relay sends inserts' data in the request body, not the query text, so it never reaches the log. Langfuse keeps the grant it needs.
 - **Operators read across tenants** in Grafana, as `admin` or a read-only `grafana_analytics` user with no row policy. [portalr ADR-0005](../portalr/adr/0005-operators-see-across-tenants.md) allows this.
 - **Two-tenant acceptance tests** ([portalr ADR-0012](../portalr/adr/0012-acceptance-against-a-two-tenant-stack.md)) show tenant A's Adoption page never counts B's events.
 
@@ -105,6 +107,8 @@ CREATE ROW POLICY tenant_wall ON analytics.events
 - **Default retention is 395 days** (13 months, so a year can be compared with the one before), as a table `TTL`.
 - **The operator sets it per deployment** (`PORTAL_ANALYTICS_RETENTION_DAYS`). Tenants can't shorten it in v1 (owner, 2026-10-22).
 - **`distinct_id` is `HMAC-SHA-256(key, user_id)`,** truncated to 128 bits and kept hex. Analytics never holds the raw user id, and a person's events can still be found and deleted by computing the hash. The key's scope (per deployment or per tenant) is an open question.
+- **The key is a secret of the deployment's,** generated by `make env` (`PORTAL_ANALYTICS_KEY`), held as the other secrets are, and never in ClickHouse. Rotating it breaks deletion by person for the events hashed under the old key, so a rotation either keeps the old key to delete with until its events age out under the TTL, or re-keys the table by a mutation; which one is for the ADR that adds the key. It is never rotated silently.
+- **Backups keep deleted persons' events** until the bucket's lifecycle rule expires the backups that hold them. A deletion is not retroactive in a backup, and the operator's guide says so, with the backups' retention.
 - **Deletion:**
   - a person: `DELETE FROM analytics.events WHERE distinct_id = …` (a lightweight delete), when they withdraw consent or are removed;
   - a tenant: by `tenant_id`.
@@ -136,7 +140,8 @@ CREATE ROW POLICY tenant_wall ON analytics.events
   - **Consent:** separate from analytics consent, opt-in, per person, and withdrawable, which deletes that person's recordings.
   - **Links:** a replay links to its traces by `session.id`, and a trace links to its replay. Whether a replay can be opened by session id in Umami is **unverified**, for phase 0. If it can't, ClickStack (HyperDX) is the fallback to look at again.
   - **Retention:** no longer than analytics' own, and shorter if the review asks.
-  - **Exit criterion:** a privacy review of replay signs off before replay is turned on in any release. It covers the masking rules against every route in both UIs (a screenshot of each, masked), the consent flow, the retention, and where the recordings are kept. Without it the profile ships with replay off.
+  - **The relay to Umami** strips `X-Forwarded-For` and the user agent, and sends events from portalr's own address, so Umami sees no person's network or browser. It checks replay consent server-side on every replay payload, caps each payload's size, and is rate- and body-limited per person, as the events route is.
+  - **Exit criterion:** a privacy review of replay signs off before replay is turned on in any release. It covers the masking rules against every route in both UIs (a screenshot of each, masked), the consent flow, the trace links (the `session.id` join between a replay and its traces, and who can follow it either way), the retention, and where the recordings are kept. Without it the profile ships with replay off.
 
 ## Phases
 
@@ -155,7 +160,7 @@ About 8 to 9 PRs, batched where they share a review:
 
 One PR, with no browser capture and no UI:
 
-1. the `analytics` database, the `events` table, and the two users, in `users.xml` and an init step; the `clickhouse` profile; backups naming the database;
+1. the `analytics` database, the `events` table, and the two users, in `users.xml` and an init step; the `clickhouse` profile, with `langfuse` never left with an empty password; backups naming the database, with the `backup` user's grants on it and the drill's on its scratch database; the `query_masking_rules` for `analytics.`;
 2. one server-side event, `integration.used.v1`, from an existing action;
 3. the `analytics` reader, with the test that every query carries the tenant;
 4. a two-tenant test: A's reads never see B's rows, through the reader and through the row policy (the phase 0 experiment above);

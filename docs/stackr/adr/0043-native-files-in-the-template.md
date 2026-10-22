@@ -1,6 +1,6 @@
 # ADR-0043: Native files in the template: a worker for each app, with no route out, and its editor on a loopback origin
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0046](0046-native-files-a-relay-a-slimmer-worker-blender-and-the-editors-at-the-edge.md)
 **Date:** 2026-10-20
 **Deciders:** Alex Nodeland
 
@@ -148,9 +148,9 @@ Building the worker from the application's own Dockerfile costs image size, a fe
 1. [x] `native_files` in the template, `Files` and `editor.py`, the worker's and editor's targets, a network and a token for each worker, the containers' limits, the sweep after each call, and `make up FILES=...`.
 2. [x] The release-pin check in `scripts/check-template`.
 3. [x] `scripts/check-files`, and CI's "Native files" job.
-4. [ ] An upload route for a new native file, in artifactr, and portalr's control.
-5. [ ] The image's digest as `WORKER_BUILD`.
-6. [ ] The editors on a single host's edge, on host names of their own.
-7. [ ] A relay between the application and the workers, so no worker reaches the application's unauthenticated routes.
-8. [ ] A slimmer worker image: `artifactr-ai[files]` alone, at the application's lock.
-9. [ ] Blender's worker in the template: an x86_64-only image, its 4 GiB floor in the limits and the container's memory, and its GPL notices and source offer.
+4. [x] An upload route for a new native file, in artifactr, and portalr's control.
+5. [x] The image's digest as `WORKER_BUILD`.
+6. [x] The editors on a single host's edge, on host names of their own.
+7. [x] A relay between the application and the workers, so no worker reaches the application's unauthenticated routes.
+8. [x] A slimmer worker image: `artifactr-ai[files]` alone, at the application's lock.
+9. [x] Blender's worker in the template: an x86_64-only image, its 4 GiB floor in the limits and the container's memory, and its GPL notices and source offer.

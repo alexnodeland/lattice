@@ -1,9 +1,10 @@
 """Native files: files in an app's own format, kept as artifacts (lattice RFC-0003).
 
-Each app ``FILES_CRAFTS`` names runs in a worker of its own, ``files-<app>`` in the app profile:
-its pinned CLI, under the worker's limits, in a read-only container on a network of its own,
-``files-<app>``, which has no route out (stackr ADR-0043). This application joins each, and calls
-the worker there, by its name, with its own token, ``FILES_<APP>_TOKEN``. With no app named,
+Each app ``FILES_CRAFTS`` names runs in a worker of its own, ``files-<app>-worker``: its pinned
+CLI, under the worker's limits, in a read-only container on a network of its own, which has no
+route out (stackr ADR-0043). This application calls it through its relay, ``files-<app>``, on the
+``files`` network, with the worker's own token, ``FILES_<APP>_TOKEN``; the worker never reaches
+this application (stackr ADR-0046). With no app named,
 native files are off: no route is mounted, and the agent has no tools for them.
 
 - ``/artifactr/v1/workspaces/{w}/files/...``: a file's head, check-out and check-in, and each
@@ -48,7 +49,7 @@ TYPES: Final[Mapping[str, type[NativeFile]]] = {
 
 
 def worker_url(craft: str) -> str:
-    """Where an app's worker answers, on its network: its service's name."""
+    """Where an app's worker answers: its relay, on the ``files`` network."""
     return f"http://files-{craft}:8080"
 
 

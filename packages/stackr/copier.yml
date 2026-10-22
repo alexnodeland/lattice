@@ -216,8 +216,8 @@ crafts:
       memory: 4
       # The X11 and GL libraries its tarball links, and Mesa, which draws its pages with no GPU.
       packages:
-        [libx11-6, libxi6, libxxf86vm1, libxfixes3, libxrender1, libxkbcommon0, libgl1, libegl1,
-         libegl-mesa0, libgl1-mesa-dri]
+        [libx11-6, libxi6, libxxf86vm1, libxfixes3, libxrender1, libxkbcommon0, libsm6, libice6,
+         libgl1, libegl1, libegl-mesa0, libgl1-mesa-dri]
       # GPL-3.0: its source, offered with it.
       source: https://download.blender.org/source/blender-5.2.2.tar.xz
   when: false

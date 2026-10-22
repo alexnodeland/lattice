@@ -419,7 +419,7 @@ test("a workbook whose build hands it over is edited in its editor, framed here,
   const frame = editor.element() as HTMLIFrameElement;
   expect(frame.getAttribute("src")).toBe("http://127.0.0.1:9/.lattice/shim.html");
   expect(frame.getAttribute("sandbox")).toBe(
-    "allow-scripts allow-same-origin allow-downloads allow-modals allow-forms",
+    "allow-scripts allow-same-origin allow-downloads allow-modals allow-forms allow-popups",
   );
   expect(frame.getAttribute("allow")).toBe("clipboard-read; clipboard-write");
   await expect.element(book.getByText("Opening figures.xlsx in GridCraft")).toBeVisible();

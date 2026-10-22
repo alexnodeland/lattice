@@ -23,7 +23,7 @@ export const INTEGRATIONS = [
   {"key":"ui:forms","default":true,"description":"Forms: the agent asks with a form, and people fill it in the chat."},
   {"key":"ui:dashboards","default":true,"description":"Dashboards: the agent shows figures and charts as a dashboard in the chat."},
   {"key":"ui:mini-apps","default":false,"description":"Mini apps: small apps the agent writes, run apart from the portal."},
-  {"key":"excalidraw","default":true,"description":"Diagrams: Excalidraw drawings that people and agents draw on together."},
+  {"key":"excalidraw","default":false,"description":"Diagrams: Excalidraw drawings that people and agents draw on together."},
   {"key":"markdown:math","default":true,"description":"Math: formulas in messages and documents, typeset."},
   {"key":"markdown:mermaid","default":false,"description":"Mermaid: diagrams written as text in messages, drawn."},
   {"key":"connect:freecad","default":false,"description":"Connected FreeCAD: the agent reads and edits the FreeCAD its operator runs."},

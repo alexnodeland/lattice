@@ -26,7 +26,6 @@ const ON_BY_DEFAULT: ReadonlySet<IntegrationKey> = new Set([
   "files:wordcraft",
   "ui:forms",
   "ui:dashboards",
-  "excalidraw",
   "markdown:math",
 ]);
 

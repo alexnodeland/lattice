@@ -1,0 +1,103 @@
+<!-- portalr's analytics users (stackr ADR-0044, lattice RFC-0008), from the stack's private
+     networks only. `portalr_analytics_writer` may insert into analytics.events and nothing else.
+     `portalr_analytics` may read it, behind a row policy that keeps each query to the tenant its
+     SQL_portalr_tenant setting names. Neither's queries reach system.query_log, which Langfuse's
+     user reads, and each has a quota, since analytics shares ClickHouse with Langfuse. Their
+     passwords come from the environment, which compose.yaml requires, and are kept out of the
+     preprocessed configuration ClickHouse writes to its data volume. -->
+<clickhouse>
+  <users>
+    <portalr_analytics_writer>
+      <password from_env="CLICKHOUSE_ANALYTICS_WRITER_PASSWORD" hide_in_preprocessed="true"/>
+      <networks>
+        <ip>127.0.0.1</ip>
+        <ip>::1</ip>
+        <ip>10.0.0.0/8</ip>
+        <ip>172.16.0.0/12</ip>
+        <ip>192.168.0.0/16</ip>
+        <ip>fc00::/7</ip>
+      </networks>
+      <profile>analytics_writer</profile>
+      <quota>analytics</quota>
+      <grants>
+        <query>GRANT INSERT ON analytics.events</query>
+      </grants>
+    </portalr_analytics_writer>
+    <portalr_analytics>
+      <password from_env="CLICKHOUSE_ANALYTICS_PASSWORD" hide_in_preprocessed="true"/>
+      <networks>
+        <ip>127.0.0.1</ip>
+        <ip>::1</ip>
+        <ip>10.0.0.0/8</ip>
+        <ip>172.16.0.0/12</ip>
+        <ip>192.168.0.0/16</ip>
+        <ip>fc00::/7</ip>
+      </networks>
+      <profile>analytics_reader</profile>
+      <quota>analytics</quota>
+      <grants>
+        <query>GRANT SELECT ON analytics.events</query>
+      </grants>
+      <!-- The tenant wall behind portalr's reader: a row is seen only by a query whose
+           SQL_portalr_tenant setting names its tenant. Without the setting, a query fails. -->
+      <databases>
+        <analytics>
+          <events>
+            <filter>tenant_id = getSetting('SQL_portalr_tenant')</filter>
+          </events>
+        </analytics>
+      </databases>
+    </portalr_analytics>
+  </users>
+  <profiles>
+    <!-- Inserts are gathered into parts by ClickHouse, and each waits until it is written. Its
+         limits are fixed: an insert can't lift them, or turn logging on. -->
+    <analytics_writer>
+      <async_insert>1</async_insert>
+      <wait_for_async_insert>1</wait_for_async_insert>
+      <log_queries>0</log_queries>
+      <max_execution_time>10</max_execution_time>
+      <max_memory_usage>500000000</max_memory_usage>
+      <max_threads>2</max_threads>
+      <max_concurrent_queries_for_user>16</max_concurrent_queries_for_user>
+      <constraints>
+        <log_queries><readonly/></log_queries>
+        <async_insert><readonly/></async_insert>
+        <max_execution_time><readonly/></max_execution_time>
+        <max_memory_usage><readonly/></max_memory_usage>
+        <max_threads><readonly/></max_threads>
+        <max_concurrent_queries_for_user><readonly/></max_concurrent_queries_for_user>
+      </constraints>
+    </analytics_writer>
+    <!-- Reads are read-only (readonly 1): they may change one setting, the tenant the row policy
+         reads, and no other, so a read can't turn logging on or lift its own limits; no analytics
+         query reaches system.query_log; and each is bounded: a 90-day funnel over one tenant's
+         half a million rows took under 140 ms and ClickHouse 423 MiB in all (RFC-0008). -->
+    <analytics_reader>
+      <readonly>1</readonly>
+      <max_execution_time>10</max_execution_time>
+      <max_memory_usage>1000000000</max_memory_usage>
+      <max_threads>4</max_threads>
+      <max_rows_to_read>200000000</max_rows_to_read>
+      <max_bytes_to_read>20000000000</max_bytes_to_read>
+      <max_result_rows>100000</max_result_rows>
+      <max_concurrent_queries_for_user>4</max_concurrent_queries_for_user>
+      <log_queries>0</log_queries>
+      <constraints>
+        <SQL_portalr_tenant><changeable_in_readonly/></SQL_portalr_tenant>
+      </constraints>
+    </analytics_reader>
+  </profiles>
+  <quotas>
+    <!-- Analytics shares ClickHouse with Langfuse: an hour's reads and writes are bounded. -->
+    <analytics>
+      <interval>
+        <duration>3600</duration>
+        <queries>5000</queries>
+        <errors>500</errors>
+        <read_rows>500000000</read_rows>
+        <execution_time>600</execution_time>
+      </interval>
+    </analytics>
+  </quotas>
+</clickhouse>

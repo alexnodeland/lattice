@@ -37,6 +37,10 @@ Over `db-init`'s own connection to the adapter (its host, admin role and network
 
 It sends a trace with a known id to the Collector's HTTP port, and finds it in Langfuse through the public API, `/api/public/v2/observations`, and in Tempo. That checks the Collector's route to Langfuse, its credentials and Langfuse's ingestion, end to end. It needs `observability` too.
 
+### `analytics`
+
+ClickHouse runs without Langfuse's containers when `langfuse` isn't chosen, and `clickhouse-init` has made `analytics.events`. Its writer inserts two tenants' events and is refused a read; its reader sees only the tenant its `SQL_portalr_tenant` setting names, fails without it, and is refused an insert and turning query logging on. Langfuse's user is refused `analytics`, and an empty password. portalr's own reader and writer (`packages/portalr/scripts/smoke_analytics.py`) record events in two new tenants and read each back alone. Last, `system.query_log`, which Langfuse's user reads, holds no analytics query ([ADR-0044](../adr/0044-clickhouse-a-profile-of-its-own-and-portalrs-analytics-users.md)).
+
 ### `gateway`
 
 - The proxy loaded both guardrails, `pii-mask` and `prompt-injection`, and serves both model groups, `default` and `fast`.
@@ -104,13 +108,14 @@ At the end it removes the application, its image and volumes, the key, the user,
 
 ## In CI
 
-CI's smoke job starts the stack four ways, each on a fresh runner, and runs `make smoke` against it:
+CI's smoke job starts the stack five ways, each on a fresh runner, and runs `make smoke` against it:
 
 | Run | Profiles | Database |
 |---|---|---|
 | observability | `observability` | None |
 | everything on local Supabase, and an application | `observability langfuse gateway`, then `make smoke-app` | Local Supabase |
 | everything on PostgreSQL | `observability langfuse gateway` | Plain PostgreSQL |
-| a single host, behind Caddy, and an application | `observability langfuse gateway auth`, with `STACKR_RECIPE=host` and Caddy's own CA, then `make smoke-app`, then the backups to a MinIO of the job's own and the restore drill | Plain PostgreSQL |
+| analytics, without Langfuse | `analytics` | None |
+| a single host, behind Caddy, and an application | `observability langfuse gateway auth analytics`, with `STACKR_RECIPE=host` and Caddy's own CA, then `make smoke-app`, then the backups to a MinIO of the job's own and the restore drill | Plain PostgreSQL |
 
 It installs the Supabase CLI version pinned in `versions.env`, and starts Supabase without the services the smoke tests don't use (`SUPABASE_START_FLAGS`). When a run fails, it prints every container and the last 200 lines of each service's logs, and it always ends with `make reset`.

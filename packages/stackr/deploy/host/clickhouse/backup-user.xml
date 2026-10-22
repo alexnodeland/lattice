@@ -1,8 +1,10 @@
 <!-- The user deploy/host/backup and restore-drill run as, from inside the container only: it may
-     read and back up Langfuse's database, use the bucket, read the system tables the drill needs,
-     and own the drill's three databases. It can't write Langfuse's tables: ClickHouse's `admin`
-     restores a new host (ADR-0031). Langfuse's own user can't reach the bucket. Its password is
-     kept out of the preprocessed configuration ClickHouse writes to its data volume. -->
+     read and back up Langfuse's database and portalr's analytics (ADR-0044), make the analytics
+     database empty where analytics doesn't run, so one backup statement serves both, use the
+     bucket, read the system tables the drill needs, and own the drill's four databases. It can't
+     write Langfuse's tables: ClickHouse's `admin` restores a new host (ADR-0031). Langfuse's own
+     user can't reach the bucket. Its password is kept out of the preprocessed configuration
+     ClickHouse writes to its data volume. -->
 <clickhouse>
   <users>
     <backup>
@@ -15,9 +17,12 @@
       <quota>default</quota>
       <grants>
         <query>GRANT SELECT, BACKUP ON default.*</query>
+        <query>GRANT SELECT, BACKUP ON analytics.*</query>
+        <query>GRANT CREATE DATABASE ON analytics.*</query>
         <query>GRANT ALL ON stackr_drill.*</query>
         <query>GRANT ALL ON restore_drill.*</query>
         <query>GRANT ALL ON restore_sentinel.*</query>
+        <query>GRANT ALL ON restore_analytics.*</query>
         <!-- The system tables the drill reads: what it restored, and the room to restore it. -->
         <query>GRANT SELECT ON system.tables</query>
         <query>GRANT SELECT ON system.parts</query>

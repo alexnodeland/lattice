@@ -12,7 +12,7 @@ stackr's defaults are for local development and single hosts: secrets generated 
 
 ## Published ports bind to `127.0.0.1`
 
-Every port the stack publishes binds to `STACKR_BIND`, `127.0.0.1` by default, so no service is reachable from another machine unless you choose it ([ADR-0006](../adr/0006-networks-and-published-ports.md)). Services that nothing outside the stack uses (ClickHouse, Valkey, the Collector's own metrics) aren't published at all, and the stack's services reach each other on the `stackr` network by name.
+Every port the stack publishes binds to `STACKR_BIND`, `127.0.0.1` by default, so no service is reachable from another machine unless you choose it ([ADR-0006](../adr/0006-networks-and-published-ports.md)). Services that nothing outside the stack uses (Valkey, the Collector's own metrics) aren't published at all, and the stack's services reach each other on the `stackr` network by name. ClickHouse's HTTP interface is the one exception to `STACKR_BIND`: it is published on `127.0.0.1` alone, whatever `STACKR_BIND` says, for portalr's analytics in an application on this machine, since Langfuse's ClickHouse user signs in from any address ([ADR-0044](../adr/0044-clickhouse-a-profile-of-its-own-and-portalrs-analytics-users.md)).
 
 Setting `STACKR_BIND=0.0.0.0` publishes every port on every interface. Don't: to serve users from a machine others can reach, use the [single host](single-host.md) recipe instead.
 

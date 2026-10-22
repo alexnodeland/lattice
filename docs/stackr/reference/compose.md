@@ -13,6 +13,9 @@
 | `langfuse` | `db-init`, `redis`, `minio`, `clickhouse`, `langfuse-worker`, `langfuse-web` | yes |
 | `gateway` | `db-init`, `redis`, `litellm` | yes |
 | `auth` | `db-init`, `gotrue` | no |
+| `clickhouse` | `clickhouse` | no |
+| `analytics` | `clickhouse` | no |
+| `analytics-init` | `clickhouse`, `clickhouse-init` | no |
 | `smoke` | `telemetrygen`, `probe` | no |
 
 <!-- end generated -->
@@ -25,7 +28,7 @@
 
 | Network | Created | Joined by |
 |---|---|---|
-| `stackr` | by Compose | `otel-collector`, `tempo`, `prometheus`, `prom-label-proxy`, `loki`, `pyroscope`, `grafana`, `postgres`, `db-init`, `gotrue`, `redis`, `minio`, `clickhouse`, `langfuse-worker`, `langfuse-web`, `litellm`, `telemetrygen`, `probe` |
+| `stackr` | by Compose | `otel-collector`, `tempo`, `prometheus`, `prom-label-proxy`, `loki`, `pyroscope`, `grafana`, `postgres`, `db-init`, `gotrue`, `redis`, `minio`, `clickhouse`, `clickhouse-init`, `langfuse-worker`, `langfuse-web`, `litellm`, `telemetrygen`, `probe` |
 | `supabase_network_stackr-supabase` | by `make up`, if missing | `db-init`, `langfuse-worker`, `langfuse-web`, `litellm`, `probe` |
 
 <!-- end generated -->
@@ -328,15 +331,15 @@ MinIO, for the S3 port: Langfuse's event and media bucket, `langfuse`.
 
 ### `clickhouse`
 
-Langfuse's traces, observations and scores.
+Langfuse's traces, observations and scores, and portalr's analytics events.
 
 | Property | Value |
 |---|---|
-| Profiles | `langfuse` |
+| Profiles | `clickhouse`, `langfuse`, `analytics`, `analytics-init` |
 | Image | `clickhouse/clickhouse-server`, pinned by tag and digest in `compose.yaml` |
-| Published ports | none |
+| Published ports | 8123 (`CLICKHOUSE_HTTP_PORT`) on 127.0.0.1 only → 8123 |
 | Networks | `stackr` |
-| Volumes | `./deploy/clickhouse/users.xml` → `/etc/clickhouse-server/users.d/users.xml` (read-only), `clickhouse-data` → `/var/lib/clickhouse`, `clickhouse-logs` → `/var/log/clickhouse-server` |
+| Volumes | `./deploy/clickhouse/users.xml` → `/etc/clickhouse-server/users.d/users.xml` (read-only), `./deploy/clickhouse/analytics-users.xml` → `/etc/clickhouse-server/users.d/analytics-users.xml` (read-only), `./deploy/clickhouse/analytics.xml` → `/etc/clickhouse-server/config.d/analytics.xml` (read-only), `clickhouse-data` → `/var/lib/clickhouse`, `clickhouse-logs` → `/var/log/clickhouse-server` |
 | Depends on | none |
 | Health check | `wget --no-verbose --tries=1 --spider http://127.0.0.1:8123/ping`, every 3s |
 | Restart | `unless-stopped` |
@@ -348,6 +351,30 @@ Langfuse's traces, observations and scores.
     | `CLICKHOUSE_SKIP_USER_SETUP` | `1` |
     | `CLICKHOUSE_ADMIN_PASSWORD` | `${CLICKHOUSE_ADMIN_PASSWORD:?run make env}` |
     | `CLICKHOUSE_LANGFUSE_PASSWORD` | `${CLICKHOUSE_PASSWORD:?run make env}` |
+    | `CLICKHOUSE_ANALYTICS_WRITER_PASSWORD` | `${CLICKHOUSE_ANALYTICS_WRITER_PASSWORD:?run make env}` |
+    | `CLICKHOUSE_ANALYTICS_PASSWORD` | `${CLICKHOUSE_ANALYTICS_PASSWORD:?run make env}` |
+
+### `clickhouse-init`
+
+Makes portalr's analytics database and its events table, with the deployment's retention, each time `make up` starts the analytics profile, then exits.
+
+| Property | Value |
+|---|---|
+| Profiles | `analytics-init` |
+| Image | `clickhouse/clickhouse-server`, pinned by tag and digest in `compose.yaml` |
+| Published ports | none |
+| Networks | `stackr` |
+| Volumes | `./deploy/clickhouse/analytics.sql` → `/analytics.sql` (read-only) |
+| Depends on | `clickhouse` (healthy) |
+| Runs | `sh -c` |
+| Restart | `no` |
+
+??? note "Environment"
+
+    | Variable | Value |
+    |---|---|
+    | `CLICKHOUSE_PASSWORD` | `${CLICKHOUSE_ADMIN_PASSWORD:?run make env}` |
+    | `ANALYTICS_RETENTION_DAYS` | `${ANALYTICS_RETENTION_DAYS:-395}` |
 
 ### `langfuse-worker`
 

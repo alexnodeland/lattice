@@ -34,7 +34,7 @@ Each record captures one decision: the context that forced it, the options consi
 | [0028](0028-local-supabase-on-the-loopback.md) | Local Supabase on the loopback | Accepted |
 | [0029](0029-the-aws-modules-and-tier-1.md) | The AWS modules, and tier 1 | Accepted, amended by [0034](0034-the-stack-on-aws.md) |
 | [0030](0030-the-incident-experiment-and-its-postmortem.md) | The incident experiment, and its postmortem | Accepted |
-| [0031](0031-clickhouses-admin-apart-from-langfuse.md) | ClickHouse's admin, apart from Langfuse | Accepted |
+| [0031](0031-clickhouses-admin-apart-from-langfuse.md) | ClickHouse's admin, apart from Langfuse | Accepted, amended by [0044](0044-clickhouse-a-profile-of-its-own-and-portalrs-analytics-users.md) (proposed) |
 | [0032](0032-the-edge-the-services-and-the-state-host.md) | The edge, the services, and the state host | Accepted, amended by [0034](0034-the-stack-on-aws.md) and [0037](0037-the-state-hosts-clickhouse-backups.md) |
 | [0033](0033-the-combined-system-proved-in-ci.md) | The combined system, proved in CI | Accepted |
 | [0034](0034-the-stack-on-aws.md) | The stack on AWS | Accepted, amended by [0035](0035-the-thin-images.md) |
@@ -47,5 +47,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0041](0041-integrations-switched-per-workspace-in-the-template.md) | Integrations switched per workspace in the template | Accepted |
 | [0042](0042-a-generated-application-as-a-local-product.md) | A generated application as a local product: one origin, a first run, and the tailnet | Accepted |
 | [0043](0043-native-files-in-the-template.md) | Native files in the template: a worker for each app, with no route out, and its editor on a loopback origin | Accepted |
+| [0044](0044-clickhouse-a-profile-of-its-own-and-portalrs-analytics-users.md) | ClickHouse, a profile of its own, and portalr's analytics users | Proposed |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

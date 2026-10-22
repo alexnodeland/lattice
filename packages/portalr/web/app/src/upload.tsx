@@ -249,6 +249,16 @@ export function Uploader({
     setItems((now) => [...now, item]);
   };
   const extensions = on.flatMap((kind) => kind.extensions);
+  // The kinds' extensions by the largest file each takes, the largest first: ".docx, .pdf up to
+  // 26 MB each; .fcproj up to 2.1 MB each".
+  const byLimit = new Map<number, string[]>();
+  for (const kind of on) {
+    byLimit.set(kind.limit, [...(byLimit.get(kind.limit) ?? []), ...kind.extensions]);
+  }
+  const sizes = [...byLimit]
+    .sort(([a], [b]) => b - a)
+    .map(([most, shown]) => `${shown.join(", ")}, up to ${fileSize(most)} each`)
+    .join("; ");
   return (
     <div className="flex min-w-0 flex-col gap-3">
       <FileChooser
@@ -256,7 +266,7 @@ export function Uploader({
         hint={
           on.length === 0
             ? "No app for files is on in this workspace: an admin can switch one on in its integrations."
-            : `${extensions.join(", ")}, up to ${fileSize(offered.limit)} each.`
+            : `${sizes}.`
         }
         accept={extensions.join(",")}
         multiple

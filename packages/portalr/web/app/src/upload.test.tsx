@@ -47,7 +47,7 @@ test("files chosen together are sent one after another, each of its kind, and sa
   await expect
     .element(input)
     .toHaveAccessibleDescription(
-      ".docx, .dwg, .dxf, .DXF, .fcproj, up to 1 kB each. Or drop them here.",
+      ".docx, .dwg, .dxf, .DXF, up to 1 kB each; .fcproj, up to 500 bytes each. Or drop them here.",
     );
   await input.upload([new File(["one"], "brief.docx"), new File(["two"], "plan.dwg")]);
   const first = await sent(1);

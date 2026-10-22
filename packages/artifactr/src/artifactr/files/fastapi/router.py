@@ -236,7 +236,9 @@ def files_router(
     router = APIRouter(responses=REFUSALS)
     pace = Pace(uploads_per_minute)
     each = min(uploads_each, uploads_at_once)
-    per_tenant = uploads_per_tenant or max(uploads_at_once // 2, each)
+    per_tenant = (
+        max(uploads_at_once // 2, each) if uploads_per_tenant is None else uploads_per_tenant
+    )
     taking = Gauge(uploads_at_once, tenant=per_tenant, each=each)
     pacing = body or Body()
 
@@ -314,11 +316,13 @@ def files_router(
             HTTPException: 429, if they are past their pace, or no place is theirs to take.
         """
         who = (ws.tenant_id, ws.actor.participant)
-        if (wait := pace.admit(who)) is not None:
-            raise _too_many("rate_limited", wait)
+        # The place first: a refusal as busy counts against no one's pace, so a client that
+        # retries while the places are full never paces itself out.
         with taking.held(who) as held:
             if not held:
                 raise _too_many("busy", BUSY)
+            if (wait := pace.admit(who)) is not None:
+                raise _too_many("rate_limited", wait)
             yield
 
     async def create(
@@ -334,9 +338,10 @@ def files_router(
         file_type = _native_types_by_kind().get(kind)
         if file_type is None:
             raise HTTPException(status_code=422, detail=f"{kind} is no native type")
+        most = min(limit, files.most(file_type))
         declared = request.headers.get("content-length", "")
-        if declared.isdigit() and int(declared) > limit:
-            raise HTTPException(status_code=413, detail=f"the file is larger than {limit} bytes")
+        if declared.isdigit() and int(declared) > most:
+            raise HTTPException(status_code=413, detail=f"the file is larger than {most} bytes")
         async with admitted(ws):
             outcome = await files.upload(
                 ws, file_type, name, meter, artifact_id=artifact_id, thread_id=thread_id

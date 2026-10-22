@@ -1,11 +1,14 @@
 """A diagram's type: permissive about Excalidraw's fields, strict about keys and size."""
 
+import math
+from typing import Any
+
 import pytest
 from pydantic import ValidationError
 
 from artifactr.core import load_artifact
 from artifactr.excalidraw import Diagram, excalidraw_key_of
-from artifactr.excalidraw.types import MAX_DIAGRAM_BYTES, MAX_ELEMENTS
+from artifactr.excalidraw.types import MAX_DIAGRAM_BYTES, MAX_ELEMENTS, MAX_NONCE, MAX_VERSION
 from tests.excalidraw.scenes import data, element
 
 
@@ -66,3 +69,40 @@ def test_agents_propose_by_default() -> None:
 def test_only_a_diagram_is_the_integrations() -> None:
     assert excalidraw_key_of("excalidraw_diagram", {}) == "excalidraw"
     assert excalidraw_key_of("note", {}) is None
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"version": 10**400},
+        {"version": 2**53},
+        {"version": True},
+        {"version": 2.0},
+        {"version": "2"},
+        {"nonce": -1},
+        {"nonce": 2**31},
+        {"nonce": False},
+        {"x": math.nan},
+        {"x": math.inf},
+        {"points": [[0, -math.inf]]},
+        {"updated": 1.5},
+    ],
+)
+def test_a_hostile_element_is_refused(fields: dict[str, Any]) -> None:
+    with pytest.raises(ValidationError):
+        element("r1", **fields)
+
+
+def test_an_element_nested_past_what_json_holds_is_refused() -> None:
+    deep: dict[str, Any] = {}
+    inner = deep
+    for _ in range(100_000):
+        inner["a"] = {}
+        inner = inner["a"]
+    with pytest.raises(ValidationError, match="nests too deep"):
+        element("r1", deep=deep)
+
+
+def test_the_largest_version_and_nonce_are_kept() -> None:
+    kept = element("r1", version=MAX_VERSION, nonce=MAX_NONCE)
+    assert (kept.version, kept.version_nonce) == (MAX_VERSION, MAX_NONCE)

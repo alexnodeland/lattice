@@ -37,7 +37,7 @@ def describe(name: str, elements: Mapping[str, Element]) -> str:
         elif kind in _SHAPES:
             shapes.append(f"- {kind} {_named(labels, key)}")
         elif kind in _LINES:
-            arrows.append(f"- {_arrow(element, labels)}")
+            arrows.append(f"- {kind} {key}: {_arrow(element, labels, live)}")
         elif kind == "text" and element.get("containerId") is None:
             texts.append(f"- {_quote(element.get('text'))}")
     lines = [f"Diagram {_quote(name)}: {len(live)} elements"]
@@ -73,19 +73,22 @@ def _name(element: Element, key: str) -> str:
     return f"{key} {_quote(name)}" if isinstance(name, str) and name else key
 
 
-def _arrow(element: Element, labels: Mapping[str, str]) -> str:
-    start = _bound(element.get("startBinding"))
-    end = _bound(element.get("endBinding"))
+def _arrow(element: Element, labels: Mapping[str, str], live: Mapping[str, Element]) -> str:
+    start = _bound(element.get("startBinding"), live)
+    end = _bound(element.get("endBinding"), live)
     label = labels.get(str(element.get("id")))
     via = f"--{label}-->" if label else "-->"
     left = _named(labels, start) if start else "(free)"
     right = _named(labels, end) if end else "(free)"
-    return f"{element.get('type')} {element.get('id')}: {left} {via} {right}"
+    return f"{left} {via} {right}"
 
 
-def _bound(binding: JsonValue) -> str | None:
-    if isinstance(binding, dict) and isinstance(binding.get("elementId"), str):
-        return str(binding["elementId"])
+def _bound(binding: JsonValue, live: Mapping[str, Element]) -> str | None:
+    """The live element a binding names, by its key; None for any other string, said or not."""
+    if isinstance(binding, dict):
+        bound = binding.get("elementId")
+        if isinstance(bound, str) and bound in live:
+            return bound  # a key: an element's id, which holds no space or quote
     return None
 
 
@@ -111,8 +114,9 @@ def _box(elements: Iterable[Element]) -> str | None:
 
 
 def _quote(text: JsonValue) -> str:
-    said = " ".join(str(text or "").split())
-    return f'"{said[:80]}"'
+    """Words written in the diagram, as words: on one line, at most 80 characters, quoted."""
+    said = " ".join(str(text or "").split())[:80]
+    return '"' + said.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
 def _cut(text: str) -> str:

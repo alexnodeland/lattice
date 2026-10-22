@@ -36,7 +36,6 @@ from artifactr.workspace import Check, Workspace
 __all__ = ["excalidraw_checks"]
 
 _ELEMENT: Final = "/elements/"
-_FILE: Final = "/files/"
 
 
 def excalidraw_checks() -> Mapping[str, Check]:
@@ -76,18 +75,22 @@ async def _edited(workspace: Workspace, command: EditArtifact, *, on_head: bool)
         _added(head, op)
     # Loaded as core will load it, so data it refuses is refused here as core refuses it.
     after = cast("Diagram", load_artifact(Diagram.kind, apply_patch(head.to_json(), command.patch)))
+    _kept(head, after)
     _grown(head, after)
 
 
 def _added(head: Diagram, op: Mapping[str, JsonValue]) -> None:
-    path, kind = str(op.get("path")), op.get("op")
-    if path.startswith(_FILE) and kind != "test":
-        digest = path.removeprefix(_FILE)
-        if kind != "add" or digest in head.files:
-            _refuse(["files", digest], "an image is added, never replaced or removed")
-    if kind == "add" and path.removeprefix(_ELEMENT) in head.elements:
+    path = str(op.get("path"))
+    if op.get("op") == "add" and path.removeprefix(_ELEMENT) in head.elements:
         key = path.removeprefix(_ELEMENT)
         _refuse(["elements", key], f"element {key} exists: change it with a replace")
+
+
+def _kept(head: Diagram, after: Diagram) -> None:
+    """Every image the head has is still there, as it was, whatever the patch's paths say."""
+    for digest, file in head.files.items():
+        if after.files.get(digest) != file:
+            _refuse(["files", digest], "an image is added, never replaced or removed")
 
 
 def _grown(head: Diagram, after: Diagram) -> None:

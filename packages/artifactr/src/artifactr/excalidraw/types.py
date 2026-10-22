@@ -17,7 +17,7 @@ them, the images it shows by their digests, and what every viewer shares of its 
 import json
 from typing import Annotated, ClassVar, Final, Self, override
 
-from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, StrictInt, model_validator
 
 from artifactr.core import Artifact, WritePolicy
 from artifactr.excalidraw.integrations import DIAGRAM_KIND
@@ -28,6 +28,8 @@ __all__ = [
     "MAX_DIAGRAM_BYTES",
     "MAX_ELEMENTS",
     "MAX_NAME",
+    "MAX_NONCE",
+    "MAX_VERSION",
     "Diagram",
     "DiagramFile",
     "Element",
@@ -44,6 +46,12 @@ MAX_DIAGRAM_BYTES: Final = 1024 * 1024
 
 MAX_NAME: Final = 200
 """The longest name of a diagram, in characters."""
+
+MAX_VERSION: Final = 2**53 - 1
+"""The largest version, or time, an element holds: the largest integer JavaScript holds exactly."""
+
+MAX_NONCE: Final = 2**31 - 1
+"""The largest nonce Excalidraw makes: a random 31-bit integer."""
 
 ElementId = Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{1,64}$")]
 """An element's id, as Excalidraw makes them."""
@@ -63,10 +71,10 @@ class Element(BaseModel):
     type: str = Field(min_length=1)
     """Any type: a newer one is kept, not refused."""
 
-    version: int = Field(ge=1)
+    version: StrictInt = Field(ge=1, le=MAX_VERSION)
     """Grows with every change; Excalidraw's reconciliation depends on it."""
 
-    version_nonce: int = Field(alias="versionNonce")
+    version_nonce: StrictInt = Field(alias="versionNonce", ge=0, le=MAX_NONCE)
     """Breaks a tie between two elements of one version: the lower wins."""
 
     is_deleted: bool = Field(default=False, alias="isDeleted")
@@ -74,7 +82,19 @@ class Element(BaseModel):
     index: str | None = None
     """Its fractional index, which orders it; never sort-validated."""
 
-    updated: int | None = None
+    updated: StrictInt | None = Field(default=None, ge=0, le=MAX_VERSION)
+
+    @model_validator(mode="after")
+    def _storable(self) -> Self:
+        try:
+            json.dumps(self.model_extra, allow_nan=False)
+        except ValueError:
+            msg = f"element {self.id} holds a number JSON can't: NaN or an infinity"
+            raise ValueError(msg) from None
+        except RecursionError:
+            msg = f"element {self.id} nests too deep to store"
+            raise ValueError(msg) from None
+        return self
 
 
 class DiagramFile(BaseModel):

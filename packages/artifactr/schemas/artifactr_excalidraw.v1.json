@@ -99,6 +99,8 @@
         "updated": {
           "anyOf": [
             {
+              "maximum": 9007199254740991,
+              "minimum": 0,
               "type": "integer"
             },
             {
@@ -109,11 +111,14 @@
           "title": "Updated"
         },
         "version": {
+          "maximum": 9007199254740991,
           "minimum": 1,
           "title": "Version",
           "type": "integer"
         },
         "versionNonce": {
+          "maximum": 2147483647,
+          "minimum": 0,
           "title": "Versionnonce",
           "type": "integer"
         }

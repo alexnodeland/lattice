@@ -2,6 +2,8 @@
 elements both accept, on the same element the second fails, a stale direct edit rebases, and an
 element's version only grows."""
 
+from typing import Any
+
 import pytest
 
 from artifactr.core import (
@@ -10,6 +12,7 @@ from artifactr.core import (
     EditArtifact,
     JsonPatch,
     NotEnabled,
+    NotFound,
     PatchFailed,
     ProposeChange,
     Proposed,
@@ -19,8 +22,16 @@ from artifactr.core import (
     ValidationFailed,
     VersionConflict,
 )
-from artifactr.excalidraw import EXCALIDRAW, Diagram, element_patch, rebase
-from artifactr.workspace import Workspace, Workspaces
+from artifactr.excalidraw import (
+    EXCALIDRAW,
+    EXCALIDRAW_TYPES,
+    Diagram,
+    element_patch,
+    excalidraw_checks,
+    excalidraw_key_of,
+    rebase,
+)
+from artifactr.workspace import Storage, Workspace, Workspaces, integration_gate
 from tests.excalidraw.scenes import data, diagram, element, moved
 from tests.ui.people import ALICE, BOB, agent
 from tests.ui.toggles import Toggles
@@ -244,12 +255,46 @@ async def test_an_element_put_under_another_key_is_refused_as_core_would(
         await ws.commit(EditArtifact(artifact_id=artifact_id, base_version=version, patch=wrong))
 
 
-async def test_an_image_is_never_removed(workspaces: Workspaces) -> None:
+@pytest.mark.parametrize(
+    "op",
+    [
+        {"op": "remove", "path": f"/files/{'a' * 64}"},
+        {"op": "remove", "path": "/files"},
+        {"op": "replace", "path": "/files", "value": {}},
+        {"op": "move", "from": "/files", "path": "/scene/files"},
+        {"op": "copy", "from": "/scene", "path": "/files"},
+    ],
+)
+async def test_an_image_is_never_removed_by_any_path(
+    workspaces: Workspaces, op: dict[str, Any]
+) -> None:
     ws, artifact_id = await _drawn(workspaces)
+    digest = "a" * 64
+    image = {"sha256": digest, "size": 3, "media_type": "image/png"}
     version, _ = await _head(ws, artifact_id)
-    remove = JsonPatch(ops=({"op": "remove", "path": f"/files/{'d' * 64}"},))
-    with pytest.raises(ValidationFailed, match="never replaced or removed"):
-        await ws.commit(EditArtifact(artifact_id=artifact_id, base_version=version, patch=remove))
+    add = JsonPatch(ops=({"op": "add", "path": f"/files/{digest}", "value": image},))
+    await ws.commit(EditArtifact(artifact_id=artifact_id, base_version=version, patch=add))
+    with pytest.raises(ValidationFailed):
+        await ws.commit(
+            EditArtifact(
+                artifact_id=artifact_id, base_version=version + 1, patch=JsonPatch(ops=(op,))
+            )
+        )
+    assert (await _head(ws, artifact_id))[1].files[digest].size == 3
+    another = {**image, "sha256": "b" * 64}
+    more = JsonPatch(ops=({"op": "add", "path": f"/files/{'b' * 64}", "value": another},))
+    await ws.commit(EditArtifact(artifact_id=artifact_id, base_version=version + 1, patch=more))
+    assert set((await _head(ws, artifact_id))[1].files) == {digest, "b" * 64}
+
+
+async def test_a_root_replace_is_held_to_the_same_rules(workspaces: Workspaces) -> None:
+    ws, artifact_id = await _drawn(workspaces)
+    version, head = await _head(ws, artifact_id)
+    same = head.elements["r1"].model_copy(update={"x": 5})
+    root = head.model_copy(update={"elements": {**head.elements, "r1": same}}).to_json()
+    patch = JsonPatch(ops=({"op": "replace", "path": "", "value": root},))
+    with pytest.raises(ValidationFailed, match="version must grow"):
+        await ws.commit(EditArtifact(artifact_id=artifact_id, base_version=version, patch=patch))
 
 
 async def test_a_persons_proposal_is_held_to_the_same_rules(workspaces: Workspaces) -> None:
@@ -263,3 +308,37 @@ async def test_a_persons_proposal_is_held_to_the_same_rules(workspaces: Workspac
     )
     with pytest.raises(ValidationFailed, match="version must grow"):
         await ws.as_actor(BOB).commit(ProposeChange(change=change))
+
+
+class _ByTenant:
+    """Integrations switched off by tenant and workspace, as grantr keeps them."""
+
+    def __init__(self) -> None:
+        self.off: set[tuple[str, str, str]] = set()
+
+    async def is_enabled(self, tenant_id: str, workspace_id: str, key: str, /) -> bool:
+        return (tenant_id, workspace_id, key) not in self.off
+
+
+async def test_nothing_of_one_tenant_reaches_another(storage: Storage) -> None:
+    switches = _ByTenant()
+    workspaces = Workspaces(
+        storage,
+        types=EXCALIDRAW_TYPES,
+        checks=excalidraw_checks(),
+        gate=integration_gate(switches, excalidraw_key_of),
+    )
+    ws_a, artifact_id = await _drawn(workspaces)
+    await _propose(ws_a, artifact_id, ("r1", 100))
+    switches.off.add(("tenant_a", "ws_1", EXCALIDRAW))
+    ws_b = await workspaces.open("tenant_b", "ws_1", actor=ALICE)
+    assert await ws_b.artifacts(Diagram) == []
+    with pytest.raises(NotFound):
+        await ws_b.get(Diagram, artifact_id)
+    assert await ws_b.proposals() == []
+    # tenant_a's switch is tenant_a's: tenant_b's workspace of the same name still draws.
+    made = await ws_b.commit(CreateArtifact(kind="excalidraw_diagram", data=data(R1)))
+    assert isinstance(made, Applied)
+    with pytest.raises(NotEnabled):
+        await ws_a.commit(CreateArtifact(kind="excalidraw_diagram", data=data(R1)))
+    assert [d.id for d in await ws_b.artifacts(Diagram)] == [made.artifact_id]

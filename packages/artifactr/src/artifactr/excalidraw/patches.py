@@ -15,17 +15,13 @@ elements never conflict, and nothing is locked:
 
 import secrets
 from collections.abc import Mapping
-from typing import Final
 
 from pydantic import JsonValue
 
 from artifactr.core import JsonPatch
-from artifactr.excalidraw.types import Diagram, DiagramFile, Element
+from artifactr.excalidraw.types import MAX_NONCE, Diagram, DiagramFile, Element
 
-__all__ = ["MAX_NONCE", "element_patch", "rebase", "reconcile", "won"]
-
-MAX_NONCE: Final = 2**31 - 1
-"""The largest nonce Excalidraw makes: a random 31-bit integer."""
+__all__ = ["element_patch", "rebase", "reconcile", "won"]
 
 
 def element_patch(

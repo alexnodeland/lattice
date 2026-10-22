@@ -18,7 +18,10 @@ RFC-0006 makes an Excalidraw diagram an ordinary JSON artifact, edited by JSON P
   - `files`, keyed by each image's digest;
   - `scene`, what every viewer shares.
 
-  An `Element` validates only `id`, `type`, `version`, `versionNonce`, `isDeleted`, `index` and `updated`, and keeps every other field as written, under Excalidraw's own camel-case names. An image is a `DiagramFile` with `Blob`'s shape (`sha256`, `size`, `media_type`). It is kept apart from `Blob` so the data layer doesn't import the `files` extra; images through `Blobs` come with the worker.
+  An `Element` validates only `id`, `type`, `version`, `versionNonce`, `isDeleted`, `index` and `updated`, and keeps every other field as written, under Excalidraw's own camel-case names.
+  - `version` and `updated` are strict integers up to 2^53 − 1, the largest JavaScript holds exactly. `versionNonce` is a strict integer from 0 to 2^31 − 1. No bool or float is coerced.
+  - A field that holds NaN or an infinity is refused, since JSON would store it as null. So is one nested past what JSON encodes.
+  - `type` is open on purpose: a type a newer Excalidraw writes is kept, not refused. An image is a `DiagramFile` with `Blob`'s shape (`sha256`, `size`, `media_type`). It is kept apart from `Blob` so the data layer doesn't import the `files` extra; images through `Blobs` come with the worker.
 - **The type refuses** an element kept under another's id, an image kept under another's digest, more than 2,000 elements (tombstones included), and more than 1 MiB of JSON. The owner set these limits from phase 0's measurements. Every commit validates and stores the whole document, so its cost grows linearly with the scene. Each edit was one element's `test` and `replace`:
 
   | Elements | JSON | Edit in memory (median / max) | Edit on SQLite (median / max) | Storage a revision |
@@ -39,10 +42,12 @@ RFC-0006 makes an Excalidraw diagram an ordinary JSON artifact, edited by JSON P
 - **The checks, `excalidraw_checks()`**, run on every surface, for an edit, a proposed edit, and a proposal accepted against the head:
   - an element an edit changes must grow its `version` past the head's;
   - an `add` of an id the head already has is refused;
-  - an image is added only, never replaced or removed.
+  - an image is added only, never replaced or removed. This is checked on the result, not on the patch's paths, so removing or replacing `/files`, a root replace, and a `move` or `copy` are all held to it.
 
   The result is loaded as core loads it, so data the type refuses is refused here as core would refuse it.
-- **`render_for_agent`** describes a diagram in at most 4,000 characters: frames, shapes with their labels, arrows as `A --label--> B`, free text, counts and the bounding box. It reads live elements only, does no IO, and stores nothing.
+- **`render_for_agent`** describes a diagram in at most 4,000 characters: frames, shapes with their labels, arrows as `A --label--> B`, free text, counts and the bounding box. It reads live elements only, does no IO, and stores nothing. What the agent reads is written by people, so:
+  - every word from the diagram is quoted on one line, its quotes escaped, at most 80 characters;
+  - an arrow names a bound element only if it is a live element's id, and is "(free)" otherwise.
 - **The wire schema** is checked in at `schemas/artifactr_excalidraw.v1.json`, drift-tested, and generated into portalr's client types.
 - **`excalidraw` is off by default** in lattice-core's registry, as lattice ADR-0027's amendment records.
 
@@ -51,4 +56,5 @@ RFC-0006 makes an Excalidraw diagram an ordinary JSON artifact, edited by JSON P
 - Easier: two proposals on different elements both accept. A proposal whose element moved since fails whole, as `patch_failed`. A stale direct edit conflicts, and rebases cheaply because ids are stable. RFC-0006's exit criteria for this slice are tests, on every storage and over REST.
 - Easier: an application registers `EXCALIDRAW_TYPES` and `excalidraw_checks()` and gates them with `excalidraw_key_of`, as it does forms.
 - Harder: an application with checks of its own for the same command types composes them, since `Workspaces(checks=...)` takes one check a command type.
+- A known gap: an element patched out with a bare `remove`, with no `test`, is deleted at once rather than left as a tombstone. RFC-0006 keeps tombstones a day, so a client mid-edit doesn't bring the element back. The canvas only ever writes `isDeleted`, and the tombstone sweep (U3) is what removes them. Refusing a `remove` that isn't the sweep's comes with the sweep.
 - Not yet: the agent's `DiagramTools`, the worker (Mermaid and skeleton conversion, rendering), images in `Blobs`, the tombstone sweep (U3), and the canvas (phase 3).

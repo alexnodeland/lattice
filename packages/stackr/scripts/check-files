@@ -9,16 +9,20 @@
 # - runs as compose.yaml says, each value as configured: read-only, as user 10002, with no
 #   capabilities added and all dropped, no new privileges, not privileged, under an init, with
 #   its memory, swap, CPUs and processes limited, no mount but its tmpfs, which runs nothing, no
-#   device, no port published, and on its own internal network alone
+#   device, no port published, and on its own internal network alone, with its relay
 # - reaches nothing outside it: no name resolves, host.docker.internal included; and TCP to a
 #   public IPv4 and IPv6 address, UDP to a public resolver and the cloud metadata address each
 #   fail; and the network is made with no address for the host on it (inhibit_ipv4). (ICMP
 #   can't be tried: the worker has no CAP_NET_RAW.)
-# - answers a probe on its network (scripts/_files_probe.py): its release's licences and notices
+# - answers a probe through its relay, from the application's side (scripts/_files_probe.py): its
+#   release's licences and notices
 #   in its image; the app at its pinned version, behind its own token; a new file made, read and
-#   rendered; and hostile files refused within their deadline
+#   rendered; and hostile files refused within their deadline; and, for an app whose licence asks
+#   for it, the offer of its source
 # - leaves nothing from one call to the next: a process its user started and a file in /tmp
 #   before the probe's calls are gone after them
+# Its relay, socat: as configured, read-only, as user 10004, on the worker's network and the
+# application's side alone; and the worker's network holds the worker and its relay, nothing else.
 # And its editor, for an app whose build hands a file over: as configured, read-only, as user
 # 10003, published on 127.0.0.1 alone, serving the build and lattice's shim, which only the
 # portal may frame.
@@ -36,12 +40,13 @@ status=0
 scratch=$(mktemp -d)
 app_dir=$scratch/$name
 apps=("$@")
+kept=()
 if ((${#apps[@]} == 0)); then
   read -ra apps <<<"$(uv run python -c "import yaml; print(*yaml.safe_load(open('copier.yml'))['crafts']['default'])")"
 fi
-# An app's version, as copier.yml has it from its pin.
-version_of() {
-  uv run python -c "import sys, yaml; print(yaml.safe_load(open('copier.yml'))['crafts']['default'][sys.argv[1]]['version'])" "$1"
+# An app's version, or another of its fields, as copier.yml has it.
+field_of() {
+  uv run python -c "import sys, yaml; print(yaml.safe_load(open('copier.yml'))['crafts']['default'][sys.argv[1]].get(sys.argv[2], ''))" "$1" "$2"
 }
 
 log() { printf '%s\n' "$*"; }
@@ -67,6 +72,18 @@ cleanup() {
 trap cleanup EXIT
 
 log "files: Docker Engine $(docker version --format '{{.Server.Version}}'), Compose $(docker compose version --short)"
+# Unless named, an app whose release is built for another platform than this Docker's is passed
+# over: it would run emulated, if at all (Blender's, x86_64 alone, on arm64).
+platform="linux/$(docker version --format '{{.Server.Arch}}')"
+for app in "${apps[@]}"; do
+  built=$(field_of "$app" platform)
+  if (($# == 0)) && [[ -n $built && $built != "$platform" ]]; then
+    log "files: passed over: $app is built for $built alone, and this Docker is $platform"
+  else
+    kept+=("$app")
+  fi
+done
+apps=("${kept[@]}")
 log "files: generating $name from the template, and building ${apps[*]}"
 if ! uv run copier copy --quiet --defaults --vcs-ref HEAD --data project_name="$name" \
   --data libraries=artifactr --data evals=false ../.. "$app_dir" 2>/dev/null ||
@@ -89,7 +106,7 @@ profiles=()
 services=()
 for app in "${apps[@]}"; do
   profiles+=(--profile "files-$app")
-  services+=("files-$app")
+  services+=("files-$app-worker" "files-$app")
   if compose "${profiles[@]}" config --services | grep -qx "files-$app-editor"; then
     services+=("files-$app-editor")
   fi
@@ -168,12 +185,22 @@ sys.exit(0 if there == (sys.argv[1] == "there") and (there or not strays and not
 '
 
 for app in "${apps[@]}"; do
-  container=$(compose ps --quiet "files-$app")
+  container=$(compose ps --quiet "files-$app-worker")
+  relay=$(compose ps --quiet "files-$app")
   network="${name}_files-$app"
+  # 3 GiB, or, for an app that names the GiB its CLI needs, that and 2 GiB more.
+  gib=$(field_of "$app" memory)
+  memory=$((3 << 30))
+  if [[ -n $gib ]]; then memory=$(((gib + 2) << 30)); fi
   check "$app's network is internal" \
     same "$(docker network inspect --format '{{.Internal}}' "$network")" true
   check "$app's worker runs as compose.yaml says" same "$(posture "$container")" \
-    "read-only=true user=10002 privileged=false cap-add= cap-drop=ALL security=no-new-privileges:true init=true memory=3221225472 swap=3221225472 cpus=2000000000 pids=128 pid-mode= mounts=0 devices=0 tmpfs=/tmp:size=1g,mode=1777,noexec,nosuid,nodev network=$network networks=$network"
+    "read-only=true user=10002 privileged=false cap-add= cap-drop=ALL security=no-new-privileges:true init=true memory=$memory swap=$memory cpus=2000000000 pids=128 pid-mode= mounts=0 devices=0 tmpfs=/tmp:size=1g,mode=1777,noexec,nosuid,nodev network=$network networks=$network"
+  check "$app's relay runs as compose.yaml says" same "$(posture "$relay")" \
+    "read-only=true user=10004 privileged=false cap-add= cap-drop=ALL security=no-new-privileges:true init=true memory=67108864 swap=67108864 cpus=0 pids=32 pid-mode= mounts=0 devices=0 tmpfs= network=${name}_files networks=${name}_files,$network"
+  check "$app's network holds its worker and its relay alone" same \
+    "$(docker network inspect --format '{{range .Containers}}{{println .Name}}{{end}}' "$network" | grep -v '^$' | sort | tr '\n' ' ')" \
+    "$(docker inspect --format '{{.Name}}' "$container" "$relay" | tr -d / | sort | tr '\n' ' ')"
   check "$app's worker publishes no port" \
     same "$(docker inspect --format '{{len .HostConfig.PortBindings}}' "$container")" 0
   check "$app's network gives the host no address on it" same \
@@ -197,12 +224,17 @@ for app in "${apps[@]}"; do
     docker exec "$container" python -I -c "$left" there
   WORKER_TOKEN=$(setting "$container" WORKER_TOKEN)
   export WORKER_TOKEN
-  version=$(version_of "$app")
-  check "$app's worker answers its probe" \
-    docker run --rm --name "$name-probe-$app" --network "$network" --read-only --tmpfs /tmp \
+  version=$(field_of "$app" version)
+  check "$app's worker answers its probe, through its relay" \
+    docker run --rm --name "$name-probe-$app" --network "${name}_files" --read-only --tmpfs /tmp \
     --env WORKER_TOKEN --volume "$PWD/scripts/_files_probe.py:/probe.py:ro" --entrypoint python \
     "$name-files-$app:local" -I /probe.py "http://files-$app:8080" "$app" "$version"
   unset WORKER_TOKEN
+  source=$(field_of "$app" source)
+  if [[ -n $source ]]; then
+    check "$app's image offers its source, $source" \
+      grep -qF "$source" <<<"$(docker exec "$container" cat /opt/craft/SOURCE-OFFER)"
+  fi
   check "$app's worker kept nothing of one call for the next" \
     docker exec "$container" python -I -c "$left" gone
 

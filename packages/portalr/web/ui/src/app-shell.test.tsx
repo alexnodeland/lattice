@@ -196,5 +196,5 @@ test("from 1024 pixels, a focused skip link moves the rail down by its bar, and 
 test("a page without the frame has nothing pinned above it, so nothing is held clear", async () => {
   await viewport(390);
   await render(<p>A plain page</p>);
-  expect(getComputedStyle(document.documentElement).scrollPaddingTop).toBe("0px");
+  expect(getComputedStyle(document.documentElement).scrollPaddingTop).toBe("auto");
 });

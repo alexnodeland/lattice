@@ -52,8 +52,6 @@ REMAINING = (
     ("app/src/native-inline.tsx", "h-[min(80dvh,48rem)]"),
     ("ui/src/dashboard-view.tsx", "grid-cols-[repeat(auto-fit,minmax(9rem,1fr))]"),
     ("ui/src/file-preview.tsx", "h-[min(70dvh,32rem)]"),
-    ("ui/src/json-view.tsx", "max-h-[32rem]"),
-    ("ui/src/line-diff.tsx", "max-h-[32rem]"),
     ("ui/src/log-list.tsx", "lg:grid-cols-[minmax(0,1fr)_22rem]"),
     ("ui/src/log-list.tsx", "max-h-[30rem]"),
     ("ui/src/native-file.tsx", "grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))]"),

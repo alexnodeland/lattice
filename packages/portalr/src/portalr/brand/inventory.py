@@ -346,8 +346,10 @@ COMPONENTS: tuple[Group, ...] = (
         ),
     ),
     Group(
-        "A code block: its corners, and its code's padding.",
+        "A code block: the most it is tall before it scrolls (a JSON view's, a diff's), its "
+        "corners, and its code's padding.",
         (
+            Row("component.code-block.max-height", "--code-block-max-height", "dimension"),
             Row("component.code-block.radius", "--code-block-radius", "dimension"),
             Row("component.code-block.pad-x", "--code-block-pad-x", "dimension"),
             Row("component.code-block.pad-y", "--code-block-pad-y", "dimension"),

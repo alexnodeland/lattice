@@ -12,7 +12,7 @@ import { Icon } from "./icon";
  */
 const LOOK = {
   quiet: "text-muted hover:text-fg",
-  link: "text-accent underline-offset-2 hover:underline",
+  link: "text-accent underline-offset-(--link-underline-offset) hover:underline",
   block: "w-full items-start text-start hover:bg-wash",
 } as const;
 

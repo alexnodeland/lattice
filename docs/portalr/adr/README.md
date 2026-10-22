@@ -71,5 +71,6 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0063](0063-disclosures.md) | Disclosures | Proposed |
 | [0064](0064-the-frames-edges.md) | The frame's edges | Proposed |
 | [0065](0065-empty-error-and-not-found-states.md) | Empty, error and not-found states | Proposed |
+| [0066](0066-the-style-census-enforced.md) | The style census, enforced | Proposed |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

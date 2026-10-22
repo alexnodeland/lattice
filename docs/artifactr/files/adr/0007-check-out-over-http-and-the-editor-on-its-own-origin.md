@@ -56,4 +56,4 @@ Level 1 is what the unmodified build offers. The routes and the editor prove the
 1. [x] `files_router`, its OpenAPI document and its tests.
 2. [x] `editor_app` and `editor_policy`; the pilot run by hand, and its server side nightly.
 3. [x] portalr's renderer, previews, diffs, check-out and check-in, with `bdd` scenarios.
-4. [ ] stackr: the build at the edge, on its own host name. A generated application serves each bridged app's build on a loopback port of its own ([stackr ADR-0043](../../../stackr/adr/0043-native-files-in-the-template.md)); a single host's edge, with host names and TLS, doesn't yet.
+4. [x] stackr ([ADR-0046](../../../stackr/adr/0046-native-files-a-relay-a-slimmer-worker-blender-and-the-editors-at-the-edge.md)): the build at the edge, on its own host name. A generated application serves each bridged app's build on a loopback port of its own ([stackr ADR-0043](../../../stackr/adr/0043-native-files-in-the-template.md)); a single host's edge, with host names and TLS, doesn't yet.

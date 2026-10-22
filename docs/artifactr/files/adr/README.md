@@ -24,6 +24,7 @@ This is the native files' own series, inside artifactr's section since `artifact
 | [0014](0014-freecad-on-a-third-dialect-and-no-python-a-file-or-an-agent-brings.md) | FreeCAD on a third dialect, a script it runs, and no Python a file or an agent brings | Accepted |
 | [0015](0015-blender-on-the-script-dialect-and-no-file-that-may-run-python.md) | Blender on the script dialect, its files read block by block, and none that may run Python | Accepted |
 | [0016](0016-a-project-that-holds-its-own-media-is-a-native-file.md) | A project that holds its own media is a native file, and an export is not kept | Accepted |
-| [0017](0017-a-persons-upload-told-by-its-bytes-read-before-it-is-committed.md) | A person's upload, told by its bytes, read by the app before it is committed, and held to quotas | Accepted |
+| [0017](0017-a-persons-upload-told-by-its-bytes-read-before-it-is-committed.md) | A person's upload, told by its bytes, read by the app before it is committed, and held to quotas | Accepted; amended by [0018](0018-a-page-takes-a-reading-is-kept-and-is-paced.md) |
+| [0018](0018-a-page-takes-a-reading-is-kept-and-is-paced.md) | A page takes one of the tenant's readings, is kept, and is paced | Accepted |
 
 To add a record, copy lattice's [ADR template](../../../adr/template.md) to the next number and add a row above.

@@ -509,6 +509,13 @@ def test_history_messages_are_model_requests_first() -> None:
         ("tokenizer: gpt2", "tokenizer: gpt2"),
         ("passwordless: true", "passwordless: true"),
         ("max_tokens=unlimited", "max_tokens=unlimited"),
+        ("tokenCount=12", "tokenCount=12"),
+        ("maxtokens=12", "maxtokens=12"),
+        # A long name, and names whose words are run together, are a secret's still.
+        ("x" * 65 + "_password=abc", "x" * 65 + "_password=[redacted]"),
+        ("CLIENTSECRET=abc", "CLIENTSECRET=[redacted]"),
+        ("ACCESSTOKEN=abc", "ACCESSTOKEN=[redacted]"),
+        ("APIKEY=abc", "APIKEY=[redacted]"),
     ],
 )
 def test_what_looks_like_a_secret_is_redacted(text: str, kept: str) -> None:
@@ -517,7 +524,7 @@ def test_what_looks_like_a_secret_is_redacted(text: str, kept: str) -> None:
 
 @pytest.mark.parametrize(
     argnames="text",
-    ids=["hyphens", "underscores", "a-a", "a-a-a", "spaces", "urls"],
+    ids=["hyphens", "underscores", "a-a", "a-a-a", "spaces", "urls", "a long name", "a long run"],
     argvalues=[
         "token-" * 5000,
         "token_" * 5000,
@@ -525,6 +532,8 @@ def test_what_looks_like_a_secret_is_redacted(text: str, kept: str) -> None:
         "a-a-a-" * 5000,
         "password " * 5000,
         "a://" * 8000,
+        "x" * 100_000 + "=",
+        "a-" * 50_000 + "_password",
     ],
 )
 def test_redaction_takes_time_in_line_with_the_text(text: str) -> None:

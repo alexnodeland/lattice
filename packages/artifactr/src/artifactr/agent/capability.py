@@ -502,14 +502,15 @@ def _bare_url(match: re.Match[str]) -> str:
     return scheme + re.split(r"[?#]", authority + slash + path, maxsplit=1)[0]
 
 
-# A name and the value given it: api_key=..., "password": "...", SECRET_KEY: .... The name is one
-# bounded run, so a long run of names' characters costs each start at most its bound.
-_GIVEN = re.compile(r"\b([\w-]{1,64})([\"']?\s{0,8}[:=]\s{0,8}[\"']?)([^\s\"',}]+)")
+# A name and the value given it: api_key=..., "password": "...", SECRET_KEY: .... The name is the
+# whole run of names' characters, taken once from its start and never given back, so a long run
+# costs one pass, and a long name's secret word still counts.
+_GIVEN = re.compile(r"(?<![\w-])([\w-]++)([\"']?\s{0,8}[:=]\s{0,8}[\"']?)([^\s\"',}]+)")
 # A name's words: split at `_`, `-` and where lower case meets upper (apiKey).
 _WORDS = re.compile(r"[_-]+|(?<=[a-z0-9])(?=[A-Z])")
-# Words that make a name a secret's, whole words only: a tokenizer, a secretary, passwordless
-# aren't. `api` then `key` counts as one, as `apikey` does.
-_SECRET_WORDS = frozenset({"token", "secret", "secrets", "password", "passwd", "apikey"})
+# Words that make a name a secret's, whole or at a word's end (CLIENTSECRET, ACCESSTOKEN): a
+# tokenizer, a secretary, passwordless aren't. `api` then `key` counts as one, as `apikey` does.
+_SECRET_WORDS = ("token", "secret", "secrets", "password", "passwd", "apikey")
 # Words that make a name a count's, such as token_count or max_tokens: given all digits, it stays.
 _COUNT_WORDS = frozenset({"count", "limit", "max", "min", "num", "tokens"})
 
@@ -517,7 +518,7 @@ _COUNT_WORDS = frozenset({"count", "limit", "max", "min", "num", "tokens"})
 def _is_secret(name: str) -> bool:
     words = [word.lower() for word in _WORDS.split(name) if word]
     pairs = {a + b for a, b in itertools.pairwise(words)}
-    return bool(_SECRET_WORDS.intersection(words) or "apikey" in pairs)
+    return "apikey" in pairs or any(word.endswith(_SECRET_WORDS) for word in words)
 
 
 def _named_secret(match: re.Match[str]) -> str:

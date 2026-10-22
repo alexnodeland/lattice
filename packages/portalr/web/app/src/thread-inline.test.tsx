@@ -890,3 +890,55 @@ test("a file whose app has no hosted editor keeps its preview, with no switch", 
   expect(book.getByRole("button", { name: /Edit in/ }).elements()).toHaveLength(0);
   await expect.element(book.getByRole("button", { name: "Check out and download" })).toBeVisible();
 });
+
+test("a download that fails is said below, in the file's controls, and announced by its button", async () => {
+  vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+  const { screen } = await open(
+    THREAD,
+    async (request, path) =>
+      path.endsWith("/files/doc_1/versions/1/content")
+        ? new Response(null, { status: 500 })
+        : serving()(request, path),
+    undefined,
+    { artifactrLog: thread([["doc_1", "word_document"]]) },
+  );
+  const file = screen.getByRole("listitem", { name: "brief.docx" });
+  await file.getByRole("button", { name: "Download", exact: true }).click();
+  await expect
+    .element(file.getByText("The file wasn't downloaded. Try again in a moment."))
+    .toBeVisible();
+  await expect
+    .poll(
+      () =>
+        file
+          .getByRole("button", { name: "Download", exact: true })
+          .element()
+          .parentElement?.querySelector("[role=status]")?.textContent,
+    )
+    .toBe("brief.docx wasn't downloaded.");
+});
+
+test("while a file's status is read, or when it can't be, no download is offered", async () => {
+  const { screen } = await open(
+    THREAD,
+    async (request, path) =>
+      path === `${AT}/files/doc_1` ? new Promise<Response>(() => {}) : serving()(request, path),
+    undefined,
+    { artifactrLog: thread([["doc_1", "word_document"]]) },
+  );
+  const reading = screen.getByRole("listitem", { name: "brief.docx" });
+  await expect.element(reading.getByText("Reading the file…")).toBeVisible();
+  expect(reading.getByRole("button", { name: "Download", exact: true }).elements()).toHaveLength(0);
+});
+
+test("a file whose status can't be read offers no download", async () => {
+  const { screen } = await open(
+    THREAD,
+    serving({ status: () => Response.json({ detail: "no" }, { status: 403 }) }),
+    undefined,
+    { artifactrLog: thread([["doc_1", "word_document"]]) },
+  );
+  const file = screen.getByRole("listitem", { name: "brief.docx" });
+  await expect.element(file.getByText(/^This file couldn't be read/)).toBeVisible();
+  expect(file.getByRole("button", { name: "Download", exact: true }).elements()).toHaveLength(0);
+});

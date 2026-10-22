@@ -47,6 +47,7 @@ from artifactr.core.commands import (
     ThreadMode,
 )
 from artifactr.core.errors import (
+    AlreadyExists,
     Forbidden,
     InvalidState,
     NotEnabled,
@@ -199,6 +200,7 @@ __all__ = [
     "ActiveRun",
     "Actor",
     "AgentActor",
+    "AlreadyExists",
     "AnswerDeferred",
     "Answers",
     "AppEvent",

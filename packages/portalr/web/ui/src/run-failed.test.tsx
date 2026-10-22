@@ -42,3 +42,15 @@ test("a failure further up, or one without a reason, is a note, with no way to t
   expect(screen.getByRole("button", { name: "Try again" }).elements()).toHaveLength(0);
   expect(screen.getByRole("alert").elements()).toHaveLength(0);
 });
+
+test("a latest turn that can't be tried again says why, in place of the button", async () => {
+  const screen = await render(
+    <Messages>
+      <RunFailed reason={null} error={null} retryRefused="It can't be tried again here." />
+    </Messages>,
+  );
+  await expect
+    .poll(() => screen.getByRole("alert").element().textContent)
+    .toContain("It can't be tried again here.");
+  expect(screen.getByRole("button", { name: "Try again" }).elements()).toHaveLength(0);
+});

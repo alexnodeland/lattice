@@ -39,6 +39,7 @@ from artifactr.core.commands import (
     SetThreadMode,
 )
 from artifactr.core.errors import (
+    AlreadyExists,
     Forbidden,
     InvalidState,
     NotFound,
@@ -278,7 +279,7 @@ def _propose(
     actor: Actor,
 ) -> CommitResult:
     if _loaded(state.proposals, proposal_id, "proposal") is not None:
-        raise InvalidState(f"proposal {proposal_id} already exists")
+        raise AlreadyExists("proposal", proposal_id)
     if not isinstance(change, CreateArtifact):
         _check_version(_current(state, change.artifact_id), change.base_version)
     thread_id = _context_thread_id(change.thread_id, actor)
@@ -420,7 +421,7 @@ def _apply_create(
     proposal_id: ProposalId | None,
 ) -> CommitResult:
     if _loaded(state.artifacts, command.artifact_id, "artifact") is not None:
-        raise InvalidState(f"artifact {command.artifact_id} already exists")
+        raise AlreadyExists("artifact", command.artifact_id)
     data = command.data if changes is None else apply_patch(command.data, changes)
     artifact = load_artifact(command.kind, data)
     stored = artifact.to_json()
@@ -551,7 +552,7 @@ def _apply_archive(
 
 def _create_thread(command: CreateThread, state: State) -> CommitResult:
     if _loaded(state.threads, command.thread_id, "thread") is not None:
-        raise InvalidState(f"thread {command.thread_id} already exists")
+        raise AlreadyExists("thread", command.thread_id)
     return CommitResult(
         outcome=Recorded(),
         events=(ThreadCreated(thread_id=command.thread_id, title=command.title),),
@@ -562,7 +563,7 @@ def _create_thread(command: CreateThread, state: State) -> CommitResult:
 def _post_message(command: PostMessage, state: State, actor: Actor) -> CommitResult:
     _thread(state, command.thread_id)
     if _loaded(state.messages, command.message_id, "message"):
-        raise InvalidState(f"message {command.message_id} already exists")
+        raise AlreadyExists("message", command.message_id)
     return CommitResult(
         outcome=Recorded(),
         events=(

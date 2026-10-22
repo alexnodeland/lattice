@@ -27,7 +27,7 @@ None of these moved the focus when it replaced the page the reader asked for. Th
 ## Announcement and the failure's words
 
 - **Heard twice, by choice.** An `ErrorState` moves the focus to its heading, and its failure is an `alert`. Some screen readers announce both: the heading as the focus lands, then the alert. We chose this over dropping either. The focus tells a keyboard reader where they are. The alert is heard even where the focus isn't followed.
-- **The failure's words aren't vetted yet.** `failureSaid` shows the error's message as is. A refused read's message includes the server's `detail` text. Deciding which server text a reader may see is a follow-up, [#552](https://github.com/alexnodeland/lattice/issues/552).
+- **A reader sees the kit's words for a failure, never the server's** ([#552](https://github.com/alexnodeland/lattice/issues/552), decided 2026-10-22). `failureSaid` picks a sentence by the refusal's known reason code (`forbidden`, `not_found`, `not_enabled`, `invalid_state`, `version_conflict`, `validation_failed`), then by its status (401, 403, 404, 422, 429, 5xx), else a generic one. `FailureAlert`, which `ErrorState` and the apps' error boundaries use, writes the whole failure to the console for operators once, after the render, as one line: hidden characters out, what looks like a secret redacted, cut between graphemes. Other screens that still show an error's message (the boot failure, the audit log's paging and the deployment audit, the tools page, the confirm dialog, a run's command refusals, a form's rejection message, sign-in) are #552's remaining scope.
 
 ## Consequences
 

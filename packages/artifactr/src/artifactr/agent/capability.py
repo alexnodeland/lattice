@@ -12,6 +12,7 @@ attribution to those spans, and record each attempt's trace id with ``run_starte
 """
 
 import asyncio
+import itertools
 import json
 import logging
 import re
@@ -479,28 +480,54 @@ def _named(args: dict[str, Any]) -> str | None:
 
 
 _SECRETS = (
-    # A URL's credentials and query, where tokens and keys travel; its host and path stay.
-    (re.compile(r"(\w+://)[^/\s@]*@"), r"\1"),
-    (re.compile(r"(\w+://[^\s?#]*)[?#][^\s'\"]*"), r"\1"),
     # An Authorization header's credentials, whatever their scheme.
     (re.compile(r"(?i)\b(authorization\s*[:=]\s*\w+)\s+\S+"), r"\1 [redacted]"),
     (re.compile(r"(?i)\b(bearer|basic)\s+[\w.~+/=-]+"), r"\1 [redacted]"),
-    # A secret given by name, outside a URL: api_key=..., token: ..., "password": "...", and
-    # names with more around them, client_secret=..., OPENAI_API_KEY=..., SECRET_KEY: .... A
-    # name's other words are part of it, as `_` is a word's character, so they are matched with
-    # it; a count, such as max_tokens=1000, is not a secret, and stays.
-    (
-        re.compile(
-            r"(?i)\b([\w-]*?(?:api[_-]?key|access[_-]?token|token|secret|password|passwd)[\w-]*"
-            r"[\"']?\s*[:=]\s*[\"']?)(?![\d.]+\b)[^\s\"',}]+"
-        ),
-        r"\1[redacted]",
-    ),
     # Tokens in the shapes their issuers give them: provider keys, GitHub's, and JWTs.
     (re.compile(r"\b(?:sk|pk|rk|key)-[\w-]{8,}"), "[redacted]"),
     (re.compile(r"\b(?:gh[pousr]_\w{20,}|github_pat_\w{20,})"), "[redacted]"),
     (re.compile(r"\beyJ[\w-]+\.eyJ[\w-]+\.[\w-]+"), "[redacted]"),
 )
+
+
+# A URL, matched once whole, so a run of them costs one pass.
+_URL = re.compile(r"\b(\w+://)([^\s'\"]*)")
+
+
+def _bare_url(match: re.Match[str]) -> str:
+    """A URL without its credentials and query, where tokens and keys travel; host and path stay."""
+    scheme, rest = match.groups()
+    authority, slash, path = rest.partition("/")
+    authority = authority.rpartition("@")[2]
+    return scheme + re.split(r"[?#]", authority + slash + path, maxsplit=1)[0]
+
+
+# A name and the value given it: api_key=..., "password": "...", SECRET_KEY: .... The name is one
+# bounded run, so a long run of names' characters costs each start at most its bound.
+_GIVEN = re.compile(r"\b([\w-]{1,64})([\"']?\s{0,8}[:=]\s{0,8}[\"']?)([^\s\"',}]+)")
+# A name's words: split at `_`, `-` and where lower case meets upper (apiKey).
+_WORDS = re.compile(r"[_-]+|(?<=[a-z0-9])(?=[A-Z])")
+# Words that make a name a secret's, whole words only: a tokenizer, a secretary, passwordless
+# aren't. `api` then `key` counts as one, as `apikey` does.
+_SECRET_WORDS = frozenset({"token", "secret", "secrets", "password", "passwd", "apikey"})
+# Words that make a name a count's, such as token_count or max_tokens: given all digits, it stays.
+_COUNT_WORDS = frozenset({"count", "limit", "max", "min", "num", "tokens"})
+
+
+def _is_secret(name: str) -> bool:
+    words = [word.lower() for word in _WORDS.split(name) if word]
+    pairs = {a + b for a, b in itertools.pairwise(words)}
+    return bool(_SECRET_WORDS.intersection(words) or "apikey" in pairs)
+
+
+def _named_secret(match: re.Match[str]) -> str:
+    name, given, value = match.groups()
+    if not _is_secret(name):
+        return match.group(0)
+    words = {word.lower() for word in _WORDS.split(name) if word}
+    if value.isdigit() and _COUNT_WORDS.intersection(words):
+        return match.group(0)
+    return f"{name}{given}[redacted]"
 
 
 def redacted(text: str) -> str:
@@ -511,9 +538,10 @@ def redacted(text: str) -> str:
     JWTs) go. What a run failed with, and a tool's errors and refusals, are recorded in the
     thread, which everyone who may read it reads.
     """
+    text = _URL.sub(_bare_url, text)
     for pattern, replacement in _SECRETS:
         text = pattern.sub(replacement, text)
-    return text
+    return _GIVEN.sub(_named_secret, text)
 
 
 def _reason(error: Exception) -> str | None:

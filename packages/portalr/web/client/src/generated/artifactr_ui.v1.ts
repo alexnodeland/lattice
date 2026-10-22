@@ -116,7 +116,7 @@ export type Closed = boolean;
 export type Submissions = "once" | "per_person" | "many";
 export type Title12 = string;
 export type IntegrationKey = "ui:forms" | "ui:dashboards" | "ui:mini-apps";
-export type RefusalReason = "changed" | "closed";
+export type RefusalReason = "changed" | "closed" | "already_exists";
 export type Nonce = string | null;
 export type Version = number;
 

@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import time
 from datetime import timedelta
 from typing import override
 
@@ -493,10 +494,43 @@ def test_history_messages_are_model_requests_first() -> None:
         ('{"refresh_token": "r1"}', '{"refresh_token": "[redacted]"}'),
         ("db_password=hunter2", "db_password=[redacted]"),
         ("max_tokens=1000 reached", "max_tokens=1000 reached"),
+        ("token_count=12 used", "token_count=12 used"),
+        ("apiKey=abc", "apiKey=[redacted]"),
+        # A secret all digits, or digits first, is a secret still.
+        ("password=123456", "password=[redacted]"),
+        ('{"password": "123456"}', '{"password": "[redacted]"}'),
+        ("api_key=1234567890123456", "api_key=[redacted]"),
+        ("token=123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw", "token=[redacted]"),
+        ("secret=123.hunter2", "secret=[redacted]"),
+        ("password=1.5x", "password=[redacted]"),
+        ("password=123-456", "password=[redacted]"),
+        # A name that only has a secret's word inside a longer word isn't a secret's.
+        ("secretary: John", "secretary: John"),
+        ("tokenizer: gpt2", "tokenizer: gpt2"),
+        ("passwordless: true", "passwordless: true"),
+        ("max_tokens=unlimited", "max_tokens=unlimited"),
     ],
 )
 def test_what_looks_like_a_secret_is_redacted(text: str, kept: str) -> None:
     assert redacted(text) == kept
+
+
+@pytest.mark.parametrize(
+    argnames="text",
+    ids=["hyphens", "underscores", "a-a", "a-a-a", "spaces", "urls"],
+    argvalues=[
+        "token-" * 5000,
+        "token_" * 5000,
+        "a-" * 15000,
+        "a-a-a-" * 5000,
+        "password " * 5000,
+        "a://" * 8000,
+    ],
+)
+def test_redaction_takes_time_in_line_with_the_text(text: str) -> None:
+    started = time.perf_counter()
+    redacted(text)
+    assert time.perf_counter() - started < 0.5
 
 
 async def test_a_tools_own_refusal_is_recorded_without_its_secrets(

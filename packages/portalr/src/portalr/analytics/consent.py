@@ -22,7 +22,8 @@ class Consent(Protocol):
     async def give(self, user_id: str, *, yes: bool) -> int | None:
         """Record the person's answer: the deletion now owed them, if any, by its number.
 
-        A yes taken back owes a new one; a no again keeps the one owed, if any; a yes owes none.
+        A yes taken back owes a new one; a no again, or a yes, keeps the one owed, if any: a
+        yes never cancels a deletion a no owed.
         """
         ...
 
@@ -38,8 +39,8 @@ class Consent(Protocol):
         """Record that deletion `debt` is done: cleared only if it is still the one owed."""
         ...
 
-    async def owing(self) -> list[tuple[str, int]]:
-        """The people a deletion is owed, each with its number."""
+    async def owing(self, most: int) -> list[tuple[str, int]]:
+        """At most `most` people a deletion is owed, the longest owed first, with its number."""
         ...
 
 
@@ -57,9 +58,7 @@ class InMemoryConsent:
 
     async def give(self, user_id: str, *, yes: bool) -> int | None:
         """Record the person's answer: the deletion now owed them, if any."""
-        if yes:
-            self._owed.pop(user_id, None)
-        elif self._answers.get(user_id, False):
+        if not yes and self._answers.get(user_id, False):
             await self.owe(user_id)
         self._answers[user_id] = yes
         return self._owed.get(user_id)
@@ -79,6 +78,6 @@ class InMemoryConsent:
         if self._owed.get(user_id) == debt:
             del self._owed[user_id]
 
-    async def owing(self) -> list[tuple[str, int]]:
-        """The people a deletion is owed, each with its number."""
-        return sorted(self._owed.items())
+    async def owing(self, most: int) -> list[tuple[str, int]]:
+        """At most `most` people a deletion is owed, the longest owed first, with its number."""
+        return sorted(self._owed.items(), key=lambda owed: owed[1])[:most]

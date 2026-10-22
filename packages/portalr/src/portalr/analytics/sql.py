@@ -119,8 +119,8 @@ class SqlConsent:
     async def give(self, user_id: str, *, yes: bool) -> int | None:
         """Record the person's answer: the deletion now owed them, if any, by its number.
 
-        One statement, which locks the row: a yes taken back takes the next number, a no again
-        keeps the one owed, a yes clears it; and it touches nothing else of the row's.
+        One statement, which locks the row: a yes taken back takes the next number; a no again,
+        or a yes, keeps the one owed, which a yes never cancels; and it touches nothing else.
         """
         table = Answer.__table__.c
         async with self._engine.begin() as connection:
@@ -140,11 +140,7 @@ class SqlConsent:
                     set_={
                         "given": yes,
                         "answered_at": datetime.now(UTC),
-                        "delete_owed": case(
-                            (literal(yes), 0),
-                            (taken_back, table.debts + 1),
-                            else_=table.delete_owed,
-                        ),
+                        "delete_owed": case((taken_back, table.debts + 1), else_=table.delete_owed),
                         "debts": case((taken_back, table.debts + 1), else_=table.debts),
                     },
                 )
@@ -196,13 +192,18 @@ class SqlConsent:
                 .values(delete_owed=0)
             )
 
-    async def owing(self) -> list[tuple[str, int]]:
-        """The people a deletion is owed, each with its number, as the tables' owner reads them."""
+    async def owing(self, most: int) -> list[tuple[str, int]]:
+        """At most `most` people a deletion is owed, longest unanswered first, with its number.
+
+        Read as the tables' owner. A person whose deletion keeps failing goes to the back as they
+        are tried, since trying it doesn't change their row: the oldest answers come first.
+        """
         async with self._owner.connect() as connection:
             rows = await connection.execute(
                 select(Answer.user_id, Answer.delete_owed)
                 .where(Answer.delete_owed > 0)
-                .order_by(Answer.user_id)
+                .order_by(Answer.answered_at, Answer.user_id)
+                .limit(most)
             )
             return [(row.user_id, row.delete_owed) for row in rows]
 

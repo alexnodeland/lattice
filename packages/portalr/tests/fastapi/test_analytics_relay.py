@@ -241,7 +241,7 @@ async def test_deletions_owed_are_done_as_a_replica_starts(
         await relay.answer(person, yes=False)
     clickhouse.status = 200
     assert await relay.settle_owed() == 2
-    assert await relay.consent.owing() == []
+    assert await relay.consent.owing(100) == []
 
 
 async def test_a_no_that_lands_while_a_batch_is_written_deletes_the_batch_too(
@@ -449,4 +449,4 @@ async def test_a_pass_settles_so_many_people_at_most(clickhouse: ClickHouse, rel
         await relay.consent.give(person, yes=True)
         await relay.consent.give(person, yes=False)
     assert await relay.settle_owed(most=2) == 2
-    assert [person for person, _ in await relay.consent.owing()] == ["carol"]
+    assert [person for person, _ in await relay.consent.owing(100)] == ["carol"]

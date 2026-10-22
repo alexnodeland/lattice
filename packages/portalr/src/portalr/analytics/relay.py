@@ -170,7 +170,7 @@ class Relay:
         no harm, since a deletion done twice deletes nothing more.
         """
         done = 0
-        for user_id, debt in (await self.consent.owing())[:most]:
+        for user_id, debt in await self.consent.owing(most):
             done += await self.settle(user_id, debt, paced=False)
         return done
 

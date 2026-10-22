@@ -698,8 +698,9 @@ def _analytics(router: APIRouter, grants: Grants, relay: Relay, current: Any) ->
         """Record the person's answer. Taking a yes back deletes their events at once.
 
         A deletion ClickHouse can't take stays owed, and is tried again on the person's next
-        request, and as the application starts: ``deleted`` says whether it is done. It is
-        never refused for the person's pace: a withdrawal always lands.
+        request, and by a background pass every few minutes: ``deleted`` says whether it is
+        done. A yes later doesn't cancel it. It is never refused for the person's pace: a
+        withdrawal always lands.
         """
         return await relay.answer(user, yes=body.given)
 

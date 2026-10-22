@@ -82,7 +82,7 @@ async def test_the_owner_reads_every_deletion_owed(
         debt = await consent.give(person, yes=False)
         assert debt is not None
         owed.append((person, debt))
-    assert await consent.owing() == owed
+    assert await consent.owing(100) == owed
 
 
 async def test_two_replicas_migrating_at_once_both_succeed(
@@ -113,7 +113,7 @@ async def test_a_yes_racing_a_deletion_owed_survives_with_the_debt_owed(
         _, debt = await asyncio.gather(consent.give("alice", yes=True), consent.owe("alice"))
         given = await consent.given("alice")
         owed = await consent.owes("alice")
-        # Whichever ran last: a yes after the debt clears it; a debt after the yes stays owed.
+        # Whichever ran last, the yes stands and the debt stays owed: a yes never cancels it.
         assert given, "the yes is never lost"
-        assert owed in (None, debt)
+        assert owed == debt
         await consent.give("alice", yes=False)

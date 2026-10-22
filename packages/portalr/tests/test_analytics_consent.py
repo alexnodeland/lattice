@@ -26,22 +26,24 @@ async def answers(consent: Consent) -> None:
     assert not await consent.given("alice")
     assert await consent.owes("alice") == first
     assert await consent.give("alice", yes=False) == first, "a no again keeps the one owed"
-    assert await consent.owing() == [("alice", first)]
+    assert await consent.owing(100) == [("alice", first)]
     await consent.settled("alice", first)
     assert await consent.owes("alice") is None
     assert await consent.give("alice", yes=False) is None, "a no again owes nothing more"
-    assert await consent.owing() == []
+    assert await consent.owing(100) == []
     await consent.give("bob", yes=True)
-    await consent.give("bob", yes=False)
-    assert await consent.give("bob", yes=True) is None, "a yes again owes nothing"
-    assert await consent.owes("bob") is None
+    owed = await consent.give("bob", yes=False)
+    assert owed is not None
+    assert await consent.give("bob", yes=True) == owed, "a yes never cancels a deletion owed"
+    assert await consent.owes("bob") == owed
+    assert await consent.owing(1) == [("bob", owed)], "at most so many"
 
 
 async def a_late_settling_clears_only_its_own_debt(consent: Consent) -> None:
     await consent.give("alice", yes=True)
     first = await consent.give("alice", yes=False)
     assert first is not None
-    await consent.give("alice", yes=True)
+    assert await consent.give("alice", yes=True) == first, "still owed after a yes"
     second = await consent.give("alice", yes=False)
     assert second is not None
     assert second != first

@@ -10,9 +10,11 @@ libraries from GitHub at a pushed commit and Docker (`scripts/smoke app` and the
 jobs run those on a fresh application).
 """
 
+import os
 import re
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -25,7 +27,9 @@ a commit of its own for each run of copier."""
 
 
 def _copier(*arguments: str, cwd: Path) -> None:
-    subprocess.run(["uv", "run", "copier", *arguments], cwd=cwd, check=True, capture_output=True)
+    subprocess.run(
+        [sys.executable, "-m", "copier", *arguments], cwd=cwd, check=True, capture_output=True
+    )
 
 
 def _git(*arguments: str, cwd: Path) -> None:
@@ -60,6 +64,9 @@ def _files(directory: Path) -> dict[str, str]:
 @pytest.mark.skipif(shutil.which("git") is None, reason="needs git")
 def test_an_application_from_0_1_0_updates_to_this_template(tmp_path: Path) -> None:
     if not _released():
+        # CI's checkout fetches every tag; only a local clone may lack it.
+        if os.environ.get("CI"):
+            pytest.fail(f"{RELEASED} isn't in CI's clone: its checkout must fetch the tags")
         pytest.skip(f"{RELEASED} isn't in this clone: fetch the tags")
     application, fresh = tmp_path / "application", tmp_path / "fresh"
     answers = ["--quiet", "--defaults", "--data", "project_name=Upgraded"]

@@ -1,4 +1,5 @@
-"""A database at the schema each package's last release left it, migrated to this commit's.
+"""A database at the schema each package's last release left it, migrated to this commit's:
+artifactr from 0.2.1, grantr from 0.1.0, relayr from 0.1.1.
 
 For artifactr, grantr and relayr, the packages whose 0.2 adds migrations, the database is migrated
 to the revision their last release's head was, a row is written in every table it had then, and
@@ -57,7 +58,9 @@ from relayr.sql.tables import metadata as relayr_metadata
 Migrate = Callable[[AsyncEngine], Any]
 
 RELEASED: Mapping[str, tuple[Callable[[Connection], Config], str, Migrate, MetaData, str]] = {
-    # artifactr-v0.2.1: the core's head was 0006, and native files' schema didn't exist.
+    # artifactr-v0.2.1, not a 0.1 release: the core's head was 0006, which is still its head, so
+    # its upgrade adds nothing to the core's tables; what it holds is that native files' schema,
+    # new in 0.2, is made beside them and leaves their rows alone.
     "artifactr": (
         artifactr_schema._alembic_config,
         "0006",

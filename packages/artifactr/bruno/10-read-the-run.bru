@@ -18,8 +18,16 @@ script:pre-request {
   const headers = req.getHeaders();
   let status = 0;
   for (let attempt = 0; attempt < 50 && status !== 200; attempt++) {
-    const found = await bru.sendRequest({ method: "GET", url, headers, validateStatus: () => true });
-    status = found.status;
+    // `sendRequest` rejects on a 4xx whatever `validateStatus` says, so a 404, the run not yet
+    // recorded, is read from the rejection and polled again rather than failing the request.
+    try {
+      status = (await bru.sendRequest({ method: "GET", url, headers })).status;
+    } catch (error) {
+      status = error?.response?.status ?? 0;
+      if (status === 0) {
+        throw error;
+      }
+    }
     if (status !== 200) {
       await bru.sleep(200);
     }

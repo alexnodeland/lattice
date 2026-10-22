@@ -1,8 +1,10 @@
 """People's answers: no until they say yes, in memory and in the application's database."""
 
+import importlib
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
+from types import SimpleNamespace
 from typing import cast
 
 import pytest
@@ -79,3 +81,71 @@ async def test_on_postgresql_the_application_role_may_read_and_write_answers_alo
 
     await migrate(cast(AsyncEngine, Engine()), application_role="app")
     assert statements == ['GRANT SELECT, INSERT, UPDATE ON portalr_analytics_consent TO "app"']
+
+
+MIGRATION = "portalr.analytics.migrations.versions.0001_analytics_consent"
+
+
+@pytest.mark.parametrize("dialect", ["postgresql", "sqlite"])
+def test_the_migration_keeps_each_answer_to_its_person_on_postgresql_and_undoes_it(
+    dialect: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    migration = importlib.import_module(MIGRATION)
+    statements: list[str] = []
+
+    class Op:
+        def get_bind(self) -> object:
+            return SimpleNamespace(dialect=SimpleNamespace(name=dialect))
+
+        def execute(self, statement: str) -> None:
+            statements.append(statement)
+
+        def create_table(self, name: str, *_: object) -> None:
+            statements.append(f"CREATE TABLE {name}")
+
+        def drop_table(self, name: str) -> None:
+            statements.append(f"DROP TABLE {name}")
+
+        def f(self, name: str) -> str:
+            return name
+
+    monkeypatch.setattr(migration, "op", Op())
+    migration.upgrade()
+    migration.downgrade()
+    policies = [s for s in statements if "POLICY" in s or "ROW LEVEL" in s]
+    if dialect == "sqlite":
+        assert policies == []
+    else:
+        assert policies == [
+            "ALTER TABLE portalr_analytics_consent ENABLE ROW LEVEL SECURITY",
+            "CREATE POLICY portalr_analytics_consent_person ON portalr_analytics_consent"
+            " USING (user_id = current_setting('portalr.user_id', true))"
+            " WITH CHECK (user_id = current_setting('portalr.user_id', true))",
+            "DROP POLICY portalr_analytics_consent_person ON portalr_analytics_consent",
+        ]
+    assert statements[-1] == "DROP TABLE portalr_analytics_consent"
+
+
+async def test_on_postgresql_each_transaction_names_its_person() -> None:
+    said: list[tuple[str, object]] = []
+
+    class Connection:
+        dialect = SimpleNamespace(name="postgresql")
+
+        async def execute(self, statement: object, parameters: object = None) -> None:
+            said.append((str(statement), parameters))
+
+        async def scalar(self, _: object) -> bool:
+            return True
+
+    class Engine:
+        @asynccontextmanager
+        async def begin(self) -> AsyncIterator[Connection]:
+            yield Connection()
+
+    consent = SqlConsent(cast(AsyncEngine, Engine()))
+    assert await consent.given("alice")
+    assert said[0] == (
+        "SELECT set_config('portalr.user_id', :person, true)",
+        {"person": "alice"},
+    )

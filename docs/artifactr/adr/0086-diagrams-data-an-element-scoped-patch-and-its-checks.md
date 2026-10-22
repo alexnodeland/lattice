@@ -19,6 +19,7 @@ RFC-0006 makes an Excalidraw diagram an ordinary JSON artifact, edited by JSON P
   - `scene`, what every viewer shares.
 
   An `Element` validates only `id`, `type`, `version`, `versionNonce`, `isDeleted`, `index` and `updated`, and keeps every other field as written, under Excalidraw's own camel-case names.
+
   - `version` and `updated` are strict integers up to 2^53 − 1, the largest JavaScript holds exactly. `versionNonce` is a strict integer from 0 to 2^31 − 1. No bool or float is coerced.
   - A field that holds NaN or an infinity is refused, since JSON would store it as null. So is one nested past what JSON encodes.
   - `type` is open on purpose: a type a newer Excalidraw writes is kept, not refused. An image is a `DiagramFile` with `Blob`'s shape (`sha256`, `size`, `media_type`). It is kept apart from `Blob` so the data layer doesn't import the `files` extra; images through `Blobs` come with the worker.
@@ -32,6 +33,7 @@ RFC-0006 makes an Excalidraw diagram an ordinary JSON artifact, edited by JSON P
   | 26,667 | 15.2 MB | 967 / 1,787 ms | 2,317 / 3,513 ms | 18 MB |
 
   At the limits, an edit takes about 40 ms in memory or 90 ms on SQLite, for a revision of about 1.2 MB. The RFC's 5,000 elements would be about 2.9 MB and 200 to 400 ms a commit. PostgreSQL wasn't measured.
+
 - **The patch builder, `element_patch(base, elements, files)`:**
   - a changed element is `test` of its base version, then `replace`;
   - a new element is `add`;
@@ -39,12 +41,14 @@ RFC-0006 makes an Excalidraw diagram an ordinary JSON artifact, edited by JSON P
   - a new image is `add`.
 
   `rebase(base, local, head)` moves a writer's elements onto a newer head after a `version_conflict`. It reconciles the way Excalidraw 0.18.1's `reconcileElements` does: the higher version wins, and at one version the lower nonce. Where the writer's element wins, it is resent above the head's version with a new nonce. `reconcile` and `won` are the same rule, for a writer that merges.
+
 - **The checks, `excalidraw_checks()`**, run on every surface, for an edit, a proposed edit, and a proposal accepted against the head:
   - an element an edit changes must grow its `version` past the head's;
   - an `add` of an id the head already has is refused;
   - an image is added only, never replaced or removed. This is checked on the result, not on the patch's paths, so removing or replacing `/files`, a root replace, and a `move` or `copy` are all held to it.
 
   The result is loaded as core loads it, so data the type refuses is refused here as core would refuse it.
+
 - **`render_for_agent`** describes a diagram in at most 4,000 characters: frames, shapes with their labels, arrows as `A --label--> B`, free text, counts and the bounding box. It reads live elements only, does no IO, and stores nothing. What the agent reads is written by people, so:
   - every word from the diagram is quoted on one line, its quotes escaped, at most 80 characters;
   - an arrow names a bound element only if it is a live element's id, and is "(free)" otherwise.

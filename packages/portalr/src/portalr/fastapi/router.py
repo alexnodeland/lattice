@@ -12,7 +12,17 @@ from importlib.resources import files
 from pathlib import Path
 from typing import Annotated, Any, Final
 
-from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Request, Response
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Body,
+    Depends,
+    Header,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+)
 from fastapi import Path as PathParam
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
@@ -60,6 +70,7 @@ from portalr.readers import (
     read_usage,
     reading,
 )
+from portalr.readers.analytics import Analytics, actor_of
 from portalr.readers.loki import RECORD_ID
 from portalr.readers.query import Id
 from portalr.tenant import Tenant, allowed
@@ -470,7 +481,7 @@ def portalr_router(
     if people is not None:
         _naming(api, grants, people, current)
     if invite is not None:
-        _invitations(api, grants, invite, current)
+        _invitations(api, grants, invite, current, readers.analytics)
         _tenant_creation(api, grants, invite, operating)
     router.include_router(api)
 
@@ -580,7 +591,13 @@ def _tenant_creation(router: APIRouter, grants: Grants, invite: Invite, operatin
         return CreatedTenant(tenant=body.tenant, owner=owner)
 
 
-def _invitations(router: APIRouter, grants: Grants, invite: Invite, current: Any) -> None:
+def _invitations(
+    router: APIRouter,
+    grants: Grants,
+    invite: Invite,
+    current: Any,
+    analytics: Analytics | None,
+) -> None:
     failed = {
         "model": Refused,
         "description": "Supabase Auth didn't invite or find the person: `invite_failed`",
@@ -588,7 +605,10 @@ def _invitations(router: APIRouter, grants: Grants, invite: Invite, current: Any
 
     @router.post("/v1/invites", status_code=201, responses={502: failed})
     async def invite_member(
-        body: Annotated[NewInvite, Body()], x_tenant: TenantHeader = None, who: Caller = current
+        body: Annotated[NewInvite, Body()],
+        background: BackgroundTasks,
+        x_tenant: TenantHeader = None,
+        who: Caller = current,
     ) -> Invited:
         """Invite someone to the tenant: Supabase Auth creates or finds them, grantr adds them.
 
@@ -612,4 +632,15 @@ def _invitations(router: APIRouter, grants: Grants, invite: Invite, current: Any
                 await grants.add_member(tenant, User(id=user), by=who.subject)
             except (Forbidden, Invalid) as error:
                 raise _refused(error) from error
+        if analytics is not None and (actor := actor_of(who.subject)) is not None:
+            # Recorded after the answer is sent: analytics never slows or fails an invitation.
+            kind, by = actor
+            background.add_task(
+                analytics.capture,
+                tenant,
+                "member.invited.v1",
+                by,
+                actor=kind,
+                props={"outcome": "invited"},
+            )
         return Invited(tenant=tenant, user=user)

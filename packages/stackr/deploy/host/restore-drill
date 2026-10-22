@@ -10,8 +10,9 @@
 #    container from the same image, with no volume, and must have every table the live databases
 #    have, and the sentinel.
 # 4. ClickHouse's latest nightly backup is restored as restore_drill, beside Langfuse's, and must
-#    have rows in every table where the live one has rows; the drill's own backup is restored as
-#    restore_sentinel, and must have the sentinel. Both are dropped after.
+#    have rows in every table where the live one has rows; its analytics database (ADR-0044) is
+#    restored as restore_analytics, and must have as many tables; the drill's own backup is
+#    restored as restore_sentinel, and must have the sentinel. All are dropped after.
 #
 # Each restore first checks there is room for it. The result goes to the Collector as
 # stackr.restore_drill.success, 1 or 0, from an exit trap, so a drill that fails part way, or
@@ -37,6 +38,7 @@ clickhouse() {
 finish() {
   clickhouse "DROP DATABASE IF EXISTS restore_drill SYNC" >/dev/null 2>&1 || true
   clickhouse "DROP DATABASE IF EXISTS restore_sentinel SYNC" >/dev/null 2>&1 || true
+  clickhouse "DROP DATABASE IF EXISTS restore_analytics SYNC" >/dev/null 2>&1 || true
   rm -rf "$scratch"
   deploy/host/report-metric stackr-restore-drill stackr.restore_drill.success $((status == 0)) || true
   log "restore-drill: reported $((status == 0)) to the Collector"
@@ -128,7 +130,7 @@ log "ok: PostgreSQL's latest backup restores, with every table the live database
 
 # --- 4. ClickHouse ---------------------------------------------------------------------------
 
-used=$(clickhouse "SELECT sum(bytes_on_disk) FROM system.parts WHERE database = 'default' AND active")
+used=$(clickhouse "SELECT sum(bytes_on_disk) FROM system.parts WHERE database IN ('default', 'analytics') AND active")
 free=$(clickhouse "SELECT free_space FROM system.disks WHERE name = 'default'")
 ((free > used + used / 5)) || fail "ClickHouse has no room to restore: $free bytes free, $used used"
 tables_with_rows() {
@@ -141,8 +143,19 @@ live_rows=$(tables_with_rows default) || fail "listing Langfuse's tables"
 restored_rows=$(tables_with_rows restore_drill) || fail "listing the restored tables"
 missing=$(comm -23 <(printf '%s\n' "$live_rows") <(printf '%s\n' "$restored_rows"))
 [[ -z $missing ]] || fail "ClickHouse's restore of $latest has no rows in: $missing"
+clickhouse "DROP DATABASE IF EXISTS restore_analytics SYNC"
+clickhouse "RESTORE DATABASE analytics AS restore_analytics FROM S3(backups, '$latest') FORMAT Null"
+tables_in() { clickhouse "SELECT count() FROM system.tables WHERE database = '$1'"; }
+[[ $(tables_in restore_analytics) == $(tables_in analytics) ]] ||
+  fail "ClickHouse's restore of $latest lacks analytics' tables"
+# Its events are readable, and none is newer than the backup: it is the backup's, not the live table's.
+if [[ $(tables_in analytics) -gt 0 ]]; then
+  newer=$(clickhouse "SELECT count() FROM restore_analytics.events WHERE toUnixTimestamp(ts) > $taken") ||
+    fail "reading the restored analytics events"
+  [[ $newer == 0 ]] || fail "ClickHouse's restore of $latest has $newer analytics events newer than itself"
+fi
 clickhouse "RESTORE DATABASE stackr_drill AS restore_sentinel FROM S3(backups, 'drill/$sentinel') FORMAT Null"
 [[ $(clickhouse "SELECT count() FROM restore_sentinel.sentinel WHERE id = '$sentinel'") == 1 ]] ||
   fail "ClickHouse's drill backup lacks the sentinel"
-log "ok: ClickHouse's latest backup, $latest, restores with rows in every table, and the sentinel's does"
+log "ok: ClickHouse's latest backup, $latest, restores with rows in every table and analytics' tables, and the sentinel's does"
 status=0

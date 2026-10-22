@@ -17,7 +17,7 @@ from fastapi.testclient import TestClient
 from portalr.invites import InviteFailed, SupabaseInvite
 from portalr.people import SupabasePeople
 
-from {{ package_name }}.portal import LARGEST, invitations, people, readers
+from {{ package_name }}.portal import LARGEST, analytics, invitations, people, readers
 from {{ package_name }}.settings import AuthSettings, PortalSettings, Settings
 
 from conftest import TENANT, Script, app, bearer, settings, token
@@ -321,7 +321,7 @@ def test_every_tool_with_an_address_is_read(ui: Path) -> None:
         "langfuse": True,
         "litellm": True,
         "grafana": True,
-        # portalr's analytics isn't wired into the template yet (lattice RFC-0008).
+        # portalr's analytics needs its four settings (lattice RFC-0008).
         "analytics": False,
     }
     assert len(clients) == 2, "Langfuse's and LiteLLM's, which the portal closes"
@@ -442,3 +442,59 @@ def test_a_token_is_still_needed_to_read(script: Script) -> None:
         forged = token("alice", secret="not-the-secret-at-all-32-characters-long")
         headers = {"Authorization": f"Bearer {forged}", "X-Tenant": TENANT}
         assert client.get("/portalr/v1/spend", headers=headers).status_code == 401
+
+
+ANALYTICS = {
+    "analytics_url": "http://127.0.0.1:8123",
+    "analytics_key": "ab" * 32,
+    "analytics_writer_password": "w",
+    "analytics_password": "r",
+}
+
+
+def test_analytics_comes_from_its_four_settings_and_not_from_fewer() -> None:
+    named = PortalSettings.from_environ(
+        {
+            "PORTAL_ANALYTICS_URL": "http://127.0.0.1:8123",
+            "PORTAL_ANALYTICS_KEY": "ab" * 32,
+            "PORTAL_ANALYTICS_WRITER_PASSWORD": "w",
+            "PORTAL_ANALYTICS_PASSWORD": "r",
+        }
+    )
+    assert (named.analytics_url, named.analytics_key) == ("http://127.0.0.1:8123", "ab" * 32)
+    assert "ab" * 32 not in repr(named)
+    for missing in ANALYTICS:
+        clients: list[httpx.AsyncClient] = []
+        partial = with_portal(**{k: v for k, v in ANALYTICS.items() if k != missing})
+        assert analytics(partial, clients) is None, missing
+        assert clients == []
+    clients = []
+    whole = analytics(with_portal(**ANALYTICS), clients)
+    assert whole is not None
+    assert whole.key == bytes.fromhex("ab" * 32)
+    assert len(clients) == 2, "the writer's and the reader's, which the portal closes"
+
+
+def test_with_analytics_and_a_database_a_person_answers_and_their_answer_is_kept(
+    script: Script, ui: Path, tmp_path: Path
+) -> None:
+    named = replace(
+        with_portal(ui_dir=str(ui), **ANALYTICS),
+        database_url=f"sqlite+aiosqlite:///{tmp_path / 'app.db'}",
+    )
+    with TestClient(app(script, named)) as client:
+        headers = bearer("alice")
+        assert client.get("/portalr/v1/analytics/consent", headers=headers).json() == {
+            "given": False
+        }
+        said = client.put("/portalr/v1/analytics/consent", json={"given": True}, headers=headers)
+        assert said.json() == {"given": True, "deleted": None}
+    with TestClient(app(script, named)) as client:
+        said = client.get("/portalr/v1/analytics/consent", headers=bearer("alice"))
+        assert said.json() == {"given": True}
+
+
+def test_without_a_database_there_is_no_relay(script: Script, ui: Path) -> None:
+    with TestClient(app(script, with_portal(ui_dir=str(ui), **ANALYTICS))) as client:
+        said = client.get("/portalr/v1/analytics/consent", headers=bearer("alice"))
+        assert said.status_code == 404

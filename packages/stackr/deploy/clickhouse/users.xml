@@ -51,6 +51,11 @@
           <processes>
             <filter>user = 'langfuse'</filter>
           </processes>
+          <!-- A person's deletion is a mutation that names their hashed id: Langfuse sees its own
+               database's mutations alone. -->
+          <mutations>
+            <filter>database = 'default'</filter>
+          </mutations>
         </system>
       </databases>
     </langfuse>

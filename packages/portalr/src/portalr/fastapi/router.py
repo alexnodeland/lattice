@@ -24,7 +24,7 @@ from fastapi import (
     Response,
 )
 from fastapi import Path as PathParam
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, ValidationError
 
 from grantr.core import (
     DEPLOYMENT,
@@ -41,6 +41,16 @@ from grantr.grants import Grants
 from lattice_core.refusals import Refused, refusals
 from portalr.access import record_links
 from portalr.actions import READ_DEPLOYMENT, READ_SPEND, READ_TELEMETRY
+from portalr.analytics.relay import (
+    MOST_BYTES,
+    Answer,
+    Answered,
+    Batch,
+    Relay,
+    Relayed,
+    Session,
+    kept,
+)
 from portalr.fastapi.site import Site, Surfaces
 from portalr.fastapi.ui import ui_router
 from portalr.invites import Invite, InviteFailed
@@ -70,7 +80,7 @@ from portalr.readers import (
     read_usage,
     reading,
 )
-from portalr.readers.analytics import Analytics, actor_of
+from portalr.readers.analytics import REGISTRY, Analytics, actor_of
 from portalr.readers.loki import RECORD_ID
 from portalr.readers.query import Id
 from portalr.tenant import Tenant, allowed
@@ -260,6 +270,7 @@ def portalr_router(
     site: Site,
     ui: Path = UI,
     people: People | None = None,
+    relay: Relay | None = None,
 ) -> APIRouter:
     """Build portalr's router, for an application to mount at ``/portalr``.
 
@@ -273,6 +284,8 @@ def portalr_router(
         ui: Where the built UIs are; the wheel's own, unless a test says otherwise.
         people: Names people by email, from the application's auth service; without it, the UIs
             show a short id, and there is no people route.
+        relay: Product analytics from people's browsers, with their consent (lattice RFC-0008);
+            without it, there are no analytics routes.
     """
     router = APIRouter()
     router.include_router(ui_router(site, ui))
@@ -480,6 +493,8 @@ def portalr_router(
 
     if people is not None:
         _naming(api, grants, people, current)
+    if relay is not None:
+        _analytics(api, grants, relay, current)
     if invite is not None:
         _invitations(api, grants, invite, current, readers.analytics)
         _tenant_creation(api, grants, invite, operating)
@@ -644,3 +659,84 @@ def _invitations(
                 props={"outcome": "invited"},
             )
         return Invited(tenant=tenant, user=user)
+
+
+def _analytics(router: APIRouter, grants: Grants, relay: Relay, current: Any) -> None:
+    """The relay's routes, for a signed-in person only: a key or an agent sends no events."""
+
+    async def person(who: Caller = current) -> str:
+        if not isinstance(who.subject, User):
+            raise _refusal("forbidden", "only a signed-in person sends product analytics")
+        return who.subject.id
+
+    signed_in = Depends(person)
+
+    @router.get("/v1/analytics/consent")
+    async def read_consent(user: str = signed_in) -> Answer:
+        """The person's answer to product analytics: no until they say yes."""
+        return Answer(given=await relay.consent.given(user))
+
+    @router.put("/v1/analytics/consent")
+    async def answer(body: Annotated[Answer, Body()], user: str = signed_in) -> Answered:
+        """Record the person's answer. A no deletes every event of theirs at once."""
+        await relay.consent.give(user, yes=body.given)
+        if body.given:
+            return Answered(given=True)
+        return Answered(given=False, deleted=await relay.analytics.forget(user))
+
+    @router.post("/v1/analytics/session")
+    async def session(user: str = signed_in) -> Session:
+        """A session id signed for the person, which their browser sends with its events."""
+        return Session(session=relay.sign(user))
+
+    too_large = {"model": Refused, "description": "The body is over 16 KB: `too_large`"}
+    too_fast = {"model": Refused, "description": "Past the person's pace: `too_fast`"}
+
+    @router.post("/v1/events", status_code=202, responses={413: too_large, 429: too_fast})
+    async def events(
+        request: Request,
+        x_tenant: TenantHeader = None,
+        user: str = signed_in,
+    ) -> Relayed:
+        """A batch of the person's events in a tenant they belong to, kept as the registry says.
+
+        Without the person's yes, nothing is kept, and the answer says so.
+        """
+        raw = await request.body()
+        if len(raw) > MOST_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail={"type": "too_large", "message": f"a batch is {MOST_BYTES} bytes at most"},
+            )
+        try:
+            batch = Batch.model_validate_json(raw)
+        except ValidationError as error:
+            raise HTTPException(
+                status_code=422, detail={"type": "invalid", "message": str(error.error_count())}
+            ) from error
+        if x_tenant is None:
+            raise _refusal("tenant_required", "name the tenant with X-Tenant")
+        if await grants.member(x_tenant, user) is None:
+            raise _refusal("forbidden", f"the caller isn't a member of {x_tenant}")
+        session_id = relay.session_of(user, batch.session)
+        if session_id is None:
+            raise _refusal("forbidden", "the session isn't one portalr signed for this person")
+        if not await relay.consent.given(user):
+            return Relayed(recorded=0, dropped=len(batch.events))
+        wait = relay.limiter.spend(user, len(batch.events))
+        if wait is not None:
+            raise HTTPException(
+                status_code=429,
+                detail={"type": "too_fast", "message": "too many events; send them later"},
+                headers={"Retry-After": str(max(1, round(wait)))},
+            )
+        named = [
+            (event.event, kept(event, REGISTRY[event.event]))
+            for event in batch.events
+            if event.event in REGISTRY
+        ]
+        written = bool(named) and await relay.analytics.capture_many(
+            x_tenant, user, named, session_id=session_id
+        )
+        recorded = len(named) if written else 0
+        return Relayed(recorded=recorded, dropped=len(batch.events) - recorded)

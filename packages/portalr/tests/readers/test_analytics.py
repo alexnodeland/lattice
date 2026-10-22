@@ -47,7 +47,8 @@ READS: dict[str, Callable[[Analytics], Awaitable[object]]] = {
 
 def test_every_read_of_the_reader_is_listed() -> None:
     public = {name for name in vars(Analytics) if not name.startswith("_")}
-    assert public - {"capture", "url", "key", "writer", "reader"} == set(READS)
+    writes = {"capture", "capture_many", "forget", "url", "key", "writer", "reader"}
+    assert public - writes == set(READS)
 
 
 @pytest.mark.parametrize("name", sorted(READS))
@@ -167,3 +168,31 @@ def test_an_event_is_by_a_person_or_a_principal_and_no_one_else() -> None:
     assert actor_of(User(id="alice")) == ("user", "alice")
     assert actor_of(ServicePrincipal(id="key-1")) == ("principal", "key-1")
     assert actor_of(Agent()) is None
+
+
+async def test_a_persons_events_are_recorded_in_one_write_with_their_session() -> None:
+    sent, writer = recorded(httpx.Response(200))
+    analytics = Analytics(URL, KEY, writer=writer)
+    events = [("app.page.viewed.v1", {"route": "/t/$tenant"}), ("app.thread.opened.v1", {})]
+    assert await analytics.capture_many("acme", "user-1", events, session_id="s1")
+    (request,) = sent
+    rows = [json.loads(line) for line in request.content.decode().splitlines()]
+    assert [row["event"] for row in rows] == ["app.page.viewed.v1", "app.thread.opened.v1"]
+    assert {row["session_id"] for row in rows} == {"s1"}
+    assert {row["distinct_id"] for row in rows} == {distinct_id(KEY, "user-1")}
+
+
+async def test_forgetting_a_person_deletes_their_events_by_their_hash_alone() -> None:
+    sent, writer = recorded(httpx.Response(200))
+    assert await Analytics(URL, KEY, writer=writer).forget("user-1")
+    (request,) = sent
+    assert request.content.decode() == (
+        "DELETE FROM analytics.events WHERE distinct_id = {person:FixedString(32)}"
+    )
+    assert request.url.params["param_person"] == distinct_id(KEY, "user-1")
+    assert "user-1" not in str(request.url)
+
+
+async def test_a_deletion_clickhouse_refuses_is_said() -> None:
+    _, writer = recorded(httpx.Response(500))
+    assert not await Analytics(URL, KEY, writer=writer).forget("user-1")

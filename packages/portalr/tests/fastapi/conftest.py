@@ -17,6 +17,7 @@ from grantr.core import ServicePrincipal, User
 from grantr.fastapi import Caller, Unauthorized
 from grantr.grants import Grants, InMemoryStorage
 from portalr.actions import ACTIONS
+from portalr.analytics import Relay
 from portalr.fastapi import Site, portalr_router
 from portalr.invites import Invite
 from portalr.people import People
@@ -138,6 +139,7 @@ def app_for(
     ui: Path,
     people: People | None = None,
     site: Site = SITE,
+    relay: Relay | None = None,
 ) -> FastAPI:
     app = FastAPI()
     router = portalr_router(
@@ -148,6 +150,7 @@ def app_for(
         site=site,
         ui=ui,
         people=people,
+        relay=relay,
     )
     app.include_router(router, prefix="/portalr")
     return app

@@ -1,6 +1,25 @@
 {
   "$comment": "The events portalr records in its analytics (lattice RFC-0008, P6): each by a namespaced, versioned name, with the props keys it may carry. A key not listed is dropped; content, emails and free text are never listed.",
   "events": {
-    "member.invited.v1": ["outcome"]
+    "member.invited.v1": [
+      "outcome"
+    ],
+    "app.page.viewed.v1": [
+      "route"
+    ],
+    "app.thread.opened.v1": [
+      "route"
+    ],
+    "app.message.sent.v1": [
+      "route"
+    ],
+    "app.artifact.opened.v1": [
+      "route",
+      "kind"
+    ],
+    "app.integration.used.v1": [
+      "route",
+      "integration"
+    ]
   }
 }

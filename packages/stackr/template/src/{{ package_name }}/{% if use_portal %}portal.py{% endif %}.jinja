@@ -27,10 +27,22 @@ import httpx
 from fastapi import APIRouter, FastAPI, HTTPException, Request, Response
 
 from grantr import Grants
+from portalr.analytics import InMemoryRateLimiter, Relay
+from portalr.analytics.sql import SqlConsent
+from portalr.analytics.sql import migrate as migrate_consent
 from portalr.fastapi import UI, SandboxOrigin, Site, {% if use_tracker %}Surfaces, {% endif %}portalr_router
 from portalr.invites import Invite, InviteFailed, SupabaseInvite
 from portalr.people import People, SupabasePeople
-from portalr.readers import Grafana, Langfuse, LiteLLM, Loki, Prometheus, Readers, Tempo
+from portalr.readers import (
+    Analytics,
+    Grafana,
+    Langfuse,
+    LiteLLM,
+    Loki,
+    Prometheus,
+    Readers,
+    Tempo,
+)
 
 from {{ package_name }}.access import Access
 from {{ package_name }}.database import Database
@@ -101,6 +113,23 @@ def _passed(url: str, client: httpx.AsyncClient) -> Callable[[Request], Awaitabl
     return call
 
 
+def analytics(settings: Settings, clients: list[httpx.AsyncClient]) -> Analytics | None:
+    """The portal's product analytics on ClickHouse, where the settings name it whole; else None.
+
+    Events are written as ClickHouse's writer, and read as its reader, each with its own client,
+    added to ``clients`` for the portal to close (lattice RFC-0008, stackr ADR-0044).
+    """
+    portal = settings.portal
+    url, key = portal.analytics_url, portal.analytics_key
+    writer_password, reader_password = portal.analytics_writer_password, portal.analytics_password
+    if not (url and key and writer_password and reader_password):
+        return None
+    writer = httpx.AsyncClient(auth=("portalr_analytics_writer", writer_password))
+    reader = httpx.AsyncClient(auth=("portalr_analytics", reader_password))
+    clients.extend((writer, reader))
+    return Analytics(url, bytes.fromhex(key), writer=writer, reader=reader)
+
+
 def readers(settings: Settings, clients: list[httpx.AsyncClient]) -> Readers:
     """The tools the settings name, each read at its address.
 
@@ -124,6 +153,7 @@ def readers(settings: Settings, clients: list[httpx.AsyncClient]) -> Readers:
         langfuse=langfuse,
         litellm=litellm,
         grafana=Grafana(portal.grafana_url) if portal.grafana_url else None,
+        analytics=analytics(settings, clients),
     )
 
 
@@ -169,9 +199,12 @@ class Portal:
         settings: The settings; the portal's are ``settings.portal``.
     """
 
-    def __init__(self, *, access: Access, settings: Settings) -> None:
+    def __init__(
+        self, *, access: Access, settings: Settings, database: Database | None = None
+    ) -> None:
         self._access = access
         self._settings = settings
+        self._database = database
         self._clients: list[httpx.AsyncClient] = []
 
     @property
@@ -207,7 +240,8 @@ class Portal:
         return self.site is not None
 
     async def migrate(self, database: Database) -> None:
-        """The portal keeps nothing of its own in the database."""
+        """Upgrade portalr's one table, people's answers to analytics, as the tables' owner."""
+        await migrate_consent(database.owner, application_role=database.role)
 
     @contextlib.asynccontextmanager
     async def lifespan(self) -> AsyncGenerator[None]:
@@ -250,10 +284,17 @@ class Portal:
             client = httpx.AsyncClient(timeout=10)
             self._clients.append(client)
             app.include_router(sign_in(base.rstrip("/"), client))
+        tools = readers(self._settings, self._clients)
+        relay = None
+        if tools.analytics is not None and self._database is not None:
+            # Each replica counts a person's pace apart (lattice RFC-0008).
+            consent = SqlConsent(self._database.engine)
+            relay = Relay(tools.analytics, consent, InMemoryRateLimiter())
         router = portalr_router(
             resolve_actor=self._access.caller,
             grants=self.grants,
-            readers=readers(self._settings, self._clients),
+            readers=tools,
+            relay=relay,
             invite=invitations(self._settings, self._clients),
             people=people(self._settings, self._clients),
             site=site,

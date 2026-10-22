@@ -308,6 +308,13 @@ class PortalSettings:
             the admin reads.
             Never the master key, which opens everything; with ``LITELLM_BASE_URL``.
         grafana_url: Grafana, as operators' browsers reach it, for deep links.
+        analytics_url: ClickHouse's HTTP interface, for portalr's product analytics (lattice
+            RFC-0008); with ``analytics_key`` and the two users' passwords. Without them, there
+            is no analytics.
+        analytics_key: The deployment's key for a person's hashed id in analytics, which
+            ``make env`` generates. It never reaches ClickHouse.
+        analytics_writer_password: ClickHouse's ``portalr_analytics_writer``'s password.
+        analytics_password: ClickHouse's ``portalr_analytics``'s password.
         required: Whether the application must not start without a Supabase project for the UIs
             to sign in to, rather than leave the portal off: set on a single host, where a
             portal that is silently off would be an application that looks deployed and isn't.
@@ -326,6 +333,10 @@ class PortalSettings:
     langfuse_project: str | None = None
     litellm_key: str | None = field(default=None, repr=False)
     grafana_url: str | None = None
+    analytics_url: str | None = None
+    analytics_key: str | None = field(default=None, repr=False)
+    analytics_writer_password: str | None = field(default=None, repr=False)
+    analytics_password: str | None = field(default=None, repr=False)
     required: bool = False
 
     @classmethod
@@ -345,6 +356,10 @@ class PortalSettings:
             langfuse_project=env.get("PORTAL_LANGFUSE_PROJECT"),
             litellm_key=env.get("PORTAL_LITELLM_KEY"),
             grafana_url=env.get("PORTAL_GRAFANA_URL"),
+            analytics_url=env.get("PORTAL_ANALYTICS_URL") or None,
+            analytics_key=env.get("PORTAL_ANALYTICS_KEY") or None,
+            analytics_writer_password=env.get("PORTAL_ANALYTICS_WRITER_PASSWORD") or None,
+            analytics_password=env.get("PORTAL_ANALYTICS_PASSWORD") or None,
             required=env.get("PORTAL_REQUIRED") == "true",
         )
 

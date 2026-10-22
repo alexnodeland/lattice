@@ -1,6 +1,6 @@
 # ADR-0065: Empty, error and not-found states
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-10-21
 **Deciders:** Alex Nodeland
 

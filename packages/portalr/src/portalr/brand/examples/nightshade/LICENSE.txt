@@ -1,7 +1,8 @@
 nightshade: an example brand kit for portalr
 
-Nightshade is a made-up product, named for the example; the name is no one's trademark
-and is not portalr's or lattice's. The kit's marks, favicon and tokens are under the MIT licence:
+Nightshade is a product name made up for this example; the kit makes no trademark claim
+in the name and grants none, and the name is not portalr's or lattice's. The kit's marks,
+favicon and tokens are under the MIT licence:
 
 Copyright (c) 2026 Alex Nodeland
 

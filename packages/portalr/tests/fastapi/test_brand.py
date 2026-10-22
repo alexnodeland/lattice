@@ -92,6 +92,13 @@ async def test_a_head_request_and_the_referrer_policy(branded_client: httpx.Asyn
     assert response.headers["referrer-policy"] == "no-referrer"
 
 
+async def test_a_png_favicon_is_served_as_a_png(branded_client: httpx.AsyncClient) -> None:
+    response = await branded_client.get(f"/brand/{kit().hash}/assets/favicon.png")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/png"
+    assert response.content.startswith(b"\x89PNG\r\n\x1a\n")
+
+
 async def test_another_hash_is_not_found(branded_client: httpx.AsyncClient) -> None:
     response = await branded_client.get("/brand/0000000000000000/brand.css")
     assert response.status_code == 404

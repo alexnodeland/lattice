@@ -139,3 +139,62 @@ test("admin's frame is named for admin, and shows its own mark", async () => {
   await expect.element(adminLink).toBeVisible();
   expect(adminLink.element().innerHTML).not.toBe(appMark);
 });
+
+async function tall(width: number) {
+  await viewport(width);
+  return render(
+    <AppShell home={<a href="#home" />} switcher={<span>acme</span>} account={<span>alice</span>}>
+      <div style={{ height: "300vh" }} />
+      <p id="far">Far down</p>
+      <div style={{ height: "300vh" }} />
+    </AppShell>,
+  );
+}
+
+test("from 1024 pixels, the rail stays in the window while the page scrolls past it", async () => {
+  await tall(1280);
+  window.scrollTo(0, document.documentElement.scrollHeight);
+  const rail = (document.querySelector("header") as HTMLElement).getBoundingClientRect();
+  expect(window.scrollY).toBeGreaterThan(0);
+  expect(rail.top).toBe(0);
+  expect(rail.bottom).toBeCloseTo(window.innerHeight, 0);
+  window.scrollTo(0, 0);
+});
+
+test("narrower, what is scrolled to stops below the pinned header, not under it", async () => {
+  await tall(390);
+  const header = document.querySelector("header") as HTMLElement;
+  const room = Number.parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop);
+  expect(room).toBeGreaterThanOrEqual(header.getBoundingClientRect().height);
+  document.getElementById("far")?.scrollIntoView();
+  expect(document.getElementById("far")?.getBoundingClientRect().top).toBeGreaterThanOrEqual(
+    header.getBoundingClientRect().bottom,
+  );
+  window.scrollTo(0, 0);
+});
+
+test("at the rail's width, nothing is pinned above the page, so nothing is held clear of it", async () => {
+  await tall(1280);
+  expect(getComputedStyle(document.documentElement).scrollPaddingTop).toBe("0px");
+});
+
+test("from 1024 pixels, a focused skip link moves the rail down by its bar, and a scroll pins it again", async () => {
+  // Recorded, not compensated (portalr ADR-0064): the rail is the window's height, so while the
+  // bar shows at the top of the page the rail's foot sits below the window by the bar's height.
+  await tall(1280);
+  window.scrollTo(0, 0);
+  await userEvent.tab();
+  const bar = (document.activeElement as HTMLElement).getBoundingClientRect().height;
+  const header = document.querySelector("header") as HTMLElement;
+  expect(header.getBoundingClientRect().top).toBeCloseTo(bar, 0);
+  expect(header.getBoundingClientRect().bottom).toBeCloseTo(window.innerHeight + bar, 0);
+  window.scrollTo(0, 200);
+  expect(header.getBoundingClientRect().top).toBe(0);
+  window.scrollTo(0, 0);
+});
+
+test("a page without the frame has nothing pinned above it, so nothing is held clear", async () => {
+  await viewport(390);
+  await render(<p>A plain page</p>);
+  expect(getComputedStyle(document.documentElement).scrollPaddingTop).toBe("auto");
+});

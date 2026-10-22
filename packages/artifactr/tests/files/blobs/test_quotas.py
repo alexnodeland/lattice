@@ -77,3 +77,10 @@ async def test_bytes_put_together_are_stored_whole_or_not_at_all(blobs: Blobs) -
     assert await blobs.put_all(ACME, "a1", [(b"1234567890", DOCX)]), "nothing of it was kept"
     with pytest.raises(TooLarge):
         await blobs.put_all(ACME, "a2", [(b"x" * (blobs.limit + 1), DOCX)])
+
+
+def test_a_quota_is_never_below_nothing() -> None:
+    assert Quota(bytes=0, files=0)
+    for held in ({"bytes": -1}, {"files": -1}):
+        with pytest.raises(ValueError, match="no fewer than nothing"):
+            Quota(**held)

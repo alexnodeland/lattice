@@ -178,6 +178,11 @@ class NativeFiles:
         self._reading: Counter[str] = Counter()
 
     @property
+    def readings(self) -> int | None:
+        """How many files each tenant may have the app read at once, or None for no limit."""
+        return self._readings
+
+    @property
     def limit(self) -> int:
         """The largest file, in bytes, that the blob store keeps."""
         return self._blobs.limit

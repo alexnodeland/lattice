@@ -64,6 +64,7 @@ export { ConfirmDialog } from "./confirm-dialog";
 export { type FormOf, PANELS, type PanelProps, type PanelRenderers } from "./dashboard-panels";
 export { DashboardView } from "./dashboard-view";
 export { Dialog } from "./dialog";
+export { Disclosure } from "./disclosure";
 export { EmptyState } from "./empty-state";
 export { failureSaid } from "./failure";
 export { FileChooser } from "./file-chooser";

@@ -1,6 +1,6 @@
 import type { Artifactr } from "@portalr/client";
 import { expect, onTestFinished, test, vi } from "vitest";
-import { userEvent } from "vitest/browser";
+import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { ToolCall, ToolCalls } from "./tool-call";
 
@@ -23,11 +23,11 @@ test("closed, a call says its name, how it is going and a line of its arguments"
     </ToolCalls>,
   );
   const calls = screen.getByRole("list", { name: "Tools" });
-  const [running, done] = calls.getByRole("group").elements();
-  expect(running?.hasAttribute("open")).toBe(false);
+  const [running, done] = calls.getByRole("button", { expanded: false }).elements();
+  expect(running?.getAttribute("aria-expanded")).toBe("false");
   await expect.element(calls.getByText("Running")).toBeVisible();
   await expect.element(calls.getByText("Done")).toBeVisible();
-  expect(done?.querySelector("summary")?.textContent).toContain('"Ship Friday"');
+  expect(done?.textContent).toContain('"Ship Friday"');
   await expect.element(calls.getByText("Arguments").first()).not.toBeVisible();
 });
 
@@ -59,12 +59,14 @@ test("the keyboard opens and closes a call", async () => {
     </ToolCalls>,
   );
   await userEvent.tab();
-  const details = screen.getByRole("group").element();
-  expect(document.activeElement).toBe(details.querySelector("summary"));
+  const trigger = page.elementLocator(
+    screen.container.querySelector("[aria-expanded]") as HTMLElement,
+  );
+  await expect.element(trigger).toHaveFocus();
   await userEvent.keyboard("{Enter}");
-  expect(details.hasAttribute("open")).toBe(true);
+  await expect.element(trigger).toHaveAttribute("aria-expanded", "true");
   await userEvent.keyboard(" ");
-  expect(details.hasAttribute("open")).toBe(false);
+  await expect.element(trigger).toHaveAttribute("aria-expanded", "false");
 });
 
 test("a failed or refused call says why where it is closed, and under its own name open", async () => {
@@ -78,9 +80,9 @@ test("a failed or refused call says why where it is closed, and under its own na
   );
   await expect.element(screen.getByText("Failed")).toBeVisible();
   await expect.element(screen.getByText("Refused")).toBeVisible();
-  const [failed, refused] = screen.getByRole("group").elements();
-  expect(failed?.querySelector("summary")?.textContent).toContain("the disk is full");
-  expect(refused?.querySelector("summary")?.textContent).toContain("Field required");
+  const [failed, refused] = screen.getByRole("button", { expanded: false }).elements();
+  expect(failed?.textContent).toContain("the disk is full");
+  expect(refused?.textContent).toContain("Field required");
   await screen.getByText("draft_rule").click();
   await expect.element(screen.getByText("Why it was refused")).toBeVisible();
   await screen.getByText("create_artifact").click();
@@ -95,7 +97,7 @@ test("a long value is capped, and scrolls; a value that isn't JSON is shown as i
     </ToolCalls>,
   );
   await screen.getByText("create_artifact").click();
-  await expect.element(screen.getByRole("group").getByText("not JSON…").last()).toBeVisible();
+  await expect.element(screen.getByText("not JSON…").last()).toBeVisible();
   const result = screen.getByRole("region", { name: "The result of create_artifact" }).element();
   expect(result.scrollHeight).toBeGreaterThan(result.clientHeight);
   expect(getComputedStyle(result).overflowY).toBe("auto");

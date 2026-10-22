@@ -4,8 +4,10 @@
  * draws it, so a chart drawn another way can't lose its text equivalent (portalr ADR-0047).
  */
 
+import { useEffect, useState } from "react";
 import type { Keyed, Panel, Row, TablePanel, TableRow } from "./artifactr-ui";
 import { formatNumber, largestFirst } from "./chart-theme";
+import { Disclosure } from "./disclosure";
 import { type Column, ItemTable } from "./item-table";
 import { isNumber, own } from "./json";
 
@@ -71,9 +73,16 @@ export function Figures({
   panel: Extract<Panel, { type: "bar" | "line" | "donut" }>;
   open?: boolean;
 }) {
+  // Opened by the person, or by the page once the chart can't be drawn: `open` may turn true after
+  // the first render, when the charts' add-on fails to load.
+  const [shown, setShown] = useState(open);
+  useEffect(() => {
+    if (open) {
+      setShown(true);
+    }
+  }, [open]);
   return (
-    <details className="text-sm" open={open}>
-      <summary className="cursor-pointer text-muted">Show the figures</summary>
+    <Disclosure summary="Show the figures" className="text-sm" open={shown} onOpenChange={setShown}>
       {panel.type === "donut" ? (
         <Rows
           caption={panel.label}
@@ -87,6 +96,6 @@ export function Figures({
       ) : (
         <Rows caption={panel.label} columns={[panel.index, ...panel.series]} rows={panel.rows} />
       )}
-    </details>
+    </Disclosure>
   );
 }

@@ -3,6 +3,7 @@ import { allowedIn, filedBy, type Reflexr, type TrackerItem, workspaceOf } from 
 import {
   Alert,
   ConfirmDialog,
+  Disclosure,
   EmptyState,
   Moment,
   PageHeader,
@@ -250,14 +251,12 @@ function Title({ run, filed }: { run: Reflexr.Run; filed: readonly TrackerItem[]
       )}
       <TrackerItems label="Filed as" items={filed} />
       {run.history.length > 0 && (
-        <details className="text-xs">
-          <summary
-            aria-label={`History of run ${run.id}, ${run.history.length}`}
-            className="cursor-pointer text-muted"
-          >
-            History ({run.history.length})
-          </summary>
-          <ul className="mt-1 flex flex-col gap-1">
+        <Disclosure
+          summary={`History (${run.history.length})`}
+          name={`History of run ${run.id}, ${run.history.length}`}
+          className="text-xs"
+        >
+          <ul className="flex flex-col gap-1">
             {run.history.map((step) => (
               <li key={step.seq}>
                 {actorName(step.actor)} {DONE[step.kind]} <Moment at={step.at} />
@@ -265,7 +264,7 @@ function Title({ run, filed }: { run: Reflexr.Run; filed: readonly TrackerItem[]
               </li>
             ))}
           </ul>
-        </details>
+        </Disclosure>
       )}
     </div>
   );

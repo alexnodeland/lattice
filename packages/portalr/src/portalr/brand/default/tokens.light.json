@@ -965,6 +965,26 @@
         "$value": "{radius.3}"
       }
     },
+    "disclosure": {
+      "target": {
+        "$value": {
+          "value": 1.5,
+          "unit": "rem"
+        }
+      },
+      "gap": {
+        "$value": "{space.1-5}"
+      },
+      "radius": {
+        "$value": "{radius.3}"
+      },
+      "panel-gap": {
+        "$value": "{space.2}"
+      },
+      "duration": {
+        "$value": "{motion.duration.fast}"
+      }
+    },
     "question": {
       "radius": {
         "$value": "{radius.4}"

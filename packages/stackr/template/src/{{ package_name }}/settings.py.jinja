@@ -539,6 +539,10 @@ def _json_object(text: str, name: str) -> dict[str, object]:
 
 {% endif -%}
 {% if use_files -%}
+WHOLE = re.compile(r"[0-9]+")
+"""A whole number as a setting gives one: ASCII digits, and nothing else, not ``1_000`` or ``²``."""
+
+
 def _quota(text: str, name: str) -> Held | None:
     """A quota, ``<bytes>`` or ``<bytes>,<files>``, or None if empty.
 
@@ -547,14 +551,10 @@ def _quota(text: str, name: str) -> Held | None:
     """
     if not text.strip():
         return None
-    held, comma, files = text.partition(",")
-    try:
-        counts = [int(held), *([int(files)] if comma else [])]
-    except ValueError:
-        counts = []
-    if not counts or min(counts) < 0:
+    parts = text.strip().split(",")
+    if len(parts) > 2 or not all(WHOLE.fullmatch(part) for part in parts):
         raise ValueError(f"{name} is <bytes> or <bytes>,<files>, each whole, not {text!r}")
-    return Held(*counts)
+    return Held(*(int(part) for part in parts))
 
 
 def _whole[N: int | None](env: Mapping[str, str], name: str, default: N) -> int | N:
@@ -566,7 +566,7 @@ def _whole[N: int | None](env: Mapping[str, str], name: str, default: N) -> int 
     text = env.get(name, "").strip()
     if not text:
         return default
-    if not text.isdigit() or int(text) < 1:
+    if not WHOLE.fullmatch(text) or int(text) < 1:
         raise ValueError(f"{name} is a whole number of at least 1, not {text!r}")
     return int(text)
 

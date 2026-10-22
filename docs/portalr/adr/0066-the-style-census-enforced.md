@@ -26,4 +26,4 @@ The style census ([lattice RFC-0007](../../rfcs/0007-portalr-brand-kits.md)) cou
 - **What the census doesn't see.**
   - It selects `a[href]`, `button`, `[role=button]` and `h1` to `h6`. It doesn't select `[role=link]`, tabs or menu items that aren't buttons, `summary`, or `input[type=button]`. None of these are in the galleries today, but one added would go uncounted.
   - It counts looks at rest only. A hover, focus or pressed state that differs between two same-looking controls isn't counted; the computed-style snapshots cover those states scene by scene.
-- Badges aren't counted: `Badge` and `StatusBadge` carry no attribute the census can select. Counting them is a follow-up.
+- Badges are counted too, since 2026-10-22: `Badge` and `StatusBadge` carry `data-badge`, which the census selects, and their looks are 6, the same in light and dark: the status tones' five (the accent's fill; the failed edge; quiet, on the line; the warning edge; the text's colour, on the line) and `Badge`'s accent. `Badge`'s neutral look is in no gallery, so it isn't counted until one shows it.

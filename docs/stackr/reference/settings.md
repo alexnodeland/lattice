@@ -56,6 +56,12 @@ Empty for certificates from Let's Encrypt; `tls internal` for Caddy's own CA.
 |---|---|
 | `CADDY_TLS` | Empty |
 
+The editors of the native files' apps the application runs, each at <app>.<domain>, with a DNS record of its own: `gridcraft.example.com, pdfcraft.example.com`. None by default.
+
+| Setting | In `.env.example` |
+|---|---|
+| `STACKR_EDITOR_HOSTS` | Empty |
+
 Where Caddy publishes 80 and 443, as STACKR_BIND is for the rest: this machine only by default. Set a LAN address, or 0.0.0.0, only on purpose: on the host users reach, `deploy/host/bootstrap` sets 0.0.0.0.
 
 | Setting | In `.env.example` |

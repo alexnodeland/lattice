@@ -261,6 +261,17 @@ Local model servers on this machine, as the gateway's container sees them.
 | `LM_STUDIO_API_BASE` | `http://host.docker.internal:1234/v1` |
 | `OMLX_API_BASE` | `http://host.docker.internal:4243/v1` |
 
+The model groups applications ask for, `default` and `fast`: providers (the provider models above) or upstream, another OpenAI-compatible gateway, such as one of your own in front of your own models (ADR-0047). For upstream, its URL and key, its models for the two groups, and, if its certificate is signed by an authority of your own, that authority's PEM file, a path on this machine: the gateway then trusts it alone.
+
+| Setting | In `.env.example` |
+|---|---|
+| `STACKR_GATEWAY_MODELS` | `providers` |
+| `STACKR_UPSTREAM_URL` | Empty |
+| `STACKR_UPSTREAM_API_KEY` | Empty |
+| `STACKR_UPSTREAM_DEFAULT_MODEL` | Empty |
+| `STACKR_UPSTREAM_FAST_MODEL` | Empty |
+| `STACKR_UPSTREAM_CA` | Empty |
+
 ### Task trackers: the opt-in recipes, trackers/ (lattice RFC-0004)
 
 `make tracker-up TRACKER=plane` or `TRACKER=vikunja`, beside the stack.

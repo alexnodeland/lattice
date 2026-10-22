@@ -38,12 +38,15 @@ class Alice extends Signed {
 export type Serve = (request: Request, path: string) => Promise<Response | undefined>;
 
 /**
- * What the stream says of a command: its rejection's type, or its type and message, or null to
- * carry it out.
+ * What the stream says of a command: its rejection's type, or its type, message and fields, or
+ * null to carry it out.
  */
 export type Answer = (command: {
   type: string;
-}) => string | { readonly type: string; readonly message: string } | null;
+}) =>
+  | string
+  | ({ readonly type: string; readonly message: string } & Readonly<Record<string, unknown>>)
+  | null;
 
 /** A WebSocket that replays its library's log, or none, then answers each command as `answer` says. */
 function socketAnswering(

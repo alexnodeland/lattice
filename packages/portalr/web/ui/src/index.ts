@@ -67,7 +67,7 @@ export { Dialog } from "./dialog";
 export { Disclosure } from "./disclosure";
 export { EmptyState } from "./empty-state";
 export { ErrorState } from "./error-state";
-export { failureSaid } from "./failure";
+export { FailureAlert } from "./failure-alert";
 export { FileChooser } from "./file-chooser";
 export { PageViewer, SheetTable, sheetsOf } from "./file-preview";
 export { Heading } from "./heading";

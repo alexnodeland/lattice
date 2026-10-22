@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import time
 from datetime import timedelta
 from typing import override
 
@@ -476,6 +477,10 @@ def test_history_messages_are_model_requests_first() -> None:
     assert ModelRequest.kind == "request"
 
 
+BOT_ID = "1" * 9
+BOT_KEY = "AA" + "x" * 33
+
+
 @pytest.mark.parametrize(
     ("text", "kept"),
     [
@@ -487,10 +492,59 @@ def test_history_messages_are_model_requests_first() -> None:
         ("used github_pat_11AAAAAAAAAAAAAAAAAAAAAA_b", "used [redacted]"),
         ("jwt eyJhbGci.eyJzdWIi.c2ln", "jwt [redacted]"),
         ("no artifact art_1", "no artifact art_1"),
+        ("client_secret=s3cr3t&x", "client_secret=[redacted]"),
+        ("OPENAI_API_KEY=abc123 missing", "OPENAI_API_KEY=[redacted] missing"),
+        ("SECRET_KEY: abc", "SECRET_KEY: [redacted]"),
+        ('{"refresh_token": "r1"}', '{"refresh_token": "[redacted]"}'),
+        ("db_password=hunter2", "db_password=[redacted]"),
+        ("max_tokens=1000 reached", "max_tokens=1000 reached"),
+        ("token_count=12 used", "token_count=12 used"),
+        ("apiKey=abc", "apiKey=[redacted]"),
+        # A secret all digits, or digits first, is a secret still.
+        ("password=123456", "password=[redacted]"),
+        ('{"password": "123456"}', '{"password": "[redacted]"}'),
+        ("api_key=1234567890123456", "api_key=[redacted]"),
+        # A bot token's shape, a number and a key, put together here so no whole one is written.
+        (f"token={BOT_ID}:{BOT_KEY}", "token=[redacted]"),
+        ("secret=123.hunter2", "secret=[redacted]"),
+        ("password=1.5x", "password=[redacted]"),
+        ("password=123-456", "password=[redacted]"),
+        # A name that only has a secret's word inside a longer word isn't a secret's.
+        ("secretary: John", "secretary: John"),
+        ("tokenizer: gpt2", "tokenizer: gpt2"),
+        ("passwordless: true", "passwordless: true"),
+        ("max_tokens=unlimited", "max_tokens=unlimited"),
+        ("tokenCount=12", "tokenCount=12"),
+        ("maxtokens=12", "maxtokens=12"),
+        # A long name, and names whose words are run together, are a secret's still.
+        ("x" * 65 + "_password=abc", "x" * 65 + "_password=[redacted]"),
+        ("CLIENTSECRET=abc", "CLIENTSECRET=[redacted]"),
+        ("ACCESSTOKEN=abc", "ACCESSTOKEN=[redacted]"),
+        ("APIKEY=abc", "APIKEY=[redacted]"),
     ],
 )
 def test_what_looks_like_a_secret_is_redacted(text: str, kept: str) -> None:
     assert redacted(text) == kept
+
+
+@pytest.mark.parametrize(
+    argnames="text",
+    ids=["hyphens", "underscores", "a-a", "a-a-a", "spaces", "urls", "a long name", "a long run"],
+    argvalues=[
+        "token-" * 5000,
+        "token_" * 5000,
+        "a-" * 15000,
+        "a-a-a-" * 5000,
+        "password " * 5000,
+        "a://" * 8000,
+        "x" * 100_000 + "=",
+        "a-" * 50_000 + "_password",
+    ],
+)
+def test_redaction_takes_time_in_line_with_the_text(text: str) -> None:
+    started = time.perf_counter()
+    redacted(text)
+    assert time.perf_counter() - started < 0.5
 
 
 async def test_a_tools_own_refusal_is_recorded_without_its_secrets(

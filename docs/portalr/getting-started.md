@@ -193,7 +193,7 @@ The UIs read this first. It is public, so it holds no secret:
 | `people` | Whether the router names people by email: true where `people` was passed |
 | `editors` | Each native file's app's hosted editor, by its integration, such as `files:wordcraft`: pass `editors={...}` in `Site` where you serve one on an origin of its own ([ADR-0049](adr/0049-checking-a-native-file-out-and-in.md)). Empty by default |
 | `apps` | The origin mini apps run on: pass `apps=` in `Site` where you serve their sandbox, below. `null` by default, and apps are then shown as their label and summary |
-| `brand` | The deployment's brand kit: its hash, identity, words, and where its stylesheet and marks are served. Pass `brand=Path(...)` in `Site` to point at a kit's folder ([lattice RFC-0007](../rfcs/0007-portalr-brand-kits.md)); it is read and checked as the site is made. `null` by default, for portalr's own look. The UIs draw the kit's mark and the product's name in the header, and its words when signing in; what a kit does not reach yet is listed in the RFC's "Not yet" |
+| `brand` | The deployment's brand kit: its hash, identity, words, and where its stylesheet and marks are served. Pass `brand=Path(...)` in `Site` to point at a kit's folder ([lattice RFC-0007](../rfcs/0007-portalr-brand-kits.md)); it is read and checked as the site is made. `null` by default, for portalr's own look. The UIs draw the kit's mark and the product's name in the header, and its words when signing in; what a kit does not reach yet is listed in the RFC's "Not yet". `portalr brand init` starts a kit and `portalr brand validate` checks one: see [white-labelling the portal](guides/white-labelling.md) |
 
 ```python
 from httpx import ASGITransport, AsyncClient

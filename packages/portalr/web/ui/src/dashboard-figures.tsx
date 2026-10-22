@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
 /**
  * A dashboard's figures, as text, from its panels alone: each chart's "Show the figures" and a
  * table's rows before, or without, the dashboards add-on. Built from the panel, never from what
  * draws it, so a chart drawn another way can't lose its text equivalent (portalr ADR-0047).
  */
 
+import { useEffect, useState } from "react";
 import type { Keyed, Panel, Row, TablePanel, TableRow } from "./artifactr-ui";
 import { formatNumber, largestFirst } from "./chart-theme";
 import { Disclosure } from "./disclosure";

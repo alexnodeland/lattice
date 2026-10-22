@@ -66,6 +66,9 @@ uv run scripts/check-config supabase || fail "supabase"
 step "The gateway's configuration"
 uv run scripts/check-config litellm || fail "litellm"
 
+step "What make up refuses, and the gateway's groups' check"
+scripts/check-make || fail "make"
+
 step "The AWS recipe, against the stack"
 uv run scripts/check-config aws || fail "aws"
 

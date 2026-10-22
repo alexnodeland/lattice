@@ -1,0 +1,23 @@
+# The model groups on an upstream gateway (ADR-0047): another OpenAI-compatible
+# API, at STACKR_UPSTREAM_URL with STACKR_UPSTREAM_API_KEY, such as a gateway
+# of your own in front of your own models. `default` and `fast` are its models
+# STACKR_UPSTREAM_DEFAULT_MODEL and STACKR_UPSTREAM_FAST_MODEL, and any other
+# of its models is upstream/<model>. Chosen with STACKR_GATEWAY_MODELS=upstream.
+model_list:
+  - model_name: default
+    litellm_params:
+      model: os.environ/STACKR_UPSTREAM_DEFAULT_MODEL
+      custom_llm_provider: openai
+      api_base: os.environ/STACKR_UPSTREAM_URL
+      api_key: os.environ/STACKR_UPSTREAM_API_KEY
+  - model_name: fast
+    litellm_params:
+      model: os.environ/STACKR_UPSTREAM_FAST_MODEL
+      custom_llm_provider: openai
+      api_base: os.environ/STACKR_UPSTREAM_URL
+      api_key: os.environ/STACKR_UPSTREAM_API_KEY
+  - model_name: upstream/*
+    litellm_params:
+      model: openai/*
+      api_base: os.environ/STACKR_UPSTREAM_URL
+      api_key: os.environ/STACKR_UPSTREAM_API_KEY

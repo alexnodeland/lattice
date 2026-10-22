@@ -17,16 +17,21 @@ export interface Posting {
   readonly unsent: boolean;
 }
 
-/** Whether the server refused a post as one it already has, which a message id is once. */
+/**
+ * Whether the server refused a post as one it already has, which a message id is once: by the
+ * refusal's typed fields, its reason and what it names, not by its words.
+ */
 function alreadyPosted(sent: Awaited<Sent>, id: string): boolean {
-  const rejection = sent.outcome === "refused" ? sent.result?.rejection : undefined;
+  const refused = sent.outcome === "refused" ? sent.result?.rejection : undefined;
+  if (typeof refused !== "object" || refused === null) {
+    return false;
+  }
+  const rejection = refused as Readonly<Record<string, unknown>>;
   return (
-    typeof rejection === "object" &&
-    rejection !== null &&
-    "type" in rejection &&
     rejection.type === "invalid_state" &&
-    "message" in rejection &&
-    rejection.message === `message ${id} already exists`
+    rejection.reason === "already_exists" &&
+    rejection.entity === "message" &&
+    rejection.id === id
   );
 }
 

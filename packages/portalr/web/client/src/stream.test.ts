@@ -190,12 +190,23 @@ test("a command unanswered when the connection drops is sent again with its id",
 test("a create sent again and refused because its id is used was carried out the first time", async () => {
   open();
   await until(stream, (s) => s.status === "live");
-  server.answer("drop", { rejection: "invalid_state" });
+  server.answer("drop", { rejection: "invalid_state", reason: "already_exists" });
   const settled = await stream.send(
     { type: "create_thread", thread_id: "thr_9", title: "Retro" },
     "c_2",
   );
   expect(settled).toEqual({ outcome: "done", result: expect.objectContaining({ ok: false }) });
+});
+
+test("a create sent again and refused for another reason is a refusal", async () => {
+  open();
+  await until(stream, (s) => s.status === "live");
+  server.answer("drop", { rejection: "invalid_state" });
+  const settled = await stream.send(
+    { type: "create_thread", thread_id: "thr_9", title: "Retro" },
+    "c_4",
+  );
+  expect(settled.outcome).toBe("refused");
 });
 
 test("a refusal the first time is a refusal", async () => {

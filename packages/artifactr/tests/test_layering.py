@@ -103,6 +103,12 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
             "lattice_core.integrations",
         },
     ),
+    # Excalidraw diagrams, the excalidraw extra (lattice RFC-0006): a plugin nothing else
+    # imports, on core's and the workspace's public API.
+    "excalidraw": (
+        {"artifactr.core", "artifactr.workspace", "artifactr.excalidraw"},
+        {"pydantic"},
+    ),
     # The evalr adapter: a feedback source, experiment tasks, a TurnEvaluator and measures.
     # Only this layer and the score mirror may import evalr.
     "evals": (

@@ -25,6 +25,7 @@ export {
 } from "./files";
 export type * as ArtifactrApi from "./generated/artifactr.openapi";
 export type * as ArtifactrV1 from "./generated/artifactr.v1";
+export type * as ArtifactrExcalidrawV1 from "./generated/artifactr_excalidraw.v1";
 export type * as ArtifactrUiV1 from "./generated/artifactr_ui.v1";
 export type * as FilesApi from "./generated/files.openapi";
 export type * as GrantrApi from "./generated/grantr.openapi";

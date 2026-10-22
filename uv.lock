@@ -361,7 +361,7 @@ requires-dist = [
     { name = "uvicorn", marker = "extra == 'files'", specifier = ">=0.35" },
     { name = "zstandard", marker = "extra == 'files'", specifier = ">=0.25" },
 ]
-provides-extras = ["sql", "sqlite", "postgres", "fastapi", "mcp", "otel", "langfuse", "litellm", "evals", "files", "connect", "forms"]
+provides-extras = ["sql", "sqlite", "postgres", "fastapi", "mcp", "otel", "langfuse", "litellm", "evals", "files", "connect", "forms", "excalidraw"]
 
 [package.metadata.requires-dev]
 dev = [

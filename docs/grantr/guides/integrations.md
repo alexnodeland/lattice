@@ -32,7 +32,7 @@ lattice declares its integrations in one registry, `lattice_core.integrations.KN
 | `files:lightcraft` | Off | Nothing yet: LightCraft keeps its edits in a library, not in a file ([native files ADR-0016](../../artifactr/files/adr/0016-a-project-that-holds-its-own-media-is-a-native-file.md)) |
 | `ui:forms`, `ui:dashboards` | On | Forms and dashboards in the chat ([RFC-0005](../../rfcs/0005-forms-dashboards-and-mini-apps.md)) |
 | `ui:mini-apps` | Off | Mini apps, RFC-0005's second phase |
-| `excalidraw` | On | Diagrams ([RFC-0006](../../rfcs/0006-excalidraw-diagrams-drawn-live.md)) |
+| `excalidraw` | Off | Diagrams ([RFC-0006](../../rfcs/0006-excalidraw-diagrams-drawn-live.md)), off until their canvas ships |
 | `markdown:math` | On | Formulas in Markdown |
 | `markdown:mermaid` | Off | Mermaid's diagrams, parked while Mermaid can't draw under portalr's policy |
 

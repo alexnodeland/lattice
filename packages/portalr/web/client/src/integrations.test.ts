@@ -100,7 +100,8 @@ test("a read that fails leaves each integration its default", async () => {
   await expect(queryClient.fetchQuery(read)).rejects.toThrow("503");
   const enabled = enabledFrom(queryClient.getQueryData(read.queryKey));
   expect(enabled("markdown:mermaid")).toBe(false);
-  expect(enabled("excalidraw")).toBe(true);
+  expect(enabled("excalidraw")).toBe(false);
+  expect(enabled("markdown:math")).toBe(true);
 });
 
 test("a command refused as not_enabled makes the workspace's integrations stale, and no other", () => {

@@ -28,6 +28,7 @@ from starlette.requests import HTTPConnection
 
 from artifactr import InMemoryStorage, UserActor, Workspaces
 from artifactr.core import Actor, TenantId
+from artifactr.fastapi import ResolveActor
 from artifactr.files import DOCX, FakeApp, WordDocument
 from artifactr.files.app import Inspection
 from artifactr.files.blobs import once
@@ -143,6 +144,7 @@ def test_the_application_mounts_native_files_while_an_app_runs(script: Script) -
         ({"FILES_TENANT_QUOTA": "1000,"}, "FILES_TENANT_QUOTA is <bytes> or <bytes>,<files>"),
         ({"FILES_TENANT_QUOTA": "-1"}, "FILES_TENANT_QUOTA is <bytes> or <bytes>,<files>"),
         ({"FILES_TENANT_QUOTA": "1_000"}, "FILES_TENANT_QUOTA is <bytes> or <bytes>,<files>"),
+        ({"FILES_TENANT_QUOTA": "1000, 10"}, "FILES_TENANT_QUOTA is <bytes> or <bytes>,<files>"),
         ({"FILES_UPLOADS_EACH": "\u00b2"}, "FILES_UPLOADS_EACH is a whole number of at least 1"),
         ({"FILES_UPLOADS_AT_ONCE": "abc"}, "FILES_UPLOADS_AT_ONCE is a whole number of at least 1"),
         ({"FILES_UPLOADS_EACH": "0"}, "FILES_UPLOADS_EACH is a whole number of at least 1"),
@@ -202,12 +204,14 @@ class Reads(Stand):
 
 
 @contextlib.asynccontextmanager
-async def served(held: FilesSettings, reads: Reads) -> AsyncIterator[httpx.AsyncClient]:
+async def served(
+    held: FilesSettings, reads: Reads, *, resolve: ResolveActor = resolve_actor
+) -> AsyncIterator[httpx.AsyncClient]:
     """The files' routes, as the settings mount them, over a worker that reads as ``reads`` lets."""
     files = Files(held, integrations=Defaults(), transport=workers(app=reads))
     application = FastAPI()
     workspaces = Workspaces(InMemoryStorage(), types=files.types)
-    files.mount(application, workspaces, resolve_actor=resolve_actor, prefix="/artifactr/v1")
+    files.mount(application, workspaces, resolve_actor=resolve, prefix="/artifactr/v1")
     transport = httpx.ASGITransport(app=application)
     async with (
         files.lifespan(),
@@ -231,23 +235,56 @@ async def test_files_are_held_to_the_workspaces_quota_and_read_as_the_settings_s
     assert over.json()["detail"]["quota"] == "workspace_bytes", "FILES_WORKSPACE_QUOTA"
 
 
+async def tenants(connection: HTTPConnection) -> tuple[TenantId, Actor]:
+    """Alice, of the tenant the request names in ``x-tenant``."""
+    return connection.headers.get("x-tenant", TENANT), ALICE
+
+
+async def hold(
+    client: httpx.AsyncClient, tenant: str, through: asyncio.Event
+) -> asyncio.Task[httpx.Response]:
+    """An upload, by a tenant, that holds its place while its body waits for ``through``.
+
+    The worker reads one file at a time, so places are held by bodies still arriving instead.
+    """
+    reading = asyncio.Event()
+
+    async def body() -> AsyncIterator[bytes]:
+        yield SMALL[:4]
+        reading.set()  # the route has its place, and reads on
+        await through.wait()
+        yield SMALL[4:]
+
+    headers = {"x-tenant": tenant}
+    going = asyncio.create_task(client.post(UPLOAD, params=PARAMS, content=body(), headers=headers))
+    await asyncio.wait_for(reading.wait(), 10)
+    return going
+
+
 @pytest.mark.parametrize(
-    "uploads",
-    [Uploads(at_once=1, each=1), Uploads(at_once=3, per_tenant=3, each=1)],
+    ("uploads", "held"),
+    [
+        # Two tenants hold one place each: only the places in all, two, refuse a third.
+        (Uploads(at_once=2, per_tenant=2, each=2), ("acme", "globex")),
+        # One person holds one place, with their tenant's and the router's to spare.
+        (Uploads(at_once=3, per_tenant=3, each=1), ("acme",)),
+    ],
     ids=["FILES_UPLOADS_AT_ONCE", "FILES_UPLOADS_EACH"],
 )
-async def test_a_second_file_at_once_is_refused_as_the_settings_say(uploads: Uploads) -> None:
-    """Readings keep their default, two, so only the router's places can refuse the second."""
-    reads = Reads()
-    async with served(replace(WORDCRAFT, uploads=uploads), reads) as client:
-        reads.through.clear()
-        going = asyncio.create_task(client.post(UPLOAD, params=PARAMS, content=SMALL))
+async def test_a_file_past_its_places_is_refused_as_the_settings_say(
+    uploads: Uploads, held: tuple[str, ...]
+) -> None:
+    through = asyncio.Event()
+    async with served(replace(WORDCRAFT, uploads=uploads), Reads(), resolve=tenants) as client:
+        going = []
         try:
-            assert await anyio.to_thread.run_sync(reads.reading.wait, 10)
-            busy = await client.post(UPLOAD, params=PARAMS, content=SMALL)
+            going = [await hold(client, tenant, through) for tenant in held]
+            busy = await client.post(
+                UPLOAD, params=PARAMS, content=SMALL, headers={"x-tenant": "acme"}
+            )
         finally:
-            reads.through.set()
-        assert (await going).status_code == 201
+            through.set()
+        assert [(await g).status_code for g in going] == [201] * len(held)
     assert busy.json()["detail"]["type"] == "busy"
 
 

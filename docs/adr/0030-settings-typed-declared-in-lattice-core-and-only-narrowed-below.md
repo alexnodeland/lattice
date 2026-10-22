@@ -8,6 +8,7 @@
 ## Context
 
 Integrations are booleans, switched per tenant and workspace through one port ([ADR-0027](0027-integrations-switched-per-workspace-through-one-port.md)). Some decisions are values instead: a connected app's hourly limit on tries at code and network calls (artifactr [ADR-0085](../artifactr/adr/0085-connected-apps-an-operators-own-freecad-or-blender-through-a-vetted-mcp-server.md)), and, next, which of an app's tools a workspace offers. Until now these were operator configuration, in code. The owner decided (2026-10-22) that a tenant's and a workspace's admins may change them, with these limits:
+
 - they may only **lower** or **narrow**, never raise;
 - a new grant is needed to do it;
 - the admin screen is a separate page;
@@ -22,15 +23,13 @@ Integrations are booleans, switched per tenant and workspace through one port ([
   - its default;
   - `lowest`, the lowest tier that may set it: `operator`, `tenant` or `workspace`;
   - a one-sentence description.
-
-  A setting is never free text and never a secret: no kind holds either. `KNOWN_SETTINGS` is lattice's: `connect-per-hour:freecad` and `connect-per-hour:blender`, each `IntRange(0, 1000)`, default 30, set down to the workspace. The tool name or app is part of the key, never of a free value. A connected app vetted later adds its own `connect-per-hour:<app>` to the registry.
+  - A setting is never free text and never a secret: no kind holds either. `KNOWN_SETTINGS` is lattice's: `connect-per-hour:freecad` and `connect-per-hour:blender`, each `IntRange(0, 1000)`, default 30, set down to the workspace. The tool name or app is part of the key, never of a free value. A connected app vetted later adds its own `connect-per-hour:<app>` to the registry.
 - **Four layers, resolved top down:**
   - the registry's default;
   - the operator's value, in the deployment's configuration, which replaces the default and is checked against the registry as the deployment starts;
   - the tenant's value;
   - the workspace's value.
-
-  Each layer below the operator may only narrow the one above: `min` for a number, intersection for a subset. Unset leaves a layer as the one above.
+  - Each layer below the operator may only narrow the one above: `min` for a number, intersection for a subset. Unset leaves a layer as the one above.
 - **The ceiling is held three times:**
   - **At write:** a value wider than the layer above is refused (422). The refusal says how wide the value may be and which layer says so: "may be at most 20 here: the tenant's value".
   - **At read:** a stored value is narrowed again by the layers above as they are now. When the operator later lowers the ceiling, the narrower value wins at once; the stored row stays, and an admin's read shows it as `clamped`.

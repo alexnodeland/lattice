@@ -16,8 +16,7 @@ ADR-0085 limits each workspace's tries at a connected app's code and network cal
   - a store that raises;
   - a key the store doesn't declare;
   - a value that isn't a number.
-
-  grantr's own port already answers 0 while its store can't be read.
+  - grantr's own port already answers 0 while its store can't be read.
 - **The limit is per app within a workspace**, as the key says. A connected app vetted later needs its key added to lattice-core's registry before its limit can be set.
 - An integer `per_hour` keeps working, as the code's own value.
 

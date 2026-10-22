@@ -4,7 +4,7 @@
  */
 
 import { QueryCache, QueryClient } from "@tanstack/react-query";
-import { Refused, refusedOutright } from "./queries";
+import { Refused, refusedOutright, retryDelay } from "./queries";
 
 /** A query cache whose reads call `unsigned` when one is refused for no one signed in. */
 export function createQueryClient(unsigned: () => void): QueryClient {
@@ -17,7 +17,7 @@ export function createQueryClient(unsigned: () => void): QueryClient {
       },
     }),
     defaultOptions: {
-      queries: { retry: (count, error) => !refusedOutright(error) && count < 3 },
+      queries: { retry: (count, error) => !refusedOutright(error) && count < 3, retryDelay },
     },
   });
 }

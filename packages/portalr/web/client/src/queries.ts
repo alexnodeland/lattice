@@ -212,7 +212,8 @@ async function body<D>(
 ): Promise<D> {
   const { data, error, response: answered } = await response;
   if (data === undefined) {
-    throw new Refused(answered.status, error);
+    const wait = Number.parseInt(answered.headers.get("retry-after") ?? "", 10);
+    throw new Refused(answered.status, error, Number.isNaN(wait) ? null : wait);
   }
   return data;
 }
@@ -248,21 +249,35 @@ function forbidden(error: unknown): boolean {
   );
 }
 
-/** The server refused a read: 401 when no one is signed in, 403 when they may not. */
+/**
+ * The server refused a read: 401 when no one is signed in, 403 when they may not, 429 when it is
+ * busy or paced, with the seconds it said to wait (`Retry-After`), if it said.
+ */
 export class Refused extends Error {
   readonly status: number;
   readonly detail: unknown;
+  readonly retryAfter: number | null;
 
-  constructor(status: number, detail: unknown) {
+  constructor(status: number, detail: unknown, retryAfter: number | null = null) {
     super(`the server refused the read (${status}): ${reasons(status, detail).join("; ")}`);
     this.status = status;
     this.detail = detail;
+    this.retryAfter = retryAfter;
   }
 }
 
-/** Whether the server refused a read for what was asked: asking again would get the same. */
+/**
+ * Whether the server refused a read for what was asked: asking again would get the same. A 429
+ * is not: it is asked again once the server's wait has passed.
+ */
 export const refusedOutright = (error: unknown) =>
-  error instanceof Refused && error.status >= 400 && error.status < 500;
+  error instanceof Refused && error.status >= 400 && error.status < 500 && error.status !== 429;
+
+/** How long to wait before a read is tried again: the server's `Retry-After`, or a backoff. */
+export const retryDelay = (count: number, error: unknown) =>
+  error instanceof Refused && error.retryAfter !== null
+    ? error.retryAfter * 1000
+    : Math.min(1000 * 2 ** count, 30_000);
 
 /** A long read is tried again once, unless the server refused it outright. */
 const once = (count: number, error: unknown) => !refusedOutright(error) && count < 1;

@@ -1571,7 +1571,38 @@
             "content": {
               "image/png": {}
             },
-            "description": "Successful Response"
+            "description": "Successful Response",
+            "headers": {
+              "Cache-Control": {
+                "description": "`private, max-age=86400`: a page never changes",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "The page's bytes, named",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "The page `If-None-Match` names: the browser has it",
+            "headers": {
+              "Cache-Control": {
+                "description": "`private, max-age=86400`: a page never changes",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "The page's bytes, named",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "400": {
             "content": {
@@ -1865,7 +1896,38 @@
             "content": {
               "image/png": {}
             },
-            "description": "Successful Response"
+            "description": "Successful Response",
+            "headers": {
+              "Cache-Control": {
+                "description": "`private, max-age=86400`: a page never changes",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "The page's bytes, named",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "The page `If-None-Match` names: the browser has it",
+            "headers": {
+              "Cache-Control": {
+                "description": "`private, max-age=86400`: a page never changes",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "The page's bytes, named",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "400": {
             "content": {

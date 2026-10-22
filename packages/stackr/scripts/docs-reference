@@ -75,7 +75,7 @@ ROLES = {
     "clickhouse": "Langfuse's traces, observations and scores, and portalr's analytics events.",
     "clickhouse-init": (
         "Makes portalr's analytics database and its events table, with the deployment's "
-        "retention, on every start of the analytics profile, then exits."
+        "retention, each time `make up` starts the analytics profile, then exits."
     ),
     "langfuse-worker": "Langfuse's worker: runs ingestion and evaluation jobs from the queues.",
     "langfuse-web": (
@@ -160,7 +160,8 @@ def command(value: str | list[str]) -> str:
 # --- compose.yaml -------------------------------------------------------------------------------
 
 PORT = re.compile(
-    r"^\$\{(?P<bind>\w+):-(?P<address>[^}]+)\}:\$\{(?P<var>\w+):-(?P<port>\d+)\}:(?P<target>\d+)$"
+    r"^(?:\$\{(?P<bind>\w+):-(?P<address>[^}]+)\}|(?P<loopback>127\.0\.0\.1))"
+    r":\$\{(?P<var>\w+):-(?P<port>\d+)\}:(?P<target>\d+)$"
 )
 
 
@@ -187,14 +188,16 @@ def ports(service: dict[str, Any], defaults: dict[str, str]) -> str:
         match = PORT.match(str(entry))
         if match is None:
             raise Problem(f"a published port isn't bound to a setting: {entry!r}")
-        if match["bind"] != "STACKR_BIND":
+        # The loopback alone is the one other binding: ClickHouse's, whatever STACKR_BIND says.
+        if match["bind"] != "STACKR_BIND" and not match["loopback"]:
             raise Problem(f"a published port isn't bound to STACKR_BIND: {entry!r}")
         if defaults.get(match["var"]) != match["port"]:
             raise Problem(
                 f"{match['var']} defaults to {match['port']} in compose.yaml, but .env.example "
                 f"has {defaults.get(match['var'])!r}"
             )
-        published.append(f"{match['port']} (`{match['var']}`) → {match['target']}")
+        where = " on 127.0.0.1 only" if match["loopback"] else ""
+        published.append(f"{match['port']} (`{match['var']}`){where} → {match['target']}")
     return ", ".join(published) if published else "none"
 
 

@@ -14,7 +14,8 @@
 | `gateway` | `db-init`, `redis`, `litellm` | yes |
 | `auth` | `db-init`, `gotrue` | no |
 | `clickhouse` | `clickhouse` | no |
-| `analytics` | `clickhouse`, `clickhouse-init` | no |
+| `analytics` | `clickhouse` | no |
+| `analytics-init` | `clickhouse`, `clickhouse-init` | no |
 | `smoke` | `telemetrygen`, `probe` | no |
 
 <!-- end generated -->
@@ -334,9 +335,9 @@ Langfuse's traces, observations and scores, and portalr's analytics events.
 
 | Property | Value |
 |---|---|
-| Profiles | `clickhouse`, `langfuse`, `analytics` |
+| Profiles | `clickhouse`, `langfuse`, `analytics`, `analytics-init` |
 | Image | `clickhouse/clickhouse-server`, pinned by tag and digest in `compose.yaml` |
-| Published ports | 8123 (`CLICKHOUSE_HTTP_PORT`) → 8123 |
+| Published ports | 8123 (`CLICKHOUSE_HTTP_PORT`) on 127.0.0.1 only → 8123 |
 | Networks | `stackr` |
 | Volumes | `./deploy/clickhouse/users.xml` → `/etc/clickhouse-server/users.d/users.xml` (read-only), `./deploy/clickhouse/analytics-users.xml` → `/etc/clickhouse-server/users.d/analytics-users.xml` (read-only), `./deploy/clickhouse/analytics.xml` → `/etc/clickhouse-server/config.d/analytics.xml` (read-only), `clickhouse-data` → `/var/lib/clickhouse`, `clickhouse-logs` → `/var/log/clickhouse-server` |
 | Depends on | none |
@@ -355,11 +356,11 @@ Langfuse's traces, observations and scores, and portalr's analytics events.
 
 ### `clickhouse-init`
 
-Makes portalr's analytics database and its events table, with the deployment's retention, on every start of the analytics profile, then exits.
+Makes portalr's analytics database and its events table, with the deployment's retention, each time `make up` starts the analytics profile, then exits.
 
 | Property | Value |
 |---|---|
-| Profiles | `analytics` |
+| Profiles | `analytics-init` |
 | Image | `clickhouse/clickhouse-server`, pinned by tag and digest in `compose.yaml` |
 | Published ports | none |
 | Networks | `stackr` |

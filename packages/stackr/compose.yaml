@@ -383,8 +383,9 @@ services:
 
   clickhouse:
     image: clickhouse/clickhouse-server:26.9.20.23@sha256:83243a0057e4c78fa019f5b59d0082f2f9844986b57a598a6d9b012221f90ba2
-    # Its own profile, which Langfuse's and portalr's analytics both pull in (ADR-0044).
-    profiles: [clickhouse, langfuse, analytics]
+    # Its own profile, which Langfuse's and portalr's analytics both pull in (ADR-0044), and
+    # clickhouse-init's, which `make up` runs after it.
+    profiles: [clickhouse, langfuse, analytics, analytics-init]
     restart: unless-stopped
     user: "101:101"
     # Its users are deploy/clickhouse/users.xml's, not the image's: an admin for operators,
@@ -417,10 +418,12 @@ services:
       retries: 30
 
   # portalr's analytics database (lattice RFC-0008, ADR-0044), made as ClickHouse's admin, who
-  # signs in from inside ClickHouse's own network namespace only; then it exits.
+  # signs in from inside ClickHouse's own network namespace only; then it exits. `make up` runs it
+  # once ClickHouse is up, with `docker compose run`, so `up --wait` waits on no container that
+  # exits; its profile is never started on its own.
   clickhouse-init:
     image: clickhouse/clickhouse-server:26.9.20.23@sha256:83243a0057e4c78fa019f5b59d0082f2f9844986b57a598a6d9b012221f90ba2
-    profiles: [analytics]
+    profiles: [analytics-init]
     restart: "no"
     network_mode: service:clickhouse
     user: "101:101"

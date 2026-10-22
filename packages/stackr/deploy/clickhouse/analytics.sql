@@ -1,5 +1,5 @@
 -- portalr's analytics database (lattice RFC-0008, stackr ADR-0044), made as ClickHouse's admin by
--- clickhouse-init, every time the analytics profile starts, with @RETENTION@ the deployment's
+-- clickhouse-init, each time `make up` starts the analytics profile, with @RETENTION@ the deployment's
 -- ANALYTICS_RETENTION_DAYS. Each statement is safe to run again.
 CREATE DATABASE IF NOT EXISTS analytics;
 

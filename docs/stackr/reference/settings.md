@@ -215,7 +215,7 @@ portalr's analytics (lattice RFC-0008, ADR-0044): the writer's and the reader's 
 | `CLICKHOUSE_ANALYTICS_PASSWORD` | Generated: 64 hex characters |
 | `ANALYTICS_RETENTION_DAYS` | `395` |
 
-ClickHouse's HTTP interface, on STACKR_BIND, for portalr's analytics in `make serve`.
+ClickHouse's HTTP interface, on 127.0.0.1 only, for portalr's analytics in `make serve`.
 
 | Setting | In `.env.example` |
 |---|---|

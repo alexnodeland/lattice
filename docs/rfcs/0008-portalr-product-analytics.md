@@ -112,7 +112,7 @@ CREATE ROW POLICY tenant_wall ON analytics.events
 ### P5. Retention and deletion
 
 - **Default retention is 395 days** (13 months, so a year can be compared with the one before), as a table `TTL`.
-- **The operator sets it per deployment** (stackr's `ANALYTICS_RETENTION_DAYS`, which `clickhouse-init` sets as the table's TTL on every start). Tenants can't shorten it in v1 (owner, 2026-10-22).
+- **The operator sets it per deployment** (stackr's `ANALYTICS_RETENTION_DAYS`, which `clickhouse-init` sets as the table's TTL each time `make up` starts the analytics profile). Tenants can't shorten it in v1 (owner, 2026-10-22).
 - **`distinct_id` is `HMAC-SHA-256(key, user_id)`,** truncated to 128 bits and kept hex. Analytics never holds the raw user id, and a person's events can still be found and deleted by computing the hash. The key is **per deployment** (owner, 2026-10-22), so one person's events across tenants are deleted with one hash.
 - **A known trade-off of a per-deployment key:** the same person has the same `distinct_id` in every tenant, so an operator, who reads across tenants, can link one person's use of several tenants. Tenants can't, since each sees only its own rows. The owner chose per deployment for one-hash deletion (2026-10-22).
 - **The key is a secret of the deployment's,** `PORTAL_ANALYTICS_KEY`, which the template's `make env` will generate once analytics is wired into a generated application (the next phase), held as the other secrets are, and never in ClickHouse. Rotating it breaks deletion by person for the events hashed under the old key, so a rotation either keeps the old key to delete with until its events age out under the TTL, or re-keys the table by a mutation; which one is for the ADR that adds the key. It is never rotated silently.
@@ -182,7 +182,7 @@ One PR, with no browser capture and no UI:
 
 - **The stack.**
   - ClickHouse runs under `profiles: [clickhouse, langfuse, analytics]`.
-  - `clickhouse-init` (analytics only) makes `analytics.events` as `admin`, from inside ClickHouse's network namespace, and sets the TTL from `ANALYTICS_RETENTION_DAYS` (395).
+  - `clickhouse-init`, which `make up` runs with `docker compose run` once ClickHouse is up (so `up --wait` waits on nothing that exits), makes `analytics.events` as `admin`, from inside ClickHouse's network namespace, and sets the TTL from `ANALYTICS_RETENTION_DAYS` (395).
   - The two users are in `deploy/clickhouse/analytics-users.xml`, and the server settings (`custom_settings_prefixes`, `query_masking_rules`) in `deploy/clickhouse/analytics.xml`.
   - ClickHouse's HTTP interface is published on `STACKR_BIND` (`CLICKHOUSE_HTTP_PORT`, 8123), for an application on this machine.
 - **The row policy** is the user's own, in `analytics-users.xml` (`<databases><analytics><events><filter>`), not a `CREATE ROW POLICY` statement: it is reviewed with the code, as ADR-0031's users are.

@@ -5,9 +5,9 @@ import { FailureAlert } from "./failure-alert";
 
 /**
  * A read that failed, where its content would be (portalr ADR-0065): a heading saying what
- * couldn't be read, what failed in the kit's words (the server's go to the console), and one way on, reading it again. It
- * takes the focus, as a state that replaces the page does. `action` is for a second way on that
- * a screen has, such as clearing a filter.
+ * couldn't be read, what failed in the kit's words (the server's go to the console), and one
+ * way on, reading it again. It takes the focus, as a state that replaces the page does.
+ * `action` is for a second way on that a screen has, such as clearing a filter.
  */
 export function ErrorState({
   title,

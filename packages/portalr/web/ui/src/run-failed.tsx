@@ -19,8 +19,9 @@ const REASONS: Readonly<Record<string, string>> = {
 
 /**
  * A failed turn: what went wrong, the run's own words under "Details" where `error` is given,
- * which the thread gives the person the turn acted for, and "Try again" where `onRetry` is, which
- * it gives its latest turn, or `retryRefused`, why it can't. Only that one is announced, as it fails; one further up is a note.
+ * which the thread gives the person the turn acted for, and "Try again" where `onRetry` is,
+ * which it gives its latest turn, or `retryRefused`, why it can't. Only that one is announced,
+ * as it fails; one further up is a note.
  */
 export function RunFailed({
   reason,

@@ -7,6 +7,7 @@ Each is optional: an application passes those its stack runs.
 
 from dataclasses import dataclass
 
+from portalr.readers.analytics import Analytics, EventCount
 from portalr.readers.feedback import Feedback, FeedbackQuery, read_feedback
 from portalr.readers.grafana import Grafana
 from portalr.readers.langfuse import Langfuse, Score, Scores
@@ -30,6 +31,8 @@ class Readers:
     litellm: LiteLLM | None = None
     grafana: Grafana | None = None
     """Grafana, for operators' deep links into Tempo's and Loki's views."""
+    analytics: Analytics | None = None
+    """portalr's product analytics on ClickHouse (lattice RFC-0008)."""
 
     def configured(self) -> dict[str, bool]:
         """Which tools are configured, by name, for the UIs' ``config.json``."""
@@ -40,10 +43,13 @@ class Readers:
             "langfuse": self.langfuse is not None,
             "litellm": self.litellm is not None,
             "grafana": self.grafana is not None,
+            "analytics": self.analytics is not None,
         }
 
 
 __all__ = [
+    "Analytics",
+    "EventCount",
     "Feedback",
     "FeedbackQuery",
     "Grafana",

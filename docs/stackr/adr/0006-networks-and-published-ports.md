@@ -17,7 +17,7 @@ The stack's services talk to each other, to local Supabase (whose containers the
   - the ports applications send to keep their standard numbers: OTLP on 4317 (gRPC) and 4318 (HTTP), Pyroscope on 4040
   - the user interfaces and APIs keep their usual numbers where they don't collide: Grafana 3000, Prometheus 9090, Tempo 3200, Loki 3100
   - where two services share a usual number, or it is commonly taken, one moves; those choices are listed in the architecture document as the services land
-- **Services that nothing outside the stack uses** (ClickHouse, Redis, internal APIs) are not published.
+- **Services that nothing outside the stack uses** (Redis, internal APIs) are not published. ClickHouse's HTTP interface is published on `127.0.0.1` alone, whatever `STACKR_BIND` says, for portalr's analytics (amended by [ADR-0044](0044-clickhouse-a-profile-of-its-own-and-portalrs-analytics-users.md)).
 
 ## Options considered
 

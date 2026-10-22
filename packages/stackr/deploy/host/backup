@@ -43,6 +43,8 @@ clickhouse "CREATE DATABASE IF NOT EXISTS stackr_drill"
 clickhouse "CREATE TABLE IF NOT EXISTS stackr_drill.sentinel (id String, at DateTime DEFAULT now())
   ENGINE = MergeTree ORDER BY id"
 name=$(date -u +%Y-%m-%dT%H-%M-%SZ)
-clickhouse "BACKUP DATABASE default, DATABASE stackr_drill TO S3(backups, '$name') FORMAT Null"
+# portalr's analytics (ADR-0044), made empty where it doesn't run, so one statement serves both.
+clickhouse "CREATE DATABASE IF NOT EXISTS analytics"
+clickhouse "BACKUP DATABASE default, DATABASE analytics, DATABASE stackr_drill TO S3(backups, '$name') FORMAT Null"
 echo "backup: ClickHouse, as clickhouse/$name"
 status=0

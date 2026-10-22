@@ -179,7 +179,10 @@ services:
         CRAFT: {{ name }}
         VERSION: "{{ craft.version }}"
 {%- if craft.packages %}
-        PACKAGES: {{ craft.packages | join(' ') }}
+        PACKAGES: >-
+{%- for package in craft.packages %}
+          {{ package }}
+{%- endfor %}
 {%- endif %}
 {%- if craft.source %}
         SOURCE: {{ craft.source }}

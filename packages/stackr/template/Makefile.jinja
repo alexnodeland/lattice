@@ -26,7 +26,7 @@ FILES ?= $(subst $(comma),$(space),$(shell sed -n 's/^FILES_CRAFTS=//p' .env 2>/
 export FILES_CRAFTS := $(subst $(space),$(comma),$(strip $(FILES)))
 PROFILES := --profile app $(foreach craft,$(FILES),--profile files-$(craft))
 # Each worker is told the ID of the image it runs in, which each file's provenance records.
-WORKER_BUILDS = $(foreach craft,$(FILES),FILES_$(shell echo $(craft) | tr a-z A-Z)_BUILD=$$(docker image inspect --format '{{ '{{.Id}}' }}' {{ project_slug }}-files-$(craft):local))
+WORKER_BUILDS = $(foreach craft,$(FILES),FILES_$(shell echo $(craft) | tr a-z A-Z)_BUILD=$$(docker images --quiet --no-trunc {{ project_slug }}-files-$(craft):local))
 {%- else %}
 PROFILES := --profile app
 {%- endif %}

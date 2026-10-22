@@ -493,6 +493,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/grantr/v1/tenants/{tenant}/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tenant Settings
+         * @description Every setting as it is narrowed on a tenant: each layer, the ceiling, the outcome.
+         */
+        get: operations["tenant_settings_grantr_v1_tenants__tenant__settings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/grantr/v1/tenants/{tenant}/settings/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Tenant Setting
+         * @description Narrow a setting on a tenant, or unset it with null.
+         *
+         *     `If-Match` names the version of the tenant's setting the caller read, `"0"` for one never
+         *     set: another is refused with 409. A value wider than the layer above is refused with 422,
+         *     saying how wide it may be and which layer says so.
+         */
+        put: operations["set_tenant_setting_grantr_v1_tenants__tenant__settings__key__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/grantr/v1/tenants/{tenant}/workspaces/{workspace}/enabled-integrations": {
         parameters: {
             query?: never;
@@ -555,6 +599,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/grantr/v1/tenants/{tenant}/workspaces/{workspace}/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Workspace Settings
+         * @description Every setting as it is narrowed in a workspace and on its tenant, and the outcome.
+         */
+        get: operations["workspace_settings_grantr_v1_tenants__tenant__workspaces__workspace__settings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/grantr/v1/tenants/{tenant}/workspaces/{workspace}/settings/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Workspace Setting
+         * @description Narrow a setting in a workspace, or unset it with null, as on the tenant.
+         */
+        put: operations["set_workspace_setting_grantr_v1_tenants__tenant__workspaces__workspace__settings__key__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -586,9 +670,9 @@ export interface components {
             seq: number;
             tenant: components["schemas"]["TenantId"] | null;
         };
-        AuditEvent: components["schemas"]["TenantCreated"] | components["schemas"]["DeploymentTenantCreated"] | components["schemas"]["TenantDeleted"] | components["schemas"]["MemberAdded"] | components["schemas"]["MemberRemoved"] | components["schemas"]["GroupDefined"] | components["schemas"]["GroupDeleted"] | components["schemas"]["RoleDefined"] | components["schemas"]["RoleDeleted"] | components["schemas"]["Granted"] | components["schemas"]["Revoked"] | components["schemas"]["KeyIssued"] | components["schemas"]["KeyRevoked"] | components["schemas"]["Restricted"] | components["schemas"]["Unrestricted"] | components["schemas"]["IntegrationSet"];
+        AuditEvent: components["schemas"]["TenantCreated"] | components["schemas"]["DeploymentTenantCreated"] | components["schemas"]["TenantDeleted"] | components["schemas"]["MemberAdded"] | components["schemas"]["MemberRemoved"] | components["schemas"]["GroupDefined"] | components["schemas"]["GroupDeleted"] | components["schemas"]["RoleDefined"] | components["schemas"]["RoleDeleted"] | components["schemas"]["Granted"] | components["schemas"]["Revoked"] | components["schemas"]["KeyIssued"] | components["schemas"]["KeyRevoked"] | components["schemas"]["Restricted"] | components["schemas"]["Unrestricted"] | components["schemas"]["IntegrationSet"] | components["schemas"]["SettingSet"];
         /** @enum {string} */
-        AuditType: "tenant_created" | "deployment_tenant_created" | "tenant_deleted" | "member_added" | "member_removed" | "group_defined" | "group_deleted" | "role_defined" | "role_deleted" | "granted" | "revoked" | "key_issued" | "key_revoked" | "restricted" | "unrestricted" | "integration_set";
+        AuditType: "tenant_created" | "deployment_tenant_created" | "tenant_deleted" | "member_added" | "member_removed" | "group_defined" | "group_deleted" | "role_defined" | "role_deleted" | "granted" | "revoked" | "key_issued" | "key_revoked" | "restricted" | "unrestricted" | "integration_set" | "setting_set";
         /**
          * BuiltInRole
          * @description A built-in role a tenant's admins grant, and the kinds of resource it may be granted on.
@@ -1025,6 +1109,107 @@ export interface components {
              */
             kind: "service_principal";
         };
+        /**
+         * SettingChange
+         * @description A setting's new value on the tenant or in a workspace, as its path names.
+         */
+        SettingChange: {
+            /** Value */
+            value: number | string[] | null;
+        };
+        /**
+         * SettingKind
+         * @description What a setting's value is: a whole number within bounds, or some of a set of names.
+         */
+        SettingKind: {
+            /** High */
+            high?: number | null;
+            /** Low */
+            low?: number | null;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "int_range" | "subset";
+            /** Universe */
+            universe?: string[] | null;
+        };
+        /**
+         * SettingLayer
+         * @description One level's setting as an admin reads it.
+         */
+        SettingLayer: {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            by: components["schemas"]["Subject"];
+            /** Clamped */
+            clamped: boolean;
+            value: components["schemas"]["Wire"];
+            /** Version */
+            version: number;
+        };
+        /**
+         * SettingSet
+         * @description A setting was narrowed on the tenant or in a workspace, or unset (lattice ADR-0030).
+         */
+        SettingSet: {
+            /** Key */
+            key: string;
+            /** New */
+            new: number | string[] | null;
+            /** Old */
+            old: number | string[] | null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "setting_set";
+            /** Version */
+            version: number;
+            workspace: components["schemas"]["WorkspaceId"] | null;
+        };
+        /**
+         * SettingState
+         * @description A setting as an admin reads it, on the tenant or in a workspace.
+         */
+        SettingState: {
+            ceiling: components["schemas"]["Wire"];
+            /**
+             * Ceiling Set By
+             * @enum {string}
+             */
+            ceiling_set_by: "default" | "operator" | "tenant";
+            default: components["schemas"]["Wire"];
+            /** Description */
+            description: string;
+            effective: components["schemas"]["Wire"];
+            /** Key */
+            key: string;
+            kind: components["schemas"]["SettingKind"];
+            /**
+             * Lowest
+             * @enum {string}
+             */
+            lowest: "operator" | "tenant" | "workspace";
+            operator: components["schemas"]["Wire"] | null;
+            tenant: components["schemas"]["SettingLayer"] | null;
+            /** Version */
+            version: number;
+            workspace: components["schemas"]["SettingLayer"] | null;
+        };
+        /**
+         * SettingsView
+         * @description Every setting as an admin reads it, and the stored keys no registry declares any more.
+         */
+        SettingsView: {
+            /** Settings */
+            settings: components["schemas"]["SettingState"][];
+            /** Unknown */
+            unknown: string[];
+        };
         Subject: components["schemas"]["User"] | components["schemas"]["ServicePrincipal"] | components["schemas"]["RulePrincipal"] | components["schemas"]["Agent"];
         /**
          * TenantCreated
@@ -1088,6 +1273,7 @@ export interface components {
             /** Error Type */
             type: string;
         };
+        Wire: number | string[];
         WorkspaceId: string;
     };
     responses: never;
@@ -2082,6 +2268,75 @@ export interface operations {
             };
         };
     };
+    tenant_settings_grantr_v1_tenants__tenant__settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_tenant_setting_grantr_v1_tenants__tenant__settings__key__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string | null;
+            };
+            path: {
+                tenant: string;
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettingChange"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     enabled_integrations_grantr_v1_tenants__tenant__workspaces__workspace__enabled_integrations_get: {
         parameters: {
             query?: never;
@@ -2172,6 +2427,77 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IntegrationState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    workspace_settings_grantr_v1_tenants__tenant__workspaces__workspace__settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant: string;
+                workspace: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_workspace_setting_grantr_v1_tenants__tenant__workspaces__workspace__settings__key__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string | null;
+            };
+            path: {
+                tenant: string;
+                workspace: string;
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettingChange"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingState"];
                 };
             };
             /** @description Validation Error */

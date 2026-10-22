@@ -12,6 +12,7 @@ import time
 from collections.abc import AsyncGenerator, Awaitable, Callable, Collection, Iterable, Mapping
 from contextlib import asynccontextmanager
 from datetime import timedelta
+from types import MappingProxyType
 from typing import Final, NamedTuple, Protocol
 
 from opentelemetry.metrics import MeterProvider
@@ -59,6 +60,11 @@ from grantr.core import (
     RoleDeleted,
     RulePrincipal,
     ServicePrincipal,
+    SettingRow,
+    SettingSet,
+    SettingState,
+    SettingsView,
+    Stale,
     Subject,
     TenantCreated,
     TenantDeleted,
@@ -74,10 +80,13 @@ from grantr.core import (
     verify,
 )
 from grantr.core.grants import held
-from grantr.core.roles import MANAGE_INTEGRATIONS, RESTRICT, RULE_ROLE
+from grantr.core.roles import MANAGE_INTEGRATIONS, MANAGE_SETTINGS, RESTRICT, RULE_ROLE
+from grantr.core.settings import state as setting_state
+from grantr.core.settings import wire
 from grantr.grants.storage import Reads, Storage, Transaction
 from grantr.telemetry import SLOW_CHECK, Reason, Telemetry
 from lattice_core.integrations import KNOWN, Integration
+from lattice_core.settings import KNOWN_SETTINGS, Setting, Tier, Value, floor, operator_layer
 
 logger = logging.getLogger(__name__)
 
@@ -153,9 +162,14 @@ class Grants:
             :data:`~lattice_core.integrations.KNOWN`, if omitted.
         installed: The keys of those the deployment installs; every one if omitted. One it
             doesn't install is off everywhere, whatever is set.
+        settings: The settings a tenant's and a workspace's admins narrow, by key: lattice's,
+            :data:`~lattice_core.settings.KNOWN_SETTINGS`, if omitted.
+        operator_settings: The operator's values, by key, which replace the settings' defaults
+            and are the ceiling every tenant narrows; checked as the deployment starts.
 
     Raises:
-        ValueError: If it installs an integration that ``integrations`` doesn't declare.
+        ValueError: If it installs an integration that ``integrations`` doesn't declare, or the
+            operator sets a setting ``settings`` doesn't declare, or a value of the wrong kind.
     """
 
     def __init__(
@@ -169,12 +183,16 @@ class Grants:
         application: ServicePrincipal | None = None,
         integrations: Mapping[str, Integration] = KNOWN,
         installed: Collection[str] | None = None,
+        settings: Mapping[str, Setting] = KNOWN_SETTINGS,
+        operator_settings: Mapping[str, object] = MappingProxyType({}),
     ) -> None:
         if installed is not None and (unknown := sorted(set(installed) - set(integrations))):
             raise ValueError(f"installs integrations it doesn't declare: {', '.join(unknown)}")
         self._storage = storage
         self._integrations = integrations
         self._installed = frozenset(integrations if installed is None else installed)
+        self._settings_known = settings
+        self._operator = operator_layer(settings, operator_settings)
         self._catalog = Catalog.of(*catalogs)
         self._application = application
         self._telemetry = Telemetry(
@@ -920,6 +938,147 @@ class Grants:
             workspace=workspace.get(key),
         )
 
+    # ─── settings ────────────────────────────────────────────────────────────
+
+    async def value(self, tenant_id: str, workspace_id: str, key: str, /) -> Value:
+        """A setting's value in a tenant's workspace: lattice-core's ``Settings`` port.
+
+        It checks no one, as :meth:`is_enabled` doesn't. It reads the store each time, with no
+        cache. While the store can't be read, and for an id that names no tenant or workspace,
+        it answers the narrowest value the setting may have, so a failure never widens what a
+        workspace may do (lattice ADR-0030).
+
+        Raises:
+            KeyError: For a key no setting declares.
+        """
+        setting = self._settings_known[key]
+        if not TENANT_ID.fullmatch(tenant_id) or not workspace_id:
+            return floor(setting)
+        try:
+            on_tenant = await self._storage.settings(tenant_id)
+            in_workspace = await self._storage.settings(tenant_id, workspace_id)
+        except Exception:
+            logger.warning("%s is at its floor: the store can't be read", key, exc_info=True)
+            return floor(setting)
+        state = setting_state(
+            setting,
+            operator=self._operator.get(key),
+            tenant=on_tenant.get(key),
+            workspace=in_workspace.get(key),
+            in_workspace=True,
+        )
+        return setting.value(state.effective)
+
+    async def settings(
+        self, tenant: TenantId, *, workspace: WorkspaceId | None = None, by: Subject
+    ) -> SettingsView:
+        """Every setting as it is set on the tenant, or in a workspace.
+
+        The stored keys no setting declares any more are listed apart: never applied.
+
+        Raises:
+            Invalid: If the workspace's id is empty.
+            Forbidden: If ``by`` may not: ``grantr:manage_settings`` on the tenant, or on the
+                workspace.
+        """
+        await self._require(self._storage, tenant, by, MANAGE_SETTINGS, _level(workspace))
+        on_tenant, in_workspace = await self._stored(self._storage, tenant, workspace)
+        here = on_tenant if workspace is None else in_workspace
+        return SettingsView(
+            settings=[
+                self._setting(key, on_tenant, in_workspace, workspace is not None)
+                for key in self._settings_known
+            ],
+            unknown=sorted(key for key in here if key not in self._settings_known),
+        )
+
+    async def set_setting(
+        self,
+        tenant: TenantId,
+        key: str,
+        value: object,
+        *,
+        version: int | None = None,
+        workspace: WorkspaceId | None = None,
+        by: Subject,
+    ) -> SettingState:
+        """Narrow a setting on the tenant or in a workspace, or unset it with None.
+
+        A value may only narrow the layer above: no higher a number, no more names. ``version``,
+        if given, is the version of this level's setting the caller read: 0 for one never set.
+        Setting what is set already changes nothing, and records nothing.
+
+        Raises:
+            Invalid: If no setting has the key, the value isn't of its kind, or it would widen
+                the layer above, saying which layer and how far it may go.
+            Forbidden: If ``by`` may not: ``grantr:manage_settings`` on the tenant, or on the
+                workspace; or the level may not set it at all: the operator's alone.
+            Stale: If ``version`` isn't the setting's current one there.
+        """
+        setting = self._settings_known.get(key)
+        if setting is None:
+            raise Invalid("there is no such setting")
+        tier: Tier = "tenant" if workspace is None else "workspace"
+        level = _level(workspace)
+        if not setting.settable_by(tier):
+            raise Forbidden(f"{key} is set by the {setting.lowest} alone")
+        try:
+            canonical = None if value is None else setting.value(value)
+        except ValueError as error:
+            raise Invalid(f"{key} is {error}") from None
+        async with self._change(tenant) as (tx, record):
+            await self._require(tx, tenant, by, MANAGE_SETTINGS, level)
+            on_tenant, in_workspace = await self._stored(tx, tenant, workspace)
+            rows = on_tenant if workspace is None else in_workspace
+            stored = rows.get(key)
+            current = 0 if stored is None else stored.version
+            if version is not None and version != current:
+                raise Stale(f"{key} is at version {current} here, not {version}")
+            state = self._setting(key, on_tenant, in_workspace, workspace is not None)
+            if canonical is not None and not setting.within(
+                canonical, setting.value(state.ceiling)
+            ):
+                raise Invalid(
+                    f"{key} may be at most {_said(state.ceiling)} here: the"
+                    f" {state.ceiling_set_by}'s value"
+                )
+            new = None if canonical is None else wire(canonical)
+            old = None if stored is None else stored.value
+            if new == old:
+                return state
+            event = SettingSet(workspace=workspace, key=key, old=old, new=new, version=current + 1)
+            entry = await record(tenant, by, event)
+            row = SettingRow(value=new, version=current + 1, by=by, at=entry.at)
+            await tx.set_setting(tenant, workspace, key, row)
+            changed = {**rows, key: row}
+            if workspace is None:
+                return self._setting(key, changed, in_workspace, False)
+            return self._setting(key, on_tenant, changed, True)
+
+    async def _stored(
+        self, reads: Reads, tenant: TenantId, workspace: WorkspaceId | None
+    ) -> tuple[dict[str, SettingRow], dict[str, SettingRow]]:
+        """The settings stored on the tenant, and in the workspace: none there for None."""
+        on_tenant = await reads.settings(tenant)
+        if workspace is None:
+            return on_tenant, {}
+        return on_tenant, await reads.settings(tenant, workspace)
+
+    def _setting(
+        self,
+        key: str,
+        on_tenant: Mapping[str, SettingRow],
+        in_workspace: Mapping[str, SettingRow],
+        here_in_workspace: bool,
+    ) -> SettingState:
+        return setting_state(
+            self._settings_known[key],
+            operator=self._operator.get(key),
+            tenant=on_tenant.get(key),
+            workspace=in_workspace.get(key),
+            in_workspace=here_in_workspace,
+        )
+
     @asynccontextmanager
     async def _change(self, tenant: TenantId | None) -> AsyncGenerator[tuple[Transaction, Record]]:
         """A transaction, and how to record its audit entries, which are logged once it commits."""
@@ -1115,6 +1274,11 @@ def _level(workspace: WorkspaceId | None) -> Resource:
     if workspace == "":
         raise Invalid("a workspace's id isn't empty")
     return TENANT if workspace is None else Resource(kind="workspace", workspace=workspace)
+
+
+def _said(value: int | list[str]) -> str:
+    """A value as a refusal says it: a number, or names joined."""
+    return ", ".join(value) if isinstance(value, list) else str(value)
 
 
 def _tenant_id(tenant: TenantId) -> None:

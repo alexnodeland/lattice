@@ -7,9 +7,9 @@ Tenants, members, groups, roles, grants, keys, integrations and the audit log; a
 from collections.abc import Awaitable, Callable
 from typing import Annotated, Any, Final, Literal, NamedTuple
 
-from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Request
+from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Request, Response
 from fastapi.exceptions import RequestValidationError
-from pydantic import BaseModel, ConfigDict, TypeAdapter, ValidationError
+from pydantic import BaseModel, ConfigDict, StrictInt, StrictStr, TypeAdapter, ValidationError
 from starlette.requests import HTTPConnection
 
 from grantr.core import (
@@ -32,6 +32,9 @@ from grantr.core import (
     Role,
     RulePrincipal,
     ServicePrincipal,
+    SettingState,
+    SettingsView,
+    Stale,
     Subject,
     TenantId,
     User,
@@ -63,6 +66,7 @@ STATUS_CODES: dict[str, int] = {
     "tenant_required": 400,
     "forbidden": 403,
     "invalid": 422,
+    "version_conflict": 409,
 }
 """The HTTP status for each refusal ``type``."""
 
@@ -139,6 +143,13 @@ class IntegrationSwitch(BaseModel):
 
     on: bool | None
     """On, off, or ``null`` to unset it, so it inherits the level above."""
+
+
+class SettingChange(BaseModel):
+    """A setting's new value on the tenant or in a workspace, as its path names."""
+
+    value: StrictInt | list[StrictStr] | None
+    """A whole number or names, no wider than the layer above's; ``null`` to unset it."""
 
 
 class NewKey(BaseModel):
@@ -245,6 +256,9 @@ Kept = Annotated[AuditFilter, Depends(audit_filter)]
 
 
 TenantHeader = Annotated[TenantId | None, Header(alias="X-Tenant")]
+
+IfMatch = Annotated[str | None, Header(alias="If-Match")]
+"""The version of a setting the caller read, as an entity tag: `"3"`."""
 """The tenant a request to ``/me`` or ``/checks`` names."""
 
 
@@ -562,6 +576,65 @@ def grantr_router(grants: Grants, *, resolve_actor: ResolveActor) -> APIRouter:
         """Whether each integration is on in a workspace, by key, for whoever can open it."""
         return await _or_http(grants.integrations_enabled(tenant, workspace, by=by(tenant, who)))
 
+    @router.get("/tenants/{tenant}/settings")
+    async def tenant_settings(tenant: TenantId, who: Caller = current) -> SettingsView:
+        """Every setting as it is narrowed on a tenant: each layer, the ceiling, the outcome."""
+        return await _or_http(grants.settings(tenant, by=by(tenant, who)))
+
+    @router.put("/tenants/{tenant}/settings/{key}")
+    async def set_tenant_setting(
+        tenant: TenantId,
+        key: str,
+        body: SettingChange,
+        response: Response,
+        if_match: IfMatch = None,
+        who: Caller = current,
+    ) -> SettingState:
+        """Narrow a setting on a tenant, or unset it with null.
+
+        `If-Match` names the version of the tenant's setting the caller read, `"0"` for one never
+        set: another is refused with 409. A value wider than the layer above is refused with 422,
+        saying how wide it may be and which layer says so.
+        """
+        state = await _or_http(
+            grants.set_setting(
+                tenant, key, body.value, version=_version(if_match), by=by(tenant, who)
+            )
+        )
+        response.headers["ETag"] = f'"{state.version}"'
+        return state
+
+    @router.get("/tenants/{tenant}/workspaces/{workspace:path}/settings")
+    async def workspace_settings(
+        tenant: TenantId, workspace: WorkspaceId, who: Caller = current
+    ) -> SettingsView:
+        """Every setting as it is narrowed in a workspace and on its tenant, and the outcome."""
+        return await _or_http(grants.settings(tenant, workspace=workspace, by=by(tenant, who)))
+
+    @router.put("/tenants/{tenant}/workspaces/{workspace:path}/settings/{key}")
+    async def set_workspace_setting(
+        tenant: TenantId,
+        workspace: WorkspaceId,
+        key: str,
+        body: SettingChange,
+        response: Response,
+        if_match: IfMatch = None,
+        who: Caller = current,
+    ) -> SettingState:
+        """Narrow a setting in a workspace, or unset it with null, as on the tenant."""
+        state = await _or_http(
+            grants.set_setting(
+                tenant,
+                key,
+                body.value,
+                version=_version(if_match),
+                workspace=workspace,
+                by=by(tenant, who),
+            )
+        )
+        response.headers["ETag"] = f'"{state.version}"'
+        return state
+
     @router.get("/tenants/{tenant}/keys")
     async def list_keys(tenant: TenantId, who: Caller = current) -> list[KeyView]:
         """A tenant's keys: their ids and principals, never their secrets."""
@@ -589,11 +662,23 @@ def _refusal(code: str, message: str) -> HTTPException:
 
 
 def _refused(error: GrantrError) -> HTTPException:
+    if isinstance(error, Stale):
+        return _refusal("version_conflict", str(error))
     return _refusal("forbidden" if isinstance(error, Forbidden) else "invalid", str(error))
+
+
+def _version(if_match: str | None) -> int | None:
+    """The version an `If-Match` names, quoted or not; a 422 for anything else."""
+    if if_match is None:
+        return None
+    tag = if_match.strip().removeprefix("W/").strip('"')
+    if not tag.isdigit() or len(tag) > 9:
+        raise _refusal("invalid", "If-Match names a version: a whole number, quoted")
+    return int(tag)
 
 
 async def _or_http[T](awaitable: Awaitable[T]) -> T:
     try:
         return await awaitable
-    except (Forbidden, Invalid) as error:
+    except (Forbidden, Invalid, Stale) as error:
         raise _refused(error) from error

@@ -11,3 +11,7 @@ class Forbidden(GrantrError):
 
 class Invalid(GrantrError):
     """The command can't apply: an unknown tenant, role, group or key, or a duplicate."""
+
+
+class Stale(GrantrError):
+    """The command named a version that isn't the current one: someone changed it since."""

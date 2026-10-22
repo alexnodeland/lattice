@@ -48,7 +48,7 @@ The application hands `Grants` each library's catalog, its `ACTIONS`, and grantr
 | `owner` | a tenant | every action in every catalog but the operator's, the deployment's reads and the bookkeeping; portalr's `read_telemetry` and `read_spend` included |
 | `admin` | a tenant | the owner's, but `grantr:delete_tenant` |
 | `member` | a tenant | `artifactr:read_workspaces`: listing the tenant's workspaces, which artifactr filters by what the caller may open; it makes a user or service principal a member |
-| `admin` | a workspace | every library action but the bookkeeping, and `grantr:grant`, `revoke`, `restrict` and `manage_integrations` ([ADR-0034](adr/0034-integrations-switched-per-tenant-and-workspace-in-grantrs-table-audited.md)) |
+| `admin` | a workspace | every library action but the bookkeeping, and `grantr:grant`, `revoke`, `restrict`, `manage_integrations` ([ADR-0034](adr/0034-integrations-switched-per-tenant-and-workspace-in-grantrs-table-audited.md)) and `manage_settings` ([ADR-0035](adr/0035-settings-narrowed-per-tenant-and-workspace-in-grantrs-table-versioned-audited.md)) |
 | `editor` | a workspace, thread, artifact or rule | a viewer's, and the commands that post, create, edit, propose, archive, resolve proposals, record a turn, and stop and operate runs |
 | `viewer` | a workspace, thread, artifact or rule | every `read_` action but the cursors, every `open`, and giving feedback |
 | `rule` | a workspace | `reflexr:open`, `reflexr:publish`, `reflexr:checkpoint_run`, `reflexr:read_events` and `reflexr:read_runs`: a stored rule's runs; and `artifactr:open` and `artifactr:post_message`, for their notices through relayr. A stored rule's principal holds it in its own workspace with no grant ([ADR-0029](adr/0029-a-stored-rule-acts-as-itself-in-its-own-workspace.md)) |
@@ -77,6 +77,7 @@ A custom role is a tenant's own set of actions, granted wherever `editor` can be
 | `issue_key`, `revoke_key` | `grantr:issue_key`, `grantr:revoke_key` |
 | `restrict` | `grantr:restrict` on the thread or artifact; it sets or clears its restricted flag |
 | `set_integration` | `grantr:manage_integrations` on the tenant, or on the workspace; it turns an integration on or off there, or unsets it, and records only a real change |
+| `set_setting` | `grantr:manage_settings` on the tenant, or on the workspace, at a level the setting's `lowest` reaches; it narrows a setting there, never past the layer above, or unsets it, at the version the caller read, and records only a real change |
 | `audit` | `grantr:read_audit`, or `grantr:grant_operator` for the deployment's log |
 
 - **No one gives more than they hold.** A command that gives or takes access is refused unless its maker holds every action it gives or takes, where it applies: a grant's role on its resource; each grant a removed member loses; the grants a group's members gain or lose; and the grants a key acts with, when it is issued or revoked. A custom role needs no bound: whoever may define one holds every action it can hold.
@@ -88,7 +89,7 @@ A custom role is a tenant's own set of actions, granted wherever `editor` can be
 
 ## Lists
 
-An admin reads each list with the action of the command that changes it ([ADR-0017](adr/0017-the-admin-api.md)): `members` with `grantr:add_member`, `groups` with `grantr:manage_groups`, `roles` with `grantr:define_role`, `grants_in` with `grantr:grant` on the tenant or a workspace, `keys` with `grantr:issue_key`, `restrictions` with `grantr:restrict` on the workspace, `integrations` with `grantr:manage_integrations` on the tenant or a workspace, and `tenants` with `grantr:create_tenant`.
+An admin reads each list with the action of the command that changes it ([ADR-0017](adr/0017-the-admin-api.md)): `members` with `grantr:add_member`, `groups` with `grantr:manage_groups`, `roles` with `grantr:define_role`, `grants_in` with `grantr:grant` on the tenant or a workspace, `keys` with `grantr:issue_key`, `restrictions` with `grantr:restrict` on the workspace, `integrations` with `grantr:manage_integrations` on the tenant or a workspace, `settings` with `grantr:manage_settings` on the tenant or a workspace, and `tenants` with `grantr:create_tenant`.
 
 ## Integrations
 

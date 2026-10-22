@@ -405,3 +405,56 @@ async def test_a_workspace_named_like_a_route_is_still_one_workspace(
         "/tenants/acme/audit", params={"type": "integration_set"}, headers=AS_ALICE
     )
     assert [entry["event"]["workspace"] for entry in audit.json()] == [workspace]
+
+
+async def test_admins_narrow_settings_by_version_and_are_told_why_not(
+    client: httpx.AsyncClient,
+) -> None:
+    await client.post("/tenants/acme/members", json={"member": BOB}, headers=AS_ALICE)
+    admin = {"role": "admin", "on": {"kind": "workspace", "workspace": "team/notes"}, "to": BOB}
+    await client.post("/tenants/acme/grants", json=admin, headers=AS_ALICE)
+    notes = "/tenants/acme/workspaces/team/notes"
+    key = "connect-per-hour:freecad"
+
+    lowered = await client.put(
+        f"/tenants/acme/settings/{key}", json={"value": 20}, headers=AS_ALICE | {"If-Match": '"0"'}
+    )
+    assert lowered.status_code == 200
+    assert lowered.headers["ETag"] == '"1"'
+    assert (lowered.json()["effective"], lowered.json()["tenant"]["value"]) == (20, 20)
+    stale = await client.put(
+        f"/tenants/acme/settings/{key}", json={"value": 10}, headers=AS_ALICE | {"If-Match": '"0"'}
+    )
+    assert (stale.status_code, stale.json()["detail"]["type"]) == (409, "version_conflict")
+
+    raised = await client.put(f"{notes}/settings/{key}", json={"value": 25}, headers=AS_BOB)
+    assert raised.status_code == 422
+    assert raised.json()["detail"] == {
+        "type": "invalid",
+        "message": f"{key} may be at most 20 here: the tenant's value",
+    }
+    narrowed = await client.put(f"{notes}/settings/{key}", json={"value": 5}, headers=AS_BOB)
+    assert (narrowed.json()["effective"], narrowed.json()["ceiling"]) == (5, 20)
+    listed = await client.get(f"{notes}/settings", headers=AS_BOB)
+    [state] = [s for s in listed.json()["settings"] if s["key"] == key]
+    assert (state["workspace"]["value"], state["version"], listed.json()["unknown"]) == (5, 1, [])
+
+    for body in ({"value": True}, {"value": "5"}, {"value": 5.5}, {"value": {"x": 1}}, {}):
+        bad = await client.put(f"{notes}/settings/{key}", json=body, headers=AS_BOB)
+        assert bad.status_code == 422, body
+    for tag in ("abc", '"-1"', '"1e9"', '"9999999999"'):
+        bad = await client.put(
+            f"{notes}/settings/{key}", json={"value": 4}, headers=AS_BOB | {"If-Match": tag}
+        )
+        assert bad.status_code == 422, tag
+    unknown = await client.put(f"{notes}/settings/<script>", json={"value": 1}, headers=AS_BOB)
+    assert unknown.json()["detail"] == {"type": "invalid", "message": "there is no such setting"}
+    tenant = await client.put(f"/tenants/acme/settings/{key}", json={"value": 1}, headers=AS_BOB)
+    assert tenant.status_code == 403, "a workspace's admin, not the tenant's"
+    sibling = await client.put(
+        f"/tenants/acme/workspaces/other/settings/{key}", json={"value": 1}, headers=AS_BOB
+    )
+    assert sibling.status_code == 403
+    for path in ("..", "team/../other", "%2E%2E", "team%2Fnotes%2F..%2Fother"):
+        escaped = await client.get(f"/tenants/acme/workspaces/{path}/settings", headers=AS_BOB)
+        assert escaped.status_code in (403, 404), path

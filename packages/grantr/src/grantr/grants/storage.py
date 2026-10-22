@@ -1,4 +1,4 @@
-"""The storage port: where access, the settings of integrations, and the audit log live.
+"""The storage port: where access, integrations' and settings' values, and the audit log live.
 
 It holds tenants, grants, groups, custom roles and keys, and which integrations each tenant and
 workspace turned on or off.
@@ -29,6 +29,7 @@ from grantr.core import (
     Member,
     Resource,
     Role,
+    SettingRow,
     Subject,
     TenantId,
     UserId,
@@ -111,6 +112,12 @@ class Reads(Protocol):
         """The integrations set on a tenant, with None, or in one of its workspaces, by key."""
         ...
 
+    async def settings(
+        self, tenant: TenantId, workspace: WorkspaceId | None = None
+    ) -> dict[str, SettingRow]:
+        """The settings stored on a tenant, with None, or in one of its workspaces, by key."""
+        ...
+
 
 class Transaction(Reads, Protocol):
     """One atomic change to access, serialized with every other in its tenant.
@@ -166,6 +173,12 @@ class Transaction(Reads, Protocol):
         setting: IntegrationSetting | None,
     ) -> None:
         """Set an integration on a tenant, with None, or in a workspace; unset it with None."""
+        ...
+
+    async def set_setting(
+        self, tenant: TenantId, workspace: WorkspaceId | None, key: str, row: SettingRow
+    ) -> None:
+        """Store a setting's row on a tenant, with None, or in a workspace, replacing its last."""
         ...
 
     async def add_key(self, key: Key) -> None:

@@ -383,26 +383,62 @@ services:
 
   clickhouse:
     image: clickhouse/clickhouse-server:26.9.20.23@sha256:83243a0057e4c78fa019f5b59d0082f2f9844986b57a598a6d9b012221f90ba2
-    profiles: [langfuse]
+    # Its own profile, which Langfuse's and portalr's analytics both pull in (ADR-0044).
+    profiles: [clickhouse, langfuse, analytics]
     restart: unless-stopped
     user: "101:101"
-    # Its users are deploy/clickhouse/users.xml's, not the image's: an admin for operators, and
-    # Langfuse's, which may use only its own database and the system tables it reads (ADR-0031).
-    # Langfuse's password is CLICKHOUSE_LANGFUSE_PASSWORD here, since both the image's entrypoint
-    # and clickhouse-client read CLICKHOUSE_PASSWORD as their own.
+    # Its users are deploy/clickhouse/users.xml's, not the image's: an admin for operators,
+    # Langfuse's, which may use only its own database and the system tables it reads (ADR-0031),
+    # and analytics' writer and reader (ADR-0044). Langfuse's password is
+    # CLICKHOUSE_LANGFUSE_PASSWORD here, since both the image's entrypoint and clickhouse-client
+    # read CLICKHOUSE_PASSWORD as their own. `make env` makes it whether or not Langfuse runs, and
+    # it is required here, so Langfuse's user, which signs in from anywhere, never has an empty one.
     environment:
       CLICKHOUSE_SKIP_USER_SETUP: "1"
       CLICKHOUSE_ADMIN_PASSWORD: ${CLICKHOUSE_ADMIN_PASSWORD:?run make env}
       CLICKHOUSE_LANGFUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?run make env}
+      CLICKHOUSE_ANALYTICS_WRITER_PASSWORD: ${CLICKHOUSE_ANALYTICS_WRITER_PASSWORD:?run make env}
+      CLICKHOUSE_ANALYTICS_PASSWORD: ${CLICKHOUSE_ANALYTICS_PASSWORD:?run make env}
     volumes:
       - ./deploy/clickhouse/users.xml:/etc/clickhouse-server/users.d/users.xml:ro
+      - ./deploy/clickhouse/analytics-users.xml:/etc/clickhouse-server/users.d/analytics-users.xml:ro
+      - ./deploy/clickhouse/analytics.xml:/etc/clickhouse-server/config.d/analytics.xml:ro
       - clickhouse-data:/var/lib/clickhouse
       - clickhouse-logs:/var/log/clickhouse-server
+    # Its HTTP interface, on the loopback, for an application `make serve` runs on this machine:
+    # analytics' users sign in from the stack's private networks, Langfuse's from anywhere.
+    ports:
+      - ${STACKR_BIND:-127.0.0.1}:${CLICKHOUSE_HTTP_PORT:-8123}:8123
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8123/ping"]
       interval: 3s
       timeout: 5s
       retries: 30
+
+  # portalr's analytics database (lattice RFC-0008, ADR-0044), made as ClickHouse's admin, who
+  # signs in from inside ClickHouse's own network namespace only; then it exits.
+  clickhouse-init:
+    image: clickhouse/clickhouse-server:26.9.20.23@sha256:83243a0057e4c78fa019f5b59d0082f2f9844986b57a598a6d9b012221f90ba2
+    profiles: [analytics]
+    restart: "no"
+    network_mode: service:clickhouse
+    user: "101:101"
+    entrypoint: ["sh", "-c"]
+    command:
+      - >-
+        case "$$ANALYTICS_RETENTION_DAYS" in ''|*[!0-9]*)
+        echo "ANALYTICS_RETENTION_DAYS is a number of days" >&2; exit 1;; esac;
+        sed "s/@RETENTION@/$$ANALYTICS_RETENTION_DAYS/g" /analytics.sql |
+        clickhouse-client --user admin --multiquery
+    environment:
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_ADMIN_PASSWORD:?run make env}
+      # How long an event is kept: 395 days unless the operator chooses (RFC-0008, P5).
+      ANALYTICS_RETENTION_DAYS: ${ANALYTICS_RETENTION_DAYS:-395}
+    volumes:
+      - ./deploy/clickhouse/analytics.sql:/analytics.sql:ro
+    depends_on:
+      clickhouse:
+        condition: service_healthy
 
   langfuse-worker:
     image: langfuse/langfuse-worker:4.46.0@sha256:3568d2d1eb5dd570f4087b37972ddffa3f6ae4f872553e0b0e2eedf4896a29e9

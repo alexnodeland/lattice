@@ -544,10 +544,14 @@ jobs:
           - name: everything on PostgreSQL
             profiles: observability langfuse gateway
             database: postgres
+          # portalr's analytics on a ClickHouse of its own profile, without Langfuse (ADR-0044).
+          - name: analytics, without Langfuse
+            profiles: analytics
+            database: postgres
           # stackr RFC-0004's single host: behind Caddy, with its own CA, on PostgreSQL with
           # GoTrue, and an application from the template's hosting: host.
           - name: a single host, behind Caddy, and an application
-            profiles: observability langfuse gateway auth
+            profiles: observability langfuse gateway auth analytics
             database: postgres
             recipe: host
             app: true

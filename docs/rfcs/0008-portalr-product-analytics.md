@@ -60,7 +60,9 @@ The `events` table, a `MergeTree`:
 
 ### P2. Capture: a same-origin relay and a server-side helper
 
-- **`POST /portalr/v1/events`** is same-origin and needs the signed-in user's token, so the CSP stays `'self'` and no third-party script loads. It caps a request's body and the events in it, and is rate-limited per person.
+- **`POST /portalr/v1/events`** is same-origin and needs the signed-in user's token, so the CSP stays `'self'` and no third-party script loads. It caps a request's body, the events in it, and each `props` value's length, and is rate-limited per person.
+- **The relay mints the session id,** or binds the browser's to the signed-in user with an HMAC, so a browser can't attach its events or replays to another person's session.
+- **A route is the router's template,** such as `/t/$tenant/w/$workspace/threads/$thread`, never the raw path or its query string, which can hold ids and search text.
 - **What the relay does to each event:**
   - checks consent (P3) and drops the event without it;
   - checks the name against the registry (P6) and drops any key the registry doesn't allow;
@@ -80,18 +82,23 @@ The `events` table, a `MergeTree`:
 
 ### P4. Isolation: the reader is the wall, row policies the second
 
-- **The tenant wall is portalr's `analytics` reader.** It takes a `Tenant` and puts `tenant_id = {tenant}` first in every query it builds, as its siblings do. A test in `test_queries.py` fails if any analytics query lacks it.
+- **The tenant wall is portalr's `analytics` reader.** It takes a `Tenant` and puts `tenant_id = {tenant:String}` in every query it builds, as its siblings do. A test in `tests/readers/test_analytics.py` fails if any of the reader's reads, each listed there, sends a query without it, or without the row policy's setting.
 - **The second wall is a ClickHouse row policy** on `portalr_analytics`, so a reader bug can't read across tenants. The reader sets a custom setting on each query (`SETTINGS SQL_portalr_tenant = '…'`), and the policy below holds its rows to it. The setting is set by the query, so the policy guards against a missing filter, not against a hostile query string; it is a wall only as far as the reader can't be made to set another tenant's id.
-- **This row-policy-by-setting pattern is unverified on 26.9.** Phase 0 settles it with an experiment in the first slice's test:
+- **This row-policy-by-setting pattern held on ClickHouse 26.9.20.23** (the first slice's experiment, below). The plan was:
   1. Configure `custom_settings_prefixes` for `SQL_`.
   2. Make the policy, and insert rows for two tenants.
   3. As `portalr_analytics`, show:
      - a query with the setting for tenant A sees only A's rows;
      - with no setting, it sees none, or fails;
-     - it can't change the setting by `SET` within a readonly profile, if `readonly=2` allows only the query-level setting (to measure);
+     - it can change that one setting and no other: a readonly profile (`readonly = 1`) with the tenant setting alone `changeable_in_readonly`, so a read can't lift its memory or time limits, or turn logging on;
      - `system.query_log` shows the setting, for audit; see P4's note on who else reads that log.
-- **If the pattern fails,** the fallback is a ClickHouse user per tenant made by portalr (heavier), or the reader alone, with the decision recorded.
-- **`system.query_log` is readable by `langfuse`** (ADR-0031 granted it, to follow its own queries' progress), so it could read analytics' query text: tenant ids, `distinct_id` hashes, and an insert's values where they are inline. stackr ADR-0044 picks masking: ClickHouse's `query_masking_rules` redact the literals in any statement on `analytics.`, and the relay sends inserts' data in the request body, not the query text, so it never reaches the log. Langfuse keeps the grant it needs.
+- **Had the pattern failed,** the fallback was a ClickHouse user per tenant made by portalr (heavier), or the reader alone.
+- **`system.query_log` is readable by `langfuse`** (ADR-0031 granted it, to follow its own queries' progress), so it could read analytics' query text: tenant ids, `distinct_id` hashes, and an insert's values where they are inline. stackr ADR-0044 closes it three ways:
+  - a row policy on `system.query_log` and `system.processes` limits `langfuse` to its own queries;
+  - analytics' queries aren't logged (`log_queries = 0`, which they can't change);
+  - `query_masking_rules` redact the tenant setting and a `distinct_id` literal in any statement that is logged.
+  - the relay sends inserts' rows in the request body, not the query text.
+- **The reader can still name any tenant in the setting.** ClickHouse can't refuse one tenant id for another, so the setting guards against a missing filter, not a reader that names the wrong tenant. A query whose `WHERE` and setting disagree sees nothing.
 - **Operators read across tenants** in Grafana, as `admin` or a read-only `grafana_analytics` user with no row policy. [portalr ADR-0005](../portalr/adr/0005-operators-see-across-tenants.md) allows this.
 - **Two-tenant acceptance tests** ([portalr ADR-0012](../portalr/adr/0012-acceptance-against-a-two-tenant-stack.md)) show tenant A's Adoption page never counts B's events.
 
@@ -105,8 +112,9 @@ CREATE ROW POLICY tenant_wall ON analytics.events
 ### P5. Retention and deletion
 
 - **Default retention is 395 days** (13 months, so a year can be compared with the one before), as a table `TTL`.
-- **The operator sets it per deployment** (`PORTAL_ANALYTICS_RETENTION_DAYS`). Tenants can't shorten it in v1 (owner, 2026-10-22).
-- **`distinct_id` is `HMAC-SHA-256(key, user_id)`,** truncated to 128 bits and kept hex. Analytics never holds the raw user id, and a person's events can still be found and deleted by computing the hash. The key's scope (per deployment or per tenant) is an open question.
+- **The operator sets it per deployment** (stackr's `ANALYTICS_RETENTION_DAYS`, which `clickhouse-init` sets as the table's TTL on every start). Tenants can't shorten it in v1 (owner, 2026-10-22).
+- **`distinct_id` is `HMAC-SHA-256(key, user_id)`,** truncated to 128 bits and kept hex. Analytics never holds the raw user id, and a person's events can still be found and deleted by computing the hash. The key is **per deployment** (owner, 2026-10-22), so one person's events across tenants are deleted with one hash.
+- **A known trade-off of a per-deployment key:** the same person has the same `distinct_id` in every tenant, so an operator, who reads across tenants, can link one person's use of several tenants. Tenants can't, since each sees only its own rows. The owner chose per deployment for one-hash deletion (2026-10-22).
 - **The key is a secret of the deployment's,** generated by `make env` (`PORTAL_ANALYTICS_KEY`), held as the other secrets are, and never in ClickHouse. Rotating it breaks deletion by person for the events hashed under the old key, so a rotation either keeps the old key to delete with until its events age out under the TTL, or re-keys the table by a mutation; which one is for the ADR that adds the key. It is never rotated silently.
 - **Backups keep deleted persons' events** until the bucket's lifecycle rule expires the backups that hold them. A deletion is not retroactive in a backup, and the operator's guide says so, with the backups' retention.
 - **Deletion:**
@@ -134,7 +142,7 @@ CREATE ROW POLICY tenant_wall ON analytics.events
   - the image pinned by version and digest, Renovate-managed;
   - bound to 127.0.0.1 locally, and reached through the edge on a host;
   - telemetry off.
-- **Umami's ingest is unauthenticated,** so it is reachable only from portalr's relay, on an internal network with no published port. The relay forwards consented events to it.
+- **Umami's ingest is unauthenticated,** so it is reachable only from portalr's relay: Umami is on a network it shares only with portalr's application, with no published port. The relay forwards consented events to it.
 - **Replay is in the first release, behind this profile** (owner, 2026-10-22). Masking is the main risk, so these hold:
   - **Masking:** all text is masked by default. Inputs are never recorded. The chat, artifact, native file, form and dashboard regions are blocked whole (`data-analytics-block`), and so are mini apps' frames. Admin's Access pages are never recorded.
   - **Consent:** separate from analytics consent, opt-in, per person, and withdrawable, which deletes that person's recordings.
@@ -169,6 +177,63 @@ One PR, with no browser capture and no UI:
    - compressed bytes per row;
    - a 90-day funnel for one tenant;
    - the ClickHouse container's memory with and without Langfuse.
+
+## First slice as built
+
+- **The stack.**
+  - ClickHouse runs under `profiles: [clickhouse, langfuse, analytics]`.
+  - `clickhouse-init` (analytics only) makes `analytics.events` as `admin`, from inside ClickHouse's network namespace, and sets the TTL from `ANALYTICS_RETENTION_DAYS` (395).
+  - The two users are in `deploy/clickhouse/analytics-users.xml`, and the server settings (`custom_settings_prefixes`, `query_masking_rules`) in `deploy/clickhouse/analytics.xml`.
+  - ClickHouse's HTTP interface is published on `STACKR_BIND` (`CLICKHOUSE_HTTP_PORT`, 8123), for an application on this machine.
+- **The row policy** is the user's own, in `analytics-users.xml` (`<databases><analytics><events><filter>`), not a `CREATE ROW POLICY` statement: it is reviewed with the code, as ADR-0031's users are.
+- **The reader's profile is `readonly = 1`,** with `SQL_portalr_tenant` its only `changeable_in_readonly` setting, and fixed limits (10 seconds, 2 GB). A read that tries to change `max_memory_usage`, `max_execution_time`, `log_queries` or `readonly` is refused (code 164).
+- **`langfuse` sees only its own rows** of `system.query_log` and `system.processes`, by a row policy on each.
+- **No analytics query reaches `system.query_log`.** Both analytics profiles set `log_queries = 0`, which the reader can't change, being read-only, and the writer can't by a constraint. So `langfuse`, which keeps its grant on that log, sees none of them, failed ones included.
+  - Audit of reads is therefore portalr's to keep, not ClickHouse's.
+  - The masking rules still redact the tenant setting and a `distinct_id` literal in any statement that is logged, such as an operator's as `admin`.
+  - Caveat: the `Settings` column of an operator's own logged query, run with `SQL_portalr_tenant`, still shows the tenant id. Operators run deletions without it.
+- **portalr.**
+  - `portalr.readers.Analytics` writes as the writer and reads `counts(tenant, span)` as the reader. Each read names the tenant twice, in the setting and in its `WHERE`, each as a parameter, never as text.
+  - `actor_of` limits events to people and service principals.
+  - `analytics_events.json` is the registry; `member.invited.v1` is its first event, recorded after an invitation succeeds, in a background task, so it never slows or fails the invitation.
+  - `config.json`'s `readers` gains `analytics`.
+  - Not yet wired into stackr's template (`PORTAL_ANALYTICS_KEY` and ClickHouse's settings in a generated application): the next phase's.
+- **Backups.**
+  - The single host's backups take `analytics`, made empty where analytics doesn't run.
+  - The `backup` user may back it up and make it empty, and owns `restore_analytics`.
+  - The drill restores it and checks that it has as many tables as the live one. It checks tables, not rows: rows written since the backup would make a row count differ.
+- **The AWS recipe's state host doesn't run analytics yet.** `scripts/check-config` names the two users' settings and files it leaves out.
+
+**The experiment, on ClickHouse 26.9.20.23,** in a throwaway container on 127.0.0.1, and in CI's smoke test:
+
+| Check | Result |
+|---|---|
+| Reader, setting for tenant A, with and without its own `WHERE` | A's rows only |
+| Reader, no setting | Fails: `Unknown setting 'SQL_portalr_tenant'` (code 115) |
+| Reader inserts | Refused (497) |
+| Reader sets `max_memory_usage`, `max_execution_time`, `log_queries` or `readonly` | Refused (164) |
+| Reader filters on tenant A, with the setting for B | Nothing |
+| Users without a row policy (`users_without_row_policies_can_read_rows`, `true` in the image's config) | `admin` reads every tenant, as a future `grafana_analytics` will; the writer has no `SELECT` at all |
+| Writer reads | Refused (497) |
+| `langfuse` reads `analytics.events` | Refused (497) |
+| `langfuse` with an empty password | Refused (516) |
+| `system.query_log`, as `langfuse`, after analytics reads, writes and a failed read | Only `langfuse`'s own rows; no analytics query, tenant id or `distinct_id`, in the text, the exception or the settings |
+| An operator's statement with a `distinct_id` and the tenant setting | Logged as `distinct_id = '***'` and `SQL_portalr_tenant = '***'` |
+
+**Cost**, measured on one laptop's Docker (ClickHouse 26.9.20.23; 10 million events over 90 days, 20 tenants, 50,000 people, random 32-hex trace ids):
+
+| Measure | Result |
+|---|---|
+| Insert, server-side `INSERT SELECT` of 10 million rows | 8.3 s, about 1.2 million rows a second |
+| Insert over HTTP as the writer, async inserts waited for: one event | 56 to 75 ms |
+| Insert over HTTP as the writer: a batch of 10,000 events | 91 to 106 ms |
+| Stored size | 321 MiB compressed for 10 million rows, about 34 bytes a row (1.04 GiB uncompressed); the random trace ids are most of it |
+| A three-step `windowFunnel` over 90 days, one tenant (about 500,000 rows), as the reader | 77 to 136 ms |
+| Weekly `retention` over four weeks, one tenant | 39 ms |
+| Daily active people over 90 days, one tenant | 25 ms |
+| ClickHouse's memory with the 10 million rows loaded, analytics alone | 423 MiB |
+
+Langfuse's own load wasn't run beside it here, so its memory with Langfuse on wasn't measured. The smoke row with both profiles is where that shows.
 
 ## Drawbacks
 
@@ -215,20 +280,22 @@ Decided by the owner (2026-10-22):
 - Replay is in v1, behind Umami.
 - Native ClickHouse is the record, with the reader and row policies as two walls.
 
+Decided by the owner (2026-10-22), with the first slice:
+
+- **The `distinct_id` key is per deployment,** `PORTAL_ANALYTICS_KEY`, made by `make env`. One person's events across tenants are deleted with one hash.
+- **Umami's data is a schema in the stack's shared PostgreSQL,** not a PostgreSQL of its own: lighter, with its role limited to its schema.
+- **Grafana's ClickHouse datasource plugin is baked into the `stackr-grafana` image,** pinned, so Grafana starts offline.
+
+Settled by the first slice: the row-policy-by-setting pattern holds on 26.9.20.23.
+
 Still open:
 
-1. **The `distinct_id` hashing key: per deployment or per tenant?**
-   - Per deployment: one person's events across tenants can be deleted with one hash.
-   - Per tenant: their events in two tenants can't be joined, even by an operator.
-2. **Umami's PostgreSQL:** a schema in the stack's shared PostgreSQL, or a PostgreSQL of its own? Sharing is lighter. A database of its own keeps a third-party tool's migrations and replay storage away from Supabase's and LiteLLM's.
-3. **Grafana's ClickHouse plugin:** baked into the `stackr-grafana` image, or installed when Grafana starts? Baking it is pinned and offline. Installing at start needs the network and a pin in the environment.
-4. Whether the row-policy-by-setting pattern holds on 26.9 (phase 0's experiment).
-5. How lightweight deletes behave on 26.9, and whether grantr needs a removal hook for them.
+1. How lightweight deletes behave on 26.9, and whether grantr needs a removal hook for them (the deletion phase).
 
 ## Tracking
 
-- [ ] Phase 0: this RFC and [stackr ADR-0044](../stackr/adr/0044-clickhouse-a-profile-of-its-own-and-portalrs-analytics-users.md)
-- [ ] The first slice
+- [x] Phase 0: this RFC and [stackr ADR-0044](../stackr/adr/0044-clickhouse-a-profile-of-its-own-and-portalrs-analytics-users.md)
+- [x] The first slice
 - [ ] Relay, consent and browser capture
 - [ ] Grafana's datasource and dashboard
 - [ ] Adoption read and page

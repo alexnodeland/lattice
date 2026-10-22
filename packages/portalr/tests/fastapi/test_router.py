@@ -354,7 +354,7 @@ async def test_a_tool_the_application_doesnt_run_is_unconfigured(grants: Grants,
         )
         assert creating.status_code in (404, 405)
         assert (await client.get("/config.json")).json()["readers"] == dict.fromkeys(
-            ("tempo", "loki", "prometheus", "langfuse", "litellm", "grafana"), False
+            ("tempo", "loki", "prometheus", "langfuse", "litellm", "grafana", "analytics"), False
         )
 
 

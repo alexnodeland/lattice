@@ -1,0 +1,18 @@
+<!-- The server's settings for portalr's analytics (stackr ADR-0044): the custom setting a read names
+     its tenant with, which the row policy in users.xml reads, and the masking of what an analytics
+     statement would put in a log, should one be logged. -->
+<clickhouse>
+  <custom_settings_prefixes>SQL_</custom_settings_prefixes>
+  <query_masking_rules>
+    <rule>
+      <name>analytics tenant</name>
+      <regexp>SQL_portalr_tenant\s*=\s*'[^']*'</regexp>
+      <replace>SQL_portalr_tenant = '***'</replace>
+    </rule>
+    <rule>
+      <name>analytics distinct id</name>
+      <regexp>distinct_id\s*(=|IN|in)\s*\(?'[0-9a-f]{32}'</regexp>
+      <replace>distinct_id = '***'</replace>
+    </rule>
+  </query_masking_rules>
+</clickhouse>

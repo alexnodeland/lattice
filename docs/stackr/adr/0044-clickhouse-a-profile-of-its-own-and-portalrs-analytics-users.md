@@ -1,6 +1,6 @@
 # ADR-0044: ClickHouse, a profile of its own, and portalr's analytics users
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-10-22
 **Deciders:** Alex Nodeland
 
@@ -62,4 +62,13 @@ The owner decided on 2026-10-22 that ClickHouse gets a profile of its own, pulle
 - `make env` generates two more passwords, and a deployment upgrading to this record needs them in its `.env`, which `make env` adds.
 - The backups grow by the analytics database's size, small next to Langfuse's.
 - ADR-0031's smoke test and users file change, and its statement that ClickHouse is Langfuse's alone no longer holds.
-- Until the first slice merges, this record is Proposed, and nothing in the stack changes.
+- **As built** (the first slice, lattice RFC-0008's "First slice as built"):
+  - The two users are in a file of their own, `deploy/clickhouse/analytics-users.xml`, with their profiles and quota. Their row policy is a user-level `<filter>` there. Without the setting, a read fails with `Unknown setting` rather than seeing nothing.
+  - The server's settings are in `deploy/clickhouse/analytics.xml`.
+  - **The reader is `readonly = 1`,** with `SQL_portalr_tenant` its only `changeable_in_readonly` setting, and fixed limits: it can't lift `max_memory_usage` or `max_execution_time`, so the quota protecting Langfuse holds.
+  - **`langfuse` sees only its own rows** of `system.query_log` and `system.processes`, by a row policy in `users.xml`.
+  - **Analytics' queries aren't logged:** `log_queries = 0` in both profiles, which the reader can't change and the writer can't by a constraint. The masking rules cover what an operator's statements log.
+  - **The empty-password invariant holds by what exists:** `make env` makes `CLICKHOUSE_PASSWORD` whether or not Langfuse runs, and `compose.yaml` keeps requiring it (`:?`), so `langfuse` never has an empty one. The smoke test checks it.
+  - ClickHouse's HTTP interface is published on `STACKR_BIND`, for an application on this machine.
+  - The drill checks `restore_analytics` has as many tables as `analytics`; rows written since the backup would make a row count differ.
+  - **The AWS recipe's state host doesn't run analytics yet.** Its ClickHouse leaves out the two users and the settings, which `scripts/check-config` names, and its backups are unchanged.

@@ -72,7 +72,11 @@ ROLES = {
         "gateway's routing state and cache in database 1."
     ),
     "minio": "MinIO, for the S3 port: Langfuse's event and media bucket, `langfuse`.",
-    "clickhouse": "Langfuse's traces, observations and scores.",
+    "clickhouse": "Langfuse's traces, observations and scores, and portalr's analytics events.",
+    "clickhouse-init": (
+        "Makes portalr's analytics database and its events table, with the deployment's "
+        "retention, on every start of the analytics profile, then exits."
+    ),
     "langfuse-worker": "Langfuse's worker: runs ingestion and evaluation jobs from the queues.",
     "langfuse-web": (
         "Langfuse's UI and public API. Receives traces from the Collector, and runs the "

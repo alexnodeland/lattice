@@ -207,6 +207,20 @@ ClickHouse's admin, for operators, from inside its container only.
 |---|---|
 | `CLICKHOUSE_ADMIN_PASSWORD` | Generated: 64 hex characters |
 
+portalr's analytics (lattice RFC-0008, ADR-0044): the writer's and the reader's ClickHouse passwords, each limited to analytics.events, and how many days an event is kept.
+
+| Setting | In `.env.example` |
+|---|---|
+| `CLICKHOUSE_ANALYTICS_WRITER_PASSWORD` | Generated: 64 hex characters |
+| `CLICKHOUSE_ANALYTICS_PASSWORD` | Generated: 64 hex characters |
+| `ANALYTICS_RETENTION_DAYS` | `395` |
+
+ClickHouse's HTTP interface, on STACKR_BIND, for portalr's analytics in `make serve`.
+
+| Setting | In `.env.example` |
+|---|---|
+| `CLICKHOUSE_HTTP_PORT` | `8123` |
+
 SALT and ENCRYPTION_KEY must never change once Langfuse has data.
 
 | Setting | In `.env.example` |

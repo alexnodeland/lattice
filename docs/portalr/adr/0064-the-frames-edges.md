@@ -15,7 +15,7 @@ The UI audit of 2026-10-20 ([lattice RFC-0007](../../rfcs/0007-portalr-brand-kit
 - **The rail stays in the window.** From `lg` the header is a rail the height of the window, pinned at the top while the page scrolls past it. It already behaved this way; a test now holds it. Its width is a kit token, `--rail-width` (15.5rem, as before), so the literal leaves the literal-value list.
 - **Selection is a deeper wash.** `::selection` is `--selection`, mixed in base.css as 22% accent over paper (the wash is 10%), so a selection still shows over a washed row. Selected text is `--fg`. The pair `fg` on `selection` (4.5) is in the manifest, and the validator mixes `--selection` as base.css does.
 - **Scrollbars take the kit's colours.** The root's `scrollbar-color` is `--edge` on `--paper`. The thumb is a control, so it must hold 3:1. The pair `edge` on `paper` (3) is already in the manifest, and its reason now names the thumb. `--line` was about 1.4:1 in the default light scheme.
-- **A scroll stops below the pinned header.** Below `lg`, the root's `scroll-padding-top` is `--header-clearance`, a new kit token (3.5rem, more than the header's height). At `lg` the header is beside the page, and the padding is 0.
+- **A scroll stops below the pinned header.** Below `lg`, the root's `scroll-padding-top` is `--header-clearance`, a new kit token (3.5rem, more than the header's height). It applies only where the frame's header is on the page (`html:has([data-frame-header])`). At `lg` the header is beside the page, and a page without the frame has nothing pinned, so the padding is 0 for both.
 
 ## Forced colours and overlay scrollbars
 

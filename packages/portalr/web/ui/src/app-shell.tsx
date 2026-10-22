@@ -84,7 +84,10 @@ export function AppShell({
       className="min-h-dvh lg:grid lg:grid-cols-[var(--rail-width)_minmax(0,1fr)]"
     >
       <SkipLink />
-      <header className="sticky top-0 z-20 flex items-center gap-1 border-line border-b bg-surface px-3 py-2 lg:h-dvh lg:flex-col lg:items-stretch lg:gap-4 lg:border-r lg:border-b-0 lg:p-3">
+      <header
+        data-frame-header=""
+        className="sticky top-0 z-20 flex items-center gap-1 border-line border-b bg-surface px-3 py-2 lg:h-dvh lg:flex-col lg:items-stretch lg:gap-4 lg:border-r lg:border-b-0 lg:p-3"
+      >
         <Dialog.Root open={open} onOpenChange={setOpen}>
           <Dialog.Trigger className={`${button} lg:hidden`}>
             <Icon icon={MenuGlyph} />

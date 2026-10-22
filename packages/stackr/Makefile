@@ -145,6 +145,10 @@ ifneq ($(strip $(START_SUPABASE)),)
 endif
 # Ten minutes: the first start pulls and builds every image. The app stack's up waits five.
 	$(COMPOSE_ENV) $(STACK) $(PROFILE_FLAGS) up --detach --wait --wait-timeout 600 --build
+ifneq ($(filter analytics,$(PROFILES)),)
+# portalr's analytics database, with the deployment's retention, once ClickHouse is up (ADR-0044).
+	$(COMPOSE_ENV) $(STACK) $(PROFILE_FLAGS) run --rm --no-deps clickhouse-init
+endif
 
 down: ## Stop the stack, keeping its data
 	$(STACK) --profile '*' down

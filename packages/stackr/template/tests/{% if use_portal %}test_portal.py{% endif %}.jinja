@@ -321,6 +321,8 @@ def test_every_tool_with_an_address_is_read(ui: Path) -> None:
         "langfuse": True,
         "litellm": True,
         "grafana": True,
+        # portalr's analytics isn't wired into the template yet (lattice RFC-0008).
+        "analytics": False,
     }
     assert len(clients) == 2, "Langfuse's and LiteLLM's, which the portal closes"
 

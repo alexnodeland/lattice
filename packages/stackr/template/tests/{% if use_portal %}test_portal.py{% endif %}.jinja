@@ -5,6 +5,7 @@ import logging
 import re
 import subprocess
 import threading
+import time
 from collections.abc import Iterator
 from dataclasses import replace
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -546,6 +547,11 @@ def test_a_deletion_owed_is_done_as_the_application_starts_again(
         return True
 
     monkeypatch.setattr(Analytics, "forget", forgotten)
-    with caplog.at_level(logging.INFO), TestClient(app(script, named)):
-        pass
+    with caplog.at_level(logging.INFO), TestClient(app(script, named)) as client:
+        # The deletions owed are done beside the start: by the time a request is answered.
+        for _ in range(50):
+            if "deleted the events of 1 people owed it" in caplog.text:
+                break
+            client.get("/healthz")
+            time.sleep(0.01)
     assert "deleted the events of 1 people owed it" in caplog.text

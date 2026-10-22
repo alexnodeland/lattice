@@ -66,7 +66,7 @@ async def test_one_person_cant_read_or_write_anothers_answer(
     async with application.begin() as connection:
         with pytest.raises(Exception, match="row-level security"):
             await connection.execute(
-                text("INSERT INTO portalr_analytics_consent VALUES ('alice', false, now(), false)")
+                text("INSERT INTO portalr_analytics_consent VALUES ('alice', false, now(), 0, 0)")
             )
     assert await consent.given("alice")
 
@@ -76,10 +76,13 @@ async def test_the_owner_reads_every_deletion_owed(
 ) -> None:
     owner, application = schema
     consent = SqlConsent(application, owner=owner)
+    owed = []
     for person in ("alice", "bob"):
         await consent.give(person, yes=True)
-        assert await consent.give(person, yes=False)
-    assert await consent.owing() == ["alice", "bob"]
+        debt = await consent.give(person, yes=False)
+        assert debt is not None
+        owed.append((person, debt))
+    assert await consent.owing() == owed
 
 
 async def test_two_replicas_migrating_at_once_both_succeed(

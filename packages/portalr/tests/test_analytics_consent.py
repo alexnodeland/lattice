@@ -17,27 +17,47 @@ from portalr.analytics.sql import SqlConsent, migrate
 
 async def answers(consent: Consent) -> None:
     assert not await consent.given("alice")
-    assert not await consent.give("alice", yes=False), "a no never said yes owes nothing"
-    assert not await consent.give("alice", yes=True)
+    assert await consent.give("alice", yes=False) is None, "a no never said yes owes nothing"
+    assert await consent.give("alice", yes=True) is None
     assert await consent.given("alice")
     assert not await consent.given("bob")
-    assert await consent.give("alice", yes=False), "a yes taken back owes a deletion"
+    first = await consent.give("alice", yes=False)
+    assert first is not None, "a yes taken back owes a deletion"
     assert not await consent.given("alice")
-    assert await consent.owes("alice")
-    assert await consent.give("alice", yes=False), "still owed until it is done"
-    assert await consent.owing() == ["alice"]
-    await consent.settled("alice")
-    assert not await consent.owes("alice")
-    assert not await consent.give("alice", yes=False), "a no again owes nothing more"
+    assert await consent.owes("alice") == first
+    assert await consent.give("alice", yes=False) == first, "a no again keeps the one owed"
+    assert await consent.owing() == [("alice", first)]
+    await consent.settled("alice", first)
+    assert await consent.owes("alice") is None
+    assert await consent.give("alice", yes=False) is None, "a no again owes nothing more"
     assert await consent.owing() == []
     await consent.give("bob", yes=True)
     await consent.give("bob", yes=False)
-    assert await consent.give("bob", yes=True) is False, "a yes again owes nothing"
-    assert not await consent.owes("bob")
+    assert await consent.give("bob", yes=True) is None, "a yes again owes nothing"
+    assert await consent.owes("bob") is None
+
+
+async def a_late_settling_clears_only_its_own_debt(consent: Consent) -> None:
+    await consent.give("alice", yes=True)
+    first = await consent.give("alice", yes=False)
+    assert first is not None
+    await consent.give("alice", yes=True)
+    second = await consent.give("alice", yes=False)
+    assert second is not None
+    assert second != first
+    await consent.settled("alice", first)
+    assert await consent.owes("alice") == second, "the newer deletion is still owed"
+    owed = await consent.owe("alice")
+    assert owed not in (first, second)
+    assert not await consent.given("alice"), "owing a deletion leaves the answer as it was"
+    await consent.give("alice", yes=True)
+    assert await consent.owe("alice") is not None
+    assert await consent.given("alice"), "owing a deletion leaves a yes a yes"
 
 
 async def test_answers_in_memory() -> None:
     await answers(InMemoryConsent())
+    await a_late_settling_clears_only_its_own_debt(InMemoryConsent())
 
 
 async def test_answers_in_the_applications_database(tmp_path: Path) -> None:
@@ -45,6 +65,7 @@ async def test_answers_in_the_applications_database(tmp_path: Path) -> None:
     await migrate(engine)
     await migrate(engine)  # again, as on every start: nothing changes
     await answers(SqlConsent(engine))
+    await a_late_settling_clears_only_its_own_debt(SqlConsent(engine))
     async with engine.connect() as connection:
         tables = await connection.run_sync(lambda sync: inspect(sync).get_table_names())
         version = await connection.scalar(text("SELECT version_num FROM portalr_alembic_version"))

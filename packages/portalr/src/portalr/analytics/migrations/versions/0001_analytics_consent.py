@@ -31,7 +31,8 @@ def upgrade() -> None:
         sa.Column("user_id", sa.String(), nullable=False),
         sa.Column("given", sa.Boolean(), nullable=False),
         sa.Column("answered_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("delete_pending", sa.Boolean(), nullable=False),
+        sa.Column("delete_owed", sa.Integer(), nullable=False),
+        sa.Column("debts", sa.Integer(), nullable=False),
         sa.PrimaryKeyConstraint("user_id", name=op.f("pk_portalr_analytics_consent")),
     )
     if op.get_bind().dialect.name == "postgresql":

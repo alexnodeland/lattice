@@ -1,13 +1,13 @@
 """People's answers to product analytics, in the application's database: portalr's first table.
 
-``portalr_analytics_consent`` holds one row per person who has answered: their answer, when, and
-whether a deletion of their events is owed, until it is done. A deployment is its database, so
-an answer is per person and per deployment. It is read on every event, from the application's
-database, so consent holds whether or not ClickHouse is up. On PostgreSQL each transaction names
-its person, and row-level security keeps it to their row, for the role the application connects
-as; without ``DATABASE_ADMIN_URL`` that role owns the table, and row-level security doesn't hold
-it. Its Alembic migrations record their version in ``portalr_alembic_version``, apart from the
-application's own and the libraries'.
+``portalr_analytics_consent`` holds one row per person who has answered: their answer, when,
+which deletion of their events is owed, by its number, until it is done, and how many they have
+been owed. A deployment is its database, so an answer is per person and per deployment. It is
+read on every event, from the application's database, so consent holds whether or not ClickHouse
+is up. On PostgreSQL each transaction names its person, and row-level security keeps it to their
+row, for the role the application connects as; without ``DATABASE_ADMIN_URL`` that role owns the
+table, and row-level security doesn't hold it. Its Alembic migrations record their version in
+``portalr_alembic_version``, apart from the application's own and the libraries'.
 """
 
 from datetime import UTC, datetime
@@ -15,7 +15,17 @@ from typing import Final
 
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import Boolean, Connection, DateTime, MetaData, String, select, text, update
+from sqlalchemy import (
+    Boolean,
+    Connection,
+    DateTime,
+    Integer,
+    MetaData,
+    String,
+    select,
+    text,
+    update,
+)
 from sqlalchemy.dialects.postgresql import insert as postgres_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
@@ -42,7 +52,10 @@ class Answer(Base):
     user_id: Mapped[str] = mapped_column(String, primary_key=True)
     given: Mapped[bool] = mapped_column(Boolean, nullable=False)
     answered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    delete_pending: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    delete_owed: Mapped[int] = mapped_column(Integer, nullable=False)
+    """The deletion owed the person, by its number; 0 for none."""
+    debts: Mapped[int] = mapped_column(Integer, nullable=False)
+    """How many deletions the person has been owed: the next one's number is one more."""
 
 
 metadata = Base.metadata
@@ -98,59 +111,89 @@ class SqlConsent:
             answer = await connection.scalar(select(Answer.given).where(Answer.user_id == user_id))
         return bool(answer)
 
-    async def give(self, user_id: str, *, yes: bool) -> bool:
-        """Record the person's answer: whether a deletion of their events is now owed."""
+    async def give(self, user_id: str, *, yes: bool) -> int | None:
+        """Record the person's answer: the deletion now owed them, if any, by its number."""
         async with self._engine.begin() as connection:
             await _as_person(connection, user_id)
-            before = (
-                await connection.execute(
-                    select(Answer.given, Answer.delete_pending).where(Answer.user_id == user_id)
-                )
-            ).first()
-            owed = not yes and (
-                before is not None and (bool(before.given) or bool(before.delete_pending))
-            )
-            row = {
-                "user_id": user_id,
-                "given": yes,
-                "answered_at": datetime.now(UTC),
-                "delete_pending": owed,
-            }
-            insert = (
-                postgres_insert if connection.dialect.name == "postgresql" else sqlite_insert
-            )(Answer).values(row)
-            await connection.execute(
-                insert.on_conflict_do_update(
-                    index_elements=[Answer.user_id],
-                    set_={k: v for k, v in row.items() if k != "user_id"},
-                )
-            )
-        return owed
+            before = await _row(connection, user_id)
+            given, owed, debts = before if before is not None else (False, 0, 0)
+            if yes:
+                owed = 0
+            elif given:
+                debts += 1
+                owed = debts
+            await _put(connection, user_id, yes, owed, debts)
+        return owed or None
 
-    async def owes(self, user_id: str) -> bool:
-        """Whether a deletion of the person's events is owed."""
+    async def owe(self, user_id: str) -> int:
+        """Owe the person a new deletion, whatever their answer: its number."""
+        async with self._engine.begin() as connection:
+            await _as_person(connection, user_id)
+            before = await _row(connection, user_id)
+            given, _, debts = before if before is not None else (False, 0, 0)
+            await _put(connection, user_id, given, debts + 1, debts + 1)
+        return debts + 1
+
+    async def owes(self, user_id: str) -> int | None:
+        """The deletion owed the person, by its number, if any."""
         async with self._engine.begin() as connection:
             await _as_person(connection, user_id)
             owed = await connection.scalar(
-                select(Answer.delete_pending).where(Answer.user_id == user_id)
+                select(Answer.delete_owed).where(Answer.user_id == user_id)
             )
-        return bool(owed)
+        return owed or None
 
-    async def settled(self, user_id: str) -> None:
-        """Record that the deletion owed the person is done."""
+    async def settled(self, user_id: str, debt: int) -> None:
+        """Clear deletion `debt`, only if it is still the one owed."""
         async with self._engine.begin() as connection:
             await _as_person(connection, user_id)
             await connection.execute(
-                update(Answer).where(Answer.user_id == user_id).values(delete_pending=False)
+                update(Answer)
+                .where(Answer.user_id == user_id, Answer.delete_owed == debt)
+                .values(delete_owed=0)
             )
 
-    async def owing(self) -> list[str]:
-        """The people a deletion is owed, as the tables' owner reads them."""
+    async def owing(self) -> list[tuple[str, int]]:
+        """The people a deletion is owed, each with its number, as the tables' owner reads them."""
         async with self._owner.connect() as connection:
-            rows = await connection.scalars(
-                select(Answer.user_id).where(Answer.delete_pending).order_by(Answer.user_id)
+            rows = await connection.execute(
+                select(Answer.user_id, Answer.delete_owed)
+                .where(Answer.delete_owed > 0)
+                .order_by(Answer.user_id)
             )
-            return list(rows)
+            return [(row.user_id, row.delete_owed) for row in rows]
+
+
+async def _row(connection: AsyncConnection, user_id: str) -> tuple[bool, int, int] | None:
+    """The person's answer, the deletion owed them, and how many they have been owed."""
+    row = (
+        await connection.execute(
+            select(Answer.given, Answer.delete_owed, Answer.debts).where(Answer.user_id == user_id)
+        )
+    ).first()
+    return None if row is None else (bool(row.given), int(row.delete_owed), int(row.debts))
+
+
+async def _put(
+    connection: AsyncConnection, user_id: str, given: bool, owed: int, debts: int
+) -> None:
+    """Write the person's row, as it now stands."""
+    row = {
+        "user_id": user_id,
+        "given": given,
+        "answered_at": datetime.now(UTC),
+        "delete_owed": owed,
+        "debts": debts,
+    }
+    insert = (postgres_insert if connection.dialect.name == "postgresql" else sqlite_insert)(
+        Answer
+    ).values(row)
+    await connection.execute(
+        insert.on_conflict_do_update(
+            index_elements=[Answer.user_id],
+            set_={key: value for key, value in row.items() if key != "user_id"},
+        )
+    )
 
 
 async def _as_person(connection: AsyncConnection, user_id: str) -> None:

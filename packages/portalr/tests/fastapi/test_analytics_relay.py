@@ -9,7 +9,7 @@ import pytest
 
 from grantr.grants import Grants
 from portalr.analytics import InMemoryConsent, InMemoryRateLimiter, Relay
-from portalr.analytics.relay import MOST_BYTES, MOST_EVENTS, SESSION_HOURS
+from portalr.analytics.relay import MOST_BYTES, MOST_EVENTS, SESSION_HOURS, Batch, Event, Relayed
 from portalr.invites import Invite
 from portalr.readers import Analytics, Readers
 from portalr.readers.analytics import distinct_id
@@ -30,9 +30,10 @@ class ClickHouse:
 
     async def __call__(self, request: httpx.Request) -> httpx.Response:
         self.requests.append(request)
+        status = self.status
         if self.after_insert is not None and "INSERT" in request.url.params.get("query", ""):
             await self.after_insert()
-        return httpx.Response(self.status)
+        return httpx.Response(status)
 
     def rows(self) -> list[dict[str, object]]:
         return [
@@ -226,7 +227,7 @@ async def test_a_deletion_clickhouse_cant_take_stays_owed_until_it_can(
     assert await relay.consent.owes("alice"), "still down: still owed"
     clickhouse.status = 200
     await client.get("/v1/analytics/consent", headers=ALICE)
-    assert not await relay.consent.owes("alice"), "tried again on the next request"
+    assert await relay.consent.owes("alice") is None, "tried again on the next request"
     assert deletions(clickhouse) == 3
 
 
@@ -259,7 +260,7 @@ async def test_a_no_that_lands_while_a_batch_is_written_deletes_the_batch_too(
         ("INSERT" in r.url.params.get("query", ""), "DELETE" in r.content.decode())
         for r in clickhouse.requests
     ] == [(True, False), (False, True)]
-    assert not await relay.consent.owes("alice")
+    assert await relay.consent.owes("alice") is None
 
 
 async def test_a_session_that_isnt_ascii_is_refused_not_failed(client: httpx.AsyncClient) -> None:
@@ -302,6 +303,14 @@ async def test_a_person_making_too_many_requests_is_slowed_before_anything_is_re
             (await client.get("/v1/analytics/consent", headers=ALICE)).status_code for _ in range(3)
         ]
     assert codes == [200, 200, 429]
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://app/portalr"
+    ) as client:
+        for answer in (True, False, True, False):
+            withdrawn = await client.put(
+                "/v1/analytics/consent", json={"given": answer}, headers=ALICE
+            )
+            assert withdrawn.status_code == 200, "an answer is never refused for the pace"
 
 
 async def test_only_the_registrys_values_are_kept_however_written(
@@ -348,3 +357,59 @@ async def test_a_batch_of_unknown_events_writes_nothing(
     )
     assert sent.json() == {"recorded": 0, "dropped": 1}
     assert clickhouse.requests == []
+
+
+async def test_a_no_that_lands_after_the_last_deletion_still_owes_the_straggler(
+    client: httpx.AsyncClient, clickhouse: ClickHouse, relay: Relay
+) -> None:
+    await say_yes(client)
+    signed = await session(client)
+
+    async def no_and_settled_then_clickhouse_down() -> None:
+        # The person's no lands, and its deletion is done, before the straggler's write returns;
+        # then ClickHouse goes down, so the straggler's own deletion fails.
+        await relay.answer("alice", yes=False)
+        clickhouse.status = 503
+
+    clickhouse.after_insert = no_and_settled_then_clickhouse_down
+    await client.post("/v1/events", json={"session": signed, "events": [page()]}, headers=ALICE)
+    assert await relay.consent.owes("alice") is not None, "the straggler's deletion is owed"
+    assert not await relay.consent.given("alice")
+
+
+async def test_a_yes_given_while_a_straggler_is_deleted_stays_a_yes(
+    clickhouse: ClickHouse, relay: Relay
+) -> None:
+    class Wavering(InMemoryConsent):
+        """Yes before the write, no just after it, yes again as the straggler is deleted."""
+
+        def __init__(self) -> None:
+            super().__init__()
+            self.answers = iter([True, False])
+
+        async def given(self, user_id: str) -> bool:
+            return next(self.answers, await super().given(user_id))
+
+    consent = Wavering()
+    await consent.give("alice", yes=True)
+    wavering = Relay(relay.analytics, consent, relay.limiter)
+    batch = Batch(session="s", events=[Event(event="app.page.viewed.v1")])
+    assert await wavering.record("acme", "alice", batch, "s") == Relayed(recorded=0, dropped=1)
+    assert await consent.given("alice"), "the deletion owed never touched the person's yes"
+    assert [("INSERT" in r.url.params.get("query", "")) for r in clickhouse.requests] == [
+        True,
+        False,
+    ]
+
+
+async def test_a_late_deletion_never_clears_a_newer_one(
+    clickhouse: ClickHouse, relay: Relay
+) -> None:
+    await relay.consent.give("alice", yes=True)
+    first = await relay.consent.give("alice", yes=False)
+    await relay.consent.give("alice", yes=True)
+    await relay.consent.give("alice", yes=False)
+    clickhouse.status = 200
+    assert first is not None
+    assert await relay.settle("alice", first)
+    assert await relay.consent.owes("alice") is not None

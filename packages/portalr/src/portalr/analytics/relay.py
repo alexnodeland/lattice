@@ -139,27 +139,39 @@ class Relay:
 
     async def answer(self, user_id: str, *, yes: bool) -> Answered:
         """Record the person's answer; a yes taken back deletes their events, or owes it."""
-        owed = await self.consent.give(user_id, yes=yes)
+        debt = await self.consent.give(user_id, yes=yes)
         if yes:
             return Answered(given=True)
-        return Answered(given=False, deleted=await self.settle(user_id) if owed else None)
+        return Answered(given=False, deleted=await self.settle(user_id, debt) if debt else None)
 
-    async def settle(self, user_id: str) -> bool:
-        """Delete the person's events, as owed: whether it was done. Undone, it stays owed."""
+    async def settle(self, user_id: str, debt: int) -> bool:
+        """Delete the person's events, for deletion `debt`: whether it was done.
+
+        Undone, it stays owed. Done, it clears `debt` alone: a newer deletion, owed for events
+        written since this one began, stays owed.
+        """
         if not await self.analytics.forget(user_id):
             return False
-        await self.consent.settled(user_id)
+        await self.consent.settled(user_id, debt)
         return True
 
     async def settle_owed(self) -> int:
-        """Delete the events of everyone a deletion is owed, as a replica starts: how many."""
-        return sum([await self.settle(user_id) for user_id in await self.consent.owing()])
+        """Delete the events of everyone a deletion is owed, one after another: how many.
+
+        Every replica that starts runs it: two may delete the same person's events, which does
+        no harm, since a deletion done twice deletes nothing more.
+        """
+        done = 0
+        for user_id, debt in await self.consent.owing():
+            done += await self.settle(user_id, debt)
+        return done
 
     async def record(self, tenant: str, user_id: str, batch: Batch, session_id: str) -> Relayed:
         """Keep the person's batch as the registry says, if they have said yes.
 
         A no that lands while the batch is written deletes it too: the answer is read again
-        after the write, and if it is no longer yes, the person's events are deleted, or owed.
+        after the write, and if it is no longer yes, a new deletion is owed and tried, without
+        touching the answer itself.
         """
         if not await self.consent.given(user_id):
             await self.settle_if_owed(user_id)
@@ -173,16 +185,16 @@ class Relay:
             tenant, user_id, named, session_id=session_id
         )
         if written and not await self.consent.given(user_id):
-            await self.consent.give(user_id, yes=False)
-            await self.settle(user_id)
+            await self.settle(user_id, await self.consent.owe(user_id))
             return Relayed(recorded=0, dropped=len(batch.events))
         recorded = len(named) if written else 0
         return Relayed(recorded=recorded, dropped=len(batch.events) - recorded)
 
     async def settle_if_owed(self, user_id: str) -> None:
         """Try again a deletion owed the person, on their next request."""
-        if await self.consent.owes(user_id):
-            await self.settle(user_id)
+        debt = await self.consent.owes(user_id)
+        if debt is not None:
+            await self.settle(user_id, debt)
 
 
 def kept(event: Event, allowed: dict[str, frozenset[str] | None]) -> dict[str, str]:

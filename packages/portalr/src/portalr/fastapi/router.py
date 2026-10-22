@@ -663,17 +663,24 @@ def _invitations(
 def _analytics(router: APIRouter, grants: Grants, relay: Relay, current: Any) -> None:
     """The relay's routes, for a signed-in person only: a key or an agent sends no events.
 
-    Each request is counted against the person's pace before anything else is read.
+    Each request is counted against the person's pace before anything else is read, and past it
+    refused; but never their answer, so a person can always take their yes back.
     """
 
-    async def person(who: Caller = current) -> str:
+    def signed_in_person(who: Caller) -> str:
         if not isinstance(who.subject, User):
             raise _refusal("forbidden", "only a signed-in person sends product analytics")
-        user = who.subject.id
+        return who.subject.id
+
+    async def person(who: Caller = current) -> str:
+        user = signed_in_person(who)
         wait = relay.requests.spend(user, 1)
         if wait is not None:
             raise _too_fast(wait)
         return user
+
+    async def answering(who: Caller = current) -> str:
+        return signed_in_person(who)
 
     signed_in = Depends(person)
 
@@ -683,12 +690,13 @@ def _analytics(router: APIRouter, grants: Grants, relay: Relay, current: Any) ->
         await relay.settle_if_owed(user)
         return Answer(given=await relay.consent.given(user))
 
-    @router.put("/v1/analytics/consent", responses={429: TOO_FAST})
-    async def answer(body: Annotated[Answer, Body()], user: str = signed_in) -> Answered:
+    @router.put("/v1/analytics/consent")
+    async def answer(body: Annotated[Answer, Body()], user: str = Depends(answering)) -> Answered:
         """Record the person's answer. Taking a yes back deletes their events at once.
 
         A deletion ClickHouse can't take stays owed, and is tried again on the person's next
-        request, and as the application starts: ``deleted`` says whether it is done.
+        request, and as the application starts: ``deleted`` says whether it is done. It is
+        never refused for the person's pace: a withdrawal always lands.
         """
         return await relay.answer(user, yes=body.given)
 

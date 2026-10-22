@@ -1,37 +1,45 @@
-"""Whether a person has said yes to product analytics, and whether a deletion of theirs is owed.
+"""Whether a person has said yes to product analytics, and which deletion of theirs is owed.
 
 A person's answer is no until they say yes. Taking a yes back owes the deletion of their events,
 which stays owed, in the same row, until it is done: a deletion ClickHouse couldn't take is
 tried again, so a no deletes their events even across an outage (lattice RFC-0008, P5).
+
+Each debt is numbered. Settling names the number it started with, and clears the debt only if it
+is still that one: a deletion that finishes late never clears a newer debt, owed for events
+written after it began.
 """
 
 from typing import Protocol
 
 
 class Consent(Protocol):
-    """A deployment's people's answers, and the deletions owed them."""
+    """A deployment's people's answers, and the deletions owed them, each numbered."""
 
     async def given(self, user_id: str) -> bool:
         """Whether the person has said yes; never asked, or no, is ``False``."""
         ...
 
-    async def give(self, user_id: str, *, yes: bool) -> bool:
-        """Record the person's answer: whether a deletion of their events is now owed.
+    async def give(self, user_id: str, *, yes: bool) -> int | None:
+        """Record the person's answer: the deletion now owed them, if any, by its number.
 
-        A yes taken back owes one; a no again, or a yes, owes none it didn't already.
+        A yes taken back owes a new one; a no again keeps the one owed, if any; a yes owes none.
         """
         ...
 
-    async def owes(self, user_id: str) -> bool:
-        """Whether a deletion of the person's events is owed."""
+    async def owe(self, user_id: str) -> int:
+        """Owe the person a new deletion, whatever their answer: its number."""
         ...
 
-    async def settled(self, user_id: str) -> None:
-        """Record that the deletion owed the person is done."""
+    async def owes(self, user_id: str) -> int | None:
+        """The deletion owed the person, by its number, if any."""
         ...
 
-    async def owing(self) -> list[str]:
-        """The people a deletion is owed."""
+    async def settled(self, user_id: str, debt: int) -> None:
+        """Record that deletion `debt` is done: cleared only if it is still the one owed."""
+        ...
+
+    async def owing(self) -> list[tuple[str, int]]:
+        """The people a deletion is owed, each with its number."""
         ...
 
 
@@ -40,29 +48,37 @@ class InMemoryConsent:
 
     def __init__(self) -> None:
         self._answers: dict[str, bool] = {}
-        self._owed: set[str] = set()
+        self._owed: dict[str, int] = {}
+        self._last = 0
 
     async def given(self, user_id: str) -> bool:
         """Whether the person has said yes."""
         return self._answers.get(user_id, False)
 
-    async def give(self, user_id: str, *, yes: bool) -> bool:
-        """Record the person's answer: whether a deletion is now owed."""
-        if not yes and self._answers.get(user_id, False):
-            self._owed.add(user_id)
+    async def give(self, user_id: str, *, yes: bool) -> int | None:
+        """Record the person's answer: the deletion now owed them, if any."""
         if yes:
-            self._owed.discard(user_id)
+            self._owed.pop(user_id, None)
+        elif self._answers.get(user_id, False):
+            await self.owe(user_id)
         self._answers[user_id] = yes
-        return user_id in self._owed
+        return self._owed.get(user_id)
 
-    async def owes(self, user_id: str) -> bool:
-        """Whether a deletion of the person's events is owed."""
-        return user_id in self._owed
+    async def owe(self, user_id: str) -> int:
+        """Owe the person a new deletion."""
+        self._last += 1
+        self._owed[user_id] = self._last
+        return self._last
 
-    async def settled(self, user_id: str) -> None:
-        """Record that the deletion owed the person is done."""
-        self._owed.discard(user_id)
+    async def owes(self, user_id: str) -> int | None:
+        """The deletion owed the person, if any."""
+        return self._owed.get(user_id)
 
-    async def owing(self) -> list[str]:
-        """The people a deletion is owed."""
-        return sorted(self._owed)
+    async def settled(self, user_id: str, debt: int) -> None:
+        """Clear deletion `debt`, if it is still the one owed."""
+        if self._owed.get(user_id) == debt:
+            del self._owed[user_id]
+
+    async def owing(self) -> list[tuple[str, int]]:
+        """The people a deletion is owed, each with its number."""
+        return sorted(self._owed.items())

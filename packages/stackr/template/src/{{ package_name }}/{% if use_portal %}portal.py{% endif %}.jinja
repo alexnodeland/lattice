@@ -17,6 +17,7 @@ and ``PORTAL_SUPABASE_KEY``); a tool is read only where its address is. The Supa
 stays here, for inviting people and naming them by email, and is never in what the browser is given.
 """
 
+import asyncio
 import contextlib
 import logging
 import re
@@ -252,16 +253,30 @@ class Portal:
 
     @contextlib.asynccontextmanager
     async def lifespan(self) -> AsyncGenerator[None]:
-        """Settle the deletions owed as it starts; close the clients it made as it stops."""
-        if self._relay is not None:
-            settled = await self._relay.settle_owed()
-            if settled:
-                LOGGER.info("analytics: deleted the events of %d people owed it", settled)
+        """Settle the deletions owed beside the start; close the clients it made as it stops.
+
+        The deletions run in the background, so a ClickHouse that is down doesn't hold the
+        application's start: each one stays owed until it is done.
+        """
+        settling = (
+            asyncio.create_task(self._settle(self._relay)) if self._relay is not None else None
+        )
         try:
             yield
         finally:
+            if settling is not None:
+                settling.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await settling
             for client in self._clients:
                 await client.aclose()
+
+    @staticmethod
+    async def _settle(relay: Relay) -> None:
+        """The deletions owed, done one after another; any left stay owed for the next start."""
+        settled = await relay.settle_owed()
+        if settled:
+            LOGGER.info("analytics: deleted the events of %d people owed it", settled)
 
     def mount(self, app: FastAPI) -> None:
         """Add the router and the UIs, and mini apps' sandbox, as the settings name them.

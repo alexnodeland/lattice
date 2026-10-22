@@ -496,13 +496,13 @@ def test_a_token_file_nested_too_deep_is_refused(
 
 
 def test_a_loop_of_links_is_a_fault_on_every_python(kit: Path) -> None:
-    (kit / "assets" / "favicon.svg").unlink()
-    (kit / "assets" / "favicon.svg").symlink_to(kit / "assets" / "favicon.svg")
+    (kit / "assets" / "mark-dark.svg").unlink()
+    (kit / "assets" / "mark-dark.svg").symlink_to(kit / "assets" / "mark-dark.svg")
     # 3.12's resolve() finds the loop; 3.13's leaves it to the open, which refuses the link.
     said = faults(kit)
     assert (
-        "assets/favicon.svg: no such file in the kit" in said
-        or "assets/favicon.svg: a plain file of the kit's own, not a link" in said
+        "assets/mark-dark.svg: no such file in the kit" in said
+        or "assets/mark-dark.svg: a plain file of the kit's own, not a link" in said
     )
 
 
@@ -513,12 +513,12 @@ def test_a_path_that_cant_be_resolved_is_no_file_of_the_kits(
     real = Path.resolve
 
     def looping(self: Path, strict: bool = False) -> Path:
-        if self.name == "favicon.svg":
+        if self.name == "mark-dark.svg":
             raise RuntimeError("Symlink loop")
         return real(self, strict)
 
     monkeypatch.setattr(Path, "resolve", looping)
-    assert "assets/favicon.svg: no such file in the kit" in faults(kit)
+    assert "assets/mark-dark.svg: no such file in the kit" in faults(kit)
 
 
 def test_a_link_inside_the_kit_is_refused_too(kit: Path) -> None:

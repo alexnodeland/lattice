@@ -181,6 +181,7 @@ for (const name of [LONG, EMOJI]) {
       const screen = await render(branded(view, long));
       const lockup = screen.container.querySelector(".truncate");
       expect(lockup?.textContent).toBe(name);
+      expect(lockup?.getAttribute("title")).toBe(name);
       expect(lockup?.getBoundingClientRect().right).toBeLessThanOrEqual(window.innerWidth);
       await screen.unmount();
     }

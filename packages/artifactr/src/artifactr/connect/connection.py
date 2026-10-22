@@ -9,8 +9,9 @@ secrets the operator names, so the runner's model keys and everything else stay 
 prints to stderr goes nowhere, and none of its words reach the model but its replies, which the
 toolset frames. It reaches the app on the host it is given: loopback, or with `remote=True` a
 host of the operator's tailnet, never without the add-on's token. Calls to one app run one at a
-time. The app keeps its state, the operator's own session; the server and lattice keep none
-(ADR-0085).
+time: in this process by default, or in every process on one database with the application's
+`lock`, such as PostgreSQL's `AdvisoryLock`. The app keeps its state, the operator's own
+session; the server and lattice keep none (ADR-0085).
 """
 
 import ipaddress
@@ -19,8 +20,9 @@ import os
 import re
 import tempfile
 import time
-from collections.abc import Awaitable, Callable, Sequence
-from typing import Any, Final, Literal, TextIO, cast
+from collections.abc import AsyncGenerator, Awaitable, Callable, Sequence
+from contextlib import AbstractAsyncContextManager, AsyncExitStack, asynccontextmanager
+from typing import Any, Final, Literal, Protocol, TextIO, cast
 
 import anyio
 from mcp import ClientSession, StdioServerParameters
@@ -29,7 +31,17 @@ from mcp.types import CallToolResult, Tool
 
 from artifactr.connect.registry import PROTECTED, ConnectedServer, digest
 
-__all__ = ["LOOPBACK", "RETRY_AFTER", "TAILNET", "Connection", "ConnectionFailed"]
+__all__ = [
+    "LOOPBACK",
+    "PER_HOUR",
+    "RETRY_AFTER",
+    "TAILNET",
+    "AppLock",
+    "Connection",
+    "ConnectionFailed",
+    "PerHour",
+    "ProcessLock",
+]
 
 logger = logging.getLogger("artifactr.connect")
 
@@ -53,9 +65,52 @@ else a URL could read as another host. Where it resolves isn't checked: an addre
 RETRY_AFTER: Final = 30.0
 """The seconds a failed listing is remembered before the server is asked again."""
 
-_LOCKS: Final[dict[tuple[str, ...], anyio.Lock]] = {}
-"""One lock for each app the runner reaches, by its server and address: in this process, on its
-one event loop, which anyio's lock refuses to leave. Two runner processes don't share it."""
+
+PER_HOUR: Final = 30
+"""How many code and network calls each workspace may run in an hour, by default."""
+
+PerHour = Callable[[str, str], Awaitable[int]]
+"""The application's limit of a workspace's code and network calls in an hour, by its tenant and
+its id."""
+
+
+class AppLock(Protocol):
+    """What calls to one app take turns by: a lock for each app, by its server and address."""
+
+    def held(self, key: str, *, wait: float) -> AbstractAsyncContextManager[None]:
+        """Hold the key's lock, waiting for whoever holds it for at most `wait` seconds.
+
+        Raises:
+            TimeoutError: If it wasn't taken within `wait`.
+        """
+        ...
+
+
+class ProcessLock:
+    """A lock for each key in this process, on its one event loop.
+
+    anyio's lock refuses to leave its event loop, and two runner processes don't share it: with
+    more than one, on PostgreSQL, use `artifactr.sql.AdvisoryLock`; on any other database, run
+    one runner process.
+    """
+
+    def __init__(self) -> None:
+        self._locks: dict[str, anyio.Lock] = {}
+
+    @asynccontextmanager
+    async def held(self, key: str, *, wait: float) -> AsyncGenerator[None]:
+        """Hold the key's lock, waiting at most `wait` seconds for it."""
+        lock = self._locks.setdefault(key, anyio.Lock())
+        with anyio.fail_after(wait):
+            await lock.acquire()
+        try:
+            yield
+        finally:
+            lock.release()
+
+
+PROCESS: Final = ProcessLock()
+"""This process's locks, which every connection shares unless it is given another."""
 
 
 class ConnectionFailed(Exception):
@@ -88,6 +143,11 @@ class Connection:
             refuses the call before anyone is asked (`block`).
         deadline: The seconds one call may take, the server's start included.
         approval_ttl: The seconds an approval holds once asked: an older one runs nothing.
+        lock: What calls to the app take turns by: this process's lock by default; with more
+            than one runner process, PostgreSQL's `artifactr.sql.AdvisoryLock`.
+        per_hour: How many code and network calls each workspace may run in an hour: a number
+            for every workspace, or the application's answer for each, by tenant and workspace,
+            such as a setting its admins change. Counted in the workspace's log.
 
     Raises:
         ValueError: If the host isn't loopback without `remote`, or a tailnet's with it; if
@@ -111,6 +171,8 @@ class Connection:
         scan: Literal["warn", "block"] = "warn",
         deadline: float = 30.0,
         approval_ttl: float = 15 * 60,
+        lock: AppLock = PROCESS,
+        per_hour: int | PerHour = PER_HOUR,
     ) -> None:
         if not command:
             raise ValueError("a command starts the server")
@@ -152,7 +214,9 @@ class Connection:
         self._secrets = tuple(secrets)
         self._tools: list[Tool] | None = None
         self._failed_at: float | None = None
-        self._lock = _LOCKS.setdefault((server.app, *self._options), anyio.Lock())
+        self._lock = lock
+        self._per_hour = per_hour
+        self._key = "\0".join(("artifactr.connect", server.app, *self._options))
 
     @property
     def server(self) -> ConnectedServer:
@@ -174,6 +238,12 @@ class Connection:
         """The seconds one call may take."""
         return self._deadline
 
+    async def per_hour(self, tenant_id: str, workspace_id: str) -> int:
+        """How many code and network calls the workspace may run in an hour."""
+        if isinstance(self._per_hour, int):
+            return self._per_hour
+        return await self._per_hour(tenant_id, workspace_id)
+
     @property
     def approval_ttl(self) -> float:
         """The seconds an approval holds once asked."""
@@ -189,7 +259,7 @@ class Connection:
             if self._failed_at is not None and time.monotonic() - self._failed_at < RETRY_AFTER:
                 raise ConnectionFailed(f"{self._server.title} didn't answer a moment ago")
             try:
-                async with self._lock:
+                async with self._turn():
                     listed = await self._spawn(lambda session: session.list_tools())
             except ConnectionFailed:
                 self._failed_at = time.monotonic()
@@ -212,8 +282,21 @@ class Connection:
                 raise ConnectionFailed(f"{name} isn't the tool that was vetted: it wasn't run")
             return await session.call_tool(name, arguments)
 
-        async with self._lock:
+        async with self._turn():
             return await self._spawn(checked)
+
+    @asynccontextmanager
+    async def _turn(self) -> AsyncGenerator[None]:
+        """Wait for the app's turn, for at most the call's deadline, and hold it."""
+        async with AsyncExitStack() as stack:
+            try:
+                await stack.enter_async_context(self._lock.held(self._key, wait=self._deadline))
+            except TimeoutError:
+                logger.warning("%s: another call held it past the deadline", self._server.title)
+                raise ConnectionFailed(
+                    f"{self._server.title} was busy with another call past the deadline"
+                ) from None
+            yield
 
     async def _spawn[T](self, work: Callable[[ClientSession], Awaitable[T]]) -> T:
         """Start the server, do the work, and end it, within the deadline.

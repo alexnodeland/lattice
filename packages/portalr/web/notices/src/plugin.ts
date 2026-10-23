@@ -15,7 +15,12 @@ export const NOTICES_FILE = "THIRD-PARTY-NOTICES.txt";
  * the stylesheets imported from it are in the bundler's list of modules, and what a stylesheet
  * `@import`s itself (`tailwindcss`) is read from the stylesheet's source.
  */
-export function notices(options: { ui: string; policy: Policy }): Plugin {
+export function notices(options: {
+  ui: string;
+  policy: Policy;
+  /** What the notices say first: portalr's UIs' words unless given. */
+  preface?: (ui: string, count: number) => string[];
+}): Plugin {
   return {
     name: "portalr-notices",
     apply: "build",
@@ -63,7 +68,7 @@ export function notices(options: { ui: string; policy: Policy }): Plugin {
       this.emitFile({
         type: "asset",
         fileName: NOTICES_FILE,
-        source: render(options.ui, packages, notes),
+        source: render(options.ui, packages, notes, options.preface),
       });
     },
   };

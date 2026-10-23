@@ -17,6 +17,7 @@ projects:
   ui: 'packages/portalr/web/ui'
   app: 'packages/portalr/web/app'
   admin: 'packages/portalr/web/admin'
+  diagrams-worker: 'packages/stackr/workers/diagrams'
   docplan: 'examples/docplan'
   oncall: 'examples/oncall'
 

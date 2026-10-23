@@ -8,7 +8,8 @@ export {
   type Problem,
   readPolicy,
   staleExceptions,
+  UNDECLARED,
   usedUnder,
 } from "./policy";
-export { type Entry, type Note, parseNotices, render, SEPARATOR } from "./render";
+export { type Entry, type Note, parseNotices, preface, render, SEPARATOR } from "./render";
 export { allows, type Expression, elect, ids, parse } from "./spdx";

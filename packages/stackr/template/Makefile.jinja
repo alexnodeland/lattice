@@ -27,6 +27,16 @@ export FILES_CRAFTS := $(subst $(space),$(comma),$(strip $(FILES)))
 PROFILES := --profile app $(foreach craft,$(FILES),--profile files-$(craft))
 # Each worker is told the ID of the image it runs in, which each file's provenance records.
 WORKER_BUILDS = $(foreach craft,$(FILES),FILES_$(shell echo $(craft) | tr a-z A-Z)_BUILD=$$(docker images --quiet --no-trunc {{ project_slug }}-files-$(craft):local))
+{%- if use_diagrams %}
+# Diagrams: the diagrams worker runs with DIAGRAMS=on, in .env or `make up DIAGRAMS=on`, which the
+# application is told too (stackr ADR-0049).
+DIAGRAMS ?= $(or $(shell sed -n 's/^DIAGRAMS=//p' .env 2>/dev/null | tail -n 1),off)
+export DIAGRAMS
+ifeq ($(DIAGRAMS),on)
+PROFILES += --profile diagrams
+WORKER_BUILDS += DIAGRAMS_BUILD=$$(docker images --quiet --no-trunc {{ project_slug }}-diagrams:local)
+endif
+{%- endif %}
 {%- else %}
 PROFILES := --profile app
 {%- endif %}

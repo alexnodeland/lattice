@@ -1,0 +1,179 @@
+{
+  "allowed": [
+    "0BSD",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "BlueOak-1.0.0",
+    "CC0-1.0",
+    "ISC",
+    "MIT",
+    "Python-2.0",
+    "Unlicense",
+    "Zlib"
+  ],
+  "exceptions": [
+    {
+      "package": "@excalidraw/excalidraw",
+      "licence": "MIT",
+      "kind": "text",
+      "reason": "It declares MIT and ships no licence file; excalidraw/excalidraw, its repository, holds the licence. It is what the worker draws with (stackr ADR-0049)."
+    },
+    {
+      "package": "@radix-ui/primitive",
+      "licence": "MIT",
+      "kind": "text",
+      "reason": "It declares MIT and ships no licence file; radix-ui/primitives, its repository, holds the licence. Excalidraw bundles it."
+    },
+    {
+      "package": "@radix-ui/react-arrow",
+      "licence": "MIT",
+      "kind": "text",
+      "reason": "It declares MIT and ships no licence file; radix-ui/primitives, its repository, holds the licence. Excalidraw bundles it."
+    },
+    {
+      "package": "@radix-ui/react-collection",
+      "licence": "MIT",
+      "kind": "text",
+      "reason": "It declares MIT and ships no licence file; radix-ui/primitives, its repository, holds the licence. Excalidraw bundles it."
+    },
+    {
+      "package": "@radix-ui/react-compose-refs",
+      "licence": "MIT",
+      "kind": "text",
+      "reason": "It declares MIT and ships no licence file; radix-ui/primitives, its repository, holds the licence. Excalidraw bundles it."
+    },
+    {
+      "package": "@radix-ui/react-context",
+      "licence": "MIT",
+      "kind": "text",
+      "reason": "It declares MIT and ships no licence file; radix-ui/primitives, its repository, holds the licence. Excalidraw bundles it."
+    },
+    {
+      "package": "@radix-ui/react-direction",
+      "licence": "MIT",
+      "kind": "text",
+      "reason": "It declares MIT and ships no licence file; radix-ui/primitives, its repository, holds the licence. Excalidraw bundles it."
+    },
+    {
+      "package": "@radix-ui/react-dismissable-layer",
+      "licence": "MIT",
+      "kind": "text",
+      "reason": "It declares MIT and ships no licence file; radix-ui/primitives, its repository, holds the licence. Excalidraw bundles it."
+    },
+    {
+      "package": "@radix-ui/react-focus-guards",
+      "licence": "MIT",
+      "kind": "text",
+      "reason": "It declares MIT and ships no licence file; radix-ui/primitives, its repository, holds the licence. Excalidraw bundles it."
+    },
+    {
+      "package": "@radix-ui/react-focus-scope",
+      "licence": "MIT",
+      "kind": "text",
+      "reason": "It declares MIT and ships no licence file; radix-ui/primitives, its repository, holds the licence. Excalidraw bundles it."
+    },
+    {
+      "package": "@radix-ui/react-id",
+      "licence": "MIT",
+      "kind": "text",
+      "reason": "It declares MIT and ships no licence file; radix-ui/primitives, its repository, holds the licence. Excalidraw bundles it."
+    },
+    {
+      "package": "@radix-ui/react-popover",
+      "licence": "MIT",
+      "kind": "text",
+      "reason": "It declares MIT and ships no licence file; radix-ui/primitives, its repository, holds the licence. Excalidraw bundles it."
+    },
+    {
+      "package": "@radix-ui/react-popper",
+      "licence": "MIT",
+      "kind": "text",
+      "reason": "It declares MIT and ships no licence file; radix-ui/primitives, its repository, holds the licence. Excalidraw bundles it."
+    },
+    {
+      "package": "@radix-ui/react-portal",
+      "licence": "MIT",
+      "kind": "text",
+      "reason": "It declares MIT and ships no licence file; radix-ui/primitives, its repository, holds the licence. Excalidraw bundles it."
+    },
+    {
+      "package": "@radix-ui/react-presence",
+      "licence": "MIT",
+      "kind": "text",
+      "reason": "It declares MIT and ships no licence file; radix-ui/primitives, its repository, holds the licence. Excalidraw bundles it."
+    },
+    {
+      "package": "@radix-ui/react-primitive",
+      "licence": "MIT",
+      "kind": "text",
+      "reason": "It declares MIT and ships no licence file; radix-ui/primitives, its repository, holds the licence. Excalidraw bundles it."
+    },
+    {
+      "package": "@radix-ui/react-roving-focus",
+      "licence": "MIT",
+      "kind": "text",
+      "reason": "It declares MIT and ships no licence file; radix-ui/primitives, its repository, holds the licence. Excalidraw bundles it."
+    },
+    {
+      "package": "@radix-ui/react-slot",
+      "licence": "MIT",
+      "kind": "text",
+      "reason": "It declares MIT and ships no licence file; radix-ui/primitives, its repository, holds the licence. Excalidraw bundles it."
+    },
+    {
+      "package": "@radix-ui/react-tabs",
+      "licence": "MIT",
+      "kind": "text",
+      "reason": "It declares MIT and ships no licence file; radix-ui/primitives, its repository, holds the licence. Excalidraw bundles it."
+    },
+    {
+      "package": "@radix-ui/react-use-callback-ref",
+      "licence": "MIT",
+      "kind": "text",
+      "reason": "It declares MIT and ships no licence file; radix-ui/primitives, its repository, holds the licence. Excalidraw bundles it."
+    },
+    {
+      "package": "@radix-ui/react-use-controllable-state",
+      "licence": "MIT",
+      "kind": "text",
+      "reason": "It declares MIT and ships no licence file; radix-ui/primitives, its repository, holds the licence. Excalidraw bundles it."
+    },
+    {
+      "package": "@radix-ui/react-use-escape-keydown",
+      "licence": "MIT",
+      "kind": "text",
+      "reason": "It declares MIT and ships no licence file; radix-ui/primitives, its repository, holds the licence. Excalidraw bundles it."
+    },
+    {
+      "package": "@radix-ui/react-use-layout-effect",
+      "licence": "MIT",
+      "kind": "text",
+      "reason": "It declares MIT and ships no licence file; radix-ui/primitives, its repository, holds the licence. Excalidraw bundles it."
+    },
+    {
+      "package": "@radix-ui/react-use-size",
+      "licence": "MIT",
+      "kind": "text",
+      "reason": "It declares MIT and ships no licence file; radix-ui/primitives, its repository, holds the licence. Excalidraw bundles it."
+    },
+    {
+      "package": "fastdom",
+      "licence": "MIT",
+      "kind": "text",
+      "reason": "It declares MIT and ships no licence file; wilsonpage/fastdom, its repository, holds the licence. Mermaid bundles it."
+    },
+    {
+      "package": "react-remove-scroll-bar",
+      "licence": "MIT",
+      "kind": "text",
+      "reason": "It declares MIT and ships no licence file; theKashey/react-remove-scroll-bar, its repository, holds the licence. Excalidraw bundles it."
+    },
+    {
+      "package": "khroma",
+      "licence": "none",
+      "kind": "licence",
+      "reason": "Its package.json declares no licence; the licence file it ships is MIT's. Mermaid bundles it."
+    }
+  ]
+}

@@ -3,7 +3,7 @@
 # ADR-0043): each app's image, built from its pinned release, run by the application's own
 # compose.yaml, with nothing else of the application or the stack.
 #
-# Usage: scripts/check-files [APP...]   (default: every app a worker runs)
+# Usage: scripts/check-files [APP...] [diagrams]   (default: every app a worker runs, and diagrams)
 #
 # For each app, its worker:
 # - runs as compose.yaml says, each value as configured: read-only, as user 10002, with no
@@ -27,6 +27,14 @@
 # 10003, published on 127.0.0.1 alone, serving the build and lattice's shim, which only the
 # portal may frame.
 #
+# And the diagrams worker (stackr ADR-0049), unless only apps are named: as configured,
+# read-only, as user 10005, under 1 GiB, on its own internal network with its relay alone; it
+# reaches nothing outside it, the application's side of its relay and the application's name
+# included; and it answers a probe through its relay, from a native file's worker's image, which
+# has artifactr's converter (scripts/_diagrams_probe.py): Mermaid, skeletons, checked SVGs and
+# PNGs, a diagram at its 2,000 elements within the deadline, and typed refusals; and it isn't
+# killed for its memory meanwhile.
+#
 # The application is generated at HEAD, whose libraries its image installs from GitHub, so HEAD
 # must be pushed and the working tree clean, as `scripts/smoke app` needs. Everything it makes is
 # named stackr-files-check, and removed by that name when it ends.
@@ -39,10 +47,19 @@ readonly name=stackr-files-check
 status=0
 scratch=$(mktemp -d)
 app_dir=$scratch/$name
-apps=("$@")
+apps=()
+diagrams=0
+for named in "$@"; do
+  if [[ $named == diagrams ]]; then diagrams=1; else apps+=("$named"); fi
+done
 kept=()
-if ((${#apps[@]} == 0)); then
+if (($# == 0)); then
+  diagrams=1
   read -ra apps <<<"$(uv run python -c "import yaml; print(*yaml.safe_load(open('copier.yml'))['crafts']['default'])")"
+fi
+if ((diagrams && ${#apps[@]} == 0)); then
+  echo "check-files: the diagrams worker's probe runs in an app's worker's image: name an app too" >&2
+  exit 2
 fi
 # An app's version, or another of its fields, as copier.yml has it.
 field_of() {
@@ -66,6 +83,8 @@ cleanup() {
       docker rm -f "$name-probe-$app" >/dev/null 2>&1 || true
       docker image rm "$name-files-$app:local" "$name-files-$app-editor:local" >/dev/null 2>&1 || true
     done
+    docker rm -f "$name-probe-diagrams" >/dev/null 2>&1 || true
+    docker image rm "$name-diagrams:local" >/dev/null 2>&1 || true
   fi
   rm -rf "$scratch"
 }
@@ -100,6 +119,7 @@ fi
     # Each editor on a port Docker chooses, on this machine's loopback.
     printf '%s_EDITOR_PORT=0\n' "$(upper "$app")"
   done
+  printf 'DIAGRAMS_TOKEN=%s\n' "$(openssl rand -hex 32)"
 ) >"$app_dir/.env"
 
 profiles=()
@@ -111,6 +131,10 @@ for app in "${apps[@]}"; do
     services+=("files-$app-editor")
   fi
 done
+if ((diagrams)); then
+  profiles+=(--profile diagrams)
+  services+=(diagrams-worker diagrams)
+fi
 if ! compose "${profiles[@]}" up --detach --build --wait --wait-timeout 300 "${services[@]}"; then
   log "FAIL: the workers and editors started and answered their health checks"
   compose "${profiles[@]}" logs --no-color --tail=100 || true
@@ -173,6 +197,51 @@ else:
     except OSError as error:
         print(f"  refused: TCP to {host}:80, where the host would be: {error}")
 sys.exit(0 if all(results) else 1)
+'
+# Run inside the diagrams worker, in Node, which is all it has, given where the host's address
+# would be on its network, and the relay's on the application's side: none of them answers, and
+# no name resolves, the application's included.
+reach='
+const net = require("node:net");
+const dgram = require("node:dgram");
+const dns = require("node:dns").promises;
+const [host, beyond] = process.argv.slice(1);
+const tcp = (address, port) => new Promise((done, fail) => {
+  const socket = net.connect({ host: address, port, timeout: 5000 });
+  socket.on("connect", () => { socket.destroy(); done(); });
+  socket.on("timeout", () => { socket.destroy(); fail(new Error("timed out")); });
+  socket.on("error", fail);
+});
+const udp = () => new Promise((done, fail) => {
+  const socket = dgram.createSocket("udp4");
+  const timer = setTimeout(() => { socket.close(); fail(new Error("timed out")); }, 5000);
+  socket.on("message", () => { clearTimeout(timer); socket.close(); done(); });
+  socket.on("error", (error) => { clearTimeout(timer); socket.close(); fail(error); });
+  socket.send(Buffer.from("abcd01000001000000000000076578616d706c6503636f6d0000010001", "hex"), 53, "1.1.1.1");
+});
+const attempts = [
+  ["resolving github.com", () => dns.lookup("github.com")],
+  ["resolving app, the application", () => dns.lookup("app")],
+  ["resolving host.docker.internal", () => dns.lookup("host.docker.internal")],
+  ["TCP to 1.1.1.1:443", () => tcp("1.1.1.1", 443)],
+  ["TCP to [2606:4700:4700::1111]:443", () => tcp("2606:4700:4700::1111", 443)],
+  ["UDP DNS to 1.1.1.1:53", udp],
+  ["TCP to 169.254.169.254:80", () => tcp("169.254.169.254", 80)],
+  // Refused is an answer: something is at the host'"'"'s address, as the worker'"'"'s check has it.
+  ["TCP to " + host + ":80, where the host would be", () => tcp(host, 80).catch((error) => {
+    if (error.code === "ECONNREFUSED") return;
+    throw error;
+  })],
+  ["TCP to " + beyond + ":8080, the relay on the application side", () => tcp(beyond, 8080)],
+];
+(async () => {
+  let all = true;
+  for (const [what, attempt] of attempts) {
+    try { await attempt(); console.log("  REACHED: " + what); all = false; }
+    catch (error) { console.log("  refused: " + what + ": " + error.message); }
+  }
+  process.exit(all ? 0 : 1);
+})();
 '
 # Run inside the worker: what was planted is there (`there`), or gone (`gone`).
 left='
@@ -252,5 +321,43 @@ for app in "${apps[@]}"; do
       grep -qiF "frame-ancestors $portal" <<<"$shim"
   fi
 done
+
+if ((diagrams)); then
+  container=$(compose ps --quiet diagrams-worker)
+  relay=$(compose ps --quiet diagrams)
+  network="${name}_diagrams"
+  check "the diagrams worker's network is internal" \
+    same "$(docker network inspect --format '{{.Internal}}' "$network")" true
+  check "the diagrams worker runs as compose.yaml says" same "$(posture "$container")" \
+    "read-only=true user=10005 privileged=false cap-add= cap-drop=ALL security=no-new-privileges:true init=true memory=1073741824 swap=1073741824 cpus=1000000000 pids=256 pid-mode= mounts=0 devices=0 tmpfs=/tmp:size=256m,mode=1777,noexec,nosuid,nodev network=$network networks=$network"
+  check "the diagrams worker's relay runs as compose.yaml says" same "$(posture "$relay")" \
+    "read-only=true user=10004 privileged=false cap-add= cap-drop=ALL security=no-new-privileges:true init=true memory=67108864 swap=67108864 cpus=0 pids=32 pid-mode= mounts=0 devices=0 tmpfs= network=${name}_files networks=${name}_diagrams,${name}_files"
+  check "the diagrams worker's network holds it and its relay alone" same \
+    "$(docker network inspect --format '{{range .Containers}}{{println .Name}}{{end}}' "$network" | grep -v '^$' | sort | tr '\n' ' ')" \
+    "$(docker inspect --format '{{.Name}}' "$container" "$relay" | tr -d / | sort | tr '\n' ' ')"
+  check "the diagrams worker publishes no port" \
+    same "$(docker inspect --format '{{len .HostConfig.PortBindings}}' "$container")" 0
+  check "the diagrams worker's network gives the host no address on it" same \
+    "$(docker network inspect --format '{{index .Options "com.docker.network.bridge.inhibit_ipv4"}}' "$network")" true
+  host=$(docker network inspect --format '{{range .IPAM.Config}}{{.Gateway}}{{end}}' "$network")
+  if [[ ! $host =~ ^[0-9.]+$ ]]; then
+    subnet=$(docker network inspect --format '{{range .IPAM.Config}}{{.Subnet}}{{end}}' "$network")
+    host="${subnet%.*/*}.1"
+  fi
+  # The relay's address on the application's side, where the application is too.
+  beyond=$(docker inspect --format "{{(index .NetworkSettings.Networks \"${name}_files\").IPAddress}}" "$relay")
+  check "the diagrams worker reaches nothing outside its network: the internet, the host, the application's side" \
+    docker exec "$container" node -e "$reach" "$host" "$beyond"
+  WORKER_TOKEN=$(setting "$container" WORKER_TOKEN)
+  export WORKER_TOKEN
+  check "the diagrams worker answers its probe, through its relay" \
+    docker run --rm --name "$name-probe-diagrams" --network "${name}_files" --read-only --tmpfs /tmp \
+    --env WORKER_TOKEN --volume "$PWD/scripts/_diagrams_probe.py:/probe.py:ro" --entrypoint python \
+    "$name-files-${apps[0]}:local" -I /probe.py "http://diagrams:8080"
+  unset WORKER_TOKEN
+  check "the diagrams worker wasn't killed for its memory, nor restarted" same \
+    "$(docker inspect --format '{{.State.OOMKilled}} {{.RestartCount}}' "$container")" "false 0"
+  log "the diagrams worker's page asked for $(compose logs --no-color diagrams-worker | grep -c 'refused a request out' || true) address(es) out of it, each refused"
+fi
 
 exit $status

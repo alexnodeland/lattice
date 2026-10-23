@@ -16,6 +16,9 @@
     },
     "packages/portalr/web/ui": {
       "entry": ["csp/main.tsx", "csp/vite.config.ts", "src/sandbox-page.ts"]
+    },
+    "packages/stackr/workers/diagrams": {
+      "entry": ["src/server.ts"]
     }
   }
 }

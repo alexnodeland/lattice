@@ -8,6 +8,7 @@
   "files": {
     "includes": [
       "packages/portalr/web/**",
+      "packages/stackr/workers/**",
       "package.json",
       "biome.json",
       "knip.json",

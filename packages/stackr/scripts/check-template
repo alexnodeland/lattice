@@ -5,9 +5,9 @@ Usage: scripts/check-template [--keep DIR]
 
 Renders every variant of the template (artifactr, reflexr or both, with and without evals, with
 grantr or no access control, with portalr, which grantr needs, or without it, both without
-relayr's bridge, both without artifactr's forms, both without native files, both hosted on a
-single host, and both filing in Plane or Vikunja) from this checkout, working tree included,
-under the name in NAME, and checks each one:
+relayr's bridge, both without artifactr's forms, both without native files, both without
+diagrams, both hosted on a single host, and both filing in Plane or Vikunja) from this checkout,
+working tree included, under the name in NAME, and checks each one:
 
 - every Jinja expression was rendered: nothing is left of `{{ ... }}` or `{% ... %}`, apart
   from GitHub Actions' own `${{ ... }}`
@@ -18,7 +18,11 @@ under the name in NAME, and checks each one:
 - the Compose file is valid for the app profile, with the single host's overlay when it has one,
   and with every profile, native files' workers and editors among them
 
-It checks the release pins once, too: the template's crafting apps are lattice's own, each pinned
+It checks the diagrams worker's pins once, too: one Excalidraw, versions.env's, in the worker
+and in portalr's UIs once they show diagrams; Mermaid's converter, the one Excalidraw depends on;
+and the Playwright image whose Chromium the worker drives, at its playwright-core's version.
+
+And the release pins: the template's crafting apps are lattice's own, each pinned
 by the same file as scripts/crafts, fetched by the same scripts/craft, at the version its pin
 names (lattice RFC-0003's release-pin check), so a worker's CLI and its editor's build are one
 release, the one lattice's tests ran.
@@ -31,6 +35,7 @@ from __future__ import annotations
 
 import argparse
 import itertools
+import json
 import os
 import re
 import subprocess
@@ -61,6 +66,7 @@ class Variant(NamedTuple):
     ui: bool  # artifactr's forms, artifactr.ui, which only artifactr can have
     tracker: str = "none"  # the task tracker relayr files in, which only the bridge can have
     native_files: bool = True  # native files' workers and editors, which only artifactr can have
+    diagrams: bool = True  # diagrams and their worker, which only native files can have
 
     @property
     def name(self) -> str:
@@ -74,6 +80,7 @@ class Variant(NamedTuple):
             f"{'-noui' if self.libraries != 'reflexr' and not self.ui else ''}"
             f"{'' if self.tracker == 'none' else f'-{self.tracker}'}"
             f"{'-nofiles' if self.libraries != 'reflexr' and not self.native_files else ''}"
+            f"{'-nodiagrams' if self.native_files and not self.diagrams else ''}"
         )
 
 
@@ -96,6 +103,7 @@ VARIANTS = [
     Variant("both", True, "grantr", True, "none", False, True),
     Variant("both", True, "grantr", True, "none", True, False),
     Variant("both", True, "grantr", True, "none", True, True, native_files=False),
+    Variant("both", True, "grantr", True, "none", True, True, diagrams=False),
     Variant("both", True, "grantr", True, "none", True, True, "plane"),
     Variant("both", True, "none", True, "none", False, True, "vikunja"),
 ]
@@ -244,6 +252,58 @@ def check_crafts() -> list[str]:
     return problems
 
 
+WORKER = ROOT / "workers" / "diagrams"
+"""The diagrams worker, which the template's image builds from lattice's own commit."""
+PLAYWRIGHT_IMAGE = re.compile(
+    r"^FROM mcr\.microsoft\.com/playwright:v([0-9.]+)-noble@sha256:[0-9a-f]{64} "
+    r"AS diagrams-worker$",
+    re.M,
+)
+
+
+def check_diagrams() -> list[str]:
+    """Check the diagrams worker's pins: one Excalidraw, and one Playwright with its Chromium.
+
+    Excalidraw is versions.env's EXCALIDRAW_VERSION in the worker, and in portalr's UIs once they
+    show diagrams; Mermaid's converter is the one that Excalidraw depends on; and the image's
+    Playwright, whose Chromium the worker drives, is the version of the playwright-core it pins.
+    """
+    problems = []
+    pinned = re.search(r"^EXCALIDRAW_VERSION=(\S+)$", (ROOT / "versions.env").read_text(), re.M)
+    wanted = pinned[1] if pinned else None
+    worker = json.loads((WORKER / "package.json").read_text())["dependencies"]
+    manifests = [WORKER / "package.json", *LATTICE.glob("packages/portalr/web/*/package.json")]
+    for manifest in manifests:
+        found = json.loads(manifest.read_text())
+        version = {**found.get("dependencies", {}), **found.get("devDependencies", {})}.get(
+            "@excalidraw/excalidraw"
+        )
+        if (version is not None or manifest.parent == WORKER) and version != wanted:
+            where = manifest.relative_to(LATTICE)
+            problems.append(f"{where}'s Excalidraw is {version}; versions.env's is {wanted}")
+    lock = (LATTICE / "bun.lock").read_text()
+    depends = re.search(
+        r'"@excalidraw/excalidraw": \["@excalidraw/excalidraw@[^"]+", "", \{[^\n]*?'
+        r'"@excalidraw/mermaid-to-excalidraw": "([^"]+)"',
+        lock,
+    )
+    mermaid = worker.get("@excalidraw/mermaid-to-excalidraw")
+    if depends is None or mermaid != depends[1]:
+        problems.append(
+            f"the worker's mermaid-to-excalidraw is {mermaid}; Excalidraw's is "
+            f"{depends and depends[1]}"
+        )
+    dockerfile = (ROOT / "template" / "Dockerfile.jinja").read_text()
+    image = PLAYWRIGHT_IMAGE.search(dockerfile)
+    driver = worker.get("playwright-core")
+    if image is None or image[1] != driver:
+        problems.append(
+            f"Dockerfile's Playwright image is {image and image[1]}; the worker's "
+            f"playwright-core is {driver}"
+        )
+    return problems
+
+
 def check(app: Path, sources: dict[str, dict[str, str]]) -> list[str]:
     """Check one rendered application, which needs these sources; return the problems found."""
     problems = check_sources(app, sources)
@@ -286,6 +346,9 @@ def main() -> int:
     failures = 0
     for problem in check_crafts():
         print(f"FAIL: release pins: {problem}", file=sys.stderr)
+        failures += 1
+    for problem in check_diagrams():
+        print(f"FAIL: diagrams' pins: {problem}", file=sys.stderr)
         failures += 1
     with tempfile.TemporaryDirectory() as scratch:
         base = args.keep or Path(scratch)

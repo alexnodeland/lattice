@@ -12,11 +12,23 @@ export interface Note {
   readonly usedUnder?: string;
 }
 
+/** What a UI's notices say first, before the packages: portalr's UIs', unless a build says. */
+export function preface(ui: string, count: number): string[] {
+  return [
+    `Third-party notices for the JavaScript in portalr's ${ui} UI`,
+    "",
+    `The ${count} packages below are bundled into this UI. Their own licences and notices`,
+    "follow, as they ship them. The typefaces' licences and Tremor's, whose charts the UI adapts,",
+    "are with the wheel's licences.",
+  ];
+}
+
 /** The notices file for a UI: the same bundle always gives the same text, with no date in it. */
 export function render(
   ui: string,
   packages: readonly BundledPackage[],
   notes: ReadonlyMap<string, Note> = new Map(),
+  first: (ui: string, count: number) => string[] = preface,
 ): string {
   const entries = packages.map((found) => {
     const key = `${found.name}@${found.version}`;
@@ -40,11 +52,7 @@ export function render(
     return lines.join("\n");
   });
   return `${[
-    `Third-party notices for the JavaScript in portalr's ${ui} UI`,
-    "",
-    `The ${packages.length} packages below are bundled into this UI. Their own licences and notices`,
-    "follow, as they ship them. The typefaces' licences and Tremor's, whose charts the UI adapts,",
-    "are with the wheel's licences.",
+    ...first(ui, packages.length),
     "",
     "Generated at build time from the bundle by portalr's web/notices: not edited by hand.",
     ...entries.flatMap((entry) => ["", entry]),

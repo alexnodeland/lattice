@@ -3300,7 +3300,7 @@
     },
     "/grantr/v1/tenants/{tenant}/settings/{key}": {
       "put": {
-        "description": "Narrow a setting on a tenant, or unset it with null.\n\n`If-Match` names the version of the tenant's setting the caller read, `\"0\"` for one never\nset: another is refused with 409. A value wider than the layer above is refused with 422,\nsaying how wide it may be and which layer says so.",
+        "description": "Narrow a setting on a tenant, or unset it with null.\n\n`If-Match` names the version of the tenant's setting the caller read, `\"0\"` for one never\nset: another is refused with 409; omitted, the last write wins. A value wider than the\nlayer above is refused with 422, saying how wide it may be and which layer says so. A\ncaller who may not is refused with 403 before its body or `If-Match` is read.",
         "operationId": "set_tenant_setting_grantr_v1_tenants__tenant__settings__key__put",
         "parameters": [
           {

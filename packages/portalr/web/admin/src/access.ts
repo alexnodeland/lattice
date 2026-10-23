@@ -40,6 +40,7 @@ export const TENANT_ACTIONS = [
   "grantr:delete_tenant",
   "grantr:read_audit",
   "grantr:manage_integrations",
+  "grantr:manage_settings",
   "portalr:read_telemetry",
   "portalr:read_spend",
   "reflexr:read_runs",

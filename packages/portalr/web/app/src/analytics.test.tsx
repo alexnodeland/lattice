@@ -10,6 +10,7 @@ import { FLAGS } from "./test/files";
 
 interface Relay {
   given: boolean;
+  deletes?: boolean;
   readonly events: { tenant: string | null; body: unknown }[];
   answers: boolean[];
 }
@@ -29,7 +30,7 @@ function serving(relay: Relay) {
       if (request.method === "PUT") {
         relay.given = ((await request.json()) as { given: boolean }).given;
         relay.answers.push(relay.given);
-        return Response.json({ given: relay.given, deleted: relay.given ? null : true });
+        return Response.json({ given: relay.given, deleted: relay.given ? null : relay.deletes });
       }
       return Response.json({ given: relay.given });
     }
@@ -91,7 +92,7 @@ test("off until turned on, then the page the person is on is sent, by its route,
 });
 
 test("turned off, it says no, and nothing more is sent", async () => {
-  const relay: Relay = { given: true, events: [], answers: [] };
+  const relay: Relay = { given: true, deletes: true, events: [], answers: [] };
   const { screen } = await open("/t/acme/w/notes", serving(relay), undefined, {
     readers: { analytics: true },
   });
@@ -100,4 +101,30 @@ test("turned off, it says no, and nothing more is sent", async () => {
   await expect.element(share).toHaveAttribute("aria-checked", "true");
   await share.click();
   await expect.poll(() => relay.answers).toEqual([false]);
+  await expect
+    .element(screen.getByRole("status").filter({ hasText: "Sharing how you use the app is off." }))
+    .toBeInTheDocument();
+});
+
+test("a no whose deletion isn't done yet says so, in the menu and to a screen reader", async () => {
+  const relay: Relay = { given: true, deletes: false, events: [], answers: [] };
+  const { screen } = await open("/t/acme/w/notes", serving(relay), undefined, {
+    readers: { analytics: true },
+  });
+  await screen.getByRole("button", { name: /^Account/ }).click();
+  await screen.getByRole("menuitemcheckbox", { name: "Share how I use the app" }).click();
+  await expect
+    .element(
+      screen.getByRole("status").filter({
+        hasText: "Sharing is off. What you shared is still being deleted, and will be.",
+      }),
+    )
+    .toBeInTheDocument();
+  await screen.getByRole("button", { name: /^Account/ }).click();
+  await expect
+    .element(screen.getByText("What you shared is still being deleted, and will be."))
+    .toBeVisible();
+  await expect
+    .element(screen.getByRole("menuitem", { name: "What is shared, and how it is kept" }))
+    .toHaveAttribute("href", expect.stringContaining("/portalr/guides/privacy/"));
 });

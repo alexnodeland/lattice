@@ -1,7 +1,7 @@
 import { expect, test, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
-import { AccountMenu } from "./account-menu";
+import { AccountMenu, analyticsStatus } from "./account-menu";
 import { viewport } from "./test/viewport";
 
 test("the account menu is named for who is signed in", async () => {
@@ -147,6 +147,8 @@ test("the switch says what it does, as its description, and its name is the word
   await expect.element(item).toHaveAccessibleDescription("Changes chart colours and adds patterns");
 });
 
+const GUIDE = "https://lattice.example/portalr/guides/privacy/";
+
 test("without product analytics there is no switch for it", async () => {
   const screen = await render(
     <AccountMenu
@@ -176,7 +178,7 @@ test("sharing how the app is used is off until the person turns it on, and says 
       onAppearance={vi.fn()}
       colourBlind={false}
       onColourBlind={vi.fn()}
-      analytics={{ given: false, onAnswer }}
+      analytics={{ given: false, onAnswer, guide: GUIDE }}
       onSignOut={vi.fn()}
     />,
   );
@@ -201,7 +203,7 @@ test("turned on, a click turns sharing off, as easily as it was turned on", asyn
       onAppearance={vi.fn()}
       colourBlind={false}
       onColourBlind={vi.fn()}
-      analytics={{ given: true, onAnswer }}
+      analytics={{ given: true, onAnswer, guide: GUIDE }}
       onSignOut={vi.fn()}
     />,
   );
@@ -210,4 +212,39 @@ test("turned on, a click turns sharing off, as easily as it was turned on", asyn
   await expect.element(item).toHaveAttribute("aria-checked", "true");
   await item.click();
   expect(onAnswer).toHaveBeenCalledExactlyOnceWith(false);
+});
+
+test("the switch is beside a link to what is shared, and says when a deletion is still to be done", async () => {
+  const screen = await render(
+    <AccountMenu
+      name="Alex Nodeland"
+      appearance="system"
+      onAppearance={vi.fn()}
+      colourBlind={false}
+      onColourBlind={vi.fn()}
+      analytics={{ given: false, onAnswer: vi.fn(), deleting: true, guide: GUIDE }}
+      onSignOut={vi.fn()}
+    />,
+  );
+  await screen.getByRole("button", { name: "Account: Alex Nodeland" }).click();
+  const link = screen.getByRole("menuitem", { name: "What is shared, and how it is kept" });
+  await expect.element(link).toHaveAttribute("href", GUIDE);
+  await expect
+    .element(screen.getByText("What you shared is still being deleted, and will be."))
+    .toBeVisible();
+});
+
+test("what a screen reader hears as the answer changes", () => {
+  const guide = GUIDE;
+  const onAnswer = vi.fn();
+  expect(analyticsStatus(undefined)).toBe("");
+  expect(analyticsStatus({ given: true, onAnswer, guide })).toBe(
+    "Sharing how you use the app is on.",
+  );
+  expect(analyticsStatus({ given: false, onAnswer, guide })).toBe(
+    "Sharing how you use the app is off.",
+  );
+  expect(analyticsStatus({ given: false, onAnswer, guide, deleting: true })).toBe(
+    "Sharing is off. What you shared is still being deleted, and will be.",
+  );
 });

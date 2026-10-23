@@ -70,6 +70,16 @@ Without the `people` hook there is no people route, and the UIs show a short id 
 - Reads that expose content are not kept: a revealed span or line is dropped when nothing shows it. An operator's links are read once each and not cached, because each is recorded.
 - Markdown renders without raw HTML; links go to the web, mail, the page and the app, and images load only from the app's origin.
 
+## Product analytics
+
+Where the deployment runs product analytics (lattice RFC-0008), the app's account menu has a **Privacy** switch. Nothing is collected until a person turns it on, and nothing asks them to.
+
+- **What is collected:** which pages a person opens in a tenant, named by the app's routes (`/t/$tenant/w/$workspace/runs`), never the address in the bar or anything typed. Each event carries the tenant and a signed session id. The person is a keyed hash of their id, never their id or email. No address and no browser details are kept.
+- **What is never collected:** messages, artifacts, file names, emails, search text, or any other content.
+- **Where it goes:** to portalr's relay on the app's own origin, then to ClickHouse's `analytics` database in the deployment's own stack. Each tenant reads only its own events.
+- **Turning it off** deletes everything the person shared, at once. If ClickHouse can't take the deletion just then, it stays owed, the menu says so, and portalr tries again until it is done. A backup taken before then keeps the events until the backups expire.
+- **How long it is kept:** 395 days unless the operator sets otherwise.
+
 ## Where the gate stops
 
 Langfuse and Grafana are not tenant-scoped and have no reveal gate. An operator's links into them show content across tenants, which is why Tools carries a notice and each making of links is [recorded](operators.md#what-is-recorded). Anyone with access to those tools directly has the same reach.

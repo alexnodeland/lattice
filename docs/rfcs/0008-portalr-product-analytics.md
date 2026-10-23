@@ -291,7 +291,9 @@ So the person sees their events gone at once, and so does an operator's ordinary
   - It is a checkbox menu item, off until the person turns it on, and turned off with the same one click.
   - Its description is read out with it (`aria-describedby`).
   - There is no banner, no pre-ticked box, and nothing that asks again.
-  - The wording, drafted for the owner's review: **"Share how I use the app"**, described as **"Which pages and features you open, never what you write. Off deletes it."**
+  - It sits beside a link to the privacy guide's "Product analytics", which says what is shared and how it is kept.
+  - A status region, there from the start, tells a screen reader the answer as it changes. Where a no's deletion isn't done yet, the menu and the status say so, from the relay's `deleted: false`.
+  - The wording, drafted for the owner's review and not final: **"Share how I use the app"**, described as **"Which pages and features you open, never what you write. Off deletes it."**
 - **Capture** is an add-on of its own (`ui/src/on-demand/analytics.ts`, 442 bytes gzipped, under a 600-byte ceiling). It is fetched only once the person's answer is yes, so someone who never says yes never loads it.
   - It sends `app.page.viewed.v1` for each page the person opens in a tenant, named by the router's own `fullPath` (`/t/$tenant/w/$workspace/runs`), never the address in the bar.
   - Events wait in memory and go ten at a time, or after five seconds, under a session id portalr signs for the person.

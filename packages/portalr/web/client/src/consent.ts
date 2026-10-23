@@ -11,8 +11,15 @@ export async function readConsent(api: Api): Promise<boolean> {
   return data?.given ?? false;
 }
 
-/** Record the person's answer; a yes taken back deletes their events. Whether it was recorded. */
-export async function answerConsent(api: Api, given: boolean): Promise<boolean> {
+/** What became of an answer: recorded, and on a no, whether the deletion is done yet. */
+export interface Answered {
+  readonly given: boolean;
+  /** On a no that owed one: whether the person's events are deleted yet; else none. */
+  readonly deleted: boolean | null;
+}
+
+/** Record the person's answer; a yes taken back deletes their events. What became of it, or null. */
+export async function answerConsent(api: Api, given: boolean): Promise<Answered | null> {
   const { data } = await api.portalr.PUT("/portalr/v1/analytics/consent", { body: { given } });
-  return data?.given === given;
+  return data === undefined ? null : { given: data.given, deleted: data.deleted ?? null };
 }

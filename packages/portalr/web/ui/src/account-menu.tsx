@@ -26,6 +26,23 @@ function initials(name: string): string {
 export interface AnalyticsAnswer {
   readonly given: boolean;
   readonly onAnswer: (given: boolean) => void;
+  /** Whether a deletion the person's no asked for is still to be done, as the relay said. */
+  readonly deleting?: boolean | undefined;
+  /** The privacy guide, which says what is shared and how it is kept. */
+  readonly guide: string;
+}
+
+/** What the account menu says, for a screen reader, as the person's answer changes. */
+export function analyticsStatus(analytics: AnalyticsAnswer | undefined): string {
+  if (!analytics) {
+    return "";
+  }
+  if (analytics.given) {
+    return "Sharing how you use the app is on.";
+  }
+  return analytics.deleting
+    ? "Sharing is off. What you shared is still being deleted, and will be."
+    : "Sharing how you use the app is off.";
 }
 
 /**
@@ -146,6 +163,19 @@ export function AccountMenu({
                       <Icon icon={Check} />
                     </Menu.CheckboxItemIndicator>
                   </Menu.CheckboxItem>
+                  {!analytics.given && analytics.deleting && (
+                    <p className="px-2.5 pb-1.5 text-muted text-xs">
+                      What you shared is still being deleted, and will be.
+                    </p>
+                  )}
+                  <Menu.LinkItem
+                    href={analytics.guide}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={item}
+                  >
+                    What is shared, and how it is kept
+                  </Menu.LinkItem>
                 </Menu.Group>
               </>
             )}

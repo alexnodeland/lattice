@@ -64,9 +64,9 @@ beforeEach(() => {
 
 test("the answer is no until the person says yes, and no where the relay can't be read", async () => {
   expect(await readConsent(api)).toBe(false);
-  expect(await answerConsent(api, true)).toBe(true);
+  expect(await answerConsent(api, true)).toEqual({ given: true, deleted: null });
   expect(await readConsent(api)).toBe(true);
   down = true;
   expect(await readConsent(api)).toBe(false);
-  expect(await answerConsent(api, false)).toBe(false);
+  expect(await answerConsent(api, false)).toBeNull();
 });

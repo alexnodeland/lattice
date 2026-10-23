@@ -16,6 +16,9 @@ import { useEffect, useState } from "react";
 
 const consentKey = (user: string) => ["portalr", "analytics", "consent", user] as const;
 
+/** The privacy guide, which says what is shared and how it is kept. */
+const PRIVACY_GUIDE = "https://lattice.alexnodeland.com/portalr/guides/privacy/#product-analytics";
+
 /** The person's answer, for the account menu, where the deployment has analytics; else none. */
 export function useConsent(): AnalyticsAnswer | undefined {
   const { config, api, user } = useRouteContext({ from: "/_signed" });
@@ -27,12 +30,14 @@ export function useConsent(): AnalyticsAnswer | undefined {
     enabled,
     staleTime: Number.POSITIVE_INFINITY,
   });
-  const { mutate } = useMutation({
+  const { mutate, data: answered } = useMutation({
     mutationFn: (answer: boolean) => answerConsent(api, answer),
     onMutate: (answer: boolean) => client.setQueryData(consentKey(user), answer),
     onSettled: () => client.invalidateQueries({ queryKey: consentKey(user) }),
   });
-  return enabled ? { given, onAnswer: mutate } : undefined;
+  // A no whose deletion ClickHouse didn't take yet: the relay tries it again, and says so here.
+  const deleting = answered?.given === false && answered.deleted === false;
+  return enabled ? { given, onAnswer: mutate, deleting, guide: PRIVACY_GUIDE } : undefined;
 }
 
 /** The account menu, with the person's answer to analytics where the deployment has it. */

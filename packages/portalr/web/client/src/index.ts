@@ -11,7 +11,7 @@ export { allowedIn, workspaceOf } from "./allowed";
 export type * as Artifactr from "./artifactr";
 export { type ArtifactrStream, artifactr } from "./artifactr";
 export { type Answer, createCommands, orThrow, type Refusal, refusal } from "./commands";
-export { answerConsent, readConsent } from "./consent";
+export { type Answered, answerConsent, readConsent } from "./consent";
 export { type Change, changes, type Granularity } from "./diff";
 export { type Feedback, type Thumb, thumbs } from "./feedback";
 export {

@@ -24,6 +24,7 @@ import { type Level, levelOf } from "../../../../integrations";
 import { ReadFailed } from "../../../../read-failed";
 import {
   anywhere,
+  MOST_ASKED,
   numberOf,
   type Places,
   refusedAs,
@@ -113,6 +114,7 @@ function SettingsPage() {
   const { data: places } = useSuspenseQuery(settingsPlaces(queries, tenant, workspaces));
   const navigate = Route.useNavigate();
   const { workspace, mine } = levelIn(places, asked);
+  const known = workspace === undefined || workspaces.includes(workspace);
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title={title} meta={meta} focus />
@@ -121,7 +123,11 @@ function SettingsPage() {
         hint={
           places.tenant
             ? "A workspace may lower what the tenant allows, never raise it."
-            : "The workspaces you administer. A workspace may lower what the tenant allows."
+            : `The workspaces you administer. A workspace may lower what the tenant allows.${
+                places.cut
+                  ? ` Only the first ${MOST_ASKED} workspaces by name are checked here; a later one's settings are changed through grantr's API.`
+                  : ""
+              }`
         }
         className="max-w-sm"
         value={workspace ?? ""}
@@ -134,9 +140,13 @@ function SettingsPage() {
       />
       {mine ? (
         <LevelSettings key={workspace ?? ""} tenant={tenant} workspace={workspace} />
-      ) : (
+      ) : known ? (
         <EmptyState title="Not a workspace you administer">
           You may change settings in the workspaces listed above. Choose one of them.
+        </EmptyState>
+      ) : (
+        <EmptyState title="No such workspace">
+          This tenant has no workspace by that name. Choose one of those listed above.
         </EmptyState>
       )}
     </div>
@@ -182,8 +192,9 @@ function refusedWhy(row: SettingRow, status: number, reasons: readonly string[])
  */
 function focusWithin(form: HTMLFormElement | null, target: Element | null) {
   const active = document.activeElement;
-  if (active === null || active === document.body || form?.contains(active)) {
-    (target as HTMLElement | null)?.focus();
+  const free = active === null || active === document.body || form?.contains(active);
+  if (free && target instanceof HTMLElement) {
+    target.focus();
   }
 }
 
@@ -200,14 +211,21 @@ type Sent = number | readonly string[] | null;
 /** What a field holds before it is sent: a number's text, or the names checked. */
 type Draft = string | readonly string[];
 
-/** What a row's field starts from: what is set here, or, unset, what applies. */
+/**
+ * What a row's field starts from: what is set here, or, unset, what applies. A setting of names
+ * starts from those the layer above still offers, so none is checked that can't be unchecked.
+ */
 function draftOf(row: SettingRow): Draft {
-  if (row.kind.type === "subset") {
-    const value = row.here?.value ?? row.effectiveValue;
-    return typeof value === "number" ? [] : value;
+  const value = row.here?.value ?? row.effectiveValue;
+  if (Array.isArray(value)) {
+    const offered = new Set(Array.isArray(row.ceilingValue) ? row.ceilingValue : []);
+    return value.filter((name) => offered.has(name));
   }
   return row.here === null ? "" : said(row.here.value);
 }
+
+/** A draft that holds for one version of a setting: what the reader typed, or kept after a 409. */
+type Held = { readonly version: number; readonly draft: Draft } | null;
 
 /** One setting at a level: what applies and why, and its field to narrow it, or unset it. */
 function Setting({
@@ -220,21 +238,17 @@ function Setting({
   workspace: string | undefined;
 }) {
   const { commands, queryClient, queries } = Route.useRouteContext();
-  const shown = draftOf(row);
-  const shownKey = typeof shown === "string" ? shown : shown.join("\0");
-  // What the field holds, for the value it was read at: read back at a new value, it starts
-  // from that one, unless what was tried is kept because someone changed it first.
-  const [drafted, setDrafted] = useState<{ for: string; draft: Draft }>({
-    for: shownKey,
-    draft: shown,
-  });
-  const keepDraft = useRef(false);
-  if (drafted.for !== shownKey) {
-    setDrafted({ for: shownKey, draft: keepDraft.current ? drafted.draft : shown });
-    keepDraft.current = false;
-  }
-  const draft = drafted.draft;
-  const setDraft = (next: Draft) => setDrafted((now) => ({ ...now, draft: next }));
+  // What the field holds, for the version read: what the reader typed at it, or what they tried,
+  // kept after someone else changed it first, at the version that came back; else what is set.
+  const [edited, setEdited] = useState<Held>(null);
+  const [kept, setKept] = useState<Held>(null);
+  const draft =
+    edited?.version === row.version
+      ? edited.draft
+      : kept?.version === row.version
+        ? kept.draft
+        : draftOf(row);
+  const setDraft = (next: Draft) => setEdited({ version: row.version, draft: next });
   const [error, setErrorText] = useState<string | null>(null);
   // Each refusal is counted, so the same words again still take the field's focus, and are
   // read out again.
@@ -270,7 +284,6 @@ function Setting({
       return;
     }
     sending.current = true;
-    keepDraft.current = false;
     setSaving(true);
     setError(null);
     setStale(null);
@@ -293,17 +306,20 @@ function Setting({
         focusWithin(form.current, controlOf(form.current, field, subset));
       }
     } else if (answer.status === 409) {
-      keepDraft.current = true;
+      const tried = draft;
       await queryClient.invalidateQueries({ queryKey: keys.grantr.settings(tenant) });
       const now = queryClient
         .getQueryData(queries.grantr.settings(tenant, workspace).queryKey)
         ?.settings.find((state) => state.key === row.key);
+      if (now !== undefined) {
+        setKept({ version: now.version, draft: tried });
+      }
       const here = workspace === undefined ? now?.tenant : now?.workspace;
-      const tried = value === null ? "unset it" : `set ${said(value as number | string[])}`;
+      const what = value === null ? "unset it" : `set ${said(value)}`;
       setStale(
         `${row.name} was changed by someone else since you read it: ${
           here ? `it is set here to ${said(here.value)} now` : "nothing is set here now"
-        }, and ${now ? said(now.effective) : "what it was"} applies. You tried to ${tried}, which wasn't saved: save again if you still want it.`,
+        }, and ${now ? said(now.effective) : "what it was"} applies. You tried to ${what}, which wasn't saved: save again if you still want it.`,
       );
     } else {
       setError(refusedWhy(row, answer.status, answer.reasons));
@@ -328,7 +344,7 @@ function Setting({
     void send(read.value);
   };
 
-  const allowed = new Set(typeof row.ceilingValue === "number" ? [] : row.ceilingValue);
+  const allowed = new Set(Array.isArray(row.ceilingValue) ? row.ceilingValue : []);
   return (
     <Row
       name={row.name}
@@ -369,15 +385,20 @@ function Setting({
           ) : (
             <CheckboxGroup
               legend={row.name}
-              hint="Checked tools are offered here. A tool not offered above can't be checked."
+              hint={`Checked tools are offered here. A tool ${row.ceilingBy} doesn't offer can't be checked.`}
               value={draft}
               onValueChange={setDraft}
               error={error}
-              choices={(row.kind.universe ?? []).map((name) => ({
-                value: name,
-                label: `${name} (${row.kind.labels?.[name] ?? "a tool"})`,
-                ...(allowed.has(name) ? {} : { disabled: true, description: "Not offered above" }),
-              }))}
+              choices={(row.kind.universe ?? []).map((name) => {
+                const risk = row.kind.labels?.[name];
+                return {
+                  value: name,
+                  label: risk === undefined ? name : `${name} (${risk})`,
+                  ...(allowed.has(name)
+                    ? {}
+                    : { disabled: true, description: `Not offered by ${row.ceilingBy}` }),
+                };
+              })}
             />
           )}
           {/* There before anything is said, so what is said is announced as it changes. */}

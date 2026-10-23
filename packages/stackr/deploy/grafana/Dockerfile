@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.28.0@sha256:bb22d9815c728170f72750f4e5b0d672e06176142e1d602c7e66c050100b7e5b
 # stackr-grafana: the Grafana compose.yaml pins, with stackr's provisioning and the dashboards of
 # stackr, artifactr and reflexr in it, as compose.yaml mounts them, for the AWS recipe's Fargate
 # task (RFC-0004, ADR-0034). Its data sources' addresses come from the environment: Compose's names
@@ -6,7 +7,11 @@
 # is built, pinned by version and by each architecture's sha256, and signed by Grafana Labs: it
 # loads without a network, and no unsigned plugin is allowed.
 
-# The plugin's archive for each architecture the image is built for.
+# The plugin's archive for each architecture the image is built for. Renovate doesn't track it. To
+# move it, take the version and each architecture's sha256 from grafana.com's list of its versions
+# (https://grafana.com/api/plugins/grafana-clickhouse-datasource/versions/<version>, `packages`),
+# and check each against the download itself:
+#   curl -fsSL '<the URL below, at the new version>' | sha256sum
 FROM scratch AS clickhouse-plugin-amd64
 ADD --checksum=sha256:fc8b4a4ff71e7db614a3560e5b5678bbab523578abca280a195e0bd30d9a52d5 \
   "https://grafana.com/api/plugins/grafana-clickhouse-datasource/versions/4.22.1/download?os=linux&arch=amd64" /plugin.zip

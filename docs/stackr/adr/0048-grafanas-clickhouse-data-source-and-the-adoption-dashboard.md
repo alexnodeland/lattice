@@ -17,12 +17,16 @@ Amends [ADR-0044](0044-clickhouse-a-profile-of-its-own-and-portalrs-analytics-us
 - **`stackr-grafana` carries the plugin, and Compose builds that image.** `deploy/grafana/Dockerfile` fetches version 4.22.1 as the image is built, one archive per architecture, each checked against its sha256, and unpacks it outside `/var/lib/grafana`, so the data volume doesn't hide it. One machine and the AWS recipe run the same image; Compose's mounts keep the checkout's dashboards and provisioning live.
   - The plugin is signed by Grafana Labs, and Grafana checks the signature as it loads it. No unsigned plugin is allowed.
   - Nothing is downloaded when Grafana starts: the plugin is in the image, and preinstalled plugins are turned off.
-  - `deploy/build-images` checks that the plugin loads with a valid signature. Renovate doesn't track the plugin's version; it moves by hand, with both digests.
+  - `deploy/build-images` checks that the plugin loads with a valid signature. Renovate doesn't track the plugin's version; it moves by hand, with both digests, as the Dockerfile says ([#664](https://github.com/alexnodeland/lattice/issues/664) would report drift).
+  - `scripts/check-config` holds every image the Dockerfile builds on, other than `scratch` and its own stages, to a digest.
 - **`grafana_analytics` reads `analytics.events`, every tenant's, and nothing else.** It has `SELECT` on that table only, and no row policy, so no setting to name a tenant.
-  - Its profile is read-only (`readonly` 2, since the plugin sends settings of its own), logs no query, and has the reader's limits as ceilings it may lower but not raise. The time limit's ceiling is 30 seconds, not the reader's 10: the plugin asks for a little more than the data source's 10-second query timeout.
+  - Its profile is read-only (`readonly` 2, since the plugin sends settings of its own) and logs no query. The reader's memory, thread, row, byte and result limits are fixed: a query can't change them, so it can't set one to 0, which would mean none.
+  - The time limit is the exception: the plugin sets it, a little more than the data source's 10-second query timeout (14 seconds), so a query may set it from 1 to 30 seconds.
+  - It shares the `analytics` quota's limits, which ClickHouse counts per user, so Grafana's panels never use up the writer's hour.
   - Its password is `CLICKHOUSE_GRAFANA_PASSWORD`, which `make env` generates.
 - **The data source is `analytics`,** provisioned beside the others, at `CLICKHOUSE_ADDRESS` over HTTP.
 - **One dashboard, Adoption** (`stackr-adoption`), across tenants or for the ones chosen: active people by day, people per integration, the funnel from a page to a thread to a message, and weekly retention. People are counted by their keyed hash, never their id, and only people who said yes are there.
+  - Its tenant variable is Grafana's, quoted into the SQL (`${tenant:singlequote}`), with its values read from `analytics.events`. A value that broke out of its quotes could only change a query of `grafana_analytics`, which already reads every tenant's events and nothing else, within its fixed limits.
 
 ### Who reaches it
 
@@ -45,4 +49,5 @@ portalr links no tenant to Grafana: its deep links go only to callers allowed `p
 
 - Compose builds Grafana's image the first time it starts, from lattice's checkout.
 - A plugin release is a hand-made change: its version and its two digests.
-- The smoke test checks that Grafana's user reads both tenants and is refused an insert, `system.query_log` and any higher limit, and, with Grafana running, that the data source is healthy and the dashboard is there.
+- The smoke test checks that Grafana's user reads both tenants and is refused an insert, `system.query_log`, any higher limit and any limit of 0. It also runs each of the dashboard's queries as that user. With Grafana running, it checks that the data source is healthy and the dashboard is there.
+- Each smoke job that builds Grafana downloads the plugin from grafana.com, with no cache across jobs, so an outage there fails the build.

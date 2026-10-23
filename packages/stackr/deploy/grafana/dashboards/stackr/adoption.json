@@ -127,7 +127,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT step, countIf(level >= step) AS people FROM (SELECT distinct_id, windowFunnel(86400)(toDateTime(ts), event = 'app.page.viewed.v1', event = 'app.thread.opened.v1', event = 'app.message.sent.v1') AS level FROM analytics.events WHERE $__timeFilter(ts) AND tenant_id IN (${tenant:singlequote}) GROUP BY distinct_id) ARRAY JOIN [1, 2, 3] AS step GROUP BY step ORDER BY step"
+          "rawSql": "SELECT name AS step, countIf(level >= number) AS people FROM (SELECT distinct_id, windowFunnel(86400)(toDateTime(ts), event = 'app.page.viewed.v1', event = 'app.thread.opened.v1', event = 'app.message.sent.v1') AS level FROM analytics.events WHERE $__timeFilter(ts) AND tenant_id IN (${tenant:singlequote}) GROUP BY distinct_id) ARRAY JOIN [1, 2, 3] AS number, ['a page', 'a thread', 'a message'] AS name GROUP BY number, name ORDER BY number"
         }
       ]
     },
@@ -145,7 +145,7 @@
         "type": "grafana-clickhouse-datasource",
         "uid": "analytics"
       },
-      "description": "Of the people active four weeks ago, how many came back in each week since.",
+      "description": "Of the people active three weeks ago, how many were active again in each week since, the weeks from Monday, in UTC. It doesn't follow the time range.",
       "targets": [
         {
           "datasource": {
@@ -156,7 +156,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT sum(r[1]) AS `week 0`, sum(r[2]) AS `week 1`, sum(r[3]) AS `week 2`, sum(r[4]) AS `week 3` FROM (SELECT distinct_id, retention(toStartOfWeek(ts) = toStartOfWeek(now() - INTERVAL 3 WEEK), toStartOfWeek(ts) = toStartOfWeek(now() - INTERVAL 2 WEEK), toStartOfWeek(ts) = toStartOfWeek(now() - INTERVAL 1 WEEK), toStartOfWeek(ts) = toStartOfWeek(now())) AS r FROM analytics.events WHERE ts >= toStartOfWeek(now() - INTERVAL 3 WEEK) AND tenant_id IN (${tenant:singlequote}) GROUP BY distinct_id)"
+          "rawSql": "SELECT sum(r[1]) AS `week 0`, sum(r[2]) AS `week 1`, sum(r[3]) AS `week 2`, sum(r[4]) AS `week 3` FROM (SELECT distinct_id, retention(toStartOfWeek(ts, 1) = toStartOfWeek(now() - INTERVAL 3 WEEK, 1), toStartOfWeek(ts, 1) = toStartOfWeek(now() - INTERVAL 2 WEEK, 1), toStartOfWeek(ts, 1) = toStartOfWeek(now() - INTERVAL 1 WEEK, 1), toStartOfWeek(ts, 1) = toStartOfWeek(now(), 1)) AS r FROM analytics.events WHERE ts >= toStartOfWeek(now() - INTERVAL 3 WEEK, 1) AND tenant_id IN (${tenant:singlequote}) GROUP BY distinct_id)"
         }
       ]
     }

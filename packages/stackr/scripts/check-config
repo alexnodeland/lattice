@@ -39,7 +39,8 @@ namespace in place of Compose's. GoTrue's proxy, the edge's caddy_image, is the
 single host's Caddy, and the images the stack module runs as they are, such as
 GoTrue's and Langfuse's, are compose.yaml's, and each image deploy/<service>/
 Dockerfile builds is on its service's image, as compose.yaml pins it, unless
-compose.yaml builds that image itself, as it does Grafana's.
+compose.yaml builds that image itself, as it does Grafana's, when each image
+it builds on is pinned by digest.
 """
 
 from __future__ import annotations
@@ -371,12 +372,21 @@ def check_aws() -> list[str]:
     # Each thin image builds on its own service's image, as compose.yaml pins it.
     for dockerfile in sorted((ROOT / "deploy").glob("*/Dockerfile")):
         service = stack.get(dockerfile.parent.name)
-        # A service compose.yaml builds from its Dockerfile runs the thin image itself (ADR-0048).
-        if service is None or "build" in service:
+        if service is None:
             continue
-        for base in re.findall(r"^FROM (\S+)", dockerfile.read_text(), re.MULTILINE):
+        text = dockerfile.read_text()
+        where = dockerfile.relative_to(ROOT)
+        # A service compose.yaml builds from this Dockerfile runs the thin image itself (ADR-0048):
+        # each image it builds on, other than scratch and its own stages, is pinned by digest.
+        if service.get("build", {}).get("dockerfile") == f"packages/stackr/{where}":
+            stages = set(re.findall(r"^FROM \S+ AS (\S+)", text, re.MULTILINE))
+            for base in re.findall(r"^FROM (\S+)", text, re.MULTILINE):
+                stage = base.replace("${TARGETARCH}", "amd64")
+                if base != "scratch" and stage not in stages and "@sha256:" not in base:
+                    problems.append(f"{where} builds on {base}, which isn't pinned by digest")
+            continue
+        for base in re.findall(r"^FROM (\S+)", text, re.MULTILINE):
             if base != service["image"]:
-                where = dockerfile.relative_to(ROOT)
                 problems.append(f"{where} builds on {base}, not compose.yaml's {service['image']}")
     if not problems:
         print(f"ok: the state host runs {', '.join(state)} as compose.yaml does")

@@ -2,7 +2,8 @@
      networks only. `portalr_analytics_writer` may insert into analytics.events, and delete a
      person's events there when they take back their yes, and nothing else.
      `portalr_analytics` may read it, behind a row policy that keeps each query to the tenant its
-     SQL_portalr_tenant setting names. Neither's queries reach system.query_log, which Langfuse's
+     SQL_portalr_tenant setting names. `grafana_analytics` reads it across tenants, for
+     operators' dashboards in Grafana (ADR-0048). None of their queries reach system.query_log, which Langfuse's
      user reads, and each has a quota, since analytics shares ClickHouse with Langfuse. Their
      passwords come from the environment, which compose.yaml requires, and are kept out of the
      preprocessed configuration ClickHouse writes to its data volume. -->
@@ -107,10 +108,10 @@
         <SQL_portalr_tenant><changeable_in_readonly/></SQL_portalr_tenant>
       </constraints>
     </analytics_reader>
-    <!-- An operator's dashboards: read only, with the reader's limits as ceilings it may lower
-         but not raise (readonly 2, since Grafana's plugin sends settings of its own), and no
-         query logged. Its time may go to 30 seconds: the plugin asks for a little more than
-         its data source's 10-second query timeout. -->
+    <!-- An operator's dashboards: read only (readonly 2, since Grafana's plugin sends settings of
+         its own), with the reader's limits fixed, and no query logged. The plugin sets the time
+         limit itself, a little more than its data source's 10-second query timeout, so that one
+         may be from 1 to 30 seconds; 0, which would mean none, is refused. -->
     <analytics_operator>
       <readonly>2</readonly>
       <max_execution_time>10</max_execution_time>
@@ -124,18 +125,19 @@
       <constraints>
         <readonly><readonly/></readonly>
         <log_queries><readonly/></log_queries>
-        <max_execution_time><max>30</max></max_execution_time>
-        <max_memory_usage><max>1000000000</max></max_memory_usage>
-        <max_threads><max>4</max></max_threads>
-        <max_rows_to_read><max>200000000</max></max_rows_to_read>
-        <max_bytes_to_read><max>20000000000</max></max_bytes_to_read>
-        <max_result_rows><max>100000</max></max_result_rows>
+        <max_execution_time><min>1</min><max>30</max></max_execution_time>
+        <max_memory_usage><readonly/></max_memory_usage>
+        <max_threads><readonly/></max_threads>
+        <max_rows_to_read><readonly/></max_rows_to_read>
+        <max_bytes_to_read><readonly/></max_bytes_to_read>
+        <max_result_rows><readonly/></max_result_rows>
         <max_concurrent_queries_for_user><readonly/></max_concurrent_queries_for_user>
       </constraints>
     </analytics_operator>
   </profiles>
   <quotas>
-    <!-- Analytics shares ClickHouse with Langfuse: an hour's reads and writes are bounded. -->
+    <!-- Analytics shares ClickHouse with Langfuse: an hour's reads and writes are bounded. The
+         quota is counted per user, so Grafana's panels never use up the writer's hour. -->
     <analytics>
       <interval>
         <duration>3600</duration>

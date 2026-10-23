@@ -1,5 +1,5 @@
 import { expect, test, vi } from "vitest";
-import { Refused } from "./queries";
+import { Refused, refusal } from "./queries";
 import { createQueryClient } from "./query-client";
 
 const refused = (status: number) => async () => {
@@ -37,6 +37,20 @@ test("a read refused as busy is asked again once the server's wait has passed", 
   await expect(client.fetchQuery({ queryKey: ["busy"], queryFn: read })).resolves.toBe("page");
   expect(read).toHaveBeenCalledTimes(2);
   const delay = client.getDefaultOptions().queries?.retryDelay as (n: number, e: unknown) => number;
+  const random = vi.spyOn(Math, "random").mockReturnValue(0);
   expect(delay(0, new Refused(429, null, 5))).toBe(5000);
   expect(delay(1, new Error("down"))).toBe(2000);
+  random.mockReturnValue(0.999);
+  expect(delay(0, new Refused(429, null, 5))).toBeCloseTo(6000, -1);
+  expect(delay(0, new Refused(429, null, 5))).toBeLessThan(6000);
+  random.mockRestore();
+});
+
+test("a refusal carries the server's Retry-After, in seconds, or none", () => {
+  const answered = (headers: Record<string, string>) =>
+    new Response(null, { status: 429, headers });
+  expect(refusal(answered({ "retry-after": "5" }), null).retryAfter).toBe(5);
+  expect(refusal(answered({}), null).retryAfter).toBeNull();
+  expect(refusal(answered({ "retry-after": "soon" }), null).retryAfter).toBeNull();
+  expect(refusal(answered({}), null).status).toBe(429);
 });

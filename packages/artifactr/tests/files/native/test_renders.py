@@ -270,3 +270,35 @@ async def test_an_upload_to_a_hidden_files_id_is_refused_before_it_is_read(
         await uploaded(files, bob, "a1")
     assert Counting.read == 1, "Bob's file was never read"
     assert [a.id for a in await alice.artifacts(NativeFile)] == ["a1"]
+
+
+async def test_past_the_tenants_waiting_a_page_is_refused_at_once(stores: Stores) -> None:
+    app = Gated()
+    files = NativeFiles(
+        stores.blobs, stores.checkouts, app, formats=JSON_DOCX, pages=0, deadline=5.0, waiting=1
+    )
+    ws = await Workspaces(InMemoryStorage()).open("acme", "w1", actor=ALICE)
+    await uploaded(files, ws, "a1")
+    held = [asyncio.create_task(files.render(ws, "a1", 1)) for _ in range(2)]
+    await app.holding(2)
+    waiter = asyncio.create_task(files.render(ws, "a1", 1))
+    await asyncio.sleep(0)
+    started = asyncio.get_running_loop().time()
+    with pytest.raises(Busy):
+        await files.render(ws, "a1", 1)
+    assert asyncio.get_running_loop().time() - started < 1, "refused at once, not after its wait"
+    app.through.set()
+    await asyncio.gather(*held, waiter)
+
+
+async def test_pages_asked_for_together_render_once(stores: Stores) -> None:
+    app = Gated()
+    files = native(stores, app)
+    ws = await Workspaces(InMemoryStorage()).open("acme", "w1", actor=ALICE)
+    await uploaded(files, ws, "a1")
+    asked = [asyncio.create_task(files.render(ws, "a1", 1)) for _ in range(3)]
+    await app.holding(2)
+    app.through.set()
+    pages = await asyncio.gather(*asked)
+    assert len(set(pages)) == 1
+    assert app.waiting == 2, "the third found the page kept once it had a reading"

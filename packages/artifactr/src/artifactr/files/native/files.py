@@ -159,6 +159,9 @@ class NativeFiles:
             the page and the scale, so a page asked for again doesn't reach the app: 64 MiB by
             default, 0 for none. A page is the same for any reader of the same bytes, and only
             a reader the workspace lets read them is given it.
+        waiting: How many of a tenant's pages may wait for one of its readings at once, past
+            which another is refused with `Busy` at once: eight by default, twice the pages a
+            viewer's first screen asks for.
 
     Raises:
         ValueError: If an edit's lease would end before the apps' deadline, or no app is given.
@@ -179,6 +182,7 @@ class NativeFiles:
         formats: Mapping[str, Format] = FORMATS,
         readings: int | None = 2,
         pages: int = 64 << 20,
+        waiting: int = 8,
     ) -> None:
         if edit_ttl.total_seconds() <= deadline:
             raise ValueError("an edit's lease must outlast the app's deadline, and the commit")
@@ -198,6 +202,8 @@ class NativeFiles:
         self._formats = formats
         self._readings = readings
         self._reading: Counter[str] = Counter()
+        self._waiting_most = waiting
+        self._waiting: Counter[str] = Counter()
         self._pages_most = pages
         self._pages: OrderedDict[tuple[str, str, int, float], bytes] = OrderedDict()
         self._pages_held = 0
@@ -683,14 +689,15 @@ class NativeFiles:
             AppFailed: If the app can't render it, or there is no such page.
             Busy: If the tenant has as many files being read or rendered as it may.
         """
-        source, file_type = await self._proposed(ws, proposal_id, "content")
+        artifact_id, named, file_type = await self._proposed_blob(ws, proposal_id, "content")
         app = self.app_of(file_type)
-        key = (app.name, hashlib.sha256(source).hexdigest(), page, 1.0)
-        if (png := self._page(key)) is not None:
+        sha256 = named.sha256 if named is not None else ""  # none: refused as its bytes are read
+        key = (app.name, sha256, page, 1.0)
+        if named is not None and (png := self._page(key)) is not None:
             return png
 
         async def proposed() -> bytes:
-            return source
+            return await self._bytes(_scope(ws), artifact_id, named, "content")
 
         return await self._rendered(ws, app, key, proposed, admit)
 
@@ -716,6 +723,9 @@ class NativeFiles:
         """
         _, _, page, scale = key
         async with self._turn(ws.tenant_id, wait=self._deadline):
+            # Rendered by another while this one waited: pages asked for together render once.
+            if (kept := self._page(key)) is not None:
+                return kept
             if admit is not None:
                 admit()
             png = await app.render(await source(), page, scale=scale, deadline=self._deadline)
@@ -730,11 +740,18 @@ class NativeFiles:
         self, ws: Workspace, proposal_id: ProposalId, part: Part
     ) -> tuple[bytes, type[NativeFile]]:
         """What a proposal would make of a part of a native file, and the file's type."""
+        artifact_id, named, file_type = await self._proposed_blob(ws, proposal_id, part)
+        return await self._bytes(_scope(ws), artifact_id, named, part), file_type
+
+    async def _proposed_blob(
+        self, ws: Workspace, proposal_id: ProposalId, part: Part
+    ) -> tuple[ArtifactId, Blob | None, type[NativeFile]]:
+        """The file a proposal is to, the blob it names for a part, if any, and the file's type."""
         proposal = await ws.proposal(proposal_id)
         head = await ws.get(NativeFile, proposal.artifact_id)
         change = proposal.change
         named = _replaced(change.patch, part) if isinstance(change, EditArtifact) else None
-        return await self._bytes(_scope(ws), proposal.artifact_id, named, part), type(head.data)
+        return proposal.artifact_id, named, type(head.data)
 
     # ─── collection ───────────────────────────────────────────────────────────
 
@@ -817,20 +834,30 @@ class NativeFiles:
     async def _turn(self, tenant_id: str, *, wait: float = 0.0) -> AsyncGenerator[None]:
         """Hold one of the tenant's readings while the app reads a file.
 
-        Without one free, it waits up to `wait` seconds for one, then refuses.
+        Without one free, it waits up to `wait` seconds for one, then refuses; so does one past
+        the tenant's waiting, at once. The waiters look again every `LOOK_AGAIN` seconds, not
+        in turn: whichever looks first after a reading is freed takes it (files ADR-0018).
 
         Raises:
-            Busy: If the tenant has all of its readings, for all of the wait.
+            Busy: If the tenant has all of its readings, for all of the wait, or as many pages
+                waiting as it may.
         """
         readings = self._readings
         if readings is not None and self._reading[tenant_id] >= readings:
+            if wait <= 0 or self._waiting[tenant_id] >= self._waiting_most:
+                raise Busy(readings)
             # Looked at again every so often, not woken: an application may serve requests on
             # several event loops, and a waiter tied to one can't be woken from another.
-            until = time.monotonic() + wait
-            while self._reading[tenant_id] >= readings:
-                if time.monotonic() >= until:
-                    raise Busy(readings)
-                await asyncio.sleep(LOOK_AGAIN)
+            self._waiting[tenant_id] += 1
+            try:
+                until = time.monotonic() + wait
+                while self._reading[tenant_id] >= readings:
+                    left = until - time.monotonic()
+                    if left <= 0:
+                        raise Busy(readings)
+                    await asyncio.sleep(min(LOOK_AGAIN, left))
+            finally:
+                self._waiting[tenant_id] -= 1
         self._reading[tenant_id] += 1
         try:
             yield

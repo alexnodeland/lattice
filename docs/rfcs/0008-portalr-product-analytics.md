@@ -378,6 +378,6 @@ Still open:
 - [x] Browser capture and the consent UI
 - [x] Grafana's datasource and dashboard ([stackr ADR-0048](../stackr/adr/0048-grafanas-clickhouse-data-source-and-the-adoption-dashboard.md))
 - [x] Adoption read and page ([portalr ADR-0071](../portalr/adr/0071-adoption-the-tenants-read-and-page.md))
-- [ ] Traces both ways
+- [x] Traces both ways ([portalr ADR-0073](../portalr/adr/0073-a-requests-analytics-session-on-its-trace.md))
 - [ ] Umami profile, then replay after the privacy review
 - [ ] relayr's sink

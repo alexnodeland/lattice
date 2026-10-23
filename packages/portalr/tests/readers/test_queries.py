@@ -33,6 +33,47 @@ def test_every_trace_search_names_the_tenant_first() -> None:
             assert f'(span.artifactr.run.id = "{run}" || span.reflexr.run.id = "{run}")' in query
 
 
+SESSION = "1792800000-0123456789abcdef"
+
+
+def test_an_analytics_sessions_search_names_the_tenant_and_the_session_each_quoted() -> None:
+    for session, run in product(IDS, IDS):
+        query = search_query(
+            ACME,
+            TraceQuery(start=START, end=END, session=session, run=run, analytics_session=SESSION),
+        )
+        # The tenant's spans and the session's server span, in the same trace.
+        assert query.startswith('{ span.tenant.id = "acme"'), query
+        assert query.endswith(f' && {{ span.portalr.analytics.session = "{SESSION}" }}'), query
+    quoted = search_query(
+        allowed('a"b'), TraceQuery(start=START, end=END, analytics_session=SESSION)
+    )
+    assert quoted.startswith('{ span.tenant.id = "a\\"b" }'), quoted
+
+
+@pytest.mark.parametrize(
+    "session",
+    [
+        "",
+        "thr_1",
+        "1792800000-0123456789ABCDEF",
+        '1-0123456789abcdef" } || { true',
+        "1-" + "a" * 17,
+    ],
+)
+def test_an_analytics_session_is_only_one_the_relay_could_have_made(session: str) -> None:
+    with pytest.raises(ValidationError):
+        TraceQuery(start=START, end=END, analytics_session=session)
+
+
+def test_an_analytics_sessions_window_is_at_most_91_days() -> None:
+    TraceQuery(start=START, end=START + timedelta(days=91), analytics_session=SESSION)
+    with pytest.raises(ValidationError, match="at most 91 days"):
+        TraceQuery(start=START, end=START + timedelta(days=92), analytics_session=SESSION)
+    # Without one, a search's window is as before.
+    TraceQuery(start=START, end=START + timedelta(days=92))
+
+
 def test_every_log_query_filters_on_the_tenant_first() -> None:
     for thread, run in product(IDS, IDS):
         query = logs_query(ACME, LogQuery(start=START, end=END, thread=thread, run=run))

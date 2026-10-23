@@ -37,12 +37,23 @@ export class Capture {
 
   private readonly api: Api;
   private readonly tenant: string;
+  private readonly carry: (session: string | null) => void;
   private readonly wait: number;
 
-  /** `wait` is how long a few events wait before they go, `WAIT` unless a test says otherwise. */
-  constructor(api: Api, tenant: string, wait: number = WAIT) {
+  /**
+   * `carry` is handed the signed session while it is held, and null once it isn't, for every
+   * request to carry (portalr ADR-0073); `wait` is how long a few events wait before they go,
+   * `WAIT` unless a test says otherwise.
+   */
+  constructor(
+    api: Api,
+    tenant: string,
+    carry: (session: string | null) => void = () => {},
+    wait: number = WAIT,
+  ) {
     this.api = api;
     this.tenant = tenant;
+    this.carry = carry;
     this.wait = wait;
   }
 
@@ -66,6 +77,7 @@ export class Capture {
   close(): void {
     this.closed = true;
     this.waiting.length = 0;
+    this.carry(null);
     if (this.timer !== null) {
       clearTimeout(this.timer);
       this.timer = null;
@@ -108,6 +120,7 @@ export class Capture {
     if (session === null) {
       this.session = null;
     }
+    this.carry(this.closed ? null : session);
     return session;
   }
 

@@ -2292,6 +2292,7 @@ export interface operations {
                 limit?: number;
                 session?: components["schemas"]["Id"] | null;
                 run?: components["schemas"]["Id"] | null;
+                analytics_session?: string | null;
             };
             header?: {
                 "X-Tenant"?: components["schemas"]["TenantId"] | null;

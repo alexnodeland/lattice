@@ -1,5 +1,12 @@
 import { expect, test } from "vitest";
-import { isId, shownOf, startedAt, windowOf } from "./traces";
+import {
+  ANALYTICS_ATTRIBUTE,
+  analyticsSessionOf,
+  isId,
+  shownOf,
+  startedAt,
+  windowOf,
+} from "./traces";
 
 test("a window ends at the next whole minute, so a read holds a minute", () => {
   const first = windowOf(1, new Date("2026-10-15T09:30:10.500Z"));
@@ -34,4 +41,21 @@ test("the address keeps a window Traces offers, and the ids portalr takes", () =
 
 test("a trace's start is the moment its nanoseconds say", () => {
   expect(startedAt(1_792_105_139_940_000_000)).toBe("2026-10-15T22:58:59.940Z");
+});
+
+test("an analytics session in the address is kept only where the relay could have made it", () => {
+  expect(shownOf({ analytics: "1792800000-0123456789abcdef" }).analytics).toBe(
+    "1792800000-0123456789abcdef",
+  );
+  for (const wrong of ["", "thr_1", "1-0123456789ABCDEF", 42]) {
+    expect(shownOf({ analytics: wrong }).analytics).toBeUndefined();
+  }
+});
+
+test("a trace's analytics session is the first its spans name, where it is one", () => {
+  const span = (session?: unknown) => ({
+    attributes: session === undefined ? {} : { [ANALYTICS_ATTRIBUTE]: session },
+  });
+  expect(analyticsSessionOf([span(), span("1-0123456789abcdef")])).toBe("1-0123456789abcdef");
+  expect(analyticsSessionOf([span("x"), span(7)])).toBeUndefined();
 });

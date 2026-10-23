@@ -51,12 +51,14 @@ export const Route = createFileRoute("/_signed/t/$tenant/traces/")({
     window: windowOf(search.hours, new Date()),
     session: search.thread,
     run: search.run,
+    analytics: search.analytics,
   }),
   loader: ({ context, params, deps }) =>
     context.queryClient.ensureQueryData(
       context.queries.portalr.traces(params.tenant, deps.window, {
         session: deps.session,
         run: deps.run,
+        analytics_session: deps.analytics,
       }),
     ),
   component: Traces,
@@ -77,10 +79,10 @@ export const Route = createFileRoute("/_signed/t/$tenant/traces/")({
 function Traces() {
   const { tenant } = Route.useParams();
   const shown = Route.useSearch();
-  const { window, session, run } = Route.useLoaderDeps();
+  const { window, session, run, analytics } = Route.useLoaderDeps();
   const { queries } = Route.useRouteContext();
   const { data: reading } = useSuspenseQuery(
-    queries.portalr.traces(tenant, window, { session, run }),
+    queries.portalr.traces(tenant, window, { session, run, analytics_session: analytics }),
   );
   if (reading.status === "unconfigured") {
     return (
@@ -103,12 +105,19 @@ function Traces() {
     );
   }
   const traces = reading.data;
-  const filtered = shown.thread !== undefined || shown.run !== undefined;
+  const filtered =
+    shown.thread !== undefined || shown.run !== undefined || shown.analytics !== undefined;
   return (
     <div className="flex flex-col gap-6">
       {HEADER}
       {/* Keyed by what the address holds, so the form's own fields start from it again when it changes. */}
       <Filter key={JSON.stringify(shown)} shown={shown} />
+      {shown.analytics !== undefined && (
+        <p className="text-muted text-sm">
+          The traces of one analytics session, <code className="font-mono">{shown.analytics}</code>:
+          the requests a person who shares how they use the app made in it.
+        </p>
+      )}
       {traces.length >= TRACES_LIMIT && (
         <Alert tone="warn">
           The newest {TRACES_LIMIT} are shown. A shorter window, or a thread or a run, finds the

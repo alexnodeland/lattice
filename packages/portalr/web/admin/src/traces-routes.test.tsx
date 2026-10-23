@@ -16,6 +16,8 @@ let tempo: "ok" | "unconfigured" | "unavailable" = "ok";
 let found = 2;
 let missing = false;
 let partial = false;
+/** The analytics session the trace's server span carries, if any. */
+let carried: string | null = null;
 
 const A = `${"0".repeat(24)}c029eec9`;
 const B = `${"0".repeat(24)}c029eeca`;
@@ -43,7 +45,10 @@ const spans = (span: string | null) => {
       name: "turn",
       start_ns: 1_000_000_000,
       end_ns: 1_100_000_000,
-      attributes: { "gen_ai.operation.name": "invoke_workflow" },
+      attributes: {
+        "gen_ai.operation.name": "invoke_workflow",
+        ...(carried === null ? {} : { "portalr.analytics.session": carried }),
+      },
       error: false,
       withheld: [],
     },
@@ -100,6 +105,7 @@ afterEach(() => {
   found = 2;
   missing = false;
   partial = false;
+  carried = null;
   vi.unstubAllGlobals();
 });
 
@@ -274,4 +280,32 @@ test("a trace's crumb is a link to Traces, never the page shown", async () => {
   const traces = trail.getByRole("link", { name: "Traces" });
   await expect.element(traces).toBeVisible();
   await expect.element(traces).not.toHaveAttribute("aria-current");
+});
+
+const SESSION = "1792800000-0123456789abcdef";
+
+test("a trace a person's analytics session made links to that session's traces", async () => {
+  carried = SESSION;
+  const { screen, router } = await open(`/t/acme/traces/${A}`);
+  const link = screen.getByRole("link", { name: SESSION });
+  await expect.element(link).toBeVisible();
+  await link.click();
+  await expect.poll(() => router.state.location.pathname).toBe("/t/acme/traces");
+  expect(router.state.location.search).toMatchObject({ hours: 168, analytics: SESSION });
+  await expect.poll(() => reads.at(-1)?.query.get("analytics_session")).toBe(SESSION);
+  await expect.element(screen.getByText(/The traces of one analytics session/)).toBeVisible();
+});
+
+test("a trace without an analytics session, or with one that isn't, shows none", async () => {
+  carried = "not-a-session";
+  const { screen } = await open(`/t/acme/traces/${A}`);
+  const tree = screen.getByRole("tree", { name: "Spans" });
+  await expect.element(tree.getByRole("treeitem", { name: /^turn,/ })).toBeVisible();
+  await expect.element(screen.getByText(/Analytics session/)).not.toBeInTheDocument();
+});
+
+test("an analytics session in the address that isn't one is no filter", async () => {
+  await open("/t/acme/traces?analytics=1-x");
+  await expect.poll(() => reads.at(-1)?.path).toBe("/portalr/v1/traces");
+  expect(reads.at(-1)?.query.has("analytics_session")).toBe(false);
 });

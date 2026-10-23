@@ -6,6 +6,7 @@ import {
   PageHeader,
   type Reveal,
   type Standing,
+  TextLink,
   TraceView,
 } from "@portalr/ui";
 import { useQueries, useSuspenseQuery } from "@tanstack/react-query";
@@ -13,7 +14,7 @@ import { createFileRoute, type ErrorComponentProps, Link } from "@tanstack/react
 import { useMemo, useState } from "react";
 import { opening } from "../../../../../access";
 import { ReadFailed } from "../../../../../read-failed";
-import { isId } from "../../../../../traces";
+import { analyticsSessionOf, isId } from "../../../../../traces";
 
 const HEADER = <PageHeader title="Trace" />;
 
@@ -137,10 +138,35 @@ function Body({ trace }: { trace: string }) {
       return (
         <>
           {header}
+          {reading.data && <Session tenant={tenant} trace={reading.data} />}
           {laid ? <TraceView outline={laid} reveal={reveal} /> : <NoSuch />}
         </>
       );
   }
+}
+
+/** The trace's analytics session, where a request of it carried one, and the session's traces. */
+function Session({ tenant, trace }: { tenant: string; trace: Trace }) {
+  const session = analyticsSessionOf(trace.spans);
+  if (session === undefined) {
+    return null;
+  }
+  return (
+    <p className="text-muted text-sm">
+      Analytics session:{" "}
+      <TextLink
+        render={
+          <Link
+            to="/t/$tenant/traces"
+            params={{ tenant }}
+            search={{ hours: 168, analytics: session }}
+          />
+        }
+      >
+        <code className="font-mono">{session}</code>
+      </TextLink>
+    </p>
+  );
 }
 
 /** A span of a trace, by its id. */

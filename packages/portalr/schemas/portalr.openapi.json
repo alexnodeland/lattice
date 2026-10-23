@@ -3720,6 +3720,23 @@
             }
           },
           {
+            "in": "query",
+            "name": "analytics_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^\\d{1,12}-[0-9a-f]{16}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Analytics Session"
+            }
+          },
+          {
             "in": "header",
             "name": "X-Tenant",
             "required": false,

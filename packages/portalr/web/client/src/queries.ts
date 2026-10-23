@@ -303,10 +303,11 @@ export const retryDelay = (count: number, error: unknown) => {
 /** A long read is tried again once, unless the server refused it outright. */
 const once = (count: number, error: unknown) => !refusedOutright(error) && count < 1;
 
-/** What narrows a tenant's traces: a thread's, or a run's. */
+/** What narrows a tenant's traces: a thread's, a run's, or an analytics session's. */
 export interface TraceFilter {
   readonly session?: string | undefined;
   readonly run?: string | undefined;
+  readonly analytics_session?: string | undefined;
 }
 
 /** What narrows a tenant's logs: a thread's, or a run's. */
@@ -967,6 +968,9 @@ export function createQueries(api: Api) {
                     limit: TRACES_LIMIT,
                     ...(filter.session && { session: filter.session }),
                     ...(filter.run && { run: filter.run }),
+                    ...(filter.analytics_session && {
+                      analytics_session: filter.analytics_session,
+                    }),
                   },
                 },
               }),

@@ -41,4 +41,4 @@ Implements the tenant's view in phase 4 of [lattice RFC-0008](../../rfcs/0008-po
 
 - A tenant's admins see how their people use the product without an operator.
 - A partial answer leaves out the later parts, retention first. The page says which parts weren't read.
-- Links from a session to its trace, and back, follow in their own record.
+- Links from a session to its trace, and back, are [ADR-0073](0073-a-requests-analytics-session-on-its-trace.md)'s.

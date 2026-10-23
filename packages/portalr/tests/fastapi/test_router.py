@@ -801,3 +801,23 @@ async def test_a_session_link_is_recorded_for_langfuse_alone(
     with caplog.at_level("INFO", logger="portalr.access"):
         await client.get("/v1/deployment/links", params={"session_id": "thr_1"}, headers=OPS_LINKS)
     assert [record["tools"] for record in _recorded(caplog)] == [["langfuse"]]
+
+
+async def test_an_analytics_sessions_traces_are_the_tenants_alone(
+    client: httpx.AsyncClient, stack: Stack
+) -> None:
+    stack.tempo.paths["/api/search"] = json({"traces": []})
+    session = "1792800000-0123456789abcdef"
+    response = await client.get(
+        "/v1/traces", params={**WINDOW, "analytics_session": session}, headers=headers("alice")
+    )
+    assert response.json() == {"status": "ok", "data": []}
+    assert stack.tempo.last.url.params["q"] == (
+        f'{{ span.tenant.id = "acme" }} && {{ span.portalr.analytics.session = "{session}" }}'
+    )
+    forged = await client.get(
+        "/v1/traces",
+        params={**WINDOW, "analytics_session": 'x" } || { true'},
+        headers=headers("alice"),
+    )
+    assert forged.status_code == 422

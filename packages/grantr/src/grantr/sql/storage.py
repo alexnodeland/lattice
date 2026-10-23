@@ -37,6 +37,7 @@ from grantr.core import (
     Role,
     RulePrincipal,
     ServicePrincipal,
+    SettingRow,
     Subject,
     TenantId,
     User,
@@ -53,6 +54,7 @@ from grantr.sql.tables import (
     KeyRow,
     ResourceRow,
     RoleRow,
+    SettingRowRecord,
     TenantRow,
 )
 from lattice_core.sql.sessions import awaited_to_the_end, lock_row, to_the_end
@@ -285,6 +287,28 @@ class _Reads:
         return {row.key: IntegrationSetting.model_validate(row.setting) for row in rows}
 
     @awaited_to_the_end
+    async def settings(
+        self, tenant: TenantId, workspace: WorkspaceId | None = None
+    ) -> dict[str, SettingRow]:
+        rows = await self._session.scalars(
+            select(SettingRowRecord).where(
+                SettingRowRecord.tenant_id == tenant,
+                SettingRowRecord.workspace == (workspace or ""),
+            )
+        )
+        return {
+            row.key: SettingRow.model_validate(
+                {
+                    **row.written,
+                    "value": row.value,
+                    "version": row.version,
+                    "profile_version": row.profile_version,
+                }
+            )
+            for row in rows
+        }
+
+    @awaited_to_the_end
     async def keys(self, tenant: TenantId) -> list[Key]:
         rows = await self._session.scalars(select(KeyRow).where(KeyRow.tenant_id == tenant))
         return [_stored_key(row) for row in rows]
@@ -334,6 +358,7 @@ class _Transaction(_Reads):
             KeyRow,
             ResourceRow,
             IntegrationRow,
+            SettingRowRecord,
         ):
             await self._session.execute(delete(model).where(model.tenant_id == tenant))
         await self._session.execute(
@@ -466,6 +491,22 @@ class _Transaction(_Reads):
                 workspace=workspace or "",
                 key=key,
                 setting=setting.model_dump(mode="json"),
+            )
+        )
+
+    @awaited_to_the_end
+    async def set_setting(
+        self, tenant: TenantId, workspace: WorkspaceId | None, key: str, row: SettingRow
+    ) -> None:
+        await self._session.merge(
+            SettingRowRecord(
+                tenant_id=tenant,
+                workspace=workspace or "",
+                key=key,
+                value=row.value,
+                version=row.version,
+                written=row.model_dump(mode="json", include={"by", "at"}),
+                profile_version=row.profile_version,
             )
         )
         await self._session.flush()
@@ -688,6 +729,12 @@ class SqlStorage:
     ) -> dict[str, IntegrationSetting]:
         """The integrations set on a tenant, with None, or in one of its workspaces, by key."""
         return await self._read(tenant, lambda reads: reads.integrations(tenant, workspace))
+
+    async def settings(
+        self, tenant: TenantId, workspace: WorkspaceId | None = None
+    ) -> dict[str, SettingRow]:
+        """The settings stored on a tenant, with None, or in one of its workspaces, by key."""
+        return await self._read(tenant, lambda reads: reads.settings(tenant, workspace))
 
     async def keys(self, tenant: TenantId) -> list[Key]:
         """A tenant's keys."""

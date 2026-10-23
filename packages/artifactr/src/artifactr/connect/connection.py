@@ -30,6 +30,7 @@ from mcp.client.stdio import stdio_client
 from mcp.types import CallToolResult, Tool
 
 from artifactr.connect.registry import PROTECTED, ConnectedServer, digest
+from lattice_core.settings import Settings
 
 __all__ = [
     "LOOPBACK",
@@ -41,6 +42,7 @@ __all__ = [
     "ConnectionFailed",
     "PerHour",
     "ProcessLock",
+    "per_hour_setting",
 ]
 
 logger = logging.getLogger("artifactr.connect")
@@ -72,6 +74,24 @@ PER_HOUR: Final = 30
 PerHour = Callable[[str, str], Awaitable[int]]
 """The application's limit of a workspace's code and network calls in an hour, by its tenant and
 its id."""
+
+
+def per_hour_setting(settings: Settings, app: str) -> PerHour:
+    """The limit a settings store holds for an app: `connect-per-hour:<app>`, read each call.
+
+    The store's own answer while it can't be read is its floor, 0; a value that isn't a number,
+    or a key it doesn't declare, raises, which `Connection` answers with 0 too (lattice
+    ADR-0030).
+    """
+    key = f"connect-per-hour:{app}"
+
+    async def read(tenant_id: str, workspace_id: str) -> int:
+        value = await settings.value(tenant_id, workspace_id, key)
+        if isinstance(value, tuple):
+            raise TypeError(f"{key} holds a number")
+        return value
+
+    return read
 
 
 class AppLock(Protocol):
@@ -145,9 +165,10 @@ class Connection:
         approval_ttl: The seconds an approval holds once asked: an older one runs nothing.
         lock: What calls to the app take turns by: this process's lock by default; with more
             than one runner process, PostgreSQL's `artifactr.sql.AdvisoryLock`.
-        per_hour: How many code and network calls each workspace may run in an hour: a number
-            for every workspace, or the application's answer for each, by tenant and workspace,
-            such as a setting its admins change. Counted in the workspace's log.
+        per_hour: How many tries at code and network calls each workspace may make to the app
+            an hour: a number for every workspace, or the application's answer for each, by
+            tenant and workspace, read each call: `per_hour_setting(grants, app)` reads the
+            setting its admins narrow. Counted in the workspace's log; 0 if it can't be read.
 
     Raises:
         ValueError: If the host isn't loopback without `remote`, or a tailnet's with it; if
@@ -239,10 +260,18 @@ class Connection:
         return self._deadline
 
     async def per_hour(self, tenant_id: str, workspace_id: str) -> int:
-        """How many code and network calls the workspace may run in an hour."""
+        """How many tries at code and network calls the workspace may make an hour, read now.
+
+        A `PerHour` that fails, such as a settings store that can't be read, answers 0, so the
+        call is refused rather than run uncounted.
+        """
         if isinstance(self._per_hour, int):
             return self._per_hour
-        return await self._per_hour(tenant_id, workspace_id)
+        try:
+            return await self._per_hour(tenant_id, workspace_id)
+        except Exception:
+            logger.warning("%s's hourly limit can't be read: none is run", self._server.title)
+            return 0
 
     @property
     def approval_ttl(self) -> float:

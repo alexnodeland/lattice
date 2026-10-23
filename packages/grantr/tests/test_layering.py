@@ -18,10 +18,11 @@ OTEL_API = {"opentelemetry.metrics", "opentelemetry.trace"}
 
 LAYERS: dict[str, tuple[set[str], set[str]]] = {
     # layer: (grantr packages it may import, third-party modules it may import)
-    "core": ({"grantr.core"}, {"pydantic"}),
+    # Settings are declared in lattice-core, which says how a layer narrows another: pure code.
+    "core": ({"grantr.core"}, {"pydantic", "lattice_core.settings"}),
     "grants": (
         {"grantr.core", "grantr.grants", "grantr.telemetry"},
-        {*OTEL_API, "lattice_core.integrations"},
+        {*OTEL_API, "lattice_core.integrations", "lattice_core.settings"},
     ),
     "telemetry": ({"grantr.core", "grantr.telemetry"}, {"opentelemetry", *OTEL_API}),
     "testing": ({"grantr.core", "grantr.testing"}, set()),

@@ -6,6 +6,8 @@ when one is accepted, against the head it is applied to:
 
 - **An element's version only grows.** An element an edit changes must have a ``version``
   greater than the head's, or the canvases that reconcile it would keep their own.
+- **An element is never removed:** it is deleted by marking it ``isDeleted``, and kept, so a
+  client mid-edit doesn't bring it back. Removing tombstones is a sweep's (RFC-0006, U3).
 - **A new element is an ``add``,** and an ``add`` of an id the head has already is refused:
   JSON Patch's ``add`` would replace it.
 - **An image is added, never replaced or removed,** since its key is its digest.
@@ -94,9 +96,15 @@ def _kept(head: Diagram, after: Diagram) -> None:
 
 
 def _grown(head: Diagram, after: Diagram) -> None:
-    for key, element in after.elements.items():
-        before = head.elements.get(key)
-        if before is not None and element != before and element.version <= before.version:
+    for key, before in head.elements.items():
+        element = after.elements.get(key)
+        if element is None:
+            _refuse(
+                ["elements", key],
+                f"element {key} is deleted by marking it isDeleted, never removed: only the "
+                "sweep removes a tombstone",
+            )
+        elif element.written() != before.written() and element.version <= before.version:
             _refuse(
                 ["elements", key, "version"],
                 f"element {key} changed, so its version must grow past {before.version}",

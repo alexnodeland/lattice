@@ -1,12 +1,13 @@
 """A diagram's type: permissive about Excalidraw's fields, strict about keys and size."""
 
+import json
 import math
 from typing import Any
 
 import pytest
 from pydantic import ValidationError
 
-from artifactr.core import load_artifact
+from artifactr.core import ValidationFailed, load_artifact
 from artifactr.excalidraw import Diagram, excalidraw_key_of
 from artifactr.excalidraw.types import MAX_DIAGRAM_BYTES, MAX_ELEMENTS, MAX_NONCE, MAX_VERSION
 from tests.excalidraw.scenes import data, element
@@ -86,6 +87,9 @@ def test_only_a_diagram_is_the_integrations() -> None:
         {"x": math.inf},
         {"points": [[0, -math.inf]]},
         {"updated": 1.5},
+        {"x": 10**5000},
+        {"x": 2**53},
+        {"points": [[0, -(2**60)]]},
     ],
 )
 def test_a_hostile_element_is_refused(fields: dict[str, Any]) -> None:
@@ -106,3 +110,20 @@ def test_an_element_nested_past_what_json_holds_is_refused() -> None:
 def test_the_largest_version_and_nonce_are_kept() -> None:
     kept = element("r1", version=MAX_VERSION, nonce=MAX_NONCE)
     assert (kept.version, kept.version_nonce) == (MAX_VERSION, MAX_NONCE)
+
+
+def test_core_refuses_a_huge_integer_as_validation_failed() -> None:
+    huge = {"id": "r1", "type": "rectangle", "version": 1, "versionNonce": 1, "x": 10**5000}
+    data = {"name": "Plan", "elements": {"r1": huge}}
+    with pytest.raises(ValidationFailed, match="invalid excalidraw_diagram data") as refused:
+        load_artifact("excalidraw_diagram", data)
+    assert "JavaScript can't hold exactly" in json.dumps(refused.value.errors)
+
+
+@pytest.mark.parametrize(
+    "size", [10**5000, 2**53, -1, 1.5, True], ids=["huge", "past-2^53", "negative", "float", "bool"]
+)
+def test_an_images_size_is_a_whole_number_javascript_holds(size: object) -> None:
+    image = {"sha256": "a" * 64, "size": size, "media_type": "image/png"}
+    with pytest.raises(ValidationError):
+        Diagram.model_validate({"name": "Plan", "files": {"a" * 64: image}})

@@ -52,3 +52,18 @@ Taking a reading costs a tenant two calls at once, of any kind. It buys a bound 
 1. [x] `render` and `render_proposed` in a reading, and their pages kept (`pages`).
 2. [x] `renders_per_minute`, `Cache-Control` and `ETag` on the page routes.
 3. [x] An upload to a hidden id refused before it is read.
+
+## Amendment (2026-10-23): the waiters, bounded, and what wasn't built
+
+The review's follow-ups ([lattice #570](https://github.com/alexnodeland/lattice/issues/570)):
+
+- **A page waits for a reading by looking again, not in turn.** Each waiter looks every `LOOK_AGAIN` (50 ms), and whichever looks first after a reading is freed takes it: an earlier waiter can lose every race until its deadline and be refused, `Busy`, 429 with `Retry-After`, which the client retries. A waiter's last sleep is cut to what is left of its deadline, so the deadline is exact.
+- **A tenant's waiters are bounded:** `NativeFiles(waiting=8)`, twice the pages a viewer's first screen asks for. Past it, a page is refused at once, so one tenant's pages cost at most eight looks every 50 ms between them, about 160 wakeups a second.
+- **A page that waited finds one rendered meanwhile:** a page that gets a reading looks again in the pages kept, and is given the one another render kept while it waited, without the app or the reader's pace. Two pages asked for at the same moment, each with a reading free, both render: no in-flight map is shared, since a waiter on it would need a primitive of one event loop's.
+- **A page is kept, and found, by the blob, as the blob store keeps bytes:** the tenant, the workspace, the file and the digest, with the app, the page and the scale. A proposal's page is found by the digest its patch names without hashing its bytes. That digest is the proposer's to write, so it finds only a page kept for the same file's bytes in the same workspace: never one kept for another tenant's, or another file's, that names the same digest. A page kept is of bytes the file holds: collection drops the pages of the bytes it may delete, those nothing names, so a digest whose bytes are gone finds no page. On a miss the bytes are read from the store, and a digest the file doesn't have is refused, `ContentUnavailable`, as before. A proposal that changes no content is refused before it takes a reading or its reader's pace.
+- **portalr's client waits a little more, at random,** before it asks again after a refusal: up to a fifth past the server's `Retry-After`, or its own backoff, so the pages a busy server refused together don't come back together.
+
+Not built, and why:
+
+- **A condition per tenant, to wake a waiter rather than have it look.** asyncio's and anyio's conditions belong to one event loop, and a waiter on one is never woken from another; an application, or its tests, can serve requests on several, which is what the store's own asyncio lock hung on (lattice #594). Looking again works on any loop, and the cap bounds what it costs.
+- **Cancelling a render when its reader goes away.** The worker does the call once it has it, whatever the application does, and does one at a time: cancelling the application's side frees no turn of the worker's. The reading is held until the render ends, at most the app's deadline, as an upload's is.

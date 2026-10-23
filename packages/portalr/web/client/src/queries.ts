@@ -220,10 +220,15 @@ async function body<D>(
 ): Promise<D> {
   const { data, error, response: answered } = await response;
   if (data === undefined) {
-    const wait = Number.parseInt(answered.headers.get("retry-after") ?? "", 10);
-    throw new Refused(answered.status, error, Number.isNaN(wait) ? null : wait);
+    throw refusal(answered, error);
   }
   return data;
+}
+
+/** The server's refusal of a read: its status, its detail, and the seconds it said to wait. */
+export function refusal(answered: Response, detail: unknown): Refused {
+  const wait = Number.parseInt(answered.headers.get("retry-after") ?? "", 10);
+  return new Refused(answered.status, detail, Number.isNaN(wait) ? null : wait);
 }
 
 /** A text read's words, or null where the server has none to give (`409`, nothing to read). */
@@ -282,10 +287,16 @@ export const refusedOutright = (error: unknown) =>
   error instanceof Refused && error.status >= 400 && error.status < 500 && error.status !== 429;
 
 /** How long to wait before a read is tried again: the server's `Retry-After`, or a backoff. */
-export const retryDelay = (count: number, error: unknown) =>
-  error instanceof Refused && error.retryAfter !== null
-    ? error.retryAfter * 1000
-    : Math.min(1000 * 2 ** count, 30_000);
+export const retryDelay = (count: number, error: unknown) => {
+  // The server's wait, at least none and at most five minutes, or a backoff of our own.
+  const wait =
+    error instanceof Refused && error.retryAfter !== null
+      ? Math.min(Math.max(error.retryAfter, 0), 300) * 1000
+      : Math.min(1000 * 2 ** count, 30_000);
+  // Up to a fifth more, at random, so the reads a busy server refused together don't all come
+  // back at the same moment.
+  return wait + Math.random() * (wait / 5);
+};
 
 /** A long read is tried again once, unless the server refused it outright. */
 const once = (count: number, error: unknown) => !refusedOutright(error) && count < 1;

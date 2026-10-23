@@ -4,12 +4,29 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from artifactr.core import CreateArtifact, EditArtifact, JsonPatch, ValidationFailed
-from artifactr.excalidraw import SWEEPER, Diagram, element_patch, sweep_tombstones
-from artifactr.excalidraw.sweep import KEEP
-from artifactr.workspace import Workspace, Workspaces
+from artifactr.core import (
+    CreateArtifact,
+    EditArtifact,
+    JsonPatch,
+    Revision,
+    ValidationFailed,
+    VersionConflict,
+)
+from artifactr.excalidraw import (
+    EXCALIDRAW,
+    EXCALIDRAW_TYPES,
+    SWEEPER,
+    Diagram,
+    element_patch,
+    excalidraw_checks,
+    excalidraw_key_of,
+    sweep_tombstones,
+)
+from artifactr.excalidraw.sweep import KEEP, deleted_before
+from artifactr.workspace import Storage, Workspace, Workspaces, integration_gate
 from tests.excalidraw.scenes import data, element
 from tests.ui.people import ALICE
+from tests.ui.toggles import Toggles
 
 
 async def _drawn(workspaces: Workspaces) -> Workspace:
@@ -58,17 +75,46 @@ async def test_only_the_sweep_removes_and_only_a_tombstone(workspaces: Workspace
         )
 
 
-async def test_an_untimed_revision_counts_as_old(workspaces: Workspaces) -> None:
-    from artifactr.core import Revision
-    from artifactr.excalidraw.sweep import _deleted_before
-
+def test_an_untimed_revision_counts_as_old() -> None:
     gone = element("a", version=2, isDeleted=True)
     untimed = Revision(
-        artifact_id="d1",
-        version=2,
-        kind="excalidraw_diagram",
-        data=data(gone),
-        actor=ALICE,
+        artifact_id="d1", version=2, kind="excalidraw_diagram", data=data(gone), actor=ALICE
     )
-    assert _deleted_before(gone, [untimed], datetime.now(UTC))
-    assert not _deleted_before(gone, [], datetime.now(UTC))
+    assert deleted_before(gone, [untimed], datetime.now(UTC))
+    assert not deleted_before(gone, [], datetime.now(UTC))
+
+
+async def test_a_naive_now_is_refused(workspaces: Workspaces) -> None:
+    ws = await _drawn(workspaces)
+    with pytest.raises(ValueError, match="time zone"):
+        await sweep_tombstones(ws.as_actor(SWEEPER), now=datetime(2026, 10, 23))
+
+
+async def test_a_diagram_changed_meanwhile_is_left_for_the_next_sweep(
+    workspaces: Workspaces, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ws = await _drawn(workspaces)
+    sweeper = ws.as_actor(SWEEPER)
+    later = datetime.now(UTC) + KEEP + timedelta(hours=1)
+
+    async def changed(_command: object) -> None:
+        raise VersionConflict("d1", base=2, head=3)
+
+    monkeypatch.setattr(sweeper, "commit", changed)
+    assert await sweep_tombstones(sweeper, now=later) == 0
+    assert "a" in (await ws.get(Diagram, "d1")).data.elements
+
+
+async def test_where_diagrams_are_off_their_tombstones_wait(storage: Storage) -> None:
+    switches = Toggles()
+    workspaces = Workspaces(
+        storage,
+        types=EXCALIDRAW_TYPES,
+        checks=excalidraw_checks(),
+        gate=integration_gate(switches, excalidraw_key_of),
+    )
+    ws = await _drawn(workspaces)
+    switches.off["ws_1"] = {EXCALIDRAW}
+    later = datetime.now(UTC) + KEEP + timedelta(hours=1)
+    assert await sweep_tombstones(ws.as_actor(SWEEPER), now=later) == 0
+    assert "a" in (await ws.get(Diagram, "d1")).data.elements

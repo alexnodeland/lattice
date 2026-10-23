@@ -68,9 +68,9 @@ connect = ["mcp>=2.2", "anyio>=4.9"]
 # the forms by, which a dependency they ever need joins.
 forms = ["pydantic-core>=2.46.0"]
 # Excalidraw diagrams, artifactr.excalidraw (lattice RFC-0006, as ADR-0026 amends it): the name an
-# application installs them by. Its data layer needs nothing beyond artifactr's own dependencies;
-# the agent's tools keep a drawing's images in native files' blob store, and call the converter's
-# worker with httpx, both of which the files extra brings (artifactr ADR-0090).
+# application installs them by. The agent's tools keep a drawing's images in native files' blob
+# store, and call the converter's worker with httpx under anyio's deadlines, so it is the files
+# extra whole: with them, mcp, starlette, uvicorn and zstandard (artifactr ADR-0090).
 excalidraw = ["artifactr-ai[files]"]
 
 [project.urls]

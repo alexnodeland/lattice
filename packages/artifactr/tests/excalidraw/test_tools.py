@@ -6,7 +6,6 @@ from collections.abc import AsyncIterator, Mapping, Sequence
 from typing import Any
 
 import pytest
-from pydantic import JsonValue
 from pydantic_ai import Agent, BinaryContent, RetryPromptPart, ToolReturnPart
 
 from artifactr.agent import ArtifactWorkspace, Runner, Session
@@ -20,8 +19,9 @@ from artifactr.excalidraw import (
     FakeConverter,
     diagram_tools,
 )
-from artifactr.excalidraw.converter import ConvertedFile, Format
+from artifactr.excalidraw.converter import ConvertedFile, Format, Skeleton
 from artifactr.excalidraw.tools import PAGE
+from artifactr.excalidraw.types import MAX_VERSION
 from artifactr.files.blobs import InMemoryBlobs
 from artifactr.workspace import Workspace, Workspaces
 from tests.excalidraw.scenes import data, element
@@ -57,7 +57,7 @@ class Broken(FakeConverter):
         raise ConversionFailed("crashed", "the worker failed")
 
     async def skeletons(
-        self, skeletons: Sequence[Mapping[str, JsonValue]], *, deadline: float = 10.0
+        self, skeletons: Sequence[Skeleton], *, deadline: float = 10.0
     ) -> Converted:
         raise ConversionFailed("too_large", "too many")
 
@@ -188,7 +188,11 @@ async def test_reading_a_diagram_gives_its_description_version_and_elements_by_p
     await _run(_runner(runners, script), ws, thread)
     [first] = _returned(script, 1)
     lines = first.split("\n")
-    assert f"Version 1. Elements 1 to {PAGE} of {PAGE + 6}; read page 1 for more." in lines
+    assert lines[0].startswith("The diagram's words")
+    assert (
+        f"Version 1. Elements 1 to {PAGE} of {PAGE + 6}; read page 1 for more, of the same version."
+        in lines
+    )
     listed = json.loads(lines[-1])
     assert listed[0] == {
         "id": "a1",
@@ -471,3 +475,91 @@ async def test_an_element_with_no_place_is_read_without_one_and_a_lost_image_isn
     assert {"id": "p", "type": "rectangle", "width": 10, "height": 10} in listed
     [png] = _returned(script, 2)
     assert b"(0 images)" in png.data, "its bytes were collected: the render goes on without them"
+
+
+async def test_a_page_past_the_last_a_long_label_and_an_unknown_diagram_are_said_so(
+    ws: Workspace, thread: Thread, runners: list[Runner[None]]
+) -> None:
+    long = element("t", type="text", text="w" * 500)
+    await ws.commit(CreateArtifact(kind="excalidraw_diagram", artifact_id="d1", data=data(long)))
+    script = Script(
+        call("read_diagram", "c1", id="d1", page=5),
+        call("read_diagram", "c2", id="d1"),
+        call("read_diagram", "c3", id="nope"),
+        say("Read."),
+    )
+    await _run(_runner(runners, script), ws, thread)
+    assert "No elements on page 5: version 1 has 1." in _returned(script, 1)[0]
+    listed = json.loads(_returned(script, 2)[0].split("\n")[-1])
+    assert listed[0]["text"] == "w" * 200 + "…"
+    assert "There is no diagram 'nope' here" in _retried(script, 3)[0]
+
+
+async def test_a_new_diagram_with_no_name_spends_no_converters_time(
+    ws: Workspace, thread: Thread, runners: list[Runner[None]]
+) -> None:
+    class Counting(FakeConverter):
+        calls = 0
+
+        async def mermaid(self, source: str, *, deadline: float = 10.0) -> Converted:
+            Counting.calls += 1
+            return await super().mermaid(source, deadline=deadline)
+
+    script = Script(call("draw_mermaid", mermaid="graph TD\n  A --> B", summary="ab"), say("."))
+    await _run(_runner(runners, script, converter=Counting()), ws, thread)
+    assert "needs a `name`" in _retried(script, 1)[0]
+    assert Counting.calls == 0
+
+
+async def test_an_edit_out_of_reach_an_empty_restyle_and_a_bad_colour_go_back_to_the_model(
+    ws: Workspace, thread: Thread, runners: list[Runner[None]]
+) -> None:
+    await ws.commit(
+        CreateArtifact(kind="excalidraw_diagram", artifact_id="d1", data=data(element("a")))
+    )
+    refused = [
+        {"op": "move", "id": "a", "x": float("nan"), "y": 0},
+        {"op": "move", "id": "a", "x": 1e12, "y": 0},
+        {"op": "restyle", "id": "a"},
+        {"op": "restyle", "id": "a", "stroke_color": "url(x)"},
+    ]
+    for op in refused:
+        script = Script(
+            call("edit_elements", id="d1", base_version=1, ops=[op], summary="x"), say("Sorry.")
+        )
+        await _run(_runner(runners, script), ws, thread)
+        assert _retried(script, 1), op
+    assert (await ws.get(Diagram, "d1")).version == 1
+
+
+async def test_an_element_whose_change_isnt_one_goes_back_to_the_model(
+    ws: Workspace, thread: Thread, runners: list[Runner[None]]
+) -> None:
+    near = element("a", version=MAX_VERSION)
+    await ws.commit(CreateArtifact(kind="excalidraw_diagram", artifact_id="d1", data=data(near)))
+    script = Script(
+        call(
+            "edit_elements",
+            id="d1",
+            base_version=1,
+            ops=[{"op": "move", "id": "a", "x": 1, "y": 1}],
+            summary="x",
+        ),
+        say("Sorry."),
+    )
+    await _run(_runner(runners, script), ws, thread)
+    assert "Not changed: element a" in _retried(script, 1)[0]
+
+
+async def test_images_too_large_to_show_are_said_so(
+    ws: Workspace, thread: Thread, runners: list[Runner[None]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    blobs = InMemoryBlobs()
+    script = Script(call("draw_mermaid", mermaid="gantt\n  x", summary="g", name="G"), say("."))
+    await _run(_runner(runners, script, converter=Pictured(), blobs=blobs), ws, thread)
+    await _accepted(ws)
+    [diagram] = await ws.artifacts(Diagram)
+    monkeypatch.setattr("artifactr.excalidraw.tools.MAX_RENDERING", 3)
+    viewing = Script(call("view_diagram", id=diagram.id), say("."))
+    await _run(_runner(runners, viewing, converter=Pictured(), blobs=blobs, view=True), ws, thread)
+    assert "too large to show" in _retried(viewing, 1)[0]

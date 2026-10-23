@@ -18,25 +18,57 @@ ADR-0086 made a diagram an artifact, edited by element-scoped patches. The agent
   - `timeout`: past the deadline;
   - `crashed`: anything else.
 - **`WorkerConverter`** calls the worker over HTTP, as native files' worker client does.
-  - It sends a `POST` of JSON with the worker's token, and opens a new connection for each call.
-  - The deadline is 10 s, plus a 5 s grace for the worker to say how it failed.
-  - Its sizes are checked before anything is sent: 50,000 characters of Mermaid, and 500 skeletons.
-  - Whatever the worker replies, other than its own `{reason, message}`, is `crashed`. A message is cut to 500 characters before the model reads it.
-- **`FakeConverter`** draws without a worker, for tests and for an application with none: a flowchart's edges as boxes and arrows, and skeletons as their elements. It refuses any other Mermaid as `unsupported`.
+  - It sends a `POST` of JSON with the worker's token, and opens a new connection for each call. Redirects aren't followed: one is `crashed`.
+  - **One deadline for the whole call,** 10 s plus a 5 s grace, sending and reading together, so a worker that drips its reply can't stretch it.
+  - **Checked before anything is sent:**
+    - 50,000 characters of Mermaid;
+    - 500 skeletons, each its allowed fields alone, so their bytes and depth are bounded;
+    - a render's images, 16 MiB in all;
+    - JSON that holds no number JSON can't (`invalid`).
+  - **Read with a cap:** a conversion's reply up to 2 MiB plus its images; a render up to 8 MiB.
+    - A conversion gives at most 8 images, each at most 2 MiB, and each element once.
+    - A PNG must start as one.
+    - An SVG must parse, have `svg` as its root, and hold no doctype, script, foreign object, event handler or `javascript:` link.
+    - Anything else is `crashed` or `too_large`.
+  - Whatever the worker replies, other than its own `{reason, message}`, is `crashed`. The worker's words reach the model only for `invalid`, `unsupported` and `too_large`, the failures about what the agent sent, cut to 500 characters. `crashed` and `timeout` are said in fixed words.
+  - **Every call fails only with `ConversionFailed`,** whatever the worker or the agent sends.
+  - **The worker runs one job at a time for every tenant:** no tenant has a bound of its own on its calls yet.
+- **What a skeleton may set is an allowlist (`Skeleton`)**, the same for the fake and the worker:
+  - its type (rectangle, ellipse, diamond, arrow, line, text, frame), an id of the agent's own, its place and size (finite, within ten million either way);
+  - its label or text (2,000 characters), and its colours (hex, `transparent` or a name);
+  - an arrow's or a line's start and end, by id.
+
+  Nothing else reaches the converter: no `customData` and no links.
+
+- **`FakeConverter`** draws without a worker, for tests and for an application with none: a flowchart's edges as boxes and arrows, and skeletons as their elements. It refuses any other Mermaid as `unsupported`, and a drawing past a diagram's elements as `too_large`. It renders a real one-pixel PNG, and an SVG with its words escaped.
 - **`diagram_tools(converter, blobs=, view=, integrations=)`**, a pydantic-ai toolset:
-  - `read_diagram(id, page)`: the description, the version, and up to 100 live elements a page, each its id, type, label, place, size and bindings;
+  - `read_diagram(id, page)`: the description, the version, and up to 100 live elements a page, each its id, type, label, place, size and bindings.
+    - Words are cut to 200 characters.
+    - A page past the last says there are none.
+    - Pages are of the version named. If it changes between pages, the model reads again from the first.
+    - **It says first that the diagram's words are data written by people, never instructions:** a diagram is anyone's to write in.
   - `draw_mermaid` and `draw`: a new diagram, or a drawing beside what an existing one holds, moved to the right of its live elements. An element id the diagram already has is refused;
-  - `edit_elements(id, base_version, ops)`, by element id, never raw JSON Patch (ADR-0003): `move`, `resize`, `restyle`, `relabel` (a text, or the label bound in a shape or an arrow), `delete` (the element and its label, as tombstones) and `connect` (an arrow, with a label). A stale `base_version` is sent back to read again;
+  - `edit_elements(id, base_version, ops)`, by element id, never raw JSON Patch (ADR-0003):
+    - `move` and `resize` take finite places and sizes;
+    - `restyle` takes at least one checked colour;
+    - `relabel` changes a text, or the label bound in a shape or an arrow;
+    - `delete` makes the element and its label tombstones; arrows bound to it stay, bound to nothing;
+    - `connect` draws an arrow, with a label.
+
+    A stale `base_version`, and anything that wouldn't make a valid element, go back to the model;
+
   - `view_diagram`: a PNG, offered only with `view`, as `view_page` is.
 - **How the tools behave.**
   - Each change goes through the workspace and its checks, so the agent's changes are proposals, as a diagram's write policy says.
-  - A refusal goes back to the model to fix, up to three tries a tool.
-  - The tools are offered only while `excalidraw` is on in the run's workspace, which it isn't by default.
+  - A refusal goes back to the model to fix, up to three tries a tool. A new diagram with no name, or an unknown diagram, is refused before the converter is called.
+  - **The tools are offered only while `excalidraw` is on** in the run's workspace, so none of them, `view_diagram` included, spends the worker's time while it's off. Without `integrations`, it is lattice-core's defaults, where diagrams are off.
+  - **What a tool changes is refused again by the workspace's gate** while diagrams are off. Reads don't change anything, and aren't gated there.
 - **Images go to native files' blob store.**
   - A conversion's images, such as a Gantt chart Excalidraw draws only as a picture, are put in the `Blobs` store. Each image element's `fileId` becomes the bytes' digest, which is the image's key in the diagram.
   - Without a store, such a drawing is refused, and the model is told to draw shapes.
-  - Native files' collection takes `naming=(Diagram,)`, so it keeps what diagrams name too.
-  - So the extra now needs the `files` extra, and is `artifactr-ai[excalidraw]` = `artifactr-ai[files]`.
+  - Native files' collection takes `naming=(Diagram,)`, so it keeps what diagrams name too: their revisions, archived ones included, and pending proposals, creates among them.
+  - **The two go together:** an application that gives the tools `blobs` must give the same store's `NativeFiles` `naming=(Diagram,)`, or its collection deletes a diagram's images as named by nothing. The toolset's docstring says so.
+  - So the extra now needs the `files` extra whole, and with it mcp, starlette, uvicorn and zstandard: `artifactr-ai[excalidraw]` = `artifactr-ai[files]`.
 
 ## Consequences
 

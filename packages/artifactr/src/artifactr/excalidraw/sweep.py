@@ -15,11 +15,18 @@ from typing import Final
 
 from pydantic import JsonValue
 
-from artifactr.core import EditArtifact, JsonPatch, Revision, SystemActor
+from artifactr.core import (
+    EditArtifact,
+    JsonPatch,
+    NotEnabled,
+    Revision,
+    SystemActor,
+    VersionConflict,
+)
 from artifactr.excalidraw.types import Diagram, Element
 from artifactr.workspace import Workspace
 
-__all__ = ["KEEP", "SWEEPER", "sweep_tombstones"]
+__all__ = ["KEEP", "SWEEPER", "deleted_before", "sweep_tombstones"]
 
 KEEP: Final = timedelta(hours=24)
 """How long a tombstone is kept after the revision that made it."""
@@ -33,8 +40,19 @@ async def sweep_tombstones(ws: Workspace, *, now: datetime, keep: timedelta = KE
 
     The handle is the sweep's own, as `SWEEPER`, and must see every artifact, as an application's
     own actor does. An archived diagram keeps its tombstones: it isn't edited. A diagram changed
-    between the read and the sweep's commit is skipped, for the next sweep.
+    between the read and the sweep's commit is skipped, for the next sweep. Where diagrams are off
+    in the workspace, nothing is swept, and the workspace's tombstones wait until they are on
+    again: the sweep is a change to a diagram, which the workspace's gate refuses while they're
+    off.
+
+    It reads every revision of a diagram that holds tombstones, to date them: a cost that grows
+    with the diagram's history, until revisions are thinned (artifactr ADR-0091).
+
+    Raises:
+        ValueError: If `now` isn't aware of its time zone, as the server's revisions are.
     """
+    if now.tzinfo is None:
+        raise ValueError("the sweep's `now` names its time zone, as revisions' times do")
     removed = 0
     for diagram in await ws.artifacts(Diagram):
         head = diagram.data
@@ -42,7 +60,7 @@ async def sweep_tombstones(ws: Workspace, *, now: datetime, keep: timedelta = KE
         if not tombstones:
             continue
         revisions = await ws.revisions(diagram.id)
-        old = [e for e in tombstones if _deleted_before(e, revisions, now - keep)]
+        old = [e for e in tombstones if deleted_before(e, revisions, now - keep)]
         if not old:
             continue
         ops: list[dict[str, JsonValue]] = []
@@ -51,19 +69,24 @@ async def sweep_tombstones(ws: Workspace, *, now: datetime, keep: timedelta = KE
                 {"op": "test", "path": f"/elements/{element.id}/version", "value": element.version}
             )
             ops.append({"op": "remove", "path": f"/elements/{element.id}"})
-        await ws.commit(
-            EditArtifact(
-                artifact_id=diagram.id,
-                base_version=diagram.version,
-                patch=JsonPatch(ops=tuple(ops)),
-                summary=f"removed {len(old)} deleted elements",
+        try:
+            await ws.commit(
+                EditArtifact(
+                    artifact_id=diagram.id,
+                    base_version=diagram.version,
+                    patch=JsonPatch(ops=tuple(ops)),
+                    summary=f"removed {len(old)} deleted elements",
+                )
             )
-        )
+        except VersionConflict:
+            continue  # changed since it was read: the next sweep takes it
+        except NotEnabled:
+            return removed  # diagrams are off here: their tombstones wait
         removed += len(old)
     return removed
 
 
-def _deleted_before(element: Element, revisions: Sequence[Revision], before: datetime) -> bool:
+def deleted_before(element: Element, revisions: Sequence[Revision], before: datetime) -> bool:
     """Whether the revision that made this tombstone, as it is now, was committed before `before`.
 
     That is the first revision whose element has the tombstone's version: a revision with no

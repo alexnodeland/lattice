@@ -111,7 +111,7 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
             *("artifactr.core", "artifactr.workspace", "artifactr.agent", "artifactr.excalidraw"),
             "artifactr.files.blobs",
         },
-        {"pydantic", "pydantic_ai", "httpx", "lattice_core.integrations"},
+        {"pydantic", "pydantic_ai", "httpx", "anyio", "lattice_core.integrations"},
     ),
     # The evalr adapter: a feedback source, experiment tasks, a TurnEvaluator and measures.
     # Only this layer and the score mirror may import evalr.

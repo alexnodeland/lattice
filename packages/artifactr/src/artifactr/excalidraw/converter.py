@@ -13,11 +13,25 @@ import base64
 import binascii
 import hashlib
 import json
+import re
+import struct
+import zlib
 from collections.abc import Mapping, Sequence
 from typing import Annotated, Final, Literal, Protocol, Self
+from xml.etree import ElementTree
+from xml.sax.saxutils import escape
 
+import anyio
 import httpx
-from pydantic import BaseModel, ConfigDict, Field, JsonValue, ValidationError
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    JsonValue,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 
 from artifactr.excalidraw.types import MAX_ELEMENTS, Diagram, Element
 
@@ -25,6 +39,7 @@ __all__ = [
     "DEADLINE",
     "MAX_MERMAID",
     "MAX_SKELETONS",
+    "Colour",
     "ConversionFailed",
     "Converted",
     "ConvertedFile",
@@ -32,6 +47,7 @@ __all__ = [
     "FakeConverter",
     "Format",
     "Reason",
+    "Skeleton",
     "WorkerConverter",
 ]
 
@@ -51,6 +67,36 @@ MAX_IMAGE_BYTES: Final = 2 * 1024 * 1024
 """The largest image a conversion may give, before base64: a Mermaid diagram Excalidraw draws
 only as a picture, such as a Gantt chart."""
 
+MAX_IMAGES: Final = 8
+"""The most images a conversion may give."""
+
+MAX_REPLY: Final = 2 * 1024 * 1024 + MAX_IMAGES * MAX_IMAGE_BYTES * 4 // 3
+"""The most bytes a conversion's reply may hold: its elements, and its images as base64."""
+
+MAX_RENDERED: Final = 8 * 1024 * 1024
+"""The most bytes a rendered diagram may be."""
+
+MAX_RENDERING: Final = 16 * 1024 * 1024
+"""The most bytes a render may send the worker: the diagram, and its images as base64."""
+
+PLACE: Final = 10_000_000.0
+"""How far from the origin anything the agent places may be, either way."""
+
+PNG: Final = b"\x89PNG\r\n\x1a\n"
+"""A PNG's first bytes."""
+
+Colour = Annotated[str, Field(pattern=r"^(#[0-9a-fA-F]{3,8}|transparent|[a-z]{3,20})$")]
+"""A colour an element may be given: hex, `transparent`, or a CSS colour's name."""
+
+Coordinate = Annotated[float, Field(allow_inf_nan=False, ge=-PLACE, le=PLACE)]
+"""A place on the canvas, finite and within reach."""
+
+Extent = Annotated[float, Field(allow_inf_nan=False, gt=0, le=PLACE)]
+"""A size, finite and more than nothing."""
+
+Words = Annotated[str, Field(max_length=2_000)]
+"""Words written in a diagram."""
+
 Format = Literal["svg", "png"]
 """What a diagram renders as."""
 
@@ -65,6 +111,38 @@ class ConversionFailed(Exception):
     def __init__(self, reason: Reason, message: str) -> None:
         super().__init__(message)
         self.reason: Reason = reason
+
+
+class Bound(BaseModel):
+    """An element an arrow is bound to, by its id."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    id: Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{1,64}$")]
+
+
+class Skeleton(BaseModel):
+    """An element to draw, given by what the agent may set of it, and nothing else.
+
+    The worker's contract is these fields alone: its type, an id of the agent's own to bind to,
+    its place and size, its label (or a text's words), its colours, and, for an arrow or a line,
+    what it starts and ends at.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    type: Literal["rectangle", "ellipse", "diamond", "arrow", "line", "text", "frame"]
+    id: Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{1,64}$")] | None = None
+    x: Coordinate = 0
+    y: Coordinate = 0
+    width: Extent | None = None
+    height: Extent | None = None
+    label: Words | None = None
+    text: Words | None = None
+    stroke_color: Colour | None = None
+    background_color: Colour | None = None
+    start: Bound | None = None
+    end: Bound | None = None
 
 
 class ConvertedFile(BaseModel):
@@ -97,6 +175,22 @@ class Converted(BaseModel):
     elements: list[Element] = Field(max_length=MAX_ELEMENTS)
     files: dict[str, ConvertedFile] = Field(default_factory=dict[str, ConvertedFile])
 
+    @field_validator("files")
+    @classmethod
+    def _few(cls, files: dict[str, ConvertedFile]) -> dict[str, ConvertedFile]:
+        if len(files) > MAX_IMAGES:
+            msg = f"a conversion gives at most {MAX_IMAGES} images"
+            raise ValueError(msg)
+        return files
+
+    @model_validator(mode="after")
+    def _once(self) -> Self:
+        ids = [element.id for element in self.elements]
+        if len(ids) != len(set(ids)):
+            msg = "a conversion gives each element once"
+            raise ValueError(msg)
+        return self
+
 
 class Converter(Protocol):
     """What draws and renders diagrams: Mermaid or skeletons into elements, a diagram into an image.
@@ -110,7 +204,7 @@ class Converter(Protocol):
         ...
 
     async def skeletons(
-        self, skeletons: Sequence[Mapping[str, JsonValue]], *, deadline: float = DEADLINE
+        self, skeletons: Sequence[Skeleton], *, deadline: float = DEADLINE
     ) -> Converted:
         """Draw skeletons: elements given by their type, place, size, label and what they bind."""
         ...
@@ -123,7 +217,7 @@ class Converter(Protocol):
         as_: Format,
         deadline: float = DEADLINE,
     ) -> bytes:
-        """Render a diagram, with the images it shows, as SVG or PNG."""
+        """Render a diagram, with the images it shows, as SVG or PNG: a PNG, or a checked SVG."""
         ...
 
 
@@ -163,16 +257,19 @@ class WorkerConverter:
     async def mermaid(self, source: str, *, deadline: float = DEADLINE) -> Converted:
         """Draw a Mermaid diagram in the worker."""
         _within("Mermaid's source", len(source), MAX_MERMAID, "characters")
-        reply = await self._post("/mermaid", {"source": source, "deadline": deadline}, deadline)
-        return _converted(reply)
+        sent = {"source": source, "deadline": deadline}
+        return _converted(await self._post("/mermaid", sent, deadline, MAX_REPLY))
 
     async def skeletons(
-        self, skeletons: Sequence[Mapping[str, JsonValue]], *, deadline: float = DEADLINE
+        self, skeletons: Sequence[Skeleton], *, deadline: float = DEADLINE
     ) -> Converted:
         """Draw skeletons in the worker."""
         _within("the skeletons", len(skeletons), MAX_SKELETONS, "skeletons")
-        sent = {"skeletons": [dict(each) for each in skeletons], "deadline": deadline}
-        return _converted(await self._post("/skeletons", sent, deadline))
+        sent = {
+            "skeletons": [each.model_dump(exclude_none=True) for each in skeletons],
+            "deadline": deadline,
+        }
+        return _converted(await self._post("/skeletons", sent, deadline, MAX_REPLY))
 
     async def render(
         self,
@@ -183,17 +280,35 @@ class WorkerConverter:
         deadline: float = DEADLINE,
     ) -> bytes:
         """Render a diagram in the worker."""
+        _within("the images", sum(len(data) for data in files.values()), MAX_RENDERING, "bytes")
         sent = {
             "diagram": diagram.to_json(),
             "files": {key: base64.b64encode(data).decode() for key, data in files.items()},
             "as": as_,
             "deadline": deadline,
         }
-        return (await self._post("/render", sent, deadline)).content
+        return checked(await self._post("/render", sent, deadline, MAX_RENDERED), as_)
 
-    async def _post(self, path: str, body: Mapping[str, object], deadline: float) -> httpx.Response:
+    async def _post(
+        self, path: str, body: Mapping[str, object], deadline: float, most: int
+    ) -> bytes:
+        """Send a call, and read its reply, all within the deadline and its grace, up to `most`."""
         try:
-            reply = await self._client.post(path, json=body, timeout=deadline + GRACE)
+            content = json.dumps(body, allow_nan=False, separators=(",", ":")).encode()
+        except ValueError as error:
+            raise ConversionFailed("invalid", "it holds a number JSON can't") from error
+        _within("the call", len(content), MAX_RENDERING, "bytes")
+        headers = {"Content-Type": "application/json"}
+        try:
+            with anyio.fail_after(deadline + GRACE):
+                async with self._client.stream(
+                    "POST", path, content=content, headers=headers
+                ) as reply:
+                    read = await _read(reply, most)
+        except TimeoutError as error:
+            raise ConversionFailed(
+                "timeout", f"the converter took more than {deadline:g}s"
+            ) from error
         except httpx.TimeoutException as error:
             raise ConversionFailed(
                 "timeout", f"the converter took more than {deadline:g}s"
@@ -201,8 +316,8 @@ class WorkerConverter:
         except httpx.HTTPError as error:
             raise ConversionFailed("crashed", "the converter couldn't be reached") from error
         if reply.is_success:
-            return reply
-        raise _refused(reply)
+            return read
+        raise _refused(reply.status_code, read)
 
 
 class FakeConverter:
@@ -232,34 +347,49 @@ class FakeConverter:
                 raise ConversionFailed("invalid", f"not an edge: {line!r}")
             start, label = [*parts[0].split("--", 1), ""][:2]
             ends = [self._node(nodes, made, name.strip()) for name in (start, parts[1])]
-            arrow = self._element(
-                "arrow",
-                None,
-                startBinding={"elementId": ends[0].id},
-                endBinding={"elementId": ends[1].id},
-            )
+            ends_bound: dict[str, JsonValue] = {
+                "startBinding": {"elementId": ends[0].id},
+                "endBinding": {"elementId": ends[1].id},
+            }
+            arrow = self._element("arrow", None, ends_bound)
             made.append(arrow)
             if label.strip():
-                made.append(self._element("text", None, text=label.strip(), containerId=arrow.id))
-        return Converted(elements=made)
+                made.append(
+                    self._element("text", None, {"text": label.strip(), "containerId": arrow.id})
+                )
+            if len(made) > MAX_ELEMENTS:
+                raise ConversionFailed("too_large", f"it makes more than {MAX_ELEMENTS} elements")
+        return _made(made)
 
     async def skeletons(
-        self, skeletons: Sequence[Mapping[str, JsonValue]], *, deadline: float = DEADLINE
+        self, skeletons: Sequence[Skeleton], *, deadline: float = DEADLINE
     ) -> Converted:
         """Draw each skeleton as its element, its label a text bound in it."""
         _in_time(deadline)
         _within("the skeletons", len(skeletons), MAX_SKELETONS, "skeletons")
         made: list[Element] = []
         for skeleton in skeletons:
-            kind = skeleton.get("type")
-            if not isinstance(kind, str) or not kind:
-                raise ConversionFailed("invalid", "a skeleton names its type")
-            fields = {k: v for k, v in skeleton.items() if k not in {"type", "label", "id"}}
-            element = self._element(kind, skeleton.get("id"), **fields)
+            given: dict[str, JsonValue] = {
+                "width": skeleton.width,
+                "height": skeleton.height,
+                "text": skeleton.text,
+                "strokeColor": skeleton.stroke_color,
+                "backgroundColor": skeleton.background_color,
+            }
+            fields: dict[str, JsonValue] = {
+                "x": skeleton.x,
+                "y": skeleton.y,
+                **{key: value for key, value in given.items() if value is not None},
+            }
+            for key, bound in (("startBinding", skeleton.start), ("endBinding", skeleton.end)):
+                if bound is not None:
+                    fields[key] = {"elementId": bound.id}
+            element = self._element(skeleton.type, skeleton.id, fields)
             made.append(element)
-            if isinstance(label := skeleton.get("label"), str):
-                made.append(self._element("text", None, text=label, containerId=element.id))
-        return Converted(elements=made)
+            if skeleton.label is not None:
+                label = {"text": skeleton.label, "containerId": element.id}
+                made.append(self._element("text", None, label))
+        return _made(made)
 
     async def render(
         self,
@@ -269,40 +399,38 @@ class FakeConverter:
         as_: Format,
         deadline: float = DEADLINE,
     ) -> bytes:
-        """A small SVG, or the PNG's signature and the same words, holding the description."""
+        """A one-pixel PNG, or a small SVG, holding the diagram's description."""
         _in_time(deadline)
-        said = json.dumps(f"{diagram.render_for_agent()} ({len(files)} images)")
+        said = f"{diagram.render_for_agent()} ({len(files)} images)"
         if as_ == "png":
-            return b"\x89PNG\r\n\x1a\n" + said.encode()
-        return f'<svg xmlns="http://www.w3.org/2000/svg"><desc>{said}</desc></svg>'.encode()
+            return _png(said)
+        return f'<svg xmlns="http://www.w3.org/2000/svg"><desc>{escape(said)}</desc></svg>'.encode()
 
     def _node(self, nodes: dict[str, Element], made: list[Element], name: str) -> Element:
         if name not in nodes:
-            nodes[name] = self._element("rectangle", None, x=len(nodes) * 200, y=0)
+            nodes[name] = self._element("rectangle", None, {"x": len(nodes) * 200, "y": 0})
             made.append(nodes[name])
-            made.append(self._element("text", None, text=name, containerId=nodes[name].id))
+            made.append(self._element("text", None, {"text": name, "containerId": nodes[name].id}))
         return nodes[name]
 
-    def _element(self, kind: str, given: JsonValue, **fields: JsonValue) -> Element:
+    def _element(
+        self, kind: str, given: str | None, fields: Mapping[str, JsonValue] | None = None
+    ) -> Element:
         self._made += 1
-        made = given if isinstance(given, str) else f"fake{self._made}"
+        made = given if given is not None else f"fake{self._made}"
         data: dict[str, JsonValue] = {
             "x": 0,
             "y": 0,
             "width": 160,
             "height": 80,
-            **fields,
+            **(fields or {}),
             "id": made,
             "type": kind,
             "version": 1,
             "versionNonce": int(hashlib.sha256(made.encode()).hexdigest()[:7], 16),
         }
-        try:
-            return Element.model_validate(data)
-        except ValidationError as error:
-            raise ConversionFailed(
-                "invalid", f"not an element: {error.errors()[0]['msg']}"
-            ) from error
+        # What a skeleton may set is checked as it is made, so this is an element.
+        return Element.model_validate(data)
 
 
 def _in_time(deadline: float) -> None:
@@ -315,18 +443,43 @@ def _within(what: str, size: int, most: int, unit: str) -> None:
         raise ConversionFailed("too_large", f"{what} is {size} {unit}: at most {most}")
 
 
-def _converted(reply: httpx.Response) -> Converted:
+def _made(made: list[Element]) -> Converted:
     try:
-        return Converted.model_validate_json(reply.content)
+        return Converted(elements=made)
+    except ValidationError as error:
+        raise ConversionFailed("invalid", f"not drawn: {error.errors()[0]['msg']}") from error
+
+
+async def _read(reply: httpx.Response, most: int) -> bytes:
+    read = bytearray()
+    async for chunk in reply.aiter_bytes():
+        read += chunk
+        if len(read) > most:
+            raise ConversionFailed("too_large", f"the converter's reply is more than {most} bytes")
+    return bytes(read)
+
+
+def _converted(reply: bytes) -> Converted:
+    try:
+        return Converted.model_validate_json(reply)
     except ValidationError as error:
         raise ConversionFailed("crashed", "the converter replied with something else") from error
 
 
-def _refused(reply: httpx.Response) -> ConversionFailed:
+SAID: Final[frozenset[Reason]] = frozenset({"invalid", "unsupported", "too_large"})
+"""The failures whose words, the worker's own, may reach the model: they are about what it sent."""
+
+
+def _refused(status: int, reply: bytes) -> ConversionFailed:
     try:
-        said = _Refusal.model_validate_json(reply.content)
+        said = _Refusal.model_validate_json(reply)
     except ValidationError:
-        return ConversionFailed("crashed", f"the converter answered {reply.status_code}")
+        return ConversionFailed("crashed", f"the converter answered {status}")
+    if said.reason not in SAID:
+        words = (
+            "the converter took too long" if said.reason == "timeout" else "the converter failed"
+        )
+        return ConversionFailed(said.reason, words)
     return ConversionFailed(said.reason, said.message[:500])
 
 
@@ -335,3 +488,49 @@ class _Refusal(BaseModel):
 
     reason: Reason
     message: str
+
+
+_UNSAFE: Final = re.compile(
+    rb"<!DOCTYPE|<!ENTITY|<script|<foreignObject|\son[a-z]+\s*=|javascript:", re.I
+)
+"""What an SVG to show may not hold: a doctype, script, foreign content, handlers, script links."""
+
+
+def checked(rendered: bytes, as_: Format) -> bytes:
+    """A render as it may be shown: a PNG by its signature, or an SVG that parses and runs nothing.
+
+    Raises:
+        ConversionFailed: If it is anything else, as `crashed`.
+    """
+    if as_ == "png":
+        if not rendered.startswith(PNG):
+            raise ConversionFailed("crashed", "the converter's PNG isn't one")
+        return rendered
+    if _UNSAFE.search(rendered):
+        raise ConversionFailed("crashed", "the converter's SVG holds what can't be shown")
+    try:
+        root = ElementTree.fromstring(rendered)
+    except ElementTree.ParseError as error:
+        raise ConversionFailed("crashed", "the converter's SVG doesn't parse") from error
+    if root.tag not in {"svg", "{http://www.w3.org/2000/svg}svg"}:
+        raise ConversionFailed("crashed", "the converter's SVG isn't one")
+    return rendered
+
+
+def _png(said: str) -> bytes:
+    """A one-pixel white PNG, with `said` as its description."""
+
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        body = kind + data
+        return struct.pack(">I", len(data)) + body + struct.pack(">I", zlib.crc32(body))
+
+    header = struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0)
+    pixel = zlib.compress(b"\x00\xff\xff\xff")
+    text = b"Description\x00" + said.encode("latin-1", "replace")
+    return (
+        PNG
+        + chunk(b"IHDR", header)
+        + chunk(b"tEXt", text)
+        + chunk(b"IDAT", pixel)
+        + chunk(b"IEND", b"")
+    )

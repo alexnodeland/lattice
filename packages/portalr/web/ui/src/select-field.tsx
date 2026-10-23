@@ -92,7 +92,8 @@ export function SelectField({
                   <Select.Item
                     key={option.value}
                     value={option.value}
-                    className={`${item} data-selected:font-semibold`}
+                    // The pointer shows where it rests, as the keys' highlight doesn't follow it.
+                    className={`${item} hover:bg-wash data-selected:font-semibold`}
                   >
                     <Select.ItemText>{option.label}</Select.ItemText>
                     <Select.ItemIndicator className="text-accent">

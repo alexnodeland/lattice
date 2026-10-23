@@ -130,7 +130,11 @@ test("Tab while it is open closes it, choosing nothing, and moves on", async () 
   // The list takes the focus a frame after it is seen. A Tab before then leaves the trigger, and
   // the focus, arriving late, comes back into a list that stays open.
   await expect.poll(() => document.activeElement?.getAttribute("role")).toBe("option");
+  await expect
+    .element(page.getByRole("option", { name: "Owner" }))
+    .not.toHaveAttribute("data-highlighted");
   await userEvent.keyboard("{ArrowDown}");
+  // From the choice, Viewer, to its neighbour: not from Owner, the last, where the pointer rests.
   await expect
     .element(page.getByRole("option", { name: "Editor" }))
     .toHaveAttribute("data-highlighted");

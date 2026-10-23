@@ -27,6 +27,8 @@ from tests.workspace.conftest import StorageFactory
 
 ALICE = UserActor(id="alice")
 SCOPE = Scope("tenant_a", "ws_1")
+HANG = 10
+"""Seconds past which a transaction after a cancelled one is taken to hang."""
 
 
 async def _create_thread(storage: Storage, thread_id: str) -> None:
@@ -93,7 +95,10 @@ async def test_a_transaction_cancelled_at_any_await_leaves_the_workspace_usable(
             await asyncio.sleep(0)
         task.cancel()
         await asyncio.gather(task, return_exceptions=True)
-        async with asyncio.timeout(1):
+        # The next transaction must not hang on what the cancelled one left: the bound turns a hang
+        # into a failure, and is no measure of speed. One second wasn't: on a loaded runner, the
+        # next transaction on PostgreSQL with row-level security, a fresh connection, took longer.
+        async with asyncio.timeout(HANG):
             await _create_thread(storage, f"next{yields}")
         if not task.cancelled():
             task.result()

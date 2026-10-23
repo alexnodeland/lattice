@@ -24,6 +24,8 @@ from tests.event_types import ServiceError
 from tests.workspace.helpers import deploy, entry, fired
 
 ACME = WorkspaceRef("acme", "prod")
+HANG = 10
+"""Seconds past which a transaction after a cancelled one is taken to hang."""
 OTHER = WorkspaceRef("globex", "prod")
 
 ANY_ORDER = RunPolicy()
@@ -132,7 +134,10 @@ async def test_a_transaction_cancelled_at_any_await_leaves_the_workspace_usable(
             await asyncio.sleep(0)
         task.cancel()
         await asyncio.gather(task, return_exceptions=True)
-        async with asyncio.timeout(1), storage.transaction(ACME) as transaction:
+        # The next transaction must not hang on what the cancelled one left: the bound turns a hang
+        # into a failure, and is no measure of speed. One second wasn't: on a loaded runner, the
+        # next transaction on PostgreSQL with row-level security, a fresh connection, took longer.
+        async with asyncio.timeout(HANG), storage.transaction(ACME) as transaction:
             await transaction.save_schedule("next", START)
         if not task.cancelled():
             task.result()

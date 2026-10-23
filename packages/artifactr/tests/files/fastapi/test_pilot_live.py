@@ -12,7 +12,6 @@ from pathlib import Path
 
 import pytest
 from fastapi import FastAPI
-from fastapi.testclient import TestClient
 from starlette.requests import HTTPConnection
 
 from artifactr.core import Actor, TenantId, UserActor
@@ -24,6 +23,7 @@ from artifactr.files.manifest import DOCX, WordDocument
 from artifactr.files.native import NativeFiles
 from artifactr.files.wordcraft import Subprocess
 from artifactr.workspace import InMemoryStorage, Workspaces
+from tests.clients import entered
 from tests.files.corpus.wordcraft.corpus import CORPUS
 from tests.files.wordcraft.test_live import DEADLINE, VERSION
 
@@ -37,7 +37,7 @@ async def alice(_connection: HTTPConnection) -> tuple[TenantId, Actor]:
 
 def test_the_browser_build_is_served_as_released_under_its_policy() -> None:
     build = Path(os.environ["ARTIFACTR_TEST_CRAFT_WEB"])
-    client = TestClient(editor_app(build))
+    client = entered(editor_app(build))
     page = client.get("/")
     assert page.content == (build / "index.html").read_bytes()
     assert page.headers["content-security-policy"] == editor_policy(page.text)
@@ -55,7 +55,7 @@ async def test_a_check_out_edited_in_wordcraft_checks_in_as_a_revision() -> None
     await files.upload(ws, WordDocument, "t.docx", once(source), media_type=DOCX, artifact_id="a1")
     server = FastAPI()
     server.include_router(files_router(workspaces, files, resolve_actor=alice))
-    client = TestClient(server)
+    client = entered(server)
 
     checkout = client.post("/workspaces/w1/files/a1/checkouts").json()
     downloaded = client.get("/workspaces/w1/files/a1/versions/1/content").content

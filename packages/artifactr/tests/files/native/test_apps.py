@@ -6,7 +6,6 @@ from typing import ClassVar, override
 
 import pytest
 from fastapi import FastAPI
-from fastapi.testclient import TestClient
 from starlette.requests import HTTPConnection
 
 from artifactr.core import Actor, NotEnabled, NotFound, TenantId, UserActor, ValidationFailed
@@ -17,6 +16,7 @@ from artifactr.files.fastapi import files_router
 from artifactr.files.manifest import DOCX, PDF, XLSX, NativeFile, WordDocument
 from artifactr.files.native import FormatChanged, NativeFiles
 from artifactr.workspace import InMemoryStorage, Workspace, Workspaces
+from tests.clients import entered
 from tests.files.conftest import Switch
 
 ALICE = UserActor(id="alice", name="Alice")
@@ -173,7 +173,7 @@ async def test_the_router_takes_the_check_ins_format_from_its_content_type(
     )
     server = FastAPI()
     server.include_router(files_router(workspaces, files, resolve_actor=alice))
-    client = TestClient(server)
+    client = entered(server)
     checkout = client.post("/workspaces/w1/files/a/checkouts").json()
     put = client.put(
         f"/workspaces/w1/checkouts/{checkout['id']}/file",

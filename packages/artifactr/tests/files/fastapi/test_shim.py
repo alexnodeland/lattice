@@ -6,11 +6,11 @@ import re
 from pathlib import Path
 
 import pytest
-from starlette.testclient import TestClient
 
 from artifactr.files.craft import CRAFTS
 from artifactr.files.fastapi import editor_app, editor_policy
 from artifactr.files.fastapi.shim import PATH, SCRIPT, STYLE, shim_page, shim_policy
+from tests.clients import entered
 
 PORTAL = "https://portal.example"
 INDEX = "<!DOCTYPE html><html><body><script>start()</script></body></html>"
@@ -75,7 +75,7 @@ def test_a_shim_that_cant_reach_or_be_reached_is_refused(
 def test_the_editor_serves_the_shim_beside_the_build_and_lets_it_frame_the_build(
     build: Path,
 ) -> None:
-    client = TestClient(editor_app(build, craft=CRAFTS["pdfcraft"], portal=PORTAL))
+    client = entered(editor_app(build, craft=CRAFTS["pdfcraft"], portal=PORTAL))
     shim = client.get(PATH)
     assert shim.text == shim_page(CRAFTS["pdfcraft"], PORTAL)
     assert shim.headers["content-security-policy"] == shim_policy(PORTAL)
@@ -90,7 +90,7 @@ def test_the_editor_serves_the_shim_beside_the_build_and_lets_it_frame_the_build
 
 
 def test_without_a_bridge_there_is_no_shim(build: Path) -> None:
-    assert TestClient(editor_app(build)).get(PATH).status_code == 404
+    assert entered(editor_app(build)).get(PATH).status_code == 404
 
 
 def test_a_shim_needs_its_app_and_its_portal(build: Path) -> None:

@@ -8,7 +8,13 @@ from typing import get_args
 
 import pytest
 
-from artifactr.core import Applied, InvalidState, Proposed, UserActor, ValidationFailed
+from artifactr.core import (
+    AlreadyExists,
+    Applied,
+    Proposed,
+    UserActor,
+    ValidationFailed,
+)
 from artifactr.files.app import AppFailed, Failure, FakeApp, Inspection
 from artifactr.files.blobs import DEFAULT_LIMIT, InMemoryBlobs, Quota, TooLarge, once
 from artifactr.files.checkouts import InMemoryCheckouts
@@ -136,10 +142,17 @@ async def test_an_upload_sent_again_makes_nothing_twice(stores: Stores) -> None:
     assert isinstance(first, Applied)
     assert again is None
     assert (await ws.get(WordDocument, "a1")).version == 1
-    with pytest.raises(InvalidState, match="a1 already exists"):
+    with pytest.raises(AlreadyExists, match="a1 already exists") as refused:
         await files.upload(
             ws, WordDocument, "w.docx", once(FakeApp.file("Other")), artifact_id="a1"
         )
+    assert refused.value.payload() == {
+        "type": "invalid_state",
+        "message": "artifact a1 already exists",
+        "reason": "already_exists",
+        "entity": "artifact",
+        "id": "a1",
+    }
 
 
 async def test_a_tenant_has_only_so_many_files_read_at_once(stores: Stores) -> None:

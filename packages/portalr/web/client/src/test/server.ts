@@ -14,7 +14,11 @@ export interface Hello {
 }
 
 /** How the server answers a command: with a result, by dropping the connection first, or not at all. */
-export type Answer = { readonly ok: true } | { readonly rejection: string } | "drop" | "silent";
+export type Answer =
+  | { readonly ok: true }
+  | { readonly rejection: string; readonly reason?: string }
+  | "drop"
+  | "silent";
 
 interface Entry {
   readonly seq: number;
@@ -167,7 +171,14 @@ export class ScriptedServer {
         type: "command_result",
         command_id: commandId,
         ...("rejection" in answer
-          ? { ok: false, rejection: { type: answer.rejection, message: answer.rejection } }
+          ? {
+              ok: false,
+              rejection: {
+                type: answer.rejection,
+                message: answer.rejection,
+                reason: answer.reason,
+              },
+            }
           : { ok: true, outcome: null }),
       }),
     );

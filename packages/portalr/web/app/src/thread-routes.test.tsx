@@ -210,7 +210,13 @@ test("Try again refused as already posted, by another tab, says nothing went wro
     serve,
     (command) =>
       command.type === "post_message"
-        ? { type: "invalid_state", message: "message msg_again_run_2 already exists" }
+        ? {
+            type: "invalid_state",
+            message: "message msg_again_run_2 already exists",
+            reason: "already_exists",
+            entity: "message",
+            id: "msg_again_run_2",
+          }
         : null,
     { artifactrLog: LOG },
   );
@@ -230,4 +236,22 @@ test("the breadcrumb names the place above as a link, never as the page shown", 
   for (const crumb of trail.getByRole("link").elements()) {
     expect(crumb.getAttribute("aria-current")).toBeNull();
   }
+});
+
+test("Try again refused in words alone, without the typed reason, is a refusal", async () => {
+  const { screen } = await open(
+    "/t/acme/w/notes/threads/thr_1",
+    serve,
+    (command) =>
+      command.type === "post_message"
+        ? {
+            type: "invalid_state",
+            message: "message msg_again_run_2 already exists",
+          }
+        : null,
+    { artifactrLog: LOG },
+  );
+  const log = screen.getByRole("log", { name: "Messages" });
+  await log.getByRole("button", { name: "Try again" }).click();
+  await expect.element(screen.getByText("That wasn't done: the server refused it.")).toBeVisible();
 });

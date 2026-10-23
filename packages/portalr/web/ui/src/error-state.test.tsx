@@ -8,13 +8,15 @@ test("an error state says what couldn't be read, the failure, and reading it aga
   const screen = await render(
     <ErrorState
       title="The audit log couldn't be read"
-      error={new Error("the server is down")}
+      error={Object.assign(new Error("grantr is down"), { status: 503, detail: "grantr is down" })}
       retry={retry}
     />,
   );
   const heading = screen.getByRole("heading", { name: "The audit log couldn't be read" });
   await expect.element(heading).toHaveFocus();
-  await expect.element(screen.getByRole("alert")).toHaveTextContent("The server is down");
+  await expect
+    .element(screen.getByRole("alert"))
+    .toHaveTextContent("The server had a problem. Try again in a moment.");
   await screen.getByRole("button", { name: "Try again" }).click();
   expect(retry).toHaveBeenCalledOnce();
 });

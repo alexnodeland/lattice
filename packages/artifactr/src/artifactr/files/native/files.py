@@ -27,6 +27,7 @@ from typing import Final, Literal, cast, override
 from pydantic import JsonValue
 
 from artifactr.core import (
+    AlreadyExists,
     Applied,
     ArtifactId,
     EditArtifact,
@@ -323,10 +324,10 @@ class NativeFiles:
         if artifact_id is not None and artifact_id in (await ws.hidden()).artifacts:
             # Taken, by a file its uploader can't see: refused as a taken id they can see is,
             # at the same point, before the app reads any of it or anything is stored.
-            raise InvalidState(f"artifact {artifact_id} already exists")
+            raise AlreadyExists("artifact", artifact_id)
         if artifact_id is not None and (uploaded := await _existing(ws, artifact_id)):
             if uploaded.data.content.sha256 != hashlib.sha256(content).hexdigest():
-                raise InvalidState(f"artifact {artifact_id} already exists")
+                raise AlreadyExists("artifact", artifact_id)
             return None
         inspection = await self._read(ws, app, content)
         if inspection.media_type != media_type and (

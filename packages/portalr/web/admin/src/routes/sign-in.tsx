@@ -1,4 +1,4 @@
-import { SignIn } from "@portalr/ui";
+import { SignIn, signInRefused } from "@portalr/ui";
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/sign-in")({
@@ -23,7 +23,7 @@ function SigningIn() {
       onSignIn={async (email, password) => {
         const { error } = await signed.auth.signInWithPassword({ email, password });
         if (error) {
-          return error.message;
+          return signInRefused(error);
         }
         await navigate({ to: "/" });
         return null;

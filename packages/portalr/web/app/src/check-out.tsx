@@ -14,6 +14,7 @@ import {
   type FilesApi,
   keys,
   type Refusal,
+  runOn,
 } from "@portalr/client";
 import { Button, FileChooser, fileSize, Moment, Progress, TextLink } from "@portalr/ui";
 import { useQueryClient } from "@tanstack/react-query";
@@ -55,9 +56,9 @@ export function editorAt(editors: Readonly<Record<string, string>>, key: string)
   return new URL(url, location.href).origin === location.origin ? null : url;
 }
 
-/** Reasons run on after a colon: in lower case at their start, with a full stop, once. */
+/** Reasons run on after a colon (`runOn`), with a full stop, once. */
 const sentence = (text: string) => {
-  const run = text.charAt(0).toLowerCase() + text.slice(1);
+  const run = runOn(text);
   return /[.!?]$/.test(run) ? run : `${run}.`;
 };
 

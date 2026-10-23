@@ -117,9 +117,7 @@ test("a failure that isn't an error says the kit's sentence, and goes to the con
     await screen.getByRole("button", { name: "Archive" }).click();
     await screen.getByRole("button", { name: "Archive the rule" }).click();
     const alert = screen.getByRole("alertdialog").getByRole("alert");
-    await expect
-      .element(alert)
-      .toHaveTextContent("The server had a problem. Try again in a moment.");
+    await expect.element(alert).toHaveTextContent("Something went wrong. Try again in a moment.");
     expect(alert.element().textContent).not.toContain("hunter2");
     expect(warned).toHaveBeenCalledOnce();
   } finally {

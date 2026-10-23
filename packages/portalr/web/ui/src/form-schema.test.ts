@@ -465,7 +465,7 @@ describe("a server's refusal", () => {
     expect(refusalsOf({ type: "validation_failed" }, fields)).toEqual(invalid);
   });
 
-  test("an error without a place is the form's, and one with a place no field has says it", () => {
+  test("an error without a place, or with a place no field has, is the form's", () => {
     expect(
       refusalsOf({ type: "validation_failed", errors: [{ msg: "Stale!" }] }, fields)?.form,
     ).toEqual(["What was asked for isn't valid."]);
@@ -474,7 +474,7 @@ describe("a server's refusal", () => {
         { type: "validation_failed", errors: [{ loc: ["answer", "extra"], msg: "Stale!" }] },
         fields,
       )?.form,
-    ).toEqual(["What was asked for isn't valid: answer.extra."]);
+    ).toEqual(["What was asked for isn't valid."]);
   });
 
   test("no words of the server's reach the reader, however they are made", () => {

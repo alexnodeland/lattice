@@ -248,7 +248,7 @@ test("the server's refusal is put under the fields it names, and what names none
   await expect
     .element(screen.getByRole("alert"))
     .toHaveTextContent(
-      "One answer needs a change: each says why under it.What was asked for isn't valid: form.",
+      "One answer needs a change: each says why under it.What was asked for isn't valid.",
     );
 });
 

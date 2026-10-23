@@ -129,10 +129,7 @@ test("a check-out refused says why, opens nothing, and reads the workspace's swi
       .length;
   await expect.poll(flags).toBe(1);
   await screen.getByRole("button", { name: "Check out and open WordCraft" }).click();
-  await told(
-    screen,
-    "It wasn't checked out: someone else has it now. Try again once they're done.",
-  );
+  await told(screen, "It wasn't checked out: someone else has it now.");
   expect(opened).not.toHaveBeenCalled();
   await expect.poll(flags).toBe(2);
 });

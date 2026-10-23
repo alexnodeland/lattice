@@ -94,5 +94,8 @@ test("a refusal is said in words, whatever the server's own", () => {
     "The server refused it.",
   );
   expect(refusedAs({ type: "odd" })).toBe("The server refused it.");
+  expect(refusedAs({ type: "odd", message: "<img src=x> password=hunter2" })).toBe(
+    "The server refused it.",
+  );
   expect(refusedAs(null)).toBe("The server refused it.");
 });

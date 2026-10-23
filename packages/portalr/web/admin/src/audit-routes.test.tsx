@@ -47,7 +47,12 @@ async function audit(request: Request, path: string): Promise<Response | undefin
     return Response.json({ detail: "no such subject" }, { status: 422 });
   }
   if (failsPagingBack && query.has("before_seq")) {
-    return Response.json({ detail: "grantr is down" }, { status: 503 });
+    return Response.json(
+      {
+        detail: `grantr is down ${String.fromCodePoint(0x202e)}<img src=x>\npassword=hunter2`,
+      },
+      { status: 503 },
+    );
   }
   const before = Number(query.get("before_seq") ?? Number.POSITIVE_INFINITY);
   const kept = log.filter(
@@ -181,6 +186,7 @@ test("a page before that can't be read says so, and keeps the log shown", async 
   expect(
     screen.getByRole("table", { name: "Audit log" }).getByRole("rowheader").elements(),
   ).toHaveLength(50);
+  expect(screen.getByRole("alert").element().textContent).not.toMatch(/grantr|hunter2|img/);
 });
 
 test("on a phone, the log is a list of cards, each named by its change and when", async () => {

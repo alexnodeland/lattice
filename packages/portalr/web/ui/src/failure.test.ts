@@ -1,43 +1,34 @@
 import { expect, test, vi } from "vitest";
-import { failureLine, failureLogged, failureSaid, GENERIC, LONGEST } from "./failure";
+import {
+  failureLine,
+  failureLogged,
+  failureSaid,
+  GENERIC,
+  LONGEST,
+  signInRefused,
+} from "./failure";
 
-/** A refusal as the client's `Refused` is: a status, and the body in `detail`. */
-const refused = (status: number, detail: unknown) =>
-  Object.assign(new Error(`the server refused the read (${status})`), { status, detail });
+/** A refused read as the client's `Refused` is: a status, the body in `detail`, and `said`. */
+const refused = (status: number, detail: unknown, said: string) =>
+  Object.assign(new Error(`the server refused the read (${status})`), { status, detail, said });
 
-test("a known reason code says its own sentence", () => {
-  expect(failureSaid(refused(403, { detail: { type: "forbidden", message: "bob may not" } }))).toBe(
-    "You may not see this.",
-  );
-  expect(failureSaid(refused(409, { rejection: { type: "not_enabled" } }))).toBe(
-    "This is switched off for this workspace. Ask an admin to switch it on.",
-  );
+test("a refused read says the sentence the client chose for it", () => {
+  expect(
+    failureSaid(refused(403, { detail: { type: "forbidden" } }, "You may not see this.")),
+  ).toBe("You may not see this.");
 });
 
-test("an unknown or missing reason code says what its status does, or the generic sentence", () => {
-  expect(failureSaid(refused(404, { detail: { type: "made_up" } }))).toBe(
-    "It isn't there: it may have been moved or archived.",
-  );
-  expect(failureSaid(refused(503, "grantr is down"))).toBe(
-    "The server had a problem. Try again in a moment.",
-  );
-  expect(failureSaid(refused(418, {}))).toBe(GENERIC);
-  expect(failureSaid(refused(400, { detail: { type: "toString" } }))).toBe(GENERIC);
-  expect(failureSaid(new Error("fetch failed"))).toBe(GENERIC);
-  expect(failureSaid("down")).toBe(GENERIC);
-});
-
-test("a server's words never reach the reader", () => {
+test("anything else says the generic sentence, whatever it holds", () => {
   const hostile = `${String.fromCodePoint(0x202e)}txt.exe <img src=x onerror=alert(1)> password=hunter2`;
   for (const error of [
-    refused(400, { detail: hostile }),
-    refused(422, { detail: { type: hostile, message: hostile } }),
+    Object.assign(new Error(hostile), { status: 400, detail: hostile }),
+    { status: 422, detail: { type: "validation_failed", message: hostile } },
+    { said: 7 },
     new Error(hostile),
+    hostile,
+    null,
   ]) {
-    const said = failureSaid(error);
-    expect(said).not.toContain("hunter2");
-    expect(said).not.toContain("img");
-    expect(said).not.toContain(String.fromCodePoint(0x202e));
+    expect(failureSaid(error)).toBe(GENERIC);
   }
 });
 
@@ -81,4 +72,38 @@ test("a failure is logged once", () => {
   expect(warned).toHaveBeenCalledTimes(1);
   expect(warned).toHaveBeenCalledWith("A failure, for operators:", "down");
   warned.mockRestore();
+});
+
+test("the console line holds the server's words, scrubbed, and a thrown refusal's whole", () => {
+  const detail = { type: "invalid", message: "grantr is down\nat db-1", password: "hunter2" };
+  const read = Object.assign(new Error("the server refused the read (503)"), {
+    status: 503,
+    detail,
+    said: "The server had a problem. Try again in a moment.",
+  });
+  const line = failureLine(read);
+  expect(line).toContain("grantr is down");
+  expect(line).toContain("status=503");
+  expect(line).not.toContain("hunter2");
+  expect(line).not.toContain("\n");
+  const thrown = failureLine({ status: 422, detail: "token=abc123 x" });
+  expect(thrown).toContain("status=422");
+  expect(thrown).not.toContain("[object Object]");
+  expect(thrown).not.toContain("abc123");
+});
+
+test("signing in refused says the kit's words, never Supabase's, and logs the whole", () => {
+  const warned = vi.spyOn(console, "warn").mockImplementation(() => {});
+  try {
+    const wrong = { name: "AuthApiError", status: 400, code: "invalid_credentials", message: "x" };
+    expect(signInRefused(wrong)).toBe("That email and password don't match an account.");
+    expect(signInRefused({ status: 429, message: "<b>slow</b>" })).toBe(
+      "Too many tries. Wait a moment, then try again.",
+    );
+    expect(signInRefused(new Error("password=hunter2 upstream"))).toBe(GENERIC);
+    expect(warned).toHaveBeenCalledTimes(3);
+    expect(String(warned.mock.calls.at(-1)?.[1])).not.toContain("hunter2");
+  } finally {
+    warned.mockRestore();
+  }
 });

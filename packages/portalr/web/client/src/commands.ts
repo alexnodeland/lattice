@@ -11,7 +11,7 @@ import type { components as Files } from "./generated/files.openapi";
 import type { components as Grantr } from "./generated/grantr.openapi";
 import type { components as Portalr } from "./generated/portalr.openapi";
 import type { components } from "./generated/reflexr.openapi";
-import { reasons } from "./reasons";
+import { reasons, runOn } from "./reasons";
 import { type Api, named } from "./rest";
 
 type Command = components["schemas"]["Command"];
@@ -41,11 +41,11 @@ export interface Refusal {
 
 /** FastAPI's account of a body it couldn't validate. */
 /**
- * What a field or a form says of a command that wasn't done, after what it would have done: the
- * reasons, the kit's own sentences, run on after a colon, so each starts in lower case.
+ * What a field or a form says of a command that wasn't done, after what it would have done: its
+ * reasons run on after a colon (`runOn`).
  */
 export const refusal = (undone: string, refused: Refusal) =>
-  `${undone}: ${refused.reasons.map((reason) => reason.charAt(0).toLowerCase() + reason.slice(1)).join("; ")}`;
+  `${undone}: ${refused.reasons.map(runOn).join("; ")}`;
 
 /**
  * What a done command answered, or an error that says why it wasn't done, for a caller that

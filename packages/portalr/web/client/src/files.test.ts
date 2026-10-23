@@ -356,7 +356,7 @@ test("an upload refused past a quota says which, and one stopped says it may hav
   expect(await full).toEqual({
     outcome: "refused",
     status: 413,
-    reasons: ["There's no more room for files here."],
+    reasons: ["There's no room left here."],
     type: "over_quota",
     quota: "workspace_files",
   });

@@ -20,7 +20,7 @@ Feature: Signing in
   Scenario: A wrong password is refused
     When alice signs in with the password "not-alices"
     Then they see the page "Sign in"
-    And they are told "Invalid login credentials"
+    And they are told "That email and password don't match an account."
 
   Scenario: Signing out
     Given alice has signed in

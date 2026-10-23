@@ -272,12 +272,16 @@ export class Refused extends Error {
   readonly status: number;
   readonly detail: unknown;
   readonly retryAfter: number | null;
+  /** What a reader is told of it: the kit's sentence, never the server's words (ADR-0070). */
+  readonly said: string;
 
   constructor(status: number, detail: unknown, retryAfter: number | null = null) {
-    super(`the server refused the read (${status}): ${refusalSaid(status, detail)}`);
+    const said = refusalSaid(status, detail);
+    super(`the server refused the read (${status}): ${said}`);
     this.status = status;
     this.detail = detail;
     this.retryAfter = retryAfter;
+    this.said = said;
   }
 }
 

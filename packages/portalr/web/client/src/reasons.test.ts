@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { pathsOf, reasons, refusalSaid } from "./reasons";
+import { invalidSaid, pathsOf, reasons, refusalSaid, runOn } from "./reasons";
 
 const HIDDEN = String.fromCodePoint(0x202e);
 /** A detail as a hostile or careless server might send it: long, on lines, with markup, a
@@ -50,9 +50,34 @@ test("values that aren't valid are said with where they are, the fields' paths a
 test("a known code, then the status, says the sentence; a command's forbidden is an action's", () => {
   expect(refusalSaid(403, { detail: { type: "forbidden" } })).toBe("You may not see this.");
   expect(reasons(403, { detail: { type: "forbidden" } })).toEqual(["You may not do this here."]);
-  expect(refusalSaid(409, { detail: { type: "artifact_busy" } })).toBe(
-    "Someone else has it now. Try again once they're done.",
-  );
+  expect(refusalSaid(409, { detail: { type: "artifact_busy" } })).toBe("Someone else has it now.");
   expect(refusalSaid(413, null)).toBe("That's too large.");
   expect(refusalSaid(418, null)).toBe("Something went wrong. Try again in a moment.");
+});
+
+test("paths are capped, and none names a secret-shaped key", () => {
+  const many = Array.from({ length: 100 }, (_, at) => ({ loc: ["body", `field${at}`] }));
+  expect(pathsOf(many)).toEqual(["field0", "field1", "field2", "field3", "field4"]);
+  expect(
+    pathsOf([
+      { loc: ["body", "api_key"] },
+      { loc: ["body", "access_token"] },
+      { loc: ["body", "Password"] },
+      { loc: ["body", "sk-abcdef123"] },
+      { loc: ["body", "a", "b", "c", "d", "e", "f", "g"] },
+      { loc: ["body", "ok"] },
+    ]),
+  ).toEqual(["ok"]);
+  const long = Array.from({ length: 10 }, (_, at) => ({ loc: ["body", `${"p".repeat(30)}${at}`] }));
+  expect(pathsOf(long).join(", ").length).toBeLessThanOrEqual(170);
+  expect(invalidSaid([])).toBe("What was asked for isn't valid.");
+  expect(invalidSaid(["a", "b"])).toBe("What was asked for isn't valid: a, b.");
+});
+
+test("a reason runs on after a colon in lower case, but a name keeps its capitals", () => {
+  expect(runOn("You may not do this here.")).toBe("you may not do this here.");
+  expect(runOn("Someone else has it now.")).toBe("someone else has it now.");
+  expect(runOn("WordCraft couldn't read it.")).toBe("WordCraft couldn't read it.");
+  expect(runOn("OK, done.")).toBe("OK, done.");
+  expect(runOn("already lower")).toBe("already lower");
 });

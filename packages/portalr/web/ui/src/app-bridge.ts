@@ -576,7 +576,11 @@ export class Bridge {
         try {
           return this.#answer(id, toolResult({ state: this.#state.set(args.patch) }));
         } catch (error) {
-          return this.#answer(id, toolRefusal(error instanceof Error ? error.message : "refused"));
+          // A patch's own refusal, which names only what the app sent; anything else, no words.
+          return this.#answer(
+            id,
+            toolRefusal(error instanceof PatchRefused ? error.message : "refused"),
+          );
         }
       case "submit": {
         const { values } = args;

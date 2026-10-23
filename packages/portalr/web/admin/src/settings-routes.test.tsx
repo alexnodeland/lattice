@@ -310,7 +310,7 @@ test("a raise is refused on the field, in the page's words, naming the ceiling a
   await expect
     .element(field)
     .toHaveAccessibleDescription(
-      /FreeCAD's tries an hour wasn't changed: it may be at most 20: the tenant's value\./,
+      /FreeCAD's tries an hour wasn't changed: it may be at most 20 here, as the tenant set it\./,
     );
   await expect.element(field).toHaveFocus();
   expect(screen.getByText(/connect-per-hour:freecad/).elements()).toHaveLength(0);
@@ -391,7 +391,7 @@ test("a late answer doesn't take the focus from where the reader moved to", asyn
   answer();
   await expect
     .element(screen.getByRole("textbox", { name: "FreeCAD's tries an hour" }))
-    .toHaveAccessibleDescription(/may be at most 20: the tenant's value/);
+    .toHaveAccessibleDescription(/may be at most 20 here, as the tenant set it/);
   await expect.element(elsewhere).toHaveFocus();
 });
 

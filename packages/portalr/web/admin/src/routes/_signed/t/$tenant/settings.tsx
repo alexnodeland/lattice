@@ -26,6 +26,7 @@ import {
   anywhere,
   MOST_ASKED,
   numberOf,
+  refusedWhy,
   type Places,
   type SettingRow,
   said,
@@ -177,21 +178,6 @@ function LevelSettings({ tenant, workspace }: { tenant: string; workspace: strin
 }
 
 /**
- * Why a change wasn't made, in words the field says, for each status grantr answers it with:
- * never grantr's own words (portalr ADR-0070). A value refused is told the ceiling and the layer
- * that sets it, which the page already shows and an admin needs to act on.
- */
-function refusedWhy(row: SettingRow, status: number): string {
-  if (status === 422) {
-    return `${row.name} wasn't changed: it may be ${row.ceiling.replace(/^At most/u, "at most")}`;
-  }
-  if (status === 403) {
-    return `${row.name} wasn't changed: it can't be changed here.`;
-  }
-  return `${row.name} wasn't changed: the server couldn't do it just now. Try again in a moment.`;
-}
-
-/**
  * Focus something of a row's, only where the reader hasn't moved on: from nowhere, or from within
  * the row's form; never from another row they have started on.
  */
@@ -327,7 +313,7 @@ function Setting({
         }, and ${now ? said(now.effective) : "what it was"} applies. You tried to ${what}, which wasn't saved: save again if you still want it.`,
       );
     } else {
-      setError(refusedWhy(row, answer.status));
+      setError(refusedWhy(row, answer.status, value));
     }
     if (answer.outcome === "done") {
       await queryClient.invalidateQueries({ queryKey: keys.grantr.settings(tenant) });

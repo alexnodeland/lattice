@@ -32,12 +32,10 @@ const REASONS = new Map<string, string>([
   ["invalid_state", STATE],
   ["version_conflict", CHANGED],
   ["validation_failed", INVALID],
-  ["over_quota", "There's no more room for files here."],
-  ["busy", `Too much was asked at once.${AGAIN}`],
-  ["rate_limited", `Too much was asked at once.${AGAIN}`],
-  ["too_slow", "It arrived too slowly. Try again."],
-  ["artifact_busy", "Someone else has it now. Try again once they're done."],
-  ["invite_failed", "The invitation couldn't be sent: check the email address, then try again."],
+  ["over_quota", "There's no room left here."],
+  ["too_slow", "It arrived too slowly."],
+  ["artifact_busy", "Someone else has it now."],
+  ["invite_failed", "The invitation wasn't sent: check the email."],
 ]);
 
 /** What each status says, where no reason code a reader is told of came with it. */
@@ -70,34 +68,65 @@ function reasonOf(body: unknown): string | undefined {
 /** Where in a request FastAPI says an error is, which isn't part of a field's path. */
 const WHERE = new Set(["body", "query", "path", "header", "cookie"]);
 
-/** A part of a field's path as a reader may see it: a name or an index, at most 64 long. */
-const PART = /^[A-Za-z0-9_-]{1,64}$/u;
+/** A part of a field's path as a reader may see it: a name or an index, at most 32 long. */
+const PART = /^[A-Za-z0-9_-]{1,32}$/u;
+
+/** A part that names what may be a secret, or is shaped like one: its path isn't shown. */
+const SECRET =
+  /token|secret|passw|api[_-]?key|credential|bearer|authorization|^(sk|pk|rk|gh[pousr])[_-]/iu;
+
+/** The most paths told, the most parts in each, and the most characters of them all. */
+const MOST_PATHS = 5;
+const MOST_PARTS = 6;
+const MOST_SAID = 160;
+
+/** Where in a `loc` a field's path starts: after a command frame's own parts, or where it is. */
+function startOf(loc: readonly unknown[]): number {
+  const command = loc.indexOf("command");
+  if (command !== -1) {
+    return command + 2;
+  }
+  return WHERE.has(String(loc[0])) ? 1 : 0;
+}
 
 /**
  * Where FastAPI's or Pydantic's errors say the values aren't valid: each error's `loc` as a dotted
- * path. FastAPI's starts where in the request it is, `body` or `query`; in a command frame it runs on through `command` and the
- * command's own type, which say nothing a person typed, so the path starts after them. A path
- * with a part that isn't a plain name or index is left out, so no text of the server's comes
- * through one.
+ * path, from where `startOf` says. A path is told only if each of its parts is a plain name or
+ * index of at most 32 characters, none of them secret-shaped, and it has at most six; at most
+ * five paths are told, of at most 160 characters in all. So no text of the server's, nor a
+ * secret it put in a key, comes through one.
  */
 export function pathsOf(errors: unknown): string[] {
   if (!Array.isArray(errors)) {
     return [];
   }
   const paths = new Set<string>();
+  let said = 0;
   for (const error of errors) {
+    if (paths.size === MOST_PATHS) {
+      break;
+    }
     if (!(isRecord(error) && Array.isArray(error.loc))) {
       continue;
     }
     const loc: readonly unknown[] = error.loc;
-    const command = loc.indexOf("command");
-    const from = command === -1 ? (WHERE.has(String(loc[0])) ? 1 : 0) : command + 2;
-    const parts = loc.slice(from).map(String);
-    if (parts.length > 0 && parts.every((part) => PART.test(part))) {
-      paths.add(parts.join("."));
+    const parts = loc.slice(startOf(loc)).map(String);
+    const shown =
+      parts.length > 0 &&
+      parts.length <= MOST_PARTS &&
+      parts.every((part) => PART.test(part) && !SECRET.test(part));
+    const path = parts.join(".");
+    if (shown && !paths.has(path) && said + path.length <= MOST_SAID) {
+      paths.add(path);
+      said += path.length;
     }
   }
   return [...paths];
+}
+
+/** What values that aren't valid say, with where they are, if known: "…isn't valid: a, b." */
+export function invalidSaid(paths: readonly string[]): string {
+  return paths.length > 0 ? `${INVALID.slice(0, -1)}: ${paths.join(", ")}.` : INVALID;
 }
 
 /** The paths a refusal says aren't valid: FastAPI's `detail` list, or a rejection's `errors`. */
@@ -118,11 +147,21 @@ export function refusalSaid(status: number, body: unknown, acting = false): stri
   const byStatus = status >= 500 ? `The server had a problem.${AGAIN}` : STATUSES.get(status);
   const read = reason ?? byStatus ?? GENERIC;
   const said = acting && read === FORBIDDEN ? NOT_ALLOWED : read;
-  const paths = said === INVALID ? invalidAt(body) : [];
-  return paths.length > 0 ? `${INVALID.slice(0, -1)}: ${paths.join(", ")}.` : said;
+  return said === INVALID ? invalidSaid(invalidAt(body)) : said;
 }
 
 /** Each reason a command's refusal gives, as its sender is told it: one sentence of the kit's own. */
 export function reasons(status: number, body: unknown): string[] {
   return [refusalSaid(status, body, true)];
+}
+
+/**
+ * A reason run on after a colon, as `refusal` and a file's check-out say them: its first letter
+ * in lower case, where its first word is an ordinary one ("You", "Someone", "The"), and as it is
+ * where it is a name with capitals of its own ("WordCraft") or an initialism ("OK").
+ */
+export function runOn(reason: string): string {
+  return /^[A-Z][a-z']*\b/u.test(reason) && !/^[A-Z][a-z']*[A-Z]/u.test(reason)
+    ? reason.charAt(0).toLowerCase() + reason.slice(1)
+    : reason;
 }

@@ -252,9 +252,7 @@ test("an owner Supabase couldn't invite is said, without the email", async () =>
   await dialog.getByRole("button", { name: "Create the tenant" }).click();
   await expect
     .element(dialog.getByRole("alert"))
-    .toHaveTextContent(
-      "Not created: the invitation couldn't be sent: check the email address, then try again.",
-    );
+    .toHaveTextContent("Not created: the invitation wasn't sent: check the email.");
   expect(dialog.getByRole("alert").element().textContent).not.toContain("dan@initech.com");
 });
 

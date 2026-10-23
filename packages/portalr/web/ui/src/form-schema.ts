@@ -6,7 +6,6 @@
  * the same fields.
  */
 
-import { INVALID, pathsOf } from "@portalr/client";
 import type {
   AskForm,
   Form,
@@ -18,6 +17,7 @@ import type {
   Value,
   Values,
 } from "./artifactr-ui";
+import { INVALID } from "./failure";
 import { isNumber, isObject, isString, own } from "./json";
 import { realDay, realMoment } from "./moment";
 
@@ -809,7 +809,7 @@ export function valuesOf(
 }
 
 /** What a field's value the server refused says, where the kit has no words of its own. */
-const NOT_VALID = "This isn't valid.";
+const FIELD_INVALID = "This isn't valid.";
 
 /**
  * A server's error under a field, in the kit's words, by the error's type: a field left out, a
@@ -820,15 +820,15 @@ function saidOf(field: Field | undefined, type: unknown): string {
   const property = field?.property;
   switch (type) {
     case "missing":
-      return field ? EMPTY[field.control] : NOT_VALID;
+      return field ? EMPTY[field.control] : FIELD_INVALID;
     case "format":
       return property?.type === "string" && property.format !== undefined
         ? FORMAT_SAID[property.format]
-        : NOT_VALID;
+        : FIELD_INVALID;
     case "enum":
       return field?.control === "checkboxes" ? "Choose among these." : "Choose one of these.";
     default:
-      return NOT_VALID;
+      return FIELD_INVALID;
   }
 }
 
@@ -847,7 +847,7 @@ export function refusalsOf(
   const byName = new Map(fields.map((field) => [field.name, field]));
   const byField: Record<string, string> = {};
   const form: string[] = [];
-  const unnamed: unknown[] = [];
+  let unnamed = 0;
   const errors = Array.isArray(rejection.errors) ? rejection.errors : [];
   for (const error of errors) {
     if (!isObject(error)) {
@@ -856,15 +856,14 @@ export function refusalsOf(
     const loc = Array.isArray(error.loc) ? error.loc : [];
     const name = loc.find((part): part is string => isString(part) && byName.has(part));
     if (name === undefined) {
-      unnamed.push(error);
+      unnamed += 1;
     } else {
       byField[name] ??= saidOf(byName.get(name), error.type);
     }
   }
-  // What names no field is the form's own: the kit's sentence, with where, by the paths alone.
-  if (unnamed.length > 0 || errors.length === 0) {
-    const paths = pathsOf(unnamed);
-    form.push(paths.length > 0 ? `${INVALID.slice(0, -1)}: ${paths.join(", ")}.` : INVALID);
+  // What names no field is the form's own: the kit's sentence. A field's is under it.
+  if (unnamed > 0 || errors.length === 0) {
+    form.push(INVALID);
   }
   return { fields: byField, form };
 }

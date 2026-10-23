@@ -184,3 +184,25 @@ export function settingsPlaces(
 
 /** Whether a person may narrow settings anywhere in the tenant: whether Settings joins the rail. */
 export const anywhere = (places: Places) => places.tenant || places.workspaces.length > 0;
+
+/**
+ * Why grantr refused to set a value, in the page's words from what the page shows, never grantr's
+ * own (portalr ADR-0070): a number over the ceiling is told the ceiling and who set it; any other
+ * value refused, that it isn't allowed; a 403, that it can't be changed here.
+ */
+export function refusedWhy(row: SettingRow, status: number, tried: number | null): string {
+  return `${row.name} wasn't changed: ${whyRefused(row, status, tried)}`;
+}
+
+function whyRefused(row: SettingRow, status: number, tried: number | null): string {
+  if (status === 403) {
+    return "it can't be changed here.";
+  }
+  if (status !== 422) {
+    return "the server couldn't do it just now. Try again in a moment.";
+  }
+  const over = typeof row.ceilingValue === "number" && tried !== null && tried > row.ceilingValue;
+  return over
+    ? `it may be at most ${said(row.ceilingValue)} here, as ${row.ceilingBy} set it.`
+    : "that value isn't allowed here.";
+}

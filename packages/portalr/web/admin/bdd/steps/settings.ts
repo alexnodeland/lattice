@@ -35,16 +35,11 @@ When("they try to raise {string} to {int}", async ({ page }, name: string, value
   await page.getByRole("button", { name: "Save FreeCAD's tries an hour" }).click();
 });
 
-Then(
-  "they are told it may be at most {int}, the default's value",
-  async ({ page }, ceiling: number) => {
-    await expect(
-      page.getByRole("textbox", { name: "FreeCAD's tries an hour" }),
-    ).toHaveAccessibleDescription(
-      new RegExp(`may be at most ${ceiling} here: the default's value`),
-    );
-  },
-);
+Then("they are told it may be at most {int}, the default", async ({ page }, ceiling: number) => {
+  await expect(
+    page.getByRole("textbox", { name: "FreeCAD's tries an hour" }),
+  ).toHaveAccessibleDescription(new RegExp(`it may be at most ${ceiling} here: the default\\.`));
+});
 
 When("they set {string} back to the default", async ({ page }, name: string) => {
   await page.getByRole("button", { name: `Use the default for ${name}` }).click();

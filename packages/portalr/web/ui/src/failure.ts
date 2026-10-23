@@ -1,29 +1,41 @@
 /**
  * What a failure says, as every screen shows it (lattice issue 552, portalr ADR-0065 and
  * ADR-0070). A reader sees a sentence of the kit's own, chosen by the refusal's status and its
- * known reason code, and where values aren't valid, the fields' paths; no
- * words of the server's reach them, as they may hold what a tenant shouldn't read. The whole
- * failure is for operators: `failureLogged` writes it to the console, once, as one line, with
- * what looks like a secret taken out.
+ * known reason code, and where values aren't valid, the fields' paths; no words of the server's
+ * reach them, as they may hold what a tenant shouldn't read. The whole failure, the server's
+ * words included, goes to the console of the reader's own browser: `failureLogged` writes it
+ * once, as one line, with what looks like a secret taken out.
  */
-
-import { GENERIC, refusalSaid } from "@portalr/client";
 
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-export { GENERIC };
+/** What any other failure says, such as one where the server couldn't be reached. */
+export const GENERIC = "Something went wrong. Try again in a moment.";
+
+/** What values that aren't valid say, as the client's refusals say it too. */
+export const INVALID = "What was asked for isn't valid.";
 
 /**
- * The sentence a reader sees for a failure: by its reason code, then its status, else the
- * generic one (the client's `refusalSaid`). A refusal is anything with a numeric `status` and the
- * body in `detail`, as the client's `Refused` is.
+ * The sentence a reader sees for a failure: a refused read's `said`, which the client chose by
+ * its reason code and status (portalr ADR-0070), else the generic one. No words of the server's
+ * are read here.
  */
 export function failureSaid(error: unknown): string {
-  if (!isRecord(error) || typeof error.status !== "number") {
-    return GENERIC;
+  return isRecord(error) && typeof error.said === "string" ? error.said : GENERIC;
+}
+
+/**
+ * Why signing in was refused, in the kit's words: Supabase Auth's own message isn't shown
+ * (portalr ADR-0070), and the whole error goes to the console.
+ */
+export function signInRefused(error: unknown): string {
+  failureLogged(error);
+  const record = isRecord(error) ? error : {};
+  if (record.code === "invalid_credentials" || record.status === 400) {
+    return "That email and password don't match an account.";
   }
-  return refusalSaid(error.status, error.detail);
+  return record.status === 429 ? "Too many tries. Wait a moment, then try again." : GENERIC;
 }
 
 /** The most graphemes of a failure's text the console line keeps. */
@@ -59,13 +71,33 @@ const SECRETS: readonly (readonly [RegExp, string])[] = [
 ];
 
 /**
+ * A failure whole, as text: an error's message, and a refusal's status and the server's body, as
+ * JSON, which is where the server's own words are. Nothing of it is shown to the reader.
+ */
+function wholeOf(error: unknown): string {
+  if (!isRecord(error)) {
+    return String(error);
+  }
+  const message = error instanceof Error ? error.message : "";
+  if (!("status" in error || "detail" in error)) {
+    return message;
+  }
+  let detail: string;
+  try {
+    detail = JSON.stringify(error.detail) ?? "";
+  } catch {
+    detail = String(error.detail);
+  }
+  return `${message} status=${String(error.status)} detail=${detail}`;
+}
+
+/**
  * A failure's text as the console line keeps it: one line, nothing hidden, what looks like a
  * secret out, and no longer than `LONGEST` graphemes, cut between them.
  */
 export function failureLine(error: unknown): string {
   // A joiner stays, so an emoji made of parts does.
-  const whole = error instanceof Error ? error.message : String(error);
-  let line = whole
+  let line = wholeOf(error)
     .replace(HIDDEN, (hidden) => (hidden === JOINER ? hidden : ""))
     .replace(BREAKS, " ")
     .trim();

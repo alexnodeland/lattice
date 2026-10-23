@@ -9,7 +9,7 @@ Feature: Settings
     And they lower "FreeCAD's tries an hour" to 12
     Then 12 applies to "FreeCAD's tries an hour", set here
     When they try to raise "FreeCAD's tries an hour" to 1000
-    Then they are told it may be at most 30, the default's value
+    Then they are told it may be at most 30, the default
     When they set "FreeCAD's tries an hour" back to the default
     Then 30 applies to "FreeCAD's tries an hour"
 

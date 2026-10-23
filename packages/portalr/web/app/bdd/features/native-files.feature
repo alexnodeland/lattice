@@ -55,7 +55,7 @@ Feature: Native files
     When they open the document
     And they check it out
     And they check in the brief with "Everyone comes." for "Who comes.", but the answer never comes
-    Then the file says "It wasn't checked in: The connection ended before the server answered. Try again."
+    Then the file says "It wasn't checked in: the connection ended before the server answered. Try again."
     When they send it again
     Then the file says "brief.docx was checked in already: nothing new was made."
     And its latest version is 2

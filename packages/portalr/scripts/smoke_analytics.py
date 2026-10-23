@@ -65,6 +65,16 @@ async def main() -> int:
         else:
             say(f"FAIL: portalr's analytics reader, for {tenant}, saw {seen}")
             status = 1
+    # Forgetting a's person, as taking back their yes does: a's reads see nothing at once.
+    if not await analytics.forget(f"{a}-person"):
+        say("FAIL: portalr's analytics didn't delete a person's events")
+        return 1
+    counts = await analytics.counts(allowed(a), span)
+    if isinstance(counts, Ok) and counts.data == []:
+        say(f"ok: portalr's analytics forgets {a}'s person, at once")
+    else:
+        say(f"FAIL: portalr's analytics, after forgetting {a}'s person, read {counts}")
+        status = 1
     await writer.aclose()
     await reader.aclose()
     return status

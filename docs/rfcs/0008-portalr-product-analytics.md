@@ -60,7 +60,7 @@ The `events` table, a `MergeTree`:
 
 ### P2. Capture: a same-origin relay and a server-side helper
 
-- **`POST /portalr/v1/events`** is same-origin and needs the signed-in user's token, so the CSP stays `'self'` and no third-party script loads. It caps a request's body, the events in it, and each `props` value's length, and is rate-limited per person.
+- **`POST /portalr/v1/events`** is on the portal's own origin, so the browser sends to no other and the CSP stays `'self'`; it needs the signed-in user's bearer token, not a cookie, so another site's page can't send under a person's name. It caps a request's body, the events in it, and each `props` value's length, and is rate-limited per person.
 - **The relay mints the session id,** or binds the browser's to the signed-in user with an HMAC, so a browser can't attach its events or replays to another person's session.
 - **A route is the router's template,** such as `/t/$tenant/w/$workspace/threads/$thread`, never the raw path or its query string, which can hold ids and search text.
 - **What the relay does to each event:**
@@ -236,6 +236,54 @@ One PR, with no browser capture and no UI:
 
 Langfuse's own load wasn't run beside it here, so its memory with Langfuse on wasn't measured. The smoke row with both profiles is where that shows.
 
+## The relay's slice as built
+
+- **portalr's relay** (`portalr.analytics`), mounted when `portalr_router(relay=…)` is given:
+  - `POST /portalr/v1/analytics/session` signs a session id for the signed-in person: a timestamp, a random part, and an HMAC over the person's id under the deployment's key. A batch under a session signed for someone else, or more than 24 hours old, is refused (403).
+  - `POST /portalr/v1/events` takes at most 20 events and 16 KB.
+    - Each event has at most 10 props, and each value at most 200 characters; more is 413 or 422.
+    - The batch must be in a tenant the person is a member of, checked with grantr; the tenant is never the browser's.
+    - Without the person's yes, the answer says how many were dropped and nothing is written.
+    - Past the person's pace it answers 429 with `Retry-After`.
+    - Of each event it keeps only a registry name, the registry's keys and no value with an `@`. A route is kept only if it is one of the app's router's own (`routes.json`, which a test holds to `routeTree.gen.ts`), so a raw path or a query string never is.
+    - Browser events have no workspace: the workspace isn't the session's to vouch for.
+  - Only a signed-in person may use it: a service principal's key or an agent is refused (403).
+  - `GET` and `PUT /portalr/v1/analytics/consent` read and record the person's answer.
+    - Only a yes taken back deletes the person's events; a no again, or a no never preceded by a yes, deletes nothing.
+    - **Each deletion owed is numbered,** in the consent row (`delete_owed`, and `debts`, how many the person has been owed), by one statement that locks the row (an upsert whose update adds one to `debts`, returning the number): two at once take two numbers, and owing a deletion never writes the answer. A deletion ClickHouse can't take stays owed, and is tried again on the person's next request and by a background pass. The answer's `deleted` says whether it is done.
+    - **A yes never cancels a deletion owed.** A no owes the deletion of everything before it; a yes given before it is done leaves it owed, and the next try does it. Its cost: since a deletion is by the person's hash, events they send after that yes and before the deletion is done are deleted too. It is rare, and errs on the side of deleting.
+    - **Settling clears only the debt it started with.** A deletion that finishes late, after the person said yes, sent events and said no again, leaves the newer debt owed.
+    - **A no that lands while a batch is being written deletes that batch too.** The relay reads the answer again after each write; if it is no longer yes, it owes and tries a new deletion, without touching the answer itself. A yes given meanwhile stays a yes.
+    - **The answer is never refused for the person's pace**, so a withdrawal always lands; it is still counted, so a loop of answers drains the pace of the other three routes.
+    - **A person's answers set off at most ten deletions an hour.** Past that, the deletion stays owed, and the background pass, which isn't paced, does it: a loop of yes and no costs ClickHouse no more than ten mutations an hour.
+  - **Every other relay request is counted first,** per person (20 at once, one a second after), before a database or ClickHouse is asked, so a refused or a dropped request costs a count, not a query. Events have their own, larger, pace.
+  - **The body is read no further than 16 KB**: a declared `Content-Length` over it, or a stream that grows past it, is refused (413).
+  - **A session id is compared as bytes,** so any text a browser sends is refused (403), never raised on.
+  - **Each prop value must be one the registry lists for its key** (an artifact's kind, an integration's key, an outcome). A route must be one of the router's own. Other values are dropped, whatever their spelling, so a lookalike `＠` doesn't get past a check for `@`.
+- **Consent** is `portalr_analytics_consent` in the application's database, with `delete_owed` and `debts`, from portalr's first Alembic migration (`portalr_alembic_version`), behind a `Consent` port. Portalr's `sql` extra brings SQLAlchemy and Alembic. On PostgreSQL the application's role is granted reading and writing it, and row-level security keeps each transaction to the person it names (`portalr.user_id`). That holds for the role the application connects as with `DATABASE_ADMIN_URL`; without it, the application's role owns the table and row-level security doesn't hold it. A test on a real PostgreSQL shows one person can't read or write another's row. Replicas starting at once migrate in turn, under an advisory lock.
+- **The rate limiter** is `InMemoryRateLimiter`: a token bucket per person, 60 events at once and one a second after, per replica, behind the `RateLimiter` port. It remembers 100,000 people at most, forgetting the one seen longest ago in constant time.
+- **stackr's template** wires it all when the four settings are set:
+  - `PORTAL_ANALYTICS_URL`;
+  - `PORTAL_ANALYTICS_KEY`, which `make env` now generates (`generate:hex`);
+  - the two users' passwords.
+  - A key that isn't 64 hex digits turns analytics off at start, and says why.
+  - The portal migrates the consent table on every start, under an advisory lock, mounts the relay only with a database, since consent must persist, and settles the deletions owed in a background pass about every five minutes (jittered), at most 100 people a pass, read with a `LIMIT`, those who answered longest ago first, so a ClickHouse that is down doesn't hold the start, and a person who never comes back is still deleted. A pass that fails is logged, and the next one tries again; its clients are closed at shutdown whatever it raised. Every replica that starts does so: two may delete the same person's events, which does no harm. A person who says yes and sends events between a replica's reading the deletions owed and its deletion loses those events; it is rare, and errs on the side of deleting.
+- **The writer may delete,** `GRANT ALTER DELETE ON analytics.events`, for a person's deletion; the grant reaches every tenant's rows, though the writer still reads none. Langfuse's user now sees only `default`'s rows of `system.mutations`, since a deletion is a mutation that names the person's hash.
+
+**Lightweight deletes, measured on ClickHouse 26.9.20.23** (10 million events over 90 days, 20 tenants, 50,000 people, about 200 events a person):
+
+| Measure | Result |
+|---|---|
+| A person's deletion, as the writer, over HTTP | 0.18 to 1.04 s; it returns once the rows are masked |
+| Rows visible to any read just after, the operator's or a tenant's reader | 0 |
+| The mutation | `UPDATE _row_exists = 0 WHERE distinct_id = …`, done at once (`is_done = 1`); it names the person's hash, so only operators may read `system.mutations` for it |
+| Rows on disk just after | Still there, masked, until ClickHouse merges the parts that hold them |
+| After a merge (`OPTIMIZE … FINAL`, 7.3 s here) | Gone from disk, even with the mask off (`apply_deleted_mask = 0`) |
+| With the TTL | The table's TTL still drops old rows; masked rows age out with the rest |
+| With backups | A backup taken after the delete holds the rows masked, and they stay masked when restored. A backup taken before it holds them visible until the bucket's lifecycle rule expires it, as P5 says |
+
+So the person sees their events gone at once, and so does an operator's ordinary read. An operator who reads with the mask off, or a backup from before, can still find them until the merge or the backup's expiry.
+
 ## Drawbacks
 
 - Langfuse and analytics share one ClickHouse's CPU, memory and disk. A heavy funnel can slow Langfuse's writes, so each user gets a quota.
@@ -283,21 +331,33 @@ Decided by the owner (2026-10-22):
 
 Decided by the owner (2026-10-22), with the first slice:
 
-- **The `distinct_id` key is per deployment,** `PORTAL_ANALYTICS_KEY`, which the template's `make env` will make when analytics is wired into it. One person's events across tenants are deleted with one hash.
+- **The `distinct_id` key is per deployment,** `PORTAL_ANALYTICS_KEY`, which the template's `make env` makes (the relay's slice). One person's events across tenants are deleted with one hash.
 - **Umami's data is a schema in the stack's shared PostgreSQL,** not a PostgreSQL of its own: lighter, with its role limited to its schema.
 - **Grafana's ClickHouse datasource plugin is baked into the `stackr-grafana` image,** pinned, so Grafana starts offline.
 
 Settled by the first slice: the row-policy-by-setting pattern holds on 26.9.20.23.
 
+Decided by the owner (2026-10-22), for the relay's slice:
+
+- **Consent is a portalr table in the application's PostgreSQL,** portalr's first migration, per person and per deployment, off until a person says yes, and read whether ClickHouse is up or not.
+- **Taking back a yes deletes the person's past events at once,** with ClickHouse's lightweight delete by their hashed id.
+- **A person's pace is counted per replica, in memory,** behind a `RateLimiter` port, so a limiter over Valkey can take its place without the relay changing. Valkey runs only under the `langfuse` and `gateway` profiles, not under `analytics` alone, so the in-memory limiter is the default.
+
+Settled by the relay's slice: lightweight deletes on 26.9 (below).
+
 Still open:
 
-1. How lightweight deletes behave on 26.9, and whether grantr needs a removal hook for them (the deletion phase).
+1. **The OpenAPI document** lacks the relay's routes: they are mounted only when a relay is given, and `portalr.fastapi.openapi` builds the document without one. Their `413`, `422` and `429` answers and the batch's schema are declared on the routes, for when it does (the browser's slice).
+2. **Browser events carry no workspace**: the workspace isn't the session's to vouch for, and the relay doesn't ask artifactr which workspaces a person may open. A per-workspace adoption view needs that check first.
+3. **The writer's `ALTER DELETE` reaches every tenant's rows** (stackr ADR-0044): portalr deletes only by a person's hash, but the grant isn't narrower.
+4. Whether grantr needs a removal hook, so a person removed from every tenant has their events deleted too; until then, it is their own no, or an operator's delete.
 
 ## Tracking
 
 - [x] Phase 0: this RFC and [stackr ADR-0044](../stackr/adr/0044-clickhouse-a-profile-of-its-own-and-portalrs-analytics-users.md)
 - [x] The first slice
-- [ ] Relay, consent and browser capture
+- [x] Relay and consent (the server's side)
+- [ ] Browser capture and the consent UI
 - [ ] Grafana's datasource and dashboard
 - [ ] Adoption read and page
 - [ ] Traces both ways

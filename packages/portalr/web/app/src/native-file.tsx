@@ -6,7 +6,6 @@
  */
 
 import {
-  changes,
   type createQueries,
   type FilesApi,
   type IntegrationKey,
@@ -15,6 +14,7 @@ import {
   useEnabled,
   usePeople,
 } from "@portalr/client";
+import { changes } from "@portalr/client/diff";
 import {
   Alert,
   Button,

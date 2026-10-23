@@ -1,4 +1,4 @@
-import type { Change } from "@portalr/client";
+import type { Change } from "@portalr/client/diff";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "./button";
 import { cn } from "./cn";

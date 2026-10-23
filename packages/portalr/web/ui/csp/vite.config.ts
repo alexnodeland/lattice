@@ -12,6 +12,10 @@ const outDir = "../node_modules/.csp";
 // (portalr ADR-0051).
 export default defineConfig({
   root: import.meta.dirname,
+  // Streamdown's `rehype-raw`, which portalr never passes it, is built as nothing (portalr ADR-0040).
+  resolve: {
+    alias: { "rehype-raw": fileURLToPath(new URL("../src/rehype-raw.ts", import.meta.url)) },
+  },
   plugins: [
     react(),
     tailwindcss(),

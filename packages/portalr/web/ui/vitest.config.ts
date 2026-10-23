@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { playwright } from "@vitest/browser-playwright";
@@ -57,6 +58,10 @@ const forcedColors: BrowserCommand<[active: boolean]> = async ({ page }, active)
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // Streamdown's `rehype-raw`, which portalr never passes it, is built as nothing (portalr ADR-0040).
+  resolve: {
+    alias: { "rehype-raw": fileURLToPath(new URL("./src/rehype-raw.ts", import.meta.url)) },
+  },
   // Every test's imports are found before the first runs, so a dependency met mid-run doesn't
   // reload the page under the tests.
   optimizeDeps: { entries: ["src/**/*.test.{ts,tsx}"] },

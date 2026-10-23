@@ -5,6 +5,7 @@ element's version only grows."""
 from typing import Any
 
 import pytest
+from pydantic import JsonValue
 
 from artifactr.core import (
     Applied,
@@ -342,3 +343,45 @@ async def test_nothing_of_one_tenant_reaches_another(storage: Storage) -> None:
     with pytest.raises(NotEnabled):
         await ws_a.commit(CreateArtifact(kind="excalidraw_diagram", data=data(R1)))
     assert [d.id for d in await ws_b.artifacts(Diagram)] == [made.artifact_id]
+
+
+async def test_an_element_is_never_removed_only_marked_deleted(workspaces: Workspaces) -> None:
+    ws, artifact_id = await _drawn(workspaces)
+    version, head = await _head(ws, artifact_id)
+    removals: list[tuple[dict[str, JsonValue], ...]] = [
+        ({"op": "remove", "path": "/elements/r1"},),
+        (
+            {"op": "test", "path": "/elements/r1/version", "value": 1},
+            {"op": "remove", "path": "/elements/r1"},
+        ),
+        ({"op": "replace", "path": "/elements", "value": {}},),
+    ]
+    for ops in removals:
+        with pytest.raises(ValidationFailed, match="never removed"):
+            await ws.commit(
+                EditArtifact(
+                    artifact_id=artifact_id, base_version=version, patch=JsonPatch(ops=ops)
+                )
+            )
+    deleted = head.elements["r1"].model_copy(update={"version": 2, "is_deleted": True})
+    await ws.commit(
+        EditArtifact(
+            artifact_id=artifact_id,
+            base_version=version,
+            patch=element_patch(head, {**head.elements, "r1": deleted}),
+        )
+    )
+    assert (await _head(ws, artifact_id))[1].elements["r1"].is_deleted
+
+
+@pytest.mark.parametrize("value", [10.0, True])
+async def test_a_number_rewritten_as_a_float_or_a_bool_must_grow_the_version(
+    workspaces: Workspaces, value: JsonValue
+) -> None:
+    ws, artifact_id = await _drawn(workspaces)
+    version, _ = await _head(ws, artifact_id)
+    rewritten = JsonPatch(ops=({"op": "replace", "path": "/elements/r1/width", "value": value},))
+    with pytest.raises(ValidationFailed, match="version must grow"):
+        await ws.commit(
+            EditArtifact(artifact_id=artifact_id, base_version=version, patch=rewritten)
+        )

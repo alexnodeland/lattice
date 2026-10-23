@@ -32,8 +32,7 @@ class Partitioned(InMemoryStorage):
         self.cut_off.clear()
         self._healed.set()
 
-    @override
-    async def acquire_lease(self, scope: Scope, key: str, holder: str, ttl: timedelta) -> bool:
+    async def _reach(self, key: str, holder: str) -> None:
         self.asked[holder] += 1
         self.holders[key] = holder
         if holder in self.cut_off:
@@ -41,4 +40,13 @@ class Partitioned(InMemoryStorage):
             if not self.in_flight:
                 raise ConnectionError("the database is out of reach")
             await self._healed.wait()
+
+    @override
+    async def acquire_lease(self, scope: Scope, key: str, holder: str, ttl: timedelta) -> bool:
+        await self._reach(key, holder)
         return await super().acquire_lease(scope, key, holder, ttl)
+
+    @override
+    async def renew_lease(self, scope: Scope, key: str, holder: str, ttl: timedelta) -> bool:
+        await self._reach(key, holder)
+        return await super().renew_lease(scope, key, holder, ttl)

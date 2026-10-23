@@ -238,6 +238,15 @@ class Storage(Protocol):
         """Take or renew an exclusive lease. Return False if another holder has it."""
         ...
 
+    async def renew_lease(self, scope: Scope, key: str, holder: str, ttl: timedelta) -> bool:
+        """Renew a lease only if ``holder`` still has it, expired or not; never take one.
+
+        Return False if the lease is another holder's, or no one's: a holder that took it after
+        it expired may have released it since. Unlike :meth:`acquire_lease`, it is atomic with
+        that check, so a claim renewed late is renewed only if no one else had it meanwhile.
+        """
+        ...
+
     async def release_lease(self, scope: Scope, key: str, holder: str) -> None:
         """Release a lease if ``holder`` has it."""
         ...

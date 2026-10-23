@@ -1183,11 +1183,15 @@ class Workspace:
         claims releases the lease, which storage may have granted all the same.
 
         Yields:
-            An event set once the claim is lost: it lapsed, a whole ``ttl`` after its last
-            renewal began, even while a renewal hangs, or a renewal found that another holder
-            has the thread. The claim is never renewed after that, even if storage would allow
-            it. Its lease is released only when the block exits, so exit promptly once the event
-            is set.
+            An event set once the claim is lost, as storage says: a renewal found that another
+            holder has the thread, or no one has it, or a renewal still in flight a whole
+            ``ttl`` after it began, or one that raised once the claim was due to lapse, left it
+            unknown. A ``ttl`` after its last renewal began, with no renewal in flight, as when
+            the event loop stalled, the claim is renewed at once, and only if no one else has
+            had it meanwhile (:meth:`~artifactr.workspace.Storage.renew_lease`): so a holder
+            whose loop stalled keeps its claim, and its run, unless storage gave it to another.
+            The claim is never renewed once lost, even if storage would allow it. Its lease is
+            released only when the block exits, so exit promptly once the event is set.
 
         Raises:
             ThreadBusy: If another holder has the thread.
@@ -1221,31 +1225,55 @@ class Workspace:
         self, key: str, holder: str, ttl: timedelta, lapses: float, lost: asyncio.Event
     ) -> None:
         # Renewing is bookkeeping, not part of the turn that holds the thread. A timer on the
-        # loop's monotonic clock marks the claim lost when it lapses, at ``lapses``, a ttl after
-        # its last renewal began, whatever storage is doing.
+        # loop's monotonic clock fires a ttl after the last renewal began. With a renewal in
+        # flight, storage hangs: the claim is lost. With none, the loop itself was late, as in a
+        # stall, and storage decides: the claim is renewed at once, if it is still this holder's.
         loop = asyncio.get_running_loop()
+        due = asyncio.Event()
+        renewing: float | None = None  # when the renewal in flight began
+
+        def lapse() -> None:
+            if renewing is None:
+                due.set()
+            else:
+                _lose(key, lost)
+
         with untraced():
-            lapse = loop.call_at(lapses, _lose, key, lost)
+            timer = loop.call_at(lapses, lapse)
             try:
                 while True:
-                    await asyncio.sleep(ttl.total_seconds() / 3)
-                    if lost.is_set():
-                        return
+                    with contextlib.suppress(TimeoutError):
+                        await asyncio.wait_for(due.wait(), ttl.total_seconds() / 3)
+                    late = due.is_set()
+                    due.clear()
                     renewing = loop.time()
+                    if late:  # a hang from here on is lost a ttl on
+                        timer = loop.call_at(renewing + ttl.total_seconds(), lapse)
                     try:
-                        kept = await self._storage.acquire_lease(self._scope, key, holder, ttl)
+                        if late:
+                            kept = await self._storage.renew_lease(self._scope, key, holder, ttl)
+                        else:
+                            kept = await self._storage.acquire_lease(self._scope, key, holder, ttl)
                     except Exception:
+                        if late:  # due to lapse, and storage can't say it is still this one's
+                            logger.exception("renewing the claim %s late failed", key)
+                            _lose(key, lost)
+                            return
                         logger.exception("renewing the claim %s failed; retrying", key)
                         continue
+                    finally:
+                        began, renewing = renewing, None
                     if lost.is_set():
                         return  # it lapsed while the renewal was in flight
                     if not kept:
-                        _lose(key, lost)  # another holder has the thread
+                        _lose(key, lost)  # another holder has the thread, or had it
                         return
-                    lapse.cancel()
-                    lapse = loop.call_at(renewing + ttl.total_seconds(), _lose, key, lost)
+                    if late:
+                        logger.warning("the claim %s was renewed late, and storage kept it", key)
+                    timer.cancel()
+                    timer = loop.call_at(began + ttl.total_seconds(), lapse)
             finally:
-                lapse.cancel()
+                timer.cancel()
 
 
 def _thread_key(thread_id: ThreadId) -> str:

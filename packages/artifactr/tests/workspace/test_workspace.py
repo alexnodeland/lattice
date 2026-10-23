@@ -2,6 +2,7 @@
 
 import asyncio
 import inspect
+import time
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -592,6 +593,58 @@ async def test_a_claim_is_lost_at_its_deadline_while_a_renewal_hangs() -> None:
         assert storage.asked["run_1"] == asked, "a lost claim is not renewed"
     async with ws.claim_thread(thread.id, holder="run_2", ttl=ttl):
         pass  # leaving the block released the lease
+
+
+def _stall(seconds: float) -> None:
+    """Block the event loop, as a stall does: no task runs, and no timer fires, until it ends."""
+    time.sleep(seconds)
+
+
+async def test_a_claim_whose_loop_stalls_past_its_ttl_is_renewed_late_and_kept(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    ws = await Workspaces(InMemoryStorage()).open("tenant_a", "ws_1", actor=ALICE)
+    thread = await ws.create_thread()
+    ttl = timedelta(milliseconds=60)
+    async with ws.claim_thread(thread.id, holder="run_1", ttl=ttl) as lost:
+        _stall(ttl.total_seconds() * 2)
+        await asyncio.sleep(ttl.total_seconds())  # the late renewal, and the next on time
+        assert not lost.is_set(), "storage kept the claim, so it is not lost"
+        with pytest.raises(ThreadBusy):
+            async with ws.claim_thread(thread.id, holder="run_2", ttl=ttl):
+                pass
+    assert f"the claim thread:{thread.id} was renewed late, and storage kept it" in caplog.text
+
+
+async def test_a_claim_another_holder_had_while_its_loop_stalled_is_lost() -> None:
+    now = datetime(2026, 9, 30, tzinfo=UTC)
+    storage = InMemoryStorage(clock=lambda: now)
+    ws = await Workspaces(storage).open("tenant_a", "ws_1", actor=ALICE)
+    thread = await ws.create_thread()
+    ttl = timedelta(milliseconds=60)
+    async with ws.claim_thread(thread.id, holder="run_1", ttl=ttl) as lost:
+        now += ttl  # the lease lapses in storage; another holder takes it, and releases it
+        async with ws.claim_thread(thread.id, holder="run_2", ttl=ttl):
+            pass
+        _stall(ttl.total_seconds() * 2)  # run_1's renewals were all due meanwhile
+        async with asyncio.timeout(5):
+            await lost.wait()
+        async with ws.claim_thread(thread.id, holder="run_3", ttl=ttl):
+            pass  # the late renewal took nothing: the lease is no one's
+
+
+async def test_a_late_renewal_that_hangs_is_lost_a_ttl_on() -> None:
+    storage = Partitioned(in_flight=True)
+    ws = await Workspaces(storage).open("tenant_a", "ws_1", actor=ALICE)
+    thread = await ws.create_thread()
+    ttl = timedelta(milliseconds=60)
+    async with ws.claim_thread(thread.id, holder="run_1", ttl=ttl) as lost:
+        storage.cut_off.add("run_1")
+        _stall(ttl.total_seconds() * 2)  # the renewal due is late, and hangs
+        async with asyncio.timeout(5):
+            await storage.reached.wait()
+            await lost.wait()
+        storage.heal()
 
 
 def test_subclassing_artifact_is_all_it_takes() -> None:

@@ -497,12 +497,16 @@ Tick ==
     /\ lapsed' = (lapsed \/ (Live(lease.owner) /\ lease.ttl = 1))
     /\ UNCHANGED <<shared, count, effects, crashes, faults, failed, local>>
 
+\* A renewal after the lease ran out, as when the holder's loop stalled, renews it only while it
+\* is still p's (Storage.renew_lease): no one else has taken it since. Lapse stays enabled beside
+\* it, for a late renewal that hangs or fails.
 Renew(p) ==
-    /\ Live(p) /\ lease.ttl > 0 /\ lease.ttl < TTL
+    /\ Live(p) /\ lease.ttl < TTL
     /\ lease' = [lease EXCEPT !.ttl = TTL]
     /\ UNCHANGED <<shared, audit, local>>
 
-\* The renewal's timer fires, or a renewal finds another holder: the claim is lost.
+\* A renewal finds another holder, or the lease ran out and a late renewal hangs or fails: the
+\* claim is lost.
 Lapse(p) ==
     /\ pc[p] \in Holding /\ ~lost[p] /\ (lease.owner # p \/ lease.ttl = 0)
     /\ lost' = [lost EXCEPT ![p] = TRUE]

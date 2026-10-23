@@ -49,6 +49,7 @@ A property that cannot fail checks nothing. Each change below, made to a copy of
 |---|---|---|
 | A run's start saves no `taken` | `ThreadClaim.cfg` | `I1_ConsumedAtMostOnce` violated |
 | A run's start is not fenced by its claim | `ThreadClaimLapse.cfg` | `I3_OneActiveRun` violated, in 16 states |
+| A late renewal takes the lease whoever had it since, as `acquire_lease` would | `ThreadClaimLapse.cfg` | `I1_ConsumedAtMostOnce` violated, in 18 states |
 | A claim granted to a cancelled call is not released | `ThreadClaimLive.cfg` | `I3_ClaimHasATask` violated, in 5 states |
 | A call cancelled in `_take` before it claims hands nothing over | `ThreadClaimLive.cfg` | `I3_NoStrandedAsk` violated, in 4 states |
 | A hand-over never proceeds | `ThreadClaimLive.cfg` | `I3_NoStrandedAsk` violated |

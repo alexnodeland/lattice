@@ -79,6 +79,8 @@ nav:
   - adr/0066-the-style-census-enforced.md
   - adr/0067-settings-in-admin.md
   - adr/0068-where-the-focus-goes-and-one-not-found.md
+||||||| parent of 989995ca (feat(portalr): a tenant's adoption, read from its product analytics, and admin's page of it)
+  - adr/0071-adoption-the-tenants-read-and-page.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

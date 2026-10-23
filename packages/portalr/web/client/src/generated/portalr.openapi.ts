@@ -22,6 +22,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/portalr/v1/adoption": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Adoption
+         * @description The tenant's adoption from its product analytics (portalr ADR-0071).
+         *
+         *     People active each day, who used each integration, the funnel from a page to a thread to
+         *     a message, and weekly retention, over a window of at most 91 days. People are counted by
+         *     a keyed hash of their id, and only those who said yes. ``complete`` is false where the
+         *     read stopped at its deadline.
+         */
+        get: operations["adoption_portalr_v1_adoption_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/portalr/v1/analytics/consent": {
         parameters: {
             query?: never;
@@ -396,6 +421,36 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /**
+         * ActiveDay
+         * @description How many people did anything in the tenant on one day, in UTC.
+         */
+        ActiveDay: {
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /** People */
+            people: number;
+        };
+        /**
+         * Adoption
+         * @description A tenant's adoption over a window, and whether all of it was read.
+         */
+        Adoption: {
+            /** Complete */
+            complete: boolean;
+            /** Days */
+            days: components["schemas"]["ActiveDay"][];
+            funnel: components["schemas"]["Funnel"] | null;
+            /** Integrations */
+            integrations: components["schemas"]["IntegrationUse"][];
+            /** People */
+            people: number;
+            /** Retention */
+            retention: number[];
+        };
+        /**
          * Answer
          * @description A person's answer to product analytics: yes, or no.
          */
@@ -601,7 +656,31 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
+        /**
+         * Funnel
+         * @description How many people viewed a page, then opened a thread, then sent a message, within a day.
+         */
+        Funnel: {
+            /** Message */
+            message: number;
+            /** Page */
+            page: number;
+            /** Thread */
+            thread: number;
+        };
         Id: string;
+        /**
+         * IntegrationUse
+         * @description How many times an integration was used in the window, by how many people.
+         */
+        IntegrationUse: {
+            /** Integration */
+            integration: string;
+            /** People */
+            people: number;
+            /** Uses */
+            uses: number;
+        };
         /**
          * Invited
          * @description The member an invitation made, by the user id their tokens carry.
@@ -719,6 +798,15 @@ export interface components {
             /** Owner Email */
             owner_email: string;
             tenant: components["schemas"]["TenantId"];
+        };
+        /** Ok[Adoption] */
+        Ok_Adoption_: {
+            data: components["schemas"]["Adoption"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "ok";
         };
         /** Ok[Feedback] */
         Ok_Feedback_: {
@@ -1140,6 +1228,67 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Config"];
+                };
+            };
+        };
+    };
+    adoption_portalr_v1_adoption_get: {
+        parameters: {
+            query: {
+                start: string;
+                end: string;
+            };
+            header?: {
+                "X-Tenant"?: components["schemas"]["TenantId"] | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Ok_Adoption_"] | components["schemas"]["Unavailable"] | components["schemas"]["Unconfigured"];
+                };
+            };
+            /** @description Refused */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
                 };
             };
         };

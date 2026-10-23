@@ -1,16 +1,28 @@
 """portalr's analytics: each event is the registry's and the server's; each read, the tenant's."""
 
+import asyncio
 import json
 import logging
 from collections.abc import Awaitable, Callable
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import httpx
 import pytest
+from pydantic import ValidationError
 
 from grantr.core import Agent, ServicePrincipal, User
 from portalr.readers import Analytics, Readers
-from portalr.readers.analytics import REGISTRY, TENANT_SETTING, actor_of, distinct_id
+from portalr.readers.analytics import (
+    REGISTRY,
+    TENANT_SETTING,
+    ActiveDay,
+    Adoption,
+    AdoptionQuery,
+    Funnel,
+    IntegrationUse,
+    actor_of,
+    distinct_id,
+)
 from portalr.readers.query import Span
 from portalr.readers.reading import Ok, Unavailable
 from portalr.tenant import allowed
@@ -41,6 +53,9 @@ def failing() -> httpx.AsyncClient:
 
 READS: dict[str, Callable[[Analytics], Awaitable[object]]] = {
     "counts": lambda analytics: analytics.counts(ACME, SPAN),
+    "adoption": lambda analytics: analytics.adoption(
+        ACME, AdoptionQuery(start=SPAN.start, end=SPAN.end)
+    ),
 }
 """Every read the analytics reader has: a new one is added here, and held to the tenant below."""
 
@@ -196,3 +211,116 @@ async def test_forgetting_a_person_deletes_their_events_by_their_hash_alone() ->
 async def test_a_deletion_clickhouse_refuses_is_said() -> None:
     _, writer = recorded(httpx.Response(500))
     assert not await Analytics(URL, KEY, writer=writer).forget("user-1")
+
+
+def adoption_answers(**overrides: str) -> httpx.AsyncClient:
+    """A ClickHouse that answers each of the adoption's reads, by what it selects."""
+    answers = {
+        "toDate(ts) AS day": '{"day":"2026-10-01","people":"2"}\n{"day":"2026-10-02","people":"1"}',
+        "props['integration']": '{"integration":"tracker","uses":"5","people":"2"}',
+        "windowFunnel": '{"people":"3","page":"3","thread":"2","message":"1"}',
+        "retention(": '{"retention":["3","2","1"]}',
+        **overrides,
+    }
+
+    async def handle(request: httpx.Request) -> httpx.Response:
+        query = request.content.decode()
+        for marker, text in answers.items():
+            if marker in query:
+                if text == "slow":
+                    await asyncio.sleep(1)
+                if text == "refused":
+                    return httpx.Response(500, text="Code: 241. DB::Exception: secret detail")
+                return httpx.Response(200, text=text)
+        raise AssertionError(query)
+
+    return httpx.AsyncClient(transport=httpx.MockTransport(handle))
+
+
+ADOPTION = AdoptionQuery(start=SPAN.start, end=SPAN.end)
+
+
+async def test_a_tenants_adoption_is_its_people_days_integrations_funnel_and_retention() -> None:
+    adoption = await Analytics(URL, KEY, reader=adoption_answers()).adoption(ACME, ADOPTION)
+    assert adoption == Ok(
+        data=Adoption(
+            people=3,
+            days=[
+                ActiveDay(day=date(2026, 10, 1), people=2),
+                ActiveDay(day=date(2026, 10, 2), people=1),
+            ],
+            integrations=[IntegrationUse(integration="tracker", uses=5, people=2)],
+            funnel=Funnel(page=3, thread=2, message=1),
+            retention=[3, 2, 1],
+            complete=True,
+        )
+    )
+
+
+async def test_retention_asks_after_each_week_the_window_touches() -> None:
+    sent, reader = recorded(httpx.Response(200, text=""))
+    window = AdoptionQuery(start=SPAN.start, end=SPAN.start + timedelta(days=91))
+    await Analytics(URL, KEY, reader=reader).adoption(ACME, window)
+    (asked,) = [r.content.decode() for r in sent if "retention(" in r.content.decode()]
+    assert "week = 12)" in asked
+    assert "week = 13" not in asked
+
+
+async def test_a_one_week_window_asks_retention_after_two_weeks_and_keeps_one() -> None:
+    window = AdoptionQuery(start=SPAN.start, end=SPAN.start + timedelta(days=7))
+    reader = adoption_answers(**{"retention(": '{"retention":["3","0"]}'})
+    adoption = await Analytics(URL, KEY, reader=reader).adoption(ACME, window)
+    assert isinstance(adoption, Ok)
+    assert adoption.data.retention == [3]
+
+
+async def test_an_adoption_read_asks_clickhouse_one_query_at_a_time() -> None:
+    running, most = 0, 0
+
+    async def handle(request: httpx.Request) -> httpx.Response:
+        nonlocal running, most
+        running += 1
+        most = max(most, running)
+        await asyncio.sleep(0.01)
+        running -= 1
+        return httpx.Response(200, text="")
+
+    reader = httpx.AsyncClient(transport=httpx.MockTransport(handle))
+    await Analytics(URL, KEY, reader=reader).adoption(ACME, ADOPTION)
+    assert most == 1
+
+
+async def test_an_empty_tenant_has_no_one_and_a_whole_answer() -> None:
+    _, reader = recorded(httpx.Response(200, text=""))
+    adoption = await Analytics(URL, KEY, reader=reader).adoption(ACME, ADOPTION)
+    assert adoption == Ok(
+        data=Adoption(people=0, days=[], integrations=[], funnel=None, retention=[], complete=True)
+    )
+
+
+@pytest.mark.parametrize(
+    "read", ["windowFunnel", "toDate(ts) AS day", "props['integration']", "retention("]
+)
+async def test_a_read_clickhouse_refuses_makes_the_adoption_unavailable_without_its_words(
+    read: str,
+) -> None:
+    reader = adoption_answers(**{read: "refused"})
+    adoption = await Analytics(URL, KEY, reader=reader).adoption(ACME, ADOPTION)
+    assert adoption == Unavailable(reason="ClickHouse answered 500")
+
+
+async def test_a_read_past_the_deadline_is_left_out_and_the_answer_is_partial(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("portalr.readers.analytics.DEADLINE", 0.2)
+    reader = adoption_answers(**{"retention(": "slow"})
+    adoption = await Analytics(URL, KEY, reader=reader).adoption(ACME, ADOPTION)
+    assert isinstance(adoption, Ok)
+    assert adoption.data.retention == []
+    assert adoption.data.funnel == Funnel(page=3, thread=2, message=1)
+    assert adoption.data.complete is False
+
+
+def test_an_adoption_window_is_at_most_91_days() -> None:
+    with pytest.raises(ValidationError, match="at most 91 days"):
+        AdoptionQuery(start=SPAN.start, end=SPAN.start + timedelta(days=92))

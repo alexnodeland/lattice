@@ -1,8 +1,8 @@
 """Check portalr's analytics against a running stack's ClickHouse: two tenants, each its own.
 
 stackr's smoke test runs this with its analytics profile (lattice RFC-0008, stackr ADR-0044). It
-records an event in each of two new tenants as the writer, then reads each tenant's counts as the
-reader, through portalr's reader, and fails if either sees the other's.
+records an event in each of two new tenants as the writer, then reads each tenant's counts and
+adoption as the reader, through portalr's reader, and fails if either sees the other's.
 
 Usage: scripts/smoke_analytics.py   (from portalr's directory)
 
@@ -19,6 +19,7 @@ from datetime import UTC, datetime, timedelta
 import httpx
 
 from portalr.readers import Analytics, Ok
+from portalr.readers.analytics import AdoptionQuery
 from portalr.readers.query import Span
 from portalr.tenant import allowed
 
@@ -64,6 +65,24 @@ async def main() -> int:
             say(f"ok: portalr's analytics reader sees {tenant}'s {times} events, and no other's")
         else:
             say(f"FAIL: portalr's analytics reader, for {tenant}, saw {seen}")
+            status = 1
+    # Each tenant's adoption: a's one person, who viewed a page; b's none.
+    if not await analytics.capture(a, "app.page.viewed.v1", f"{a}-person", props={"route": "/"}):
+        say(f"FAIL: portalr's analytics didn't record a page view in {a}")
+        return 1
+    window = AdoptionQuery(start=span.start, end=span.end)
+    for tenant, people, viewed in ((a, 1, 1), (b, 1, 0)):
+        adoption = await analytics.adoption(allowed(tenant), window)
+        if (
+            isinstance(adoption, Ok)
+            and adoption.data.complete
+            and adoption.data.people == people
+            and adoption.data.funnel is not None
+            and adoption.data.funnel.page == viewed
+        ):
+            say(f"ok: portalr's adoption read of {tenant} counts its own people alone")
+        else:
+            say(f"FAIL: portalr's adoption read of {tenant}: {adoption}")
             status = 1
     # Forgetting a's person, as taking back their yes does: a's reads see nothing at once.
     if not await analytics.forget(f"{a}-person"):

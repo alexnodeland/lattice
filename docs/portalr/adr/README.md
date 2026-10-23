@@ -74,5 +74,7 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0066](0066-the-style-census-enforced.md) | The style census, enforced | Accepted |
 | [0067](0067-settings-in-admin.md) | Settings in admin | Proposed |
 | [0068](0068-where-the-focus-goes-and-one-not-found.md) | Where the focus goes, and one not-found | Proposed |
+||||||| parent of 989995ca (feat(portalr): a tenant's adoption, read from its product analytics, and admin's page of it)
+| [0071](0071-adoption-the-tenants-read-and-page.md) | Adoption, the tenant's read and page | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

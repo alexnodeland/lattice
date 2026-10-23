@@ -377,7 +377,7 @@ Still open:
 - [x] Relay and consent (the server's side)
 - [x] Browser capture and the consent UI
 - [x] Grafana's datasource and dashboard ([stackr ADR-0048](../stackr/adr/0048-grafanas-clickhouse-data-source-and-the-adoption-dashboard.md))
-- [ ] Adoption read and page
+- [x] Adoption read and page ([portalr ADR-0071](../portalr/adr/0071-adoption-the-tenants-read-and-page.md))
 - [ ] Traces both ways
 - [ ] Umami profile, then replay after the privacy review
 - [ ] relayr's sink

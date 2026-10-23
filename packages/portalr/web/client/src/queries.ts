@@ -172,6 +172,8 @@ export const keys = {
       [...keys.portalr.tenant(tenant), "feedback", window, workspace] as const,
     usage: (tenant: string, window: TimeSpan, workspaces: readonly string[]) =>
       [...keys.portalr.tenant(tenant), "usage", window, workspaces] as const,
+    adoption: (tenant: string, window: TimeSpan) =>
+      [...keys.portalr.tenant(tenant), "adoption", window] as const,
     traces: (tenant: string, window: TimeSpan, filter: TraceFilter) =>
       [...keys.portalr.tenant(tenant), "traces", "list", window, filter] as const,
     logs: (tenant: string, window: TimeSpan, filter: LogFilter) =>
@@ -926,6 +928,24 @@ export function createQueries(api: Api) {
               }),
             ),
           // Summing a window reads LiteLLM at length: kept a while, and tried again once.
+          staleTime: 10 * 60_000,
+          retry: once,
+        }),
+      /**
+       * The tenant's adoption over a window, from its product analytics: people active each day,
+       * by integration, the funnel and weekly retention (portalr ADR-0071).
+       */
+      adoption: (tenant: string, window: TimeSpan) =>
+        queryOptions({
+          queryKey: keys.portalr.adoption(tenant, window),
+          queryFn: () =>
+            body(
+              api.portalr.GET("/portalr/v1/adoption", {
+                ...named(tenant),
+                params: { query: { start: window.start, end: window.end } },
+              }),
+            ),
+          // Four reads of ClickHouse over the window: kept a while, and tried again once.
           staleTime: 10 * 60_000,
           retry: once,
         }),

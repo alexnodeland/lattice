@@ -7,7 +7,7 @@ Each is optional: an application passes those its stack runs.
 
 from dataclasses import dataclass
 
-from portalr.readers.analytics import Analytics, EventCount
+from portalr.readers.analytics import Adoption, AdoptionQuery, Analytics, EventCount
 from portalr.readers.feedback import Feedback, FeedbackQuery, read_feedback
 from portalr.readers.grafana import Grafana
 from portalr.readers.langfuse import Langfuse, Score, Scores
@@ -48,6 +48,8 @@ class Readers:
 
 
 __all__ = [
+    "Adoption",
+    "AdoptionQuery",
     "Analytics",
     "EventCount",
     "Feedback",

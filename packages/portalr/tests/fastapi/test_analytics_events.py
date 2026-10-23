@@ -66,3 +66,28 @@ async def test_a_refused_invitation_records_nothing(
         )
     assert response.status_code == 403
     assert rows == []
+
+
+async def test_a_tenants_adoption_is_read_as_that_tenant(
+    grants: Grants, invite: Invite, ui: Path
+) -> None:
+    tenants: list[str] = []
+
+    def clickhouse(request: httpx.Request) -> httpx.Response:
+        tenants.append(request.url.params["param_tenant"])
+        return httpx.Response(200, text="")
+
+    reader = httpx.AsyncClient(transport=httpx.MockTransport(clickhouse))
+    analytics = Analytics("http://clickhouse:8123", KEY, reader=reader)
+    app = app_for(grants, Readers(analytics=analytics), invite, ui)
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://app/portalr"
+    ) as client:
+        response = await client.get(
+            "/v1/adoption",
+            params={"start": "2026-10-01T00:00:00Z", "end": "2026-10-22T00:00:00Z"},
+            headers={"x-user": "alice", "x-tenant": "acme"},
+        )
+    assert response.json()["status"] == "ok"
+    assert response.json()["data"]["complete"] is True
+    assert set(tenants) == {"acme"}

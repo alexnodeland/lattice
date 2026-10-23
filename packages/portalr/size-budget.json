@@ -9,7 +9,8 @@
       "math-syntax": { "total": 2500, "largest": 2500 },
       "dashboards": { "total": 150000, "largest": 130000 },
       "apps": { "total": 9000, "largest": 9000 },
-      "analytics": { "total": 600, "largest": 600 }
+      "analytics": { "total": 600, "largest": 600 },
+      "files": { "total": 14000, "largest": 14000 }
     }
   },
   "admin": { "initial": 225000, "total": 600000, "largest": 140000 }

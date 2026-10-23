@@ -2,8 +2,8 @@ import { useState } from "react";
 import { expect, test } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
+import type { PageShown } from "./file-pages";
 import { columnName, PageViewer, SHOWN_ROWS, SheetTable, sheetsOf } from "./file-preview";
-import type { PageShown } from "./native-file";
 import { axeViolations } from "./test/axe";
 import { PAGES } from "./test/native-file";
 

@@ -5,7 +5,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
-import { absent, lean, RAW_HTML } from "../ui/bundle-checks";
+import { absent, lean, NATIVE_FILES, onDemand, RAW_HTML } from "../ui/bundle-checks";
 
 /**
  * Where the app's routes are, and the route tree TanStack Router generates from them, which is
@@ -38,6 +38,8 @@ export default defineConfig({
     // The diff library is the file views' and proposals', never the first page's.
     lean(/[\\/]node_modules[\\/]diff[\\/]/),
     absent(RAW_HTML),
+    // A native file's parts are the native files' add-on's, never a route's (portalr ADR-0044).
+    onDemand(NATIVE_FILES),
     // The licences of the packages bundled, beside the UI (portalr ADR-0033).
     notices({ ui: "app", policy: readPolicy(new URL("../notices/policy.json", import.meta.url)) }),
     // The page mini apps run in, served on the apps' origin alone (portalr ADR-0051).

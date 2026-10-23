@@ -54,7 +54,7 @@ REMAINING = (
     ("ui/src/file-preview.tsx", "h-[min(70dvh,32rem)]"),
     ("ui/src/log-list.tsx", "lg:grid-cols-[minmax(0,1fr)_22rem]"),
     ("ui/src/log-list.tsx", "max-h-[30rem]"),
-    ("ui/src/native-file.tsx", "grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))]"),
+    ("ui/src/file-pages.tsx", "grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))]"),
     ("ui/src/select-field.tsx", "max-h-[min(18rem,var(--available-height))]"),
     ("ui/src/trace-view.tsx", "lg:grid-cols-[minmax(0,1fr)_22rem]"),
     ("ui/src/trace-view.tsx", "max-h-[28rem]"),

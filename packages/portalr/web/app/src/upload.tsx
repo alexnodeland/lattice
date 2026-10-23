@@ -23,7 +23,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { Context } from "./context";
-import { NATIVE } from "./renderers";
+import { NATIVE } from "./native";
 
 type Kinds = readonly { readonly kind: string; readonly extensions: readonly string[] }[];
 

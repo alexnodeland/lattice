@@ -1,5 +1,6 @@
 import { expect, test } from "vitest";
-import { NATIVE, RENDERERS } from "./renderers";
+import { NATIVE } from "./native";
+import { RENDERERS } from "./renderers";
 import { titleOf } from "./titles";
 
 test("each native file's kind is shown as a native file, and switched by its app's key", () => {

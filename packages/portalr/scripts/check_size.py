@@ -10,11 +10,13 @@ typefaces and the notices are not counted):
 - ``largest``: the largest single file of those, which is Streamdown's chunk (the chat's markdown),
   shared by both UIs (portalr ADR-0015), so a second large dependency shows up here.
 
-An add-on is a module of ui's ``src/on-demand/``, which Markdown imports only when a message needs
-it (portalr ADR-0044). What an add-on's import reaches that the UI doesn't load without add-ons, as
-Vite's manifest says, is that add-on's: what its first use loads. It has a ``total`` and a
-``largest`` of its own, under the UI's ``addons``, and counts toward neither of the UI's; a chunk
-two add-ons share counts in each. Every add-on a UI holds has a budget, and every budget an add-on.
+An add-on is a module of ui's ``src/on-demand/``, or of a UI's own, which a part imports only when
+a page needs it, such as Markdown's math or the app's native files (portalr ADR-0044). What an
+add-on's import reaches that the UI doesn't load without add-ons, as Vite's manifest says, is
+that add-on's, but other add-ons it loads in turn: what its first use loads. It has a ``total``
+and a ``largest`` of its own, under the UI's ``addons``, and counts toward neither of the UI's; a
+chunk two add-ons share counts in each. Every add-on a UI holds has a budget, and every budget an
+add-on.
 
 A budget is a ceiling set a little above the size at the time, not a target: raise it in the same
 change that grows a bundle, and say why in the change.
@@ -40,8 +42,9 @@ LOADED = re.compile(r'<(?:script|link)\b[^>]*?\b(?:src|href)="([^"]+\.(?:js|css)
 """A script or a stylesheet or a preload that index.html names."""
 MANIFEST = Path(".vite") / "manifest.json"
 """Where Vite writes its manifest, in each UI's directory; the wheel leaves it out."""
-ADDON = re.compile(r"(?:^|/)ui/src/on-demand/([a-z][a-z-]*)\.tsx?$")
-"""An add-on's module, by the path of its source, as the manifest keys it, and its name."""
+ADDON = re.compile(r"(?:^|/)src/on-demand/([a-z][a-z-]*)\.tsx?$")
+"""An add-on's module, ui's or the UI's own, by the path of its source, as the manifest keys it,
+and its name."""
 
 type Manifest = dict[str, dict[str, Any]]
 type Sizes = dict[str, int]
@@ -77,8 +80,10 @@ def addon_files(manifest: Manifest) -> dict[str, set[str]]:
     addons = {found[1]: key for key in manifest if (found := ADDON.search(key))}
     entries = [key for key, chunk in manifest.items() if chunk.get("isEntry")]
     base = files_of(manifest, reached(manifest, entries, frozenset(addons.values())))
+    # An add-on that loads another, as the native files' parts load Markdown's, isn't its size.
     return {
-        name: files_of(manifest, reached(manifest, [key], frozenset())) - base
+        name: files_of(manifest, reached(manifest, [key], frozenset(addons.values()) - {key}))
+        - base
         for name, key in addons.items()
     }
 

@@ -71,6 +71,14 @@ export { EmptyState } from "./empty-state";
 export { ErrorState } from "./error-state";
 export { FailureAlert } from "./failure-alert";
 export { FileChooser } from "./file-chooser";
+export {
+  FileHolder,
+  type Holder,
+  PageCompare,
+  type PagePair,
+  type PageShown,
+  PageStrip,
+} from "./file-pages";
 export { PageViewer, SheetTable, sheetsOf } from "./file-preview";
 export { Heading } from "./heading";
 export { Icon } from "./icon";
@@ -83,20 +91,11 @@ export { Markdown } from "./markdown";
 export { Lockup, Mark, type Ui } from "./marks";
 export { Menu, type MenuItem } from "./menu";
 export { Ago, ago, Moment } from "./moment";
-export {
-  FileHolder,
-  factsOf,
-  fileSize,
-  type Holder,
-  nativeFile,
-  PageCompare,
-  type PagePair,
-  type PageShown,
-  PageStrip,
-} from "./native-file";
+export { factsOf, fileSize, nativeFile } from "./native-file";
 export { NewVersion, NewVersionOffer } from "./new-version";
 export { NotFound } from "./not-found";
 export { Num } from "./num";
+export { useLoaded } from "./on-demand";
 export { PageHeader } from "./page-header";
 export { Plain } from "./plain";
 export { Progress } from "./progress";

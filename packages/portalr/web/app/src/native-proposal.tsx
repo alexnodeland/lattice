@@ -24,7 +24,8 @@ import {
 import { type UseQueryResult, useQueries, useQuery } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import type { Place } from "./check-out";
-import { holderOf, type Native, PAGES_AT_ONCE, userOf } from "./native-file";
+import type { Native } from "./native";
+import { holderOf, PAGES_AT_ONCE, userOf } from "./native-file";
 import { useWorkspace } from "./workspace";
 
 type Op = Readonly<Record<string, unknown>>;

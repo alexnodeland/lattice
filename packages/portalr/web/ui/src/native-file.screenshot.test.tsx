@@ -9,7 +9,8 @@ import { expect, onTestFinished, test } from "vitest";
 import { commands, page } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { Card } from "./card";
-import { FileHolder, nativeFile, PageStrip } from "./native-file";
+import { FileHolder, PageStrip } from "./file-pages";
+import { nativeFile } from "./native-file";
 import { dark } from "./test/colours";
 import { FAILED, MANIFEST, NOW, PAGES, UNTIL } from "./test/native-file";
 

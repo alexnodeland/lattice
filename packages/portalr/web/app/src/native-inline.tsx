@@ -24,7 +24,8 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { editorAt, type Place } from "./check-out";
 import { useEditing } from "./editing";
-import { downloadingSaid, FileControls, type Native, useDownload } from "./native-file";
+import type { Native } from "./native";
+import { downloadingSaid, FileControls, useDownload } from "./native-file";
 import { useNear } from "./near";
 import { ViewSlotsContext } from "./view-slots";
 

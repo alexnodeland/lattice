@@ -21,10 +21,11 @@ import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useAppHost } from "./app-host";
 import type { Context } from "./context";
+import { NativeInline } from "./files";
 import { useFormHost } from "./form-host";
 import { KillSwitch } from "./kill-switch";
-import { NativeInline } from "./native-inline";
-import { NATIVE, RENDERERS } from "./renderers";
+import { NATIVE } from "./native";
+import { RENDERERS } from "./renderers";
 import { titleOf } from "./titles";
 
 /** What people call an artifact of a kind: a native file by its type, any other by its kind. */

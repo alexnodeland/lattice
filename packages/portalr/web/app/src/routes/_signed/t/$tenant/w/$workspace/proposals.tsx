@@ -2,8 +2,8 @@ import { useMe } from "@portalr/client";
 import { EmptyState, PageHeader, ProposalCard, proposedOn, TextLink } from "@portalr/ui";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { NativeProposal } from "../../../../../../native-proposal";
-import { NATIVE } from "../../../../../../renderers";
+import { NativeProposal } from "../../../../../../files";
+import { NATIVE } from "../../../../../../native";
 import { titlesOf } from "../../../../../../titles";
 import { Connection, useStream, useWorkspace } from "../../../../../../workspace";
 

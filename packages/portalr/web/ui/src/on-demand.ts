@@ -8,10 +8,14 @@
 
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 
-/** An add-on as a caller has it: its module once loaded, or null, and whether it failed to load. */
+/**
+ * An add-on as a caller has it: its module once loaded, or null, and whether it failed to load,
+ * with why.
+ */
 export interface Loaded<T> {
   readonly module: T | null;
   readonly failed: boolean;
+  readonly error: unknown;
 }
 
 type Loading<T> = {
@@ -21,7 +25,7 @@ type Loading<T> = {
   readonly listeners: Set<() => void>;
 };
 
-const NOTHING: Loaded<never> = { module: null, failed: false };
+const NOTHING: Loaded<never> = { module: null, failed: false, error: null };
 
 const loads = new Map<() => Promise<unknown>, Loading<unknown>>();
 
@@ -47,8 +51,8 @@ function start<T>(load: () => Promise<T>): void {
     }
   };
   load().then(
-    (module) => settle({ module, failed: false }),
-    () => settle({ module: null, failed: true }),
+    (module) => settle({ module, failed: false, error: null }),
+    (error: unknown) => settle({ module: null, failed: true, error }),
   );
 }
 

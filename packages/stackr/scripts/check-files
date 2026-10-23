@@ -205,7 +205,7 @@ reach='
 const net = require("node:net");
 const dgram = require("node:dgram");
 const dns = require("node:dns").promises;
-const [host, beyond] = process.argv.slice(1);
+const [host, beyond, own] = process.argv.slice(1);
 const tcp = (address, port) => new Promise((done, fail) => {
   const socket = net.connect({ host: address, port, timeout: 5000 });
   socket.on("connect", () => { socket.destroy(); done(); });
@@ -227,15 +227,19 @@ const attempts = [
   ["TCP to [2606:4700:4700::1111]:443", () => tcp("2606:4700:4700::1111", 443)],
   ["UDP DNS to 1.1.1.1:53", udp],
   ["TCP to 169.254.169.254:80", () => tcp("169.254.169.254", 80)],
-  // Refused is an answer: something is at the host'"'"'s address, as the worker'"'"'s check has it.
-  ["TCP to " + host + ":80, where the host would be", () => tcp(host, 80).catch((error) => {
-    if (error.code === "ECONNREFUSED") return;
-    throw error;
-  })],
   ["TCP to " + beyond + ":8080, the relay on the application side", () => tcp(beyond, 8080)],
 ];
 (async () => {
   let all = true;
+  if (host === own) {
+    console.log("  passed over: " + host + ", where the host would be, is the worker itself");
+  } else {
+    // Refused is an answer: something is at the host'"'"'s address, as the worker'"'"'s check has it.
+    attempts.push(["TCP to " + host + ":80, where the host would be", () => tcp(host, 80).catch((error) => {
+      if (error.code === "ECONNREFUSED") return;
+      throw error;
+    })]);
+  }
   for (const [what, attempt] of attempts) {
     try { await attempt(); console.log("  REACHED: " + what); all = false; }
     catch (error) { console.log("  refused: " + what + ": " + error.message); }
@@ -331,7 +335,7 @@ if ((diagrams)); then
   check "the diagrams worker runs as compose.yaml says" same "$(posture "$container")" \
     "read-only=true user=10005 privileged=false cap-add= cap-drop=ALL security=no-new-privileges:true init=true memory=1073741824 swap=1073741824 cpus=1000000000 pids=256 pid-mode= mounts=0 devices=0 tmpfs=/tmp:size=256m,mode=1777,noexec,nosuid,nodev network=$network networks=$network"
   check "the diagrams worker's relay runs as compose.yaml says" same "$(posture "$relay")" \
-    "read-only=true user=10004 privileged=false cap-add= cap-drop=ALL security=no-new-privileges:true init=true memory=67108864 swap=67108864 cpus=0 pids=32 pid-mode= mounts=0 devices=0 tmpfs= network=${name}_files networks=${name}_diagrams,${name}_files"
+    "read-only=true user=10004 privileged=false cap-add= cap-drop=ALL security=no-new-privileges:true init=true memory=67108864 swap=67108864 cpus=0 pids=32 pid-mode= mounts=0 devices=0 tmpfs= network=${name}_diagrams networks=${name}_diagrams,${name}_files"
   check "the diagrams worker's network holds it and its relay alone" same \
     "$(docker network inspect --format '{{range .Containers}}{{println .Name}}{{end}}' "$network" | grep -v '^$' | sort | tr '\n' ' ')" \
     "$(docker inspect --format '{{.Name}}' "$container" "$relay" | tr -d / | sort | tr '\n' ' ')"
@@ -344,10 +348,11 @@ if ((diagrams)); then
     subnet=$(docker network inspect --format '{{range .IPAM.Config}}{{.Subnet}}{{end}}' "$network")
     host="${subnet%.*/*}.1"
   fi
+  own=$(docker inspect --format "{{(index .NetworkSettings.Networks \"$network\").IPAddress}}" "$container")
   # The relay's address on the application's side, where the application is too.
   beyond=$(docker inspect --format "{{(index .NetworkSettings.Networks \"${name}_files\").IPAddress}}" "$relay")
   check "the diagrams worker reaches nothing outside its network: the internet, the host, the application's side" \
-    docker exec "$container" node -e "$reach" "$host" "$beyond"
+    docker exec "$container" node -e "$reach" "$host" "$beyond" "$own"
   WORKER_TOKEN=$(setting "$container" WORKER_TOKEN)
   export WORKER_TOKEN
   check "the diagrams worker answers its probe, through its relay" \

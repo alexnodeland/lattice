@@ -1,8 +1,10 @@
 import { useMe } from "@portalr/client";
 import { EmptyState, PageHeader, ProposalCard, proposedOn, TextLink } from "@portalr/ui";
+import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { NativeProposal } from "../../../../../../native-proposal";
 import { NATIVE } from "../../../../../../renderers";
+import { titlesOf } from "../../../../../../titles";
 import { Connection, useStream, useWorkspace } from "../../../../../../workspace";
 
 /**
@@ -22,6 +24,9 @@ function Proposals() {
   const context = Route.useRouteContext();
   const me = useMe(context.queries, context.user, tenant);
   const stream = useStream();
+  // Each artifact's link is named by its title, as the artifacts' list names it, or its id.
+  const { data: read } = useQuery(context.queries.artifactr.artifacts(tenant, workspace));
+  const titles = titlesOf(read);
   const snapshot = useWorkspace();
   const listed = Object.values(snapshot.state.proposals).sort(
     (a, b) => Number(b.status === "open") - Number(a.status === "open"),
@@ -55,7 +60,7 @@ function Proposals() {
                 />
               }
             >
-              {artifact}
+              {titles.get(artifact) ?? <span className="font-mono">{artifact}</span>}
             </TextLink>
           );
           return artifact && native ? (

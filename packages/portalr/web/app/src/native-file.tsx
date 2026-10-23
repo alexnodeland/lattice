@@ -106,10 +106,9 @@ export function useDownload(place: Place, name: string | undefined) {
   const download = async (version: number) => {
     setSaving("saving");
     try {
-      save(
-        await queryClient.fetchQuery(queries.files.content(tenant, workspace, artifact, version)),
-        name ?? artifact,
-      );
+      // Tried again once, at once, not as often as a read the page makes itself: the person waits.
+      const content = queries.files.content(tenant, workspace, artifact, version);
+      save(await queryClient.fetchQuery({ ...content, retry: 1, retryDelay: 0 }), name ?? artifact);
       setSaving(null);
     } catch {
       setSaving("failed");
@@ -118,7 +117,14 @@ export function useDownload(place: Place, name: string | undefined) {
   return { saving, download } as const;
 }
 
-/** The download's button, and its failure, said. */
+/** What a download's status region says while it goes: its failure is said where it is shown. */
+export const downloadingSaid = (saving: "saving" | "failed" | null) =>
+  saving === "saving" ? "Downloading…" : "";
+
+/**
+ * The download's button. While it goes it can't be pressed again, but keeps the focus, and says
+ * so politely; its failure is said with the file's controls.
+ */
 function DownloadButton({
   saving,
   onDownload,
@@ -127,9 +133,19 @@ function DownloadButton({
   onDownload: () => void;
 }) {
   return (
-    <Button variant="secondary" disabled={saving === "saving"} onClick={onDownload}>
-      {saving === "saving" ? "Downloading…" : "Download"}
-    </Button>
+    <>
+      <Button
+        variant="secondary"
+        disabled={saving === "saving"}
+        focusableWhenDisabled
+        onClick={onDownload}
+      >
+        {saving === "saving" ? "Downloading…" : "Download"}
+      </Button>
+      <span role="status" className="sr-only">
+        {downloadingSaid(saving)}
+      </span>
+    </>
   );
 }
 

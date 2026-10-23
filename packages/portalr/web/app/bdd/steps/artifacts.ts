@@ -9,11 +9,14 @@ const kept = (note: string | null): string => {
   return note;
 };
 
-/** The proposal on the kept note, among the workspace's, by the link to it. */
+/**
+ * The proposal on the kept note, among the workspace's, by the link to it: named by the note's
+ * title, as the artifacts' list names it, and leading to its page by its id.
+ */
 const proposalOn = (page: Page, note: string) =>
   page
     .getByRole("region", { name: /^Proposal:/ })
-    .filter({ has: page.getByRole("link", { name: note, exact: true }) });
+    .filter({ has: page.locator(`a[href$="/artifacts/${note}"]`) });
 
 When("they keep the note the assistant proposed an edit to", async ({ page, scenario }) => {
   scenario.note = await proposedTo(page);
@@ -63,8 +66,11 @@ Then(
 );
 
 Then("the note's proposal is open there", async ({ page, scenario }) => {
-  const proposal = proposalOn(page, kept(scenario.note));
+  const note = kept(scenario.note);
+  const proposal = proposalOn(page, note);
   await expect(proposal.getByRole("button", { name: "Reject" })).toBeEnabled();
+  // Its link names the note by its title, not its id.
+  await expect(proposal.locator(`a[href$="/artifacts/${note}"]`)).not.toHaveText(note);
 });
 
 When("they reject the note's proposal there", async ({ page, scenario }) => {

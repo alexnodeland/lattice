@@ -24,7 +24,7 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { editorAt, type Place } from "./check-out";
 import { useEditing } from "./editing";
-import { FileControls, type Native, useDownload } from "./native-file";
+import { downloadingSaid, FileControls, type Native, useDownload } from "./native-file";
 import { useNear } from "./near";
 import { ViewSlotsContext } from "./view-slots";
 
@@ -252,7 +252,7 @@ function FileView({
         onClick={() => void download(status.version)}
       />
       <span role="status" className="sr-only">
-        {saving === "failed" ? `${status.name} wasn't downloaded.` : ""}
+        {saving === "failed" ? `${status.name} wasn't downloaded.` : downloadingSaid(saving)}
       </span>
     </>
   );

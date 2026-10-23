@@ -4,7 +4,7 @@ import {
   Button,
   ConfirmDialog,
   CRUMB,
-  EmptyState,
+  NotFound as NotFoundPage,
   PageHeader,
   TextField,
   TextLink,
@@ -29,7 +29,9 @@ export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/rules/$rul
   head: ({ params, match }) => ({
     meta: [
       {
-        title: match.context.title(`${params.rule} · ${params.workspace}`),
+        title: match.context.title(
+          `${match.status === "notFound" ? "Rule not found" : params.rule} · ${params.workspace}`,
+        ),
       },
     ],
   }),
@@ -200,21 +202,17 @@ function RulePage() {
 function NotFound() {
   const { tenant, workspace } = Route.useParams();
   return (
-    <>
-      <PageHeader title="Rules" />
-      <EmptyState
-        focus
-        title="Rule not found"
-        action={
-          <TextLink
-            render={<Link to="/t/$tenant/w/$workspace/rules" params={{ tenant, workspace }} />}
-          >
-            All rules
-          </TextLink>
-        }
-      >
-        There's no rule here by that name: it may have been archived.
-      </EmptyState>
-    </>
+    <NotFoundPage
+      title="Rule not found"
+      action={
+        <TextLink
+          render={<Link to="/t/$tenant/w/$workspace/rules" params={{ tenant, workspace }} />}
+        >
+          All rules
+        </TextLink>
+      }
+    >
+      There's no rule here by that name: it may have been archived.
+    </NotFoundPage>
   );
 }

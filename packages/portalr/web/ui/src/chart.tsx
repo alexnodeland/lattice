@@ -441,6 +441,7 @@ export function BarChart({
       {(margin, labels) => (
         <ResponsiveContainer>
           <RechartsBarChart
+            accessibilityLayer={false}
             data={[...rows]}
             stackOffset={diverging ? "sign" : "none"}
             barCategoryGap="20%"
@@ -527,7 +528,7 @@ export function LineChart({
     >
       {(margin, labels) => (
         <ResponsiveContainer>
-          <RechartsLineChart data={[...data]} margin={margin}>
+          <RechartsLineChart data={[...data]} margin={margin} accessibilityLayer={false}>
             <Axes index={index.key} shown={format} domain={domain} tick={tick} whole={false} />
             <Unknown data={data} index={index.key} rows={unknown} />
             <Tooltip
@@ -604,13 +605,16 @@ export function DonutChart({
       <div className="relative size-40 shrink-0">
         <div className="size-full" aria-hidden="true">
           <ResponsiveContainer>
-            <PieChart>
+            {/* Hidden from assistive technology, so nothing in it is a stop: the figures are
+                read as the chart's table instead. */}
+            <PieChart accessibilityLayer={false}>
               <defs>
                 {shown.map(
                   (part, at) => at > 0 && <Hatch key={part.key} id={`${id}-${at}`} at={at} />,
                 )}
               </defs>
               <Pie
+                rootTabIndex={-1}
                 data={[...shown]}
                 dataKey="value"
                 nameKey="name"

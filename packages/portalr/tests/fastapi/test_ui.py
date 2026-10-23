@@ -25,8 +25,8 @@ async def test_a_client_side_route_gets_the_index_which_is_never_cached(
 
 POLICY = (
     "default-src 'self'",
-    # First-party WebAssembly, in either UI (portalr ADR-0041); never 'unsafe-eval'.
-    "script-src 'self' 'wasm-unsafe-eval'",
+    # No WebAssembly and never 'unsafe-eval' (portalr ADR-0041, as artifactr ADR-0088 amends it).
+    "script-src 'self'",
     "style-src 'self'",
     "img-src 'self' data:",
     "font-src 'self'",

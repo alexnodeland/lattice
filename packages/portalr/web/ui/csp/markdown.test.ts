@@ -1,8 +1,8 @@
 /**
  * ui's Markdown under the policy both UIs share, in Chromium: every element, streamed or whole,
  * each hostile message, and each control, with not one violation of the policy, and not one use of
- * WebAssembly, which the harness reports (portalr ADR-0041), since Markdown and its add-ons need
- * none (ADR-0044). The page is built as the UIs are, so what is checked is what ships (ADR-0043),
+ * WebAssembly, which the harness reports and the policy refuses (portalr ADR-0041, as amended),
+ * since Markdown and its add-ons need none (ADR-0044). The page is built as the UIs are, so what is checked is what ships (ADR-0043),
  * and draws each from its own task, where a string it evaluated would be refused (ADR-0047).
  */
 
@@ -83,15 +83,21 @@ test("the harness sees a violation: an inline style, and a style element, each r
   await page.context().close();
 });
 
-test("the harness sees WebAssembly: a module compiles under the policy, and is reported", async () => {
+test("the harness sees WebAssembly: a module is refused under the policy, and the call is reported", async () => {
   const { page, reported } = await open(browser);
-  // The smallest module: its magic, `\0asm`, and version 1.
-  const compiled = await page.evaluate(async () => {
-    const module = await WebAssembly.compile(new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0]));
-    return module instanceof WebAssembly.Module;
+  // The smallest module: its magic, `\0asm`, and version 1. The policy has no
+  // 'wasm-unsafe-eval' (portalr ADR-0041, amended by artifactr ADR-0088), so compiling it fails.
+  const refused = await page.evaluate(async () => {
+    try {
+      await WebAssembly.compile(new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0]));
+      return null;
+    } catch (error) {
+      return error instanceof Error ? error.name : String(error);
+    }
   });
-  expect(compiled).toBe(true);
-  expect(await reported()).toEqual(["WebAssembly.compile"]);
+  expect(refused).toBe("CompileError");
+  // The call, as the harness wraps it, and the policy's own report of the refusal.
+  expect(await reported()).toEqual(["WebAssembly.compile", "script-src: wasm-eval at "]);
   await page.context().close();
 });
 

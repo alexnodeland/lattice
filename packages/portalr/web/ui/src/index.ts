@@ -95,7 +95,7 @@ export { factsOf, fileSize, nativeFile } from "./native-file";
 export { NewVersion, NewVersionOffer } from "./new-version";
 export { NotFound } from "./not-found";
 export { Num } from "./num";
-export { useLoaded } from "./on-demand";
+export { retry, useLoaded } from "./on-demand";
 export { PageHeader } from "./page-header";
 export { Plain } from "./plain";
 export { Progress } from "./progress";

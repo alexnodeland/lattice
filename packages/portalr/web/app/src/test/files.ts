@@ -9,7 +9,7 @@ export const FLAGS = "/grantr/v1/tenants/acme/workspaces/notes/enabled-integrati
 const DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 export const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
-const manifest = (text: string, outline: string, pages: number) => ({
+export const manifest = (text: string, outline: string, pages: number) => ({
   name: "brief.docx",
   content: { sha256: text.repeat(64), size: 48_213, media_type: DOCX },
   fingerprint: "f".repeat(64),

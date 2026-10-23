@@ -57,6 +57,23 @@ function start<T>(load: () => Promise<T>): void {
 }
 
 /**
+ * Loads an add-on that failed to again, such as after a moment offline or a deploy that replaced
+ * its chunk: whoever has it sees it load, as at first. One loaded, or loading, is left as it is.
+ */
+export function retry<T>(load: () => Promise<T>): void {
+  const entry = loading(load);
+  if (!entry.state.failed) {
+    return;
+  }
+  entry.started = false;
+  entry.state = NOTHING;
+  for (const listener of entry.listeners) {
+    listener();
+  }
+  start(load);
+}
+
+/**
  * The add-on `load` gives, as it loads: its module once it has, and whether it failed to; `load`
  * starts only when `wanted`, and while it isn't, the caller has nothing.
  */

@@ -5,7 +5,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
-import { absent, lean, NATIVE_FILES, onDemand, RAW_HTML } from "../ui/bundle-checks";
+import { absent, lean, onlyWithAddOn, RAW_HTML } from "../ui/bundle-checks";
 
 /**
  * Where the app's routes are, and the route tree TanStack Router generates from them, which is
@@ -18,6 +18,20 @@ export const ROUTES = {
   generatedRouteTree: "./src/routeTree.gen.ts",
   routeTreeFileHeader: [],
 };
+
+/**
+ * The native files' add-on and what only it holds (portalr ADR-0044): the parts that draw a
+ * native file, its check-out and editor's frame, and ui's pages, page viewer and sheets.
+ */
+const NATIVE_FILES = new RegExp(
+  [
+    ...["on-demand[\\/]files", "native-file", "native-inline", "native-proposal"],
+    ...["check-out", "editor-frame"],
+  ]
+    .map((name) => String.raw`[\\/]app[\\/]src[\\/]${name}\.tsx$`)
+    .concat(String.raw`[\\/]ui[\\/]src[\\/](file-pages|file-preview)\.tsx$`)
+    .join("|"),
+);
 
 // portalr's router serves the built UI at /portalr/app/, from the Python package, whose wheel
 // carries it (lattice RFC-0002). In development, Vite's server sends everything else to the
@@ -39,7 +53,7 @@ export default defineConfig({
     lean(/[\\/]node_modules[\\/]diff[\\/]/),
     absent(RAW_HTML),
     // A native file's parts are the native files' add-on's, never a route's (portalr ADR-0044).
-    onDemand(NATIVE_FILES),
+    onlyWithAddOn(NATIVE_FILES),
     // The licences of the packages bundled, beside the UI (portalr ADR-0033).
     notices({ ui: "app", policy: readPolicy(new URL("../notices/policy.json", import.meta.url)) }),
     // The page mini apps run in, served on the apps' origin alone (portalr ADR-0051).

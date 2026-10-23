@@ -229,3 +229,13 @@ def test_the_report_gives_each_add_on_a_line_against_its_budget() -> None:
         "check_size: app: initial 1,000/2,000, total 2,000/3,000, largest 900/1,000\n"
         "check_size: app's add-on math: total 80,000/0, largest 77,000/0\n"
     )
+
+
+def test_two_add_ons_of_one_name_stop_the_check(tmp_path: Path) -> None:
+    static = built(tmp_path)
+    manifest = static / "app" / ".vite" / "manifest.json"
+    read = json.loads(manifest.read_text())
+    read["src/on-demand/math.tsx"] = {"file": "assets/chem.js", "isDynamicEntry": True}
+    manifest.write_text(json.dumps(read))
+    with pytest.raises(SystemExit, match="two add-ons are named math"):
+        check_size.measure("app", static)

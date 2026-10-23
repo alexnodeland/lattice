@@ -28,6 +28,7 @@ import gzip
 import json
 import re
 import sys
+from collections import Counter
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
@@ -77,7 +78,10 @@ def files_of(manifest: Manifest, keys: Iterable[str]) -> set[str]:
 
 def addon_files(manifest: Manifest) -> dict[str, set[str]]:
     """Each add-on's files: what its import reaches that the UI's entry doesn't without add-ons."""
-    addons = {found[1]: key for key in manifest if (found := ADDON.search(key))}
+    found = [(match[1], key) for key in manifest if (match := ADDON.search(key))]
+    if twice := sorted(name for name, count in Counter(n for n, _ in found).items() if count > 1):
+        raise SystemExit(f"check_size: two add-ons are named {twice[0]}, ui's and the UI's own")
+    addons = dict(found)
     entries = [key for key, chunk in manifest.items() if chunk.get("isEntry")]
     base = files_of(manifest, reached(manifest, entries, frozenset(addons.values())))
     # An add-on that loads another, as the native files' parts load Markdown's, isn't its size.

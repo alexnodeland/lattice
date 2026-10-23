@@ -1,5 +1,8 @@
 import { expect, test } from "vitest";
-import { type Bundled, loadedWithout, NATIVE_FILES } from "../bundled";
+import { type Bundled, loadedWithout } from "../bundled";
+
+/** An add-on's parts, as an app's build guards them. */
+const PARTS_OF_FILES = /[\\/](on-demand[\\/]files|native-file|file-pages)\.tsx$/;
 
 const chunk = (
   facadeModuleId: string | null,
@@ -31,11 +34,11 @@ const app = (route: { imports?: string[]; dynamicImports?: string[] }): Bundled 
 });
 
 test("the native files' parts loaded only with their add-on are not loaded without it", () => {
-  expect(loadedWithout(app({ dynamicImports: ["files.js"] }), NATIVE_FILES)).toEqual([]);
+  expect(loadedWithout(app({ dynamicImports: ["files.js"] }), PARTS_OF_FILES)).toEqual([]);
 });
 
 test("an add-on imported statically, rather than loaded, loads its parts without it", () => {
-  expect(loadedWithout(app({ imports: ["files.js"] }), NATIVE_FILES)).toEqual([
+  expect(loadedWithout(app({ imports: ["files.js"] }), PARTS_OF_FILES)).toEqual([
     FILES,
     PARTS,
     PAGES,
@@ -45,5 +48,5 @@ test("an add-on imported statically, rather than loaded, loads its parts without
 test("a part a route holds itself loads without the add-on", () => {
   const bundle = app({ dynamicImports: ["files.js"] });
   const held = { ...bundle, "route.js": chunk(null, [PAGES], { dynamicImports: ["files.js"] }) };
-  expect(loadedWithout(held, NATIVE_FILES)).toEqual([PAGES]);
+  expect(loadedWithout(held, PARTS_OF_FILES)).toEqual([PAGES]);
 });

@@ -3,13 +3,6 @@
  * so a test reads it too: `bundle-checks` fails the build on it.
  */
 
-/**
- * The app's native files' add-on and what only it holds (portalr ADR-0044): the parts that draw a native file, its
- * check-out and editor's frame, and ui's pages, page viewer and sheets.
- */
-export const NATIVE_FILES =
-  /[\\/](app[\\/]src[\\/](on-demand[\\/]files|native-file|native-inline|native-proposal|check-out|editor-frame)|ui[\\/]src[\\/](file-pages|file-preview))\.tsx$/;
-
 /** An add-on's module, ui's or a UI's own (portalr ADR-0044). */
 const ADDON = /[\\/]src[\\/]on-demand[\\/][a-z][a-z-]*\.tsx?$/;
 

@@ -191,6 +191,13 @@ def _postgres(package: str) -> str | None:
     return named[package]
 
 
+def _url(backend: str, package: str, tmp_path: Path) -> str | None:
+    """The backend's database for the package: a SQLite file, or PostgreSQL's if one is named."""
+    if backend == "sqlite":
+        return f"sqlite+aiosqlite:///{tmp_path / 'released.db'}"
+    return _postgres(package)
+
+
 @contextlib.asynccontextmanager
 async def _engine(url: str) -> AsyncIterator[AsyncEngine]:
     """An empty database: the SQLite file named, or a PostgreSQL schema of its own."""
@@ -203,15 +210,17 @@ async def _engine(url: str) -> AsyncIterator[AsyncEngine]:
         return
     schema = f"upgrade_{uuid.uuid4().hex[:12]}"
     admin = create_async_engine(url)
-    async with admin.begin() as connection:
-        await connection.execute(text(f"CREATE SCHEMA {schema}"))
-    engine = create_async_engine(url, connect_args={"server_settings": {"search_path": schema}})
     try:
-        yield engine
-    finally:
-        await engine.dispose()
         async with admin.begin() as connection:
-            await connection.execute(text(f"DROP SCHEMA {schema} CASCADE"))
+            await connection.exec_driver_sql(f'CREATE SCHEMA "{schema}"')
+        engine = create_async_engine(url, connect_args={"server_settings": {"search_path": schema}})
+        try:
+            yield engine
+        finally:
+            await engine.dispose()
+            async with admin.begin() as connection:
+                await connection.exec_driver_sql(f'DROP SCHEMA "{schema}" CASCADE')
+    finally:
         await admin.dispose()
 
 
@@ -242,8 +251,7 @@ async def _upgrade_keeps_the_rows(engine: AsyncEngine, package: str) -> None:
 def test_a_database_at_the_last_release_keeps_its_rows_on_upgrade(
     tmp_path: Path, backend: str, package: str
 ) -> None:
-    url = f"sqlite+aiosqlite:///{tmp_path / 'released.db'}" if backend == "sqlite" else None
-    url = url or _postgres(package)
+    url = _url(backend, package, tmp_path)
     if url is None:
         pytest.skip(f"no {package.upper()}_TEST_POSTGRES_URL")
 
@@ -252,3 +260,14 @@ def test_a_database_at_the_last_release_keeps_its_rows_on_upgrade(
             await _upgrade_keeps_the_rows(engine, package)
 
     asyncio.run(run())
+
+
+def test_postgresql_named_for_some_packages_and_not_others_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for name in RELEASED:
+        monkeypatch.delenv(f"{name.upper()}_TEST_POSTGRES_URL", raising=False)
+    assert _postgres("grantr") is None, "none named: skipped"
+    monkeypatch.setenv("GRANTR_TEST_POSTGRES_URL", "postgresql+asyncpg://localhost/grantr")
+    with pytest.raises(pytest.fail.Exception, match="ARTIFACTR_TEST_POSTGRES_URL"):
+        _postgres("grantr")

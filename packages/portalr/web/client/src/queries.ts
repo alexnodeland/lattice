@@ -280,9 +280,10 @@ export const refusedOutright = (error: unknown) =>
 
 /** How long to wait before a read is tried again: the server's `Retry-After`, or a backoff. */
 export const retryDelay = (count: number, error: unknown) => {
+  // The server's wait, at least none and at most five minutes, or a backoff of our own.
   const wait =
     error instanceof Refused && error.retryAfter !== null
-      ? error.retryAfter * 1000
+      ? Math.min(Math.max(error.retryAfter, 0), 300) * 1000
       : Math.min(1000 * 2 ** count, 30_000);
   // Up to a fifth more, at random, so the reads a busy server refused together don't all come
   // back at the same moment.

@@ -104,6 +104,11 @@ class FormatChanged(InvalidState):
         return {"checked_out": self.checked_out, "checked_in": self.checked_in}
 
 
+type PageKey = tuple[str, str, ArtifactId, str, str, int, float]
+"""A kept page's key: the tenant, the workspace, the file, its app, the blob's digest, the page
+and the scale."""
+
+
 LOOK_AGAIN: Final = 0.05
 """How often, in seconds, a page waiting for one of its tenant's readings looks again."""
 
@@ -205,8 +210,12 @@ class NativeFiles:
         self._waiting_most = waiting
         self._waiting: Counter[str] = Counter()
         self._pages_most = pages
-        self._pages: OrderedDict[tuple[str, str, int, float], bytes] = OrderedDict()
+        self._pages: OrderedDict[PageKey, bytes] = OrderedDict()
         self._pages_held = 0
+
+    def waiting(self, tenant_id: str) -> int:
+        """How many of the tenant's pages wait for one of its readings now."""
+        return self._waiting[tenant_id]
 
     @property
     def readings(self) -> int | None:
@@ -645,7 +654,7 @@ class NativeFiles:
         """
         manifest = await _manifest_at(ws, artifact_id, version)
         app = self.app_of(type(manifest))
-        key = (app.name, manifest.content.sha256, page, 1.0)
+        key = _page_key(ws, artifact_id, app, manifest.content.sha256, page)
         if (png := self._page(key)) is not None:
             return png
 
@@ -690,10 +699,11 @@ class NativeFiles:
             Busy: If the tenant has as many files being read or rendered as it may.
         """
         artifact_id, named, file_type = await self._proposed_blob(ws, proposal_id, "content")
+        if named is None:  # a proposal that doesn't change the file's content has no page of it
+            raise ContentUnavailable(artifact_id, "content")
         app = self.app_of(file_type)
-        sha256 = named.sha256 if named is not None else ""  # none: refused as its bytes are read
-        key = (app.name, sha256, page, 1.0)
-        if named is not None and (png := self._page(key)) is not None:
+        key = _page_key(ws, artifact_id, app, named.sha256, page)
+        if (png := self._page(key)) is not None:
             return png
 
         async def proposed() -> bytes:
@@ -701,7 +711,7 @@ class NativeFiles:
 
         return await self._rendered(ws, app, key, proposed, admit)
 
-    def _page(self, key: tuple[str, str, int, float]) -> bytes | None:
+    def _page(self, key: PageKey) -> bytes | None:
         """A page rendered before, if this process still keeps it."""
         png = self._pages.get(key)
         if png is not None:
@@ -712,7 +722,7 @@ class NativeFiles:
         self,
         ws: Workspace,
         app: App,
-        key: tuple[str, str, int, float],
+        key: PageKey,
         source: Callable[[], Awaitable[bytes]],
         admit: Callable[[], None] | None,
     ) -> bytes:
@@ -721,9 +731,9 @@ class NativeFiles:
         A page waits a while for a reading, as a viewer's pages are asked for a few at once,
         and is counted against its reader's pace only once it has one.
         """
-        _, _, page, scale = key
+        *_, page, scale = key
         async with self._turn(ws.tenant_id, wait=self._deadline):
-            # Rendered by another while this one waited: pages asked for together render once.
+            # Rendered by another while this one waited for its reading: given that one.
             if (kept := self._page(key)) is not None:
                 return kept
             if admit is not None:
@@ -897,6 +907,18 @@ class NativeFiles:
         if found is None:
             raise ContentUnavailable(artifact_id, part)
         return found
+
+
+def _page_key(ws: Workspace, artifact_id: ArtifactId, app: App, sha256: str, page: int) -> PageKey:
+    """Where a page of a file's bytes is kept: by the blob, as the blob store keeps it.
+
+    The blob store keeps bytes by tenant, workspace, file and digest, so a page is kept and found
+    by all four too. A digest a proposal names is the proposer's to write, so a page kept for one
+    file's bytes is never given for another's that names the same digest; and one kept for a file
+    is a render of bytes that file held, which collection keeps while a pending proposal names
+    them.
+    """
+    return (ws.tenant_id, ws.workspace_id, artifact_id, app.name, sha256, page, 1.0)
 
 
 def _canonical(value: JsonValue) -> bytes:

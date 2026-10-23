@@ -38,12 +38,18 @@ test("a read refused as busy is asked again once the server's wait has passed", 
   expect(read).toHaveBeenCalledTimes(2);
   const delay = client.getDefaultOptions().queries?.retryDelay as (n: number, e: unknown) => number;
   const random = vi.spyOn(Math, "random").mockReturnValue(0);
-  expect(delay(0, new Refused(429, null, 5))).toBe(5000);
-  expect(delay(1, new Error("down"))).toBe(2000);
-  random.mockReturnValue(0.999);
-  expect(delay(0, new Refused(429, null, 5))).toBeCloseTo(6000, -1);
-  expect(delay(0, new Refused(429, null, 5))).toBeLessThan(6000);
-  random.mockRestore();
+  try {
+    expect(delay(0, new Refused(429, null, 5))).toBe(5000);
+    expect(delay(1, new Error("down"))).toBe(2000);
+    expect(delay(0, new Refused(429, null, -3))).toBe(0);
+    expect(delay(0, new Refused(429, null, 86_400))).toBe(300_000);
+    random.mockReturnValue(0.999);
+    const most = delay(0, new Refused(429, null, 5));
+    expect(most).toBeGreaterThan(5990);
+    expect(most).toBeLessThan(6000);
+  } finally {
+    random.mockRestore();
+  }
 });
 
 test("a refusal carries the server's Retry-After, in seconds, or none", () => {

@@ -1,7 +1,8 @@
-import { Account, AppShell, NavLink, SideNav, Switcher } from "@portalr/ui";
+import { AppShell, NavLink, SideNav, Switcher } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, Outlet, useMatchRoute, useNavigate } from "@tanstack/react-router";
 import { FileText, MessageSquare, Play, Workflow, Zap } from "lucide-react";
+import { AppAccount } from "../../../../../analytics";
 import { useWorkspace, WorkspaceAddons, WorkspaceStreams } from "../../../../../workspace";
 
 /**
@@ -61,7 +62,7 @@ function Workspace() {
           />
         }
         nav={<Areas tenant={tenant} workspace={workspace} />}
-        account={<Account signed={signed} />}
+        account={<AppAccount />}
       >
         <WorkspaceAddons queries={queries} tenant={tenant} workspace={workspace}>
           <Outlet />

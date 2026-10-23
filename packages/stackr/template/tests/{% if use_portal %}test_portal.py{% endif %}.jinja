@@ -489,13 +489,14 @@ def test_with_analytics_and_a_database_a_person_answers_and_their_answer_is_kept
     with TestClient(app(script, named)) as client:
         headers = bearer("alice")
         assert client.get("/portalr/v1/analytics/consent", headers=headers).json() == {
-            "given": False
+            "given": False,
+            "deleting": False,
         }
         said = client.put("/portalr/v1/analytics/consent", json={"given": True}, headers=headers)
         assert said.json() == {"given": True, "deleted": None}
     with TestClient(app(script, named)) as client:
         said = client.get("/portalr/v1/analytics/consent", headers=bearer("alice"))
-        assert said.json() == {"given": True}
+        assert said.json() == {"given": True, "deleting": False}
 
 
 def test_without_a_database_there_is_no_relay(script: Script, ui: Path) -> None:

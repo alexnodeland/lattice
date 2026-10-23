@@ -3,12 +3,14 @@
  * and the commands sent over REST.
  */
 
-import type { Config, createCommands, createQueries, Signed } from "@portalr/client";
+import type { Api, Config, createCommands, createQueries, Signed } from "@portalr/client";
 import type { QueryClient } from "@tanstack/react-query";
 
 export interface Context {
   readonly config: Config;
   readonly signed: Signed;
+  /** The REST clients, for what isn't a cached read: the person's answer, and their events. */
+  readonly api: Api;
   readonly queries: ReturnType<typeof createQueries>;
   readonly commands: ReturnType<typeof createCommands>;
   readonly queryClient: QueryClient;

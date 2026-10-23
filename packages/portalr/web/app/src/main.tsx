@@ -29,6 +29,7 @@ function start(root: Root, config: Config) {
     context: {
       config,
       signed,
+      api,
       queries: createQueries(api),
       // A command refused as unsigned ends the session, as a read does.
       commands: createCommands(api, () => void signed.signOut()),

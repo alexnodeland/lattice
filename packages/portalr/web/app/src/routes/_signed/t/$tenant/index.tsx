@@ -1,6 +1,7 @@
-import { Account, AppShell, PageHeader, Row, RowLink, Rows, Switcher, TextLink } from "@portalr/ui";
+import { AppShell, PageHeader, Row, RowLink, Rows, Switcher, TextLink } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { AppAccount } from "../../../../analytics";
 
 /**
  * The workspaces the caller can open in the tenant, as grantr lists them, in order, in the app's
@@ -27,7 +28,7 @@ const AREAS = [
 
 function Workspaces() {
   const { tenant } = Route.useParams();
-  const { queries, signed, user } = Route.useRouteContext();
+  const { queries, user } = Route.useRouteContext();
   const navigate = useNavigate();
   const { data: memberships } = useSuspenseQuery(queries.grantr.memberships(user));
   const { data: me } = useSuspenseQuery(queries.grantr.me(tenant));
@@ -47,7 +48,7 @@ function Workspaces() {
           }
         />
       }
-      account={<Account signed={signed} />}
+      account={<AppAccount />}
     >
       <PageHeader title={tenant} meta="The workspaces you can open here" />
       {workspaces.length === 0 ? (

@@ -22,6 +22,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/portalr/v1/analytics/consent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Consent
+         * @description The person's answer to product analytics: no until they say yes.
+         *
+         *     ``deleting`` says a deletion their no asked for isn't done yet: tried again now, and by
+         *     the background pass, until it is.
+         */
+        get: operations["read_consent_portalr_v1_analytics_consent_get"];
+        /**
+         * Answer
+         * @description Record the person's answer. Taking a yes back deletes their events at once.
+         *
+         *     A deletion ClickHouse can't take stays owed, and is tried again on the person's next
+         *     request, and by a background pass every few minutes: ``deleted`` says whether it is
+         *     done. A yes later doesn't cancel it. It is never refused for the person's pace: a
+         *     withdrawal always lands.
+         */
+        put: operations["answer_portalr_v1_analytics_consent_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portalr/v1/analytics/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Session
+         * @description A session id signed for the person, which their browser sends with its events.
+         */
+        post: operations["session_portalr_v1_analytics_session_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/portalr/v1/deployment/links": {
         parameters: {
             query?: never;
@@ -70,6 +122,28 @@ export interface paths {
          *     answered with: the answer names the tenant and the owner's user id.
          */
         post: operations["create_tenant_portalr_v1_deployment_tenants_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portalr/v1/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Events
+         * @description A batch of the person's events in a tenant they belong to, kept as the registry says.
+         *
+         *     Without the person's yes, nothing is kept, and the answer says so.
+         */
+        post: operations["events_portalr_v1_events_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -322,6 +396,24 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /**
+         * Answer
+         * @description A person's answer to product analytics: yes, or no.
+         */
+        Answer: {
+            /** Given */
+            given: boolean;
+        };
+        /**
+         * Answered
+         * @description A person's answer, recorded; on a no, whether their events were deleted.
+         */
+        Answered: {
+            /** Deleted */
+            deleted?: boolean | null;
+            /** Given */
+            given: boolean;
+        };
+        /**
          * Brand
          * @description The deployment's brand kit, as the UIs read it (lattice RFC-0007).
          *
@@ -410,6 +502,19 @@ export interface components {
             };
             supabase: components["schemas"]["Supabase"];
             surfaces: components["schemas"]["Surfaces"];
+        };
+        /**
+         * Consented
+         * @description A person's answer, as read: and whether a deletion their no asked for is still to be done.
+         */
+        Consented: {
+            /**
+             * Deleting
+             * @default false
+             */
+            deleting: boolean;
+            /** Given */
+            given: boolean;
         };
         /**
          * CreatedTenant
@@ -742,6 +847,16 @@ export interface components {
             [key: string]: unknown;
         };
         /**
+         * Relayed
+         * @description What became of a batch: how many events were recorded, and how many were dropped.
+         */
+        Relayed: {
+            /** Dropped */
+            dropped: number;
+            /** Recorded */
+            recorded: number;
+        };
+        /**
          * Score
          * @description A score: a person's feedback, or an evaluator's verdict, on a trace.
          */
@@ -786,6 +901,14 @@ export interface components {
             known_from?: string | null;
             /** Scores */
             scores: components["schemas"]["Score"][];
+        };
+        /**
+         * Session
+         * @description A session id portalr signed for the person; the browser sends it with every batch.
+         */
+        Session: {
+            /** Session */
+            session: string;
         };
         /**
          * Span
@@ -1021,6 +1144,196 @@ export interface operations {
             };
         };
     };
+    read_consent_portalr_v1_analytics_consent_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Consented"];
+                };
+            };
+            /** @description Refused */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Past the person's pace: `too_fast` */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+        };
+    };
+    answer_portalr_v1_analytics_consent_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Answer"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Answered"];
+                };
+            };
+            /** @description Refused */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+        };
+    };
+    session_portalr_v1_analytics_session_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Session"];
+                };
+            };
+            /** @description Refused */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Past the person's pace: `too_fast` */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+        };
+    };
     links_portalr_v1_deployment_links_get: {
         parameters: {
             query?: {
@@ -1198,6 +1511,103 @@ export interface operations {
             };
             /** @description Supabase Auth didn't invite or find the owner: `invite_failed` */
             502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+        };
+    };
+    events_portalr_v1_events_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Tenant"?: components["schemas"]["TenantId"] | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Events */
+                    events: {
+                        /** Event */
+                        event: string;
+                        /**
+                         * Props
+                         * @default {}
+                         */
+                        props?: {
+                            [key: string]: string;
+                        };
+                        /** Route */
+                        route?: string | null;
+                    }[];
+                    /** Session */
+                    session: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Relayed"];
+                };
+            };
+            /** @description Refused */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description The body is over 16 KB: `too_large` */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Not a batch the relay takes: `invalid` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Past the person's pace: `too_fast` */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };

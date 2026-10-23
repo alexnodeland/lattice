@@ -11,6 +11,7 @@ import {
 import { Alert } from "./alert";
 import { Button, type ButtonSize, type ButtonVariant } from "./button";
 import { actions, backdrop, description, title as heading, popup } from "./dialog";
+import { failureLogged, failureSaid } from "./failure";
 import { keepTabWithin } from "./full-view";
 import { TextField } from "./text-field";
 
@@ -126,7 +127,11 @@ export function ConfirmDialog({
       done.current = true;
       setOpen(false);
     } catch (error) {
-      setFailed(error instanceof Error ? error.message : String(error));
+      // An action's error is its caller's words, a refused command's the kit's own (`refusal`);
+      // anything else is the kit's sentence for it. The whole failure is for operators, in the
+      // console (portalr ADR-0070).
+      failureLogged(error);
+      setFailed(error instanceof Error ? error.message : failureSaid(error));
     } finally {
       busy.current = false;
       setPending(false);

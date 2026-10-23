@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { nameOf, numberOf, refusedAs, said, settersOf, settingRowsOf } from "./settings";
+import { nameOf, numberOf, said, settersOf, settingRowsOf } from "./settings";
 
 const RANGE = { type: "int_range", low: 0, high: 1000, universe: null } as const;
 
@@ -53,13 +53,6 @@ test("a clamped value says why: the settings now allow more, or less", () => {
   expect(settingRowsOf([raised], false, (id) => id)[0]?.clamped).toBe(
     "The settings now allow at least 10: 10 applies.",
   );
-});
-
-test("grantr's refusal names the setting as the page does, never by its key", () => {
-  const row = { key: "connect-per-hour:freecad", name: "FreeCAD's tries an hour" };
-  expect(
-    refusedAs("connect-per-hour:freecad may be at most 20 here: the tenant's value", row),
-  ).toBe("FreeCAD's tries an hour may be at most 20 here: the tenant's value");
 });
 
 test("a value is said as a number, or names, or none", () => {

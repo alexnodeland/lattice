@@ -194,7 +194,7 @@ test("a change grantr refuses says why, and leaves the switch as it was", async 
   await forms.click();
   await expect
     .element(screen.getByRole("alert"))
-    .toHaveTextContent("Forms wasn't changed: alice may not grantr:manage_integrations");
+    .toHaveTextContent("Forms wasn't changed: you may not do this here.");
   await expect.element(forms).toBeChecked();
   await expect.element(forms).toBeEnabled();
 });

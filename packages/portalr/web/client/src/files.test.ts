@@ -159,7 +159,7 @@ test("a check-out and its extension are commands on the file and the check-out",
   expect(await commands.files.extend("acme", "ws_1", "co_2")).toEqual({
     outcome: "refused",
     status: 409,
-    reasons: ["checkout co_2 was checked in"],
+    reasons: ["That can't be done as things stand."],
   });
 });
 
@@ -250,14 +250,14 @@ test("a check-in refused says why, and one never answered or stopped is status 0
   expect(await refused.answer).toEqual({
     outcome: "refused",
     status: 413,
-    reasons: ["the file is larger than 4096 bytes"],
+    reasons: ["That's too large."],
   });
   const garbled = sending();
   garbled.xhr.answer(502, "Bad Gateway");
   expect(await garbled.answer).toEqual({
     outcome: "refused",
     status: 502,
-    reasons: ["The server answered 502."],
+    reasons: ["The server had a problem. Try again in a moment."],
   });
   const dropped = sending();
   dropped.xhr.onerror?.();
@@ -286,7 +286,7 @@ test("a check-in refused says its rejection's type, and one refused unsigned end
   expect(await busy.answer).toEqual({
     outcome: "refused",
     status: 409,
-    reasons: ["checked in already"],
+    reasons: ["That can't be done as things stand."],
     type: "invalid_state",
   });
   let unsigned = 0;
@@ -356,7 +356,7 @@ test("an upload refused past a quota says which, and one stopped says it may hav
   expect(await full).toEqual({
     outcome: "refused",
     status: 413,
-    reasons: ["The server answered 413."],
+    reasons: ["There's no more room for files here."],
     type: "over_quota",
     quota: "workspace_files",
   });
@@ -365,7 +365,7 @@ test("an upload refused past a quota says which, and one stopped says it may hav
   expect(await odd).toEqual({
     outcome: "refused",
     status: 429,
-    reasons: ["The server answered 429."],
+    reasons: ["Too much was asked at once. Try again in a moment."],
   });
   const stop = new AbortController();
   stop.abort();

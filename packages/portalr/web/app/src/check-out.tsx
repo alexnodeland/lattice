@@ -55,8 +55,11 @@ export function editorAt(editors: Readonly<Record<string, string>>, key: string)
   return new URL(url, location.href).origin === location.origin ? null : url;
 }
 
-/** A reason as a sentence: with its full stop, once. */
-const sentence = (text: string) => (/[.!?]$/.test(text) ? text : `${text}.`);
+/** Reasons run on after a colon: in lower case at their start, with a full stop, once. */
+const sentence = (text: string) => {
+  const run = text.charAt(0).toLowerCase() + text.slice(1);
+  return /[.!?]$/.test(run) ? run : `${run}.`;
+};
 
 /**
  * Why something wasn't done, as the reader can act on it, from the refusal's status and reasons.

@@ -244,10 +244,12 @@ test("the server's refusal is put under the fields it names, and what names none
   await screen.getByRole("button", { name: "Send" }).click();
   const email = screen.getByRole("textbox", { name: "Email" });
   await expect.element(email).toHaveFocus();
-  await expect.element(email).toHaveAccessibleDescription("Value is not a valid email address.");
+  await expect.element(email).toHaveAccessibleDescription("This isn't valid.");
   await expect
     .element(screen.getByRole("alert"))
-    .toHaveTextContent("One answer needs a change: each says why under it.The form is closed.");
+    .toHaveTextContent(
+      "One answer needs a change: each says why under it.What was asked for isn't valid: form.",
+    );
 });
 
 test("a refusal that names no field says why, above the fields", async () => {
@@ -257,7 +259,10 @@ test("a refusal that names no field says why, above the fields", async () => {
   });
   const screen = await render(<SchemaForm schema={EMAIL} onSubmit={onSubmit} />);
   await screen.getByRole("button", { name: "Send" }).click();
-  await expect.element(screen.getByRole("alert")).toHaveTextContent("Too many values.");
+  await expect
+    .element(screen.getByRole("alert"))
+    .toHaveTextContent("What was asked for isn't valid.");
+  expect(screen.getByText(/too many values/i).elements()).toHaveLength(0);
 });
 
 test.each([

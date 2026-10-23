@@ -1,0 +1,43 @@
+# ADR-0070: A server's words never reach a reader
+
+**Status:** Accepted
+**Date:** 2026-10-23
+**Deciders:** Alex Nodeland
+
+Builds on [ADR-0065](0065-empty-error-and-not-found-states.md), and settles [lattice #552](https://github.com/alexnodeland/lattice/issues/552).
+
+## Context
+
+A refusal's body is the server's: its `detail`, a rejection's `message`, Pydantic's `msg`. It can hold what a tenant shouldn't read, such as another person's name, an internal address or a stack's words. It can also be long, run over lines, or carry markup or direction controls.
+
+`failureSaid` already said a read's failure in the kit's own words (ADR-0065). But several other places still put the server's text on screen:
+- the client's `reasons`, which every refused command shows;
+- a form's errors under its fields;
+- the UIs' start-up and paging failures, and the deployment tools' failure;
+- the runs page's fallback;
+- the settings page's refusal.
+
+## Decision
+
+- **A reader is told a sentence of the kit's own,** chosen by the refusal's known reason code, else its status, else a generic one. The client's `refusalSaid` decides it, and `failureSaid`, `reasons`, and so every refused command's words, all use it.
+  - **Codes:** `forbidden`, `not_found`, `not_enabled`, `invalid_state`, `version_conflict`, `validation_failed`, `artifact_busy`, `over_quota`, `busy`, `rate_limited`, `too_slow` and `invite_failed`.
+  - **Statuses:** 401, 403, 404, 413, 422, 429 and 5xx.
+  - A command's `forbidden` says "You may not do this here.", since it was an action and not a read.
+- **Values that aren't valid are told where they are,** as the owner decided: the kit's sentence and the fields' paths, from each error's `loc`, such as "What was asked for isn't valid: rule.when." Never the server's `msg`.
+  - A path starts after where in the request it is (`body`, `query`) and after a command frame's `command` and its type.
+  - A path with any part that isn't a plain name or index, at most 64 characters, is left out. So no text of the server's comes through one.
+  - A form's own fields say the kit's words under them ("This isn't valid.", or the kit's words for a missing value, a format or a choice).
+- **Everything else goes through `FailureAlert`:** the UIs' start-up failures, an audit log's earlier page, and the deployment's tools. Each says what didn't happen, then the kit's sentence.
+- **`ConfirmDialog` shows its caller's words,** which are the kit's own: a refused command's are `refusal`'s. Anything thrown that isn't an `Error` gets the kit's sentence.
+- **The settings page tells a refused value its ceiling from the row it already shows,** not from grantr's message.
+- **The whole failure is for operators.** `failureLogged` writes it to the console once, as one line, with what looks like a secret taken out.
+
+## Options considered
+
+- **The status and code alone, no paths:** a person who typed a rule or filled a form would learn only that something was wrong, not where. A path is a field's name and nothing more, so the owner kept it.
+- **The server's message, cleaned:** markup, controls and a length can be taken out, but not what the words say.
+
+## Consequences
+
+- Easier: no refusal can show a tenant what a server said, whatever it says.
+- Harder: a message that was useful, such as "acme exists" or a ceiling's layer, is now the kit's sentence. Where a reader needs more, the code or a typed field carries it, as `artifact_busy`, `over_quota` and the settings' ceiling do. A new code needs its sentence here.

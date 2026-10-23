@@ -19,7 +19,7 @@ import type {
 import type { components as Portalr } from "./generated/portalr.openapi";
 import type * as reflexrV1 from "./generated/reflexr.v1";
 import type { components as Relayr } from "./generated/relayr.openapi";
-import { reasons } from "./reasons";
+import { refusalSaid } from "./reasons";
 import * as reflexr from "./reflexr";
 import { type Api, named } from "./rest";
 import type { Result } from "./stream";
@@ -274,7 +274,7 @@ export class Refused extends Error {
   readonly retryAfter: number | null;
 
   constructor(status: number, detail: unknown, retryAfter: number | null = null) {
-    super(`the server refused the read (${status}): ${reasons(status, detail).join("; ")}`);
+    super(`the server refused the read (${status}): ${refusalSaid(status, detail)}`);
     this.status = status;
     this.detail = detail;
     this.retryAfter = retryAfter;

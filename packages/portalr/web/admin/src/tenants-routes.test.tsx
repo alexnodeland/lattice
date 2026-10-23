@@ -232,7 +232,9 @@ test("a tenant that exists is refused in the dialog, which stays, and nothing el
   await screen.getByRole("button", { name: "Create tenant" }).click();
   const dialog = screen.getByRole("alertdialog", { name: "Create initech?" });
   await dialog.getByRole("button", { name: "Create the tenant" }).click();
-  await expect.element(dialog.getByRole("alert")).toHaveTextContent("Not created: initech exists");
+  await expect
+    .element(dialog.getByRole("alert"))
+    .toHaveTextContent("Not created: what was asked for isn't valid.");
   // Still filled in, to change; and nothing says it was created.
   await expect.element(screen.getByText(/is created, owned by/)).not.toBeInTheDocument();
 });
@@ -250,7 +252,9 @@ test("an owner Supabase couldn't invite is said, without the email", async () =>
   await dialog.getByRole("button", { name: "Create the tenant" }).click();
   await expect
     .element(dialog.getByRole("alert"))
-    .toHaveTextContent("Not created: supabase answered 500");
+    .toHaveTextContent(
+      "Not created: the invitation couldn't be sent: check the email address, then try again.",
+    );
   expect(dialog.getByRole("alert").element().textContent).not.toContain("dan@initech.com");
 });
 
@@ -267,7 +271,7 @@ test("a caller who may not create is refused in the dialog", async () => {
   await dialog.getByRole("button", { name: "Create the tenant" }).click();
   await expect
     .element(dialog.getByRole("alert"))
-    .toHaveTextContent("Not created: the caller may not create tenants");
+    .toHaveTextContent("Not created: you may not do this here.");
 });
 
 const entry = (seq: number, id: string) => ({

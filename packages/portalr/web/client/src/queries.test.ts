@@ -439,13 +439,13 @@ test("a workspace's grants and the tenant's are read apart", () => {
   expect(queries.grantr.grants("acme").queryKey).toEqual(keys.grantr.grants("acme"));
 });
 
-test("a refusal says why, and never shows its body as it came", () => {
+test("a refusal says the kit's sentence for it, and never the server's words", () => {
   const said = (status: number, detail: unknown) => new Refused(status, detail).message;
   expect(said(422, { detail: "no such subject" })).toBe(
-    "the server refused the read (422): no such subject",
+    "the server refused the read (422): What was asked for isn't valid.",
   );
   expect(said(403, { detail: { type: "forbidden", message: "not an operator" } })).toBe(
-    "the server refused the read (403): not an operator",
+    "the server refused the read (403): You may not see this.",
   );
   expect(
     said(422, {
@@ -454,17 +454,16 @@ test("a refusal says why, and never shows its body as it came", () => {
         { loc: ["query", "end"], msg: "Field required", url: "https://errors.pydantic.dev" },
       ],
     }),
-  ).toBe(
-    "the server refused the read (422): start: Input should be a valid datetime; end: Field required",
-  );
+  ).toBe("the server refused the read (422): What was asked for isn't valid: start, end.");
+  const trouble = "The server had a problem. Try again in a moment.";
   expect(said(502, "<html>Bad gateway</html>")).toBe(
-    "the server refused the read (502): The server answered 502.",
+    `the server refused the read (502): ${trouble}`,
   );
   expect(said(403, { detail: { type: "forbidden", message: { nested: true } } })).toBe(
-    "the server refused the read (403): The server answered 403.",
+    "the server refused the read (403): You may not see this.",
   );
-  expect(said(500, null)).toBe("the server refused the read (500): The server answered 500.");
-  expect(said(500, undefined)).toBe("the server refused the read (500): The server answered 500.");
+  expect(said(500, null)).toBe(`the server refused the read (500): ${trouble}`);
+  expect(said(500, undefined)).toBe(`the server refused the read (500): ${trouble}`);
 });
 
 test("a traces read names its window, its limit and its filter; a trace read, whether it wants content", async () => {

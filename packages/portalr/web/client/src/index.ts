@@ -69,6 +69,7 @@ export {
   type TraceFilter,
 } from "./queries";
 export { createQueryClient } from "./query-client";
+export { GENERIC, INVALID, pathsOf, refusalSaid } from "./reasons";
 export type * as Reflexr from "./reflexr";
 export { type ReflexrStream, RUN_EVENTS, reflexr } from "./reflexr";
 export { type Api, type Config, createApi, readConfig, type Surfaces } from "./rest";

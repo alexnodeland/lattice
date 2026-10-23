@@ -91,7 +91,7 @@ test("a refusal is said in words, whatever the server's own", () => {
   expect(refusedAs({ type: "not_found" })).toMatch(/no longer exists/);
   expect(refusedAs({ type: "invalid_state" })).toMatch(/has changed/);
   expect(refusedAs({ type: "validation", message: "text cannot hold a NUL character" })).toBe(
-    "text cannot hold a NUL character",
+    "The server refused it.",
   );
   expect(refusedAs({ type: "odd" })).toBe("The server refused it.");
   expect(refusedAs(null)).toBe("The server refused it.");

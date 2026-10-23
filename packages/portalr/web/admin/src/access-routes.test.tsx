@@ -226,7 +226,7 @@ test("without reading members, a group's members are typed, and checked before s
   await screen.getByRole("button", { name: "Create the group" }).click();
   await expect
     .element(screen.getByRole("alert"))
-    .toHaveTextContent("Not saved: Write each member as user:id or service_principal:id, not ci.");
+    .toHaveTextContent("Not saved: write each member as user:id or service_principal:id, not ci.");
   await typed.fill("user:bob, service_principal:ci");
   await screen.getByRole("button", { name: "Create the group" }).click();
   await expect.element(screen.getByRole("status")).toHaveTextContent("eng has 2 members.");
@@ -455,7 +455,7 @@ test("a refused grant says why, and keeps what was entered", async () => {
   await screen.getByRole("button", { name: "Grant", exact: true }).click();
   await expect
     .element(screen.getByRole("alert"))
-    .toHaveTextContent("Not granted: bob holds editor there already");
+    .toHaveTextContent("Not granted: what was asked for isn't valid.");
   // What was chosen is what was sent: bob, as a user.
   expect(JSON.parse(String(sent.at(-1)?.body)).to).toEqual({ kind: "user", id: "bob" });
   await expect.element(screen.getByRole("combobox", { name: "Workspace" })).toHaveValue("ws_1");
@@ -541,5 +541,5 @@ test("a refused revocation keeps the dialog open, and says why", async () => {
   await dialog.getByRole("button", { name: "Revoke" }).click();
   await expect
     .element(dialog.getByRole("alert"))
-    .toHaveTextContent("Not revoked: holds less than editor gives: reflexr:retry_run");
+    .toHaveTextContent("Not revoked: you may not do this here.");
 });

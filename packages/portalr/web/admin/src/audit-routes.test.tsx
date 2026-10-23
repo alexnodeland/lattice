@@ -176,7 +176,7 @@ test("a page before that can't be read says so, and keeps the log shown", async 
   await expect
     .element(screen.getByRole("alert"))
     .toHaveTextContent(
-      "The changes before these couldn't be read: the server refused the read (503): grantr is down",
+      "The changes before these couldn't be read. The server had a problem. Try again in a moment.",
     );
   expect(
     screen.getByRole("table", { name: "Audit log" }).getByRole("rowheader").elements(),

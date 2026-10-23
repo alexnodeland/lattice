@@ -452,27 +452,50 @@ describe("a server's refusal", () => {
       },
       fields,
     );
+    // The kit's words under each field, never the server's; what names no field, the form's.
     expect(refused).toEqual({
-      fields: {
-        email: "Value is not a valid email address.",
-        age: "Input should be a valid integer.",
-      },
-      form: ["Too many values."],
+      fields: { email: "This isn't valid.", age: "This isn't valid." },
+      form: ["What was asked for isn't valid."],
     });
   });
 
-  test("without errors, its message is the form's", () => {
-    expect(refusalsOf({ type: "validation_failed", message: "no" }, fields)).toEqual({
-      fields: {},
-      form: ["No."],
-    });
-    expect(refusalsOf({ type: "validation_failed" }, fields)).toEqual({ fields: {}, form: [] });
+  test("without errors, the form isn't valid, whatever its message says", () => {
+    const invalid = { fields: {}, form: ["What was asked for isn't valid."] };
+    expect(refusalsOf({ type: "validation_failed", message: "no" }, fields)).toEqual(invalid);
+    expect(refusalsOf({ type: "validation_failed" }, fields)).toEqual(invalid);
   });
 
-  test("an error without a place is the form's", () => {
+  test("an error without a place is the form's, and one with a place no field has says it", () => {
     expect(
       refusalsOf({ type: "validation_failed", errors: [{ msg: "Stale!" }] }, fields)?.form,
-    ).toEqual(["Stale!"]);
+    ).toEqual(["What was asked for isn't valid."]);
+    expect(
+      refusalsOf(
+        { type: "validation_failed", errors: [{ loc: ["answer", "extra"], msg: "Stale!" }] },
+        fields,
+      )?.form,
+    ).toEqual(["What was asked for isn't valid: answer.extra."]);
+  });
+
+  test("no words of the server's reach the reader, however they are made", () => {
+    const hostile = `${String.fromCodePoint(0x202e)}<img src=x onerror=alert(1)>\npassword=hunter2${"x".repeat(5000)}`;
+    const refused = refusalsOf(
+      {
+        type: "validation_failed",
+        message: hostile,
+        errors: [
+          { loc: ["email"], type: "value_error", msg: hostile },
+          { loc: [hostile], msg: hostile },
+          { loc: ["deep", hostile, "path"], msg: hostile },
+        ],
+      },
+      fields,
+    );
+    const said = JSON.stringify(refused);
+    for (const part of ["hunter2", "img", "onerror", String.fromCodePoint(0x202e), "xxxx"]) {
+      expect(said).not.toContain(part);
+    }
+    expect(refused?.form).toEqual(["What was asked for isn't valid."]);
   });
 
   test.each([null, "refused", { type: "invalid_state", message: "answered" }])(
@@ -751,8 +774,8 @@ describe("the server's errors, in the kit's words", () => {
       "Choose one of these.",
     ],
     [{ loc: ["tags"], type: "enum", msg: "b not among a" }, "tags", "Choose among these."],
-    [{ loc: ["size"], type: "format", msg: "odd" }, "size", "Odd."],
-    [{ loc: ["mail"], type: "string_too_long", msg: "too long" }, "mail", "Too long."],
+    [{ loc: ["size"], type: "format", msg: "odd" }, "size", "This isn't valid."],
+    [{ loc: ["mail"], type: "string_too_long", msg: "too long" }, "mail", "This isn't valid."],
   ])("%j is said under %s as %j", (error, name, said) => {
     expect(refusalsOf({ type: "validation_failed", errors: [error] }, fields)?.fields).toEqual({
       [name]: said,
@@ -765,6 +788,6 @@ describe("the server's errors, in the kit's words", () => {
         { type: "validation_failed", errors: [{ loc: [], type: "missing", msg: "gone" }] },
         fields,
       )?.form,
-    ).toEqual(["Gone."]);
+    ).toEqual(["What was asked for isn't valid."]);
   });
 });

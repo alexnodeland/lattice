@@ -6,6 +6,7 @@
  * the same fields.
  */
 
+import { INVALID, pathsOf } from "@portalr/client";
 import type {
   AskForm,
   Form,
@@ -807,31 +808,27 @@ export function valuesOf(
   return { values, problems: { ...checked, ...unread }, whole };
 }
 
-/** A server's message as a sentence: its first letter a capital, and a full stop at its end. */
-const sentence = (text: string) => {
-  const trimmed = text.trim();
-  const capital = trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
-  return /[.!?]$/.test(capital) ? capital : `${capital}.`;
-};
+/** What a field's value the server refused says, where the kit has no words of its own. */
+const NOT_VALID = "This isn't valid.";
 
 /**
- * A server's error under a field, in the kit's words where the package's check is one this side
- * says too, by the error's type: a field left out, a format, or a choice not offered. Anything
- * else is the server's own message, as a sentence.
+ * A server's error under a field, in the kit's words, by the error's type: a field left out, a
+ * format, or a choice not offered, as this side says them too; anything else isn't valid. Never
+ * the server's own message (portalr ADR-0070).
  */
-function saidOf(field: Field | undefined, type: unknown, message: string): string {
+function saidOf(field: Field | undefined, type: unknown): string {
   const property = field?.property;
   switch (type) {
     case "missing":
-      return field ? EMPTY[field.control] : sentence(message);
+      return field ? EMPTY[field.control] : NOT_VALID;
     case "format":
       return property?.type === "string" && property.format !== undefined
         ? FORMAT_SAID[property.format]
-        : sentence(message);
+        : NOT_VALID;
     case "enum":
       return field?.control === "checkboxes" ? "Choose among these." : "Choose one of these.";
     default:
-      return sentence(message);
+      return NOT_VALID;
   }
 }
 
@@ -850,26 +847,24 @@ export function refusalsOf(
   const byName = new Map(fields.map((field) => [field.name, field]));
   const byField: Record<string, string> = {};
   const form: string[] = [];
+  const unnamed: unknown[] = [];
   const errors = Array.isArray(rejection.errors) ? rejection.errors : [];
   for (const error of errors) {
-    if (!(isObject(error) && isString(error.msg))) {
+    if (!isObject(error)) {
       continue;
     }
     const loc = Array.isArray(error.loc) ? error.loc : [];
     const name = loc.find((part): part is string => isString(part) && byName.has(part));
-    const message = saidOf(
-      name === undefined ? undefined : byName.get(name),
-      error.type,
-      error.msg,
-    );
     if (name === undefined) {
-      form.push(message);
+      unnamed.push(error);
     } else {
-      byField[name] ??= message;
+      byField[name] ??= saidOf(byName.get(name), error.type);
     }
   }
-  if (errors.length === 0 && isString(rejection.message)) {
-    form.push(sentence(rejection.message));
+  // What names no field is the form's own: the kit's sentence, with where, by the paths alone.
+  if (unnamed.length > 0 || errors.length === 0) {
+    const paths = pathsOf(unnamed);
+    form.push(paths.length > 0 ? `${INVALID.slice(0, -1)}: ${paths.join(", ")}.` : INVALID);
   }
   return { fields: byField, form };
 }

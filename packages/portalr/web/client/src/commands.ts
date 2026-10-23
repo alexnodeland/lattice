@@ -40,9 +40,12 @@ export interface Refusal {
 }
 
 /** FastAPI's account of a body it couldn't validate. */
-/** What a field or a form says of a command that wasn't done, after what it would have done. */
+/**
+ * What a field or a form says of a command that wasn't done, after what it would have done: the
+ * reasons, the kit's own sentences, run on after a colon, so each starts in lower case.
+ */
 export const refusal = (undone: string, refused: Refusal) =>
-  `${undone}: ${refused.reasons.join("; ")}`;
+  `${undone}: ${refused.reasons.map((reason) => reason.charAt(0).toLowerCase() + reason.slice(1)).join("; ")}`;
 
 /**
  * What a done command answered, or an error that says why it wasn't done, for a caller that

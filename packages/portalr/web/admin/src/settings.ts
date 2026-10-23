@@ -137,10 +137,6 @@ export function numberOf(
   return { value };
 }
 
-/** grantr's refusal of a setting as the field says it: its key named as the page names it. */
-export const refusedAs = (reason: string, row: { readonly key: string; readonly name: string }) =>
-  reason.replaceAll(row.key, row.name);
-
 /** Where a person may narrow settings: on the tenant, and in which of its workspaces. */
 export interface Places {
   readonly tenant: boolean;

@@ -298,7 +298,7 @@ test("a value sent again while it is under way is sent once", async () => {
   expect(screen.getByText(/changed by someone else/).elements()).toHaveLength(0);
 });
 
-test("a raise is refused on the field, in grantr's words, naming the ceiling and who set it", async () => {
+test("a raise is refused on the field, in the page's words, naming the ceiling and who set it", async () => {
   rows.set("", { value: 20, version: 1, by: { kind: "user", id: "alice" }, at });
   const { screen } = await open("/t/acme/settings?workspace=notes");
   await expect
@@ -310,7 +310,7 @@ test("a raise is refused on the field, in grantr's words, naming the ceiling and
   await expect
     .element(field)
     .toHaveAccessibleDescription(
-      /FreeCAD's tries an hour wasn't changed: FreeCAD's tries an hour may be at most 20 here: the tenant's value/,
+      /FreeCAD's tries an hour wasn't changed: it may be at most 20: the tenant's value\./,
     );
   await expect.element(field).toHaveFocus();
   expect(screen.getByText(/connect-per-hour:freecad/).elements()).toHaveLength(0);
@@ -391,7 +391,7 @@ test("a late answer doesn't take the focus from where the reader moved to", asyn
   answer();
   await expect
     .element(screen.getByRole("textbox", { name: "FreeCAD's tries an hour" }))
-    .toHaveAccessibleDescription(/may be at most 20 here/);
+    .toHaveAccessibleDescription(/may be at most 20: the tenant's value/);
   await expect.element(elsewhere).toHaveFocus();
 });
 

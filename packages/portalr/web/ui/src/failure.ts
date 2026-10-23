@@ -1,70 +1,29 @@
 /**
- * What a failure says, as every screen shows it (lattice issue 552, portalr ADR-0065). A reader
- * sees a sentence of the kit's own, chosen by the refusal's status and its known reason code; no
+ * What a failure says, as every screen shows it (lattice issue 552, portalr ADR-0065 and
+ * ADR-0070). A reader sees a sentence of the kit's own, chosen by the refusal's status and its
+ * known reason code, and where values aren't valid, the fields' paths; no
  * words of the server's reach them, as they may hold what a tenant shouldn't read. The whole
  * failure is for operators: `failureLogged` writes it to the console, once, as one line, with
  * what looks like a secret taken out.
  */
 
+import { GENERIC, refusalSaid } from "@portalr/client";
+
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-const AGAIN = " Try again in a moment.";
-
-/** What any other failure says, such as one where the server couldn't be reached. */
-export const GENERIC = `Something went wrong.${AGAIN}`;
-
-const CHANGED = `It changed while you were reading it.${AGAIN}`;
-const STATE = "That can't be done as things stand.";
-const FORBIDDEN = "You may not see this.";
-const INVALID = "What was asked for isn't valid.";
-const NOT_FOUND = "It isn't there: it may have been moved or archived.";
-
-/** What each reason code a refusal may carry says, in plain words. */
-const REASONS = new Map<string, string>([
-  ["forbidden", FORBIDDEN],
-  ["not_found", NOT_FOUND],
-  ["not_enabled", "This is switched off for this workspace. Ask an admin to switch it on."],
-  ["invalid_state", STATE],
-  ["version_conflict", CHANGED],
-  ["validation_failed", INVALID],
-]);
-
-/** What each status says, where no reason code a reader is told of came with it. */
-const STATUSES = new Map<number, string>([
-  [401, "You're not signed in. Sign in, then try again."],
-  [403, FORBIDDEN],
-  [404, NOT_FOUND],
-  [422, INVALID],
-  [429, `Too much was asked at once.${AGAIN}`],
-]);
-
-/** A refusal's reason code: its `detail`'s `type`, or its rejection's. */
-function reasonOf(body: unknown): string | undefined {
-  if (!isRecord(body)) {
-    return undefined;
-  }
-  const typed = isRecord(body.detail) ? body.detail : body.rejection;
-  return isRecord(typed) && typeof typed.type === "string" ? typed.type : undefined;
-}
+export { GENERIC };
 
 /**
  * The sentence a reader sees for a failure: by its reason code, then its status, else the
- * generic one. A refusal is anything with a numeric `status` and the body in `detail`, as the
- * client's `Refused` is.
+ * generic one (the client's `refusalSaid`). A refusal is anything with a numeric `status` and the
+ * body in `detail`, as the client's `Refused` is.
  */
 export function failureSaid(error: unknown): string {
   if (!isRecord(error) || typeof error.status !== "number") {
     return GENERIC;
   }
-  const reason = REASONS.get(reasonOf(error.detail) ?? "");
-  if (reason !== undefined) {
-    return reason;
-  }
-  if (error.status >= 500) {
-    return `The server had a problem.${AGAIN}`;
-  }
-  return STATUSES.get(error.status) ?? GENERIC;
+  return refusalSaid(error.status, error.detail);
 }
 
 /** The most graphemes of a failure's text the console line keeps. */

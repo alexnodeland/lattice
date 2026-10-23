@@ -103,9 +103,8 @@ export function refusedAs(rejection: { readonly [key: string]: unknown } | null 
     case "invalid_state":
       return "The run has changed, and can't take this now: what it is now is shown above.";
     default:
-      return typeof rejection?.message === "string" && rejection.message !== ""
-        ? rejection.message
-        : "The server refused it.";
+      // Never the rejection's message: the server's words are for operators (portalr ADR-0070).
+      return "The server refused it.";
   }
 }
 

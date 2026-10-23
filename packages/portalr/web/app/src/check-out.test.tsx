@@ -129,7 +129,10 @@ test("a check-out refused says why, opens nothing, and reads the workspace's swi
       .length;
   await expect.poll(flags).toBe(1);
   await screen.getByRole("button", { name: "Check out and open WordCraft" }).click();
-  await told(screen, "It wasn't checked out: bob has the file.");
+  await told(
+    screen,
+    "It wasn't checked out: someone else has it now. Try again once they're done.",
+  );
   expect(opened).not.toHaveBeenCalled();
   await expect.poll(flags).toBe(2);
 });
@@ -180,7 +183,7 @@ test("an answer that never came, where the check-in landed, is sent again and fo
   (await sent(1)).onerror?.();
   await told(
     screen,
-    "It wasn't checked in: The connection ended before the server answered. Try again.",
+    "It wasn't checked in: the connection ended before the server answered. Try again.",
   );
   await expect.element(screen.getByText(/^Your check-out ran out/)).toBeVisible();
   await screen.getByRole("button", { name: "Try again" }).click();

@@ -4,6 +4,7 @@ import httpx
 import pytest
 
 from grantr.core import Resource, User
+from grantr.fastapi.openapi import openapi_document
 from grantr.grants import Grants
 from tests.fastapi.conftest import ALICE, ROOT
 
@@ -462,3 +463,30 @@ async def test_admins_narrow_settings_by_version_and_are_told_why_not(
     for path in ("..", "team/../other", "%2E%2E", "team%2Fnotes%2F..%2Fother"):
         escaped = await client.get(f"/tenants/acme/workspaces/{path}/settings", headers=AS_BOB)
         assert escaped.status_code in (403, 404), path
+
+
+async def test_a_caller_who_may_not_is_refused_before_its_body_is_read(
+    client: httpx.AsyncClient,
+) -> None:
+    await client.post("/tenants/acme/members", json={"member": BOB}, headers=AS_ALICE)
+    key = "connect-per-hour:freecad"
+    for path in (f"/tenants/acme/settings/{key}", f"/tenants/acme/workspaces/w1/settings/{key}"):
+        for body, tag in (({"value": "x"}, "*"), ({"wrong": 1}, "abc"), ({"value": 1}, '"-1"')):
+            refused = await client.put(path, json=body, headers=AS_BOB | {"If-Match": tag})
+            assert refused.status_code == 403, (path, body, tag)
+            assert refused.json()["detail"]["type"] == "forbidden"
+
+
+def test_the_document_keeps_a_settings_body_and_its_if_match() -> None:
+    document = openapi_document()
+    for path in (
+        "/grantr/v1/tenants/{tenant}/settings/{key}",
+        "/grantr/v1/tenants/{tenant}/workspaces/{workspace}/settings/{key}",
+    ):
+        put = document["paths"][path]["put"]
+        assert put["requestBody"]["content"]["application/json"]["schema"] == {
+            "$ref": "#/components/schemas/SettingChange"
+        }
+        assert {"name": "If-Match", "in": "header"}.items() <= next(
+            p for p in put["parameters"] if p["name"] == "If-Match"
+        ).items()

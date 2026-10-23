@@ -4,7 +4,8 @@ Feature: Integrations
   scenario sets back what it changed, so it can run again on the same application.
 
   Scenario: An integration turned off in a workspace, who did it in the audit log, and back
-    Given alice has signed in to admin
+    Given acme has the workspace "notes"
+    And alice has signed in to admin
     When they open Integrations for the workspace "notes"
     And they turn "Math" off
     Then "Math" is off, set here

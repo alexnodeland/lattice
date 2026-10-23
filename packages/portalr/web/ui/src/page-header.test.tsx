@@ -32,3 +32,8 @@ test("a page header's heading can name the region around it", async () => {
   );
   await expect.element(screen.getByRole("region", { name: "art_1" })).toBeVisible();
 });
+
+test("a page that takes the focus puts it on its heading, as it appears", async () => {
+  const screen = await render(<PageHeader title="Settings" focus />);
+  await expect.element(screen.getByRole("heading", { level: 1, name: "Settings" })).toHaveFocus();
+});

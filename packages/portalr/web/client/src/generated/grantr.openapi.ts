@@ -526,8 +526,9 @@ export interface paths {
          * @description Narrow a setting on a tenant, or unset it with null.
          *
          *     `If-Match` names the version of the tenant's setting the caller read, `"0"` for one never
-         *     set: another is refused with 409. A value wider than the layer above is refused with 422,
-         *     saying how wide it may be and which layer says so.
+         *     set: another is refused with 409; omitted, the last write wins. A value wider than the
+         *     layer above is refused with 422, saying how wide it may be and which layer says so. A
+         *     caller who may not is refused with 403 before its body or `If-Match` is read.
          */
         put: operations["set_tenant_setting_grantr_v1_tenants__tenant__settings__key__put"];
         post?: never;

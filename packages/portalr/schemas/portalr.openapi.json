@@ -1,6 +1,30 @@
 {
   "components": {
     "schemas": {
+      "Active": {
+        "description": "How many people did anything: in the window, and in its last 7 and last 30 days.\n\nThe last 7 and 30 days end where the window does, and are within it: a window shorter than\neither counts its own people for it.",
+        "properties": {
+          "month": {
+            "title": "Month",
+            "type": "integer"
+          },
+          "week": {
+            "title": "Week",
+            "type": "integer"
+          },
+          "window": {
+            "title": "Window",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "window",
+          "week",
+          "month"
+        ],
+        "title": "Active",
+        "type": "object"
+      },
       "ActiveDay": {
         "description": "How many people did anything in the tenant on one day, in UTC.",
         "properties": {
@@ -22,18 +46,35 @@
         "type": "object"
       },
       "Adoption": {
-        "description": "A tenant's adoption over a window, and whether all of it was read.",
+        "description": "A tenant's adoption over a window, and whether all of it was read.\n\nEach part is None where the read stopped at its deadline before reading it: unknown, which\nisn't none.",
         "properties": {
+          "active": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Active"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "complete": {
             "title": "Complete",
             "type": "boolean"
           },
           "days": {
-            "items": {
-              "$ref": "#/components/schemas/ActiveDay"
-            },
-            "title": "Days",
-            "type": "array"
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ActiveDay"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days"
           },
           "funnel": {
             "anyOf": [
@@ -46,26 +87,36 @@
             ]
           },
           "integrations": {
-            "items": {
-              "$ref": "#/components/schemas/IntegrationUse"
-            },
-            "title": "Integrations",
-            "type": "array"
-          },
-          "people": {
-            "title": "People",
-            "type": "integer"
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/IntegrationUse"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Integrations"
           },
           "retention": {
-            "items": {
-              "type": "integer"
-            },
-            "title": "Retention",
-            "type": "array"
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retention"
           }
         },
         "required": [
-          "people",
+          "active",
           "days",
           "integrations",
           "funnel",
@@ -561,7 +612,7 @@
         "type": "object"
       },
       "Funnel": {
-        "description": "How many people viewed a page, then opened a thread, then sent a message, within a day.",
+        "description": "How many people viewed a page, then opened a thread, then sent a message, within 24 hours.",
         "properties": {
           "message": {
             "title": "Message",

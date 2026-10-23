@@ -421,6 +421,21 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /**
+         * Active
+         * @description How many people did anything: in the window, and in its last 7 and last 30 days.
+         *
+         *     The last 7 and 30 days end where the window does, and are within it: a window shorter than
+         *     either counts its own people for it.
+         */
+        Active: {
+            /** Month */
+            month: number;
+            /** Week */
+            week: number;
+            /** Window */
+            window: number;
+        };
+        /**
          * ActiveDay
          * @description How many people did anything in the tenant on one day, in UTC.
          */
@@ -436,19 +451,21 @@ export interface components {
         /**
          * Adoption
          * @description A tenant's adoption over a window, and whether all of it was read.
+         *
+         *     Each part is None where the read stopped at its deadline before reading it: unknown, which
+         *     isn't none.
          */
         Adoption: {
+            active: components["schemas"]["Active"] | null;
             /** Complete */
             complete: boolean;
             /** Days */
-            days: components["schemas"]["ActiveDay"][];
+            days: components["schemas"]["ActiveDay"][] | null;
             funnel: components["schemas"]["Funnel"] | null;
             /** Integrations */
-            integrations: components["schemas"]["IntegrationUse"][];
-            /** People */
-            people: number;
+            integrations: components["schemas"]["IntegrationUse"][] | null;
             /** Retention */
-            retention: number[];
+            retention: number[] | null;
         };
         /**
          * Answer
@@ -658,7 +675,7 @@ export interface components {
         };
         /**
          * Funnel
-         * @description How many people viewed a page, then opened a thread, then sent a message, within a day.
+         * @description How many people viewed a page, then opened a thread, then sent a message, within 24 hours.
          */
         Funnel: {
             /** Message */

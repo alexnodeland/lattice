@@ -15,6 +15,7 @@ from portalr.readers import Analytics, Readers
 from portalr.readers.analytics import (
     REGISTRY,
     TENANT_SETTING,
+    Active,
     ActiveDay,
     Adoption,
     AdoptionQuery,
@@ -213,15 +214,19 @@ async def test_a_deletion_clickhouse_refuses_is_said() -> None:
     assert not await Analytics(URL, KEY, writer=writer).forget("user-1")
 
 
+ANSWERS: dict[str, str] = {
+    "uniqExactIf": '{"window":"4","week":"3","month":"4"}',
+    "toDate(ts) AS day": '{"day":"2026-10-01","people":"2"}\n{"day":"2026-10-02","people":"1"}',
+    "props['integration']": '{"integration":"tracker","uses":"5","people":"2"}',
+    "windowFunnel": '{"page":"3","thread":"2","message":"1"}',
+    "retention(": '{"retention":["3","2","1"]}',
+}
+"""Each of the adoption's reads, by what its query selects, in the order they are made."""
+
+
 def adoption_answers(**overrides: str) -> httpx.AsyncClient:
     """A ClickHouse that answers each of the adoption's reads, by what it selects."""
-    answers = {
-        "toDate(ts) AS day": '{"day":"2026-10-01","people":"2"}\n{"day":"2026-10-02","people":"1"}',
-        "props['integration']": '{"integration":"tracker","uses":"5","people":"2"}',
-        "windowFunnel": '{"people":"3","page":"3","thread":"2","message":"1"}',
-        "retention(": '{"retention":["3","2","1"]}',
-        **overrides,
-    }
+    answers = {**ANSWERS, **overrides}
 
     async def handle(request: httpx.Request) -> httpx.Response:
         query = request.content.decode()
@@ -238,13 +243,14 @@ def adoption_answers(**overrides: str) -> httpx.AsyncClient:
 
 
 ADOPTION = AdoptionQuery(start=SPAN.start, end=SPAN.end)
+"""Three weeks: 21 days."""
 
 
 async def test_a_tenants_adoption_is_its_people_days_integrations_funnel_and_retention() -> None:
     adoption = await Analytics(URL, KEY, reader=adoption_answers()).adoption(ACME, ADOPTION)
     assert adoption == Ok(
         data=Adoption(
-            people=3,
+            active=Active(window=4, week=3, month=4),
             days=[
                 ActiveDay(day=date(2026, 10, 1), people=2),
                 ActiveDay(day=date(2026, 10, 2), people=1),
@@ -257,21 +263,41 @@ async def test_a_tenants_adoption_is_its_people_days_integrations_funnel_and_ret
     )
 
 
-async def test_retention_asks_after_each_week_the_window_touches() -> None:
+async def test_retention_asks_after_each_whole_week_of_the_window() -> None:
     sent, reader = recorded(httpx.Response(200, text=""))
-    window = AdoptionQuery(start=SPAN.start, end=SPAN.start + timedelta(days=91))
+    # 30 days: four whole weeks, and two days of a fifth, which isn't asked after.
+    window = AdoptionQuery(start=SPAN.start, end=SPAN.start + timedelta(days=30))
     await Analytics(URL, KEY, reader=reader).adoption(ACME, window)
     (asked,) = [r.content.decode() for r in sent if "retention(" in r.content.decode()]
-    assert "week = 12)" in asked
-    assert "week = 13" not in asked
+    assert "week = 3)" in asked
+    assert "week = 4" not in asked
 
 
 async def test_a_one_week_window_asks_retention_after_two_weeks_and_keeps_one() -> None:
     window = AdoptionQuery(start=SPAN.start, end=SPAN.start + timedelta(days=7))
-    reader = adoption_answers(**{"retention(": '{"retention":["3","0"]}'})
-    adoption = await Analytics(URL, KEY, reader=reader).adoption(ACME, window)
+    sent: list[str] = []
+    answers = adoption_answers(**{"retention(": '{"retention":["3","0"]}'})
+    original = answers.post
+
+    async def post(*args: object, **kwargs: object) -> httpx.Response:
+        sent.append(str(kwargs["content"]))
+        return await original(*args, **kwargs)  # type: ignore[arg-type]
+
+    answers.post = post  # type: ignore[method-assign]
+    adoption = await Analytics(URL, KEY, reader=answers).adoption(ACME, window)
     assert isinstance(adoption, Ok)
     assert adoption.data.retention == [3]
+    (asked,) = [query for query in sent if "retention(" in query]
+    assert "week = 0, week = 1)" in asked
+
+
+async def test_a_window_shorter_than_a_week_has_no_retention_and_asks_none() -> None:
+    sent, reader = recorded(httpx.Response(200, text=""))
+    window = AdoptionQuery(start=SPAN.start, end=SPAN.start + timedelta(days=6))
+    adoption = await Analytics(URL, KEY, reader=reader).adoption(ACME, window)
+    assert isinstance(adoption, Ok)
+    assert adoption.data.retention == []
+    assert not [r for r in sent if "retention(" in r.content.decode()]
 
 
 async def test_an_adoption_read_asks_clickhouse_one_query_at_a_time() -> None:
@@ -291,16 +317,30 @@ async def test_an_adoption_read_asks_clickhouse_one_query_at_a_time() -> None:
 
 
 async def test_an_empty_tenant_has_no_one_and_a_whole_answer() -> None:
-    _, reader = recorded(httpx.Response(200, text=""))
+    # As ClickHouse answers an aggregate of no rows: zeros, and no days or integrations.
+    reader = adoption_answers(
+        uniqExactIf='{"window":"0","week":"0","month":"0"}',
+        **{
+            "toDate(ts) AS day": "",
+            "props['integration']": "",
+            "windowFunnel": '{"page":"0","thread":"0","message":"0"}',
+            "retention(": '{"retention":[]}',
+        },
+    )
     adoption = await Analytics(URL, KEY, reader=reader).adoption(ACME, ADOPTION)
     assert adoption == Ok(
-        data=Adoption(people=0, days=[], integrations=[], funnel=None, retention=[], complete=True)
+        data=Adoption(
+            active=Active(window=0, week=0, month=0),
+            days=[],
+            integrations=[],
+            funnel=Funnel(page=0, thread=0, message=0),
+            retention=[],
+            complete=True,
+        )
     )
 
 
-@pytest.mark.parametrize(
-    "read", ["windowFunnel", "toDate(ts) AS day", "props['integration']", "retention("]
-)
+@pytest.mark.parametrize("read", list(ANSWERS))
 async def test_a_read_clickhouse_refuses_makes_the_adoption_unavailable_without_its_words(
     read: str,
 ) -> None:
@@ -309,15 +349,24 @@ async def test_a_read_clickhouse_refuses_makes_the_adoption_unavailable_without_
     assert adoption == Unavailable(reason="ClickHouse answered 500")
 
 
-async def test_a_read_past_the_deadline_is_left_out_and_the_answer_is_partial(
-    monkeypatch: pytest.MonkeyPatch,
+async def test_an_answer_portalr_cant_read_is_unavailable() -> None:
+    reader = adoption_answers(uniqExactIf='{"window":"many"}')
+    adoption = await Analytics(URL, KEY, reader=reader).adoption(ACME, ADOPTION)
+    assert adoption == Unavailable(reason="ClickHouse answered what portalr can't read")
+
+
+@pytest.mark.parametrize("slow", range(len(ANSWERS)))
+async def test_the_parts_not_read_by_the_deadline_are_unknown_not_none(
+    slow: int, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr("portalr.readers.analytics.DEADLINE", 0.2)
-    reader = adoption_answers(**{"retention(": "slow"})
+    reader = adoption_answers(**{list(ANSWERS)[slow]: "slow"})
     adoption = await Analytics(URL, KEY, reader=reader).adoption(ACME, ADOPTION)
     assert isinstance(adoption, Ok)
-    assert adoption.data.retention == []
-    assert adoption.data.funnel == Funnel(page=3, thread=2, message=1)
+    parts = ["active", "days", "integrations", "funnel", "retention"]
+    read = [getattr(adoption.data, part) is not None for part in parts]
+    # Each part before the one the deadline cut off was read; it and each after, not.
+    assert read == [n < slow for n in range(len(parts))]
     assert adoption.data.complete is False
 
 

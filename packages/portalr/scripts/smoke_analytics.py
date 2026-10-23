@@ -76,7 +76,8 @@ async def main() -> int:
         if (
             isinstance(adoption, Ok)
             and adoption.data.complete
-            and adoption.data.people == people
+            and adoption.data.active is not None
+            and adoption.data.active.window == people
             and adoption.data.funnel is not None
             and adoption.data.funnel.page == viewed
         ):

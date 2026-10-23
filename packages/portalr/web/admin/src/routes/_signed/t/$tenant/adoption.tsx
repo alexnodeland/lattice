@@ -6,9 +6,9 @@ import {
   formatDay,
   Heading,
   ItemTable,
-  Num,
   PageHeader,
   SegmentedFilter,
+  StatCard,
   StatusBadge,
 } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
@@ -106,8 +106,8 @@ function AdoptionPage() {
           <StatusBadge tone="stopped" className="mr-2">
             Partial
           </StatusBadge>
-          The read stopped short, so what it didn't reach is left out, not shown as none. A shorter
-          window may read it all.
+          The read stopped short, so the parts it didn't reach say so, rather than showing none. A
+          shorter window may read it all.
         </Alert>
       )}
       <Active adoption={adoption} />
@@ -121,108 +121,140 @@ function AdoptionPage() {
   );
 }
 
-/** How many people were active over the window, and each day. */
-function Active({ adoption }: { adoption: Adoption }) {
+/** What a part the read didn't reach says: unknown, which isn't none. */
+function NotRead({ what }: { what: string }) {
   return (
-    <>
-      <p className="text-muted text-sm">
-        <span className="font-semibold text-fg text-xl">
-          <Num>{numbers.format(adoption.people)}</Num>
-        </span>{" "}
-        {adoption.people === 1 ? "person was" : "people were"} active over the window.
-      </p>
-      <BarChart
-        label="People active per day"
-        index={DAY}
-        series={[{ key: "people", name: "People" }]}
-        data={adoption.days.map((day) => ({ day: day.day, people: day.people }))}
-        format={(people) => numbers.format(people)}
-        tick={formatDay}
-      />
-    </>
+    <p className="text-muted text-sm">{what} wasn't read: the read stopped before it got there.</p>
+  );
+}
+
+/** How many people were active: over the window, in its last 7 and 30 days, and each day. */
+function Active({ adoption }: { adoption: Adoption }) {
+  const { active, days } = adoption;
+  return (
+    <section aria-labelledby="active" className="flex flex-col gap-3">
+      <Heading id="active" level={2} look="subsection">
+        Active people
+      </Heading>
+      {active ? (
+        <div className="grid gap-3 sm:grid-cols-3">
+          <StatCard title="Over the window" figure={numbers.format(active.window)} />
+          <StatCard title="In its last 7 days" figure={numbers.format(active.week)} />
+          <StatCard title="In its last 30 days" figure={numbers.format(active.month)} />
+        </div>
+      ) : (
+        <NotRead what="How many people were active" />
+      )}
+      {days ? (
+        <BarChart
+          label="People active per day"
+          index={DAY}
+          series={[{ key: "people", name: "People" }]}
+          data={days.map((day) => ({ day: day.day, people: day.people }))}
+          format={(people) => numbers.format(people)}
+          tick={formatDay}
+        />
+      ) : (
+        <NotRead what="Each day's people" />
+      )}
+    </section>
   );
 }
 
 /** Each integration's people and uses. */
 function Integrations({ adoption }: { adoption: Adoption }) {
+  const { integrations, active } = adoption;
   return (
     <section aria-labelledby="by-integration" className="flex flex-col gap-3">
       <Heading id="by-integration" level={2} look="subsection">
         By integration
       </Heading>
-      <ItemTable
-        caption="Each integration's people and uses"
-        columns={[
-          { key: "integration", label: "Integration", cell: (use) => use.integration },
-          { key: "people", label: "People", cell: (use) => numbers.format(use.people) },
-          {
-            key: "share",
-            label: "Of everyone active",
-            cell: (use) => shareOf(use.people, adoption.people),
-          },
-          { key: "uses", label: "Uses", cell: (use) => numbers.format(use.uses) },
-        ]}
-        items={adoption.integrations}
-        keyOf={(use) => use.integration}
-        empty={{
-          title: "No integration was used in this window",
-          body: "An integration is counted when someone uses it in the app.",
-        }}
-      />
+      {integrations ? (
+        <ItemTable
+          caption="Each integration's people and uses"
+          columns={[
+            { key: "integration", label: "Integration", cell: (use) => use.integration },
+            { key: "people", label: "People", cell: (use) => numbers.format(use.people) },
+            {
+              key: "share",
+              label: "Of everyone active",
+              cell: (use) => (active ? shareOf(use.people, active.window) : "–"),
+            },
+            { key: "uses", label: "Uses", cell: (use) => numbers.format(use.uses) },
+          ]}
+          items={integrations}
+          keyOf={(use) => use.integration}
+          empty={{
+            title: "No integration was used in this window",
+            body: "An integration is counted when someone uses it in the app.",
+          }}
+        />
+      ) : (
+        <NotRead what="Each integration's use" />
+      )}
     </section>
   );
 }
 
-/** How far people went, from a page to a thread to a message, within a day. */
+/** How far people went, from a page to a thread to a message, within 24 hours. */
 function Funnel({ adoption }: { adoption: Adoption }) {
-  const steps = adoption.funnel ? stepsOf(adoption.funnel) : [];
-  const first = steps[0]?.people ?? 0;
+  const steps = adoption.funnel ? stepsOf(adoption.funnel) : null;
+  const first = steps?.[0]?.people ?? 0;
   return (
     <section aria-labelledby="funnel" className="flex flex-col gap-3">
       <Heading id="funnel" level={2} look="subsection">
         From a page to a message
       </Heading>
-      <ItemTable
-        caption="People at each step, within a day of the first"
-        columns={[
-          { key: "step", label: "Step", cell: (step) => step.name },
-          { key: "people", label: "People", cell: (step) => numbers.format(step.people) },
-          { key: "share", label: "Of the first step", cell: (step) => shareOf(step.people, first) },
-        ]}
-        items={steps}
-        keyOf={(step) => step.key}
-        empty={{
-          title: "The funnel wasn't read",
-          body: "The read stopped before it reached the funnel.",
-        }}
-      />
+      {steps ? (
+        <ItemTable
+          caption="People at each step, within 24 hours of the first"
+          columns={[
+            { key: "step", label: "Step", cell: (step) => step.name },
+            { key: "people", label: "People", cell: (step) => numbers.format(step.people) },
+            {
+              key: "share",
+              label: "Of the first step",
+              cell: (step) => shareOf(step.people, first),
+            },
+          ]}
+          items={steps}
+          keyOf={(step) => step.key}
+          empty={{ title: "No steps", body: "The funnel has three steps." }}
+        />
+      ) : (
+        <NotRead what="The funnel" />
+      )}
     </section>
   );
 }
 
-/** Of the window's first week's people, how many were active in each week of it. */
+/** Of the window's first week's people, how many were active in each whole week of it. */
 function Retention({ adoption }: { adoption: Adoption }) {
-  const weeks = weeksOf(adoption.retention);
-  const first = weeks[0]?.people ?? 0;
+  const weeks = adoption.retention ? weeksOf(adoption.retention) : null;
+  const first = weeks?.[0]?.people ?? 0;
   return (
     <section aria-labelledby="retention" className="flex flex-col gap-3">
       <Heading id="retention" level={2} look="subsection">
         Weekly retention
       </Heading>
-      <ItemTable
-        caption="Of the people active in the window's first week, those active in each week"
-        columns={[
-          { key: "week", label: "Week", cell: (week) => weekSaid(week.week) },
-          { key: "people", label: "People", cell: (week) => numbers.format(week.people) },
-          { key: "share", label: "Of week 1", cell: (week) => shareOf(week.people, first) },
-        ]}
-        items={weeks}
-        keyOf={(week) => String(week.week)}
-        empty={{
-          title: "No one was active in the window's first week",
-          body: "Retention follows the people active in the first week of the window.",
-        }}
-      />
+      {weeks ? (
+        <ItemTable
+          caption="Of the people active in the window's first week, those active in each whole week of it"
+          columns={[
+            { key: "week", label: "Week", cell: (week) => weekSaid(week.week) },
+            { key: "people", label: "People", cell: (week) => numbers.format(week.people) },
+            { key: "share", label: "Of week 1", cell: (week) => shareOf(week.people, first) },
+          ]}
+          items={weeks}
+          keyOf={(week) => String(week.week)}
+          empty={{
+            title: "No one was active in the window's first week",
+            body: "Retention follows the people active in the first week of the window, over its whole weeks.",
+          }}
+        />
+      ) : (
+        <NotRead what="Retention" />
+      )}
     </section>
   );
 }

@@ -11,19 +11,25 @@ import { open as opened } from "./test/admin";
 /** The adoption reads made, by their query. */
 const reads: URLSearchParams[] = [];
 
-let analytics: "ok" | "partial" | "unconfigured" | "unavailable" = "ok";
+let analytics: "ok" | "unconfigured" | "unavailable" = "ok";
+/** How many of the five reads were made before the deadline: five for a whole answer. */
+let read = 5;
 
-const adoption = () => ({
-  people: 4,
-  days: [
-    { day: "2026-10-01", people: 3 },
-    { day: "2026-10-02", people: 2 },
-  ],
-  integrations: [{ integration: "tracker", uses: 9, people: 2 }],
-  funnel: analytics === "partial" ? null : { page: 4, thread: 2, message: 1 },
-  retention: analytics === "partial" ? [] : [4, 1],
-  complete: analytics !== "partial",
-});
+function adoption() {
+  const whole = {
+    active: { window: 4, week: 3, month: 4 },
+    days: [
+      { day: "2026-10-01", people: 3 },
+      { day: "2026-10-02", people: 2 },
+    ],
+    integrations: [{ integration: "tracker", uses: 9, people: 2 }],
+    funnel: { page: 4, thread: 2, message: 1 },
+    retention: [4, 1],
+  };
+  // As portalr answers a read the deadline cut off: each part it didn't reach is null.
+  const parts = Object.entries(whole).map(([part, value], at) => [part, at < read ? value : null]);
+  return { ...Object.fromEntries(parts), complete: read === 5 };
+}
 
 async function portalr(request: Request, path: string): Promise<Response | undefined> {
   if (path === "/portalr/v1/adoption") {
@@ -55,6 +61,7 @@ beforeEach(async () => {
 afterEach(() => {
   reads.length = 0;
   analytics = "ok";
+  read = 5;
 });
 
 test("Adoption is on the rail where reading telemetry is allowed, and not found elsewhere", async () => {
@@ -73,7 +80,9 @@ test("the window's people, each integration's, the funnel and retention", async 
     .getByRole("navigation", { name: "Tenant" })
     .getByRole("link", { name: "Adoption" })
     .click();
-  await expect.element(screen.getByText(/4 people were active over the window/)).toBeVisible();
+  await expect
+    .element(screen.getByRole("article", { name: "In its last 7 days" }))
+    .toHaveTextContent("In its last 7 days3");
   await expect.element(screen.getByRole("figure", { name: "People active per day" })).toBeVisible();
   await expect
     .element(screen.getByRole("row", { name: /tracker/ }))
@@ -83,15 +92,41 @@ test("the window's people, each integration's, the funnel and retention", async 
     .toHaveTextContent("Then sent a message125%");
   await expect.element(screen.getByRole("row", { name: /Week 2/ })).toHaveTextContent("Week 2125%");
   await expect.element(screen.getByText(/never what they wrote/)).toBeVisible();
+  await expect.element(screen.getByText(/wasn't read/)).not.toBeInTheDocument();
   expect(new Date(reads.at(-1)?.get("start") ?? "").getUTCHours()).toBe(0);
 });
 
-test("a partial read says so, and what it didn't read is empty, not none", async () => {
-  analytics = "partial";
-  const { screen } = await open("/t/acme/adoption");
-  await expect.element(screen.getByText(/The read stopped short/)).toBeVisible();
-  await expect.element(screen.getByText("The funnel wasn't read")).toBeVisible();
-});
+test.each([
+  [1, ["Each day's people", "Each integration's use", "The funnel", "Retention"]],
+  [2, ["Each integration's use", "The funnel", "Retention"]],
+  [3, ["The funnel", "Retention"]],
+])(
+  "cut off after %i reads, each part not read says so, and none claims none",
+  async (made, unread) => {
+    read = made;
+    const { screen } = await open("/t/acme/adoption");
+    await expect.element(screen.getByText(/The read stopped short/)).toBeVisible();
+    for (const part of unread) {
+      await expect.element(screen.getByText(`${part} wasn't read`, { exact: false })).toBeVisible();
+    }
+    await expect.poll(() => screen.getByText(/wasn't read/).elements().length).toBe(unread.length);
+    // What was read is shown; nothing unread is shown as none.
+    await expect
+      .element(screen.getByRole("article", { name: "Over the window" }))
+      .toHaveTextContent("Over the window4");
+    await expect
+      .element(screen.getByText("No integration was used in this window"))
+      .not.toBeInTheDocument();
+    await expect
+      .element(screen.getByText("No one was active in the window's first week"))
+      .not.toBeInTheDocument();
+    if (made < 2) {
+      await expect
+        .element(screen.getByRole("figure", { name: "People active per day" }))
+        .not.toBeInTheDocument();
+    }
+  },
+);
 
 test("analytics not configured says so", async () => {
   analytics = "unconfigured";

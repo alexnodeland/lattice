@@ -11,10 +11,11 @@ the rows of the tenant a query's ``SQL_portalr_tenant`` setting names (stackr AD
 query here names the tenant twice, in that setting and in its own ``WHERE``, each a parameter,
 never text in the query: a reader that forgot one would still be held to the tenant by the other.
 
-A tenant's adoption (portalr ADR-0071) is four such reads, in turn: who was active each
-day, who used each integration, how far people went from a page to a thread to a message, and
-how many of the window's first week came back each week after. Each counts people by their
-keyed hash, and only people who said yes are there to count.
+A tenant's adoption (portalr ADR-0071) is five such reads, in turn: who was active in the window,
+in its last 7 days and its last 30; who was active each day; who used each integration; how far
+people went from a page to a thread to a message; and how many of the window's first week came
+back each week after. Each counts people by their keyed hash, and only people who said yes are
+there to count.
 """
 
 import asyncio
@@ -28,7 +29,7 @@ from importlib import resources
 from typing import Final, Literal
 
 import httpx
-from pydantic import BaseModel, ConfigDict, TypeAdapter
+from pydantic import BaseModel, ConfigDict, TypeAdapter, ValidationError
 
 from grantr.core import ServicePrincipal, Subject, User
 from portalr.readers.query import BoundedSpan, Span
@@ -118,7 +119,7 @@ class IntegrationUse(BaseModel):
 
 
 class Funnel(BaseModel):
-    """How many people viewed a page, then opened a thread, then sent a message, within a day."""
+    """How many people viewed a page, then opened a thread, then sent a message, within 24 hours."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -127,33 +128,50 @@ class Funnel(BaseModel):
     message: int
 
 
-class Adoption(BaseModel):
-    """A tenant's adoption over a window, and whether all of it was read."""
+class Active(BaseModel):
+    """How many people did anything: in the window, and in its last 7 and last 30 days.
+
+    The last 7 and 30 days end where the window does, and are within it: a window shorter than
+    either counts its own people for it.
+    """
 
     model_config = ConfigDict(frozen=True)
 
-    people: int
-    """How many people did anything in the window."""
-    days: list[ActiveDay]
+    window: int
+    week: int
+    month: int
+
+
+class Adoption(BaseModel):
+    """A tenant's adoption over a window, and whether all of it was read.
+
+    Each part is None where the read stopped at its deadline before reading it: unknown, which
+    isn't none.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    active: Active | None
+    days: list[ActiveDay] | None
     """Each day anyone was active, the first first; a day no one was isn't here."""
-    integrations: list[IntegrationUse]
-    """The most used first; an integration no one used isn't here."""
+    integrations: list[IntegrationUse] | None
+    """The most used first, ``MOST_INTEGRATIONS`` at most; one no one used isn't here."""
     funnel: Funnel | None
-    """None where the read stopped before it answered."""
-    retention: list[int]
-    """Of the people active in the window's first week, how many were active in each week of
-    it, the first week first: its first is all of them."""
+    retention: list[int] | None
+    """Of the people active in the window's first week, how many were active in each whole week
+    of it, the first first: its first is all of them. A week the window ends before it ends isn't
+    here, nor is any week in a window shorter than one."""
     complete: bool
-    """False where a read stopped at the deadline: what it hadn't read is empty, not 0."""
+    """False where the read stopped at its deadline: the parts it didn't read are None."""
 
 
-class _Funnel(Funnel):
-    people: int
+MOST_INTEGRATIONS: Final = 100
+"""The most integrations an adoption read answers."""
 
-
+_ACTIVE = TypeAdapter(list[Active])
 _DAYS = TypeAdapter(list[ActiveDay])
 _INTEGRATIONS = TypeAdapter(list[IntegrationUse])
-_FUNNELS = TypeAdapter(list[_Funnel])
+_FUNNELS = TypeAdapter(list[Funnel])
 _RETENTION = TypeAdapter(list[dict[str, list[int]]])
 
 _IN_THE_WINDOW: Final = (
@@ -295,54 +313,64 @@ class Analytics:
         return await self._read(tenant, span, query, _COUNTS)
 
     async def adoption(self, tenant: Tenant, query: AdoptionQuery) -> Ok[Adoption] | Unavailable:
-        """The tenant's adoption over the window: four reads, in turn, within ``DEADLINE``.
+        """The tenant's adoption over the window: five reads, in turn, within ``DEADLINE``.
 
         In turn, so an adoption read takes one of the reader's few queries at a time (stackr
-        ADR-0044). A read ClickHouse refuses, or doesn't answer, makes the whole unavailable; the
-        reads left when the deadline passes aren't made, and the answer says it is partial.
+        ADR-0044); a read cut off at the deadline is stopped by ClickHouse, whose reader's profile
+        cancels a read whose client gave up. A read ClickHouse refuses makes the whole
+        unavailable; the parts not read by the deadline are None, and the answer is partial.
         """
-        weeks = -(-int((query.end - query.start).total_seconds()) // WEEK)
-        # retention() takes two conditions at least: a one-week window asks after two, keeps one.
-        asked = max(weeks, 2)
+        weeks = int((query.end - query.start).total_seconds()) // WEEK
+        active_sql = (
+            "SELECT uniqExact(distinct_id) AS window,"
+            " uniqExactIf(distinct_id, ts >= {end:DateTime64(3, 'UTC')} - INTERVAL 7 DAY) AS week,"
+            " uniqExactIf(distinct_id, ts >= {end:DateTime64(3, 'UTC')} - INTERVAL 30 DAY)"
+            " AS month FROM analytics.events" + _IN_THE_WINDOW + " FORMAT JSONEachRow"
+        )
+        days_sql = (
+            "SELECT toDate(ts) AS day, uniqExact(distinct_id) AS people FROM analytics.events"
+            + _IN_THE_WINDOW
+            + " GROUP BY day ORDER BY day FORMAT JSONEachRow"
+        )
+        integrations_sql = (
+            "SELECT props['integration'] AS integration, count() AS uses,"
+            " uniqExact(distinct_id) AS people FROM analytics.events"
+            + _IN_THE_WINDOW
+            + " AND event = 'app.integration.used.v1' AND props['integration'] != ''"
+            " GROUP BY integration ORDER BY uses DESC, integration"
+            f" LIMIT {MOST_INTEGRATIONS} FORMAT JSONEachRow"
+        )
         funnel_sql = (
-            "SELECT count() AS people, countIf(level >= 1) AS page,"
-            " countIf(level >= 2) AS thread, countIf(level >= 3) AS message"
+            "SELECT countIf(level >= 1) AS page, countIf(level >= 2) AS thread,"
+            " countIf(level >= 3) AS message"
             f" FROM (SELECT distinct_id, windowFunnel({FUNNEL_WINDOW})(toDateTime(ts), "
             + ", ".join(f"event = '{event}'" for event in FUNNEL)
             + ") AS level FROM analytics.events"
             + _IN_THE_WINDOW
             + " GROUP BY distinct_id) FORMAT JSONEachRow"
         )
-        days_sql = (
-            "SELECT toDate(ts) AS day, uniq(distinct_id) AS people FROM analytics.events"
-            + _IN_THE_WINDOW
-            + " GROUP BY day ORDER BY day FORMAT JSONEachRow"
-        )
-        integrations_sql = (
-            "SELECT props['integration'] AS integration, count() AS uses,"
-            " uniq(distinct_id) AS people FROM analytics.events"
-            + _IN_THE_WINDOW
-            + " AND event = 'app.integration.used.v1' AND props['integration'] != ''"
-            " GROUP BY integration ORDER BY uses DESC, integration FORMAT JSONEachRow"
-        )
+        # retention() takes two conditions at least: a one-week window asks after two, keeps one.
         retention_sql = (
             "SELECT sumForEach(weeks) AS retention FROM (SELECT distinct_id, retention("
-            + ", ".join(f"week = {n}" for n in range(asked))
+            + ", ".join(f"week = {n}" for n in range(max(weeks, 2)))
             + ") AS weeks FROM (SELECT distinct_id,"
             f" intDiv(dateDiff('second', {{start:DateTime64(3, 'UTC')}}, ts), {WEEK}) AS week"
             " FROM analytics.events" + _IN_THE_WINDOW + ") GROUP BY distinct_id) FORMAT JSONEachRow"
         )
-        funnels: list[_Funnel] = []
-        days: list[ActiveDay] = []
-        integrations: list[IntegrationUse] = []
-        retained: list[dict[str, list[int]]] = []
+        active: Active | None = None
+        days: list[ActiveDay] | None = None
+        integrations: list[IntegrationUse] | None = None
+        funnel: Funnel | None = None
+        retention: list[int] | None = None
         complete = True
         try:
             async with asyncio.timeout(DEADLINE):
-                read_funnels = await self._read(tenant, query, funnel_sql, _FUNNELS)
-                if isinstance(read_funnels, Unavailable):
-                    return read_funnels
-                funnels = read_funnels.data
+                read_active = await self._read(tenant, query, active_sql, _ACTIVE)
+                if isinstance(read_active, Unavailable):
+                    return read_active
+                active = (
+                    read_active.data[0] if read_active.data else Active(window=0, week=0, month=0)
+                )
                 read_days = await self._read(tenant, query, days_sql, _DAYS)
                 if isinstance(read_days, Unavailable):
                     return read_days
@@ -351,22 +379,29 @@ class Analytics:
                 if isinstance(read_integrations, Unavailable):
                     return read_integrations
                 integrations = read_integrations.data
-                read_retention = await self._read(tenant, query, retention_sql, _RETENTION)
-                if isinstance(read_retention, Unavailable):
-                    return read_retention
-                retained = read_retention.data
+                read_funnel = await self._read(tenant, query, funnel_sql, _FUNNELS)
+                if isinstance(read_funnel, Unavailable):
+                    return read_funnel
+                funnel = (
+                    read_funnel.data[0] if read_funnel.data else Funnel(page=0, thread=0, message=0)
+                )
+                if weeks == 0:
+                    retention = []
+                else:
+                    read_retention = await self._read(tenant, query, retention_sql, _RETENTION)
+                    if isinstance(read_retention, Unavailable):
+                        return read_retention
+                    retained = read_retention.data[0]["retention"] if read_retention.data else []
+                    retention = retained[:weeks]
         except TimeoutError:
             complete = False
-        funnel = funnels[0] if funnels else None
         return Ok(
             data=Adoption(
-                people=funnel.people if funnel else 0,
+                active=active,
                 days=days,
                 integrations=integrations,
-                funnel=Funnel(page=funnel.page, thread=funnel.thread, message=funnel.message)
-                if funnel
-                else None,
-                retention=retained[0]["retention"][:weeks] if retained else [],
+                funnel=funnel,
+                retention=retention,
                 complete=complete,
             )
         )
@@ -391,7 +426,10 @@ class Analytics:
             return Unavailable(reason=f"ClickHouse didn't answer: {type(error).__name__}")
         if response.status_code >= 400:
             return Unavailable(reason=f"ClickHouse answered {response.status_code}")
-        return Ok(data=rows.validate_json("[" + ",".join(response.text.splitlines()) + "]"))
+        try:
+            return Ok(data=rows.validate_json("[" + ",".join(response.text.splitlines()) + "]"))
+        except ValidationError:
+            return Unavailable(reason="ClickHouse answered what portalr can't read")
 
 
 def _clickhouse_time(at: datetime) -> str:

@@ -7,7 +7,14 @@
  * A page is named by the router's own name for its route, never the address in the bar.
  */
 
-import { type Api, answerConsent, type Consent, NOT_READ, readConsent } from "@portalr/client";
+import {
+  type Api,
+  answerConsent,
+  type Consent,
+  carryAnalyticsSession,
+  NOT_READ,
+  readConsent,
+} from "@portalr/client";
 import type { AnalyticsAnswer } from "@portalr/ui";
 import { Account, loadCapture } from "@portalr/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -106,7 +113,7 @@ export function usePageViews(api: Api, tenant: string, given: boolean) {
     loadCapture()
       .then(({ Capture }) => {
         if (live) {
-          opened = new Capture(api, tenant);
+          opened = new Capture(api, tenant, carryAnalyticsSession);
           setCapture(opened);
         }
       })

@@ -358,7 +358,9 @@ export interface paths {
         };
         /**
          * Traces
-         * @description The tenant's traces, a session's or a run's, from Tempo.
+         * @description The tenant's traces, a thread's or a run's, from Tempo.
+         *
+         *     An analytics session's are for operators alone (portalr ADR-0073).
          */
         get: operations["traces_portalr_v1_traces_get"];
         put?: never;
@@ -380,7 +382,8 @@ export interface paths {
          * Trace
          * @description A trace, if it is the tenant's: its spans, for its waterfall.
          *
-         *     Only the attributes known to be safe are shown. ``content=true`` and ``span`` ask for one
+         *     Only the attributes known to be safe are shown, and a span's analytics session only to
+         *     operators. ``content=true`` and ``span`` ask for one
          *     span's others, its prompt and completion among them, and nothing of any other span's; the
          *     answer is not to be kept.
          */
@@ -2292,6 +2295,7 @@ export interface operations {
                 limit?: number;
                 session?: components["schemas"]["Id"] | null;
                 run?: components["schemas"]["Id"] | null;
+                analytics_session?: string | null;
             };
             header?: {
                 "X-Tenant"?: components["schemas"]["TenantId"] | null;

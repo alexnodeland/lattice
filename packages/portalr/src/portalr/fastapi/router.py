@@ -85,6 +85,7 @@ from portalr.readers import (
 from portalr.readers.analytics import Analytics, actor_of
 from portalr.readers.loki import RECORD_ID
 from portalr.readers.query import Id
+from portalr.readers.tempo import carries_analytics_session, for_tenant
 from portalr.tenant import Tenant, allowed
 
 UI: Final = Path(str(files("portalr") / "static"))
@@ -339,9 +340,14 @@ def portalr_router(
 
     @api.get("/v1/traces", response_model=reading(list[TraceSummary]))
     async def traces(
-        query: Annotated[TraceQuery, Query()], tenant: Tenant = telemetry
+        query: Annotated[TraceQuery, Query()], tenant: Tenant = telemetry, who: Caller = current
     ) -> Ok[list[TraceSummary]] | Unavailable | Unconfigured:
-        """The tenant's traces, a session's or a run's, from Tempo."""
+        """The tenant's traces, a thread's or a run's, from Tempo.
+
+        An analytics session's are for operators alone (portalr ADR-0073).
+        """
+        if query.analytics_session is not None and not await _operates(grants, who):
+            raise _refusal("forbidden", "only operators find traces by analytics session")
         return await readers.tempo.search(tenant, query) if readers.tempo else Unconfigured()
 
     @api.get("/v1/traces/{trace_id}", response_model=reading(Trace | None))
@@ -351,10 +357,12 @@ def portalr_router(
         content: bool = False,
         span: Id | None = None,
         tenant: Tenant = telemetry,
+        who: Caller = current,
     ) -> Ok[Trace | None] | Unavailable | Unconfigured:
         """A trace, if it is the tenant's: its spans, for its waterfall.
 
-        Only the attributes known to be safe are shown. ``content=true`` and ``span`` ask for one
+        Only the attributes known to be safe are shown, and a span's analytics session only to
+        operators. ``content=true`` and ``span`` ask for one
         span's others, its prompt and completion among them, and nothing of any other span's; the
         answer is not to be kept.
         """
@@ -364,7 +372,16 @@ def portalr_router(
             return Unconfigured()
         if content:
             response.headers["Cache-Control"] = "no-store"
-        return await readers.tempo.trace(tenant, trace_id, reveal=span if content else None)
+        read = await readers.tempo.trace(tenant, trace_id, reveal=span if content else None)
+        # A request's analytics session is the operators' alone (portalr ADR-0073).
+        if (
+            isinstance(read, Ok)
+            and read.data is not None
+            and carries_analytics_session(read.data)
+            and not await _operates(grants, who)
+        ):
+            return Ok(data=for_tenant(read.data))
+        return read
 
     @api.get("/v1/logs", response_model=reading(Logs))
     async def logs(

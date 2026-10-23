@@ -141,3 +141,22 @@ test("a batch the relay refuses outright is dropped, and never fails the page", 
   capture.record({ event: "app.page.viewed.v1" });
   await expect(capture.flush()).resolves.toBeUndefined();
 });
+
+test("the signed session is handed on while it is held, and null once the person stops", async () => {
+  const carried: (string | null)[] = [];
+  const capture = new Capture(api, "acme", (session) => carried.push(session));
+  capture.record({ event: "app.page.viewed.v1" });
+  await capture.flush();
+  expect(carried).toEqual(["s1"]);
+  capture.close();
+  expect(carried).toEqual(["s1", null]);
+});
+
+test("a session that couldn't be signed is handed on as none", async () => {
+  down = true;
+  const carried: (string | null)[] = [];
+  const capture = new Capture(api, "acme", (session) => carried.push(session));
+  capture.record({ event: "app.page.viewed.v1" });
+  await capture.flush();
+  expect(carried).toEqual([null]);
+});

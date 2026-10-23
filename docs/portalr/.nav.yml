@@ -80,6 +80,7 @@ nav:
   - adr/0067-settings-in-admin.md
   - adr/0068-where-the-focus-goes-and-one-not-found.md
   - adr/0071-adoption-the-tenants-read-and-page.md
+  - adr/0073-a-requests-analytics-session-on-its-trace.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

@@ -12,5 +12,5 @@
       "analytics": { "total": 600, "largest": 600 }
     }
   },
-  "admin": { "initial": 225000, "total": 670000, "largest": 160000 }
+  "admin": { "initial": 225000, "total": 600000, "largest": 160000 }
 }

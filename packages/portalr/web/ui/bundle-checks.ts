@@ -1,5 +1,6 @@
 /**
- * Checks of what a UI's build holds, which fail the build: app's and admin's Vite configs use them.
+ * Checks of what a UI's build holds, which fail the build: app's, admin's and the CSP harness's
+ * Vite configs use them.
  */
 
 import type { Plugin } from "vite";
@@ -10,7 +11,7 @@ import type { Plugin } from "vite";
  */
 export function lean(heavy: RegExp): Plugin {
   return {
-    name: "lean-entry",
+    name: "lean",
     generateBundle(_, bundle) {
       const loaded = new Set<string>();
       const load = (file: string) => {
@@ -40,6 +41,13 @@ export function lean(heavy: RegExp): Plugin {
     },
   };
 }
+
+/**
+ * `rehype-raw` and what only it brings: parse5 and the hast utilities around it, which Streamdown
+ * imports and portalr never uses, since it never passes HTML through (portalr ADR-0040).
+ */
+export const RAW_HTML =
+  /[\\/]node_modules[\\/](rehype-raw|parse5|hast-util-raw|hast-util-from-parse5|hast-util-to-parse5)[\\/]/;
 
 /**
  * Fails the build where any chunk holds a module that `dead` matches: code the UI must never ship,

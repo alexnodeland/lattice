@@ -58,7 +58,10 @@ const forcedColors: BrowserCommand<[active: boolean]> = async ({ page }, active)
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  // Streamdown's `rehype-raw`, which portalr never passes it, is built as nothing (portalr ADR-0040).
+  // Streamdown's `rehype-raw`, which portalr never passes it, is built as nothing (portalr ADR-0040),
+  // here as in app's and admin's builds, so the tests render what ships; `src/rehype-raw.test.ts`
+  // fails if it is dropped. app's and admin's own vitest configs don't alias it: a real raw-HTML
+  // feature must remove the alias everywhere, and the stub with it.
   resolve: {
     alias: { "rehype-raw": fileURLToPath(new URL("./src/rehype-raw.ts", import.meta.url)) },
   },

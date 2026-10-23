@@ -4,7 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
-import { absent, lean } from "../ui/bundle-checks";
+import { absent, lean, RAW_HTML } from "../ui/bundle-checks";
 
 /**
  * Where admin's routes are, and the route tree TanStack Router generates from them, which is
@@ -34,9 +34,7 @@ export default defineConfig({
     react(),
     tailwindcss(),
     lean(/[\\/]node_modules[\\/](recharts|d3-[a-z]+)[\\/]/),
-    absent(
-      /[\\/]node_modules[\\/](rehype-raw|parse5|hast-util-raw|hast-util-from-parse5|hast-util-to-parse5)[\\/]/,
-    ),
+    absent(RAW_HTML),
     // The licences of the packages bundled, beside the UI (portalr ADR-0033).
     notices({
       ui: "admin",

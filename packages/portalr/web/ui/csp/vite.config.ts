@@ -2,6 +2,7 @@ import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
+import { absent, RAW_HTML } from "../bundle-checks";
 import { sandboxPage } from "../sandbox/build";
 
 const outDir = "../node_modules/.csp";
@@ -19,6 +20,7 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    absent(RAW_HTML),
     sandboxPage(fileURLToPath(new URL(`${outDir}/sandbox/index.html`, import.meta.url))),
   ],
   publicDir: "../public",

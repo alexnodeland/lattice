@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = ">=3.12"
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'win32'",
@@ -246,6 +246,14 @@ connect = [
 evals = [
     { name = "evalr" },
 ]
+excalidraw = [
+    { name = "anyio" },
+    { name = "httpx" },
+    { name = "mcp" },
+    { name = "starlette" },
+    { name = "uvicorn" },
+    { name = "zstandard" },
+]
 fastapi = [
     { name = "fastapi" },
     { name = "starlette" },
@@ -331,6 +339,7 @@ requires-dist = [
     { name = "alembic", marker = "extra == 'sql'", specifier = ">=1.20" },
     { name = "anyio", marker = "extra == 'connect'", specifier = ">=4.9" },
     { name = "anyio", marker = "extra == 'files'", specifier = ">=4.9" },
+    { name = "artifactr-ai", extras = ["files"], marker = "extra == 'excalidraw'" },
     { name = "artifactr-ai", extras = ["sql"], marker = "extra == 'postgres'" },
     { name = "artifactr-ai", extras = ["sql"], marker = "extra == 'sqlite'" },
     { name = "asyncpg", marker = "extra == 'postgres'", specifier = ">=0.31" },

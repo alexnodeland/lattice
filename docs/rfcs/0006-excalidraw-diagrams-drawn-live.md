@@ -395,14 +395,14 @@ Each is settled in phase 0's ADR or carried as an exit criterion.
 ## Tracking
 
 - [x] Phase 0: the spike and its ADR ([artifactr ADR-0088](../artifactr/adr/0088-excalidraws-phase-0-what-the-canvas-costs-and-needs.md), 2026-10-22)
-- [ ] artifactr: a retention rule for diagram revisions, in an ADR of its own (follow-up from phase 0)
-- [ ] artifactr: the tombstone sweep (U3), its own PR, before the canvas ships: until it exists, a diagram at 2,000 elements can't shrink
+- [ ] artifactr: a retention rule for diagram revisions: ratified in [artifactr ADR-0091](../artifactr/adr/0091-diagrams-tombstones-swept-and-their-revisions-thinned.md), to be built with phase 4
+- [x] artifactr: the tombstone sweep (U3) ([artifactr ADR-0091](../artifactr/adr/0091-diagrams-tombstones-swept-and-their-revisions-thinned.md))
 - [x] RFC-0003, RFC-0004 and RFC-0005 amended to name the shared `Integrations` port
 - [x] Sign-off on U1 to U6 (2026-10-22)
 - [x] lattice-core and grantr: `Integrations`, its adapter, audit and action ([lattice ADR-0027](../adr/0027-integrations-switched-per-workspace-through-one-port.md))
 - [ ] artifactr: `Workspaces(gate=...)` and `NotEnabled` (done, [artifactr ADR-0081](../artifactr/adr/0081-a-gate-before-access-integrations-switched-off-answer-not-enabled.md)); the watch commands, presence frames and `PresenceChannel`, with ADRs
 - [ ] artifactr-files: the collector's kinds
-- [ ] artifactr's `excalidraw` extra: its type, patches, checks and `render_for_agent` (done: artifactr ADR-0086, with phase 0's limits, and `excalidraw` off by default); its toolset, converter and router
+- [ ] artifactr's `excalidraw` extra: its type, patches, checks and `render_for_agent` (done: artifactr ADR-0086, with phase 0's limits, and `excalidraw` off by default); its toolset and converter (done: [artifactr ADR-0090](../artifactr/adr/0090-diagrams-drawn-by-the-agent-through-a-converter.md)); its router
 - [ ] stackr: the worker, its image and the `excalidraw` question
 - [ ] portalr: ADR-0041's policy and allow-list test, the `canvas` budget, the renderer, the canvas, presence, the list, the overlay, admin's Integrations page
 - [ ] The `[relayr]` projections and feedback anchors

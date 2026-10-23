@@ -831,7 +831,7 @@ async def test_i3_a_message_asked_while_its_holder_dies_is_taken_once_its_claim_
     taking = _taking()
     living = runners(
         make_agent(script),
-        claim_ttl=timedelta(milliseconds=50),
+        look_again_after=timedelta(milliseconds=50),
         turn_context=_held_at_its_start(taking),
     )
     sent = await living.send(ws.as_actor(BOB), thread.id, "Also book the big room")
@@ -857,7 +857,7 @@ async def test_i3_a_runner_that_starts_takes_what_a_dead_holder_was_asked(
 async def test_i3_a_runner_closed_as_it_looks_again_stops_looking(runners: MakeRunner) -> None:
     storage = InMemoryStorage(clock=_Clock())
     ws, thread, script = await _left_by_a_dead_holder(runners, storage)
-    living = runners(make_agent(script), claim_ttl=timedelta(milliseconds=50))
+    living = runners(make_agent(script), look_again_after=timedelta(milliseconds=50))
     sent = await living.send(ws.as_actor(BOB), thread.id, "Also book the big room")
     assert sent.run is None, "the dead process's claim refuses the message"
     looking = hold(storage, "cursor")  # the look's first read, once it has waited

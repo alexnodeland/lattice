@@ -3407,6 +3407,12 @@ dependencies = [
     { name = "starlette" },
 ]
 
+[package.optional-dependencies]
+sql = [
+    { name = "alembic" },
+    { name = "sqlalchemy", extra = ["asyncio"] },
+]
+
 [package.dev-dependencies]
 app = [
     { name = "artifactr-ai", extra = ["files", "forms", "otel"] },
@@ -3417,6 +3423,7 @@ app = [
     { name = "websockets" },
 ]
 dev = [
+    { name = "aiosqlite" },
     { name = "artifactr-ai", extra = ["files", "forms", "otel"] },
     { name = "pyjwt" },
     { name = "pyright" },
@@ -3435,6 +3442,7 @@ lint = [
     { name = "ruff" },
 ]
 test = [
+    { name = "aiosqlite" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
@@ -3443,13 +3451,16 @@ test = [
 
 [package.metadata]
 requires-dist = [
+    { name = "alembic", marker = "extra == 'sql'", specifier = ">=1.20" },
     { name = "fastapi", specifier = ">=0.141" },
     { name = "grantr", extras = ["fastapi"], editable = "packages/grantr" },
     { name = "httpx", specifier = ">=0.28" },
     { name = "lattice-core-ai", editable = "packages/lattice-core" },
     { name = "pydantic", specifier = ">=2.13" },
+    { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'sql'", specifier = ">=2.1" },
     { name = "starlette", specifier = ">=0.46.0" },
 ]
+provides-extras = ["sql"]
 
 [package.metadata.requires-dev]
 app = [
@@ -3461,6 +3472,7 @@ app = [
     { name = "websockets", specifier = ">=15" },
 ]
 dev = [
+    { name = "aiosqlite", specifier = ">=0.22" },
     { name = "artifactr-ai", extras = ["otel", "files", "forms"], editable = "packages/artifactr" },
     { name = "pyjwt", specifier = ">=2.15" },
     { name = "pyright", specifier = ">=1.1.414" },
@@ -3479,6 +3491,7 @@ lint = [
     { name = "ruff", specifier = ">=0.16" },
 ]
 test = [
+    { name = "aiosqlite", specifier = ">=0.22" },
     { name = "pytest", specifier = ">=9.1" },
     { name = "pytest-asyncio", specifier = ">=1.4" },
     { name = "pytest-cov", specifier = ">=7.1" },

@@ -1,0 +1,16 @@
+{
+  "$comment": "The app's routes, as its router names them: the only routes the analytics relay records (lattice RFC-0008). A test holds it to web/app/src/routeTree.gen.ts.",
+  "routes": [
+    "/",
+    "/sign-in",
+    "/t/$tenant",
+    "/t/$tenant/w/$workspace",
+    "/t/$tenant/w/$workspace/artifacts",
+    "/t/$tenant/w/$workspace/artifacts/$artifact",
+    "/t/$tenant/w/$workspace/proposals",
+    "/t/$tenant/w/$workspace/rules",
+    "/t/$tenant/w/$workspace/rules/$rule",
+    "/t/$tenant/w/$workspace/runs",
+    "/t/$tenant/w/$workspace/threads/$thread"
+  ]
+}

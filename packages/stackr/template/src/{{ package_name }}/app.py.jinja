@@ -269,7 +269,7 @@ def create_app(
     tracking.connect(automation.workspaces, automation.resolve_actor)
 {%- endif %}
 {%- if use_portal %}
-    portal = Portal(access=access, settings=settings)
+    portal = Portal(access=access, settings=settings, database=database)
 {%- endif %}
 {%- if use_relayr %}
     # The bridge starts after the libraries' parts, and stops before them.

@@ -24,7 +24,7 @@ from fastapi import (
     Response,
 )
 from fastapi import Path as PathParam
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, ValidationError
 
 from grantr.core import (
     DEPLOYMENT,
@@ -41,6 +41,15 @@ from grantr.grants import Grants
 from lattice_core.refusals import Refused, refusals
 from portalr.access import record_links
 from portalr.actions import READ_DEPLOYMENT, READ_SPEND, READ_TELEMETRY
+from portalr.analytics.relay import (
+    MOST_BYTES,
+    Answer,
+    Answered,
+    Batch,
+    Relay,
+    Relayed,
+    Session,
+)
 from portalr.fastapi.site import Site, Surfaces
 from portalr.fastapi.ui import ui_router
 from portalr.invites import Invite, InviteFailed
@@ -260,6 +269,7 @@ def portalr_router(
     site: Site,
     ui: Path = UI,
     people: People | None = None,
+    relay: Relay | None = None,
 ) -> APIRouter:
     """Build portalr's router, for an application to mount at ``/portalr``.
 
@@ -273,6 +283,8 @@ def portalr_router(
         ui: Where the built UIs are; the wheel's own, unless a test says otherwise.
         people: Names people by email, from the application's auth service; without it, the UIs
             show a short id, and there is no people route.
+        relay: Product analytics from people's browsers, with their consent (lattice RFC-0008);
+            without it, there are no analytics routes.
     """
     router = APIRouter()
     router.include_router(ui_router(site, ui))
@@ -480,6 +492,8 @@ def portalr_router(
 
     if people is not None:
         _naming(api, grants, people, current)
+    if relay is not None:
+        _analytics(api, grants, relay, current)
     if invite is not None:
         _invitations(api, grants, invite, current, readers.analytics)
         _tenant_creation(api, grants, invite, operating)
@@ -644,3 +658,123 @@ def _invitations(
                 props={"outcome": "invited"},
             )
         return Invited(tenant=tenant, user=user)
+
+
+def _analytics(router: APIRouter, grants: Grants, relay: Relay, current: Any) -> None:
+    """The relay's routes, for a signed-in person only: a key or an agent sends no events.
+
+    Each request is counted against the person's pace before anything else is read, and past it
+    refused; but never their answer, so a person can always take their yes back.
+    """
+
+    def signed_in_person(who: Caller) -> str:
+        if not isinstance(who.subject, User):
+            raise _refusal("forbidden", "only a signed-in person sends product analytics")
+        return who.subject.id
+
+    async def person(who: Caller = current) -> str:
+        user = signed_in_person(who)
+        wait = relay.requests.spend(user, 1)
+        if wait is not None:
+            raise _too_fast(wait)
+        return user
+
+    async def answering(who: Caller = current) -> str:
+        user = signed_in_person(who)
+        # Counted, so answers drain the person's pace for the other routes; never refused.
+        relay.requests.spend(user, 1)
+        return user
+
+    signed_in = Depends(person)
+
+    @router.get("/v1/analytics/consent", responses={429: TOO_FAST})
+    async def read_consent(user: str = signed_in) -> Answer:
+        """The person's answer to product analytics: no until they say yes."""
+        await relay.settle_if_owed(user)
+        return Answer(given=await relay.consent.given(user))
+
+    @router.put("/v1/analytics/consent")
+    async def answer(body: Annotated[Answer, Body()], user: str = Depends(answering)) -> Answered:
+        """Record the person's answer. Taking a yes back deletes their events at once.
+
+        A deletion ClickHouse can't take stays owed, and is tried again on the person's next
+        request, and by a background pass every few minutes: ``deleted`` says whether it is
+        done. A yes later doesn't cancel it. It is never refused for the person's pace: a
+        withdrawal always lands.
+        """
+        return await relay.answer(user, yes=body.given)
+
+    @router.post("/v1/analytics/session", responses={429: TOO_FAST})
+    async def session(user: str = signed_in) -> Session:
+        """A session id signed for the person, which their browser sends with its events."""
+        return Session(session=relay.sign(user))
+
+    @router.post(
+        "/v1/events",
+        status_code=202,
+        responses={413: TOO_LARGE, 422: INVALID, 429: TOO_FAST},
+        openapi_extra={
+            "requestBody": {
+                "required": True,
+                "content": {"application/json": {"schema": Batch.model_json_schema()}},
+            }
+        },
+    )
+    async def events(
+        request: Request,
+        x_tenant: TenantHeader = None,
+        user: str = signed_in,
+    ) -> Relayed:
+        """A batch of the person's events in a tenant they belong to, kept as the registry says.
+
+        Without the person's yes, nothing is kept, and the answer says so.
+        """
+        batch = await _batch(request)
+        if x_tenant is None:
+            raise _refusal("tenant_required", "name the tenant with X-Tenant")
+        if await grants.member(x_tenant, user) is None:
+            raise _refusal("forbidden", f"the caller isn't a member of {x_tenant}")
+        session_id = relay.session_of(user, batch.session)
+        if session_id is None:
+            raise _refusal("forbidden", "the session isn't one portalr signed for this person")
+        wait = relay.limiter.spend(user, len(batch.events))
+        if wait is not None:
+            raise _too_fast(wait)
+        return await relay.record(x_tenant, user, batch, session_id)
+
+
+TOO_LARGE: Final = {"model": Refused, "description": "The body is over 16 KB: `too_large`"}
+TOO_FAST: Final = {"model": Refused, "description": "Past the person's pace: `too_fast`"}
+INVALID: Final = {"model": Refused, "description": "Not a batch the relay takes: `invalid`"}
+
+
+def _too_fast(wait: float) -> HTTPException:
+    seconds = str(max(1, round(wait)))
+    return HTTPException(
+        status_code=429,
+        detail={"type": "too_fast", "message": "too many requests; try again later"},
+        headers={"Retry-After": seconds},
+    )
+
+
+async def _batch(request: Request) -> Batch:
+    """The request's batch, read no further than its cap: a longer body is refused as it comes."""
+    too_large = HTTPException(
+        status_code=413,
+        detail={"type": "too_large", "message": f"a batch is {MOST_BYTES} bytes at most"},
+    )
+    declared = request.headers.get("content-length", "")
+    if declared.isdigit() and int(declared) > MOST_BYTES:
+        raise too_large
+    raw = bytearray()
+    async for chunk in request.stream():
+        raw += chunk
+        if len(raw) > MOST_BYTES:
+            raise too_large
+    try:
+        return Batch.model_validate_json(bytes(raw))
+    except ValidationError as error:
+        raise HTTPException(
+            status_code=422,
+            detail={"type": "invalid", "message": f"{error.error_count()} faults in the batch"},
+        ) from error

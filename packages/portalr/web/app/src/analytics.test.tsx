@@ -15,6 +15,8 @@ interface Relay {
   deleting: boolean;
   /** Whether the relay takes an answer: false answers 503. */
   up: boolean;
+  /** Whether the relay can be read: false answers 503. */
+  readable: boolean;
   readonly events: { tenant: string | null; body: unknown }[];
   readonly answers: boolean[];
 }
@@ -23,6 +25,7 @@ const relayOf = (given: boolean): Relay => ({
   given,
   deleting: false,
   up: true,
+  readable: true,
   events: [],
   answers: [],
 });
@@ -52,6 +55,9 @@ function serving(relay: Relay) {
           given: relay.given,
           deleted: relay.given ? null : !relay.deleting,
         });
+      }
+      if (!relay.readable) {
+        return Response.json({ detail: "down" }, { status: 503 });
       }
       return Response.json({ given: relay.given, deleting: relay.deleting });
     }
@@ -196,4 +202,58 @@ test("an answer the relay doesn't take puts the switch back, and says so", async
   await expect
     .element(screen.getByRole("menuitemcheckbox", { name: "Share how I use the app" }))
     .toHaveAttribute("aria-checked", "true");
+});
+
+const CONSENT = ["portalr", "analytics", "consent", "alice"];
+
+test("a read that fails while a deletion is owed keeps the note, and the reading again", async () => {
+  const relay = relayOf(false);
+  relay.deleting = true;
+  const { screen, queryClient } = await open("/t/acme/w/notes", serving(relay), undefined, {
+    readers: { analytics: true },
+  });
+  await openMenu(screen);
+  await expect.element(screen.getByText(DELETING)).toBeVisible();
+  relay.readable = false;
+  await queryClient.refetchQueries({ queryKey: CONSENT }).catch(() => undefined);
+  // The last answer read stands: still owed, so the account menu still reads it again.
+  expect(queryClient.getQueryData(CONSENT)).toEqual({ given: false, deleting: true });
+  await expect.element(screen.getByText(DELETING)).toBeVisible();
+});
+
+test("an answer not saved, and a relay that can't be read after, keeps the switch as it was", async () => {
+  const relay = relayOf(true);
+  const { screen, queryClient } = await open("/t/acme/w/notes", serving(relay), undefined, {
+    readers: { analytics: true },
+  });
+  await openMenu(screen);
+  await expect
+    .element(screen.getByRole("menuitemcheckbox", { name: "Share how I use the app" }))
+    .toHaveAttribute("aria-checked", "true");
+  relay.up = false;
+  relay.readable = false;
+  await screen.getByRole("menuitemcheckbox", { name: "Share how I use the app" }).click();
+  await expect
+    .element(
+      screen
+        .getByRole("status")
+        .filter({ hasText: "Your answer wasn't saved, so nothing has changed." }),
+    )
+    .toBeInTheDocument();
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  expect(queryClient.getQueryData(CONSENT)).toEqual({ given: true, deleting: false });
+});
+
+test("a yes keeps a deletion still owed in view until the relay has done it", async () => {
+  const relay = relayOf(false);
+  relay.deleting = true;
+  const { screen, queryClient } = await open("/t/acme/w/notes", serving(relay), undefined, {
+    readers: { analytics: true },
+  });
+  await openMenu(screen);
+  await expect.element(screen.getByText(DELETING)).toBeVisible();
+  relay.readable = false;
+  await screen.getByRole("menuitemcheckbox", { name: "Share how I use the app" }).click();
+  await expect.poll(() => relay.answers).toEqual([true]);
+  expect(queryClient.getQueryData(CONSENT)).toEqual({ given: true, deleting: true });
 });

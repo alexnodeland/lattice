@@ -11,10 +11,21 @@ export interface Consent {
   readonly deleting: boolean;
 }
 
-/** The person's answer; no, and nothing owed, where the relay can't be read. */
+/** Before the answer is first read: not sharing, and nothing known to be owed. */
+export const NOT_READ: Consent = { given: false, deleting: false };
+
+/**
+ * The person's answer, as the relay reads it.
+ *
+ * @throws Error if the relay can't be read: a screen keeps the last answer it read, or
+ *   `NOT_READ` before the first, rather than taking a failure for a no.
+ */
 export async function readConsent(api: Api): Promise<Consent> {
-  const { data } = await api.portalr.GET("/portalr/v1/analytics/consent");
-  return { given: data?.given ?? false, deleting: data?.deleting ?? false };
+  const { data, response } = await api.portalr.GET("/portalr/v1/analytics/consent");
+  if (data === undefined) {
+    throw new Error(`the answer couldn't be read (${response.status})`);
+  }
+  return { given: data.given, deleting: data.deleting };
 }
 
 /** What became of an answer: recorded, and on a no, whether the deletion is done yet. */

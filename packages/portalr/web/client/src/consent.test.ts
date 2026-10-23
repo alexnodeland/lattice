@@ -62,11 +62,11 @@ beforeEach(() => {
   down = false;
 });
 
-test("the answer is no until the person says yes, and no where the relay can't be read", async () => {
+test("the answer is no until the person says yes, and a relay that can't be read is said to be", async () => {
   expect(await readConsent(api)).toEqual({ given: false, deleting: false });
   expect(await answerConsent(api, true)).toEqual({ given: true, deleted: null });
   expect(await readConsent(api)).toEqual({ given: true, deleting: false });
   down = true;
-  expect(await readConsent(api)).toEqual({ given: false, deleting: false });
+  await expect(readConsent(api)).rejects.toThrow("the answer couldn't be read (503)");
   await expect(answerConsent(api, false)).rejects.toThrow("the answer wasn't recorded (503)");
 });

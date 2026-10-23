@@ -298,7 +298,7 @@ So the person sees their events gone at once, and so does an operator's ordinary
   - It sends `app.page.viewed.v1` for each page the person opens in a tenant, named by the router's own `fullPath` (`/t/$tenant/w/$workspace/runs`), never the address in the bar.
   - Events wait in memory and go ten at a time, or after five seconds, under a session id portalr signs for the person; a session the relay no longer takes is signed afresh, and the batch sent again, once. A no, or leaving the tenant, closes the capture: what waits is dropped, unsent.
   - A batch the relay doesn't take is dropped, never retried, and never fails a screen.
-- **The app's first load** grows by about 1 KB, for the consent read and the switch: 200,751 of its 202,000 bytes, with about 1.2 KB of headroom left. The capture code is outside it.
+- **The app's bundles,** measured against main as it stood (2026-10-23): the first load is 201,933 of its 203,000 bytes, against main's 202,276, so no larger, the chunks falling out differently; the total is 520,443 bytes, about 1.9 KB more than main's 518,532, for the consent read, the switch with its rollback and the status region, so its ceiling was raised to 521,000 (ADR-0040). The capture code is outside both, in its own 600-byte add-on (550 bytes).
 - **Not yet:** other events than page views (threads, messages, artifacts and integrations are in the registry, for screens to send later), and admin, which sends nothing.
 
 ## Drawbacks

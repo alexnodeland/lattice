@@ -7,7 +7,7 @@
  * A page is named by the router's own name for its route, never the address in the bar.
  */
 
-import { type Api, answerConsent, type Consent, readConsent } from "@portalr/client";
+import { type Api, answerConsent, type Consent, NOT_READ, readConsent } from "@portalr/client";
 import type { AnalyticsAnswer } from "@portalr/ui";
 import { Account, loadCapture } from "@portalr/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -25,17 +25,21 @@ const PRIVACY_GUIDE = "https://lattice.alexnodeland.com/portalr/guides/privacy/#
 /** How often an answer whose deletion isn't done yet is read again, until it is, in ms. */
 const UNTIL_DELETED = 30_000;
 
-/** The person's answer, read once and shared by every screen that shows or uses it. */
-function useAnswer() {
+/**
+ * The person's answer, read once and shared by every screen that shows or uses it. A read that
+ * fails keeps the last answer read, or `NOT_READ` (not sharing) before the first. Only the account
+ * menu reads it again while a deletion is owed (`poll`): one reader, not one per screen.
+ */
+function useAnswer(poll = false) {
   const { config, api, user } = useRouteContext({ from: "/_signed" });
   const enabled = config.readers.analytics === true;
-  const { data = { given: false, deleting: false } } = useQuery({
+  const { data = NOT_READ } = useQuery({
     queryKey: consentKey(user),
     queryFn: () => readConsent(api),
     enabled,
     staleTime: Number.POSITIVE_INFINITY,
     // Read again while a deletion is owed, so the note goes when the relay has done it.
-    refetchInterval: (query) => (query.state.data?.deleting ? UNTIL_DELETED : false),
+    refetchInterval: (query) => (poll && query.state.data?.deleting ? UNTIL_DELETED : false),
   });
   return { enabled, consent: data, api, user };
 }
@@ -48,7 +52,7 @@ export function useGiven(): boolean {
 
 /** The person's answer, for the account menu, where the deployment has analytics; else none. */
 function useConsent(): AnalyticsAnswer | undefined {
-  const { enabled, consent, api, user } = useAnswer();
+  const { enabled, consent, api, user } = useAnswer(true);
   const client = useQueryClient();
   const key = consentKey(user);
   const { mutate, isError } = useMutation({
@@ -56,7 +60,8 @@ function useConsent(): AnalyticsAnswer | undefined {
     onMutate: async (answer: boolean) => {
       await client.cancelQueries({ queryKey: key });
       const before = client.getQueryData<Consent>(key);
-      client.setQueryData<Consent>(key, { given: answer, deleting: false });
+      // A deletion owed stays owed whatever the answer: the relay says when it is done.
+      client.setQueryData<Consent>(key, { given: answer, deleting: before?.deleting ?? false });
       return { before };
     },
     // Not recorded: the switch goes back to the answer the relay has, and the status says so.

@@ -21,6 +21,8 @@ It measured Excalidraw 0.18.1 in a minimal Vite 8 app with portalr's React, serv
 
 ## Decision
 
+The policy change is implemented by #629, and the element and render checks by #630. The budgets, the `check_size.py` change, the esm.sh build test, the worker and the fonts come with the canvas, in phases 2b and 3.
+
 ### The policy (amends portalr ADR-0041)
 
 | Step | Violations under portalr's policy | WebAssembly compiled |
@@ -32,7 +34,7 @@ It measured Excalidraw 0.18.1 in a minimal Vite 8 app with portalr's React, serv
 - **Editing never compiles WebAssembly,** so both UIs' policy drops `'wasm-unsafe-eval'`. Nothing either UI ships compiles a module, so it is dropped now, in its own change. `web/wasm-allowlist.json` stays empty, and `scripts/check_wasm.py` holds both builds to no module. Without the directive, pica, the image resizer, falls back to JavaScript. The directive would buy pica's speed and nothing else seen; that speed wasn't measured (unverified).
 - **`img-src blob:` is the one directive the canvas adds,** when it lands (phase 3). Without it a pasted image isn't resized, and its stored data URL is about four times larger.
 - **`'unsafe-eval'` is never in the app's policy.** Font subsetting needs it, so it fails under both policies: the browser's export then embeds whole fonts (an SVG of 299 kB against 15 kB). Subset export is the worker's job. `'unsafe-eval'` is allowed only on the worker's isolated page, which has no egress and runs no model-authored code. The subsetting chunk (741 kB gzip) is stubbed out of portalr's build.
-- **No esm.sh.** Every `@font-face` lists esm.sh as a second source: opening the canvas tried 230 blocked requests even with `EXCALIDRAW_ASSET_PATH` set. The fallback is removed at build time, and a build test fails if the build names esm.sh.
+- **No esm.sh.** Every `@font-face` lists esm.sh as a second source: opening the canvas tried 230 blocked requests even with `EXCALIDRAW_ASSET_PATH` set. The fallback is removed at build time, and a build test, to be built, fails if the build names esm.sh.
 - **Other directives:**
   - `style-src 'self'` is enough;
   - `img-src data:` stays;
@@ -55,7 +57,7 @@ It measured Excalidraw 0.18.1 in a minimal Vite 8 app with portalr's React, serv
   - `canvas`: 402,000 total, 375,000 largest;
   - `canvas-images`: 32,000 total, 18,000 largest;
   - no export budget.
-- **`check_size.py` learns the canvas's root,** since today it treats only modules under `ui/src/on-demand/` as add-ons, and counts everything reachable.
+- **`check_size.py` is to learn the canvas's root,** since today it treats only modules under `ui/src/on-demand/` as add-ons, and counts everything reachable.
 - **The other locales and the subsetting chunk are kept out of the build,** not just out of the count, with a build test.
 
 ### The limits
@@ -96,7 +98,7 @@ Headless Chromium, as U6 has it. The SVGs jsdom wrote were byte-identical to Chr
 
 - **Latin faces are self-hosted.** A build script copies them and sets `EXCALIDRAW_ASSET_PATH`: Vite emits only the Assistant faces, and the hand-drawn ones load at run time.
 - **Xiaolai, the CJK face (12 MB in 209 files), ships only in the worker's image.** Browsers fall back to a system CJK face, which is readable but not hand-drawn; the element's stored width was the same.
-- **Licences come from pinned upstream commits.** The package ships no licence file for itself or its fonts. Virgil, Assistant, Cascadia and Comic Shanns were verified from their metadata. Nunito and Lilita One carry only the OFL's URL. Excalifont, Liberation and Xiaolai weren't verified, and must be before they ship.
+- **Licences come from pinned upstream commits.** The package ships no licence file for itself or its fonts. Virgil, Assistant, Cascadia and Comic Shanns were verified from their metadata. Nunito and Lilita One carry only the OFL's URL: their OFL text is to be verified before they ship. Excalifont, Liberation and Xiaolai weren't verified, and must be before they ship.
   - All 81 bundled packages are on portalr's notices allow-list.
   - `@excalidraw/excalidraw`, 23 `@radix-ui` packages and `react-remove-scroll-bar` need `exceptions` entries for their missing licence files.
 
@@ -105,7 +107,7 @@ Headless Chromium, as U6 has it. The SVGs jsdom wrote were byte-identical to Chr
 - Easier: both UIs' policy is tighter than before, and the canvas adds only `img-src blob:`.
 - Harder: an export from the browser embeds whole fonts; a small export is the worker's.
 - Harder: revision storage grows with the scene until the retention rule lands.
-- Harder: upgrading Excalidraw means re-running the spike's scripts. Its `main` already reworks the API (`onExcalidrawAPI`, no `restore()`, new arrow bindings).
+- Harder: upgrading Excalidraw means re-running the spike's method. Its `main` already reworks the API (`onExcalidrawAPI`, no `restore()`, new arrow bindings).
 - **Carried, unverified:**
   - presence over PostgreSQL `LISTEN`/`NOTIFY` for 10 peers at 20 Hz;
   - the conflict rate with three people and an agent;

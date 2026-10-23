@@ -1,6 +1,6 @@
 # ADR-0011: The router and its readers
 
-**Status:** Accepted, amended by [ADR-0012](0012-acceptance-against-a-two-tenant-stack.md) and [ADR-0041](0041-first-party-webassembly-in-the-apps-policy.md) (both UIs' policy allowed first-party WebAssembly, until artifactr ADR-0088 dropped it again)
+**Status:** Accepted, amended by [ADR-0012](0012-acceptance-against-a-two-tenant-stack.md) and [ADR-0041](0041-first-party-webassembly-in-the-apps-policy.md) (both UIs' policy allowed first-party WebAssembly; artifactr ADR-0088 drops it)
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 

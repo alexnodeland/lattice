@@ -2,8 +2,9 @@
  * ui's Markdown under the policy both UIs share, in Chromium: every element, streamed or whole,
  * each hostile message, and each control, with not one violation of the policy, and not one use of
  * WebAssembly, which the harness reports and the policy refuses (portalr ADR-0041, as amended),
- * since Markdown and its add-ons need none (ADR-0044). The page is built as the UIs are, so what is checked is what ships (ADR-0043),
- * and draws each from its own task, where a string it evaluated would be refused (ADR-0047).
+ * since Markdown and its add-ons need none (ADR-0044). The page is built as the UIs are, so what is
+ * checked is what ships (ADR-0043), and draws each from its own task, where a string it evaluated
+ * would be refused (ADR-0047).
  */
 
 import { type Browser, chromium, type Page } from "playwright";

@@ -1247,7 +1247,8 @@ async def test_a_workspace_offers_only_the_tools_it_keeps(world: World) -> None:
     world.switch.on.add(FAKE.key)
     store = Narrowed("get_objects", "get_view")
     connection = connected(
-        offer=("get_objects", "get_view", "create_object"), tools=tools_setting(store, "fake")
+        offer=("get_objects", "get_view", "create_object"),
+        workspace_tools=tools_setting(store, "fake"),
     )
     assert await world.offered(connection) == {"fake_get_objects", "fake_get_view"}
     tools, ctx = await _direct(world, connection)
@@ -1260,7 +1261,7 @@ async def test_a_workspace_offers_only_the_tools_it_keeps(world: World) -> None:
 async def test_tools_that_cant_be_read_are_none_at_listing_and_at_call(world: World) -> None:
     world.switch.on.add(FAKE.key)
     store = Narrowed("get_objects")
-    connection = connected(tools=tools_setting(store, "fake"))
+    connection = connected(workspace_tools=tools_setting(store, "fake"))
     tools, ctx = await _direct(world, connection)
     offered = await tools.get_tools(ctx)
     assert set(offered) == {"fake_get_objects"}
@@ -1273,5 +1274,47 @@ async def test_tools_that_cant_be_read_are_none_at_listing_and_at_call(world: Wo
         async def value(self, *_: Any) -> Any:
             return 3
 
-    odd = connected(tools=tools_setting(Names(), "fake"))
-    assert await odd.here("acme", "w1") == frozenset(), "a value that isn't names: none"
+    odd = connected(workspace_tools=tools_setting(Names(), "fake"))
+    assert await odd.workspace_offers("acme", "w1") == frozenset(), "a value that isn't names: none"
+
+
+async def test_a_store_wider_than_the_operators_offer_never_widens_it(world: World) -> None:
+    world.switch.on.add(FAKE.key)
+    store = Narrowed("get_objects", "get_view", "create_object")
+    connection = connected(offer=("get_objects",), workspace_tools=tools_setting(store, "fake"))
+    assert await world.offered(connection) == {"fake_get_objects"}
+    wide = connected(workspace_tools=tools_setting(store, "fake"))
+    tools, ctx = await _direct(world, wide)
+    view = (await tools.get_tools(ctx))["fake_get_view"]
+    narrow, narrow_ctx = await _direct(world, connection)
+    with pytest.raises(ToolFailed, match="fake_get_view isn't offered in this workspace"):
+        await narrow.call_tool("fake_get_view", {}, narrow_ctx, view)
+
+
+async def test_a_code_tool_the_workspace_drops_is_neither_offered_nor_run(world: World) -> None:
+    world.switch.on |= {FAKE.key, FAKE.code_key}
+    store = Narrowed(*FAKE.tools)
+    connection = connected(
+        allow=("execute_code",),
+        secrets=("FAKE_TOKEN",),
+        workspace_tools=tools_setting(store, "fake"),
+    )
+    tools, ctx = await _direct(world, connection)
+    offered = await tools.get_tools(ctx)
+    assert "fake_execute_code" in offered, "kept, allowed and switched on: offered"
+    code = offered["fake_execute_code"]
+    world.switch.on.discard(FAKE.code_key)
+    assert "fake_execute_code" not in await tools.get_tools(ctx), "kept, but switched off"
+    world.switch.on.add(FAKE.code_key)
+    store.names = frozenset(FAKE.tools) - {"execute_code"}
+    assert "fake_execute_code" not in await tools.get_tools(ctx)
+    with pytest.raises(ToolFailed, match="isn't offered in this workspace"):
+        await tools.call_tool("fake_execute_code", {"code": CODE}, ctx, code)
+    approved = replace(ctx, tool_call_approved=True)
+    with pytest.raises(ToolFailed, match="isn't offered in this workspace"):
+        await tools.call_tool("fake_execute_code", {"code": CODE}, approved, code)
+    called = [e for e in await world.ws.read() if isinstance(e.event, AppEvent)]
+    assert called == [], "no hourly try was taken"
+    store.broken = True
+    with pytest.raises(ToolFailed, match="isn't offered in this workspace"):
+        await tools.call_tool("fake_execute_code", {"code": CODE}, approved, code)

@@ -241,15 +241,30 @@ CONNECTED_TOOLS: Final = MappingProxyType(
     {
         "freecad": frozenset(
             {
-                *("list_documents", "get_objects", "get_object", "get_parts_list", "get_view"),
-                *("get_rpc_status", "get_async_status", "create_document", "create_object"),
-                *("edit_object", "delete_object", "execute_code", "execute_code_async"),
+                "create_document",
+                "create_object",
+                "delete_object",
+                "edit_object",
+                "execute_code",
+                "execute_code_async",
+                "get_async_status",
+                "get_object",
+                "get_objects",
+                "get_parts_list",
+                "get_rpc_status",
+                "get_view",
+                "list_documents",
             }
         ),
         "blender": frozenset(
             {
-                *("get_scene_info", "get_addon_status", "look", "execute_blender_code"),
-                *("search_assets", "import_asset", "generate_3d"),
+                "execute_blender_code",
+                "generate_3d",
+                "get_addon_status",
+                "get_scene_info",
+                "import_asset",
+                "look",
+                "search_assets",
             }
         ),
     }

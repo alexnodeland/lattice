@@ -19,9 +19,9 @@ ADR-0085 offers a connected app's `read` and `edit` tools wherever the app is sw
   - Its universe is every tool the vetted entry names, other than `host` tools. lattice-core holds it as `CONNECTED_TOOLS`, since it can't import artifactr.
   - An artifactr test holds the two lists equal. When it fails, its message names the file to edit.
   - Its default is the whole universe, so nothing changes until someone narrows it.
-- **`Connection(tools=tools_setting(grants, app))` reads it.**
+- **`Connection(workspace_tools=tools_setting(grants, app))` reads it.**
   - The tools a workspace offers are the operator's `offer` and `allow`, intersected with the setting.
-  - The setting is read with no cache at each listing, and again at each call: a tool narrowed out between the two is refused at the call.
+  - The setting is read with no cache at each listing, and again at each call: a tool narrowed out between the two is refused at the call. The check is made as the call starts, not atomically with it: a narrowing that lands while a call is already under way doesn't stop that call, and stops the next.
   - The app's switches (`connect:<app>`, `connect-code:<app>`) and the person's action still gate as before. The setting only ever removes more.
 - **It fails closed.** A setting that can't be read, or isn't names, offers no tools, at the listing and at the call alike.
 - **Wiring it is the application's.** For the setting to narrow from the operator's layer, the operator's value in grantr's `operator_settings` is the same list as `offer` and `allow` together. Otherwise it narrows from the registry's default, and the intersection with `offer` and `allow` still holds.

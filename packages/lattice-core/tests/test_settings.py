@@ -33,8 +33,10 @@ def test_lattices_settings_are_each_apps_hourly_tries() -> None:
         "connect-tools:freecad",
         "connect-tools:blender",
     ]
-    tools = KNOWN_SETTINGS["connect-tools:blender"]
-    assert (tools.lowest, tools.default) == ("workspace", tuple(sorted(CONNECTED_TOOLS["blender"])))
+    for app in ("freecad", "blender"):
+        tools = KNOWN_SETTINGS[f"connect-tools:{app}"]
+        assert tools.kind == Subset(CONNECTED_TOOLS[app])
+        assert (tools.lowest, tools.default) == ("workspace", tuple(sorted(CONNECTED_TOOLS[app])))
     assert (LIMIT.kind, LIMIT.default, LIMIT.lowest) == (IntRange(0, 1000), 30, "workspace")
 
 

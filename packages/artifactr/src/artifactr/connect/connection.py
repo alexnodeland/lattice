@@ -195,9 +195,10 @@ class Connection:
             setting its admins narrow. Counted in the workspace's log; 0 if it can't be read.
         offer: The `read` and `edit` tools the operator offers, by the server's name: every one
             by default. With `allow`, the operator's layer of the tools a workspace may offer.
-        tools: Which of the app's tools each workspace offers, by tenant and workspace, read
-            each listing and each call: `tools_setting(grants, app)` reads the setting its
-            admins narrow. It only ever narrows `offer` and `allow`; none if it can't be read.
+        workspace_tools: Which of the app's tools each workspace offers, by tenant and
+            workspace, read each listing and each call: `tools_setting(grants, app)` reads the
+            setting its admins narrow. It only ever narrows `offer` and `allow`; none if it
+            can't be read.
 
     Raises:
         ValueError: If the host isn't loopback without `remote`, or a tailnet's with it; if
@@ -224,7 +225,7 @@ class Connection:
         lock: AppLock = PROCESS,
         per_hour: int | PerHour = PER_HOUR,
         offer: Sequence[str] | None = None,
-        tools: ToolsFor | None = None,
+        workspace_tools: ToolsFor | None = None,
     ) -> None:
         if not command:
             raise ValueError("a command starts the server")
@@ -272,7 +273,7 @@ class Connection:
         self._lock = lock
         self._per_hour = per_hour
         self._offer = frozenset(open_ if offer is None else offer)
-        self._tools_for = tools
+        self._tools_for = workspace_tools
         self._key = "\0".join(("artifactr.connect", server.app, *self._options))
 
     @property
@@ -285,18 +286,23 @@ class Connection:
         """The `code` and `network` tools the operator allows."""
         return self._allow
 
-    async def here(self, tenant_id: str, workspace_id: str) -> frozenset[str]:
+    async def workspace_offers(self, tenant_id: str, workspace_id: str) -> frozenset[str]:
         """The tools the workspace offers, of the operator's: read now, and none if it can't be.
 
-        The operator's offer and `allow`, narrowed by `tools` where it is given.
+        The operator's offer and `allow`, narrowed by `workspace_tools` where it is given.
         """
         operators = self._offer | self._allow
         if self._tools_for is None:
             return operators
         try:
             return operators & await self._tools_for(tenant_id, workspace_id)
-        except Exception:
-            logger.warning("%s's tools here can't be read: none is offered", self._server.title)
+        except Exception as error:
+            logger.warning(
+                "%s's tools in the workspace can't be read (%s): none is offered",
+                self._server.title,
+                type(error).__name__,
+                exc_info=True,
+            )
             return frozenset()
 
     @property

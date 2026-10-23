@@ -515,11 +515,13 @@ test("a workspace's admin finds Settings, and only the workspaces they administe
   await expect.element(screen.getByRole("list", { name: "Settings in plans" })).toBeVisible();
   expect(router.state.location.pathname).toBe("/t/acme/settings");
   await screen.getByRole("combobox", { name: "Where" }).click();
-  const options = screen
-    .getByRole("option")
-    .elements()
-    .map((one) => one.textContent);
-  expect(options).toEqual(["Workspace plans"]);
+  // The list opens after the click resolves, a frame or more later: read once it has.
+  const options = () =>
+    screen
+      .getByRole("option")
+      .elements()
+      .map((one) => one.textContent);
+  await expect.poll(options).toEqual(["Workspace plans"]);
 });
 
 test("a workspace the reader doesn't administer isn't theirs to change", async () => {

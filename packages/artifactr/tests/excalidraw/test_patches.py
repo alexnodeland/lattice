@@ -63,10 +63,14 @@ def test_one_written_as_true_or_as_a_float_is_a_change() -> None:
 
 
 def test_a_rebase_counts_a_number_rewritten_as_a_float_as_the_writers_change() -> None:
+    # One version on both sides: only the JSON text tells 10.0 from 10, as Python's == can't.
     base = diagram(element("r1", width=10))
-    head = diagram(element("r1", width=10))
-    mine = {"r1": element("r1", version=2, width=10.0)}
+    head = diagram(element("r1", width=10, nonce=99))
+    mine = {"r1": element("r1", width=10.0)}
     rebased = rebase(base, mine, head)
-    assert rebased["r1"].model_dump(mode="json")["width"] == 10.0
-    assert rebased["r1"].version == 2
-    assert rebase(base, base.elements, head) == head.elements, "nothing changed, nothing sent"
+    assert rebased["r1"].model_dump(mode="json")["width"] == 10.0, "counted as the writer's"
+    assert rebased["r1"].version == 2, "sent above the head's version"
+    # Left alone, the writer's element is the head's, whatever its nonce: nothing to send.
+    untouched = rebase(base, base.elements, head)
+    assert untouched == head.elements
+    assert untouched["r1"].version_nonce == 99

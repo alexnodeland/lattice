@@ -18,6 +18,8 @@ let missing = false;
 let partial = false;
 /** The analytics session the trace's server span carries, if any. */
 let carried: string | null = null;
+/** Whether the person operates the deployment, as portalr's list of every tenant says. */
+let operating = false;
 
 const A = `${"0".repeat(24)}c029eec9`;
 const B = `${"0".repeat(24)}c029eeca`;
@@ -59,9 +61,12 @@ const spans = (span: string | null) => {
 
 async function portalr(request: Request, path: string): Promise<Response | undefined> {
   if (!path.startsWith("/portalr/v1/traces")) {
-    return path === "/portalr/v1/deployment/tenants"
-      ? Response.json({ detail: { type: "forbidden", message: "no" } }, { status: 403 })
-      : undefined;
+    if (path !== "/portalr/v1/deployment/tenants") {
+      return undefined;
+    }
+    return operating
+      ? Response.json({ tenants: ["acme"], spend: { status: "unconfigured" } })
+      : Response.json({ detail: { type: "forbidden", message: "no" } }, { status: 403 });
   }
   reads.push({ path, query: new URL(request.url).searchParams });
   if (tempo === "unconfigured") {
@@ -106,6 +111,7 @@ afterEach(() => {
   missing = false;
   partial = false;
   carried = null;
+  operating = false;
   vi.unstubAllGlobals();
 });
 
@@ -284,8 +290,9 @@ test("a trace's crumb is a link to Traces, never the page shown", async () => {
 
 const SESSION = "1792800000-0123456789abcdef";
 
-test("a trace a person's analytics session made links to that session's traces", async () => {
+test("to an operator, a trace an analytics session made links to that session's traces", async () => {
   carried = SESSION;
+  operating = true;
   const { screen, router } = await open(`/t/acme/traces/${A}`);
   const link = screen.getByRole("link", { name: SESSION });
   await expect.element(link).toBeVisible();
@@ -308,4 +315,13 @@ test("an analytics session in the address that isn't one is no filter", async ()
   await open("/t/acme/traces?analytics=1-x");
   await expect.poll(() => reads.at(-1)?.path).toBe("/portalr/v1/traces");
   expect(reads.at(-1)?.query.has("analytics_session")).toBe(false);
+});
+
+test("to a tenant's admin, a trace shows no analytics session, even one the server let through", async () => {
+  carried = SESSION;
+  const { screen } = await open(`/t/acme/traces/${A}`);
+  const tree = screen.getByRole("tree", { name: "Spans" });
+  await expect.element(tree.getByRole("treeitem", { name: /^turn,/ })).toBeVisible();
+  await new Promise((done) => setTimeout(done, 150));
+  await expect.element(screen.getByText(/Analytics session/)).not.toBeInTheDocument();
 });

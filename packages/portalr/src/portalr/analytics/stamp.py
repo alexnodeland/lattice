@@ -2,7 +2,8 @@
 
 The browser of a person who said yes sends the session id portalr signed for them in
 ``X-Portalr-Analytics-Session``, with every request it makes to the application. ``SessionStamp``
-reads it, and only then asks the application's own resolver who the caller is. Where the value
+reads it, and only then asks the application's own resolver who the caller is: a second call of
+it, where the route resolves its caller too, the cost of a stamp on any route. Where the value
 is that person's own session, signed by portalr and still fresh, and they still say yes, it sets
 the session's id on the request's server span, as ``portalr.analytics.session``.
 
@@ -12,7 +13,7 @@ expired or bare, a person who said no, or a resolver or a consent that fails. Th
 is never logged.
 """
 
-import contextlib
+import logging
 from typing import Final
 
 from opentelemetry import trace
@@ -22,6 +23,8 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from grantr.core import User
 from grantr.fastapi import ResolveActor
 from portalr.analytics.relay import Relay
+
+LOGGER = logging.getLogger("portalr.analytics")
 
 HEADER: Final = b"x-portalr-analytics-session"
 """The header a person's browser sends their signed session in."""
@@ -56,8 +59,11 @@ class SessionStamp:
             signed = dict(scope["headers"]).get(HEADER)
             if signed is not None:
                 # A stamp that fails for any reason is no stamp; the request goes on as it came.
-                with contextlib.suppress(Exception):
+                # Only the failure's type is logged: never the header.
+                try:
                     await self._stamp(scope, signed)
+                except Exception as error:
+                    LOGGER.debug("analytics: no session stamp: %s", type(error).__name__)
         await self.app(scope, receive, send)
 
     async def _stamp(self, scope: Scope, signed: bytes) -> None:

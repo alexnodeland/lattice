@@ -803,21 +803,77 @@ async def test_a_session_link_is_recorded_for_langfuse_alone(
     assert [record["tools"] for record in _recorded(caplog)] == [["langfuse"]]
 
 
-async def test_an_analytics_sessions_traces_are_the_tenants_alone(
+SESSION = "1792800000-0123456789abcdef"
+
+
+def _stamped_trace() -> dict[str, Any]:
+    """Tempo's trace of a request that carried an analytics session, in the tenant acme."""
+    attributes = [
+        {"key": "tenant.id", "value": {"stringValue": "acme"}},
+        {"key": "portalr.analytics.session", "value": {"stringValue": SESSION}},
+    ]
+    return {
+        "trace": {
+            "resourceSpans": [
+                {
+                    "scopeSpans": [
+                        {
+                            "spans": [
+                                {
+                                    "spanId": "a000000000000001",
+                                    "name": "POST /artifactr/v1/messages",
+                                    "startTimeUnixNano": "1",
+                                    "endTimeUnixNano": "2",
+                                    "attributes": attributes,
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+
+
+async def test_a_tenants_admin_neither_sees_nor_searches_by_an_analytics_session(
     client: httpx.AsyncClient, stack: Stack
 ) -> None:
+    stack.tempo.paths["/api/v2/traces/t1"] = json(_stamped_trace())
+    alice = headers("alice")
+    for asked in ({}, {"content": "true", "span": "a000000000000001"}):
+        read = await client.get("/v1/traces/t1", params=asked, headers=alice)
+        assert read.json()["status"] == "ok"
+        assert read.json()["data"]["spans"], asked
+        assert "portalr.analytics.session" not in read.text, asked
+        assert SESSION not in read.text, asked
+    searched = await client.get(
+        "/v1/traces", params={**WINDOW, "analytics_session": SESSION}, headers=alice
+    )
+    assert searched.status_code == 403
+    assert searched.json()["detail"]["type"] == "forbidden"
+    assert not [r for r in stack.tempo.requests if r.url.path == "/api/search"]
+
+
+async def test_an_operator_sees_and_searches_by_an_analytics_session(
+    client: httpx.AsyncClient, stack: Stack, grants: Grants
+) -> None:
+    await grants.grant_operator("alice", by=User(id="ops"))
+    stack.tempo.paths["/api/v2/traces/t1"] = json(_stamped_trace())
     stack.tempo.paths["/api/search"] = json({"traces": []})
-    session = "1792800000-0123456789abcdef"
+    alice = headers("alice")
+    read = await client.get("/v1/traces/t1", headers=alice)
+    (span,) = read.json()["data"]["spans"]
+    assert span["attributes"]["portalr.analytics.session"] == SESSION
     response = await client.get(
-        "/v1/traces", params={**WINDOW, "analytics_session": session}, headers=headers("alice")
+        "/v1/traces", params={**WINDOW, "analytics_session": SESSION}, headers=alice
     )
     assert response.json() == {"status": "ok", "data": []}
     assert stack.tempo.last.url.params["q"] == (
-        f'{{ span.tenant.id = "acme" }} && {{ span.portalr.analytics.session = "{session}" }}'
+        f'{{ span.tenant.id = "acme" }} && {{ span.portalr.analytics.session = "{SESSION}" }}'
     )
     forged = await client.get(
         "/v1/traces",
         params={**WINDOW, "analytics_session": 'x" } || { true'},
-        headers=headers("alice"),
+        headers=alice,
     )
     assert forged.status_code == 422

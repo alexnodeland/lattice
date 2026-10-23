@@ -3652,7 +3652,7 @@
     },
     "/portalr/v1/traces": {
       "get": {
-        "description": "The tenant's traces, a session's or a run's, from Tempo.",
+        "description": "The tenant's traces, a thread's or a run's, from Tempo.\n\nAn analytics session's are for operators alone (portalr ADR-0073).",
         "operationId": "traces_portalr_v1_traces_get",
         "parameters": [
           {
@@ -3829,7 +3829,7 @@
     },
     "/portalr/v1/traces/{trace_id}": {
       "get": {
-        "description": "A trace, if it is the tenant's: its spans, for its waterfall.\n\nOnly the attributes known to be safe are shown. ``content=true`` and ``span`` ask for one\nspan's others, its prompt and completion among them, and nothing of any other span's; the\nanswer is not to be kept.",
+        "description": "A trace, if it is the tenant's: its spans, for its waterfall.\n\nOnly the attributes known to be safe are shown, and a span's analytics session only to\noperators. ``content=true`` and ``span`` ask for one\nspan's others, its prompt and completion among them, and nothing of any other span's; the\nanswer is not to be kept.",
         "operationId": "trace_portalr_v1_traces__trace_id__get",
         "parameters": [
           {

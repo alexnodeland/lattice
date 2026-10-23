@@ -39,7 +39,8 @@ SESSION_ATTRIBUTE: Final = "session.id"
 
 ANALYTICS_SESSION_ATTRIBUTE: Final = "portalr.analytics.session"
 """The server span attribute that names a request's analytics session (portalr ADR-0073), set
-only where the session was the caller's own: a random id, of no one, never their user id."""
+only where the session was the caller's own: a random id, of no one, never their user id. It is
+safe to show, but to operators alone: :func:`for_tenant` takes it out of every other reader's."""
 
 ANALYTICS_SESSION: Final = r"^\d{1,12}-[0-9a-f]{16}$"
 """An analytics session's id, as the relay makes it: when it began, and 16 random hex digits."""
@@ -270,6 +271,29 @@ class _Found(BaseModel):
 
 _FOUND: Final = TypeAdapter(_Found)
 _OTLP: Final = TypeAdapter(dict[str, Any])
+
+
+def carries_analytics_session(trace: Trace) -> bool:
+    """Whether a span of the trace names an analytics session."""
+    return any(ANALYTICS_SESSION_ATTRIBUTE in span.attributes for span in trace.spans)
+
+
+def for_tenant(trace: Trace) -> Trace:
+    """The trace as one who isn't an operator reads it: without any span's analytics session."""
+    spans = tuple(
+        span.model_copy(
+            update={
+                "attributes": {
+                    name: value
+                    for name, value in span.attributes.items()
+                    if name != ANALYTICS_SESSION_ATTRIBUTE
+                },
+                "withheld": tuple(n for n in span.withheld if n != ANALYTICS_SESSION_ATTRIBUTE),
+            }
+        )
+        for span in trace.spans
+    )
+    return trace.model_copy(update={"spans": spans})
 
 
 def search_query(tenant: Tenant, query: TraceQuery) -> str:

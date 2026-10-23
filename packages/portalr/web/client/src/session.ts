@@ -18,6 +18,8 @@ export interface StreamSession {
  * null otherwise. Each request carries it, so the server can mark its trace with the session
  * where it is the person's own (portalr ADR-0073).
  */
+// Module state, not a Session field: the capture add-on sets it after it loads, and every client
+// made before then must carry it too, without each being made again.
 let analytics: string | null = null;
 
 /** Set, or with null clear, the analytics session every request carries. */

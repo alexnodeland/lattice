@@ -11,29 +11,25 @@ get {
 }
 
 script:pre-request {
-  // The message starts its run in the background, so the run may not be recorded yet: wait for
-  // it, for up to ten seconds, before reading it. The poll sends the request's own headers, the
-  // collection's x-user among them.
-  const url = bru.interpolate("{{baseUrl}}/workspaces/{{workspace}}/runs/{{run}}");
+  // The message starts its run in the background, so the run may not be recorded yet: wait, for
+  // up to ten seconds, until the thread's log holds the run's `run_started`, then read the run
+  // once. The log's tail always answers 200, so nothing waits on a 404: inside `bru run`'s
+  // QuickJS sandbox a rejected `sendRequest` loses its `response`, so a 404 can't be told from a
+  // failure there. The poll sends this request's headers, the collection's x-user among them.
+  const run = bru.getVar("run");
+  const thread = encodeURIComponent(bru.getEnvVar("thread"));
+  const url = bru.interpolate(`{{baseUrl}}/workspaces/{{workspace}}/events?thread_id=${thread}`);
   const headers = req.getHeaders();
-  let status = 0;
-  for (let attempt = 0; attempt < 50 && status !== 200; attempt++) {
-    // `sendRequest` rejects on a 4xx whatever `validateStatus` says, so a 404, the run not yet
-    // recorded, is read from the rejection and polled again rather than failing the request.
-    try {
-      status = (await bru.sendRequest({ method: "GET", url, headers })).status;
-    } catch (error) {
-      status = error?.response?.status ?? 0;
-      if (status === 0) {
-        throw error;
-      }
+  const deadline = Date.now() + 10000;
+  for (;;) {
+    const tail = await bru.sendRequest({ method: "GET", url, headers });
+    if (tail.data.some((envelope) => envelope.event.type === "run_started" && envelope.event.run_id === run)) {
+      break;
     }
-    if (status !== 200) {
-      await bru.sleep(200);
+    if (Date.now() > deadline) {
+      throw new Error("the run wasn't recorded within ten seconds: its run_started isn't in the log");
     }
-  }
-  if (status !== 200) {
-    throw new Error(`the run wasn't recorded within ten seconds: the last read answered ${status}`);
+    await bru.sleep(200);
   }
 }
 

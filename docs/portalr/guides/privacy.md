@@ -65,7 +65,7 @@ Without the `people` hook there is no people route, and the UIs show a short id 
 
 ## The browser
 
-- The session lives in `localStorage`, under `portalr`. The UIs' Content-Security-Policy allows only their own origin and your Supabase project, no inline script, no framing, and WebAssembly only from portalr's own build.
+- The session lives in `localStorage`, under `portalr`. The UIs' Content-Security-Policy allows only their own origin and your Supabase project, no inline script, no framing, and no WebAssembly.
 - `config.json` is public and holds only Supabase's *publishable* key: `Site` refuses a secret key.
 - Reads that expose content are not kept: a revealed span or line is dropped when nothing shows it. An operator's links are read once each and not cached, because each is recorded.
 - Markdown renders without raw HTML; links go to the web, mail, the page and the app, and images load only from the app's origin.

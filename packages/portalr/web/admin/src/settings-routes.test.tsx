@@ -30,6 +30,25 @@ let racing = false;
 let held: Promise<void> | null = null;
 /** Someone else saves the same value again before the next change lands: a new version only. */
 let sameValueRace = false;
+/** Whether grantr lists a setting of names too. */
+let names = false;
+
+/** A setting of names, as grantr lists it, set by no one. */
+const TOOLS = {
+  key: "connect-tools:freecad",
+  description:
+    "Which of a connected FreeCAD's tools a workspace offers, of those its operator offers.",
+  kind: { type: "subset", low: null, high: null, universe: ["get_objects", "get_view"] },
+  default: ["get_objects", "get_view"],
+  lowest: "workspace",
+  operator: null,
+  tenant: null,
+  workspace: null,
+  version: 0,
+  ceiling: ["get_objects", "get_view"],
+  ceiling_set_by: "default",
+  effective: ["get_objects", "get_view"],
+};
 
 const at = "2026-10-22T09:00:00Z";
 
@@ -118,7 +137,8 @@ async function grantr(request: Request, path: string): Promise<Response | undefi
     });
     return Response.json(stateOf(workspace));
   }
-  return Response.json({ settings: [stateOf(workspace)], unknown });
+  const listed = names ? [stateOf(workspace), TOOLS] : [stateOf(workspace)];
+  return Response.json({ settings: listed, unknown });
 }
 
 const open = (path: string, allowed: readonly string[] = ["grantr:manage_settings"]) =>
@@ -135,6 +155,7 @@ afterEach(() => {
   racing = false;
   held = null;
   sameValueRace = false;
+  names = false;
   vi.unstubAllGlobals();
 });
 
@@ -344,4 +365,15 @@ test("an unset after someone else's change leaves the field empty", async () => 
     .click();
   await expect.element(screen.getByText("FreeCAD's tries an hour: 60 applies.")).toBeVisible();
   await expect.element(field).toHaveValue("");
+});
+
+test("a setting of names is shown as it applies, with no field to change it here", async () => {
+  names = true;
+  const { screen } = await open("/t/acme/settings");
+  await expect
+    .element(
+      screen.getByText(/Applies: get_objects, get_view\. Changed through grantr's API for now\./),
+    )
+    .toBeVisible();
+  expect(screen.getByRole("textbox", { name: "FreeCAD's tools" }).elements()).toHaveLength(0);
 });

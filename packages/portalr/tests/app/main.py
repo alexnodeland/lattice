@@ -48,8 +48,18 @@ from grantr.core import Resource, User
 from grantr.fastapi import Caller, Unauthorized, grantr_router
 from grantr.grants import Grants, InMemoryStorage
 from portalr.actions import ACTIONS
+from portalr.analytics import InMemoryConsent, InMemoryRateLimiter, Relay
 from portalr.fastapi import UI, Site, Surfaces, portalr_router
-from portalr.readers import Grafana, Langfuse, LiteLLM, Loki, Prometheus, Readers, Tempo
+from portalr.readers import (
+    Analytics,
+    Grafana,
+    Langfuse,
+    LiteLLM,
+    Loki,
+    Prometheus,
+    Readers,
+    Tempo,
+)
 from reflexr.workspace import ACTIONS as REFLEXR_ACTIONS
 from relayr.fastapi import tracker_reads_router
 from tests.app.notes import APPLICATION, collaboration
@@ -283,6 +293,13 @@ def create_app(ui: Path = UI) -> FastAPI:
             readers=readers(),
             invite=invite,
             people=people,
+            # The relay's routes, over a ClickHouse that isn't there: answers are kept in memory,
+            # and every event is dropped, as a deployment without ClickHouse up would drop it.
+            relay=Relay(
+                Analytics("http://127.0.0.1:9", b"acceptance"),
+                InMemoryConsent(),
+                InMemoryRateLimiter(),
+            ),
             site=Site(
                 supabase_url="/",
                 supabase_key="sb_publishable_test",

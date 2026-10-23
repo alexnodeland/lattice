@@ -86,7 +86,10 @@ def page(route: str = "/t/$tenant/w/$workspace/runs", **props: str) -> dict[str,
 async def test_nothing_is_kept_until_the_person_says_yes(
     client: httpx.AsyncClient, clickhouse: ClickHouse
 ) -> None:
-    assert (await client.get("/v1/analytics/consent", headers=ALICE)).json() == {"given": False}
+    assert (await client.get("/v1/analytics/consent", headers=ALICE)).json() == {
+        "given": False,
+        "deleting": False,
+    }
     sent = await client.post(
         "/v1/events", json={"session": await session(client), "events": [page()]}, headers=ALICE
     )
@@ -450,3 +453,36 @@ async def test_a_pass_settles_so_many_people_at_most(clickhouse: ClickHouse, rel
         await relay.consent.give(person, yes=False)
     assert await relay.settle_owed(most=2) == 2
     assert [person for person, _ in await relay.consent.owing(100)] == ["carol"]
+
+
+@pytest.mark.parametrize("given", [0, 1, "true", "no", None])
+async def test_an_answer_is_true_or_false_and_nothing_like_it(
+    client: httpx.AsyncClient, given: object
+) -> None:
+    said = await client.put("/v1/analytics/consent", json={"given": given}, headers=ALICE)
+    assert said.status_code == 422
+
+
+async def test_a_batch_is_taken_as_it_is_written_and_not_coerced(
+    client: httpx.AsyncClient,
+) -> None:
+    await say_yes(client)
+    signed = await session(client)
+    for event in ({"event": 1}, {"event": "app.page.viewed.v1", "props": {"kind": 3}}):
+        sent = await client.post(
+            "/v1/events", json={"session": signed, "events": [event]}, headers=ALICE
+        )
+        assert sent.status_code == 422, event
+
+
+async def test_a_deletion_still_owed_is_read_with_the_answer_until_it_is_done(
+    client: httpx.AsyncClient, clickhouse: ClickHouse
+) -> None:
+    await say_yes(client)
+    clickhouse.status = 503
+    await client.put("/v1/analytics/consent", json={"given": False}, headers=ALICE)
+    read = await client.get("/v1/analytics/consent", headers=ALICE)
+    assert read.json() == {"given": False, "deleting": True}
+    clickhouse.status = 200
+    read = await client.get("/v1/analytics/consent", headers=ALICE)
+    assert read.json() == {"given": False, "deleting": False}

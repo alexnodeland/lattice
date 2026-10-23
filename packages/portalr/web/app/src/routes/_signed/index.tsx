@@ -1,7 +1,8 @@
 import { landing } from "@portalr/client";
-import { Account, Plain, Row, RowLink, Rows } from "@portalr/ui";
+import { Plain, Row, RowLink, Rows } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { AppAccount } from "../../analytics";
 
 /** Where a signed-in person lands: their one tenant, a choice of several, or no access. */
 export const Route = createFileRoute("/_signed/")({
@@ -19,8 +20,8 @@ export const Route = createFileRoute("/_signed/")({
 });
 
 function Tenants() {
-  const { queries, user, signed } = Route.useRouteContext();
-  const account = <Account signed={signed} />;
+  const { queries, user } = Route.useRouteContext();
+  const account = <AppAccount />;
   const { data } = useSuspenseQuery(queries.grantr.memberships(user));
   const lands = landing(data);
   if (lands.kind !== "choose") {

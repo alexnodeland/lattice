@@ -6,7 +6,7 @@
  */
 
 export { Account } from "./account";
-export { AccountMenu, type Appearance } from "./account-menu";
+export { AccountMenu, type AnalyticsAnswer, type Appearance } from "./account-menu";
 export { Alert, type AlertTone } from "./alert";
 export { AnsiText, type Run, runs } from "./ansi";
 export { type AppHost, AppHostContext } from "./app-frame";
@@ -29,6 +29,7 @@ export { Badge } from "./badge";
 export { type Brand, BrandContext, brandName, pageTitle, useBrand, useUiName } from "./brand";
 export { Breadcrumbs, CRUMB, type Crumb } from "./breadcrumbs";
 export { Button, type ButtonSize, type ButtonVariant } from "./button";
+export { loadCapture } from "./capture";
 export { Card } from "./card";
 export {
   BarChart,

@@ -1,9 +1,11 @@
 # ADR-0041: First-party WebAssembly in the UIs' policy
 
-**Status:** Accepted, amended 2026-10-17 (see Amendment: both UIs, one policy)
+**Status:** Accepted, amended 2026-10-17 (see Amendment: both UIs, one policy), and amended 2026-10-22 by [artifactr ADR-0088](../../artifactr/adr/0088-excalidraws-phase-0-what-the-canvas-costs-and-needs.md)
 **Date:** 2026-10-17
 **Deciders:** Alex Nodeland
 **Amends:** the Content-Security-Policy of [ADR-0011](0011-the-router-and-its-readers.md), and the refusal of `'wasm-unsafe-eval'` on portalr's origin in [lattice RFC-0003](../../rfcs/0003-native-files-as-artifacts.md#alternatives)
+
+> **Amended (2026-10-22) by [artifactr ADR-0088](../../artifactr/adr/0088-excalidraws-phase-0-what-the-canvas-costs-and-needs.md), Excalidraw's phase 0:** Excalidraw's editing compiles no WebAssembly, and its font subsetting needs `'unsafe-eval'`, which this record never allowed. So both UIs' policy drops `'wasm-unsafe-eval'`, and `wasm-allowlist.json` holds both builds to no module. The canvas adds `img-src blob:` alone. `'unsafe-eval'` is never in either UI's policy; subset export is the worker's, on its own isolated page. The guardrails below stay, for a module a UI might need again, which would put the directive back in a reviewed change.
 
 ## Context
 

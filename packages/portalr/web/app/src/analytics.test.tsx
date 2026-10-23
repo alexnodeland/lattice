@@ -120,7 +120,10 @@ test("a no whose deletion isn't done yet says so, in the menu and to a screen re
       }),
     )
     .toBeInTheDocument();
-  await screen.getByRole("button", { name: /^Account/ }).click();
+  // The menu stays open as a checkbox is checked; opened again only if it closed.
+  if (screen.getByRole("menu").elements().length === 0) {
+    await screen.getByRole("button", { name: /^Account/ }).click();
+  }
   await expect
     .element(screen.getByText("What you shared is still being deleted, and will be."))
     .toBeVisible();

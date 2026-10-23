@@ -104,6 +104,9 @@
       <max_result_rows>100000</max_result_rows>
       <max_concurrent_queries_for_user>4</max_concurrent_queries_for_user>
       <log_queries>0</log_queries>
+      <!-- A read whose client gave up, such as portalr's at its deadline, is stopped, so it
+           doesn't keep one of the user's few queries (portalr ADR-0071). -->
+      <cancel_http_readonly_queries_on_client_close>1</cancel_http_readonly_queries_on_client_close>
       <constraints>
         <SQL_portalr_tenant><changeable_in_readonly/></SQL_portalr_tenant>
       </constraints>

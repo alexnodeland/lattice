@@ -13,6 +13,7 @@ import {
   Terminal,
   ThumbsUp,
   Route as TracesIcon,
+  UsersRound,
 } from "lucide-react";
 import { allowedNow, anyPart, useAccess } from "../../../access";
 import { Frame } from "../../../frame";
@@ -133,6 +134,14 @@ function Tenant() {
           {allowed.has("reflexr:read_runs") && (
             <NavLink icon={ListChecks} render={<Link to="/t/$tenant/runs" params={{ tenant }} />}>
               Runs
+            </NavLink>
+          )}
+          {allowed.has("portalr:read_telemetry") && (
+            <NavLink
+              icon={UsersRound}
+              render={<Link to="/t/$tenant/adoption" params={{ tenant }} />}
+            >
+              Adoption
             </NavLink>
           )}
           {allowed.has("portalr:read_spend") && (

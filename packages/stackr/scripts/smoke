@@ -518,6 +518,14 @@ smoke_analytics() {
     log "FAIL: analytics' reader, held to $a, saw: $said"
     status=1
   fi
+  said=$(analytics_as reader "SELECT getSetting('cancel_http_readonly_queries_on_client_close')
+    SETTINGS SQL_portalr_tenant = '$a'" </dev/null || true)
+  if [[ $said == true ]]; then
+    log "ok: analytics' reader stops a read whose client gave up"
+  else
+    log "FAIL: analytics' reader keeps reading after its client gives up (answered: $said)"
+    status=1
+  fi
   expect_code "$(analytics_as reader "SELECT count() FROM analytics.events" </dev/null || true)" 115 \
     "analytics' reader fails without its tenant"
   expect_code "$(analytics_as reader "INSERT INTO analytics.events (tenant_id) VALUES ('$a')" </dev/null || true)" 497 \

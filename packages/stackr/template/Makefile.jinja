@@ -41,21 +41,17 @@ install: ## Install the dependencies and the git hooks
 	$(UV) sync --all-groups
 	$(UV) run pre-commit install --hook-type pre-commit --hook-type commit-msg
 
-{%- if use_files %}
-# Each worker's token is its own, from openssl; .env is readable by its owner alone.
-env: ## Create .env from .env.example, with each worker's token, if there is none
+# Each secret is the machine's own, from openssl: a worker's token, and any `generate:hex` value,
+# such as the portal's analytics key; .env is readable by its owner alone.
+env: ## Create .env from .env.example, with its secrets generated, if there is none
 	@test -f .env && echo ".env exists; compare it with .env.example" || ( \
-		command -v openssl >/dev/null || { echo "make env: the workers' tokens need openssl" >&2; exit 1; }; \
+		command -v openssl >/dev/null || { echo "make env: the secrets need openssl" >&2; exit 1; }; \
 		umask 077 && cp .env.example .env.new && \
-		for app in $$(sed -n 's/^FILES_\([A-Z]*\)_TOKEN=$$/\1/p' .env.example); do \
-			token=$$(openssl rand -hex 32) && \
-			sed "s/^FILES_$${app}_TOKEN=$$/FILES_$${app}_TOKEN=$$token/" .env.new > .env.next && \
+		for name in $$(sed -n -e 's/^\(FILES_[A-Z]*_TOKEN\)=$$/\1/p' -e 's/^\([A-Z0-9_]*\)=generate:hex$$/\1/p' .env.example); do \
+			secret=$$(openssl rand -hex 32) && \
+			sed -e "s/^$${name}=$$/$${name}=$$secret/" -e "s/^$${name}=generate:hex$$/$${name}=$$secret/" .env.new > .env.next && \
 			mv .env.next .env.new || exit 1; \
 		done && mv .env.new .env && echo "created .env")
-{%- else %}
-env: ## Create .env from .env.example, if there is none
-	@test -f .env && echo ".env exists; compare it with .env.example" || (cp .env.example .env && echo "created .env")
-{%- endif %}
 
 fmt: ## Format the code and apply safe lint fixes
 	$(UV) run ruff format .

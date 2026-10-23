@@ -17,8 +17,11 @@ and ``PORTAL_SUPABASE_KEY``); a tool is read only where its address is. The Supa
 stays here, for inviting people and naming them by email, and is never in what the browser is given.
 """
 
+import asyncio
 import contextlib
 import logging
+import re
+import secrets
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from pathlib import Path
 from typing import Final
@@ -27,16 +30,31 @@ import httpx
 from fastapi import APIRouter, FastAPI, HTTPException, Request, Response
 
 from grantr import Grants
+from portalr.analytics import InMemoryRateLimiter, Relay
+from portalr.analytics.sql import SqlConsent
+from portalr.analytics.sql import migrate as migrate_consent
 from portalr.fastapi import UI, SandboxOrigin, Site, {% if use_tracker %}Surfaces, {% endif %}portalr_router
 from portalr.invites import Invite, InviteFailed, SupabaseInvite
 from portalr.people import People, SupabasePeople
-from portalr.readers import Grafana, Langfuse, LiteLLM, Loki, Prometheus, Readers, Tempo
+from portalr.readers import (
+    Analytics,
+    Grafana,
+    Langfuse,
+    LiteLLM,
+    Loki,
+    Prometheus,
+    Readers,
+    Tempo,
+)
 
 from {{ package_name }}.access import Access
 from {{ package_name }}.database import Database
 from {{ package_name }}.settings import Settings
 
 PREFIX = "/portalr"
+
+SETTLE_EVERY: Final = 300.0
+"""About how many seconds apart the background pass settles deletions owed (lattice RFC-0008)."""
 
 LOGGER = logging.getLogger(__name__)
 
@@ -101,6 +119,28 @@ def _passed(url: str, client: httpx.AsyncClient) -> Callable[[Request], Awaitabl
     return call
 
 
+def analytics(settings: Settings, clients: list[httpx.AsyncClient]) -> Analytics | None:
+    """The portal's product analytics on ClickHouse, where the settings name it whole; else None.
+
+    Events are written as ClickHouse's writer, and read as its reader, each with its own client,
+    added to ``clients`` for the portal to close (lattice RFC-0008, stackr ADR-0044).
+    """
+    portal = settings.portal
+    url, key = portal.analytics_url, portal.analytics_key
+    writer_password, reader_password = portal.analytics_writer_password, portal.analytics_password
+    if not (url and key and writer_password and reader_password):
+        return None
+    if not re.fullmatch(r"[0-9a-fA-F]{64}", key):
+        LOGGER.error(
+            "analytics is off: PORTAL_ANALYTICS_KEY is 64 hex digits, as `make env` makes it"
+        )
+        return None
+    writer = httpx.AsyncClient(auth=("portalr_analytics_writer", writer_password))
+    reader = httpx.AsyncClient(auth=("portalr_analytics", reader_password))
+    clients.extend((writer, reader))
+    return Analytics(url, bytes.fromhex(key), writer=writer, reader=reader)
+
+
 def readers(settings: Settings, clients: list[httpx.AsyncClient]) -> Readers:
     """The tools the settings name, each read at its address.
 
@@ -124,6 +164,7 @@ def readers(settings: Settings, clients: list[httpx.AsyncClient]) -> Readers:
         langfuse=langfuse,
         litellm=litellm,
         grafana=Grafana(portal.grafana_url) if portal.grafana_url else None,
+        analytics=analytics(settings, clients),
     )
 
 
@@ -169,9 +210,13 @@ class Portal:
         settings: The settings; the portal's are ``settings.portal``.
     """
 
-    def __init__(self, *, access: Access, settings: Settings) -> None:
+    def __init__(
+        self, *, access: Access, settings: Settings, database: Database | None = None
+    ) -> None:
         self._access = access
         self._settings = settings
+        self._database = database
+        self._relay: Relay | None = None
         self._clients: list[httpx.AsyncClient] = []
 
     @property
@@ -207,16 +252,43 @@ class Portal:
         return self.site is not None
 
     async def migrate(self, database: Database) -> None:
-        """The portal keeps nothing of its own in the database."""
+        """Upgrade portalr's one table, people's answers to analytics, as the tables' owner."""
+        await migrate_consent(database.owner, application_role=database.role)
 
     @contextlib.asynccontextmanager
     async def lifespan(self) -> AsyncGenerator[None]:
-        """Close the clients the portal made, when the application stops."""
+        """Settle the deletions owed in the background, now and then; close its clients as it stops.
+
+        A ClickHouse that is down doesn't hold the application's start: each deletion stays owed
+        until a pass does it, a few minutes apart, so a person who never comes back is still
+        deleted. Whatever the pass raised, its clients are closed.
+        """
+        settling = (
+            asyncio.create_task(self._settle(self._relay)) if self._relay is not None else None
+        )
         try:
             yield
         finally:
+            if settling is not None:
+                settling.cancel()
+                with contextlib.suppress(asyncio.CancelledError, Exception):
+                    await settling
             for client in self._clients:
                 await client.aclose()
+
+    @staticmethod
+    async def _settle(relay: Relay) -> None:
+        """The deletions owed, a bounded pass at a time, a few minutes apart, until it stops."""
+        jitter = secrets.SystemRandom()
+        while True:
+            try:
+                settled = await relay.settle_owed()
+            except Exception:
+                LOGGER.exception("analytics: the deletions owed weren't read; tried again later")
+            else:
+                if settled:
+                    LOGGER.info("analytics: deleted the events of %d people owed it", settled)
+            await asyncio.sleep(SETTLE_EVERY * jitter.uniform(0.5, 1.5))
 
     def mount(self, app: FastAPI) -> None:
         """Add the router and the UIs, and mini apps' sandbox, as the settings name them.
@@ -250,10 +322,18 @@ class Portal:
             client = httpx.AsyncClient(timeout=10)
             self._clients.append(client)
             app.include_router(sign_in(base.rstrip("/"), client))
+        tools = readers(self._settings, self._clients)
+        relay = None
+        if tools.analytics is not None and self._database is not None:
+            # Each replica counts a person's pace apart (lattice RFC-0008).
+            consent = SqlConsent(self._database.engine, owner=self._database.owner)
+            relay = Relay(tools.analytics, consent, InMemoryRateLimiter())
+            self._relay = relay
         router = portalr_router(
             resolve_actor=self._access.caller,
             grants=self.grants,
-            readers=readers(self._settings, self._clients),
+            readers=tools,
+            relay=relay,
             invite=invitations(self._settings, self._clients),
             people=people(self._settings, self._clients),
             site=site,

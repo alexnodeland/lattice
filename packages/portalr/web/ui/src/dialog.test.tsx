@@ -64,10 +64,18 @@ test("a dialog is modal: named so, and Tab goes round its own controls", async (
   await expect.element(dialog).toHaveAttribute("aria-modal", "true");
   // Once its first focus has landed in it, as it opens.
   await expect.poll(() => dialog.element().contains(document.activeElement)).toBe(true);
-  for (let step = 0; step < 5; step++) {
-    await userEvent.tab();
+  // Never, even for a frame, on Base UI's guards outside the dialog.
+  const guarded: Element[] = [];
+  const onGuard = (event: FocusEvent) => {
+    if (event.target instanceof Element && event.target.hasAttribute("data-base-ui-focus-guard")) {
+      guarded.push(event.target);
+    }
+  };
+  document.addEventListener("focusin", onGuard);
+  for (const shift of [false, false, false, false, false, true, true, true, true]) {
+    await userEvent.tab({ shift });
     expect(dialog.element().contains(document.activeElement)).toBe(true);
   }
-  await userEvent.tab({ shift: true });
-  expect(dialog.element().contains(document.activeElement)).toBe(true);
+  document.removeEventListener("focusin", onGuard);
+  expect(guarded).toEqual([]);
 });

@@ -163,6 +163,14 @@ test("Share is modal: Tab and Shift+Tab go round its own controls, Close among t
   // Once its first focus has landed in it, as it opens.
   await expect.poll(() => dialog.element().contains(document.activeElement)).toBe(true);
   const inside = () => dialog.element().contains(document.activeElement);
+  // Never, even for a frame, on Base UI's guards outside the dialog: Tab is kept in it at once.
+  const guarded: Element[] = [];
+  const onGuard = (event: FocusEvent) => {
+    if (event.target instanceof Element && event.target.hasAttribute("data-base-ui-focus-guard")) {
+      guarded.push(event.target);
+    }
+  };
+  document.addEventListener("focusin", onGuard);
   const seen = new Set<string>();
   for (let step = 0; step < 8; step++) {
     await userEvent.tab();
@@ -174,4 +182,6 @@ test("Share is modal: Tab and Shift+Tab go round its own controls, Close among t
     await userEvent.tab({ shift: true });
     expect(inside()).toBe(true);
   }
+  document.removeEventListener("focusin", onGuard);
+  expect(guarded).toEqual([]);
 });

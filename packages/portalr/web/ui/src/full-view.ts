@@ -74,14 +74,19 @@ function atStop(at: Element, stop: HTMLElement, within: Element): boolean {
 }
 
 /**
- * Keep Tab within a box, as a modal dialog does: from its last stop, or past it, to its first,
+ * Keep Tab within a box, as a modal dialog does, at once: from its last stop, or past it, to its first,
  * and Shift+Tab from its first, or before it, to its last. The page behind is inert, but without
  * this Tab leaves for the browser's own controls, through the document, before it comes back
  * (WCAG 2.4.3). A key something else took, focus in a popup of its own outside the box, and a box
  * with no stop are left alone. Keys pressed inside an app's frame never reach this page, so Tab
- * from a frame that is the last stop leaves as the browser has it.
+ * from a frame that is the last stop leaves as the browser has it. The kit's dialogs and the
+ * drawer use it too: Base UI's own trap moves the focus a frame late, from a guard outside the
+ * dialog, which a reader can land on meanwhile (portalr ADR-0068).
  */
-function wrap(within: Element, event: KeyboardEvent) {
+export function keepTabWithin(within: Element, event: KeyboardEvent) {
+  if (event.key !== "Tab") {
+    return;
+  }
   const at = document.activeElement;
   const lost = at === null || at === document.body;
   if (event.defaultPrevented || !(lost || within.contains(at))) {
@@ -131,7 +136,7 @@ export function useFullView() {
     back.current?.focus();
     const leave = (event: KeyboardEvent) => {
       if (event.key === "Tab") {
-        wrap(within, event);
+        keepTabWithin(within, event);
         return;
       }
       // Something inside that took Escape keeps it, but the back button's own tooltip, which

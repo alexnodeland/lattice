@@ -32,8 +32,13 @@ ADR-0055, ADR-0058 and ADR-0059 set no rule for any of these.
 
   Tab from the last stop, or from a control past it that is off the order, goes to the first; Shift+Tab, the other way. A key something else took, and focus in a popup of the box's own, such as a dialog opened from it, are left alone. A key pressed inside an app's frame never reaches this page, so Tab from a frame that is the last stop leaves as the browser has it.
 
-- **The drawer's and Share's escape wasn't reproduced.** On this Base UI version, in Chromium, Tab and Shift+Tab stay inside the phone's drawer and inside Share, whether Share is opened alone or from the thread's menu. Tests now hold both.
-  - The kit's `Dialog`, which Share uses, now says `aria-modal="true"`, as the drawer already did. `ConfirmDialog` is Base UI's `AlertDialog`, and is left as it is.
+- **The drawer's, Share's and every kit dialog's escape: the cause.**
+  - Base UI keeps Tab in a dialog with two focus guards, `tabindex=0` spans outside the dialog's element. Tab or Shift+Tab past an edge lands on a guard, and Base UI moves the focus back in a frame later (`enqueueFocus`).
+  - For that frame the focus is outside the dialog. A screen reader may announce it, and a slow machine (CI) sees it. Under the audit's tools it showed as an escape.
+  - Every Tab past an edge lands on a guard, which a test that listens for focus on the guards shows every time, however fast the machine.
+  - **The fix:** the kit's `Dialog` (which Share uses), `ConfirmDialog` and the drawer keep Tab in themselves at once, with the full view's `keepTabWithin`. The guards are never reached by Tab.
+  - The kit's `Dialog` also says `aria-modal="true"`, as the drawer did.
+
 - **A download keeps the focus.**
   - Its button is `focusableWhenDisabled` while it goes. Pressed again, it starts nothing more.
   - "Downloading…" is said in a polite status.

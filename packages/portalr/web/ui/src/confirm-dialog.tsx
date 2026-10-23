@@ -11,6 +11,7 @@ import {
 import { Alert } from "./alert";
 import { Button, type ButtonSize, type ButtonVariant } from "./button";
 import { actions, backdrop, description, title as heading, popup } from "./dialog";
+import { keepTabWithin } from "./full-view";
 import { TextField } from "./text-field";
 
 /** The most a reason may be, in characters. */
@@ -158,6 +159,8 @@ export function ConfirmDialog({
         <AlertDialog.Backdrop className={backdrop} />
         <AlertDialog.Popup
           className={popup}
+          // Tab kept in it at once, never on Base UI's guards outside it (portalr ADR-0068).
+          onKeyDown={(event) => keepTabWithin(event.currentTarget, event.nativeEvent)}
           initialFocus={typed === undefined ? cancel : true}
           {...(finalFocus && { finalFocus: () => (done.current ? finalFocus.current : true) })}
         >

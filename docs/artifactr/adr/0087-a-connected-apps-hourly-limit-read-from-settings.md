@@ -24,3 +24,4 @@ ADR-0085 limits each workspace's tries at a connected app's code and network cal
 
 - Easier: an admin lowers a workspace's limit for one app without a deploy.
 - Harder: a deployment that forgets the setting's key for a new app gets the floor, 0, and no code calls, until the registry declares it.
+- Beside it, [ADR-0089](0089-a-connected-apps-tools-narrowed-per-workspace.md) narrows which tools a workspace offers, read and failing closed the same way.

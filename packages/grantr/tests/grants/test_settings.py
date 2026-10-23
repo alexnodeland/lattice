@@ -332,3 +332,20 @@ async def test_names_stored_in_another_order_are_not_clamped(storage: Storage) -
     [state] = (await grants.settings("acme", by=ALICE)).settings
     assert state.tenant is not None
     assert state.tenant.clamped is False
+
+
+async def test_a_workspace_offers_only_tools_the_tenant_keeps(storage: Storage) -> None:
+    key = "connect-tools:freecad"
+    grants = await _grants(
+        storage, operator_settings={key: ["get_objects", "get_view", "create_object"]}
+    )
+    await grants.set_setting("acme", key, ["get_objects", "get_view"], by=ALICE)
+    with pytest.raises(
+        Invalid, match="may be at most get_objects, get_view here: the tenant's value"
+    ):
+        await grants.set_setting("acme", key, ["create_object"], workspace="w1", by=BOB)
+    await grants.set_setting("acme", key, ["get_view"], workspace="w1", by=BOB)
+    assert await grants.value("acme", "w1", key) == ("get_view",)
+    assert await grants.value("acme", "w2", key) == ("get_objects", "get_view")
+    with pytest.raises(Invalid, match="names it knows, not rm"):
+        await grants.set_setting("acme", key, ["rm"], by=ALICE)

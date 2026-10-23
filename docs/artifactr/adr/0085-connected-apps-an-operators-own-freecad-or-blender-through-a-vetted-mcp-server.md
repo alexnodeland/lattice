@@ -1,6 +1,6 @@
 # ADR-0085: Connected apps: an operator's own FreeCAD or Blender, through a vetted MCP server
 
-**Status:** Proposed
+**Status:** Proposed, amended by [ADR-0087](0087-a-connected-apps-hourly-limit-read-from-settings.md) (the hourly limit read from settings) and [ADR-0089](0089-a-connected-apps-tools-narrowed-per-workspace.md) (a connected app's tools narrowed per workspace)
 **Date:** 2026-10-20
 **Deciders:** Alex Nodeland
 **Beside:** native files' [ADR-0014](../files/adr/0014-freecad-on-a-third-dialect-and-no-python-a-file-or-an-agent-brings.md) (FreeCAD) and Blender's native files (in review, #445), which stay as they are
@@ -159,4 +159,4 @@ Not proven: the vetted servers were read and listed, never run against FreeCAD o
 - Harder: each release of a vetted server is a new vetting, its digests computed again.
 - Decided by the owner, above: Blender Lab's server is not a v0.2 entry; `artifactr:run_connected_code` is held by owners and admins only; an approval holds 15 minutes; no bridge for hosted portals in v0.2.
 - Since 2026-10-22, as the owner decided: a lock shared between runner processes on PostgreSQL; a per-workspace hourly limit on each app's code and network calls, counted in the log; images past 8,000 pixels a side refused, saying so; an approval's time kept with the run, so it survives a restart.
-- Since 2026-10-22, the hourly limit is a setting admins narrow ([ADR-0087](0087-a-connected-apps-hourly-limit-read-from-settings.md), lattice ADR-0030). Follow-ups: per-tool switches in each workspace, as a subset setting with `Connection(offer=)`; portalr's Settings page.
+- Since 2026-10-22, the hourly limit is a setting admins narrow ([ADR-0087](0087-a-connected-apps-hourly-limit-read-from-settings.md), lattice ADR-0030). Per-tool switches in each workspace are [ADR-0089](0089-a-connected-apps-tools-narrowed-per-workspace.md), with `Connection(offer=)`. A follow-up: their checkboxes on portalr's Settings page.

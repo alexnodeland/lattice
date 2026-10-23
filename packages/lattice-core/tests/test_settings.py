@@ -5,6 +5,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from lattice_core.settings import (
+    CONNECTED_TOOLS,
     KNOWN_SETTINGS,
     IntRange,
     Setting,
@@ -26,7 +27,16 @@ TOOLS = Setting(
 
 
 def test_lattices_settings_are_each_apps_hourly_tries() -> None:
-    assert list(KNOWN_SETTINGS) == ["connect-per-hour:freecad", "connect-per-hour:blender"]
+    assert list(KNOWN_SETTINGS) == [
+        "connect-per-hour:freecad",
+        "connect-per-hour:blender",
+        "connect-tools:freecad",
+        "connect-tools:blender",
+    ]
+    for app in ("freecad", "blender"):
+        tools = KNOWN_SETTINGS[f"connect-tools:{app}"]
+        assert tools.kind == Subset(CONNECTED_TOOLS[app])
+        assert (tools.lowest, tools.default) == ("workspace", tuple(sorted(CONNECTED_TOOLS[app])))
     assert (LIMIT.kind, LIMIT.default, LIMIT.lowest) == (IntRange(0, 1000), 30, "workspace")
 
 

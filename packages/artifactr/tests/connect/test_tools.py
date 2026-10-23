@@ -53,6 +53,7 @@ from artifactr.connect import (
     connected_app_tools,
     digest,
     per_hour_setting,
+    tools_setting,
 )
 from artifactr.core import (
     Actor,
@@ -68,6 +69,7 @@ from artifactr.core import (
 )
 from artifactr.workspace import Access, InMemoryStorage, Workspace, Workspaces
 from lattice_core.integrations import Defaults
+from lattice_core.settings import CONNECTED_TOOLS
 from tests.agent.conftest import ALICE, Script, call, say
 from tests.artifact_types import Note
 
@@ -1209,3 +1211,67 @@ async def test_the_hourly_limit_is_read_from_settings_each_call_and_fails_closed
     limits["connect-per-hour:fake"] = ("names",)
     assert await connection.per_hour("acme", "w1") == 0, "not a number: none"
     assert reads == [("acme", "w1", "connect-per-hour:fake")] * 4
+
+
+def test_every_vetted_tool_but_the_hosts_is_one_a_workspace_may_offer() -> None:
+    for server in (FREECAD, BLENDER):
+        vetted = {name for name, tool in server.tools.items() if tool.risk != "host"}
+        assert CONNECTED_TOOLS[server.app] == vetted, (
+            f"{server.app}'s tools changed: make CONNECTED_TOOLS in "
+            "packages/lattice-core/src/lattice_core/settings.py name the same ones"
+        )
+
+
+async def test_the_operator_offers_read_and_edit_tools_by_name(world: World) -> None:
+    with pytest.raises(ValueError, match="only Fake's read and edit tools are offered"):
+        connected(offer=("execute_code",))
+    world.switch.on.add(FAKE.key)
+    assert await world.offered(connected(offer=("get_objects",))) == {"fake_get_objects"}
+
+
+class Narrowed:
+    """A settings store's answer for the tools here, which a test changes, or breaks."""
+
+    def __init__(self, *names: str) -> None:
+        self.names = frozenset(names)
+        self.broken = False
+
+    async def value(self, _tenant: str, _workspace: str, key: str, /) -> Any:
+        if self.broken:
+            raise OSError("the store can't be read")
+        assert key == "connect-tools:fake"
+        return tuple(sorted(self.names))
+
+
+async def test_a_workspace_offers_only_the_tools_it_keeps(world: World) -> None:
+    world.switch.on.add(FAKE.key)
+    store = Narrowed("get_objects", "get_view")
+    connection = connected(
+        offer=("get_objects", "get_view", "create_object"), tools=tools_setting(store, "fake")
+    )
+    assert await world.offered(connection) == {"fake_get_objects", "fake_get_view"}
+    tools, ctx = await _direct(world, connection)
+    offered = await tools.get_tools(ctx)
+    store.names = frozenset({"get_objects"})
+    with pytest.raises(ToolFailed, match="fake_get_view isn't offered in this workspace"):
+        await tools.call_tool("fake_get_view", {}, ctx, offered["fake_get_view"])
+
+
+async def test_tools_that_cant_be_read_are_none_at_listing_and_at_call(world: World) -> None:
+    world.switch.on.add(FAKE.key)
+    store = Narrowed("get_objects")
+    connection = connected(tools=tools_setting(store, "fake"))
+    tools, ctx = await _direct(world, connection)
+    offered = await tools.get_tools(ctx)
+    assert set(offered) == {"fake_get_objects"}
+    store.broken = True
+    assert await tools.get_tools(ctx) == {}, "at listing: none"
+    with pytest.raises(ToolFailed, match="isn't offered in this workspace"):
+        await tools.call_tool("fake_get_objects", {}, ctx, offered["fake_get_objects"])
+
+    class Names:
+        async def value(self, *_: Any) -> Any:
+            return 3
+
+    odd = connected(tools=tools_setting(Names(), "fake"))
+    assert await odd.here("acme", "w1") == frozenset(), "a value that isn't names: none"

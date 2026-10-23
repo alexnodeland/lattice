@@ -53,6 +53,8 @@ const SETTERS = {
 const LABELS: Readonly<Record<string, string>> = {
   "connect-per-hour:freecad": "FreeCAD's tries an hour",
   "connect-per-hour:blender": "Blender's tries an hour",
+  "connect-tools:freecad": "FreeCAD's tools",
+  "connect-tools:blender": "Blender's tools",
 };
 
 /** A setting's name: its label, or, for one this admin doesn't know yet, its sentence. */

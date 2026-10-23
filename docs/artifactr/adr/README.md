@@ -92,5 +92,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0086](0086-diagrams-data-an-element-scoped-patch-and-its-checks.md) | Diagrams' data: an element-scoped patch and its checks | Proposed |
 | [0087](0087-a-connected-apps-hourly-limit-read-from-settings.md) | A connected app's hourly limit, read from settings | Proposed |
 | [0088](0088-excalidraws-phase-0-what-the-canvas-costs-and-needs.md) | Excalidraw's phase 0: what the canvas costs and needs | Proposed |
+| [0089](0089-a-connected-apps-tools-narrowed-per-workspace.md) | A connected app's tools, narrowed per workspace | Proposed |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

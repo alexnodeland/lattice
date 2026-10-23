@@ -25,6 +25,7 @@ from typing import Final, Literal, Protocol, cast
 from lattice_core.integrations import KEY
 
 __all__ = [
+    "CONNECTED_TOOLS",
     "KNOWN_SETTINGS",
     "TIERS",
     "IntRange",
@@ -236,8 +237,50 @@ def _per_hour(app: str, title: str) -> Setting:
     )
 
 
-KNOWN_SETTINGS: Final = registry(_per_hour("freecad", "FreeCAD"), _per_hour("blender", "Blender"))
-"""lattice's settings. A connected app vetted later adds its own ``connect-per-hour:<app>``."""
+CONNECTED_TOOLS: Final = MappingProxyType(
+    {
+        "freecad": frozenset(
+            {
+                *("list_documents", "get_objects", "get_object", "get_parts_list", "get_view"),
+                *("get_rpc_status", "get_async_status", "create_document", "create_object"),
+                *("edit_object", "delete_object", "execute_code", "execute_code_async"),
+            }
+        ),
+        "blender": frozenset(
+            {
+                *("get_scene_info", "get_addon_status", "look", "execute_blender_code"),
+                *("search_assets", "import_asset", "generate_3d"),
+            }
+        ),
+    }
+)
+"""Each connected app's tools a workspace may offer, by app: every tool its vetted entry in
+artifactr.connect names but those that act on the runner's host. An artifactr test holds the
+two lists equal, so a tool vetted later is added here too."""
+
+
+def _tools(app: str, title: str) -> Setting:
+    universe = CONNECTED_TOOLS[app]
+    return Setting(
+        f"connect-tools:{app}",
+        Subset(universe),
+        default=tuple(sorted(universe)),
+        lowest="workspace",
+        description=(
+            f"Which of a connected {title}'s tools a workspace offers, of those its operator"
+            " offers."
+        ),
+    )
+
+
+KNOWN_SETTINGS: Final = registry(
+    _per_hour("freecad", "FreeCAD"),
+    _per_hour("blender", "Blender"),
+    _tools("freecad", "FreeCAD"),
+    _tools("blender", "Blender"),
+)
+"""lattice's settings. A connected app vetted later adds its own ``connect-per-hour:<app>`` and
+``connect-tools:<app>``."""
 
 
 def operator_layer(

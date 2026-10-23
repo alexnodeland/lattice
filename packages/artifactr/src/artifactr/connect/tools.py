@@ -163,6 +163,7 @@ class _ConnectedApp(AbstractToolset[Session[Any]]):
         except ConnectionFailed:
             return {}  # the app isn't there: its tools are left out until it is
         protected = await self._protected(workspace)
+        here = await self._connection.here(workspace.tenant_id, workspace.workspace_id)
         offered: dict[str, ToolsetTool[Session[Any]]] = {}
         for tool in listed:
             vetted = self._server.tools.get(tool.name)
@@ -174,6 +175,8 @@ class _ConnectedApp(AbstractToolset[Session[Any]]):
                 )
                 continue
             risk = vetted.risk
+            if tool.name not in here:
+                continue  # not the operator's, or narrowed out in this workspace
             if risk in PROTECTED and not (protected and tool.name in self._connection.allow):
                 continue
             name = f"{self._server.app}_{tool.name}"
@@ -204,6 +207,8 @@ class _ConnectedApp(AbstractToolset[Session[Any]]):
             raise ToolFailed(f"{name} isn't one of {server.title}'s tools here")
         if not await self._on(workspace, server.key):
             raise ToolFailed(f"{server.title} is switched off in this workspace")
+        if own not in await self._connection.here(workspace.tenant_id, workspace.workspace_id):
+            raise ToolFailed(f"{name} isn't offered in this workspace")
         if own in server.properties:
             given = tool_args.get(server.properties[own])
             if given is not None and not isinstance(given, dict):

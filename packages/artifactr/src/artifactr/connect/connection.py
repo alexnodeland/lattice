@@ -42,7 +42,9 @@ __all__ = [
     "ConnectionFailed",
     "PerHour",
     "ProcessLock",
+    "ToolsFor",
     "per_hour_setting",
+    "tools_setting",
 ]
 
 logger = logging.getLogger("artifactr.connect")
@@ -74,6 +76,28 @@ PER_HOUR: Final = 30
 PerHour = Callable[[str, str], Awaitable[int]]
 """The application's limit of a workspace's code and network calls in an hour, by its tenant and
 its id."""
+
+
+ToolsFor = Callable[[str, str], Awaitable[frozenset[str]]]
+"""Which of an app's tools a workspace offers, by its tenant and its id."""
+
+
+def tools_setting(settings: Settings, app: str) -> ToolsFor:
+    """The tools a settings store holds for an app's workspaces: `connect-tools:<app>`.
+
+    It is read each time.
+    A value that isn't names raises, which `Connection` answers with no tools (lattice
+    ADR-0030, artifactr ADR-0089).
+    """
+    key = f"connect-tools:{app}"
+
+    async def read(tenant_id: str, workspace_id: str) -> frozenset[str]:
+        value = await settings.value(tenant_id, workspace_id, key)
+        if not isinstance(value, tuple):
+            raise TypeError(f"{key} holds names")
+        return frozenset(value)
+
+    return read
 
 
 def per_hour_setting(settings: Settings, app: str) -> PerHour:
@@ -169,13 +193,18 @@ class Connection:
             an hour: a number for every workspace, or the application's answer for each, by
             tenant and workspace, read each call: `per_hour_setting(grants, app)` reads the
             setting its admins narrow. Counted in the workspace's log; 0 if it can't be read.
+        offer: The `read` and `edit` tools the operator offers, by the server's name: every one
+            by default. With `allow`, the operator's layer of the tools a workspace may offer.
+        tools: Which of the app's tools each workspace offers, by tenant and workspace, read
+            each listing and each call: `tools_setting(grants, app)` reads the setting its
+            admins narrow. It only ever narrows `offer` and `allow`; none if it can't be read.
 
     Raises:
         ValueError: If the host isn't loopback without `remote`, or a tailnet's with it; if
             `remote` is given without the add-on's token; if a port is given to a server that
             takes none; if `allow` names a tool that isn't the server's `code` or `network`,
             or names one without the add-on's token, or, for an add-on that takes none,
-            without `unauthenticated`.
+            without `unauthenticated`; if `offer` names a tool that isn't its `read` or `edit`.
     """
 
     def __init__(
@@ -194,6 +223,8 @@ class Connection:
         approval_ttl: float = 15 * 60,
         lock: AppLock = PROCESS,
         per_hour: int | PerHour = PER_HOUR,
+        offer: Sequence[str] | None = None,
+        tools: ToolsFor | None = None,
     ) -> None:
         if not command:
             raise ValueError("a command starts the server")
@@ -213,6 +244,9 @@ class Connection:
             raise ValueError(
                 f"only {server.title}'s code and network tools are allowed, not {wrong}"
             )
+        open_ = {name for name, risk in risks.items() if risk in ("read", "edit")}
+        if offer is not None and (wrong := sorted(set(offer) - open_)):
+            raise ValueError(f"only {server.title}'s read and edit tools are offered, not {wrong}")
         if allow and not tokened and not (server.token is None and unauthenticated):
             raise ValueError(
                 f"code and network tools need {server.token} in secrets"
@@ -237,6 +271,8 @@ class Connection:
         self._failed_at: float | None = None
         self._lock = lock
         self._per_hour = per_hour
+        self._offer = frozenset(open_ if offer is None else offer)
+        self._tools_for = tools
         self._key = "\0".join(("artifactr.connect", server.app, *self._options))
 
     @property
@@ -248,6 +284,20 @@ class Connection:
     def allow(self) -> frozenset[str]:
         """The `code` and `network` tools the operator allows."""
         return self._allow
+
+    async def here(self, tenant_id: str, workspace_id: str) -> frozenset[str]:
+        """The tools the workspace offers, of the operator's: read now, and none if it can't be.
+
+        The operator's offer and `allow`, narrowed by `tools` where it is given.
+        """
+        operators = self._offer | self._allow
+        if self._tools_for is None:
+            return operators
+        try:
+            return operators & await self._tools_for(tenant_id, workspace_id)
+        except Exception:
+            logger.warning("%s's tools here can't be read: none is offered", self._server.title)
+            return frozenset()
 
     @property
     def scan(self) -> Literal["warn", "block"]:

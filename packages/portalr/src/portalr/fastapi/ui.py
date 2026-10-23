@@ -28,8 +28,9 @@ def policy(site: Site) -> str:
 
     It matters because supabase-js keeps the session in ``localStorage`` (lattice RFC-0002). A
     Supabase project on a path of the application's own origin is already ``'self'``.
-    ``'wasm-unsafe-eval'`` lets either UI compile WebAssembly, and ``eval`` stays refused;
-    ``scripts/check_wasm.py`` holds what each build ships to ``web/wasm-allowlist.json`` (ADR-0041).
+    It compiles no WebAssembly and evaluates no string, so neither ``'wasm-unsafe-eval'`` nor
+    ``'unsafe-eval'`` is in it, as ADR-0041's amendment of 2026-10-22 decides; and
+    ``scripts/check_wasm.py`` holds each build to no module, as ``web/wasm-allowlist.json`` lists.
     Where the deployment runs mini apps, ``frame-src`` names their origin, and where it hosts
     native files' editors, each editor's origin, whose shim frames the app's build there (portalr
     ADR-0055): the UIs frame nothing else, and their own pages are still framed by no one
@@ -44,7 +45,7 @@ def policy(site: Site) -> str:
     return "; ".join(
         (
             "default-src 'self'",
-            "script-src 'self' 'wasm-unsafe-eval'",
+            "script-src 'self'",
             "style-src 'self'",
             "img-src 'self' data:",
             "font-src 'self'",

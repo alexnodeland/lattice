@@ -15,6 +15,7 @@ import {
   ASK_USER,
   Composer,
   ComposerDock,
+  CRUMB,
   Message,
   Messages,
   PageHeader,
@@ -127,7 +128,9 @@ function Chat() {
   const crumbs = [
     {
       label: "Threads",
-      render: <Link to="/t/$tenant/w/$workspace" params={{ tenant, workspace }} />,
+      render: (
+        <Link to="/t/$tenant/w/$workspace" params={{ tenant, workspace }} activeOptions={CRUMB} />
+      ),
     },
   ];
   const context = Route.useRouteContext();

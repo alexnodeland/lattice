@@ -141,6 +141,17 @@ function refusedWhy(row: SettingRow, status: number, reasons: readonly string[])
   return `${row.name} wasn't changed: the server couldn't do it just now. Try again in a moment.`;
 }
 
+/**
+ * Focus something of a row's, only where the reader hasn't moved on: from nowhere, or from within
+ * the row's form; never from another row they have started on.
+ */
+function focusWithin(form: HTMLFormElement | null, target: HTMLElement | null) {
+  const active = document.activeElement;
+  if (active === null || active === document.body || form?.contains(active)) {
+    target?.focus();
+  }
+}
+
 /** One setting at a level: what applies and why, and a field to lower it, or unset it. */
 function Setting({
   row,
@@ -154,7 +165,16 @@ function Setting({
   const { commands, queryClient, queries } = Route.useRouteContext();
   const shown = row.here === null ? "" : said(row.here.value);
   const [text, setText] = useState(shown);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setErrorText] = useState<string | null>(null);
+  // Each refusal is counted, so the same words again still take the field's focus, and are
+  // read out again.
+  const [refusals, setRefusals] = useState(0);
+  const setError = (said: string | null) => {
+    setErrorText(said);
+    if (said !== null) {
+      setRefusals((count) => count + 1);
+    }
+  };
   const [done, setDone] = useState("");
   const [stale, setStale] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -162,6 +182,7 @@ function Setting({
   const keepText = useRef(false);
   const field = useId();
   const warning = useRef<HTMLDivElement>(null);
+  const form = useRef<HTMLFormElement>(null);
   // Read back at a new version, the field starts from what is set now, unless what was tried
   // is kept in it because someone changed it first.
   useEffect(() => {
@@ -172,14 +193,14 @@ function Setting({
   }, [shown]);
   useEffect(() => {
     if (stale) {
-      warning.current?.focus();
+      focusWithin(form.current, warning.current);
     }
   }, [stale]);
   useEffect(() => {
-    if (error) {
-      document.getElementById(field)?.focus();
+    if (refusals > 0) {
+      focusWithin(form.current, document.getElementById(field));
     }
-  }, [error, field]);
+  }, [refusals, field]);
 
   /** Send a value, or unset with null, at the version read, once, and say what came of it. */
   async function send(value: number | null) {
@@ -187,16 +208,27 @@ function Setting({
       return;
     }
     sending.current = true;
+    keepText.current = false;
     setSaving(true);
     setError(null);
     setStale(null);
     setDone("");
+    try {
+      await sent(value);
+    } finally {
+      sending.current = false;
+      setSaving(false);
+    }
+  }
+
+  /** What came of a send, said, with the setting read back. */
+  async function sent(value: number | null) {
     const answer = await commands.grantr.setSetting(tenant, row.key, value, row.version, workspace);
     if (answer.outcome === "done") {
       setDone(`${row.name}: ${said(answer.result.effective)} applies.`);
       if (value === null) {
         // Its unset button goes once nothing is set here: the field keeps the focus instead.
-        document.getElementById(field)?.focus();
+        focusWithin(form.current, document.getElementById(field));
       }
     } else if (answer.status === 409) {
       keepText.current = true;
@@ -217,8 +249,6 @@ function Setting({
     if (answer.outcome === "done") {
       await queryClient.invalidateQueries({ queryKey: keys.grantr.settings(tenant) });
     }
-    sending.current = false;
-    setSaving(false);
   }
 
   const ceiling = typeof row.ceilingValue === "number" ? row.ceilingValue : 0;
@@ -247,6 +277,7 @@ function Setting({
       }
       end={
         <form
+          ref={form}
           className="flex flex-col gap-2"
           onSubmit={(event) => {
             event.preventDefault();
@@ -261,7 +292,7 @@ function Setting({
           <TextField
             id={field}
             label={row.name}
-            hint={`A whole number from ${low} to ${ceiling}.`}
+            hint={`A whole number from ${low} to ${Math.max(low, ceiling)}.`}
             inputMode="numeric"
             value={text}
             onChange={(event) => setText(event.currentTarget.value)}

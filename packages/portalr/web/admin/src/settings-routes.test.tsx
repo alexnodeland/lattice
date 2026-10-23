@@ -28,6 +28,8 @@ let unknown: string[] = [];
 let racing = false;
 /** What a change waits for before it is answered, so a test can act while it is under way. */
 let held: Promise<void> | null = null;
+/** Someone else saves the same value again before the next change lands: a new version only. */
+let sameValueRace = false;
 
 const at = "2026-10-22T09:00:00Z";
 
@@ -85,6 +87,13 @@ async function grantr(request: Request, path: string): Promise<Response | undefi
     sent.push(`${workspace ?? "tenant"} ${tag} ${body}`);
     await held;
     const name = workspace ?? "";
+    if (sameValueRace) {
+      sameValueRace = false;
+      const before = rows.get(name);
+      if (before) {
+        rows.set(name, { ...before, version: before.version + 4 });
+      }
+    }
     if (racing) {
       racing = false;
       rows.set(name, { value: 7, version: 5, by: { kind: "user", id: "alice" }, at });
@@ -125,6 +134,7 @@ afterEach(() => {
   unknown = [];
   racing = false;
   held = null;
+  sameValueRace = false;
   vi.unstubAllGlobals();
 });
 
@@ -271,4 +281,67 @@ test("the level is chosen in the address", async () => {
   await choose(screen, "Where", "Workspace plans");
   await expect.element(screen.getByRole("list", { name: "Settings in plans" })).toBeVisible();
   expect(router.state.location.search).toEqual({ workspace: "plans" });
+});
+
+test("two submits in one tick send once", async () => {
+  let answer = () => {};
+  held = new Promise((resolve) => {
+    answer = resolve;
+  });
+  const { screen } = await open("/t/acme/settings");
+  await screen.getByRole("textbox", { name: "FreeCAD's tries an hour" }).fill("12");
+  const form = (
+    screen.getByRole("textbox", { name: "FreeCAD's tries an hour" }).element() as HTMLInputElement
+  ).form;
+  form?.requestSubmit();
+  form?.requestSubmit();
+  answer();
+  await expect.element(screen.getByText("FreeCAD's tries an hour: 12 applies.")).toBeVisible();
+  expect(sent).toEqual(['tenant "0" {"value":12}']);
+});
+
+test("a late answer doesn't take the focus from where the reader moved to", async () => {
+  rows.set("", { value: 20, version: 1, by: { kind: "user", id: "alice" }, at });
+  let answer = () => {};
+  held = new Promise((resolve) => {
+    answer = resolve;
+  });
+  const { screen } = await open("/t/acme/settings?workspace=notes");
+  await screen.getByRole("textbox", { name: "FreeCAD's tries an hour" }).fill("25");
+  await screen.getByRole("button", { name: "Save FreeCAD's tries an hour" }).click();
+  const elsewhere = screen.getByRole("combobox", { name: "Where" });
+  (elsewhere.element() as HTMLElement).focus();
+  answer();
+  await expect
+    .element(screen.getByRole("textbox", { name: "FreeCAD's tries an hour" }))
+    .toHaveAccessibleDescription(/may be at most 20 here/);
+  await expect.element(elsewhere).toHaveFocus();
+});
+
+test("the same refusal twice takes the field's focus again", async () => {
+  const { screen } = await open("/t/acme/settings");
+  const field = screen.getByRole("textbox", { name: "FreeCAD's tries an hour" });
+  const save = screen.getByRole("button", { name: "Save FreeCAD's tries an hour" });
+  await field.fill("lots");
+  await save.click();
+  await expect.element(field).toHaveFocus();
+  (save.element() as HTMLElement).focus();
+  await userEvent.keyboard("{Enter}");
+  await expect.element(field).toHaveFocus();
+  expect(sent).toEqual([]);
+});
+
+test("an unset after someone else's change leaves the field empty", async () => {
+  rows.set("", { value: 7, version: 1, by: { kind: "user", id: "alice" }, at });
+  sameValueRace = true;
+  const { screen } = await open("/t/acme/settings");
+  const field = screen.getByRole("textbox", { name: "FreeCAD's tries an hour" });
+  await field.fill("9");
+  await screen.getByRole("button", { name: "Save FreeCAD's tries an hour" }).click();
+  await expect.element(screen.getByText(/was changed by someone else/)).toBeVisible();
+  await screen
+    .getByRole("button", { name: "Use the operator's for FreeCAD's tries an hour" })
+    .click();
+  await expect.element(screen.getByText("FreeCAD's tries an hour: 60 applies.")).toBeVisible();
+  await expect.element(field).toHaveValue("");
 });

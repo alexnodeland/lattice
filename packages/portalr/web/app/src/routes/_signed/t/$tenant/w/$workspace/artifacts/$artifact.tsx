@@ -20,11 +20,11 @@ import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useEffect, useMemo } from "react";
 import { useAppHost } from "../../../../../../../app-host";
 import { author } from "../../../../../../../author";
+import { NativeFile, NativeProposal, TextChanges } from "../../../../../../../files";
 import { useFormHost } from "../../../../../../../form-host";
 import { KillSwitch } from "../../../../../../../kill-switch";
-import { NativeFile, TextChanges, wordsChanged } from "../../../../../../../native-file";
-import { NativeProposal } from "../../../../../../../native-proposal";
-import { NATIVE, RENDERERS } from "../../../../../../../renderers";
+import { NATIVE, wordsChanged } from "../../../../../../../native";
+import { RENDERERS } from "../../../../../../../renderers";
 import { titleOf } from "../../../../../../../titles";
 import { Connection, useStream, useWorkspace } from "../../../../../../../workspace";
 

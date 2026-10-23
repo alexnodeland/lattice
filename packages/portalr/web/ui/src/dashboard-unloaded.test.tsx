@@ -12,7 +12,7 @@ import { SUPPORT } from "./test/dashboards";
 // Every add-on fails to load, as `useLoaded` says once a chunk's import is refused; that it does
 // is `on-demand.test.ts`'s.
 vi.mock(import("./on-demand"), () => ({
-  useLoaded: () => ({ module: null, failed: true }),
+  useLoaded: () => ({ module: null, failed: true, error: new TypeError("Failed to fetch") }),
   useOnDemand: () => null,
 }));
 

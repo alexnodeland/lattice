@@ -29,8 +29,8 @@ def zipped(text: str) -> int:
 def built(root: Path, *, html: str | None = None) -> Path:
     """A built `app`: an entry, a preloaded chunk, a lazy chunk and a stylesheet, and an add-on.
 
-    The add-on `math` is a chunk of its own and katex.js; it imports react.js, which the entry does
-    too. The add-on `chem` imports katex.js as well.
+    The add-on `math`, ui's, is a chunk of its own and katex.js; it imports react.js, which the
+    entry does too. The add-on `chem`, the UI's own, imports katex.js as well, and loads `math`.
     """
     assets = root / "app" / "assets"
     assets.mkdir(parents=True)
@@ -59,7 +59,7 @@ def built(root: Path, *, html: str | None = None) -> Path:
             "dynamicImports": [
                 "src/chat.tsx",
                 "../ui/src/on-demand/math.ts",
-                "../ui/src/on-demand/chem.ts",
+                "src/on-demand/chem.tsx",
             ],
             "css": ["assets/index.css"],
         },
@@ -71,10 +71,11 @@ def built(root: Path, *, html: str | None = None) -> Path:
             "imports": ["_react.js", "_katex.js"],
         },
         "_katex.js": {"file": "assets/katex.js"},
-        "../ui/src/on-demand/chem.ts": {
+        "src/on-demand/chem.tsx": {
             "file": "assets/chem.js",
             "isDynamicEntry": True,
             "imports": ["_katex.js"],
+            "dynamicImports": ["../ui/src/on-demand/math.ts"],
         },
     }
     (root / "app" / ".vite").mkdir()
@@ -104,7 +105,7 @@ def test_an_add_on_is_what_only_its_import_reaches_measured_apart(tmp_path: Path
         zipped((assets / name).read_text()) for name in ("math.js", "katex.js", "chem.js")
     )
     # react.js, which the entry imports as well, is the UI's own; katex.js, which both add-ons
-    # import, is each add-on's, since either loads it first.
+    # import, is each add-on's, since either loads it first; math, which chem loads, is its own.
     assert check_size.measure("app", static)["addons"] == {
         "math": {"total": math + katex, "largest": max(math, katex)},
         "chem": {"total": chem + katex, "largest": max(chem, katex)},
@@ -228,3 +229,13 @@ def test_the_report_gives_each_add_on_a_line_against_its_budget() -> None:
         "check_size: app: initial 1,000/2,000, total 2,000/3,000, largest 900/1,000\n"
         "check_size: app's add-on math: total 80,000/0, largest 77,000/0\n"
     )
+
+
+def test_two_add_ons_of_one_name_stop_the_check(tmp_path: Path) -> None:
+    static = built(tmp_path)
+    manifest = static / "app" / ".vite" / "manifest.json"
+    read = json.loads(manifest.read_text())
+    read["src/on-demand/math.tsx"] = {"file": "assets/chem.js", "isDynamicEntry": True}
+    manifest.write_text(json.dumps(read))
+    with pytest.raises(SystemExit, match="two add-ons are named math"):
+        check_size.measure("app", static)

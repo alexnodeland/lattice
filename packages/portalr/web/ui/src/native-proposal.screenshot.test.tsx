@@ -11,7 +11,7 @@ import { commands, page } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { Alert } from "./alert";
 import { ProposalCard } from "./chat";
-import { PageCompare } from "./native-file";
+import { PageCompare } from "./file-pages";
 import { dark } from "./test/colours";
 import { PAGES } from "./test/native-file";
 

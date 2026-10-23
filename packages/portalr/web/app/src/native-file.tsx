@@ -8,7 +8,6 @@
 import {
   type createQueries,
   type FilesApi,
-  type IntegrationKey,
   type Names,
   Refused,
   useEnabled,
@@ -30,15 +29,10 @@ import { useQueries, useQuery } from "@tanstack/react-query";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { CheckOut, editorAt, type Place, type Said } from "./check-out";
 import { useEditing } from "./editing";
+import type { Native } from "./native";
 
 type Queries = ReturnType<typeof createQueries>;
 type Lease = FilesApi.components["schemas"]["Lease"];
-
-/** A native file's app: what people call it, and the integration that switches it. */
-export interface Native {
-  readonly app: string;
-  readonly integration: IntegrationKey;
-}
 
 /** How many pages are shown at first, and how many more each time more are asked for. */
 export const PAGES_AT_ONCE = 4;
@@ -65,21 +59,6 @@ export function holderOf(lease: Lease | null, me: string, names: Names): Holder 
   // Another participant, such as an external agent's client, by what follows its kind.
   const who = user === undefined ? lease.checked_out_by.replace(/^[^:]*:/, "") : names(user);
   return { kind: "person", who, until: lease.expires_at };
-}
-
-/** A manifest's text blob's digest, if it names one. */
-const textOf = (data: Readonly<Record<string, unknown>>): string | null => {
-  const text = data.text;
-  return typeof text === "object" && text !== null && "sha256" in text ? String(text.sha256) : null;
-};
-
-/** Whether a revision changed a native file's words: both versions have text, and it differs. */
-export function wordsChanged(
-  before: Readonly<Record<string, unknown>>,
-  after: Readonly<Record<string, unknown>>,
-): boolean {
-  const [was, is] = [textOf(before), textOf(after)];
-  return was !== null && is !== null && was !== is;
 }
 
 /** Save bytes as a file of a name, as a download the browser asks where to put. */

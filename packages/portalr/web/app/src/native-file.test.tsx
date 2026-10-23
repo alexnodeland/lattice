@@ -6,7 +6,8 @@
 
 import { afterEach, expect, test, vi } from "vitest";
 import { userEvent } from "vitest/browser";
-import { holderOf, wordsChanged } from "./native-file";
+import { wordsChanged } from "./native";
+import { holderOf } from "./native-file";
 import { open } from "./test/app";
 import { AT, FILE, FLAGS, PNG, REVISIONS, status } from "./test/files";
 

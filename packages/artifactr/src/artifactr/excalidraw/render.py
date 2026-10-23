@@ -3,9 +3,11 @@
 It is synchronous and does no IO, and is never stored: frames, shapes with their labels, arrows
 as ``A --label--> B``, free text, counts and the bounding box, in at most
 :data:`MAX_DESCRIPTION` characters. portalr's text alternative for a diagram is the same
-description, ported, and held equal to it by a shared fixture.
+description, ported, held equal to it by a shared fixture when the port lands.
 """
 
+import math
+import unicodedata
 from collections.abc import Iterable, Mapping
 from typing import Final
 
@@ -103,7 +105,9 @@ def _box(elements: Iterable[Element]) -> str | None:
             and isinstance(width, int | float)
             and isinstance(height, int | float)
         ):
-            edges.append((x, y, x + width, y + height))
+            edge = (x, y, x + width, y + height)
+            if all(math.isfinite(e) for e in edge):
+                edges.append(edge)
     if not edges:
         return None
     left = min(e[0] for e in edges)
@@ -114,9 +118,30 @@ def _box(elements: Iterable[Element]) -> str | None:
 
 
 def _quote(text: JsonValue) -> str:
-    """Words written in the diagram, as words: on one line, at most 80 characters, quoted."""
-    said = " ".join(str(text or "").split())[:80]
+    """Words written in the diagram, as words: on one line, at most 80 characters, quoted.
+
+    Control characters go, such as a terminal's escapes, and so do the bidirectional controls and
+    tag characters that would make what the agent reads say something else than it holds.
+    """
+    shown = "".join(c for c in " ".join(str(text or "").split()) if _shown(c))
+    said = " ".join(shown.split())[:80]
     return '"' + said.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+_BIDI: Final = frozenset("\u061c\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069")
+"""The bidirectional controls: marks, embeddings, overrides and isolates."""
+
+
+def _shown(character: str) -> bool:
+    """Whether a character is said: not a control, a bidirectional control or a tag character.
+
+    Joiners (ZWJ, ZWNJ) stay, since emoji sequences and Persian words need them.
+    """
+    return (
+        unicodedata.category(character) != "Cc"
+        and character not in _BIDI
+        and not "\U000e0000" <= character <= "\U000e007f"
+    )
 
 
 def _cut(text: str) -> str:

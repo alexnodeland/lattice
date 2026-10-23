@@ -61,7 +61,7 @@ export function SelectField({
       <Select.Root
         items={items}
         // The pointer resting on a choice doesn't take the highlight or the focus, as on the
-        // platform's select: the keys keep them, and Tab leaves a list the pointer is over (#568).
+        // platform's select: the keys keep them, and Tab leaves a list the pointer is over.
         highlightItemOnHover={false}
         value={shown}
         onValueChange={(next) => {

@@ -124,8 +124,8 @@ test("Tab while it is open closes it, choosing nothing, and moves on", async () 
   await role.click();
   await expect.element(page.getByRole("listbox")).toBeVisible();
   // The pointer rests on an option, and stays there. It used to take the highlight and the focus
-  // there, so the arrow keys moved from wherever the pointer was, not from the choice: #275's
-  // flake, when the click left the pointer over the list, and #568. Now it takes neither.
+  // there, so the arrow keys moved from wherever the pointer was, not from the choice: the
+  // flake this test had when the click left the pointer over the list. Now it takes neither.
   await commands.pointAt("[role=option]:last-child");
   // The list takes the focus a frame after it is seen. A Tab before then leaves the trigger, and
   // the focus, arriving late, comes back into a list that stays open.

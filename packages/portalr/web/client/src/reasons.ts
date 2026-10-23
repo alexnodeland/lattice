@@ -13,7 +13,7 @@ const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
 const AGAIN = " Try again in a moment.";
 
 /** What any other refusal says, such as one where the server couldn't be reached. */
-export const GENERIC = `Something went wrong.${AGAIN}`;
+const GENERIC = `Something went wrong.${AGAIN}`;
 
 const CHANGED = `It changed while you were reading it.${AGAIN}`;
 const STATE = "That can't be done as things stand.";
@@ -21,7 +21,7 @@ const FORBIDDEN = "You may not see this.";
 /** What a refused command says of the reader not being allowed: it is an action, not a read. */
 const NOT_ALLOWED = "You may not do this here.";
 /** What values that aren't valid say, before where they are. */
-export const INVALID = "What was asked for isn't valid.";
+const INVALID = "What was asked for isn't valid.";
 const NOT_FOUND = "It isn't there: it may have been moved or archived.";
 
 /** What each reason code a refusal may carry says, in plain words. */

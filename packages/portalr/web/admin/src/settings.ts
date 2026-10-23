@@ -24,6 +24,8 @@ export interface SettingRow {
   /** How far this level may go, and which layer says so. */
   readonly ceiling: string;
   readonly ceilingValue: Value;
+  /** Who sets the ceiling, for a choice it leaves out: "the operator", "the tenant". */
+  readonly ceilingBy: string;
   /** What is set at this level, or null where nothing is. */
   readonly here: { readonly value: Value; readonly by: string; readonly at: string } | null;
   /** Why what is set here doesn't apply, where something else does; null where it applies. */
@@ -38,7 +40,7 @@ export interface SettingRow {
 }
 
 /** A value as a sentence says it: a number, or names joined. */
-export const said = (value: Value): string =>
+export const said = (value: number | readonly string[]): string =>
   typeof value === "number" ? `${value}` : value.length > 0 ? value.join(", ") : "none";
 
 const SETTERS = {
@@ -90,6 +92,9 @@ export function settingRowsOf(
       effectiveValue: state.effective,
       ceiling: `At most ${said(state.ceiling)}: ${SETTERS[state.ceiling_set_by]}.`,
       ceilingValue: state.ceiling,
+      ceilingBy: { default: "the deployment", operator: "the operator", tenant: "the tenant" }[
+        state.ceiling_set_by
+      ],
       here: here ? { value: here.value, by: actor(here.by, names), at: here.at } : null,
       clamped: here?.clamped ? clampedOf(state, here.value) : null,
       low: state.kind.low ?? null,
@@ -140,22 +145,29 @@ export const refusedAs = (reason: string, row: { readonly key: string; readonly 
 export interface Places {
   readonly tenant: boolean;
   readonly workspaces: readonly string[];
+  /**
+   * Whether some workspaces weren't asked about: one read of grantr's checks asks about the
+   * tenant and the first 99 by name, so a workspace's admin of a later one isn't told of it here.
+   */
+  readonly cut: boolean;
 }
 
 /** The most workspaces one read of grantr's checks asks about: its batch's most, but the tenant. */
-const MOST_ASKED = 99;
+export const MOST_ASKED = 99;
 
 /**
  * One read of grantr's checks: whether the person holds `grantr:manage_settings` on the tenant and
- * in each of its workspaces (issue 627). A tenant's owners and admins hold it everywhere; a
- * workspace's admins in theirs alone.
+ * in each of its first 99 workspaces (issue 627). Held on the tenant, it covers every workspace, so
+ * all of them are theirs, past the 99 too; grantr checks each change again. A workspace's admins
+ * hold it in theirs alone.
  */
 export function settingsPlaces(
   queries: ReturnType<typeof createQueries>,
   tenant: string,
   workspaces: readonly string[],
 ) {
-  const asked = [...workspaces].sort().slice(0, MOST_ASKED);
+  const sorted = [...workspaces].sort();
+  const asked = sorted.slice(0, MOST_ASKED);
   const action = "grantr:manage_settings";
   const checks = [
     { action, resource: { kind: "tenant" as const } },
@@ -163,10 +175,14 @@ export function settingsPlaces(
   ];
   return {
     ...queries.grantr.checks(tenant, checks),
-    select: (answers: boolean[]): Places => ({
-      tenant: answers[0] === true,
-      workspaces: asked.filter((_name, at) => answers[at + 1] === true),
-    }),
+    select: (answers: boolean[]): Places =>
+      answers[0] === true
+        ? { tenant: true, workspaces: sorted, cut: false }
+        : {
+            tenant: false,
+            workspaces: asked.filter((_name, at) => answers[at + 1] === true),
+            cut: sorted.length > asked.length,
+          },
   };
 }
 

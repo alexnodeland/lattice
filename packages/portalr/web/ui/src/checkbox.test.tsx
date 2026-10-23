@@ -1,6 +1,6 @@
 import { Field } from "@base-ui/react/field";
 import { useState } from "react";
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { Checkbox, CheckboxGroup } from "./checkbox";
@@ -75,4 +75,24 @@ test("a box on its own is named by the label around it, toggled by Space, and ri
   await userEvent.keyboard(" ");
   await expect.element(box).toBeChecked();
   expect(getComputedStyle(box.element()).backgroundColor).toBe(token("accent"));
+});
+
+test("a choice that can't be changed says why, and the rest still change", async () => {
+  const changed = vi.fn();
+  const screen = await render(
+    <CheckboxGroup
+      legend="Tools"
+      choices={[
+        { value: "a", label: "Read" },
+        { value: "b", label: "Run", disabled: true, description: "Not offered above" },
+      ]}
+      value={["a"]}
+      onValueChange={changed}
+    />,
+  );
+  const run = screen.getByRole("checkbox", { name: "Run" });
+  await expect.element(run).toBeDisabled();
+  await expect.element(run).toHaveAccessibleDescription("Not offered above");
+  await screen.getByRole("checkbox", { name: "Read" }).click();
+  expect(changed).toHaveBeenCalledWith([]);
 });

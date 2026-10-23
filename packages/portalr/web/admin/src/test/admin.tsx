@@ -53,8 +53,14 @@ function server(allowed: readonly string[], serve: Serve, tenants: readonly stri
       });
     }
     if (path === "/grantr/v1/checks") {
-      const asked: { action: string }[] = await request.json();
-      return Response.json(asked.map(({ action }) => allowed.includes(action)));
+      // An action is allowed everywhere, or, written `action@workspace`, in that workspace alone.
+      const asked: { action: string; resource: { workspace?: string } }[] = await request.json();
+      return Response.json(
+        asked.map(
+          ({ action, resource }) =>
+            allowed.includes(action) || allowed.includes(`${action}@${resource.workspace ?? ""}`),
+        ),
+      );
     }
     return (await serve(request, path)) ?? Response.json({ detail: "not here" }, { status: 403 });
   };

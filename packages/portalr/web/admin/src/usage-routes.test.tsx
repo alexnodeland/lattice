@@ -11,7 +11,13 @@ import { open as opened } from "./test/admin";
 /** The usage reads made, by their query. */
 const reads: URLSearchParams[] = [];
 
-const days = (count: number, from = new Date()) =>
+/**
+ * The test's own now, taken once as it starts, so the days the stub answers and the days the test
+ * reads are the same ones, however near a midnight it runs.
+ */
+let now = new Date();
+
+const days = (count: number, from = now) =>
   Array.from({ length: count }, (_, back) =>
     new Date(from.getTime() - (count - 1 - back) * 86_400_000).toISOString().slice(0, 10),
   );
@@ -87,6 +93,7 @@ const open = (path: string, allowed: readonly string[] = ["portalr:read_spend"])
   opened(path, allowed, portalr);
 
 beforeEach(async () => {
+  now = new Date();
   await page.viewport(1280, 900);
 });
 

@@ -167,7 +167,10 @@
       "expect": {
         "rejection": {
           "type": "invalid_state",
-          "message": "message msg_1 already exists"
+          "message": "message msg_1 already exists",
+          "reason": "already_exists",
+          "entity": "message",
+          "id": "msg_1"
         }
       }
     },
@@ -273,7 +276,10 @@
       "expect": {
         "rejection": {
           "type": "invalid_state",
-          "message": "message msg_1 already exists"
+          "message": "message msg_1 already exists",
+          "reason": "already_exists",
+          "entity": "message",
+          "id": "msg_1"
         }
       }
     },

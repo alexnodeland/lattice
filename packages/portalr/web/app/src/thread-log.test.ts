@@ -50,7 +50,7 @@ test("a failed turn is tried again with the message that started it, under the r
   });
   const two = { run_1: run({ prompt: ["m1", "m2"] }) };
   const both = thread(message("m1", "alice"), message("m2", "alice"));
-  expect(retryOf(both, two, "alice")?.content).toBe("Posted as m1\n\nPosted as m2");
+  expect(retryOf(both, two, "alice")).toMatchObject({ content: "Posted as m1\n\nPosted as m2" });
 });
 
 test("it isn't tried again by others, twice, or when the thread's latest turn didn't fail", () => {
@@ -71,4 +71,18 @@ test("an id someone else took first doesn't stop the try: the next is used", () 
   const tried = { ...message("msg_again_run_1_2", "alice"), content: "Posted as m1" };
   const after = thread(message("m1", "alice"), message("msg_again_run_1", "mallory"), tried);
   expect(retryOf(after, { run_1: run({}) }, "alice")).toBeNull();
+});
+
+test("a thread whose every try id is someone else's says it can't try, rather than looking for ever", () => {
+  const taken = Array.from({ length: 100 }, (_, at) =>
+    message(at === 0 ? "msg_again_run_1" : `msg_again_run_1_${at + 1}`, "mallory"),
+  );
+  expect(retryOf(thread(message("m1", "alice"), ...taken), { run_1: run({}) }, "alice")).toEqual({
+    run: "run_1",
+    id: null,
+  });
+  // One short of that, the last id is still offered.
+  expect(
+    retryOf(thread(message("m1", "alice"), ...taken.slice(0, 99)), { run_1: run({}) }, "alice")?.id,
+  ).toBe("msg_again_run_1_100");
 });

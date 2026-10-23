@@ -77,7 +77,7 @@ Where the deployment runs product analytics (lattice RFC-0008), the app's accoun
 - **What is collected:** which pages a person opens in a tenant, named by the app's routes (`/t/$tenant/w/$workspace/runs`), never the address in the bar or anything typed. Each event carries the tenant and a signed session id. The person is a keyed hash of their id, never their id or email. No address and no browser details are kept.
 - **What is never collected:** messages, artifacts, file names, emails, search text, or any other content.
 - **Where it goes:** to portalr's relay on the app's own origin, then to ClickHouse's `analytics` database in the deployment's own stack. Each tenant reads only its own events.
-- **Turning it off** deletes everything the person shared, at once. If ClickHouse can't take the deletion just then, it stays owed, the menu says so, and portalr tries again until it is done. A backup taken before then keeps the events until the backups expire.
+- **Turning it off** deletes everything the person shared, at once. If ClickHouse can't take the deletion just then, it stays owed, the menu says so ("Deleting what you shared hasn't finished yet. It will be retried until it is done."), and portalr tries again until it is done. Anything waiting in the browser to be sent is dropped as the person says no. A backup taken before then keeps the events until the backups expire.
 - **How long it is kept:** 395 days unless the operator sets otherwise.
 
 ## Where the gate stops

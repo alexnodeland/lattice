@@ -292,11 +292,11 @@ So the person sees their events gone at once, and so does an operator's ordinary
   - Its description is read out with it (`aria-describedby`).
   - There is no banner, no pre-ticked box, and nothing that asks again.
   - It sits beside a link to the privacy guide's "Product analytics", which says what is shared and how it is kept.
-  - A status region, there from the start, tells a screen reader the answer as it changes. Where a no's deletion isn't done yet, the menu and the status say so, from the relay's `deleted: false`.
-  - The wording, drafted for the owner's review and not final: **"Share how I use the app"**, described as **"Which pages and features you open, never what you write. Off deletes it."**
-- **Capture** is an add-on of its own (`ui/src/on-demand/analytics.ts`, 442 bytes gzipped, under a 600-byte ceiling). It is fetched only once the person's answer is yes, so someone who never says yes never loads it.
+  - A status region, there from the start, tells a screen reader the answer as it changes. Where a no's deletion isn't done yet, the menu and the status say so, from the relay's answer read (`GET` returns `deleting`), so it holds across a reload, and is read again every 30 seconds until the relay has done it.
+  - The wording, as the owner decided (2026-10-23): **"Share how I use the app"**, described as **"Which pages you open, never what you write. Turning it off deletes what you shared."**; the link **"What is shared, and how it is kept (opens in a new tab)"**; and, while a deletion is owed, **"Deleting what you shared hasn't finished yet. It will be retried until it is done."** An answer the relay didn't record puts the switch back, and the status says **"Your answer wasn't saved. Try again."** (not yet the owner's).
+- **Capture** is an add-on of its own (`ui/src/on-demand/analytics.ts`, 550 bytes gzipped, under a 600-byte ceiling). It is fetched only once the person's answer is yes, so someone who never says yes never loads it.
   - It sends `app.page.viewed.v1` for each page the person opens in a tenant, named by the router's own `fullPath` (`/t/$tenant/w/$workspace/runs`), never the address in the bar.
-  - Events wait in memory and go ten at a time, or after five seconds, under a session id portalr signs for the person.
+  - Events wait in memory and go ten at a time, or after five seconds, under a session id portalr signs for the person; a session the relay no longer takes is signed afresh, and the batch sent again, once. A no, or leaving the tenant, closes the capture: what waits is dropped, unsent.
   - A batch the relay doesn't take is dropped, never retried, and never fails a screen.
 - **The app's first load** grows by about 1 KB, for the consent read and the switch: 200,751 of its 202,000 bytes, with about 1.2 KB of headroom left. The capture code is outside it.
 - **Not yet:** other events than page views (threads, messages, artifacts and integrations are in the registry, for screens to send later), and admin, which sends nothing.

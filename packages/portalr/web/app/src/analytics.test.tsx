@@ -4,16 +4,31 @@
  */
 
 import { afterEach, expect, test, vi } from "vitest";
+import { userEvent } from "vitest/browser";
 import { routeOf } from "./analytics";
 import { open } from "./test/app";
 import { FLAGS } from "./test/files";
 
 interface Relay {
   given: boolean;
-  deletes?: boolean;
+  /** Whether a deletion a no asked for isn't done yet, as the relay reads it. */
+  deleting: boolean;
+  /** Whether the relay takes an answer: false answers 503. */
+  up: boolean;
   readonly events: { tenant: string | null; body: unknown }[];
-  answers: boolean[];
+  readonly answers: boolean[];
 }
+
+const relayOf = (given: boolean): Relay => ({
+  given,
+  deleting: false,
+  up: true,
+  events: [],
+  answers: [],
+});
+
+const DELETING =
+  "Deleting what you shared hasn't finished yet. It will be retried until it is done.";
 
 function serving(relay: Relay) {
   return async (request: Request, path: string) => {
@@ -28,11 +43,17 @@ function serving(relay: Relay) {
     }
     if (path === "/portalr/v1/analytics/consent") {
       if (request.method === "PUT") {
+        if (!relay.up) {
+          return Response.json({ detail: "down" }, { status: 503 });
+        }
         relay.given = ((await request.json()) as { given: boolean }).given;
         relay.answers.push(relay.given);
-        return Response.json({ given: relay.given, deleted: relay.given ? null : relay.deletes });
+        return Response.json({
+          given: relay.given,
+          deleted: relay.given ? null : !relay.deleting,
+        });
       }
-      return Response.json({ given: relay.given });
+      return Response.json({ given: relay.given, deleting: relay.deleting });
     }
     if (path === "/portalr/v1/analytics/session") {
       return Response.json({ session: "signed" });
@@ -43,6 +64,13 @@ function serving(relay: Relay) {
     }
     return undefined;
   };
+}
+
+async function openMenu(screen: Awaited<ReturnType<typeof open>>["screen"]) {
+  // Closed first, whether or not a click left it open, then opened.
+  await userEvent.keyboard("{Escape}");
+  await screen.getByRole("button", { name: /^Account/ }).click();
+  await expect.element(screen.getByRole("menu")).toBeVisible();
 }
 
 afterEach(() => {
@@ -56,9 +84,9 @@ test("a page is named by its route, not its address", () => {
 });
 
 test("without analytics in the deployment there is no switch, and nothing is asked or sent", async () => {
-  const relay: Relay = { given: true, events: [], answers: [] };
+  const relay = relayOf(true);
   const { screen, fetched } = await open("/t/acme/w/notes", serving(relay));
-  await screen.getByRole("button", { name: /^Account/ }).click();
+  await openMenu(screen);
   await expect
     .element(screen.getByRole("menuitemcheckbox", { name: "Colour-blind friendly charts" }))
     .toBeVisible();
@@ -70,64 +98,101 @@ test("without analytics in the deployment there is no switch, and nothing is ask
   expect(relay.events).toEqual([]);
 });
 
+test("with the switch shown and off, nothing is sent", async () => {
+  const relay = relayOf(false);
+  const { screen, fetched } = await open("/t/acme/w/notes", serving(relay), undefined, {
+    readers: { analytics: true },
+  });
+  await openMenu(screen);
+  await expect
+    .element(screen.getByRole("menuitemcheckbox", { name: "Share how I use the app" }))
+    .toHaveAttribute("aria-checked", "false");
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  const asked = fetched.mock.calls.map(([input]) => String(input));
+  expect(asked.some((url) => /analytics\/session|\/events/.test(url))).toBe(false);
+  expect(relay.events).toEqual([]);
+});
+
 test("off until turned on, then the page the person is on is sent, by its route, in the tenant", async () => {
-  const relay: Relay = { given: false, events: [], answers: [] };
+  const relay = relayOf(false);
   const { screen } = await open("/t/acme/w/notes", serving(relay), undefined, {
     readers: { analytics: true },
   });
-  await screen.getByRole("button", { name: /^Account/ }).click();
-  const share = screen.getByRole("menuitemcheckbox", { name: "Share how I use the app" });
-  await expect.element(share).toHaveAttribute("aria-checked", "false");
-  expect(relay.events).toEqual([]);
-  await share.click();
+  await openMenu(screen);
+  await screen.getByRole("menuitemcheckbox", { name: "Share how I use the app" }).click();
   await expect.poll(() => relay.answers).toEqual([true]);
   await expect.poll(() => relay.events.length, { timeout: 10_000 }).toBe(1);
   expect(relay.events[0]).toEqual({
     tenant: "acme",
     body: {
       session: "signed",
-      events: [{ event: "app.page.viewed.v1", route: "/t/$tenant/w/$workspace", props: {} }],
+      events: [{ event: "app.page.viewed.v1", route: "/t/$tenant/w/$workspace" }],
     },
   });
 });
 
-test("turned off, it says no, and nothing more is sent", async () => {
-  const relay: Relay = { given: true, deletes: true, events: [], answers: [] };
+test("after a no, what waited is dropped and nothing more is sent", async () => {
+  const relay = relayOf(true);
   const { screen } = await open("/t/acme/w/notes", serving(relay), undefined, {
     readers: { analytics: true },
   });
-  await screen.getByRole("button", { name: /^Account/ }).click();
-  const share = screen.getByRole("menuitemcheckbox", { name: "Share how I use the app" });
-  await expect.element(share).toHaveAttribute("aria-checked", "true");
-  await share.click();
+  await openMenu(screen);
+  await screen.getByRole("menuitemcheckbox", { name: "Share how I use the app" }).click();
   await expect.poll(() => relay.answers).toEqual([false]);
   await expect
     .element(screen.getByRole("status").filter({ hasText: "Sharing how you use the app is off." }))
     .toBeInTheDocument();
+  // Past the five seconds a page view would wait: it was dropped with the no.
+  await new Promise((resolve) => setTimeout(resolve, 5_500));
+  expect(relay.events).toEqual([]);
 });
 
-test("a no whose deletion isn't done yet says so, in the menu and to a screen reader", async () => {
-  const relay: Relay = { given: true, deletes: false, events: [], answers: [] };
+test("a no whose deletion isn't done yet says so, to a screen reader as it happens", async () => {
+  const relay = relayOf(true);
+  relay.deleting = true;
   const { screen } = await open("/t/acme/w/notes", serving(relay), undefined, {
     readers: { analytics: true },
   });
-  await screen.getByRole("button", { name: /^Account/ }).click();
+  await openMenu(screen);
+  await screen.getByRole("menuitemcheckbox", { name: "Share how I use the app" }).click();
+  await expect
+    .element(screen.getByRole("status").filter({ hasText: `Sharing is off. ${DELETING}` }))
+    .toBeInTheDocument();
+});
+
+test("a deletion still owed is read from the relay, as a reload reads it, and shown in the menu", async () => {
+  const relay = relayOf(false);
+  relay.deleting = true;
+  const { screen } = await open("/t/acme/w/notes", serving(relay), undefined, {
+    readers: { analytics: true },
+  });
+  await openMenu(screen);
+  await expect.element(screen.getByText(DELETING)).toBeVisible();
+  await expect
+    .element(
+      screen.getByRole("menuitem", {
+        name: "What is shared, and how it is kept (opens in a new tab)",
+      }),
+    )
+    .toHaveAttribute("href", expect.stringContaining("/portalr/guides/privacy/"));
+});
+
+test("an answer the relay doesn't take puts the switch back, and says so", async () => {
+  const relay = relayOf(true);
+  relay.up = false;
+  const { screen } = await open("/t/acme/w/notes", serving(relay), undefined, {
+    readers: { analytics: true },
+  });
+  await openMenu(screen);
   await screen.getByRole("menuitemcheckbox", { name: "Share how I use the app" }).click();
   await expect
     .element(
       screen.getByRole("status").filter({
-        hasText: "Sharing is off. What you shared is still being deleted, and will be.",
+        hasText: "Your answer wasn't saved. Try again. Sharing how you use the app is on.",
       }),
     )
     .toBeInTheDocument();
-  // The menu stays open as a checkbox is checked; opened again only if it closed.
-  if (screen.getByRole("menu").elements().length === 0) {
-    await screen.getByRole("button", { name: /^Account/ }).click();
-  }
   await expect
-    .element(screen.getByText("What you shared is still being deleted, and will be."))
-    .toBeVisible();
-  await expect
-    .element(screen.getByRole("menuitem", { name: "What is shared, and how it is kept" }))
-    .toHaveAttribute("href", expect.stringContaining("/portalr/guides/privacy/"));
+    .element(screen.getByRole("menuitemcheckbox", { name: "Share how I use the app" }))
+    .toHaveAttribute("aria-checked", "true");
 });

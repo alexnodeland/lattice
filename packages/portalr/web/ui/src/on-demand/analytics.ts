@@ -33,6 +33,7 @@ export class Capture {
   private readonly waiting: AnalyticsEvent[] = [];
   private session: Promise<string | null> | null = null;
   private timer: ReturnType<typeof setTimeout> | null = null;
+  private closed = false;
 
   private readonly api: Api;
   private readonly tenant: string;
@@ -47,11 +48,27 @@ export class Capture {
 
   /** Gather an event, sending what has gathered when there are enough, or after a while. */
   record(event: AnalyticsEvent): void {
+    if (this.closed) {
+      return;
+    }
     this.waiting.push(event);
     if (this.waiting.length >= BATCH) {
       void this.flush();
     } else if (this.timer === null) {
       this.timer = setTimeout(() => void this.flush(), this.wait);
+    }
+  }
+
+  /**
+   * Stop, as the person says no or leaves the tenant: what waits is dropped, unsent, and nothing
+   * is sent after.
+   */
+  close(): void {
+    this.closed = true;
+    this.waiting.length = 0;
+    if (this.timer !== null) {
+      clearTimeout(this.timer);
+      this.timer = null;
     }
   }
 
@@ -62,9 +79,27 @@ export class Capture {
       this.timer = null;
     }
     const events = this.waiting.splice(0, BATCH);
-    if (events.length === 0) {
+    if (events.length === 0 || this.closed) {
       return;
     }
+    // A session the relay no longer takes, as one past its hours, is signed afresh, once.
+    for (let tries = 0; tries < 2 && !this.closed; tries += 1) {
+      const session = await this.signed();
+      if (session === null || this.closed) {
+        return;
+      }
+      if (await this.send(session, events)) {
+        break;
+      }
+      this.session = null;
+    }
+    if (this.waiting.length > 0) {
+      void this.flush();
+    }
+  }
+
+  /** The session portalr signed for this capture, asked for once; null if it couldn't be. */
+  private async signed(): Promise<string | null> {
     this.session ??= this.api.portalr
       .POST("/portalr/v1/analytics/session")
       .then(({ data }) => data?.session ?? null)
@@ -72,18 +107,20 @@ export class Capture {
     const session = await this.session;
     if (session === null) {
       this.session = null;
-      return;
     }
+    return session;
+  }
+
+  /** Send a batch: false only where the relay refused its session, true otherwise. */
+  private async send(session: string, events: readonly AnalyticsEvent[]): Promise<boolean> {
     try {
-      await this.api.portalr.POST("/portalr/v1/events", {
+      const { response } = await this.api.portalr.POST("/portalr/v1/events", {
         headers: { "X-Tenant": this.tenant },
-        body: { session, events: events.map((e) => ({ ...e, props: { ...e.props } })) },
+        body: { session, events: [...events] },
       });
+      return response.status !== 403;
     } catch {
-      // Dropped: analytics never fails a screen.
-    }
-    if (this.waiting.length > 0) {
-      void this.flush();
+      return true; // Dropped: analytics never fails a screen.
     }
   }
 }

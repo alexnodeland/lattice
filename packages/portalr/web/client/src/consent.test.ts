@@ -37,7 +37,7 @@ beforeAll(() => {
           given = (JSON.parse(text) as { given: boolean }).given;
           return Response.json({ given, deleted: given ? null : true });
         }
-        return Response.json({ given });
+        return Response.json({ given, deleting: false });
       }
       if (url.pathname === "/portalr/v1/analytics/session") {
         sessions += 1;
@@ -63,10 +63,10 @@ beforeEach(() => {
 });
 
 test("the answer is no until the person says yes, and no where the relay can't be read", async () => {
-  expect(await readConsent(api)).toBe(false);
+  expect(await readConsent(api)).toEqual({ given: false, deleting: false });
   expect(await answerConsent(api, true)).toEqual({ given: true, deleted: null });
-  expect(await readConsent(api)).toBe(true);
+  expect(await readConsent(api)).toEqual({ given: true, deleting: false });
   down = true;
-  expect(await readConsent(api)).toBe(false);
-  expect(await answerConsent(api, false)).toBeNull();
+  expect(await readConsent(api)).toEqual({ given: false, deleting: false });
+  await expect(answerConsent(api, false)).rejects.toThrow("the answer wasn't recorded (503)");
 });

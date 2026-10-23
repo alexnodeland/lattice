@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet } from "@tanstack/react-router";
-import { useConsent, usePageViews } from "../../../analytics";
+import { useGiven, usePageViews } from "../../../analytics";
 
 /** A tenant: grantr says who the caller is in it, and every read under it names it. */
 export const Route = createFileRoute("/_signed/t/$tenant")({
@@ -15,6 +15,6 @@ export const Route = createFileRoute("/_signed/t/$tenant")({
 function Tenant() {
   const { api } = Route.useRouteContext();
   const { tenant } = Route.useParams();
-  usePageViews(api, tenant, useConsent()?.given ?? false);
+  usePageViews(api, tenant, useGiven());
   return <Outlet />;
 }

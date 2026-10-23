@@ -252,6 +252,26 @@
         "title": "Config",
         "type": "object"
       },
+      "Consented": {
+        "additionalProperties": false,
+        "description": "A person's answer, as read: and whether a deletion their no asked for is still to be done.",
+        "properties": {
+          "deleting": {
+            "default": false,
+            "title": "Deleting",
+            "type": "boolean"
+          },
+          "given": {
+            "title": "Given",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "given"
+        ],
+        "title": "Consented",
+        "type": "object"
+      },
       "CreatedTenant": {
         "description": "The tenant a creation made, and its owner.\n\nThe owner is by the user id their tokens carry, never by email.",
         "properties": {
@@ -1733,14 +1753,14 @@
     },
     "/portalr/v1/analytics/consent": {
       "get": {
-        "description": "The person's answer to product analytics: no until they say yes.",
+        "description": "The person's answer to product analytics: no until they say yes.\n\n``deleting`` says a deletion their no asked for isn't done yet: tried again now, and by\nthe background pass, until it is.",
         "operationId": "read_consent_portalr_v1_analytics_consent_get",
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Answer"
+                  "$ref": "#/components/schemas/Consented"
                 }
               }
             },

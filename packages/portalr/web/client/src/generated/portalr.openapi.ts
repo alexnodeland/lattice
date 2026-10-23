@@ -32,6 +32,9 @@ export interface paths {
         /**
          * Read Consent
          * @description The person's answer to product analytics: no until they say yes.
+         *
+         *     ``deleting`` says a deletion their no asked for isn't done yet: tried again now, and by
+         *     the background pass, until it is.
          */
         get: operations["read_consent_portalr_v1_analytics_consent_get"];
         /**
@@ -499,6 +502,19 @@ export interface components {
             };
             supabase: components["schemas"]["Supabase"];
             surfaces: components["schemas"]["Surfaces"];
+        };
+        /**
+         * Consented
+         * @description A person's answer, as read: and whether a deletion their no asked for is still to be done.
+         */
+        Consented: {
+            /**
+             * Deleting
+             * @default false
+             */
+            deleting: boolean;
+            /** Given */
+            given: boolean;
         };
         /**
          * CreatedTenant
@@ -1143,7 +1159,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Answer"];
+                    "application/json": components["schemas"]["Consented"];
                 };
             };
             /** @description Refused */

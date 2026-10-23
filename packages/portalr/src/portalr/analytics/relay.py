@@ -92,6 +92,12 @@ class Answer(BaseModel):
     given: bool
 
 
+class Consented(Answer):
+    """A person's answer, as read: and whether a deletion their no asked for is still to be done."""
+
+    deleting: bool = False
+
+
 class Answered(Answer):
     """A person's answer, recorded; on a no, whether their events were deleted."""
 

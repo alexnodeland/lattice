@@ -5,10 +5,16 @@
 
 import type { Api } from "./rest";
 
-/** Whether the person has said yes; no, until they do, and no where the relay can't be read. */
-export async function readConsent(api: Api): Promise<boolean> {
+/** A person's answer, as read: and whether a deletion their no asked for is still to be done. */
+export interface Consent {
+  readonly given: boolean;
+  readonly deleting: boolean;
+}
+
+/** The person's answer; no, and nothing owed, where the relay can't be read. */
+export async function readConsent(api: Api): Promise<Consent> {
   const { data } = await api.portalr.GET("/portalr/v1/analytics/consent");
-  return data?.given ?? false;
+  return { given: data?.given ?? false, deleting: data?.deleting ?? false };
 }
 
 /** What became of an answer: recorded, and on a no, whether the deletion is done yet. */
@@ -18,8 +24,17 @@ export interface Answered {
   readonly deleted: boolean | null;
 }
 
-/** Record the person's answer; a yes taken back deletes their events. What became of it, or null. */
-export async function answerConsent(api: Api, given: boolean): Promise<Answered | null> {
-  const { data } = await api.portalr.PUT("/portalr/v1/analytics/consent", { body: { given } });
-  return data === undefined ? null : { given: data.given, deleted: data.deleted ?? null };
+/**
+ * Record the person's answer; a yes taken back deletes their events.
+ *
+ * @throws Error if the relay didn't record it: a screen says so, and keeps the answer it had.
+ */
+export async function answerConsent(api: Api, given: boolean): Promise<Answered> {
+  const { data, response } = await api.portalr.PUT("/portalr/v1/analytics/consent", {
+    body: { given },
+  });
+  if (data === undefined) {
+    throw new Error(`the answer wasn't recorded (${response.status})`);
+  }
+  return { given: data.given, deleted: data.deleted ?? null };
 }

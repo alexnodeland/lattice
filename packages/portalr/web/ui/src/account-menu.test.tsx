@@ -188,7 +188,7 @@ test("sharing how the app is used is off until the person turns it on, and says 
   await expect
     .element(item)
     .toHaveAccessibleDescription(
-      "Which pages and features you open, never what you write. Off deletes it.",
+      "Which pages you open, never what you write. Turning it off deletes what you shared.",
     );
   await item.click();
   expect(onAnswer).toHaveBeenCalledExactlyOnceWith(true);
@@ -227,10 +227,16 @@ test("the switch is beside a link to what is shared, and says when a deletion is
     />,
   );
   await screen.getByRole("button", { name: "Account: Alex Nodeland" }).click();
-  const link = screen.getByRole("menuitem", { name: "What is shared, and how it is kept" });
+  const link = screen.getByRole("menuitem", {
+    name: "What is shared, and how it is kept (opens in a new tab)",
+  });
   await expect.element(link).toHaveAttribute("href", GUIDE);
   await expect
-    .element(screen.getByText("What you shared is still being deleted, and will be."))
+    .element(
+      screen.getByText(
+        "Deleting what you shared hasn't finished yet. It will be retried until it is done.",
+      ),
+    )
     .toBeVisible();
 });
 
@@ -244,7 +250,10 @@ test("what a screen reader hears as the answer changes", () => {
   expect(analyticsStatus({ given: false, onAnswer, guide })).toBe(
     "Sharing how you use the app is off.",
   );
+  expect(analyticsStatus({ given: true, onAnswer, guide, failed: true })).toBe(
+    "Your answer wasn't saved. Try again. Sharing how you use the app is on.",
+  );
   expect(analyticsStatus({ given: false, onAnswer, guide, deleting: true })).toBe(
-    "Sharing is off. What you shared is still being deleted, and will be.",
+    "Sharing is off. Deleting what you shared hasn't finished yet. It will be retried until it is done.",
   );
 });

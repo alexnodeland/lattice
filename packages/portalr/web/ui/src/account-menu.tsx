@@ -28,21 +28,30 @@ export interface AnalyticsAnswer {
   readonly onAnswer: (given: boolean) => void;
   /** Whether a deletion the person's no asked for is still to be done, as the relay said. */
   readonly deleting?: boolean | undefined;
+  /** Whether the person's last answer wasn't recorded: the switch shows the answer before it. */
+  readonly failed?: boolean | undefined;
   /** The privacy guide, which says what is shared and how it is kept. */
   readonly guide: string;
 }
+
+/** What the menu says while a deletion the person's no asked for isn't done yet. */
+const STILL_DELETING =
+  "Deleting what you shared hasn't finished yet. It will be retried until it is done.";
+
+/** What a screen reader hears when an answer wasn't recorded. */
+const NOT_SAVED = "Your answer wasn't saved. Try again.";
 
 /** What the account menu says, for a screen reader, as the person's answer changes. */
 export function analyticsStatus(analytics: AnalyticsAnswer | undefined): string {
   if (!analytics) {
     return "";
   }
-  if (analytics.given) {
-    return "Sharing how you use the app is on.";
-  }
-  return analytics.deleting
-    ? "Sharing is off. What you shared is still being deleted, and will be."
-    : "Sharing how you use the app is off.";
+  const answer = analytics.given
+    ? "Sharing how you use the app is on."
+    : analytics.deleting
+      ? `Sharing is off. ${STILL_DELETING}`
+      : "Sharing how you use the app is off.";
+  return analytics.failed ? `${NOT_SAVED} ${answer}` : answer;
 }
 
 /**
@@ -156,7 +165,8 @@ export function AccountMenu({
                         id={sharing}
                         className="font-normal text-muted text-xs"
                       >
-                        Which pages and features you open, never what you write. Off deletes it.
+                        Which pages you open, never what you write. Turning it off deletes what you
+                        shared.
                       </span>
                     </span>
                     <Menu.CheckboxItemIndicator className="text-accent">
@@ -164,9 +174,7 @@ export function AccountMenu({
                     </Menu.CheckboxItemIndicator>
                   </Menu.CheckboxItem>
                   {!analytics.given && analytics.deleting && (
-                    <p className="px-2.5 pb-1.5 text-muted text-xs">
-                      What you shared is still being deleted, and will be.
-                    </p>
+                    <p className="px-2.5 pb-1.5 text-muted text-xs">{STILL_DELETING}</p>
                   )}
                   <Menu.LinkItem
                     href={analytics.guide}
@@ -174,7 +182,7 @@ export function AccountMenu({
                     rel="noopener noreferrer"
                     className={item}
                   >
-                    What is shared, and how it is kept
+                    What is shared, and how it is kept (opens in a new tab)
                   </Menu.LinkItem>
                 </Menu.Group>
               </>

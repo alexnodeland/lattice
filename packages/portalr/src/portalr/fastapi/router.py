@@ -46,6 +46,7 @@ from portalr.analytics.relay import (
     Answer,
     Answered,
     Batch,
+    Consented,
     Relay,
     Relayed,
     Session,
@@ -688,10 +689,17 @@ def _analytics(router: APIRouter, grants: Grants, relay: Relay, current: Any) ->
     signed_in = Depends(person)
 
     @router.get("/v1/analytics/consent", responses={429: TOO_FAST})
-    async def read_consent(user: str = signed_in) -> Answer:
-        """The person's answer to product analytics: no until they say yes."""
+    async def read_consent(user: str = signed_in) -> Consented:
+        """The person's answer to product analytics: no until they say yes.
+
+        ``deleting`` says a deletion their no asked for isn't done yet: tried again now, and by
+        the background pass, until it is.
+        """
         await relay.settle_if_owed(user)
-        return Answer(given=await relay.consent.given(user))
+        return Consented(
+            given=await relay.consent.given(user),
+            deleting=await relay.consent.owes(user) is not None,
+        )
 
     @router.put("/v1/analytics/consent")
     async def answer(body: Annotated[Answer, Body()], user: str = Depends(answering)) -> Answered:
@@ -749,7 +757,12 @@ INVALID: Final = {"model": Refused, "description": "Not a batch the relay takes:
 
 
 def _inlined(schema: dict[str, Any]) -> dict[str, Any]:
-    """A model's JSON Schema with its own definitions written in place, as OpenAPI takes it."""
+    """A model's JSON Schema with its own definitions written in place, as OpenAPI takes it.
+
+    The events route reads its body by hand, to stop at the 16 KB cap as it comes, so FastAPI
+    doesn't know its model: the schema is given in ``openapi_extra``, where a ``$defs`` reference
+    would point nowhere, so the definitions are inlined.
+    """
     definitions: dict[str, Any] = schema.pop("$defs", {})
 
     def inline(node: object) -> object:

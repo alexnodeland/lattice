@@ -47,10 +47,29 @@ Then(
 );
 
 When("they set {string} back to the default", async ({ page }, name: string) => {
-  await page.getByRole("button", { name: "Use the default for FreeCAD's tries an hour" }).click();
+  await page.getByRole("button", { name: `Use the default for ${name}` }).click();
   await expect(page.getByRole("status").filter({ hasText: `${name}: ` })).toBeVisible();
 });
 
 Then("{int} applies to {string}", async ({ page }, value: number, name: string) => {
   await expect(rowOf(page, name).getByText(`Applies: ${value}.`)).toBeVisible();
+});
+
+When(
+  "they uncheck {string} in {string} and save",
+  async ({ page }, tool: string, setting: string) => {
+    await page.getByRole("group", { name: setting }).getByRole("checkbox", { name: tool }).click();
+    await page.getByRole("button", { name: `Save ${setting}` }).click();
+    await expect(page.getByRole("status").filter({ hasText: `${setting}: ` })).toBeVisible();
+  },
+);
+
+Then("{string} is unchecked in {string}", async ({ page }, tool: string, setting: string) => {
+  const box = page.getByRole("group", { name: setting }).getByRole("checkbox", { name: tool });
+  await expect(box).not.toBeChecked();
+});
+
+Then("{string} is checked in {string}", async ({ page }, tool: string, setting: string) => {
+  const box = page.getByRole("group", { name: setting }).getByRole("checkbox", { name: tool });
+  await expect(box).toBeChecked();
 });

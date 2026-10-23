@@ -167,7 +167,7 @@ Dashboards and exploration, over the four backends.
 | Property | Value |
 |---|---|
 | Profiles | `observability` |
-| Image | `grafana/grafana`, pinned by tag and digest in `compose.yaml` |
+| Image | `stackr-grafana`, built from `packages/stackr/deploy/grafana/Dockerfile`, which pins its base |
 | Published ports | 3000 (`GRAFANA_PORT`) → 3000 |
 | Networks | `stackr` |
 | Volumes | `./deploy/grafana/provisioning/datasources` → `/etc/grafana/provisioning/datasources` (read-only), `./deploy/grafana/provisioning/dashboards` → `/etc/grafana/provisioning/dashboards` (read-only), `./deploy/grafana/dashboards/stackr` → `/var/lib/grafana/dashboards/stackr` (read-only), `../artifactr/deploy/grafana/dashboards` → `/var/lib/grafana/dashboards/artifactr` (read-only), `../reflexr/deploy/grafana/dashboards` → `/var/lib/grafana/dashboards/reflexr` (read-only), `grafana-data` → `/var/lib/grafana` |
@@ -189,6 +189,8 @@ Dashboards and exploration, over the four backends.
     | `TEMPO_ADDRESS` | `tempo` |
     | `LOKI_ADDRESS` | `loki` |
     | `PYROSCOPE_ADDRESS` | `pyroscope` |
+    | `CLICKHOUSE_ADDRESS` | `clickhouse` |
+    | `CLICKHOUSE_GRAFANA_PASSWORD` | `${CLICKHOUSE_GRAFANA_PASSWORD:?run make env}` |
 
 ### `postgres`
 
@@ -353,6 +355,7 @@ Langfuse's traces, observations and scores, and portalr's analytics events.
     | `CLICKHOUSE_LANGFUSE_PASSWORD` | `${CLICKHOUSE_PASSWORD:?run make env}` |
     | `CLICKHOUSE_ANALYTICS_WRITER_PASSWORD` | `${CLICKHOUSE_ANALYTICS_WRITER_PASSWORD:?run make env}` |
     | `CLICKHOUSE_ANALYTICS_PASSWORD` | `${CLICKHOUSE_ANALYTICS_PASSWORD:?run make env}` |
+    | `CLICKHOUSE_GRAFANA_PASSWORD` | `${CLICKHOUSE_GRAFANA_PASSWORD:?run make env}` |
 
 ### `clickhouse-init`
 

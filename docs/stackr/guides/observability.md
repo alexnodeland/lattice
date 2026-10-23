@@ -94,7 +94,9 @@ Pyroscope 2 runs as a single process, with its data on the `pyroscope-data` volu
 
 Grafana is at <http://localhost:3000>, as `admin` with `GRAFANA_ADMIN_PASSWORD` from `.env`. Everything in it is provisioned from `deploy/grafana/`, so a new stack starts with the same data sources, links and dashboards ([Grafana provisioning](../reference/grafana.md)).
 
-**Data sources** have fixed uids, which dashboards and links refer to: `prometheus` (the default), `tempo`, `loki` and `pyroscope`. They can't be edited in the UI.
+**Data sources** have fixed uids, which dashboards and links refer to: `prometheus` (the default), `tempo`, `loki` and `pyroscope`, and `analytics`, portalr's product analytics on ClickHouse with the `analytics` profile. They can't be edited in the UI.
+
+**Grafana's image is `stackr-grafana`,** which Compose builds from `deploy/grafana/Dockerfile`, as the AWS recipe runs it: Grafana with ClickHouse's data source plugin baked in, pinned and signed, so nothing is downloaded as it starts ([ADR-0048](../adr/0048-grafanas-clickhouse-data-source-and-the-adoption-dashboard.md)).
 
 **Links between signals:**
 
@@ -111,7 +113,7 @@ Grafana is at <http://localhost:3000>, as `admin` with `GRAFANA_ADMIN_PASSWORD` 
 
 Dashboards are files under `deploy/grafana/dashboards/`, one Grafana folder per directory, rescanned every 30 seconds and read-only in the UI:
 
-- **`stackr/`** is committed. **Collector health** (`stackr-collector`) shows what the Collector receives, what each backend receives, send failures, queues, memory and CPU, and whether each of the stack's services is up.
+- **`stackr/`** is committed. **Collector health** (`stackr-collector`) shows what the Collector receives, what each backend receives, send failures, queues, memory and CPU, and whether each of the stack's services is up. **Adoption** (`stackr-adoption`) shows portalr's product analytics across tenants, for operators: active people by day, people per integration, a funnel and weekly retention. It reads as `grafana_analytics`, which may read every tenant's events and nothing else, so Grafana is for operators only and is never exposed to tenants.
 - **`artifactr/` and `reflexr/`** are the libraries' own dashboards, mounted from the libraries' directories in lattice.
 
 ### The libraries' dashboards

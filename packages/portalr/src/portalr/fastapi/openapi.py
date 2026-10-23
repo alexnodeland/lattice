@@ -15,9 +15,19 @@ from starlette.requests import HTTPConnection
 
 from grantr.fastapi import Caller, Unauthorized
 from grantr.grants import Grants, InMemoryStorage
+from portalr.analytics import InMemoryConsent, InMemoryRateLimiter, Relay
 from portalr.fastapi.router import portalr_router
 from portalr.fastapi.site import Site
-from portalr.readers import Grafana, Langfuse, LiteLLM, Loki, Prometheus, Readers, Tempo
+from portalr.readers import (
+    Analytics,
+    Grafana,
+    Langfuse,
+    LiteLLM,
+    Loki,
+    Prometheus,
+    Readers,
+    Tempo,
+)
 
 PREFIX = "/portalr"
 """Where applications mount the router."""
@@ -38,6 +48,7 @@ async def _no_one(_ids: Collection[str]) -> dict[str, str]:
 def openapi_app() -> FastAPI:
     """A bare application that mounts only the router, with every tool, and admits no caller."""
     app = FastAPI(title="portalr", version="1")
+    analytics = Analytics("http://clickhouse", b"key")
     readers = Readers(
         tempo=Tempo("http://tempo"),
         loki=Loki("http://loki"),
@@ -45,13 +56,16 @@ def openapi_app() -> FastAPI:
         langfuse=Langfuse("http://langfuse", project="project"),
         litellm=LiteLLM("http://litellm"),
         grafana=Grafana("http://grafana"),
+        analytics=analytics,
     )
+    relay = Relay(analytics, InMemoryConsent(), InMemoryRateLimiter())
     router = portalr_router(
         resolve_actor=_nobody,
         grants=Grants(InMemoryStorage()),
         readers=readers,
         invite=_no_invite,
         people=_no_one,
+        relay=relay,
         site=Site(supabase_url="http://supabase", supabase_key="publishable"),
         ui=Path("static"),
     )

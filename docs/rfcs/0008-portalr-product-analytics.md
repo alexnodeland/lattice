@@ -284,6 +284,23 @@ Langfuse's own load wasn't run beside it here, so its memory with Langfuse on wa
 
 So the person sees their events gone at once, and so does an operator's ordinary read. An operator who reads with the mask off, or a backup from before, can still find them until the merge or the backup's expiry.
 
+## The browser's slice as built
+
+- **The OpenAPI document** now has the relay's routes: `portalr.fastapi.openapi` builds the router with a relay. The batch's schema is written in place, so the client's types cover it.
+- **The consent switch** is in the account menu, beside colour-blind friendly charts, under "Privacy". It is shown only where `config.json`'s `readers.analytics` is true.
+  - It is a checkbox menu item, off until the person turns it on, and turned off with the same one click.
+  - Its description is read out with it (`aria-describedby`).
+  - There is no banner, no pre-ticked box, and nothing that asks again.
+  - It sits beside a link to the privacy guide's "Product analytics", which says what is shared and how it is kept.
+  - A status region, there from the start, tells a screen reader the answer as it changes. Where a no's deletion isn't done yet, the menu and the status say so, from the relay's answer read (`GET` returns `deleting`), so it holds across a reload, and is read again every 30 seconds until the relay has done it.
+  - The wording, as the owner decided (2026-10-23): **"Share how I use the app"**, described as **"Which pages you open, never what you write. Turning it off deletes what you shared."**; the link **"What is shared, and how it is kept (opens in a new tab)"**; and, while a deletion is owed, **"Deleting what you shared hasn't finished yet. It will be retried until it is done."** An answer the relay didn't record puts the switch back, and the status says **"Your answer wasn't saved, so nothing has changed. Try again."**.
+- **Capture** is an add-on of its own (`ui/src/on-demand/analytics.ts`, 550 bytes gzipped, under a 600-byte ceiling). It is fetched only once the person's answer is yes, so someone who never says yes never loads it.
+  - It sends `app.page.viewed.v1` for each page the person opens in a tenant, named by the router's own `fullPath` (`/t/$tenant/w/$workspace/runs`), never the address in the bar.
+  - Events wait in memory and go ten at a time, or after five seconds, under a session id portalr signs for the person; a session the relay no longer takes is signed afresh, and the batch sent again, once. A no, or leaving the tenant, closes the capture: what waits is dropped, unsent.
+  - A batch the relay doesn't take is dropped, never retried, and never fails a screen.
+- **The app's bundles,** measured against main as it stood (2026-10-23): the first load is 201,933 of its 203,000 bytes, against main's 202,276, so no larger, the chunks falling out differently; the total is 520,443 bytes, about 1.9 KB more than main's 518,532, for the consent read, the switch with its rollback and the status region, so its ceiling was raised to 521,000 (ADR-0040). The capture code is outside both, in its own 600-byte add-on (550 bytes).
+- **Not yet:** other events than page views (threads, messages, artifacts and integrations are in the registry, for screens to send later), and admin, which sends nothing.
+
 ## Drawbacks
 
 - Langfuse and analytics share one ClickHouse's CPU, memory and disk. A heavy funnel can slow Langfuse's writes, so each user gets a quota.
@@ -347,17 +364,16 @@ Settled by the relay's slice: lightweight deletes on 26.9 (below).
 
 Still open:
 
-1. **The OpenAPI document** lacks the relay's routes: they are mounted only when a relay is given, and `portalr.fastapi.openapi` builds the document without one. Their `413`, `422` and `429` answers and the batch's schema are declared on the routes, for when it does (the browser's slice).
-2. **Browser events carry no workspace**: the workspace isn't the session's to vouch for, and the relay doesn't ask artifactr which workspaces a person may open. A per-workspace adoption view needs that check first.
-3. **The writer's `ALTER DELETE` reaches every tenant's rows** (stackr ADR-0044): portalr deletes only by a person's hash, but the grant isn't narrower.
-4. Whether grantr needs a removal hook, so a person removed from every tenant has their events deleted too; until then, it is their own no, or an operator's delete.
+1. **Browser events carry no workspace**: the workspace isn't the session's to vouch for, and the relay doesn't ask artifactr which workspaces a person may open. A per-workspace adoption view needs that check first.
+2. **The writer's `ALTER DELETE` reaches every tenant's rows** (stackr ADR-0044): portalr deletes only by a person's hash, but the grant isn't narrower.
+3. Whether grantr needs a removal hook, so a person removed from every tenant has their events deleted too; until then, it is their own no, or an operator's delete.
 
 ## Tracking
 
 - [x] Phase 0: this RFC and [stackr ADR-0044](../stackr/adr/0044-clickhouse-a-profile-of-its-own-and-portalrs-analytics-users.md)
 - [x] The first slice
 - [x] Relay and consent (the server's side)
-- [ ] Browser capture and the consent UI
+- [x] Browser capture and the consent UI
 - [ ] Grafana's datasource and dashboard
 - [ ] Adoption read and page
 - [ ] Traces both ways

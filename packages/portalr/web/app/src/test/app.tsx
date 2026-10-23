@@ -117,6 +117,8 @@ export interface World {
   readonly surfaces?: Partial<Config["surfaces"]>;
   readonly editors?: Config["editors"];
   readonly apps?: Config["apps"];
+  /** The tools the deployment reads, past the defaults. */
+  readonly readers?: Config["readers"];
 }
 
 /** The app, opened at `path`, over `serve` and streams that answer as `answer` does. */
@@ -141,6 +143,7 @@ export async function open(
     surfaces: { ...CONFIG.surfaces, ...world.surfaces },
     editors: world.editors ?? CONFIG.editors,
     apps: world.apps ?? CONFIG.apps,
+    readers: { ...CONFIG.readers, ...world.readers },
   };
   const api = createApi(config.surfaces, () => ({ token: "t0k3n" }));
   const router = createRouter({
@@ -149,6 +152,7 @@ export async function open(
     context: {
       config,
       signed: new Alice(config, () => undefined),
+      api,
       queries: createQueries(api),
       commands: createCommands(api, () => undefined),
       queryClient,

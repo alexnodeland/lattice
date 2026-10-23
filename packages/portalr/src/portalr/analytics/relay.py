@@ -49,7 +49,7 @@ Short = Annotated[str, StringConstraints(max_length=MOST_VALUE)]
 class Event(BaseModel):
     """One event, as a browser sends it: its name, the route it was on, and the registry's keys."""
 
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
 
     event: Annotated[str, StringConstraints(max_length=64)]
     route: Short | None = None
@@ -61,7 +61,7 @@ class Event(BaseModel):
 class Batch(BaseModel):
     """A browser's events, in the session portalr signed for it."""
 
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
 
     session: Annotated[str, StringConstraints(max_length=128)]
     events: Annotated[list[Event], Field(min_length=1, max_length=MOST_EVENTS)]
@@ -87,9 +87,15 @@ class Session(BaseModel):
 class Answer(BaseModel):
     """A person's answer to product analytics: yes, or no."""
 
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
 
     given: bool
+
+
+class Consented(Answer):
+    """A person's answer, as read: and whether a deletion their no asked for is still to be done."""
+
+    deleting: bool = False
 
 
 class Answered(Answer):

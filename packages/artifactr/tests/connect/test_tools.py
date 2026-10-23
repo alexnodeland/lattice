@@ -52,6 +52,7 @@ from artifactr.connect import (
     Vetted,
     connected_app_tools,
     digest,
+    per_hour_setting,
 )
 from artifactr.core import (
     Actor,
@@ -1179,3 +1180,32 @@ async def test_counting_and_approving_read_back_past_a_page(world: World) -> Non
 def everything_on(world: World) -> Switch:
     world.switch.on |= {FAKE.key, FAKE.code_key}
     return world.switch
+
+
+async def test_the_hourly_limit_is_read_from_settings_each_call_and_fails_closed(
+    world: World,
+) -> None:
+    world.switch.on |= {FAKE.key, FAKE.code_key}
+    limits: dict[str, Any] = {"connect-per-hour:fake": 1}
+    reads: list[tuple[str, str, str]] = []
+
+    class Store:
+        async def value(self, tenant_id: str, workspace_id: str, key: str, /) -> Any:
+            reads.append((tenant_id, workspace_id, key))
+            if key not in limits:
+                raise KeyError(key)
+            return limits[key]
+
+    connection = connected(
+        allow=("execute_code",),
+        secrets=("FAKE_TOKEN",),
+        per_hour=per_hour_setting(Store(), "fake"),
+    )
+    assert await connection.per_hour("acme", "w1") == 1
+    limits["connect-per-hour:fake"] = 0
+    assert await connection.per_hour("acme", "w1") == 0, "read each call, no cache"
+    limits.clear()
+    assert await connection.per_hour("acme", "w1") == 0, "a key it doesn't know: none"
+    limits["connect-per-hour:fake"] = ("names",)
+    assert await connection.per_hour("acme", "w1") == 0, "not a number: none"
+    assert reads == [("acme", "w1", "connect-per-hour:fake")] * 4

@@ -35,6 +35,7 @@ GRANTR_ACTIONS: Final = frozenset(
         "revoke_key",
         "restrict",
         "manage_integrations",
+        "manage_settings",
         "read_audit",
         "grant_operator",
     )
@@ -51,11 +52,15 @@ RESTRICT: Final = "grantr:restrict"
 MANAGE_INTEGRATIONS: Final = "grantr:manage_integrations"
 """Switching integrations on or off, on the tenant or in a workspace, and reading how they are."""
 
+MANAGE_SETTINGS: Final = "grantr:manage_settings"
+"""Narrowing settings, on the tenant or in a workspace, and reading how they are (lattice
+ADR-0030)."""
+
 WORKSPACE_GRANTS: Final = frozenset(
-    {"grantr:grant", "grantr:revoke", "grantr:restrict", MANAGE_INTEGRATIONS}
+    {"grantr:grant", "grantr:revoke", "grantr:restrict", MANAGE_INTEGRATIONS, MANAGE_SETTINGS}
 )
-"""grantr's actions a workspace's admins hold within it: granting, restricting, and switching its
-integrations."""
+"""grantr's actions a workspace's admins hold within it: granting, restricting, switching its
+integrations and narrowing its settings."""
 
 FEEDBACK: Final = frozenset({"artifactr:give_feedback", "reflexr:give_feedback"})
 """The commands a viewer may send: feedback on what they read."""

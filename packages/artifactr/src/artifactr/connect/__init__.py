@@ -17,6 +17,7 @@ from artifactr.connect.connection import (
     ConnectionFailed,
     PerHour,
     ProcessLock,
+    per_hour_setting,
 )
 from artifactr.connect.registry import (
     BLENDER,
@@ -68,5 +69,6 @@ __all__ = [
     "Vetted",
     "connected_app_tools",
     "digest",
+    "per_hour_setting",
     "scan",
 ]

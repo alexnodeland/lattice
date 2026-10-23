@@ -444,3 +444,38 @@ async def test_a_connection_that_names_no_tenant_adds_no_creation_either(
         await connection.execute(text("SELECT set_config('lattice.tenant_id', '', false)"))
         with pytest.raises(ProgrammingError, match="row-level security"):
             await connection.execute(DEPLOYMENT_ENTRY, _entry(CREATION, tenant=""))
+
+
+SETTINGS = text("SELECT tenant_id, workspace, key FROM grantr_settings ORDER BY tenant_id")
+ANOTHERS_SETTING = text(
+    "INSERT INTO grantr_settings (tenant_id, workspace, key, value, version, written)"
+    " VALUES ('globex', 'w1', 'connect-per-hour:freecad', '1', 1, CAST(:written AS json))"
+)
+
+
+@pytest.mark.postgres
+async def test_a_tenant_neither_reads_nor_writes_anothers_settings(
+    engines: tuple[AsyncEngine, AsyncEngine],
+) -> None:
+    owner, application = engines
+    storage = SqlStorage(application, row_level_security=True, across_tenants=owner)
+    grants = Grants(storage, catalogs=[ARTIFACTR])
+    for tenant in ("acme", "globex"):
+        by = User(id=f"{tenant}-owner")
+        await grants.set_setting(tenant, "connect-per-hour:freecad", 3, by=by)
+    async with _session(application, "acme") as session:
+        assert [tuple(row) for row in await session.execute(SETTINGS)] == [
+            ("acme", "", "connect-per-hour:freecad")
+        ]
+        connection = await session.connection()
+        for statement in (
+            "UPDATE grantr_settings SET value = '1000'",
+            "DELETE FROM grantr_settings",
+        ):
+            changed = await connection.execute(text(f"{statement} WHERE tenant_id = 'globex'"))
+            assert changed.rowcount == 0
+    written = json.dumps({"by": {"kind": "user", "id": "x"}, "at": "2026-10-22T00:00:00Z"})
+    with pytest.raises(ProgrammingError, match="row-level security"):
+        async with _session(application, "acme") as session:
+            await session.execute(ANOTHERS_SETTING, {"written": written})
+    assert await grants.value("globex", "w1", "connect-per-hour:freecad") == 3

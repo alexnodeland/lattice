@@ -90,5 +90,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0084](0084-what-a-run-records-of-its-calls-and-who-reads-it.md) | What a run records of its calls and its failure, and who reads it | Accepted |
 | [0085](0085-connected-apps-an-operators-own-freecad-or-blender-through-a-vetted-mcp-server.md) | Connected apps: an operator's own FreeCAD or Blender, through a vetted MCP server | Proposed |
 | [0086](0086-diagrams-data-an-element-scoped-patch-and-its-checks.md) | Diagrams' data: an element-scoped patch and its checks | Proposed |
+| [0087](0087-a-connected-apps-hourly-limit-read-from-settings.md) | A connected app's hourly limit, read from settings | Proposed |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

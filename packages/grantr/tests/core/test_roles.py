@@ -63,6 +63,7 @@ def test_rule_management_is_the_workspace_admins_alone() -> None:
         "grantr:revoke",
         "grantr:restrict",
         "grantr:manage_integrations",
+        "grantr:manage_settings",
     }
 
 

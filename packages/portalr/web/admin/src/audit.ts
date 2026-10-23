@@ -48,6 +48,7 @@ export function peopleOf(entry: AuditEntry): string[] {
     case "restricted":
     case "unrestricted":
     case "integration_set":
+    case "setting_set":
       break;
     default:
       // Every type is read above: a new type of grantr's fails to typecheck here.
@@ -102,6 +103,15 @@ export function said(event: AuditEvent, names: Names = shortId): string {
         ? `set ${event.key} back to the default in the tenant`
         : `set ${event.key} back to inherited in ${place}`;
     }
+    case "setting_set": {
+      const place = event.workspace === null ? "the tenant" : `workspace ${event.workspace}`;
+      const value = (v: number | readonly string[]) => (typeof v === "number" ? `${v}` : listed(v));
+      if (event.new === null) {
+        return `unset ${event.key} in ${place}`;
+      }
+      const from = event.old === null ? "" : ` from ${value(event.old)}`;
+      return `set ${event.key}${from} to ${value(event.new)} in ${place}`;
+    }
     default: {
       // Every type is read above: a new type of grantr's fails to typecheck here.
       const unread: never = event;
@@ -129,6 +139,7 @@ const LABELS: Record<AuditType, string> = {
   restricted: "Restrictions",
   unrestricted: "Restrictions lifted",
   integration_set: "Integrations switched",
+  setting_set: "Settings narrowed",
   tenant_created: "Tenant created",
   deployment_tenant_created: "Tenant created (deployment)",
   tenant_deleted: "Tenant deleted",

@@ -5,6 +5,7 @@
  */
 
 import { afterEach, expect, test, vi } from "vitest";
+import { userEvent } from "vitest/browser";
 import { holderOf, wordsChanged } from "./native-file";
 import { open } from "./test/app";
 import { AT, FILE, FLAGS, PNG, REVISIONS, status } from "./test/files";
@@ -183,4 +184,38 @@ test("words change only between texts", () => {
   expect(wordsChanged(text("a"), text("a"))).toBe(false);
   expect(wordsChanged(text(null), text("b"))).toBe(false);
   expect(wordsChanged(text("a"), text(null))).toBe(false);
+});
+
+test("a download keeps the focus while it goes, says so politely, and is tried again only once", async () => {
+  let asked = 0;
+  let release: () => void = () => {};
+  const held = new Promise<void>((done) => {
+    release = done;
+  });
+  const { screen } = await open("/t/acme/w/notes/artifacts/doc_1", async (request, path) => {
+    if (path.endsWith("/content")) {
+      asked += 1;
+      await held;
+      return new Response("gone", { status: 503 });
+    }
+    return serving()(request, path);
+  });
+  const button = screen.getByRole("button", { name: "Download" });
+  await expect.element(button).toBeVisible();
+  (button.element() as HTMLElement).focus();
+  await userEvent.keyboard("{Enter}");
+  const going = screen.getByRole("button", { name: "Downloading…" });
+  await expect.element(going).toHaveFocus();
+  await expect.element(going).toHaveAttribute("aria-disabled", "true");
+  // Pressed again while it goes, it starts nothing more.
+  await userEvent.keyboard("{Enter}");
+  await expect
+    .element(screen.getByRole("status").filter({ hasText: "Downloading…" }))
+    .toBeInTheDocument();
+  release();
+  await expect
+    .element(screen.getByText("The file wasn't downloaded. Try again in a moment."))
+    .toBeVisible();
+  expect(asked).toBe(2);
+  await expect.element(screen.getByRole("button", { name: "Download" })).toHaveFocus();
 });

@@ -72,6 +72,7 @@ Langfuse and LiteLLM aren't in that stack, so their reads answer `unavailable` t
 | `/sign-in` | An email and a password |
 | `/` | The person's tenants, from grantr's `/me`: none is no access, and one goes straight to it |
 | `/t/$tenant` | The workspaces grantr says they can open there |
+| `/t/$tenant/$` | A page that isn't there under a tenant: "Page not found", on a plain page ([ADR-0068](adr/0068-where-the-focus-goes-and-one-not-found.md)) |
 | `/t/$tenant/w/$workspace` | A workspace's threads, and a new one; its artifactr stream is open while any of its routes is, and its integrations are read as it opens |
 | `/t/$tenant/w/$workspace/threads/$thread` | A thread's chat: its messages, and among them the artifacts made in it, each kind the app draws: a mini app running ([ADR-0052](adr/0052-artifacts-inline-in-their-thread.md)), a form sent from there, and a native file read a page at a time, or its cells, and checked out or edited in its framed editor ([ADR-0055](adr/0055-every-kind-inline-and-a-native-file-read-and-edited-in-its-thread.md)), its runs as they stream, what a paused run waits on, its proposals, and a message to post where grantr allows; and its menu, to restrict and share it ([ADR-0022](adr/0022-restricting-and-sharing-a-thread.md)) |
 | `/t/$tenant/w/$workspace/artifacts` | The workspace's artifacts that aren't archived, each by kind and latest version |
@@ -80,6 +81,7 @@ Langfuse and LiteLLM aren't in that stack, so their reads answer `unavailable` t
 | `/t/$tenant/w/$workspace/runs` | The agent's turns and the rules' runs, newest first, with Stop, Retry, Skip and Cancel as each library and grantr allow, and thumbs on each; a rule's run links to the tracker items its chain filed, from relayr's read, and to those whose `tracker:` events set it off ([ADR-0046](adr/0046-tracker-links-on-runs.md)) |
 | `/t/$tenant/w/$workspace/rules` | The workspace's rules, each with its origin, version and how far it has read, the schedules that tick into it, and a stored rule installed from its JSON where grantr allows |
 | `/t/$tenant/w/$workspace/rules/$rule` | A rule: a code rule's JSON, or a stored rule's, edited and archived where grantr allows |
+| `/t/$tenant/w/$workspace/$` | A page that isn't there in a workspace: "Page not found", in its frame ([ADR-0068](adr/0068-where-the-focus-goes-and-one-not-found.md)) |
 
 TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test holds it to `src/routes/`. `moon run app:bdd` runs one feature per area through playwright-bdd, in Bun, against the test application with Supabase Auth (GoTrue, alone) in compose's `bdd` profile, served at `/auth/v1` on its origin ([ADR-0013](adr/0013-the-apps-scenarios-against-the-test-application.md)). The native files' scenarios check files out to the hosted editor, a stand-in for WordCraft's build that compose's `editor` profile serves on a port of its own, which the script starts first and names to the application ([ADR-0050](adr/0050-a-native-files-proposals-and-the-pilots-scenarios.md)).
 
@@ -130,6 +132,7 @@ Forms, dashboards and mini apps are switched on and off per workspace by an inte
 | `/sign-in` | An email and a password |
 | `/` | Where admin opens: its last choice while still the person's, their one tenant, every tenant for an operator, a choice, or no access |
 | `/t/$tenant` | A tenant someone owns or administers, in admin's frame, with the areas grantr allows |
+| `/t/$tenant/$` | A page that isn't there in a tenant they administer: "Page not found", in the frame ([ADR-0068](adr/0068-where-the-focus-goes-and-one-not-found.md)) |
 | `/t/$tenant/` | Home: members, workspaces, feedback, failed turns and spend, each a card from one read, with its own state |
 | `/t/$tenant/access/members`, `/groups`, `/keys`, `/roles`, `/grants` | Access: members, invited or made as service principals, and removed; groups; keys, a secret shown once, and revoked; roles, built in and custom; and grants, given and revoked. Each part where grantr allows its read, as a table or, on a phone, cards ([ADR-0024](adr/0024-access-members-groups-and-keys.md), [ADR-0025](adr/0025-access-roles-and-grants.md)) |
 | `/t/$tenant/integrations` | Integrations: on the tenant or in a workspace the address chooses, each integration switched on or off, or back to what it inherits, with where its state comes from, the tenant's off and the deployment's not installing as ceilings, and who set it there and when ([ADR-0045](adr/0045-integrations-in-admin-and-the-apps-read-of-them.md)) |

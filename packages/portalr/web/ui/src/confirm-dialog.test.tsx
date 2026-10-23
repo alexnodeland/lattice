@@ -4,6 +4,7 @@ import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { ConfirmDialog } from "./confirm-dialog";
 import { contrast, token } from "./test/colours";
+import { guardsFocused } from "./test/guards";
 
 function Archive({
   onConfirm = vi.fn(async () => undefined),
@@ -375,4 +376,18 @@ test("cancelling a dialog that sends focus elsewhere when done still returns it 
   await screen.getByRole("alertdialog").getByRole("button", { name: "Cancel" }).click();
   await expect.element(screen.getByRole("alertdialog")).not.toBeInTheDocument();
   await expect.element(screen.getByRole("button", { name: "Create", exact: true })).toHaveFocus();
+});
+
+test("Tab and Shift+Tab stay in it, never for a frame on a guard outside it", async () => {
+  const screen = await render(<Archive />);
+  await screen.getByRole("button", { name: "Archive" }).click();
+  const dialog = screen.getByRole("alertdialog", { name: "Archive portalr:triage?" });
+  await expect.element(dialog.getByRole("button", { name: "Cancel" })).toHaveFocus();
+  const guarded = await guardsFocused(async () => {
+    for (const shift of [false, false, false, true, true, true]) {
+      await userEvent.tab({ shift });
+      expect(dialog.element().contains(document.activeElement)).toBe(true);
+    }
+  });
+  expect(guarded).toEqual([]);
 });

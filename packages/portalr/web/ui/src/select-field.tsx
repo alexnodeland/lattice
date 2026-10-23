@@ -60,6 +60,9 @@ export function SelectField({
     <FormField label={label} hint={hint} error={error} className={className}>
       <Select.Root
         items={items}
+        // The pointer resting on a choice doesn't take the highlight or the focus, as on the
+        // platform's select: the keys keep them, and Tab leaves a list the pointer is over.
+        highlightItemOnHover={false}
         value={shown}
         onValueChange={(next) => {
           const picked = String(next ?? "");
@@ -89,7 +92,8 @@ export function SelectField({
                   <Select.Item
                     key={option.value}
                     value={option.value}
-                    className={`${item} data-selected:font-semibold`}
+                    // The pointer shows where it rests, as the keys' highlight doesn't follow it.
+                    className={`${item} hover:bg-wash data-selected:font-semibold`}
                   >
                     <Select.ItemText>{option.label}</Select.ItemText>
                     <Select.ItemIndicator className="text-accent">

@@ -123,14 +123,18 @@ test("Tab while it is open closes it, choosing nothing, and moves on", async () 
   const role = screen.getByRole("combobox", { name: "Role" });
   await role.click();
   await expect.element(page.getByRole("listbox")).toBeVisible();
-  // The click leaves the pointer resting on an option, and while it rests there, Tab leaves the
-  // list open with that option highlighted (#275's flake). That is a bug of its own, #568. The
-  // pointer is moved off the list, so this test checks the keys alone.
-  await commands.pointerAway();
+  // The pointer rests on an option, and stays there. It used to take the highlight and the focus
+  // there, so the arrow keys moved from wherever the pointer was, not from the choice: the
+  // flake this test had when the click left the pointer over the list. Now it takes neither.
+  await commands.pointAt("[role=option]:last-child");
   // The list takes the focus a frame after it is seen. A Tab before then leaves the trigger, and
   // the focus, arriving late, comes back into a list that stays open.
   await expect.poll(() => document.activeElement?.getAttribute("role")).toBe("option");
+  await expect
+    .element(page.getByRole("option", { name: "Owner" }))
+    .not.toHaveAttribute("data-highlighted");
   await userEvent.keyboard("{ArrowDown}");
+  // From the choice, Viewer, to its neighbour: not from Owner, the last, where the pointer rests.
   await expect
     .element(page.getByRole("option", { name: "Editor" }))
     .toHaveAttribute("data-highlighted");

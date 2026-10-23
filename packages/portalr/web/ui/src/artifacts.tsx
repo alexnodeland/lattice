@@ -6,7 +6,7 @@
  * a revision shows as its source and its changes (portalr ADR-0054).
  */
 
-import type { Change, Granularity } from "@portalr/client";
+import type { Change, Granularity } from "@portalr/client/diff";
 import { createContext, type ReactNode } from "react";
 import { cn } from "./cn";
 import { JsonView } from "./json-view";

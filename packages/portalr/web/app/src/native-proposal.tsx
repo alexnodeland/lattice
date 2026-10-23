@@ -6,7 +6,8 @@
  * the head when asked. A reviewer compares its pages and words with the head's, on demand.
  */
 
-import { type Artifactr, changes, keys, usePeople } from "@portalr/client";
+import { type Artifactr, keys, usePeople } from "@portalr/client";
+import { changes } from "@portalr/client/diff";
 import {
   Alert,
   Button,

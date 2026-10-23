@@ -1,4 +1,5 @@
-import { allowedIn, changes, keys, Refused, thumbs, useMe, workspaceOf } from "@portalr/client";
+import { allowedIn, keys, Refused, thumbs, useMe, workspaceOf } from "@portalr/client";
+import { changes } from "@portalr/client/diff";
 import {
   AppHostContext,
   ArtifactContent,

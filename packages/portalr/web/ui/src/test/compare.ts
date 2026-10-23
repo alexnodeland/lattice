@@ -1,4 +1,4 @@
-import type { Change, Granularity } from "@portalr/client";
+import type { Change, Granularity } from "@portalr/client/diff";
 
 /** Text cut as `client`'s `changes` cuts it: whole lines, or words and the spaces between. */
 const pieces = (text: string, by: Granularity) =>

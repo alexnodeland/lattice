@@ -124,6 +124,24 @@ class IntegrationRow(Base):
     setting: Mapped[dict[str, Any]] = mapped_column(JSON)
 
 
+class SettingRowRecord(Base):
+    """A setting on a tenant, with an empty workspace, or in one of its workspaces.
+
+    Its value is JSON, a number or names, null once unset; its version counts each change, for
+    a client to name; who set it and when are JSON, as an audit entry's body is.
+    """
+
+    __tablename__ = "grantr_settings"
+
+    tenant_id: Mapped[str] = mapped_column(primary_key=True)
+    workspace: Mapped[str] = mapped_column(primary_key=True)
+    key: Mapped[str] = mapped_column(primary_key=True)
+    value: Mapped[Any] = mapped_column(JSON, nullable=True)
+    version: Mapped[int] = mapped_column(Integer)
+    written: Mapped[dict[str, Any]] = mapped_column(JSON)
+    profile_version: Mapped[str | None] = mapped_column(nullable=True)
+
+
 class KeyRow(Base):
     """A service principal's key: its id, and its secret's digest, never the secret."""
 

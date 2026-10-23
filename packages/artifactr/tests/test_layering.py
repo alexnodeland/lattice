@@ -116,11 +116,14 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         {"evalr", "pydantic", "pydantic_ai", *OTEL_API},
     ),
     # Connected apps, the connect extra (ADR-0085): the agent's tools for an operator's own app,
-    # on the agent's and the workspace's public API, behind the switches lattice-core declares,
-    # over the MCP client the extra brings.
+    # on the agent's and the workspace's public API, behind the switches and settings
+    # lattice-core declares, over the MCP client the extra brings.
     "connect": (
         {*INNER, "artifactr.connect"},
-        {"pydantic_ai", "pydantic_core", "mcp", "anyio", "lattice_core.integrations"},
+        {
+            *("pydantic_ai", "pydantic_core", "mcp", "anyio"),
+            *("lattice_core.integrations", "lattice_core.settings"),
+        },
     ),
     # Native files, the files extra (lattice RFC-0003 and ADR-0026): built on the public API of
     # core and the workspace, with its SQL stores in the sql extra and the apps' adapters on the

@@ -74,6 +74,39 @@ test("each type of change reads as a sentence", () => {
       { type: "integration_set", workspace: null, key: "ui:mini-apps", on: null },
       "set ui:mini-apps back to the default in the tenant",
     ],
+    [
+      {
+        type: "setting_set",
+        workspace: "notes",
+        key: "connect-per-hour:freecad",
+        old: null,
+        new: 10,
+        version: 1,
+      },
+      "set connect-per-hour:freecad to 10 in workspace notes",
+    ],
+    [
+      {
+        type: "setting_set",
+        workspace: null,
+        key: "connect-per-hour:freecad",
+        old: 20,
+        new: 10,
+        version: 2,
+      },
+      "set connect-per-hour:freecad from 20 to 10 in the tenant",
+    ],
+    [
+      {
+        type: "setting_set",
+        workspace: null,
+        key: "connect-per-hour:freecad",
+        old: 10,
+        new: null,
+        version: 3,
+      },
+      "unset connect-per-hour:freecad in the tenant",
+    ],
   ];
   for (const [event, sentence] of cases) {
     expect(said(event)).toBe(sentence);
@@ -81,7 +114,7 @@ test("each type of change reads as a sentence", () => {
 });
 
 test("the filter offers every type, and reads one back from the address", () => {
-  expect(TYPES).toHaveLength(16);
+  expect(TYPES).toHaveLength(17);
   expect(TYPES.find((type) => type.value === "tenant_created")?.label).toBe("Tenant created");
   expect(filterOf({ type: "granted" })).toEqual({ type: "granted" });
   expect(filterOf({ type: "nonsense" })).toEqual({});

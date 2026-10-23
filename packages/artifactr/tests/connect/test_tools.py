@@ -69,7 +69,7 @@ from artifactr.core import (
 )
 from artifactr.workspace import Access, InMemoryStorage, Workspace, Workspaces
 from lattice_core.integrations import Defaults
-from lattice_core.settings import CONNECTED_TOOLS
+from lattice_core.settings import CONNECTED_TOOL_RISKS, CONNECTED_TOOLS
 from tests.agent.conftest import ALICE, Script, call, say
 from tests.artifact_types import Note
 
@@ -1215,11 +1215,12 @@ async def test_the_hourly_limit_is_read_from_settings_each_call_and_fails_closed
 
 def test_every_vetted_tool_but_the_hosts_is_one_a_workspace_may_offer() -> None:
     for server in (FREECAD, BLENDER):
-        vetted = {name for name, tool in server.tools.items() if tool.risk != "host"}
-        assert CONNECTED_TOOLS[server.app] == vetted, (
-            f"{server.app}'s tools changed: make CONNECTED_TOOLS in "
+        vetted = {name: tool.risk for name, tool in server.tools.items() if tool.risk != "host"}
+        assert dict(CONNECTED_TOOL_RISKS[server.app]) == vetted, (
+            f"{server.app}'s tools or their risks changed: make CONNECTED_TOOL_RISKS in "
             "packages/lattice-core/src/lattice_core/settings.py name the same ones"
         )
+        assert CONNECTED_TOOLS[server.app] == set(vetted)
 
 
 async def test_the_operator_offers_read_and_edit_tools_by_name(world: World) -> None:

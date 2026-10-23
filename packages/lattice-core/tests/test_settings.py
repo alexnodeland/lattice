@@ -166,3 +166,10 @@ def test_a_stored_number_is_clamped_into_a_changed_range_both_ways() -> None:
     raised = Setting("a", IntRange(10, 500), 100, "workspace", "A.")
     assert raised.kept(5) == 10, "a registry that raises its lowest permits no less"
     assert raised.kept(800) == 500
+
+
+def test_a_subsets_labels_name_only_its_names() -> None:
+    with pytest.raises(ValueError, match="labels names it doesn't have: x"):
+        Setting("a", Subset(frozenset({"r"})), ("r",), "workspace", "A.", labels={"x": "y"})
+    tools = KNOWN_SETTINGS["connect-tools:freecad"]
+    assert (tools.labels["execute_code"], tools.labels["get_view"]) == ("runs code", "reads")

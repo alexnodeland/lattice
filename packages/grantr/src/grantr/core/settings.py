@@ -67,6 +67,9 @@ class SettingKind(BaseModel):
     low: int | None = None
     high: int | None = None
     universe: list[str] | None = None
+    labels: dict[str, str] | None = None
+    """What each of a subset's names is, in words, where the registry says: such as a tool's
+    risk."""
 
 
 class SettingState(BaseModel):
@@ -129,7 +132,9 @@ def kind(setting: Setting) -> SettingKind:
     """A setting's kind, as JSON carries it."""
     if isinstance(setting.kind, IntRange):
         return SettingKind(type="int_range", low=setting.kind.low, high=setting.kind.high)
-    return SettingKind(type="subset", universe=sorted(setting.kind.universe))
+    return SettingKind(
+        type="subset", universe=sorted(setting.kind.universe), labels=dict(setting.labels)
+    )
 
 
 def state(

@@ -73,5 +73,6 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0065](0065-empty-error-and-not-found-states.md) | Empty, error and not-found states | Accepted |
 | [0066](0066-the-style-census-enforced.md) | The style census, enforced | Accepted |
 | [0067](0067-settings-in-admin.md) | Settings in admin | Proposed |
+| [0069](0069-a-connected-apps-tools-chosen-in-admin-and-a-way-in-for-workspace-admins.md) | A connected app's tools chosen in admin, and a way in for a workspace's admins | Proposed |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

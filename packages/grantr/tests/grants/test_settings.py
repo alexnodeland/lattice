@@ -344,7 +344,12 @@ async def test_a_workspace_offers_only_tools_the_tenant_keeps(storage: Storage) 
         Invalid, match="may be at most get_objects, get_view here: the tenant's value"
     ):
         await grants.set_setting("acme", key, ["create_object"], workspace="w1", by=BOB)
-    await grants.set_setting("acme", key, ["get_view"], workspace="w1", by=BOB)
+    state = await grants.set_setting("acme", key, ["get_view"], workspace="w1", by=BOB)
+    assert state.kind.labels is not None
+    assert (state.kind.labels["get_view"], state.kind.labels["execute_code"]) == (
+        "reads",
+        "runs code",
+    )
     assert await grants.value("acme", "w1", key) == ("get_view",)
     assert await grants.value("acme", "w2", key) == ("get_objects", "get_view")
     with pytest.raises(Invalid, match="names it knows, not rm"):

@@ -104,6 +104,11 @@ class FormatChanged(InvalidState):
         return {"checked_out": self.checked_out, "checked_in": self.checked_in}
 
 
+type PageKey = tuple[str, str, ArtifactId, str, str, int, float]
+"""A kept page's key: the tenant, the workspace, the file, its app, the blob's digest, the page
+and the scale."""
+
+
 LOOK_AGAIN: Final = 0.05
 """How often, in seconds, a page waiting for one of its tenant's readings looks again."""
 
@@ -159,6 +164,9 @@ class NativeFiles:
             the page and the scale, so a page asked for again doesn't reach the app: 64 MiB by
             default, 0 for none. A page is the same for any reader of the same bytes, and only
             a reader the workspace lets read them is given it.
+        waiting: How many of a tenant's pages may wait for one of its readings at once, past
+            which another is refused with `Busy` at once: eight by default, twice the pages a
+            viewer's first screen asks for.
 
     Raises:
         ValueError: If an edit's lease would end before the apps' deadline, or no app is given.
@@ -179,6 +187,7 @@ class NativeFiles:
         formats: Mapping[str, Format] = FORMATS,
         readings: int | None = 2,
         pages: int = 64 << 20,
+        waiting: int = 8,
     ) -> None:
         if edit_ttl.total_seconds() <= deadline:
             raise ValueError("an edit's lease must outlast the app's deadline, and the commit")
@@ -198,9 +207,15 @@ class NativeFiles:
         self._formats = formats
         self._readings = readings
         self._reading: Counter[str] = Counter()
+        self._waiting_most = waiting
+        self._waiting: Counter[str] = Counter()
         self._pages_most = pages
-        self._pages: OrderedDict[tuple[str, str, int, float], bytes] = OrderedDict()
+        self._pages: OrderedDict[PageKey, bytes] = OrderedDict()
         self._pages_held = 0
+
+    def waiting(self, tenant_id: str) -> int:
+        """How many of the tenant's pages wait for one of its readings now."""
+        return self._waiting[tenant_id]
 
     @property
     def readings(self) -> int | None:
@@ -639,7 +654,7 @@ class NativeFiles:
         """
         manifest = await _manifest_at(ws, artifact_id, version)
         app = self.app_of(type(manifest))
-        key = (app.name, manifest.content.sha256, page, 1.0)
+        key = _page_key(ws, artifact_id, app, manifest.content.sha256, page)
         if (png := self._page(key)) is not None:
             return png
 
@@ -683,18 +698,20 @@ class NativeFiles:
             AppFailed: If the app can't render it, or there is no such page.
             Busy: If the tenant has as many files being read or rendered as it may.
         """
-        source, file_type = await self._proposed(ws, proposal_id, "content")
+        artifact_id, named, file_type = await self._proposed_blob(ws, proposal_id, "content")
+        if named is None:  # a proposal that doesn't change the file's content has no page of it
+            raise ContentUnavailable(artifact_id, "content")
         app = self.app_of(file_type)
-        key = (app.name, hashlib.sha256(source).hexdigest(), page, 1.0)
+        key = _page_key(ws, artifact_id, app, named.sha256, page)
         if (png := self._page(key)) is not None:
             return png
 
         async def proposed() -> bytes:
-            return source
+            return await self._bytes(_scope(ws), artifact_id, named, "content")
 
         return await self._rendered(ws, app, key, proposed, admit)
 
-    def _page(self, key: tuple[str, str, int, float]) -> bytes | None:
+    def _page(self, key: PageKey) -> bytes | None:
         """A page rendered before, if this process still keeps it."""
         png = self._pages.get(key)
         if png is not None:
@@ -705,7 +722,7 @@ class NativeFiles:
         self,
         ws: Workspace,
         app: App,
-        key: tuple[str, str, int, float],
+        key: PageKey,
         source: Callable[[], Awaitable[bytes]],
         admit: Callable[[], None] | None,
     ) -> bytes:
@@ -714,8 +731,11 @@ class NativeFiles:
         A page waits a while for a reading, as a viewer's pages are asked for a few at once,
         and is counted against its reader's pace only once it has one.
         """
-        _, _, page, scale = key
+        *_, page, scale = key
         async with self._turn(ws.tenant_id, wait=self._deadline):
+            # Rendered by another while this one waited for its reading: given that one.
+            if (kept := self._page(key)) is not None:
+                return kept
             if admit is not None:
                 admit()
             png = await app.render(await source(), page, scale=scale, deadline=self._deadline)
@@ -730,11 +750,18 @@ class NativeFiles:
         self, ws: Workspace, proposal_id: ProposalId, part: Part
     ) -> tuple[bytes, type[NativeFile]]:
         """What a proposal would make of a part of a native file, and the file's type."""
+        artifact_id, named, file_type = await self._proposed_blob(ws, proposal_id, part)
+        return await self._bytes(_scope(ws), artifact_id, named, part), file_type
+
+    async def _proposed_blob(
+        self, ws: Workspace, proposal_id: ProposalId, part: Part
+    ) -> tuple[ArtifactId, Blob | None, type[NativeFile]]:
+        """The file a proposal is to, the blob it names for a part, if any, and the file's type."""
         proposal = await ws.proposal(proposal_id)
         head = await ws.get(NativeFile, proposal.artifact_id)
         change = proposal.change
         named = _replaced(change.patch, part) if isinstance(change, EditArtifact) else None
-        return await self._bytes(_scope(ws), proposal.artifact_id, named, part), type(head.data)
+        return proposal.artifact_id, named, type(head.data)
 
     # ─── collection ───────────────────────────────────────────────────────────
 
@@ -764,7 +791,16 @@ class NativeFiles:
         for artifact in await ws.artifacts(NativeFile, include_archived=True):
             for revision in await ws.revisions(artifact.id):
                 referenced |= {(artifact.id, sha256) for sha256 in digests(revision.data)}
-        return await self._blobs.collect(_scope(ws), referenced, before=before)
+        deleted = await self._blobs.collect(_scope(ws), referenced, before=before)
+        # The pages kept of bytes nothing names go too, so a page is never given for a digest
+        # whose bytes the store no longer has.
+        for key in [
+            key
+            for key in self._pages
+            if key[:2] == (ws.tenant_id, ws.workspace_id) and (key[2], key[4]) not in referenced
+        ]:
+            self._pages_held -= len(self._pages.pop(key))
+        return deleted
 
     # ─── what every write shares ──────────────────────────────────────────────
 
@@ -817,20 +853,30 @@ class NativeFiles:
     async def _turn(self, tenant_id: str, *, wait: float = 0.0) -> AsyncGenerator[None]:
         """Hold one of the tenant's readings while the app reads a file.
 
-        Without one free, it waits up to `wait` seconds for one, then refuses.
+        Without one free, it waits up to `wait` seconds for one, then refuses; so does one past
+        the tenant's waiting, at once. The waiters look again every `LOOK_AGAIN` seconds, not
+        in turn: whichever looks first after a reading is freed takes it (files ADR-0018).
 
         Raises:
-            Busy: If the tenant has all of its readings, for all of the wait.
+            Busy: If the tenant has all of its readings, for all of the wait, or as many pages
+                waiting as it may.
         """
         readings = self._readings
         if readings is not None and self._reading[tenant_id] >= readings:
+            if wait <= 0 or self._waiting[tenant_id] >= self._waiting_most:
+                raise Busy(readings)
             # Looked at again every so often, not woken: an application may serve requests on
             # several event loops, and a waiter tied to one can't be woken from another.
-            until = time.monotonic() + wait
-            while self._reading[tenant_id] >= readings:
-                if time.monotonic() >= until:
-                    raise Busy(readings)
-                await asyncio.sleep(LOOK_AGAIN)
+            self._waiting[tenant_id] += 1
+            try:
+                until = time.monotonic() + wait
+                while self._reading[tenant_id] >= readings:
+                    left = until - time.monotonic()
+                    if left <= 0:
+                        raise Busy(readings)
+                    await asyncio.sleep(min(LOOK_AGAIN, left))
+            finally:
+                self._waiting[tenant_id] -= 1
         self._reading[tenant_id] += 1
         try:
             yield
@@ -870,6 +916,18 @@ class NativeFiles:
         if found is None:
             raise ContentUnavailable(artifact_id, part)
         return found
+
+
+def _page_key(ws: Workspace, artifact_id: ArtifactId, app: App, sha256: str, page: int) -> PageKey:
+    """Where a page of a file's bytes is kept: by the blob, as the blob store keeps it.
+
+    The blob store keeps bytes by tenant, workspace, file and digest, so a page is kept and found
+    by all four too. A digest a proposal names is the proposer's to write, so a page kept for one
+    file's bytes is never given for another's that names the same digest. A page kept for a file
+    is a render of bytes that file holds: collection drops the pages of the bytes it may delete,
+    those nothing names, so a digest whose bytes are gone finds no page and is refused.
+    """
+    return (ws.tenant_id, ws.workspace_id, artifact_id, app.name, sha256, page, 1.0)
 
 
 def _canonical(value: JsonValue) -> bytes:

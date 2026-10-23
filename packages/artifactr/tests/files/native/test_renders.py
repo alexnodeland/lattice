@@ -3,15 +3,22 @@ never a starved worker's cause; and an upload to a hidden file's id, refused bef
 """
 
 import asyncio
+from datetime import timedelta
 
 import pytest
+from pydantic import JsonValue
 
+import artifactr.files.native.files as files_module
 from artifactr.core import (
     Actor,
     AgentActor,
+    EditArtifact,
     InvalidState,
+    JsonPatch,
     NotFound,
+    ProposeChange,
     Proposed,
+    RespondToProposal,
     TenantId,
     UserActor,
     Visibility,
@@ -19,9 +26,10 @@ from artifactr.core import (
 )
 from artifactr.files.app import AppCommand, AppFailed, FakeApp, Inspection
 from artifactr.files.blobs import once
-from artifactr.files.manifest import NativeFile, WordDocument
-from artifactr.files.native import Busy, NativeFiles
-from artifactr.workspace import InMemoryStorage, Workspace, Workspaces
+from artifactr.files.manifest import DOCX, Blob, NativeFile, WordDocument
+from artifactr.files.native import Busy, ContentUnavailable, NativeFiles
+from artifactr.workspace import InMemoryStorage, Scope, Workspace, Workspaces
+from tests.files.clock import FakeClock
 from tests.files.conftest import Stores
 from tests.files.native.test_uploads import JSON_DOCX
 
@@ -270,3 +278,197 @@ async def test_an_upload_to_a_hidden_files_id_is_refused_before_it_is_read(
         await uploaded(files, bob, "a1")
     assert Counting.read == 1, "Bob's file was never read"
     assert [a.id for a in await alice.artifacts(NativeFile)] == ["a1"]
+
+
+async def waiting(files: NativeFiles, tenant_id: str) -> None:
+    """Return once one of the tenant's pages waits for a reading, as the files say."""
+    for _ in range(100_000):
+        if files.waiting(tenant_id):
+            return
+        await asyncio.sleep(0)
+    raise AssertionError("no page waited")
+
+
+async def test_past_the_tenants_waiting_a_page_is_refused_at_once(stores: Stores) -> None:
+    app = Gated()
+    files = NativeFiles(
+        stores.blobs, stores.checkouts, app, formats=JSON_DOCX, pages=0, deadline=5.0, waiting=1
+    )
+    ws = await Workspaces(InMemoryStorage()).open("acme", "w1", actor=ALICE)
+    await uploaded(files, ws, "a1")
+    held = [asyncio.create_task(files.render(ws, "a1", 1)) for _ in range(2)]
+    await app.holding(2)
+    waiter = asyncio.create_task(files.render(ws, "a1", 1))
+    await waiting(files, "acme")
+    started = asyncio.get_running_loop().time()
+    with pytest.raises(Busy):
+        await files.render(ws, "a1", 1)
+    assert asyncio.get_running_loop().time() - started < 1, "refused at once, not after its wait"
+    app.through.set()
+    await asyncio.gather(*held, waiter)
+    assert files.waiting("acme") == 0, "the waiter gave its place back"
+
+
+async def test_a_page_that_waited_finds_one_rendered_meanwhile(stores: Stores) -> None:
+    app = Gated()
+    files = native(stores, app)
+    ws = await Workspaces(InMemoryStorage()).open("acme", "w1", actor=ALICE)
+    await uploaded(files, ws, "a1")
+    asked = [asyncio.create_task(files.render(ws, "a1", 1)) for _ in range(3)]
+    await app.holding(2)
+    app.through.set()
+    pages = await asyncio.gather(*asked)
+    assert len(set(pages)) == 1
+    assert app.waiting == 2, "the third, which waited, found the page kept once it had a reading"
+
+
+async def test_a_waiters_place_is_given_back_when_it_is_cancelled_or_refused(
+    stores: Stores,
+) -> None:
+    app = Gated()
+    files = native(stores, app, pages=0, deadline=0.2)
+    ws = await Workspaces(InMemoryStorage()).open("acme", "w1", actor=ALICE)
+    await uploaded(files, ws, "a1")
+    held = [asyncio.create_task(files.render(ws, "a1", 1)) for _ in range(2)]
+    await app.holding(2)
+    cancelled = asyncio.create_task(files.render(ws, "a1", 1))
+    await waiting(files, "acme")
+    cancelled.cancel()
+    await asyncio.gather(cancelled, return_exceptions=True)
+    assert files.waiting("acme") == 0, "cancelled"
+    with pytest.raises(Busy):
+        await files.render(ws, "a1", 1)
+    assert files.waiting("acme") == 0, "refused at its deadline"
+    app.through.set()
+    await asyncio.gather(*held)
+
+
+async def test_a_waiters_deadline_is_exact(stores: Stores, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The waiter's sleeps, on a clock of the test's: the last is what is left of its deadline."""
+    app = Gated()
+    files = native(stores, app, pages=0, deadline=0.12)
+    ws = await Workspaces(InMemoryStorage()).open("acme", "w1", actor=ALICE)
+    await uploaded(files, ws, "a1")
+    held = [asyncio.create_task(files.render(ws, "a1", 1)) for _ in range(2)]
+    await app.holding(2)
+    now, slept = [100.0], []
+    sleep = asyncio.sleep
+
+    async def asleep(seconds: float) -> None:
+        slept.append(round(seconds, 6))
+        now[0] += seconds
+        await sleep(0)
+
+    monkeypatch.setattr(files_module.time, "monotonic", lambda: now[0])
+    monkeypatch.setattr(files_module.asyncio, "sleep", asleep)
+    with pytest.raises(Busy):
+        await files.render(ws, "a1", 1)
+    monkeypatch.undo()
+    assert slept == [0.05, 0.05, 0.02], "refused at its deadline, not a look later"
+    app.through.set()
+    await asyncio.gather(*held)
+
+
+async def proposal_naming(files: NativeFiles, ws: Workspace, blob: Blob) -> str:
+    """A proposal to the file a1 whose content is the blob given."""
+    agent = ws.as_actor(AgentActor(thread_id="t1", on_behalf_of=ALICE))
+    op: dict[str, JsonValue] = {
+        "op": "replace",
+        "path": "/content",
+        "value": blob.model_dump(mode="json"),
+    }
+    change = EditArtifact(artifact_id="a1", base_version=1, patch=JsonPatch(ops=(op,)))
+    proposed = await agent.commit(ProposeChange(change=change))
+    assert isinstance(proposed, Proposed)
+    return proposed.proposal_id
+
+
+async def test_a_page_kept_for_one_file_is_never_given_for_a_digest_another_names(
+    stores: Stores,
+) -> None:
+    app = Serial()
+    files = native(stores, app)
+    workspaces = Workspaces(InMemoryStorage())
+    globex = await workspaces.open("globex", "w1", actor=BOB)
+    await files.upload(
+        globex, WordDocument, "g.docx", once(FakeApp.file("Theirs")), artifact_id="g1"
+    )
+    theirs = (await globex.get(WordDocument, "g1")).data.content
+    await files.render(globex, "g1", 1)  # kept, for globex's file
+    acme = await workspaces.open("acme", "w1", actor=ALICE)
+    await uploaded(files, acme, "a1")
+    with pytest.raises(ContentUnavailable):
+        await files.render_proposed(acme, await proposal_naming(files, acme, theirs), 1)
+    absent = theirs.model_copy(update={"sha256": "0" * 64})
+    with pytest.raises(ContentUnavailable):
+        await files.render_proposed(acme, await proposal_naming(files, acme, absent), 1)
+
+
+async def test_a_page_kept_for_one_file_is_never_given_for_another_files_digest(
+    stores: Stores,
+) -> None:
+    app = Serial()
+    files = native(stores, app)
+    ws = await Workspaces(InMemoryStorage()).open("acme", "w1", actor=ALICE)
+    await uploaded(files, ws, "a1")
+    await files.upload(ws, WordDocument, "b.docx", once(FakeApp.file("Other")), artifact_id="a2")
+    others = (await ws.get(WordDocument, "a2")).data.content
+    await files.render(ws, "a2", 1)  # kept, for a2, in the same workspace
+    with pytest.raises(ContentUnavailable):
+        await files.render_proposed(ws, await proposal_naming(files, ws, others), 1)
+
+
+async def test_a_page_whose_bytes_were_collected_is_given_no_more(
+    stores: Stores, clock: FakeClock
+) -> None:
+    app = Serial()
+    files = NativeFiles(stores.blobs, stores.checkouts, app, formats=JSON_DOCX, clock=clock)
+    ws = await Workspaces(InMemoryStorage()).open("acme", "w1", actor=ALICE)
+    await uploaded(files, ws, "a1")
+    one = await stores.blobs.put(Scope("acme", "w1"), "a1", once(FakeApp.file("One")), DOCX)
+    first = await proposal_naming(files, ws, one)
+    await files.render_proposed(ws, first, 1)  # kept
+    await ws.commit(RespondToProposal(proposal_id=first, decision="reject"))
+    clock.advance(timedelta(days=2))
+    assert await files.collect(ws) == 1, "the rejected proposal's bytes are collected"
+    with pytest.raises(ContentUnavailable):
+        await files.render_proposed(ws, await proposal_naming(files, ws, one), 1)
+
+
+async def test_proposals_naming_one_blob_render_it_once_and_others_their_own(
+    stores: Stores,
+) -> None:
+    app = Serial()
+    files = native(stores, app)
+    ws = await Workspaces(InMemoryStorage()).open("acme", "w1", actor=ALICE)
+    await uploaded(files, ws, "a1")
+    scope = Scope("acme", "w1")
+    one = await stores.blobs.put(scope, "a1", once(FakeApp.file("One")), DOCX)
+    two = await stores.blobs.put(scope, "a1", once(FakeApp.file("Two")), DOCX)
+    first, again = [await proposal_naming(files, ws, one) for _ in range(2)]
+    other = await proposal_naming(files, ws, two)
+    page = await files.render_proposed(ws, first, 1)
+    assert await files.render_proposed(ws, again, 1) == page
+    assert app.rendered == 1, "the same blob, under two proposals, rendered once"
+    assert await files.render_proposed(ws, other, 1) != page
+    assert app.rendered == 2, "another blob isn't the first's page"
+
+
+async def test_a_proposal_that_changes_no_content_has_no_page(stores: Stores) -> None:
+    app = Gated()
+    files = native(stores, app)
+    ws = await Workspaces(InMemoryStorage()).open("acme", "w1", actor=ALICE)
+    await uploaded(files, ws, "a1")
+    agent = ws.as_actor(AgentActor(thread_id="t1", on_behalf_of=ALICE))
+    op: dict[str, JsonValue] = {"op": "replace", "path": "/name", "value": "renamed.docx"}
+    change = EditArtifact(artifact_id="a1", base_version=1, patch=JsonPatch(ops=(op,)))
+    proposed = await agent.commit(ProposeChange(change=change))
+    assert isinstance(proposed, Proposed)
+    paced: list[int] = []
+    held = [asyncio.create_task(files.render(ws, "a1", 1)) for _ in range(2)]
+    await app.holding(2)  # both readings taken: one asked for now would wait, then be refused
+    with pytest.raises(ContentUnavailable):
+        await files.render_proposed(ws, proposed.proposal_id, 1, admit=lambda: paced.append(1))
+    assert (paced, files.waiting("acme")) == ([], 0), "refused before a reading or the pace"
+    app.through.set()
+    await asyncio.gather(*held)

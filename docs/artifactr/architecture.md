@@ -602,7 +602,7 @@ With `Workspaces(gate=integration_gate(integrations, ui_key_of))` ([ADR-0080](ad
 
 `FormChanged` and `FormClosed` are `invalid_state` refusals whose payload adds `reason`, `"changed"` or `"closed"`, and the target, so a client tells them apart without reading the message; every surface sends a refusal's payload as it is.
 
-What artifactr refuses itself, a second answer, a stale edit or an id in use, is left to it, so its refusal is the one a client sees.
+What artifactr refuses itself, a second answer, a stale edit or an id in use, is left to it, so its refusal is the one a client sees. An id in use is `AlreadyExists`: `invalid_state` with `reason: "already_exists"`, the `entity` and the `id`.
 
 ### The agent's tools
 

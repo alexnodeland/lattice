@@ -113,6 +113,25 @@ class InvalidState(Rejection):
     code: ClassVar[str] = "invalid_state"
 
 
+class AlreadyExists(InvalidState):
+    """What a create names is there already: an id is used once.
+
+    Its type is ``invalid_state``, as before, and it says why in ``reason``, with what was there,
+    so a client tells a create sent again after a lost answer from any other refusal by its fields,
+    not its words.
+    """
+
+    def __init__(self, entity: str, id: str) -> None:
+        super().__init__(f"{entity} {id} already exists")
+        self.entity = entity
+        self.id = id
+
+    @override
+    def details(self) -> dict[str, JsonValue]:
+        """Return why, and what is there."""
+        return {"reason": "already_exists", "entity": self.entity, "id": self.id}
+
+
 class UnsupportedProtocol(Rejection):
     """The client asked for a protocol version the server does not speak."""
 

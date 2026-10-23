@@ -76,10 +76,11 @@ from lattice_core.integrations import Defaults, Integrations
 
 __all__ = ["FormChanged", "FormClosed", "IsAdmin", "RefusalReason", "ui_checks"]
 
-RefusalReason = Literal["changed", "closed"]
-"""The ``reason`` in the payload of artifactr.ui's ``invalid_state`` refusals: :class:`FormChanged`
-and :class:`FormClosed`. An ``invalid_state`` with none, to an answer, is artifactr's: the request
-is answered already."""
+RefusalReason = Literal["changed", "closed", "already_exists"]
+"""The ``reason`` in the payload of an ``invalid_state`` refusal a client may meet here:
+:class:`FormChanged` and :class:`FormClosed`, and artifactr's
+:class:`~artifactr.core.AlreadyExists`, for a submission whose id is used (one sent again). An
+``invalid_state`` with none, to an answer, is artifactr's: the request is answered already."""
 
 IsAdmin = Callable[[Workspace], Awaitable[bool]]
 """Whether the workspace's actor may govern any form, and archive any submission, as their

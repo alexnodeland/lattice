@@ -148,6 +148,8 @@ The ways a command can fail. See [Rejections](../guides/workspaces.md#rejections
 
 ::: artifactr.core.InvalidState
 
+::: artifactr.core.AlreadyExists
+
 ::: artifactr.core.UnsupportedProtocol
 
 ## Patches

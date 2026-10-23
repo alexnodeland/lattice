@@ -131,6 +131,8 @@ nav:
     - adr/0087-a-connected-apps-hourly-limit-read-from-settings.md
     - adr/0088-excalidraws-phase-0-what-the-canvas-costs-and-needs.md
     - adr/0089-a-connected-apps-tools-narrowed-per-workspace.md
+    - adr/0090-diagrams-drawn-by-the-agent-through-a-converter.md
+    - adr/0091-diagrams-tombstones-swept-and-their-revisions-thinned.md
   - RFCs:
     - rfcs/README.md
     - rfcs/0001-v0.1-implementation-plan.md

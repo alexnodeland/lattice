@@ -8,13 +8,18 @@ Each row must still be there, column for column, and the schema must be the mode
 
 The rows are written from the schema as it was, a value for each column by its type, rather than
 by the old release's own code: what is held is that the migrations keep what was there, not that
-0.1's code wrote it. On SQLite here; the packages' own migration tests cover PostgreSQL's
-row-level security.
+0.1's code wrote it. On SQLite always, and on PostgreSQL where `<PACKAGE>_TEST_POSTGRES_URL`
+names a database, as CI's Check job does: each in a schema of its own, dropped as it ends. On
+PostgreSQL every table of the package's must also have row-level security on, with its policies,
+the new ones included.
 """
 
 import asyncio
+import contextlib
 import datetime
-from collections.abc import Callable, Mapping
+import os
+import uuid
+from collections.abc import AsyncIterator, Callable, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -34,9 +39,9 @@ from sqlalchemy import (
     String,
     Table,
     Text,
-    create_engine,
     insert,
     select,
+    text,
 )
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
@@ -138,8 +143,23 @@ def kept(connection: Connection, rows: dict[str, dict[str, Any]]) -> dict[str, l
 
 
 def _same(value: Any) -> Any:
-    """A value as SQLite gives it back: a datetime without its zone."""
+    """A value as either database gives it back: a datetime without its zone."""
     return value.replace(tzinfo=None) if isinstance(value, datetime.datetime) else value
+
+
+def unguarded(connection: Connection, tables: list[str]) -> list[str]:
+    """The tables, of those named, without row-level security on, or with no policy."""
+    guarded = set(
+        connection.scalars(
+            text(
+                "SELECT c.relname FROM pg_class c"
+                " WHERE c.relnamespace = current_schema()::regnamespace AND c.relrowsecurity"
+                " AND EXISTS (SELECT 1 FROM pg_policies p"
+                " WHERE p.schemaname = current_schema() AND p.tablename = c.relname)"
+            )
+        )
+    )
+    return sorted(set(tables) - guarded)
 
 
 def schema_differences(connection: Connection, models: list[MetaData]) -> list[Any]:
@@ -156,36 +176,98 @@ def schema_differences(connection: Connection, models: list[MetaData]) -> list[A
     return compare_metadata(context, together)
 
 
-@pytest.fixture
-def database(tmp_path: Path) -> str:
-    return f"sqlite+aiosqlite:///{tmp_path / 'released.db'}"
+def _postgres(package: str) -> str | None:
+    """The package's PostgreSQL test database, if one is named.
+
+    CI's Check job names one for each package, which runs these; a job that names none, as the
+    Tests jobs, skips them. One that names some and not others is a mistake, and fails.
+    """
+    named = {name: os.environ.get(f"{name.upper()}_TEST_POSTGRES_URL") for name in RELEASED}
+    if any(named.values()) and not all(named.values()):
+        missing = sorted(
+            f"{name.upper()}_TEST_POSTGRES_URL" for name, url in named.items() if not url
+        )
+        pytest.fail(f"PostgreSQL is named for some packages and not {', '.join(missing)}")
+    return named[package]
 
 
-@pytest.mark.parametrize("package", list(RELEASED))
-def test_a_database_at_the_last_release_keeps_its_rows_on_upgrade(
-    database: str, package: str
-) -> None:
-    config, head, migrate, metadata, versions = RELEASED[package]
-    sync = create_engine(database.replace("+aiosqlite", ""))
-    with sync.begin() as connection:
-        command.upgrade(config(connection), head)
-        rows = seeded(connection, versions)
-    assert rows, f"{package}'s release had tables"
+def _url(backend: str, package: str, tmp_path: Path) -> str | None:
+    """The backend's database for the package: a SQLite file, or PostgreSQL's if one is named."""
+    if backend == "sqlite":
+        return f"sqlite+aiosqlite:///{tmp_path / 'released.db'}"
+    return _postgres(package)
 
-    async def upgraded() -> None:
-        """What an application on the new release does as it starts."""
-        engine = create_async_engine(database)
+
+@contextlib.asynccontextmanager
+async def _engine(url: str) -> AsyncIterator[AsyncEngine]:
+    """An empty database: the SQLite file named, or a PostgreSQL schema of its own."""
+    if url.startswith("sqlite"):
+        engine = create_async_engine(url)
         try:
-            await migrate(engine)
-            if package == "artifactr":
-                await migrate_files(engine)  # native files' schema, new in 0.2, beside the core's
+            yield engine
         finally:
             await engine.dispose()
+        return
+    schema = f"upgrade_{uuid.uuid4().hex[:12]}"
+    admin = create_async_engine(url)
+    try:
+        async with admin.begin() as connection:
+            await connection.exec_driver_sql(f'CREATE SCHEMA "{schema}"')
+        engine = create_async_engine(url, connect_args={"server_settings": {"search_path": schema}})
+        try:
+            yield engine
+        finally:
+            await engine.dispose()
+            async with admin.begin() as connection:
+                await connection.exec_driver_sql(f'DROP SCHEMA "{schema}" CASCADE')
+    finally:
+        await admin.dispose()
 
-    asyncio.run(upgraded())
 
-    with sync.connect() as connection:
-        assert kept(connection, rows) == {}, f"{package}'s rows changed on upgrade"
-        models = [metadata, files_metadata] if package == "artifactr" else [metadata]
-        assert schema_differences(connection, models) == [], f"{package}'s schema is the models'"
-    sync.dispose()
+async def _upgrade_keeps_the_rows(engine: AsyncEngine, package: str) -> None:
+    config, head, migrate, metadata, versions = RELEASED[package]
+    async with engine.begin() as connection:
+        await connection.run_sync(lambda c: command.upgrade(config(c), head))
+        rows = await connection.run_sync(seeded, versions)
+    assert rows, f"{package}'s release had tables"
+
+    # What an application on the new release does as it starts.
+    await migrate(engine)
+    if package == "artifactr":
+        await migrate_files(engine)  # native files' schema, new in 0.2, beside the core's
+
+    models = [metadata, files_metadata] if package == "artifactr" else [metadata]
+    async with engine.connect() as connection:
+        assert await connection.run_sync(kept, rows) == {}, f"{package}'s rows changed"
+        differences = await connection.run_sync(schema_differences, models)
+        assert differences == [], f"{package}'s schema is the models'"
+        if engine.dialect.name == "postgresql":
+            tables = [name for model in models for name in model.tables]
+            assert await connection.run_sync(unguarded, tables) == [], "row-level security"
+
+
+@pytest.mark.parametrize("backend", ["sqlite", "postgres"])
+@pytest.mark.parametrize("package", list(RELEASED))
+def test_a_database_at_the_last_release_keeps_its_rows_on_upgrade(
+    tmp_path: Path, backend: str, package: str
+) -> None:
+    url = _url(backend, package, tmp_path)
+    if url is None:
+        pytest.skip(f"no {package.upper()}_TEST_POSTGRES_URL")
+
+    async def run() -> None:
+        async with _engine(url) as engine:
+            await _upgrade_keeps_the_rows(engine, package)
+
+    asyncio.run(run())
+
+
+def test_postgresql_named_for_some_packages_and_not_others_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for name in RELEASED:
+        monkeypatch.delenv(f"{name.upper()}_TEST_POSTGRES_URL", raising=False)
+    assert _postgres("grantr") is None, "none named: skipped"
+    monkeypatch.setenv("GRANTR_TEST_POSTGRES_URL", "postgresql+asyncpg://localhost/grantr")
+    with pytest.raises(pytest.fail.Exception, match="ARTIFACTR_TEST_POSTGRES_URL"):
+        _postgres("grantr")

@@ -19,6 +19,7 @@ VERSIONS = Path(__file__).parents[2] / "src/grantr/sql/migrations/versions"
 MIGRATION = VERSIONS / "0003_row_level_security.py"
 CREATION = VERSIONS / "0005_tenant_creation_in_the_deployment_log.py"
 INTEGRATIONS = VERSIONS / "0006_integrations.py"
+SETTINGS = VERSIONS / "0007_settings.py"
 
 POLICIES = 10
 """How many policies the migration creates: one per table it names, frozen in it."""
@@ -68,7 +69,7 @@ def test_create_schema_creates_the_policies_the_migration_does(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     migrated = Recorder()
-    for path in (MIGRATION, CREATION, INTEGRATIONS):
+    for path in (MIGRATION, CREATION, INTEGRATIONS, SETTINGS):
         _migration(migrated, monkeypatch, path).upgrade()
     created = Recorder()
     _row_level_security(cast("Connection", created))
@@ -143,3 +144,24 @@ def test_the_integrations_migration_makes_only_the_table_off_postgresql(
     recorder = Recorder(SimpleNamespace(name="sqlite"))
     _migration(recorder, monkeypatch, INTEGRATIONS).upgrade()
     assert recorder.statements == ["CREATE TABLE grantr_integrations"]
+
+
+def test_the_settings_migration_keeps_its_table_to_its_tenant(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    recorder = Recorder()
+    migration = _migration(recorder, monkeypatch, SETTINGS)
+    migration.upgrade()
+    assert recorder.statements == [
+        "CREATE TABLE grantr_settings",
+        "ALTER TABLE grantr_settings ENABLE ROW LEVEL SECURITY",
+        "CREATE POLICY grantr_settings_tenant ON grantr_settings"
+        " USING (tenant_id = current_setting('lattice.tenant_id', true))"
+        " WITH CHECK (tenant_id = current_setting('lattice.tenant_id', true))",
+    ]
+    recorder.calls.clear()
+    migration.downgrade()
+    assert recorder.statements == ["DROP TABLE grantr_settings"], "its policy goes with it"
+    recorder = Recorder(SimpleNamespace(name="sqlite"))
+    _migration(recorder, monkeypatch, SETTINGS).upgrade()
+    assert recorder.statements == ["CREATE TABLE grantr_settings"]

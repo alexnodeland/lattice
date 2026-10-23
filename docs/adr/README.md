@@ -35,5 +35,6 @@ Outside its own series, a record is named with its package, as in "reflexr ADR-0
 | [0027](0027-integrations-switched-per-workspace-through-one-port.md) | Integrations switched per workspace, through one port | Accepted |
 | [0028](0028-a-stuck-test-fails-by-a-signal-and-its-worker-carries-on.md) | A stuck test fails by a signal, and its worker carries on | Accepted |
 | [0029](0029-each-wheel-checked-at-its-floors.md) | Each wheel checked at its floors | Accepted |
+| [0030](0030-settings-typed-declared-in-lattice-core-and-only-narrowed-below.md) | Settings: typed, declared in lattice-core, and only narrowed below the operator | Proposed |
 
 To add a record, copy [`template.md`](template.md) to the next number and add a row above. Each package's series uses the same template.

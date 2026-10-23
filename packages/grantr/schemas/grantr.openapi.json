@@ -76,6 +76,7 @@
             "revoked": "#/components/schemas/Revoked",
             "role_defined": "#/components/schemas/RoleDefined",
             "role_deleted": "#/components/schemas/RoleDeleted",
+            "setting_set": "#/components/schemas/SettingSet",
             "tenant_created": "#/components/schemas/TenantCreated",
             "tenant_deleted": "#/components/schemas/TenantDeleted",
             "unrestricted": "#/components/schemas/Unrestricted"
@@ -130,6 +131,9 @@
           },
           {
             "$ref": "#/components/schemas/IntegrationSet"
+          },
+          {
+            "$ref": "#/components/schemas/SettingSet"
           }
         ]
       },
@@ -150,7 +154,8 @@
           "key_revoked",
           "restricted",
           "unrestricted",
-          "integration_set"
+          "integration_set",
+          "setting_set"
         ],
         "type": "string"
       },
@@ -1072,6 +1077,310 @@
         "title": "ServicePrincipal",
         "type": "object"
       },
+      "SettingChange": {
+        "description": "A setting's new value on the tenant or in a workspace, as its path names.",
+        "properties": {
+          "value": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "value"
+        ],
+        "title": "SettingChange",
+        "type": "object"
+      },
+      "SettingKind": {
+        "description": "What a setting's value is: a whole number within bounds, or some of a set of names.",
+        "properties": {
+          "high": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "High"
+          },
+          "low": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Low"
+          },
+          "type": {
+            "enum": [
+              "int_range",
+              "subset"
+            ],
+            "title": "Type",
+            "type": "string"
+          },
+          "universe": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Universe"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "SettingKind",
+        "type": "object"
+      },
+      "SettingLayer": {
+        "description": "One level's setting as an admin reads it.",
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "by": {
+            "$ref": "#/components/schemas/Subject"
+          },
+          "clamped": {
+            "title": "Clamped",
+            "type": "boolean"
+          },
+          "value": {
+            "$ref": "#/components/schemas/Wire"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "value",
+          "version",
+          "by",
+          "at",
+          "clamped"
+        ],
+        "title": "SettingLayer",
+        "type": "object"
+      },
+      "SettingSet": {
+        "description": "A setting was narrowed on the tenant or in a workspace, or unset (lattice ADR-0030).",
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "new": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New"
+          },
+          "old": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Old"
+          },
+          "type": {
+            "const": "setting_set",
+            "default": "setting_set",
+            "title": "Type",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          },
+          "workspace": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkspaceId"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "workspace",
+          "key",
+          "old",
+          "new",
+          "version"
+        ],
+        "title": "SettingSet",
+        "type": "object"
+      },
+      "SettingState": {
+        "description": "A setting as an admin reads it, on the tenant or in a workspace.",
+        "properties": {
+          "ceiling": {
+            "$ref": "#/components/schemas/Wire"
+          },
+          "ceiling_set_by": {
+            "enum": [
+              "default",
+              "operator",
+              "tenant"
+            ],
+            "title": "Ceiling Set By",
+            "type": "string"
+          },
+          "default": {
+            "$ref": "#/components/schemas/Wire"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "effective": {
+            "$ref": "#/components/schemas/Wire"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/SettingKind"
+          },
+          "lowest": {
+            "enum": [
+              "operator",
+              "tenant",
+              "workspace"
+            ],
+            "title": "Lowest",
+            "type": "string"
+          },
+          "operator": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Wire"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tenant": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SettingLayer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          },
+          "workspace": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SettingLayer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "key",
+          "description",
+          "kind",
+          "default",
+          "lowest",
+          "operator",
+          "tenant",
+          "workspace",
+          "version",
+          "ceiling",
+          "ceiling_set_by",
+          "effective"
+        ],
+        "title": "SettingState",
+        "type": "object"
+      },
+      "SettingsView": {
+        "description": "Every setting as an admin reads it, and the stored keys no registry declares any more.",
+        "properties": {
+          "settings": {
+            "items": {
+              "$ref": "#/components/schemas/SettingState"
+            },
+            "title": "Settings",
+            "type": "array"
+          },
+          "unknown": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unknown",
+            "type": "array"
+          }
+        },
+        "required": [
+          "settings",
+          "unknown"
+        ],
+        "title": "SettingsView",
+        "type": "object"
+      },
       "Subject": {
         "discriminator": {
           "mapping": {
@@ -1213,6 +1522,19 @@
         ],
         "title": "ValidationError",
         "type": "object"
+      },
+      "Wire": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        ]
       },
       "WorkspaceId": {
         "type": "string"
@@ -2935,6 +3257,123 @@
         "summary": "Define Role"
       }
     },
+    "/grantr/v1/tenants/{tenant}/settings": {
+      "get": {
+        "description": "Every setting as it is narrowed on a tenant: each layer, the ceiling, the outcome.",
+        "operationId": "tenant_settings_grantr_v1_tenants__tenant__settings_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "pattern": "^[^~]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Tenant Settings"
+      }
+    },
+    "/grantr/v1/tenants/{tenant}/settings/{key}": {
+      "put": {
+        "description": "Narrow a setting on a tenant, or unset it with null.\n\n`If-Match` names the version of the tenant's setting the caller read, `\"0\"` for one never\nset: another is refused with 409. A value wider than the layer above is refused with 422,\nsaying how wide it may be and which layer says so.",
+        "operationId": "set_tenant_setting_grantr_v1_tenants__tenant__settings__key__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "pattern": "^[^~]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Tenant Setting"
+      }
+    },
     "/grantr/v1/tenants/{tenant}/workspaces/{workspace}/enabled-integrations": {
       "get": {
         "description": "Whether each integration is on in a workspace, by key, for whoever can open it.",
@@ -3110,6 +3549,141 @@
           }
         },
         "summary": "Set Workspace Integration"
+      }
+    },
+    "/grantr/v1/tenants/{tenant}/workspaces/{workspace}/settings": {
+      "get": {
+        "description": "Every setting as it is narrowed in a workspace and on its tenant, and the outcome.",
+        "operationId": "workspace_settings_grantr_v1_tenants__tenant__workspaces__workspace__settings_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "pattern": "^[^~]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "title": "Workspace",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Workspace Settings"
+      }
+    },
+    "/grantr/v1/tenants/{tenant}/workspaces/{workspace}/settings/{key}": {
+      "put": {
+        "description": "Narrow a setting in a workspace, or unset it with null, as on the tenant.",
+        "operationId": "set_workspace_setting_grantr_v1_tenants__tenant__workspaces__workspace__settings__key__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "pattern": "^[^~]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "title": "Workspace",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Workspace Setting"
       }
     }
   }

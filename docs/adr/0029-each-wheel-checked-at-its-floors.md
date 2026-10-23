@@ -8,7 +8,7 @@
 
 The v0.2 release audit found floors below what the code needs.
 
-- artifactr, grantr and portalr import `lattice_core.integrations`, which `lattice-core-ai` 0.1.0 doesn't have, but allow `>=0.1.0`.
+- artifactr, grantr and portalr import `lattice_core.integrations`, and artifactr and grantr `lattice_core.settings` too (since [ADR-0030](0030-settings-typed-declared-in-lattice-core-and-only-narrowed-below.md)), neither of which `lattice-core-ai` 0.1.0 has, but allow `>=0.1.0`.
 - relayr allows `artifactr-ai>=0.2.0`.
 - Checking found one more: artifactr and relayr allow `pydantic-ai-slim>=2.51`, but artifactr's runner imports `repair_messages`, which is new in 2.53.
 
@@ -17,7 +17,7 @@ Nothing caught these. CI installs the workspace from its lock, at the newest ver
 ## Decision
 
 - **CI's "Floors (lowest direct)" job installs each wheel at the lowest versions its ranges allow:** `uv pip install --resolution lowest-direct --no-sources`, with every extra it declares, its siblings from PyPI rather than the workspace. Then it imports every module, as `scripts/standalone.py` does (`scripts/lowest_direct.py`).
-- **The floors known to be too low are a list, `EXPECTED`,** each with why and what its import says when it fails so (`No module named 'lattice_core.integrations'`, `cannot import name 'repair_messages'`). A package on it must still fail with that message. One that fails otherwise, or starts passing, fails the job until the list is right. Every other package must pass. So the job is required, and green, today.
+- **The floors known to be too low are a list, `EXPECTED`,** each with why and what its import says when it fails so (`No module named 'lattice_core.`, for whichever module 0.1.0 lacks an import reaches first, `lattice_core.integrations` or `lattice_core.settings`; `cannot import name 'repair_messages'`). A package on it must still fail with that message. One that fails otherwise, or starts passing, fails the job until the list is right. Every other package must pass. So the job is required, and green, today.
 - **An install that fails is never a floor's fault the list names:** when PyPI can't be reached, or nothing satisfies the ranges, the job fails and says the package couldn't be installed, whatever `EXPECTED` says. A re-run settles an outage.
 - **Only direct dependencies are at their floors.** Everything else resolves to its newest version that fits, as a user's install would, so a third party's new release can change the result between runs. Pinning the transitive versions would test an install no user makes.
 - **Raising a floor stays each package's release step,** the owner's. This changes no floor. Each release that raises one takes its package off `EXPECTED` in the same pull request.
@@ -30,5 +30,5 @@ Nothing caught these. CI installs the workspace from its lock, at the newest ver
 ## Consequences
 
 - Easier: a floor that is too low fails a pull request, not a user's install.
-- Known: artifactr fails on `lattice_core.integrations` before it reaches `repair_messages`, so its `pydantic-ai-slim` floor shows only once its `lattice-core-ai` floor is raised. Raise both together.
+- Known: artifactr fails on a lattice-core module 0.1.0 lacks before it reaches `repair_messages`, so its `pydantic-ai-slim` floor shows only once its `lattice-core-ai` floor is raised. Raise both together.
 - Harder: CI installs each wheel once more, about a minute in all; and a release must edit `EXPECTED` when it raises a floor.

@@ -21,11 +21,12 @@ from grantr.core.audit import (
     Revoked,
     RoleDefined,
     RoleDeleted,
+    SettingSet,
     TenantCreated,
     TenantDeleted,
     Unrestricted,
 )
-from grantr.core.errors import Forbidden, GrantrError, Invalid
+from grantr.core.errors import Forbidden, GrantrError, Invalid, Stale
 from grantr.core.grants import Grant, Membership, Visibility, memberships
 from grantr.core.ids import PRINCIPAL_ID, TENANT_ID, PrincipalId, TenantId, UserId, WorkspaceId
 from grantr.core.integrations import IntegrationSetting, IntegrationState, effective
@@ -49,6 +50,13 @@ from grantr.core.roles import (
     CatalogView,
     Level,
     Role,
+)
+from grantr.core.settings import (
+    SettingKind,
+    SettingLayer,
+    SettingRow,
+    SettingState,
+    SettingsView,
 )
 from grantr.core.subjects import (
     Agent,
@@ -112,6 +120,13 @@ __all__ = [
     "RoleDeleted",
     "RulePrincipal",
     "ServicePrincipal",
+    "SettingKind",
+    "SettingLayer",
+    "SettingRow",
+    "SettingSet",
+    "SettingState",
+    "SettingsView",
+    "Stale",
     "Subject",
     "TenantCreated",
     "TenantDeleted",

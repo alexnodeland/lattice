@@ -178,6 +178,26 @@ class IntegrationSet(BaseModel):
     """Its new setting; ``None`` for unset, which inherits the level above."""
 
 
+class SettingSet(BaseModel):
+    """A setting was narrowed on the tenant or in a workspace, or unset (lattice ADR-0030)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["setting_set"] = "setting_set"
+    workspace: WorkspaceId | None
+    """The workspace it was set in; ``None`` for the tenant."""
+
+    key: str
+    old: int | list[str] | None
+    """Its value before; ``None`` for unset."""
+
+    new: int | list[str] | None
+    """Its new value; ``None`` for unset, which inherits the level above."""
+
+    version: int
+    """The level's version of the setting once changed: one more than before."""
+
+
 type AuditEvent = Annotated[
     TenantCreated
     | DeploymentTenantCreated
@@ -194,10 +214,11 @@ type AuditEvent = Annotated[
     | KeyRevoked
     | Restricted
     | Unrestricted
-    | IntegrationSet,
+    | IntegrationSet
+    | SettingSet,
     Field(discriminator="type"),
 ]
-"""A change to access, or to an integration's setting."""
+"""A change to access, to an integration's setting, or to a setting."""
 
 
 class AuditEntry(BaseModel):
@@ -235,6 +256,7 @@ type AuditType = Literal[
     "restricted",
     "unrestricted",
     "integration_set",
+    "setting_set",
 ]
 """An audit event's ``type``: what a read of the log may keep."""
 

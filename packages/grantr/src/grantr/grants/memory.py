@@ -25,6 +25,7 @@ from grantr.core import (
     Resource,
     Role,
     ServicePrincipal,
+    SettingRow,
     Subject,
     TenantId,
     User,
@@ -60,6 +61,11 @@ class _Data:
         default_factory=dict[tuple[TenantId, WorkspaceId | None, str], IntegrationSetting]
     )
     """Each integration's setting, by tenant, workspace (None for the tenant's) and key."""
+
+    settings: dict[tuple[TenantId, WorkspaceId | None, str], SettingRow] = field(
+        default_factory=dict[tuple[TenantId, WorkspaceId | None, str], SettingRow]
+    )
+    """Each setting's row, by tenant, workspace (None for the tenant's) and key."""
     log: tuple[AuditEntry, ...] = ()
 
 
@@ -136,6 +142,15 @@ class _Reads:
             if (t, w) == (tenant, workspace)
         }
 
+    async def settings(
+        self, tenant: TenantId, workspace: WorkspaceId | None = None
+    ) -> dict[str, SettingRow]:
+        return {
+            key: row
+            for (t, w, key), row in self._data.settings.items()
+            if (t, w) == (tenant, workspace)
+        }
+
     async def groups(self, tenant: TenantId) -> dict[str, frozenset[Member]]:
         return {
             group.id: members for (t, group), members in self._data.groups.items() if t == tenant
@@ -178,6 +193,7 @@ class _Transaction(_Reads):
             integrations={
                 key: setting for key, setting in data.integrations.items() if key[0] != tenant
             },
+            settings={key: row for key, row in data.settings.items() if key[0] != tenant},
         )
 
     async def add_grant(self, grant: Grant) -> None:
@@ -240,6 +256,13 @@ class _Transaction(_Reads):
         else:
             integrations[tenant, workspace, key] = setting
         self._data = replace(self._data, integrations=integrations)
+
+    async def set_setting(
+        self, tenant: TenantId, workspace: WorkspaceId | None, key: str, row: SettingRow
+    ) -> None:
+        self._data = replace(
+            self._data, settings={**self._data.settings, (tenant, workspace, key): row}
+        )
 
     async def add_key(self, key: Key) -> None:
         self._data = replace(self._data, keys={**self._data.keys, key.id: key})

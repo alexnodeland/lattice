@@ -1,4 +1,4 @@
-import type { Change } from "@portalr/client";
+import type { Change } from "@portalr/client/diff";
 import { expect, test } from "vitest";
 import { render } from "vitest-browser-react";
 import {

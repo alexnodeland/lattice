@@ -18,7 +18,6 @@ export {
   NOT_READ,
   readConsent,
 } from "./consent";
-export { type Change, changes, type Granularity } from "./diff";
 export { type Feedback, type Thumb, thumbs } from "./feedback";
 export {
   type CheckedIn,

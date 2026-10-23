@@ -119,6 +119,9 @@ for image in "${images[@]}"; do
       for folder in stackr artifactr reflexr; do
         [[ $dashboards == *"\"folderTitle\":\"$folder\""* ]] || fail "grafana has no $folder dashboards"
       done
+      # ClickHouse's plugin, baked in, loads, signed by Grafana Labs (ADR-0048).
+      plugin=$(ask --user admin:check 'http://grafana-compose:3000/api/plugins/grafana-clickhouse-datasource/settings')
+      [[ $plugin == *'"signature":"valid"'* ]] || fail "grafana's ClickHouse plugin isn't loaded, signed"
       ;;
     litellm)
       # Its configuration caches in Valkey, which it needs to start.

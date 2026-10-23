@@ -1,5 +1,6 @@
 # Grafana's data sources, with fixed uids so dashboards and links can refer to
-# them: prometheus, tempo, loki and pyroscope. The libraries' dashboards use
+# them: prometheus, tempo, loki and pyroscope, and analytics, portalr's events in
+# ClickHouse (ADR-0048). The libraries' dashboards use
 # these uids. Each one's address is in the environment, which Grafana expands
 # here: Compose's names on one machine (compose.yaml), and the AWS recipe's
 # (stackr ADR-0034).
@@ -111,3 +112,22 @@ datasources:
     access: proxy
     url: http://${PYROSCOPE_ADDRESS}:4040
     editable: false
+
+  # portalr's product analytics on ClickHouse (lattice RFC-0008, ADR-0048), read as a user that
+  # may only read analytics.events, every tenant's: Grafana is for operators (portalr ADR-0005).
+  - name: Analytics
+    uid: analytics
+    type: grafana-clickhouse-datasource
+    editable: false
+    jsonData:
+      host: ${CLICKHOUSE_ADDRESS}
+      port: 8123
+      protocol: http
+      username: grafana_analytics
+      defaultDatabase: analytics
+      # Seconds. The plugin asks ClickHouse for a little more than the query's, within the
+      # 30 its user may not exceed (deploy/clickhouse/analytics-users.xml).
+      queryTimeout: "10"
+      dialTimeout: "5"
+    secureJsonData:
+      password: ${CLICKHOUSE_GRAFANA_PASSWORD}

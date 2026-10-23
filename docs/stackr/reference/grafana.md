@@ -14,6 +14,7 @@ Every data source has a fixed uid, which dashboards and links refer to, and none
 | Tempo | `tempo` | `tempo` | `http://${TEMPO_ADDRESS}:3200` | no | none |
 | Loki | `loki` | `loki` | `http://${LOKI_ADDRESS}:3100` | no | none |
 | Pyroscope | `pyroscope` | `grafana-pyroscope-datasource` | `http://${PYROSCOPE_ADDRESS}:4040` | no | none |
+| Analytics | `analytics` | `grafana-clickhouse-datasource` | `http://${CLICKHOUSE_ADDRESS}:8123` | no | `host: ${CLICKHOUSE_ADDRESS}`, `port: 8123`, `protocol: http`, `username: grafana_analytics`, `defaultDatabase: analytics`, `queryTimeout: 10`, `dialTimeout: 5` |
 
 <!-- end generated -->
 
@@ -54,6 +55,12 @@ Each directory under Grafana's `/var/lib/grafana/dashboards` is a folder: `stack
 | Provider | Path | A folder per directory | Editable in the UI | Rescanned |
 |---|---|---|---|---|
 | `stackr` | `/var/lib/grafana/dashboards` | yes | no | every 30s |
+
+**Adoption** (`stackr-adoption`), from `deploy/grafana/dashboards/stackr/adoption.json`:
+
+| Row | Panels |
+|---|---|
+|  | Active people, by day; Adoption by integration; Funnel: a page, a thread, a message; Weekly retention |
 
 **Collector health** (`stackr-collector`), from `deploy/grafana/dashboards/stackr/collector.json`:
 

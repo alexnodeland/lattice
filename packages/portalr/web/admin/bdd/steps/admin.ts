@@ -84,6 +84,24 @@ async function posted(request: APIRequestContext, bearer: string, thread: string
   );
 }
 
+Given("acme has the workspace {string}", async ({ request }, workspace: string) => {
+  // A workspace is there once something is in it: a thread of its own, made as acme's owner, so
+  // a scenario that names it doesn't wait on another scenario to have made it first.
+  const created = await request.post(`${origin()}/artifactr/v1/workspaces/${workspace}/commands`, {
+    headers: { Authorization: `Bearer ${await token(request, "alice")}`, "X-Tenant": "acme" },
+    data: {
+      type: "command",
+      command_id: crypto.randomUUID(),
+      command: {
+        type: "create_thread",
+        thread_id: `thr_${crypto.randomUUID().replaceAll("-", "")}`,
+        title: "A workspace's first thread",
+      },
+    },
+  });
+  expect(created.ok()).toBe(true);
+});
+
 Given("bob has had a turn fail in acme", async ({ request }) => {
   const bearer = await token(request, "bob");
   const thread = `thr_${crypto.randomUUID().replaceAll("-", "")}`;

@@ -24,6 +24,7 @@ type IssuedKey = Grantr["schemas"]["IssuedKey"];
 type Invited = Portalr["schemas"]["Invited"];
 type CreatedTenant = Portalr["schemas"]["CreatedTenant"];
 type IntegrationState = Grantr["schemas"]["IntegrationState"];
+type SettingState = Grantr["schemas"]["SettingState"];
 type Checkout = Files["schemas"]["Checkout"];
 
 /** A command's answer: carried out, with what the server answered, or refused, with each reason. */
@@ -219,6 +220,35 @@ export function createCommands(api: Api, unsigned: () => void = () => {}) {
                 },
               ),
         ),
+      /**
+       * Narrow a setting on the tenant, or in a workspace, or unset it with null, at the
+       * version read: `If-Match` names it, so a change someone made since is refused, 409.
+       */
+      setSetting: (
+        tenant: string,
+        key: string,
+        value: number | readonly string[] | null,
+        version: number,
+        workspace?: string,
+      ): Promise<Answer<SettingState>> => {
+        const body = {
+          value: value === null ? null : typeof value === "number" ? value : [...value],
+        };
+        const header = { "If-Match": `"${version}"` };
+        return answer(
+          workspace === undefined
+            ? api.grantr.PUT("/grantr/v1/tenants/{tenant}/settings/{key}", {
+                ...named(tenant),
+                params: { path: { tenant, key }, header },
+                body,
+              })
+            : api.grantr.PUT("/grantr/v1/tenants/{tenant}/workspaces/{workspace}/settings/{key}", {
+                ...named(tenant),
+                params: { path: { tenant, workspace, key }, header },
+                body,
+              }),
+        );
+      },
       /** Revoke a key, by its public id. */
       revokeKey: (tenant: string, key: string): Promise<Answer<AuditEntry>> =>
         answer(

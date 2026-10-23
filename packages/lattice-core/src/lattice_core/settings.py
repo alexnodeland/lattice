@@ -174,12 +174,16 @@ class Setting:
     def kept(self, stored: object) -> Value:
         """A value stored under an earlier registry, as this one keeps it: never wider.
 
-        A number is clamped into the bounds, and names this registry doesn't know are dropped;
-        a value of another type isn't read at all, and is the setting's floor.
+        A number is clamped into today's bounds: above them it is lowered to the highest, and
+        below them raised to the lowest, which is a registry's deliberate widening; names this
+        registry doesn't know are dropped; a value of another type isn't read at all, and is the
+        setting's floor. An admin's read flags each such value as clamped.
         """
         if isinstance(self.kind, IntRange):
             if isinstance(stored, bool) or not isinstance(stored, int):
                 return floor(self)
+            # Clamped into today's bounds. A registry that raises its lowest widens what it
+            # permits on purpose: a value below it can't be honoured, and its lowest applies.
             return max(self.kind.low, min(self.kind.high, stored))
         if not isinstance(stored, list | tuple):
             return floor(self)

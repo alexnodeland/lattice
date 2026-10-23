@@ -9,6 +9,7 @@ import {
   ListChecks,
   Puzzle,
   ScrollText,
+  SlidersHorizontal,
   Terminal,
   ThumbsUp,
   Route as TracesIcon,
@@ -89,6 +90,14 @@ function Tenant() {
               render={<Link to="/t/$tenant/integrations" params={{ tenant }} />}
             >
               Integrations
+            </NavLink>
+          )}
+          {allowed.has("grantr:manage_settings") && (
+            <NavLink
+              icon={SlidersHorizontal}
+              render={<Link to="/t/$tenant/settings" params={{ tenant }} />}
+            >
+              Settings
             </NavLink>
           )}
           {allowed.has("grantr:read_audit") && (

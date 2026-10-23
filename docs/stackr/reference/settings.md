@@ -215,6 +215,12 @@ portalr's analytics (lattice RFC-0008, ADR-0044): the writer's and the reader's 
 | `CLICKHOUSE_ANALYTICS_PASSWORD` | Generated: 64 hex characters |
 | `ANALYTICS_RETENTION_DAYS` | `395` |
 
+The password of Grafana's ClickHouse user, which reads every tenant's analytics for operators' dashboards (ADR-0048).
+
+| Setting | In `.env.example` |
+|---|---|
+| `CLICKHOUSE_GRAFANA_PASSWORD` | Generated: 64 hex characters |
+
 ClickHouse's HTTP interface, on 127.0.0.1 only, for portalr's analytics in `make serve`.
 
 | Setting | In `.env.example` |

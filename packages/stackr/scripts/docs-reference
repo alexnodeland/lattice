@@ -279,9 +279,12 @@ def block_compose_services() -> str:
     for name, service in document["services"].items():
         image = str(service["image"]).split("@")[0].rsplit(":", 1)[0]
         pinned = "by tag and digest" if "@sha256:" in str(service["image"]) else "by tag"
+        where = f"pinned {pinned} in `compose.yaml`"
+        if build := service.get("build"):
+            where = f"built from `{build['dockerfile']}`, which pins its base"
         rows = [
             ["Profiles", codes(service.get("profiles", []))],
-            ["Image", f"{code(image)}, pinned {pinned} in `compose.yaml`"],
+            ["Image", f"{code(image)}, {where}"],
             ["Published ports", ports(service, defaults)],
             ["Networks", codes(networks(document, service))],
             ["Volumes", volumes(service)],
@@ -537,7 +540,8 @@ def block_grafana_datasources() -> str:
                 source["name"],
                 code(source["uid"]),
                 code(source["type"]),
-                code(source["url"]),
+                # ClickHouse's plugin takes its address as settings, not a URL.
+                code(source.get("url") or f"{data['protocol']}://{data['host']}:{data['port']}"),
                 "yes" if source.get("isDefault") else "no",
                 ", ".join(settings) or "none",
             ]

@@ -30,7 +30,7 @@ import httpx
 from fastapi import APIRouter, FastAPI, HTTPException, Request, Response
 
 from grantr import Grants
-from portalr.analytics import InMemoryRateLimiter, Relay
+from portalr.analytics import InMemoryRateLimiter, Relay, SessionStamp
 from portalr.analytics.sql import SqlConsent
 from portalr.analytics.sql import migrate as migrate_consent
 from portalr.fastapi import UI, SandboxOrigin, Site, {% if use_tracker %}Surfaces, {% endif %}portalr_router
@@ -329,6 +329,9 @@ class Portal:
             consent = SqlConsent(self._database.engine, owner=self._database.owner)
             relay = Relay(tools.analytics, consent, InMemoryRateLimiter())
             self._relay = relay
+            # A request's analytics session on its server span, where it is the caller's own: added
+            # before the server's instrumentation, which runs outside it (portalr ADR-0073).
+            app.add_middleware(SessionStamp, relay=relay, resolve_actor=self._access.caller)
         router = portalr_router(
             resolve_actor=self._access.caller,
             grants=self.grants,

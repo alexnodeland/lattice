@@ -75,5 +75,6 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0067](0067-settings-in-admin.md) | Settings in admin | Proposed |
 | [0068](0068-where-the-focus-goes-and-one-not-found.md) | Where the focus goes, and one not-found | Proposed |
 | [0071](0071-adoption-the-tenants-read-and-page.md) | Adoption, the tenant's read and page | Accepted |
+| [0073](0073-a-requests-analytics-session-on-its-trace.md) | A request's analytics session, on its trace | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

@@ -13,9 +13,30 @@ export interface StreamSession {
   readonly tenant: string;
 }
 
-/** The headers every REST request carries: the token, once there is one. */
+/**
+ * The analytics session portalr signed for the person, while they share how they use the app;
+ * null otherwise. Each request carries it, so the server can mark its trace with the session
+ * where it is the person's own (portalr ADR-0073).
+ */
+// Module state, not a Session field: the capture add-on sets it after it loads, and every client
+// made before then must carry it too, without each being made again.
+let analytics: string | null = null;
+
+/** Set, or with null clear, the analytics session every request carries. */
+export function carryAnalyticsSession(signed: string | null): void {
+  analytics = signed;
+}
+
+/** The headers every REST request carries: the token, once there is one, and the analytics session. */
 export function sessionHeaders(session: Session): Record<string, string> {
-  return session.token === null ? {} : { Authorization: `Bearer ${session.token}` };
+  if (session.token === null) {
+    return {};
+  }
+  const headers: Record<string, string> = { Authorization: `Bearer ${session.token}` };
+  if (analytics !== null) {
+    headers["X-Portalr-Analytics-Session"] = analytics;
+  }
+  return headers;
 }
 
 /**

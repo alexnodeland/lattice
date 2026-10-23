@@ -6,14 +6,15 @@ import {
   PageHeader,
   type Reveal,
   type Standing,
+  TextLink,
   TraceView,
 } from "@portalr/ui";
-import { useQueries, useSuspenseQuery } from "@tanstack/react-query";
+import { useQueries, useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, type ErrorComponentProps, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { opening } from "../../../../../access";
 import { ReadFailed } from "../../../../../read-failed";
-import { isId } from "../../../../../traces";
+import { analyticsSessionOf, isId } from "../../../../../traces";
 
 const HEADER = <PageHeader title="Trace" />;
 
@@ -137,10 +138,41 @@ function Body({ trace }: { trace: string }) {
       return (
         <>
           {header}
+          {reading.data && <Session tenant={tenant} trace={reading.data} />}
           {laid ? <TraceView outline={laid} reveal={reveal} /> : <NoSuch />}
         </>
       );
   }
+}
+
+/**
+ * The trace's analytics session, where a request of it carried one, and the session's traces:
+ * for operators alone, as portalr gives the session to no one else (portalr ADR-0073).
+ */
+function Session({ tenant, trace }: { tenant: string; trace: Trace }) {
+  const { queries, user } = Route.useRouteContext();
+  // Whether they operate the deployment, as the tenant's frame reads it.
+  const { data: every } = useQuery(queries.portalr.tenants(user));
+  const session = analyticsSessionOf(trace.spans);
+  if (session === undefined || every === null || every === undefined) {
+    return null;
+  }
+  return (
+    <p className="text-muted text-sm">
+      Analytics session:{" "}
+      <TextLink
+        render={
+          <Link
+            to="/t/$tenant/traces"
+            params={{ tenant }}
+            search={{ hours: 168, analytics: session }}
+          />
+        }
+      >
+        <code className="font-mono">{session}</code>
+      </TextLink>
+    </p>
+  );
 }
 
 /** A span of a trace, by its id. */

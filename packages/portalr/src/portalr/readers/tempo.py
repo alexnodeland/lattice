@@ -11,13 +11,22 @@ import json
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Annotated, Any, Final
+from datetime import timedelta
+from typing import Annotated, Any, Final, Self
 
 import httpx
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, TypeAdapter
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    TypeAdapter,
+    model_validator,
+)
 
 from portalr.readers.http import read
-from portalr.readers.query import Id, Window, quoted
+from portalr.readers.query import MOST_DAYS, Id, Window, quoted
 from portalr.readers.reading import Ok, Unavailable
 from portalr.tenant import Tenant
 
@@ -28,6 +37,14 @@ TENANT_ATTRIBUTE: Final = "tenant.id"
 SESSION_ATTRIBUTE: Final = "session.id"
 """The span attribute that names a span's session: an artifactr thread."""
 
+ANALYTICS_SESSION_ATTRIBUTE: Final = "portalr.analytics.session"
+"""The server span attribute that names a request's analytics session (portalr ADR-0073), set
+only where the session was the caller's own: a random id, of no one, never their user id. It is
+safe to show, but to operators alone: :func:`for_tenant` takes it out of every other reader's."""
+
+ANALYTICS_SESSION: Final = r"^\d{1,12}-[0-9a-f]{16}$"
+"""An analytics session's id, as the relay makes it: when it began, and 16 random hex digits."""
+
 RUN_ATTRIBUTES: Final = ("artifactr.run.id", "reflexr.run.id")
 """The span attributes that name a run, in either library."""
 
@@ -37,6 +54,7 @@ SAFE_ATTRIBUTES: Final = frozenset(
         "tenant.id",
         "session.id",
         "user.id",
+        ANALYTICS_SESSION_ATTRIBUTE,
         # artifactr's: ids, kinds, outcomes and counts, never text a person or a model wrote.
         "artifactr.actor.kind",
         "artifactr.artifact.id",
@@ -188,10 +206,20 @@ def _hex(span_id: str) -> str:
 
 
 class TraceQuery(Window):
-    """Which of a tenant's traces to find: a session's, a run's, or any, in a window."""
+    """Which of a tenant's traces to find: a thread's, a run's, an analytics session's, or any.
+
+    A search by analytics session reads at most ``MOST_DAYS``: a session lasts hours.
+    """
 
     session: Id | None = None
     run: Id | None = None
+    analytics_session: Annotated[str, StringConstraints(pattern=ANALYTICS_SESSION)] | None = None
+
+    @model_validator(mode="after")
+    def _a_sessions_window_is_bounded(self) -> Self:
+        if self.analytics_session is not None and self.end - self.start > timedelta(days=MOST_DAYS):
+            raise ValueError(f"a window is at most {MOST_DAYS} days")
+        return self
 
 
 class TraceSummary(BaseModel):
@@ -245,6 +273,29 @@ _FOUND: Final = TypeAdapter(_Found)
 _OTLP: Final = TypeAdapter(dict[str, Any])
 
 
+def carries_analytics_session(trace: Trace) -> bool:
+    """Whether a span of the trace names an analytics session."""
+    return any(ANALYTICS_SESSION_ATTRIBUTE in span.attributes for span in trace.spans)
+
+
+def for_tenant(trace: Trace) -> Trace:
+    """The trace as one who isn't an operator reads it: without any span's analytics session."""
+    spans = tuple(
+        span.model_copy(
+            update={
+                "attributes": {
+                    name: value
+                    for name, value in span.attributes.items()
+                    if name != ANALYTICS_SESSION_ATTRIBUTE
+                },
+                "withheld": tuple(n for n in span.withheld if n != ANALYTICS_SESSION_ATTRIBUTE),
+            }
+        )
+        for span in trace.spans
+    )
+    return trace.model_copy(update={"spans": spans})
+
+
 def search_query(tenant: Tenant, query: TraceQuery) -> str:
     """The TraceQL that finds a tenant's traces: always ``span.tenant.id``, then the filters."""
     conditions = [f"span.{TENANT_ATTRIBUTE} = {quoted(tenant.id)}"]
@@ -253,7 +304,12 @@ def search_query(tenant: Tenant, query: TraceQuery) -> str:
     if query.run is not None:
         runs = " || ".join(f"span.{name} = {quoted(query.run)}" for name in RUN_ATTRIBUTES)
         conditions.append(f"({runs})")
-    return "{ " + " && ".join(conditions) + " }"
+    found = "{ " + " && ".join(conditions) + " }"
+    if query.analytics_session is None:
+        return found
+    # The session is on the server's span, the tenant on the libraries': each in the same trace.
+    session = f"span.{ANALYTICS_SESSION_ATTRIBUTE} = {quoted(query.analytics_session)}"
+    return f"{found} && {{ {session} }}"
 
 
 def _plain(value: Mapping[str, Any]) -> Any:

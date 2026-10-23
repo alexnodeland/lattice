@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { sessionHeaders, streamUrl } from "./session";
+import { carryAnalyticsSession, sessionHeaders, streamUrl } from "./session";
 
 test("a request carries the token: each read names its own tenant", () => {
   expect(sessionHeaders({ token: "t0k3n" })).toEqual({ Authorization: "Bearer t0k3n" });
@@ -23,4 +23,15 @@ test("a stream with no one signed in carries no token, which the server refuses"
   expect(streamUrl("https://app.example/v1", "ws_1", { token: null, tenant: "acme" })).toBe(
     "wss://app.example/v1/workspaces/ws_1/stream?tenant=acme",
   );
+});
+
+test("a signed-in request carries the analytics session while one is set, and no one's does", () => {
+  carryAnalyticsSession("1-abc.sig");
+  expect(sessionHeaders({ token: "t0k3n" })).toEqual({
+    Authorization: "Bearer t0k3n",
+    "X-Portalr-Analytics-Session": "1-abc.sig",
+  });
+  expect(sessionHeaders({ token: null })).toEqual({});
+  carryAnalyticsSession(null);
+  expect(sessionHeaders({ token: "t0k3n" })).toEqual({ Authorization: "Bearer t0k3n" });
 });

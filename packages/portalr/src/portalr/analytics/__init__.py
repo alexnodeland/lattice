@@ -10,5 +10,13 @@ when ClickHouse is down; and withdrawing it deletes the person's events at once.
 from portalr.analytics.consent import Consent, InMemoryConsent
 from portalr.analytics.limiter import InMemoryRateLimiter, RateLimiter
 from portalr.analytics.relay import Relay
+from portalr.analytics.stamp import SessionStamp
 
-__all__ = ["Consent", "InMemoryConsent", "InMemoryRateLimiter", "RateLimiter", "Relay"]
+__all__ = [
+    "Consent",
+    "InMemoryConsent",
+    "InMemoryRateLimiter",
+    "RateLimiter",
+    "Relay",
+    "SessionStamp",
+]

@@ -37,6 +37,7 @@ from artifactr.files.fastapi.openapi import openapi_app, openapi_document
 from artifactr.files.manifest import DOCX, WordDocument
 from artifactr.files.native import Busy, NativeFiles
 from artifactr.workspace import Access, InMemoryStorage, Workspace, Workspaces, integration_gate
+from tests.clients import entered
 from tests.files.clock import FakeClock
 from tests.files.conftest import Switch
 
@@ -103,7 +104,7 @@ async def world() -> World:
     await files.upload(ws, WordDocument, "c ø.docx", upload, media_type=DOCX, artifact_id="a1")
     server = FastAPI()
     server.include_router(files_router(workspaces, files, resolve_actor=resolve_actor, limit=LIMIT))
-    return World(TestClient(server), switch, app, clock, ws, files)
+    return World(entered(server), switch, app, clock, ws, files)
 
 
 def test_a_file_says_who_has_it_and_how_it_is_edited(world: World) -> None:
@@ -265,7 +266,7 @@ async def test_each_persons_pages_that_reach_the_app_are_paced() -> None:
     server.include_router(
         files_router(workspaces, files, resolve_actor=resolve_actor, renders_per_minute=2)
     )
-    client = TestClient(server)
+    client = entered(server)
     page = f"{FILE}/versions/1/pages/1"
     assert [client.get(page).status_code for _ in range(2)] == [200, 200]
     paced = client.get(page)
@@ -331,7 +332,7 @@ def test_no_one_unknown_is_let_in(world: World) -> None:
 
 
 def test_the_documents_application_admits_no_one() -> None:
-    assert TestClient(openapi_app()).get(FILE).status_code == 401
+    assert entered(openapi_app()).get(FILE).status_code == 401
 
 
 def test_the_committed_document_is_current() -> None:
@@ -363,7 +364,7 @@ def test_a_page_past_the_tenants_readings_is_told_to_wait() -> None:
     )
     server = FastAPI()
     server.include_router(files_router(workspaces, files, resolve_actor=resolve_actor))
-    busy = TestClient(server).get(f"{FILE}/versions/1/pages/1")
+    busy = entered(server).get(f"{FILE}/versions/1/pages/1")
     assert busy.status_code == 429
     assert busy.json()["detail"]["type"] == "busy"
     assert busy.headers["retry-after"] == "5"

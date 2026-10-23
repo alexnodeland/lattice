@@ -49,6 +49,7 @@ from artifactr.files.native.formats import PROJECT
 from artifactr.files.worker import Limits, Worker, worker_app
 from artifactr.workspace import Access, InMemoryStorage, Workspace, Workspaces, integration_gate
 from artifactr.workspace.workspace import Hidden
+from tests.clients import entered
 from tests.files.conftest import Switch
 
 LIMIT = 4096
@@ -141,24 +142,9 @@ def world_of(
         )
     )
     ws = asyncio.run(workspaces.open("acme", "w1", actor=UserActor(id="alice")))
-    # Every request on one event loop, the client's, as a server runs them: the in-memory stores'
-    # locks are asyncio's, which a request on a loop of its own, as a client not entered makes
-    # for each, would wait on and never be woken from another's.
-    client = OPEN.enter_context(TestClient(server))
+    # Every request on the client's one event loop, as a server runs them (tests/clients.py).
+    client = entered(server)
     return World(client, switch, app, ws)
-
-
-OPEN = contextlib.ExitStack()
-"""The clients the test's worlds entered, which it leaves when it ends."""
-
-
-@pytest.fixture(autouse=True)
-def _closed() -> Iterator[None]:
-    """Leave every client the test entered as it ends."""
-    try:
-        yield
-    finally:
-        OPEN.close()
 
 
 @pytest.fixture
@@ -622,7 +608,7 @@ def test_a_kinds_own_most_is_refused_from_the_length_and_as_it_streams() -> None
     server.include_router(
         files_router(Workspaces(InMemoryStorage()), files, resolve_actor=resolve_actor)
     )
-    client = TestClient(server)
+    client = entered(server)
     big = b"{" + b" " * PROJECT + b"}"
     params = {"kind": "video_project", "name": "cut.fcproj"}
     refused = client.post(UPLOAD, params=params, content=big)

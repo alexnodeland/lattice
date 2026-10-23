@@ -8,9 +8,10 @@ Each row must still be there, column for column, and the schema must be the mode
 
 The rows are written from the schema as it was, a value for each column by its type, rather than
 by the old release's own code: what is held is that the migrations keep what was there, not that
-0.1's code wrote it. On SQLite always, and on PostgreSQL where `<PACKAGE>_TEST_POSTGRES_URL` names
-a database, as CI's do: each in a schema of its own, dropped as it ends. On PostgreSQL every table
-of the package's must also have row-level security on, with its policies, the new ones included.
+0.1's code wrote it. On SQLite always, and on PostgreSQL where `<PACKAGE>_TEST_POSTGRES_URL`
+names a database, as CI's Check job does: each in a schema of its own, dropped as it ends. On
+PostgreSQL every table of the package's must also have row-level security on, with its policies,
+the new ones included.
 """
 
 import asyncio
@@ -176,11 +177,18 @@ def schema_differences(connection: Connection, models: list[MetaData]) -> list[A
 
 
 def _postgres(package: str) -> str | None:
-    """The package's PostgreSQL test database, if one is named; CI names one for each."""
-    url = os.environ.get(f"{package.upper()}_TEST_POSTGRES_URL")
-    if url is None and os.environ.get("CI"):
-        pytest.fail(f"CI names no {package.upper()}_TEST_POSTGRES_URL for the upgrade's test")
-    return url
+    """The package's PostgreSQL test database, if one is named.
+
+    CI's Check job names one for each package, which runs these; a job that names none, as the
+    Tests jobs, skips them. One that names some and not others is a mistake, and fails.
+    """
+    named = {name: os.environ.get(f"{name.upper()}_TEST_POSTGRES_URL") for name in RELEASED}
+    if any(named.values()) and not all(named.values()):
+        missing = sorted(
+            f"{name.upper()}_TEST_POSTGRES_URL" for name, url in named.items() if not url
+        )
+        pytest.fail(f"PostgreSQL is named for some packages and not {', '.join(missing)}")
+    return named[package]
 
 
 @contextlib.asynccontextmanager

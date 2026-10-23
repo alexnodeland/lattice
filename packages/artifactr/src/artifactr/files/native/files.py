@@ -791,7 +791,16 @@ class NativeFiles:
         for artifact in await ws.artifacts(NativeFile, include_archived=True):
             for revision in await ws.revisions(artifact.id):
                 referenced |= {(artifact.id, sha256) for sha256 in digests(revision.data)}
-        return await self._blobs.collect(_scope(ws), referenced, before=before)
+        deleted = await self._blobs.collect(_scope(ws), referenced, before=before)
+        # The pages kept of bytes nothing names go too, so a page is never given for a digest
+        # whose bytes the store no longer has.
+        for key in [
+            key
+            for key in self._pages
+            if key[:2] == (ws.tenant_id, ws.workspace_id) and (key[2], key[4]) not in referenced
+        ]:
+            self._pages_held -= len(self._pages.pop(key))
+        return deleted
 
     # ─── what every write shares ──────────────────────────────────────────────
 
@@ -914,9 +923,9 @@ def _page_key(ws: Workspace, artifact_id: ArtifactId, app: App, sha256: str, pag
 
     The blob store keeps bytes by tenant, workspace, file and digest, so a page is kept and found
     by all four too. A digest a proposal names is the proposer's to write, so a page kept for one
-    file's bytes is never given for another's that names the same digest; and one kept for a file
-    is a render of bytes that file held, which collection keeps while a pending proposal names
-    them.
+    file's bytes is never given for another's that names the same digest. A page kept for a file
+    is a render of bytes that file holds: collection drops the pages of the bytes it may delete,
+    those nothing names, so a digest whose bytes are gone finds no page and is refused.
     """
     return (ws.tenant_id, ws.workspace_id, artifact_id, app.name, sha256, page, 1.0)
 

@@ -3,6 +3,7 @@ never a starved worker's cause; and an upload to a hidden file's id, refused bef
 """
 
 import asyncio
+from datetime import timedelta
 
 import pytest
 from pydantic import JsonValue
@@ -17,6 +18,7 @@ from artifactr.core import (
     NotFound,
     ProposeChange,
     Proposed,
+    RespondToProposal,
     TenantId,
     UserActor,
     Visibility,
@@ -27,6 +29,7 @@ from artifactr.files.blobs import once
 from artifactr.files.manifest import DOCX, Blob, NativeFile, WordDocument
 from artifactr.files.native import Busy, ContentUnavailable, NativeFiles
 from artifactr.workspace import InMemoryStorage, Scope, Workspace, Workspaces
+from tests.files.clock import FakeClock
 from tests.files.conftest import Stores
 from tests.files.native.test_uploads import JSON_DOCX
 
@@ -401,6 +404,37 @@ async def test_a_page_kept_for_one_file_is_never_given_for_a_digest_another_name
         await files.render_proposed(acme, await proposal_naming(files, acme, absent), 1)
 
 
+async def test_a_page_kept_for_one_file_is_never_given_for_another_files_digest(
+    stores: Stores,
+) -> None:
+    app = Serial()
+    files = native(stores, app)
+    ws = await Workspaces(InMemoryStorage()).open("acme", "w1", actor=ALICE)
+    await uploaded(files, ws, "a1")
+    await files.upload(ws, WordDocument, "b.docx", once(FakeApp.file("Other")), artifact_id="a2")
+    others = (await ws.get(WordDocument, "a2")).data.content
+    await files.render(ws, "a2", 1)  # kept, for a2, in the same workspace
+    with pytest.raises(ContentUnavailable):
+        await files.render_proposed(ws, await proposal_naming(files, ws, others), 1)
+
+
+async def test_a_page_whose_bytes_were_collected_is_given_no_more(
+    stores: Stores, clock: FakeClock
+) -> None:
+    app = Serial()
+    files = NativeFiles(stores.blobs, stores.checkouts, app, formats=JSON_DOCX, clock=clock)
+    ws = await Workspaces(InMemoryStorage()).open("acme", "w1", actor=ALICE)
+    await uploaded(files, ws, "a1")
+    one = await stores.blobs.put(Scope("acme", "w1"), "a1", once(FakeApp.file("One")), DOCX)
+    first = await proposal_naming(files, ws, one)
+    await files.render_proposed(ws, first, 1)  # kept
+    await ws.commit(RespondToProposal(proposal_id=first, decision="reject"))
+    clock.advance(timedelta(days=2))
+    assert await files.collect(ws) == 1, "the rejected proposal's bytes are collected"
+    with pytest.raises(ContentUnavailable):
+        await files.render_proposed(ws, await proposal_naming(files, ws, one), 1)
+
+
 async def test_proposals_naming_one_blob_render_it_once_and_others_their_own(
     stores: Stores,
 ) -> None:
@@ -421,7 +455,7 @@ async def test_proposals_naming_one_blob_render_it_once_and_others_their_own(
 
 
 async def test_a_proposal_that_changes_no_content_has_no_page(stores: Stores) -> None:
-    app = Serial()
+    app = Gated()
     files = native(stores, app)
     ws = await Workspaces(InMemoryStorage()).open("acme", "w1", actor=ALICE)
     await uploaded(files, ws, "a1")
@@ -431,6 +465,10 @@ async def test_a_proposal_that_changes_no_content_has_no_page(stores: Stores) ->
     proposed = await agent.commit(ProposeChange(change=change))
     assert isinstance(proposed, Proposed)
     paced: list[int] = []
+    held = [asyncio.create_task(files.render(ws, "a1", 1)) for _ in range(2)]
+    await app.holding(2)  # both readings taken: one asked for now would wait, then be refused
     with pytest.raises(ContentUnavailable):
         await files.render_proposed(ws, proposed.proposal_id, 1, admit=lambda: paced.append(1))
-    assert (paced, app.rendered) == ([], 0), "refused before a reading or the pace"
+    assert (paced, files.waiting("acme")) == ([], 0), "refused before a reading or the pace"
+    app.through.set()
+    await asyncio.gather(*held)

@@ -43,7 +43,7 @@ RFC-0006 makes an Excalidraw diagram an ordinary JSON artifact, edited by JSON P
   `rebase(base, local, head)` moves a writer's elements onto a newer head after a `version_conflict`. It reconciles the way Excalidraw 0.18.1's `reconcileElements` does: the higher version wins, and at one version the lower nonce. Where the writer's element wins, it is resent above the head's version with a new nonce. `reconcile` and `won` are the same rule, for a writer that merges.
 
 - **The checks, `excalidraw_checks()`**, run on every surface, for an edit, a proposed edit, and a proposal accepted against the head:
-  - an element is never removed, by any path: it is deleted by `isDeleted`, and only the sweep (U3) removes tombstones;
+  - an element is never removed, by any path: it is deleted by `isDeleted`, and only the sweep (U3, [ADR-0091](0091-diagrams-tombstones-swept-and-their-revisions-thinned.md)) removes tombstones;
   - an element an edit changes must grow its `version` past the head's. Changed means its JSON text differs (`Element.written()`): a Python writer sending `10.0` for `10` must grow the version, and a re-send that changes nothing is refused as empty. JavaScript never writes `1.0`, so the canvas is unaffected;
   - an `add` of an id the head already has is refused;
   - an image is added only, never replaced or removed. This is checked on the result, not on the patch's paths, so removing or replacing `/files`, a root replace, and a `move` or `copy` are all held to it.

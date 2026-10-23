@@ -29,6 +29,7 @@ from pydantic import JsonValue
 from artifactr.core import (
     AlreadyExists,
     Applied,
+    Artifact,
     ArtifactId,
     EditArtifact,
     Forbidden,
@@ -167,6 +168,9 @@ class NativeFiles:
         waiting: How many of a tenant's pages may wait for one of its readings at once, past
             which another is refused with `Busy` at once: eight by default, twice the pages a
             viewer's first screen asks for.
+        naming: Other artifact types whose revisions name bytes in the same store, such as
+            diagrams, whose images it keeps: collection keeps what their revisions and their
+            pending proposals name too (artifactr ADR-0090).
 
     Raises:
         ValueError: If an edit's lease would end before the apps' deadline, or no app is given.
@@ -188,6 +192,7 @@ class NativeFiles:
         readings: int | None = 2,
         pages: int = 64 << 20,
         waiting: int = 8,
+        naming: Sequence[type[Artifact]] = (),
     ) -> None:
         if edit_ttl.total_seconds() <= deadline:
             raise ValueError("an edit's lease must outlast the app's deadline, and the commit")
@@ -212,6 +217,7 @@ class NativeFiles:
         self._pages_most = pages
         self._pages: OrderedDict[PageKey, bytes] = OrderedDict()
         self._pages_held = 0
+        self._naming: tuple[type[Artifact], ...] = (NativeFile, *naming)
 
     def waiting(self, tenant_id: str) -> int:
         """How many of the tenant's pages wait for one of its readings now."""
@@ -768,11 +774,12 @@ class NativeFiles:
     async def collect(self, ws: Workspace) -> int:
         """Delete the workspace's blobs that nothing names, unless they were put lately.
 
-        Named means by a pending proposal, or by any revision of a native file, archived ones
-        too; the proposals are read first, so that one accepted meanwhile is read as a
-        revision. Bytes put within `keep` are kept whatever names them, for the commit that
-        follows a put. The handle must see every thread and artifact, as an application's own
-        actor does: a blob that only a hidden revision names would otherwise be lost.
+        Named means by a pending proposal, or by any revision of a native file, or of a type
+        `naming` adds, archived ones too; the proposals are read first, so that one accepted
+        meanwhile is read as a revision. Bytes put within `keep` are kept whatever names them, for
+        the commit that follows a put. The handle must see every thread and artifact, as an
+        application's own actor does: a blob that only a hidden revision names would otherwise be
+        lost.
 
         Returns:
             How many blobs were deleted.
@@ -788,9 +795,10 @@ class NativeFiles:
         for proposal in await ws.proposals(status="pending"):
             named = digests(proposal.change.model_dump(mode="json"))
             referenced |= {(proposal.artifact_id, sha256) for sha256 in named}
-        for artifact in await ws.artifacts(NativeFile, include_archived=True):
-            for revision in await ws.revisions(artifact.id):
-                referenced |= {(artifact.id, sha256) for sha256 in digests(revision.data)}
+        for kind in self._naming:
+            for artifact in await ws.artifacts(kind, include_archived=True):
+                for revision in await ws.revisions(artifact.id):
+                    referenced |= {(artifact.id, sha256) for sha256 in digests(revision.data)}
         deleted = await self._blobs.collect(_scope(ws), referenced, before=before)
         # The pages kept of bytes nothing names go too, so a page is never given for a digest
         # whose bytes the store no longer has.

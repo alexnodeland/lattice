@@ -44,4 +44,5 @@ A refusal's body is the server's: its `detail`, a rejection's `message`, Pydanti
 ## Consequences
 
 - Easier: no refusal can show a tenant what a server said, whatever it says.
+- Known gap: reflexr reports a stored rule's problems as strings, with no `loc`, so the rule editor says only that the rule isn't valid, not which field ([lattice #665](https://github.com/alexnodeland/lattice/issues/665)).
 - Harder: a message that was useful, such as "acme exists" or a ceiling's layer, is now the kit's sentence. Where a reader needs more, the code or a typed field carries it, as `artifact_busy`, `over_quota` and the settings' ceiling do. A new code needs its sentence here.

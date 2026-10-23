@@ -38,7 +38,8 @@ configuration is deploy/prometheus's, with the services' names in the private
 namespace in place of Compose's. GoTrue's proxy, the edge's caddy_image, is the
 single host's Caddy, and the images the stack module runs as they are, such as
 GoTrue's and Langfuse's, are compose.yaml's, and each image deploy/<service>/
-Dockerfile builds is on its service's image, as compose.yaml pins it.
+Dockerfile builds is on its service's image, as compose.yaml pins it, unless
+compose.yaml builds that image itself, as it does Grafana's.
 """
 
 from __future__ import annotations
@@ -286,7 +287,11 @@ STATE_HOST_EXTRA = {
 Prometheus."""
 STATE_HOST_LACKS = {
     "clickhouse": {
-        "environment": {"CLICKHOUSE_ANALYTICS_WRITER_PASSWORD", "CLICKHOUSE_ANALYTICS_PASSWORD"},
+        "environment": {
+            "CLICKHOUSE_ANALYTICS_WRITER_PASSWORD",
+            "CLICKHOUSE_ANALYTICS_PASSWORD",
+            "CLICKHOUSE_GRAFANA_PASSWORD",
+        },
         "mounts": {
             "/etc/clickhouse-server/users.d/analytics-users.xml",
             "/etc/clickhouse-server/config.d/analytics.xml",
@@ -366,7 +371,8 @@ def check_aws() -> list[str]:
     # Each thin image builds on its own service's image, as compose.yaml pins it.
     for dockerfile in sorted((ROOT / "deploy").glob("*/Dockerfile")):
         service = stack.get(dockerfile.parent.name)
-        if service is None:
+        # A service compose.yaml builds from its Dockerfile runs the thin image itself (ADR-0048).
+        if service is None or "build" in service:
             continue
         for base in re.findall(r"^FROM (\S+)", dockerfile.read_text(), re.MULTILINE):
             if base != service["image"]:

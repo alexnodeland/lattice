@@ -1,0 +1,164 @@
+{
+  "uid": "stackr-adoption",
+  "title": "Adoption",
+  "description": "portalr's product analytics, across tenants, for operators (lattice RFC-0008, stackr ADR-0048). Only people who said yes are counted.",
+  "tags": [
+    "stackr",
+    "analytics"
+  ],
+  "timezone": "utc",
+  "schemaVersion": 39,
+  "time": {
+    "from": "now-30d",
+    "to": "now"
+  },
+  "editable": false,
+  "templating": {
+    "list": [
+      {
+        "name": "tenant",
+        "label": "Tenant",
+        "type": "query",
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "analytics"
+        },
+        "query": "SELECT DISTINCT tenant_id FROM analytics.events ORDER BY tenant_id",
+        "definition": "SELECT DISTINCT tenant_id FROM analytics.events ORDER BY tenant_id",
+        "includeAll": true,
+        "multi": true,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "refresh": 2
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Active people, by day",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "analytics"
+      },
+      "description": "People who did anything in the tenants chosen, each day: by their keyed hash, never their id.",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "analytics"
+          },
+          "refId": "A",
+          "editorType": "sql",
+          "format": 0,
+          "queryType": "timeseries",
+          "rawSql": "SELECT toStartOfDay(ts) AS time, uniq(distinct_id) AS people FROM analytics.events WHERE $__timeFilter(ts) AND tenant_id IN (${tenant:singlequote}) GROUP BY time ORDER BY time"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "bargauge",
+      "title": "Adoption by integration",
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "analytics"
+      },
+      "description": "How many people used each integration in the range.",
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "basic"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "analytics"
+          },
+          "refId": "A",
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT props['integration'] AS integration, uniq(distinct_id) AS people FROM analytics.events WHERE $__timeFilter(ts) AND tenant_id IN (${tenant:singlequote}) AND event = 'app.integration.used.v1' AND props['integration'] != '' GROUP BY integration ORDER BY people DESC"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "bargauge",
+      "title": "Funnel: a page, a thread, a message",
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "analytics"
+      },
+      "description": "People who opened a page, then a thread, then sent a message, within a day, in the range.",
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "basic"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "analytics"
+          },
+          "refId": "A",
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT step, countIf(level >= step) AS people FROM (SELECT distinct_id, windowFunnel(86400)(toDateTime(ts), event = 'app.page.viewed.v1', event = 'app.thread.opened.v1', event = 'app.message.sent.v1') AS level FROM analytics.events WHERE $__timeFilter(ts) AND tenant_id IN (${tenant:singlequote}) GROUP BY distinct_id) ARRAY JOIN [1, 2, 3] AS step GROUP BY step ORDER BY step"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "table",
+      "title": "Weekly retention",
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "analytics"
+      },
+      "description": "Of the people active four weeks ago, how many came back in each week since.",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "analytics"
+          },
+          "refId": "A",
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT sum(r[1]) AS `week 0`, sum(r[2]) AS `week 1`, sum(r[3]) AS `week 2`, sum(r[4]) AS `week 3` FROM (SELECT distinct_id, retention(toStartOfWeek(ts) = toStartOfWeek(now() - INTERVAL 3 WEEK), toStartOfWeek(ts) = toStartOfWeek(now() - INTERVAL 2 WEEK), toStartOfWeek(ts) = toStartOfWeek(now() - INTERVAL 1 WEEK), toStartOfWeek(ts) = toStartOfWeek(now())) AS r FROM analytics.events WHERE ts >= toStartOfWeek(now() - INTERVAL 3 WEEK) AND tenant_id IN (${tenant:singlequote}) GROUP BY distinct_id)"
+        }
+      ]
+    }
+  ]
+}

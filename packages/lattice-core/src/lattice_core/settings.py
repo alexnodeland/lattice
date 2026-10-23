@@ -18,7 +18,7 @@ setting is never a secret and never free text: no kind holds either.
 """
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Final, Literal, Protocol, cast
 
@@ -26,7 +26,9 @@ from lattice_core.integrations import KEY
 
 __all__ = [
     "CONNECTED_TOOLS",
+    "CONNECTED_TOOL_RISKS",
     "KNOWN_SETTINGS",
+    "RISKS",
     "TIERS",
     "IntRange",
     "Kind",
@@ -140,11 +142,19 @@ class Setting:
     description: str
     """One sentence, for the admin who sets it."""
 
+    labels: Mapping[str, str] = field(default_factory=dict[str, str])
+    """What each of a subset's names is, in words, for the admin who chooses them: such as a
+    tool's risk. Each label names one of its universe's names."""
+
     def __post_init__(self) -> None:
         if not KEY.fullmatch(self.key):
             raise ValueError(f"a setting's key is a name or family:name, not {self.key!r}")
         if not self.description.strip():
             raise ValueError(f"{self.key} needs a description")
+        if isinstance(self.kind, Subset) and (
+            stray := sorted(set(self.labels) - self.kind.universe)
+        ):
+            raise ValueError(f"{self.key} labels names it doesn't have: {', '.join(stray)}")
         try:
             self.value(self.default)
         except ValueError as error:
@@ -237,37 +247,53 @@ def _per_hour(app: str, title: str) -> Setting:
     )
 
 
-CONNECTED_TOOLS: Final = MappingProxyType(
+RISKS: Final = MappingProxyType(
     {
-        "freecad": frozenset(
+        "read": "reads",
+        "edit": "edits",
+        "code": "runs code",
+        "network": "downloads",
+    }
+)
+"""Each tool's risk, as a connected app's vetted entry names it, in the words admin shows."""
+
+CONNECTED_TOOL_RISKS: Final = MappingProxyType(
+    {
+        "freecad": MappingProxyType(
             {
-                "create_document",
-                "create_object",
-                "delete_object",
-                "edit_object",
-                "execute_code",
-                "execute_code_async",
-                "get_async_status",
-                "get_object",
-                "get_objects",
-                "get_parts_list",
-                "get_rpc_status",
-                "get_view",
-                "list_documents",
+                "create_document": "edit",
+                "create_object": "edit",
+                "delete_object": "edit",
+                "edit_object": "edit",
+                "execute_code": "code",
+                "execute_code_async": "code",
+                "get_async_status": "read",
+                "get_object": "read",
+                "get_objects": "read",
+                "get_parts_list": "read",
+                "get_rpc_status": "read",
+                "get_view": "read",
+                "list_documents": "read",
             }
         ),
-        "blender": frozenset(
+        "blender": MappingProxyType(
             {
-                "execute_blender_code",
-                "generate_3d",
-                "get_addon_status",
-                "get_scene_info",
-                "import_asset",
-                "look",
-                "search_assets",
+                "execute_blender_code": "code",
+                "generate_3d": "network",
+                "get_addon_status": "read",
+                "get_scene_info": "read",
+                "import_asset": "network",
+                "look": "read",
+                "search_assets": "network",
             }
         ),
     }
+)
+"""Each connected app's tools' risks, as its vetted entry names them; an artifactr test holds
+them equal."""
+
+CONNECTED_TOOLS: Final = MappingProxyType(
+    {app: frozenset(risks) for app, risks in CONNECTED_TOOL_RISKS.items()}
 )
 """Each connected app's tools a workspace may offer, by app: every tool its vetted entry in
 artifactr.connect names but those that act on the runner's host. An artifactr test holds the
@@ -285,6 +311,7 @@ def _tools(app: str, title: str) -> Setting:
             f"Which of a connected {title}'s tools a workspace offers, of those its operator"
             " offers."
         ),
+        labels={name: RISKS[risk] for name, risk in CONNECTED_TOOL_RISKS[app].items()},
     )
 
 

@@ -18,6 +18,7 @@ import {
 import { allowedNow, anyPart, useAccess } from "../../../access";
 import { Frame } from "../../../frame";
 import { remember } from "../../../last";
+import { anywhere, settingsPlaces } from "../../../settings";
 
 /**
  * A tenant in admin, for its owners and admins: its areas, in admin's frame. Who may open it is
@@ -76,6 +77,16 @@ function Tenant() {
   // Whether they may see every tenant, for the switch alone: a tenant's admin needn't wait on it.
   const { data: every } = useQuery(queries.portalr.tenants(user));
   const { allowed } = useAccess(tenant);
+  // A workspace's admin may narrow settings there without holding it on the tenant (issue 627): read
+  // where, once a page has read the tenant's workspaces, without the rail reading them itself.
+  const { data: workspaces = [] } = useQuery({
+    ...queries.artifactr.workspaces(tenant),
+    enabled: false,
+  });
+  const { data: places } = useQuery({
+    ...settingsPlaces(queries, tenant, workspaces),
+    enabled: !allowed.has("grantr:manage_settings") && workspaces.length > 0,
+  });
   return (
     <Frame
       tenant={tenant}
@@ -103,7 +114,7 @@ function Tenant() {
               Integrations
             </NavLink>
           )}
-          {allowed.has("grantr:manage_settings") && (
+          {(allowed.has("grantr:manage_settings") || (places && anywhere(places))) && (
             <NavLink
               icon={SlidersHorizontal}
               render={<Link to="/t/$tenant/settings" params={{ tenant }} />}

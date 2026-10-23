@@ -3,6 +3,7 @@ import {
   AppHostContext,
   ArtifactContent,
   Card,
+  CRUMB,
   EmptyState,
   FormHostContext,
   PageHeader,
@@ -148,7 +149,13 @@ function Artifact() {
         breadcrumbs={[
           {
             label: "Artifacts",
-            render: <Link to="/t/$tenant/w/$workspace/artifacts" params={{ tenant, workspace }} />,
+            render: (
+              <Link
+                to="/t/$tenant/w/$workspace/artifacts"
+                params={{ tenant, workspace }}
+                activeOptions={CRUMB}
+              />
+            ),
           },
         ]}
         meta={[

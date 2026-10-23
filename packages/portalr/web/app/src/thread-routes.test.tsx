@@ -220,3 +220,14 @@ test("Try again refused as already posted, by another tab, says nothing went wro
   await expect.element(posting.getByText("Sending…")).toBeVisible();
   expect(screen.getByText("That wasn't done: the server refused it.").elements()).toHaveLength(0);
 });
+
+test("the breadcrumb names the place above as a link, never as the page shown", async () => {
+  const { screen } = await open("/t/acme/w/notes/threads/thr_1", serve, () => null, {
+    artifactrLog: LOG,
+  });
+  const trail = screen.getByRole("navigation", { name: "Breadcrumb" });
+  await expect.element(trail.getByRole("link").first()).toBeVisible();
+  for (const crumb of trail.getByRole("link").elements()) {
+    expect(crumb.getAttribute("aria-current")).toBeNull();
+  }
+});

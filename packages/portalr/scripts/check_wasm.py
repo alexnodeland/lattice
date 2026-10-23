@@ -1,7 +1,9 @@
 r"""Fail on a WebAssembly module in a built UI that web/wasm-allowlist.json doesn't list.
 
-Both UIs' policy allows ``'wasm-unsafe-eval'``, for the modules their own build ships and no
-others (portalr ADR-0041). This check finds every module in each UI's build, as Vite wrote it:
+Both UIs' policy no longer allows ``'wasm-unsafe-eval'`` (portalr ADR-0041, amended 2026-10-22),
+so a module either UI ships would fail to compile; the allow-list holds each build to none. Should
+a UI need one again, its module is listed here with the directive put back, in one reviewed
+change. This check finds every module in each UI's build, as Vite wrote it:
 
 - a ``.wasm`` file;
 - a module inlined in any other file as base64, by the encoding of its magic ``\0asm``,

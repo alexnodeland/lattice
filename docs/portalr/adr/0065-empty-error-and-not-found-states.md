@@ -1,6 +1,6 @@
 # ADR-0065: Empty, error and not-found states
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0068](0068-where-the-focus-goes-and-one-not-found.md) (a not-found that stands in for a page is the `NotFound` heading)
 **Date:** 2026-10-21
 **Deciders:** Alex Nodeland
 

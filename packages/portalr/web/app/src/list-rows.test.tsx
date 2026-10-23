@@ -170,3 +170,31 @@ test("a row's second line holds up: right to left, emoji, long, empty, and a tim
   // An untitled thread is named as such, and its time ahead of the clock is "now".
   expect(row("Untitled").element().textContent).toContain("You: Ahead · now");
 });
+
+test("a proposal's link to its artifact is named by the artifact's title, not its id", async () => {
+  const proposed = {
+    type: "event",
+    seq: 99,
+    id: "evt_p1",
+    ts: "2026-10-17T09:30:00Z",
+    workspace_id: "notes",
+    actor: { kind: "user", id: "alice" },
+    event: {
+      type: "proposal_created",
+      proposal_id: "prop_1",
+      rationale: null,
+      change: {
+        type: "edit_artifact",
+        artifact_id: "art_note",
+        base_version: 1,
+        summary: "Say where",
+        patch: { kind: "json_patch", ops: [{ op: "replace", path: "/text", value: "# Lisbon" }] },
+      },
+    },
+  };
+  const { screen } = await open("/t/acme/w/notes/proposals", serving(), undefined, {
+    artifactrLog: [...LOG, proposed],
+  });
+  await expect.element(screen.getByRole("link", { name: "Flights on Monday" })).toBeVisible();
+  expect(screen.getByRole("link", { name: "art_note" }).elements()).toHaveLength(0);
+});

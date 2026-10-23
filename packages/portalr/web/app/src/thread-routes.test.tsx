@@ -5,6 +5,7 @@
  */
 
 import { afterEach, expect, test, vi } from "vitest";
+import { userEvent } from "vitest/browser";
 import { open, type Serve } from "./test/app";
 
 const ALICE = { kind: "user", id: "alice" };
@@ -254,4 +255,78 @@ test("Try again refused in words alone, without the typed reason, is a refusal",
   const log = screen.getByRole("log", { name: "Messages" });
   await log.getByRole("button", { name: "Try again" }).click();
   await expect.element(screen.getByText("That wasn't done: the server refused it.")).toBeVisible();
+});
+
+test("following a thread's link from the list lands on the thread's heading, and Back on the list's", async () => {
+  const { screen, router } = await open("/t/acme/w/notes", serve, () => null, {
+    artifactrLog: LOG,
+  });
+  const link = screen
+    .getByRole("main")
+    .getByRole("link", { name: /Launch/ })
+    .first();
+  await expect.element(link).toBeVisible();
+  (link.element() as HTMLElement).focus();
+  await userEvent.keyboard("{Enter}");
+  const thread = screen.getByRole("heading", { level: 1 });
+  await expect.element(thread).not.toHaveTextContent("Threads");
+  await expect.element(thread).toHaveFocus();
+  router.history.back();
+  await expect.element(screen.getByRole("heading", { level: 1, name: "Threads" })).toHaveFocus();
+});
+
+test("a question waiting when the thread is opened leaves the focus be, and is reached by Go to the question", async () => {
+  const waiting = LOG.slice(
+    0,
+    LOG.findIndex((entry) => entry.event.type === "deferred_answered"),
+  );
+  const { screen } = await open("/t/acme/w/notes/threads/thr_1", serve, () => null, {
+    artifactrLog: waiting,
+  });
+  const question = screen.getByRole("radio", { name: "This week" });
+  await expect.element(question).toBeVisible();
+  await new Promise((settled) => requestAnimationFrame(() => requestAnimationFrame(settled)));
+  expect(document.activeElement?.getAttribute("role")).not.toBe("radio");
+  await screen.getByRole("button", { name: "Go to the question" }).click();
+  // To the question's own named part, inside the request.
+  expect(document.activeElement?.closest("#request-q1")).not.toBeNull();
+  expect(document.activeElement?.getAttribute("aria-label")).toBe("The agent asks");
+  await userEvent.tab();
+  expect(document.activeElement?.closest("#request-q1")).not.toBeNull();
+});
+
+test("another thread's question waiting when its page opens leaves the focus be too", async () => {
+  const waiting = LOG.slice(
+    0,
+    LOG.findIndex((entry) => entry.event.type === "deferred_answered"),
+  );
+  const second = [
+    { type: "thread_created", thread_id: "thr_2", title: "Venue" },
+    { type: "run_started", run_id: "run_9", thread_id: "thr_2" },
+    {
+      type: "run_paused",
+      run_id: "run_9",
+      thread_id: "thr_2",
+      requests: [{ kind: "question", tool_call_id: "q9", tool_name: "ask_user", args: QUESTIONS }],
+    },
+  ].map((event, at) => ({
+    type: "event",
+    seq: waiting.length + at + 1,
+    id: `evt_t2_${at}`,
+    ts: "2026-10-20T00:00:00Z",
+    workspace_id: "notes",
+    actor: at === 0 ? ALICE : agent("run_9"),
+    event,
+  }));
+  const { screen, router } = await open("/t/acme/w/notes/threads/thr_1", serve, () => null, {
+    artifactrLog: [...waiting, ...second],
+  });
+  await expect.element(screen.getByRole("heading", { level: 1, name: "Launch" })).toBeVisible();
+  await router.navigate({
+    to: "/t/$tenant/w/$workspace/threads/$thread",
+    params: { tenant: "acme", workspace: "notes", thread: "thr_2" },
+  });
+  await expect.element(screen.getByRole("heading", { level: 1, name: "Venue" })).toBeVisible();
+  await new Promise((settled) => requestAnimationFrame(() => requestAnimationFrame(settled)));
+  expect(document.activeElement?.getAttribute("role")).not.toBe("radio");
 });

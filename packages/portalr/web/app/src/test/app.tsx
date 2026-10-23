@@ -98,7 +98,12 @@ function server(serve: Serve) {
     const request = new Request(input, init);
     const path = new URL(request.url).pathname;
     if (path === "/grantr/v1/me") {
-      return request.headers.has("X-Tenant")
+      const tenant = request.headers.get("X-Tenant");
+      if (tenant !== null && tenant !== "acme") {
+        // Alice is a member of acme alone.
+        return Response.json({ detail: "the caller isn't a member" }, { status: 403 });
+      }
+      return tenant !== null
         ? Response.json({ tenant: "acme", user: "alice", roles: [], workspaces: ["notes"] })
         : Response.json({ memberships: [{ tenant: "acme", user: "alice", roles: ["member"] }] });
     }

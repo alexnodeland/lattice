@@ -7,6 +7,7 @@
 
 export { Account } from "./account";
 export { AccountMenu, type AnalyticsAnswer, type Appearance } from "./account-menu";
+export { focusPageHeading, useHeadingAfterNavigation } from "./after-navigation";
 export { Alert, type AlertTone } from "./alert";
 export { AnsiText, type Run, runs } from "./ansi";
 export { type AppHost, AppHostContext } from "./app-frame";
@@ -94,6 +95,7 @@ export {
   PageStrip,
 } from "./native-file";
 export { NewVersion, NewVersionOffer } from "./new-version";
+export { NotFound } from "./not-found";
 export { Num } from "./num";
 export { PageHeader } from "./page-header";
 export { Plain } from "./plain";

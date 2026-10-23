@@ -72,6 +72,7 @@ Langfuse and LiteLLM aren't in that stack, so their reads answer `unavailable` t
 | `/sign-in` | An email and a password |
 | `/` | The person's tenants, from grantr's `/me`: none is no access, and one goes straight to it |
 | `/t/$tenant` | The workspaces grantr says they can open there |
+| `/t/$tenant/$` | A page that isn't there under a tenant: "Page not found", on a plain page ([ADR-0068](adr/0068-where-the-focus-goes-and-one-not-found.md)) |
 | `/t/$tenant/w/$workspace` | A workspace's threads, and a new one; its artifactr stream is open while any of its routes is, and its integrations are read as it opens |
 | `/t/$tenant/w/$workspace/threads/$thread` | A thread's chat: its messages, and among them the artifacts made in it, each kind the app draws: a mini app running ([ADR-0052](adr/0052-artifacts-inline-in-their-thread.md)), a form sent from there, and a native file read a page at a time, or its cells, and checked out or edited in its framed editor ([ADR-0055](adr/0055-every-kind-inline-and-a-native-file-read-and-edited-in-its-thread.md)), its runs as they stream, what a paused run waits on, its proposals, and a message to post where grantr allows; and its menu, to restrict and share it ([ADR-0022](adr/0022-restricting-and-sharing-a-thread.md)) |
 | `/t/$tenant/w/$workspace/artifacts` | The workspace's artifacts that aren't archived, each by kind and latest version |
@@ -130,6 +131,7 @@ Forms, dashboards and mini apps are switched on and off per workspace by an inte
 | `/sign-in` | An email and a password |
 | `/` | Where admin opens: its last choice while still the person's, their one tenant, every tenant for an operator, a choice, or no access |
 | `/t/$tenant` | A tenant someone owns or administers, in admin's frame, with the areas grantr allows |
+| `/t/$tenant/$` | A page that isn't there in a tenant they administer: "Page not found", in the frame ([ADR-0068](adr/0068-where-the-focus-goes-and-one-not-found.md)) |
 | `/t/$tenant/` | Home: members, workspaces, feedback, failed turns and spend, each a card from one read, with its own state |
 | `/t/$tenant/access/members`, `/groups`, `/keys`, `/roles`, `/grants` | Access: members, invited or made as service principals, and removed; groups; keys, a secret shown once, and revoked; roles, built in and custom; and grants, given and revoked. Each part where grantr allows its read, as a table or, on a phone, cards ([ADR-0024](adr/0024-access-members-groups-and-keys.md), [ADR-0025](adr/0025-access-roles-and-grants.md)) |
 | `/t/$tenant/integrations` | Integrations: on the tenant or in a workspace the address chooses, each integration switched on or off, or back to what it inherits, with where its state comes from, the tenant's off and the deployment's not installing as ceilings, and who set it there and when ([ADR-0045](adr/0045-integrations-in-admin-and-the-apps-read-of-them.md)) |

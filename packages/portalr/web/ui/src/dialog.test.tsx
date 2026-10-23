@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { expect, test } from "vitest";
+import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { Button } from "./button";
 import { Dialog } from "./dialog";
@@ -44,4 +45,29 @@ test("focus starts where it's aimed, and returns where it's sent", async () => {
   await expect.element(dialog.getByRole("textbox", { name: "Person" })).toHaveFocus();
   await dialog.getByRole("button", { name: "Close" }).click();
   await expect.element(screen.getByRole("button", { name: "Thread actions" })).toHaveFocus();
+});
+
+test("a dialog is modal: named so, and Tab goes round its own controls", async () => {
+  function Shown() {
+    const [open, setOpen] = useState(true);
+    return (
+      <>
+        <button type="button">Behind</button>
+        <Dialog open={open} onOpenChange={setOpen} title="Share the thread">
+          <button type="button">One</button>
+        </Dialog>
+      </>
+    );
+  }
+  const screen = await render(<Shown />);
+  const dialog = screen.getByRole("dialog", { name: "Share the thread" });
+  await expect.element(dialog).toHaveAttribute("aria-modal", "true");
+  // Once its first focus has landed in it, as it opens.
+  await expect.poll(() => dialog.element().contains(document.activeElement)).toBe(true);
+  for (let step = 0; step < 5; step++) {
+    await userEvent.tab();
+    expect(dialog.element().contains(document.activeElement)).toBe(true);
+  }
+  await userEvent.tab({ shift: true });
+  expect(dialog.element().contains(document.activeElement)).toBe(true);
 });

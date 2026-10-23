@@ -8,6 +8,7 @@ import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as SignedIndexRouteImport } from './routes/_signed/index'
 import { Route as SignedTTenantRouteImport } from './routes/_signed/t/$tenant'
 import { Route as SignedTTenantIndexRouteImport } from './routes/_signed/t/$tenant/index'
+import { Route as SignedTTenantSplatRouteImport } from './routes/_signed/t/$tenant/$'
 import { Route as SignedTTenantWWorkspaceRouteImport } from './routes/_signed/t/$tenant/w/$workspace'
 import { Route as SignedTTenantWWorkspaceIndexRouteImport } from './routes/_signed/t/$tenant/w/$workspace/index'
 import { Route as SignedTTenantWWorkspaceProposalsRouteImport } from './routes/_signed/t/$tenant/w/$workspace/proposals'
@@ -40,6 +41,11 @@ const SignedTTenantRoute = SignedTTenantRouteImport.update({
 const SignedTTenantIndexRoute = SignedTTenantIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => SignedTTenantRoute,
+} as any)
+const SignedTTenantSplatRoute = SignedTTenantSplatRouteImport.update({
+  id: '/$',
+  path: '/$',
   getParentRoute: () => SignedTTenantRoute,
 } as any)
 const SignedTTenantWWorkspaceRoute = SignedTTenantWWorkspaceRouteImport.update({
@@ -100,6 +106,7 @@ export interface FileRoutesByFullPath {
   '/': typeof SignedIndexRoute
   '/sign-in': typeof SignInRoute
   '/t/$tenant': typeof SignedTTenantRouteWithChildren
+  '/t/$tenant/$': typeof SignedTTenantSplatRoute
   '/t/$tenant/': typeof SignedTTenantIndexRoute
   '/t/$tenant/w/$workspace': typeof SignedTTenantWWorkspaceRouteWithChildren
   '/t/$tenant/w/$workspace/proposals': typeof SignedTTenantWWorkspaceProposalsRoute
@@ -114,6 +121,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/sign-in': typeof SignInRoute
   '/': typeof SignedIndexRoute
+  '/t/$tenant/$': typeof SignedTTenantSplatRoute
   '/t/$tenant': typeof SignedTTenantIndexRoute
   '/t/$tenant/w/$workspace/proposals': typeof SignedTTenantWWorkspaceProposalsRoute
   '/t/$tenant/w/$workspace/runs': typeof SignedTTenantWWorkspaceRunsRoute
@@ -130,6 +138,7 @@ export interface FileRoutesById {
   '/sign-in': typeof SignInRoute
   '/_signed/': typeof SignedIndexRoute
   '/_signed/t/$tenant': typeof SignedTTenantRouteWithChildren
+  '/_signed/t/$tenant/$': typeof SignedTTenantSplatRoute
   '/_signed/t/$tenant/': typeof SignedTTenantIndexRoute
   '/_signed/t/$tenant/w/$workspace': typeof SignedTTenantWWorkspaceRouteWithChildren
   '/_signed/t/$tenant/w/$workspace/proposals': typeof SignedTTenantWWorkspaceProposalsRoute
@@ -147,6 +156,7 @@ export interface FileRouteTypes {
     | '/'
     | '/sign-in'
     | '/t/$tenant'
+    | '/t/$tenant/$'
     | '/t/$tenant/'
     | '/t/$tenant/w/$workspace'
     | '/t/$tenant/w/$workspace/proposals'
@@ -161,6 +171,7 @@ export interface FileRouteTypes {
   to:
     | '/sign-in'
     | '/'
+    | '/t/$tenant/$'
     | '/t/$tenant'
     | '/t/$tenant/w/$workspace/proposals'
     | '/t/$tenant/w/$workspace/runs'
@@ -176,6 +187,7 @@ export interface FileRouteTypes {
     | '/sign-in'
     | '/_signed/'
     | '/_signed/t/$tenant'
+    | '/_signed/t/$tenant/$'
     | '/_signed/t/$tenant/'
     | '/_signed/t/$tenant/w/$workspace'
     | '/_signed/t/$tenant/w/$workspace/proposals'
@@ -228,6 +240,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/t/$tenant/'
       preLoaderRoute: typeof SignedTTenantIndexRouteImport
+      parentRoute: typeof SignedTTenantRoute
+    }
+    '/_signed/t/$tenant/$': {
+      id: '/_signed/t/$tenant/$'
+      path: '/$'
+      fullPath: '/t/$tenant/$'
+      preLoaderRoute: typeof SignedTTenantSplatRouteImport
       parentRoute: typeof SignedTTenantRoute
     }
     '/_signed/t/$tenant/w/$workspace': {
@@ -331,11 +350,13 @@ const SignedTTenantWWorkspaceRouteWithChildren =
   )
 
 interface SignedTTenantRouteChildren {
+  SignedTTenantSplatRoute: typeof SignedTTenantSplatRoute
   SignedTTenantIndexRoute: typeof SignedTTenantIndexRoute
   SignedTTenantWWorkspaceRoute: typeof SignedTTenantWWorkspaceRouteWithChildren
 }
 
 const SignedTTenantRouteChildren: SignedTTenantRouteChildren = {
+  SignedTTenantSplatRoute: SignedTTenantSplatRoute,
   SignedTTenantIndexRoute: SignedTTenantIndexRoute,
   SignedTTenantWWorkspaceRoute: SignedTTenantWWorkspaceRouteWithChildren,
 }

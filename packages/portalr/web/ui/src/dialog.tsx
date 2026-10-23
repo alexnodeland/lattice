@@ -52,6 +52,9 @@ export function Dialog({
       <BaseDialog.Portal>
         <BaseDialog.Backdrop className={backdrop} />
         <BaseDialog.Popup
+          // Base UI traps the focus but doesn't say so: assistive technology learns the page
+          // behind is out of reach from aria-modal, as the drawer says it.
+          aria-modal="true"
           className={popup}
           {...(initialFocus && { initialFocus })}
           {...(finalFocus && { finalFocus })}

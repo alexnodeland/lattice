@@ -13,11 +13,13 @@ import {
   Alert,
   ASK_FORM,
   ASK_USER,
+  Button,
   Composer,
   ComposerDock,
   CRUMB,
   Message,
   Messages,
+  NotFound as NotFoundPage,
   PageHeader,
   ProposalCard,
   Questions,
@@ -26,6 +28,7 @@ import {
   RunStatus,
   rendererFor,
   Streaming,
+  TextLink,
   ToolCall,
   ToolCalls,
 } from "@portalr/ui";
@@ -174,12 +177,34 @@ function Chat() {
       me,
     ),
   );
+  // The requests already waiting when this thread is first shown live: they don't take the focus,
+  // which starts at the page's heading; one that arrives while the page is open does (portalr
+  // ADR-0068). Kept with the thread's id, so another thread's page starts afresh.
+  const [atLoad, setAtLoad] = useState<{ id: string; waiting: ReadonlySet<string> } | null>(null);
+  useEffect(() => {
+    if (snapshot.status === "live" && atLoad?.id !== id) {
+      setAtLoad({
+        id,
+        waiting: new Set(
+          Object.values(runs)
+            .filter((run) => run.threadId === id)
+            .flatMap((run) => run.requests.map((request) => request.tool_call_id)),
+        ),
+      });
+    }
+  }, [snapshot.status, runs, id, atLoad]);
   if (thread === undefined) {
     return snapshot.status === "live" ? (
-      <>
-        <PageHeader title="Thread not found" breadcrumbs={crumbs} />
-        <p>There's no thread here by that name, or it isn't one you can see.</p>
-      </>
+      <NotFoundPage
+        title="Thread not found"
+        action={
+          <TextLink render={<Link to="/t/$tenant/w/$workspace" params={{ tenant, workspace }} />}>
+            All threads
+          </TextLink>
+        }
+      >
+        There's no thread here by that name, or it isn't one you can see.
+      </NotFoundPage>
     ) : (
       <Connection snapshot={snapshot} waiting="the thread" />
     );
@@ -234,6 +259,19 @@ function Chat() {
   // The thread's latest turn, if it failed, can be tried again by whoever may post.
   const retry = allowed.has("artifactr:post_message") ? retryOf(thread, runs, me) : null;
   const latestRequest = active.flatMap((run) => run.requests).at(-1);
+  const arrived =
+    latestRequest !== undefined &&
+    atLoad?.id === id &&
+    !atLoad.waiting.has(latestRequest.tool_call_id);
+  // To the question's own named part, such as "The agent asks", or else to where it is.
+  const toQuestion = () => {
+    const at = document.getElementById(`request-${latestRequest?.tool_call_id}`);
+    const named = at?.querySelector<HTMLElement>("[aria-label]") ?? at;
+    if (named && !named.hasAttribute("tabindex")) {
+      named.tabIndex = -1;
+    }
+    named?.focus();
+  };
 
   return (
     <section aria-labelledby="thread" className="flex max-w-190 flex-col gap-6">
@@ -242,18 +280,25 @@ function Chat() {
         breadcrumbs={crumbs}
         id="thread"
         actions={
-          (allowed.has("grantr:grant") || allowed.has("grantr:restrict")) && (
-            <CatchBoundary
-              getResetKey={() => id}
-              errorComponent={() => (
-                <Alert tone="error">Who has access to it couldn't be read.</Alert>
-              )}
-            >
-              <Suspense fallback={null}>
-                <Access tenant={tenant} workspace={workspace} thread={id} allowed={allowed} />
-              </Suspense>
-            </CatchBoundary>
-          )
+          <>
+            {latestRequest !== undefined && (
+              <Button variant="secondary" size="sm" onClick={toQuestion}>
+                Go to the question
+              </Button>
+            )}
+            {(allowed.has("grantr:grant") || allowed.has("grantr:restrict")) && (
+              <CatchBoundary
+                getResetKey={() => id}
+                errorComponent={() => (
+                  <Alert tone="error">Who has access to it couldn't be read.</Alert>
+                )}
+              >
+                <Suspense fallback={null}>
+                  <Access tenant={tenant} workspace={workspace} thread={id} allowed={allowed} />
+                </Suspense>
+              </CatchBoundary>
+            )}
+          </>
         }
       />
       <Connection snapshot={snapshot} waiting="the thread" />
@@ -282,12 +327,17 @@ function Chat() {
             case "question": {
               const { request, answer: given } = entry.question;
               return (
-                <li key={request.tool_call_id}>
+                <li
+                  key={request.tool_call_id}
+                  id={`request-${request.tool_call_id}`}
+                  tabIndex={-1}
+                  className="outline-none"
+                >
                   <Questions
                     request={request}
                     answer={given?.value ?? null}
                     answeredBy={given ? author(given.actor, me, names) : null}
-                    focus={request === latestRequest}
+                    focus={request === latestRequest && arrived}
                     onAnswer={(value) => answer(entry.run, request)({ answer: value })}
                   />
                 </li>
@@ -357,14 +407,21 @@ function Chat() {
               .filter(({ request }) => request.tool_name === ASK_FORM)
               .map(({ request, actor }) => ({ request, by: author(actor, me, names) })),
           ].map(({ request, by }) => (
-            <Request
+            <div
               key={request.tool_call_id}
-              request={request}
-              {...(by !== undefined && { answeredBy: by })}
-              // The newest request waiting takes the focus, never one already answered.
-              focus={request === latestRequest}
-              onAnswer={answer(run, request)}
-            />
+              id={`request-${request.tool_call_id}`}
+              tabIndex={-1}
+              className="outline-none"
+            >
+              <Request
+                request={request}
+                {...(by !== undefined && { answeredBy: by })}
+                // The newest request waiting takes the focus if it arrived while the page was
+                // open, never one already answered, nor one waiting when the page was shown.
+                focus={request === latestRequest && arrived}
+                onAnswer={answer(run, request)}
+              />
+            </div>
           ))}
         </div>
       ))}

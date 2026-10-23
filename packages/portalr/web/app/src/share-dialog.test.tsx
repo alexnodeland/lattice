@@ -2,6 +2,7 @@ import { type Names, namesOf } from "@portalr/client";
 import { choose, optionsOf } from "@portalr/ui/testing";
 import { useRef, useState } from "react";
 import { expect, test, vi } from "vitest";
+import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { type Role, ShareDialog } from "./share-dialog";
 
@@ -152,4 +153,25 @@ test("people are offered in the order of what is shown", async () => {
     "c0ffee00…",
     "zoe@acme.test",
   ]);
+});
+
+test("Share is modal: Tab and Shift+Tab go round its own controls, Close among them", async () => {
+  const screen = await render(<Opened />);
+  await screen.getByRole("button", { name: "Thread actions" }).click();
+  const dialog = screen.getByRole("dialog", { name: "Share the thread" });
+  await expect.element(dialog).toHaveAttribute("aria-modal", "true");
+  // Once its first focus has landed in it, as it opens.
+  await expect.poll(() => dialog.element().contains(document.activeElement)).toBe(true);
+  const inside = () => dialog.element().contains(document.activeElement);
+  const seen = new Set<string>();
+  for (let step = 0; step < 8; step++) {
+    await userEvent.tab();
+    expect(inside()).toBe(true);
+    seen.add(document.activeElement?.textContent ?? "");
+  }
+  expect(seen.has("Close")).toBe(true);
+  for (let step = 0; step < 8; step++) {
+    await userEvent.tab({ shift: true });
+    expect(inside()).toBe(true);
+  }
 });

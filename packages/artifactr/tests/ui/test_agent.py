@@ -89,6 +89,9 @@ async def _paused(runner: Runner[None], ws: Workspace, thread: Thread) -> str:
     sent = await runner.send(ws, thread.id, "When shall we have lunch?")
     assert sent.run is not None
     assert isinstance((await sent.run.wait()).output, DeferredToolRequests)
+    # The ended run hands its thread over in the background, holding the thread as it plans:
+    # an answer sent meanwhile finds the thread busy, and the hand-over, not the answer, resumes.
+    await runner.drain()
     return sent.run.run_id
 
 

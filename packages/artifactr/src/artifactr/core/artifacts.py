@@ -233,7 +233,12 @@ def load_versioned(
 
 
 def _errors(error: ValidationError) -> list[JsonValue]:
-    errors: list[JsonValue] = json.loads(error.json(include_url=False))
+    """The errors as JSON, without the inputs where an input is one JSON can't write."""
+    errors: list[JsonValue]
+    try:
+        errors = json.loads(error.json(include_url=False))
+    except ValueError:  # such as an integer past the digits Python reads from text
+        errors = json.loads(error.json(include_url=False, include_input=False))
     return errors
 
 

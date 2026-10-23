@@ -224,12 +224,15 @@ ANSWERS: dict[str, str] = {
 """Each of the adoption's reads, by what its query selects, in the order they are made."""
 
 
-def adoption_answers(**overrides: str) -> httpx.AsyncClient:
-    """A ClickHouse that answers each of the adoption's reads, by what it selects."""
+def adoption_answers(sent: list[str] | None = None, /, **overrides: str) -> httpx.AsyncClient:
+    """A ClickHouse that answers each of the adoption's reads, by what it selects; each query it
+    is sent is kept in ``sent``, if given."""
     answers = {**ANSWERS, **overrides}
 
     async def handle(request: httpx.Request) -> httpx.Response:
         query = request.content.decode()
+        if sent is not None:
+            sent.append(query)
         for marker, text in answers.items():
             if marker in query:
                 if text == "slow":
@@ -276,14 +279,7 @@ async def test_retention_asks_after_each_whole_week_of_the_window() -> None:
 async def test_a_one_week_window_asks_retention_after_two_weeks_and_keeps_one() -> None:
     window = AdoptionQuery(start=SPAN.start, end=SPAN.start + timedelta(days=7))
     sent: list[str] = []
-    answers = adoption_answers(**{"retention(": '{"retention":["3","0"]}'})
-    original = answers.post
-
-    async def post(*args: object, **kwargs: object) -> httpx.Response:
-        sent.append(str(kwargs["content"]))
-        return await original(*args, **kwargs)  # type: ignore[arg-type]
-
-    answers.post = post  # type: ignore[method-assign]
+    answers = adoption_answers(sent, **{"retention(": '{"retention":["3","0"]}'})
     adoption = await Analytics(URL, KEY, reader=answers).adoption(ACME, window)
     assert isinstance(adoption, Ok)
     assert adoption.data.retention == [3]

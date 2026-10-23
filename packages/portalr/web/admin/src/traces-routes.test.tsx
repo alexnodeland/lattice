@@ -267,3 +267,11 @@ test("a trace that isn't there, or isn't the tenant's, or whose id isn't one, sa
   await expect.element(bad.screen.getByText("No such trace")).toBeVisible();
   expect(reads).toEqual([]);
 });
+
+test("a trace's crumb is a link to Traces, never the page shown", async () => {
+  const { screen } = await open(`/t/acme/traces/${A}`);
+  const trail = screen.getByRole("navigation", { name: "Breadcrumb" });
+  const traces = trail.getByRole("link", { name: "Traces" });
+  await expect.element(traces).toBeVisible();
+  await expect.element(traces).not.toHaveAttribute("aria-current");
+});

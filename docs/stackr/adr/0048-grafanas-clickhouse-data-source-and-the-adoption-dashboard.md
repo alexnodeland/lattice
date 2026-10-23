@@ -10,7 +10,7 @@ Amends [ADR-0044](0044-clickhouse-a-profile-of-its-own-and-portalrs-analytics-us
 
 - **Grafana had no ClickHouse data source.** ClickHouse's isn't one of Grafana's own; it is a plugin, `grafana-clickhouse-datasource`, which Grafana would otherwise download as it starts.
 - **Compose ran upstream Grafana with mounts,** and the AWS recipe ran `stackr-grafana`, a thin image with the same files baked in ([ADR-0035](0035-the-thin-images.md)). A plugin in one would not be in the other.
-- **ClickHouse's analytics users are tenant-bound:** `portalr_analytics` sees only the tenant its setting names. Operators read across tenants ([portalr ADR-0005](../portalr/adr/0005-operators-see-across-tenants.md)), as RFC-0008 planned with a `grafana_analytics` user.
+- **ClickHouse's analytics users are tenant-bound:** `portalr_analytics` sees only the tenant its setting names. Operators read across tenants ([portalr ADR-0005](../../portalr/adr/0005-operators-see-across-tenants.md)), as RFC-0008 planned with a `grafana_analytics` user.
 
 ## Decision
 

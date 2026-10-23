@@ -551,8 +551,6 @@ smoke_analytics() {
   fi
   expect_code "$(analytics_as operator "INSERT INTO analytics.events (tenant_id) VALUES ('$a')" </dev/null || true)" 497 \
     "Grafana's analytics user is refused an insert"
-  expect_code "$(analytics_as operator "SELECT count() FROM system.query_log" </dev/null || true)" 497 \
-    "Grafana's analytics user is refused system.query_log"
   # 0, for each limit, would mean none.
   for setting in "max_execution_time = 1000" "max_memory_usage = 99999999999" "log_queries = 1" \
     "max_execution_time = 0" "max_memory_usage = 0" "max_rows_to_read = 0" "max_bytes_to_read = 0" \
@@ -602,6 +600,10 @@ smoke_analytics() {
     status=1
   fi
   clickhouse_as admin "SYSTEM FLUSH LOGS" >/dev/null
+  # After the flush, which makes system.query_log from admin's logged queries: before, a read of
+  # it is refused as an unknown table, not by its grants.
+  expect_code "$(analytics_as operator "SELECT count() FROM system.query_log" </dev/null || true)" 497 \
+    "Grafana's analytics user is refused system.query_log"
   said=$(clickhouse_as langfuse "SELECT count() FROM system.query_log
     WHERE user LIKE 'portalr_analytics%' OR user = 'grafana_analytics'
       OR position(query, '$a') > 0 OR position(query, '$b') > 0

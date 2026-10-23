@@ -1,10 +1,11 @@
 /**
  * A page on the CSP tests' harness, and what it has reported: each violation of the policy, each
- * use of WebAssembly, and each error. The policy allows first-party WebAssembly (portalr ADR-0041),
- * so it can't refuse a module here; the page reports each call that compiles one instead, since
- * Markdown, its add-ons and a dashboard need none. With `search`, the page draws what it names at load, from a task of its own, which a
- * test's `page.evaluate` isn't: Playwright runs that outside the page's `script-src` check, so an
- * `eval` there passes where the page's own would be refused (portalr ADR-0047).
+ * use of WebAssembly, and each error. The policy refuses WebAssembly (portalr ADR-0041, as
+ * artifactr ADR-0088 amends it); the page reports each call that tries to compile a module too,
+ * since Markdown, its add-ons and a dashboard need none, and a refused call is otherwise silent.
+ * With `search`, the page draws what it names at load, from a task of its own, which a test's
+ * `page.evaluate` isn't: Playwright runs that outside the page's `script-src` check, so an `eval`
+ * there passes where the page's own would be refused (portalr ADR-0047).
  */
 
 import type { Browser, Page } from "playwright";

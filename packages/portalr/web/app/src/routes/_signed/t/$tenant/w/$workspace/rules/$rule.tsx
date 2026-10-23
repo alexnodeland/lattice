@@ -3,6 +3,7 @@ import {
   Alert,
   Button,
   ConfirmDialog,
+  CRUMB,
   EmptyState,
   PageHeader,
   TextField,
@@ -122,7 +123,13 @@ function RulePage() {
         breadcrumbs={[
           {
             label: "Rules",
-            render: <Link to="/t/$tenant/w/$workspace/rules" params={{ tenant, workspace }} />,
+            render: (
+              <Link
+                to="/t/$tenant/w/$workspace/rules"
+                params={{ tenant, workspace }}
+                activeOptions={CRUMB}
+              />
+            ),
           },
         ]}
         meta={

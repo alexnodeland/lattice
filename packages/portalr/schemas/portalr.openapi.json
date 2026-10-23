@@ -1,6 +1,131 @@
 {
   "components": {
     "schemas": {
+      "Active": {
+        "description": "How many people did anything: in the window, and in its last 7 and last 30 days.\n\nThe last 7 and 30 days end where the window does, and are within it: a window shorter than\neither counts its own people for it.",
+        "properties": {
+          "month": {
+            "title": "Month",
+            "type": "integer"
+          },
+          "week": {
+            "title": "Week",
+            "type": "integer"
+          },
+          "window": {
+            "title": "Window",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "window",
+          "week",
+          "month"
+        ],
+        "title": "Active",
+        "type": "object"
+      },
+      "ActiveDay": {
+        "description": "How many people did anything in the tenant on one day, in UTC.",
+        "properties": {
+          "day": {
+            "format": "date",
+            "title": "Day",
+            "type": "string"
+          },
+          "people": {
+            "title": "People",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "day",
+          "people"
+        ],
+        "title": "ActiveDay",
+        "type": "object"
+      },
+      "Adoption": {
+        "description": "A tenant's adoption over a window, and whether all of it was read.\n\nEach part is None where the read stopped at its deadline before reading it: unknown, which\nisn't none.",
+        "properties": {
+          "active": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Active"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "complete": {
+            "title": "Complete",
+            "type": "boolean"
+          },
+          "days": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ActiveDay"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days"
+          },
+          "funnel": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Funnel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "integrations": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/IntegrationUse"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Integrations"
+          },
+          "retention": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retention"
+          }
+        },
+        "required": [
+          "active",
+          "days",
+          "integrations",
+          "funnel",
+          "retention",
+          "complete"
+        ],
+        "title": "Adoption",
+        "type": "object"
+      },
       "Answer": {
         "additionalProperties": false,
         "description": "A person's answer to product analytics: yes, or no.",
@@ -486,9 +611,57 @@
         "title": "FieldError",
         "type": "object"
       },
+      "Funnel": {
+        "description": "How many people viewed a page, then opened a thread, then sent a message, within 24 hours.",
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "integer"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "thread": {
+            "title": "Thread",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "page",
+          "thread",
+          "message"
+        ],
+        "title": "Funnel",
+        "type": "object"
+      },
       "Id": {
         "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:@-]{0,127}$",
         "type": "string"
+      },
+      "IntegrationUse": {
+        "description": "How many times an integration was used in the window, by how many people.",
+        "properties": {
+          "integration": {
+            "title": "Integration",
+            "type": "string"
+          },
+          "people": {
+            "title": "People",
+            "type": "integer"
+          },
+          "uses": {
+            "title": "Uses",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "integration",
+          "uses",
+          "people"
+        ],
+        "title": "IntegrationUse",
+        "type": "object"
       },
       "Invited": {
         "description": "The member an invitation made, by the user id their tokens carry.",
@@ -802,6 +975,24 @@
           "owner_email"
         ],
         "title": "NewTenant",
+        "type": "object"
+      },
+      "Ok_Adoption_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Adoption"
+          },
+          "status": {
+            "const": "ok",
+            "default": "ok",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "Ok[Adoption]",
         "type": "object"
       },
       "Ok_Feedback_": {
@@ -1749,6 +1940,122 @@
           }
         },
         "summary": "Config"
+      }
+    },
+    "/portalr/v1/adoption": {
+      "get": {
+        "description": "The tenant's adoption from its product analytics (portalr ADR-0071).\n\nPeople active each day, who used each integration, the funnel from a page to a thread to\na message, and weekly retention, over a window of at most 91 days. People are counted by\na keyed hash of their id, and only those who said yes. ``complete`` is false where the\nread stopped at its deadline.",
+        "operationId": "adoption_portalr_v1_adoption_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "start",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "title": "Start",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "title": "End",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/TenantId"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "discriminator": {
+                    "mapping": {
+                      "ok": "#/components/schemas/Ok_Adoption_",
+                      "unavailable": "#/components/schemas/Unavailable",
+                      "unconfigured": "#/components/schemas/Unconfigured"
+                    },
+                    "propertyName": "status"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Ok_Adoption_"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Unavailable"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Unconfigured"
+                    }
+                  ],
+                  "title": "Response Adoption Portalr V1 Adoption Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          }
+        },
+        "summary": "Adoption"
       }
     },
     "/portalr/v1/analytics/consent": {

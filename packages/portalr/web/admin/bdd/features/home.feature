@@ -7,7 +7,7 @@ Feature: Home
     Given alice has signed in to admin
     Then they're in "acme"
     And they see the page "acme"
-    And the areas are "Home, Access, Integrations, Settings, Audit, Feedback, Traces, Logs, Runs, Usage"
+    And the areas are "Home, Access, Integrations, Settings, Audit, Feedback, Traces, Logs, Runs, Adoption, Usage"
     And the tenant switch offers "acme"
     And the "Members" card shows a figure
     And the "Workspaces" card shows a figure

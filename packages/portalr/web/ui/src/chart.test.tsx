@@ -507,3 +507,30 @@ test("a bare chart is its legend and drawing alone, for a caller that frames it 
   await expect.element(screen.getByText("Spend", { exact: true })).toBeVisible();
   await expect.element(screen.getByText("Total")).toBeVisible();
 });
+
+test("nothing the keyboard reaches is inside a chart's drawing, which is hidden from assistive technology", async () => {
+  await page.viewport(900, 700);
+  const series = [{ key: "up", name: "Thumbs up" }];
+  const data = [
+    { day: "2026-10-12", up: 3 },
+    { day: "2026-10-13", up: 5 },
+  ];
+  await render(
+    <>
+      <BarChart label="Thumbs" index={days} series={series} data={data} />
+      <LineChart label="Thumbs, daily" index={days} series={series} data={data} />
+      <DonutChart
+        label="By workspace"
+        parts={[
+          { key: "notes", name: "notes", value: 6 },
+          { key: "plans", name: "plans", value: 2 },
+        ]}
+      />
+    </>,
+  );
+  await expect.poll(() => document.querySelectorAll("svg.recharts-surface").length).toBe(3);
+  const reached = document.querySelectorAll(
+    "[aria-hidden=true] :is([tabindex]:not([tabindex='-1']), a[href], button, input, select)",
+  );
+  expect([...reached].map((element) => element.outerHTML.slice(0, 80))).toEqual([]);
+});

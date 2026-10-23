@@ -1,5 +1,6 @@
 import { MessageSquare } from "lucide-react";
-import { expect, test } from "vitest";
+import { expect, onTestFinished, test } from "vitest";
+import { commands, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { NavLink, SideNav } from "./side-nav";
 import { contrast, token } from "./test/colours";
@@ -46,4 +47,35 @@ test("a link renders as the element it is given, such as the router's", async ()
   await expect
     .element(screen.getByRole("link", { name: "Proposals" }))
     .toHaveAttribute("data-router", "");
+});
+
+test("under forced colours, the area shown keeps an outline, and the others none", async () => {
+  onTestFinished(() => commands.forcedColors(false));
+  const screen = await render(<Nav />);
+  await commands.forcedColors(true);
+  await expect.poll(() => matchMedia("(forced-colors: active)").matches).toBe(true);
+  const style = (name: string) =>
+    getComputedStyle(screen.getByRole("link", { name: new RegExp(`^${name}`) }).element());
+  expect(style("Threads").outlineStyle).toBe("solid");
+  expect(Number.parseFloat(style("Threads").outlineWidth)).toBeGreaterThan(0);
+  const others = screen
+    .getByRole("link")
+    .elements()
+    .filter((link) => !link.hasAttribute("aria-current"));
+  expect(others.length).toBeGreaterThan(0);
+  for (const other of others) {
+    expect(getComputedStyle(other).outlineStyle).toBe("none");
+  }
+});
+
+test("under forced colours, the current area focused from the keyboard has its ring outside", async () => {
+  onTestFinished(() => commands.forcedColors(false));
+  const screen = await render(<Nav />);
+  await commands.forcedColors(true);
+  await expect.poll(() => matchMedia("(forced-colors: active)").matches).toBe(true);
+  const current = screen.getByRole("link", { name: /^Threads/ }).element();
+  expect(Number.parseFloat(getComputedStyle(current).outlineOffset)).toBeLessThan(0);
+  await userEvent.tab();
+  expect(document.activeElement).toBe(current);
+  expect(Number.parseFloat(getComputedStyle(current).outlineOffset)).toBeGreaterThan(0);
 });

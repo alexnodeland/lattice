@@ -2,6 +2,12 @@ import type { ReactElement } from "react";
 import { TextLink } from "./text-link";
 import { TYPE } from "./type";
 
+/**
+ * How a router's link in a crumb matches, as TanStack Router's `activeOptions`: exactly, so the
+ * place above isn't marked as the page shown, `aria-current="page"`, while a page below it is.
+ */
+export const CRUMB = { exact: true } as const;
+
 /** One place above this one: its name, and the link to it, such as the router's own. */
 export type Crumb = { label: string } & ({ render: ReactElement } | { href: string });
 

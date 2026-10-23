@@ -249,8 +249,10 @@ class Runner[AppDepsT]:
             it lapses, the thread's next run records the run left behind as abandoned, and a run
             of this process whose claim lapsed is cancelled. A claim is renewed every third of
             it, so a run survives one failed renewal, or storage that stalls for about two thirds
-            of it. It must exceed the clock skew between replicas. A claimant that finds its
-            thread claimed looks again this long after, in case the claim's holder died.
+            of it. It must exceed the clock skew between replicas.
+        look_again_after: How long a claimant that finds its thread claimed waits before it looks
+            again, in case the claim's holder died. Defaults to ``claim_ttl``, the soonest the
+            claim could have lapsed; a look before then is refused, and waits again.
         tracer_provider: Where turn spans go. Defaults to the global tracer provider.
         meter_provider: Where turn metrics go. Defaults to the global meter provider.
         turn_context: Entered around each turn, inside its span.
@@ -268,6 +270,7 @@ class Runner[AppDepsT]:
         live: FanoutChannel | None = None,
         agent_name: str = "assistant",
         claim_ttl: timedelta = timedelta(seconds=30),
+        look_again_after: timedelta | None = None,
         tracer_provider: TracerProvider | None = None,
         meter_provider: MeterProvider | None = None,
         turn_context: TurnContext | None = None,
@@ -282,6 +285,7 @@ class Runner[AppDepsT]:
         self.live = live or FanoutChannel()
         self._agent_name = agent_name
         self._claim_ttl = claim_ttl
+        self._look_again_after = claim_ttl if look_again_after is None else look_again_after
         self._runs: dict[RunId, RunHandle] = {}
         self._handovers: set[asyncio.Task[None]] = set()
         self._looks: set[asyncio.Task[None]] = set()
@@ -413,7 +417,7 @@ class Runner[AppDepsT]:
         thread's next turn if a message or an answer asked for one meanwhile. This waits until
         none is pending, not for the turns they start. :meth:`aclose` cancels them instead; a
         hand-over it cancels ends this wait, rather than raising here. It does not wait for a
-        claimant that another holder's claim refused to look again, a ``claim_ttl`` on.
+        claimant that another holder's claim refused to look again, ``look_again_after`` on.
         """
         while pending := [handover for handover in self._handovers if not handover.done()]:
             await asyncio.gather(*pending, return_exceptions=True)
@@ -767,10 +771,10 @@ class Runner[AppDepsT]:
     def _retake(self, workspace: Workspace, thread_id: ThreadId) -> None:
         """Look at a thread again once the claim that refused this claimant could have lapsed.
 
-        A ``claim_ttl`` on, a claim that refused this claimant has lapsed if its holder was dead
-        by then. Otherwise the look is refused, as by a live holder or one with a longer
-        ``claim_ttl``, and waits again, until what was asked is taken. A thread has one wait at
-        a time in this process; :meth:`aclose` cancels every look.
+        ``look_again_after`` on, ``claim_ttl`` by default, a claim that refused this claimant has
+        lapsed if its holder was dead by then. Otherwise the look is refused, as by a live holder
+        or one with a longer ``claim_ttl``, and waits again, until what was asked is taken. A
+        thread has one wait at a time in this process; :meth:`aclose` cancels every look.
         """
         key = (workspace.tenant_id, workspace.workspace_id, thread_id)
         if self._closed or key in self._waiting:
@@ -784,7 +788,7 @@ class Runner[AppDepsT]:
 
     async def _take_again(self, workspace: Workspace, thread_id: ThreadId, key: _ThreadKey) -> None:
         try:
-            await asyncio.sleep(self._claim_ttl.total_seconds())
+            await asyncio.sleep(self._look_again_after.total_seconds())
         finally:
             self._waiting.discard(key)  # a refusal from here on waits again
         await self._take_or_log(workspace, thread_id)

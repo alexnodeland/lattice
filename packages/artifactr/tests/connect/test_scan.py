@@ -21,8 +21,18 @@ from artifactr.connect import BLENDER, FREECAD, scan
         ("while True:\n    pass", ["line 1: loops with no end of its own"]),
         ("while 1:\n    pass", ["line 1: loops with no end of its own"]),
         ("def f(:", ["line 1: it isn't Python that parses (invalid syntax)"]),
-        ("-" * 200_000 + "1", ["it can't be analysed (MemoryError)"]),
-        ("a" + ".b" * 200_000, ["it can't be analysed (RecursionError)"]),
+        # Nested past what one interpreter's parser takes, or past the scan's own bound where
+        # another's parses it: a finding in every version either way.
+        (
+            "-" * 200_000 + "1",
+            ["it can't be analysed: it nests too deeply, or the parser refuses it"],
+        ),
+        (
+            "a" + ".b" * 200_000,
+            ["it can't be analysed: it nests too deeply, or the parser refuses it"],
+        ),
+        ("a" + ".b" * 300, ["it can't be analysed: it nests too deeply, or the parser refuses it"]),
+        ("a" + ".b" * 150, []),
         (
             "x = 1\0",
             [

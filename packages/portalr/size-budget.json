@@ -1,8 +1,8 @@
 {
   "app": {
     "initial": 203000,
-    "total": 521000,
-    "largest": 160000,
+    "total": 475000,
+    "largest": 100000,
     "addons": {
       "highlight": { "total": 177000, "largest": 53000 },
       "math": { "total": 87000, "largest": 85000 },
@@ -12,5 +12,5 @@
       "analytics": { "total": 600, "largest": 600 }
     }
   },
-  "admin": { "initial": 225000, "total": 670000, "largest": 160000 }
+  "admin": { "initial": 225000, "total": 600000, "largest": 140000 }
 }

@@ -1,8 +1,10 @@
+import { fileURLToPath } from "node:url";
 import { notices, readPolicy } from "@portalr/notices";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
-import { defineConfig, type Plugin } from "vite";
+import { defineConfig } from "vite";
+import { absent, lean, RAW_HTML } from "../ui/bundle-checks";
 
 /**
  * Where admin's routes are, and the route tree TanStack Router generates from them, which is
@@ -20,51 +22,19 @@ export const ROUTES = {
 // application, at PORTALR_APP_URL, so the UI shares its origin as it does when served.
 const application = process.env.PORTALR_APP_URL ?? "http://localhost:8000";
 
-/**
- * Fails the build where a module that `heavy` matches loads with the entry, rather than with the
- * routes that use it: Recharts is Feedback's and Usage's, so the first page doesn't wait on it.
- */
-function lean(heavy: RegExp): Plugin {
-  return {
-    name: "lean-entry",
-    generateBundle(_, bundle) {
-      const loaded = new Set<string>();
-      const load = (file: string) => {
-        const chunk = bundle[file];
-        if (loaded.has(file) || chunk?.type !== "chunk") {
-          return;
-        }
-        loaded.add(file);
-        chunk.imports.forEach(load);
-      };
-      for (const [file, chunk] of Object.entries(bundle)) {
-        if (chunk.type === "chunk" && chunk.isEntry) {
-          load(file);
-        }
-      }
-      const heavyModules = [...loaded].flatMap((file) => {
-        const chunk = bundle[file];
-        return chunk?.type === "chunk"
-          ? Object.keys(chunk.modules).filter((id) => heavy.test(id))
-          : [];
-      });
-      if (heavyModules.length > 0) {
-        this.error(
-          `the entry loads ${heavyModules.length} modules it shouldn't, such as ${heavyModules[0]}`,
-        );
-      }
-    },
-  };
-}
-
 export default defineConfig({
   base: "/portalr/admin/",
+  // Streamdown's `rehype-raw`, which portalr never passes it, is built as nothing (portalr ADR-0040).
+  resolve: {
+    alias: { "rehype-raw": fileURLToPath(new URL("../ui/src/rehype-raw.ts", import.meta.url)) },
+  },
   // Each route is a chunk of its own, loaded when it is first visited.
   plugins: [
     tanstackRouter({ ...ROUTES, autoCodeSplitting: true }),
     react(),
     tailwindcss(),
     lean(/[\\/]node_modules[\\/](recharts|d3-[a-z]+)[\\/]/),
+    absent(RAW_HTML),
     // The licences of the packages bundled, beside the UI (portalr ADR-0033).
     notices({
       ui: "admin",

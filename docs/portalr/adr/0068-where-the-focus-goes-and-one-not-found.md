@@ -22,18 +22,22 @@ ADR-0055, ADR-0058 and ADR-0059 set no rule for any of these.
   - `useHeadingAfterNavigation` in ui subscribes to the router's `onResolved`. When the path changed, two frames later, it focuses `#main h1`, with `tabIndex=-1` and no ring.
   - The first load starts at the document, as a browser's does, so a plain page's heading isn't focused on a first load.
   - Focus that is still somewhere stays there: a rail's or a drawer's link that stays, or a page that placed it itself.
+  - A page that draws its heading late, such as a thread before its stream is live, is watched for it for two seconds.
   - app's and admin's root routes use it.
 - **A full view keeps Tab inside it:** from its last stop to its first, and Shift+Tab back, as a modal dialog does. Its stops are what Tab reaches:
   - in the order, and enabled;
   - drawn, so not hidden and not inside a closed `<details>`;
   - a `<details>`' summary;
-  - of a group of radios, the checked one, or the first.
+  - of a group of radios, the checked one, or either end where none is checked, since Tab leaves a group as one stop.
+
+  Tab from the last stop, or from a control past it that is off the order, goes to the first; Shift+Tab, the other way. A key something else took, and focus in a popup of the box's own, such as a dialog opened from it, are left alone. A key pressed inside an app's frame never reaches this page, so Tab from a frame that is the last stop leaves as the browser has it.
+
 - **The drawer's and Share's escape wasn't reproduced.** On this Base UI version, in Chromium, Tab and Shift+Tab stay inside the phone's drawer and inside Share, whether Share is opened alone or from the thread's menu. Tests now hold both.
   - The kit's `Dialog`, which Share uses, now says `aria-modal="true"`, as the drawer already did. `ConfirmDialog` is Base UI's `AlertDialog`, and is left as it is.
 - **A download keeps the focus.**
   - Its button is `focusableWhenDisabled` while it goes. Pressed again, it starts nothing more.
   - "Downloading…" is said in a polite status.
-  - A download the person started is tried again once, not as often as a read the page makes itself, so its failure is said within seconds.
+  - A download the person started is tried again once, at once, not as often as a read the page makes itself, so its failure is said within seconds.
   - The file page's button carries no `aria-busy`, which belongs to regions and may quiet the name's change. The inline header's icon button keeps the one it had.
 - **A question waiting when its thread opens leaves the focus be.**
   - The page lands on its heading. "Go to the question" in the header takes the focus to the question's own named part, its form "The agent asks".
@@ -41,11 +45,13 @@ ADR-0055, ADR-0058 and ADR-0059 set no rule for any of these.
   - What was waiting is kept with the thread's id, so another thread's page starts afresh.
 - **One not-found, `NotFound` in ui:** an `h1` naming what is missing, which takes the focus; a sentence on why it may be; and one link on. The window's title says the same.
   - In the frame, it is used for an artifact, a rule, a thread, and admin's unknown page.
-  - An unknown page under a tenant is its own catch-all route, `$tenant/$.tsx`, in app and in admin. admin's renders inside the frame's own `main`.
+  - An unknown page is its own catch-all route: under a workspace, `$workspace/$.tsx`, in its frame; under a tenant, `$tenant/$.tsx`, a plain page in app and in admin's frame. Each renders inside the one `main` there is.
   - So the tenant's not-found means one thing only, without a flag:
     - a tenant the reader isn't a member of, which grantr refuses as 403, is "Tenant not found" on a plain page in app;
     - a tenant they don't administer stays admin's own plain page.
   - This replaces ADR-0065's `PageHeader` with an `EmptyState` beneath, for not-founds that stand in for a page. The empty and error states stay ADR-0065's.
+
+- **Proposal links are named by the artifact's title** (audit N2), as the artifacts' list names it, or by its id in the mono face where it has none.
 
 ## Consequences
 

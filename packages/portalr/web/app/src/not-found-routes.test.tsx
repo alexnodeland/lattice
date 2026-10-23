@@ -79,3 +79,29 @@ test("an artifact that isn't there is the page's heading, in the window's title 
   await expect.element(heading).toHaveFocus();
   await expect.poll(() => document.title).toMatch(/^Artifact not found · notes/);
 });
+
+test("a page that isn't there in a workspace is not found inside its frame", async () => {
+  const { screen } = await open(
+    "/t/acme/w/notes/zzz",
+    serving(() => undefined),
+  );
+  const heading = screen.getByRole("heading", { level: 1, name: "Page not found" });
+  await expect.element(heading).toBeVisible();
+  expect(document.querySelector("[data-frame-header]")).not.toBeNull();
+  expect(document.querySelectorAll("main")).toHaveLength(1);
+  await expect.poll(() => document.title).toMatch(/^Page not found · notes/);
+  await expect
+    .element(screen.getByRole("link", { name: "The workspace's threads" }))
+    .toHaveAttribute("href", "/t/acme/w/notes");
+});
+
+test("an address under a tenant with no page is not found on a plain page", async () => {
+  const { screen } = await open(
+    "/t/acme/w",
+    serving(() => undefined),
+  );
+  await expect
+    .element(screen.getByRole("heading", { level: 1, name: "Page not found" }))
+    .toBeVisible();
+  await expect.poll(() => document.title).toMatch(/^Page not found · /);
+});

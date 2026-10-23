@@ -27,42 +27,81 @@ export function inertOutside(within: Element): () => void {
   };
 }
 
-/** Whether an element is a stop of Tab: focusable in order, enabled, drawn, and not inert. */
-function isStop(element: HTMLElement): boolean {
-  // A <details>' summary is a stop, though the DOM gives it no tab index.
-  const ordered = element.tabIndex >= 0 || element.matches("details > summary");
-  if (!ordered || element.matches(":disabled") || element.closest("[inert]")) {
+/** Whether an element can take the focus by Tab: in the order, enabled, drawn and not inert. */
+function reachable(element: HTMLElement): boolean {
+  // A <details>' first summary is in the order, though the DOM gives it no tab index.
+  const ordered = element.tabIndex >= 0 || element.matches("details > summary:first-of-type");
+  return (
+    ordered &&
+    !element.matches(":disabled") &&
+    !element.closest("[inert]") &&
+    // Not drawn: hidden, or inside a closed <details>.
+    element.checkVisibility({ visibilityProperty: true })
+  );
+}
+
+/** The radios of a radio's group, by its name, in its form or else in the box, that Tab reaches. */
+function groupOf(radio: HTMLInputElement, within: Element): HTMLInputElement[] {
+  return [
+    ...(radio.form ?? within).querySelectorAll<HTMLInputElement>(
+      `input[type=radio][name="${CSS.escape(radio.name)}"]`,
+    ),
+  ].filter(reachable);
+}
+
+const isRadio = (element: Element | null): element is HTMLInputElement =>
+  element instanceof HTMLInputElement && element.type === "radio" && element.name !== "";
+
+/**
+ * Whether an element is a stop of Tab in a box. Of a group of radios, the checked one is; where
+ * none is, Tab enters at the first and Shift+Tab at the last, so both are.
+ */
+function isStop(element: HTMLElement, within: Element): boolean {
+  if (!reachable(element)) {
     return false;
   }
-  if (!element.checkVisibility({ visibilityProperty: true })) {
-    return false; // not drawn: hidden, or in a closed <details>
-  }
-  // Of a group of radios, Tab stops at the checked one, or at the first where none is.
-  if (element instanceof HTMLInputElement && element.type === "radio" && element.name !== "") {
-    const group = [
-      ...(element.form ?? document).querySelectorAll<HTMLInputElement>(
-        `input[type=radio][name="${CSS.escape(element.name)}"]`,
-      ),
-    ];
-    return element === (group.find((radio) => radio.checked) ?? group[0]);
+  if (isRadio(element)) {
+    const group = groupOf(element, within);
+    const checked = group.find((radio) => radio.checked);
+    return checked ? element === checked : element === group[0] || element === group.at(-1);
   }
   return true;
 }
 
+/** Whether `at` is `stop`, or a radio of its group, where Tab leaves the group as one stop. */
+function atStop(at: Element, stop: HTMLElement, within: Element): boolean {
+  return at === stop || (isRadio(at) && isRadio(stop) && groupOf(stop, within).includes(at));
+}
+
 /**
- * Keep Tab within a box, as a modal dialog does: from its last stop to its first, and Shift+Tab
- * from its first to its last. The page behind is inert, but without this Tab leaves for the
- * browser's own controls, through the document, before it comes back (WCAG 2.4.3). A box with no
- * stop leaves Tab to the browser.
+ * Keep Tab within a box, as a modal dialog does: from its last stop, or past it, to its first,
+ * and Shift+Tab from its first, or before it, to its last. The page behind is inert, but without
+ * this Tab leaves for the browser's own controls, through the document, before it comes back
+ * (WCAG 2.4.3). A key something else took, focus in a popup of its own outside the box, and a box
+ * with no stop are left alone. Keys pressed inside an app's frame never reach this page, so Tab
+ * from a frame that is the last stop leaves as the browser has it.
  */
 function wrap(within: Element, event: KeyboardEvent) {
-  const stops = [...within.querySelectorAll<HTMLElement>("*")].filter(isStop);
+  const at = document.activeElement;
+  const lost = at === null || at === document.body;
+  if (event.defaultPrevented || !(lost || within.contains(at))) {
+    return;
+  }
+  const stops = [...within.querySelectorAll<HTMLElement>("*")].filter((each) =>
+    isStop(each, within),
+  );
   const [first, last] = [stops[0], stops.at(-1)];
   if (first === undefined || last === undefined) {
     return;
   }
-  const at = document.activeElement;
-  if (event.shiftKey ? at === first || !within.contains(at) : at === last) {
+  const leaving =
+    lost ||
+    (event.shiftKey
+      ? atStop(at, first, within) ||
+        Boolean(first.compareDocumentPosition(at) & Node.DOCUMENT_POSITION_PRECEDING)
+      : atStop(at, last, within) ||
+        Boolean(last.compareDocumentPosition(at) & Node.DOCUMENT_POSITION_FOLLOWING));
+  if (leaving) {
     event.preventDefault();
     (event.shiftKey ? last : first).focus();
   }

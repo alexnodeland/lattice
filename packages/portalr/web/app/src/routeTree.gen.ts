@@ -11,6 +11,7 @@ import { Route as SignedTTenantIndexRouteImport } from './routes/_signed/t/$tena
 import { Route as SignedTTenantSplatRouteImport } from './routes/_signed/t/$tenant/$'
 import { Route as SignedTTenantWWorkspaceRouteImport } from './routes/_signed/t/$tenant/w/$workspace'
 import { Route as SignedTTenantWWorkspaceIndexRouteImport } from './routes/_signed/t/$tenant/w/$workspace/index'
+import { Route as SignedTTenantWWorkspaceSplatRouteImport } from './routes/_signed/t/$tenant/w/$workspace/$'
 import { Route as SignedTTenantWWorkspaceProposalsRouteImport } from './routes/_signed/t/$tenant/w/$workspace/proposals'
 import { Route as SignedTTenantWWorkspaceRunsRouteImport } from './routes/_signed/t/$tenant/w/$workspace/runs'
 import { Route as SignedTTenantWWorkspaceArtifactsIndexRouteImport } from './routes/_signed/t/$tenant/w/$workspace/artifacts/index'
@@ -57,6 +58,12 @@ const SignedTTenantWWorkspaceIndexRoute =
   SignedTTenantWWorkspaceIndexRouteImport.update({
     id: '/',
     path: '/',
+    getParentRoute: () => SignedTTenantWWorkspaceRoute,
+  } as any)
+const SignedTTenantWWorkspaceSplatRoute =
+  SignedTTenantWWorkspaceSplatRouteImport.update({
+    id: '/$',
+    path: '/$',
     getParentRoute: () => SignedTTenantWWorkspaceRoute,
   } as any)
 const SignedTTenantWWorkspaceProposalsRoute =
@@ -109,6 +116,7 @@ export interface FileRoutesByFullPath {
   '/t/$tenant/$': typeof SignedTTenantSplatRoute
   '/t/$tenant/': typeof SignedTTenantIndexRoute
   '/t/$tenant/w/$workspace': typeof SignedTTenantWWorkspaceRouteWithChildren
+  '/t/$tenant/w/$workspace/$': typeof SignedTTenantWWorkspaceSplatRoute
   '/t/$tenant/w/$workspace/proposals': typeof SignedTTenantWWorkspaceProposalsRoute
   '/t/$tenant/w/$workspace/runs': typeof SignedTTenantWWorkspaceRunsRoute
   '/t/$tenant/w/$workspace/': typeof SignedTTenantWWorkspaceIndexRoute
@@ -123,6 +131,7 @@ export interface FileRoutesByTo {
   '/': typeof SignedIndexRoute
   '/t/$tenant/$': typeof SignedTTenantSplatRoute
   '/t/$tenant': typeof SignedTTenantIndexRoute
+  '/t/$tenant/w/$workspace/$': typeof SignedTTenantWWorkspaceSplatRoute
   '/t/$tenant/w/$workspace/proposals': typeof SignedTTenantWWorkspaceProposalsRoute
   '/t/$tenant/w/$workspace/runs': typeof SignedTTenantWWorkspaceRunsRoute
   '/t/$tenant/w/$workspace': typeof SignedTTenantWWorkspaceIndexRoute
@@ -141,6 +150,7 @@ export interface FileRoutesById {
   '/_signed/t/$tenant/$': typeof SignedTTenantSplatRoute
   '/_signed/t/$tenant/': typeof SignedTTenantIndexRoute
   '/_signed/t/$tenant/w/$workspace': typeof SignedTTenantWWorkspaceRouteWithChildren
+  '/_signed/t/$tenant/w/$workspace/$': typeof SignedTTenantWWorkspaceSplatRoute
   '/_signed/t/$tenant/w/$workspace/proposals': typeof SignedTTenantWWorkspaceProposalsRoute
   '/_signed/t/$tenant/w/$workspace/runs': typeof SignedTTenantWWorkspaceRunsRoute
   '/_signed/t/$tenant/w/$workspace/': typeof SignedTTenantWWorkspaceIndexRoute
@@ -159,6 +169,7 @@ export interface FileRouteTypes {
     | '/t/$tenant/$'
     | '/t/$tenant/'
     | '/t/$tenant/w/$workspace'
+    | '/t/$tenant/w/$workspace/$'
     | '/t/$tenant/w/$workspace/proposals'
     | '/t/$tenant/w/$workspace/runs'
     | '/t/$tenant/w/$workspace/'
@@ -173,6 +184,7 @@ export interface FileRouteTypes {
     | '/'
     | '/t/$tenant/$'
     | '/t/$tenant'
+    | '/t/$tenant/w/$workspace/$'
     | '/t/$tenant/w/$workspace/proposals'
     | '/t/$tenant/w/$workspace/runs'
     | '/t/$tenant/w/$workspace'
@@ -190,6 +202,7 @@ export interface FileRouteTypes {
     | '/_signed/t/$tenant/$'
     | '/_signed/t/$tenant/'
     | '/_signed/t/$tenant/w/$workspace'
+    | '/_signed/t/$tenant/w/$workspace/$'
     | '/_signed/t/$tenant/w/$workspace/proposals'
     | '/_signed/t/$tenant/w/$workspace/runs'
     | '/_signed/t/$tenant/w/$workspace/'
@@ -263,6 +276,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignedTTenantWWorkspaceIndexRouteImport
       parentRoute: typeof SignedTTenantWWorkspaceRoute
     }
+    '/_signed/t/$tenant/w/$workspace/$': {
+      id: '/_signed/t/$tenant/w/$workspace/$'
+      path: '/$'
+      fullPath: '/t/$tenant/w/$workspace/$'
+      preLoaderRoute: typeof SignedTTenantWWorkspaceSplatRouteImport
+      parentRoute: typeof SignedTTenantWWorkspaceRoute
+    }
     '/_signed/t/$tenant/w/$workspace/proposals': {
       id: '/_signed/t/$tenant/w/$workspace/proposals'
       path: '/proposals'
@@ -316,6 +336,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface SignedTTenantWWorkspaceRouteChildren {
+  SignedTTenantWWorkspaceSplatRoute: typeof SignedTTenantWWorkspaceSplatRoute
   SignedTTenantWWorkspaceProposalsRoute: typeof SignedTTenantWWorkspaceProposalsRoute
   SignedTTenantWWorkspaceRunsRoute: typeof SignedTTenantWWorkspaceRunsRoute
   SignedTTenantWWorkspaceIndexRoute: typeof SignedTTenantWWorkspaceIndexRoute
@@ -328,6 +349,7 @@ interface SignedTTenantWWorkspaceRouteChildren {
 
 const SignedTTenantWWorkspaceRouteChildren: SignedTTenantWWorkspaceRouteChildren =
   {
+    SignedTTenantWWorkspaceSplatRoute: SignedTTenantWWorkspaceSplatRoute,
     SignedTTenantWWorkspaceProposalsRoute:
       SignedTTenantWWorkspaceProposalsRoute,
     SignedTTenantWWorkspaceRunsRoute: SignedTTenantWWorkspaceRunsRoute,

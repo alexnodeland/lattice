@@ -1,7 +1,8 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { expect, test } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
+import { Dialog } from "./dialog";
 import { useFullView } from "./full-view";
 
 function Box({ children, backInside = true }: { children?: ReactNode; backInside?: boolean }) {
@@ -91,6 +92,67 @@ test("of a group of radios, Tab stops at the checked one, or the first, as the b
     "Back to the page",
   ]);
   expect(await named(true)).toBe("Alone");
+  // Shift+Tab enters a group with nothing checked where the browser has it (Chromium: the
+  // first); either end of the group counts as its stop.
+  expect(await named(true)).toBe("Warm");
+});
+
+test("a radio the browser wouldn't stop at, hidden or off, isn't its group's stop", async () => {
+  const screen = await render(
+    <Box>
+      <input type="radio" name="pick" aria-label="Gone" style={{ visibility: "hidden" }} />
+      <input type="radio" name="pick" aria-label="Shown" />
+      <input type="radio" name="pick" aria-label="Off" disabled />
+    </Box>,
+  );
+  await screen.getByRole("button", { name: "Full view" }).click();
+  await userEvent.tab();
+  expect(document.activeElement?.getAttribute("aria-label")).toBe("Shown");
+  await userEvent.tab();
+  expect(focused()).toBe("Back to the page");
+});
+
+test("from past its last stop, as a control off the order, Tab still goes back to its first", async () => {
+  const screen = await render(
+    <Box>
+      <button type="button">Inside</button>
+      <button type="button" tabIndex={-1}>
+        Roving
+      </button>
+    </Box>,
+  );
+  await screen.getByRole("button", { name: "Full view" }).click();
+  (screen.getByRole("button", { name: "Roving" }).element() as HTMLElement).focus();
+  await userEvent.tab();
+  expect(focused()).toBe("Back to the page");
+  (screen.getByRole("button", { name: "Back to the page" }).element() as HTMLElement).focus();
+  await userEvent.tab({ shift: true });
+  expect(focused()).toBe("Inside");
+});
+
+test("a dialog opened from a full view keeps Tab and Shift+Tab to itself", async () => {
+  function WithDialog() {
+    const [open, setOpen] = useState(false);
+    return (
+      <Box>
+        <button type="button" onClick={() => setOpen(true)}>
+          Ask
+        </button>
+        <Dialog open={open} onOpenChange={setOpen} title="Sure?">
+          <button type="button">Yes</button>
+        </Dialog>
+      </Box>
+    );
+  }
+  const screen = await render(<WithDialog />);
+  await screen.getByRole("button", { name: "Full view" }).click();
+  await screen.getByRole("button", { name: "Ask" }).click();
+  const dialog = screen.getByRole("dialog", { name: "Sure?" });
+  await expect.poll(() => dialog.element().contains(document.activeElement)).toBe(true);
+  for (const shift of [false, false, false, true, true, true]) {
+    await userEvent.tab({ shift });
+    expect(dialog.element().contains(document.activeElement)).toBe(true);
+  }
 });
 
 test("Shift+Tab from outside the box goes to its last stop", async () => {
@@ -118,4 +180,19 @@ test("back in the page, Tab goes on as the page has it", async () => {
   await screen.getByRole("button", { name: "Full view" }).click();
   await screen.getByRole("button", { name: "Back to the page" }).click();
   expect(await tabs(2)).toEqual(["Inside", "After"]);
+});
+
+test("a group of radios with nothing checked at the end of the box is its last stop, either radio", async () => {
+  const screen = await render(
+    <Box>
+      <input type="radio" name="end" aria-label="North" />
+      <input type="radio" name="end" aria-label="South" />
+    </Box>,
+  );
+  await screen.getByRole("button", { name: "Full view" }).click();
+  for (const radio of ["North", "South"]) {
+    (screen.getByRole("radio", { name: radio }).element() as HTMLElement).focus();
+    await userEvent.tab();
+    expect(focused()).toBe("Back to the page");
+  }
 });

@@ -6,6 +6,7 @@
     "/t/$tenant",
     "/t/$tenant/$",
     "/t/$tenant/w/$workspace",
+    "/t/$tenant/w/$workspace/$",
     "/t/$tenant/w/$workspace/artifacts",
     "/t/$tenant/w/$workspace/artifacts/$artifact",
     "/t/$tenant/w/$workspace/proposals",

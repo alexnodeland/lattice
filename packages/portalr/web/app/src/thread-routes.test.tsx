@@ -330,3 +330,36 @@ test("another thread's question waiting when its page opens leaves the focus be 
   await new Promise((settled) => requestAnimationFrame(() => requestAnimationFrame(settled)));
   expect(document.activeElement?.getAttribute("role")).not.toBe("radio");
 });
+
+test("Go to the question reaches a form the agent asks by its name too", async () => {
+  const waiting = LOG.slice(0, 3);
+  const paused = {
+    type: "event",
+    seq: waiting.length + 1,
+    id: "evt_form",
+    ts: "2026-10-20T00:00:00Z",
+    workspace_id: "notes",
+    actor: agent("run_1"),
+    event: {
+      type: "run_paused",
+      run_id: "run_1",
+      thread_id: "thr_1",
+      requests: [
+        {
+          kind: "question",
+          tool_call_id: "f1",
+          tool_name: "ask_form",
+          args: {
+            title: "Dietary needs",
+            schema: { properties: { note: { type: "string" } }, required: [] },
+          },
+        },
+      ],
+    },
+  };
+  const { screen } = await open("/t/acme/w/notes/threads/thr_1", serve, () => null, {
+    artifactrLog: [...waiting, paused],
+  });
+  await screen.getByRole("button", { name: "Go to the question" }).click();
+  await expect.element(screen.getByRole("form", { name: "Dietary needs" })).toHaveFocus();
+});

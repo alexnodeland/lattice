@@ -106,9 +106,9 @@ export function useDownload(place: Place, name: string | undefined) {
   const download = async (version: number) => {
     setSaving("saving");
     try {
-      // Tried again once, not as often as a read the page makes itself: the person waits on it.
+      // Tried again once, at once, not as often as a read the page makes itself: the person waits.
       const content = queries.files.content(tenant, workspace, artifact, version);
-      save(await queryClient.fetchQuery({ ...content, retry: 1 }), name ?? artifact);
+      save(await queryClient.fetchQuery({ ...content, retry: 1, retryDelay: 0 }), name ?? artifact);
       setSaving(null);
     } catch {
       setSaving("failed");

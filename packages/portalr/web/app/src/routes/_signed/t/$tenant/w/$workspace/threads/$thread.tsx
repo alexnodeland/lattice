@@ -266,7 +266,7 @@ function Chat() {
   // To the question's own named part, such as "The agent asks", or else to where it is.
   const toQuestion = () => {
     const at = document.getElementById(`request-${latestRequest?.tool_call_id}`);
-    const named = at?.querySelector<HTMLElement>("[aria-label]") ?? at;
+    const named = at?.querySelector<HTMLElement>("[aria-label], [aria-labelledby]") ?? at;
     if (named && !named.hasAttribute("tabindex")) {
       named.tabIndex = -1;
     }

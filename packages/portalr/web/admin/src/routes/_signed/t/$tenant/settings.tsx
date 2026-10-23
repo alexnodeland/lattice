@@ -118,10 +118,20 @@ function LevelSettings({ tenant, workspace }: { tenant: string; workspace: strin
   return (
     <div className="flex flex-col gap-3">
       <Rows label={inWorkspace ? `Settings in ${workspace}` : "Settings on the tenant"}>
-        {rows.map((row) => (
+        {rows.map((row) =>
           // Kept by its key alone, so a change read back keeps what has the focus.
-          <Setting key={row.key} row={row} tenant={tenant} workspace={workspace} />
-        ))}
+          row.kind.type === "int_range" ? (
+            <Setting key={row.key} row={row} tenant={tenant} workspace={workspace} />
+          ) : (
+            // A setting of names is shown as it applies; it is changed through grantr's API
+            // until this page has a field for it.
+            <Row
+              key={row.key}
+              name={row.name}
+              meta={`${row.description} Applies: ${row.effective}. Changed through grantr's API for now.`}
+            />
+          ),
+        )}
       </Rows>
       {view.unknown.length > 0 && (
         <Alert tone="info">

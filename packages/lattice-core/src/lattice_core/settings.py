@@ -25,6 +25,7 @@ from typing import Final, Literal, Protocol, cast
 from lattice_core.integrations import KEY
 
 __all__ = [
+    "CONNECTED_TOOLS",
     "KNOWN_SETTINGS",
     "TIERS",
     "IntRange",
@@ -236,8 +237,65 @@ def _per_hour(app: str, title: str) -> Setting:
     )
 
 
-KNOWN_SETTINGS: Final = registry(_per_hour("freecad", "FreeCAD"), _per_hour("blender", "Blender"))
-"""lattice's settings. A connected app vetted later adds its own ``connect-per-hour:<app>``."""
+CONNECTED_TOOLS: Final = MappingProxyType(
+    {
+        "freecad": frozenset(
+            {
+                "create_document",
+                "create_object",
+                "delete_object",
+                "edit_object",
+                "execute_code",
+                "execute_code_async",
+                "get_async_status",
+                "get_object",
+                "get_objects",
+                "get_parts_list",
+                "get_rpc_status",
+                "get_view",
+                "list_documents",
+            }
+        ),
+        "blender": frozenset(
+            {
+                "execute_blender_code",
+                "generate_3d",
+                "get_addon_status",
+                "get_scene_info",
+                "import_asset",
+                "look",
+                "search_assets",
+            }
+        ),
+    }
+)
+"""Each connected app's tools a workspace may offer, by app: every tool its vetted entry in
+artifactr.connect names but those that act on the runner's host. An artifactr test holds the
+two lists equal, so a tool vetted later is added here too."""
+
+
+def _tools(app: str, title: str) -> Setting:
+    universe = CONNECTED_TOOLS[app]
+    return Setting(
+        f"connect-tools:{app}",
+        Subset(universe),
+        default=tuple(sorted(universe)),
+        lowest="workspace",
+        description=(
+            f"Which of a connected {title}'s tools a workspace offers, of those its operator"
+            " offers."
+        ),
+    )
+
+
+KNOWN_SETTINGS: Final = registry(
+    _per_hour("freecad", "FreeCAD"),
+    _per_hour("blender", "Blender"),
+    _tools("freecad", "FreeCAD"),
+    _tools("blender", "Blender"),
+)
+"""lattice's settings. A connected app vetted later adds its own ``connect-per-hour:<app>`` and
+``connect-tools:<app>``."""
 
 
 def operator_layer(

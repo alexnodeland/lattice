@@ -23,7 +23,7 @@ Integrations are booleans, switched per tenant and workspace through one port ([
   - its default;
   - `lowest`, the lowest tier that may set it: `operator`, `tenant` or `workspace`;
   - a one-sentence description.
-  - A setting is never free text and never a secret: no kind holds either. `KNOWN_SETTINGS` is lattice's: `connect-per-hour:freecad` and `connect-per-hour:blender`, each `IntRange(0, 1000)`, default 30, set down to the workspace. The tool name or app is part of the key, never of a free value. A connected app vetted later adds its own `connect-per-hour:<app>` to the registry.
+  - A setting is never free text and never a secret: no kind holds either. `KNOWN_SETTINGS` is lattice's: `connect-per-hour:freecad` and `connect-per-hour:blender`, each `IntRange(0, 1000)`, default 30, set down to the workspace. The tool name or app is part of the key, never of a free value. Since [artifactr ADR-0089](../artifactr/adr/0089-a-connected-apps-tools-narrowed-per-workspace.md), each app has a `Subset` setting too, `connect-tools:<app>`, the tools a workspace offers. A connected app vetted later adds both of its keys to the registry.
 - **Four layers, resolved top down:**
   - the registry's default;
   - the operator's value, in the deployment's configuration, which replaces the default and is checked against the registry as the deployment starts;

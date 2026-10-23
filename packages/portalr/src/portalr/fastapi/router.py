@@ -56,6 +56,8 @@ from portalr.fastapi.ui import ui_router
 from portalr.invites import Invite, InviteFailed
 from portalr.people import People
 from portalr.readers import (
+    Adoption,
+    AdoptionQuery,
     Feedback,
     FeedbackQuery,
     LogQuery,
@@ -433,6 +435,21 @@ def portalr_router(
         if not readers.litellm:
             return Unconfigured()
         return await read_usage(readers.litellm, tenant, query)
+
+    @api.get("/v1/adoption", response_model=reading(Adoption))
+    async def adoption(
+        query: Annotated[AdoptionQuery, Query()], tenant: Tenant = telemetry
+    ) -> Ok[Adoption] | Unavailable | Unconfigured:
+        """The tenant's adoption from its product analytics (portalr ADR-0071).
+
+        People active each day, who used each integration, the funnel from a page to a thread to
+        a message, and weekly retention, over a window of at most 91 days. People are counted by
+        a keyed hash of their id, and only those who said yes. ``complete`` is false where the
+        read stopped at its deadline.
+        """
+        if not readers.analytics:
+            return Unconfigured()
+        return await readers.analytics.adoption(tenant, query)
 
     @api.get("/v1/deployment/tenants")
     async def deployment_tenants(by: Subject = operating) -> DeploymentTenants:

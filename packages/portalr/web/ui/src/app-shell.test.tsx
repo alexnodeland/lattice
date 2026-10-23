@@ -4,6 +4,7 @@ import { render } from "vitest-browser-react";
 import { AppShell } from "./app-shell";
 import type { Ui } from "./marks";
 import { NavLink, SideNav } from "./side-nav";
+import { guardsFocused } from "./test/guards";
 import { viewport } from "./test/viewport";
 
 async function shell(width: number, ui: Ui = "app", withNav = true) {
@@ -197,4 +198,18 @@ test("a page without the frame has nothing pinned above it, so nothing is held c
   await viewport(390);
   await render(<p>A plain page</p>);
   expect(getComputedStyle(document.documentElement).scrollPaddingTop).toBe("auto");
+});
+
+test("narrower, Tab and Shift+Tab stay in the open drawer, never for a frame on a guard outside it", async () => {
+  const screen = await shell(390);
+  await screen.getByRole("button", { name: "Menu" }).click();
+  const drawer = screen.getByRole("dialog");
+  await expect.poll(() => drawer.element().contains(document.activeElement)).toBe(true);
+  const guarded = await guardsFocused(async () => {
+    for (const shift of [false, false, false, false, false, false, true, true, true, true]) {
+      await userEvent.tab({ shift });
+      expect(drawer.element().contains(document.activeElement)).toBe(true);
+    }
+  });
+  expect(guarded).toEqual([]);
 });

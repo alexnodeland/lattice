@@ -362,6 +362,8 @@ Decided by the owner (2026-10-22), for the relay's slice:
 
 Settled by the relay's slice: lightweight deletes on 26.9 (below).
 
+Settled by the operators' slice ([stackr ADR-0048](../stackr/adr/0048-grafanas-clickhouse-data-source-and-the-adoption-dashboard.md)): the plugin, 4.22.1, signed, is fetched as `stackr-grafana` is built, pinned by version and each architecture's sha256, and Compose builds that image too. `grafana_analytics` reads `analytics.events` across tenants, read-only, with nothing logged; its time ceiling is 30 seconds, since the plugin asks for a little more than its query timeout.
+
 Still open:
 
 1. **Browser events carry no workspace**: the workspace isn't the session's to vouch for, and the relay doesn't ask artifactr which workspaces a person may open. A per-workspace adoption view needs that check first.
@@ -374,8 +376,8 @@ Still open:
 - [x] The first slice
 - [x] Relay and consent (the server's side)
 - [x] Browser capture and the consent UI
-- [ ] Grafana's datasource and dashboard
-- [ ] Adoption read and page
+- [x] Grafana's datasource and dashboard ([stackr ADR-0048](../stackr/adr/0048-grafanas-clickhouse-data-source-and-the-adoption-dashboard.md))
+- [x] Adoption read and page ([portalr ADR-0071](../portalr/adr/0071-adoption-the-tenants-read-and-page.md))
 - [ ] Traces both ways
 - [ ] Umami profile, then replay after the privacy review
 - [ ] relayr's sink

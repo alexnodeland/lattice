@@ -13,6 +13,7 @@ import {
   Terminal,
   ThumbsUp,
   Route as TracesIcon,
+  UsersRound,
 } from "lucide-react";
 import { allowedNow, anyPart, useAccess } from "../../../access";
 import { Frame } from "../../../frame";
@@ -25,7 +26,13 @@ import { remember } from "../../../last";
  */
 export const Route = createFileRoute("/_signed/t/$tenant")({
   head: ({ params, match }) => ({
-    meta: [{ title: match.context.title(params.tenant) }],
+    meta: [
+      {
+        title: match.context.title(
+          match.status === "notFound" ? "Not a tenant you administer" : params.tenant,
+        ),
+      },
+    ],
   }),
   beforeLoad: async ({ context, params }) => {
     const { queries, queryClient, user } = context;
@@ -43,6 +50,10 @@ export const Route = createFileRoute("/_signed/t/$tenant")({
   component: Tenant,
 });
 
+/**
+ * A tenant the reader doesn't administer, on a plain page. A page that isn't there, in a tenant
+ * they do, is `$.tsx`'s, in the frame (portalr ADR-0068).
+ */
 function NotAdministered() {
   const { signed } = Route.useRouteContext();
   return (
@@ -123,6 +134,14 @@ function Tenant() {
           {allowed.has("reflexr:read_runs") && (
             <NavLink icon={ListChecks} render={<Link to="/t/$tenant/runs" params={{ tenant }} />}>
               Runs
+            </NavLink>
+          )}
+          {allowed.has("portalr:read_telemetry") && (
+            <NavLink
+              icon={UsersRound}
+              render={<Link to="/t/$tenant/adoption" params={{ tenant }} />}
+            >
+              Adoption
             </NavLink>
           )}
           {allowed.has("portalr:read_spend") && (

@@ -63,14 +63,39 @@ def scan(code: str) -> list[str]:
     except SyntaxError as error:
         where = f"line {error.lineno}: " if error.lineno else ""
         return [*hidden, f"{where}it isn't Python that parses ({error.msg})"]
-    except (ValueError, RecursionError, MemoryError) as error:
-        return [*hidden, f"it can't be analysed ({type(error).__name__})"]
+    except (RecursionError, MemoryError, ValueError):
+        # How deep a parser goes before it gives up is the interpreter's, and varies by version;
+        # a ValueError is an older parser's refusal of what newer ones call a SyntaxError.
+        return [*hidden, UNREAD]
+    if _deeper_than(tree, DEEPEST):
+        # The bound is the scan's own, so code nested past it is a finding in every version,
+        # never passed unread as one interpreter's parser takes what another's refuses.
+        return [*hidden, UNREAD]
     found = {
         (getattr(node, "lineno", 0), finding)
         for node in ast.walk(tree)
         if (finding := _finding(node)) is not None
     }
     return [*hidden, *(f"line {line}: {finding}" for line, finding in sorted(found))]
+
+
+DEEPEST: Final = 200
+"""How deeply a tree may nest before the scan calls it too deep to analyse: far past what code a
+person reads nests, and well within what any supported interpreter parses."""
+
+UNREAD: Final = "it can't be analysed: it nests too deeply, or the parser refuses it"
+"""The finding for code nested past the bound, or that the interpreter's parser gives up on."""
+
+
+def _deeper_than(tree: ast.AST, deepest: int) -> bool:
+    """Whether a tree nests past `deepest`, measured without recursion, so it can't overflow."""
+    stack = [(tree, 0)]
+    while stack:
+        node, depth = stack.pop()
+        if depth > deepest:
+            return True
+        stack.extend((child, depth + 1) for child in ast.iter_child_nodes(node))
+    return False
 
 
 def _finding(node: ast.AST) -> str | None:

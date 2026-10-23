@@ -5,8 +5,8 @@ import {
   ArtifactContent,
   Card,
   CRUMB,
-  EmptyState,
   FormHostContext,
+  NotFound as NotFoundPage,
   PageHeader,
   ProposalCard,
   proposedOn,
@@ -37,13 +37,6 @@ import { Connection, useStream, useWorkspace } from "../../../../../../../worksp
 const ACTIONS = ["artifactr:give_feedback"] as const;
 
 export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/artifacts/$artifact")({
-  head: ({ params, match }) => ({
-    meta: [
-      {
-        title: match.context.title(`${params.artifact} · ${params.workspace}`),
-      },
-    ],
-  }),
   loader: async ({ context, params }) => {
     const { tenant, workspace, artifact } = params;
     await context.queryClient.ensureQueryData(
@@ -63,6 +56,16 @@ export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/artifacts/
       throw error;
     }
   },
+  head: ({ params, match }) => ({
+    meta: [
+      {
+        // Not found, named as its heading is (portalr ADR-0068).
+        title: match.context.title(
+          `${match.status === "notFound" ? "Artifact not found" : params.artifact} · ${params.workspace}`,
+        ),
+      },
+    ],
+  }),
   notFoundComponent: NotFound,
   component: Artifact,
 });
@@ -247,21 +250,17 @@ function Artifact() {
 function NotFound() {
   const { tenant, workspace } = Route.useParams();
   return (
-    <>
-      <PageHeader title="Artifacts" />
-      <EmptyState
-        focus
-        title="Artifact not found"
-        action={
-          <TextLink
-            render={<Link to="/t/$tenant/w/$workspace/artifacts" params={{ tenant, workspace }} />}
-          >
-            All artifacts
-          </TextLink>
-        }
-      >
-        There's no artifact here by that name, or it isn't one you can see.
-      </EmptyState>
-    </>
+    <NotFoundPage
+      title="Artifact not found"
+      action={
+        <TextLink
+          render={<Link to="/t/$tenant/w/$workspace/artifacts" params={{ tenant, workspace }} />}
+        >
+          All artifacts
+        </TextLink>
+      }
+    >
+      There's no artifact here by that name, or it isn't one you can see.
+    </NotFoundPage>
   );
 }

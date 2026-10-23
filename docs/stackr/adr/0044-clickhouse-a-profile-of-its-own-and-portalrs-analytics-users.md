@@ -1,6 +1,6 @@
 # ADR-0044: ClickHouse, a profile of its own, and portalr's analytics users
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0048](0048-grafanas-clickhouse-data-source-and-the-adoption-dashboard.md)
 **Date:** 2026-10-22
 **Deciders:** Alex Nodeland
 

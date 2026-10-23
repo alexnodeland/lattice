@@ -39,6 +39,7 @@ test("an artifact that isn't there: its heading takes the focus, and the way on 
 test("a rule that isn't there: its heading takes the focus, and the way on is all rules", async () => {
   const { screen } = await open("/t/acme/w/notes/rules/rul_missing", missing("rul_missing"));
   await expect.element(screen.getByRole("heading", { name: "Rule not found" })).toHaveFocus();
+  await expect.poll(() => document.title).toMatch(/^Rule not found · notes/);
   await expect
     .element(screen.getByRole("link", { name: "All rules" }))
     .toHaveAttribute("href", "/t/acme/w/notes/rules");
@@ -55,4 +56,52 @@ test("a read that fails outside the frame says what went wrong, and offers to st
   await expect
     .element(screen.getByRole("link", { name: "Start again" }))
     .toHaveAttribute("href", "/");
+});
+
+test("a tenant the reader isn't a member of is not found, named so, with a way to choose another", async () => {
+  const { screen } = await open(
+    "/t/nosuch",
+    serving(() => undefined),
+  );
+  await expect
+    .element(screen.getByRole("heading", { level: 1, name: "Tenant not found" }))
+    .toBeVisible();
+  expect(screen.getByRole("alert").elements()).toHaveLength(0);
+  await expect.element(screen.getByRole("link", { name: "Choose a tenant" })).toBeVisible();
+  await expect.poll(() => document.title).toMatch(/^Tenant not found · /);
+  // A first load starts at the document, as a browser's does: the heading isn't focused.
+  expect(document.activeElement).toBe(document.body);
+});
+
+test("an artifact that isn't there is the page's heading, in the window's title too", async () => {
+  const { screen } = await open("/t/acme/w/notes/artifacts/art_missing", missing("art_missing"));
+  const heading = screen.getByRole("heading", { level: 1, name: "Artifact not found" });
+  await expect.element(heading).toHaveFocus();
+  await expect.poll(() => document.title).toMatch(/^Artifact not found · notes/);
+});
+
+test("a page that isn't there in a workspace is not found inside its frame", async () => {
+  const { screen } = await open(
+    "/t/acme/w/notes/zzz",
+    serving(() => undefined),
+  );
+  const heading = screen.getByRole("heading", { level: 1, name: "Page not found" });
+  await expect.element(heading).toBeVisible();
+  expect(document.querySelector("[data-frame-header]")).not.toBeNull();
+  expect(document.querySelectorAll("main")).toHaveLength(1);
+  await expect.poll(() => document.title).toMatch(/^Page not found · notes/);
+  await expect
+    .element(screen.getByRole("link", { name: "The workspace's threads" }))
+    .toHaveAttribute("href", "/t/acme/w/notes");
+});
+
+test("an address under a tenant with no page is not found on a plain page", async () => {
+  const { screen } = await open(
+    "/t/acme/w",
+    serving(() => undefined),
+  );
+  await expect
+    .element(screen.getByRole("heading", { level: 1, name: "Page not found" }))
+    .toBeVisible();
+  await expect.poll(() => document.title).toMatch(/^Page not found · /);
 });

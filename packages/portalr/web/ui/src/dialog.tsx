@@ -9,6 +9,7 @@
 import { Dialog as BaseDialog } from "@base-ui/react/dialog";
 import type { ReactNode, RefObject } from "react";
 import { Button } from "./button";
+import { keepTabWithin } from "./full-view";
 
 export const backdrop =
   "fixed inset-0 z-40 bg-scrim backdrop-blur-(--dialog-scrim-blur) transition-[opacity,backdrop-filter] duration-(--dialog-duration) data-ending-style:opacity-0 data-ending-style:backdrop-blur-none data-starting-style:opacity-0 data-starting-style:backdrop-blur-none motion-reduce:transition-none";
@@ -52,6 +53,11 @@ export function Dialog({
       <BaseDialog.Portal>
         <BaseDialog.Backdrop className={backdrop} />
         <BaseDialog.Popup
+          // Base UI traps the focus but doesn't say so: assistive technology learns the page
+          // behind is out of reach from aria-modal, as the drawer says it.
+          aria-modal="true"
+          // Tab kept in it at once, never on Base UI's guards outside it (portalr ADR-0068).
+          onKeyDown={(event) => keepTabWithin(event.currentTarget, event.nativeEvent)}
           className={popup}
           {...(initialFocus && { initialFocus })}
           {...(finalFocus && { finalFocus })}

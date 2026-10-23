@@ -461,13 +461,15 @@ smoke_langfuse() {
   fi
 }
 
-# A query in ClickHouse as one of analytics' users, writer or reader, whose password is in the
-# container's environment; standard input goes to the query, for an insert's rows.
+# A query in ClickHouse as one of analytics' users, writer, reader or Grafana's operator, whose
+# password is in the container's environment; standard input goes to the query, for an insert's
+# rows.
 analytics_as() {
   local role=$1 query=$2 user variable
   case $role in
     writer) user=portalr_analytics_writer variable=CLICKHOUSE_ANALYTICS_WRITER_PASSWORD ;;
     reader) user=portalr_analytics variable=CLICKHOUSE_ANALYTICS_PASSWORD ;;
+    operator) user=grafana_analytics variable=CLICKHOUSE_GRAFANA_PASSWORD ;;
   esac
   stack_compose exec -T clickhouse sh -c \
     "CLICKHOUSE_USER=$user CLICKHOUSE_PASSWORD=\"\$$variable\" clickhouse-client --query \"\$0\" 2>&1" \
@@ -516,6 +518,14 @@ smoke_analytics() {
     log "FAIL: analytics' reader, held to $a, saw: $said"
     status=1
   fi
+  said=$(analytics_as reader "SELECT getSetting('cancel_http_readonly_queries_on_client_close')
+    SETTINGS SQL_portalr_tenant = '$a'" </dev/null || true)
+  if [[ $said == true ]]; then
+    log "ok: analytics' reader stops a read whose client gave up"
+  else
+    log "FAIL: analytics' reader keeps reading after its client gives up (answered: $said)"
+    status=1
+  fi
   expect_code "$(analytics_as reader "SELECT count() FROM analytics.events" </dev/null || true)" 115 \
     "analytics' reader fails without its tenant"
   expect_code "$(analytics_as reader "INSERT INTO analytics.events (tenant_id) VALUES ('$a')" </dev/null || true)" 497 \
@@ -538,6 +548,40 @@ smoke_analytics() {
     log "FAIL: analytics' reader, filtering on $a and held to $b, saw $said rows"
     status=1
   fi
+  # Grafana's user reads every tenant's events, for operators (ADR-0048), and nothing else.
+  said=$(analytics_as operator "SELECT count(DISTINCT tenant_id) FROM analytics.events
+    WHERE tenant_id IN ('$a', '$b')" </dev/null || true)
+  if [[ $said == 2 ]]; then
+    log "ok: Grafana's analytics user reads both tenants' events"
+  else
+    log "FAIL: Grafana's analytics user, reading two tenants, saw: $said"
+    status=1
+  fi
+  expect_code "$(analytics_as operator "INSERT INTO analytics.events (tenant_id) VALUES ('$a')" </dev/null || true)" 497 \
+    "Grafana's analytics user is refused an insert"
+  # 0, for each limit, would mean none.
+  for setting in "max_execution_time = 1000" "max_memory_usage = 99999999999" "log_queries = 1" \
+    "max_execution_time = 0" "max_memory_usage = 0" "max_rows_to_read = 0" "max_bytes_to_read = 0" \
+    "max_result_rows = 0"; do
+    expect_code "$(analytics_as operator "SELECT 1 SETTINGS $setting" </dev/null || true)" 452 \
+      "Grafana's analytics user can't set ${setting%% *}"
+  done
+  expect_code "$(analytics_as operator "SELECT 1 SETTINGS readonly = 0" </dev/null || true)" 164 \
+    "Grafana's analytics user can't set readonly"
+  # The adoption dashboard's queries, as Grafana's user, over the last 30 days of one tenant.
+  local title sql
+  # shellcheck disable=SC2016 # Grafana's macro and variable, literally.
+  while IFS=$'\t' read -r title sql; do
+    sql=${sql//'$__timeFilter(ts)'/ts >= now() - INTERVAL 30 DAY}
+    sql=${sql//'${tenant:singlequote}'/\'$a\'}
+    said=$(analytics_as operator "$sql" </dev/null || true)
+    if [[ $said == *"Code: "* ]]; then
+      log "FAIL: the adoption dashboard's \"$title\" fails (answered: $(head -c 200 <<<"$said"))"
+      status=1
+    else
+      log "ok: the adoption dashboard's \"$title\" runs"
+    fi
+  done < <(jq -r '.panels[] | [.title, .targets[0].rawSql] | @tsv' deploy/grafana/dashboards/stackr/adoption.json)
   # A query that fails, naming a tenant, for the log check below.
   analytics_as reader "SELECT no_such_column_$a FROM analytics.events SETTINGS SQL_portalr_tenant = '$a'" \
     </dev/null >/dev/null 2>&1 || true
@@ -564,8 +608,13 @@ smoke_analytics() {
     status=1
   fi
   clickhouse_as admin "SYSTEM FLUSH LOGS" >/dev/null
+  # After the flush, which makes system.query_log from admin's logged queries: before, a read of
+  # it is refused as an unknown table, not by its grants.
+  expect_code "$(analytics_as operator "SELECT count() FROM system.query_log" </dev/null || true)" 497 \
+    "Grafana's analytics user is refused system.query_log"
   said=$(clickhouse_as langfuse "SELECT count() FROM system.query_log
-    WHERE user LIKE 'portalr_analytics%' OR position(query, '$a') > 0 OR position(query, '$b') > 0
+    WHERE user LIKE 'portalr_analytics%' OR user = 'grafana_analytics'
+      OR position(query, '$a') > 0 OR position(query, '$b') > 0
       OR position(exception, '$a') > 0 OR position(toString(Settings), '$a') > 0")
   if [[ $said == 0 ]]; then
     log "ok: system.query_log, which Langfuse reads, holds no analytics query, failed ones included"
@@ -595,7 +644,8 @@ smoke_analytics() {
     status=1
   fi
   # Each layer on its own: no analytics user's query is logged at all, as the operators see it.
-  said=$(clickhouse_as admin "SELECT count() FROM system.query_log WHERE user LIKE 'portalr_analytics%'")
+  said=$(clickhouse_as admin "SELECT count() FROM system.query_log
+    WHERE user LIKE 'portalr_analytics%' OR user = 'grafana_analytics'")
   if [[ $said == 0 ]]; then
     log "ok: no query of analytics' users is logged"
   else
@@ -622,6 +672,11 @@ smoke_analytics() {
   else
     log "FAIL: Langfuse's user sees $said other users' queries in system.query_log"
     status=1
+  fi
+  # Operators' adoption dashboard, on Grafana's ClickHouse data source (ADR-0048).
+  if has_profile observability; then
+    eventually "Grafana's analytics data source is healthy" grafana_datasource_ok analytics
+    eventually "Grafana has the adoption dashboard" grafana_has_dashboard stackr-adoption
   fi
 }
 

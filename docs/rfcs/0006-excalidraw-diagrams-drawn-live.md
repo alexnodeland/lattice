@@ -160,6 +160,7 @@ class Presence(BaseModel):
 **5. From live to durable.** The canvas commits its own changes as `edit_artifact`, as the person:
 
 - **Cadence.** On pointer-up, and after one second idle while there are unsaved changes, at most one commit a second per person and diagram; a flush when the tab is hidden or closed; a badge while anything is unsaved. Phase 0 measures the revision volume this makes and may lengthen it.
+  > **Decided (2026-10-22), from phase 0's measurements:** on pointer-up and after two seconds idle, at most one commit every five seconds per person and diagram ([artifactr ADR-0088](../artifactr/adr/0088-excalidraws-phase-0-what-the-canvas-costs-and-needs.md)).
 - **Ordering.** The server orders commits, and the transport runs each frame as its own task, so a canvas keeps one `edit_artifact` in flight per diagram. A commit's `base_version` is the head the canvas last merged. A `VersionConflict` is rebased as above, at most three times; after that the edit stays local under the unsaved badge and is retried on the next event, so nothing is lost. Phase 0 measures the conflict rate on a busy diagram. After a reconnect, a commit whose result never came is resent with its original `command_id`, which the server deduplicates.
 - **Merging.** A foreign revision is merged with `reconcileElements(local, remote, appState)` and applied with `updateScene({elements, captureUpdate: CaptureUpdateAction.NEVER})`, so it never enters the local undo stack. In 0.18.1, reconcile keeps a local element that is being edited, resized or created, or that has a higher `version`, or the same version and a lower `versionNonce`, and takes the remote one otherwise. It then orders by fractional index and repairs invalid indices itself.
 - **Echoes.** `command_result` carries `Applied.version`, so the canvas knows which revisions are its own and doesn't re-merge them. The event can arrive before the result. That is harmless, because merging one's own revision is idempotent: the local elements' versions are equal or higher, so reconcile keeps them.
@@ -269,6 +270,8 @@ class Integrations(Protocol):                     # lattice_core.integrations
 - English only, as the app is ([portalr ADR-0014][p-adr-0014]).
 - Fonts self-hosted: `window.EXCALIDRAW_ASSET_PATH` is set by a file script, as `scheme.js` is, since the policy forbids inline script. Without it, 0.18.1 fetches fonts from esm.sh.
 
+> **Amended (2026-10-22) by [artifactr ADR-0088](../artifactr/adr/0088-excalidraws-phase-0-what-the-canvas-costs-and-needs.md):** phase 0 found that editing compiles no WebAssembly and font subsetting needs `'unsafe-eval'`. So the policy drops `'wasm-unsafe-eval'` and adds only `img-src blob:`; subset export is the worker's; the budgets are `canvas` 402,000/375,000 and `canvas-images` 32,000/18,000, with no export budget. What follows is the RFC as first written.
+
 **The policy** gains `'wasm-unsafe-eval'` in `script-src`, across `app` (O4) and, by the owner's later decision, admin too: both UIs share one policy, as [portalr ADR-0041][p-adr-0041] records with its guardrails. In 0.18.1, the WebAssembly is two modules, harfbuzz and woff2, inlined as base64 in one 743 kB (gzip) chunk. Only font subsetting reaches that chunk, through two dynamic imports, for SVG export with embedded fonts. Nothing in the static graph of `index.js` imports it. So plain editing likely never compiles WebAssembly, and phase 0 confirms it in Chromium under a policy without `'wasm-unsafe-eval'`. Subsetting runs in a module worker (`new Worker(url, {type: "module"})`, same origin, so `worker-src` falls back to `'self'`) and falls back to the main thread if the worker fails. `connect-src` stays `'self'`.
 
 **A budget of its own.** `size-budget.json` gains a `canvas` entry, and `check_size.py` measures the chunks reachable only through the canvas's dynamic import under it, read from Vite's build manifest (`build.manifest`), since today it only globs files and reads `index.html`, leaving them out of `app`'s `total` and `largest`. `app`'s `initial` is unchanged, since the canvas is lazy. Two ceilings: `canvas.total` for editing, and `canvas.export` for the subsetting chunk. The package's own chunks are about 330 kB gzip without the subsetting chunk and 1.06 MB with it. Its dependencies (React aside, `roughjs`, `jotai`, Radix, `pako` and others) are external to the package and come on top; phase 0 measures the built total and sets the ceilings 10% above it. Fonts are not counted, as today: 0.18.1 ships 13 MB of them, 12 MB of which is Xiaolai, its CJK face, split by Unicode range and loaded only when used. Excalidraw and its dependencies are in the generated third-party notices and held to their licence allow-list ([portalr ADR-0033][p-adr-0033]). Its fonts' licences sit beside them in the wheel, as the kit's typefaces' do ([portalr ADR-0019][p-adr-0019]); which faces ship is an unresolved question.
@@ -329,7 +332,7 @@ Decided by the owner on 2026-10-17:
 | O1 | What a diagram is | An ordinary JSON artifact, `elements: {id: element}`, edited by JSON Patch scoped to elements with `test /elements/<id>/version`; no lease, no core change; leases stay for opaque native files | A `NativeFile` over a `.excalidraw` blob, checked out under a lease |
 | O2 | Packaging | A new distribution, `artifactr-excalidraw-ai`, depending on `artifactr-files` for `Blobs` only | An extension of `artifactr-files` or `artifactr-ui`; an artifactr extra |
 | O3 | Where the canvas runs | Directly in portalr's `app`, on its origin | A third UI, `canvas`, with its own policy (the brainstorm's recommendation); an origin of its own |
-| O4 | The policy | `'wasm-unsafe-eval'` in the policy both UIs share, for first-party pinned WebAssembly only, with [ADR-0041][p-adr-0041]'s guardrails; amends RFC-0003's refusal; the spike still settles whether editing needs it | Holding RFC-0003's line, with the canvas on a separate origin |
+| O4 | The policy | **Changed by phase 0 (2026-10-22, artifactr ADR-0088): no `'wasm-unsafe-eval'`; the canvas adds `img-src blob:` alone.** As first decided: `'wasm-unsafe-eval'` in the policy both UIs share, for first-party pinned WebAssembly only, with [ADR-0041][p-adr-0041]'s guardrails; amends RFC-0003's refusal; the spike still settles whether editing needs it | Holding RFC-0003's line, with the canvas on a separate origin |
 | O5 | Live collaboration | Full, from the first release: presence and live sync between people and agents | Coalesced commits first, presence later (the brainstorm's recommendation) |
 | O6 | Agents' edits | Proposals by default, with a switch per application to apply | Every edit applied; every edit proposed, always |
 | O7 | Conversion and export | A headless worker, so agents and rules work with no browser open | In the browser only |
@@ -351,7 +354,7 @@ Recommended, for the maintainer to decide, and signed off by the owner on 2026-1
 
 - **A heavy dependency on a moving target.** About 330 kB gzip of the package's own JavaScript to edit, 1.06 MB with export, before its dependencies, and 13 MB of fonts. Excalidraw's `main` carries an unreleased breaking rework: `excalidrawAPI` becomes `onExcalidrawAPI`, `restore()` is no longer exported, and arrow bindings change. Upgrading from 0.18.1 will be a migration of its own.
 - **Revision volume.** Live drawing makes many revisions, each holding the whole scene. An hour of drawing by three people can be thousands of revisions. The cadence and the size limits bound it; nothing compacts it.
-- **`'wasm-unsafe-eval'` for everyone** in both UIs, to serve a feature some workspaces turn off. ADR-0041's guardrails narrow it, but a policy is now looser than it was.
+- ~~**`'wasm-unsafe-eval'` for everyone** in both UIs, to serve a feature some workspaces turn off.~~ Gone: phase 0 found editing needs none, and the policy dropped it (artifactr ADR-0088). The canvas adds only `img-src blob:`.
 - **The canvas can't meet portalr's accessibility bar.** The description, the list and the agent are equivalents, not the same experience.
 - **Last writer wins per element.** Two people moving the same shape in the same second see one move survive, as on excalidraw.com.
 - **A new protocol surface** with its own abuse cases: presence floods, oversized `editing`, a watcher who keeps seeing after losing access. Each has a limit or a re-check, and each is a test.
@@ -362,7 +365,7 @@ Recommended, for the maintainer to decide, and signed off by the owner on 2026-1
 - **Live collaboration through relayr events.** That is a category error: relayr bridges the durable log to reflexr through polled followers, and the browser never talks to relayr (RFC-0005). Every stroke would be a reflexr event.
 - **excalidraw-room,** Excalidraw's own relay: a small socket.io server passing encrypted scenes, with the key in the URL's fragment. It is another service with its own protocol and no notion of lattice's access, and its scenes would bypass the log.
 - **A CRDT (Yjs) under the scene.** Excalidraw's model is per-element last-writer-wins, not a CRDT, and lattice already orders writes on the server. A CRDT would add a second source of truth.
-- **A third UI or an origin of its own for the canvas** (O3). Its own policy would keep `'wasm-unsafe-eval'` off `app` and admin, at the cost of a second session handover and a second WebSocket. The owner chose one origin.
+- **A third UI or an origin of its own for the canvas** (O3). Its own policy would have kept `'wasm-unsafe-eval'` off `app` and admin (moot since phase 0, which needs none), at the cost of a second session handover and a second WebSocket. The owner chose one origin.
 - **Conversion in the browser only** (O7). It needs no worker, but an agent couldn't draw unless someone had the diagram open.
 - **The official Excalidraw MCP server** as the agent's tools. It is an MCP App whose export uploads to excalidraw.com (O8). Its tool shapes, and `yctimlin/mcp_excalidraw`'s, informed `DiagramTools`.
 
@@ -378,8 +381,8 @@ As of 2026-10-22, the CJK fonts are decided; revision growth has a follow-up; vi
 
 Each is settled in phase 0's ADR or carried as an exit criterion.
 
-- Plain editing in 0.18.1 never compiles WebAssembly in Chromium, and works under a policy without `'wasm-unsafe-eval'`. The chunk graph says so; nothing was run.
-- The directives 0.18.1 needs beyond `'wasm-unsafe-eval'`: whether it writes a `<style>` element (`style-src`), uses `blob:` images, or needs `worker-src` named.
+- ~~Plain editing in 0.18.1 never compiles WebAssembly in Chromium, and works under a policy without `'wasm-unsafe-eval'`.~~ Settled by phase 0: it doesn't, and it does.
+- ~~The directives 0.18.1 needs beyond `'wasm-unsafe-eval'`.~~ Settled by phase 0: `img-src blob:` alone; `style-src 'self'` is enough; `worker-src` unverified.
 - Excalidraw's canvas lets Escape move focus out, and exposes nothing to a screen reader beyond its toolbar. Its open issues on this (#5759, #7492, #8088) were not read here.
 - `UIOptions` hides the embeddable tool, and stroke and background presets can be replaced with a palette of ours.
 - Excalidraw's own collaboration sends a pointer about every 33 ms, and excalidraw-room keeps tombstones for 24 hours.
@@ -391,8 +394,9 @@ Each is settled in phase 0's ADR or carried as an exit criterion.
 
 ## Tracking
 
-- [ ] Phase 0: the spike (done, 2026-10-22) and its ADR (to follow)
+- [x] Phase 0: the spike and its ADR ([artifactr ADR-0088](../artifactr/adr/0088-excalidraws-phase-0-what-the-canvas-costs-and-needs.md), 2026-10-22)
 - [ ] artifactr: a retention rule for diagram revisions, in an ADR of its own (follow-up from phase 0)
+- [ ] artifactr: the tombstone sweep (U3), its own PR, before the canvas ships: until it exists, a diagram at 2,000 elements can't shrink
 - [x] RFC-0003, RFC-0004 and RFC-0005 amended to name the shared `Integrations` port
 - [x] Sign-off on U1 to U6 (2026-10-22)
 - [x] lattice-core and grantr: `Integrations`, its adapter, audit and action ([lattice ADR-0027](../adr/0027-integrations-switched-per-workspace-through-one-port.md))

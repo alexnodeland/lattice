@@ -126,6 +126,10 @@ nav:
     - adr/0082-mini-apps-the-agents-tools-and-html-that-loads-nothing.md
     - adr/0083-ask-user-asks-questions-with-options.md
     - adr/0084-what-a-run-records-of-its-calls-and-who-reads-it.md
+    - adr/0085-connected-apps-an-operators-own-freecad-or-blender-through-a-vetted-mcp-server.md
+    - adr/0086-diagrams-data-an-element-scoped-patch-and-its-checks.md
+    - adr/0087-a-connected-apps-hourly-limit-read-from-settings.md
+    - adr/0088-excalidraws-phase-0-what-the-canvas-costs-and-needs.md
   - RFCs:
     - rfcs/README.md
     - rfcs/0001-v0.1-implementation-plan.md

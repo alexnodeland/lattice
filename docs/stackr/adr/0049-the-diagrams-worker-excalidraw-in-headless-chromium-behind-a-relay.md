@@ -26,8 +26,9 @@ Records stackr's half of [lattice RFC-0006](../../rfcs/0006-excalidraw-diagrams-
   - a failure as a 4xx or a 5xx with `{reason, message}`.
 - **One job at a time, within its deadline,** at most 10 s whatever a call asks for.
   - A job that waits past its deadline isn't started.
-  - A job that runs past it is answered `timeout`, and its page is thrown away.
-  - A job that fails is answered `crashed`, and its page is thrown away. A browser that died is started again.
+  - A job that runs past it is answered `timeout`. A job the page didn't answer, because the page or the browser failed, is answered `crashed`, in fixed words. After either, the page is thrown away, and a new one is made at once, in the background, so the next job finds it warm unless it comes within the few seconds a cold page takes. A browser that died is started again.
+  - **`invalid` is the page's own refusal alone:** Mermaid that doesn't parse, or skeletons Excalidraw can't convert, which the page answers with, in their words. Such a job, and a `too_large` one, leaves the page as it was.
+  - The page is made at most once at a time: a job that gives up waiting for a cold page leaves no second one being made behind it.
 - **Its replies are what artifactr checks for** (ADR-0090). Running the real worker's replies through artifactr's own `Converted` and `checked()` found four things, each fixed in the worker; artifactr needed no change:
   - **Mermaid names its nodes as it likes,** `中文` among them, and Excalidraw keeps the names as element ids. A Mermaid diagram's ids are made new, as the canvas's are. The agent's skeletons keep the ids it gave them, which artifactr holds to `[A-Za-z0-9_-]`.
   - **A Mermaid `click` gives an element a link,** which an export draws as `<a href>`. Converted elements keep no link.
@@ -38,7 +39,8 @@ Records stackr's half of [lattice RFC-0006](../../rfcs/0006-excalidraw-diagrams-
 
 ### The page, and `'unsafe-eval'`
 
-- **The page's origin is `http://diagrams.invalid`,** which no network has. The server answers every request to it from the page's own files, through Playwright's routing, and refuses any other request, logging it.
+- **The page's origin is `http://diagrams.invalid`,** which no network has. The server answers every request to it from the page's own files, through Playwright's routing, and refuses any other request, logging each origin once.
+  - Playwright's routing sees the page's HTTP requests, not a WebSocket's or WebRTC's. Those the policy refuses (`connect-src` names no other origin), and the container has no route out: each wall stands without the others.
 - **Its policy is the only one in lattice with `'unsafe-eval'`:**
 
   ```text
@@ -56,7 +58,9 @@ Records stackr's half of [lattice RFC-0006](../../rfcs/0006-excalidraw-diagrams-
   - **`diagrams-build`** is the Bun lattice uses, pinned by digest. `scripts/build-diagrams-worker.sh` clones lattice at the commit `uv.lock` pins artifactr at, so the worker and the converter that calls it come from one commit. It runs `bun install --frozen-lockfile` and builds the page and the server.
   - **`diagrams-worker`** is Playwright's image, `mcr.microsoft.com/playwright:v1.64.0-noble`, pinned by digest. Its Chromium is the one Playwright 1.64.0 drives, and the worker's `playwright-core` is 1.64.0.
 - **It runs as user 10005,** with `HOME` in its tmpfs.
-- **Noto CJK draws CJK.** The image installs Debian's `fonts-noto-cjk` (SIL OFL 1.1), and removes the image's other CJK faces, WenQuanYi Zen Hei and IPAGothic, so Noto is the one it draws with. Xiaolai is left out of the page's faces unless the build argument `XIAOLAI` is 1, which waits for lattice#679.
+- **Noto CJK draws CJK.** The image installs Debian's `fonts-noto-cjk` (SIL OFL 1.1), and removes the image's other CJK faces, WenQuanYi Zen Hei and IPAGothic, so Noto is the one it draws with. Xiaolai is left out of the page's faces unless the build argument `XIAOLAI` is 1, which `.env`'s `DIAGRAMS_XIAOLAI=1` sets, and which waits for lattice#679.
+- **The build checks its Playwright.** The worker's `playwright-core` comes from the lattice commit `uv.lock` pins; the image's Chromium, from the template. The Dockerfile's `ARG PLAYWRIGHT` names the image's version, and the build fails, saying so, if the worker it built drives another: an application whose libraries and template were updated apart can't run a Chromium its driver doesn't know.
+- **The commit must hold the worker.** An application whose `uv.lock` pins artifactr at a commit before this record's has no `packages/stackr/workers/diagrams` to build, and the build says to update the libraries. Generated from the template once this record is in lattice, an application's lock pins a commit that has it.
 - **Its notices are beside its page:**
   - `THIRD-PARTY-NOTICES.txt`, which portalr's notices plugin writes from the page's bundle, under a policy of the worker's own (`policy.json`);
   - `FONTS.txt`, with the faces' licences: the OFL's text and Noto CJK's copyright, as Debian records them.
@@ -80,6 +84,7 @@ Records stackr's half of [lattice RFC-0006](../../rfcs/0006-excalidraw-diagrams-
   - With `DIAGRAMS=on`, it gives the agent `diagram_tools`, over a `WorkerConverter` at `http://diagrams:8080`, with native files' store as `blobs`.
   - Native files' collection is told about diagrams (`naming=(Diagram,)`), so it keeps their images (ADR-0090).
   - The tools are offered only where `excalidraw` is on, and it is off in every workspace until switched on (lattice-core's `KNOWN`).
+- **Diagrams without forms.** The template's `diagrams` doesn't need its `ui`: the application gates every artifact by its integration either way (`integration_gate(integrations, files.key_of)`), so `excalidraw` is a switch in both.
 
 ### One Excalidraw
 

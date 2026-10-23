@@ -13,9 +13,10 @@
 import { timingSafeEqual } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { extname, join, normalize } from "node:path";
+import { extname, join } from "node:path";
 import { type Browser, chromium, type Page, type Route } from "playwright-core";
-import type { Converted, Diagram, Skeleton } from "./page";
+import type { Answer, Converted, Diagram, Skeleton } from "./page";
+import { imagesRefused, servedPath, Warm } from "./rules";
 import { EXCALIDRAW } from "./version";
 
 /** The most seconds a call may take, whatever it asks for. */
@@ -53,6 +54,10 @@ const POLICY = [
 const TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
+  ".mjs": "text/javascript; charset=utf-8",
+  ".svg": "image/svg+xml",
+  ".woff": "font/woff",
+  ".wasm": "application/wasm",
   ".css": "text/css; charset=utf-8",
   ".woff2": "font/woff2",
   ".ttf": "font/ttf",
@@ -84,63 +89,64 @@ if (token.length < 32) {
   throw new Error("WORKER_TOKEN must be set, at least 32 characters");
 }
 
-/** The warm browser and its page, made again after a job that failed or ran out of time. */
-class Chromium {
-  private browser: Browser | undefined;
-  private page: Page | undefined;
-  /** Requests the page made to anywhere but its own origin, each refused. */
-  refused = 0;
+/** The browser, launched once and again only if it dies, and the page, made on a fresh context. */
+let browser: Browser | undefined;
 
-  async ready(): Promise<Page> {
-    if (this.page !== undefined && !this.page.isClosed()) return this.page;
-    if (this.browser === undefined || !this.browser.isConnected()) {
-      this.browser = await chromium.launch({
-        args: ["--js-flags=--max-old-space-size=512", "--disable-dev-shm-usage"],
-      });
-    }
-    const context = await this.browser.newContext({ serviceWorkers: "block" });
-    await context.route("**/*", (route) => this.serve(route));
-    const page = await context.newPage();
-    await page.goto(`${ORIGIN}/index.html`);
-    await page.waitForFunction(() => window.diagrams !== undefined);
-    this.page = page;
-    return page;
+async function launched(): Promise<Browser> {
+  if (browser === undefined || !browser.isConnected()) {
+    browser = await chromium.launch({
+      args: ["--js-flags=--max-old-space-size=512", "--disable-dev-shm-usage"],
+    });
   }
+  return browser;
+}
 
-  /** Throw the page away, and the browser if it is gone, so the next job starts clean. */
-  async recycle(): Promise<void> {
-    const page = this.page;
-    this.page = undefined;
-    await page
-      ?.context()
-      .close()
-      .catch(() => undefined);
-    if (this.browser !== undefined && !this.browser.isConnected()) this.browser = undefined;
-  }
+/** The origins the page asked for, each refused, and said once. */
+const refusedOrigins = new Set<string>();
+const MAX_SAID = 32;
 
-  private async serve(route: Route): Promise<void> {
-    const url = new URL(route.request().url());
-    if (url.origin !== ORIGIN) {
-      this.refused += 1;
+async function serve(route: Route): Promise<void> {
+  const url = new URL(route.request().url());
+  if (url.origin !== ORIGIN) {
+    // The page chooses what it asks for, so each origin is said once, and at most 32 of them.
+    if (!refusedOrigins.has(url.origin) && refusedOrigins.size < MAX_SAID) {
+      refusedOrigins.add(url.origin);
       console.warn(`refused a request out: ${url.origin}`);
-      await route.abort("blockedbyclient");
-      return;
     }
-    const path = normalize(decodeURIComponent(url.pathname)).replace(/^(\.\.[/\\])+/, "");
-    try {
-      const body = await readFile(join(PAGE_DIR, path));
-      const headers: Record<string, string> = {
-        "content-type": TYPES[extname(path)] ?? "application/octet-stream",
-      };
-      if (path.endsWith(".html")) headers["content-security-policy"] = POLICY;
-      await route.fulfill({ status: 200, headers, body });
-    } catch {
-      await route.fulfill({ status: 404, body: "" });
-    }
+    await route.abort("blockedbyclient");
+    return;
+  }
+  const path = servedPath(url.pathname);
+  try {
+    if (path === undefined) throw new Error("no such file");
+    const body = await readFile(join(PAGE_DIR, path));
+    const headers: Record<string, string> = {
+      "content-type": TYPES[extname(path)] ?? "application/octet-stream",
+    };
+    if (path.endsWith(".html")) headers["content-security-policy"] = POLICY;
+    await route.fulfill({ status: 200, headers, body });
+  } catch {
+    await route.fulfill({ status: 404, body: "" });
   }
 }
 
-const chromiumWarm = new Chromium();
+/**
+ * The page, warm between jobs, and made anew only after a job crashed or ran out of time: one
+ * whose sender's input was refused leaves it as it was.
+ */
+const page = new Warm<Page>(
+  async () => {
+    const context = await (await launched()).newContext({ serviceWorkers: "block" });
+    await context.route("**/*", serve);
+    const made = await context.newPage();
+    await made.goto(`${ORIGIN}/index.html`);
+    await made.waitForFunction(() => window.diagrams !== undefined);
+    return made;
+  },
+  (held) => !held.isClosed(),
+  (held) => held.context().close(),
+);
+
 let queue: Promise<unknown> = Promise.resolve();
 
 /** Run a job alone, within what is left of its deadline once it starts; else `timeout`. */
@@ -154,11 +160,15 @@ function alone<T>(deadline: number, job: (page: Page) => Promise<T>): Promise<T>
       timer = setTimeout(() => reject(new Refused("timeout", `took more than ${deadline}s`)), left);
     });
     try {
-      const page = await Promise.race([chromiumWarm.ready(), late]);
-      return await Promise.race([job(page), late]);
+      return await Promise.race([page.get().then(job), late]);
     } catch (error) {
-      await chromiumWarm.recycle();
-      throw error;
+      const refused = failed(error);
+      if (refused.reason === "timeout" || refused.reason === "crashed") {
+        // The page may still be busy, or broken: a new one is made now, for the next job.
+        await page.discard();
+        page.warm();
+      }
+      throw refused;
     } finally {
       clearTimeout(timer);
     }
@@ -187,29 +197,33 @@ function held(converted: Converted): Converted {
   return converted;
 }
 
-/** What the page threw, as the agent's fault when Mermaid couldn't read its source. */
-function failed(error: unknown, invalid: boolean): Refused {
+/**
+ * A failure, as the sender reads it: a refusal as itself; anything else, which the page didn't
+ * answer with, such as the browser crashing, as `crashed`, in fixed words.
+ */
+function failed(error: unknown): Refused {
   if (error instanceof Refused) return error;
-  const said = error instanceof Error ? error.message : String(error);
-  // Mermaid's own words, with where it stopped, and not the page's stack.
-  const words = said.replace(/^page\.evaluate: (Error: )?/, "").split(/\n\s+at /)[0] ?? said;
-  if (invalid) return new Refused("invalid", words);
-  console.error(said);
+  console.error(error instanceof Error ? error.message : String(error));
   return new Refused("crashed", "the worker failed");
+}
+
+/** What a conversion made, or the page's refusal of what it was sent, as `invalid`. */
+function made(answer: Answer): Converted {
+  if ("refused" in answer) {
+    // Mermaid's own words, with where it stopped, and not a stack.
+    throw new Refused("invalid", answer.refused.split(/\n\s+at /)[0] ?? answer.refused);
+  }
+  return held(answer.made);
 }
 
 async function mermaid(body: Record<string, unknown>): Promise<Converted> {
   const source = body.source;
   if (typeof source !== "string") throw new Refused("invalid", "source is Mermaid's text");
   within("Mermaid's source", source.length, MAX_MERMAID);
-  return held(
-    await alone(deadlineOf(body), async (page) => {
-      try {
-        return await page.evaluate((text) => window.diagrams.mermaid(text), source);
-      } catch (error) {
-        throw failed(error, true);
-      }
-    }),
+  return made(
+    await alone(deadlineOf(body), (on) =>
+      on.evaluate((text) => window.diagrams.mermaid(text), source),
+    ),
   );
 }
 
@@ -217,14 +231,10 @@ async function skeletons(body: Record<string, unknown>): Promise<Converted> {
   const given = body.skeletons;
   if (!Array.isArray(given)) throw new Refused("invalid", "skeletons is a list");
   within("the skeletons", given.length, MAX_SKELETONS);
-  return held(
-    await alone(deadlineOf(body), async (page) => {
-      try {
-        return await page.evaluate((each) => window.diagrams.skeletons(each), given as Skeleton[]);
-      } catch (error) {
-        throw failed(error, true);
-      }
-    }),
+  return made(
+    await alone(deadlineOf(body), (on) =>
+      on.evaluate((each) => window.diagrams.skeletons(each), given as Skeleton[]),
+    ),
   );
 }
 
@@ -237,20 +247,18 @@ async function render(body: Record<string, unknown>): Promise<[string, Buffer]> 
   }
   if (as !== "svg" && as !== "png") throw new Refused("invalid", "as is svg or png");
   within("the diagram's elements", Object.keys(diagram.elements).length, MAX_ELEMENTS);
-  const made = await alone(deadlineOf(body), async (page) => {
-    try {
-      return await page.evaluate(([d, f, a]) => window.diagrams.render(d, f, a), [
-        diagram,
-        files,
-        as,
-      ] as const);
-    } catch (error) {
-      throw failed(error, false);
-    }
-  });
+  if (typeof files !== "object" || files === null || Array.isArray(files)) {
+    throw new Refused("invalid", "files is the images by their digest");
+  }
+  const named = (diagram.files ?? {}) as Record<string, { media_type?: unknown } | undefined>;
+  const wrong = imagesRefused(files, named);
+  if (wrong !== undefined) throw new Refused("invalid", wrong);
+  const drawn = await alone(deadlineOf(body), (on) =>
+    on.evaluate(([d, f, a]) => window.diagrams.render(d, f, a), [diagram, files, as] as const),
+  );
   return as === "svg"
-    ? ["image/svg+xml", Buffer.from(made, "utf8")]
-    : ["image/png", Buffer.from(made, "base64")];
+    ? ["image/svg+xml", Buffer.from(drawn, "utf8")]
+    : ["image/png", Buffer.from(drawn, "base64")];
 }
 
 async function read(request: IncomingMessage): Promise<Record<string, unknown>> {
@@ -317,12 +325,12 @@ const server = createServer(async (request, response) => {
       await (CALLS[path] as (b: Record<string, unknown>) => Promise<unknown>)(body),
     );
   } catch (error) {
-    const refused = failed(error, false);
+    const refused = failed(error);
     json(response, STATUS[refused.reason], { reason: refused.reason, message: refused.message });
   }
 });
 
-await chromiumWarm.ready();
+await page.get();
 server.listen(Number(process.env.PORT ?? 8080), "0.0.0.0", () => {
   console.log(`diagrams worker: Excalidraw ${EXCALIDRAW}, ready`);
 });
@@ -330,6 +338,6 @@ server.listen(Number(process.env.PORT ?? 8080), "0.0.0.0", () => {
 for (const signal of ["SIGTERM", "SIGINT"] as const) {
   process.on(signal, () => {
     server.close();
-    void chromiumWarm.recycle().finally(() => process.exit(0));
+    void page.discard().finally(() => process.exit(0));
   });
 }

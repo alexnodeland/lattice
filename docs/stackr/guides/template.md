@@ -189,7 +189,8 @@ The worker is a Compose profile, `diagrams`, which `make up` adds; its first bui
 
 - **The worker has no route out**, as a native file's worker hasn't: read-only, as a user that isn't root, with no capabilities, under an init, with 1 GiB of memory and no swap (`DIAGRAMS_MEMORY`), one CPU (`DIAGRAMS_CPUS`), and alone on its own internal network, `diagrams`, with its relay, `diagrams`, which the application reaches on `files`. Its page loads nothing but its own files, and its exports name no address outside them.
 - **One job at a time, each within 10 seconds.** A job past its deadline is answered `timeout`, and the page it ran on is thrown away.
-- **CJK is drawn in Noto CJK**, not Excalidraw's Xiaolai, until Xiaolai's licence is confirmed (lattice#679). Its SVGs embed the Latin faces they use and leave CJK to the viewer's own.
+- **CJK is drawn in Noto CJK**, not Excalidraw's Xiaolai, until Xiaolai's licence is confirmed (lattice#679); then `DIAGRAMS_XIAOLAI=1` builds the worker with it. Its SVGs embed the Latin faces they use and leave CJK to the viewer's own.
+- **The worker comes from the libraries' commit.** Its build clones lattice at the commit `uv.lock` pins artifactr at, so a lock that predates the worker can't build it: `uv lock --upgrade-package artifactr-ai` moves it on. The build also checks that the worker drives the Playwright whose Chromium the image holds, and says to run `copier update` if the template and the libraries have drifted apart.
 
 `scripts/check-files` in stackr builds the worker as a generated application does, checks its posture value by value, that it reaches nothing outside its network, the application's side of its relay and the application's name included, and that it draws, renders and refuses as artifactr's converter expects.
 

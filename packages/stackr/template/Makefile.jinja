@@ -32,7 +32,8 @@ WORKER_BUILDS = $(foreach craft,$(FILES),FILES_$(shell echo $(craft) | tr a-z A-
 # application is told too (stackr ADR-0049).
 DIAGRAMS ?= $(or $(shell sed -n 's/^DIAGRAMS=//p' .env 2>/dev/null | tail -n 1),off)
 export DIAGRAMS
-ifeq ($(DIAGRAMS),on)
+# On or off, in any case, as the application reads it.
+ifeq ($(shell echo '$(DIAGRAMS)' | tr '[:upper:]' '[:lower:]'),on)
 PROFILES += --profile diagrams
 WORKER_BUILDS += DIAGRAMS_BUILD=$$(docker images --quiet --no-trunc {{ project_slug }}-diagrams:local)
 endif

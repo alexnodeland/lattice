@@ -41,10 +41,16 @@ export interface Diagram {
   files: Record<string, { media_type: string }>;
 }
 
+/**
+ * What a conversion gives: what it made, or why what it was sent can't be drawn. Anything the
+ * page throws instead is the worker's failure, not the sender's.
+ */
+export type Answer = { made: Converted } | { refused: string };
+
 /** What the page offers the server. */
 export interface Diagrams {
-  mermaid(source: string): Promise<Converted>;
-  skeletons(skeletons: Skeleton[]): Promise<Converted>;
+  mermaid(source: string): Promise<Answer>;
+  skeletons(skeletons: Skeleton[]): Promise<Answer>;
   render(diagram: Diagram, files: Record<string, string>, as: "svg" | "png"): Promise<string>;
 }
 
@@ -123,24 +129,42 @@ function held(css: string): string {
   );
 }
 
+/** Why what was sent can't be drawn, in the words of what refused it. */
+function refusal(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 window.diagrams = {
   async mermaid(source) {
-    const parsed = await parseMermaidToExcalidraw(source);
-    return {
-      elements: converted(parsed.elements as Drawn, true),
-      files: await images(parsed.files),
-    };
+    let parsed: Awaited<ReturnType<typeof parseMermaidToExcalidraw>>;
+    let elements: ExcalidrawElement[];
+    try {
+      parsed = await parseMermaidToExcalidraw(source);
+      elements = converted(parsed.elements as Drawn, true);
+    } catch (error) {
+      return { refused: refusal(error) };
+    }
+    return { made: { elements, files: await images(parsed.files) } };
   },
 
   async skeletons(skeletons) {
-    return { elements: converted(skeletons.map(skeleton), false), files: {} };
+    try {
+      return { made: { elements: converted(skeletons.map(skeleton), false), files: {} } };
+    } catch (error) {
+      return { refused: refusal(error) };
+    }
   },
 
   async render(diagram, files, as) {
     // What a diagram leaves out of an element, Excalidraw's defaults fill, as its canvas does.
-    const elements = restoreElements(Object.values(diagram.elements), null);
+    // And a link is drawn as one, out of the SVG: none is kept.
+    const elements = restoreElements(Object.values(diagram.elements), null).map((element) => ({
+      ...element,
+      link: null,
+    }));
     const binary: BinaryFiles = {};
     for (const [id, data] of Object.entries(files)) {
+      // The server has held each image's type to a PNG's or a JPEG's.
       const mimeType = diagram.files[id]?.media_type ?? "image/png";
       binary[id] = {
         id,

@@ -99,6 +99,7 @@ def pinned(
     mermaid: str = "2.2.2",
     driver: str = "1.64.0",
     stage: str = PLAYWRIGHT,
+    argument: str = "1.64.0",
     canvas: str | None = None,
 ) -> None:
     """A lattice whose worker, versions.env, lock, image and portalr's UIs pin these."""
@@ -108,7 +109,9 @@ def pinned(
     worker.mkdir(parents=True)
     (stackr / "template").mkdir()
     (stackr / "versions.env").write_text("# Excalidraw\nEXCALIDRAW_VERSION=0.18.1\n")
-    (stackr / "template" / "Dockerfile.jinja").write_text(f"FROM python AS build\n{stage}\n")
+    (stackr / "template" / "Dockerfile.jinja").write_text(
+        f"FROM bun AS diagrams-build\nARG PLAYWRIGHT={argument}\n{stage}\n"
+    )
     dependencies = {
         "@excalidraw/excalidraw": excalidraw,
         "@excalidraw/mermaid-to-excalidraw": mermaid,
@@ -152,11 +155,21 @@ def test_this_lattices_diagrams_pins_hold() -> None:
             {"stage": "FROM mcr.microsoft.com/playwright:v1.64.0-noble AS diagrams-worker"},
             "is None",
         ),
+        ({"argument": "1.63.0"}, "ARG PLAYWRIGHT is 1.63.0"),
     ],
 )
 def test_a_pin_that_differs_is_a_problem_that_names_both(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, pins: dict[str, str], said: str
 ) -> None:
     pinned(tmp_path, monkeypatch, **pins)
+    problems = check_template.check_diagrams()
+    assert [problem for problem in problems if said in problem], problems
+
+
+def test_a_lock_whose_format_changed_says_so(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pinned(tmp_path, monkeypatch)
+    (check_template.LATTICE / "bun.lock").write_text("{}\n")
     [problem] = check_template.check_diagrams()
-    assert said in problem
+    assert "has the lock's format changed?" in problem

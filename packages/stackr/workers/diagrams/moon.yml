@@ -5,9 +5,7 @@ language: 'typescript'
 layer: 'application'
 dependsOn:
   - 'notices'
-workspace:
-  inheritedTasks:
-    exclude: ['test'] # its calls are tested in its image, by scripts/check-files
+# Its server's rules are tested here; its calls are tested in its image, by scripts/check-files.
 
 tasks:
   build:

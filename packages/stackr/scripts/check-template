@@ -288,10 +288,14 @@ def check_diagrams() -> list[str]:
         lock,
     )
     mermaid = worker.get("@excalidraw/mermaid-to-excalidraw")
-    if depends is None or mermaid != depends[1]:
+    if depends is None:
         problems.append(
-            f"the worker's mermaid-to-excalidraw is {mermaid}; Excalidraw's is "
-            f"{depends and depends[1]}"
+            "bun.lock has no entry for @excalidraw/excalidraw that names its "
+            "mermaid-to-excalidraw: has the lock's format changed?"
+        )
+    elif mermaid != depends[1]:
+        problems.append(
+            f"the worker's mermaid-to-excalidraw is {mermaid}; Excalidraw's is {depends[1]}"
         )
     dockerfile = (ROOT / "template" / "Dockerfile.jinja").read_text()
     image = PLAYWRIGHT_IMAGE.search(dockerfile)
@@ -300,6 +304,12 @@ def check_diagrams() -> list[str]:
         problems.append(
             f"Dockerfile's Playwright image is {image and image[1]}; the worker's "
             f"playwright-core is {driver}"
+        )
+    argument = re.search(r"^ARG PLAYWRIGHT=(\S+)$", dockerfile, re.M)
+    if argument is None or argument[1] != driver:
+        problems.append(
+            f"Dockerfile's ARG PLAYWRIGHT is {argument and argument[1]}, which the build checks "
+            f"the worker's playwright-core against; it is {driver}"
         )
     return problems
 

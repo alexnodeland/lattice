@@ -355,6 +355,7 @@ if ((diagrams)); then
     docker exec "$container" node -e "$reach" "$host" "$beyond" "$own"
   WORKER_TOKEN=$(setting "$container" WORKER_TOKEN)
   export WORKER_TOKEN
+  # The probe runs in the first app's worker's image, which has artifactr, and so its converter.
   check "the diagrams worker answers its probe, through its relay" \
     docker run --rm --name "$name-probe-diagrams" --network "${name}_files" --read-only --tmpfs /tmp \
     --env WORKER_TOKEN --volume "$PWD/scripts/_diagrams_probe.py:/probe.py:ro" --entrypoint python \

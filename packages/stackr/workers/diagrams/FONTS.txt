@@ -21,8 +21,16 @@ each comes from lattice artifactr ADR-0088, from pinned upstream commits:
 ## Noto CJK (Debian's fonts-noto-cjk)
 
 Source: https://github.com/notofonts/noto-cjk
-The copyright file Debian ships with the package, /usr/share/doc/fonts-noto-cjk/copyright,
-which is in the image too, records:
+
+The faces' own copyright notice, as each of them holds it (its name table's copyright and
+trademark entries), is:
+
+  © 2014-2021 Adobe (http://www.adobe.com/).
+  Noto is a trademark of Google Inc.
+
+The faces name no Reserved Font Name, and the licence file upstream ships beside them,
+Sans/LICENSE, holds the licence's text alone. The copyright file Debian ships with the package,
+/usr/share/doc/fonts-noto-cjk/copyright, which is in the image too, records:
 
   Files: *
   Copyright: 2010-2012, Google Corporation

@@ -7,6 +7,9 @@
 # diagrams-build stage runs it. Xiaolai, Excalidraw's CJK face, is left out unless XIAOLAI is 1,
 # until its licence is confirmed (lattice#679).
 #
+# The commit must hold the worker: lattice's, from the one that added it (stackr ADR-0049). With
+# PLAYWRIGHT set, the playwright-core it builds must be that version, the image's Chromium's.
+#
 # Usage: scripts/build-diagrams-worker.sh DIR [UV_LOCK]
 #   DIR       where to write server.mjs, page/ and node_modules/playwright-core
 #   UV_LOCK   the lock file (default: uv.lock)
@@ -34,7 +37,16 @@ git remote add origin "$repo"
 git fetch --quiet --depth 1 origin "$rev"
 git checkout --quiet FETCH_HEAD
 bun install --frozen-lockfile --filter '@stackr/diagrams-worker'
+if [[ ! -d packages/stackr/workers/diagrams ]]; then
+  echo "build-diagrams-worker: lattice at $rev has no diagrams worker: update the libraries (uv lock --upgrade-package artifactr-ai)" >&2
+  exit 1
+fi
 cd packages/stackr/workers/diagrams
+built=$(bun -e 'console.log(require("./node_modules/playwright-core/package.json").version)')
+if [[ -n ${PLAYWRIGHT:-} && $built != "$PLAYWRIGHT" ]]; then
+  echo "build-diagrams-worker: lattice at $rev drives Playwright $built, and the image's Chromium is Playwright $PLAYWRIGHT's: run \`copier update\`, or pin the libraries at a commit whose worker matches" >&2
+  exit 1
+fi
 bun x --bun --no-install vite build --outDir "$out/page" --emptyOutDir
 bun build src/server.ts --target=node --format=esm --external playwright-core --outfile "$out/server.mjs"
 cp FONTS.txt "$out/page/FONTS.txt"

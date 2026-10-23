@@ -41,7 +41,8 @@ def _clients_entered(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
 
     Unentered, each request has an event loop of its own (see `tests/clients.py`).
     """
-    for name in ("request", "websocket_connect"):
+    # `send` is what `request`, `get` and the rest, and `stream`, all go through.
+    for name in ("send", "websocket_connect"):
         monkeypatch.setattr(TestClient, name, _only_entered(getattr(TestClient, name)))
     try:
         yield

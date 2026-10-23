@@ -76,12 +76,12 @@ def test_a_drafted_document_waits_out_a_check_out_then_takes_a_proposal(
 
 
 def test_the_editor_is_a_stand_in_served_under_its_own_policy() -> None:
-    editor = TestClient(editor_app)
-    page = editor.get("/")
-    policy = page.headers["content-security-policy"]
-    assert "'sha256-" in policy, "its inline script, by its hash"
-    assert policy.startswith("default-src 'self' blob:")
-    assert editor.get("/app-1a2b_bg.wasm").headers["content-type"] == "application/wasm"
+    with TestClient(editor_app) as editor:
+        page = editor.get("/")
+        policy = page.headers["content-security-policy"]
+        assert "'sha256-" in policy, "its inline script, by its hash"
+        assert policy.startswith("default-src 'self' blob:")
+        assert editor.get("/app-1a2b_bg.wasm").headers["content-type"] == "application/wasm"
 
 
 def test_the_application_names_the_editor_its_environment_names(

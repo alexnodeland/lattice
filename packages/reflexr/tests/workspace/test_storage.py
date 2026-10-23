@@ -24,9 +24,9 @@ from tests.event_types import ServiceError
 from tests.workspace.helpers import deploy, entry, fired
 
 ACME = WorkspaceRef("acme", "prod")
+OTHER = WorkspaceRef("globex", "prod")
 HANG = 10
 """Seconds past which a transaction after a cancelled one is taken to hang."""
-OTHER = WorkspaceRef("globex", "prod")
 
 ANY_ORDER = RunPolicy()
 """No rule known: every due run is a candidate."""

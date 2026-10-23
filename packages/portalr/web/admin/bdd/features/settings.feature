@@ -12,3 +12,11 @@ Feature: Settings
     Then they are told it may be at most 30, the default's value
     When they set "FreeCAD's tries an hour" back to the default
     Then 30 applies to "FreeCAD's tries an hour"
+
+  Scenario: A tenant's tools narrowed, and back
+    Given alice has signed in to admin
+    When they open Settings for the tenant
+    And they uncheck "look (reads)" in "Blender's tools" and save
+    Then "look (reads)" is unchecked in "Blender's tools"
+    When they set "Blender's tools" back to the default
+    Then "look (reads)" is checked in "Blender's tools"

@@ -47,6 +47,7 @@ nav:
   - adr/0032-the-audit-log-read-newest-first.md
   - adr/0033-a-tenants-creation-in-the-deployments-log.md
   - adr/0034-integrations-switched-per-tenant-and-workspace-in-grantrs-table-audited.md
+  - adr/0035-settings-narrowed-per-tenant-and-workspace-in-grantrs-table-versioned-audited.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

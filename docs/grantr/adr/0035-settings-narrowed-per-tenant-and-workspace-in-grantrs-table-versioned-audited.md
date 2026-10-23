@@ -28,7 +28,8 @@ lattice ADR-0030 declares settings in lattice-core and has a store hold the tena
   - `GET /tenants/{t}/settings` and `GET /tenants/{t}/workspaces/{w}/settings` return every layer, the ceiling, which layer set the ceiling, and the effective value; clamped rows are flagged, and keys no registry declares are listed apart.
   - `PUT /tenants/{t}[/workspaces/{w}]/settings/{key}` takes `{"value": number | names | null}`, with `If-Match: "<version>"` (`"0"` for a setting never set). It answers with the new state and its `ETag`.
   - `If-Match` is optional: without it the last write wins. `If-Match: *` names no version and is refused (422). A GET carries each setting's version in its body, not as an `ETag` header, since one response holds many settings.
-  - Who may is checked before what is asked: a caller without the grant is refused (403) before the key or the value is read.
+  - Who may is checked before what is asked. A route's dependency checks `grantr:manage_settings`, then reads `If-Match`, before the body is validated, so a caller without the grant gets 403 whatever its body or `If-Match` holds. The document still declares the body (`SettingChange`) and the `If-Match` header.
+  - Two things are refused before anyone is checked: a body that isn't JSON, which is read before any dependency, and a tenant id outside its pattern, which is refused as the path is matched. Both are 422.
   - A workspace id or key longer than 256 characters is refused (422) before anything is stored.
   - Refusals use the refusal schema: 409 `version_conflict`, 422 `invalid`, 403 `forbidden`.
   - The value is strict: a boolean, a string or a float is refused.

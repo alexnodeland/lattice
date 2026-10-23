@@ -150,3 +150,9 @@ def test_a_stored_number_is_kept_within_todays_bounds(stored: object, kept: int)
 )
 def test_stored_names_are_kept_to_those_known_today(stored: object, kept: tuple[str, ...]) -> None:
     assert TOOLS.kept(stored) == kept
+
+
+def test_a_stored_number_is_clamped_into_a_changed_range_both_ways() -> None:
+    raised = Setting("a", IntRange(10, 500), 100, "workspace", "A.")
+    assert raised.kept(5) == 10, "a registry that raises its lowest permits no less"
+    assert raised.kept(800) == 500

@@ -6,7 +6,7 @@ role its row-level security holds.
 
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -234,7 +234,23 @@ async def test_a_changed_registry_never_widens_a_stored_value(storage: Storage) 
     assert await after.value("acme", "w1", tools.key) == ("read",), "not the whole default"
     assert await after.value("acme", "w1", "limit") == 500, "clamped, not risen"
     view = await after.settings("acme", by=ALICE)
-    assert [s.tenant.value if s.tenant else None for s in view.settings] == [["read"], 500]
+    assert [(s.tenant.value, s.tenant.clamped) for s in view.settings if s.tenant] == [
+        (["read", "run"], True),
+        (800, True),
+    ], "what was set, flagged: today's registry keeps it narrower"
+    assert [s.effective for s in view.settings] == [["read"], 500]
+
+
+async def test_a_registry_raising_its_lowest_raises_a_value_below_it(storage: Storage) -> None:
+    low = Setting("limit", IntRange(0, 1000), 100, "workspace", "A limit.")
+    before = await _grants(storage, settings=registry(low))
+    await before.set_setting("acme", "limit", 5, by=ALICE)
+    raised = Setting("limit", IntRange(10, 1000), 100, "workspace", "At least 10.")
+    after = Grants(storage, catalogs=[ARTIFACTR], settings=registry(raised))
+    assert await after.value("acme", "w1", "limit") == 10, "the registry permits no less"
+    [state] = (await after.settings("acme", by=ALICE)).settings
+    assert state.tenant is not None
+    assert (state.tenant.value, state.tenant.clamped, state.effective) == (5, True, 10)
 
 
 async def test_a_stored_value_of_another_type_is_the_floor(storage: Storage) -> None:
@@ -267,7 +283,7 @@ async def test_a_tenant_no_one_made_has_the_operators_value(storage: Storage) ->
     assert await grants.value("bad~id", "w1", KEY) == 0, "a malformed id: the floor"
 
 
-async def test_a_change_that_cant_be_stored_records_nothing() -> None:
+async def test_a_change_that_cant_be_stored_records_nothing(storage: Storage) -> None:
     class RefusingTransaction:
         """A transaction that takes everything but a setting's row."""
 
@@ -280,15 +296,39 @@ async def test_a_change_that_cant_be_stored_records_nothing() -> None:
         async def set_setting(self, *_: Any) -> None:
             raise OSError("the disk is full")
 
-    class Refusing(InMemoryStorage):
+    class Refusing:
+        """The storage, on every backend, whose transactions refuse a setting's row."""
+
+        def __getattr__(self, name: str) -> Any:
+            return getattr(storage, name)
+
         @asynccontextmanager
         async def transaction(self, tenant: Any) -> AsyncGenerator[Any]:
-            async with super().transaction(tenant) as transaction:
+            async with storage.transaction(tenant) as transaction:
                 yield RefusingTransaction(transaction)
 
-    storage = Refusing()
-    grants = await _grants(storage)
+    grants = await _grants(cast("Storage", Refusing()))
     with pytest.raises(OSError, match="the disk is full"):
         await grants.set_setting("acme", KEY, 5, by=ALICE)
     assert await grants.audit("acme", by=ALICE, keep=SET_ONLY) == [], "the entry went with it"
     assert await grants.value("acme", "w1", KEY) == 30
+
+
+async def test_names_stored_in_another_order_are_not_clamped(storage: Storage) -> None:
+    tools = Setting(
+        "connect-tools:fake",
+        Subset(frozenset({"read", "edit", "run"})),
+        default=("edit", "read", "run"),
+        lowest="workspace",
+        description="The fake's tools.",
+    )
+    grants = await _grants(storage, settings=registry(tools))
+    await grants.set_setting("acme", tools.key, ["run", "read"], by=ALICE)
+    row = (await storage.settings("acme"))[tools.key]
+    async with storage.transaction("acme") as tx:
+        await tx.set_setting(
+            "acme", None, tools.key, row.model_copy(update={"value": ["run", "read"]})
+        )
+    [state] = (await grants.settings("acme", by=ALICE)).settings
+    assert state.tenant is not None
+    assert state.tenant.clamped is False

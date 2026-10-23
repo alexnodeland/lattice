@@ -36,7 +36,8 @@ Integrations are booleans, switched per tenant and workspace through one port ([
   - **By design:** an operator-only setting can't be written through the REST API at all.
 - **A change of the registry never widens a stored value.**
   - A key removed from the registry is never applied. Its row stays and is listed by an admin's read as `unknown`.
-  - A number stored under bounds that have since tightened is clamped into the new bounds; it is not dropped, so the value can't rise.
+  - A number stored under bounds that have since changed is clamped into the new bounds, and is not dropped. Above the new highest, it is lowered to it, so the value can't rise. Below the new lowest, it is raised to it: a registry that raises its lowest is a deliberate widening of what it permits, and it can't be honoured below that. Operators who raise it should expect this.
+  - Either way the stored row keeps what was set, and an admin's read flags it `clamped`, showing what applies instead.
   - Names stored in a subset whose universe has since shrunk keep only the names still known.
   - A value of another type is not read, and stands as the setting's floor (`Setting.kept`).
 - **Packages ask a `Settings` port,** `value(tenant_id, workspace_id, key)`, each time they act, with no cache. An implementation that can't read its store answers the setting's floor (its lowest number, or no names), so a failure never widens anything. `SettingsDefaults` answers without a store: the operator's value, or the default.

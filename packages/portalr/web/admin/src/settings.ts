@@ -5,7 +5,7 @@
  * applies instead.
  */
 
-import type { GrantrApi, Names } from "@portalr/client";
+import { type createQueries, type GrantrApi, type Names, workspaceOf } from "@portalr/client";
 import { actor } from "./audit";
 
 type SettingState = GrantrApi.components["schemas"]["SettingState"];
@@ -18,8 +18,9 @@ export interface SettingRow {
   readonly name: string;
   readonly description: string;
   readonly kind: SettingState["kind"];
-  /** What applies at this level. */
+  /** What applies at this level, said, and as it is. */
   readonly effective: string;
+  readonly effectiveValue: Value;
   /** How far this level may go, and which layer says so. */
   readonly ceiling: string;
   readonly ceilingValue: Value;
@@ -86,6 +87,7 @@ export function settingRowsOf(
       description: state.description,
       kind: state.kind,
       effective: said(state.effective),
+      effectiveValue: state.effective,
       ceiling: `At most ${said(state.ceiling)}: ${SETTERS[state.ceiling_set_by]}.`,
       ceilingValue: state.ceiling,
       here: here ? { value: here.value, by: actor(here.by, names), at: here.at } : null,
@@ -133,3 +135,40 @@ export function numberOf(
 /** grantr's refusal of a setting as the field says it: its key named as the page names it. */
 export const refusedAs = (reason: string, row: { readonly key: string; readonly name: string }) =>
   reason.replaceAll(row.key, row.name);
+
+/** Where a person may narrow settings: on the tenant, and in which of its workspaces. */
+export interface Places {
+  readonly tenant: boolean;
+  readonly workspaces: readonly string[];
+}
+
+/** The most workspaces one read of grantr's checks asks about: its batch's most, but the tenant. */
+const MOST_ASKED = 99;
+
+/**
+ * One read of grantr's checks: whether the person holds `grantr:manage_settings` on the tenant and
+ * in each of its workspaces (issue 627). A tenant's owners and admins hold it everywhere; a
+ * workspace's admins in theirs alone.
+ */
+export function settingsPlaces(
+  queries: ReturnType<typeof createQueries>,
+  tenant: string,
+  workspaces: readonly string[],
+) {
+  const asked = [...workspaces].sort().slice(0, MOST_ASKED);
+  const action = "grantr:manage_settings";
+  const checks = [
+    { action, resource: { kind: "tenant" as const } },
+    ...asked.map((name) => ({ action, resource: workspaceOf(name) })),
+  ];
+  return {
+    ...queries.grantr.checks(tenant, checks),
+    select: (answers: boolean[]): Places => ({
+      tenant: answers[0] === true,
+      workspaces: asked.filter((_name, at) => answers[at + 1] === true),
+    }),
+  };
+}
+
+/** Whether a person may narrow settings anywhere in the tenant: whether Settings joins the rail. */
+export const anywhere = (places: Places) => places.tenant || places.workspaces.length > 0;

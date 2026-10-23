@@ -38,8 +38,14 @@ const TOOLS = {
   key: "connect-tools:freecad",
   description:
     "Which of a connected FreeCAD's tools a workspace offers, of those its operator offers.",
-  kind: { type: "subset", low: null, high: null, universe: ["get_objects", "get_view"] },
-  default: ["get_objects", "get_view"],
+  kind: {
+    type: "subset",
+    low: null,
+    high: null,
+    universe: ["create_object", "get_objects", "get_view"],
+    labels: { create_object: "edits", get_objects: "reads", get_view: "reads" },
+  },
+  default: ["create_object", "get_objects", "get_view"],
   lowest: "workspace",
   operator: null,
   tenant: null,
@@ -105,6 +111,10 @@ async function grantr(request: Request, path: string): Promise<Response | undefi
     const tag = request.headers.get("If-Match");
     sent.push(`${workspace ?? "tenant"} ${tag} ${body}`);
     await held;
+    if (key === TOOLS.key) {
+      const { value } = JSON.parse(body) as { value: string[] };
+      return Response.json({ ...TOOLS, effective: value, version: 1 });
+    }
     const name = workspace ?? "";
     if (sameValueRace) {
       sameValueRace = false;
@@ -367,13 +377,38 @@ test("an unset after someone else's change leaves the field empty", async () => 
   await expect.element(field).toHaveValue("");
 });
 
-test("a setting of names is shown as it applies, with no field to change it here", async () => {
+test("a workspace's tools are checked, each with its risk, and those not offered above can't be", async () => {
   names = true;
-  const { screen } = await open("/t/acme/settings");
-  await expect
-    .element(
-      screen.getByText(/Applies: get_objects, get_view\. Changed through grantr's API for now\./),
-    )
-    .toBeVisible();
-  expect(screen.getByRole("textbox", { name: "FreeCAD's tools" }).elements()).toHaveLength(0);
+  const { screen } = await open("/t/acme/settings?workspace=notes");
+  const tools = screen.getByRole("group", { name: "FreeCAD's tools" });
+  const view = tools.getByRole("checkbox", { name: "get_view (reads)" });
+  await expect.element(view).toBeChecked();
+  const create = tools.getByRole("checkbox", { name: "create_object (edits)" });
+  await expect.element(create).toBeDisabled();
+  await expect.element(create).toHaveAccessibleDescription("Not offered above");
+  await view.click();
+  await screen.getByRole("button", { name: "Save FreeCAD's tools" }).click();
+  await expect.element(screen.getByText("FreeCAD's tools: get_objects applies.")).toBeVisible();
+  expect(sent).toEqual(['notes "0" {"value":["get_objects"]}']);
+});
+
+test("a workspace's admin finds Settings, and only the workspaces they administer", async () => {
+  const { screen, router } = await open("/t/acme", ["grantr:manage_settings@plans"]);
+  const rail = screen.getByRole("navigation", { name: "Tenant" });
+  await rail.getByRole("link", { name: "Settings" }).click();
+  await expect.element(screen.getByRole("list", { name: "Settings in plans" })).toBeVisible();
+  expect(router.state.location.pathname).toBe("/t/acme/settings");
+  await screen.getByRole("combobox", { name: "Where" }).click();
+  const options = screen
+    .getByRole("option")
+    .elements()
+    .map((one) => one.textContent);
+  expect(options).toEqual(["Workspace plans"]);
+});
+
+test("a workspace the reader doesn't administer isn't theirs to change", async () => {
+  const { screen } = await open("/t/acme/settings?workspace=notes", [
+    "grantr:manage_settings@plans",
+  ]);
+  await expect.element(screen.getByText("Not a workspace you administer")).toBeVisible();
 });

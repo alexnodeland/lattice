@@ -10,6 +10,10 @@ import { Icon } from "./icon";
 export interface CheckboxChoice {
   readonly value: string;
   readonly label: string;
+  /** Not to be changed, as it is, where the rest may be. */
+  readonly disabled?: boolean;
+  /** Said under it, and describing it: such as why it can't be changed. */
+  readonly description?: string;
 }
 
 /**
@@ -65,11 +69,16 @@ export function CheckboxGroup({
           className="flex flex-col gap-1.5 pt-1"
         >
           {choices.map((choice) => (
-            <Field.Root key={choice.value}>
-              <Field.Label className="flex items-center gap-2 text-fg text-sm">
+            <Field.Root key={choice.value} disabled={choice.disabled}>
+              <Field.Label className="flex items-center gap-2 text-fg text-sm data-disabled:text-muted">
                 <Checkbox value={choice.value} />
                 {choice.label}
               </Field.Label>
+              {choice.description && (
+                <Field.Description className="ps-(--checkbox-size) ms-2 text-muted text-xs">
+                  {choice.description}
+                </Field.Description>
+              )}
             </Field.Root>
           ))}
         </BaseCheckboxGroup>

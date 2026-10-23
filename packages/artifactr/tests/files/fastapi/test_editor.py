@@ -5,9 +5,9 @@ import hashlib
 from pathlib import Path
 
 import pytest
-from starlette.testclient import TestClient
 
 from artifactr.files.fastapi import editor_app, editor_policy
+from tests.clients import entered
 
 SCRIPT = "\nimport init from './app-1a2b.js';\nawait init();\n"
 INDEX = f"""<!DOCTYPE html><html><head>
@@ -53,7 +53,7 @@ def test_a_script_loaded_by_its_url_adds_no_hash() -> None:
 
 
 def test_the_page_is_served_unchanged_and_revalidated(build: Path) -> None:
-    client = TestClient(editor_app(build))
+    client = entered(editor_app(build))
     page = client.get("/")
     assert page.text == INDEX
     assert page.headers["content-security-policy"] == editor_policy(INDEX)
@@ -65,7 +65,7 @@ def test_the_page_is_served_unchanged_and_revalidated(build: Path) -> None:
 
 
 def test_hashed_files_are_cached_for_good_and_typed(build: Path) -> None:
-    client = TestClient(editor_app(build))
+    client = entered(editor_app(build))
     wasm = client.get("/app-1a2b_bg.wasm")
     assert wasm.headers["content-type"] == "application/wasm"
     assert wasm.headers["cache-control"] == "public, max-age=31536000, immutable"

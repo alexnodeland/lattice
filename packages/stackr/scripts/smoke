@@ -573,6 +573,27 @@ smoke_analytics() {
     log "FAIL: system.query_log holds $said analytics queries"
     status=1
   fi
+  # A person's deletion, as the writer does it when they take back their yes (RFC-0008, P5): their
+  # rows are gone from every read at once, and Langfuse can't see the mutation that names them.
+  local gone
+  gone=$(random_hex 16)
+  printf '{"tenant_id":"%s","distinct_id":"%s","event":"member.invited.v1"}\n' "$a" "$gone" |
+    analytics_as writer "INSERT INTO analytics.events FORMAT JSONEachRow" >/dev/null
+  said=$(analytics_as writer "DELETE FROM analytics.events WHERE distinct_id = '$gone'" </dev/null || true)
+  if [[ -z $said ]] &&
+    [[ $(clickhouse_as admin "SELECT count() FROM analytics.events WHERE distinct_id = '$gone'") == 0 ]]; then
+    log "ok: analytics' writer deletes a person's events, gone from reads at once"
+  else
+    log "FAIL: analytics' writer deleting a person's events: $said"
+    status=1
+  fi
+  said=$(clickhouse_as langfuse "SELECT count() FROM system.mutations WHERE database != 'default'")
+  if [[ $said == 0 ]]; then
+    log "ok: Langfuse's user sees no mutation of analytics'"
+  else
+    log "FAIL: Langfuse's user sees $said mutations outside its database"
+    status=1
+  fi
   # Each layer on its own: no analytics user's query is logged at all, as the operators see it.
   said=$(clickhouse_as admin "SELECT count() FROM system.query_log WHERE user LIKE 'portalr_analytics%'")
   if [[ $said == 0 ]]; then

@@ -31,13 +31,14 @@ from portalr.tenant import Tenant
 
 log = logging.getLogger("portalr.analytics")
 
-REGISTRY: Final[dict[str, frozenset[str]]] = {
-    name: frozenset(keys)
-    for name, keys in json.loads(
+REGISTRY: Final[dict[str, dict[str, frozenset[str] | None]]] = {
+    name: {key: None if values == "route" else frozenset(values) for key, values in props.items()}
+    for name, props in json.loads(
         resources.files("portalr.readers").joinpath("analytics_events.json").read_text()
     )["events"].items()
 }
-"""Each event portalr records, by its versioned name, with the ``props`` keys it may carry."""
+"""Each event portalr records, by its versioned name: each key it may carry, with the values it
+may take, or None for a route, which the relay holds to the app's router's own."""
 
 TENANT_SETTING: Final = "SQL_portalr_tenant"
 """The custom setting the row policy on ``analytics.events`` reads a query's tenant from."""
@@ -100,6 +101,7 @@ class Analytics:
         actor: Actor = "user",
         workspace: str = "",
         trace_id: str = "",
+        session_id: str = "",
         props: dict[str, str] | None = None,
     ) -> bool:
         """Record an event in the tenant: whether it was written.
@@ -107,33 +109,92 @@ class Analytics:
         Raises:
             ValueError: If the event isn't in the registry: a name is the code's, not a person's.
         """
+        row = self._row(tenant, event, user_id, actor, workspace, trace_id, session_id, props)
+        return await self._write(
+            "INSERT INTO analytics.events FORMAT JSONEachRow", json.dumps(row), event
+        )
+
+    async def capture_many(
+        self,
+        tenant: str,
+        user_id: str,
+        events: list[tuple[str, dict[str, str]]],
+        *,
+        session_id: str = "",
+    ) -> bool:
+        """Record a person's events in the tenant, each its name and props, in one write.
+
+        Raises:
+            ValueError: If an event isn't in the registry.
+        """
+        rows = [
+            self._row(tenant, event, user_id, "user", "", "", session_id, props)
+            for event, props in events
+        ]
+        body = "\n".join(json.dumps(row) for row in rows)
+        return await self._write("INSERT INTO analytics.events FORMAT JSONEachRow", body, "events")
+
+    def _row(
+        self,
+        tenant: str,
+        event: str,
+        user_id: str,
+        actor: Actor,
+        workspace: str,
+        trace_id: str,
+        session_id: str,
+        props: dict[str, str] | None,
+    ) -> dict[str, object]:
         allowed = REGISTRY.get(event)
         if allowed is None:
             raise ValueError(f"{event!r} isn't in portalr's analytics registry")
-        row = {
+        return {
             "ts": datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S.%f")[:-3],
             "tenant_id": tenant,
             "workspace_id": workspace,
             "distinct_id": distinct_id(self.key, user_id),
             "event": event,
             "trace_id": trace_id,
-            "session_id": "",
+            "session_id": session_id,
             "actor_kind": actor,
-            "props": {k: v for k, v in (props or {}).items() if k in allowed},
+            "props": {
+                key: value
+                for key, value in (props or {}).items()
+                if key in allowed and ((values := allowed[key]) is None or value in values)
+            },
         }
+
+    async def forget(self, user_id: str) -> bool:
+        """Delete every event of the person's, in every tenant, at once: whether it was done.
+
+        A lightweight delete: the rows are hidden from every read as it returns, and removed from
+        disk as ClickHouse merges the parts that hold them (lattice RFC-0008, P5).
+        """
+        return await self._write(
+            "DELETE FROM analytics.events WHERE distinct_id = {person:FixedString(32)}",
+            "",
+            "a person's events",
+            params={"param_person": distinct_id(self.key, user_id)},
+        )
+
+    async def _write(
+        self, query: str, body: str, what: str, *, params: dict[str, str] | None = None
+    ) -> bool:
         try:
-            response = await self.writer.post(
-                self.url,
-                params={"query": "INSERT INTO analytics.events FORMAT JSONEachRow"},
-                content=json.dumps(row),
-                timeout=TIMEOUT,
-            )
+            if params is None:
+                response = await self.writer.post(
+                    self.url, params={"query": query}, content=body, timeout=TIMEOUT
+                )
+            else:
+                response = await self.writer.post(
+                    self.url, params=params, content=query, timeout=TIMEOUT
+                )
         except httpx.HTTPError as error:
-            log.warning("analytics: %s not recorded: %s", event, type(error).__name__)
+            log.warning("analytics: %s not recorded: %s", what, type(error).__name__)
             return False
         if response.status_code >= 400:
             log.warning(
-                "analytics: %s not recorded: ClickHouse answered %s", event, response.status_code
+                "analytics: %s not recorded: ClickHouse answered %s", what, response.status_code
             )
             return False
         return True

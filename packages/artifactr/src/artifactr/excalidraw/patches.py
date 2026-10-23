@@ -32,8 +32,9 @@ def element_patch(
     """The patch that takes ``base`` to ``elements``, and adds ``files`` it doesn't have.
 
     An element that differs is replaced after a test of its version in ``base``; one ``base``
-    doesn't have is added; one ``elements`` leaves out is removed after the same test. An image
-    is only ever added: its key is its digest. An empty patch means nothing changed, which
+    doesn't have is added. One ``elements`` leaves out is kept: an element is deleted by marking it
+    ``isDeleted``, and only a sweep removes tombstones. An image is only ever added: its key is
+    its digest. An empty patch means nothing changed, which
     artifactr refuses, so a writer doesn't send it.
     """
     ops: list[dict[str, JsonValue]] = []
@@ -41,12 +42,8 @@ def element_patch(
         before = base.elements.get(key)
         if before is None:
             ops.append({"op": "add", "path": _at(key), "value": _json(element)})
-        elif _json(before) != _json(element):
+        elif before.written() != element.written():
             ops.extend(_replaced(key, before, element))
-    for key, before in base.elements.items():
-        if key not in elements:
-            ops.append({"op": "test", "path": f"{_at(key)}/version", "value": before.version})
-            ops.append({"op": "remove", "path": _at(key)})
     for digest, file in (files or {}).items():
         if digest not in base.files:
             ops.append({"op": "add", "path": f"/files/{digest}", "value": file.model_dump()})
@@ -82,7 +79,7 @@ def rebase(base: Diagram, local: Mapping[str, Element], head: Diagram) -> dict[s
     changed = {
         key: element
         for key, element in local.items()
-        if key not in base.elements or _json(base.elements[key]) != _json(element)
+        if key not in base.elements or base.elements[key].written() != element.written()
     }
     merged = dict(head.elements)
     for key, element in changed.items():

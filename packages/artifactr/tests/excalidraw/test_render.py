@@ -93,3 +93,21 @@ def test_a_long_word_is_cut_at_80_characters() -> None:
     said = diagram(element("t1", type="text", text="y" * 500)).render_for_agent()
     assert f'"{"y" * 80}"' in said
     assert "y" * 81 not in said
+
+
+def test_controls_bidirectional_marks_and_tags_are_dropped() -> None:
+    written = "safe\x1b[31m red\u202eevil\u2066 ok\x00\U000e0041"
+    said = diagram(element("t1", type="text", text=written)).render_for_agent()
+    assert '- "safe[31m redevil ok"' in said
+
+
+def test_joiners_stay_for_emoji_and_persian() -> None:
+    family = "\U0001f468\u200d\U0001f469\u200d\U0001f467"
+    persian = "\u0645\u06cc\u200c\u062e\u0648\u0627\u0647\u0645"
+    said = diagram(element("t1", type="text", text=f"{family} {persian}")).render_for_agent()
+    assert f'"{family} {persian}"' in said
+
+
+def test_a_bound_past_a_float_is_left_out() -> None:
+    huge = diagram(element("r1", x=1e308, width=1e308), element("r2"))
+    assert "Bounds: x 0 to 10, y 0 to 10" in huge.render_for_agent()

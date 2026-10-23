@@ -15,7 +15,9 @@ them, the images it shows by their digests, and what every viewer shares of its 
 """
 
 import json
-from typing import Annotated, ClassVar, Final, Self, override
+import math
+from collections.abc import Iterator
+from typing import Annotated, ClassVar, Final, Self, cast, override
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, StrictInt, model_validator
 
@@ -84,13 +86,23 @@ class Element(BaseModel):
 
     updated: StrictInt | None = Field(default=None, ge=0, le=MAX_VERSION)
 
+    def written(self) -> str:
+        """The element as JSON text, so that ``1``, ``1.0`` and ``true`` are three values."""
+        return json.dumps(self.model_dump(mode="json"), sort_keys=True, separators=(",", ":"))
+
     @model_validator(mode="after")
     def _storable(self) -> Self:
         try:
-            json.dumps(self.model_extra, allow_nan=False)
-        except ValueError:
-            msg = f"element {self.id} holds a number JSON can't: NaN or an infinity"
-            raise ValueError(msg) from None
+            for number in _numbers(cast("JsonValue", self.model_extra or {})):
+                if isinstance(number, float) and not math.isfinite(number):
+                    msg = f"element {self.id} holds a number JSON can't: NaN or an infinity"
+                    raise ValueError(msg)
+                if isinstance(number, int) and abs(number) > MAX_VERSION:
+                    msg = (
+                        f"element {self.id} holds an integer past {MAX_VERSION}, "
+                        "which JavaScript can't hold exactly"
+                    )
+                    raise ValueError(msg)
         except RecursionError:
             msg = f"element {self.id} nests too deep to store"
             raise ValueError(msg) from None
@@ -106,7 +118,7 @@ class DiagramFile(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     sha256: Sha256
-    size: int = Field(ge=0)
+    size: StrictInt = Field(ge=0, le=MAX_VERSION)
     media_type: str = Field(min_length=1)
 
 
@@ -160,6 +172,20 @@ class Diagram(Artifact, name=DIAGRAM_KIND):
         """Describe the diagram's live elements in a few lines, never its JSON."""
         elements = {key: e.model_dump(mode="json") for key, e in self.elements.items()}
         return describe(self.name, elements)
+
+
+def _numbers(value: JsonValue) -> Iterator[int | float]:
+    """Every number a value holds, at any depth; a bool is not one."""
+    if isinstance(value, bool):
+        return
+    if isinstance(value, int | float):
+        yield value
+    elif isinstance(value, dict):
+        for item in value.values():
+            yield from _numbers(item)
+    elif isinstance(value, list):
+        for item in value:
+            yield from _numbers(item)
 
 
 def _size(data: JsonValue) -> int:

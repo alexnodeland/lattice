@@ -251,7 +251,7 @@ test("what a screen reader hears as the answer changes", () => {
     "Sharing how you use the app is off.",
   );
   expect(analyticsStatus({ given: true, onAnswer, guide, failed: true })).toBe(
-    "Your answer wasn't saved. Try again. Sharing how you use the app is on.",
+    "Your answer wasn't saved, so nothing has changed. Try again. Sharing how you use the app is on.",
   );
   expect(analyticsStatus({ given: false, onAnswer, guide, deleting: true })).toBe(
     "Sharing is off. Deleting what you shared hasn't finished yet. It will be retried until it is done.",

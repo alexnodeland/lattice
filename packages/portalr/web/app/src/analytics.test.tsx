@@ -188,7 +188,8 @@ test("an answer the relay doesn't take puts the switch back, and says so", async
   await expect
     .element(
       screen.getByRole("status").filter({
-        hasText: "Your answer wasn't saved. Try again. Sharing how you use the app is on.",
+        hasText:
+          "Your answer wasn't saved, so nothing has changed. Try again. Sharing how you use the app is on.",
       }),
     )
     .toBeInTheDocument();

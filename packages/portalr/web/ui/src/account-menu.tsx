@@ -39,7 +39,7 @@ const STILL_DELETING =
   "Deleting what you shared hasn't finished yet. It will be retried until it is done.";
 
 /** What a screen reader hears when an answer wasn't recorded. */
-const NOT_SAVED = "Your answer wasn't saved. Try again.";
+const NOT_SAVED = "Your answer wasn't saved, so nothing has changed. Try again.";
 
 /** What the account menu says, for a screen reader, as the person's answer changes. */
 export function analyticsStatus(analytics: AnalyticsAnswer | undefined): string {

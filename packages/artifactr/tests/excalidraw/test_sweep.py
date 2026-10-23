@@ -105,6 +105,27 @@ async def test_a_diagram_changed_meanwhile_is_left_for_the_next_sweep(
     assert "a" in (await ws.get(Diagram, "d1")).data.elements
 
 
+async def test_the_sweep_removes_an_element_only_while_it_is_the_tombstone_it_read(
+    workspaces: Workspaces, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ws = await _drawn(workspaces)
+    sweeper = ws.as_actor(SWEEPER)
+    sent: list[EditArtifact] = []
+
+    async def noted(command: EditArtifact) -> None:
+        sent.append(command)
+
+    monkeypatch.setattr(sweeper, "commit", noted)
+    await sweep_tombstones(sweeper, now=datetime.now(UTC) + KEEP + timedelta(hours=1))
+    [command] = sent
+    assert isinstance(command.patch, JsonPatch)
+    assert command.patch.ops == (
+        {"op": "test", "path": "/elements/a/version", "value": 2},
+        {"op": "test", "path": "/elements/a/isDeleted", "value": True},
+        {"op": "remove", "path": "/elements/a"},
+    )
+
+
 async def test_where_diagrams_are_off_their_tombstones_wait(storage: Storage) -> None:
     switches = Toggles()
     workspaces = Workspaces(

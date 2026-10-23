@@ -11,6 +11,7 @@ an application that has none (artifactr ADR-0090).
 
 import base64
 import binascii
+import codecs
 import hashlib
 import json
 import re
@@ -18,7 +19,7 @@ import struct
 import zlib
 from collections.abc import Mapping, Sequence
 from typing import Annotated, Final, Literal, Protocol, Self
-from xml.etree import ElementTree
+from xml.parsers import expat
 from xml.sax.saxutils import escape
 
 import anyio
@@ -85,8 +86,12 @@ PLACE: Final = 10_000_000.0
 PNG: Final = b"\x89PNG\r\n\x1a\n"
 """A PNG's first bytes."""
 
-Colour = Annotated[str, Field(pattern=r"^(#[0-9a-fA-F]{3,8}|transparent|[a-z]{3,20})$")]
-"""A colour an element may be given: hex, `transparent`, or a CSS colour's name."""
+Colour = Annotated[
+    str,
+    Field(pattern=r"^(#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|transparent|[a-z]{3,20})$"),
+]
+"""A colour an element may be given: hex of 3, 4, 6 or 8 digits, `transparent`, or a CSS
+colour's name."""
 
 Coordinate = Annotated[float, Field(allow_inf_nan=False, ge=-PLACE, le=PLACE)]
 """A place on the canvas, finite and within reach."""
@@ -154,17 +159,18 @@ class ConvertedFile(BaseModel):
     data: Annotated[str, Field(max_length=MAX_IMAGE_BYTES * 4 // 3 + 4)]
 
     def content(self) -> bytes:
-        """The image's bytes.
+        """The image's bytes, checked as a render is: a PNG by its signature, or a safe SVG.
 
         Raises:
-            ConversionFailed: If its data isn't base64.
+            ConversionFailed: If its data isn't base64, or isn't the image it says, as `crashed`.
         """
         try:
-            return base64.b64decode(self.data, validate=True)
+            data = base64.b64decode(self.data, validate=True)
         except binascii.Error as error:
             raise ConversionFailed(
                 "crashed", "the converter gave an image that isn't base64"
             ) from error
+        return checked(data, "png" if self.media_type == "image/png" else "svg")
 
 
 class Converted(BaseModel):
@@ -245,6 +251,8 @@ class WorkerConverter:
             base_url=url,
             headers={"Authorization": f"Bearer {token}"},
             transport=transport,
+            # The deadline and its grace are the only clock: the worker replies when it is done.
+            timeout=None,
             # A connection for each call, as native files' worker has (artifactr.files.worker).
             limits=httpx.Limits(max_keepalive_connections=0),
         )
@@ -306,10 +314,6 @@ class WorkerConverter:
                 ) as reply:
                     read = await _read(reply, most)
         except TimeoutError as error:
-            raise ConversionFailed(
-                "timeout", f"the converter took more than {deadline:g}s"
-            ) from error
-        except httpx.TimeoutException as error:
             raise ConversionFailed(
                 "timeout", f"the converter took more than {deadline:g}s"
             ) from error
@@ -463,6 +467,10 @@ def _converted(reply: bytes) -> Converted:
     try:
         return Converted.model_validate_json(reply)
     except ValidationError as error:
+        if any(e["loc"] == ("elements",) and e["type"] == "too_long" for e in error.errors()):
+            raise ConversionFailed(
+                "too_large", f"it makes more than {MAX_ELEMENTS} elements"
+            ) from error
         raise ConversionFailed("crashed", "the converter replied with something else") from error
 
 
@@ -490,14 +498,76 @@ class _Refusal(BaseModel):
     message: str
 
 
-_UNSAFE: Final = re.compile(
-    rb"<!DOCTYPE|<!ENTITY|<script|<foreignObject|\son[a-z]+\s*=|javascript:", re.I
+SVG: Final = "http://www.w3.org/2000/svg"
+"""The SVG namespace, which every element of an SVG to show is in."""
+
+XLINK: Final = "http://www.w3.org/1999/xlink"
+"""The namespace of `xlink:href`."""
+
+XML: Final = "http://www.w3.org/XML/1998/namespace"
+"""The namespace of `xml:space` and `xml:lang`."""
+
+DRAWN: Final = frozenset(
+    {
+        "svg",
+        "g",
+        "defs",
+        "symbol",
+        "use",
+        "path",
+        "rect",
+        "circle",
+        "ellipse",
+        "line",
+        "polyline",
+        "polygon",
+        "text",
+        "tspan",
+        "textPath",
+        "image",
+        "title",
+        "desc",
+        "metadata",
+        "style",
+        "clipPath",
+        "mask",
+        "pattern",
+        "marker",
+        "linearGradient",
+        "radialGradient",
+        "stop",
+    }
 )
-"""What an SVG to show may not hold: a doctype, script, foreign content, handlers, script links."""
+"""The SVG elements a diagram is drawn with, and the only ones an SVG to show may hold: no
+script, no foreign content, no animation, no filters."""
+
+LINKED: Final = ("#", "data:image/png;base64,", "data:image/jpeg;base64,")
+"""What a link may be: a fragment in the same SVG, or a PNG or a JPEG in it."""
+
+_URL: Final = re.compile(
+    r"url\(\s*['\"]?(?!#|data:(font/(woff2?|ttf|otf)|image/(png|jpeg))[;,])", re.IGNORECASE
+)
+"""A `url(` in CSS to anything but a fragment, or a font or a picture held in the SVG itself."""
+
+_CSS: Final = re.compile(r"@import|expression\s*\(|\\", re.IGNORECASE)
+"""CSS that fetches, runs, or hides what it says behind an escape."""
+
+_BOMS: Final = (codecs.BOM_UTF8, codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE)
+"""Byte-order marks, which an SVG to show doesn't start with: it is UTF-8, plainly."""
+
+
+class _Unsafe(Exception):
+    """What an SVG may not hold, found as it is read."""
 
 
 def checked(rendered: bytes, as_: Format) -> bytes:
-    """A render as it may be shown: a PNG by its signature, or an SVG that parses and runs nothing.
+    """A render as it may be shown: a PNG by its signature, or an SVG of drawing alone.
+
+    The SVG check is an allowlist validator of the worker's output, not a general sanitiser: it
+    refuses, and never rewrites. The SVG must be UTF-8, with no doctype and no processing
+    instruction; each element in the SVG namespace and among those a diagram is drawn with;
+    no handler; each link a fragment, or a PNG or a JPEG held in it; and its CSS fetching
+    nothing but a fragment, a font or a picture held in it.
 
     Raises:
         ConversionFailed: If it is anything else, as `crashed`.
@@ -506,15 +576,76 @@ def checked(rendered: bytes, as_: Format) -> bytes:
         if not rendered.startswith(PNG):
             raise ConversionFailed("crashed", "the converter's PNG isn't one")
         return rendered
-    if _UNSAFE.search(rendered):
-        raise ConversionFailed("crashed", "the converter's SVG holds what can't be shown")
     try:
-        root = ElementTree.fromstring(rendered)
-    except ElementTree.ParseError as error:
-        raise ConversionFailed("crashed", "the converter's SVG doesn't parse") from error
-    if root.tag not in {"svg", "{http://www.w3.org/2000/svg}svg"}:
-        raise ConversionFailed("crashed", "the converter's SVG isn't one")
+        _walk(rendered)
+    except (_Unsafe, UnicodeDecodeError, expat.ExpatError) as error:
+        raise ConversionFailed(
+            "crashed", "the converter's SVG holds what can't be shown"
+        ) from error
     return rendered
+
+
+def _walk(rendered: bytes) -> None:
+    """Read an SVG through, refusing anything past what a drawing holds."""
+    if rendered.startswith(_BOMS):
+        raise _Unsafe("a byte-order mark")
+    rendered.decode("utf-8")
+    parser = expat.ParserCreate(encoding="UTF-8", namespace_separator=" ")
+    styled: list[str] = []
+    depth = {"style": 0, "elements": 0}
+
+    def declared(_version: str, encoding: str | None, _standalone: int) -> None:
+        if encoding is not None and encoding.lower() not in {"utf-8", "utf8"}:
+            raise _Unsafe(f"declared as {encoding}")
+
+    def refused(*_: object) -> None:
+        raise _Unsafe("a doctype, an entity or a processing instruction")
+
+    def started(name: str, attributes: dict[str, str]) -> None:
+        namespace, _, local = name.rpartition(" ")
+        if namespace != SVG or local not in DRAWN:
+            raise _Unsafe(f"element {name}")
+        if depth["elements"] == 0 and local != "svg":
+            raise _Unsafe("a root that isn't svg")
+        depth["elements"] += 1
+        if local == "style":
+            depth["style"] += 1
+        for key, value in attributes.items():
+            _attribute(key, value)
+
+    def ended(name: str) -> None:
+        if name == f"{SVG} style":
+            depth["style"] -= 1
+
+    def text(data: str) -> None:
+        if depth["style"]:
+            styled.append(data)
+
+    parser.XmlDeclHandler = declared
+    parser.StartDoctypeDeclHandler = refused
+    parser.EntityDeclHandler = refused
+    parser.ProcessingInstructionHandler = refused
+    parser.StartElementHandler = started
+    parser.EndElementHandler = ended
+    parser.CharacterDataHandler = text
+    parser.Parse(rendered, True)
+    _css("".join(styled))
+
+
+def _attribute(key: str, value: str) -> None:
+    namespace, _, local = key.rpartition(" ")
+    if namespace not in {"", XLINK, XML}:
+        raise _Unsafe(f"attribute {key}")
+    if local.lower().startswith("on"):
+        raise _Unsafe(f"handler {local}")
+    if local == "href" and not value.startswith(LINKED):
+        raise _Unsafe("a link out")
+    _css(value)
+
+
+def _css(css: str) -> None:
+    if _URL.search(css) or _CSS.search(css):
+        raise _Unsafe("CSS that fetches or runs something")
 
 
 def _png(said: str) -> bytes:

@@ -37,6 +37,7 @@ from artifactr.excalidraw.converter import (
     MAX_MERMAID,
     MAX_RENDERING,
     MAX_SKELETONS,
+    SAID,
     Colour,
     ConversionFailed,
     Converted,
@@ -294,7 +295,7 @@ def diagram_tools(
     if view:
 
         @toolset.tool
-        async def view_diagram(ctx: RunContext[Session[Any]], id: str) -> BinaryContent:
+        async def view_diagram(ctx: RunContext[Session[Any]], id: str) -> BinaryContent | str:
             """Look at a diagram, rendered as a PNG.
 
             Args:
@@ -306,7 +307,7 @@ def diagram_tools(
             try:
                 png = await converter.render(current.data, files, as_="png")
             except ConversionFailed as failed:
-                raise ModelRetry(f"The diagram can't be shown: {failed}") from failed
+                return _failed("The diagram can't be shown", failed)
             return BinaryContent(data=png, media_type="image/png")
 
     async def _drawn(
@@ -322,11 +323,12 @@ def diagram_tools(
         current = None if id is None else await _found(workspace, id)
         try:
             converted = await convert()
+            parts = _parts(blobs, converted)
         except ConversionFailed as failed:
-            raise ModelRetry(f"Not drawn ({failed.reason}): {failed}") from failed
+            return _failed(f"Not drawn ({failed.reason})", failed)
         if current is None:
             artifact_id = new_artifact_id()
-            files = await _stored(blobs, workspace, artifact_id, converted)
+            files = await _stored(blobs, workspace, artifact_id, converted, parts)
             elements = _with_files(converted.elements, files)
             diagram = _diagram(name or "", elements, _by_digest(files))
             command = CreateArtifact(
@@ -336,13 +338,14 @@ def diagram_tools(
                 thread_id=deps.thread_id,
             )
             return describe_outcome(await workspace.commit(command))
-        files = await _stored(blobs, workspace, current.id, converted)
-        placed = _beside(current.data.elements.values(), _with_files(converted.elements, files))
-        clashing = sorted(set(placed) & set(current.data.elements))
+        # Ids are checked before the images are kept, so a clash leaves none behind.
+        clashing = sorted({e.id for e in converted.elements} & set(current.data.elements))
         if clashing:
             raise ModelRetry(
                 f"Diagram {current.id} already has elements {clashing[:5]}: use other ids"
             )
+        files = await _stored(blobs, workspace, current.id, converted, parts)
+        placed = _beside(current.data.elements.values(), _with_files(converted.elements, files))
         merged = {**current.data.elements, **placed}
         patch = element_patch(current.data, merged, _by_digest(files))
         command = EditArtifact(
@@ -382,18 +385,40 @@ def _diagram(
         raise ModelRetry(f"Not drawn: {error}") from error
 
 
-async def _stored(
-    blobs: Blobs | None, workspace: Workspace, artifact_id: str, converted: Converted
-) -> dict[str, DiagramFile]:
-    """Keep a conversion's images in the store: each by the `fileId` the conversion gave it."""
+def _failed(what: str, failed: ConversionFailed) -> str:
+    """A conversion's failure, for the model, as a retry or as the call's answer.
+
+    A failure about what the model sent is a retry; one of the worker, crashed or out of time,
+    is the answer, once, as the worker won't do better on another try.
+    """
+    if failed.reason in SAID:
+        raise ModelRetry(f"{what}: {failed}") from failed
+    return f"{what}: {failed}. The converter is failing; don't try again now."
+
+
+def _parts(blobs: Blobs | None, converted: Converted) -> list[tuple[bytes, str]]:
+    """A conversion's images, checked, to keep: none, if it has none.
+
+    Raises:
+        ConversionFailed: If an image isn't the image it says it is.
+    """
     if not converted.files:
-        return {}
+        return []
     if blobs is None:
         raise ModelRetry("Images aren't kept here: draw it as shapes, such as a flowchart")
-    try:
-        parts = [(file.content(), file.media_type) for file in converted.files.values()]
-    except ConversionFailed as failed:
-        raise ModelRetry(f"Not drawn: {failed}") from failed
+    return [(file.content(), file.media_type) for file in converted.files.values()]
+
+
+async def _stored(
+    blobs: Blobs | None,
+    workspace: Workspace,
+    artifact_id: str,
+    converted: Converted,
+    parts: list[tuple[bytes, str]],
+) -> dict[str, DiagramFile]:
+    """Keep a conversion's checked images in the store: each by the `fileId` it was given."""
+    if blobs is None or not parts:
+        return {}
     stored = await blobs.put_all(
         Scope(workspace.tenant_id, workspace.workspace_id), artifact_id, parts
     )

@@ -65,10 +65,10 @@ async def sweep_tombstones(ws: Workspace, *, now: datetime, keep: timedelta = KE
             continue
         ops: list[dict[str, JsonValue]] = []
         for element in old:
-            ops.append(
-                {"op": "test", "path": f"/elements/{element.id}/version", "value": element.version}
-            )
-            ops.append({"op": "remove", "path": f"/elements/{element.id}"})
+            at = f"/elements/{element.id}"
+            ops.append({"op": "test", "path": f"{at}/version", "value": element.version})
+            ops.append({"op": "test", "path": f"{at}/isDeleted", "value": True})
+            ops.append({"op": "remove", "path": at})
         try:
             await ws.commit(
                 EditArtifact(

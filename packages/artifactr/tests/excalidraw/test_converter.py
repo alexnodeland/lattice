@@ -5,15 +5,19 @@ worker sends reaches the application unbounded or unchecked (artifactr ADR-0090)
 """
 
 import base64
+import codecs
 import json
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from typing import Literal
 
 import anyio
 import httpx
 import pytest
+from anyio.abc import SocketAttribute, SocketStream
 from pydantic import ValidationError
 
-from artifactr.excalidraw import ConversionFailed, FakeConverter, WorkerConverter
+from artifactr.excalidraw import ConversionFailed, FakeConverter, WorkerConverter, converter
 from artifactr.excalidraw.converter import (
     MAX_ELEMENTS,
     MAX_MERMAID,
@@ -28,6 +32,13 @@ from artifactr.excalidraw.converter import (
     checked,
 )
 from tests.excalidraw.scenes import diagram, element
+
+XLINK_NS = ' xmlns:xlink="http://www.w3.org/1999/xlink"'
+
+
+def _svg(inner: str, attributes: str = "") -> bytes:
+    return f'<svg xmlns="http://www.w3.org/2000/svg"{attributes}>{inner}</svg>'.encode()
+
 
 ONE = Converted(elements=[element("r1")]).model_dump_json(by_alias=True)
 BOX = Skeleton(type="rectangle")
@@ -103,7 +114,6 @@ async def test_a_render_sends_the_diagram_and_its_images_and_gives_a_checked_ima
             "crashed",
             "the converter replied with something else",
         ),
-        (httpx.ReadTimeout("slow"), "timeout", "the converter took more than 10s"),
         (httpx.ConnectError("down"), "crashed", "the converter couldn't be reached"),
     ],
 )
@@ -115,20 +125,67 @@ async def test_every_failure_is_a_typed_one_and_only_the_agents_own_are_in_the_w
     assert (failed.value.reason, str(failed.value)) == (reason, said)
 
 
-async def test_a_worker_that_drips_its_reply_is_held_to_the_deadline_whole() -> None:
-    async def drip() -> AsyncIterator[bytes]:
-        for _ in range(100):
-            await anyio.sleep(0.02)  # each piece within any one read's timeout
-            yield b" "
+@asynccontextmanager
+async def _served(wait: float, pieces: int, gap: float) -> AsyncIterator[str]:
+    """A worker on a real socket: it waits before its headers, then drips its body."""
 
-    async def handle(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, content=drip())
+    async def handle(client: SocketStream) -> None:
+        async with client:
+            await client.receive()
+            await anyio.sleep(wait)
+            head = f"HTTP/1.1 200 OK\r\nContent-Length: {len(ONE) + pieces}\r\n\r\n"
+            await client.send(head.encode())
+            for _ in range(pieces):
+                await anyio.sleep(gap)
+                await client.send(b" ")
+            await client.send(ONE.encode())
 
-    worker = WorkerConverter.at("http://worker", token="t", transport=httpx.MockTransport(handle))
-    with anyio.fail_after(5):
-        with pytest.raises(ConversionFailed, match="took more than") as failed:
-            await worker.mermaid("graph TD", deadline=-4.9)
-    assert failed.value.reason == "timeout"
+    listener = await anyio.create_tcp_listener(local_host="127.0.0.1")
+    async with listener, anyio.create_task_group() as tasks:
+        tasks.start_soon(listener.serve, handle)
+        port = listener.extra(SocketAttribute.local_port)
+        yield f"http://127.0.0.1:{port}"
+        tasks.cancel_scope.cancel()
+
+
+class _Timed(httpx.AsyncHTTPTransport):
+    """HTTP, noting the timeouts each request is sent with."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.timeouts: list[object] = []
+
+    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        self.timeouts.append(request.extensions["timeout"])
+        return await super().handle_async_request(request)
+
+
+async def test_the_deadline_and_its_grace_are_the_only_clock(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(converter, "GRACE", 1.0)
+    transport = _Timed()
+    async with _served(wait=0.3, pieces=0, gap=0) as url:
+        worker = WorkerConverter.at(url, token="t", transport=transport)
+        drawn = await worker.mermaid("graph TD", deadline=0.1)
+        await worker.aclose()
+    assert [e.id for e in drawn.elements] == ["r1"]
+    assert transport.timeouts == [dict.fromkeys(("connect", "read", "write", "pool"))]
+
+
+async def test_a_worker_that_drips_its_reply_is_held_to_the_deadline_whole(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(converter, "GRACE", 0.1)
+    async with _served(wait=0, pieces=100, gap=0.02) as url:
+        worker = WorkerConverter.at(url, token="t")
+        with anyio.fail_after(5), pytest.raises(ConversionFailed) as failed:
+            await worker.mermaid("graph TD", deadline=0.1)
+        await worker.aclose()
+    assert (failed.value.reason, str(failed.value)) == (
+        "timeout",
+        "the converter took more than 0.1s",
+    )
 
 
 async def test_a_reply_past_its_limit_is_refused_as_too_large() -> None:
@@ -138,17 +195,61 @@ async def test_a_reply_past_its_limit_is_refused_as_too_large() -> None:
     assert failed.value.reason == "too_large"
 
 
+def test_an_svg_of_drawing_alone_passes_as_excalidraw_draws_one() -> None:
+    drawn = _svg(
+        "<!-- svg-source:excalidraw --><metadata/><defs>"
+        '<style class="style-fonts">@font-face { font-family: Excalifont;'
+        " src: url(data:font/woff2;base64,d09GMg==); }</style>"
+        '<linearGradient id="g"><stop offset="0"/></linearGradient></defs>'
+        '<g transform="translate(10 10)"><rect fill="url(#g)" style="stroke: #1e1e1e"/>'
+        '<text xml:space="preserve">A &amp; B</text></g>'
+        '<image href="data:image/png;base64,iVBORw0KGgo="/>'
+        '<use xlink:href="#g"/>',
+        XLINK_NS,
+    )
+    declared = b'<?xml version="1.0" encoding="UTF-8"?>' + drawn
+    assert checked(drawn, "svg") == drawn
+    assert checked(declared, "svg") == declared
+
+
 @pytest.mark.parametrize(
     ("as_", "rendered"),
     [
         ("png", b"GIF89a"),
         ("svg", b"<svg"),
         ("svg", b"<html/>"),
-        ("svg", b'<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'),
-        ("svg", b'<svg onload="x()"/>'),
-        ("svg", b'<!DOCTYPE svg [<!ENTITY a "aaaa">]><svg/>'),
-        ("svg", b'<svg><a href="javascript:x()"/></svg>'),
-        ("svg", b"<svg><foreignObject/></svg>"),
+        ("svg", b"<svg/>"),
+        ("svg", b'<g xmlns="http://www.w3.org/2000/svg"/>'),
+        ("svg", _svg("<script>alert(1)</script>")),
+        ("svg", _svg("", ' onload="x()"')),
+        ("svg", b'<!DOCTYPE svg [<!ENTITY a "aaaa">]>' + _svg("")),
+        ("svg", _svg('<a href="javascript:x()"/>')),
+        ("svg", _svg("<foreignObject/>")),
+        # The byte-level filter this replaced missed each of these.
+        ("svg", codecs.BOM_UTF16_LE + _svg("<script>x()</script>").decode().encode("utf-16-le")),
+        ("svg", _svg("<script>x()</script>").decode().encode("utf-16")),
+        ("svg", b'<?xml version="1.0" encoding="ISO-8859-1"?>' + _svg("")),
+        ("svg", _svg('<image href="&#106;avascript:x()"/>')),
+        ("svg", _svg('<x:script xmlns:x="http://www.w3.org/2000/svg">x()</x:script>')),
+        ("svg", _svg('<x:foreignObject xmlns:x="http://www.w3.org/2000/svg"/>')),
+        ("svg", b'<?xml-stylesheet href="http://evil/a.css"?>' + _svg("")),
+        ("svg", _svg('<use href="http://evil/a.svg#x"/>')),
+        ("svg", _svg('<image href="https://evil/pixel.png"/>')),
+        ("svg", _svg('<image xlink:href="file:///etc/passwd"/>', XLINK_NS)),
+        ("svg", _svg('<image href="data:image/svg+xml;base64,PHN2Zy8+"/>')),
+        ("svg", _svg('<feImage href="#a"/>')),
+        ("svg", _svg('<animate attributeName="href" to="javascript:x()"/>')),
+        ("svg", _svg('<set attributeName="href" to="javascript:x()"/>')),
+        ("svg", _svg('<rect style="fill: url(http://evil/a)"/>')),
+        ("svg", _svg('<rect fill="url(https://evil/a)"/>')),
+        ("svg", _svg("<style>@import 'http://evil/a.css';</style>")),
+        ("svg", _svg("<style>rect { fill: url(//evil/a) }</style>")),
+        ("svg", _svg("<style>rect { fill: u\\72l(//evil/a) }</style>")),
+        ("svg", _svg('<rect style="width: expression(x())"/>')),
+        ("svg", _svg('<rect x:onclick="x()" xmlns:x="urn:x"/>')),
+        ("svg", _svg('<rect x:data="1" xmlns:x="urn:x"/>')),
+        ("svg", _svg('<html:div xmlns:html="http://www.w3.org/1999/xhtml"/>')),
+        ("svg", _svg("<?php x() ?>")),
     ],
 )
 def test_a_render_that_isnt_what_it_says_or_runs_something_is_refused(
@@ -183,6 +284,11 @@ def test_a_skeleton_is_its_allowed_fields_alone() -> None:
         Skeleton.model_validate({"type": "rectangle", "stroke_color": "red; background: url(x)"})
     with pytest.raises(ValidationError):
         Skeleton.model_validate({"type": "image"})
+    for colour in ("#12345", "#1234567", "#123456789"):
+        with pytest.raises(ValidationError):
+            Skeleton.model_validate({"type": "rectangle", "stroke_color": colour})
+    for colour in ("#abc", "#abcd", "#aabbcc", "#aabbccdd", "transparent", "red"):
+        assert Skeleton(type="rectangle", stroke_color=colour).stroke_color == colour
 
 
 def test_a_conversion_gives_few_images_and_each_element_once() -> None:
@@ -193,13 +299,28 @@ def test_a_conversion_gives_few_images_and_each_element_once() -> None:
         Converted(elements=[element("a"), element("a")])
 
 
-def test_an_image_is_its_base64_or_a_failure() -> None:
-    assert (
-        ConvertedFile(media_type="image/png", data=base64.b64encode(b"x").decode()).content()
-        == b"x"
-    )
+def test_an_image_is_its_base64_checked_as_a_render_is_or_a_failure() -> None:
+    def image(media_type: Literal["image/png", "image/svg+xml"], data: bytes) -> ConvertedFile:
+        return ConvertedFile(media_type=media_type, data=base64.b64encode(data).decode())
+
+    assert image("image/png", PNG).content() == PNG
+    assert image("image/svg+xml", _svg("<rect/>")).content() == _svg("<rect/>")
     with pytest.raises(ConversionFailed, match="isn't base64"):
         ConvertedFile(media_type="image/png", data="%%%").content()
+    with pytest.raises(ConversionFailed, match="PNG isn't one"):
+        image("image/png", _svg("<rect/>")).content()
+    with pytest.raises(ConversionFailed, match="can't be shown") as failed:
+        image("image/svg+xml", _svg("<script>x()</script>")).content()
+    assert failed.value.reason == "crashed"
+
+
+async def test_a_worker_that_makes_too_many_elements_is_refused_as_too_large() -> None:
+    many = json.dumps(
+        {"elements": [element(f"e{n}").model_dump(mode="json") for n in range(MAX_ELEMENTS + 1)]}
+    )
+    with pytest.raises(ConversionFailed, match=f"more than {MAX_ELEMENTS}") as failed:
+        await _worker(httpx.Response(200, text=many)).mermaid("graph TD")
+    assert failed.value.reason == "too_large"
 
 
 async def test_the_fake_draws_a_flowchart_with_labels_and_refuses_the_rest() -> None:

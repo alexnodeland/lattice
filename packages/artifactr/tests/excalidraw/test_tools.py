@@ -1,9 +1,10 @@
 """The agent's diagram tools, run by artifactr's Runner on a scripted model, on every storage."""
 
 import base64
+import hashlib
 import json
 from collections.abc import AsyncIterator, Mapping, Sequence
-from typing import Any
+from typing import Any, Literal
 
 import pytest
 from pydantic_ai import Agent, BinaryContent, RetryPromptPart, ToolReturnPart
@@ -23,7 +24,7 @@ from artifactr.excalidraw.converter import ConvertedFile, Format, Skeleton
 from artifactr.excalidraw.tools import PAGE
 from artifactr.excalidraw.types import MAX_VERSION
 from artifactr.files.blobs import InMemoryBlobs
-from artifactr.workspace import Workspace, Workspaces
+from artifactr.workspace import Scope, Workspace, Workspaces
 from tests.excalidraw.scenes import data, element
 from tests.ui.model import Script, call, say
 from tests.ui.people import ALICE
@@ -344,19 +345,57 @@ async def test_without_a_store_a_picture_goes_back_to_the_model(
     assert "Images aren't kept here" in _retried(script, 1)[0]
 
 
-async def test_a_picture_that_isnt_base64_goes_back_to_the_model(
-    ws: Workspace, thread: Thread, runners: list[Runner[None]]
+@pytest.mark.parametrize(
+    ("media_type", "data", "said"),
+    [
+        ("image/png", "not base64!", "isn't base64"),
+        ("image/png", base64.b64encode(b"GIF89a").decode(), "PNG isn't one"),
+        (
+            "image/svg+xml",
+            base64.b64encode(
+                b'<svg xmlns="http://www.w3.org/2000/svg"><script>x()</script></svg>'
+            ).decode(),
+            "can't be shown",
+        ),
+    ],
+)
+async def test_a_picture_that_isnt_what_it_says_is_neither_kept_nor_retried(
+    ws: Workspace,
+    thread: Thread,
+    runners: list[Runner[None]],
+    media_type: Literal["image/png", "image/svg+xml"],
+    data: str,
+    said: str,
 ) -> None:
     class Garbled(FakeConverter):
         async def mermaid(self, source: str, *, deadline: float = 10.0) -> Converted:
-            picture = ConvertedFile(media_type="image/png", data="not base64!")
+            picture = ConvertedFile(media_type=media_type, data=data)
             return Converted(
                 elements=[element("img1", type="image", fileId="g")], files={"g": picture}
             )
 
+    blobs = InMemoryBlobs()
     script = Script(call("draw_mermaid", mermaid="x", summary="x", name="X"), say("Sorry."))
-    await _run(_runner(runners, script, converter=Garbled(), blobs=InMemoryBlobs()), ws, thread)
-    assert "isn't base64" in _retried(script, 1)[0]
+    await _run(_runner(runners, script, converter=Garbled(), blobs=blobs), ws, thread)
+    [answer] = _returned(script, 1)
+    assert said in answer
+    assert "don't try again" in answer
+    assert _retried(script, 1) == []
+    assert await ws.proposals(status="pending") == []
+
+
+async def test_a_drawing_whose_ids_clash_keeps_no_images(
+    ws: Workspace, thread: Thread, runners: list[Runner[None]]
+) -> None:
+    await ws.commit(
+        CreateArtifact(kind="excalidraw_diagram", artifact_id="d1", data=data(element("img1")))
+    )
+    blobs = InMemoryBlobs()
+    script = Script(call("draw_mermaid", mermaid="gantt\n  x", summary="g", id="d1"), say("Sorry."))
+    await _run(_runner(runners, script, converter=Pictured(), blobs=blobs), ws, thread)
+    assert "already has elements ['img1']" in _retried(script, 1)[0]
+    scope = Scope(ws.tenant_id, ws.workspace_id)
+    assert await blobs.get(scope, "d1", hashlib.sha256(PNG).hexdigest()) is None
 
 
 async def test_view_gives_the_model_a_png_with_the_diagrams_images(
@@ -391,7 +430,11 @@ async def test_view_without_a_store_or_a_failing_render_says_so(
     assert b"(0 images)" in png.data
     failing = Script(call("view_diagram", "c1", id="d1"), say("No."))
     await _run(_runner(runners, failing, converter=Broken(), view=True), ws, thread)
-    assert "can't be shown: the worker failed" in _retried(failing, 1)[0]
+    assert _retried(failing, 1) == []
+    assert _returned(failing, 1) == [
+        "The diagram can't be shown: the worker failed. The converter is failing;"
+        " don't try again now."
+    ]
 
 
 async def test_the_tools_are_offered_only_while_diagrams_are_on(

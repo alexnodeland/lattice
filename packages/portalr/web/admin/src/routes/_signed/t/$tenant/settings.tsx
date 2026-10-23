@@ -1,4 +1,4 @@
-import { keys, refusal } from "@portalr/client";
+import { keys } from "@portalr/client";
 import {
   Alert,
   Button,
@@ -15,11 +15,18 @@ import {
   type ErrorComponentProps,
   type SearchSchemaInput,
 } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { opening, useNames } from "../../../../access";
 import { type Level, levelOf } from "../../../../integrations";
 import { ReadFailed } from "../../../../read-failed";
-import { numberOf, type SettingRow, said, settersOf, settingRowsOf } from "../../../../settings";
+import {
+  numberOf,
+  refusedAs,
+  type SettingRow,
+  said,
+  settersOf,
+  settingRowsOf,
+} from "../../../../settings";
 
 const title = "Settings";
 const meta = "Limits a tenant or a workspace may lower, never raise, below the operator's";
@@ -51,7 +58,8 @@ export const Route = createFileRoute("/_signed/t/$tenant/settings")({
     <>
       <PageHeader title={title} meta={meta} />
       <EmptyState focus title="Settings aren't yours to change here">
-        Settings are lowered by a tenant's owners and admins, and a workspace's admins.
+        Settings are lowered here by a tenant's owners and admins. A workspace's admins lower their
+        workspace's through grantr's API.
       </EmptyState>
     </>
   ),
@@ -100,30 +108,19 @@ function SettingsPage() {
   );
 }
 
-/** What came of a change to a setting: what applies now, or that someone changed it first. */
-type Notice = { readonly said: string; readonly stale: boolean };
-
-/** A level's settings, each lowered there, and what the last change to each said. */
+/** A level's settings, each lowered there. */
 function LevelSettings({ tenant, workspace }: { tenant: string; workspace: string | undefined }) {
   const { queries } = Route.useRouteContext();
   const { data: view } = useSuspenseQuery(queries.grantr.settings(tenant, workspace));
   const inWorkspace = workspace !== undefined;
   const names = useNames(tenant, settersOf(view.settings, inWorkspace));
   const rows = settingRowsOf(view.settings, inWorkspace, names);
-  const [notices, setNotices] = useState<Readonly<Record<string, Notice>>>({});
   return (
     <div className="flex flex-col gap-3">
       <Rows label={inWorkspace ? `Settings in ${workspace}` : "Settings on the tenant"}>
         {rows.map((row) => (
-          // Read again at a new version, a setting's field starts from what is set now.
-          <Setting
-            key={`${row.key}@${row.version}`}
-            row={row}
-            tenant={tenant}
-            workspace={workspace}
-            notice={notices[row.key] ?? null}
-            told={(notice) => setNotices((now) => ({ ...now, [row.key]: notice }))}
-          />
+          // Kept by its key alone, so a change read back keeps what has the focus.
+          <Setting key={row.key} row={row} tenant={tenant} workspace={workspace} />
         ))}
       </Rows>
       {view.unknown.length > 0 && (
@@ -135,54 +132,99 @@ function LevelSettings({ tenant, workspace }: { tenant: string; workspace: strin
   );
 }
 
+/** Why a change wasn't made, in words the field says, for each status grantr answers it with. */
+function refusedWhy(row: SettingRow, status: number, reasons: readonly string[]): string {
+  if (status === 403 || status === 422) {
+    // Admins are told the ceiling and the layer that sets it, which they need to act on.
+    return `${row.name} wasn't changed: ${refusedAs(reasons.join("; "), row)}`;
+  }
+  return `${row.name} wasn't changed: the server couldn't do it just now. Try again in a moment.`;
+}
+
 /** One setting at a level: what applies and why, and a field to lower it, or unset it. */
 function Setting({
   row,
   tenant,
   workspace,
-  notice,
-  told,
 }: {
   row: SettingRow;
   tenant: string;
   workspace: string | undefined;
-  notice: Notice | null;
-  told: (notice: Notice) => void;
 }) {
-  const { commands, queryClient } = Route.useRouteContext();
-  const [text, setText] = useState(row.here === null ? "" : said(row.here.value));
+  const { commands, queryClient, queries } = Route.useRouteContext();
+  const shown = row.here === null ? "" : said(row.here.value);
+  const [text, setText] = useState(shown);
   const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState("");
+  const [stale, setStale] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const alert = useRef<HTMLDivElement>(null);
+  const sending = useRef(false);
+  const keepText = useRef(false);
+  const field = useId();
+  const warning = useRef<HTMLDivElement>(null);
+  // Read back at a new version, the field starts from what is set now, unless what was tried
+  // is kept in it because someone changed it first.
   useEffect(() => {
-    // A change someone made first is said where the reader is, with the setting as it is now.
-    if (notice?.stale) {
-      alert.current?.focus();
+    if (!keepText.current) {
+      setText(shown);
     }
-  }, [notice]);
+    keepText.current = false;
+  }, [shown]);
+  useEffect(() => {
+    if (stale) {
+      warning.current?.focus();
+    }
+  }, [stale]);
+  useEffect(() => {
+    if (error) {
+      document.getElementById(field)?.focus();
+    }
+  }, [error, field]);
 
-  /** Send a value, or unset with null, at the version read, and say what came of it. */
+  /** Send a value, or unset with null, at the version read, once, and say what came of it. */
   async function send(value: number | null) {
-    setSaving(true);
-    setError(null);
-    const answer = await commands.grantr.setSetting(tenant, row.key, value, row.version, workspace);
-    setSaving(false);
-    if (answer.outcome === "done") {
-      told({ said: `${row.name}: ${said(answer.result.effective)} applies.`, stale: false });
-    } else if (answer.status === 409) {
-      told({
-        said: `${row.name} was changed by someone else since you read it, and is shown as it is now. Make your change again if you still want it.`,
-        stale: true,
-      });
-    } else {
-      setError(refusal(`${row.name} wasn't changed`, answer));
+    if (sending.current) {
       return;
     }
-    await queryClient.invalidateQueries({ queryKey: keys.grantr.settings(tenant) });
+    sending.current = true;
+    setSaving(true);
+    setError(null);
+    setStale(null);
+    setDone("");
+    const answer = await commands.grantr.setSetting(tenant, row.key, value, row.version, workspace);
+    if (answer.outcome === "done") {
+      setDone(`${row.name}: ${said(answer.result.effective)} applies.`);
+      if (value === null) {
+        // Its unset button goes once nothing is set here: the field keeps the focus instead.
+        document.getElementById(field)?.focus();
+      }
+    } else if (answer.status === 409) {
+      keepText.current = true;
+      await queryClient.invalidateQueries({ queryKey: keys.grantr.settings(tenant) });
+      const now = queryClient
+        .getQueryData(queries.grantr.settings(tenant, workspace).queryKey)
+        ?.settings.find((state) => state.key === row.key);
+      const here = workspace === undefined ? now?.tenant : now?.workspace;
+      const tried = value === null ? "unset it" : `set ${value}`;
+      setStale(
+        `${row.name} was changed by someone else since you read it: ${
+          here ? `it is set here to ${said(here.value)} now` : "nothing is set here now"
+        }, and ${now ? said(now.effective) : "what it was"} applies. You tried to ${tried}, which wasn't saved: save again if you still want it.`,
+      );
+    } else {
+      setError(refusedWhy(row, answer.status, answer.reasons));
+    }
+    if (answer.outcome === "done") {
+      await queryClient.invalidateQueries({ queryKey: keys.grantr.settings(tenant) });
+    }
+    sending.current = false;
+    setSaving(false);
   }
 
+  const ceiling = typeof row.ceilingValue === "number" ? row.ceilingValue : 0;
+  const low = row.low ?? 0;
   const lower = () => {
-    const read = numberOf(text, row.kind);
+    const read = numberOf(text, low, row.high ?? ceiling);
     if ("error" in read) {
       setError(read.error);
       return;
@@ -200,9 +242,7 @@ function Setting({
           {row.here && (
             <span>{`Set here to ${said(row.here.value)} by ${row.here.by}, ${new Date(row.here.at).toLocaleString()}.`}</span>
           )}
-          {row.clamped && (
-            <span>{`What is set here doesn't apply: ${row.effective} does, as no more is allowed now.`}</span>
-          )}
+          {row.clamped && <span>{row.clamped}</span>}
         </span>
       }
       end={
@@ -213,25 +253,35 @@ function Setting({
             lower();
           }}
         >
-          {notice && (
-            <div ref={alert} tabIndex={-1}>
-              <Alert tone={notice.stale ? "warn" : "info"}>{notice.said}</Alert>
+          {stale && (
+            <div ref={warning} tabIndex={-1}>
+              <Alert tone="warn">{stale}</Alert>
             </div>
           )}
           <TextField
+            id={field}
             label={row.name}
-            hint={`A whole number, at most ${said(row.ceilingValue)}.`}
+            hint={`A whole number from ${low} to ${ceiling}.`}
             inputMode="numeric"
             value={text}
             onChange={(event) => setText(event.currentTarget.value)}
             error={error}
           />
+          {/* There before anything is said, so what is said is announced as it changes. */}
+          <p role="status" className="text-muted text-sm">
+            {done}
+          </p>
           <div className="flex flex-wrap gap-2">
-            <Button type="submit" disabled={saving}>
+            <Button type="submit" disabled={saving} focusableWhenDisabled>
               Save<span className="sr-only"> {row.name}</span>
             </Button>
             {row.here && (
-              <Button variant="secondary" disabled={saving} onClick={() => void send(null)}>
+              <Button
+                variant="secondary"
+                disabled={saving}
+                focusableWhenDisabled
+                onClick={() => void send(null)}
+              >
                 {`Use ${row.inherits}`}
                 <span className="sr-only"> for {row.name}</span>
               </Button>

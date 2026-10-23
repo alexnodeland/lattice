@@ -25,8 +25,11 @@ export interface SettingRow {
   readonly ceilingValue: Value;
   /** What is set at this level, or null where nothing is. */
   readonly here: { readonly value: Value; readonly by: string; readonly at: string } | null;
-  /** Whether what is set here is narrowed, so something else applies instead. */
-  readonly clamped: boolean;
+  /** Why what is set here doesn't apply, where something else does; null where it applies. */
+  readonly clamped: string | null;
+  /** The lowest and highest values its kind takes, where it is a number. */
+  readonly low: number | null;
+  readonly high: number | null;
   /** The version a change names: what this level's setting was read at. */
   readonly version: number;
   /** What unsetting it here falls back to: the tenant's value, the operator's, or the default. */
@@ -44,12 +47,27 @@ const SETTERS = {
 } as const;
 
 /**
- * A setting's name, from its sentence: a connected app's limit, as lattice declares it, is named
- * by its app, "FreeCAD's tries an hour"; any other by its sentence.
+ * Each setting's name, by its key: what it limits, for its field's label and for every sentence
+ * that names it, never its key. A test holds that every setting lattice-core declares has one.
  */
-export function nameOf(state: SettingState): string {
-  const app = /connected (\S+) a workspace/u.exec(state.description)?.[1];
-  return app === undefined ? state.description : `${app}'s tries an hour`;
+const LABELS: Readonly<Record<string, string>> = {
+  "connect-per-hour:freecad": "FreeCAD's tries an hour",
+  "connect-per-hour:blender": "Blender's tries an hour",
+};
+
+/** A setting's name: its label, or, for one this admin doesn't know yet, its sentence. */
+export const nameOf = (state: SettingState): string => LABELS[state.key] ?? state.description;
+
+/**
+ * Why what is set here doesn't apply: the settings now allow no less than it, or a layer above,
+ * or the settings, allow no more.
+ */
+function clampedOf(state: SettingState, value: Value): string {
+  const low = state.kind.low;
+  if (typeof value === "number" && low != null && value < low) {
+    return `The settings now allow at least ${low}: ${said(state.effective)} applies.`;
+  }
+  return `What is set here doesn't apply: ${said(state.effective)} does, as no more is allowed now.`;
 }
 
 /** Each setting at a level as the page shows it, with who set it there named as `names` does. */
@@ -69,7 +87,9 @@ export function settingRowsOf(
       ceiling: `At most ${said(state.ceiling)}: ${SETTERS[state.ceiling_set_by]}.`,
       ceilingValue: state.ceiling,
       here: here ? { value: here.value, by: actor(here.by, names), at: here.at } : null,
-      clamped: here?.clamped ?? false,
+      clamped: here?.clamped ? clampedOf(state, here.value) : null,
+      low: state.kind.low ?? null,
+      high: state.kind.high ?? null,
       version: state.version,
       inherits: workspace
         ? "the tenant's"
@@ -88,22 +108,26 @@ export const settersOf = (states: readonly SettingState[], workspace: boolean) =
   });
 
 /**
- * A number field's text as a value: a whole number, or a sentence saying why not, before grantr
- * is asked, so a field says what's wrong as it is left.
+ * A number field's text as a value: a whole number within its kind's bounds, or a sentence saying
+ * why not, before grantr is asked. How far this level may go is grantr's to say, with the layer
+ * that sets it.
  */
 export function numberOf(
   text: string,
-  kind: SettingState["kind"],
+  low: number,
+  high: number,
 ): { value: number } | { error: string } {
   const trimmed = text.trim();
   if (!/^\d{1,9}$/u.test(trimmed)) {
-    return { error: "Enter a whole number." };
+    return { error: `Enter a whole number from ${low} to ${high}.` };
   }
   const value = Number(trimmed);
-  const low = kind.low ?? 0;
-  const high = kind.high ?? Number.MAX_SAFE_INTEGER;
   if (value < low || value > high) {
-    return { error: `Enter a number from ${low} to ${high}.` };
+    return { error: `Enter a whole number from ${low} to ${high}.` };
   }
   return { value };
 }
+
+/** grantr's refusal of a setting as the field says it: its key named as the page names it. */
+export const refusedAs = (reason: string, row: { readonly key: string; readonly name: string }) =>
+  reason.replaceAll(row.key, row.name);

@@ -312,3 +312,23 @@ async def test_a_change_that_cant_be_stored_records_nothing(storage: Storage) ->
         await grants.set_setting("acme", KEY, 5, by=ALICE)
     assert await grants.audit("acme", by=ALICE, keep=SET_ONLY) == [], "the entry went with it"
     assert await grants.value("acme", "w1", KEY) == 30
+
+
+async def test_names_stored_in_another_order_are_not_clamped(storage: Storage) -> None:
+    tools = Setting(
+        "connect-tools:fake",
+        Subset(frozenset({"read", "edit", "run"})),
+        default=("edit", "read", "run"),
+        lowest="workspace",
+        description="The fake's tools.",
+    )
+    grants = await _grants(storage, settings=registry(tools))
+    await grants.set_setting("acme", tools.key, ["run", "read"], by=ALICE)
+    row = (await storage.settings("acme"))[tools.key]
+    async with storage.transaction("acme") as tx:
+        await tx.set_setting(
+            "acme", None, tools.key, row.model_copy(update={"value": ["run", "read"]})
+        )
+    [state] = (await grants.settings("acme", by=ALICE)).settings
+    assert state.tenant is not None
+    assert state.tenant.clamped is False

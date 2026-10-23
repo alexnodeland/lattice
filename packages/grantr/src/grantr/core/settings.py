@@ -190,5 +190,12 @@ def _layer(
         version=row.version,
         by=row.by,
         at=row.at,
-        clamped=wire(value) != row.value or not setting.within(value, above),
+        clamped=_differs(value, row.value) or not setting.within(value, above),
     )
+
+
+def _differs(kept: Value, stored: Wire) -> bool:
+    """Whether what applies of a row differs from what was set: names compared as a set."""
+    if isinstance(kept, tuple):
+        return not isinstance(stored, list) or set(kept) != set(stored)
+    return kept != stored

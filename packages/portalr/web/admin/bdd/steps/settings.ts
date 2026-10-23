@@ -1,4 +1,4 @@
-import { expect } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 import { Then, When } from "./fixtures";
 
 When("they open Settings for the tenant", async ({ page }) => {
@@ -20,8 +20,12 @@ When("they lower {string} to {int}", async ({ page }, name: string, value: numbe
   ).toBeVisible();
 });
 
+/** A setting's row, by its name. */
+const rowOf = (page: Page, name: string) =>
+  page.getByRole("listitem").filter({ has: page.getByRole("textbox", { name }) });
+
 Then("{int} applies to {string}, set here", async ({ page }, value: number, name: string) => {
-  await expect(page.getByText(`Applies: ${value}.`)).toBeVisible();
+  await expect(rowOf(page, name).getByText(`Applies: ${value}.`)).toBeVisible();
   await expect(page.getByText(new RegExp(`^Set here to ${value} by `))).toBeVisible();
   await expect(page.getByRole("textbox", { name })).toHaveValue(`${value}`);
 });
@@ -47,6 +51,6 @@ When("they set {string} back to the default", async ({ page }, name: string) => 
   await expect(page.getByRole("status").filter({ hasText: `${name}: ` })).toBeVisible();
 });
 
-Then("{int} applies to {string}", async ({ page }, value: number, _name: string) => {
-  await expect(page.getByText(`Applies: ${value}.`)).toBeVisible();
+Then("{int} applies to {string}", async ({ page }, value: number, name: string) => {
+  await expect(rowOf(page, name).getByText(`Applies: ${value}.`)).toBeVisible();
 });

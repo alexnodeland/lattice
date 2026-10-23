@@ -4,6 +4,7 @@
  */
 
 import type { Plugin } from "vite";
+import { loadedWithout } from "./bundled";
 
 /**
  * Fails the build where a module that `heavy` matches loads with the entry, rather than with the
@@ -63,6 +64,22 @@ export function absent(dead: RegExp): Plugin {
       );
       if (found.length > 0) {
         this.error(`the build holds ${found.length} modules it shouldn't, such as ${found[0]}`);
+      }
+    },
+  };
+}
+
+/**
+ * Fails the build where a module that `addon` matches loads without its add-on, such as the
+ * native files' parts, which are the native files' add-on's alone (portalr ADR-0044).
+ */
+export function onlyWithAddOn(addon: RegExp): Plugin {
+  return {
+    name: "only-with-add-on",
+    generateBundle(_, bundle) {
+      const found = loadedWithout(bundle, addon);
+      if (found.length > 0) {
+        this.error(`these load without their add-on:\n${found.join("\n")}`);
       }
     },
   };

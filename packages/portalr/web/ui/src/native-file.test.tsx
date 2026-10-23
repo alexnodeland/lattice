@@ -1,7 +1,8 @@
 import { expect, test } from "vitest";
 import { render } from "vitest-browser-react";
 import { LONGEST_TITLE } from "./artifacts";
-import { FileHolder, factsOf, fileSize, nativeFile, PageCompare, PageStrip } from "./native-file";
+import { FileHolder, PageCompare, PageStrip } from "./file-pages";
+import { factsOf, fileSize, nativeFile } from "./native-file";
 import { axeViolations } from "./test/axe";
 import { FAILED, MANIFEST, NOW, PAGES, UNTIL } from "./test/native-file";
 

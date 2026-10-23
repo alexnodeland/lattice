@@ -1,6 +1,6 @@
 /** A Word document's manifest and pages, for the native file's tests and its screenshots. */
 
-import type { PageShown } from "../native-file";
+import type { PageShown } from "../file-pages";
 
 export const MANIFEST = {
   name: "launch-brief.docx",

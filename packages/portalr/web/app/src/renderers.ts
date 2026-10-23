@@ -6,28 +6,7 @@
  */
 
 import { markdown, nativeFile, type Renderers, UI_RENDERERS } from "@portalr/ui";
-import type { Native } from "./native-file";
-
-/**
- * The native files' kinds, each with its app: what people call it, and the integration that
- * switches it in a workspace. Off, a file is read and downloaded, and nothing more.
- */
-export const NATIVE: ReadonlyMap<string, Native> = new Map([
-  ["word_document", { app: "WordCraft", integration: "files:wordcraft" }],
-  ["workbook", { app: "GridCraft", integration: "files:gridcraft" }],
-  ["presentation", { app: "DeckCraft", integration: "files:deckcraft" }],
-  ["pdf_document", { app: "PdfCraft", integration: "files:pdfcraft" }],
-  ["drawing", { app: "CADCraft", integration: "files:cadcraft" }],
-  ["layered_image", { app: "PhotoCraft", integration: "files:photocraft" }],
-  ["vector_image", { app: "VectorCraft", integration: "files:vectorcraft" }],
-  ["page_layout", { app: "DesignCraft", integration: "files:designcraft" }],
-  ["design", { app: "FigCraft", integration: "files:figcraft" }],
-  ["cad_model", { app: "FreeCAD", integration: "files:freecad" }],
-  ["scene", { app: "Blender", integration: "files:blender" }],
-  ["video_project", { app: "FilmCraft", integration: "files:filmcraft" }],
-  ["motion_graphics", { app: "EffectCraft", integration: "files:effectcraft" }],
-  ["audio_session", { app: "SoundCraft", integration: "files:soundcraft" }],
-]);
+import { NATIVE } from "./native";
 
 export const RENDERERS: Renderers = new Map([
   ["note", markdown()],

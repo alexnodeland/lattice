@@ -13,28 +13,47 @@ are here; the rest are in the modules:
 - :mod:`artifactr.excalidraw.render`: what the agent reads of a diagram.
 - :mod:`artifactr.excalidraw.integrations`: the integration that gates it, off by default.
 - :mod:`artifactr.excalidraw.wire`: the JSON Schema clients generate their types from.
+- :mod:`artifactr.excalidraw.converter`: what draws and renders: the worker's client, and a fake.
+- :mod:`artifactr.excalidraw.tools`: the agent's toolset.
+- :mod:`artifactr.excalidraw.sweep`: the tombstone sweep.
 
-The agent's tools, the worker that converts and renders, and images in the blob store are
-RFC-0006's phase 2 too, and come later; the canvas is phase 3's.
+The worker that converts and renders is stackr's to run; the canvas is phase 3's.
 """
 
 from artifactr.excalidraw.checks import excalidraw_checks
+from artifactr.excalidraw.converter import (
+    ConversionFailed,
+    Converted,
+    Converter,
+    FakeConverter,
+    WorkerConverter,
+)
 from artifactr.excalidraw.integrations import EXCALIDRAW, excalidraw_key_of
 from artifactr.excalidraw.patches import element_patch, rebase, reconcile
 from artifactr.excalidraw.render import describe
+from artifactr.excalidraw.sweep import SWEEPER, sweep_tombstones
+from artifactr.excalidraw.tools import diagram_tools
 from artifactr.excalidraw.types import EXCALIDRAW_TYPES, Diagram, DiagramFile, Element, Scene
 
 __all__ = [
     "EXCALIDRAW",
     "EXCALIDRAW_TYPES",
+    "SWEEPER",
+    "ConversionFailed",
+    "Converted",
+    "Converter",
     "Diagram",
     "DiagramFile",
     "Element",
+    "FakeConverter",
     "Scene",
+    "WorkerConverter",
     "describe",
+    "diagram_tools",
     "element_patch",
     "excalidraw_checks",
     "excalidraw_key_of",
     "rebase",
     "reconcile",
+    "sweep_tombstones",
 ]

@@ -7,7 +7,8 @@ when one is accepted, against the head it is applied to:
 - **An element's version only grows.** An element an edit changes must have a ``version``
   greater than the head's, or the canvases that reconcile it would keep their own.
 - **An element is never removed:** it is deleted by marking it ``isDeleted``, and kept, so a
-  client mid-edit doesn't bring it back. Removing tombstones is a sweep's (RFC-0006, U3).
+  client mid-edit doesn't bring it back. Only the sweep, as ``SWEEPER``, removes a tombstone
+  (RFC-0006, U3; :mod:`artifactr.excalidraw.sweep`).
 - **A new element is an ``add``,** and an ``add`` of an id the head has already is refused:
   JSON Patch's ``add`` would replace it.
 - **An image is added, never replaced or removed,** since its key is its digest.
@@ -32,6 +33,7 @@ from artifactr.core import (
     apply_patch,
     load_artifact,
 )
+from artifactr.excalidraw.sweep import SWEEPER
 from artifactr.excalidraw.types import Diagram
 from artifactr.workspace import Check, Workspace
 
@@ -78,7 +80,7 @@ async def _edited(workspace: Workspace, command: EditArtifact, *, on_head: bool)
     # Loaded as core will load it, so data it refuses is refused here as core refuses it.
     after = cast("Diagram", load_artifact(Diagram.kind, apply_patch(head.to_json(), command.patch)))
     _kept(head, after)
-    _grown(head, after)
+    _grown(head, after, sweeping=workspace.actor == SWEEPER)
 
 
 def _added(head: Diagram, op: Mapping[str, JsonValue]) -> None:
@@ -95,9 +97,11 @@ def _kept(head: Diagram, after: Diagram) -> None:
             _refuse(["files", digest], "an image is added, never replaced or removed")
 
 
-def _grown(head: Diagram, after: Diagram) -> None:
+def _grown(head: Diagram, after: Diagram, *, sweeping: bool) -> None:
     for key, before in head.elements.items():
         element = after.elements.get(key)
+        if element is None and sweeping and before.is_deleted:
+            continue  # the sweep's, of a tombstone
         if element is None:
             _refuse(
                 ["elements", key],

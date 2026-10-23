@@ -10,7 +10,7 @@
  */
 
 import { Tabs } from "@base-ui/react/tabs";
-import type { Change, Granularity } from "@portalr/client";
+import type { Change, Granularity } from "@portalr/client/diff";
 import { Play, Square } from "lucide-react";
 import { createContext, type ReactNode, use, useEffect, useId, useMemo, useState } from "react";
 import { type AppHost, AppHostContext, MINI_APPS, stillWhy } from "./app-frame";

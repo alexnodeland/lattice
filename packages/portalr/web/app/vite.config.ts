@@ -5,6 +5,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
+import { absent, lean, RAW_HTML } from "../ui/bundle-checks";
 
 /**
  * Where the app's routes are, and the route tree TanStack Router generates from them, which is
@@ -25,11 +26,18 @@ const application = process.env.PORTALR_APP_URL ?? "http://localhost:8000";
 
 export default defineConfig({
   base: "/portalr/app/",
+  // Streamdown's `rehype-raw`, which portalr never passes it, is built as nothing (portalr ADR-0040).
+  resolve: {
+    alias: { "rehype-raw": fileURLToPath(new URL("../ui/src/rehype-raw.ts", import.meta.url)) },
+  },
   // Each route is a chunk of its own, loaded when it is first visited.
   plugins: [
     tanstackRouter({ ...ROUTES, autoCodeSplitting: true }),
     react(),
     tailwindcss(),
+    // The diff library is the file views' and proposals', never the first page's.
+    lean(/[\\/]node_modules[\\/]diff[\\/]/),
+    absent(RAW_HTML),
     // The licences of the packages bundled, beside the UI (portalr ADR-0033).
     notices({ ui: "app", policy: readPolicy(new URL("../notices/policy.json", import.meta.url)) }),
     // The page mini apps run in, served on the apps' origin alone (portalr ADR-0051).

@@ -1,6 +1,6 @@
 import { MessageSquare } from "lucide-react";
 import { expect, onTestFinished, test } from "vitest";
-import { commands } from "vitest/browser";
+import { commands, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { NavLink, SideNav } from "./side-nav";
 import { contrast, token } from "./test/colours";
@@ -66,4 +66,16 @@ test("under forced colours, the area shown keeps an outline, and the others none
   for (const other of others) {
     expect(getComputedStyle(other).outlineStyle).toBe("none");
   }
+});
+
+test("under forced colours, the current area focused from the keyboard has its ring outside", async () => {
+  onTestFinished(() => commands.forcedColors(false));
+  const screen = await render(<Nav />);
+  await commands.forcedColors(true);
+  await expect.poll(() => matchMedia("(forced-colors: active)").matches).toBe(true);
+  const current = screen.getByRole("link", { name: /^Threads/ }).element();
+  expect(Number.parseFloat(getComputedStyle(current).outlineOffset)).toBeLessThan(0);
+  await userEvent.tab();
+  expect(document.activeElement).toBe(current);
+  expect(Number.parseFloat(getComputedStyle(current).outlineOffset)).toBeGreaterThan(0);
 });

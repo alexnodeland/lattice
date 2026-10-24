@@ -1118,6 +1118,20 @@
             ],
             "title": "High"
           },
+          "labels": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Labels"
+          },
           "low": {
             "anyOf": [
               {

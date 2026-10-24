@@ -77,6 +77,8 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     "vikunja": ({"relayr.trackers", "relayr.vikunja"}, {"httpx", "pydantic"}),
     # The forms extra's: only it imports artifactr.ui (ADR-0038).
     "ui": ({"relayr.events", "relayr.ui"}, {*LIBRARIES, "pydantic"}),
+    # The excalidraw extra's: only it imports artifactr.excalidraw.
+    "excalidraw": ({"relayr.events", "relayr.excalidraw"}, {*LIBRARIES, "pydantic"}),
     "rules": (
         {"relayr.events", "relayr.outbound", "relayr.rules"},
         {*LIBRARIES, "pydantic", "pydantic_ai"},
@@ -132,3 +134,13 @@ def test_only_the_forms_extra_imports_artifactr_ui() -> None:
         and any(_within(module, {"artifactr.ui"}) for module, _ in _imports(path))
     )
     assert importers == []
+
+
+def test_only_the_excalidraw_extra_imports_artifactr_excalidraw() -> None:
+    importing = [
+        path.relative_to(SRC).as_posix()
+        for path in SRC.rglob("*.py")
+        if not path.is_relative_to(SRC / "excalidraw")
+        and any(_within(module, {"artifactr.excalidraw"}) for module, _ in _imports(path))
+    ]
+    assert importing == []

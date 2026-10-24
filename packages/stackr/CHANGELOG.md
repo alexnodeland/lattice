@@ -5,6 +5,49 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0](https://github.com/alexnodeland/lattice/compare/stackr-v0.1.0...stackr-v0.2.0) (2026-10-24)
+
+
+### ⚠ BREAKING CHANGES
+
+* **artifactr,portalr:** `ask_user` takes `questions` (one to four, each with `question`, `header`, two to four `options` of `label`, `description` and `recommended`, and `multiple` and `other`) in place of `question` and `choices`. An `answer_deferred` to it carries `{"answers": [{"selected": [...], "other": ...}, ...]}`, one per question, or `{"reply": ...}`; a plain string is refused as `validation_failed`. The agent's call returns each question beside its answer. The protocol schema names the shapes `ask_user` and `ask_user_answer`. This is a break in the wire contract, which the griffe-based breaks check (lattice ADR-0012) doesn't cover; it is marked here and in the title.
+
+### Features
+
+* **artifactr,portalr:** ask_user asks questions with options, and the chat shows tool calls, sides, failures and its stream ([#423](https://github.com/alexnodeland/lattice/issues/423)) ([7463e94](https://github.com/alexnodeland/lattice/commit/7463e945526c4ce7156d2b279e2da54b82158824))
+* **artifactr,portalr:** connected apps, an operator's own FreeCAD or Blender through a vetted MCP server, code approved on every call ([#450](https://github.com/alexnodeland/lattice/issues/450)) ([5fbb431](https://github.com/alexnodeland/lattice/commit/5fbb431eb763dffa58d946bb25917121fda54067))
+* **diagrams:** edit a diagram on its canvas, and put images on it ([#719](https://github.com/alexnodeland/lattice/issues/719)) ([7adf8f4](https://github.com/alexnodeland/lattice/commit/7adf8f4d88378e4f0b876953b9b9e87b89cc0918))
+* **files,portalr:** a person's upload over HTTP, told by its bytes, read before it is committed, and held to quotas ([#454](https://github.com/alexnodeland/lattice/issues/454)) ([8a59dd9](https://github.com/alexnodeland/lattice/commit/8a59dd9fe4fe9e8d48065e37d1ebe1766092953c))
+* **files,stackr:** native files in a generated application, each app's worker with no route out and its editor on loopback ([#444](https://github.com/alexnodeland/lattice/issues/444)) ([8b5258a](https://github.com/alexnodeland/lattice/commit/8b5258a78570c6626a652074d56775994e560718))
+* **files,stackr:** the generated application's uploads held back as its .env says, a busy refusal costs no pace, each kind's own cap up front ([#539](https://github.com/alexnodeland/lattice/issues/539)) ([d6adaf3](https://github.com/alexnodeland/lattice/commit/d6adaf37f3b801e3cc3ef3106d774c9f195daf87))
+* **grantr,portalr:** a person removed from a tenant has their analytics events there deleted ([#695](https://github.com/alexnodeland/lattice/issues/695)) ([d0eedbf](https://github.com/alexnodeland/lattice/commit/d0eedbf9915c1cdace51ecfd15547fbf69c0c3b3))
+* **integrations:** one switch per workspace for every integration: lattice-core's port, grantr's store and artifactr's gate ([#369](https://github.com/alexnodeland/lattice/issues/369)) ([bec7dfd](https://github.com/alexnodeland/lattice/commit/bec7dfd99b4d35a74bea8cd757e941b0d9df315b))
+* **lattice-core,grantr,artifactr:** settings each tier may only narrow, stored and audited in grantr, and a connected app's hourly limit read from them ([#609](https://github.com/alexnodeland/lattice/issues/609)) ([8b23639](https://github.com/alexnodeland/lattice/commit/8b236399fdcf3bd7cfb87dd89f3cdaec89e1022c))
+* **portalr,stackr:** analytics' relay, with each person's consent, pace and signed session ([#584](https://github.com/alexnodeland/lattice/issues/584)) ([8b25605](https://github.com/alexnodeland/lattice/commit/8b25605ea0ee309e48c86585531b13add31c0e61))
+* **portalr,stackr:** mini apps inline in their thread, with a full view, and the template running them out of the box ([#419](https://github.com/alexnodeland/lattice/issues/419)) ([42dde93](https://github.com/alexnodeland/lattice/commit/42dde93e5a1f32d05996b191c2230cc64d7bb124))
+* **portalr,stackr:** portalr brand init and validate, the template's brand kit, and white-labelling docs ([#529](https://github.com/alexnodeland/lattice/issues/529)) ([14bcb9d](https://github.com/alexnodeland/lattice/commit/14bcb9d9ce6c343a8e4d720efde7c433d8e89fc3))
+* **portalr,stackr:** portalr's analytics on ClickHouse's own profile, walled per tenant twice ([#564](https://github.com/alexnodeland/lattice/issues/564)) ([6796d2f](https://github.com/alexnodeland/lattice/commit/6796d2f92fc428d5a3317035db559c24f09a150a))
+* **portalr:** a request's analytics session on its trace, and a session's traces ([#682](https://github.com/alexnodeland/lattice/issues/682)) ([25e614e](https://github.com/alexnodeland/lattice/commit/25e614e55a8440a995e8e0b1bce2df0ec817d286))
+* **portalr:** a tenant's adoption, read from its product analytics, and admin's page of it ([#674](https://github.com/alexnodeland/lattice/issues/674)) ([d2b120b](https://github.com/alexnodeland/lattice/commit/d2b120bf4f3449f57b06a30040dba70dfb20d5a0))
+* **portalr:** session replay, built and off until the privacy review is signed (RFC-0008) ([#718](https://github.com/alexnodeland/lattice/issues/718)) ([8d0c449](https://github.com/alexnodeland/lattice/commit/8d0c449c1af09cb23a8e2d5055f1bfa6493a0ad2))
+* **portalr:** the app asks before it counts, and counts pages by their route once it may ([#622](https://github.com/alexnodeland/lattice/issues/622)) ([f1d6bb1](https://github.com/alexnodeland/lattice/commit/f1d6bb17eadb615eb4b4d4c09615d78d782d5bcc))
+* **stackr,portalr:** Umami for operators' journeys, fed by the relay, on networks of its own ([#700](https://github.com/alexnodeland/lattice/issues/700)) ([24a4165](https://github.com/alexnodeland/lattice/commit/24a4165de2b19bb8b869fd609ff5416adcc22f25))
+* **stackr:** Grafana's ClickHouse data source and the adoption dashboard ([#663](https://github.com/alexnodeland/lattice/issues/663)) ([b437466](https://github.com/alexnodeland/lattice/commit/b4374660845879c6087014884a2aafc18668bc6a))
+* **stackr:** native files relay, slimmer worker, Blender worker, and editors at the edge ([#567](https://github.com/alexnodeland/lattice/issues/567)) ([eceeb33](https://github.com/alexnodeland/lattice/commit/eceeb33e97ccc9ff5e39cc275bdbfa3aa5940819))
+* **stackr:** Plane's and Vikunja's recipes, make tracker-check, and the template's tracker question (lattice RFC-0004) ([#386](https://github.com/alexnodeland/lattice/issues/386)) ([ab0d1a7](https://github.com/alexnodeland/lattice/commit/ab0d1a7b87da7630c16737c2f3433155acfb5bfa))
+* **stackr:** refuse local Supabase where Docker ignores the loopback, and an upstream gateway setting ([#562](https://github.com/alexnodeland/lattice/issues/562)) ([e826a92](https://github.com/alexnodeland/lattice/commit/e826a9298d00910fbd7a31e79d3d9a1b79e13c95))
+* **stackr:** the diagrams worker, Excalidraw in headless Chromium behind a relay ([#690](https://github.com/alexnodeland/lattice/issues/690)) ([4c61853](https://github.com/alexnodeland/lattice/commit/4c6185319e3282a14b3d0112d75cfb9f091f8b29))
+* **template:** a generated application as a local product: one origin, a first run, and the tailnet ([#414](https://github.com/alexnodeland/lattice/issues/414)) ([894f2be](https://github.com/alexnodeland/lattice/commit/894f2be28251945e27d0b040f21e47d93f5277f5))
+* **ui:** forms and dashboards in the chat, phase 1 of RFC-0005, in artifactr and relayr ([#355](https://github.com/alexnodeland/lattice/issues/355)) ([423f37a](https://github.com/alexnodeland/lattice/commit/423f37a24d2f15a33c23c1586569becb60defd08))
+* **ui:** forms and dashboards in the chat, portalr's renderers, phase 1 of RFC-0005 ([#392](https://github.com/alexnodeland/lattice/issues/392)) ([c78e43e](https://github.com/alexnodeland/lattice/commit/c78e43e03be8dc296700e2e30b7569f3a35ba851))
+
+
+### Bug Fixes
+
+* **portalr,stackr:** a brand kit's paths never a folder or hidden, nothing hidden copied into the image, and WebRTC from a mini app's own frames an accepted risk ([#573](https://github.com/alexnodeland/lattice/issues/573)) ([7cc614c](https://github.com/alexnodeland/lattice/commit/7cc614c594866357c0da525dd9a07c84e6389acd))
+* **stackr:** bounded, retried fetches for the Grafana plugin, the stack's pulls and the worker's resolve ([#717](https://github.com/alexnodeland/lattice/issues/717)) ([1ef50a3](https://github.com/alexnodeland/lattice/commit/1ef50a3f796ea154963857d4af3fea7d95389c43))
+* **stackr:** the AWS check tries TFLint's ruleset install three times ([#599](https://github.com/alexnodeland/lattice/issues/599)) ([042aecf](https://github.com/alexnodeland/lattice/commit/042aecf6ee5837718bbc16a9e795d550b471029d))
+
 ## 0.1.0 (2026-10-17)
 
 

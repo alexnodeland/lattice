@@ -1,8 +1,10 @@
 """The portal: portalr's router and UIs over the same grantr, off without a Supabase project."""
 
+import functools
 import json
 import logging
 import re
+import sqlite3
 import subprocess
 import threading
 import time
@@ -20,6 +22,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
+from grantr.core import User
 from portalr.analytics import Relay, SessionStamp
 from portalr.invites import InviteFailed, SupabaseInvite
 from portalr.people import SupabasePeople
@@ -35,7 +38,7 @@ from {{ package_name }}.portal import (
 )
 from {{ package_name }}.settings import AuthSettings, PortalSettings, Settings
 
-from conftest import TENANT, Script, app, bearer, settings, token
+from conftest import TENANT, Script, app, bearer, seeded, settings, token
 
 SUPABASE = "http://127.0.0.1:54321"
 SECURE = "https://app.example.com"
@@ -622,6 +625,29 @@ def test_the_portal_waits_for_umamis_copies_as_it_stops(
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_a_person_removed_from_a_tenant_is_owed_their_events_deletion_there(
+    script: Script, ui: Path, tmp_path: Path
+) -> None:
+    database = tmp_path / "app.db"
+    named = replace(
+        with_portal(ui_dir=str(ui), **ANALYTICS), database_url=f"sqlite+aiosqlite:///{database}"
+    )
+    grants = seeded()
+    with TestClient(app(script, named, grants=grants)) as client:
+        remove = functools.partial(
+            grants.remove_member, TENANT, User(id="bob"), by=User(id="alice")
+        )
+        # On the application's own loop, where its database engine runs.
+        assert client.portal is not None
+        client.portal.call(remove)
+    # No ClickHouse answers here, so the deletion is owed, to be tried again (portalr ADR-0075).
+    with sqlite3.connect(database) as connection:
+        owed = connection.execute(
+            "SELECT user_id, tenant_id FROM portalr_analytics_removals_owed"
+        ).fetchall()
+    assert owed == [("bob", TENANT)]
 
 
 def test_without_a_database_there_is_no_relay(script: Script, ui: Path) -> None:

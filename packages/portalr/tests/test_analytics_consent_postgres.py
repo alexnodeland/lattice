@@ -85,6 +85,41 @@ async def test_the_owner_reads_every_deletion_owed(
     assert await consent.owing(100) == owed
 
 
+async def test_removals_are_the_owners_alone(schema: tuple[AsyncEngine, AsyncEngine]) -> None:
+    owner, application = schema
+    consent = SqlConsent(application, owner=owner)
+    at = await consent.owe_removal("alice", "acme")
+    assert await consent.removals_owed(100) == [("alice", "acme", at)]
+    for statement in (
+        "SELECT * FROM portalr_analytics_removals_owed",
+        "INSERT INTO portalr_analytics_removals_owed VALUES ('bob', 'acme', now())",
+        "UPDATE portalr_analytics_removals_owed SET removed_at = now()",
+    ):
+        async with application.begin() as connection:
+            with pytest.raises(Exception, match="permission denied"):
+                await connection.execute(text(statement))
+    async with owner.connect() as connection:
+        secured = await connection.scalar(
+            text(
+                "SELECT relrowsecurity FROM pg_class"
+                " WHERE relname = 'portalr_analytics_removals_owed'"
+            )
+        )
+    assert secured, "row-level security, so a grant made by default reads nothing"
+    async with owner.connect() as connection:
+        policies = await connection.scalar(
+            text(
+                "SELECT count(*) FROM pg_policies"
+                " WHERE tablename = 'portalr_analytics_removals_owed'"
+            )
+        )
+    assert policies == 1, (
+        "a policy, as stackr's smoke test holds every table of the application's to"
+    )
+    await consent.removal_settled("alice", "acme", at)
+    assert await consent.removals_owed(100) == []
+
+
 async def test_two_replicas_migrating_at_once_both_succeed(
     schema: tuple[AsyncEngine, AsyncEngine],
 ) -> None:

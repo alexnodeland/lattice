@@ -29,7 +29,7 @@ portalr's side of [stackr ADR-0050](../../stackr/adr/0050-umami-a-profile-for-op
   - Saying no deletes the person's sessions there, with their events, in every tenant. portalr's Umami user, who owns the website, signs in, searches for the hash (every page of the answer), reads each session to check its distinct id is the person's exactly, and deletes it.
   - It searches again until a round finds none of theirs. A deletion that still finds some after 10 rounds isn't done, and stays owed.
   - The deletion owed in ClickHouse stays owed until both are done, so an outage in either is retried.
-  - The removal from one tenant, in ADR-0075 (#695), deletes that tenant's session alone, once that change is on main.
+  - The removal from one tenant, in [ADR-0075](0075-a-person-removed-from-a-tenant-has-their-events-there-deleted.md), deletes that tenant's session alone, found by the tenant's hash. It is owed with the ClickHouse deletion and settled only when both are done.
 - **Operators' Tools page** gets a link to the website in Umami, with a tenant's other links, recorded as they are. It shows every tenant's journeys, since Umami has none.
 - **The template** reads `PORTAL_UMAMI_URL`, `PORTAL_UMAMI_WEBSITE_ID`, `PORTAL_UMAMI_PASSWORD` and `PORTAL_UMAMI_UI_URL`. Without the first three, nothing goes to Umami.
 

@@ -9,7 +9,7 @@ is still that one: a deletion that finishes late never clears a newer debt, owed
 written after it began.
 """
 
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Protocol
 
 
@@ -44,8 +44,12 @@ class Consent(Protocol):
         """At most `most` people a deletion is owed, the longest owed first, with its number."""
         ...
 
-    async def owe_removal(self, user_id: str, tenant: str) -> datetime:
-        """Owe the deletion of the person's events in the tenant, up to now: when, as owed."""
+    async def owe_removal(self, user_id: str, tenant: str, removed_at: datetime) -> None:
+        """Owe the deletion of the person's events in the tenant, up to `removed_at`.
+
+        A removal owed already, for a later moment, stays as it is: a deletion owed is never
+        owed for less.
+        """
         ...
 
     async def removal_settled(self, user_id: str, tenant: str, removed_at: datetime) -> None:
@@ -58,6 +62,14 @@ class Consent(Protocol):
         """At most `most` removals whose deletion is owed, the oldest first, removed `before`."""
         ...
 
+    async def audit_cursor(self, tenant: str) -> int:
+        """The `seq` up to which the tenant's audit log has been read for removals; 0 for none."""
+        ...
+
+    async def advance_audit(self, tenant: str, seq: int) -> None:
+        """Record that the tenant's audit log is read up to `seq`, never back from further."""
+        ...
+
 
 class InMemoryConsent:
     """Answers kept in memory, for tests and a prototype; lost when the process stops."""
@@ -67,6 +79,7 @@ class InMemoryConsent:
         self._owed: dict[str, int] = {}
         self._last = 0
         self._removals: dict[tuple[str, str], datetime] = {}
+        self._audit: dict[str, int] = {}
 
     async def given(self, user_id: str) -> bool:
         """Whether the person has said yes."""
@@ -98,11 +111,10 @@ class InMemoryConsent:
         """At most `most` people a deletion is owed, the longest owed first, with its number."""
         return sorted(self._owed.items(), key=lambda owed: owed[1])[:most]
 
-    async def owe_removal(self, user_id: str, tenant: str) -> datetime:
-        """Owe the deletion of the person's events in the tenant, up to now."""
-        now = datetime.now(UTC)
-        self._removals[user_id, tenant] = now
-        return now
+    async def owe_removal(self, user_id: str, tenant: str, removed_at: datetime) -> None:
+        """Owe the deletion of the person's events in the tenant, up to `removed_at` or later."""
+        key = user_id, tenant
+        self._removals[key] = max(removed_at, self._removals.get(key, removed_at))
 
     async def removal_settled(self, user_id: str, tenant: str, removed_at: datetime) -> None:
         """Clear the deletion owed for that removal, if no later one is owed since."""
@@ -118,3 +130,11 @@ class InMemoryConsent:
             key=lambda removal: (removal[1], removal[0]),
         )
         return [(user_id, tenant, at) for (user_id, tenant), at in owed[:most]]
+
+    async def audit_cursor(self, tenant: str) -> int:
+        """The `seq` up to which the tenant's audit log has been read for removals."""
+        return self._audit.get(tenant, 0)
+
+    async def advance_audit(self, tenant: str, seq: int) -> None:
+        """Record that the tenant's audit log is read up to `seq`, if that is further."""
+        self._audit[tenant] = max(seq, self._audit.get(tenant, 0))

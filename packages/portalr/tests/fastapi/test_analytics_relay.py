@@ -1,17 +1,27 @@
 """The relay: a signed-in person's events, with their yes, in their tenant, as the registry says."""
 
 import json
+import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import httpx
 import pytest
 
-from grantr.core import ServicePrincipal, User
+from grantr.core import AuditEntry, ServicePrincipal, User
 from grantr.grants import Grants
 from portalr.analytics import InMemoryConsent, InMemoryRateLimiter, Relay
-from portalr.analytics.relay import MOST_BYTES, MOST_EVENTS, SESSION_HOURS, Batch, Event, Relayed
+from portalr.analytics.relay import (
+    MOST_BYTES,
+    MOST_EVENTS,
+    REMOVALS,
+    SESSION_HOURS,
+    Batch,
+    Event,
+    Relayed,
+)
 from portalr.invites import Invite
 from portalr.readers import Analytics, Readers
 from portalr.readers.analytics import distinct_id
@@ -52,12 +62,13 @@ def clickhouse() -> ClickHouse:
 
 
 @pytest.fixture
-def relay(clickhouse: ClickHouse) -> Relay:
+def relay(clickhouse: ClickHouse, grants: Grants) -> Relay:
     writer = httpx.AsyncClient(transport=httpx.MockTransport(clickhouse))
     return Relay(
         Analytics("http://clickhouse:8123", KEY, writer=writer),
         InMemoryConsent(),
         InMemoryRateLimiter(per_second=1, burst=30),
+        grants=grants,
     )
 
 
@@ -490,15 +501,17 @@ async def test_a_deletion_still_owed_is_read_with_the_answer_until_it_is_done(
     assert read.json() == {"given": False, "deleting": False}
 
 
-async def test_a_removal_only_owes_and_the_pass_deletes_once_its_grace_has_passed(
-    relay: Relay, clickhouse: ClickHouse, monkeypatch: pytest.MonkeyPatch
+async def test_the_pass_owes_a_removal_from_grantrs_log_and_deletes_it_once_its_grace_has_passed(
+    relay: Relay, clickhouse: ClickHouse, grants: Grants, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    await relay.removed("acme", "bob")
+    await grants.remove_member("acme", User(id="bob"), by=User(id="alice"))
     assert clickhouse.requests == [], "the admin's removal never waits on ClickHouse"
-    ((user, tenant, removed_at),) = await relay.consent.removals_owed(100)
-    assert (user, tenant) == ("bob", "acme")
     assert await relay.settle_owed() == 0, "not before its grace has passed"
     assert clickhouse.requests == []
+    ((user, tenant, removed_at),) = await relay.consent.removals_owed(100)
+    assert (user, tenant) == ("bob", "acme")
+    (entry,) = await grants.served_audit("acme", keep=REMOVALS)
+    assert removed_at == entry.at, "owed up to the removal's entry, not the pass's clock"
     monkeypatch.setattr("portalr.analytics.relay.REMOVAL_GRACE", timedelta(0))
     assert await relay.settle_owed() == 1
     (deletion,) = clickhouse.requests
@@ -513,13 +526,15 @@ async def test_a_removal_only_owes_and_the_pass_deletes_once_its_grace_has_passe
     until = datetime.strptime(params["param_until"], "%Y-%m-%d %H:%M:%S.%f").replace(tzinfo=UTC)
     assert timedelta(seconds=4.99) <= until - removed_at <= timedelta(seconds=5)
     assert await relay.consent.removals_owed(100) == [], "done, so no longer owed"
+    assert await relay.settle_owed() == 0
+    assert len(clickhouse.requests) == 1, "a removal read once is not owed again"
 
 
 async def test_a_removals_deletion_clickhouse_refuses_stays_owed_and_is_done_later(
-    relay: Relay, clickhouse: ClickHouse, monkeypatch: pytest.MonkeyPatch
+    relay: Relay, clickhouse: ClickHouse, grants: Grants, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr("portalr.analytics.relay.REMOVAL_GRACE", timedelta(0))
-    await relay.removed("acme", "bob")
+    await grants.remove_member("acme", User(id="bob"), by=User(id="alice"))
     clickhouse.status = 503
     assert await relay.settle_owed() == 0
     assert [(u, t) for u, t, _ in await relay.consent.removals_owed(100)] == [("bob", "acme")]
@@ -530,13 +545,131 @@ async def test_a_removals_deletion_clickhouse_refuses_stays_owed_and_is_done_lat
     assert len({r.url.params["param_until"] for r in clickhouse.requests}) == 1
 
 
-async def test_grantrs_hook_owes_a_persons_deletion_and_nothing_for_a_key(
-    relay: Relay, clickhouse: ClickHouse, grants: Grants
-) -> None:
-    grants.on_member_removed(relay.member_removed)
-    await grants.add_member("acme", ServicePrincipal(id="ci"), by=User(id="alice"))
-    await grants.remove_member("acme", ServicePrincipal(id="ci"), by=User(id="alice"))
-    assert await relay.consent.removals_owed(100) == []
+async def test_a_removal_is_owed_by_a_relay_that_started_after_it(grants: Grants) -> None:
     await grants.remove_member("acme", User(id="bob"), by=User(id="alice"))
-    assert [(u, t) for u, t, _ in await relay.consent.removals_owed(100)] == [("bob", "acme")]
-    assert clickhouse.requests == []
+    started_later = Relay(
+        Analytics("http://clickhouse:8123", KEY),
+        InMemoryConsent(),
+        InMemoryRateLimiter(),
+        grants=grants,
+    )
+    await started_later.settle_owed()
+    owed = await started_later.consent.removals_owed(100)
+    assert [(u, t) for u, t, _ in owed] == [("bob", "acme")]
+
+
+async def test_the_pass_reads_each_tenants_log_on_from_where_it_stopped_and_owes_no_key(
+    relay: Relay, grants: Grants
+) -> None:
+    alice, carol = User(id="alice"), User(id="carol")
+    await grants.add_member("acme", User(id="dave"), by=alice)
+    await grants.add_member("globex", ServicePrincipal(id="ci"), by=carol)
+    await grants.add_member("globex", User(id="erin"), by=carol)
+    for tenant, member, by in (
+        ("acme", User(id="bob"), alice),
+        ("acme", User(id="dave"), alice),
+        ("globex", ServicePrincipal(id="ci"), carol),
+        ("globex", User(id="erin"), carol),
+    ):
+        await grants.remove_member(tenant, member, by=by)
+
+    async def owed() -> list[tuple[str, str]]:
+        return [(user, tenant) for user, tenant, _ in await relay.consent.removals_owed(100)]
+
+    await relay.settle_owed(most=1)
+    assert await owed() == [("bob", "acme")], "one entry of each tenant's log, the key's skipped"
+    await relay.settle_owed(most=1)
+    assert await owed() == [("bob", "acme"), ("dave", "acme"), ("erin", "globex")]
+    await relay.settle_owed(most=1)
+    assert len(await owed()) == 3, "read to the end"
+    for tenant in ("acme", "globex"):
+        *_, last = await grants.served_audit(tenant, keep=REMOVALS)
+        assert await relay.consent.audit_cursor(tenant) == last.seq
+
+
+class Failing(InMemoryConsent):
+    """Answers that fail to owe the second removal asked of them, once."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.owed = 0
+        self.fail = True
+
+    async def owe_removal(self, user_id: str, tenant: str, removed_at: datetime) -> None:
+        self.owed += 1
+        if self.fail and self.owed == 2:
+            raise RuntimeError("the database went away")
+        await super().owe_removal(user_id, tenant, removed_at)
+
+
+async def test_the_mark_stays_where_it_was_if_owing_fails_partway(
+    clickhouse: ClickHouse, grants: Grants, caplog: pytest.LogCaptureFixture
+) -> None:
+    alice = User(id="alice")
+    await grants.add_member("acme", User(id="dave"), by=alice)
+    for member in ("bob", "dave"):
+        await grants.remove_member("acme", User(id=member), by=alice)
+    consent = Failing()
+    relay = Relay(
+        Analytics("http://clickhouse:8123", KEY), consent, InMemoryRateLimiter(), grants=grants
+    )
+    with caplog.at_level(logging.ERROR):
+        await relay.settle_owed()
+    assert "RuntimeError" in caplog.text
+    assert await consent.audit_cursor("acme") == 0
+    consent.fail = False
+    await relay.settle_owed()
+    assert {(u, t) for u, t, _ in await consent.removals_owed(100)} == {
+        ("bob", "acme"),
+        ("dave", "acme"),
+    }
+    *_, last = await grants.served_audit("acme", keep=REMOVALS)
+    assert await consent.audit_cursor("acme") == last.seq
+
+
+async def test_a_tenant_whose_log_cant_be_read_holds_up_neither_the_rest_nor_the_deletions(
+    relay: Relay,
+    clickhouse: ClickHouse,
+    grants: Grants,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    monkeypatch.setattr("portalr.analytics.relay.REMOVAL_GRACE", timedelta(0))
+    await grants.remove_member("acme", User(id="bob"), by=User(id="alice"))
+    assert await relay.settle_owed() == 1
+    clickhouse.requests.clear()
+    await grants.add_member("globex", User(id="erin"), by=User(id="carol"))
+    await grants.remove_member("globex", User(id="erin"), by=User(id="carol"))
+    await grants.add_member("acme", User(id="bob"), by=User(id="alice"))
+    await grants.remove_member("acme", User(id="bob"), by=User(id="alice"))
+    read = grants.served_audit
+
+    async def unreadable(tenant: str, **kept: Any) -> list[AuditEntry]:
+        if tenant == "acme":
+            raise RuntimeError("the database went away")
+        return await read(tenant, **kept)
+
+    monkeypatch.setattr(grants, "served_audit", unreadable)
+    with caplog.at_level(logging.ERROR):
+        assert await relay.settle_owed() == 1, "globex's removal is owed and deleted"
+    assert "tenant acme's removals weren't read: RuntimeError" in caplog.text
+    assert [r.url.params["param_tenant"] for r in clickhouse.requests] == ["globex"]
+
+
+async def test_tenants_that_cant_be_listed_hold_up_no_deletion(
+    relay: Relay,
+    clickhouse: ClickHouse,
+    grants: Grants,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    monkeypatch.setattr("portalr.analytics.relay.REMOVAL_GRACE", timedelta(0))
+    await relay.consent.owe_removal("bob", "acme", datetime.now(UTC))
+
+    async def unreadable() -> list[str]:
+        raise RuntimeError("the database went away")
+
+    monkeypatch.setattr(grants, "served_tenants", unreadable)
+    with caplog.at_level(logging.ERROR):
+        assert await relay.settle_owed() == 1
+    assert "the tenants weren't listed: RuntimeError" in caplog.text

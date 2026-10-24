@@ -26,7 +26,8 @@ from typing import Annotated, Final
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
-from grantr.core import Member, User
+from grantr.core import AuditFilter, MemberRemoved, User
+from grantr.grants import Grants
 from portalr.analytics.consent import Consent
 from portalr.analytics.limiter import InMemoryRateLimiter, RateLimiter
 from portalr.analytics.replay import ReplayBatch, inlined, unmasked
@@ -124,6 +125,9 @@ REMOVAL_MARGIN: Final = timedelta(seconds=5)
 """How far past a removal its deletion reaches: events are stamped by the replica that relayed
 them, whose clock may run a little ahead of the one that removed the person."""
 
+REMOVALS: Final = AuditFilter(types={"member_removed"})
+"""The entries of grantr's audit log that owe a deletion."""
+
 
 @dataclass(frozen=True)
 class Relay:
@@ -158,6 +162,9 @@ class Relay:
     replay: Consent | None = None
     """People's answers to session replay, apart from analytics' (portalr ADR-0077); with Umami,
     the deployment records replays. Without it, there is no replay."""
+    grants: Grants | None = None
+    """grantr, whose audit log the background pass reads for the removals it hasn't owed yet
+    (portalr ADR-0075). Without it, no removal deletes anything."""
     copies: set[asyncio.Future[None]] = field(
         default_factory=lambda: set[asyncio.Future[None]](), repr=False, compare=False
     )
@@ -302,7 +309,8 @@ class Relay:
     async def settle_owed(self, *, most: int = 100) -> int:
         """Delete the events owed deletion, in turn: how many deletions were done.
 
-        At most `most` people's, and at most `most` removals'.
+        At most `most` people's, and at most `most` removals'. First it owes each removal in
+        grantr's audit log that it hasn't read: at most `most` entries of a tenant's log.
 
         Every replica runs it, now and then: two may delete the same person's events, which does
         no harm, since a deletion done twice deletes nothing more.
@@ -310,6 +318,8 @@ class Relay:
         done = 0
         for user_id, debt in await self.consent.owing(most):
             done += await self.settle(user_id, debt, paced=False)
+        if self.grants is not None:
+            await self._owe_removals(self.grants, most)
         ripe = datetime.now(UTC) - REMOVAL_GRACE
         for user_id, tenant, removed_at in await self.consent.removals_owed(most, before=ripe):
             done += await self._forget_removed(user_id, tenant, removed_at)
@@ -318,22 +328,39 @@ class Relay:
                 done += await self.settle_replay(user_id, debt)
         return done
 
-    async def removed(self, tenant: str, user_id: str) -> None:
-        """Owe the deletion of a person's events in a tenant they were just removed from.
+    async def _owe_removals(self, grants: Grants, most: int) -> None:
+        """Owe the deletion of each person removed from a tenant, as the tenant's log says.
 
-        grantr runs it once the removal is kept (portalr ADR-0075). It only owes: the background
-        pass, `settle_owed`, deletes, no sooner than ``REMOVAL_GRACE`` after, so an admin's
-        removal never waits on ClickHouse, and a batch accepted just before it has landed.
+        A tenant whose log can't be read is said, by its id and its error's type, and skipped:
+        the others are read, and the deletions ripe are done, all the same.
         """
-        await self.consent.owe_removal(user_id, tenant)
+        try:
+            tenants = await grants.served_tenants()
+        except Exception as error:  # Nor do the tenants' names, if they can't be read.
+            log.error("analytics: the tenants weren't listed: %s", type(error).__name__)
+            return
+        for tenant in tenants:
+            try:
+                await self._owe_tenants_removals(grants, tenant, most)
+            except Exception as error:  # One tenant's log never holds up the rest.
+                log.error(
+                    "analytics: tenant %s's removals weren't read: %s", tenant, type(error).__name__
+                )
 
-    async def member_removed(self, tenant: str, member: Member) -> None:
-        """Grantr's hook on a member's removal: a person's events in the tenant are deleted.
+    async def _owe_tenants_removals(self, grants: Grants, tenant: str, most: int) -> None:
+        """Read the tenant's log on from where it was read last, and owe what it says.
 
-        A key's principal records no events, so nothing is owed for one.
+        The mark moves only once its entries are owed, so a pass that stops partway reads them
+        again. A removal is owed up to its entry's time.
         """
-        if isinstance(member, User):
-            await self.removed(tenant, member.id)
+        entries = await grants.served_audit(
+            tenant, after_seq=await self.consent.audit_cursor(tenant), limit=most, keep=REMOVALS
+        )
+        for entry in entries:
+            if isinstance(entry.event, MemberRemoved) and isinstance(entry.event.member, User):
+                await self.consent.owe_removal(entry.event.member.id, tenant, entry.at)
+        if entries:
+            await self.consent.advance_audit(tenant, entries[-1].seq)
 
     async def _forget_removed(self, user_id: str, tenant: str, removed_at: datetime) -> bool:
         until = removed_at + REMOVAL_MARGIN

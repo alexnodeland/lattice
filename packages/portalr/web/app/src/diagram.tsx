@@ -35,6 +35,7 @@ const live = (data: Data) => {
     (element) =>
       typeof element === "object" &&
       element !== null &&
+      !Array.isArray(element) &&
       !(element as { isDeleted?: unknown }).isDeleted,
   ).length;
 };

@@ -55,7 +55,7 @@ function watchScheme(changed: () => void): () => void {
 /** What the canvas never draws in this phase: a page embedded, or an image, which load from away. */
 const UNDRAWN = new Set(["embeddable", "iframe", "image"]);
 
-/** The numbers an element is drawn by, each a finite number or left for Excalidraw to fill. */
+/** The numbers an element is drawn by, each finite and within reach, or left for restore to fill. */
 const NUMBERS = [
   "x",
   "y",
@@ -68,47 +68,69 @@ const NUMBERS = [
   "roughness",
 ];
 
-/** An element's numbers and points as drawn: one that isn't finite is dropped, for restore to fill. */
+/** How far from the origin a number the canvas draws by may be: further, and it is left out. */
+const REACH = 1e9;
+
+/** Lists an element holds, each a list or left for restore to fill. */
+const LISTS = ["groupIds", "boundElements"];
+
+/** Colours an element holds, each a string or left for restore to fill. */
+const COLOURS = ["strokeColor", "backgroundColor"];
+
+const finite = (value: unknown) => typeof value === "number" && Math.abs(value) <= REACH;
+
+/** An element's numbers, lists, colours and points as drawn: one that isn't is dropped, for restore to fill. */
 function drawable(element: Record<string, unknown>): Record<string, unknown> {
   const kept: Record<string, unknown> = { ...element, link: null };
   for (const key of NUMBERS) {
-    if (key in kept && !Number.isFinite(kept[key])) delete kept[key];
+    if (key in kept && !finite(kept[key])) delete kept[key];
+  }
+  for (const key of LISTS) {
+    if (key in kept && !Array.isArray(kept[key])) delete kept[key];
+  }
+  for (const key of COLOURS) {
+    if (key in kept && typeof kept[key] !== "string") delete kept[key];
   }
   const points = kept.points;
   const pair = (point: unknown) =>
-    Array.isArray(point) && point.length === 2 && point.every(Number.isFinite);
+    Array.isArray(point) && point.length === 2 && point.every(finite);
   if ("points" in kept && !(Array.isArray(points) && points.every(pair))) delete kept.points;
   return kept;
 }
 
+/** What the canvas draws of a diagram, and how many of its live elements it leaves out. */
+export interface Taken {
+  readonly elements: ExcalidrawElement[];
+  readonly left: number;
+}
+
+const isElement = (element: unknown): element is Record<string, unknown> =>
+  typeof element === "object" && element !== null && !Array.isArray(element);
+
 /**
  * A diagram's elements as the canvas takes them: objects only, none it doesn't draw, none with a
- * link, no number that isn't one, each restored by Excalidraw, which fills what one leaves out.
+ * link, nothing it would draw by that isn't what it should be, each restored by Excalidraw, which
+ * fills what one leaves out; and how many of the live ones are left out, which the canvas says.
  */
-export function elementsOf(data: Data): ExcalidrawElement[] {
+export function elementsOf(data: Data): Taken {
   const held = data.elements;
-  if (typeof held !== "object" || held === null || Array.isArray(held)) return [];
-  const taken = Object.values(held)
-    .filter(
-      (element): element is Record<string, unknown> =>
-        typeof element === "object" &&
-        element !== null &&
-        !Array.isArray(element) &&
-        !UNDRAWN.has(String((element as { type?: unknown }).type)),
-    )
-    .map(drawable);
+  if (!isElement(held)) return { elements: [], left: 0 };
+  const objects = Object.values(held).filter(isElement);
+  const live = objects.filter((element) => !element.isDeleted).length;
+  const taken = objects.filter((element) => !UNDRAWN.has(String(element.type))).map(drawable);
   const restored = (some: readonly Record<string, unknown>[]) =>
     restoreElements(some as unknown as ExcalidrawElement[], null).map((each) => ({
       ...each,
       link: null,
     }));
+  let elements: ExcalidrawElement[];
   try {
     // Together, so a label keeps its shape and an arrow what it binds.
-    return restored(taken);
+    elements = restored(taken);
   } catch {
     // Excalidraw's restore throws on some it can't mend, such as an arrow with no points: then one
-    // at a time, and each it can't is passed over, not the whole diagram.
-    return taken.flatMap((element) => {
+    // at a time, and each it can't is left out, not the whole diagram.
+    elements = taken.flatMap((element) => {
       try {
         return restored([element]);
       } catch {
@@ -116,18 +138,48 @@ export function elementsOf(data: Data): ExcalidrawElement[] {
       }
     });
   }
+  const kept = new Set(elements.map((element) => element.id));
+  const here = (binding: { elementId?: unknown } | null | undefined) =>
+    binding && typeof binding.elementId === "string" && kept.has(binding.elementId)
+      ? binding
+      : null;
+  // What an element binds to, or is held in, is let go where that isn't drawn.
+  const bound = elements.map((element) => {
+    const fields = element as unknown as Record<string, unknown>;
+    const changed: Record<string, unknown> = {
+      ...fields,
+      boundElements: Array.isArray(fields.boundElements)
+        ? fields.boundElements.filter((each: { id?: unknown }) => kept.has(String(each?.id)))
+        : fields.boundElements,
+    };
+    if ("startBinding" in fields) changed.startBinding = here(fields.startBinding as never);
+    if ("endBinding" in fields) changed.endBinding = here(fields.endBinding as never);
+    if (typeof fields.containerId === "string" && !kept.has(fields.containerId)) {
+      changed.containerId = null;
+    }
+    return changed as unknown as ExcalidrawElement;
+  });
+  return { elements: bound, left: live - bound.filter((element) => !element.isDeleted).length };
 }
 
-/** Zoom by the keyboard, which view mode keeps: Ctrl or ⌘ with +, - or 0, and Shift+1 to fit. */
+/** Zoom by the keyboard, which view mode keeps: Ctrl or ⌘ with +, - or 0. */
 const ZOOM = new Set(["+", "=", "-", "_", "0"]);
 
 /**
- * Keys the canvas may have: Tab and Escape, which the dialog keeps and closes by, arrows and
- * zoom. Any other, such as `?` for help, ⌘/ or ⌘K for the command palette, ⌘S or ⌘O, never reach
- * Excalidraw, nor the browser's own save or open.
+ * Keys the canvas may have: Tab and Escape, which the dialog keeps and closes by; the arrows;
+ * Ctrl or ⌘ with +, - or 0, which zoom; the modifiers alone; and Enter and Space on a button, such
+ * as its zoom buttons, unmodified. Any other, such as `?` for help, ⌘/ or ⌘K for the command
+ * palette, ⌘S or ⌘O, never reaches Excalidraw, nor the browser's own save or open.
  */
-function kept(event: KeyboardEvent): boolean {
+export function kept(
+  event: Pick<KeyboardEvent, "key" | "ctrlKey" | "metaKey" | "altKey" | "target">,
+): boolean {
   if (event.key === "Tab" || event.key === "Escape" || event.key.startsWith("Arrow")) return true;
+  const onButton =
+    event.target instanceof Element && event.target.closest("button, [role=button]") !== null;
+  if ((event.key === "Enter" || event.key === " ") && onButton) {
+    return !event.ctrlKey && !event.metaKey && !event.altKey;
+  }
   if (
     event.key === "Shift" ||
     event.key === "Control" ||
@@ -167,7 +219,7 @@ class Drawn extends Component<{ children: ReactNode }, { error: unknown }> {
 
 function Canvas({ data, describedBy }: { data: Data; describedBy: string }) {
   const theme = useSyncExternalStore(watchScheme, scheme);
-  const elements = useMemo(() => elementsOf(data), [data]);
+  const { elements, left } = useMemo(() => elementsOf(data), [data]);
   return (
     <section
       className="absolute inset-0"
@@ -180,6 +232,14 @@ function Canvas({ data, describedBy }: { data: Data; describedBy: string }) {
       onPasteCapture={refused}
       onContextMenuCapture={refused}
     >
+      {left > 0 && (
+        <p
+          role="status"
+          className="absolute top-2 right-2 z-10 rounded-(--input-radius) bg-surface px-2 py-1 text-muted text-xs"
+        >
+          {left} {left === 1 ? "element" : "elements"} not drawn here: its text version lists all
+        </p>
+      )}
       <Excalidraw
         initialData={{ elements, scrollToContent: true }}
         viewModeEnabled

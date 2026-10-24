@@ -73,7 +73,8 @@ def _ordered(elements: Mapping[str, Element]) -> list[tuple[str, Element]]:
         for key in elements
         if key.isascii() and key.isdigit() and str(int(key)) == key and int(key) <= _INDEX
     ]
-    rest = [key for key in elements if key not in set(indexes)]
+    first = set(indexes)
+    rest = [key for key in elements if key not in first]
     return [(key, elements[key]) for key in [*sorted(indexes, key=int), *rest]]
 
 

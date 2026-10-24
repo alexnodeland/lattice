@@ -188,19 +188,36 @@ test("the canvas stays in view mode: no shortcut, drop or paste opens anything o
   await page.context().close();
 });
 
-test("a diagram the canvas can't draw as given is restored, or said to be undrawable, never blank", async () => {
+test("a diagram written badly is mended where it can be, and what can't be is said", async () => {
   const { page, reported } = await open(browser, "?diagram=broken");
   await page.getByRole("button", { name: "Open canvas" }).click();
   const dialog = page.getByRole("dialog", { name: "Broken" });
-  await dialog.getByRole("button", { name: "Close canvas" }).waitFor();
+  await page.locator(".excalidraw canvas").first().waitFor();
+  // Restore can't mend the arrow and the line with no points, and a text with no words is none:
+  // three. The rectangle placed out of reach is drawn at the origin, the ellipse with no id given one.
   await expect
-    .poll(
-      async () =>
-        (await page.locator(".excalidraw canvas").count()) > 0 ||
-        (await dialog.getByText("its text version holds it").count()) > 0,
-    )
-    .toBe(true);
-  expect((await reported()).filter((line) => !line.startsWith("console:"))).toEqual([]);
+    .poll(() => dialog.getByRole("status").textContent())
+    .toMatch(/^3 elements not drawn here/);
+  expect(await reported()).toEqual([]);
+  await page.context().close();
+});
+
+test("the canvas zooms by its own buttons from the keyboard", async () => {
+  const { page, reported } = await open(browser, "?diagram");
+  await page.getByRole("button", { name: "Open canvas" }).click();
+  const dialog = page.getByRole("dialog", { name: "Stack" });
+  await page.locator(".excalidraw canvas").first().waitFor();
+  const zoomIn = dialog.getByRole("button", { name: "Zoom in" });
+  const level = dialog.getByRole("button", { name: "Reset zoom" });
+  const before = await level.textContent();
+  await zoomIn.focus();
+  await page.keyboard.press("Enter");
+  await expect.poll(() => level.textContent()).not.toBe(before);
+  const after = await level.textContent();
+  await zoomIn.focus();
+  await page.keyboard.press(" ");
+  await expect.poll(() => level.textContent()).not.toBe(after);
+  expect(await reported()).toEqual([]);
   await page.context().close();
 });
 

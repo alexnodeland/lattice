@@ -14,7 +14,7 @@
  *   it isn't registered, so nothing asks for it, and browsers draw CJK with a face of their own.
  */
 
-import { cpSync, readdirSync } from "node:fs";
+import { cpSync, readdirSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import type { Plugin } from "vite";
@@ -59,6 +59,13 @@ const DEV_REQUIRE =
 /** The fallback Excalidraw fetches faces from, a template literal naming esm.sh. */
 const FALLBACK = /("ASSETS_FALLBACK_URL",\s*)`https:\/\/esm\.sh\/[\s\S]{0,300}?\/dist\/prod\/`/;
 
+/** The Excalidraw the build holds, as its package says, to name in a failure. */
+function version(): string {
+  const entry = createRequire(import.meta.url).resolve("@excalidraw/excalidraw");
+  const manifest = join(dirname(entry), "..", "..", "package.json");
+  return (JSON.parse(readFileSync(manifest, "utf8")) as { version: string }).version;
+}
+
 function fonts(): string {
   const entry = createRequire(import.meta.url).resolve("@excalidraw/excalidraw");
   return join(dirname(entry), "fonts");
@@ -96,20 +103,26 @@ export function excalidraw(base: string): Plugin {
         .replace(REQUIRE, "var $1=(function($5){throw")
         .replace(DEV_REQUIRE, "var __require = (function(x) {\n  throw");
       if (changed.includes("typeof require")) {
-        this.error("esbuild's stand-in for require isn't as it was: check Excalidraw's build");
+        this.error(
+          `esbuild's stand-in for require isn't as it was in Excalidraw ${version()}'s build: check the rewrite`,
+        );
       }
       // Xiaolai's faces registered, as `register(XIAOLAI, ...faces)` among the others: not.
       const xiaolai = XIAOLAI.exec(changed)?.[1];
       if (xiaolai !== undefined && changed.includes("._initialized=!0")) {
         const registered = new RegExp(`\\w+\\(${xiaolai},\\.\\.\\.\\w+\\),`);
         if (!registered.test(changed)) {
-          this.error("Excalidraw's faces aren't registered where they were: check Xiaolai's");
+          this.error(
+            `Excalidraw ${version()}'s faces aren't registered where they were: check Xiaolai's`,
+          );
         }
         changed = changed.replace(registered, "");
       }
       if (changed.includes('"ASSETS_FALLBACK_URL"')) {
         if (!FALLBACK.test(changed)) {
-          this.error("Excalidraw's face fallback isn't where it was: check it still names esm.sh");
+          this.error(
+            `Excalidraw ${version()}'s face fallback isn't where it was: check it names esm.sh`,
+          );
         }
         changed = changed.replace(
           FALLBACK,

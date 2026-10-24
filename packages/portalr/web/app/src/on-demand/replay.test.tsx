@@ -380,36 +380,91 @@ test("changes to style and to a declaration are kept as rrweb makes them, unless
   });
 });
 
-/** Milliseconds `work` takes. */
-function took(work: () => void) {
-  const started = performance.now();
+/** Milliseconds `work` takes, by `clock`, which a test may replace. */
+function took(work: () => void, clock = () => performance.now()) {
+  const started = clock();
   work();
-  return performance.now() - started;
+  return clock() - started;
+}
+
+/**
+ * The fastest of several runs, after one to warm up: a loaded runner makes a run slower, never
+ * faster, so the minimum is the cost of the work and the rest is noise.
+ */
+function best(work: () => void, runs = 7, clock = () => performance.now()) {
+  work();
+  return Math.min(...Array.from({ length: runs }, () => took(work, clock)));
+}
+
+/**
+ * Whether twice the input takes about twice the time. Linear doubles and a quadratic quadruples,
+ * so three times the smaller (the fastest of several runs of each), and a floor above
+ * what a timer and a collection can add, tell them apart.
+ */
+function scalesLinearly(
+  work: (size: number) => void,
+  small: number,
+  large: number,
+  runs = 7,
+  clock = () => performance.now(),
+) {
+  const less = best(() => work(small), runs, clock);
+  const more = best(() => work(large), runs, clock);
+  return more < 3 * less + 10;
 }
 
 const UNITS = ["7", "a", " ", "-", ".", "/*", "url(", "x:", "'", '"', "\\", "px", "a b", "\n"];
 
-test("every pattern is matched in time linear in what is matched: twice the input, about twice the time", () => {
+test("the timing test tells a linear cost from a quadratic one, by a clock the test sets", () => {
+  // Work that costs what its input says, on a clock that moves only by that: no real time, so
+  // no runner can change the answer.
+  let now = 0;
+  const clock = () => now;
+  const costing = (cost: (size: number) => number) => (size: number) => {
+    now += cost(size);
+  };
+  const linear = costing((size) => size * 0.01);
+  const quadratic = costing((size) => size * size * 0.000001);
+  expect(scalesLinearly(linear, 8_000, 16_000, 3, clock)).toBe(true);
+  expect(scalesLinearly(quadratic, 8_000, 16_000, 3, clock)).toBe(false);
+  // The floor: work too quick to tell apart passes.
+  expect(
+    scalesLinearly(
+      costing(() => 0.5),
+      8_000,
+      16_000,
+      3,
+      clock,
+    ),
+  ).toBe(true);
+  // A noisy run is slower, never faster: the fastest of several is what counts.
+  let slow = 0;
+  const noisy = costing((size) => size * 0.01 + (slow++ % 3 === 0 ? 500 : 0));
+  expect(scalesLinearly(noisy, 8_000, 16_000, 7, clock)).toBe(true);
+});
+
+test("every pattern is matched in time linear in what is matched: twice the input, about twice the time", {
+  timeout: 120_000,
+}, () => {
   for (const pattern of REGEXES) {
     for (const unit of UNITS) {
-      const run = (size: number) =>
-        took(() => {
-          const text = `${unit.repeat(size).slice(0, size)}!`;
-          pattern.test(text);
-          pattern.test(`!${text}`);
-        });
-      run(2_000);
-      const small = run(8_000);
-      const large = run(16_000);
-      // Linear doubles; a quadratic would quadruple. A floor keeps timer noise out of it.
-      expect(large, `${pattern} on ${JSON.stringify(unit)}`).toBeLessThan(3 * small + 25);
+      const match = (size: number) => {
+        const text = `${unit.repeat(size).slice(0, size)}!`;
+        pattern.test(text);
+        pattern.test(`!${text}`);
+      };
+      expect(scalesLinearly(match, 8_000, 16_000), `${pattern} on ${JSON.stringify(unit)}`).toBe(
+        true,
+      );
     }
   }
 });
 
-test("a hostile string costs no more than a plain one of the same length", () => {
+test("a hostile string costs no more than a plain one of the same length", {
+  timeout: 60_000,
+}, () => {
   const run = (unit: string) =>
-    took(() => {
+    best(() => {
       const text = unit.repeat(20_000);
       const attributes = Object.fromEntries(
         ["width", "style", "class", "d", "id", "title", "rel"].map((name) => [name, text]),
@@ -417,7 +472,6 @@ test("a hostile string costs no more than a plain one of the same length", () =>
       scrub([{ type: 2, tagName: text, attributes, childNodes: [] }]);
       declarationsOk(text);
     });
-  run("a");
   const plain = run("a");
   for (const unit of UNITS) {
     expect(run(unit), JSON.stringify(unit)).toBeLessThan(10 * plain + 100);

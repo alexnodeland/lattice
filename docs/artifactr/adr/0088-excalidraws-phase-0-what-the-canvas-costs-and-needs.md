@@ -98,7 +98,7 @@ Headless Chromium, as U6 has it. The SVGs jsdom wrote were byte-identical to Chr
 
 - **Latin faces are self-hosted.** A build script copies them and sets `EXCALIDRAW_ASSET_PATH`: Vite emits only the Assistant faces, and the hand-drawn ones load at run time.
 - **Xiaolai, the CJK face (12 MB in 209 files), ships only in the worker's image.** Browsers fall back to a system CJK face, which is readable but not hand-drawn; the element's stored width was the same.
-- **Licences come from pinned upstream commits.** The package ships no licence file for itself or its fonts. Virgil, Assistant, Cascadia and Comic Shanns were verified from their metadata. Nunito and Lilita One carry only the OFL's URL: their OFL text is to be verified before they ship. Excalifont, Liberation and Xiaolai weren't verified, and must be before they ship.
+- **Licences come from pinned upstream commits.** The package ships no licence file for itself or its fonts. Virgil, Assistant and Comic Shanns were verified from their metadata. The others were read from their upstream repositories, at the commits `FONTS.txt` names (amended 2026-10-24, lattice#679): Xiaolai, Nunito, Lilita One, Cascadia Code and Excalifont are under the SIL Open Font License, Excalifont by its name table's text alone; Xiaolai's README reserves its name, so it still waits. Liberation Sans 1.05 is not, so Liberation 2.1.5 replaces it.
   - All 81 bundled packages are on portalr's notices allow-list.
   - `@excalidraw/excalidraw`, 23 `@radix-ui` packages and `react-remove-scroll-bar` need `exceptions` entries for their missing licence files.
 

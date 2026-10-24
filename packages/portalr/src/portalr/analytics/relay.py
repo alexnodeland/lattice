@@ -17,11 +17,13 @@ import json
 import secrets
 import time
 from dataclasses import dataclass, field
+from datetime import datetime
 from importlib import resources
 from typing import Annotated, Final
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
+from grantr.core import Member, User
 from portalr.analytics.consent import Consent
 from portalr.analytics.limiter import InMemoryRateLimiter, RateLimiter
 from portalr.readers.analytics import REGISTRY, Analytics
@@ -170,7 +172,9 @@ class Relay:
         return True
 
     async def settle_owed(self, *, most: int = 100) -> int:
-        """Delete the events of at most `most` people a deletion is owed, in turn: how many.
+        """Delete the events owed deletion, in turn: how many deletions were done.
+
+        At most `most` people's, and at most `most` removals'.
 
         Every replica runs it, now and then: two may delete the same person's events, which does
         no harm, since a deletion done twice deletes nothing more.
@@ -178,7 +182,33 @@ class Relay:
         done = 0
         for user_id, debt in await self.consent.owing(most):
             done += await self.settle(user_id, debt, paced=False)
+        for user_id, tenant, removed_at in await self.consent.removals_owed(most):
+            done += await self._forget_removed(user_id, tenant, removed_at)
         return done
+
+    async def removed(self, tenant: str, user_id: str) -> bool:
+        """Delete a person's events in a tenant they were just removed from: whether it was done.
+
+        grantr runs it once the removal is kept (portalr ADR-0075). The deletion is owed first,
+        so one ClickHouse couldn't take is tried again by the background pass; their events in
+        other tenants stay.
+        """
+        removed_at = await self.consent.owe_removal(user_id, tenant)
+        return await self._forget_removed(user_id, tenant, removed_at)
+
+    async def member_removed(self, tenant: str, member: Member) -> None:
+        """Grantr's hook on a member's removal: a person's events in the tenant are deleted.
+
+        A key's principal records no events, so nothing is owed for one.
+        """
+        if isinstance(member, User):
+            await self.removed(tenant, member.id)
+
+    async def _forget_removed(self, user_id: str, tenant: str, removed_at: datetime) -> bool:
+        if not await self.analytics.forget_in(tenant, user_id, removed_at):
+            return False
+        await self.consent.removal_settled(user_id, tenant, removed_at)
+        return True
 
     async def record(self, tenant: str, user_id: str, batch: Batch, session_id: str) -> Relayed:
         """Keep the person's batch as the registry says, if they have said yes.

@@ -7,6 +7,7 @@ from pathlib import Path
 import httpx
 import pytest
 
+from grantr.core import ServicePrincipal, User
 from grantr.grants import Grants
 from portalr.analytics import InMemoryConsent, InMemoryRateLimiter, Relay
 from portalr.analytics.relay import MOST_BYTES, MOST_EVENTS, SESSION_HOURS, Batch, Event, Relayed
@@ -486,3 +487,48 @@ async def test_a_deletion_still_owed_is_read_with_the_answer_until_it_is_done(
     clickhouse.status = 200
     read = await client.get("/v1/analytics/consent", headers=ALICE)
     assert read.json() == {"given": False, "deleting": False}
+
+
+async def test_a_person_removed_from_a_tenant_has_their_events_there_deleted(
+    relay: Relay, clickhouse: ClickHouse
+) -> None:
+    assert await relay.removed("acme", "bob")
+    (deletion,) = clickhouse.requests
+    params = deletion.url.params
+    assert deletion.content.decode() == (
+        "DELETE FROM analytics.events WHERE distinct_id = {person:FixedString(32)}"
+        " AND tenant_id = {tenant:String} AND ts <= {until:DateTime64(3, 'UTC')}"
+    )
+    assert params["param_person"] == distinct_id(KEY, "bob")
+    assert params["param_tenant"] == "acme"
+    assert params["param_until"]
+    assert await relay.consent.removals_owed(100) == [], "done, so no longer owed"
+
+
+async def test_a_removals_deletion_clickhouse_refuses_is_owed_and_done_later(
+    relay: Relay, clickhouse: ClickHouse
+) -> None:
+    clickhouse.status = 503
+    assert not await relay.removed("acme", "bob")
+    owed = await relay.consent.removals_owed(100)
+    assert [(user, tenant) for user, tenant, _ in owed] == [("bob", "acme")]
+    assert await relay.settle_owed() == 0
+    clickhouse.status = 200
+    assert await relay.settle_owed() == 1
+    assert await relay.consent.removals_owed(100) == []
+    # The same moment, each time it is tried: events written after the removal stay.
+    untils = {r.url.params["param_until"] for r in clickhouse.requests}
+    assert len(untils) == 1
+
+
+async def test_grantrs_hook_deletes_a_persons_events_and_nothing_for_a_key(
+    relay: Relay, clickhouse: ClickHouse, grants: Grants
+) -> None:
+    grants.on_member_removed(relay.member_removed)
+    await grants.add_member("acme", ServicePrincipal(id="ci"), by=User(id="alice"))
+    await grants.remove_member("acme", ServicePrincipal(id="ci"), by=User(id="alice"))
+    assert clickhouse.requests == []
+    await grants.remove_member("acme", User(id="bob"), by=User(id="alice"))
+    (deletion,) = clickhouse.requests
+    assert deletion.url.params["param_person"] == distinct_id(KEY, "bob")
+    assert deletion.url.params["param_tenant"] == "acme"

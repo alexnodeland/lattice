@@ -1,12 +1,13 @@
 import { expect, test } from "vitest";
-import { invalidSaid, pathsOf, reasons, refusalSaid, runOn } from "./reasons";
+import { pathsOf } from "./paths";
+import { invalidSaid, refusalSaid, runOn } from "./reasons";
 
 const HIDDEN = String.fromCodePoint(0x202e);
 /** A detail as a hostile or careless server might send it: long, on lines, with markup, a
  * direction override and a secret. */
 const HOSTILE = `${HIDDEN}txt.exe\n<img src=x onerror=alert(1)>\npassword=hunter2 ${"x".repeat(5000)}`;
 
-test("no words of a server's reach the reader, however the refusal carries them", () => {
+test("no words of a server's reach the reader, however the refusal carries them", async () => {
   const bodies = [
     HOSTILE,
     { detail: HOSTILE },
@@ -20,7 +21,9 @@ test("no words of a server's reach the reader, however the refusal carries them"
   ];
   for (const status of [400, 403, 404, 409, 422, 500, 503]) {
     for (const body of bodies) {
-      const said = [refusalSaid(status, body), ...reasons(status, body)].join(" ");
+      const said = [await refusalSaid(status, body), await refusalSaid(status, body, true)].join(
+        " ",
+      );
       for (const part of ["hunter2", "img", "onerror", "txt.exe", HIDDEN, "\n", "xxxx"]) {
         expect(said).not.toContain(part);
       }
@@ -29,9 +32,9 @@ test("no words of a server's reach the reader, however the refusal carries them"
   }
 });
 
-test("values that aren't valid are said with where they are, the fields' paths alone", () => {
+test("values that aren't valid are said with where they are, the fields' paths alone", async () => {
   expect(
-    refusalSaid(422, {
+    await refusalSaid(422, {
       detail: [
         { loc: ["body", "command", "install_rule", "rule", "when"], msg: "Field required" },
         { loc: ["query", "start"], msg: "Input should be a valid datetime" },
@@ -40,19 +43,23 @@ test("values that aren't valid are said with where they are, the fields' paths a
     }),
   ).toBe("What was asked for isn't valid: rule.when, start, items.2.name.");
   expect(
-    refusalSaid(422, {
+    await refusalSaid(422, {
       rejection: { type: "validation_failed", errors: [{ loc: ["answer", "email"], msg: "no" }] },
     }),
   ).toBe("What was asked for isn't valid: answer.email.");
   expect(pathsOf([{ loc: ["body", "a b"] }, { loc: ["body", "x".repeat(65)] }, "loc"])).toEqual([]);
 });
 
-test("a known code, then the status, says the sentence; a command's forbidden is an action's", () => {
-  expect(refusalSaid(403, { detail: { type: "forbidden" } })).toBe("You may not see this.");
-  expect(reasons(403, { detail: { type: "forbidden" } })).toEqual(["You may not do this here."]);
-  expect(refusalSaid(409, { detail: { type: "artifact_busy" } })).toBe("Someone else has it now.");
-  expect(refusalSaid(413, null)).toBe("That's too large.");
-  expect(refusalSaid(418, null)).toBe("Something went wrong. Try again in a moment.");
+test("a known code, then the status, says the sentence; a command's forbidden is an action's", async () => {
+  expect(await refusalSaid(403, { detail: { type: "forbidden" } })).toBe("You may not see this.");
+  expect(await refusalSaid(403, { detail: { type: "forbidden" } }, true)).toBe(
+    "You may not do this here.",
+  );
+  expect(await refusalSaid(409, { detail: { type: "artifact_busy" } })).toBe(
+    "Someone else has it now.",
+  );
+  expect(await refusalSaid(413, null)).toBe("That's too large.");
+  expect(await refusalSaid(418, null)).toBe("Something went wrong. Try again in a moment.");
 });
 
 test("paths are capped, and none names a secret-shaped key", () => {

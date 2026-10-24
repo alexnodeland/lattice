@@ -11,7 +11,7 @@ import type { components as Files } from "./generated/files.openapi";
 import type { components as Grantr } from "./generated/grantr.openapi";
 import type { components as Portalr } from "./generated/portalr.openapi";
 import type { components } from "./generated/reflexr.openapi";
-import { reasons, runOn } from "./reasons";
+import { refusalSaid, runOn } from "./reasons";
 import { type Api, named } from "./rest";
 
 type Command = components["schemas"]["Command"];
@@ -86,7 +86,7 @@ export function createCommands(api: Api, unsigned: () => void = () => {}) {
     return {
       outcome: "refused",
       status: response.status,
-      reasons: reasons(response.status, data ?? error),
+      reasons: [await refusalSaid(response.status, data ?? error, true)],
     };
   }
   /** A grantr request in a tenant, with any more of its path: the header names it, as every read sends. */

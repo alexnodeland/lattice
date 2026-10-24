@@ -65,94 +65,34 @@ function reasonOf(body: unknown): string | undefined {
   return typeof type === "string" ? type : undefined;
 }
 
-/** Where in a request FastAPI says an error is, which isn't part of a field's path. */
-const WHERE = new Set(["body", "query", "path", "header", "cookie"]);
-
-/** A part of a field's path as a reader may see it: a name or an index, at most 32 long. */
-const PART = /^[A-Za-z0-9_-]{1,32}$/u;
-
-/** A part that names what may be a secret, or is shaped like one: its path isn't shown. */
-const SECRET =
-  /token|secret|passw|api[_-]?key|credential|bearer|authorization|^(sk|pk|rk|gh[pousr])[_-]/iu;
-
-/** The most paths told, the most parts in each, and the most characters of them all. */
-const MOST_PATHS = 5;
-const MOST_PARTS = 6;
-const MOST_SAID = 160;
-
-/** Where in a `loc` a field's path starts: after a command frame's own parts, or where it is. */
-function startOf(loc: readonly unknown[]): number {
-  const command = loc.indexOf("command");
-  if (command !== -1) {
-    return command + 2;
-  }
-  return WHERE.has(String(loc[0])) ? 1 : 0;
-}
-
-/**
- * Where FastAPI's or Pydantic's errors say the values aren't valid: each error's `loc` as a dotted
- * path, from where `startOf` says. A path is told only if each of its parts is a plain name or
- * index of at most 32 characters, none of them secret-shaped, and it has at most six; at most
- * five paths are told, of at most 160 characters in all. So no text of the server's, nor a
- * secret it put in a key, comes through one.
- */
-export function pathsOf(errors: unknown): string[] {
-  if (!Array.isArray(errors)) {
-    return [];
-  }
-  const paths = new Set<string>();
-  let said = 0;
-  for (const error of errors) {
-    if (paths.size === MOST_PATHS) {
-      break;
-    }
-    if (!(isRecord(error) && Array.isArray(error.loc))) {
-      continue;
-    }
-    const loc: readonly unknown[] = error.loc;
-    const parts = loc.slice(startOf(loc)).map(String);
-    const shown =
-      parts.length > 0 &&
-      parts.length <= MOST_PARTS &&
-      parts.every((part) => PART.test(part) && !SECRET.test(part));
-    const path = parts.join(".");
-    if (shown && !paths.has(path) && said + path.length <= MOST_SAID) {
-      paths.add(path);
-      said += path.length;
-    }
-  }
-  return [...paths];
-}
-
 /** What values that aren't valid say, with where they are, if known: "…isn't valid: a, b." */
 export function invalidSaid(paths: readonly string[]): string {
   return paths.length > 0 ? `${INVALID.slice(0, -1)}: ${paths.join(", ")}.` : INVALID;
 }
 
-/** The paths a refusal says aren't valid: FastAPI's `detail` list, or a rejection's `errors`. */
-function invalidAt(body: unknown): string[] {
-  if (!isRecord(body)) {
-    return [];
-  }
-  return Array.isArray(body.detail) ? pathsOf(body.detail) : pathsOf(typedOf(body).errors);
-}
-
 /**
- * The sentence a reader is told of a refusal: by its reason code, then its status, else the
- * generic one; where it is of values that aren't valid, with where they are. `acting` is for a
- * command's refusal, whose reader wasn't allowed to do something rather than to see it.
+ * The sentence a reader is told of a refusal, but where values aren't valid: by its reason code,
+ * then its status, else the generic one. `acting` is for a command's refusal, whose reader wasn't
+ * allowed to do something rather than to see it.
  */
-export function refusalSaid(status: number, body: unknown, acting = false): string {
+export function sentenceOf(status: number, body: unknown, acting = false): string {
   const reason = REASONS.get(reasonOf(body) ?? "");
   const byStatus = status >= 500 ? `The server had a problem.${AGAIN}` : STATUSES.get(status);
   const read = reason ?? byStatus ?? GENERIC;
-  const said = acting && read === FORBIDDEN ? NOT_ALLOWED : read;
-  return said === INVALID ? invalidSaid(invalidAt(body)) : said;
+  return acting && read === FORBIDDEN ? NOT_ALLOWED : read;
 }
 
-/** Each reason a command's refusal gives, as its sender is told it: one sentence of the kit's own. */
-export function reasons(status: number, body: unknown): string[] {
-  return [refusalSaid(status, body, true)];
+/**
+ * The sentence a reader is told of a refusal, as `sentenceOf` says it; where it is of values that
+ * aren't valid, with where they are. Reading where is rare, so it loads only then.
+ */
+export async function refusalSaid(status: number, body: unknown, acting = false): Promise<string> {
+  const said = sentenceOf(status, body, acting);
+  if (said !== INVALID) {
+    return said;
+  }
+  const { invalidAt } = await import("./paths");
+  return invalidSaid(invalidAt(body));
 }
 
 /**

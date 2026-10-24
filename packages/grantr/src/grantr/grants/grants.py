@@ -209,9 +209,11 @@ class Grants:
         Each hook is awaited in turn after the removal commits, with the tenant and the member.
         One that fails is logged, by its error's type, and changes nothing: the removal stands,
         and the other hooks run. A hook that must not miss a removal keeps its own work owed, as
-        portalr's does (grantr ADR-0036).
+        portalr's does (grantr ADR-0036). Registering the same hook again changes nothing. A
+        removal cancelled while its hooks run, as its request is, skips the hooks still to run.
         """
-        self._on_member_removed.append(hook)
+        if hook not in self._on_member_removed:
+            self._on_member_removed.append(hook)
 
     # ─── checks ──────────────────────────────────────────────────────────────
 
@@ -659,7 +661,8 @@ class Grants:
             try:
                 await hook(tenant, member)
             except Exception as error:  # A hook never undoes, or fails, the removal it follows.
-                logger.warning("a member-removed hook failed: %s", type(error).__name__)
+                named = getattr(hook, "__qualname__", "hook")
+                logger.warning("member-removed hook %s failed: %s", named, type(error).__name__)
         return entry
 
     async def define_group(

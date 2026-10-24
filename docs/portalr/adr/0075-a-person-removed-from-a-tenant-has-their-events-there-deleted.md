@@ -14,11 +14,14 @@ Settles [lattice RFC-0008](../../rfcs/0008-portalr-product-analytics.md)'s open 
 ## Decision
 
 - **Removal from a tenant deletes that tenant's events of the person,** up to the moment of the removal (the owner's decision): `DELETE … WHERE distinct_id = <their hash> AND tenant_id = <the tenant> AND ts <= <removed at>`, a lightweight delete by portalr's writer. Their events in other tenants stay. Events after the removal stay too, should they be added back and say yes again.
-- **It is owed before it is tried.** The relay registers `Relay.member_removed` with grantr's hook.
-  - The hook first owes the deletion: `portalr_analytics_removals_owed` gets one row per person and tenant, with when they were removed. Then it tries the deletion, and clears the row only if that is still the removal owed.
-  - A deletion ClickHouse couldn't take is tried again by the background pass every replica already runs, `Relay.settle_owed`.
+- **The hook only owes; the background pass deletes.** The relay registers `Relay.member_removed` with grantr's hook.
+  - The hook writes one row to `portalr_analytics_removals_owed`, per person and tenant, with when they were removed, and returns. The admin's removal never waits on ClickHouse.
+  - The background pass every replica already runs, `Relay.settle_owed`, deletes each owed removal at least 30 seconds after it (`REMOVAL_GRACE`). By then a batch the relay accepted just before the removal has landed: ClickHouse gathers asynchronous inserts for up to a second. It is deleted with the rest, with no second delete needed.
+  - The pass clears the row only if that is still the removal owed, and a deletion ClickHouse couldn't take stays owed for the next pass.
   - A key's principal records no events, so nothing is owed for one.
-- **The table is the tables' owner's alone.** An admin removes another person, so the row is no person's own: it is written and read as the owner, and the role the application connects as is granted nothing on it. It is portalr's second migration.
+- **It isn't paced per person.** The person's own requests set off at most so many deletions an hour, which stops a person from flooding ClickHouse with mutations. A removal is an admin's grantr command, not the person's request, and its deletion is made by the background pass, which isn't paced for consent's deletions either: each pass takes at most 100 removals.
+- **The cut-off is 5 seconds past the removal** (`REMOVAL_MARGIN`). An event is stamped by the replica that relayed it, and that replica's clock may run a little ahead of the one that removed the person. The cost is that a person added back and sharing again within those seconds has those few seconds of new events deleted too.
+- **The table is the tables' owner's alone.** An admin removes another person, so the row is no person's own: it is written and read as the owner, and the role the application connects as is granted nothing on it. On PostgreSQL it has row-level security with no policy, so a grant made by default, such as Supabase's to its public roles, reads nothing; the owner bypasses it. It is portalr's second migration.
 - **The template wires it** in `Portal.mount`, where the relay is made. So it runs only where the portal, analytics and the application's database are configured.
 - **Replays,** when they come (RFC-0008, P8), are deleted by the same hook.
 
@@ -31,4 +34,6 @@ Settles [lattice RFC-0008](../../rfcs/0008-portalr-product-analytics.md)'s open 
 
 - A tenant's adoption no longer counts a person removed from it.
 - A second removal from the same tenant, before the first is settled, owes up to the later moment.
+- **A removal whose process stops between grantr's commit and the hook's write is never owed.** The owner accepted this for now. [#697](https://github.com/alexnodeland/lattice/issues/697) reconciles removals from grantr's audit log, after a high-water mark, which also gives the entry's commit time as the cut-off.
+- A person's own no needs no grace period. The relay reads their answer again after each write, which waits for ClickHouse to take it. A batch that lands after the no is deleted then, with a deletion owed of its own.
 - Deleting a whole tenant isn't a removal, so it deletes nothing here; that is the operator's to do.

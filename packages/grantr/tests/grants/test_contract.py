@@ -1293,10 +1293,12 @@ async def test_a_removal_runs_each_hook_once_it_is_kept_and_a_failing_one_change
 
     grants.on_member_removed(first)
     grants.on_member_removed(second)
+    grants.on_member_removed(second)  # again: still once
     await grants.remove_member("acme", BOB, by=ALICE)
     # Each ran after the removal was kept, in turn, the failing one's error logged by its type.
     assert ran == [("acme", BOB, False), ("acme", BOB, False)]
     assert not await grants.check("acme", BOB, "artifactr:read_artifacts", TENANT)
+    assert "first" in caplog.text
     assert "RuntimeError" in caplog.text
     assert "secret detail" not in caplog.text
     # A removal refused runs none.

@@ -30,6 +30,10 @@ def upgrade() -> None:
         sa.Column("removed_at", sa.DateTime(timezone=True), nullable=False),
         sa.PrimaryKeyConstraint("user_id", "tenant_id", name=op.f("pk_" + TABLE)),
     )
+    if op.get_bind().dialect.name == "postgresql":
+        # No policy: the owner, who bypasses it, reads and writes it, and a grant made by default,
+        # as Supabase makes to its public roles, reads nothing.
+        op.execute(f"ALTER TABLE {TABLE} ENABLE ROW LEVEL SECURITY")
 
 
 def downgrade() -> None:

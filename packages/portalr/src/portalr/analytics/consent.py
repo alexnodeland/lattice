@@ -52,8 +52,10 @@ class Consent(Protocol):
         """Clear the deletion owed for that removal, only if no later one is owed since."""
         ...
 
-    async def removals_owed(self, most: int) -> list[tuple[str, str, datetime]]:
-        """At most `most` removals whose deletion is owed, the oldest first."""
+    async def removals_owed(
+        self, most: int, *, before: datetime | None = None
+    ) -> list[tuple[str, str, datetime]]:
+        """At most `most` removals whose deletion is owed, the oldest first, removed `before`."""
         ...
 
 
@@ -107,7 +109,12 @@ class InMemoryConsent:
         if self._removals.get((user_id, tenant)) == removed_at:
             del self._removals[user_id, tenant]
 
-    async def removals_owed(self, most: int) -> list[tuple[str, str, datetime]]:
-        """At most `most` removals whose deletion is owed, the oldest first."""
-        owed = sorted(self._removals.items(), key=lambda removal: (removal[1], removal[0]))
+    async def removals_owed(
+        self, most: int, *, before: datetime | None = None
+    ) -> list[tuple[str, str, datetime]]:
+        """At most `most` removals whose deletion is owed, the oldest first, removed `before`."""
+        owed = sorted(
+            (item for item in self._removals.items() if before is None or item[1] < before),
+            key=lambda removal: (removal[1], removal[0]),
+        )
         return [(user_id, tenant, at) for (user_id, tenant), at in owed[:most]]

@@ -248,20 +248,18 @@ class SqlConsent:
                 )
             )
 
-    async def removals_owed(self, most: int) -> list[tuple[str, str, datetime]]:
-        """At most `most` removals whose deletion is owed, the oldest first."""
+    async def removals_owed(
+        self, most: int, *, before: datetime | None = None
+    ) -> list[tuple[str, str, datetime]]:
+        """At most `most` removals whose deletion is owed, the oldest first, removed `before`."""
+        query = select(Removal.user_id, Removal.tenant_id, Removal.removed_at)
+        if before is not None:
+            query = query.where(Removal.removed_at < before)
         async with self._owner.connect() as connection:
             rows = await connection.execute(
-                select(Removal.user_id, Removal.tenant_id, Removal.removed_at)
-                .order_by(Removal.removed_at, Removal.user_id, Removal.tenant_id)
-                .limit(most)
+                query.order_by(Removal.removed_at, Removal.user_id, Removal.tenant_id).limit(most)
             )
             return [(row.user_id, row.tenant_id, _utc(row.removed_at)) for row in rows]
-
-
-def _utc(at: datetime) -> datetime:
-    """A moment as the database gave it, in UTC: SQLite gives it without its zone."""
-    return at if at.tzinfo is not None else at.replace(tzinfo=UTC)
 
 
 def _upsert(connection: AsyncConnection) -> Callable[..., Any]:
@@ -275,3 +273,8 @@ async def _as_person(connection: AsyncConnection, user_id: str) -> None:
         await connection.execute(
             text("SELECT set_config('portalr.user_id', :person, true)"), {"person": user_id}
         )
+
+
+def _utc(at: datetime) -> datetime:
+    """A moment as the database gave it, in UTC: SQLite gives it without its zone."""
+    return at if at.tzinfo is not None else at.replace(tzinfo=UTC)

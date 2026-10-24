@@ -81,6 +81,7 @@ nav:
   - adr/0068-where-the-focus-goes-and-one-not-found.md
   - adr/0069-a-connected-apps-tools-chosen-in-admin-and-a-way-in-for-workspace-admins.md
   - adr/0071-adoption-the-tenants-read-and-page.md
+  - adr/0072-a-diagrams-card-and-its-canvas-to-look-at.md
   - adr/0073-a-requests-analytics-session-on-its-trace.md
   - adr/0076-the-relay-sends-umami-a-copy-and-deletes-there-too.md
 - RFCs:

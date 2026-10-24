@@ -9,7 +9,7 @@ description, ported, held equal to it by a shared fixture when the port lands.
 import math
 import unicodedata
 from collections.abc import Iterable, Mapping
-from typing import Final
+from typing import Final, TypeGuard
 
 from pydantic import JsonValue
 
@@ -25,15 +25,21 @@ Element = Mapping[str, JsonValue]
 
 
 def describe(name: str, elements: Mapping[str, Element]) -> str:
-    """Describe a diagram's live elements, as the agent and assistive technology read it."""
-    live = {key: e for key, e in elements.items() if not e.get("isDeleted")}
+    """Describe a diagram's live elements, as the agent and assistive technology read it.
+
+    Its elements are read in the order JavaScript reads a JSON object's keys, so portalr's port,
+    which reads them so, describes them in the same order: the keys that are array indexes first,
+    as numbers, then the rest as written. Only strings are words, and only numbers (not booleans)
+    are places, so what JSON holds reads alike in both.
+    """
+    live = {key: e for key, e in _ordered(elements) if not e.get("isDeleted")}
     labels = _labels(live)
     frames: list[str] = []
     shapes: list[str] = []
     arrows: list[str] = []
     texts: list[str] = []
     for key, element in live.items():
-        kind = str(element.get("type"))
+        kind = _words(element.get("type"))
         if kind in {"frame", "magicframe"}:
             frames.append(f"- {_name(element, key)}")
         elif kind in _SHAPES:
@@ -54,6 +60,32 @@ def describe(name: str, elements: Mapping[str, Element]) -> str:
         if part:
             lines.extend([f"{title} ({len(part)}):", *part])
     return _cut("\n".join(lines))
+
+
+_INDEX: Final = 2**32 - 2
+"""The largest array index, which JavaScript orders a key by as a number."""
+
+
+def _ordered(elements: Mapping[str, Element]) -> list[tuple[str, Element]]:
+    """The elements in the order JavaScript reads an object's keys: array indexes, then the rest."""
+    indexes = [
+        key
+        for key in elements
+        if key.isascii() and key.isdigit() and str(int(key)) == key and int(key) <= _INDEX
+    ]
+    first = set(indexes)
+    rest = [key for key in elements if key not in first]
+    return [(key, elements[key]) for key in [*sorted(indexes, key=int), *rest]]
+
+
+def _words(value: JsonValue) -> str:
+    """A string as words, and anything else as none."""
+    return value if isinstance(value, str) else ""
+
+
+def _number(value: JsonValue) -> TypeGuard[int | float]:
+    """Whether a value is a number, as JavaScript has it: a boolean is not one."""
+    return isinstance(value, int | float) and not isinstance(value, bool)
 
 
 def _labels(elements: Mapping[str, Element]) -> dict[str, str]:
@@ -78,7 +110,7 @@ def _name(element: Element, key: str) -> str:
 def _arrow(element: Element, labels: Mapping[str, str], live: Mapping[str, Element]) -> str:
     start = _bound(element.get("startBinding"), live)
     end = _bound(element.get("endBinding"), live)
-    label = labels.get(str(element.get("id")))
+    label = labels.get(_words(element.get("id")))
     via = f"--{label}-->" if label else "-->"
     left = _named(labels, start) if start else "(free)"
     right = _named(labels, end) if end else "(free)"
@@ -99,12 +131,7 @@ def _box(elements: Iterable[Element]) -> str | None:
     for element in elements:
         x, y = element.get("x"), element.get("y")
         width, height = element.get("width", 0), element.get("height", 0)
-        if (
-            isinstance(x, int | float)
-            and isinstance(y, int | float)
-            and isinstance(width, int | float)
-            and isinstance(height, int | float)
-        ):
+        if _number(x) and _number(y) and _number(width) and _number(height):
             edge = (x, y, x + width, y + height)
             if all(math.isfinite(e) for e in edge):
                 edges.append(edge)
@@ -123,7 +150,7 @@ def _quote(text: JsonValue) -> str:
     Control characters go, such as a terminal's escapes, and so do the bidirectional controls and
     tag characters that would make what the agent reads say something else than it holds.
     """
-    shown = "".join(c for c in " ".join(str(text or "").split()) if _shown(c))
+    shown = "".join(c for c in " ".join(_words(text).split()) if _shown(c))
     said = " ".join(shown.split())[:80]
     return '"' + said.replace("\\", "\\\\").replace('"', '\\"') + '"'
 

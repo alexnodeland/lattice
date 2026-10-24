@@ -404,7 +404,9 @@ Each is settled in phase 0's ADR or carried as an exit criterion.
 - [ ] artifactr-files: the collector's kinds
 - [ ] artifactr's `excalidraw` extra: its type, patches, checks and `render_for_agent` (done: artifactr ADR-0086, with phase 0's limits, and `excalidraw` off by default); its toolset and converter (done: [artifactr ADR-0090](../artifactr/adr/0090-diagrams-drawn-by-the-agent-through-a-converter.md)); its router
 - [x] stackr: the worker, its image and the `diagrams` question ([stackr ADR-0049](../stackr/adr/0049-the-diagrams-worker-excalidraw-in-headless-chromium-behind-a-relay.md)); Xiaolai in its image waits for lattice#679
-- [ ] portalr: ADR-0041's policy and allow-list test, the `canvas` budget, the renderer, the canvas, presence, the list, the overlay, admin's Integrations page
+- [x] portalr, phase 3a: the renderer, its text alternative held to artifactr's by a shared fixture, and the canvas to look at, an add-on with its budget, under the policy unchanged ([portalr ADR-0072](../portalr/adr/0072-a-diagrams-card-and-its-canvas-to-look-at.md))
+- [ ] portalr, phase 3b: editing on the canvas, the TypeScript patch builder, an upload route for a diagram's images with checks of size and type, no SVG images, and `img-src blob:`
+- [ ] portalr: presence, the list, the overlay, admin's Integrations page
 - [ ] The `[relayr]` projections and feedback anchors
 - [ ] Docs: the package's guide, its ADRs, and the architecture
 

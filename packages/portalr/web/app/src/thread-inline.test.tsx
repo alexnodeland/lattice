@@ -7,6 +7,8 @@
  */
 
 import { afterEach, expect, test, vi } from "vitest";
+import { userEvent } from "vitest/browser";
+import DIAGRAM from "../../ui/csp/diagram.json";
 import { open } from "./test/app";
 import { AT, FLAGS, PNG, Upload } from "./test/files";
 import { kindName } from "./thread-artifact";
@@ -78,6 +80,7 @@ const manifest = (name: string, mediaType: string, outline: string, pages: numbe
 
 const DATA: Record<string, readonly [string, Record<string, unknown>]> = {
   note_1: ["note", { text: "# Plan\n\nShip the **brief** on Friday." }],
+  diag_1: ["excalidraw_diagram", DIAGRAM],
   form_1: ["form", POLL],
   cad_1: [
     "cad_model",
@@ -225,6 +228,36 @@ test("a note is shown where it was made, named, with a full view that keeps it",
   await expect.element(full).not.toBeInTheDocument();
   expect(document.querySelector("[inert]")).toBeNull();
   await expect.poll(() => document.activeElement?.getAttribute("aria-label")).toBe("Full view");
+});
+
+test("a diagram opens on its canvas from its full view, and each gives the focus back", async () => {
+  const { screen } = await open(THREAD, serving(), undefined, {
+    artifactrLog: thread([["diag_1", "excalidraw_diagram"]]),
+  });
+  const card = screen.getByRole("listitem", { name: "Stack" });
+  await expect.element(card.getByText("Diagram · 9 elements")).toBeVisible();
+  await card.getByRole("button", { name: "Full view" }).click();
+  const full = screen.getByRole("dialog", { name: "Stack" });
+  await expect.element(full).toBeVisible();
+  const opener = full.getByRole("button", { name: "Open canvas" });
+  await opener.click();
+  // The full view behind it is hidden from assistive technology while the canvas is open.
+  const canvas = screen.getByRole("dialog", { name: "Stack" });
+  await expect.element(canvas.getByRole("button", { name: "Close canvas" })).toBeVisible();
+  await expect.poll(() => document.querySelector(".excalidraw canvas")).not.toBeNull();
+  const inCanvas = () =>
+    document.activeElement?.closest(".excalidraw, [data-base-ui-portal]") !== null &&
+    document.activeElement !== document.body;
+  // Tab stays in the canvas, the full view's own trap leaving it be.
+  for (let step = 0; step < 12; step += 1) {
+    await userEvent.keyboard("{Tab}");
+    expect(inCanvas()).toBe(true);
+  }
+  // Escape closes the canvas alone: the full view stays, and the focus is the opener's again.
+  await userEvent.keyboard("{Escape}");
+  await expect.poll(() => document.querySelector(".excalidraw")).toBeNull();
+  await expect.element(full).toBeVisible();
+  await expect.poll(() => document.activeElement).toBe(opener.element());
 });
 
 test("a form made in a thread is sent from it, as the reader", async () => {

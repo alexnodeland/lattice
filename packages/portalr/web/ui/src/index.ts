@@ -15,6 +15,7 @@ export { AppShell } from "./app-shell";
 export { useAppearance } from "./appearance";
 export {
   ArtifactContent,
+  capped,
   type Data,
   Diff,
   json,
@@ -66,7 +67,7 @@ export { ConfirmDialog } from "./confirm-dialog";
 export { CopyButton } from "./copy-button";
 export { type FormOf, PANELS, type PanelProps, type PanelRenderers } from "./dashboard-panels";
 export { DashboardView } from "./dashboard-view";
-export { Dialog } from "./dialog";
+export { Dialog, WholeDialog } from "./dialog";
 export { Disclosure } from "./disclosure";
 export { EmptyState } from "./empty-state";
 export { ErrorState } from "./error-state";

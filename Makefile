@@ -7,9 +7,6 @@ UV ?= uv
 BUN ?= bun
 MOON ?= moon
 
-# The stack's images and the application's run natively (scripts/dev).
-unexport DOCKER_DEFAULT_PLATFORM
-
 .PHONY: help install check dev dev-down dev-status dev-reset
 
 help: ## List the available commands

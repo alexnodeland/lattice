@@ -1,0 +1,153 @@
+#!/usr/bin/env bash
+# Check scripts/dev without starting anything: against a fake `docker`, `make`, `uv` and `git
+# fetch`, and a made-up stackr directory, it checks what each command runs, in what order, and
+# what it refuses before anything starts (stackr ADR-0053). moon's `lattice:check-dev` task runs it.
+# `check` runs the checks' functions, which shellcheck can't follow.
+# shellcheck disable=SC2329
+set -euo pipefail
+cd "$(dirname "$0")/.."
+root=$PWD
+status=0
+scratch=$(mktemp -d)
+trap 'rm -rf "$scratch"' EXIT
+
+check() {
+  local what=$1
+  shift
+  if "$@"; then echo "ok: $what"; else echo "FAIL: $what"; status=1; fi
+}
+refused() { ! "$@" >"$scratch/out" 2>&1; }
+said() { grep -qF "$1" "$scratch/out"; }
+# Whether nothing was started: no make target but env, and no docker call.
+nothing_started() { ! grep -qE '^docker|^make .* up' "$scratch/calls"; }
+
+real_uv=$(command -v uv)
+mkdir -p "$scratch/bin" "$scratch/stackr"
+cp packages/stackr/copier.yml "$scratch/stackr/"
+cat >"$scratch/bin/docker" <<'FAKE'
+#!/usr/bin/env bash
+echo "docker $*" >>"$CALLS"
+[[ $* == "context show" ]] && echo default
+exit 0
+FAKE
+cat >"$scratch/bin/make" <<'FAKE'
+#!/usr/bin/env bash
+echo "make $*" >>"$CALLS"
+if [[ $4 == env && $3 == "$APP" ]]; then
+  (umask 077 && : >"$APP/.env")
+fi
+exit 0
+FAKE
+# uv runs Python itself; Copier, the lock and stackr's scripts are made up.
+cat >"$scratch/bin/uv" <<FAKE
+#!/usr/bin/env bash
+case "\$*" in
+  *"copier copy"*)
+    echo "uv copier" >>"\$CALLS"
+    dest="\${*: -1}"
+    mkdir -p "\$dest"
+    [[ \${FAKE_RENDER:-} == fail ]] && exit 1
+    printf '_commit: %s\n' "\$(git -C "$root" rev-parse HEAD)" >"\$dest/.copier-answers.yml"
+    printf 'name: portal\n' >"\$dest/compose.yaml"
+    printf '[project]\nname = "portal"\n' >"\$dest/pyproject.toml"
+    exit 0 ;;
+  lock*) exit 0 ;;
+  *scripts/create-tenant*) echo "uv create-tenant" >>"\$CALLS"; printf '%s' "\${FAKE_TENANT_KEY-sk-tenant-made-up}"; exit 0 ;;
+  *scripts/create-portal-key*)
+    echo "uv create-portal-key" >>"\$CALLS"
+    [[ \${FAKE_PORTAL:-0} == 0 ]] && echo sk-portal-made-up
+    exit "\${FAKE_PORTAL:-0}" ;;
+  *scripts/wire-app*) cat >>"\$APP/.env"; exit 0 ;;
+esac
+exec "$real_uv" "\$@"
+FAKE
+# git as it is, but for fetch, which needs no network here, and origin, which has every commit
+# but UNPUSHED.
+cat >"$scratch/bin/git" <<FAKE
+#!/usr/bin/env bash
+[[ \$1 == fetch ]] && exit 0
+if [[ \$1 == for-each-ref ]]; then
+  [[ \$3 == "\${UNPUSHED:-}" ]] || echo "origin/main"
+  exit 0
+fi
+exec "$(command -v git)" "\$@"
+FAKE
+chmod +x "$scratch/bin/"*
+
+# A run of scripts/dev against the fakes, with a stackr .env on ADAPTER (none: no .env).
+dev() {
+  local adapter=$1
+  shift
+  rm -f "$scratch/stackr/.env"
+  [[ $adapter == none ]] || echo "STACKR_DATABASE=$adapter" >"$scratch/stackr/.env"
+  : >"$scratch/calls"
+  env PATH="$scratch/bin:$PATH" CALLS="$scratch/calls" APP="$scratch/app" DEV_APP_DIR="$scratch/app" \
+    DEV_STACKR_DIR="$scratch/stackr" "$@"
+}
+# up, with what it says in $scratch/out.
+up() { dev postgres scripts/dev up >"$scratch/out" 2>&1; }
+key() { sed -n "s/^$1=//p" "$scratch/app/.env" | head -n 1; }
+
+check "up refuses a stack on local Supabase" refused dev supabase scripts/dev up
+check "and says so, before anything starts" said "chooses STACKR_DATABASE=supabase"
+check "and starts nothing" nothing_started
+
+unpushed=$(git commit-tree "HEAD^{tree}" -p HEAD -m "not pushed")
+check "up refuses a commit that isn't on origin" refused dev none env DEV_REF="$unpushed" UNPUSHED="$unpushed" scripts/dev up
+check "and says so" said "isn't on origin"
+check "and starts nothing" nothing_started
+
+check "up refuses an application whose generation failed" refused dev postgres env FAKE_RENDER=fail scripts/dev up
+check "and leaves no application, only what it was generating" test ! -e "$scratch/app" -a -d "$scratch/app.rendering"
+
+check "up generates the application, and starts both" up
+check "and removed what the failed run left" test ! -e "$scratch/app.rendering"
+check "with stackr's stack on postgres, before the application" grep -qE \
+  "^make -s -C $scratch/stackr up PROFILES=observability langfuse gateway auth analytics umami STACKR_DATABASE=postgres$" "$scratch/calls"
+check "its keys and choices in its .env, mode 0600" test \
+  "$(key LITELLM_API_KEY) $(key PORTAL_LITELLM_KEY) $(key DIAGRAMS) $(uv run python -c 'import os, sys; print(oct(os.stat(sys.argv[1]).st_mode & 0o777))' "$scratch/app/.env")" = \
+  "sk-tenant-made-up sk-portal-made-up on 0o600"
+check "every crafting app but Blender" test "$(key FILES_CRAFTS | tr , '\n' | grep -c .) $(key FILES_CRAFTS | grep -c blender)" = "10 0"
+check "and db-roles before the start" grep -q "run --rm --no-deps -T app portal-admin db-roles" "$scratch/calls"
+check "never printing a key" refused grep -q made-up "$scratch/out"
+
+up
+check "up again generates nothing and makes no key" refused grep -qE "copier|create-tenant|create-portal-key" "$scratch/calls"
+
+rm -rf "$scratch/app"
+check "a key made before a later failure is kept" refused dev postgres env FAKE_PORTAL=1 scripts/dev up
+check "in the application's .env" test "$(key LITELLM_API_KEY)" = sk-tenant-made-up
+check "and the failure is said" said "making portalr's spend-read key failed"
+check "up doesn't make that key again" up
+check "but makes the one that failed" test "$(grep -c create-tenant "$scratch/calls") $(key PORTAL_LITELLM_KEY)" = "0 sk-portal-made-up"
+rm -rf "$scratch/app"
+check "up refuses a tenant key it can't read back" refused dev postgres env FAKE_TENANT_KEY= scripts/dev up
+check "and says how to recover" said "delete it on the gateway"
+rm -rf "$scratch/app" && mkdir -p "$scratch/app" && echo mine >"$scratch/app/notes"
+check "up refuses a directory that isn't an application it generated" refused dev postgres scripts/dev up
+check "and says so, before anything starts" said "isn't an application make dev generated"
+rm -rf "$scratch/app" && up
+
+dev postgres scripts/dev down >/dev/null 2>&1
+check "down stops the application, then the stack, keeping their data" test \
+  "$(grep -c -e --volumes -e ' -v' "$scratch/calls") $(sed -n 1p "$scratch/calls")" = "0 make -s -C $scratch/app down"
+
+check "reset refuses without a terminal" refused dev postgres scripts/dev reset </dev/null
+check "and calls no docker" test ! -s "$scratch/calls"
+# A terminal, which pty gives it, and an answer.
+in_terminal() {
+  printf '%s\n' "$1" | dev postgres env COMPOSE_PROJECT_NAME=elsewhere \
+    uv run python -c 'import pty, sys; sys.exit(pty.spawn(["scripts/dev", "reset"]) >> 8)'
+}
+in_terminal no >"$scratch/out" 2>&1 || true
+check "reset deletes nothing unless told yes" refused grep -q down "$scratch/calls"
+in_terminal yes >"$scratch/out" 2>&1
+check "reset deletes the application's project, then the stack's, by name" test \
+  "$(grep '^docker compose' "$scratch/calls" | tr '\n' '|')" = \
+  "docker compose -p portal down --volumes|docker compose -p stackr down --volumes|"
+printf 'name: stackr\n' >"$scratch/app/compose.yaml"
+in_terminal yes >"$scratch/out" 2>&1 || true
+check "reset refuses an application named as the stack" said "which isn't an application's"
+check "and deletes nothing" refused grep -q down "$scratch/calls"
+
+exit $status

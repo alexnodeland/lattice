@@ -11,14 +11,23 @@
 # move it, take the version and each architecture's sha256 from grafana.com's list of its versions
 # (https://grafana.com/api/plugins/grafana-clickhouse-datasource/versions/<version>, `packages`),
 # and check each against the download itself:
-#   curl -fsSL '<the URL below, at the new version>' | sha256sum
-FROM scratch AS clickhouse-plugin-amd64
-ADD --checksum=sha256:fc8b4a4ff71e7db614a3560e5b5678bbab523578abca280a195e0bd30d9a52d5 \
-  "https://grafana.com/api/plugins/grafana-clickhouse-datasource/versions/4.22.1/download?os=linux&arch=amd64" /plugin.zip
-FROM scratch AS clickhouse-plugin-arm64
-ADD --checksum=sha256:c9140657df5c87d1736cee522dd4f213395138fa88c84559660376f3b609a8a5 \
-  "https://grafana.com/api/plugins/grafana-clickhouse-datasource/versions/4.22.1/download?os=linux&arch=arm64" /plugin.zip
-FROM clickhouse-plugin-${TARGETARCH} AS clickhouse-plugin
+#   curl -fsSL '<the URL below, at the new version, os and arch>' | sha256sum
+# Fetched with curl, not ADD: ADD has no timeout, and one stalled download held CI for minutes
+# before it failed. Each try is bounded, a failed one is tried again, and the archive is checked
+# against its sha256 before anything uses it, as ADD's --checksum did. The curl image is the one
+# compose.yaml pins.
+FROM --platform=$BUILDPLATFORM curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777 AS clickhouse-plugin
+ARG TARGETARCH
+WORKDIR /tmp
+RUN case "$TARGETARCH" in \
+      amd64) sha256=fc8b4a4ff71e7db614a3560e5b5678bbab523578abca280a195e0bd30d9a52d5 ;; \
+      arm64) sha256=c9140657df5c87d1736cee522dd4f213395138fa88c84559660376f3b609a8a5 ;; \
+      *) echo "no ClickHouse plugin pinned for $TARGETARCH" >&2; exit 1 ;; \
+    esac && \
+    curl --fail --silent --show-error --location --connect-timeout 10 --max-time 120 \
+      --retry 4 --retry-delay 5 --retry-all-errors --output plugin.zip \
+      "https://grafana.com/api/plugins/grafana-clickhouse-datasource/versions/4.22.1/download?os=linux&arch=$TARGETARCH" && \
+    echo "$sha256  plugin.zip" | sha256sum -c -
 
 FROM grafana/grafana:13.2.2@sha256:ac461fb352abc50da10a51c7d02462e9c05488f11f53f14b3ad79a8145f638a0
 LABEL org.opencontainers.image.source="https://github.com/alexnodeland/lattice"
@@ -36,7 +45,7 @@ ENV PROMETHEUS_ADDRESS=prometheus \
     GF_NEWS_NEWS_FEED_ENABLED=false
 # Outside /var/lib/grafana, so the data volume Compose mounts there doesn't hide it.
 USER root
-RUN --mount=type=bind,from=clickhouse-plugin,source=/plugin.zip,target=/tmp/plugin.zip \
+RUN --mount=type=bind,from=clickhouse-plugin,source=/tmp/plugin.zip,target=/tmp/plugin.zip \
     mkdir -p /usr/share/grafana/plugins-baked && \
     unzip -q /tmp/plugin.zip -d /usr/share/grafana/plugins-baked && \
     chmod -R a=rX /usr/share/grafana/plugins-baked && \

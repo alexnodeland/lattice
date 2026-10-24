@@ -10,7 +10,7 @@ import pytest
 
 from grantr.grants import Grants
 from portalr.analytics import InMemoryConsent, InMemoryRateLimiter, Relay, Umami
-from portalr.analytics.relay import Batch, Event
+from portalr.analytics.relay import MOST_COPIES, Batch, Event
 from portalr.invites import Invite
 from portalr.readers import Analytics, Readers
 from portalr.readers.analytics import distinct_id
@@ -36,6 +36,11 @@ class Stand:
         self.stuck: str | None = None
         """A session Umami says it deleted, and keeps."""
         self.after_send: list[Callable[[], Awaitable[None]]] = []
+        self.refused: set[str] = set()
+        """The events' names Umami refuses, as a 400."""
+        self.sends_taken: int | None = None
+        """How many sends Umami takes before it answers 503; every one, if None."""
+        self.after_delete: list[Callable[[], None]] = []
 
     async def __call__(self, request: httpx.Request) -> httpx.Response:
         self.sent.append(request)
@@ -46,6 +51,12 @@ class Stand:
             assert json.loads(request.content) == {"username": "portalr", "password": "pw"}
             return httpx.Response(200, json={"token": "t0k"})
         if path == "/api/send":
+            if json.loads(request.content)["payload"]["name"] in self.refused:
+                return httpx.Response(400)
+            if self.sends_taken is not None:
+                if self.sends_taken == 0:
+                    return httpx.Response(503)
+                self.sends_taken -= 1
             for hook in self.after_send:
                 await hook()
             return httpx.Response(200, json={"cache": "c"})
@@ -64,6 +75,8 @@ class Stand:
                 return httpx.Response(404)
             if session != self.stuck:
                 self.sessions.pop(session)
+            for hook in self.after_delete:
+                hook()
             return httpx.Response(200)
         return httpx.Response(200, json={"id": session, "distinctId": self.sessions[session]})
 
@@ -230,11 +243,31 @@ async def test_forgetting_deletes_the_persons_sessions_exactly_in_every_tenant_o
     assert set(stand.sessions) == {"s3"}, "a distinct id that only starts like theirs stays"
 
 
-async def test_forgetting_reads_every_page_of_the_search(stand: Stand) -> None:
+def searches(stand: Stand) -> int:
+    return len([r for r in stand.sent if r.method == "GET" and r.url.path.endswith("/sessions")])
+
+
+async def test_forgetting_reads_every_page_of_the_search_in_one_round(stand: Stand) -> None:
     stand.sessions = {f"s{n:03}": f"acme:{ME}" for n in range(PAGE * 2 + 5)}
     stand.sessions["other"] = "acme:someone"
     assert await umami_of(stand).forget(ME)
     assert set(stand.sessions) == {"other"}
+    # Three pages in the first round, and one page, empty, in the second, which ends it.
+    assert searches(stand) == 3 + 1
+
+
+async def test_a_session_made_between_rounds_is_found_by_the_next(stand: Stand) -> None:
+    made: list[bool] = []
+
+    def another() -> None:
+        if not made:
+            made.append(True)
+            stand.sessions["late"] = f"acme:{ME}"
+
+    stand.after_delete.append(another)
+    assert await umami_of(stand).forget(ME)
+    assert set(stand.sessions) == {"s3"}
+    assert searches(stand) == 3, "a round for the first, one for the late one, one to end"
 
 
 async def test_a_session_umami_keeps_after_every_round_is_a_deletion_not_done(stand: Stand) -> None:
@@ -283,3 +316,97 @@ async def test_a_session_gone_before_it_is_deleted_is_no_failure(stand: Stand) -
     umami = umami_of(stand)
     assert await umami.forget(ME, "acme")
     assert await umami.sessions(ME) == ["s2"]
+
+
+def relay_of(stand: Stand, consent: InMemoryConsent | None = None) -> Relay:
+    writer = httpx.AsyncClient(transport=httpx.MockTransport(lambda _: httpx.Response(200)))
+    return Relay(
+        Analytics("http://clickhouse:8123", KEY, writer=writer),
+        consent or InMemoryConsent(),
+        InMemoryRateLimiter(),
+        umami=umami_of(stand),
+    )
+
+
+async def test_a_no_while_a_copy_fails_halfway_still_deletes_what_it_made(stand: Stand) -> None:
+    relay = relay_of(stand)
+    await relay.answer("alice", yes=True)
+    stand.sends_taken = 1  # the first event makes the session; the second is a 503
+
+    async def says_no() -> None:
+        await relay.consent.give("alice", yes=False)
+        stand.sessions["s9"] = f"acme:{ME}"
+
+    stand.after_send.append(says_no)
+    two = Batch(
+        session="s", events=[Event(event="app.page.viewed.v1"), Event(event="app.thread.opened.v1")]
+    )
+    await relay.record("acme", "alice", two, "s")
+    await asyncio.gather(*relay.copies)
+    assert "s9" not in stand.sessions
+    assert await relay.consent.owes("alice") is None, "deleted, and settled"
+
+
+class Unreadable(InMemoryConsent):
+    """Answers that can't be read once the batch is written."""
+
+    reads = 0
+
+    async def given(self, user_id: str) -> bool:
+        self.reads += 1
+        if self.reads > 2:
+            raise RuntimeError(user_id)
+        return await super().given(user_id)
+
+
+async def test_an_answer_that_cant_be_read_again_owes_a_deletion(
+    stand: Stand, caplog: pytest.LogCaptureFixture
+) -> None:
+    consent = Unreadable()
+    relay = relay_of(stand, consent)
+    await consent.give("alice", yes=True)
+    await relay.record("acme", "alice", BATCH, "s")
+    await asyncio.gather(*relay.copies)
+    assert await consent.owes("alice") is not None
+    assert "couldn't be checked: RuntimeError" in caplog.text
+
+
+async def test_past_the_most_copies_a_batchs_copy_is_dropped_not_queued(stand: Stand) -> None:
+    relay = relay_of(stand)
+    await relay.answer("alice", yes=True)
+    held = [asyncio.get_running_loop().create_future() for _ in range(MOST_COPIES)]
+    relay.copies.update(held)
+    assert (await relay.record("acme", "alice", BATCH, "s")).recorded == 1
+    assert len(relay.copies) == MOST_COPIES
+    assert stand.sent == []
+    for future in held:
+        future.cancel()
+
+
+async def test_an_event_umami_refuses_is_dropped_alone_and_the_copies_dont_rest(
+    stand: Stand,
+) -> None:
+    stand.refused = {"app.thread.opened.v1"}
+    umami = umami_of(stand)
+    events = [("app.thread.opened.v1", {}), ("app.page.viewed.v1", {})]
+    assert not await umami.send("acme", ME, events)
+    assert await umami.send("acme", ME, [("app.page.viewed.v1", {})])
+    assert len(stand.sent) == 3, "both of the first, and the next at once"
+
+
+class Broken(Unreadable):
+    """Answers that can't be read once the batch is written, nor owe a deletion."""
+
+    async def owe(self, user_id: str) -> int:
+        raise RuntimeError(user_id)
+
+
+async def test_a_deletion_that_cant_be_owed_either_is_said_for_operators(
+    stand: Stand, caplog: pytest.LogCaptureFixture
+) -> None:
+    consent = Broken()
+    relay = relay_of(stand, consent)
+    await consent.give("alice", yes=True)
+    await relay.record("acme", "alice", BATCH, "s")
+    await asyncio.gather(*relay.copies)
+    assert "a deletion couldn't be owed: RuntimeError" in caplog.text

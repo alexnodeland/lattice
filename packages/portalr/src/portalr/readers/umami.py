@@ -87,11 +87,13 @@ class Umami:
         """Send a person's events, each its name and props: whether Umami took them all.
 
         A failure is logged and dropped, as a write to ClickHouse is: Umami is never the record.
-        After one, the copies rest for ``REST`` seconds, sending nothing, so an Umami that is down
-        costs each request nothing.
+        An event Umami refuses (4xx) is dropped alone. A transport error or a 5xx stops the rest,
+        and the copies rest for ``REST`` seconds, sending nothing, so an Umami that is down costs
+        each request nothing; the journeys have a gap where it was.
         """
         if time.monotonic() < self._rest.until:
             return False
+        taken = True
         try:
             for name, props in events:
                 payload = {
@@ -108,12 +110,17 @@ class Umami:
                     headers={"User-Agent": AGENT},
                     timeout=TIMEOUT,
                 )
+                if 400 <= response.status_code < 500:
+                    # This event's, not Umami's: it is dropped, and the others go on.
+                    log.warning("analytics: Umami refused an event: %s", response.status_code)
+                    taken = False
+                    continue
                 response.raise_for_status()
         except Exception as error:  # Umami's failure is never the request's.
             self._rest.until = time.monotonic() + REST
             log.warning("analytics: Umami didn't take an event: %s", type(error).__name__)
             return False
-        return True
+        return taken
 
     async def forget(self, person: str, tenant: str | None = None) -> bool:
         """Delete a person's sessions, and their events, in one tenant or in all: whether done.

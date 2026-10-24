@@ -26,7 +26,7 @@ PROFILES ?= $(ALL_PROFILES)
 # STACKR_DATABASE in .env chooses it: supabase (default) or postgres. Profiles
 # that keep data in PostgreSQL bring it up with them.
 STACKR_DATABASE ?= $(or $(shell sed -n 's/^STACKR_DATABASE=//p' .env 2>/dev/null),supabase)
-DATABASE_USERS := langfuse gateway auth
+DATABASE_USERS := langfuse gateway auth umami
 NEEDS_DATABASE = $(filter $(DATABASE_USERS),$(PROFILES))
 
 # Local Supabase, run by its CLI: an installed `supabase`, or the pinned

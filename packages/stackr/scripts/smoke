@@ -511,11 +511,23 @@ smoke_umami() {
   port=$(setting UMAMI_PORT)
   said=$(probe -s -o /dev/null -w '%{http_code}' http://umami:3000/api/heartbeat || true)
   if [[ $said == 000 ]]; then
-    log "ok: the stack's other services don't reach Umami"
+    log "ok: the stack's other services don't reach Umami by name"
   else
     log "FAIL: a service on the stack's network reached Umami (answered $said)"
     status=1
   fi
+  # Nor by any of its addresses, on each of its networks.
+  local address
+  for address in $(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}' \
+    "$(stack_compose ps -q umami)"); do
+    said=$(probe -s -o /dev/null -w '%{http_code}' "http://$address:3000/api/heartbeat" || true)
+    if [[ $said == 000 ]]; then
+      log "ok: the stack's other services don't reach Umami at $address"
+    else
+      log "FAIL: a service on the stack's network reached Umami at $address (answered $said)"
+      status=1
+    fi
+  done
   said=$(curl -s -m 10 "http://127.0.0.1:$port/api/heartbeat" || true)
   if [[ $said == *'"ok":true'* ]]; then
     log "ok: Umami's UI answers on the loopback, for operators"

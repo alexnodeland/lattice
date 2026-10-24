@@ -17,8 +17,13 @@ portalr's side of [stackr ADR-0050](../../stackr/adr/0050-umami-a-profile-for-op
   - Each event goes to `/api/send` from portalr's own address, with the fixed user agent `portalr-relay`. No person's address, `X-Forwarded-For` or user agent is sent.
   - The route and the registry's props go as the event's URL and data. Nothing else goes, and nothing a person wrote.
   - **The copy is never waited on.** It is sent in the background, so the relay's answer, and what it recorded, are the same whether Umami is up, down or answering nonsense.
-  - Any failure of Umami's, of whatever kind, is caught at its client, logged by its type, and dropped: Umami is never the record. After one, the copies rest for 30 seconds, sending nothing, and each request to Umami waits at most 2 seconds.
-  - **A no that lands while the copy is sent** is read again after it. If the yes is gone, a deletion is owed and tried at once, so no session is left in Umami, as a batch written while a no lands is deleted in ClickHouse.
+  - Any failure of Umami's, of whatever kind, is caught at its client, logged by its type, and dropped: Umami is never the record.
+    - An event Umami refuses, a 4xx, is dropped alone, and the others go on.
+    - A transport error or a 5xx stops the copy, and the copies rest for 30 seconds, sending nothing. Each request to Umami waits at most 2 seconds.
+    - So the journeys have gaps where Umami was down, for good: a copy is never sent again.
+  - At most 100 copies are sent at once. Past that, a batch's copy is dropped, not queued.
+  - As the application stops, the portal waits up to 5 seconds for the copies still being sent, then closes their client.
+  - **A no that lands while the copy is sent:** the answer is read again after every copy, whatever the send did, since any event of it may have made a session. If the yes is gone, a deletion is owed and tried at once, so no session is left in Umami, as a batch written while a no lands is deleted in ClickHouse. If the answer can't be read again, a deletion is owed anyway, for the background pass.
 - **A person in Umami is `<tenant>:<keyed hash>`,** Umami's distinct id. So each person has a session of their own in each tenant, and never their id.
 - **Deleting reaches Umami.**
   - Saying no deletes the person's sessions there, with their events, in every tenant. portalr's Umami user, who owns the website, signs in, searches for the hash (every page of the answer), reads each session to check its distinct id is the person's exactly, and deletes it.

@@ -39,11 +39,13 @@ async def main() -> int:
         os.environ["UMAMI_PORTALR_PASSWORD"],
         httpx.AsyncClient(),
     )
-    tenant = f"smoke-{secrets.token_hex(4)}"
+    # A tenant no deployment has, so what this sends is plainly the smoke test's to operators.
+    tenant = f"stackr-smoke-{secrets.token_hex(4)}"
     first, second = secrets.token_hex(16), secrets.token_hex(16)
     for person in (first, second):
         if not await umami.send(tenant, person, [("app.page.viewed.v1", {"route": "/"})] * 2):
             say(f"FAIL: Umami didn't take {person}'s events")
+            await umami.client.aclose()
             return 1
     status = 0
     held = {person: await umami.sessions(person) for person in (first, second)}
@@ -54,6 +56,7 @@ async def main() -> int:
         status = 1
     if not await umami.forget(first):
         say("FAIL: Umami didn't delete a person's sessions")
+        await umami.client.aclose()
         return 1
     left = {person: len(await umami.sessions(person)) for person in (first, second)}
     if left == {first: 0, second: 1}:
@@ -65,6 +68,7 @@ async def main() -> int:
     clickhouse = os.environ.get("PORTALR_CLICKHOUSE_URL")
     if clickhouse:
         status |= await relayed(umami, clickhouse, tenant)
+    await umami.client.aclose()
     return status
 
 

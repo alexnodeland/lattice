@@ -57,6 +57,9 @@ PREFIX = "/portalr"
 SETTLE_EVERY: Final = 300.0
 """About how many seconds apart the background pass settles deletions owed (lattice RFC-0008)."""
 
+DRAIN = 5.0
+"""How long the portal waits, as it stops, for the copies to Umami still being sent."""
+
 LOGGER = logging.getLogger(__name__)
 
 OFF = "the portal is off: PORTAL_SUPABASE_URL and PORTAL_SUPABASE_KEY are unset"
@@ -288,7 +291,8 @@ class Portal:
 
         A ClickHouse that is down doesn't hold the application's start: each deletion stays owed
         until a pass does it, a few minutes apart, so a person who never comes back is still
-        deleted. Whatever the pass raised, its clients are closed.
+        deleted. Whatever the pass raised, its clients are closed, once the copies to Umami still
+        being sent have had a few seconds to finish.
         """
         settling = (
             asyncio.create_task(self._settle(self._relay)) if self._relay is not None else None
@@ -300,6 +304,10 @@ class Portal:
                 settling.cancel()
                 with contextlib.suppress(asyncio.CancelledError, Exception):
                     await settling
+            if self._relay is not None and self._relay.copies:
+                # The copies to Umami still being sent, a few seconds at most, before their client
+                # closes; one still going then is dropped, as a copy may be.
+                await asyncio.wait(set(self._relay.copies), timeout=DRAIN)
             for client in self._clients:
                 await client.aclose()
 

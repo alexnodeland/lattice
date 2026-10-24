@@ -1287,7 +1287,7 @@ def _artifact_key(artifact_id: ArtifactId) -> str:
 
 
 def _lose(key: str, lost: asyncio.Event) -> None:
-    """Mark a thread claim lost: it lapsed, or another holder has the thread."""
+    """Mark a thread claim lost: it lapsed, or another holder has, or had, the thread."""
     logger.warning("the claim %s lapsed, so it is lost", key)
     lost.set()
 

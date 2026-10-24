@@ -603,7 +603,8 @@ def _stall(seconds: float) -> None:
 async def test_a_claim_whose_loop_stalls_past_its_ttl_is_renewed_late_and_kept(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    ws = await Workspaces(InMemoryStorage()).open("tenant_a", "ws_1", actor=ALICE)
+    now = datetime(2026, 9, 30, tzinfo=UTC)  # storage's clock stands still: only the loop's moves
+    ws = await Workspaces(InMemoryStorage(clock=lambda: now)).open("tenant_a", "ws_1", actor=ALICE)
     thread = await ws.create_thread()
     ttl = timedelta(milliseconds=60)
     async with ws.claim_thread(thread.id, holder="run_1", ttl=ttl) as lost:
@@ -616,7 +617,7 @@ async def test_a_claim_whose_loop_stalls_past_its_ttl_is_renewed_late_and_kept(
     assert f"the claim thread:{thread.id} was renewed late, and storage kept it" in caplog.text
 
 
-async def test_a_claim_another_holder_had_while_its_loop_stalled_is_lost() -> None:
+async def test_a_claim_another_holder_had_while_its_loop_stalled_is_still_lost() -> None:
     now = datetime(2026, 9, 30, tzinfo=UTC)
     storage = InMemoryStorage(clock=lambda: now)
     ws = await Workspaces(storage).open("tenant_a", "ws_1", actor=ALICE)

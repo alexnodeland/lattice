@@ -100,6 +100,8 @@ And the behaviours the properties are checked over are reached. Each witness in 
 | `Crash`, `Restart` | a process that dies, and starts again with nothing in memory, where `Runner.recover` sweeps the thread |
 | `Tick`, `Renew`, `Lapse` | storage's clock, `Workspace._renew`, and its timer, `_lose` |
 
+The model names a claim by its process, so a lease another claim of the same process took and released is not this claim's. The code holds that by a precondition, not by the model: a holder is unique to each claim attempt (the runner's are `new_id("claim")`), as the `Storage` protocol requires of `renew_lease`. With a holder used again, a late renewal could renew a lease another attempt had meanwhile, which the model cannot show.
+
 ## What the spec assumes, and leaves out
 
 - **Assumed atomic:** `_plan`'s reads (the cursors, the head, the paused runs, the log) are separate awaits in the code, while `Runner.answer` and direct commits write without the claim. The spec takes them as one step. So are `_take`'s two cursor reads; interleaved, they only make a hand-over more likely.

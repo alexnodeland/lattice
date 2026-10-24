@@ -125,3 +125,45 @@ test("with no turns, the turns say so, rather than draw a table with no rows", a
   expect(screen.getByRole("table", { name: "Turns" }).elements()).toHaveLength(0);
   await expect.element(run(screen)).toBeVisible();
 });
+
+test("while the turns' history is still being read, they don't say there are none", async () => {
+  const { screen } = await open("/t/acme/w/notes/runs", serve, () => null, {
+    reflexrLog: LOG,
+    surfaces: { relayr: "" },
+    replaying: "artifactr",
+  });
+  await expect.element(run(screen)).toBeVisible();
+  expect(screen.getByText("No turns yet").elements()).toHaveLength(0);
+});
+
+/** A thread whose one turn started at `ts`, as artifactr's log says. */
+const turnAt = (ts: string) =>
+  [
+    { type: "thread_created", thread_id: "thr_1", title: "Launch" },
+    { type: "run_started", run_id: "run_1", thread_id: "thr_1" },
+  ].map((event, index) => ({
+    type: "event",
+    seq: index + 1,
+    id: `evt_${index + 1}`,
+    ts,
+    workspace_id: "notes",
+    actor: { kind: "user", id: "alice" },
+    event,
+  }));
+
+test("a turn says when it started", async () => {
+  const first = await open("/t/acme/w/notes/runs", serve, () => null, {
+    artifactrLog: turnAt("2026-10-23T09:00:00Z"),
+  });
+  const turn = first.screen.getByRole("table", { name: "Turns" }).getByRole("row").nth(1);
+  await expect.element(turn.getByRole("time")).toHaveAttribute("datetime", "2026-10-23T09:00:00Z");
+});
+
+test("a turn whose time in the log isn't one leaves its start blank", async () => {
+  const second = await open("/t/acme/w/notes/runs", serve, () => null, {
+    artifactrLog: turnAt("not a time"),
+  });
+  await expect.element(second.screen.getByRole("table", { name: "Turns" })).toBeVisible();
+  expect(second.screen.getByText("Invalid Date").elements()).toHaveLength(0);
+  expect(second.screen.getByRole("time").elements()).toHaveLength(0);
+});

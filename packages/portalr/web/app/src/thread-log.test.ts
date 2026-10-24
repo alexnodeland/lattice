@@ -21,7 +21,6 @@ const run = (change: Partial<Artifactr.Run>): Artifactr.Run => ({
   requests: [],
   answered: [],
   started: 2,
-  startedAt: null,
   ended: 3,
   error: null,
   reason: null,

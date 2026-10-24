@@ -51,6 +51,10 @@ export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/runs")({
   component: Runs,
 });
 
+/** Whether a moment is one a `Date` reads. */
+const readable = (at: string | undefined): at is string =>
+  at !== undefined && !Number.isNaN(Date.parse(at));
+
 /** Runs, the newest first. */
 const newest = <R extends { started: number }>(runs: Readonly<Record<string, R>>) =>
   Object.values(runs).sort((a, b) => b.started - a.started);
@@ -92,7 +96,8 @@ function Runs() {
         {turns.state.threads[run.threadId]?.title || "Untitled"}
       </TextLink>
     ),
-    started: run.startedAt === null ? undefined : <Moment at={run.startedAt} />,
+    // A start the log gave no readable time for is left blank, never "Invalid Date".
+    started: readable(run.startedAt) && <Moment at={run.startedAt} />,
     feedback: turnFeedback && (
       <Thumbs
         given={thumbs(run.feedback, me)}

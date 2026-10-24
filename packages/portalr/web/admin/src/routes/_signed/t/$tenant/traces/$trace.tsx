@@ -129,7 +129,7 @@ function Body({ trace }: { trace: string }) {
       return (
         <>
           {header}
-          <Unanswered tool="Tempo" reason={reading.reason} />
+          <Unanswered tool="Tempo" reading={reading} />
         </>
       );
     default:

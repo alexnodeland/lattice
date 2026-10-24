@@ -178,7 +178,7 @@ function Records({
         </EmptyState>
       );
     case "unavailable":
-      return <Unanswered tool="Loki" reason={reading.reason} />;
+      return <Unanswered tool="Loki" reading={reading} />;
     case "ok":
       return reading.data.records.length === 0 ? (
         <EmptyState title={filtered ? "No records match" : "No log records in this window"}>

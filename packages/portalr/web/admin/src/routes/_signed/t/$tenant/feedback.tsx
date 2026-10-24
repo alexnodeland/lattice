@@ -112,7 +112,7 @@ function Feedback() {
     return (
       <>
         {HEADER}
-        <Unanswered tool="Langfuse" reason={reading.reason} />
+        <Unanswered tool="Langfuse" reading={reading} />
       </>
     );
   }

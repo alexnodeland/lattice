@@ -107,7 +107,7 @@ function UsagePage() {
     return (
       <>
         {HEADER}
-        <Unanswered tool="LiteLLM" reason={reading.reason} />
+        <Unanswered tool="LiteLLM" reading={reading} />
       </>
     );
   }

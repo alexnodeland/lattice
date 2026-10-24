@@ -40,8 +40,10 @@ test("each integration's switch is named by it, and described by its state in wo
     .toHaveAccessibleDescription("On Set here");
   await expect
     .element(table.getByRole("row", { name: "Mini apps" }).getByText("alice@acme.test"))
-    .toBeVisible(); // Its state is in words beside its switch, with no badge to say it twice.
-  expect(table.element().querySelectorAll("[data-badge]")).toHaveLength(0);
+    .toBeVisible();
+  // Its state is in words beside its switch, and where it comes from, not a badge as well.
+  const forms = table.getByRole("row", { name: "Forms" }).element();
+  expect(forms.textContent).toContain("On · Default");
 });
 
 test("a switch under a ceiling is off and disabled, with the reason beside it", async () => {

@@ -214,7 +214,10 @@ test("Langfuse not answering says so, and why to the console", async () => {
   langfuse = "unavailable";
   const { screen } = await open("/t/acme/feedback?days=30");
   // What the reader is told is the tool and to try again; the server's words go to the console.
-  await expect.element(screen.getByText("Langfuse isn't answering")).toBeVisible();
+  // Said politely as it appears, as a failure is, in the tool's words, not the server's.
+  await expect
+    .element(screen.getByRole("status").filter({ hasText: "Langfuse isn't answering" }))
+    .toBeVisible();
   await expect.element(screen.getByText(/couldn't read from Langfuse just now/)).toBeVisible();
   expect(screen.getByText("langfuse answered 502").elements()).toHaveLength(0);
   await expect.poll(() => String(warned.mock.calls)).toContain("langfuse answered 502");

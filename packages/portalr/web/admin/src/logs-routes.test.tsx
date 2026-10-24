@@ -260,7 +260,10 @@ test("Loki not answering leaves the charts", async () => {
   loki = "unavailable";
   const { screen } = await open("/t/acme/logs");
   // What the reader is told is the tool and to try again; the server's words go to the console.
-  await expect.element(screen.getByText("Loki isn't answering")).toBeVisible();
+  // Said politely as it appears, as a failure is, in the tool's words, not the server's.
+  await expect
+    .element(screen.getByRole("status").filter({ hasText: "Loki isn't answering" }))
+    .toBeVisible();
   await expect.element(screen.getByText(/couldn't read from Loki just now/)).toBeVisible();
   expect(screen.getByText("loki answered 502").elements()).toHaveLength(0);
   await expect.poll(() => String(warned.mock.calls)).toContain("loki answered 502");

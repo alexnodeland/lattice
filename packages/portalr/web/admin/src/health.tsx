@@ -40,7 +40,7 @@ function Drawn({
         </EmptyState>
       );
     case "unavailable":
-      return <Unanswered tool="Prometheus" reason={reading.reason} />;
+      return <Unanswered tool="Prometheus" reading={reading} />;
     case "ok":
       return reading.data.length === 0 ? (
         <EmptyState title={none.title}>{none.body}</EmptyState>

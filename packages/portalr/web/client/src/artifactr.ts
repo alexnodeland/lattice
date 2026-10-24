@@ -124,8 +124,8 @@ export interface Run {
   readonly answered: readonly Answered[];
   /** The `seq` it started at: the later, the newer. */
   readonly started: number;
-  /** When it started, as the log's event says, or null before it has. */
-  readonly startedAt: string | null;
+  /** When it started, as the log's event says; none before it has. */
+  readonly startedAt?: string;
   /** The `seq` it ended at, or null while it hasn't. */
   readonly ended: number | null;
   /** Why it failed, as its `run_ended` says: what happened, and a code for it, where known. */
@@ -224,7 +224,6 @@ function withRun(state: Workspace, id: v1.RunId, change: Partial<Run>): Workspac
     requests: [],
     answered: [],
     started: 0,
-    startedAt: null,
     ended: null,
     error: null,
     reason: null,

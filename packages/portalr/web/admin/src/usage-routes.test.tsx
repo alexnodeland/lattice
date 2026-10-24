@@ -221,7 +221,10 @@ test("LiteLLM not answering says so, and why to the console", async () => {
   const warned = vi.spyOn(console, "warn").mockImplementation(() => undefined);
   litellm = "unavailable";
   const { screen } = await open("/t/acme/usage?days=30");
-  await expect.element(screen.getByText("LiteLLM isn't answering")).toBeVisible();
+  // Said politely as it appears, as a failure is, in the tool's words, not the server's.
+  await expect
+    .element(screen.getByRole("status").filter({ hasText: "LiteLLM isn't answering" }))
+    .toBeVisible();
   await expect.element(screen.getByText(/couldn't read from LiteLLM just now/)).toBeVisible();
   expect(screen.getByText("litellm answered 502").elements()).toHaveLength(0);
   await expect.poll(() => String(warned.mock.calls)).toContain("litellm answered 502");

@@ -86,6 +86,8 @@ function Traces() {
   const { data: reading } = useSuspenseQuery(
     queries.portalr.traces(tenant, window, { session, run, analytics_session: analytics }),
   );
+  // What a row's copy did, said in one status for the table, not one for each of its rows.
+  const [copied, setCopied] = useState("");
   if (reading.status === "unconfigured") {
     return (
       <>
@@ -100,7 +102,7 @@ function Traces() {
     return (
       <>
         {HEADER}
-        <Unanswered tool="Tempo" reason={reading.reason} />
+        <Unanswered tool="Tempo" reading={reading} />
       </>
     );
   }
@@ -148,7 +150,11 @@ function Traces() {
                     {trace.trace_id.slice(0, 8)}
                   </code>
                 </TextLink>
-                <CopyButton text={trace.trace_id} what="the trace's id" />
+                <CopyButton
+                  text={trace.trace_id}
+                  what={`trace ${trace.trace_id.slice(0, 8)}`}
+                  onSaid={setCopied}
+                />
               </span>
             ),
           },
@@ -175,6 +181,9 @@ function Traces() {
               }
         }
       />
+      <p role="status" className="sr-only">
+        {copied}
+      </p>
     </div>
   );
 }

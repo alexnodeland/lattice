@@ -172,12 +172,10 @@ test("a full list says it is the newest, not all", async () => {
   found = 100;
   const { screen } = await open("/t/acme/traces");
   await expect
-    .element(
-      screen.getByText(
-        "The newest 100 are shown. A shorter window, or a thread or a run, finds the rest.",
-      ),
-    )
-    .toBeVisible();
+    .element(screen.getByRole("status").filter({ hasText: "The newest 100 are shown." }))
+    .toHaveTextContent(
+      "The newest 100 are shown. A shorter window, or a thread or a run, finds the rest.",
+    );
 });
 
 test("Tempo not configured, or not answering, says so", async () => {
@@ -188,7 +186,10 @@ test("Tempo not configured, or not answering, says so", async () => {
   tempo = "unavailable";
   const second = await open(`/t/acme/traces/${A}`);
   // What the reader is told is the tool and to try again; the server's words go to the console.
-  await expect.element(second.screen.getByText("Tempo isn't answering")).toBeVisible();
+  // Said politely as it appears, as a failure is, in the tool's words, not the server's.
+  await expect
+    .element(second.screen.getByRole("status").filter({ hasText: "Tempo isn't answering" }))
+    .toBeVisible();
   await expect.element(second.screen.getByText(/couldn't read from Tempo just now/)).toBeVisible();
   expect(second.screen.getByText("tempo answered 502").elements()).toHaveLength(0);
   await expect.poll(() => String(warned.mock.calls)).toContain("tempo answered 502");
@@ -333,14 +334,20 @@ test("to a tenant's admin, a trace shows no analytics session, even one the serv
   await expect.element(screen.getByText(/Analytics session/)).not.toBeInTheDocument();
 });
 
-test("a trace is listed by its first 8 digits, named and copied whole, and took nothing it hasn't said", async () => {
+test("a trace is listed by its first 8 digits, named and copied whole, with no duration until Tempo has one", async () => {
   const { screen } = await open("/t/acme/traces");
   const table = screen.getByRole("table", { name: "Traces" });
   const first = `${"0".repeat(24)}c029eec0`;
   const link = table.getByRole("link", { name: `Trace ${first}` });
   await expect.element(link).toHaveTextContent(first.slice(0, 8));
-  await expect
-    .element(table.getByRole("button", { name: "Copy the trace's id" }).first())
-    .toBeVisible();
   expect(table.getByText("–").elements()).toHaveLength(0);
+  // Each row's copy is named by its trace, and what it did is said once, for the table.
+  expect(table.getByRole("status").elements()).toHaveLength(0);
+  await table
+    .getByRole("button", { name: `Copy trace ${first.slice(0, 8)}` })
+    .first()
+    .click();
+  await expect
+    .element(screen.getByRole("status").filter({ hasText: "trace 00000000" }))
+    .toBeInTheDocument();
 });

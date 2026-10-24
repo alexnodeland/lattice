@@ -554,10 +554,15 @@ UMAMI = {
 }
 
 
-def test_umami_comes_from_its_three_settings_and_its_link_from_the_ui_and_the_website() -> None:
+def test_umami_comes_from_its_three_settings_and_its_link_from_the_ui_and_the_website(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     clients: list[httpx.AsyncClient] = []
+    assert umami(with_portal(), clients) is None
+    assert "Umami" not in caplog.text, "none named, nothing to say"
     for missing in UMAMI:
         assert umami(with_portal(**{**UMAMI, missing: None}), clients) is None, missing
+    assert "Umami is off: PORTAL_UMAMI_PASSWORD isn't set" in caplog.text
     whole = umami(with_portal(**UMAMI), clients)
     assert whole is not None
     assert (whole.url, whole.website) == (UMAMI["umami_url"], UMAMI["umami_website"])

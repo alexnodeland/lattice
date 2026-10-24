@@ -52,38 +52,6 @@ GRANT litellm TO CURRENT_USER;
 SELECT 'CREATE DATABASE litellm OWNER litellm'
 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'litellm') \gexec
 
--- Umami (ADR-0050), with the umami profile only, on the plain PostgreSQL adapter: a database of
--- its own, owned by its role, with its tables in the schema `umami`, which the role owns and is
--- the only one it may use there.
-\getenv umami_password UMAMI_DB_PASSWORD
-\if :{?umami_password}
-SELECT :'umami_password' <> '' AS umami \gset
-\else
-\set umami false
-\endif
-\if :umami
-SELECT 'CREATE ROLE umami LOGIN'
-WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'umami') \gexec
-ALTER ROLE umami WITH LOGIN PASSWORD :'umami_password';
-SELECT CASE
-  WHEN current_setting('server_version_num')::int >= 160000
-    THEN NOT pg_has_role(current_user, 'umami', 'SET')
-  ELSE NOT pg_has_role(current_user, 'umami', 'MEMBER')
-END AS needs_grant \gset
-\if :needs_grant
-GRANT umami TO CURRENT_USER;
-\endif
-SELECT 'CREATE DATABASE umami OWNER umami'
-WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'umami') \gexec
-\connect umami
-CREATE SCHEMA IF NOT EXISTS umami AUTHORIZATION umami;
--- Its database's own `public` schema, which a database's owner would hold, isn't kept: `umami` is
--- the only schema it has.
-DROP SCHEMA IF EXISTS public;
-ALTER ROLE umami IN DATABASE umami SET search_path TO umami;
-\connect postgres
-\endif
-
 -- The AWS recipe's own (stackr ADR-0034), each only when it is given: on one machine, neither is,
 -- and this runs as it always has.
 \getenv grafana_password GRAFANA_DB_PASSWORD

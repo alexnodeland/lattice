@@ -279,7 +279,7 @@ services:
   # every start (deploy/postgres/init.sql), then exits.
   db-init:
     image: postgres:17.11-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
-    profiles: [langfuse, gateway, auth, umami, umami-init]
+    profiles: [langfuse, gateway, auth]
     restart: "no"
     command: ["psql", "--no-psqlrc", "--quiet", "--file=/init.sql"]
     # The adapter's host and admin password default to local Supabase's
@@ -295,8 +295,6 @@ services:
       LANGFUSE_DB_PASSWORD: ${LANGFUSE_DB_PASSWORD:?run make env}
       LITELLM_DB_PASSWORD: ${LITELLM_DB_PASSWORD:?run make env}
       AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD:?run make env}
-      # Umami's role and database, only where `make up` chose its profile (ADR-0050).
-      UMAMI_DB_PASSWORD: ${STACKR_UMAMI:+${UMAMI_DB_PASSWORD:?run make env}}
     volumes:
       - ./deploy/postgres/init.sql:/init.sql:ro
     networks: [default, supabase]
@@ -483,16 +481,41 @@ services:
       # Every event comes from portalr's relay, with portalr's own agent, never a browser's.
       DISABLE_BOT_CHECK: "1"
     networks: [umami-ingest, umami-db, umami-ui]
+    # On the loopback alone, whatever STACKR_BIND says: this port is the UI's, and Umami's ingest
+    # too, which takes anyone's events, so only this machine may reach it (ADR-0050).
     ports:
-      - ${STACKR_BIND:-127.0.0.1}:${UMAMI_PORT:-3400}:3000
+      - 127.0.0.1:${UMAMI_PORT:-3400}:3000
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/api/heartbeat"]
       interval: 5s
       timeout: 3s
       retries: 60
     depends_on:
-      db-init:
+      umami-db-init:
         condition: service_completed_successfully
+
+  # Umami's role and database on plain PostgreSQL (deploy/postgres/umami.sql), with its profile
+  # alone; then it exits.
+  umami-db-init:
+    image: postgres:17.11-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
+    profiles: [umami, umami-init]
+    restart: "no"
+    command: ["psql", "--no-psqlrc", "--quiet", "--file=/umami.sql"]
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGDATABASE: postgres
+      PGUSER: postgres
+      PGPASSWORD: ${POSTGRES_ADMIN_PASSWORD:?run make env}
+      PGCONNECT_TIMEOUT: "10"
+      UMAMI_DB_PASSWORD: ${UMAMI_DB_PASSWORD:?run make env}
+    volumes:
+      - ./deploy/postgres/umami.sql:/umami.sql:ro
+    # `make up` starts plain PostgreSQL beside it, and refuses the profile without it.
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
 
   # Umami's accounts and portalr's website (deploy/umami/init); `make up` runs it once Umami is
   # up, with `docker compose run`, as it does clickhouse-init.

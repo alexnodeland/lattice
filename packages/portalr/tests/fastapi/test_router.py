@@ -894,4 +894,11 @@ async def test_an_operator_gets_umamis_journeys_for_a_tenant_and_a_record_of_it(
                 "/v1/deployment/links", params={"tenant_id": "acme"}, headers=OPS_LINKS
             )
     assert links.json()["umami_journeys"] == "http://localhost:3400/websites/w1"
-    assert "umami" in caplog.text
+    (recorded,) = [
+        jsonlib.loads(r.getMessage()) for r in caplog.records if r.name == "portalr.access"
+    ]
+    assert (recorded["tools"], recorded["kinds"], recorded["tenant"]) == (
+        ["umami"],
+        ["tenant"],
+        "acme",
+    )

@@ -99,9 +99,7 @@ STACK = $(COMPOSE) $(COMPOSE_FILES)
 comma := ,
 TRACES_EXPORTERS = [otlp_grpc/tempo$(if $(filter langfuse,$(PROFILES)),$(comma) otlp_http/langfuse)]
 GATEWAY_TELEMETRY = $(if $(filter observability,$(PROFILES)),true,false)
-# db-init makes Umami's role and database only where the umami profile is chosen (ADR-0050).
-UMAMI_ENV = $(if $(filter umami,$(PROFILES)),STACKR_UMAMI=on)
-COMPOSE_ENV = STACKR_TRACES_EXPORTERS='$(TRACES_EXPORTERS)' STACKR_GATEWAY_TELEMETRY=$(GATEWAY_TELEMETRY) $(DATABASE_ENV) $(UMAMI_ENV)
+COMPOSE_ENV = STACKR_TRACES_EXPORTERS='$(TRACES_EXPORTERS)' STACKR_GATEWAY_TELEMETRY=$(GATEWAY_TELEMETRY) $(DATABASE_ENV)
 
 # scripts/smoke runs Compose as `make up` does, and the Supabase CLI as make runs it.
 SMOKE = $(COMPOSE_ENV) STACKR_DATABASE=$(STACKR_DATABASE) STACKR_RECIPE=$(STACKR_RECIPE) \
@@ -140,7 +138,12 @@ endif
 ifeq ($(STACKR_RECIPE)$(filter auth,$(PROFILES)),host)
 	$(error a single host needs the auth profile: make up PROFILES="observability langfuse gateway auth")
 endif
-	@docker network inspect $(UMAMI_NETWORK) >/dev/null 2>&1 || docker network create --internal $(UMAMI_NETWORK) >/dev/null
+	@internal=$$(docker network inspect -f '{{.Internal}}' $(UMAMI_NETWORK) 2>/dev/null) || \
+	  { docker network create --internal $(UMAMI_NETWORK) >/dev/null && internal=true; }; \
+	if [ "$$internal" != true ]; then \
+	  echo "$(UMAMI_NETWORK) isn't internal, so Umami's ingest would have a route out: docker network rm $(UMAMI_NETWORK), then make up (ADR-0050)" >&2; \
+	  exit 1; \
+	fi
 	@bound=$$(docker network inspect -f '{{index .Options "$(BINDING)"}}' $(SUPABASE_NETWORK) 2>/dev/null) || \
 	  { docker network create -o $(BINDING)=$(STACKR_BIND) $(SUPABASE_NETWORK) >/dev/null && bound=$(STACKR_BIND); }; \
 	if [ "$$bound" != "$(STACKR_BIND)" ]; then \

@@ -49,10 +49,6 @@ services:
     ports: !override
       - 127.0.0.1:${LITELLM_PORT:-4400}:4000
     networks: !override [default]
-  # Operators reach Umami's UI by an SSH tunnel, as Grafana's (ADR-0050).
-  umami:
-    ports: !override
-      - 127.0.0.1:${UMAMI_PORT:-3400}:3000
   minio:
     ports: !override
       - 127.0.0.1:${MINIO_PORT:-9000}:9000

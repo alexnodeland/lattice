@@ -13,11 +13,11 @@
 | `langfuse` | `db-init`, `redis`, `minio`, `clickhouse`, `langfuse-worker`, `langfuse-web` | yes |
 | `gateway` | `db-init`, `redis`, `litellm` | yes |
 | `auth` | `db-init`, `gotrue` | no |
-| `umami` | `db-init`, `umami` | no |
-| `umami-init` | `db-init`, `umami`, `umami-init` | no |
 | `clickhouse` | `clickhouse` | no |
 | `analytics` | `clickhouse` | no |
 | `analytics-init` | `clickhouse`, `clickhouse-init` | no |
+| `umami` | `umami`, `umami-db-init` | no |
+| `umami-init` | `umami`, `umami-db-init`, `umami-init` | no |
 | `smoke` | `telemetrygen`, `probe` | no |
 
 <!-- end generated -->
@@ -30,7 +30,7 @@
 
 | Network | Created | Joined by |
 |---|---|---|
-| `stackr` | by Compose | `otel-collector`, `tempo`, `prometheus`, `prom-label-proxy`, `loki`, `pyroscope`, `grafana`, `postgres`, `db-init`, `gotrue`, `redis`, `minio`, `clickhouse`, `clickhouse-init`, `langfuse-worker`, `langfuse-web`, `litellm`, `telemetrygen`, `probe` |
+| `stackr` | by Compose | `otel-collector`, `tempo`, `prometheus`, `prom-label-proxy`, `loki`, `pyroscope`, `grafana`, `postgres`, `db-init`, `gotrue`, `redis`, `minio`, `clickhouse`, `clickhouse-init`, `umami-db-init`, `langfuse-worker`, `langfuse-web`, `litellm`, `telemetrygen`, `probe` |
 | `supabase_network_stackr-supabase` | by `make up`, if missing | `db-init`, `langfuse-worker`, `langfuse-web`, `litellm`, `probe` |
 | `stackr-umami` | by `make up`, if missing | `umami`, `umami-init` |
 | `umami-db` | by Compose | `postgres`, `umami` |
@@ -227,7 +227,7 @@ Creates each service's role and database on the database adapter, on every start
 
 | Property | Value |
 |---|---|
-| Profiles | `langfuse`, `gateway`, `auth`, `umami`, `umami-init` |
+| Profiles | `langfuse`, `gateway`, `auth` |
 | Image | `postgres`, pinned by tag and digest in `compose.yaml` |
 | Published ports | none |
 | Networks | `stackr`, `supabase_network_stackr-supabase` |
@@ -249,7 +249,6 @@ Creates each service's role and database on the database adapter, on every start
     | `LANGFUSE_DB_PASSWORD` | `${LANGFUSE_DB_PASSWORD:?run make env}` |
     | `LITELLM_DB_PASSWORD` | `${LITELLM_DB_PASSWORD:?run make env}` |
     | `AUTH_DB_PASSWORD` | `${AUTH_DB_PASSWORD:?run make env}` |
-    | `UMAMI_DB_PASSWORD` | `${STACKR_UMAMI:+${UMAMI_DB_PASSWORD:?run make env}}` |
 
 ### `gotrue`
 
@@ -387,16 +386,16 @@ Makes portalr's analytics database and its events table, with the deployment's r
 
 ### `umami`
 
-Umami, operators' journeys: portalr's relay sends it a copy of consented events, on a network only the application joins. On the postgres adapter alone (ADR-0050).
+Umami, operators' journeys: portalr's relay sends it a copy of consented events, on a network only the application joins. On the postgres adapter alone. Its port, on 127.0.0.1 alone, is its UI's and its ingest's too: anything on this machine may post events to it (ADR-0050).
 
 | Property | Value |
 |---|---|
 | Profiles | `umami`, `umami-init` |
 | Image | `ghcr.io/umami-software/umami`, pinned by tag and digest in `compose.yaml` |
-| Published ports | 3400 (`UMAMI_PORT`) → 3000 |
+| Published ports | 3400 (`UMAMI_PORT`) on 127.0.0.1 only → 3000 |
 | Networks | `stackr-umami`, `umami-db`, `umami-ui` |
 | Volumes | none |
-| Depends on | `db-init` (completed) |
+| Depends on | `umami-db-init` (completed) |
 | Health check | `wget -q -O /dev/null http://127.0.0.1:3000/api/heartbeat`, every 5s |
 | Restart | `unless-stopped` |
 
@@ -409,6 +408,33 @@ Umami, operators' journeys: portalr's relay sends it a copy of consented events,
     | `DISABLE_TELEMETRY` | `1` |
     | `DISABLE_UPDATES` | `1` |
     | `DISABLE_BOT_CHECK` | `1` |
+
+### `umami-db-init`
+
+Makes Umami's role and database on plain PostgreSQL, with the umami profile alone, then exits.
+
+| Property | Value |
+|---|---|
+| Profiles | `umami`, `umami-init` |
+| Image | `postgres`, pinned by tag and digest in `compose.yaml` |
+| Published ports | none |
+| Networks | `stackr` |
+| Volumes | `./deploy/postgres/umami.sql` → `/umami.sql` (read-only) |
+| Depends on | `postgres` (healthy, when it runs) |
+| Runs | `psql --no-psqlrc --quiet --file=/umami.sql` |
+| Restart | `no` |
+
+??? note "Environment"
+
+    | Variable | Value |
+    |---|---|
+    | `PGHOST` | `postgres` |
+    | `PGPORT` | `5432` |
+    | `PGDATABASE` | `postgres` |
+    | `PGUSER` | `postgres` |
+    | `PGPASSWORD` | `${POSTGRES_ADMIN_PASSWORD:?run make env}` |
+    | `PGCONNECT_TIMEOUT` | `10` |
+    | `UMAMI_DB_PASSWORD` | `${UMAMI_DB_PASSWORD:?run make env}` |
 
 ### `umami-init`
 

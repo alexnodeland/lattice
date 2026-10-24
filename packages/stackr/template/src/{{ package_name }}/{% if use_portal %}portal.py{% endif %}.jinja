@@ -173,13 +173,26 @@ def readers(settings: Settings, clients: list[httpx.AsyncClient]) -> Readers:
 
 
 def umami(settings: Settings, clients: list[httpx.AsyncClient]) -> Umami | None:
-    """Umami's ingest, for a copy of consented events, where the settings name it whole."""
+    """Umami's ingest, for a copy of consented events, where the settings name it whole.
+
+    Named in part, it is off, and says which are missing, so an empty password never quietly
+    sends nothing.
+    """
     portal = settings.portal
-    if not (portal.umami_url and portal.umami_website and portal.umami_password):
+    url, website, password = portal.umami_url, portal.umami_website, portal.umami_password
+    if not (url and website and password):
+        named = {
+            "PORTAL_UMAMI_URL": url,
+            "PORTAL_UMAMI_WEBSITE_ID": website,
+            "PORTAL_UMAMI_PASSWORD": password,
+        }
+        missing = [name for name, value in named.items() if not value]
+        if len(missing) < len(named):
+            LOGGER.warning("Umami is off: %s isn't set", ", ".join(missing))
         return None
     client = httpx.AsyncClient()
     clients.append(client)
-    return Umami(portal.umami_url, portal.umami_website, portal.umami_password, client)
+    return Umami(url, website, password, client)
 
 
 def invitations(settings: Settings, clients: list[httpx.AsyncClient]) -> Invite:

@@ -28,11 +28,24 @@ AGENT: Final = "portalr-relay"
 HOSTNAME: Final = "portalr.internal"
 """The host each event is recorded on: the website's domain."""
 
-TIMEOUT: Final = 5.0
-"""How long a request to Umami may take, in seconds."""
+TIMEOUT: Final = 2.0
+"""How long a request to Umami may take, in seconds: a copy waits on no one for long."""
 
-MOST_SESSIONS: Final = 100
-"""The most sessions one search reads: a person has one per tenant, each month."""
+REST: Final = 30.0
+"""How long, in seconds, the copies wait after Umami failed one, before trying it again."""
+
+PAGE: Final = 100
+"""How many sessions one page of a search reads."""
+
+MOST_ROUNDS: Final = 10
+"""How many times a deletion searches again before it says it wasn't done: each round deletes
+every session of the person's that the search found, page by page."""
+
+
+class _Rest:
+    """Until when the copies rest, after Umami failed one: a short circuit-breaker."""
+
+    until: float = 0.0
 
 
 class _Session(BaseModel):
@@ -52,6 +65,9 @@ _SESSION: Final = TypeAdapter(_Session)
 class Umami:
     """Umami's website for portalr, sent to and deleted from.
 
+    Every failure of Umami's is caught here, whatever it is, and said by its type alone: Umami
+    never fails a request of portalr's.
+
     Args:
         url: Umami's address on the application's network, such as ``http://umami:3000``.
         website: The website's id, which stackr's ``umami-init`` makes.
@@ -63,6 +79,7 @@ class Umami:
     website: str
     password: str = field(repr=False)
     client: httpx.AsyncClient = field(default_factory=httpx.AsyncClient)
+    _rest: _Rest = field(default_factory=_Rest, repr=False, compare=False)
 
     async def send(
         self, tenant: str, person: str, events: list[tuple[str, dict[str, str]]]
@@ -70,65 +87,109 @@ class Umami:
         """Send a person's events, each its name and props: whether Umami took them all.
 
         A failure is logged and dropped, as a write to ClickHouse is: Umami is never the record.
+        After one, the copies rest for ``REST`` seconds, sending nothing, so an Umami that is down
+        costs each request nothing.
         """
-        for name, props in events:
-            payload = {
-                "website": self.website,
-                "hostname": HOSTNAME,
-                "url": props.get("route") or "/",
-                "name": name,
-                "id": f"{tenant}:{person}",
-                "data": {key: value for key, value in props.items() if key != "route"},
-            }
-            try:
+        if time.monotonic() < self._rest.until:
+            return False
+        try:
+            for name, props in events:
+                payload = {
+                    "website": self.website,
+                    "hostname": HOSTNAME,
+                    "url": props.get("route") or "/",
+                    "name": name,
+                    "id": f"{tenant}:{person}",
+                    "data": {key: value for key, value in props.items() if key != "route"},
+                }
                 response = await self.client.post(
                     f"{self.url}/api/send",
                     json={"type": "event", "payload": payload},
                     headers={"User-Agent": AGENT},
                     timeout=TIMEOUT,
                 )
-            except httpx.HTTPError as error:
-                log.warning("analytics: Umami didn't take an event: %s", type(error).__name__)
-                return False
-            if response.status_code >= 400:
-                log.warning("analytics: Umami answered %s to an event", response.status_code)
-                return False
+                response.raise_for_status()
+        except Exception as error:  # Umami's failure is never the request's.
+            self._rest.until = time.monotonic() + REST
+            log.warning("analytics: Umami didn't take an event: %s", type(error).__name__)
+            return False
         return True
 
     async def forget(self, person: str, tenant: str | None = None) -> bool:
         """Delete a person's sessions, and their events, in one tenant or in all: whether done.
 
-        portalr's user signs in, finds the sessions whose distinct id names the person, reads each
-        to check its id is theirs exactly, and deletes it.
+        portalr's user signs in, and searches for the person's hash: every page of the answer,
+        each session read to check its distinct id is theirs exactly, then each deleted. It
+        searches again until a round finds none of theirs; one still finding some after
+        ``MOST_ROUNDS`` isn't done.
         """
         try:
-            token = await self._sign_in()
-            headers = {"Authorization": f"Bearer {token}", "User-Agent": AGENT}
-            now = int(time.time() * 1000) + 60_000
-            found = await self.client.get(
-                f"{self.url}/api/websites/{self.website}/sessions",
-                params={"startAt": 0, "endAt": now, "search": person, "pageSize": MOST_SESSIONS},
-                headers=headers,
-                timeout=TIMEOUT,
-            )
-            found.raise_for_status()
-            for listed in _SESSIONS.validate_json(found.content).data:
-                path = f"{self.url}/api/websites/{self.website}/sessions/{listed.id}"
-                read = await self.client.get(path, headers=headers, timeout=TIMEOUT)
-                read.raise_for_status()
-                named = _SESSION.validate_json(read.content).distinct_id or ""
-                owner, _, whose = named.partition(":")
-                if whose != person or (tenant is not None and owner != tenant):
-                    continue
-                gone = await self.client.delete(path, headers=headers, timeout=TIMEOUT)
-                if gone.status_code not in (200, 404):
-                    gone.raise_for_status()
-        except (httpx.HTTPError, ValueError) as error:
+            headers = await self._signed_in()
+            for _ in range(MOST_ROUNDS):
+                theirs = await self._theirs(person, tenant, headers)
+                if not theirs:
+                    return True
+                for session in theirs:
+                    gone = await self.client.delete(
+                        f"{self.url}/api/websites/{self.website}/sessions/{session}",
+                        headers=headers,
+                        timeout=TIMEOUT,
+                    )
+                    if gone.status_code != 404:
+                        gone.raise_for_status()
+        except Exception as error:  # Umami's failure is never the request's.
             log.warning(
                 "analytics: Umami didn't delete a person's sessions: %s", type(error).__name__
             )
             return False
-        return True
+        log.warning("analytics: Umami still has a person's sessions after %d rounds", MOST_ROUNDS)
+        return False
+
+    async def sessions(self, person: str, tenant: str | None = None) -> list[str]:
+        """The ids of the person's sessions, in the tenant if named; Umami's failures are raised.
+
+        For checks, as stackr's smoke test makes them.
+        """
+        return await self._theirs(person, tenant, await self._signed_in())
+
+    async def _theirs(self, person: str, tenant: str | None, headers: dict[str, str]) -> list[str]:
+        """The sessions a search for the person finds that are theirs, in the tenant if named."""
+        now = int(time.time() * 1000) + 60_000
+        theirs: list[str] = []
+        page = 1
+        while True:
+            found = await self.client.get(
+                f"{self.url}/api/websites/{self.website}/sessions",
+                params={
+                    "startAt": 0,
+                    "endAt": now,
+                    "search": person,
+                    "page": page,
+                    "pageSize": PAGE,
+                },
+                headers=headers,
+                timeout=TIMEOUT,
+            )
+            found.raise_for_status()
+            listed = _SESSIONS.validate_json(found.content).data
+            for session in listed:
+                read = await self.client.get(
+                    f"{self.url}/api/websites/{self.website}/sessions/{session.id}",
+                    headers=headers,
+                    timeout=TIMEOUT,
+                )
+                read.raise_for_status()
+                named = _SESSION.validate_json(read.content).distinct_id or ""
+                owner, _, whose = named.rpartition(":")
+                if whose == person and (tenant is None or owner == tenant):
+                    theirs.append(session.id)
+            if len(listed) < PAGE:
+                return theirs
+            page += 1
+
+    async def _signed_in(self) -> dict[str, str]:
+        """The headers of a request as portalr's user, signed in."""
+        return {"Authorization": f"Bearer {await self._sign_in()}", "User-Agent": AGENT}
 
     async def _sign_in(self) -> str:
         response = await self.client.post(

@@ -501,11 +501,14 @@ umami_from() {
 }
 umami_ready() { [[ $(umami_from stackr-umami) == 200 ]]; }
 
-# Umami (ADR-0050): its ingest answers the applications' network alone, its UI the loopback, and
-# its role has nothing in any other database.
+# Umami (ADR-0050): its ingest answers the applications' network, not the stack's; the loopback
+# port, for operators' UI, takes events too, which this machine alone reaches; its role has
+# nothing outside its database; and portalr's own client and relay keep a session per person,
+# and delete one person's alone.
 smoke_umami() {
   eventually "Umami takes an event from the applications' network" umami_ready
-  local said
+  local said port
+  port=$(setting UMAMI_PORT)
   said=$(probe -s -o /dev/null -w '%{http_code}' http://umami:3000/api/heartbeat || true)
   if [[ $said == 000 ]]; then
     log "ok: the stack's other services don't reach Umami"
@@ -513,11 +516,21 @@ smoke_umami() {
     log "FAIL: a service on the stack's network reached Umami (answered $said)"
     status=1
   fi
-  said=$(curl -s -m 10 "http://127.0.0.1:$(setting UMAMI_PORT)/api/heartbeat" || true)
+  said=$(curl -s -m 10 "http://127.0.0.1:$port/api/heartbeat" || true)
   if [[ $said == *'"ok":true'* ]]; then
     log "ok: Umami's UI answers on the loopback, for operators"
   else
-    log "FAIL: Umami's UI doesn't answer on 127.0.0.1:$(setting UMAMI_PORT) (answered: $said)"
+    log "FAIL: Umami's UI doesn't answer on 127.0.0.1:$port (answered: $said)"
+    status=1
+  fi
+  # The limit ADR-0050 states: the loopback port is the ingest's too, so this machine may post.
+  said=$(curl -s -o /dev/null -w '%{http_code}' -m 10 -X POST -H 'Content-Type: application/json' \
+    --data "{\"type\":\"event\",\"payload\":{\"website\":\"$(setting UMAMI_WEBSITE_ID)\",\"hostname\":\"portalr.internal\",\"url\":\"/\",\"name\":\"stackr.smoke\"}}" \
+    "http://127.0.0.1:$port/api/send" || true)
+  if [[ $said == 200 ]]; then
+    log "ok: as ADR-0050 says, the loopback port takes events, from this machine alone"
+  else
+    log "FAIL: the loopback port answered $said to an event; ADR-0050 says it takes them"
     status=1
   fi
   # The password goes in the exec's environment, never on a command line.
@@ -527,6 +540,25 @@ smoke_umami() {
     log "ok: Umami's role is refused the server's own database"
   else
     log "FAIL: Umami's role, in another database: $(head -c 200 <<<"$said")"
+    status=1
+  fi
+  # portalr's client against this Umami, and, with the analytics profile, its relay end to end.
+  # Read before leaving stackr's directory, whose settings `setting` reads.
+  local url website password clickhouse="" writer=""
+  url="http://127.0.0.1:$port" website=$(setting UMAMI_WEBSITE_ID) password=$(setting UMAMI_PORTALR_PASSWORD)
+  if has_profile analytics; then
+    clickhouse="http://127.0.0.1:$(setting CLICKHOUSE_HTTP_PORT)"
+    writer=$(setting CLICKHOUSE_ANALYTICS_WRITER_PASSWORD)
+  fi
+  if (
+    cd ../portalr &&
+      PORTALR_UMAMI_URL=$url UMAMI_WEBSITE_ID=$website UMAMI_PORTALR_PASSWORD=$password \
+      PORTALR_CLICKHOUSE_URL=$clickhouse CLICKHOUSE_ANALYTICS_WRITER_PASSWORD=$writer \
+      uv run --locked scripts/smoke_umami.py
+  ); then
+    log "ok: portalr's Umami keeps a session per person and deletes one person's alone"
+  else
+    log "FAIL: portalr's Umami, against the stack's"
     status=1
   fi
 }

@@ -1,26 +1,37 @@
 #!/bin/sh
-# Umami's accounts and website, on every start (stackr ADR-0050): idempotent, as umami-init runs
-# it after Umami is up. Umami starts with an admin whose password is `umami`; this gives it
-# UMAMI_ADMIN_PASSWORD, makes portalr's user, and the website portalr's relay sends to, owned by
-# portalr's user, with the fixed id UMAMI_WEBSITE_ID, so portalr may delete a person's sessions in
-# it. Passwords come from the environment and are sent in bodies, never in a command line or URL.
+# Umami's accounts and website, on every start (stackr ADR-0050): idempotent, as umami-init runs it
+# after Umami is up. .env is the source of truth for each password:
+# - the admin's is UMAMI_ADMIN_PASSWORD, set from Umami's first password, `umami`, the first time;
+#   a password changed in Umami's UI since is refused, and said, until .env names it again;
+# - portalr's user, with a fixed id, has UMAMI_PORTALR_PASSWORD: made, or given it again by the
+#   admin where it was rotated in .env;
+# - portalr's website, owned by that user, with the fixed id UMAMI_WEBSITE_ID, so portalr may
+#   delete a person's sessions in it.
+# Passwords are sent in bodies, and a token in a header file, never on a command line or in a URL.
 set -eu
 url=${UMAMI_URL:-http://umami:3000}
+portalr_user=7d1f0a3e-5b2c-4e8a-9c41-706f7274616c
+scratch=$(mktemp -d)
+trap 'rm -rf "$scratch"' EXIT
 
 # A JSON field's string value, from an answer Umami gave.
 field() { sed -n "s/.*\"$1\":\"\([^\"]*\)\".*/\1/p"; }
 
-# POST a body read from standard input, as a user's token, if given; print the answer.
-post() {
-  if [ -n "${2:-}" ]; then
-    curl -fsS -X POST "$url$1" -H 'Content-Type: application/json' -H "Authorization: Bearer $2" --data-binary @-
+# A request with a body from standard input, as a token's holder if one is named: the answer.
+call() {
+  method=$1 path=$2 token=${3:-}
+  : >"$scratch/auth"
+  [ -z "$token" ] || printf 'Authorization: Bearer %s\n' "$token" >"$scratch/auth"
+  if [ "$method" = GET ]; then
+    curl -fsS "$url$path" -H "@$scratch/auth"
   else
-    curl -fsS -X POST "$url$1" -H 'Content-Type: application/json' --data-binary @-
+    curl -fsS -X "$method" "$url$path" -H 'Content-Type: application/json' -H "@$scratch/auth" \
+      --data-binary @-
   fi
 }
 
 login() {
-  printf '{"username":"%s","password":"%s"}' "$1" "$2" | post /api/auth/login 2>/dev/null | field token
+  printf '{"username":"%s","password":"%s"}' "$1" "$2" | call POST /api/auth/login 2>/dev/null | field token
 }
 
 for _ in $(seq 60); do
@@ -31,21 +42,34 @@ done
 admin=$(login admin "$UMAMI_ADMIN_PASSWORD" || true)
 if [ -z "$admin" ]; then
   first=$(login admin umami || true)
-  [ -n "$first" ] || { echo "umami-init: the admin's password is neither UMAMI_ADMIN_PASSWORD nor Umami's first" >&2; exit 1; }
-  printf '{"currentPassword":"umami","newPassword":"%s"}' "$UMAMI_ADMIN_PASSWORD" | post /api/me/password "$first" >/dev/null
+  if [ -z "$first" ]; then
+    echo "umami-init: Umami's admin has neither UMAMI_ADMIN_PASSWORD nor Umami's first password;" \
+      "if it was changed in Umami's UI, put that one in .env as UMAMI_ADMIN_PASSWORD" >&2
+    exit 1
+  fi
+  printf '{"currentPassword":"umami","newPassword":"%s"}' "$UMAMI_ADMIN_PASSWORD" |
+    call POST /api/me/password "$first" >/dev/null
   admin=$(login admin "$UMAMI_ADMIN_PASSWORD")
   echo "umami-init: the admin's password is UMAMI_ADMIN_PASSWORD"
 fi
 
 portalr=$(login portalr "$UMAMI_PORTALR_PASSWORD" || true)
 if [ -z "$portalr" ]; then
-  printf '{"username":"portalr","password":"%s","role":"user"}' "$UMAMI_PORTALR_PASSWORD" | post /api/users "$admin" >/dev/null
+  if printf '{"password":"%s"}' "$UMAMI_PORTALR_PASSWORD" |
+    call POST "/api/users/$portalr_user" "$admin" >/dev/null 2>&1; then
+    echo "umami-init: portalr's user has UMAMI_PORTALR_PASSWORD again"
+  else
+    printf '{"id":"%s","username":"portalr","password":"%s","role":"user"}' \
+      "$portalr_user" "$UMAMI_PORTALR_PASSWORD" | call POST /api/users "$admin" >/dev/null
+    echo "umami-init: made portalr's user"
+  fi
   portalr=$(login portalr "$UMAMI_PORTALR_PASSWORD")
-  echo "umami-init: made portalr's user"
 fi
 
-if ! curl -fsS -o /dev/null -H "Authorization: Bearer $portalr" "$url/api/websites/$UMAMI_WEBSITE_ID" 2>/dev/null; then
-  printf '{"id":"%s","name":"portalr","domain":"portalr.internal"}' "$UMAMI_WEBSITE_ID" | post /api/websites "$portalr" >/dev/null
-  echo "umami-init: made portalr's website, $UMAMI_WEBSITE_ID"
-fi
+call GET "/api/websites/$UMAMI_WEBSITE_ID" "$portalr" >/dev/null 2>&1 ||
+  {
+    printf '{"id":"%s","name":"portalr","domain":"portalr.internal"}' "$UMAMI_WEBSITE_ID" |
+      call POST /api/websites "$portalr" >/dev/null
+    echo "umami-init: made portalr's website, $UMAMI_WEBSITE_ID"
+  }
 echo "umami-init: ready"

@@ -79,7 +79,13 @@ ROLES = {
     ),
     "umami": (
         "Umami, operators' journeys: portalr's relay sends it a copy of consented events, on a "
-        "network only the application joins. On the postgres adapter alone (ADR-0050)."
+        "network only the application joins. On the postgres adapter alone. Its port, on "
+        "127.0.0.1 alone, is its UI's and its ingest's too: anything on this machine may post "
+        "events to it (ADR-0050)."
+    ),
+    "umami-db-init": (
+        "Makes Umami's role and database on plain PostgreSQL, with the umami profile alone, "
+        "then exits."
     ),
     "umami-init": (
         "Sets Umami's admin password, and makes portalr's user and website, each time `make up` "

@@ -11,6 +11,7 @@ browser's; no address or browser is kept.
 deletes their events at once, by their keyed hash.
 """
 
+import asyncio
 import hashlib
 import hmac
 import json
@@ -131,6 +132,10 @@ class Relay:
     umami: Umami | None = None
     """Umami, sent a copy of each consented event, for operators' journeys (portalr ADR-0076);
     a person's deletion deletes their sessions there too."""
+    copies: set[asyncio.Future[None]] = field(
+        default_factory=lambda: set[asyncio.Future[None]](), repr=False, compare=False
+    )
+    """The copies to Umami still being sent, kept so none is lost before it is done."""
 
     def sign(self, user_id: str, *, now: float | None = None) -> str:
         """A new session id for the person, signed so no one else can send under it."""
@@ -209,9 +214,23 @@ class Relay:
             return Relayed(recorded=0, dropped=len(batch.events))
         recorded = len(named) if written else 0
         if written and self.umami is not None:
-            # A copy for Umami, of what was kept, after the yes was read again: never the record.
-            await self.umami.send(tenant, self._person(user_id), named)
+            # A copy for Umami, of what was kept, after the yes was read again: never the record,
+            # and never waited on, so Umami down slows no request.
+            copy = asyncio.ensure_future(self._copy(self.umami, tenant, user_id, named))
+            self.copies.add(copy)
+            copy.add_done_callback(self.copies.discard)
         return Relayed(recorded=recorded, dropped=len(batch.events) - recorded)
+
+    async def _copy(
+        self, umami: Umami, tenant: str, user_id: str, named: list[tuple[str, dict[str, str]]]
+    ) -> None:
+        """Send Umami its copy: a no that lands while it is sent deletes it there too.
+
+        As a no that lands while a batch is written does in ClickHouse: owed, and tried at once.
+        """
+        sent = await umami.send(tenant, self._person(user_id), named)
+        if sent and not await self.consent.given(user_id):
+            await self.settle(user_id, await self.consent.owe(user_id))
 
     def _person(self, user_id: str) -> str:
         """A person as Umami knows them: the deployment's keyed hash, as ClickHouse does."""

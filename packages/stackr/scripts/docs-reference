@@ -77,6 +77,14 @@ ROLES = {
         "Makes portalr's analytics database and its events table, with the deployment's "
         "retention, each time `make up` starts the analytics profile, then exits."
     ),
+    "umami": (
+        "Umami, operators' journeys: portalr's relay sends it a copy of consented events, on a "
+        "network only the application joins. On the postgres adapter alone (ADR-0050)."
+    ),
+    "umami-init": (
+        "Sets Umami's admin password, and makes portalr's user and website, each time `make up` "
+        "starts the umami profile, then exits."
+    ),
     "langfuse-worker": "Langfuse's worker: runs ingestion and evaluation jobs from the queues.",
     "langfuse-web": (
         "Langfuse's UI and public API. Receives traces from the Collector, and runs the "

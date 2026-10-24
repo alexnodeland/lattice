@@ -70,10 +70,14 @@ export function ignoredOf(search: Record<string, unknown>): Ignored[] {
 }
 
 /** The tools a link can be into, in the order their links are listed. */
-export const TOOLS: readonly Door["tool"][] = ["langfuse", "grafana"];
+export const TOOLS: readonly Door["tool"][] = ["langfuse", "grafana", "umami"];
 
 /** A tool's name as people read it. */
-export const TOOL_NAME: Record<Door["tool"], string> = { langfuse: "Langfuse", grafana: "Grafana" };
+export const TOOL_NAME: Record<Door["tool"], string> = {
+  langfuse: "Langfuse",
+  grafana: "Grafana",
+  umami: "Umami",
+};
 
 /** The tenants an operator may ask for, by name: none for someone who isn't an operator. */
 export const tenantsOf = (every: { readonly tenants: readonly string[] } | null): string[] =>
@@ -85,7 +89,7 @@ export const asked = (ids: ToolIds) => Object.values(ids).some((value) => value 
 /** One link an id may give: the tool, what it opens, and where in the answer it is. */
 export interface Door {
   readonly kind: keyof ToolIds;
-  readonly tool: "langfuse" | "grafana";
+  readonly tool: "langfuse" | "grafana" | "umami";
   readonly label: string;
   readonly field: keyof Links;
 }
@@ -129,11 +133,18 @@ export const DOORS: readonly Door[] = [
     label: "The tenant's traces in Grafana, from Tempo",
     field: "grafana_tenant_traces",
   },
+  {
+    kind: "tenant",
+    tool: "umami",
+    label: "Journeys in Umami, across every tenant",
+    field: "umami_journeys",
+  },
 ];
 
 /** What the notice beside the links says, always: these tools are outside portalr's gates. */
 export const NOTICE =
-  "Langfuse and Grafana aren't scoped to a tenant, and they show what people and models said, " +
-  "across every tenant: they are outside the gates that Traces and Logs keep that behind. Links " +
-  "made here are recorded: who you are, which kinds of id you asked for and, for a tenant, which. " +
-  "A visit to either tool that doesn't start here, or from a link already copied, is not.";
+  "Langfuse, Grafana and Umami aren't scoped to a tenant: Langfuse and Grafana show what people " +
+  "and models said, and Umami where people went, across every tenant. They are outside the gates " +
+  "that Traces and Logs keep that behind. Links made here are recorded: who you are, which kinds " +
+  "of id you asked for and, for a tenant, which. A visit to any of them that doesn't start here, " +
+  "or from a link already copied, is not.";

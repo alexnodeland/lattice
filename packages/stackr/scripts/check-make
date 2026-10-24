@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Check what `make up` refuses, and the gateway's model groups' check, without starting anything:
 # scripts/binding-probe against a fake `docker` for each shape an engine publishes in, the
-# STACKR_GATEWAY_MODELS guard, and scripts/check-config's hold on deploy/litellm/groups/
+# STACKR_GATEWAY_MODELS guard, the umami profile's adapter (ADR-0050), and scripts/check-config's hold on deploy/litellm/groups/
 # (ADR-0045). scripts/validate runs it.
 
 set -euo pipefail
@@ -49,6 +49,10 @@ check "and names them" said "needs STACKR_UPSTREAM_URL STACKR_UPSTREAM_DEFAULT_M
 check "make takes upstream with them" quietly make --no-print-directory -n help \
   STACKR_GATEWAY_MODELS=upstream STACKR_UPSTREAM_URL=http://gateway/v1 \
   STACKR_UPSTREAM_DEFAULT_MODEL=big STACKR_UPSTREAM_FAST_MODEL=small
+
+check "make refuses the umami profile beside local Supabase" \
+  refused make --no-print-directory -n up STACKR_DATABASE=supabase PROFILES=umami
+check "and says why" said "the umami profile is for the postgres adapter"
 
 # check-config on a copy whose config.yaml includes no groups, or whose groups lack `fast`.
 copy() {

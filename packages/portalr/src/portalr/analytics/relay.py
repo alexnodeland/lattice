@@ -24,7 +24,8 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from portalr.analytics.consent import Consent
 from portalr.analytics.limiter import InMemoryRateLimiter, RateLimiter
-from portalr.readers.analytics import REGISTRY, Analytics
+from portalr.readers.analytics import REGISTRY, Analytics, distinct_id
+from portalr.readers.umami import Umami
 
 ROUTES: Final = frozenset(
     json.loads(resources.files("portalr.analytics").joinpath("routes.json").read_text())["routes"]
@@ -127,6 +128,9 @@ class Relay:
     deletes: RateLimiter = field(
         default_factory=lambda: InMemoryRateLimiter(per_second=10 / 3600, burst=10)
     )
+    umami: Umami | None = None
+    """Umami, sent a copy of each consented event, for operators' journeys (portalr ADR-0076);
+    a person's deletion deletes their sessions there too."""
 
     def sign(self, user_id: str, *, now: float | None = None) -> str:
         """A new session id for the person, signed so no one else can send under it."""
@@ -166,6 +170,8 @@ class Relay:
             return False
         if not await self.analytics.forget(user_id):
             return False
+        if self.umami is not None and not await self.umami.forget(self._person(user_id)):
+            return False
         await self.consent.settled(user_id, debt)
         return True
 
@@ -202,7 +208,14 @@ class Relay:
             await self.settle(user_id, await self.consent.owe(user_id))
             return Relayed(recorded=0, dropped=len(batch.events))
         recorded = len(named) if written else 0
+        if written and self.umami is not None:
+            # A copy for Umami, of what was kept, after the yes was read again: never the record.
+            await self.umami.send(tenant, self._person(user_id), named)
         return Relayed(recorded=recorded, dropped=len(batch.events) - recorded)
+
+    def _person(self, user_id: str) -> str:
+        """A person as Umami knows them: the deployment's keyed hash, as ClickHouse does."""
+        return distinct_id(self.analytics.key, user_id)
 
     async def settle_if_owed(self, user_id: str) -> None:
         """Try again a deletion owed the person, on their next request."""

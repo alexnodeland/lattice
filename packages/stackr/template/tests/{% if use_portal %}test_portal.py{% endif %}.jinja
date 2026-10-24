@@ -25,7 +25,7 @@ from portalr.invites import InviteFailed, SupabaseInvite
 from portalr.people import SupabasePeople
 from portalr.readers import Analytics
 
-from {{ package_name }}.portal import LARGEST, analytics, invitations, people, readers
+from {{ package_name }}.portal import LARGEST, analytics, invitations, people, readers, umami
 from {{ package_name }}.settings import AuthSettings, PortalSettings, Settings
 
 from conftest import TENANT, Script, app, bearer, settings, token
@@ -331,6 +331,8 @@ def test_every_tool_with_an_address_is_read(ui: Path) -> None:
         "grafana": True,
         # portalr's analytics needs its four settings (lattice RFC-0008).
         "analytics": False,
+        # Umami's link needs its UI's address and the website (stackr ADR-0050).
+        "umami": False,
     }
     assert len(clients) == 2, "Langfuse's and LiteLLM's, which the portal closes"
 
@@ -543,6 +545,27 @@ def test_a_persons_analytics_session_is_on_each_requests_server_span(
 def test_without_analytics_there_is_no_stamp(script: Script, ui: Path) -> None:
     application = app(script, with_portal(ui_dir=str(ui)))
     assert not any(m.cls is SessionStamp for m in application.user_middleware)
+
+
+UMAMI = {
+    "umami_url": "http://umami:3000",
+    "umami_website": "446fed1e-11a4-4c5f-9b72-31e6d4cf882d",
+    "umami_password": "p",
+}
+
+
+def test_umami_comes_from_its_three_settings_and_its_link_from_the_ui_and_the_website() -> None:
+    clients: list[httpx.AsyncClient] = []
+    for missing in UMAMI:
+        assert umami(with_portal(**{**UMAMI, missing: None}), clients) is None, missing
+    whole = umami(with_portal(**UMAMI), clients)
+    assert whole is not None
+    assert (whole.url, whole.website) == (UMAMI["umami_url"], UMAMI["umami_website"])
+    assert len(clients) == 1, "its client, which the portal closes"
+    assert readers(with_portal(**UMAMI), []).umami is None, "no link without Umami's UI"
+    linked = readers(with_portal(**UMAMI, umami_ui_url="http://localhost:3400"), []).umami
+    assert linked is not None
+    assert linked.website_link() == f"http://localhost:3400/websites/{UMAMI['umami_website']}"
 
 
 def test_without_a_database_there_is_no_relay(script: Script, ui: Path) -> None:

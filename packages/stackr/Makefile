@@ -34,6 +34,8 @@ NEEDS_DATABASE = $(filter $(DATABASE_USERS),$(PROFILES))
 #   make up SUPABASE_START_FLAGS="-x studio,imgproxy"
 SUPABASE_PROJECT := stackr-supabase
 SUPABASE_NETWORK := supabase_network_$(SUPABASE_PROJECT)
+# Umami's ingest network, internal, which the applications join (ADR-0050).
+UMAMI_NETWORK := stackr-umami
 SUPABASE ?= $(shell command -v supabase 2>/dev/null || echo npx --yes supabase@$(SUPABASE_CLI_VERSION))
 SUPABASE_START_FLAGS ?=
 SUPABASE_RUNNING = $(shell docker ps -q --filter label=com.supabase.cli.project=$(SUPABASE_PROJECT))
@@ -97,7 +99,9 @@ STACK = $(COMPOSE) $(COMPOSE_FILES)
 comma := ,
 TRACES_EXPORTERS = [otlp_grpc/tempo$(if $(filter langfuse,$(PROFILES)),$(comma) otlp_http/langfuse)]
 GATEWAY_TELEMETRY = $(if $(filter observability,$(PROFILES)),true,false)
-COMPOSE_ENV = STACKR_TRACES_EXPORTERS='$(TRACES_EXPORTERS)' STACKR_GATEWAY_TELEMETRY=$(GATEWAY_TELEMETRY) $(DATABASE_ENV)
+# db-init makes Umami's role and database only where the umami profile is chosen (ADR-0050).
+UMAMI_ENV = $(if $(filter umami,$(PROFILES)),STACKR_UMAMI=on)
+COMPOSE_ENV = STACKR_TRACES_EXPORTERS='$(TRACES_EXPORTERS)' STACKR_GATEWAY_TELEMETRY=$(GATEWAY_TELEMETRY) $(DATABASE_ENV) $(UMAMI_ENV)
 
 # scripts/smoke runs Compose as `make up` does, and the Supabase CLI as make runs it.
 SMOKE = $(COMPOSE_ENV) STACKR_DATABASE=$(STACKR_DATABASE) STACKR_RECIPE=$(STACKR_RECIPE) \
@@ -127,12 +131,16 @@ up: .env ## Start the chosen PROFILES (default: all of them), with the database 
 ifeq ($(STACKR_DATABASE)$(filter auth,$(PROFILES)),supabaseauth)
 	$(error the auth profile is GoTrue for the postgres adapter: local Supabase runs its own Auth)
 endif
+ifeq ($(STACKR_DATABASE)$(filter umami,$(PROFILES)),supabaseumami)
+	$(error the umami profile is for the postgres adapter: local Supabase's database shares a network with the stack's other services, which must not reach Umami's ingest (ADR-0050))
+endif
 ifeq ($(STACKR_RECIPE)$(STACKR_DATABASE),hostsupabase)
 	$(error a single host runs on the postgres adapter, with the auth profile)
 endif
 ifeq ($(STACKR_RECIPE)$(filter auth,$(PROFILES)),host)
 	$(error a single host needs the auth profile: make up PROFILES="observability langfuse gateway auth")
 endif
+	@docker network inspect $(UMAMI_NETWORK) >/dev/null 2>&1 || docker network create --internal $(UMAMI_NETWORK) >/dev/null
 	@bound=$$(docker network inspect -f '{{index .Options "$(BINDING)"}}' $(SUPABASE_NETWORK) 2>/dev/null) || \
 	  { docker network create -o $(BINDING)=$(STACKR_BIND) $(SUPABASE_NETWORK) >/dev/null && bound=$(STACKR_BIND); }; \
 	if [ "$$bound" != "$(STACKR_BIND)" ]; then \
@@ -148,6 +156,10 @@ endif
 ifneq ($(filter analytics,$(PROFILES)),)
 # portalr's analytics database, with the deployment's retention, once ClickHouse is up (ADR-0044).
 	$(COMPOSE_ENV) $(STACK) $(PROFILE_FLAGS) run --rm --no-deps clickhouse-init
+endif
+ifneq ($(filter umami,$(PROFILES)),)
+# Umami's accounts and portalr's website, once Umami is up (ADR-0050).
+	$(COMPOSE_ENV) $(STACK) $(PROFILE_FLAGS) --profile umami-init run --rm --no-deps umami-init
 endif
 
 down: ## Stop the stack, keeping its data

@@ -761,6 +761,17 @@
               }
             ],
             "title": "Langfuse Trace"
+          },
+          "umami_journeys": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Umami Journeys"
           }
         },
         "title": "Links",
@@ -2265,7 +2276,7 @@
     },
     "/portalr/v1/deployment/links": {
       "get": {
-        "description": "Deep links into Langfuse and Grafana, which aren't tenant-scoped, for operators.\n\nWhat those tools show isn't behind portalr's gates, so each call that makes a link is\nrecorded: who, the kinds of id, and the tenant's id if one was asked for, never a trace's,\na session's or a run's, nor a URL. A tenant that doesn't exist is refused, and nothing is\nrecorded for a refusal.",
+        "description": "Deep links into Langfuse, Grafana and Umami, which aren't tenant-scoped, for operators.\n\nWhat those tools show isn't behind portalr's gates, so each call that makes a link is\nrecorded: who, the kinds of id, and the tenant's id if one was asked for, never a trace's,\na session's or a run's, nor a URL. A tenant that doesn't exist is refused, and nothing is\nrecorded for a refusal.",
         "operationId": "links_portalr_v1_deployment_links_get",
         "parameters": [
           {

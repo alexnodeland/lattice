@@ -30,7 +30,7 @@ import httpx
 from fastapi import APIRouter, FastAPI, HTTPException, Request, Response
 
 from grantr import Grants
-from portalr.analytics import InMemoryRateLimiter, Relay, SessionStamp
+from portalr.analytics import InMemoryRateLimiter, Relay, SessionStamp, Umami
 from portalr.analytics.sql import SqlConsent
 from portalr.analytics.sql import migrate as migrate_consent
 from portalr.fastapi import UI, SandboxOrigin, Site, {% if use_tracker %}Surfaces, {% endif %}portalr_router
@@ -45,6 +45,7 @@ from portalr.readers import (
     Prometheus,
     Readers,
     Tempo,
+    UmamiLinks,
 )
 
 from {{ package_name }}.access import Access
@@ -165,7 +166,20 @@ def readers(settings: Settings, clients: list[httpx.AsyncClient]) -> Readers:
         litellm=litellm,
         grafana=Grafana(portal.grafana_url) if portal.grafana_url else None,
         analytics=analytics(settings, clients),
+        umami=UmamiLinks(portal.umami_ui_url, portal.umami_website)
+        if portal.umami_ui_url and portal.umami_website
+        else None,
     )
+
+
+def umami(settings: Settings, clients: list[httpx.AsyncClient]) -> Umami | None:
+    """Umami's ingest, for a copy of consented events, where the settings name it whole."""
+    portal = settings.portal
+    if not (portal.umami_url and portal.umami_website and portal.umami_password):
+        return None
+    client = httpx.AsyncClient()
+    clients.append(client)
+    return Umami(portal.umami_url, portal.umami_website, portal.umami_password, client)
 
 
 def invitations(settings: Settings, clients: list[httpx.AsyncClient]) -> Invite:
@@ -327,7 +341,12 @@ class Portal:
         if tools.analytics is not None and self._database is not None:
             # Each replica counts a person's pace apart (lattice RFC-0008).
             consent = SqlConsent(self._database.engine, owner=self._database.owner)
-            relay = Relay(tools.analytics, consent, InMemoryRateLimiter())
+            relay = Relay(
+                tools.analytics,
+                consent,
+                InMemoryRateLimiter(),
+                umami=umami(self._settings, self._clients),
+            )
             self._relay = relay
             # A request's analytics session on its server span, where it is the caller's own: added
             # before the server's instrumentation, which runs outside it (portalr ADR-0073).

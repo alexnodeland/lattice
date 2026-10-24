@@ -53,5 +53,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0047](0047-an-upstream-gateway-for-the-model-groups.md) | An upstream gateway for the model groups | Accepted |
 | [0048](0048-grafanas-clickhouse-data-source-and-the-adoption-dashboard.md) | Grafana's ClickHouse data source and the adoption dashboard | Accepted |
 | [0049](0049-the-diagrams-worker-excalidraw-in-headless-chromium-behind-a-relay.md) | The diagrams worker: Excalidraw in headless Chromium, behind a relay | Accepted |
+| [0050](0050-umami-a-profile-for-operators-journeys-on-the-postgres-adapter.md) | Umami, a profile for operators' journeys, on the postgres adapter | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

@@ -29,6 +29,8 @@
 # routed to `default`, masked by `pii-mask`, priced and charged to the key;
 # `prompt-injection` blocks an injection; with observability, the gateway's
 # spans continue the caller's trace in Tempo (and Langfuse, with langfuse).
+# umami: Umami takes an event from the applications' network alone, not from the stack's other
+# services; its UI answers on the loopback; and its role is refused outside its database.
 # analytics: ClickHouse runs without Langfuse; clickhouse-init made portalr's analytics.events
 # (lattice RFC-0008, ADR-0044). Its writer inserts two tenants' events and is refused a read; its
 # reader sees only the tenant its SQL_portalr_tenant setting names, fails without it, and is
@@ -483,6 +485,48 @@ expect_code() {
     log "ok: $what"
   else
     log "FAIL: $what (answered: $(head -c 200 <<<"$said"))"
+    status=1
+  fi
+}
+
+# A request to Umami's ingest from a network, as a container there would make it: the HTTP status,
+# or 000 where it isn't reached at all.
+umami_from() {
+  local network=$1 body
+  body=$(printf '{"type":"event","payload":{"website":"%s","hostname":"portalr.internal","url":"/","name":"stackr.smoke","id":"smoke:%s"}}' \
+    "$(setting UMAMI_WEBSITE_ID)" "$(random_hex 8)")
+  docker run --rm --network "$network" --entrypoint curl curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777 \
+    -s -o /dev/null -w '%{http_code}' -m 10 -X POST -H 'Content-Type: application/json' \
+    --data "$body" http://umami:3000/api/send || true
+}
+umami_ready() { [[ $(umami_from stackr-umami) == 200 ]]; }
+
+# Umami (ADR-0050): its ingest answers the applications' network alone, its UI the loopback, and
+# its role has nothing in any other database.
+smoke_umami() {
+  eventually "Umami takes an event from the applications' network" umami_ready
+  local said
+  said=$(probe -s -o /dev/null -w '%{http_code}' http://umami:3000/api/heartbeat || true)
+  if [[ $said == 000 ]]; then
+    log "ok: the stack's other services don't reach Umami"
+  else
+    log "FAIL: a service on the stack's network reached Umami (answered $said)"
+    status=1
+  fi
+  said=$(curl -s -m 10 "http://127.0.0.1:$(setting UMAMI_PORT)/api/heartbeat" || true)
+  if [[ $said == *'"ok":true'* ]]; then
+    log "ok: Umami's UI answers on the loopback, for operators"
+  else
+    log "FAIL: Umami's UI doesn't answer on 127.0.0.1:$(setting UMAMI_PORT) (answered: $said)"
+    status=1
+  fi
+  # The password goes in the exec's environment, never on a command line.
+  said=$(stack_compose exec -T -e PGPASSWORD="$(setting UMAMI_DB_PASSWORD)" postgres \
+    psql -h 127.0.0.1 -U umami -d postgres -Atc "CREATE TABLE stackr_smoke_refused (x int)" 2>&1 || true)
+  if grep -q "permission denied" <<<"$said"; then
+    log "ok: Umami's role is refused the server's own database"
+  else
+    log "FAIL: Umami's role, in another database: $(head -c 200 <<<"$said")"
     status=1
   fi
 }
@@ -1397,6 +1441,7 @@ for profile in "${profiles[@]}"; do
     database) smoke_database || status=1 ;;
     langfuse) smoke_langfuse || status=1 ;;
     analytics) smoke_analytics || status=1 ;;
+    umami) smoke_umami || status=1 ;;
     gateway) smoke_gateway || status=1 ;;
     auth) smoke_auth || status=1 ;;
     edge) smoke_edge || status=1 ;;

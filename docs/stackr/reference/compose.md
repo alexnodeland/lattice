@@ -13,6 +13,8 @@
 | `langfuse` | `db-init`, `redis`, `minio`, `clickhouse`, `langfuse-worker`, `langfuse-web` | yes |
 | `gateway` | `db-init`, `redis`, `litellm` | yes |
 | `auth` | `db-init`, `gotrue` | no |
+| `umami` | `db-init`, `umami` | no |
+| `umami-init` | `db-init`, `umami`, `umami-init` | no |
 | `clickhouse` | `clickhouse` | no |
 | `analytics` | `clickhouse` | no |
 | `analytics-init` | `clickhouse`, `clickhouse-init` | no |
@@ -30,6 +32,9 @@
 |---|---|---|
 | `stackr` | by Compose | `otel-collector`, `tempo`, `prometheus`, `prom-label-proxy`, `loki`, `pyroscope`, `grafana`, `postgres`, `db-init`, `gotrue`, `redis`, `minio`, `clickhouse`, `clickhouse-init`, `langfuse-worker`, `langfuse-web`, `litellm`, `telemetrygen`, `probe` |
 | `supabase_network_stackr-supabase` | by `make up`, if missing | `db-init`, `langfuse-worker`, `langfuse-web`, `litellm`, `probe` |
+| `stackr-umami` | by `make up`, if missing | `umami`, `umami-init` |
+| `umami-db` | by Compose | `postgres`, `umami` |
+| `umami-ui` | by Compose | `umami` |
 
 <!-- end generated -->
 
@@ -201,7 +206,7 @@ Plain PostgreSQL, the alternative database adapter, used when STACKR_DATABASE is
 | Profiles | `postgres` |
 | Image | `postgres`, pinned by tag and digest in `compose.yaml` |
 | Published ports | 55432 (`POSTGRES_PORT`) → 5432 |
-| Networks | `stackr` |
+| Networks | `stackr`, `umami-db` |
 | Volumes | `postgres-data` → `/var/lib/postgresql/data` |
 | Depends on | none |
 | Health check | `pg_isready -U "$POSTGRES_USER" -d postgres`, every 3s |
@@ -222,7 +227,7 @@ Creates each service's role and database on the database adapter, on every start
 
 | Property | Value |
 |---|---|
-| Profiles | `langfuse`, `gateway`, `auth` |
+| Profiles | `langfuse`, `gateway`, `auth`, `umami`, `umami-init` |
 | Image | `postgres`, pinned by tag and digest in `compose.yaml` |
 | Published ports | none |
 | Networks | `stackr`, `supabase_network_stackr-supabase` |
@@ -244,6 +249,7 @@ Creates each service's role and database on the database adapter, on every start
     | `LANGFUSE_DB_PASSWORD` | `${LANGFUSE_DB_PASSWORD:?run make env}` |
     | `LITELLM_DB_PASSWORD` | `${LITELLM_DB_PASSWORD:?run make env}` |
     | `AUTH_DB_PASSWORD` | `${AUTH_DB_PASSWORD:?run make env}` |
+    | `UMAMI_DB_PASSWORD` | `${STACKR_UMAMI:+${UMAMI_DB_PASSWORD:?run make env}}` |
 
 ### `gotrue`
 
@@ -378,6 +384,54 @@ Makes portalr's analytics database and its events table, with the deployment's r
     |---|---|
     | `CLICKHOUSE_PASSWORD` | `${CLICKHOUSE_ADMIN_PASSWORD:?run make env}` |
     | `ANALYTICS_RETENTION_DAYS` | `${ANALYTICS_RETENTION_DAYS:-395}` |
+
+### `umami`
+
+Umami, operators' journeys: portalr's relay sends it a copy of consented events, on a network only the application joins. On the postgres adapter alone (ADR-0050).
+
+| Property | Value |
+|---|---|
+| Profiles | `umami`, `umami-init` |
+| Image | `ghcr.io/umami-software/umami`, pinned by tag and digest in `compose.yaml` |
+| Published ports | 3400 (`UMAMI_PORT`) → 3000 |
+| Networks | `stackr-umami`, `umami-db`, `umami-ui` |
+| Volumes | none |
+| Depends on | `db-init` (completed) |
+| Health check | `wget -q -O /dev/null http://127.0.0.1:3000/api/heartbeat`, every 5s |
+| Restart | `unless-stopped` |
+
+??? note "Environment"
+
+    | Variable | Value |
+    |---|---|
+    | `DATABASE_URL` | `postgresql://umami:${UMAMI_DB_PASSWORD:?run make env}@postgres:5432/umami?schema=umami` |
+    | `APP_SECRET` | `${UMAMI_APP_SECRET:?run make env}` |
+    | `DISABLE_TELEMETRY` | `1` |
+    | `DISABLE_UPDATES` | `1` |
+    | `DISABLE_BOT_CHECK` | `1` |
+
+### `umami-init`
+
+Sets Umami's admin password, and makes portalr's user and website, each time `make up` starts the umami profile, then exits.
+
+| Property | Value |
+|---|---|
+| Profiles | `umami-init` |
+| Image | `curlimages/curl`, pinned by tag and digest in `compose.yaml` |
+| Published ports | none |
+| Networks | `stackr-umami` |
+| Volumes | `./deploy/umami/init` → `/init` (read-only) |
+| Depends on | `umami` (healthy) |
+| Runs | `sh /init` |
+| Restart | `no` |
+
+??? note "Environment"
+
+    | Variable | Value |
+    |---|---|
+    | `UMAMI_ADMIN_PASSWORD` | `${UMAMI_ADMIN_PASSWORD:?run make env}` |
+    | `UMAMI_PORTALR_PASSWORD` | `${UMAMI_PORTALR_PASSWORD:?run make env}` |
+    | `UMAMI_WEBSITE_ID` | `${UMAMI_WEBSITE_ID:?run make env}` |
 
 ### `langfuse-worker`
 

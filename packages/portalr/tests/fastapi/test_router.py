@@ -11,7 +11,7 @@ from grantr.core import TENANT, AuditEntry, Forbidden, Invalid, Member, Resource
 from grantr.grants import Grants
 from portalr.fastapi import portalr_router
 from portalr.invites import Invite, InviteFailed
-from portalr.readers import Langfuse, LiteLLM, Readers
+from portalr.readers import Langfuse, LiteLLM, Readers, UmamiLinks
 from portalr.readers.loki import _identify
 from tests.fastapi.conftest import ALICE, OPS, SITE, Stack, app_for, resolve_actor, seeded
 from tests.tools import Tool, fails, json
@@ -344,6 +344,7 @@ async def test_a_tool_the_application_doesnt_run_is_unconfigured(grants: Grants,
             "grafana_logs": None,
             "grafana_tenant_logs": None,
             "grafana_tenant_traces": None,
+            "umami_journeys": None,
         }
         # Without Supabase's admin API, there is no invitation.
         invite = await client.post("/v1/invites", json={"email": "dan@acme.com"}, headers=alice)
@@ -355,7 +356,8 @@ async def test_a_tool_the_application_doesnt_run_is_unconfigured(grants: Grants,
         )
         assert creating.status_code in (404, 405)
         assert (await client.get("/config.json")).json()["readers"] == dict.fromkeys(
-            ("tempo", "loki", "prometheus", "langfuse", "litellm", "grafana", "analytics"), False
+            ("tempo", "loki", "prometheus", "langfuse", "litellm", "grafana", "analytics", "umami"),
+            False,
         )
 
 
@@ -877,3 +879,19 @@ async def test_an_operator_sees_and_searches_by_an_analytics_session(
         headers=alice,
     )
     assert forged.status_code == 422
+
+
+async def test_an_operator_gets_umamis_journeys_for_a_tenant_and_a_record_of_it(
+    grants: Grants, invite: Invite, ui: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    readers = Readers(umami=UmamiLinks("http://localhost:3400/", "w1"))
+    transport = httpx.ASGITransport(app=app_for(grants, readers, invite, ui))
+    async with httpx.AsyncClient(transport=transport, base_url="http://app/portalr") as client:
+        bare = await client.get("/v1/deployment/links", headers=OPS_LINKS)
+        assert bare.json()["umami_journeys"] is None
+        with caplog.at_level("INFO", logger="portalr.access"):
+            links = await client.get(
+                "/v1/deployment/links", params={"tenant_id": "acme"}, headers=OPS_LINKS
+            )
+    assert links.json()["umami_journeys"] == "http://localhost:3400/websites/w1"
+    assert "umami" in caplog.text

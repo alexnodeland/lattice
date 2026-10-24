@@ -47,6 +47,24 @@ test("values that aren't valid are said with where they are, the fields' paths a
       rejection: { type: "validation_failed", errors: [{ loc: ["answer", "email"], msg: "no" }] },
     }),
   ).toBe("What was asked for isn't valid: answer.email.");
+  expect(
+    await refusalSaid(422, {
+      rejection: {
+        type: "validation_failed",
+        message: "rule tickets:echo cannot be stored",
+        errors: [
+          { loc: ["rule", "when", "throttle"], msg: "when.throttle is required", type: "missing" },
+          { loc: [], msg: "no predicate 'p'", type: "unknown" },
+        ],
+      },
+    }),
+  ).toBe("What was asked for isn't valid: rule.when.throttle.");
+  expect(
+    pathsOf([
+      { loc: ["rule", "then", "params", "command", "x"] },
+      { loc: ["body", "command", "a", "b"] },
+    ]),
+  ).toEqual(["rule.then.params.command.x", "b"]);
   expect(pathsOf([{ loc: ["body", "a b"] }, { loc: ["body", "x".repeat(65)] }, "loc"])).toEqual([]);
 });
 

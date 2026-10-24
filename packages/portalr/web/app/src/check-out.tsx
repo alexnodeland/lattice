@@ -14,6 +14,7 @@ import {
   type FilesApi,
   keys,
   type Refusal,
+  runOn,
 } from "@portalr/client";
 import { Button, FileChooser, fileSize, Moment, Progress, TextLink } from "@portalr/ui";
 import { useQueryClient } from "@tanstack/react-query";
@@ -55,8 +56,11 @@ export function editorAt(editors: Readonly<Record<string, string>>, key: string)
   return new URL(url, location.href).origin === location.origin ? null : url;
 }
 
-/** A reason as a sentence: with its full stop, once. */
-const sentence = (text: string) => (/[.!?]$/.test(text) ? text : `${text}.`);
+/** Reasons run on after a colon (`runOn`), with a full stop, once. */
+const sentence = (text: string) => {
+  const run = runOn(text);
+  return /[.!?]$/.test(run) ? run : `${run}.`;
+};
 
 /**
  * Why something wasn't done, as the reader can act on it, from the refusal's status and reasons.

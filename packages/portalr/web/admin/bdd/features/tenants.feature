@@ -21,7 +21,7 @@ Feature: Tenants
     When they fill in the same tenant again, owned by "founder@portalr.test"
     And they ask to create it
     And they confirm
-    Then they are told the tenant exists
+    Then they are told it isn't valid
 
   Scenario: Someone who administers a tenant is not shown the deployment's Tenants
     Given alice has signed in to admin

@@ -107,6 +107,24 @@ test("an action that fails keeps the dialog open, and says why", async () => {
     .toHaveTextContent("The rule wasn't archived: it changed since you opened it.");
 });
 
+test("a failure that isn't an error says the kit's sentence, and goes to the console whole", async () => {
+  const warned = vi.spyOn(console, "warn").mockImplementation(() => {});
+  try {
+    const onConfirm = vi.fn(async () => {
+      throw { status: 503, detail: "<b>grantr</b> is down: password=hunter2" };
+    });
+    const screen = await render(<Archive onConfirm={onConfirm} />);
+    await screen.getByRole("button", { name: "Archive" }).click();
+    await screen.getByRole("button", { name: "Archive the rule" }).click();
+    const alert = screen.getByRole("alertdialog").getByRole("alert");
+    await expect.element(alert).toHaveTextContent("Something went wrong. Try again in a moment.");
+    expect(alert.element().textContent).not.toContain("hunter2");
+    expect(warned).toHaveBeenCalledOnce();
+  } finally {
+    warned.mockRestore();
+  }
+});
+
 test("a trigger shows its words alone, and is named in full by what it acts on", async () => {
   const screen = await render(
     <ConfirmDialog

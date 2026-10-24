@@ -8,7 +8,11 @@ test("an error state says what couldn't be read, the failure, and reading it aga
   const screen = await render(
     <ErrorState
       title="The audit log couldn't be read"
-      error={Object.assign(new Error("grantr is down"), { status: 503, detail: "grantr is down" })}
+      error={Object.assign(new Error("grantr is down"), {
+        status: 503,
+        detail: "grantr is down",
+        said: "The server had a problem. Try again in a moment.",
+      })}
       retry={retry}
     />,
   );

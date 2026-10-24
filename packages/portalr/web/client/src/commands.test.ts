@@ -143,16 +143,16 @@ test("a command's id is its own unless one is given", async () => {
   expect(sent.at(-1)?.body.command_id).toMatch(/^[0-9a-f-]{36}$/);
 });
 
-test("a refusal gives each reason: a rejection's problems, or its message", async () => {
+test("a refusal says the kit's sentence for its reason code, never the server's words", async () => {
   expect(await commands.reflexr.send("acme", "notes", archive, "problems")).toEqual({
     outcome: "refused",
     status: 422,
-    reasons: ["timeout is required", "when.throttle is required"],
+    reasons: ["What was asked for isn't valid."],
   });
   expect(await commands.reflexr.send("acme", "notes", archive, "conflict")).toEqual({
     outcome: "refused",
     status: 409,
-    reasons: ["rule tickets:echo is at version 3"],
+    reasons: ["That can't be done as things stand."],
   });
 });
 
@@ -160,24 +160,24 @@ test("an archive refused as forbidden, or over another version, says so", async 
   expect(await commands.reflexr.send("acme", "notes", archive, "forbidden")).toEqual({
     outcome: "refused",
     status: 403,
-    reasons: ["bob may not reflexr:archive_rule"],
+    reasons: ["You may not do this here."],
   });
   expect(await commands.reflexr.send("acme", "notes", archive, "conflict")).toMatchObject({
     status: 409,
   });
 });
 
-test("a refusal's detail is its reason, and one for no one signed in ends the session", async () => {
+test("a refusal without a known code says what its status does, and one for no one signed in ends the session", async () => {
   expect(await commands.reflexr.send("acme", "gone", archive, "missing")).toEqual({
     outcome: "refused",
     status: 404,
-    reasons: ["workspace gone does not exist"],
+    reasons: ["It isn't there: it may have been moved or archived."],
   });
   expect(unsigned).toBe(0);
   expect(await commands.reflexr.send("acme", "notes", archive, "unsigned")).toEqual({
     outcome: "refused",
     status: 401,
-    reasons: ["no one is signed in"],
+    reasons: ["You're not signed in. Sign in, then try again."],
   });
   expect(unsigned).toBe(1);
 });
@@ -200,19 +200,19 @@ test("a body that isn't a command is refused with where in it each error is", as
   expect(await commands.reflexr.send("acme", "notes", archive, "unread")).toEqual({
     outcome: "refused",
     status: 422,
-    reasons: ["rule.when.throttle: Field required", "Unable to extract tag"],
+    reasons: ["What was asked for isn't valid: rule.when.throttle."],
   });
 });
 
-test("an answer that isn't the library's says its status", async () => {
-  for (const [id, status] of [
-    ["broken", 502],
-    ["odd", 400],
+test("an answer that isn't the library's says what its status does", async () => {
+  for (const [id, status, said] of [
+    ["broken", 502, "The server had a problem. Try again in a moment."],
+    ["odd", 400, "Something went wrong. Try again in a moment."],
   ] as const) {
     expect(await commands.reflexr.send("acme", "notes", archive, id)).toEqual({
       outcome: "refused",
       status,
-      reasons: [`The server answered ${status}.`],
+      reasons: [said],
     });
   }
 });
@@ -235,7 +235,7 @@ test("grantr's grants, revocations and restrictions go to the tenant's own paths
   expect(await commands.grantr.restrict("acme", { on, restricted: true })).toEqual({
     outcome: "refused",
     status: 403,
-    reasons: ["bob may not grantr:restrict"],
+    reasons: ["You may not do this here."],
   });
   expect(sent.at(-1)?.url.pathname).toBe("/grantr/v1/tenants/acme/restrictions");
   expect(sent.at(-1)?.tenant).toBe("acme");
@@ -329,7 +329,7 @@ test("creating a tenant names no tenant to act in, sends the email once, and ans
   expect(await commands.portalr.createTenant("acme", "dan@initech.com")).toMatchObject({
     outcome: "refused",
     status: 422,
-    reasons: ["acme exists"],
+    reasons: ["What was asked for isn't valid."],
   });
 });
 

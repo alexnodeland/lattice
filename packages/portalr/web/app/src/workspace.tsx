@@ -24,7 +24,7 @@ import {
   streamUrl,
   useEnabled,
 } from "@portalr/client";
-import { Alert, IntegrationsContext, Reading } from "@portalr/ui";
+import { Alert, failureLogged, IntegrationsContext, Reading } from "@portalr/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   createContext,
@@ -172,11 +172,16 @@ export function Connection({
   /** What is being read, such as "the workspace". */
   waiting: string;
 }) {
+  // The server's own words of why, if it said, go to the console alone (portalr ADR-0070).
+  useEffect(() => {
+    if (snapshot.status === "closed" && snapshot.error) {
+      failureLogged(snapshot.error);
+    }
+  }, [snapshot.status, snapshot.error]);
   if (snapshot.status === "closed") {
     return (
       <Alert tone="error">
-        The connection to this workspace ended{snapshot.error ? `: ${snapshot.error}` : ""}. Reload
-        the page to connect again.
+        The connection to this workspace ended. Reload the page to connect again.
       </Alert>
     );
   }

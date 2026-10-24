@@ -158,7 +158,7 @@ test("a setting grantr refuses says why", async () => {
   expect(await commands.grantr.setIntegration("acme", "nope", true)).toEqual({
     outcome: "refused",
     status: 422,
-    reasons: ["nope is not an integration"],
+    reasons: ["What was asked for isn't valid."],
   });
 });
 

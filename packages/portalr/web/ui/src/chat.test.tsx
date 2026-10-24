@@ -778,7 +778,7 @@ describe("a form the agent asks", () => {
     await screen.getByRole("button", { name: "Ship it?" }).click();
     await expect
       .element(screen.getByRole("textbox", { name: /When/ }))
-      .toHaveAccessibleDescription("Too early.");
+      .toHaveAccessibleDescription("This isn't valid.");
   });
 
   test("without a title it has no heading, and its button says Send; a form it can't show says so", async () => {

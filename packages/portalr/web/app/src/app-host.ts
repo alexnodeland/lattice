@@ -5,17 +5,24 @@
  * submission to it, with its derived id. Nothing else of the workspace is an app's to reach.
  */
 
-import type { Config } from "@portalr/client";
 import type { AppHost } from "@portalr/ui";
 import { useMemo } from "react";
+import type { Context } from "./context";
 import { useStream } from "./workspace";
 
-/** The app host of a page in a workspace, for the deployment `config` describes. */
-export function useAppHost(config: Config): AppHost {
+/** The app host of a page in a workspace, for the deployment and the person `context` holds. */
+export function useAppHost(context: Context, tenant: string, workspace: string): AppHost {
+  const { config, signed } = context;
   const stream = useStream();
   return useMemo(
     () => ({
       origin: config.apps ?? null,
+      place: {
+        surfaces: config.surfaces,
+        signed,
+        tenant,
+        workspace,
+      },
       setState: (id, version, state) =>
         stream.send({
           type: "edit_artifact",
@@ -32,6 +39,6 @@ export function useAppHost(config: Config): AppHost {
           data: { ...submission },
         }),
     }),
-    [config.apps, stream],
+    [config, signed, tenant, workspace, stream],
   );
 }

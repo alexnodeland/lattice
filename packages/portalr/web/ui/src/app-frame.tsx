@@ -9,6 +9,7 @@
  * once they confirm it in a dialog of the host's, outside the frame.
  */
 
+import type { Session } from "@portalr/client";
 import { Bot } from "lucide-react";
 import { createContext, use, useId } from "react";
 import { Alert } from "./alert";
@@ -32,6 +33,18 @@ export interface AppHost {
   readonly setState: (id: string, version: number, state: JsonObject) => Sent;
   /** Create a submission to an app, with its derived id, as the viewer. */
   readonly submit: (id: string, submission: Submission) => Sent;
+  /**
+   * Where the page is, and as whom: what a diagram's canvas reaches its images by, over
+   * artifactr's surface (portalr ADR-0074). A page without it shows diagrams but edits none.
+   */
+  readonly place?: {
+    /** artifactr's surface, and grantr's, which answers whether the person may edit. */
+    readonly surfaces: { readonly artifactr: string; readonly grantr: string };
+    /** Who the person is signed in as: their session, read as each request is made. */
+    readonly signed: { session(): Session };
+    readonly tenant: string;
+    readonly workspace: string;
+  };
 }
 
 /** The page's app host, which a page that runs apps provides. */

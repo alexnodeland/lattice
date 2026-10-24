@@ -79,6 +79,7 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0071](0071-adoption-the-tenants-read-and-page.md) | Adoption, the tenant's read and page | Accepted |
 | [0072](0072-a-diagrams-card-and-its-canvas-to-look-at.md) | A diagram's card, and its canvas to look at | Accepted |
 | [0073](0073-a-requests-analytics-session-on-its-trace.md) | A request's analytics session, on its trace | Accepted |
+| [0074](0074-editing-a-diagram-on-its-canvas-and-the-images-put-on-it.md) | Editing a diagram on its canvas, and the images put on it | Accepted |
 | [0075](0075-a-person-removed-from-a-tenant-has-their-events-there-deleted.md) | A person removed from a tenant has their events there deleted | Accepted |
 | [0076](0076-the-relay-sends-umami-a-copy-and-deletes-there-too.md) | The relay sends Umami a copy, and deletes there too | Accepted |
 

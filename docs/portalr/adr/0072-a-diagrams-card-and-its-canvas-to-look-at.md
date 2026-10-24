@@ -143,9 +143,9 @@ ADR-0088 proposed a `canvas` of 402,000 / 375,000 and a `canvas-images` add-on o
 1. [x] The renderer, the TypeScript description and its shared fixture.
 2. [x] The canvas add-on, its build and its budget.
 3. [x] The CSP harness's canvas page, the thread's test and the scenario.
-4. [ ] Phase 3b:
+4. [x] Phase 3b, in [ADR-0074](0074-editing-a-diagram-on-its-canvas-and-the-images-put-on-it.md):
    - the TypeScript patch builder;
    - an upload route for a diagram's images, with the app's and the server's checks of size and type, and no SVG images;
-   - `img-src blob:`;
+   - `img-src blob:`, found not needed: the policy is unchanged;
    - editing on the canvas.
 5. [ ] Phase 3's collaboration (PR 4): presence, the cadence and reconcile.

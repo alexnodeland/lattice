@@ -4,7 +4,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./diff": "./src/diff.ts"
+    "./diff": "./src/diff.ts",
+    "./diagrams": "./src/diagrams.ts"
   },
   "dependencies": {
     "@supabase/auth-js": "2.117.3",

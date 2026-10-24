@@ -19,8 +19,9 @@ from pydantic_ai import FunctionToolset, RunContext
 from artifactr import AgentActor, Session, Workspaces
 from artifactr.agent import describe_outcome
 from artifactr.core import Forbidden
+from artifactr.excalidraw import Diagram
 from artifactr.files.app import FakeApp
-from artifactr.files.blobs import InMemoryBlobs, once
+from artifactr.files.blobs import Blobs, once
 from artifactr.files.checkouts import InMemoryCheckouts
 from artifactr.files.manifest import DOCX, WordDocument
 from artifactr.files.native import NativeFiles
@@ -34,9 +35,15 @@ class StandIn(FakeApp):
     integration: str = "files:wordcraft"
 
 
-def native_files(integrations: Integrations) -> NativeFiles:
-    """The application's native files, in memory, read and edited by the stand-in."""
-    return NativeFiles(InMemoryBlobs(), InMemoryCheckouts(), StandIn(), integrations=integrations)
+def native_files(integrations: Integrations, blobs: Blobs) -> NativeFiles:
+    """The application's native files, kept in `blobs`, read and edited by the stand-in.
+
+    Diagrams keep the images a person puts on them in the same store, which its collection keeps
+    while a revision names them (artifactr ADR-0092).
+    """
+    return NativeFiles(
+        blobs, InMemoryCheckouts(), StandIn(), integrations=integrations, naming=(Diagram,)
+    )
 
 
 def document_tools(workspaces: Workspaces, files: NativeFiles) -> FunctionToolset[Session[Any]]:

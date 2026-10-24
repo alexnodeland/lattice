@@ -105,13 +105,18 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     ),
     # Excalidraw diagrams, the excalidraw extra (lattice RFC-0006): a plugin nothing else
     # imports, on core's, the workspace's and the agent's public API; its images in native files'
-    # blob store, and its converter's worker over httpx (artifactr ADR-0090).
+    # blob store, and its converter's worker over httpx (artifactr ADR-0090); and the routes a
+    # canvas puts its images on, over artifactr's router's auth and native files' pace (ADR-0092).
     "excalidraw": (
         {
             *("artifactr.core", "artifactr.workspace", "artifactr.agent", "artifactr.excalidraw"),
-            "artifactr.files.blobs",
+            *("artifactr.files.blobs", "artifactr.files.fastapi.pace"),
+            *("artifactr.fastapi", "artifactr.telemetry"),
         },
-        {"pydantic", "pydantic_ai", "httpx", "anyio", "lattice_core.integrations"},
+        {
+            *("pydantic", "pydantic_ai", "httpx", "anyio", "fastapi", "starlette"),
+            *("lattice_core.integrations", "lattice_core.refusals"),
+        },
     ),
     # The evalr adapter: a feedback source, experiment tasks, a TurnEvaluator and measures.
     # Only this layer and the score mirror may import evalr.

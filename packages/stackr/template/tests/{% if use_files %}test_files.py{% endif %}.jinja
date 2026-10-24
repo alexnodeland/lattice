@@ -82,7 +82,13 @@ def test_native_files_are_off_until_an_app_runs() -> None:
     assert files.key_of("word_document", {}) is None
     application = FastAPI()
     files.mount(application, Workspaces(InMemoryStorage()), resolve_actor=resolve_actor, prefix="")
+{%- if use_diagrams %}
+    mounted = application.openapi()["paths"]
+    assert mounted, "a diagram's images' routes"
+    assert all("/diagrams/" in path for path in mounted), "only a diagram's images' routes"
+{%- else %}
     assert not application.routes[4:], "only FastAPI's own routes"
+{%- endif %}
 
 
 async def test_a_file_is_read_by_its_apps_worker_and_served_beside_artifactr() -> None:

@@ -262,7 +262,21 @@ def test_the_removals_table_has_row_level_security_on_postgresql_alone(
         def f(self, name: str) -> str:
             return name
 
+        def drop_table(self, name: str) -> None:
+            statements.append(f"DROP TABLE {name}")
+
     monkeypatch.setattr(migration, "op", Op())
     migration.upgrade()
-    secured = "ALTER TABLE portalr_analytics_removals_owed ENABLE ROW LEVEL SECURITY"
-    assert (secured in statements) is (dialect == "postgresql")
+    secured = [
+        "ALTER TABLE portalr_analytics_removals_owed ENABLE ROW LEVEL SECURITY",
+        # A policy too: stackr's smoke test holds every table of the application's to one.
+        "CREATE POLICY portalr_analytics_removals_owed_none ON portalr_analytics_removals_owed"
+        " USING (false) WITH CHECK (false)",
+    ]
+    assert statements[1:] == (secured if dialect == "postgresql" else [])
+    migration.downgrade()
+    if dialect == "postgresql":
+        assert statements[-2:] == [
+            "DROP POLICY portalr_analytics_removals_owed_none ON portalr_analytics_removals_owed",
+            "DROP TABLE portalr_analytics_removals_owed",
+        ]

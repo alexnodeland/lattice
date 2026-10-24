@@ -106,6 +106,16 @@ async def test_removals_are_the_owners_alone(schema: tuple[AsyncEngine, AsyncEng
             )
         )
     assert secured, "row-level security, so a grant made by default reads nothing"
+    async with owner.connect() as connection:
+        policies = await connection.scalar(
+            text(
+                "SELECT count(*) FROM pg_policies"
+                " WHERE tablename = 'portalr_analytics_removals_owed'"
+            )
+        )
+    assert policies == 1, (
+        "a policy, as stackr's smoke test holds every table of the application's to"
+    )
     await consent.removal_settled("alice", "acme", at)
     assert await consent.removals_owed(100) == []
 

@@ -19,6 +19,7 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 TABLE = "portalr_analytics_removals_owed"
+POLICY = "portalr_analytics_removals_owed_none"
 
 
 def upgrade() -> None:
@@ -31,11 +32,15 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("user_id", "tenant_id", name=op.f("pk_" + TABLE)),
     )
     if op.get_bind().dialect.name == "postgresql":
-        # No policy: the owner, who bypasses it, reads and writes it, and a grant made by default,
-        # as Supabase makes to its public roles, reads nothing.
+        # A policy that lets no row through: the owner, who bypasses it, reads and writes it, and
+        # a grant made by default, as Supabase makes to its public roles, reads nothing. A table
+        # of the application's has a policy, as stackr's smoke test holds every one to.
         op.execute(f"ALTER TABLE {TABLE} ENABLE ROW LEVEL SECURITY")
+        op.execute(f"CREATE POLICY {POLICY} ON {TABLE} USING (false) WITH CHECK (false)")
 
 
 def downgrade() -> None:
     """Downgrade the schema."""
+    if op.get_bind().dialect.name == "postgresql":
+        op.execute(f"DROP POLICY {POLICY} ON {TABLE}")
     op.drop_table(TABLE)

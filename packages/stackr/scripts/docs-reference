@@ -91,6 +91,12 @@ ROLES = {
         "Sets Umami's admin password, and makes portalr's user and website, each time `make up` "
         "starts the umami profile, then exits."
     ),
+    "umami-retention": (
+        "Deletes Umami's session replays older than UMAMI_REPLAY_RETENTION_DAYS (30 by default; "
+        "0 keeps them), every six hours, as Umami's own database role. Sessions and journeys "
+        "stay. It runs whether or not replay is on, so recordings made before it was turned off "
+        "still expire (portalr ADR-0077)."
+    ),
     "langfuse-worker": "Langfuse's worker: runs ingestion and evaluation jobs from the queues.",
     "langfuse-web": (
         "Langfuse's UI and public API. Receives traces from the Collector, and runs the "

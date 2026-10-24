@@ -20,7 +20,7 @@ export function servedPath(pathname: string): string | undefined {
 }
 
 /** The images a render may hold: a PNG or a JPEG, as artifactr's checks of an SVG allow. */
-export const IMAGE_TYPES: ReadonlySet<string> = new Set(["image/png", "image/jpeg"]);
+const IMAGE_TYPES: ReadonlySet<string> = new Set(["image/png", "image/jpeg"]);
 
 /** Base64, and nothing else. */
 const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;

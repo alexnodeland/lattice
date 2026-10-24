@@ -9,6 +9,7 @@ is still that one: a deletion that finishes late never clears a newer debt, owed
 written after it began.
 """
 
+from datetime import UTC, datetime
 from typing import Protocol
 
 
@@ -43,6 +44,20 @@ class Consent(Protocol):
         """At most `most` people a deletion is owed, the longest owed first, with its number."""
         ...
 
+    async def owe_removal(self, user_id: str, tenant: str) -> datetime:
+        """Owe the deletion of the person's events in the tenant, up to now: when, as owed."""
+        ...
+
+    async def removal_settled(self, user_id: str, tenant: str, removed_at: datetime) -> None:
+        """Clear the deletion owed for that removal, only if no later one is owed since."""
+        ...
+
+    async def removals_owed(
+        self, most: int, *, before: datetime | None = None
+    ) -> list[tuple[str, str, datetime]]:
+        """At most `most` removals whose deletion is owed, the oldest first, removed `before`."""
+        ...
+
 
 class InMemoryConsent:
     """Answers kept in memory, for tests and a prototype; lost when the process stops."""
@@ -51,6 +66,7 @@ class InMemoryConsent:
         self._answers: dict[str, bool] = {}
         self._owed: dict[str, int] = {}
         self._last = 0
+        self._removals: dict[tuple[str, str], datetime] = {}
 
     async def given(self, user_id: str) -> bool:
         """Whether the person has said yes."""
@@ -81,3 +97,24 @@ class InMemoryConsent:
     async def owing(self, most: int) -> list[tuple[str, int]]:
         """At most `most` people a deletion is owed, the longest owed first, with its number."""
         return sorted(self._owed.items(), key=lambda owed: owed[1])[:most]
+
+    async def owe_removal(self, user_id: str, tenant: str) -> datetime:
+        """Owe the deletion of the person's events in the tenant, up to now."""
+        now = datetime.now(UTC)
+        self._removals[user_id, tenant] = now
+        return now
+
+    async def removal_settled(self, user_id: str, tenant: str, removed_at: datetime) -> None:
+        """Clear the deletion owed for that removal, if no later one is owed since."""
+        if self._removals.get((user_id, tenant)) == removed_at:
+            del self._removals[user_id, tenant]
+
+    async def removals_owed(
+        self, most: int, *, before: datetime | None = None
+    ) -> list[tuple[str, str, datetime]]:
+        """At most `most` removals whose deletion is owed, the oldest first, removed `before`."""
+        owed = sorted(
+            (item for item in self._removals.items() if before is None or item[1] < before),
+            key=lambda removal: (removal[1], removal[0]),
+        )
+        return [(user_id, tenant, at) for (user_id, tenant), at in owed[:most]]

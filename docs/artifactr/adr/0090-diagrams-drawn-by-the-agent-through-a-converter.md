@@ -7,6 +7,7 @@
 
 
 > **Amended (2026-10-23) by [portalr ADR-0072](../../portalr/adr/0072-a-diagrams-card-and-its-canvas-to-look-at.md):** `describe` reads only a string as words, so a text or a type that isn't one reads as `""`, and only a number, not a boolean, as a place; and it reads a diagram's elements in JavaScript's order of an object's keys, array indexes first, as numbers. portalr's port of it reads them so too, held to it by a shared fixture.
+
 ## Context
 
 ADR-0086 made a diagram an artifact, edited by element-scoped patches. The agent couldn't draw one. RFC-0006 has it write Mermaid or skeletons, which Excalidraw's own `parseMermaidToExcalidraw` and `convertToExcalidrawElements` turn into elements. Those run in a browser, so the conversion runs in a worker: headless Chromium, one job at a time, a 10 s deadline, no way out (ADR-0088). The worker's image is stackr's, in the next phase-2 change; this record is the application's side of it.

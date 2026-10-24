@@ -65,14 +65,17 @@ test("what restore can't mend is left out alone, and a binding to nothing is let
       orphan: { id: "orphan", type: "text", text: "hi", containerId: "nobody" },
     },
   });
-  expect(elements.map((element) => element.id).sort()).toEqual(
-    ["box", "dangling", "orphan", "pointless"].filter((id) => elements.some((e) => e.id === id)),
-  );
-  expect(left).toBe(4 - elements.length);
-  const field = (id: string, key: string) =>
-    (elements.find((element) => element.id === id) as unknown as Record<string, unknown>)?.[key];
-  expect(field("dangling", "startBinding") ?? null).toBeNull();
-  expect(field("orphan", "containerId") ?? null).toBeNull();
+  // The arrow with no points is the one restore can't mend: it alone is left out.
+  expect(elements.map((element) => element.id).sort()).toEqual(["box", "dangling", "orphan"]);
+  expect(left).toBe(1);
+  const field = (id: string, key: string) => {
+    const element = elements.find((each) => each.id === id) as unknown as Record<string, unknown>;
+    expect(element).toBeDefined();
+    return element[key];
+  };
+  // Present, and let go of what they pointed at.
+  expect(field("dangling", "startBinding")).toBeNull();
+  expect(field("orphan", "containerId")).toBeNull();
 });
 
 test("Enter and Space reach a button, the canvas's zoom buttons among them, and no other place", () => {

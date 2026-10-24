@@ -231,3 +231,44 @@ test("the text version is there to describe the canvas while its disclosure is c
   ).toContain('Diagram "Stack"');
   await page.context().close();
 });
+
+test("Enter and Space on every control of the canvas open nothing and store nothing", async () => {
+  const { page, reported } = await open(browser, "?diagram");
+  const origin = new URL(page.url()).origin;
+  const seen = requests(page, origin);
+  const before = await stored(page);
+  // The card's count is the description's.
+  const counted = await page.getByText(/^Diagram · \d+ elements$/).textContent();
+  const described = await page.evaluate(() => document.querySelector("pre")?.textContent ?? "");
+  expect(described).toContain(`: ${/(\d+) elements/.exec(counted ?? "")?.[1]} elements`);
+  await page.getByRole("button", { name: "Open canvas" }).click();
+  await page.locator(".excalidraw canvas").first().waitFor();
+  // Excalidraw's menu and help, which lead out of view mode, aren't there to reach.
+  for (const hidden of [".main-menu-trigger", ".help-icon"]) {
+    for (const found of await page.locator(hidden).all()) {
+      expect(await found.isVisible()).toBe(false);
+    }
+  }
+  const controls = page.locator(
+    ".excalidraw button, .excalidraw [role=button], .excalidraw [tabindex]:not([tabindex='-1'])",
+  );
+  const count = await controls.count();
+  expect(count).toBeGreaterThan(0);
+  for (let at = 0; at < count; at += 1) {
+    for (const key of ["Enter", " "]) {
+      const control = controls.nth(at);
+      if (await control.isVisible()) {
+        await control.focus();
+        await page.keyboard.press(key);
+      }
+    }
+  }
+  expect(
+    await page.locator(".HelpDialog, .Modal, .popover, .sidebar, .dropdown-menu").count(),
+  ).toBe(0);
+  expect(await page.getByRole("dialog").count()).toBe(1);
+  expect(seen.away()).toEqual([]);
+  expect(await stored(page)).toEqual(before);
+  expect(await reported()).toEqual([]);
+  await page.context().close();
+});

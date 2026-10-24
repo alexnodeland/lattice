@@ -7,19 +7,12 @@
  * A page is named by the router's own name for its route, never the address in the bar.
  */
 
-import {
-  type Api,
-  answerConsent,
-  type Consent,
-  carryAnalyticsSession,
-  NOT_READ,
-  readConsent,
-} from "@portalr/client";
+import { type Api, answerConsent, carryAnalyticsSession, readConsent } from "@portalr/client";
 import type { AnalyticsAnswer } from "@portalr/ui";
-import { Account, loadCapture } from "@portalr/ui";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Account, loadCapture, NOT_SAVED } from "@portalr/ui";
 import { useRouteContext, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useAnswering, useRead } from "./answers";
 
 const consentKey = (user: string) => ["portalr", "analytics", "consent", user] as const;
 
@@ -29,9 +22,6 @@ const consentKey = (user: string) => ["portalr", "analytics", "consent", user] a
  */
 const PRIVACY_GUIDE = "https://lattice.alexnodeland.com/portalr/guides/privacy/#product-analytics";
 
-/** How often an answer whose deletion isn't done yet is read again, until it is, in ms. */
-const UNTIL_DELETED = 30_000;
-
 /**
  * The person's answer, read once and shared by every screen that shows or uses it. A read that
  * fails keeps the last answer read, or `NOT_READ` (not sharing) before the first. Only the account
@@ -40,15 +30,8 @@ const UNTIL_DELETED = 30_000;
 function useAnswer(poll = false) {
   const { config, api, user } = useRouteContext({ from: "/_signed" });
   const enabled = config.readers.analytics === true;
-  const { data = NOT_READ } = useQuery({
-    queryKey: consentKey(user),
-    queryFn: () => readConsent(api),
-    enabled,
-    staleTime: Number.POSITIVE_INFINITY,
-    // Read again while a deletion is owed, so the note goes when the relay has done it.
-    refetchInterval: (query) => (poll && query.state.data?.deleting ? UNTIL_DELETED : false),
-  });
-  return { enabled, consent: data, api, user };
+  const consent = useRead(api, consentKey(user), readConsent, enabled, poll);
+  return { enabled, consent, api, user };
 }
 
 /** Whether the person has said yes, where the deployment has analytics. */
@@ -60,36 +43,50 @@ export function useGiven(): boolean {
 /** The person's answer, for the account menu, where the deployment has analytics; else none. */
 function useConsent(): AnalyticsAnswer | undefined {
   const { enabled, consent, api, user } = useAnswer(true);
-  const client = useQueryClient();
-  const key = consentKey(user);
-  const { mutate, isError } = useMutation({
-    mutationFn: (answer: boolean) => answerConsent(api, answer),
-    onMutate: async (answer: boolean) => {
-      await client.cancelQueries({ queryKey: key });
-      const before = client.getQueryData<Consent>(key);
-      // A deletion owed stays owed whatever the answer: the relay says when it is done.
-      client.setQueryData<Consent>(key, { given: answer, deleting: before?.deleting ?? false });
-      return { before };
-    },
-    // Not recorded: the switch goes back to the answer the relay has, and the status says so.
-    onError: (_error, _answer, context) => client.setQueryData(key, context?.before),
-    onSettled: () => client.invalidateQueries({ queryKey: key }),
-  });
+  const { answer, failed } = useAnswering(api, consentKey(user), answerConsent, true, [
+    // The relay withdraws replay with analytics' no: its answer is read again.
+    ["portalr", "analytics", "replay", user],
+  ]);
   return enabled
     ? {
         given: consent.given,
-        onAnswer: mutate,
+        onAnswer: answer,
         deleting: consent.deleting,
-        failed: isError,
+        failed,
         guide: PRIVACY_GUIDE,
       }
     : undefined;
 }
 
-/** The account menu, with the person's answer to analytics where the deployment has it. */
+/** Session replay's part of the app, fetched only where the deployment records replays. */
+const loadReplay = () => import("./on-demand/replay-account");
+
+/** Session replay's part, once it has loaded, where `wanted`: a chunk that won't load is none. */
+export function useReplay(wanted: boolean) {
+  const [loaded, setLoaded] = useState<Awaited<ReturnType<typeof loadReplay>> | null>(null);
+  useEffect(() => {
+    if (wanted) {
+      loadReplay().then(setLoaded, () => undefined);
+    }
+  }, [wanted]);
+  return loaded;
+}
+
+/**
+ * The account menu, with the person's answer to analytics where the deployment has it, and beside
+ * it to session replay where it records replays (portalr ADR-0077).
+ */
 export function AppAccount() {
-  const { signed } = useRouteContext({ from: "/_signed" });
-  return <Account signed={signed} analytics={useConsent()} />;
+  const { signed, config, api, user } = useRouteContext({ from: "/_signed" });
+  const analytics = useConsent();
+  const replay = useReplay(config.replay === true && analytics !== undefined);
+  return replay && analytics ? (
+    <replay.ReplayAccount api={api} user={user} analytics={analytics.given} notSaved={NOT_SAVED}>
+      {(answer) => <Account signed={signed} analytics={{ ...analytics, replay: answer }} />}
+    </replay.ReplayAccount>
+  ) : (
+    <Account signed={signed} analytics={analytics} />
+  );
 }
 
 /** The router's name for the route a page is on: `/t/$tenant/w/$workspace/runs`, not its address. */

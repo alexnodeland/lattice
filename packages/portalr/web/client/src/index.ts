@@ -73,6 +73,7 @@ export { createQueryClient } from "./query-client";
 export { runOn } from "./reasons";
 export type * as Reflexr from "./reflexr";
 export { type ReflexrStream, RUN_EVENTS, reflexr } from "./reflexr";
+export { answerReplayConsent, readReplayConsent } from "./replay";
 export { type Api, type Config, createApi, readConfig, type Surfaces } from "./rest";
 export {
   carryAnalyticsSession,

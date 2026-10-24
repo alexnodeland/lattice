@@ -1,6 +1,7 @@
 import type { Server } from "bun";
 import { afterAll, beforeAll, beforeEach, expect, test } from "vitest";
 import { answerConsent, readConsent } from "./consent";
+import { answerReplayConsent, readReplayConsent } from "./replay";
 import { createApi } from "./rest";
 
 interface Asked {
@@ -12,6 +13,7 @@ interface Asked {
 
 const asked: Asked[] = [];
 let given = false;
+let replay = false;
 let sessions = 0;
 let down = false;
 let server: Server<unknown>;
@@ -39,6 +41,13 @@ beforeAll(() => {
         }
         return Response.json({ given, deleting: false });
       }
+      if (url.pathname === "/portalr/v1/analytics/replay/consent") {
+        if (request.method === "PUT") {
+          replay = (JSON.parse(text) as { given: boolean }).given;
+          return Response.json({ given: replay, deleted: replay ? null : true });
+        }
+        return Response.json({ given: replay, deleting: false });
+      }
       if (url.pathname === "/portalr/v1/analytics/session") {
         sessions += 1;
         return Response.json({ session: `s${sessions}` });
@@ -58,6 +67,7 @@ afterAll(() => server.stop(true));
 beforeEach(() => {
   asked.length = 0;
   given = false;
+  replay = false;
   sessions = 0;
   down = false;
 });
@@ -69,4 +79,15 @@ test("the answer is no until the person says yes, and a relay that can't be read
   down = true;
   await expect(readConsent(api)).rejects.toThrow("the answer couldn't be read (503)");
   await expect(answerConsent(api, false)).rejects.toThrow("the answer wasn't recorded (503)");
+});
+
+test("replay's answer is its own, no until the person says yes, and a relay that can't be read is said to be", async () => {
+  expect(await readReplayConsent(api)).toEqual({ given: false, deleting: false });
+  expect(await answerReplayConsent(api, true)).toEqual({ given: true, deleted: null });
+  expect(await readReplayConsent(api)).toEqual({ given: true, deleting: false });
+  expect(await readConsent(api)).toEqual({ given: false, deleting: false });
+  expect(await answerReplayConsent(api, false)).toEqual({ given: false, deleted: true });
+  down = true;
+  await expect(readReplayConsent(api)).rejects.toThrow("the answer couldn't be read (503)");
+  await expect(answerReplayConsent(api, true)).rejects.toThrow("the answer wasn't recorded (503)");
 });

@@ -27,6 +27,7 @@ const CONFIG: Config = {
   people: false,
   editors: { "files:wordcraft": "https://wordcraft.example.test/" },
   apps: null,
+  replay: false,
 };
 
 /** alice, signed in, as Supabase Auth would say, without asking it. */
@@ -133,6 +134,8 @@ export interface World {
   readonly apps?: Config["apps"];
   /** The tools the deployment reads, past the defaults. */
   readonly readers?: Config["readers"];
+  /** Whether the deployment records session replays, which it doesn't unless told. */
+  readonly replay?: boolean;
 }
 
 /** The app, opened at `path`, over `serve` and streams that answer as `answer` does. */
@@ -159,6 +162,7 @@ export async function open(
     editors: world.editors ?? CONFIG.editors,
     apps: world.apps ?? CONFIG.apps,
     readers: { ...CONFIG.readers, ...world.readers },
+    replay: world.replay ?? CONFIG.replay,
   };
   const api = createApi(config.surfaces, () => ({ token: "t0k3n" }));
   const router = createRouter({

@@ -84,4 +84,11 @@ call GET "/api/websites/$UMAMI_WEBSITE_ID" "$portalr" >/dev/null 2>&1 ||
       call POST /api/websites "$portalr" >/dev/null
     echo "umami-init: made portalr's website, $UMAMI_WEBSITE_ID"
   }
+# Replay, on Umami's side: off unless UMAMI_REPLAY is true, which follows the privacy review's
+# sign-off (portalr ADR-0077). Set on every run, so turning it off in .env turns it off here.
+replay=false
+[ "${UMAMI_REPLAY:-false}" = true ] && replay=true
+printf '{"replayConfig":{"replayEnabled":%s,"heatmapEnabled":false}}' "$replay" |
+  call POST "/api/websites/$UMAMI_WEBSITE_ID" "$portalr" >/dev/null
+echo "umami-init: replay is $([ "$replay" = true ] && echo on || echo off) for portalr's website"
 echo "umami-init: ready"

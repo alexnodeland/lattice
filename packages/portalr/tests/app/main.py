@@ -50,7 +50,7 @@ from grantr.core import Resource, User
 from grantr.fastapi import Caller, Unauthorized, grantr_router
 from grantr.grants import Grants, InMemoryStorage
 from portalr.actions import ACTIONS
-from portalr.analytics import InMemoryConsent, InMemoryRateLimiter, Relay
+from portalr.analytics import InMemoryConsent, InMemoryRateLimiter, Relay, Umami
 from portalr.fastapi import UI, Site, Surfaces, portalr_router
 from portalr.readers import (
     Analytics,
@@ -320,6 +320,9 @@ def create_app(ui: Path = UI) -> FastAPI:
                 Analytics("http://127.0.0.1:9", b"acceptance"),
                 InMemoryConsent(),
                 InMemoryRateLimiter(),
+                # Replay's routes too, over an Umami that isn't there: a batch's copy is dropped.
+                umami=Umami("http://127.0.0.1:9", "acceptance", "acceptance"),
+                replay=InMemoryConsent(),
             ),
             site=Site(
                 supabase_url="/",

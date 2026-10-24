@@ -15,7 +15,7 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
-from portalr.analytics.sql import SqlConsent, migrate
+from portalr.analytics.sql import SqlConsent, SqlReplayConsent, migrate
 
 URL = os.environ.get("GRANTR_TEST_POSTGRES_URL")
 ROLE = "portalr_test_application"
@@ -152,3 +152,38 @@ async def test_a_yes_racing_a_deletion_owed_survives_with_the_debt_owed(
         assert given, "the yes is never lost"
         assert owed == debt
         await consent.give("alice", yes=False)
+
+
+async def test_replays_answers_are_a_table_of_their_own_and_each_persons_alone(
+    schema: tuple[AsyncEngine, AsyncEngine],
+) -> None:
+    owner, application = schema
+    analytics, replay = (
+        SqlConsent(application, owner=owner),
+        SqlReplayConsent(application, owner=owner),
+    )
+    await replay.give("alice", yes=True)
+    assert await replay.given("alice")
+    assert not await analytics.given("alice"), "replay's yes is not analytics'"
+    async with application.begin() as connection:
+        await connection.execute(text("SELECT set_config('portalr.user_id', 'bob', true)"))
+        seen = await connection.scalar(text("SELECT count(*) FROM portalr_replay_consent"))
+        changed = await connection.execute(
+            text("UPDATE portalr_replay_consent SET given = false WHERE user_id = 'alice'")
+        )
+    assert seen == 0
+    assert changed.rowcount == 0
+    async with application.begin() as connection:
+        with pytest.raises(Exception, match="row-level security"):
+            await connection.execute(
+                text("INSERT INTO portalr_replay_consent VALUES ('alice', false, now(), 0, 0)")
+            )
+    debt = await replay.give("alice", yes=False)
+    assert debt is not None
+    assert await replay.owing(100) == [("alice", debt)]
+    assert await analytics.owing(100) == []
+    async with owner.connect() as connection:
+        policies = await connection.scalar(
+            text("SELECT count(*) FROM pg_policies WHERE tablename = 'portalr_replay_consent'")
+        )
+    assert policies == 1

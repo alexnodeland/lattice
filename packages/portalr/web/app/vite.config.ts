@@ -34,6 +34,14 @@ const NATIVE_FILES = new RegExp(
     .join("|"),
 );
 
+/** The recorder's add-on and rrweb, which only it holds (portalr ADR-0077). */
+const REPLAY = new RegExp(
+  [
+    String.raw`[\\/]app[\\/]src[\\/]on-demand[\\/]replay\.ts$`,
+    String.raw`[\\/]node_modules[\\/](rrweb|rrweb-snapshot|rrdom|@rrweb)[\\/]`,
+  ].join("|"),
+);
+
 // portalr's router serves the built UI at /portalr/app/, from the Python package, whose wheel
 // carries it (lattice RFC-0002). In development, Vite's server sends everything else to the
 // application, at PORTALR_APP_URL, so the UI shares its origin as it does when served.
@@ -64,6 +72,8 @@ export default defineConfig({
     ),
     // A native file's parts are the native files' add-on's, never a route's (portalr ADR-0044).
     onlyWithAddOn(NATIVE_FILES),
+    // rrweb is session replay's add-on's alone: loaded after a person's yes, never with a page.
+    onlyWithAddOn(REPLAY),
     // The licences of the packages bundled, beside the UI (portalr ADR-0033).
     notices({ ui: "app", policy: readPolicy(new URL("../notices/policy.json", import.meta.url)) }),
     // The page mini apps run in, served on the apps' origin alone (portalr ADR-0051).

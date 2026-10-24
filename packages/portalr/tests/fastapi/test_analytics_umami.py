@@ -45,6 +45,8 @@ class Stand:
         self.stuck: str | None = None
         """A session Umami says it deleted, and keeps."""
         self.after_send: list[Callable[[], Awaitable[None]]] = []
+        self.recorded: list[list[object]] = []
+        self.replay_off = False
         self.refused: set[str] = set()
         """The events' names Umami refuses, as a 400."""
         self.sends_taken: int | None = None
@@ -59,6 +61,15 @@ class Stand:
         if path == "/api/auth/login":
             assert json.loads(request.content) == {"username": "portalr", "password": "pw"}
             return httpx.Response(200, json={"token": "t0k"})
+        if path == "/api/record":
+            assert request.headers["x-umami-cache"] == "c"
+            self.recorded.append(json.loads(request.content)["payload"]["events"])
+            if self.replay_off:
+                return httpx.Response(200, json={"ok": False, "reason": "replay_disabled"})
+            return httpx.Response(200, json={"ok": True})
+        if path == f"/api/websites/{WEBSITE}" and request.method == "GET":
+            replay = {} if self.replay_off else {"replayEnabled": True}
+            return httpx.Response(200, json={"recorderEnabled": True, "replayConfig": replay})
         if path == "/api/send":
             if json.loads(request.content)["payload"]["name"] in self.refused:
                 return httpx.Response(400)

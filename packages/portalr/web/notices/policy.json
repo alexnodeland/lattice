@@ -179,6 +179,12 @@
       "licence": "(MIT AND Zlib)",
       "kind": "licence",
       "reason": "zlib for Excalidraw's PNG export, its compression MIT and its zlib port under the Zlib licence, which is permissive, as MIT is, and asks only that its notice stays, which these notices carry. The canvas needs it (portalr ADR-0072)."
+    },
+    {
+      "package": "rrweb",
+      "licence": "MIT",
+      "kind": "text",
+      "reason": "It declares MIT and ships no licence file; rrweb-io/rrweb, its repository, holds the licence. Session replay's recorder bundles it (portalr ADR-0077)."
     }
   ]
 }

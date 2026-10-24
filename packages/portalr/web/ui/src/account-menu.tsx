@@ -1,6 +1,7 @@
 import { Menu } from "@base-ui/react/menu";
 import { Check, LogOut } from "lucide-react";
-import { useId } from "react";
+import { type ReactNode, useId } from "react";
+import { cn } from "./cn";
 import { Icon } from "./icon";
 import { groupLabel, item, popup, separator } from "./menu";
 
@@ -32,6 +33,24 @@ export interface AnalyticsAnswer {
   readonly failed?: boolean | undefined;
   /** The privacy guide, which says what is shared and how it is kept. */
   readonly guide: string;
+  /** Session replay's switch, where the deployment records replays; it rests on this one's yes. */
+  readonly replay?: ReplayAnswer | undefined;
+}
+
+/**
+ * A person's answer to session replay (portalr ADR-0077), and the words its switch says, which
+ * the app brings with it, so the first page's bytes hold none of them: no until the person turns
+ * it on, which the relay takes only while they share how they use the app.
+ */
+export interface ReplayAnswer {
+  readonly given: boolean;
+  readonly onAnswer: (given: boolean) => void;
+  /** Whether a deletion the person's no asked for is still to be done, as the relay said. */
+  readonly deleting?: boolean | undefined;
+  /** What is recorded, and how it is kept. */
+  readonly guide: string;
+  /** The switch's name, what it does, the link to the guide, and the note while a deletion is owed. */
+  readonly words: { label: string; about: string; link: string; pending: string };
 }
 
 /** What the menu says while a deletion the person's no asked for isn't done yet. */
@@ -39,7 +58,7 @@ const STILL_DELETING =
   "Deleting what you shared hasn't finished yet. It will be retried until it is done.";
 
 /** What a screen reader hears when an answer wasn't recorded. */
-const NOT_SAVED = "Your answer wasn't saved, so nothing has changed. Try again.";
+export const NOT_SAVED = "Your answer wasn't saved, so nothing has changed. Try again.";
 
 /** What the account menu says, for a screen reader, as the person's answer changes. */
 export function analyticsStatus(analytics: AnalyticsAnswer | undefined): string {
@@ -52,6 +71,58 @@ export function analyticsStatus(analytics: AnalyticsAnswer | undefined): string 
       ? `Sharing is off. ${STILL_DELETING}`
       : "Sharing how you use the app is off.";
   return analytics.failed ? `${NOT_SAVED} ${answer}` : answer;
+}
+
+const Note = ({ children }: { children: ReactNode }) => (
+  <p className="px-2.5 pb-1.5 text-muted text-xs">{children}</p>
+);
+
+/** One of the Privacy group's switches: its words, the note while a deletion is owed, and a link. */
+function PrivacySwitch({
+  given,
+  onAnswer,
+  words,
+  pending,
+  guide,
+  wrap = false,
+}: {
+  given: boolean;
+  onAnswer: (given: boolean) => void;
+  words: { label: string; about: string; link: string };
+  pending: string | undefined;
+  guide: string;
+  /** Whether its description is held to a width, for a long one. */
+  wrap?: boolean;
+}) {
+  const about = useId();
+  return (
+    <>
+      <Menu.CheckboxItem
+        checked={given}
+        aria-describedby={about}
+        onCheckedChange={(on) => onAnswer(on)}
+        className={item}
+      >
+        <span className="flex flex-col">
+          <span>{words.label}</span>
+          <span
+            aria-hidden="true"
+            id={about}
+            className={cn("font-normal text-muted text-xs", wrap && "max-w-72")}
+          >
+            {words.about}
+          </span>
+        </span>
+        <Menu.CheckboxItemIndicator className="text-accent">
+          <Icon icon={Check} />
+        </Menu.CheckboxItemIndicator>
+      </Menu.CheckboxItem>
+      {pending && <Note>{pending}</Note>}
+      <Menu.LinkItem href={guide} target="_blank" rel="noopener noreferrer" className={item}>
+        {words.link}
+      </Menu.LinkItem>
+    </>
+  );
 }
 
 /**
@@ -80,7 +151,9 @@ export function AccountMenu({
   onSignOut: () => void;
 }) {
   const hint = useId();
-  const sharing = useId();
+  const replay = analytics?.replay;
+  // A deletion of recordings still owed, which is said whether or not the switch is on offer.
+  const owed = replay !== undefined && !replay.given && replay.deleting === true;
   return (
     <Menu.Root>
       <Menu.Trigger
@@ -152,38 +225,35 @@ export function AccountMenu({
                 <Menu.Separator className={separator} />
                 <Menu.Group>
                   <Menu.GroupLabel className={groupLabel}>Privacy</Menu.GroupLabel>
-                  <Menu.CheckboxItem
-                    checked={analytics.given}
-                    aria-describedby={sharing}
-                    onCheckedChange={(on) => analytics.onAnswer(on)}
-                    className={item}
-                  >
-                    <span className="flex flex-col">
-                      <span>Share how I use the app</span>
-                      <span
-                        aria-hidden="true"
-                        id={sharing}
-                        className="font-normal text-muted text-xs"
-                      >
-                        Which pages you open, never what you write. Turning it off deletes what you
-                        shared.
-                      </span>
-                    </span>
-                    <Menu.CheckboxItemIndicator className="text-accent">
-                      <Icon icon={Check} />
-                    </Menu.CheckboxItemIndicator>
-                  </Menu.CheckboxItem>
-                  {!analytics.given && analytics.deleting && (
-                    <p className="px-2.5 pb-1.5 text-muted text-xs">{STILL_DELETING}</p>
+                  <PrivacySwitch
+                    given={analytics.given}
+                    onAnswer={analytics.onAnswer}
+                    words={{
+                      label: "Share how I use the app",
+                      about:
+                        "Which pages you open, never what you write. Turning it off deletes what you shared.",
+                      link: "What is shared, and how it is kept (opens in a new tab)",
+                    }}
+                    pending={!analytics.given && analytics.deleting ? STILL_DELETING : undefined}
+                    guide={analytics.guide}
+                  />
+                  {replay && (analytics.given || owed) && (
+                    <>
+                      <Menu.Separator className={separator} />
+                      {analytics.given ? (
+                        <PrivacySwitch
+                          given={replay.given}
+                          onAnswer={replay.onAnswer}
+                          words={replay.words}
+                          pending={owed ? replay.words.pending : undefined}
+                          guide={replay.guide}
+                          wrap
+                        />
+                      ) : (
+                        <Note>{replay.words.pending}</Note>
+                      )}
+                    </>
                   )}
-                  <Menu.LinkItem
-                    href={analytics.guide}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={item}
-                  >
-                    What is shared, and how it is kept (opens in a new tab)
-                  </Menu.LinkItem>
                 </Menu.Group>
               </>
             )}

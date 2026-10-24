@@ -62,3 +62,10 @@ test("a rule's crumbs are links, none the page shown", async () => {
     expect(current).toBeNull();
   }
 });
+
+test("an artifact marks itself, with its files and mini apps, to be blocked whole from a session replay", async () => {
+  const { screen } = await open("/t/acme/w/notes/artifacts/note_1", serve);
+  const trail = screen.getByRole("navigation", { name: "Breadcrumb" });
+  await expect.element(trail.getByRole("link").first()).toBeVisible();
+  expect(trail.element().closest('[data-portalr-replay="block"]')).not.toBeNull();
+});

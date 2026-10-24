@@ -18,6 +18,7 @@ import json
 import logging
 import secrets
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from importlib import resources
@@ -28,6 +29,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 from grantr.core import Member, User
 from portalr.analytics.consent import Consent
 from portalr.analytics.limiter import InMemoryRateLimiter, RateLimiter
+from portalr.analytics.replay import ReplayBatch, inlined, unmasked
 from portalr.readers.analytics import REGISTRY, Analytics, distinct_id
 from portalr.readers.umami import Umami
 
@@ -146,9 +148,16 @@ class Relay:
     deletes: RateLimiter = field(
         default_factory=lambda: InMemoryRateLimiter(per_second=10 / 3600, burst=10)
     )
+    replay_limiter: RateLimiter = field(
+        default_factory=lambda: InMemoryRateLimiter(per_second=128 * 1024, burst=1024 * 1024)
+    )
+    """How many bytes of replay a person may send: a batch costs its size, or 8 KiB if smaller."""
     umami: Umami | None = None
     """Umami, sent a copy of each consented event, for operators' journeys (portalr ADR-0076);
     a person's deletion deletes their sessions there too."""
+    replay: Consent | None = None
+    """People's answers to session replay, apart from analytics' (portalr ADR-0077); with Umami,
+    the deployment records replays. Without it, there is no replay."""
     copies: set[asyncio.Future[None]] = field(
         default_factory=lambda: set[asyncio.Future[None]](), repr=False, compare=False
     )
@@ -179,7 +188,100 @@ class Relay:
         debt = await self.consent.give(user_id, yes=yes)
         if yes:
             return Answered(given=True)
+        if self.replay is not None and await self.replay.given(user_id):
+            # Replay rests on analytics' yes: a no to analytics is a no to replay too, owed until
+            # the person's sessions in Umami, their replays with them, are gone.
+            replay_debt = await self.replay.give(user_id, yes=False)
+            if replay_debt:
+                await self.settle_replay(user_id, replay_debt)
         return Answered(given=False, deleted=await self.settle(user_id, debt) if debt else None)
+
+    async def answer_replay(self, user_id: str, *, yes: bool) -> Answered:
+        """Record the person's answer to replay; a yes taken back deletes their replays, or owes it.
+
+        Raises:
+            ValueError: If it is a yes from a person who hasn't said yes to analytics.
+        """
+        if self.replay is None:
+            raise ValueError("this deployment records no replays")
+        if yes and not await self.consent.given(user_id):
+            raise ValueError("replay needs product analytics' yes first")
+        debt = await self.replay.give(user_id, yes=yes)
+        if yes:
+            if not await self.consent.given(user_id):
+                # An analytics no landed between the check and the write: replay never outlives it.
+                await self.settle_replay(user_id, await self.replay.give(user_id, yes=False) or 0)
+                raise ValueError("replay needs product analytics' yes first")
+            return Answered(given=True)
+        return Answered(
+            given=False, deleted=await self.settle_replay(user_id, debt) if debt else None
+        )
+
+    async def settle_replay(self, user_id: str, debt: int) -> bool:
+        """Delete the person's replays, for deletion `debt`: whether it was done.
+
+        Umami deletes a replay with the session it is in, so this deletes the person's sessions
+        there, with their journeys; ClickHouse's events, the record, stay. Undone, it stays owed.
+        """
+        if self.replay is None:
+            return False
+        if self.umami is not None and not await self.umami.forget(self._person(user_id)):
+            return False
+        await self.replay.settled(user_id, debt)
+        return True
+
+    async def record_replay(
+        self,
+        tenant: str,
+        user_id: str,
+        batch: ReplayBatch,
+        sheets: Mapping[str, str] | None = None,
+    ) -> Relayed:
+        """Forward the person's replay events to Umami, if they said yes to both, and all is masked.
+
+        A batch with any value unmasked is dropped whole, and said by the key's first 40
+        characters, never its value. The copy is sent in the background, as the events' is; their
+        answers are read again after it, and a no that landed meanwhile deletes it.
+        """
+        dropped = Relayed(recorded=0, dropped=len(batch.events))
+        if self.replay is None or self.umami is None:
+            return dropped
+        if not (await self.consent.given(user_id) and await self.replay.given(user_id)):
+            return dropped
+        # Off the event loop: a batch is up to 512 KiB, and checking it is work.
+        if (key := await asyncio.to_thread(unmasked, batch.events)) is not None:
+            log.warning("analytics: a replay batch was dropped: %r wasn't masked", key[:40])
+            return dropped
+        if not inlined(batch.events, sheets or {}):
+            log.warning("analytics: a replay batch was dropped: it names too many stylesheets")
+            return dropped
+        if not await self.umami.replay_enabled():
+            # Umami's website keeps none: nothing is sent, and none is said to be recorded.
+            return dropped
+        if len(self.copies) >= MOST_COPIES:
+            return dropped
+        copy = asyncio.ensure_future(
+            self._replay_copy(self.umami, self.replay, tenant, user_id, batch)
+        )
+        self.copies.add(copy)
+        copy.add_done_callback(self.copies.discard)
+        return Relayed(recorded=len(batch.events), dropped=0)
+
+    async def _replay_copy(
+        self, umami: Umami, replay: Consent, tenant: str, user_id: str, batch: ReplayBatch
+    ) -> None:
+        """Send Umami the replay, then read both answers again, whatever the send did."""
+        await umami.record(tenant, self._person(user_id), batch.events)
+        try:
+            if await self.consent.given(user_id) and await replay.given(user_id):
+                return
+            await self.settle_replay(user_id, await replay.owe(user_id))
+        except Exception as error:  # The copy is never the request's: it is said, and owed.
+            log.warning("analytics: a replay's copy couldn't be checked: %s", type(error).__name__)
+            try:
+                await replay.owe(user_id)
+            except Exception as owing:  # Nothing more can be done: said, for operators.
+                log.error("analytics: a deletion couldn't be owed: %s", type(owing).__name__)
 
     async def settle(self, user_id: str, debt: int, *, paced: bool = True) -> bool:
         """Delete the person's events, for deletion `debt`: whether it was done.
@@ -211,6 +313,9 @@ class Relay:
         ripe = datetime.now(UTC) - REMOVAL_GRACE
         for user_id, tenant, removed_at in await self.consent.removals_owed(most, before=ripe):
             done += await self._forget_removed(user_id, tenant, removed_at)
+        if self.replay is not None:
+            for user_id, debt in await self.replay.owing(most):
+                done += await self.settle_replay(user_id, debt)
         return done
 
     async def removed(self, tenant: str, user_id: str) -> None:

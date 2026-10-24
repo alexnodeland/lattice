@@ -15,7 +15,7 @@ from starlette.requests import HTTPConnection
 
 from grantr.fastapi import Caller, Unauthorized
 from grantr.grants import Grants, InMemoryStorage
-from portalr.analytics import InMemoryConsent, InMemoryRateLimiter, Relay
+from portalr.analytics import InMemoryConsent, InMemoryRateLimiter, Relay, Umami
 from portalr.fastapi.router import portalr_router
 from portalr.fastapi.site import Site
 from portalr.readers import (
@@ -58,7 +58,13 @@ def openapi_app() -> FastAPI:
         grafana=Grafana("http://grafana"),
         analytics=analytics,
     )
-    relay = Relay(analytics, InMemoryConsent(), InMemoryRateLimiter())
+    relay = Relay(
+        analytics,
+        InMemoryConsent(),
+        InMemoryRateLimiter(),
+        umami=Umami("http://umami", "website", "password"),
+        replay=InMemoryConsent(),
+    )
     router = portalr_router(
         resolve_actor=_nobody,
         grants=Grants(InMemoryStorage()),

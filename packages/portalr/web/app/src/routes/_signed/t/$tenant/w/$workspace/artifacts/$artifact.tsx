@@ -145,7 +145,11 @@ function Artifact() {
     />
   );
   return (
-    <section aria-labelledby="artifact" className="flex max-w-190 flex-col gap-6">
+    <section
+      aria-labelledby="artifact"
+      data-portalr-replay="block"
+      className="flex max-w-190 flex-col gap-6"
+    >
       <PageHeader
         id="artifact"
         title={title ?? id}

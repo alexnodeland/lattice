@@ -15,7 +15,7 @@ from sqlalchemy import Connection, inspect, text
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from portalr.analytics import Consent, InMemoryConsent
-from portalr.analytics.sql import SqlConsent, migrate
+from portalr.analytics.sql import SqlConsent, SqlReplayConsent, migrate
 
 
 async def answers(consent: Consent) -> None:
@@ -93,15 +93,20 @@ async def test_answers_in_the_applications_database(tmp_path: Path) -> None:
     await answers(SqlConsent(engine))
     await a_late_settling_clears_only_its_own_debt(SqlConsent(engine))
     await removals(SqlConsent(engine))
+    # Replay's answers, in a table of their own, kept as analytics' are, and apart from them.
+    await answers(SqlReplayConsent(engine))
+    await SqlReplayConsent(engine).give("carol", yes=True)
+    assert not await SqlConsent(engine).given("carol"), "a replay yes isn't an analytics yes"
     async with engine.connect() as connection:
         tables = await connection.run_sync(lambda sync: inspect(sync).get_table_names())
         version = await connection.scalar(text("SELECT version_num FROM portalr_alembic_version"))
     assert {
         "portalr_analytics_consent",
         "portalr_analytics_removals_owed",
+        "portalr_replay_consent",
         "portalr_alembic_version",
     } <= set(tables)
-    assert version == "0002"
+    assert version == "0003"
     await engine.dispose()
 
 
@@ -150,6 +155,7 @@ async def test_on_postgresql_the_application_role_may_read_and_write_answers_alo
     assert statements == [
         "SELECT pg_advisory_xact_lock(:lock)",
         'GRANT SELECT, INSERT, UPDATE ON portalr_analytics_consent TO "app"',
+        'GRANT SELECT, INSERT, UPDATE ON portalr_replay_consent TO "app"',
     ]
 
 
@@ -280,3 +286,43 @@ def test_the_removals_table_has_row_level_security_on_postgresql_alone(
             "DROP POLICY portalr_analytics_removals_owed_none ON portalr_analytics_removals_owed",
             "DROP TABLE portalr_analytics_removals_owed",
         ]
+
+
+@pytest.mark.parametrize("dialect", ["sqlite", "postgresql"])
+def test_replays_answers_are_each_persons_own_on_postgresql_and_undone(
+    dialect: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    migration = importlib.import_module("portalr.analytics.migrations.versions.0003_replay_consent")
+    statements: list[str] = []
+
+    class Op:
+        def get_bind(self) -> object:
+            return SimpleNamespace(dialect=SimpleNamespace(name=dialect))
+
+        def execute(self, statement: str) -> None:
+            statements.append(statement)
+
+        def create_table(self, name: str, *_: object) -> None:
+            statements.append(f"CREATE TABLE {name}")
+
+        def drop_table(self, name: str) -> None:
+            statements.append(f"DROP TABLE {name}")
+
+        def f(self, name: str) -> str:
+            return name
+
+    monkeypatch.setattr(migration, "op", Op())
+    migration.upgrade()
+    migration.downgrade()
+    policies = [s for s in statements if "POLICY" in s or "ROW LEVEL" in s]
+    if dialect == "sqlite":
+        assert policies == []
+    else:
+        assert policies == [
+            "ALTER TABLE portalr_replay_consent ENABLE ROW LEVEL SECURITY",
+            "CREATE POLICY portalr_replay_consent_person ON portalr_replay_consent"
+            " USING (user_id = current_setting('portalr.user_id', true))"
+            " WITH CHECK (user_id = current_setting('portalr.user_id', true))",
+            "DROP POLICY portalr_replay_consent_person ON portalr_replay_consent",
+        ]
+    assert statements[-1] == "DROP TABLE portalr_replay_consent"

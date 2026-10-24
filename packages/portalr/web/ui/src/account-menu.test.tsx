@@ -2,6 +2,7 @@ import { expect, test, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { AccountMenu, analyticsStatus } from "./account-menu";
+import { axeViolations } from "./test/axe";
 import { viewport } from "./test/viewport";
 
 test("the account menu is named for who is signed in", async () => {
@@ -256,4 +257,152 @@ test("what a screen reader hears as the answer changes", () => {
   expect(analyticsStatus({ given: false, onAnswer, guide, deleting: true })).toBe(
     "Sharing is off. Deleting what you shared hasn't finished yet. It will be retried until it is done.",
   );
+});
+
+const WORDS = {
+  label: "Record my sessions to improve the app",
+  about:
+    "Records the layout of the pages you visit and where you click. All text and anything you type is hidden, and chats, files, mini apps and Access are never recorded. Turning it off deletes your recordings.",
+  link: "What is recorded, and how it is kept (opens in a new tab)",
+  pending: "Deleting your recordings hasn't finished yet. It will be retried until it is done.",
+};
+const REPLAY_GUIDE = `${GUIDE}#session-replay`;
+
+function withReplay(
+  analytics: { given: boolean },
+  replay: { given: boolean; deleting?: boolean },
+  onAnswer = vi.fn(),
+) {
+  return (
+    <AccountMenu
+      name="Alex Nodeland"
+      appearance="system"
+      onAppearance={vi.fn()}
+      colourBlind={false}
+      onColourBlind={vi.fn()}
+      analytics={{
+        given: analytics.given,
+        onAnswer: vi.fn(),
+        guide: GUIDE,
+        replay: { ...replay, onAnswer, guide: REPLAY_GUIDE, words: WORDS },
+      }}
+      onSignOut={vi.fn()}
+    />
+  );
+}
+
+test("without session replay in the deployment there is no switch for it", async () => {
+  const screen = await render(
+    <AccountMenu
+      name="Alex Nodeland"
+      appearance="system"
+      onAppearance={vi.fn()}
+      colourBlind={false}
+      onColourBlind={vi.fn()}
+      analytics={{ given: true, onAnswer: vi.fn(), guide: GUIDE }}
+      onSignOut={vi.fn()}
+    />,
+  );
+  await screen.getByRole("button", { name: "Account: Alex Nodeland" }).click();
+  await expect
+    .element(screen.getByRole("menuitemcheckbox", { name: "Share how I use the app" }))
+    .toBeVisible();
+  expect(
+    screen
+      .getByRole("menuitemcheckbox", { name: "Record my sessions to improve the app" })
+      .elements(),
+  ).toHaveLength(0);
+});
+
+test("recording sessions is off until the person turns it on, and says what it records and hides", async () => {
+  const onAnswer = vi.fn();
+  const screen = await render(withReplay({ given: true }, { given: false }, onAnswer));
+  await screen.getByRole("button", { name: "Account: Alex Nodeland" }).click();
+  const item = screen.getByRole("menuitemcheckbox", {
+    name: "Record my sessions to improve the app",
+  });
+  await expect.element(item).toHaveAttribute("aria-checked", "false");
+  await expect.element(item).toHaveAccessibleName("Record my sessions to improve the app");
+  await expect.element(item).toHaveAccessibleDescription(WORDS.about);
+  await item.click();
+  expect(onAnswer).toHaveBeenCalledExactlyOnceWith(true);
+});
+
+test("turned on, a click turns recording off, as easily as it was turned on", async () => {
+  const onAnswer = vi.fn();
+  const screen = await render(withReplay({ given: true }, { given: true }, onAnswer));
+  await screen.getByRole("button", { name: "Account: Alex Nodeland" }).click();
+  const item = screen.getByRole("menuitemcheckbox", {
+    name: "Record my sessions to improve the app",
+  });
+  await expect.element(item).toHaveAttribute("aria-checked", "true");
+  await item.click();
+  expect(onAnswer).toHaveBeenCalledExactlyOnceWith(false);
+});
+
+test("the keyboard reaches the recording switch and a key toggles it", async () => {
+  const onAnswer = vi.fn();
+  const screen = await render(withReplay({ given: true }, { given: false }, onAnswer));
+  await screen.getByRole("button", { name: "Account: Alex Nodeland" }).click();
+  const item = screen.getByRole("menuitemcheckbox", {
+    name: "Record my sessions to improve the app",
+  });
+  await expect.element(item).toBeVisible();
+  await item.element().focus();
+  await expect.element(item).toHaveFocus();
+  await userEvent.keyboard(" ");
+  expect(onAnswer).toHaveBeenCalledExactlyOnceWith(true);
+});
+
+test("the recording switch is beside a link to what is recorded, which opens in a new tab", async () => {
+  const screen = await render(withReplay({ given: true }, { given: false }));
+  await screen.getByRole("button", { name: "Account: Alex Nodeland" }).click();
+  const link = screen.getByRole("menuitem", {
+    name: "What is recorded, and how it is kept (opens in a new tab)",
+  });
+  await expect.element(link).toHaveAttribute("href", REPLAY_GUIDE);
+  await expect.element(link).toHaveAttribute("target", "_blank");
+  await expect.element(link).toHaveAttribute("rel", "noopener noreferrer");
+});
+
+test("a deletion of recordings still to be done is said beside the switch", async () => {
+  const screen = await render(withReplay({ given: true }, { given: false, deleting: true }));
+  await screen.getByRole("button", { name: "Account: Alex Nodeland" }).click();
+  await expect.element(screen.getByText(WORDS.pending)).toBeVisible();
+  await expect
+    .element(
+      screen.getByRole("menuitemcheckbox", { name: "Record my sessions to improve the app" }),
+    )
+    .toBeVisible();
+});
+
+test("without the person's yes to sharing there is nothing to turn on, but a deletion owed is still said", async () => {
+  const quiet = await render(withReplay({ given: false }, { given: false }));
+  await quiet.getByRole("button", { name: "Account: Alex Nodeland" }).click();
+  await expect
+    .element(quiet.getByRole("menuitemcheckbox", { name: "Share how I use the app" }))
+    .toBeVisible();
+  expect(
+    quiet
+      .getByRole("menuitemcheckbox", { name: "Record my sessions to improve the app" })
+      .elements(),
+  ).toHaveLength(0);
+  expect(quiet.getByText(WORDS.pending).elements()).toHaveLength(0);
+  await quiet.unmount();
+
+  const owing = await render(withReplay({ given: false }, { given: false, deleting: true }));
+  await owing.getByRole("button", { name: "Account: Alex Nodeland" }).click();
+  await expect.element(owing.getByText(WORDS.pending)).toBeVisible();
+  expect(
+    owing
+      .getByRole("menuitemcheckbox", { name: "Record my sessions to improve the app" })
+      .elements(),
+  ).toHaveLength(0);
+});
+
+test("the menu with both switches and a deletion owed has nothing axe finds wrong", async () => {
+  const screen = await render(withReplay({ given: true }, { given: false, deleting: true }));
+  await screen.getByRole("button", { name: "Account: Alex Nodeland" }).click();
+  await expect.element(screen.getByRole("menu")).toBeVisible();
+  expect(await axeViolations(screen.getByRole("menu").element())).toEqual([]);
 });

@@ -1,7 +1,7 @@
 import { Refused } from "@portalr/client";
 import { Plain, TextLink } from "@portalr/ui";
 import { createFileRoute, Link, notFound, Outlet } from "@tanstack/react-router";
-import { useGiven, usePageViews } from "../../../analytics";
+import { useGiven, usePageViews, useReplay } from "../../../analytics";
 
 /** A tenant: grantr says who the caller is in it, and every read under it names it. */
 export const Route = createFileRoute("/_signed/t/$tenant")({
@@ -42,10 +42,17 @@ function NoSuchTenant() {
   );
 }
 
-/** The tenant's pages, each counted as the person opens it, with their yes. */
+/** The tenant's pages, each counted as the person opens it, and recorded, with their yes. */
 function Tenant() {
-  const { api } = Route.useRouteContext();
+  const { api, config, user } = Route.useRouteContext();
   const { tenant } = Route.useParams();
-  usePageViews(api, tenant, useGiven());
-  return <Outlet />;
+  const given = useGiven();
+  usePageViews(api, tenant, given);
+  const replay = useReplay(config.replay === true);
+  return (
+    <>
+      <Outlet />
+      {replay && <replay.Recording api={api} user={user} tenant={tenant} analytics={given} />}
+    </>
+  );
 }

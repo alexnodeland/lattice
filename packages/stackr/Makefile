@@ -15,10 +15,12 @@ include versions.env
 # under emulation, where Supabase's Realtime fails to start.
 unexport DOCKER_DEFAULT_PLATFORM
 
-# The profiles `make up` starts: all of them unless you choose, for example
+# The profiles `make up` starts: observability, langfuse and gateway, unless
+# you choose, for example
 #   make up PROFILES=observability
-# `auth`, GoTrue alone, is the identity port on the postgres adapter, and is
-# only started when chosen: local Supabase runs its own.
+# The others start only when chosen: `auth`, GoTrue alone, the identity port on
+# the postgres adapter (local Supabase runs its own; a single host starts it with
+# the rest), `analytics`, and `umami`, on the postgres adapter alone.
 ALL_PROFILES := observability langfuse gateway
 PROFILES ?= $(ALL_PROFILES)
 
@@ -125,7 +127,7 @@ env: ## Create or update .env, generating local secrets
 .env: .env.example
 	$(UV) run scripts/setup-env
 
-up: .env ## Start the chosen PROFILES (default: all of them), with the database adapter they need
+up: .env ## Start the chosen PROFILES (default: observability langfuse gateway), with the database adapter they need
 ifeq ($(STACKR_DATABASE)$(filter auth,$(PROFILES)),supabaseauth)
 	$(error the auth profile is GoTrue for the postgres adapter: local Supabase runs its own Auth)
 endif

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Check what `make up` refuses, and the gateway's model groups' check, without starting anything:
 # scripts/binding-probe against a fake `docker` for each shape an engine publishes in, the
-# STACKR_GATEWAY_MODELS guard, the umami profile's adapter (ADR-0050), and scripts/check-config's hold on deploy/litellm/groups/
+# STACKR_GATEWAY_MODELS guard, the umami profile's adapter (ADR-0050), what scripts/wire-app
+# writes for a made-up stack and application, and scripts/check-config's hold on deploy/litellm/groups/
 # (ADR-0045). scripts/validate runs it.
 
 set -euo pipefail
@@ -97,6 +98,66 @@ check "make up pulls again after two failed pulls, and starts the stack" quietly
 check "having waited 20s, then 40s" grep -qzF $'pull\nslept 20\npull\nslept 40\npull\n' "$scratch/pulls"
 check "make up stops after three failed pulls" refused pulls 4
 check "and says so" said "the stack's images didn't pull, after 3 tries"
+
+# scripts/wire-app on a made-up stack and application: what it sets, by the adapter, one line a
+# key, mode 0600, the same again on a second run, never a secret on its output, and the settings
+# the smoke test gives it on stdin over the rest.
+mkdir -p "$scratch/wire/stack" "$scratch/wire/app"
+cp .env.example "$scratch/wire/stack/"
+echo STACKR_DATABASE=postgres >"$scratch/wire/stack/.env"
+uv run scripts/setup-env --example "$scratch/wire/stack/.env.example" --env-file "$scratch/wire/stack/.env" 2>/dev/null
+printf '[project]\nname = "demo-app"\n' >"$scratch/wire/app/pyproject.toml"
+printf '# the app\nAPP_PORT=8800\nLITELLM_API_KEY=\nAPP_PORT=9900\nPORTAL_SUPABASE_KEY=\n' >"$scratch/wire/app/.env"
+# A file a run that died left, readable by anyone: wire-app writes through a file of its own.
+(umask 022 && echo stale >"$scratch/wire/app/.env.wiring")
+wire() { uv run scripts/wire-app "$scratch/wire/app" --stack "$scratch/wire/stack" --stdin "$@" >"$scratch/wired" 2>&1; }
+app_setting() { sed -n "s/^$1=//p" "$scratch/wire/app/.env"; }
+stack_setting() { sed -n "s/^$1=//p" "$scratch/wire/stack/.env"; }
+mode() { uv run python -c 'import os, sys; print(oct(os.stat(sys.argv[1]).st_mode & 0o777))' "$1"; }
+staged() { find "$scratch/wire/app" -name '.env.*' ! -name .env.wiring | grep -q .; }
+printf 'LITELLM_API_KEY=sk-made-up\nAPP_PORT=8801\n' | wire --analytics --umami --langfuse-project
+check "wire-app writes .env mode 0600" test "$(mode "$scratch/wire/app/.env")" = 0o600
+check "and leaves no file of its own beside it" refused staged
+check "and sets each key once" test -z "$(sed -n 's/^\([A-Z_]*\)=.*/\1/p' "$scratch/wire/app/.env" | sort | uniq -d)"
+check "on its line, where it was" test "$(sed -n 2p "$scratch/wire/app/.env")" = APP_PORT=8801
+check "with what stdin gives it over the rest" test "$(app_setting LITELLM_API_KEY)" = sk-made-up
+check "and prints no secret" refused grep -qF -e sk-made-up -e "$(stack_setting LANGFUSE_SECRET_KEY)" "$scratch/wired"
+check "GoTrue's addresses, on the postgres adapter" test "$(app_setting STACK_AUTH_JWKS_URL) $(app_setting STACK_AUTH_ADMIN_URL) $(app_setting AUTH_ISSUER)" = \
+  "http://gotrue:9999/.well-known/jwks.json http://gotrue:9999 $(stack_setting AUTH_PUBLIC_URL)"
+check "a placeholder for the publishable key GoTrue asks none for" test "$(app_setting PORTAL_SUPABASE_KEY)" = sb_publishable_local
+check "plain PostgreSQL, as its owner" grep -qE \
+  "^STACK_DATABASE_ADMIN_URL=postgresql\+asyncpg://postgres:$(stack_setting POSTGRES_ADMIN_PASSWORD)@postgres:5432/postgres$" "$scratch/wire/app/.env"
+check "the analytics and Umami passwords, and ClickHouse on the loopback, asked for" test \
+  "$(app_setting PORTAL_ANALYTICS_PASSWORD) $(app_setting PORTAL_UMAMI_PASSWORD) $(app_setting PORTAL_ANALYTICS_URL)" = \
+  "$(stack_setting CLICKHOUSE_ANALYTICS_PASSWORD) $(stack_setting UMAMI_PORTALR_PASSWORD) http://127.0.0.1:$(stack_setting CLICKHOUSE_HTTP_PORT)"
+check "and Langfuse's project, asked for" test "$(app_setting PORTAL_LANGFUSE_PROJECT)" = "$(stack_setting LANGFUSE_INIT_PROJECT_ID)"
+printf '' | AUTH_PUBLIC_URL=https://auth.example.test wire
+check "a setting in the environment over the stack's .env, as Compose reads it" test "$(app_setting AUTH_ISSUER)" = https://auth.example.test
+printf '' | wire
+cp "$scratch/wire/app/.env" "$scratch/wire/first"
+printf 'LITELLM_API_KEY=sk-made-up\nAPP_PORT=8801\n' | wire --analytics --umami --langfuse-project
+check "and runs again to the same file, keeping the role's password" cmp -s "$scratch/wire/first" "$scratch/wire/app/.env"
+printf 'AUTH_ISSUER=http://127.0.0.1:54321/auth/v1\nAUTH_SERVICE_ROLE_KEY=made-up\n' | STACKR_DATABASE=supabase wire
+check "on local Supabase: its database and owner, and GoTrue's addresses emptied" test \
+  "$(app_setting STACK_DATABASE_ADMIN_URL) $(app_setting STACK_AUTH_JWKS_URL)x$(app_setting STACK_AUTH_ADMIN_URL)x $(app_setting AUTH_SERVICE_ROLE_KEY)" = \
+  "postgresql+asyncpg://postgres:postgres@supabase_db_stackr-supabase:5432/postgres xx made-up"
+check "and Langfuse's keys, as the smoke test set them" test "$(app_setting LANGFUSE_PUBLIC_KEY) $(app_setting LANGFUSE_SECRET_KEY)" = \
+  "$(stack_setting LANGFUSE_PUBLIC_KEY) $(stack_setting LANGFUSE_SECRET_KEY)"
+printf 'STACK_DATABASE_URL=postgresql+asyncpg://given:pw@db:5432/postgres\n' |
+  STACKR_DB_HOST=db STACKR_DB_ADMIN_PASSWORD='p@ss/word' wire
+check "the database's host and owner, as make names them, the password quoted" test "$(app_setting STACK_DATABASE_ADMIN_URL)" = \
+  "postgresql+asyncpg://postgres:p%40ss%2Fword@db:5432/postgres"
+check "and the application's role, as stdin gives it" test "$(app_setting STACK_DATABASE_URL)" = "postgresql+asyncpg://given:pw@db:5432/postgres"
+cp "$scratch/wire/app/.env" "$scratch/wire/first"
+dollar() { printf 'LITELLM_API_KEY=a%sb\n' '$' | wire; }
+check "wire-app refuses a value with \$ in it" refused dollar
+check "and changes nothing" cmp -s "$scratch/wire/first" "$scratch/wire/app/.env"
+sed -i.bak 's/^LANGFUSE_SECRET_KEY=.*/LANGFUSE_SECRET_KEY=/' "$scratch/wire/stack/.env"
+check "wire-app refuses a stack whose secrets make env hasn't made" refused uv run scripts/wire-app "$scratch/wire/app" --stack "$scratch/wire/stack"
+check "and says so" said "run \`make env\` in stackr first"
+mv "$scratch/wire/stack/.env.bak" "$scratch/wire/stack/.env"
+check "wire-app refuses an application with no .env" refused uv run scripts/wire-app "$scratch/wire" --stack "$scratch/wire/stack"
+check "and says to make it" said "run \`make env\`"
 
 # check-config on a copy whose config.yaml includes no groups, or whose groups lack `fast`.
 copy() {

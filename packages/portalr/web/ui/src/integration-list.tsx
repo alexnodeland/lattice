@@ -2,7 +2,6 @@ import { type ReactNode, useId } from "react";
 import { Button } from "./button";
 import { ItemTable } from "./item-table";
 import { Moment } from "./moment";
-import { StatusBadge } from "./status-badge";
 import { Switch } from "./switch";
 
 /**
@@ -46,9 +45,10 @@ const CEILING: Partial<Record<IntegrationSource, string>> = {
 
 /**
  * A level's integrations, in the registry's order: each one's name, key and sentence; a switch,
- * named by the integration and described by its state in words, beside a badge whose shape says
- * on or off, so no state is told by colour alone; where the state comes from; who set it here,
- * and when; and, where this level has a setting of its own, a way back to what it inherits. A
+ * named by the integration and described by its state in words beside it, "On" or "Off" and
+ * where it comes from, so no state is told by colour or the switch alone; who set it here, and
+ * when, where this level has; and, where it has a setting of its own, a way back to what it
+ * inherits. A
  * switch under a ceiling is disabled, with the reason beside it, and one saving is disabled
  * until it is answered (portalr ADR-0045).
  */
@@ -111,7 +111,7 @@ export function IntegrationList({
                   </span>
                 </>
               ) : (
-                <span className="text-muted">Not set here</span>
+                <span className="sr-only">Not set here</span>
               )}
               {history?.(row)}
             </span>
@@ -167,10 +167,14 @@ function State({
         className="mt-0.5 shrink-0"
       />
       <span id={said} className="flex flex-col items-start gap-1">
-        <StatusBadge tone={saving ? "working" : row.on ? "done" : "stopped"}>
-          {saving ? "Saving…" : row.on ? "On" : "Off"}
-        </StatusBadge>
-        <span className="text-xs">{SOURCE[row.source]}</span>
+        <span className="text-sm">
+          <span className="font-semibold">{saving ? "Saving…" : row.on ? "On" : "Off"}</span>
+          <span className="text-muted">
+            {" "}
+            <span aria-hidden="true">· </span>
+            {SOURCE[row.source]}
+          </span>
+        </span>
         {ceiling && <span className="text-muted text-xs">{ceiling}</span>}
         {level === "tenant" && row.source === "set" && !row.on && (
           <span className="text-muted text-xs">{TENANT_OFF}</span>

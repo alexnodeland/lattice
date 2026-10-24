@@ -29,7 +29,7 @@ const score = (value: boolean | number | string, evaluator?: string, feedbackTyp
 test("a tool that didn't answer, or isn't configured, says so with a shape and a word", () => {
   expect(unread("Langfuse", { status: "unavailable", reason: "timed out" })).toEqual({
     figure: null,
-    line: "Langfuse isn't answering: timed out",
+    line: "Langfuse isn't answering.",
     badge: { tone: "failed", word: "Unavailable" },
   });
   expect(unread("LiteLLM", { status: "unconfigured" })).toEqual({

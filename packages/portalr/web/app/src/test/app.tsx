@@ -52,15 +52,20 @@ export type Answer = (command: {
 function socketAnswering(
   answer: Answer,
   logs: { readonly artifactr: readonly unknown[]; readonly reflexr: readonly unknown[] },
+  /** A stream whose replay never completes, as one still catching up on its history. */
+  replaying?: "artifactr" | "reflexr",
 ) {
   return class {
     onopen: (() => void) | null = null;
     onmessage: ((message: { data: string }) => void) | null = null;
     onclose: ((closed: { code: number }) => void) | null = null;
     readonly #log: readonly unknown[];
+    readonly #replaying: boolean;
 
     constructor(url: string) {
-      this.#log = url.includes("/reflexr/") ? logs.reflexr : logs.artifactr;
+      const library = url.includes("/reflexr/") ? "reflexr" : "artifactr";
+      this.#log = logs[library];
+      this.#replaying = replaying === library;
       queueMicrotask(() => this.onopen?.());
     }
 
@@ -75,7 +80,9 @@ function socketAnswering(
         for (const event of this.#log) {
           this.#emit(event);
         }
-        this.#emit({ type: "replay_complete" });
+        if (!this.#replaying) {
+          this.#emit({ type: "replay_complete" });
+        }
         return;
       }
       const refused = answer(frame.command ?? { type: "" });
@@ -119,6 +126,8 @@ function server(serve: Serve) {
 export interface World {
   readonly artifactrLog?: readonly unknown[];
   readonly reflexrLog?: readonly unknown[];
+  /** A stream that is still catching up on its history: its replay never completes. */
+  readonly replaying?: "artifactr" | "reflexr";
   readonly surfaces?: Partial<Config["surfaces"]>;
   readonly editors?: Config["editors"];
   readonly apps?: Config["apps"];
@@ -137,10 +146,11 @@ export async function open(
   vi.stubGlobal("fetch", fetched);
   vi.stubGlobal(
     "WebSocket",
-    socketAnswering(answer, {
-      artifactr: world.artifactrLog ?? [],
-      reflexr: world.reflexrLog ?? [],
-    }),
+    socketAnswering(
+      answer,
+      { artifactr: world.artifactrLog ?? [], reflexr: world.reflexrLog ?? [] },
+      world.replaying,
+    ),
   );
   const queryClient = createQueryClient(() => undefined);
   const config = {

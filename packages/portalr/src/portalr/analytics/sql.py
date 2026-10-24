@@ -50,10 +50,8 @@ class Base(DeclarativeBase):
     metadata = MetaData(naming_convention={"pk": "pk_%(table_name)s"})
 
 
-class Answer(Base):
-    """A person's answer to product analytics."""
-
-    __tablename__ = "portalr_analytics_consent"
+class _Answered:
+    """A person's answer, and the deletion it owes: analytics' and replay's alike."""
 
     user_id: Mapped[str] = mapped_column(String, primary_key=True)
     given: Mapped[bool] = mapped_column(Boolean, nullable=False)
@@ -62,6 +60,18 @@ class Answer(Base):
     """The deletion owed the person, by its number; 0 for none."""
     debts: Mapped[int] = mapped_column(Integer, nullable=False)
     """How many deletions the person has been owed: the next one's number is one more."""
+
+
+class Answer(_Answered, Base):
+    """A person's answer to product analytics."""
+
+    __tablename__ = "portalr_analytics_consent"
+
+
+class ReplayAnswer(_Answered, Base):
+    """A person's answer to session replay, apart from analytics' (lattice RFC-0008, P8)."""
+
+    __tablename__ = "portalr_replay_consent"
 
 
 class Removal(Base):
@@ -95,9 +105,10 @@ async def migrate(engine: AsyncEngine, *, application_role: str | None = None) -
             )
         await connection.run_sync(_upgrade)
         if application_role is not None and connection.dialect.name == "postgresql":
-            await connection.exec_driver_sql(
-                f'GRANT SELECT, INSERT, UPDATE ON portalr_analytics_consent TO "{application_role}"'
-            )
+            for table in ("portalr_analytics_consent", "portalr_replay_consent"):
+                await connection.exec_driver_sql(
+                    f'GRANT SELECT, INSERT, UPDATE ON {table} TO "{application_role}"'
+                )
 
 
 def _upgrade(connection: Connection) -> None:
@@ -117,6 +128,9 @@ class SqlConsent:
             deletions owed, which a replica settles as it starts. ``engine`` without one.
     """
 
+    answers: type[_Answered] = Answer
+    """The table of the answers it keeps: analytics', or replay's for :class:`SqlReplayConsent`."""
+
     def __init__(self, engine: AsyncEngine, *, owner: AsyncEngine | None = None) -> None:
         self._engine = engine
         self._owner = owner or engine
@@ -125,7 +139,9 @@ class SqlConsent:
         """Whether the person has said yes."""
         async with self._engine.begin() as connection:
             await _as_person(connection, user_id)
-            answer = await connection.scalar(select(Answer.given).where(Answer.user_id == user_id))
+            answer = await connection.scalar(
+                select(self.answers.given).where(self.answers.user_id == user_id)
+            )
         return bool(answer)
 
     async def give(self, user_id: str, *, yes: bool) -> int | None:
@@ -134,12 +150,11 @@ class SqlConsent:
         One statement, which locks the row: a yes taken back takes the next number; a no again,
         or a yes, keeps the one owed, which a yes never cancels; and it touches nothing else.
         """
-        table = Answer.__table__.c
         async with self._engine.begin() as connection:
             await _as_person(connection, user_id)
-            taken_back = and_(not_(literal(yes)), table.given)
+            taken_back = and_(not_(literal(yes)), self.answers.given)
             owed = await connection.scalar(
-                _upsert(connection)(Answer)
+                _upsert(connection)(self.answers)
                 .values(
                     user_id=user_id,
                     given=yes,
@@ -148,15 +163,19 @@ class SqlConsent:
                     debts=0,
                 )
                 .on_conflict_do_update(
-                    index_elements=[Answer.user_id],
+                    index_elements=[self.answers.user_id],
                     set_={
                         "given": yes,
                         "answered_at": datetime.now(UTC),
-                        "delete_owed": case((taken_back, table.debts + 1), else_=table.delete_owed),
-                        "debts": case((taken_back, table.debts + 1), else_=table.debts),
+                        "delete_owed": case(
+                            (taken_back, self.answers.debts + 1), else_=self.answers.delete_owed
+                        ),
+                        "debts": case(
+                            (taken_back, self.answers.debts + 1), else_=self.answers.debts
+                        ),
                     },
                 )
-                .returning(Answer.delete_owed)
+                .returning(self.answers.delete_owed)
             )
         return owed or None
 
@@ -165,11 +184,10 @@ class SqlConsent:
 
         One statement, which locks the row and leaves the person's answer as it stands.
         """
-        table = Answer.__table__.c
         async with self._engine.begin() as connection:
             await _as_person(connection, user_id)
             owed = await connection.scalar(
-                _upsert(connection)(Answer)
+                _upsert(connection)(self.answers)
                 .values(
                     user_id=user_id,
                     given=False,
@@ -178,10 +196,10 @@ class SqlConsent:
                     debts=1,
                 )
                 .on_conflict_do_update(
-                    index_elements=[Answer.user_id],
-                    set_={"delete_owed": table.debts + 1, "debts": table.debts + 1},
+                    index_elements=[self.answers.user_id],
+                    set_={"delete_owed": self.answers.debts + 1, "debts": self.answers.debts + 1},
                 )
-                .returning(Answer.delete_owed)
+                .returning(self.answers.delete_owed)
             )
         return int(owed or 0)
 
@@ -190,7 +208,7 @@ class SqlConsent:
         async with self._engine.begin() as connection:
             await _as_person(connection, user_id)
             owed = await connection.scalar(
-                select(Answer.delete_owed).where(Answer.user_id == user_id)
+                select(self.answers.delete_owed).where(self.answers.user_id == user_id)
             )
         return owed or None
 
@@ -199,8 +217,8 @@ class SqlConsent:
         async with self._engine.begin() as connection:
             await _as_person(connection, user_id)
             await connection.execute(
-                update(Answer)
-                .where(Answer.user_id == user_id, Answer.delete_owed == debt)
+                update(self.answers)
+                .where(self.answers.user_id == user_id, self.answers.delete_owed == debt)
                 .values(delete_owed=0)
             )
 
@@ -212,9 +230,9 @@ class SqlConsent:
         """
         async with self._owner.connect() as connection:
             rows = await connection.execute(
-                select(Answer.user_id, Answer.delete_owed)
-                .where(Answer.delete_owed > 0)
-                .order_by(Answer.answered_at, Answer.user_id)
+                select(self.answers.user_id, self.answers.delete_owed)
+                .where(self.answers.delete_owed > 0)
+                .order_by(self.answers.answered_at, self.answers.user_id)
                 .limit(most)
             )
             return [(row.user_id, row.delete_owed) for row in rows]
@@ -260,6 +278,12 @@ class SqlConsent:
                 query.order_by(Removal.removed_at, Removal.user_id, Removal.tenant_id).limit(most)
             )
             return [(row.user_id, row.tenant_id, _utc(row.removed_at)) for row in rows]
+
+
+class SqlReplayConsent(SqlConsent):
+    """People's answers to session replay, in the application's database, as analytics' are."""
+
+    answers = ReplayAnswer
 
 
 def _upsert(connection: AsyncConnection) -> Callable[..., Any]:

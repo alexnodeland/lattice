@@ -43,6 +43,13 @@ headers = { "X-Tenant" = "acme" }
 include-path-regex = "^/portalr/v1/deployment/"
 checks.positive_data_acceptance.enabled = false
 
+# A yes to session replay needs a yes to analytics first, which the person in this run hasn't
+# given, so a well formed answer is refused (portalr ADR-0077).
+[[operations]]
+include-method = "PUT"
+include-path-regex = "/analytics/replay/consent$"
+checks.positive_data_acceptance.enabled = false
+
 # A diagram's image is uploaded as its raw bytes, a PNG or a JPEG, which Schemathesis has no
 # serializer for and couldn't make valid if it had: artifactr's tests check every refusal of it
 # (tests/excalidraw/test_images.py). Its read is still tested here.

@@ -13,11 +13,12 @@ Umami's ingest takes anyone's events, so it is reachable only on a network stack
 application alone. Its deletions are portalr's user's, who owns the website.
 """
 
+import asyncio
 import hashlib
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Final
+from typing import Any, Final, cast
 
 import httpx
 from pydantic import BaseModel, Field, TypeAdapter
@@ -35,6 +36,18 @@ TIMEOUT: Final = 2.0
 
 REST: Final = 30.0
 """How long, in seconds, the copies wait after Umami failed one, before trying it again."""
+
+VISIT_MINUTES: Final = 10
+"""How long a visit's token is used for a person's replay batches before the visit is sent again."""
+
+MOST_VISITS: Final = 10_000
+"""How many people's visit tokens are remembered."""
+
+ASK: Final = 1.0
+"""How long a question to Umami about its replay may take, in seconds: config.json waits on it."""
+
+REPLAY_SECONDS: Final = 60.0
+"""How long Umami's answer to whether its website keeps replays is believed."""
 
 PAGE: Final = 100
 """How many sessions one page of a search reads."""
@@ -61,10 +74,18 @@ def distinct(tenant: str, person: str) -> str:
     return f"{tenant_tag(tenant)}:{person}"
 
 
+@dataclass
 class _Rest:
     """Until when the copies rest, after Umami failed one: a short circuit-breaker."""
 
     until: float = 0.0
+    replay: tuple[float, bool] = (0.0, False)
+    """When Umami was last asked whether its website keeps replays, and what it answered."""
+    asking: asyncio.Lock = field(default_factory=asyncio.Lock)
+    """One question to Umami about its replay at a time: the rest wait, then read its answer."""
+    visits: dict[str, tuple[float, str]] = field(default_factory=dict[str, tuple[float, str]])
+    """The token Umami gave a person's visit, by distinct id, and when: a replay's batches in a
+    session send the visit once."""
 
 
 class _Session(BaseModel):
@@ -141,6 +162,102 @@ class Umami:
             return False
         return taken
 
+    async def replay_enabled(self) -> bool:
+        """Whether Umami's website keeps replays, as portalr's user reads it; false if unsure.
+
+        The answer is believed for a minute. Umami says in a 200 that a website's replay is off,
+        so without this a batch would be reported as recorded that nothing keeps.
+        """
+        if time.monotonic() < self._rest.replay[0]:
+            return self._rest.replay[1]
+        async with self._rest.asking:
+            at, known = self._rest.replay
+            now = time.monotonic()
+            if now < at:
+                return known
+            try:
+                known = await asyncio.wait_for(self._replay_kept(), ASK)
+                self._rest.replay = (now + REPLAY_SECONDS, known)
+            except Exception as error:  # Umami's failure is never the request's.
+                log.warning("analytics: Umami wasn't asked about replay: %s", type(error).__name__)
+                self._rest.replay = (now + REST, False)
+                return False
+            return known
+
+    async def _replay_kept(self) -> bool:
+        """What Umami says of its website: whether it records, and whether it keeps replays."""
+        headers = await self._signed_in()
+        response = await self.client.get(
+            f"{self.url}/api/websites/{self.website}", headers=headers, timeout=TIMEOUT
+        )
+        response.raise_for_status()
+        body = cast("dict[str, Any]", response.json())
+        config = body.get("replayConfig")
+        return (
+            body.get("recorderEnabled") is True
+            and isinstance(config, dict)
+            and cast("dict[str, Any]", config).get("replayEnabled") is True
+        )
+
+    async def record(self, tenant: str, person: str, events: list[dict[str, Any]]) -> bool:
+        """Send a person's replay events: whether Umami kept them (portalr ADR-0077).
+
+        Umami keeps a replay in the session a send names, by the token its answer carries: so a
+        send of the person's visit, once for ten minutes of batches, then the events, with that
+        token. Umami says, in a 200, where its website's replay is off; that is no replay kept.
+        Any failure is caught and said.
+        """
+        if time.monotonic() < self._rest.until:
+            return False
+        who = distinct(tenant, person)
+        try:
+            token = await self._visit(who)
+            kept = await self.client.post(
+                f"{self.url}/api/record",
+                json={"type": "record", "payload": {"website": self.website, "events": events}},
+                headers={"User-Agent": AGENT, "x-umami-cache": token},
+                timeout=TIMEOUT,
+            )
+            kept.raise_for_status()
+            if kept.json().get("ok") is not True:
+                self._rest.visits.pop(who, None)
+                log.warning("analytics: Umami kept no replay: %s", kept.json().get("reason"))
+                return False
+        except Exception as error:  # Umami's failure is never the request's.
+            self._rest.visits.pop(who, None)
+            self._rest.until = time.monotonic() + REST
+            log.warning("analytics: Umami didn't take a replay: %s", type(error).__name__)
+            return False
+        return True
+
+    async def _visit(self, who: str) -> str:
+        """The token of a person's visit, sent if it isn't already a recent one's."""
+        now = time.monotonic()
+        known = self._rest.visits.get(who)
+        if known is not None and now < known[0]:
+            return known[1]
+        visit = await self.client.post(
+            f"{self.url}/api/send",
+            json={
+                "type": "event",
+                "payload": {
+                    "website": self.website,
+                    "hostname": HOSTNAME,
+                    "url": "/",
+                    "name": "app.replay.recorded.v1",
+                    "id": who,
+                },
+            },
+            headers={"User-Agent": AGENT},
+            timeout=TIMEOUT,
+        )
+        visit.raise_for_status()
+        token = str(visit.json()["cache"])
+        if len(self._rest.visits) >= MOST_VISITS:
+            self._rest.visits.clear()
+        self._rest.visits[who] = (now + VISIT_MINUTES * 60, token)
+        return token
+
     async def forget(self, person: str, tenant: str | None = None) -> bool:
         """Delete a person's sessions, and their events, in one tenant or in all: whether done.
 
@@ -149,6 +266,9 @@ class Umami:
         searches again until a round finds none of theirs; one still finding some after
         ``MOST_ROUNDS`` isn't done.
         """
+        for who in [who for who in self._rest.visits if who.endswith(f":{person}")]:
+            if tenant is None or who.startswith(f"{tenant_tag(tenant)}:"):
+                del self._rest.visits[who]
         try:
             headers = await self._signed_in()
             for _ in range(MOST_ROUNDS):

@@ -359,6 +359,11 @@
             "title": "Readers",
             "type": "object"
           },
+          "replay": {
+            "default": false,
+            "title": "Replay",
+            "type": "boolean"
+          },
           "supabase": {
             "$ref": "#/components/schemas/Supabase"
           },
@@ -2203,6 +2208,273 @@
           }
         },
         "summary": "Answer"
+      }
+    },
+    "/portalr/v1/analytics/replay": {
+      "post": {
+        "description": "A batch of the person's replay events in a tenant they belong to, forwarded to Umami.\n\nOnly with their yes to replay and to analytics; and only if every value in it is masked:\na batch with any word, input or address in it is dropped whole.",
+        "operationId": "replays_portalr_v1_analytics_replay_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/TenantId"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "description": "A browser's replay events, in the session portalr signed for it.",
+                "properties": {
+                  "events": {
+                    "items": {
+                      "additionalProperties": true,
+                      "type": "object"
+                    },
+                    "maxItems": 200,
+                    "minItems": 1,
+                    "title": "Events",
+                    "type": "array"
+                  },
+                  "session": {
+                    "maxLength": 128,
+                    "title": "Session",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "session",
+                  "events"
+                ],
+                "title": "ReplayBatch",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Relayed"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "The body is over 512 KiB: `too_large`"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Not a batch the relay takes: `invalid`"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Past the person's pace in bytes of replay: `too_fast`"
+          }
+        },
+        "summary": "Replays"
+      }
+    },
+    "/portalr/v1/analytics/replay/consent": {
+      "get": {
+        "description": "The person's answer to session replay: no until they say yes, apart from analytics'.",
+        "operationId": "read_replay_consent_portalr_v1_analytics_replay_consent_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Consented"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Past the person's pace: `too_fast`"
+          }
+        },
+        "summary": "Read Replay Consent"
+      },
+      "put": {
+        "description": "Record the person's answer to replay. Taking a yes back deletes their replays at once.\n\nA yes needs the person's yes to analytics first; a no is never refused.",
+        "operationId": "answer_replay_portalr_v1_analytics_replay_consent_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Answer"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Answered"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          }
+        },
+        "summary": "Answer Replay"
       }
     },
     "/portalr/v1/analytics/session": {

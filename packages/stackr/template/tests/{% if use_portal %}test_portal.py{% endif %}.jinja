@@ -650,6 +650,58 @@ def test_a_person_removed_from_a_tenant_is_owed_their_events_deletion_there(
     assert owed == [("bob", TENANT)]
 
 
+class ReplayUmami(BaseHTTPRequestHandler):
+    """Umami, signing portalr's user in and saying whether its website keeps replays."""
+
+    keeps: ClassVar[bool] = True
+
+    def _json(self, body: bytes) -> None:
+        self.send_response(200)
+        self.send_header("content-type", "application/json")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_POST(self) -> None:
+        self.rfile.read(int(self.headers.get("content-length") or 0))
+        self._json(b'{"token": "t"}' if self.path == "/api/auth/login" else b"{}")
+
+    def do_GET(self) -> None:
+        on = ReplayUmami.keeps
+        self._json(
+            b'{"recorderEnabled": true, "replayConfig": {"replayEnabled": true}}'
+            if on
+            else b'{"recorderEnabled": false, "replayConfig": {}}'
+        )
+
+    def log_message(self, format: str, *args: Any) -> None:
+        pass
+
+
+def test_replay_is_off_unless_portal_replay_turns_it_on_and_umamis_website_keeps_it(
+    script: Script, ui: Path, tmp_path: Path
+) -> None:
+    server = ThreadingHTTPServer(("127.0.0.1", 0), ReplayUmami)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    there = f"http://127.0.0.1:{server.server_address[1]}"
+    try:
+        for turned_on, keeps in ((False, True), (True, True), (True, False)):
+            ReplayUmami.keeps = keeps
+            named = replace(
+                with_portal(
+                    ui_dir=str(ui), replay=turned_on, **ANALYTICS, **{**UMAMI, "umami_url": there}
+                ),
+                database_url=f"sqlite+aiosqlite:///{tmp_path / f'{turned_on}-{keeps}.db'}",
+            )
+            with TestClient(app(script, named)) as client:
+                shown = client.get("/portalr/config.json").json()["replay"]
+                assert shown is (turned_on and keeps), (turned_on, keeps)
+                said = client.get("/portalr/v1/analytics/replay/consent", headers=bearer("alice"))
+                assert said.status_code == (200 if turned_on else 404)
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
 def test_without_a_database_there_is_no_relay(script: Script, ui: Path) -> None:
     with TestClient(app(script, with_portal(ui_dir=str(ui), **ANALYTICS))) as client:
         said = client.get("/portalr/v1/analytics/consent", headers=bearer("alice"))

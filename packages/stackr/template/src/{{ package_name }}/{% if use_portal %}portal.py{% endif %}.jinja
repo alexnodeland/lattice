@@ -31,7 +31,7 @@ from fastapi import APIRouter, FastAPI, HTTPException, Request, Response
 
 from grantr import Grants
 from portalr.analytics import InMemoryRateLimiter, Relay, SessionStamp, Umami
-from portalr.analytics.sql import SqlConsent
+from portalr.analytics.sql import SqlConsent, SqlReplayConsent
 from portalr.analytics.sql import migrate as migrate_consent
 from portalr.fastapi import UI, SandboxOrigin, Site, {% if use_tracker %}Surfaces, {% endif %}portalr_router
 from portalr.invites import Invite, InviteFailed, SupabaseInvite
@@ -362,11 +362,18 @@ class Portal:
         if tools.analytics is not None and self._database is not None:
             # Each replica counts a person's pace apart (lattice RFC-0008).
             consent = SqlConsent(self._database.engine, owner=self._database.owner)
+            # Session replay, only where PORTAL_REPLAY turns it on (portalr ADR-0077).
+            replay = (
+                SqlReplayConsent(self._database.engine, owner=self._database.owner)
+                if self._settings.portal.replay
+                else None
+            )
             relay = Relay(
                 tools.analytics,
                 consent,
                 InMemoryRateLimiter(),
                 umami=umami(self._settings, self._clients),
+                replay=replay,
             )
             self._relay = relay
             # A person removed from a tenant has their events there deleted (portalr ADR-0075).

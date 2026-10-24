@@ -363,3 +363,12 @@ test("Go to the question reaches a form the agent asks by its name too", async (
   await screen.getByRole("button", { name: "Go to the question" }).click();
   await expect.element(screen.getByRole("form", { name: "Dietary needs" })).toHaveFocus();
 });
+
+test("a thread marks itself, with its chat and its sharing, to be blocked whole from a session replay", async () => {
+  const { screen } = await open("/t/acme/w/notes/threads/thr_1", serve, () => null, {
+    artifactrLog: LOG,
+  });
+  const log = screen.getByRole("log", { name: "Messages" });
+  await expect.element(log.getByText("Planned for next week.")).toBeVisible();
+  expect(log.element().closest('[data-portalr-replay="block"]')).not.toBeNull();
+});

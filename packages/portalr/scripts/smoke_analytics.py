@@ -85,6 +85,26 @@ async def main() -> int:
         else:
             say(f"FAIL: portalr's adoption read of {tenant}: {adoption}")
             status = 1
+    # One person in both tenants, removed from a: their events in a go, and in b stay.
+    both = f"both-{secrets.token_hex(4)}"
+    for tenant in (a, b):
+        if not await analytics.capture(tenant, "member.invited.v1", both):
+            say(f"FAIL: portalr's analytics didn't record {both}'s event in {tenant}")
+            return 1
+    if not await analytics.forget_in(a, both, datetime.now(UTC)):
+        say(f"FAIL: portalr's analytics didn't delete a removed person's events in {a}")
+        return 1
+    left: dict[str, object] = {}
+    for tenant in (a, b):
+        read = await analytics.adoption(allowed(tenant), window)
+        active = read.data.active if isinstance(read, Ok) else None
+        left[tenant] = active.window if active is not None else read
+    # a had its own person and both, b its own and both: a's both is gone.
+    if left == {a: 1, b: 2}:
+        say(f"ok: a person removed from {a} has their events there deleted, and {b}'s kept")
+    else:
+        say(f"FAIL: after removing {both} from {a}, the people left were {left}")
+        status = 1
     # Forgetting a's person, as taking back their yes does: a's reads see nothing at once.
     if not await analytics.forget(f"{a}-person"):
         say("FAIL: portalr's analytics didn't delete a person's events")

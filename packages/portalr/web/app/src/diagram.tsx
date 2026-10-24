@@ -7,6 +7,7 @@
  */
 
 import {
+  AppHostContext,
   Button,
   capped,
   type Data,
@@ -15,9 +16,10 @@ import {
   Reading,
   type Renderer,
   retry,
+  ShownContext,
   useLoaded,
 } from "@portalr/ui";
-import { useId, useMemo, useRef, useState } from "react";
+import { use, useId, useMemo, useRef, useState } from "react";
 import { describe } from "./diagram-text";
 
 /** The canvas add-on, loaded the first time someone opens a canvas. */
@@ -55,6 +57,9 @@ function Opened({
   onClose: () => void;
 }) {
   const { module: canvas, failed, error } = useLoaded(loadCanvas);
+  // Which diagram, at which version, its page shows: what the canvas edits.
+  const shown = use(ShownContext);
+  const apps = use(AppHostContext);
   if (failed) {
     return (
       <div className="flex flex-col items-start gap-2">
@@ -73,6 +78,8 @@ function Opened({
       describedBy={about}
       finalFocus={opener}
       onClose={onClose}
+      shown={shown}
+      place={apps?.place ?? null}
     />
   );
 }

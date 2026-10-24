@@ -13,3 +13,19 @@
 .excalidraw .help-icon {
   display: none;
 }
+
+/* Nor, while editing, a way to give an element a link: its button and its editor (portalr
+   ADR-0074). Its shortcut is refused, and the canvas saves no link whatever is typed. */
+.excalidraw button[aria-label="Add link"],
+.excalidraw button[aria-label="Edit link"],
+.excalidraw .excalidraw-hyperlinkContainer {
+  display: none;
+}
+
+/* Nor its library, which browses and imports from libraries.excalidraw.com, nor its further tools:
+   an embedded page, Mermaid's converter, which only the diagrams worker runs, frames and the
+   laser. The canvas's own saving status sits where the library's button was. */
+.excalidraw .default-sidebar-trigger,
+.excalidraw .App-toolbar__extra-tools-trigger {
+  display: none;
+}

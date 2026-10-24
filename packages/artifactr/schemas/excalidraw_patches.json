@@ -1,0 +1,1192 @@
+{
+  "base": {
+    "name": "Plan",
+    "elements": {
+      "r1": {
+        "id": "r1",
+        "type": "rectangle",
+        "version": 1,
+        "versionNonce": 10,
+        "isDeleted": false,
+        "index": null,
+        "updated": null,
+        "x": 0,
+        "y": 0,
+        "width": 10,
+        "height": 10
+      },
+      "r2": {
+        "id": "r2",
+        "type": "rectangle",
+        "version": 1,
+        "versionNonce": 10,
+        "isDeleted": false,
+        "index": null,
+        "updated": null,
+        "x": 100,
+        "y": 0,
+        "width": 10,
+        "height": 10
+      },
+      "gone": {
+        "id": "gone",
+        "type": "rectangle",
+        "version": 3,
+        "versionNonce": 10,
+        "isDeleted": true,
+        "index": null,
+        "updated": null,
+        "x": 0,
+        "y": 0,
+        "width": 10,
+        "height": 10
+      },
+      "t1": {
+        "id": "t1",
+        "type": "text",
+        "version": 1,
+        "versionNonce": 10,
+        "isDeleted": false,
+        "index": null,
+        "updated": null,
+        "x": 0,
+        "y": 0,
+        "width": 10,
+        "height": 10,
+        "text": "Hi",
+        "containerId": "r1"
+      }
+    },
+    "files": {},
+    "scene": {
+      "view_background_color": "#ffffff",
+      "grid_size": null
+    }
+  },
+  "cases": [
+    {
+      "case": "nothing changed",
+      "elements": {
+        "r1": {
+          "id": "r1",
+          "type": "rectangle",
+          "version": 1,
+          "versionNonce": 10,
+          "isDeleted": false,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "r2": {
+          "id": "r2",
+          "type": "rectangle",
+          "version": 1,
+          "versionNonce": 10,
+          "isDeleted": false,
+          "x": 100,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "gone": {
+          "id": "gone",
+          "type": "rectangle",
+          "version": 3,
+          "versionNonce": 10,
+          "isDeleted": true,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "t1": {
+          "id": "t1",
+          "type": "text",
+          "version": 1,
+          "versionNonce": 10,
+          "isDeleted": false,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10,
+          "text": "Hi",
+          "containerId": "r1"
+        }
+      },
+      "files": {},
+      "ops": []
+    },
+    {
+      "case": "one moved, one added",
+      "elements": {
+        "r1": {
+          "id": "r1",
+          "type": "rectangle",
+          "version": 2,
+          "versionNonce": 11,
+          "isDeleted": false,
+          "x": 40,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "r2": {
+          "id": "r2",
+          "type": "rectangle",
+          "version": 1,
+          "versionNonce": 10,
+          "isDeleted": false,
+          "x": 100,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "gone": {
+          "id": "gone",
+          "type": "rectangle",
+          "version": 3,
+          "versionNonce": 10,
+          "isDeleted": true,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "t1": {
+          "id": "t1",
+          "type": "text",
+          "version": 1,
+          "versionNonce": 10,
+          "isDeleted": false,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10,
+          "text": "Hi",
+          "containerId": "r1"
+        },
+        "e1": {
+          "id": "e1",
+          "type": "ellipse",
+          "version": 1,
+          "versionNonce": 10,
+          "isDeleted": false,
+          "x": 300,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        }
+      },
+      "files": {},
+      "ops": [
+        {
+          "op": "test",
+          "path": "/elements/r1/version",
+          "value": 1
+        },
+        {
+          "op": "replace",
+          "path": "/elements/r1",
+          "value": {
+            "id": "r1",
+            "type": "rectangle",
+            "version": 2,
+            "versionNonce": 11,
+            "isDeleted": false,
+            "index": null,
+            "updated": null,
+            "x": 40,
+            "y": 0,
+            "width": 10,
+            "height": 10
+          }
+        },
+        {
+          "op": "add",
+          "path": "/elements/e1",
+          "value": {
+            "id": "e1",
+            "type": "ellipse",
+            "version": 1,
+            "versionNonce": 10,
+            "isDeleted": false,
+            "index": null,
+            "updated": null,
+            "x": 300,
+            "y": 0,
+            "width": 10,
+            "height": 10
+          }
+        }
+      ]
+    },
+    {
+      "case": "one deleted, its label with it, the rest as they were",
+      "elements": {
+        "r1": {
+          "id": "r1",
+          "type": "rectangle",
+          "version": 1,
+          "versionNonce": 10,
+          "isDeleted": false,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "r2": {
+          "id": "r2",
+          "type": "rectangle",
+          "version": 2,
+          "versionNonce": 7,
+          "isDeleted": true,
+          "x": 100,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "gone": {
+          "id": "gone",
+          "type": "rectangle",
+          "version": 3,
+          "versionNonce": 10,
+          "isDeleted": true,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "t1": {
+          "id": "t1",
+          "type": "text",
+          "version": 2,
+          "versionNonce": 8,
+          "isDeleted": true,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10,
+          "text": "Hi",
+          "containerId": "r1"
+        }
+      },
+      "files": {},
+      "ops": [
+        {
+          "op": "test",
+          "path": "/elements/r2/version",
+          "value": 1
+        },
+        {
+          "op": "replace",
+          "path": "/elements/r2",
+          "value": {
+            "id": "r2",
+            "type": "rectangle",
+            "version": 2,
+            "versionNonce": 7,
+            "isDeleted": true,
+            "index": null,
+            "updated": null,
+            "x": 100,
+            "y": 0,
+            "width": 10,
+            "height": 10
+          }
+        },
+        {
+          "op": "test",
+          "path": "/elements/t1/version",
+          "value": 1
+        },
+        {
+          "op": "replace",
+          "path": "/elements/t1",
+          "value": {
+            "id": "t1",
+            "type": "text",
+            "version": 2,
+            "versionNonce": 8,
+            "isDeleted": true,
+            "index": null,
+            "updated": null,
+            "x": 0,
+            "y": 0,
+            "width": 10,
+            "height": 10,
+            "text": "Hi",
+            "containerId": "r1"
+          }
+        }
+      ]
+    },
+    {
+      "case": "a label edited, and fields the base left out",
+      "elements": {
+        "r1": {
+          "id": "r1",
+          "type": "rectangle",
+          "version": 2,
+          "versionNonce": 3,
+          "isDeleted": false,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10,
+          "index": "a1",
+          "updated": 1792000000000
+        },
+        "r2": {
+          "id": "r2",
+          "type": "rectangle",
+          "version": 1,
+          "versionNonce": 10,
+          "isDeleted": false,
+          "x": 100,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "gone": {
+          "id": "gone",
+          "type": "rectangle",
+          "version": 3,
+          "versionNonce": 10,
+          "isDeleted": true,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "t1": {
+          "id": "t1",
+          "type": "text",
+          "version": 4,
+          "versionNonce": 9,
+          "isDeleted": false,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10,
+          "text": "Hello",
+          "containerId": "r1"
+        }
+      },
+      "files": {},
+      "ops": [
+        {
+          "op": "test",
+          "path": "/elements/r1/version",
+          "value": 1
+        },
+        {
+          "op": "replace",
+          "path": "/elements/r1",
+          "value": {
+            "id": "r1",
+            "type": "rectangle",
+            "version": 2,
+            "versionNonce": 3,
+            "isDeleted": false,
+            "index": "a1",
+            "updated": 1792000000000,
+            "x": 0,
+            "y": 0,
+            "width": 10,
+            "height": 10
+          }
+        },
+        {
+          "op": "test",
+          "path": "/elements/t1/version",
+          "value": 1
+        },
+        {
+          "op": "replace",
+          "path": "/elements/t1",
+          "value": {
+            "id": "t1",
+            "type": "text",
+            "version": 4,
+            "versionNonce": 9,
+            "isDeleted": false,
+            "index": null,
+            "updated": null,
+            "x": 0,
+            "y": 0,
+            "width": 10,
+            "height": 10,
+            "text": "Hello",
+            "containerId": "r1"
+          }
+        }
+      ]
+    },
+    {
+      "case": "an image put on it, its file added",
+      "elements": {
+        "r1": {
+          "id": "r1",
+          "type": "rectangle",
+          "version": 1,
+          "versionNonce": 10,
+          "isDeleted": false,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "r2": {
+          "id": "r2",
+          "type": "rectangle",
+          "version": 1,
+          "versionNonce": 10,
+          "isDeleted": false,
+          "x": 100,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "gone": {
+          "id": "gone",
+          "type": "rectangle",
+          "version": 3,
+          "versionNonce": 10,
+          "isDeleted": true,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "t1": {
+          "id": "t1",
+          "type": "text",
+          "version": 1,
+          "versionNonce": 10,
+          "isDeleted": false,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10,
+          "text": "Hi",
+          "containerId": "r1"
+        },
+        "p1": {
+          "id": "p1",
+          "type": "image",
+          "version": 1,
+          "versionNonce": 10,
+          "isDeleted": false,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10,
+          "fileId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "status": "saved"
+        }
+      },
+      "files": {
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": {
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "size": 68,
+          "media_type": "image/png"
+        }
+      },
+      "ops": [
+        {
+          "op": "add",
+          "path": "/elements/p1",
+          "value": {
+            "id": "p1",
+            "type": "image",
+            "version": 1,
+            "versionNonce": 10,
+            "isDeleted": false,
+            "index": null,
+            "updated": null,
+            "x": 0,
+            "y": 0,
+            "width": 10,
+            "height": 10,
+            "fileId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "saved"
+          }
+        },
+        {
+          "op": "add",
+          "path": "/files/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "value": {
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "size": 68,
+            "media_type": "image/png"
+          }
+        }
+      ]
+    },
+    {
+      "case": "an element the edit leaves out is kept",
+      "elements": {
+        "r1": {
+          "id": "r1",
+          "type": "rectangle",
+          "version": 1,
+          "versionNonce": 10,
+          "isDeleted": false,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        }
+      },
+      "files": {},
+      "ops": []
+    }
+  ],
+  "rebases": [
+    {
+      "case": "a change the head didn't touch, and a new element, kept as they are",
+      "local": {
+        "r1": {
+          "id": "r1",
+          "type": "rectangle",
+          "version": 2,
+          "versionNonce": 11,
+          "isDeleted": false,
+          "x": 40,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "r2": {
+          "id": "r2",
+          "type": "rectangle",
+          "version": 1,
+          "versionNonce": 10,
+          "isDeleted": false,
+          "x": 100,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "gone": {
+          "id": "gone",
+          "type": "rectangle",
+          "version": 3,
+          "versionNonce": 10,
+          "isDeleted": true,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "t1": {
+          "id": "t1",
+          "type": "text",
+          "version": 1,
+          "versionNonce": 10,
+          "isDeleted": false,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10,
+          "text": "Hi",
+          "containerId": "r1"
+        },
+        "n1": {
+          "id": "n1",
+          "type": "rectangle",
+          "version": 1,
+          "versionNonce": 10,
+          "isDeleted": false,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        }
+      },
+      "head": {
+        "r1": {
+          "id": "r1",
+          "type": "rectangle",
+          "version": 1,
+          "versionNonce": 10,
+          "isDeleted": false,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "r2": {
+          "id": "r2",
+          "type": "rectangle",
+          "version": 2,
+          "versionNonce": 5,
+          "isDeleted": false,
+          "x": 100,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "gone": {
+          "id": "gone",
+          "type": "rectangle",
+          "version": 3,
+          "versionNonce": 10,
+          "isDeleted": true,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "t1": {
+          "id": "t1",
+          "type": "text",
+          "version": 1,
+          "versionNonce": 10,
+          "isDeleted": false,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10,
+          "text": "Hi",
+          "containerId": "r1"
+        }
+      },
+      "rebased": {
+        "r1": {
+          "id": "r1",
+          "type": "rectangle",
+          "version": 2,
+          "versionNonce": "new",
+          "isDeleted": false,
+          "index": null,
+          "updated": null,
+          "x": 40,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "r2": {
+          "id": "r2",
+          "type": "rectangle",
+          "version": 2,
+          "versionNonce": 5,
+          "isDeleted": false,
+          "index": null,
+          "updated": null,
+          "x": 100,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "gone": {
+          "id": "gone",
+          "type": "rectangle",
+          "version": 3,
+          "versionNonce": 10,
+          "isDeleted": true,
+          "index": null,
+          "updated": null,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "t1": {
+          "id": "t1",
+          "type": "text",
+          "version": 1,
+          "versionNonce": 10,
+          "isDeleted": false,
+          "index": null,
+          "updated": null,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10,
+          "text": "Hi",
+          "containerId": "r1"
+        },
+        "n1": {
+          "id": "n1",
+          "type": "rectangle",
+          "version": 1,
+          "versionNonce": 10,
+          "isDeleted": false,
+          "index": null,
+          "updated": null,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        }
+      }
+    },
+    {
+      "case": "a change that wins over the head's goes above it, with a new nonce",
+      "local": {
+        "r1": {
+          "id": "r1",
+          "type": "rectangle",
+          "version": 3,
+          "versionNonce": 11,
+          "isDeleted": false,
+          "x": 40,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "r2": {
+          "id": "r2",
+          "type": "rectangle",
+          "version": 1,
+          "versionNonce": 10,
+          "isDeleted": false,
+          "x": 100,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "gone": {
+          "id": "gone",
+          "type": "rectangle",
+          "version": 3,
+          "versionNonce": 10,
+          "isDeleted": true,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "t1": {
+          "id": "t1",
+          "type": "text",
+          "version": 1,
+          "versionNonce": 10,
+          "isDeleted": false,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10,
+          "text": "Hi",
+          "containerId": "r1"
+        }
+      },
+      "head": {
+        "r1": {
+          "id": "r1",
+          "type": "rectangle",
+          "version": 2,
+          "versionNonce": 5,
+          "isDeleted": false,
+          "x": 70,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "r2": {
+          "id": "r2",
+          "type": "rectangle",
+          "version": 1,
+          "versionNonce": 10,
+          "isDeleted": false,
+          "x": 100,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "gone": {
+          "id": "gone",
+          "type": "rectangle",
+          "version": 3,
+          "versionNonce": 10,
+          "isDeleted": true,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "t1": {
+          "id": "t1",
+          "type": "text",
+          "version": 1,
+          "versionNonce": 10,
+          "isDeleted": false,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10,
+          "text": "Hi",
+          "containerId": "r1"
+        }
+      },
+      "rebased": {
+        "r1": {
+          "id": "r1",
+          "type": "rectangle",
+          "version": 3,
+          "versionNonce": "new",
+          "isDeleted": false,
+          "index": null,
+          "updated": null,
+          "x": 40,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "r2": {
+          "id": "r2",
+          "type": "rectangle",
+          "version": 1,
+          "versionNonce": 10,
+          "isDeleted": false,
+          "index": null,
+          "updated": null,
+          "x": 100,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "gone": {
+          "id": "gone",
+          "type": "rectangle",
+          "version": 3,
+          "versionNonce": 10,
+          "isDeleted": true,
+          "index": null,
+          "updated": null,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "t1": {
+          "id": "t1",
+          "type": "text",
+          "version": 1,
+          "versionNonce": 10,
+          "isDeleted": false,
+          "index": null,
+          "updated": null,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10,
+          "text": "Hi",
+          "containerId": "r1"
+        }
+      }
+    },
+    {
+      "case": "of one version, the lower nonce wins",
+      "local": {
+        "r1": {
+          "id": "r1",
+          "type": "rectangle",
+          "version": 2,
+          "versionNonce": 4,
+          "isDeleted": false,
+          "x": 40,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "r2": {
+          "id": "r2",
+          "type": "rectangle",
+          "version": 2,
+          "versionNonce": 9,
+          "isDeleted": false,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "gone": {
+          "id": "gone",
+          "type": "rectangle",
+          "version": 3,
+          "versionNonce": 10,
+          "isDeleted": true,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "t1": {
+          "id": "t1",
+          "type": "text",
+          "version": 1,
+          "versionNonce": 10,
+          "isDeleted": false,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10,
+          "text": "Hi",
+          "containerId": "r1"
+        }
+      },
+      "head": {
+        "r1": {
+          "id": "r1",
+          "type": "rectangle",
+          "version": 2,
+          "versionNonce": 5,
+          "isDeleted": false,
+          "x": 70,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "r2": {
+          "id": "r2",
+          "type": "rectangle",
+          "version": 2,
+          "versionNonce": 6,
+          "isDeleted": false,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "gone": {
+          "id": "gone",
+          "type": "rectangle",
+          "version": 3,
+          "versionNonce": 10,
+          "isDeleted": true,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "t1": {
+          "id": "t1",
+          "type": "text",
+          "version": 1,
+          "versionNonce": 10,
+          "isDeleted": false,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10,
+          "text": "Hi",
+          "containerId": "r1"
+        }
+      },
+      "rebased": {
+        "r1": {
+          "id": "r1",
+          "type": "rectangle",
+          "version": 3,
+          "versionNonce": "new",
+          "isDeleted": false,
+          "index": null,
+          "updated": null,
+          "x": 40,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "r2": {
+          "id": "r2",
+          "type": "rectangle",
+          "version": 2,
+          "versionNonce": 6,
+          "isDeleted": false,
+          "index": null,
+          "updated": null,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "gone": {
+          "id": "gone",
+          "type": "rectangle",
+          "version": 3,
+          "versionNonce": 10,
+          "isDeleted": true,
+          "index": null,
+          "updated": null,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "t1": {
+          "id": "t1",
+          "type": "text",
+          "version": 1,
+          "versionNonce": 10,
+          "isDeleted": false,
+          "index": null,
+          "updated": null,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10,
+          "text": "Hi",
+          "containerId": "r1"
+        }
+      }
+    },
+    {
+      "case": "an element the writer left as it was takes the head's",
+      "local": {
+        "r1": {
+          "id": "r1",
+          "type": "rectangle",
+          "version": 1,
+          "versionNonce": 10,
+          "isDeleted": false,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "r2": {
+          "id": "r2",
+          "type": "rectangle",
+          "version": 1,
+          "versionNonce": 10,
+          "isDeleted": false,
+          "x": 100,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "gone": {
+          "id": "gone",
+          "type": "rectangle",
+          "version": 3,
+          "versionNonce": 10,
+          "isDeleted": true,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "t1": {
+          "id": "t1",
+          "type": "text",
+          "version": 1,
+          "versionNonce": 10,
+          "isDeleted": false,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10,
+          "text": "Hi",
+          "containerId": "r1"
+        }
+      },
+      "head": {
+        "r1": {
+          "id": "r1",
+          "type": "rectangle",
+          "version": 1,
+          "versionNonce": 10,
+          "isDeleted": false,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "r2": {
+          "id": "r2",
+          "type": "rectangle",
+          "version": 1,
+          "versionNonce": 10,
+          "isDeleted": false,
+          "x": 100,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "gone": {
+          "id": "gone",
+          "type": "rectangle",
+          "version": 4,
+          "versionNonce": 2,
+          "isDeleted": false,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "t1": {
+          "id": "t1",
+          "type": "text",
+          "version": 1,
+          "versionNonce": 10,
+          "isDeleted": false,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10,
+          "text": "Hi",
+          "containerId": "r1"
+        }
+      },
+      "rebased": {
+        "r1": {
+          "id": "r1",
+          "type": "rectangle",
+          "version": 1,
+          "versionNonce": 10,
+          "isDeleted": false,
+          "index": null,
+          "updated": null,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "r2": {
+          "id": "r2",
+          "type": "rectangle",
+          "version": 1,
+          "versionNonce": 10,
+          "isDeleted": false,
+          "index": null,
+          "updated": null,
+          "x": 100,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "gone": {
+          "id": "gone",
+          "type": "rectangle",
+          "version": 4,
+          "versionNonce": 2,
+          "isDeleted": false,
+          "index": null,
+          "updated": null,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10
+        },
+        "t1": {
+          "id": "t1",
+          "type": "text",
+          "version": 1,
+          "versionNonce": 10,
+          "isDeleted": false,
+          "index": null,
+          "updated": null,
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 10,
+          "text": "Hi",
+          "containerId": "r1"
+        }
+      }
+    }
+  ]
+}

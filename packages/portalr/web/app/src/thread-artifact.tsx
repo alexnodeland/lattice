@@ -58,7 +58,7 @@ export function ThreadArtifact({
   me: string;
 }) {
   const { queries } = context;
-  const apps = useAppHost(context.config);
+  const apps = useAppHost(context, tenant, workspace);
   const forms = useFormHost({ queries, tenant, workspace, me, renderers: RENDERERS });
   const read = useQuery(queries.artifactr.revisions(tenant, workspace, artifact.id));
   const latest = read.data?.reduce<NonNullable<typeof read.data>[number] | undefined>(

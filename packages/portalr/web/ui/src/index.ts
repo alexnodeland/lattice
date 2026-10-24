@@ -26,6 +26,8 @@ export {
   type Renderers,
   type RevisionPart,
   rendererFor,
+  type Shown,
+  ShownContext,
 } from "./artifacts";
 export { Badge } from "./badge";
 export { type Brand, BrandContext, brandName, pageTitle, useBrand, useUiName } from "./brand";

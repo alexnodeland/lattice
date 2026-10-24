@@ -42,6 +42,8 @@ import reflexr
 import reflexr.core
 import reflexr.fastapi
 import reflexr.otel
+from artifactr.excalidraw.fastapi import diagrams_router
+from artifactr.files.blobs import InMemoryBlobs
 from artifactr.files.fastapi import files_router
 from artifactr.workspace import ACTIONS as ARTIFACTR_ACTIONS
 from grantr.core import Resource, User
@@ -218,7 +220,9 @@ def create_app(ui: Path = UI) -> FastAPI:
         catalogs=[ACTIONS, ARTIFACTR_ACTIONS, REFLEXR_ACTIONS],
         application=APPLICATION,
     )
-    workspaces, runner, files = collaboration(grants)
+    # Native files' bytes, and the images people put on diagrams, in one store.
+    blobs = InMemoryBlobs()
+    workspaces, runner, files = collaboration(grants, blobs)
     tracking = Tracking()
     tickets, reactor = automation(grants, APPLICATION, tracking)
     gotrue = os.environ.get("PORTALR_GOTRUE_URL", "http://gotrue:9999")
@@ -274,6 +278,21 @@ def create_app(ui: Path = UI) -> FastAPI:
                 artifactr.fastapi.Unauthorized,
                 artifactr.core.Forbidden,
             ),
+        ),
+        prefix="/artifactr/v1",
+    )
+    # A diagram's images, put on its canvas by a person, beside artifactr's routes too.
+    app.include_router(
+        diagrams_router(
+            workspaces,
+            blobs,
+            resolve_actor=library_actor(
+                grants,
+                lambda user: artifactr.UserActor(id=user, name=user),
+                artifactr.fastapi.Unauthorized,
+                artifactr.core.Forbidden,
+            ),
+            integrations=grants,
         ),
         prefix="/artifactr/v1",
     )

@@ -81,3 +81,15 @@ def test_the_application_starts_with_diagrams_on(script: Script) -> None:
     config = replace(settings(), files=ON)
     with TestClient(app(script, config, workers=worker([])), headers=bearer()) as client:
         assert client.get("/healthz").status_code == 200
+
+
+def test_a_diagrams_images_have_their_routes(script: Script) -> None:
+    # A person's image is put on a diagram's canvas through its own route, worker or none; one
+    # put on no diagram the workspace holds is refused as not found.
+    with TestClient(app(script, settings()), headers=bearer()) as client:
+        refused = client.post(
+            "/artifactr/v1/workspaces/w1/diagrams/d1/images",
+            content=b"\x89PNG\r\n\x1a\n",
+            headers={"Content-Type": "image/png"},
+        )
+    assert refused.status_code == 404, refused.text

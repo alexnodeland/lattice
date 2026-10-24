@@ -33,12 +33,58 @@ const SHARED = /^(react|react-dom|scheduler)([\\/]|$)/;
 const REFUSED = "\0excalidraw-refused";
 const EMPTY = "\0excalidraw-empty";
 const IN_EXCALIDRAW = /[\\/]@excalidraw[\\/]excalidraw[\\/]dist[\\/]/;
-/**
- * What the canvas never runs: subsetting, Mermaid's converter, and the resizing of an image put on
- * it, pica's and image-blob-reduce's, as the canvas takes no image yet.
- */
+/** What the canvas never runs: subsetting, and Mermaid's converter. */
 const NEVER =
-  /(?:^|[\\/])subset-(?:shared|worker)\.chunk\.js$|^@excalidraw\/mermaid-to-excalidraw$|^pica$|^image-blob-reduce$/;
+  /(?:^|[\\/])subset-(?:shared|worker)\.chunk\.js$|^@excalidraw\/mermaid-to-excalidraw$/;
+
+/**
+ * pica and image-blob-reduce, which shrink an image put on the canvas, stood in for by a canvas's
+ * own drawing: no WebAssembly, no worker from a `blob:` URL, and none of their `require`s, which
+ * would put the bundler's helper in the runtime every chunk shares (portalr ADR-0074).
+ */
+const SHRINK = "\0excalidraw-shrink";
+const PICA = "\0excalidraw-pica";
+const SHRINKING = /^(pica|image-blob-reduce)$/;
+
+/** The stand-in for pica: an image drawn on a canvas, as a blob of its type. */
+const PICA_SOURCE = `export default function pica() {
+  return {
+    toBlob: (canvas, type, quality) =>
+      new Promise((done, failed) =>
+        canvas.toBlob(
+          (blob) => (blob ? done(blob) : failed(new Error("the image couldn't be drawn"))),
+          type,
+          quality,
+        ),
+      ),
+  };
+}
+`;
+
+/** The stand-in for image-blob-reduce: an image drawn again, at most \`max\` pixels a side. */
+const SHRINK_SOURCE = `export default function reduce({ pica }) {
+  return {
+    pica,
+    _create_blob(env) {
+      return this.pica.toBlob(env.out_canvas, env.type, 0.92).then((blob) => {
+        env.out_blob = blob;
+        return env;
+      });
+    },
+    async toBlob(file, { max }) {
+      const image = await createImageBitmap(file);
+      const scale = Math.min(1, max / Math.max(image.width, image.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(image.width * scale));
+      canvas.height = Math.max(1, Math.round(image.height * scale));
+      canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+      image.close();
+      const env = await this._create_blob({ out_canvas: canvas, type: file.type });
+      return env.out_blob;
+    },
+  };
+}
+`;
 /** A locale but English. */
 const LOCALE = /(?:^|[\\/])locales[\\/](?!en-[A-Z0-9]+\.js$)[^\\/]+\.js$/;
 /**
@@ -80,6 +126,9 @@ export function excalidraw(base: string): Plugin {
       const owned = importer.endsWith(OWN) || IN_EXCALIDRAW.test(importer);
       if (!owned) return null;
       if (IN_EXCALIDRAW.test(importer) && NEVER.test(source)) return REFUSED;
+      if (IN_EXCALIDRAW.test(importer) && SHRINKING.test(source)) {
+        return source === "pica" ? PICA : SHRINK;
+      }
       if (IN_EXCALIDRAW.test(importer) && LOCALE.test(source)) return EMPTY;
       if (SHARED.test(source) || source.startsWith("\0")) return null;
       const resolved = await this.resolve(source, importer, { ...options, skipSelf: true });
@@ -95,6 +144,8 @@ export function excalidraw(base: string): Plugin {
         return 'throw new Error("not in portalr: the diagrams worker draws this (artifactr ADR-0088)");';
       }
       if (id === EMPTY) return "export default {};";
+      if (id === PICA) return PICA_SOURCE;
+      if (id === SHRINK) return SHRINK_SOURCE;
       return null;
     },
     transform(code, id) {

@@ -7,7 +7,9 @@
  * switched so and the rest their defaults, and on the root `data-drawn` once it is whole, or
  * `data-error` if it stopped; `?dashboard` the dashboard gallery; `?eval` an evaluated string; and
  * `?app=` a mini app of that HTML, run in the sandbox at `&apps=` (portalr ADR-0051); and `?diagram`
- * the app's card of a diagram, whose canvas the test opens (portalr ADR-0072).
+ * the app's card of a diagram, whose canvas the test opens (portalr ADR-0072); `?diagram=edit`
+ * one the test may edit, through a host of the page's own, which keeps what it is sent on
+ * `window.canvasSent` (portalr ADR-0074).
  */
 
 import type { IntegrationKey } from "@portalr/client";
@@ -16,8 +18,10 @@ import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 // The app's diagram card and its canvas add-on, built as app's build builds them (portalr ADR-0072).
 import { diagram } from "../../app/src/diagram";
+import { type CanvasHost, CanvasHostContext } from "../../app/src/on-demand/canvas-host";
 import { AppHostContext, DashboardView, IntegrationsContext, Markdown } from "../src";
 import { AppFrame } from "../src/app-frame";
+import { ShownContext } from "../src/artifacts";
 import { byDefault } from "../src/integrations";
 import { SUPPORT } from "../src/test/dashboards";
 import SAMPLE from "./diagram.json";
@@ -168,11 +172,63 @@ const BROKEN = {
   files: {},
 };
 
-const DIAGRAMS: Record<string, object> = { "": SAMPLE, hostile: HOSTILE, broken: BROKEN };
+const DIAGRAMS: Record<string, object> = {
+  "": SAMPLE,
+  edit: SAMPLE,
+  hostile: HOSTILE,
+  broken: BROKEN,
+};
+
+declare global {
+  interface Window {
+    canvasSent: { commits: unknown[]; uploads: string[] };
+  }
+}
+
+/** A host that keeps what it is sent: each edit applied, each image kept by its digest. */
+function keeping(): CanvasHost {
+  const images = new Map<string, Blob>();
+  let version = 1;
+  window.canvasSent = { commits: [], uploads: [] };
+  return {
+    async commit(_, edit) {
+      window.canvasSent.commits.push(edit);
+      version = edit.baseVersion + 1;
+      return { outcome: "applied", version };
+    },
+    head: async () => null,
+    async upload(_, image) {
+      const digest = [
+        ...new Uint8Array(await crypto.subtle.digest("SHA-256", await image.arrayBuffer())),
+      ]
+        .map((byte) => byte.toString(16).padStart(2, "0"))
+        .join("");
+      images.set(digest, image);
+      window.canvasSent.uploads.push(image.type);
+      return {
+        outcome: "done",
+        result: { sha256: digest, size: image.size, media_type: image.type },
+      };
+    },
+    read: async (_, sha256) => images.get(sha256) ?? null,
+    mayEdit: async () => true,
+  };
+}
 
 const drawing = asked.get("diagram");
 if (drawing !== null) {
   // A diagram as the diagrams worker draws one from Mermaid, its first label holding markup; or
   // one written by a hostile hand; or one that can't be drawn as given.
-  flushSync(() => root.render(diagram.render((DIAGRAMS[drawing] ?? SAMPLE) as never)));
+  const card = diagram.render((DIAGRAMS[drawing] ?? SAMPLE) as never);
+  flushSync(() =>
+    root.render(
+      drawing === "edit" ? (
+        <ShownContext value={{ id: "d1", version: 1 }}>
+          <CanvasHostContext value={keeping()}>{card}</CanvasHostContext>
+        </ShownContext>
+      ) : (
+        card
+      ),
+    ),
+  );
 }

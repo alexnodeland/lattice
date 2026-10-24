@@ -246,6 +246,9 @@ class Links(BaseModel):
     grafana_logs: str | None = None
     grafana_tenant_logs: str | None = None
     grafana_tenant_traces: str | None = None
+    umami_journeys: str | None = None
+    """portalr's website in Umami, every tenant's journeys: made with a tenant's id, as the
+    other links for a tenant are, though Umami isn't split by tenant."""
 
 
 REFUSALS: Final = refusals(400, 401, 403, 422)
@@ -483,7 +486,7 @@ def portalr_router(
         tenant_id: TenantId | None = None,
         by: Subject = operating,
     ) -> Links:
-        """Deep links into Langfuse and Grafana, which aren't tenant-scoped, for operators.
+        """Deep links into Langfuse, Grafana and Umami, which aren't tenant-scoped, for operators.
 
         What those tools show isn't behind portalr's gates, so each call that makes a link is
         recorded: who, the kinds of id, and the tenant's id if one was asked for, never a trace's,
@@ -507,6 +510,7 @@ def portalr_router(
             grafana_tenant_traces=grafana.tenant_traces_link(tenant_id)
             if grafana and tenant_id
             else None,
+            umami_journeys=readers.umami.website_link() if readers.umami and tenant_id else None,
         )
         kinds = [
             kind
@@ -520,7 +524,7 @@ def portalr_router(
         ]
         # A record is of links made: of the tools that have one; with none, nothing is recorded.
         linked = {name.partition("_")[0] for name, value in made if value is not None}
-        tools = [tool for tool in ("langfuse", "grafana") if tool in linked]
+        tools = [tool for tool in ("langfuse", "grafana", "umami") if tool in linked]
         if kinds and tools:
             record_links(by, kinds=kinds, tenant=tenant_id, tools=tools)
         return made

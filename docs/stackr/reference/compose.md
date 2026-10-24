@@ -16,6 +16,8 @@
 | `clickhouse` | `clickhouse` | no |
 | `analytics` | `clickhouse` | no |
 | `analytics-init` | `clickhouse`, `clickhouse-init` | no |
+| `umami` | `umami`, `umami-db-init` | no |
+| `umami-init` | `umami`, `umami-db-init`, `umami-init` | no |
 | `smoke` | `telemetrygen`, `probe` | no |
 
 <!-- end generated -->
@@ -28,8 +30,11 @@
 
 | Network | Created | Joined by |
 |---|---|---|
-| `stackr` | by Compose | `otel-collector`, `tempo`, `prometheus`, `prom-label-proxy`, `loki`, `pyroscope`, `grafana`, `postgres`, `db-init`, `gotrue`, `redis`, `minio`, `clickhouse`, `clickhouse-init`, `langfuse-worker`, `langfuse-web`, `litellm`, `telemetrygen`, `probe` |
+| `stackr` | by Compose | `otel-collector`, `tempo`, `prometheus`, `prom-label-proxy`, `loki`, `pyroscope`, `grafana`, `postgres`, `db-init`, `gotrue`, `redis`, `minio`, `clickhouse`, `clickhouse-init`, `umami-db-init`, `langfuse-worker`, `langfuse-web`, `litellm`, `telemetrygen`, `probe` |
 | `supabase_network_stackr-supabase` | by `make up`, if missing | `db-init`, `langfuse-worker`, `langfuse-web`, `litellm`, `probe` |
+| `stackr-umami` | by `make up`, if missing | `umami`, `umami-init` |
+| `umami-db` | by Compose | `postgres`, `umami` |
+| `umami-ui` | by Compose | `umami` |
 
 <!-- end generated -->
 
@@ -201,7 +206,7 @@ Plain PostgreSQL, the alternative database adapter, used when STACKR_DATABASE is
 | Profiles | `postgres` |
 | Image | `postgres`, pinned by tag and digest in `compose.yaml` |
 | Published ports | 55432 (`POSTGRES_PORT`) → 5432 |
-| Networks | `stackr` |
+| Networks | `stackr`, `umami-db` |
 | Volumes | `postgres-data` → `/var/lib/postgresql/data` |
 | Depends on | none |
 | Health check | `pg_isready -U "$POSTGRES_USER" -d postgres`, every 3s |
@@ -378,6 +383,81 @@ Makes portalr's analytics database and its events table, with the deployment's r
     |---|---|
     | `CLICKHOUSE_PASSWORD` | `${CLICKHOUSE_ADMIN_PASSWORD:?run make env}` |
     | `ANALYTICS_RETENTION_DAYS` | `${ANALYTICS_RETENTION_DAYS:-395}` |
+
+### `umami`
+
+Umami, operators' journeys: portalr's relay sends it a copy of consented events, on a network only the application joins. On the postgres adapter alone. Its port, on 127.0.0.1 alone, is its UI's and its ingest's too: anything on this machine may post events to it (ADR-0050).
+
+| Property | Value |
+|---|---|
+| Profiles | `umami`, `umami-init` |
+| Image | `ghcr.io/umami-software/umami`, pinned by tag and digest in `compose.yaml` |
+| Published ports | 3400 (`UMAMI_PORT`) on 127.0.0.1 only → 3000 |
+| Networks | `stackr-umami`, `umami-db`, `umami-ui` |
+| Volumes | none |
+| Depends on | `umami-db-init` (completed) |
+| Health check | `wget -q -O /dev/null http://127.0.0.1:3000/api/heartbeat`, every 5s |
+| Restart | `unless-stopped` |
+
+??? note "Environment"
+
+    | Variable | Value |
+    |---|---|
+    | `DATABASE_URL` | `postgresql://umami:${UMAMI_DB_PASSWORD:?run make env}@postgres:5432/umami?schema=umami` |
+    | `APP_SECRET` | `${UMAMI_APP_SECRET:?run make env}` |
+    | `DISABLE_TELEMETRY` | `1` |
+    | `DISABLE_UPDATES` | `1` |
+    | `DISABLE_BOT_CHECK` | `1` |
+
+### `umami-db-init`
+
+Makes Umami's role and database on plain PostgreSQL, with the umami profile alone, then exits.
+
+| Property | Value |
+|---|---|
+| Profiles | `umami`, `umami-init` |
+| Image | `postgres`, pinned by tag and digest in `compose.yaml` |
+| Published ports | none |
+| Networks | `stackr` |
+| Volumes | `./deploy/postgres/umami.sql` → `/umami.sql` (read-only) |
+| Depends on | `postgres` (healthy, when it runs) |
+| Runs | `psql --no-psqlrc --quiet --file=/umami.sql` |
+| Restart | `no` |
+
+??? note "Environment"
+
+    | Variable | Value |
+    |---|---|
+    | `PGHOST` | `postgres` |
+    | `PGPORT` | `5432` |
+    | `PGDATABASE` | `postgres` |
+    | `PGUSER` | `postgres` |
+    | `PGPASSWORD` | `${POSTGRES_ADMIN_PASSWORD:?run make env}` |
+    | `PGCONNECT_TIMEOUT` | `10` |
+    | `UMAMI_DB_PASSWORD` | `${UMAMI_DB_PASSWORD:?run make env}` |
+
+### `umami-init`
+
+Sets Umami's admin password, and makes portalr's user and website, each time `make up` starts the umami profile, then exits.
+
+| Property | Value |
+|---|---|
+| Profiles | `umami-init` |
+| Image | `curlimages/curl`, pinned by tag and digest in `compose.yaml` |
+| Published ports | none |
+| Networks | `stackr-umami` |
+| Volumes | `./deploy/umami/init` → `/init` (read-only) |
+| Depends on | `umami` (healthy) |
+| Runs | `sh /init` |
+| Restart | `no` |
+
+??? note "Environment"
+
+    | Variable | Value |
+    |---|---|
+    | `UMAMI_ADMIN_PASSWORD` | `${UMAMI_ADMIN_PASSWORD:?run make env}` |
+    | `UMAMI_PORTALR_PASSWORD` | `${UMAMI_PORTALR_PASSWORD:?run make env}` |
+    | `UMAMI_WEBSITE_ID` | `${UMAMI_WEBSITE_ID:?run make env}` |
 
 ### `langfuse-worker`
 

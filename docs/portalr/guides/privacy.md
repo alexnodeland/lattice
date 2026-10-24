@@ -78,6 +78,7 @@ Where the deployment runs product analytics (lattice RFC-0008), the app's accoun
 - **What is never collected:** messages, artifacts, file names, emails, search text, or any other content.
 - **Where it goes:** to portalr's relay on the app's own origin, then to ClickHouse's `analytics` database in the deployment's own stack. Each tenant reads only its own events.
 - **Turning it off** deletes everything the person shared, at once. If ClickHouse can't take the deletion just then, it stays owed, the menu says so ("Deleting what you shared hasn't finished yet. It will be retried until it is done."), and portalr tries again until it is done. Anything waiting in the browser to be sent is dropped as the person says no. A backup taken before then keeps the events until the backups expire.
+- **Umami**, where a deployment runs stackr's `umami` profile, gets a copy of each event the person shared, for operators' journeys: from portalr's own address and agent, never the person's, with the person as a hash of their tenant and their keyed hash. Turning sharing off deletes their sessions there too, and portalr retries until both are done ([ADR-0076](../adr/0076-the-relay-sends-umami-a-copy-and-deletes-there-too.md)).
 - **How long it is kept:** 395 days unless the operator sets otherwise.
 
 ## Where the gate stops

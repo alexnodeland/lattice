@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Check what `make up` refuses, and the gateway's model groups' check, without starting anything:
 # scripts/binding-probe against a fake `docker` for each shape an engine publishes in, the
-# STACKR_GATEWAY_MODELS guard, and scripts/check-config's hold on deploy/litellm/groups/
+# STACKR_GATEWAY_MODELS guard, the umami profile's adapter (ADR-0050), and scripts/check-config's hold on deploy/litellm/groups/
 # (ADR-0045). scripts/validate runs it.
 
 set -euo pipefail
@@ -50,6 +50,23 @@ check "make takes upstream with them" quietly make --no-print-directory -n help 
   STACKR_GATEWAY_MODELS=upstream STACKR_UPSTREAM_URL=http://gateway/v1 \
   STACKR_UPSTREAM_DEFAULT_MODEL=big STACKR_UPSTREAM_FAST_MODEL=small
 
+check "make refuses the umami profile beside local Supabase" \
+  refused make --no-print-directory -n up STACKR_DATABASE=supabase PROFILES=umami
+check "and says why" said "the umami profile is for the postgres adapter"
+make --no-print-directory -n up STACKR_DATABASE=postgres PROFILES=umami >"$scratch/out" 2>&1 || true
+check "make starts plain PostgreSQL with the umami profile alone" said "profile postgres"
+
+# make up refuses a stackr-umami that isn't internal: a docker that says the network exists,
+# and isn't (FAKE_INTERNAL), and fails anything else.
+cat >"$scratch/bin/docker" <<'FAKE'
+#!/usr/bin/env bash
+if [[ $1 == network && $2 == inspect && $* == *Internal* ]]; then echo "$FAKE_INTERNAL"; exit 0; fi
+exit 1
+FAKE
+check "make up refuses a stackr-umami that isn't internal" \
+  refused env PATH="$scratch/bin:$PATH" FAKE_INTERNAL=false make --no-print-directory up STACKR_DATABASE=postgres PROFILES=umami
+check "and says how to fix it" said "stackr-umami isn't internal"
+
 # check-config on a copy whose config.yaml includes no groups, or whose groups lack `fast`.
 copy() {
   rm -rf "$scratch/stack" && mkdir -p "$scratch/stack/scripts" "$scratch/stack/deploy"
@@ -64,5 +81,12 @@ check "check-config refuses groups without fast" refused uv run "$scratch/stack/
 check "and names the file" said "groups/upstream.yaml doesn't define both default and fast"
 copy
 check "check-config passes the groups as they are" uv run "$scratch/stack/scripts/check-config" litellm
+
+# check-config aws on a copy of the AWS recipe that names Umami, which it must not run (ADR-0050).
+copy && cp -R deploy/aws deploy/host deploy/prometheus "$scratch/stack/deploy/"
+echo '# umami: http://umami:3000' >>"$scratch/stack/deploy/aws/modules/stack/locals.tf"
+check "check-config refuses the AWS recipe with Umami in it" \
+  refused uv run "$scratch/stack/scripts/check-config" aws
+check "and names the file" said "deploy/aws/modules/stack/locals.tf names Umami"
 
 exit $status

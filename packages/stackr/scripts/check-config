@@ -388,8 +388,15 @@ def check_aws() -> list[str]:
         for base in re.findall(r"^FROM (\S+)", text, re.MULTILINE):
             if base != service["image"]:
                 problems.append(f"{where} builds on {base}, not compose.yaml's {service['image']}")
+    # The AWS recipe runs no Umami (ADR-0050): its ingest takes anyone's events, and the recipe has
+    # no network the application alone shares.
+    for path in sorted((ROOT / "deploy" / "aws").rglob("*")):
+        if path.is_file() and "umami" in path.read_text(errors="ignore").lower():
+            where = path.relative_to(ROOT)
+            problems.append(f"{where} names Umami, which the AWS recipe doesn't run")
     if not problems:
         print(f"ok: the state host runs {', '.join(state)} as compose.yaml does")
+        print("ok: the AWS recipe runs no Umami")
         print("ok: GoTrue's proxy runs the single host's Caddy")
         print("ok: the stack runs the upstream images compose.yaml pins")
         print("ok: each thin image builds on its service's image, as compose.yaml pins it")

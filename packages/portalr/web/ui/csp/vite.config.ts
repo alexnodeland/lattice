@@ -2,6 +2,7 @@ import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
+import { excalidraw } from "../../app/excalidraw";
 import { absent, RAW_HTML } from "../bundle-checks";
 import { sandboxPage } from "../sandbox/build";
 
@@ -18,6 +19,8 @@ export default defineConfig({
     alias: { "rehype-raw": fileURLToPath(new URL("../src/rehype-raw.ts", import.meta.url)) },
   },
   plugins: [
+    // The canvas, as app's build has it: its faces beside the page, nothing from a CDN.
+    excalidraw("/"),
     react(),
     tailwindcss(),
     absent(RAW_HTML),

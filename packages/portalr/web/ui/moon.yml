@@ -27,3 +27,7 @@ tasks:
       # The schema artifactr.ui's panels are held to, and lattice's integrations and their defaults.
       - '/packages/artifactr/schemas/artifactr_ui.v1.json'
       - '/packages/portalr/schemas/integrations.json'
+      # The app's diagram card and canvas, which the CSP tests open (portalr ADR-0072).
+      - '/packages/portalr/web/app/excalidraw.ts'
+      - '/packages/portalr/web/app/src/diagram*'
+      - '/packages/portalr/web/app/src/on-demand/canvas*'

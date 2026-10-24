@@ -32,7 +32,9 @@ export default async function serve(project: TestProject) {
   await promisify(execFile)(
     "bun",
     ["x", "--bun", "--no-install", "vite", "build", "--config", "csp/vite.config.ts"],
-    { cwd: ui },
+    // As app's and admin's builds are, for production: vitest's own NODE_ENV, test, would build
+    // packages' development code, such as Excalidraw's (portalr ADR-0072).
+    { cwd: ui, env: { ...process.env, NODE_ENV: "production" } },
   );
   const sandbox = await readFile(`${outDir}/sandbox/index.html`);
   const appPolicy = (await readFile(new URL("app-policy.txt", import.meta.url), "utf8")).trim();

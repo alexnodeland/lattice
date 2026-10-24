@@ -17,7 +17,13 @@ import zipfile
 from pathlib import Path
 
 UIS = ("app", "admin")
-LICENCES = ("OFL-schibsted-grotesk.txt", "OFL-fragment-mono.txt", "tremor.txt", "NOTICE")
+LICENCES = (
+    "OFL-schibsted-grotesk.txt",
+    "OFL-fragment-mono.txt",
+    "tremor.txt",
+    "excalidraw-faces.txt",
+    "NOTICE",
+)
 """The typefaces' licences, and Tremor's, whose charts ``ui`` adapts, and the notice saying so."""
 
 SANDBOX = "portalr/static/sandbox/index.html"

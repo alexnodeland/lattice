@@ -6,17 +6,21 @@
  * agent's run writes it, with the integrations `&on=` and `&off=` name, such as `markdown:math`,
  * switched so and the rest their defaults, and on the root `data-drawn` once it is whole, or
  * `data-error` if it stopped; `?dashboard` the dashboard gallery; `?eval` an evaluated string; and
- * `?app=` a mini app of that HTML, run in the sandbox at `&apps=` (portalr ADR-0051).
+ * `?app=` a mini app of that HTML, run in the sandbox at `&apps=` (portalr ADR-0051); and `?diagram`
+ * the app's card of a diagram, whose canvas the test opens (portalr ADR-0072).
  */
 
 import type { IntegrationKey } from "@portalr/client";
 import "../src/styles.css";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
+// The app's diagram card and its canvas add-on, built as app's build builds them (portalr ADR-0072).
+import { diagram } from "../../app/src/diagram";
 import { AppHostContext, DashboardView, IntegrationsContext, Markdown } from "../src";
 import { AppFrame } from "../src/app-frame";
 import { byDefault } from "../src/integrations";
 import { SUPPORT } from "../src/test/dashboards";
+import SAMPLE from "./diagram.json";
 
 /** The characters a stream renders, one at a time, before it yields. */
 const STEP = 25;
@@ -97,4 +101,78 @@ if (html !== null) {
       </IntegrationsContext>,
     ),
   );
+}
+/** What a hostile hand could write in a diagram: links, embedded pages, an image. */
+const HOSTILE = {
+  name: "Hostile",
+  elements: {
+    ...SAMPLE.elements,
+    linked: {
+      id: "linked",
+      type: "rectangle",
+      x: 0,
+      y: 200,
+      width: 200,
+      height: 80,
+      link: "https://example.com/",
+    },
+    framed: {
+      id: "framed",
+      type: "embeddable",
+      x: 300,
+      y: 200,
+      width: 400,
+      height: 300,
+      link: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    },
+    iframe: {
+      id: "iframe",
+      type: "iframe",
+      x: 0,
+      y: 600,
+      width: 400,
+      height: 300,
+      link: "https://example.com/",
+    },
+    pictured: {
+      id: "pictured",
+      type: "image",
+      x: 800,
+      y: 0,
+      width: 100,
+      height: 100,
+      fileId: "nope",
+      status: "saved",
+    },
+  },
+  files: {},
+};
+
+/** What no canvas could draw as given: numbers that aren't, an arrow with no points. */
+const BROKEN = {
+  name: "Broken",
+  elements: {
+    a: { id: "a", type: "arrow", x: "far", y: null, points: "none", width: -1 },
+    b: { id: "b", type: "text", text: 7, fontSize: "big", containerId: 3 },
+    c: { id: "c", type: "rectangle", x: 1e308, y: -1e308, width: 1e308, height: 1e308, angle: "x" },
+    d: {
+      id: "d",
+      type: "line",
+      points: [
+        [0, 0],
+        ["x", null],
+      ],
+    },
+    e: { type: "ellipse" },
+  },
+  files: {},
+};
+
+const DIAGRAMS: Record<string, object> = { "": SAMPLE, hostile: HOSTILE, broken: BROKEN };
+
+const drawing = asked.get("diagram");
+if (drawing !== null) {
+  // A diagram as the diagrams worker draws one from Mermaid, its first label holding markup; or
+  // one written by a hostile hand; or one that can't be drawn as given.
+  flushSync(() => root.render(diagram.render((DIAGRAMS[drawing] ?? SAMPLE) as never)));
 }

@@ -75,3 +75,54 @@ export function Dialog({
     </BaseDialog.Root>
   );
 }
+
+const whole =
+  "fixed inset-0 z-50 flex flex-col bg-surface text-fg outline-none transition-[opacity,scale] duration-(--dialog-duration) data-ending-style:opacity-0 data-starting-style:opacity-0 motion-reduce:transition-none";
+
+/**
+ * A dialog that fills the window, for a part that needs all of it, such as a diagram's canvas: its
+ * title and a way to close it in a bar along its top, what it holds below. Focus is kept in it as
+ * in `Dialog`, and goes to `finalFocus`, or back where it was, when it closes. What it holds is
+ * drawn only while it is open.
+ */
+export function WholeDialog({
+  open,
+  onOpenChange,
+  title: named,
+  close = "Close",
+  describedBy,
+  finalFocus,
+  children,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  /** The words on the button that closes it. */
+  close?: string;
+  /** The id of what describes it, such as a diagram's text version. */
+  describedBy?: string;
+  finalFocus?: RefObject<HTMLElement | null>;
+  children: ReactNode;
+}) {
+  return (
+    <BaseDialog.Root open={open} onOpenChange={onOpenChange}>
+      <BaseDialog.Portal>
+        <BaseDialog.Popup
+          aria-modal="true"
+          {...(describedBy && { "aria-describedby": describedBy })}
+          onKeyDown={(event) => keepTabWithin(event.currentTarget, event.nativeEvent)}
+          className={whole}
+          {...(finalFocus && { finalFocus })}
+        >
+          <div className="flex items-center justify-between gap-3 border-line border-b px-4 py-2">
+            <BaseDialog.Title className="truncate font-semibold text-fg">{named}</BaseDialog.Title>
+            <BaseDialog.Close render={<Button variant="secondary" size="sm" />}>
+              {close}
+            </BaseDialog.Close>
+          </div>
+          <div className="relative min-h-0 flex-1">{open && children}</div>
+        </BaseDialog.Popup>
+      </BaseDialog.Portal>
+    </BaseDialog.Root>
+  );
+}

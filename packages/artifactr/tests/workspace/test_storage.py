@@ -206,6 +206,24 @@ async def test_leases_belong_to_their_holder(storage: Storage) -> None:
     await storage.release_lease(SCOPE, "missing", "b")
 
 
+async def test_a_lease_is_renewed_only_by_its_holder_and_never_taken(
+    storage_factory: StorageFactory,
+) -> None:
+    now = datetime(2026, 9, 28, tzinfo=UTC)
+    storage = storage_factory(lambda: now)
+    ttl = timedelta(seconds=30)
+    assert not await storage.renew_lease(SCOPE, "k", "a", ttl), "no one's lease is not taken"
+    assert await storage.acquire_lease(SCOPE, "k", "a", ttl)
+    now += timedelta(minutes=1)
+    assert await storage.renew_lease(SCOPE, "k", "a", ttl), "its holder's, though expired"
+    assert await storage.lease(SCOPE, "k") == ("a", now + ttl)
+    assert not await storage.renew_lease(SCOPE, "k", "b", ttl), "another's is not renewed"
+    now += timedelta(minutes=1)
+    assert await storage.acquire_lease(SCOPE, "k", "b", ttl)  # b takes it once it expired
+    await storage.release_lease(SCOPE, "k", "b")
+    assert not await storage.renew_lease(SCOPE, "k", "a", ttl), "nor one another had since"
+
+
 async def test_an_expired_lease_can_be_taken(storage_factory: StorageFactory) -> None:
     now = datetime(2026, 9, 28, tzinfo=UTC)
     storage = storage_factory(lambda: now)

@@ -49,6 +49,7 @@ A property that cannot fail checks nothing. Each change below, made to a copy of
 |---|---|---|
 | A run's start saves no `taken` | `ThreadClaim.cfg` | `I1_ConsumedAtMostOnce` violated |
 | A run's start is not fenced by its claim | `ThreadClaimLapse.cfg` | `I3_OneActiveRun` violated, in 16 states |
+| A late renewal takes the lease whoever had it since, as `acquire_lease` would | `ThreadClaimLapse.cfg` | `I1_ConsumedAtMostOnce` violated, in 18 states |
 | A claim granted to a cancelled call is not released | `ThreadClaimLive.cfg` | `I3_ClaimHasATask` violated, in 5 states |
 | A call cancelled in `_take` before it claims hands nothing over | `ThreadClaimLive.cfg` | `I3_NoStrandedAsk` violated, in 4 states |
 | A hand-over never proceeds | `ThreadClaimLive.cfg` | `I3_NoStrandedAsk` violated |
@@ -98,6 +99,8 @@ And the behaviours the properties are checked over are reached. Each witness in 
 | `HandOver` | `Runner._hand_over` and `_take_over` |
 | `Crash`, `Restart` | a process that dies, and starts again with nothing in memory, where `Runner.recover` sweeps the thread |
 | `Tick`, `Renew`, `Lapse` | storage's clock, `Workspace._renew`, and its timer, `_lose` |
+
+The model names a claim by its process, so a lease another claim of the same process took and released is not this claim's. The code holds that by a precondition, not by the model: a holder is unique to each claim attempt (the runner's are `new_id("claim")`), as the `Storage` protocol requires of `renew_lease`. With a holder used again, a late renewal could renew a lease another attempt had meanwhile, which the model cannot show.
 
 ## What the spec assumes, and leaves out
 

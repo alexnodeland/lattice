@@ -24,6 +24,8 @@ tasks:
       - '/packages/portalr/web/notices/src/**/*'
       - '!/packages/portalr/web/notices/src/**/*.test.ts'
       - '/packages/portalr/web/notices/policy.json'
+      # The typeface that replaces Excalidraw's Liberation Sans.
+      - '/packages/portalr/web/ui/fonts/*.woff2'
       # What the recorder may leave unmasked, which the relay reads too (portalr ADR-0077).
       - '/packages/portalr/src/portalr/analytics/replay_allowlist.json'
     outputs:

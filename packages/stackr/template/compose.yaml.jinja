@@ -265,7 +265,7 @@ services:
       context: .
       target: diagrams-worker
       args:
-        # 1 adds Excalidraw's CJK face, Xiaolai, once its licence is confirmed (lattice#679).
+        # 1 adds Excalidraw's CJK face, Xiaolai, once its author answers (lattice#679).
         XIAOLAI: ${DIAGRAMS_XIAOLAI:-0}
     image: {{ project_slug }}-diagrams:local
     restart: unless-stopped

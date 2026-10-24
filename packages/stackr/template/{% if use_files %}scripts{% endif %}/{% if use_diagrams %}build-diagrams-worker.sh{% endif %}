@@ -5,7 +5,7 @@
 # The worker is lattice's packages/stackr/workers/diagrams: its page, Excalidraw at the version
 # its lock pins, which Vite builds; and its server, which Bun bundles for Node. The Dockerfile's
 # diagrams-build stage runs it. Xiaolai, Excalidraw's CJK face, is left out unless XIAOLAI is 1,
-# until its licence is confirmed (lattice#679).
+# until its author answers (lattice#679).
 #
 # The commit must hold the worker: lattice's, from the one that added it (stackr ADR-0049). With
 # PLAYWRIGHT set, the playwright-core it builds must be that version, the image's Chromium's.

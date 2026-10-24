@@ -8,7 +8,7 @@ license = "MIT AND OFL-1.1 AND Apache-2.0 AND ISC AND BSD-3-Clause AND 0BSD AND 
 # used under (web/notices). `portalr:licence-expression` keeps the expression to what the UIs'
 # generated notices say is bundled.
 # The UIs carry lattice's two typefaces, and app carries Excalidraw's, under the SIL Open Font
-# License (web/ui/licenses/excalidraw-faces.txt, which says which are unverified), and charts
+# License (web/ui/licenses/excalidraw-faces.txt, which says what is not), and charts
 # adapted from Tremor's, under the Apache License (web/ui/NOTICE). They bundle third-party JavaScript,
 # whose licences each UI's build collects into THIRD-PARTY-NOTICES.txt beside its files
 # (web/notices). That file is generated and not committed, so it isn't listed here (a glob that

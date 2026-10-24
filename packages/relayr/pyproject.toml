@@ -40,6 +40,10 @@ vikunja = ["httpx>=0.28"]
 fastapi = ["lattice-core-ai>=0.1.0", "fastapi>=0.141", "starlette>=0.46.0"]
 # ui:form_submitted from artifactr's forms (relayr.ui), for an application that has them.
 forms = ["artifactr-ai[forms]>=0.2.0"]
+# excalidraw:elements_changed from artifactr's diagrams (relayr.excalidraw), for an application
+# that has them.
+# The floor is raised at release, with the owner's approval, to the artifactr that has the extra.
+excalidraw = ["artifactr-ai[excalidraw]>=0.2.0"]
 langfuse = [
     "langfuse>=4.15,<5",
     "artifactr-ai[langfuse]>=0.2.0",

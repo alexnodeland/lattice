@@ -11,6 +11,7 @@ from portalr.analytics.consent import Consent, InMemoryConsent
 from portalr.analytics.limiter import InMemoryRateLimiter, RateLimiter
 from portalr.analytics.relay import Relay
 from portalr.analytics.stamp import SessionStamp
+from portalr.readers.umami import Umami
 
 __all__ = [
     "Consent",
@@ -19,4 +20,5 @@ __all__ = [
     "RateLimiter",
     "Relay",
     "SessionStamp",
+    "Umami",
 ]

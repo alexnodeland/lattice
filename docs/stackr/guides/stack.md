@@ -11,6 +11,7 @@ Each profile is an **adapter set**: the services behind one or more of the ports
 | `observability` | The OpenTelemetry Collector, Tempo, Prometheus, Loki, Pyroscope and Grafana | Telemetry (OTLP) and profiles |
 | `langfuse` | Langfuse's web server and worker, ClickHouse, MinIO, Valkey and `db-init` | Evaluation data, and object storage (S3) |
 | `analytics` | ClickHouse; `make up` then runs `clickhouse-init`, which makes portalr's `analytics` database | portalr's product analytics ([lattice RFC-0008](../../rfcs/0008-portalr-product-analytics.md)) |
+| `umami` | Umami, on the postgres adapter alone; `make up` then runs `umami-init`, which makes portalr's user and website | Operators' journeys, from portalr's relay ([ADR-0050](../adr/0050-umami-a-profile-for-operators-journeys-on-the-postgres-adapter.md)) |
 | `clickhouse` | ClickHouse alone, which `langfuse` and `analytics` both pull in ([ADR-0044](../adr/0044-clickhouse-a-profile-of-its-own-and-portalrs-analytics-users.md)) | None of its own |
 | `gateway` | The LiteLLM proxy, Valkey and `db-init` | The LLM gateway |
 | `postgres` | Plain PostgreSQL | The database, when `STACKR_DATABASE=postgres` |

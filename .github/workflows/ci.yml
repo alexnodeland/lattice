@@ -566,9 +566,10 @@ jobs:
             profiles: analytics
             database: postgres
           # stackr RFC-0004's single host: behind Caddy, with its own CA, on PostgreSQL with
-          # GoTrue, and an application from the template's hosting: host.
+          # GoTrue, and an application from the template's hosting: host; with Umami, which needs
+          # the postgres adapter (stackr ADR-0050).
           - name: a single host, behind Caddy, and an application
-            profiles: observability langfuse gateway auth analytics
+            profiles: observability langfuse gateway auth analytics umami
             database: postgres
             recipe: host
             app: true

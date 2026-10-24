@@ -41,6 +41,7 @@ test("every link the server makes has a door, and each door is made by one kind 
     "grafana_logs",
     "grafana_tenant_logs",
     "grafana_tenant_traces",
+    "umami_journeys",
   ];
   expect([...fields].sort()).toEqual([...server].sort());
 });
@@ -49,7 +50,7 @@ test("the notice says what the tools are outside of, and that opening them is re
   expect(NOTICE).toMatch(/aren't scoped to a tenant/);
   expect(NOTICE).toMatch(/outside the gates that Traces and Logs/);
   expect(NOTICE).toMatch(/Links made here are recorded/);
-  expect(NOTICE).toMatch(/A visit to either tool that doesn't start here/);
+  expect(NOTICE).toMatch(/A visit to any of them that doesn't start here/);
 });
 
 test("the tenants to ask for are by name, and none for someone who isn't an operator", () => {
@@ -83,5 +84,5 @@ test("what the address gave that isn't taken is named, and what is taken is not"
 
 test("each door's tool is one of the tools, which have names", () => {
   expect(DOORS.every((door) => TOOLS.includes(door.tool))).toBe(true);
-  expect(TOOL_NAME).toEqual({ langfuse: "Langfuse", grafana: "Grafana" });
+  expect(TOOL_NAME).toEqual({ langfuse: "Langfuse", grafana: "Grafana", umami: "Umami" });
 });

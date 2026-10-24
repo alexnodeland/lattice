@@ -6,7 +6,7 @@
  * without them, such as the CSP harness's, provides its own through `CanvasHostContext`.
  */
 
-import type { Answer } from "@portalr/client";
+import { type Answer, streamUrl } from "@portalr/client";
 import {
   type DiagramFile,
   editRefusalSaid,
@@ -18,6 +18,7 @@ import {
 import type { AppHost } from "@portalr/ui";
 import { createContext, useMemo } from "react";
 import { useStream } from "../workspace";
+import { type Heard, type Presence, watchPresence } from "./presence";
 
 /** A JSON Patch operation, as the canvas sends one. */
 type CanvasOp = { readonly op: string; readonly path: string; readonly value: unknown };
@@ -45,6 +46,8 @@ export interface CanvasHost {
   read(id: string, sha256: string): Promise<Blob | null>;
   /** Whether the person may edit the diagram: the canvas offers Edit only where they may. */
   mayEdit(id: string): Promise<boolean>;
+  /** The diagram's presence, over a connection of the canvas's own; null where there is none. */
+  presence(id: string, heard: (now: Heard) => void): Presence | null;
 }
 
 /** A canvas host a page gives in place of its route's. */
@@ -99,6 +102,19 @@ export function useCanvasHost(place: NonNullable<AppHost["place"]>): CanvasHost 
       upload: (id, image) => uploadDiagramImage(at(id), image),
       read: (id, sha256) => readDiagramImage(at(id), sha256),
       mayEdit: (id) => mayEditDiagram(at(id)),
+      presence: (id, heard) =>
+        watchPresence(
+          {
+            url: () =>
+              streamUrl(
+                new URL(place.surfaces.artifactr, location.origin).href,
+                place.workspace,
+                place.signed.streamSession(place.tenant),
+              ),
+          },
+          id,
+          heard,
+        ),
     };
   }, [place, stream]);
 }

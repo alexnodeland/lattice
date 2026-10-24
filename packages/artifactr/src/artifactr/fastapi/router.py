@@ -22,10 +22,13 @@ from artifactr.core import (
     Run,
     TenantId,
     Thread,
+    UnwatchArtifact,
+    WatchArtifact,
     WatchRun,
     WorkspaceId,
 )
-from artifactr.fastapi.stream import Stream
+from artifactr.fastapi.presence import LocalPresence, PresenceChannel
+from artifactr.fastapi.stream import RECHECK, Stream
 from artifactr.telemetry import Telemetry, annotate, attribution
 from artifactr.workspace import MAX_COUNT, Workspace, Workspaces
 from lattice_core.refusals import Refused, refusals
@@ -68,6 +71,8 @@ def artifactr_router(
     resolve_actor: ResolveActor,
     hello_timeout: float = 10.0,
     outbox_size: int = 1000,
+    presence: PresenceChannel | None = None,
+    watch_recheck: float = RECHECK,
     tracer_provider: TracerProvider | None = None,
     meter_provider: MeterProvider | None = None,
 ) -> APIRouter:
@@ -80,6 +85,10 @@ def artifactr_router(
         resolve_actor: Authenticates each request and connection.
         hello_timeout: Seconds a new connection has to send ``hello``.
         outbox_size: Frames buffered for a slow connection before it is closed (4429).
+        presence: Passes presence between the connections that watch an artifact; by default,
+            between this process's own, which serves an application that runs one.
+        watch_recheck: Seconds between reads of a watcher's rights, which a lost grant or an
+            integration turned off ends a watch within.
         tracer_provider: Where ``artifactr.stream`` spans go. Defaults to the global one.
         meter_provider: Where connection metrics go. Defaults to the global one.
 
@@ -89,6 +98,7 @@ def artifactr_router(
     """
     router = APIRouter(responses=REFUSALS)
     telemetry = Telemetry(tracer_provider=tracer_provider, meter_provider=meter_provider)
+    rooms = presence if presence is not None else LocalPresence()
 
     async def resolve(connection: HTTPConnection) -> tuple[TenantId, Actor]:
         """Authenticate a request or connection.
@@ -140,8 +150,8 @@ def artifactr_router(
         frame: CommandFrame, response: Response, workspace: Workspace = current_workspace
     ) -> CommandResult:
         """Submit one command. The body is the same frame as over the WebSocket."""
-        if isinstance(frame.command, WatchRun):
-            refused = InvalidState("watch_run needs a WebSocket")
+        if isinstance(frame.command, WatchRun | WatchArtifact | UnwatchArtifact):
+            refused = InvalidState(f"{frame.command.type} needs a WebSocket")
             result = CommandResult(
                 command_id=frame.command_id, ok=False, rejection=refused.payload()
             )
@@ -236,6 +246,8 @@ def artifactr_router(
             hello_timeout=hello_timeout,
             outbox_size=outbox_size,
             telemetry=telemetry,
+            presence=rooms,
+            recheck=watch_recheck,
         ).serve()
 
     return router

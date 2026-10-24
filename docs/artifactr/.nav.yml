@@ -134,6 +134,7 @@ nav:
     - adr/0090-diagrams-drawn-by-the-agent-through-a-converter.md
     - adr/0091-diagrams-tombstones-swept-and-their-revisions-thinned.md
     - adr/0092-a-diagrams-images-uploaded-by-a-person-and-read-where-it-names-them.md
+    - adr/0093-presence-who-has-an-artifact-open-passed-on-and-never-stored.md
   - RFCs:
     - rfcs/README.md
     - rfcs/0001-v0.1-implementation-plan.md

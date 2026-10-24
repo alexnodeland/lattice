@@ -38,6 +38,7 @@ from artifactr.core import (
     RespondToProposal,
     SystemActor,
     TenantId,
+    Watching,
     WorkspaceId,
     new_id,
 )
@@ -216,8 +217,10 @@ class ArtifactrMcp:
         result = await self._runner.execute(workspace, command, command_id=command_id)
         if result.rejection is not None:
             raise ToolError(str(result.rejection["message"]))
-        assert result.outcome is not None, "a result has an outcome or a rejection"
-        return result.outcome
+        outcome = result.outcome
+        assert outcome is not None, "a result has an outcome or a rejection"
+        assert not isinstance(outcome, Watching), "a tool's command is never a watch"
+        return outcome
 
     async def _check_subscriptions(
         self, ctx: ServerRequestContext[Any, Any], call_next: CallNext

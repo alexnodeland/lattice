@@ -194,6 +194,8 @@ The command is one of the `Command` models in `artifactr.core`, or `stop_run` or
 | `give_feedback` | `feedback_type`, `target`, `value` | `feedback_given`. The type must be registered and declare the target's kind, the value must validate against it, and the target must exist: an artifact at that version or later, a thread, a run, or a message's thread (and run, if given, in that thread). An `evaluator` actor may only give feedback. |
 | `stop_run` | `run_id` | Cancels a run of this workspace that is running in the serving process; `run_ended` with status `stopped`. |
 | `watch_run` | `run_id` | Attaches this socket to the run's live frames, starting with what the run has produced so far. WebSocket only. |
+| `watch_artifact` | `artifact_id` | Joins the artifact's presence: answered `watching`, with `rights` (`view` or `edit`) and the connection's own `peer`, then the latest presence of each of the others there. Checked as a read of the artifact, a hidden one `not_found` as a missing one, and refused `not_enabled` while an integration that governs it is off. WebSocket only ([ADR-0093](adr/0093-presence-who-has-an-artifact-open-passed-on-and-never-stored.md)). |
+| `unwatch_artifact` | `artifact_id` | Leaves it: the others are sent `peer_left`. Answered `recorded`. WebSocket only. |
 
 ```json
 {
@@ -215,6 +217,24 @@ Every command is carried out by `artifactr.agent.Runner.execute`, whichever tran
 Every surface hands a command with its id to `Runner.execute`, which carries it out the first time the id is seen and remembers the result in the runner's `CommandResults`. A command is known by the tenant and workspace it was sent to, the sender (its actor's participant, so a changed display name does not matter) and its `command_id`; a repeated id returns the first result whatever command it comes with. By default the runner remembers the 10,000 most recent results in its process (`InMemoryCommandResults`), so a retry that reaches another process, or arrives after the result was forgotten, runs again, and so does one that arrives while the first is still being carried out.
 
 Beyond the memory, core refuses a command that creates something with an id already used, as `invalid_state`, whichever process it reaches: `create_thread`, `create_artifact`, `propose_change` and `post_message` ([ADR-0045](adr/0045-a-message-id-is-used-once.md)). A client that chooses those ids and repeats them on a retry gets each command carried out once; `invalid_state` then means an earlier attempt succeeded. For `post_message` it means the message was posted, but not that its turn ran: if the process that posted it died before starting the turn, the turn never runs. An id the client omits is generated anew each time.
+
+## Presence
+
+A connection that watches an artifact sends where its person is on it, and is sent where the others are, never stored ([ADR-0093](adr/0093-presence-who-has-an-artifact-open-passed-on-and-never-stored.md)).
+
+```json
+{"type": "presence", "artifact_id": "d_1", "seq": 12, "base_version": 7,
+ "pointer": {"x": 310.5, "y": 88, "tool": "pointer", "button": "down"},
+ "selection": ["el_4"], "editing": [{"id": "el_4", "type": "rectangle", "...": "..."}]}
+```
+
+- `seq` increases per connection; `editing` holds whole elements, relative to `base_version`: at most 100, a selection at most 500, a frame at most 64 Ki characters of JSON.
+- The others are sent `peer_presence`, the same fields with `peer`, an opaque id for the sending connection, and `actor`, as the server resolved it, never as the client said; and `peer_left` when a peer unwatches, disconnects, loses its rights, or is silent for ten seconds.
+- A connection sends at most 30 presence frames a second. More, or one past 64 KiB, are dropped, with one `error` a second at most. One for an artifact it doesn't watch is dropped. `editing` from a watch with `view` is dropped, with one `error`.
+- Presence never enters the outbox that events go through, so it never closes a connection with 4429: each connection keeps one frame per peer and artifact, the latest, and sends it after any events.
+- A watcher's rights are read again every 30 seconds (`artifactr_router(watch_recheck=...)`). Once they are gone, or can't be read, it is sent `peer_left` for everyone there and for itself, and an `error`, and its watch ends. Until then, a person whose access ended keeps seeing the others' pointers and what they are drawing: for up to the recheck interval, plus the workspace's `hidden_refresh` for a restriction, about a minute by default, which is longer than a REST read, refused at once.
+- One connection watches at most 20 artifacts, and one artifact has at most 50 watchers; past either, `watch_artifact` is `invalid_state`.
+- A connection only for presence says `hello` with `"events": false`: it is welcomed, told replay is complete, and sent no events or live frames.
 
 ## Close codes
 
@@ -247,7 +267,7 @@ REST mirrors the commands and exposes reads; `artifactr.fastapi.artifactr_router
 
 Authentication is the host's: `resolve_actor(request)` returns the tenant and actor, or raises `Unauthorized` (401). The `authorize(tenant, workspace, actor, access)` hook of the application's `Workspaces` is asked for every request: for opening the workspace, then for each action the request takes ([ADR-0056](adr/0056-access-asked-in-every-workspace-method.md)). Listing workspaces asks `artifactr:read_workspaces` with no workspace, then `artifactr:open` in each workspace, and leaves out those refused ([ADR-0058](adr/0058-a-tenants-workspaces-listed-by-what-each-actor-may-open.md)). A refusal is 403, whose `detail` is the `forbidden` rejection, as for every other rejection a read raises; over the WebSocket, a command it refuses has a `forbidden` result.
 
-Rejections map to HTTP status codes (`artifactr.fastapi.STATUS_CODES`): `version_conflict`, `invalid_state` and `not_enabled` → 409, `validation_failed` and `patch_failed` → 422, `not_found` → 404, `forbidden` → 403. `watch_run` over REST is rejected as `invalid_state`. A NUL character in any string, an id, a name or a command's text, is `validation_failed` on every surface and every storage, before `authorize` hears it ([ADR-0061](adr/0061-a-nul-character-is-refused-at-the-boundary.md)).
+Rejections map to HTTP status codes (`artifactr.fastapi.STATUS_CODES`): `version_conflict`, `invalid_state` and `not_enabled` → 409, `validation_failed` and `patch_failed` → 422, `not_found` → 404, `forbidden` → 403. `watch_run`, `watch_artifact` and `unwatch_artifact` over REST are rejected as `invalid_state`. A NUL character in any string, an id, a name or a command's text, is `validation_failed` on every surface and every storage, before `authorize` hears it ([ADR-0061](adr/0061-a-nul-character-is-refused-at-the-boundary.md)).
 
 ## MCP mapping
 

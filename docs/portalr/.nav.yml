@@ -89,6 +89,7 @@ nav:
   - adr/0075-a-person-removed-from-a-tenant-has-their-events-there-deleted.md
   - adr/0076-the-relay-sends-umami-a-copy-and-deletes-there-too.md
   - adr/0077-session-replay-its-own-yes-masked-in-the-browser-and-checked-at-the-relay.md
+  - adr/0078-the-others-on-a-diagrams-canvas-and-their-revisions-as-they-arrive.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

@@ -576,6 +576,8 @@
               "set_focus": "#/$defs/SetFocus",
               "set_thread_mode": "#/$defs/SetThreadMode",
               "stop_run": "#/$defs/StopRun",
+              "unwatch_artifact": "#/$defs/UnwatchArtifact",
+              "watch_artifact": "#/$defs/WatchArtifact",
               "watch_run": "#/$defs/WatchRun"
             },
             "propertyName": "type"
@@ -619,6 +621,12 @@
             },
             {
               "$ref": "#/$defs/WatchRun"
+            },
+            {
+              "$ref": "#/$defs/WatchArtifact"
+            },
+            {
+              "$ref": "#/$defs/UnwatchArtifact"
             }
           ],
           "title": "Command"
@@ -662,7 +670,8 @@
                   "applied": "#/$defs/Applied",
                   "proposed": "#/$defs/Proposed",
                   "recorded": "#/$defs/Recorded",
-                  "resolved": "#/$defs/Resolved"
+                  "resolved": "#/$defs/Resolved",
+                  "watching": "#/$defs/Watching"
                 },
                 "propertyName": "type"
               },
@@ -678,6 +687,9 @@
                 },
                 {
                   "$ref": "#/$defs/Recorded"
+                },
+                {
+                  "$ref": "#/$defs/Watching"
                 }
               ]
             },
@@ -1401,6 +1413,11 @@
     "Hello": {
       "description": "The first frame a client sends on a connection.",
       "properties": {
+        "events": {
+          "default": true,
+          "title": "Events",
+          "type": "boolean"
+        },
         "from_head": {
           "default": false,
           "title": "From Head",
@@ -1711,6 +1728,165 @@
       "title": "PartStarted",
       "type": "object"
     },
+    "PeerLeft": {
+      "description": "A peer closed an artifact, left, lost its access, or fell silent.",
+      "properties": {
+        "artifact_id": {
+          "$ref": "#/$defs/ArtifactId"
+        },
+        "peer": {
+          "title": "Peer",
+          "type": "string"
+        },
+        "type": {
+          "const": "peer_left",
+          "default": "peer_left",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "artifact_id",
+        "peer",
+        "type"
+      ],
+      "title": "PeerLeft",
+      "type": "object"
+    },
+    "PeerPresence": {
+      "description": "Another connection's presence on an artifact this one watches.\n\n``peer`` is opaque, one per connection; ``actor`` is whom the server says it is, never what\nthe client said.",
+      "properties": {
+        "actor": {
+          "discriminator": {
+            "mapping": {
+              "agent": "#/$defs/AgentActor",
+              "evaluator": "#/$defs/EvaluatorActor",
+              "external_agent": "#/$defs/ExternalAgentActor",
+              "system": "#/$defs/SystemActor",
+              "user": "#/$defs/UserActor"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/UserActor"
+            },
+            {
+              "$ref": "#/$defs/AgentActor"
+            },
+            {
+              "$ref": "#/$defs/ExternalAgentActor"
+            },
+            {
+              "$ref": "#/$defs/SystemActor"
+            },
+            {
+              "$ref": "#/$defs/EvaluatorActor"
+            }
+          ],
+          "title": "Actor"
+        },
+        "artifact_id": {
+          "$ref": "#/$defs/ArtifactId"
+        },
+        "base_version": {
+          "title": "Base Version",
+          "type": "integer"
+        },
+        "editing": {
+          "default": [],
+          "items": {
+            "additionalProperties": {
+              "$ref": "#/$defs/JsonValue"
+            },
+            "type": "object"
+          },
+          "title": "Editing",
+          "type": "array"
+        },
+        "peer": {
+          "title": "Peer",
+          "type": "string"
+        },
+        "pointer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Pointer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "selection": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Selection",
+          "type": "array"
+        },
+        "seq": {
+          "title": "Seq",
+          "type": "integer"
+        },
+        "type": {
+          "const": "peer_presence",
+          "default": "peer_presence",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "artifact_id",
+        "peer",
+        "actor",
+        "seq",
+        "base_version",
+        "type"
+      ],
+      "title": "PeerPresence",
+      "type": "object"
+    },
+    "Pointer": {
+      "additionalProperties": false,
+      "description": "Where a person's pointer is on a canvas, in the scene's own coordinates.",
+      "properties": {
+        "button": {
+          "default": "up",
+          "enum": [
+            "up",
+            "down"
+          ],
+          "title": "Button",
+          "type": "string"
+        },
+        "tool": {
+          "default": "pointer",
+          "enum": [
+            "pointer",
+            "laser"
+          ],
+          "title": "Tool",
+          "type": "string"
+        },
+        "x": {
+          "title": "X",
+          "type": "number"
+        },
+        "y": {
+          "title": "Y",
+          "type": "number"
+        }
+      },
+      "required": [
+        "x",
+        "y"
+      ],
+      "title": "Pointer",
+      "type": "object"
+    },
     "PostMessage": {
       "additionalProperties": false,
       "description": "Post a message, or a notice, in a thread, attributed to the actor who commits it.",
@@ -1748,6 +1924,71 @@
         "type"
       ],
       "title": "PostMessage",
+      "type": "object"
+    },
+    "Presence": {
+      "additionalProperties": false,
+      "description": "Where a person is on an artifact they watch, and what they are changing right now.\n\nNever stored. ``editing`` holds whole elements, relative to ``base_version``.",
+      "properties": {
+        "artifact_id": {
+          "$ref": "#/$defs/ArtifactId"
+        },
+        "base_version": {
+          "minimum": 1,
+          "title": "Base Version",
+          "type": "integer"
+        },
+        "editing": {
+          "default": [],
+          "items": {
+            "additionalProperties": {
+              "$ref": "#/$defs/JsonValue"
+            },
+            "type": "object"
+          },
+          "maxItems": 100,
+          "title": "Editing",
+          "type": "array"
+        },
+        "pointer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Pointer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "selection": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 500,
+          "title": "Selection",
+          "type": "array"
+        },
+        "seq": {
+          "minimum": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "type": {
+          "const": "presence",
+          "default": "presence",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "artifact_id",
+        "seq",
+        "base_version",
+        "type"
+      ],
+      "title": "Presence",
       "type": "object"
     },
     "ProposalCreated": {
@@ -2992,6 +3233,27 @@
       "title": "UnknownEvent",
       "type": "object"
     },
+    "UnwatchArtifact": {
+      "additionalProperties": false,
+      "description": "Stop watching an artifact: the others are told this connection left it.",
+      "properties": {
+        "artifact_id": {
+          "$ref": "#/$defs/ArtifactId"
+        },
+        "type": {
+          "const": "unwatch_artifact",
+          "default": "unwatch_artifact",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "artifact_id",
+        "type"
+      ],
+      "title": "UnwatchArtifact",
+      "type": "object"
+    },
     "UserActor": {
       "description": "A person, identified by the host application's user id.",
       "properties": {
@@ -3025,6 +3287,27 @@
       "title": "UserActor",
       "type": "object"
     },
+    "WatchArtifact": {
+      "additionalProperties": false,
+      "description": "Receive the presence of the others with an artifact open, and send one's own.\n\nWebSocket only, as ``watch_run`` is; answered ``watching`` (lattice RFC-0006, ADR-0093).",
+      "properties": {
+        "artifact_id": {
+          "$ref": "#/$defs/ArtifactId"
+        },
+        "type": {
+          "const": "watch_artifact",
+          "default": "watch_artifact",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "artifact_id",
+        "type"
+      ],
+      "title": "WatchArtifact",
+      "type": "object"
+    },
     "WatchRun": {
       "additionalProperties": false,
       "description": "Receive a run's live frames on this connection. WebSocket only.",
@@ -3044,6 +3327,40 @@
         "type"
       ],
       "title": "WatchRun",
+      "type": "object"
+    },
+    "Watching": {
+      "description": "A watch accepted: what the watcher may do on the artifact, ``view`` or ``edit``.",
+      "properties": {
+        "artifact_id": {
+          "$ref": "#/$defs/ArtifactId"
+        },
+        "peer": {
+          "title": "Peer",
+          "type": "string"
+        },
+        "rights": {
+          "enum": [
+            "view",
+            "edit"
+          ],
+          "title": "Rights",
+          "type": "string"
+        },
+        "type": {
+          "const": "watching",
+          "default": "watching",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "artifact_id",
+        "rights",
+        "peer",
+        "type"
+      ],
+      "title": "Watching",
       "type": "object"
     },
     "Welcome": {
@@ -3114,7 +3431,8 @@
       "discriminator": {
         "mapping": {
           "command": "#/$defs/CommandFrame",
-          "hello": "#/$defs/Hello"
+          "hello": "#/$defs/Hello",
+          "presence": "#/$defs/Presence"
         },
         "propertyName": "type"
       },
@@ -3124,6 +3442,9 @@
         },
         {
           "$ref": "#/$defs/CommandFrame"
+        },
+        {
+          "$ref": "#/$defs/Presence"
         }
       ],
       "title": "Client"
@@ -3135,6 +3456,8 @@
           "error": "#/$defs/ErrorFrame",
           "event": "#/$defs/EventFrame",
           "live": "#/$defs/LiveFrame",
+          "peer_left": "#/$defs/PeerLeft",
+          "peer_presence": "#/$defs/PeerPresence",
           "replay_complete": "#/$defs/ReplayComplete",
           "welcome": "#/$defs/Welcome"
         },
@@ -3158,6 +3481,12 @@
         },
         {
           "$ref": "#/$defs/ErrorFrame"
+        },
+        {
+          "$ref": "#/$defs/PeerPresence"
+        },
+        {
+          "$ref": "#/$defs/PeerLeft"
         }
       ],
       "title": "Server"

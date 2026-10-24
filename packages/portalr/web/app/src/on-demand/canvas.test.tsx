@@ -2,7 +2,16 @@ import { createRef } from "react";
 import { expect, test } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
-import { CanvasDialog, carriesFiles, elementsOf, kept, keptEditing, movedOnto } from "./canvas";
+import {
+  CanvasDialog,
+  carriesFiles,
+  editingOf,
+  elementsOf,
+  kept,
+  keptEditing,
+  movedOnto,
+  useComings,
+} from "./canvas";
 import { type CanvasHost, CanvasHostContext } from "./canvas-host";
 
 test("the canvas takes no link, no embedded page and no image it has no bytes for, and restores what it takes", () => {
@@ -247,6 +256,7 @@ const editing: CanvasHost = {
   upload: async () => ({ outcome: "refused", status: 0, reasons: ["no"] }),
   read: async () => null,
   mayEdit: async () => true,
+  presence: () => null,
 };
 
 test("the guard bites while editing: help and the palette open bare, and nothing on the canvas", async () => {
@@ -350,4 +360,104 @@ test("Excalidraw's own clipboard, carrying images, is refused; anything else isn
   expect(carriesFiles(JSON.stringify({ type: "excalidraw/clipboard", elements: [] }))).toBe(false);
   expect(carriesFiles("https://x.test/")).toBe(false);
   expect(carriesFiles("null")).toBe(false);
+});
+
+test("a peer's picture holds no image, nothing embedded, and nothing too large to draw", () => {
+  const at = { version: 1, versionNonce: 1, x: 0, y: 0, width: 10, height: 10 };
+  const drawn = editingOf([
+    { ...at, id: "ok", type: "rectangle", link: "https://x.test/" },
+    { ...at, id: "pic", type: "image", fileId: "a".repeat(64) },
+    { ...at, id: "page", type: "embeddable" },
+    { ...at, id: "far", type: "rectangle", x: 900_000 },
+    { ...at, id: "huge", type: "rectangle", width: 1e9, height: 1e9 },
+  ]);
+  expect(drawn.map((element) => [element.id, element.link])).toEqual([["ok", null]]);
+});
+
+test("comings and goings are said politely, gathered, at most every two seconds", async () => {
+  function Said({ here }: { here: readonly string[] }) {
+    return <p>{useComings(here).text}</p>;
+  }
+  const screen = await render(<Said here={[]} />);
+  await screen.rerender(<Said here={["Alice"]} />);
+  await screen.rerender(<Said here={["Alice", "Bob"]} />);
+  expect(screen.container.textContent).toBe("");
+  await expect
+    .poll(() => screen.container.textContent, { timeout: 3_000 })
+    .toBe("Alice is here. Bob is here.");
+  await screen.rerender(<Said here={["Bob"]} />);
+  await expect.poll(() => screen.container.textContent, { timeout: 3_000 }).toBe("Alice left.");
+  await screen.unmount();
+  // Each batch is a new one to say, by its count, though its words are the same as the last's.
+  function Counted({ here }: { here: readonly string[] }) {
+    const said = useComings(here);
+    return <p>{`${said.text}#${said.time}`}</p>;
+  }
+  const counted = await render(<Counted here={[]} />);
+  await counted.rerender(<Counted here={["Ann"]} />);
+  await expect.poll(() => counted.container.textContent, { timeout: 3_000 }).toBe("Ann is here.#1");
+  await counted.rerender(<Counted here={[]} />);
+  await expect.poll(() => counted.container.textContent, { timeout: 3_000 }).toBe("Ann left.#2");
+  await counted.rerender(<Counted here={["Ann"]} />);
+  await expect.poll(() => counted.container.textContent, { timeout: 3_000 }).toBe("Ann is here.#3");
+  await counted.unmount();
+});
+
+test("a peer's picture holds plain colours alone, and nothing drawn past its caps", () => {
+  const at = { version: 1, versionNonce: 1, x: 0, y: 0, width: 10, height: 10 };
+  const [shape, words] = editingOf([
+    {
+      ...at,
+      id: "s",
+      type: "rectangle",
+      strokeColor: "url(https://x.test/a.svg#p)",
+      backgroundColor: "rgba(10, 20, 30, 0.5)",
+      strokeWidth: 9_000,
+    },
+    { ...at, id: "t", type: "text", text: "hi", fontSize: 90_000, strokeColor: "#abc" },
+    {
+      ...at,
+      id: "l",
+      type: "line",
+      points: Array.from({ length: 1_001 }, (_, step) => [step, step]),
+    },
+  ]);
+  expect([shape?.strokeColor, shape?.backgroundColor, shape?.strokeWidth]).toEqual([
+    "#1e1e1e",
+    "rgba(10, 20, 30, 0.5)",
+    50,
+  ]);
+  expect([words?.strokeColor, (words as { fontSize?: number } | undefined)?.fontSize]).toEqual([
+    "#abc",
+    400,
+  ]);
+  expect(
+    editingOf([{ ...at, id: "c", type: "rectangle", backgroundColor: "hsl(1 2% 3%)" }])[0]
+      ?.backgroundColor,
+  ).toBe("hsl(1 2% 3%)");
+});
+
+test("a colour made to make its pattern read for long is read at once, and isn't taken", () => {
+  const at = { version: 1, versionNonce: 1, x: 0, y: 0, width: 10, height: 10, id: "s" };
+  const spaces = " ".repeat(50_000);
+  const crafted = `rgb(1${spaces}1${spaces}1${spaces}x`;
+  // Against a plain colour's reading: a crafted one may take a little longer, not ever so long.
+  const timed = (strokeColor: string) => {
+    const started = performance.now();
+    const [shape] = editingOf([{ ...at, type: "rectangle", strokeColor }]);
+    return { took: performance.now() - started, colour: shape?.strokeColor };
+  };
+  const plain = timed("rgb(1, 2, 3)");
+  const slow = timed(crafted);
+  expect(slow.colour).toBe("#1e1e1e");
+  expect(plain.colour).toBe("rgb(1, 2, 3)");
+  expect(slow.took).toBeLessThan(Math.max(50, plain.took * 50));
+  // Within the length a colour may be, the same shape is read at once too.
+  const short = timed(`rgb(1${" ".repeat(18)}1${" ".repeat(18)}1${" ".repeat(18)}x`);
+  expect(short.colour).toBe("#1e1e1e");
+  expect(short.took).toBeLessThan(Math.max(50, plain.took * 50));
+  // Plain colours with their usual spaces and slashes are still taken.
+  for (const plainOne of ["rgba(10 20 30 / 0.5)", "hsl(1, 2%, 3%)", "#abcdef80"]) {
+    expect(timed(plainOne).colour).toBe(plainOne);
+  }
 });

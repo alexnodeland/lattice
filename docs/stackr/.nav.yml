@@ -82,6 +82,7 @@ nav:
     - adr/0050-umami-a-profile-for-operators-journeys-on-the-postgres-adapter.md
     - adr/0051-build-time-fetches-bounded-and-tried-again.md
     - adr/0052-diagrams-tended-every-hour-sweep-thinning-and-collection.md
+    - adr/0053-run-everything-together.md
   - RFCs:
     - rfcs/README.md
     - rfcs/0001-v0.1-implementation-plan.md

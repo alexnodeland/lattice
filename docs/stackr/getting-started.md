@@ -160,6 +160,28 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:8800/artifactr/v1/worksp
 
 The last request lists a workspace's artifacts, in an application with artifactr; without a token it is refused with 401. Ada is in one tenant, so her requests needn't name it; a user in several names one with `X-Tenant`. The generated `README.md` goes on from here with requests for each library's example. An agent's trace, from the application through the gateway to the model, is in Grafana's Explore (Tempo) and in Langfuse, and the application's metrics are in Prometheus, with `job` set to its slug (`my-app`). [The application template](guides/template.md) describes what was generated and how to keep it up to date.
 
+## Run everything together
+
+From a clone of lattice, one command runs stackr's stack and an application beside it, wired together:
+
+```bash
+make dev            # at lattice's root; again is safe
+make first-run EMAIL=you@example.com   # in .local/run/portal: the first person in, with a password
+make dev-status     # both projects' containers
+make dev-down       # stop both, keeping their data
+make dev-reset      # delete both projects' containers and volumes, once you confirm
+```
+
+`make dev` (`scripts/dev`, [ADR-0053](adr/0053-run-everything-together.md)) does what this page does by hand:
+
+1. It starts the stack on the postgres adapter, with GoTrue: `make up PROFILES="observability langfuse gateway auth analytics umami"`. A stackr with no `.env` gets `STACKR_DATABASE=postgres`; one whose `.env` chooses local Supabase is refused, rather than switched.
+2. It generates an application with the template's defaults, the portal among them, into `.local/run/portal`, which git ignores, as a repository of its own. It is generated once, from lattice's `HEAD`, which must be on GitHub: the image installs the libraries from there, at that commit. `DEV_REF` names another commit, `DEV_APP_DIR` another directory, and `DEV_APP_NAME` another name.
+3. It makes the application's gateway keys once: a tenant's (`DEV_TENANT`, `dev`), and the read-only key portalr's admin reads spend with. Each goes into the application's `.env`, mode 0600, and neither is printed.
+4. `scripts/wire-app` gives the application's `.env` the stack's settings: Langfuse's keys, the database, GoTrue, and analytics' and Umami's passwords. It also turns on every crafting app built for every platform (all but Blender, which is amd64's alone) and diagrams. Replay stays off, and everything binds to `127.0.0.1`.
+5. It creates the role the application works as, and starts it in the app profile at `http://127.0.0.1:8800`.
+
+The two stay Compose projects of their own, `stackr` and the application's, joined by the stack's networks, so each one's `make` works in its own directory as this page describes.
+
 ## Stop
 
 ```bash

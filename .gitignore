@@ -228,3 +228,6 @@ packages/stackr/deploy/aws/modules/*/.terraform.lock.hcl
 *.tfstate
 *.tfstate.*
 .terraform.tfstate.lock.info
+
+# Where `make dev` generates its application (scripts/dev).
+.local/

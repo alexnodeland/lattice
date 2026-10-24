@@ -56,5 +56,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0050](0050-umami-a-profile-for-operators-journeys-on-the-postgres-adapter.md) | Umami, a profile for operators' journeys, on the postgres adapter | Accepted |
 | [0051](0051-build-time-fetches-bounded-and-tried-again.md) | Build-time fetches, bounded and tried again | Accepted |
 | [0052](0052-diagrams-tended-every-hour-sweep-thinning-and-collection.md) | Diagrams tended every hour: the sweep, thinning and collection | Accepted |
+| [0053](0053-run-everything-together.md) | Run everything together | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

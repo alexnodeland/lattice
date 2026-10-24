@@ -1,0 +1,144 @@
+#!/usr/bin/env bash
+# Run everything together on this machine (stackr ADR-0053): stackr's stack, on plain PostgreSQL
+# with GoTrue, and an application from the template beside it, with the portal, every crafting
+# app that runs on this machine's architecture, and diagrams. They stay two Compose projects,
+# `stackr` and the application's, joined by the stack's networks, as `make smoke-app` runs them.
+#
+# Usage, from lattice's root, as `make dev`, `make dev-down`, `make dev-status` and `make dev-reset`:
+#   scripts/dev up|down|status|reset
+#   DEV_APP_DIR   where the application is generated (default: .local/run/portal, gitignored)
+#   DEV_APP_NAME  its name, from which its package and Compose project are named (default: Portal)
+#   DEV_REF       the commit it is generated from, which must be on origin, since the image
+#                 installs the libraries from GitHub at it (default: HEAD)
+#   DEV_TENANT    the gateway's tenant whose key the application uses (default: dev)
+#
+# `up` is safe to run again: it renders the application, makes its keys and creates its database
+# role once, and starts what isn't running. The keys go into the application's .env (mode 0600)
+# and are never printed. `down` stops both projects and keeps their data; `reset` deletes the
+# data of these two projects alone, once you confirm.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+root=$PWD
+stackr=$root/packages/stackr
+app=${DEV_APP_DIR:-.local/run/portal}
+[[ $app == /* ]] || app=$root/$app
+# The stack's images and the application's run natively: one set for other work would emulate them.
+unset DOCKER_DEFAULT_PLATFORM
+PROFILES="observability langfuse gateway auth analytics umami"
+
+say() { printf 'dev: %s\n' "$*" >&2; }
+die() {
+  say "$*"
+  exit 1
+}
+# A setting of a .env, as `make` reads it: its first line.
+setting() { sed -n "s/^$2=//p" "$1" 2>/dev/null | head -n 1; }
+app_compose() { docker compose --project-directory "$app" "$@"; }
+# The application's Compose project, as its compose.yaml names it.
+app_project() { app_compose config --format json | jq -r .name; }
+
+# The crafting apps whose workers run here: every one copier.yml pins, but those built for one
+# platform alone (Blender's, amd64), as an arm64 machine can't run them natively.
+crafts() {
+  uv run --no-sync python -c '
+import sys, yaml
+crafts = yaml.safe_load(open(sys.argv[1]))["crafts"]["default"]
+print(",".join(name for name, craft in crafts.items() if "platform" not in craft))
+' "$stackr/copier.yml"
+}
+
+# stackr's .env, on the postgres adapter: chosen when there is none, and refused when it chooses
+# another, since that is a running stack's.
+stack_env() {
+  if [[ ! -f $stackr/.env ]]; then
+    (umask 077 && echo STACKR_DATABASE=postgres >"$stackr/.env")
+  elif [[ $(setting "$stackr/.env" STACKR_DATABASE) != postgres ]]; then
+    die "stackr's .env chooses STACKR_DATABASE=$(setting "$stackr/.env" STACKR_DATABASE); this runs on postgres, with GoTrue: set it there, after \`make down\` in packages/stackr, or run the stack as it is and wire an application by hand (docs/stackr/getting-started.md)"
+  fi
+  make -s -C "$stackr" env
+}
+
+# The application, generated once from DEV_REF, in a repository of its own, as `copier update`
+# and its hooks need.
+render() {
+  [[ -f $app/.copier-answers.yml ]] && return
+  local ref commit
+  ref=${DEV_REF:-HEAD}
+  commit=$(git rev-parse --verify "$ref^{commit}") || die "DEV_REF=$ref isn't a commit"
+  [[ -n $(git branch --remotes --contains "$commit" 2>/dev/null) ]] ||
+    die "$ref ($commit) isn't on origin: the image installs the libraries from GitHub at it, so push it, or set DEV_REF to a commit that is"
+  say "generating ${DEV_APP_NAME:-Portal} in $app, from $commit"
+  mkdir -p "$(dirname "$app")"
+  uv run --no-sync copier copy --quiet --defaults --vcs-ref "$commit" \
+    --data project_name="${DEV_APP_NAME:-Portal}" "$root" "$app"
+  uv lock --quiet --directory "$app"
+  git -C "$app" init --quiet
+  git -C "$app" add --all
+  git -C "$app" commit --quiet --message "Generated from lattice at $commit"
+}
+
+# The application's two gateway keys, made once: a tenant's, and the read-only one portalr's
+# admin reads spend with. Each is read from the script's output into the .env, never shown.
+keys() {
+  local tenant=${DEV_TENANT:-dev} alias key wiring=""
+  alias="$tenant-$(basename "$app")"
+  if [[ -z $(setting "$app/.env" LITELLM_API_KEY) ]]; then
+    key=$(make -s -C "$stackr" tenant NAME="$tenant" TENANT_FLAGS="--quiet --key-alias $alias")
+    [[ -n $key ]] || die "the gateway has a key $alias already, and its value can't be read back: set DEV_TENANT to another tenant"
+    wiring+="LITELLM_API_KEY=$key"$'\n'
+  fi
+  if [[ -z $(setting "$app/.env" PORTAL_LITELLM_KEY) ]]; then
+    key=$(make -s -C "$stackr" portal-key ARGS=--quiet) ||
+      die "the gateway has portalr's spend-read key already, and its value can't be read back: \`make portal-key ARGS=--rotate\` in packages/stackr replaces it, then run this again"
+    wiring+="PORTAL_LITELLM_KEY=$key"$'\n'
+  fi
+  printf '%s' "$wiring"
+}
+
+up() {
+  stack_env
+  say "starting stackr's stack: $PROFILES"
+  make -s -C "$stackr" up PROFILES="$PROFILES"
+  render
+  [[ -f $app/.env ]] || make -s -C "$app" env
+  { keys; printf 'FILES_CRAFTS=%s\nDIAGRAMS=on\n' "$(crafts)"; } |
+    (cd "$stackr" && uv run --no-sync scripts/wire-app "$app" --analytics --umami)
+  local admin
+  admin="$(sed -n 's/^name = "\(.*\)"$/\1/p' "$app/pyproject.toml" | head -n 1)-admin"
+  say "building the application, and creating the role it works as"
+  app_compose --profile app build app
+  app_compose --profile app run --rm --no-deps -T app "$admin" db-roles
+  make -s -C "$app" up
+  say "running: the portal at http://127.0.0.1:$(setting "$app/.env" APP_PORT)/, Grafana at http://127.0.0.1:3000/"
+  say "the first person in: make first-run EMAIL=you@example.com, in $app"
+}
+
+down() {
+  [[ -f $app/compose.yaml ]] && make -s -C "$app" down
+  make -s -C "$stackr" down
+}
+
+status() {
+  make -s -C "$stackr" ps
+  [[ -f $app/compose.yaml ]] && app_compose --profile '*' ps
+  return 0
+}
+
+# Deletes the two projects' containers and volumes, by their names alone, once confirmed. Local
+# images, networks and anything else of Docker's are left as they are.
+reset() {
+  local projects=(stackr) answer name=""
+  [[ -f $app/compose.yaml ]] && name=$(app_project)
+  [[ -n $name ]] && projects+=("$name")
+  [[ -t 0 ]] || die "reset deletes the data of ${projects[*]}: run it in a terminal, to confirm"
+  read -r -p "Delete the containers and volumes of ${projects[*]}? Type yes: " answer
+  [[ $answer == yes ]] || die "nothing was deleted"
+  for project in "${projects[@]}"; do
+    docker compose -p "$project" down --volumes
+  done
+}
+
+case ${1:-} in
+  up | down | status | reset) "$1" ;;
+  *) die "usage: scripts/dev up|down|status|reset" ;;
+esac

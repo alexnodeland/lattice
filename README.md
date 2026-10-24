@@ -146,6 +146,8 @@ make up                 # beside stackr's stack, at http://127.0.0.1:8800
 > [!TIP]
 > Start stackr's stack first: run `make env && make up` in [`packages/stackr`](packages/stackr). Everything binds to `127.0.0.1` unless you choose otherwise. [stackr's getting started](https://lattice.alexnodeland.com/stackr/getting-started/) walks through both.
 
+Or run everything together from a clone of lattice: `make dev` starts stackr's stack on PostgreSQL with GoTrue, analytics and Umami. Beside it, it generates an application with the portal into `.local/run/portal`, with every crafting app that runs natively here and diagrams, and wires the two together. `make dev-down` stops both, and `make dev-status` shows them ([running everything together](https://lattice.alexnodeland.com/stackr/getting-started/#run-everything-together)).
+
 <details>
 <summary><b>📦 Use a library on its own</b></summary>
 

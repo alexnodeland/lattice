@@ -56,6 +56,7 @@ from artifactr.excalidraw import (
     excalidraw_checks,
     excalidraw_key_of,
 )
+from artifactr.files.blobs import Blobs
 from artifactr.files.manifest import WordDocument
 from artifactr.files.native import NativeFiles
 from artifactr.files.tools import native_file_tools
@@ -306,11 +307,11 @@ def _together(*each: Mapping[str, Check]) -> dict[str, Check]:
     return {kind: joined([checks[kind] for checks in each if kind in checks]) for kind in kinds}
 
 
-def collaboration(grants: Grants) -> tuple[Workspaces, Runner[None], NativeFiles]:
+def collaboration(grants: Grants, blobs: Blobs) -> tuple[Workspaces, Runner[None], NativeFiles]:
     """artifactr's workspaces, checked by grantr and switched by its integrations, its runner, and
-    its native files."""
+    its native files, kept in `blobs` with diagrams' images."""
     hooks = grants.hooks(subject_of)
-    files = native_files(grants)
+    files = native_files(grants, blobs)
     workspaces = Workspaces(
         InMemoryStorage(),
         types=[Note, WordDocument, Diagram, *UI_TYPES],

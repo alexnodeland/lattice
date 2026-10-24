@@ -84,7 +84,7 @@ function Artifact() {
   const stream = useStream();
   const snapshot = useWorkspace();
   const host = useFormHost({ queries, tenant, workspace, me, renderers: RENDERERS });
-  const apps = useAppHost(context.config);
+  const apps = useAppHost(context, tenant, workspace);
   const latest = useMemo(
     () =>
       revisions.reduce<(typeof revisions)[number] | undefined>(

@@ -179,7 +179,7 @@ test("the canvas stays in view mode: no shortcut, drop or paste opens anything o
   await page.waitForTimeout(300);
   expect(await page.getByRole("dialog").count()).toBe(1);
   await expect.poll(() => dialog.isVisible()).toBe(true);
-  expect(await page.locator(".HelpDialog, .command-palette, .Modal").count()).toBe(0);
+  expect(await page.locator(".HelpDialog, .command-palette-dialog, .Modal").count()).toBe(0);
   expect(await page.getByRole("link").count()).toBe(0);
   expect(chooser).toEqual([]);
   expect(seen.away()).toEqual([]);
@@ -270,5 +270,110 @@ test("Enter and Space on every control of the canvas open nothing and store noth
   expect(seen.away()).toEqual([]);
   expect(await stored(page)).toEqual(before);
   expect(await reported()).toEqual([]);
+  await page.context().close();
+});
+
+/** What the page's host was sent: each edit, and the type of each image uploaded. */
+const sent = (page: Page) =>
+  page.evaluate(() => window.canvasSent) as Promise<{
+    commits: { baseVersion: number; ops: { op: string; path: string }[]; summary: string }[];
+    uploads: string[];
+  }>;
+
+test("a person edits on the canvas: what they draw, and an image they paste, is sent as their edit", async () => {
+  const { page, reported } = await open(browser, "?diagram=edit");
+  const origin = new URL(page.url()).origin;
+  const seen = requests(page, origin);
+  await page.getByRole("button", { name: "Open canvas" }).click();
+  const dialog = page.getByRole("dialog", { name: "Stack" });
+  await page.locator(".excalidraw canvas").first().waitFor();
+  await dialog.getByRole("button", { name: "Edit" }).click();
+  // A rectangle drawn: its tool's key, and a drag.
+  await page
+    .locator(".excalidraw canvas")
+    .last()
+    .click({ position: { x: 600, y: 600 } });
+  await page.keyboard.press("r");
+  await page.mouse.move(600, 500);
+  await page.mouse.down();
+  await page.mouse.move(700, 580, { steps: 5 });
+  await page.mouse.up();
+  await expect.poll(async () => (await sent(page)).commits.length, { timeout: 8000 }).toBe(1);
+  const [drawn] = (await sent(page)).commits;
+  expect(drawn?.baseVersion).toBe(1);
+  expect(drawn?.ops.map((op) => op.op)).toEqual(["add"]);
+  expect(drawn?.summary).toBe("1 element changed on the canvas");
+  // The rectangle, selected, has its actions shown, and its link button is there, hidden.
+  const link = page.locator('.excalidraw button[aria-label="Add link"]');
+  expect(await link.count()).toBe(1);
+  expect(await link.isVisible()).toBe(false);
+  // ⌘K, for a link, does nothing, and neither do help and the command palette.
+  for (const keys of ["Control+k", "Meta+k", "?", "Control+/", "Control+s"]) {
+    await page.keyboard.press(keys);
+  }
+  expect(await page.locator(".HelpDialog, .command-palette-dialog, .Modal").count()).toBe(0);
+  expect(await page.locator(".excalidraw-hyperlinkContainer input").count()).toBe(0);
+  // A PNG pasted: uploaded through the host, put on the canvas, and named by the next edit.
+  await page.evaluate(async () => {
+    const drawing = document.createElement("canvas");
+    drawing.width = 8;
+    drawing.height = 8;
+    const context = drawing.getContext("2d") as CanvasRenderingContext2D;
+    context.fillStyle = "#c00";
+    context.fillRect(0, 0, 8, 8);
+    const png = await new Promise<Blob>((done) => drawing.toBlob((blob) => done(blob as Blob)));
+    const pasted = new DataTransfer();
+    pasted.items.add(new File([png], "red.png", { type: "image/png" }));
+    const target = document.querySelector(".excalidraw") as HTMLElement;
+    target.dispatchEvent(
+      new ClipboardEvent("paste", { bubbles: true, cancelable: true, clipboardData: pasted }),
+    );
+  });
+  await expect
+    .poll(async () => (await sent(page)).uploads, { timeout: 8000 })
+    .toEqual(["image/png"]);
+  await expect.poll(async () => (await sent(page)).commits.length, { timeout: 12000 }).toBe(2);
+  const pictured = (await sent(page)).commits[1];
+  expect(pictured?.baseVersion).toBe(2);
+  expect(pictured?.ops.some((op) => /^\/files\/[0-9a-f]{64}$/.test(op.path))).toBe(true);
+  expect(pictured?.ops.some((op) => op.op === "add" && op.path.startsWith("/elements/"))).toBe(
+    true,
+  );
+  // An SVG pasted is refused before it is uploaded.
+  await page.evaluate(() => {
+    const pasted = new DataTransfer();
+    pasted.items.add(new File(["<svg/>"], "x.svg", { type: "image/svg+xml" }));
+    const target = document.querySelector(".excalidraw") as HTMLElement;
+    target.dispatchEvent(
+      new ClipboardEvent("paste", { bubbles: true, cancelable: true, clipboardData: pasted }),
+    );
+  });
+  // A link pasted, which Excalidraw would embed as a page: nothing is embedded, nothing loads.
+  await page.evaluate(() => {
+    const pasted = new DataTransfer();
+    pasted.setData("text/plain", "https://www.youtube.com/watch?v=x");
+    const target = document.querySelector(".excalidraw") as HTMLElement;
+    target.dispatchEvent(
+      new ClipboardEvent("paste", { bubbles: true, cancelable: true, clipboardData: pasted }),
+    );
+  });
+  await page.waitForTimeout(500);
+  expect(await page.locator("iframe, .excalidraw__embeddable").count()).toBe(0);
+  expect((await sent(page)).uploads).toEqual(["image/png"]);
+  expect(seen.away()).toEqual([]);
+  expect(await reported()).toEqual([]);
+  await page.context().close();
+});
+
+test("the harness would see a blob: image the policy refuses: the canvas's own make none", async () => {
+  const { page, reported } = await open(browser, "?diagram");
+  await page.evaluate(async () => {
+    const image = document.createElement("img");
+    image.src = URL.createObjectURL(
+      new Blob([new Uint8Array([137, 80, 78, 71])], { type: "image/png" }),
+    );
+    document.body.append(image);
+  });
+  await expect.poll(async () => (await reported()).length).toBeGreaterThan(0);
   await page.context().close();
 });

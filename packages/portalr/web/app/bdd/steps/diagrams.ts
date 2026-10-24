@@ -24,7 +24,10 @@ When("they accept the diagram the assistant proposed", async ({ page }) => {
 Then(
   "the diagram {string} is shown with {int} elements",
   async ({ page }, name: string, count: number) => {
-    await expect(card(page, name).getByText(`Diagram · ${count} elements`)).toBeVisible();
+    // A save made on the canvas is read again once it is on the log: within seconds.
+    await expect(card(page, name).getByText(`Diagram · ${count} elements`)).toBeVisible({
+      timeout: 15_000,
+    });
   },
 );
 
@@ -73,4 +76,135 @@ When("they press Escape", async ({ page }) => {
 Then("the canvas is closed, and {string} has the focus", async ({ page }, name: string) => {
   await expect(page.locator(".excalidraw")).toHaveCount(0);
   await expect(page.getByRole("button", { name })).toBeFocused();
+});
+
+const canvasOf = (page: Page) => page.locator(".excalidraw canvas").last();
+
+When("they edit it, and draw a rectangle", async ({ page }) => {
+  const dialog = page.getByRole("dialog", { name: "Stack" });
+  await dialog.getByRole("button", { name: "Edit" }).click();
+  const box = await canvasOf(page).boundingBox();
+  if (box === null) throw new Error("the canvas isn't drawn");
+  // A click on an empty place first, so the canvas has the keyboard.
+  await page.mouse.click(box.x + box.width - 200, box.y + box.height - 160);
+  await page.keyboard.press("r");
+  await page.mouse.move(box.x + box.width - 200, box.y + box.height - 160);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width - 80, box.y + box.height - 80, { steps: 5 });
+  await page.mouse.up();
+});
+
+Then("the canvas says {string}", async ({ page }, said: string) => {
+  const dialog = page.getByRole("dialog", { name: "Stack" });
+  await expect(dialog.getByRole("status")).toHaveText(said, { timeout: 15_000 });
+});
+
+When("they paste the image {string} on it", async ({ page }, name: string) => {
+  // An 8 by 8 red PNG, made on the page, pasted on the canvas as a file is.
+  const uploading = page.waitForResponse((response) =>
+    /\/diagrams\/[^/]+\/images$/.test(response.url()),
+  );
+  await page.evaluate(async (named) => {
+    const drawing = document.createElement("canvas");
+    drawing.width = 8;
+    drawing.height = 8;
+    const context = drawing.getContext("2d") as CanvasRenderingContext2D;
+    context.fillStyle = "#c00";
+    context.fillRect(0, 0, 8, 8);
+    const png = await new Promise<Blob>((done) => drawing.toBlob((blob) => done(blob as Blob)));
+    const pasted = new DataTransfer();
+    pasted.items.add(new File([png], named, { type: "image/png" }));
+    const target = document.querySelector(".excalidraw") as HTMLElement;
+    target.dispatchEvent(
+      new ClipboardEvent("paste", { bubbles: true, cancelable: true, clipboardData: pasted }),
+    );
+  }, name);
+  // Uploaded as the person; their next save, within the five seconds between saves, names it.
+  const uploaded = await uploading;
+  expect(uploaded.status()).toBe(201);
+  // Put on the canvas, it is waiting to be saved, within the five seconds between saves.
+  const dialog = page.getByRole("dialog", { name: "Stack" });
+  await expect(dialog.getByRole("status")).toHaveText("Saving…");
+});
+
+Then(
+  "the canvas asked nothing of another origin, and its policy refused nothing",
+  async ({ page }) => {
+    const watched = seen.get(page);
+    const origin = new URL(page.url()).origin;
+    expect(
+      watched?.requests.filter(
+        (url) => !url.startsWith(origin) && !url.startsWith("data:") && !url.startsWith("blob:"),
+      ),
+    ).toEqual([]);
+    expect(watched?.violations).toEqual([]);
+  },
+);
+
+Then("the canvas offers no way to give an element a link", async ({ page }) => {
+  const dialog = page.getByRole("dialog", { name: "Stack" });
+  // The image just put on it is selected, with its actions shown: no link among them.
+  await expect(dialog.getByRole("button", { name: "Duplicate" })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: /link/i })).toHaveCount(0);
+  await page.keyboard.press("ControlOrMeta+k");
+  await expect(dialog.getByRole("textbox", { name: /link/i })).toHaveCount(0);
+});
+
+When("they close the canvas", async ({ page }) => {
+  await page
+    .getByRole("dialog", { name: "Stack" })
+    .getByRole("button", { name: "Close canvas" })
+    .click();
+});
+
+Then(
+  "the canvas draws its image, read from the portal, under the portal's policy",
+  async ({ page }) => {
+    const watched = seen.get(page);
+    // Its image's bytes, read as the person, from the diagrams' route on the portal's origin.
+    await expect
+      .poll(() => watched?.requests.some((url) => /\/images\/[0-9a-f]{64}$/.test(url)))
+      .toBe(true);
+    await expect(page.locator(".excalidraw canvas").first()).toBeVisible();
+    const origin = new URL(page.url()).origin;
+    expect(
+      watched?.requests.filter(
+        (url) => !url.startsWith(origin) && !url.startsWith("data:") && !url.startsWith("blob:"),
+      ),
+    ).toEqual([]);
+    expect(watched?.violations).toEqual([]);
+  },
+);
+
+When("they open the diagram's page", async ({ page }) => {
+  await card(page, "Stack").getByRole("link", { name: "Open its page" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Stack" })).toBeVisible();
+});
+
+Then(
+  "its versions {int} and {int} are by {string}",
+  async ({ page }, first: number, second: number, who: string) => {
+    const revisions = page.getByRole("list", { name: "Revisions" });
+    for (const version of [first, second]) {
+      await expect(revisions.getByRole("listitem", { name: `Version ${version}` })).toContainText(
+        `by ${who}`,
+      );
+    }
+  },
+);
+
+When("they open the thread {string}", async ({ page }, title: string) => {
+  await page.getByRole("link", { name: title, exact: true }).first().click();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(title);
+});
+
+Then("the canvas offers no edit", async ({ page }) => {
+  const dialog = page.getByRole("dialog", { name: "Stack" });
+  // Its grants are asked as the canvas opens: once they have answered, Edit isn't there.
+  const asked = page.waitForResponse((response) => response.url().endsWith("/grantr/v1/checks"), {
+    timeout: 3_000,
+  });
+  await expect(page.locator(".excalidraw canvas").first()).toBeVisible();
+  await asked.catch(() => undefined);
+  await expect(dialog.getByRole("button", { name: "Edit" })).toHaveCount(0);
 });

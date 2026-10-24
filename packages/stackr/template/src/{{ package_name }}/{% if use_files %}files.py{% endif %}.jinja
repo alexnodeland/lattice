@@ -41,6 +41,9 @@ from artifactr.excalidraw import (
     excalidraw_key_of,
 )
 {%- endif %}
+{%- if use_diagrams %}
+from artifactr.excalidraw.fastapi import diagrams_router
+{%- endif %}
 from artifactr.fastapi import ResolveActor
 from artifactr.files import (
 {%- for name in ((crafts.values() | map(attribute='type') | list) + ['App', 'Blobs', 'Checkouts', 'InMemoryBlobs', 'InMemoryCheckouts', 'NativeFile', 'NativeFiles']) | sort %}
@@ -201,7 +204,14 @@ class Files:
     def mount(
         self, app: FastAPI, workspaces: Workspaces, *, resolve_actor: ResolveActor, prefix: str
     ) -> None:
+{%- if use_diagrams %}
+        """Add native files' routes beside artifactr's, while any app runs.
+
+        And the routes of a diagram's images, which a person puts on its canvas, app or none.
+        """
+{%- else %}
         """Add native files' routes beside artifactr's, while any app runs."""
+{%- endif %}
         if self.native is not None:
             uploads = self._uploads
             router = files_router(
@@ -214,6 +224,17 @@ class Files:
                 uploads_each=uploads.each,
             )
             app.include_router(router, prefix=prefix)
+{%- if use_diagrams %}
+        app.include_router(
+            diagrams_router(
+                workspaces,
+                self._blobs,
+                resolve_actor=resolve_actor,
+                integrations=self._integrations,
+            ),
+            prefix=prefix,
+        )
+{%- endif %}
 
 
 def _stores(database: Database | None, settings: FilesSettings) -> tuple[Blobs, Checkouts]:

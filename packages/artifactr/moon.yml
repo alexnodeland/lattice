@@ -64,13 +64,14 @@ tasks:
       - 'src/artifactr/core/rules.py'
 
   schema:
-    description: "Regenerate the protocol JSON Schema, the REST surfaces' OpenAPI documents, the forms' and the diagrams' wire schemas"
+    description: "Regenerate the protocol JSON Schema, the REST surfaces' OpenAPI documents, the forms' and the diagrams' wire schemas, and the diagrams' image routes"
     script: >-
       uv run python -m artifactr.core.schema > schemas/artifactr.v1.json
       && uv run python -m artifactr.fastapi.openapi > schemas/artifactr.openapi.json
       && uv run python -m artifactr.files.fastapi.openapi > schemas/artifactr-files.openapi.json
       && uv run python -m artifactr.ui.wire > schemas/artifactr_ui.v1.json
       && uv run python -m artifactr.excalidraw.wire > schemas/artifactr_excalidraw.v1.json
+      && uv run python -m artifactr.excalidraw.openapi > schemas/artifactr-excalidraw.openapi.json
     options:
       cache: false
       runInCI: false

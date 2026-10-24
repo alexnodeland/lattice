@@ -1,6 +1,6 @@
 # ADR-0017: CI installs its toolchain from a cache, with retries
 
-**Status:** Accepted
+**Status:** Accepted, amended 2026-10-24 (see Amendment)
 **Date:** 2026-10-13
 **Deciders:** Alex Nodeland
 **Amends:** [ADR-0003](0003-ci-on-pull-requests-nightly-on-main-and-a-required-title-check.md): how every job installs its tools
@@ -42,3 +42,7 @@ Every job that runs moon, uv or Bun installed them through `moonrepo/setup-toolc
 - Harder: lattice keeps an action and a script that setup-toolchain kept before.
 - Harder: a bump of proto needs its digests copied by hand.
 - Revisit: the `self-repository` ignores, once actionlint accepts `$/`.
+
+## Amendment (2026-10-24)
+
+Nightly's `toolchain` job, for each architecture, saves `~/.proto` on every run, in place of the check job (amd64) and the thin images' arm64 job, which ran only on a schedule or a push that a push no longer starts for them. The rule is unchanged: only Nightly, on `main`, saves it, after `proto clean`, when its key is new. The OpenTofu providers' cache, the other one pull requests share, is likewise restored by pull requests and saved by Nightly (`AWS (tier 1)` for x64, `AWS (tier 2)` for arm64): saved from every pull request's ref, its 135 MB evicted main's caches.

@@ -245,13 +245,21 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
       - run: proto trust .prototools && proto install tofu && proto install tflint
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - id: providers
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.terraform.d/plugin-cache
           key: opentofu-providers-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('packages/stackr/deploy/aws/**/.terraform.lock.hcl') }}
       - run: moon run stackr:aws
         env:
           GITHUB_TOKEN: ${{ github.token }}
+      # Saved even if the checks failed: the providers are downloaded by then, and a failing night
+      # would otherwise leave every pull request without them.
+      - if: always() && steps.providers.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.terraform.d/plugin-cache
+          key: ${{ steps.providers.outputs.cache-primary-key }}
 
   # Every lockfile git doesn't ignore: uv.lock and bun.lock.
   osv:

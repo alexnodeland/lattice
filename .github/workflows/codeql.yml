@@ -12,8 +12,10 @@ on:
     paths:
       - "**/*.py"
       - "**/*.[cm]js"
+      - "**/*.[cm]ts"
       - "**/*.[jt]s"
       - "**/*.[jt]sx"
+      - .github/workflows/codeql.yml
   push:
     branches: [main]
   schedule:

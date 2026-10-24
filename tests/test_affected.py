@@ -60,13 +60,22 @@ def test_every_task_that_starts_a_stack_runs_one_project_at_a_time() -> None:
 
 def test_a_language_narrows_the_projects_that_run_a_task() -> None:
     targets_of = AFFECTED["targets_of"]
+    # As `moon query projects` prints them: each has a language, declared or inferred.
     projects = {
-        "evalr": {"tasks": {"test": {}}, "language": "python"},
-        "lattice": {"tasks": {"test": {}}, "language": "python"},
-        "ui": {"tasks": {"test": {}}, "language": "typescript"},
-        "stackr": {"tasks": {}, "language": "bash"},
+        "evalr": {"id": "evalr", "language": "python", "tasks": {"test": {}}},
+        "lattice": {"id": "lattice", "language": "python", "tasks": {"test": {}, "lint": {}}},
+        "ui": {"id": "ui", "language": "typescript", "tasks": {"test": {}}},
+        "stackr": {"id": "stackr", "language": "bash", "tasks": {"check": {}}},
+        "docplan": {"id": "docplan", "language": "python", "tasks": {"check": {}}},
     }
-    everyone = {"evalr", "lattice", "ui", "stackr"}
+    everyone = {"evalr", "lattice", "ui", "stackr", "docplan"}
     assert targets_of("test", everyone, projects) == ["evalr:test", "lattice:test", "ui:test"]
     assert targets_of("test", everyone, projects, "python") == ["evalr:test", "lattice:test"]
     assert targets_of("test", {"ui", "stackr"}, projects, "python") == []
+
+
+def test_a_project_without_a_language_is_matched_by_no_language_but_still_runs_unfiltered() -> None:
+    targets_of = AFFECTED["targets_of"]
+    projects = {"odd": {"tasks": {"test": {}}}}
+    assert targets_of("test", {"odd"}, projects) == ["odd:test"]
+    assert targets_of("test", {"odd"}, projects, "python") == []

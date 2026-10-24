@@ -22,7 +22,7 @@ env:
 jobs:
   # Whether a pull request changes tier 2's inputs: the recipe, the images' files, or the template
   # it generates the application from. Asked on a small runner, so an unaffected pull request
-  # starts no arm64 one. First in the file, so it is given a runner first when they are scarce: it
+  # starts no arm64 one. Listed first, which in practice starts it earlier when runners are scarce: it
   # gates the longest job after Check.
   aws-tier2-affected:
     name: AWS (tier 2) affected
@@ -435,9 +435,9 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
 
   # stackr's AWS recipe, tier 2 (stackr RFC-0004, ADR-0036): envs/floci applied against Floci,
-  # with the thin images and an application from the template, smoked and destroyed, when the
-  # job above finds its inputs changed. On arm64, as Fargate runs the tasks. What it starts is
-  # published on the runner's 127.0.0.1 alone, and it never reaches AWS.
+  # with the thin images and an application from the template, smoked and destroyed, when
+  # `aws-tier2-affected` finds its inputs changed. On arm64, as Fargate runs the tasks. What it
+  # starts is published on the runner's 127.0.0.1 alone, and it never reaches AWS.
   aws-tier2:
     name: AWS (tier 2)
     needs: aws-tier2-affected
@@ -706,7 +706,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+      # Bounded apart from the checkout, so a stalled action is what times out: it ran 6 minutes
+      # in the run that stalled, and a quiet one takes under 1.
+      - timeout-minutes: 10
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
 
   # GitHub's dependency graph doesn't read uv.lock or bun.lock, so osv-scanner compares the pull
   # request's lockfiles with its base's. It finds every lockfile git doesn't ignore, uv.lock and

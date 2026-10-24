@@ -66,7 +66,8 @@ def targets_of(
     return [
         f"{name}:{task}"
         for name in sorted(affected)
-        if task in projects[name]["tasks"] and language in (None, projects[name]["language"])
+        if task in projects[name]["tasks"]
+        and (language is None or projects[name].get("language") == language)
     ]
 
 

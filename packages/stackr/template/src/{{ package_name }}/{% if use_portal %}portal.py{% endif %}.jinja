@@ -30,7 +30,7 @@ import httpx
 from fastapi import APIRouter, FastAPI, HTTPException, Request, Response
 
 from grantr import Grants
-from portalr.analytics import InMemoryRateLimiter, Relay, SessionStamp
+from portalr.analytics import InMemoryRateLimiter, Relay, SessionStamp, Umami
 from portalr.analytics.sql import SqlConsent
 from portalr.analytics.sql import migrate as migrate_consent
 from portalr.fastapi import UI, SandboxOrigin, Site, {% if use_tracker %}Surfaces, {% endif %}portalr_router
@@ -45,6 +45,7 @@ from portalr.readers import (
     Prometheus,
     Readers,
     Tempo,
+    UmamiLinks,
 )
 
 from {{ package_name }}.access import Access
@@ -55,6 +56,9 @@ PREFIX = "/portalr"
 
 SETTLE_EVERY: Final = 300.0
 """About how many seconds apart the background pass settles deletions owed (lattice RFC-0008)."""
+
+DRAIN = 5.0
+"""How long the portal waits, as it stops, for the copies to Umami still being sent."""
 
 LOGGER = logging.getLogger(__name__)
 
@@ -165,7 +169,33 @@ def readers(settings: Settings, clients: list[httpx.AsyncClient]) -> Readers:
         litellm=litellm,
         grafana=Grafana(portal.grafana_url) if portal.grafana_url else None,
         analytics=analytics(settings, clients),
+        umami=UmamiLinks(portal.umami_ui_url, portal.umami_website)
+        if portal.umami_ui_url and portal.umami_website
+        else None,
     )
+
+
+def umami(settings: Settings, clients: list[httpx.AsyncClient]) -> Umami | None:
+    """Umami's ingest, for a copy of consented events, where the settings name it whole.
+
+    Named in part, it is off, and says which are missing, so an empty password never quietly
+    sends nothing.
+    """
+    portal = settings.portal
+    url, website, password = portal.umami_url, portal.umami_website, portal.umami_password
+    if not (url and website and password):
+        named = {
+            "PORTAL_UMAMI_URL": url,
+            "PORTAL_UMAMI_WEBSITE_ID": website,
+            "PORTAL_UMAMI_PASSWORD": password,
+        }
+        missing = [name for name, value in named.items() if not value]
+        if len(missing) < len(named):
+            LOGGER.warning("Umami is off: %s isn't set", ", ".join(missing))
+        return None
+    client = httpx.AsyncClient()
+    clients.append(client)
+    return Umami(url, website, password, client)
 
 
 def invitations(settings: Settings, clients: list[httpx.AsyncClient]) -> Invite:
@@ -261,7 +291,8 @@ class Portal:
 
         A ClickHouse that is down doesn't hold the application's start: each deletion stays owed
         until a pass does it, a few minutes apart, so a person who never comes back is still
-        deleted. Whatever the pass raised, its clients are closed.
+        deleted. Whatever the pass raised, its clients are closed, once the copies to Umami still
+        being sent have had a few seconds to finish.
         """
         settling = (
             asyncio.create_task(self._settle(self._relay)) if self._relay is not None else None
@@ -273,6 +304,10 @@ class Portal:
                 settling.cancel()
                 with contextlib.suppress(asyncio.CancelledError, Exception):
                     await settling
+            if self._relay is not None and self._relay.copies:
+                # The copies to Umami still being sent, a few seconds at most, before their client
+                # closes; one still going then is dropped, as a copy may be.
+                await asyncio.wait(set(self._relay.copies), timeout=DRAIN)
             for client in self._clients:
                 await client.aclose()
 
@@ -327,7 +362,12 @@ class Portal:
         if tools.analytics is not None and self._database is not None:
             # Each replica counts a person's pace apart (lattice RFC-0008).
             consent = SqlConsent(self._database.engine, owner=self._database.owner)
-            relay = Relay(tools.analytics, consent, InMemoryRateLimiter())
+            relay = Relay(
+                tools.analytics,
+                consent,
+                InMemoryRateLimiter(),
+                umami=umami(self._settings, self._clients),
+            )
             self._relay = relay
             # A request's analytics session on its server span, where it is the caller's own: added
             # before the server's instrumentation, which runs outside it (portalr ADR-0073).

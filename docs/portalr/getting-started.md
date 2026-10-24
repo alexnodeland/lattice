@@ -190,7 +190,7 @@ The UIs read this first. It is public, so it holds no secret:
 | `supabase.url` | Your Supabase project's URL, or a path on your own origin that leads to it |
 | `supabase.key` | Its publishable key |
 | `surfaces` | Where you mounted each router: `artifactr` (default `/artifactr/v1`), `reflexr` (default `/reflexr/v1`), `grantr` (default `""`: its paths carry `/grantr/v1` themselves), `portalr` (default `/portalr/v1`) and `relayr` (default `null`: the application has no tracker; give the origin of relayr's tracker reads, `""` on this one, and runs link to what they filed). Pass `Surfaces(...)` in `Site` if you mounted them elsewhere |
-| `readers` | Which tools are configured, by name: `tempo`, `loki`, `prometheus`, `langfuse`, `litellm`, `grafana` and `analytics`, each true or false |
+| `readers` | Which tools are configured, by name: `tempo`, `loki`, `prometheus`, `langfuse`, `litellm`, `grafana`, `analytics` and `umami`, each true or false |
 | `people` | Whether the router names people by email: true where `people` was passed |
 | `editors` | Each native file's app's hosted editor, by its integration, such as `files:wordcraft`: pass `editors={...}` in `Site` where you serve one on an origin of its own ([ADR-0049](adr/0049-checking-a-native-file-out-and-in.md)). Empty by default |
 | `apps` | The origin mini apps run on: pass `apps=` in `Site` where you serve their sandbox, below. `null` by default, and apps are then shown as their label and summary |

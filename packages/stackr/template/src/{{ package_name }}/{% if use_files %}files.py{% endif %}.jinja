@@ -12,6 +12,14 @@ native files are off: no route is mounted, and the agent has no tools for them.
 - the agent's tools: ``read_native``, ``read_review``, ``find_commands`` and ``edit_native``
 
 Each app is an integration of its own, ``files:<app>``, switched per workspace like any other.
+{%- if use_diagrams %}
+
+Diagrams, Excalidraw's, are kept beside them: their images in the same store. With
+``DIAGRAMS=on``, the agent draws and renders them through the diagrams worker, ``diagrams``, on
+the ``files`` network as a native file's worker is (stackr ADR-0049): ``read_diagram``,
+``draw_mermaid``, ``draw`` and ``edit_elements``. Diagrams are the integration ``excalidraw``,
+off in every workspace until switched on.
+{%- endif %}
 """
 
 import contextlib
@@ -23,7 +31,16 @@ from fastapi import FastAPI
 from pydantic import JsonValue, ValidationError
 from pydantic_ai.toolsets import AbstractToolset
 
-from artifactr import Session, Workspaces
+from artifactr import {% if use_diagrams %}Artifact, {% endif %}Session, Workspaces
+{%- if use_diagrams %}
+from artifactr.excalidraw import (
+    Diagram,
+    WorkerConverter,
+    diagram_tools,
+    excalidraw_checks,
+    excalidraw_key_of,
+)
+{%- endif %}
 from artifactr.fastapi import ResolveActor
 from artifactr.files import (
 {%- for name in ((crafts.values() | map(attribute='type') | list) + ['App', 'Blobs', 'Checkouts', 'InMemoryBlobs', 'InMemoryCheckouts', 'NativeFile', 'NativeFiles']) | sort %}
@@ -35,6 +52,9 @@ from artifactr.files.fastapi import files_router
 from artifactr.files.sql import SqlBlobs, SqlCheckouts, migrate
 from artifactr.files.tools import native_file_tools
 from artifactr.files.worker import Worker
+{%- if use_diagrams %}
+from artifactr.workspace import Check
+{%- endif %}
 from lattice_core.integrations import Integrations
 
 from {{ package_name }}.database import Database
@@ -51,6 +71,12 @@ TYPES: Final[Mapping[str, type[NativeFile]]] = {
 def worker_url(craft: str) -> str:
     """Where an app's worker answers: its relay, on the ``files`` network."""
     return f"http://files-{craft}:8080"
+{%- if use_diagrams %}
+
+
+DIAGRAMS_URL: Final = "http://diagrams:8080"
+"""Where the diagrams worker answers: its relay, on the ``files`` network."""
+{%- endif %}
 
 
 class Files:
@@ -77,30 +103,64 @@ class Files:
             for craft in settings.crafts
         }
         self._uploads = settings.uploads
+        self._integrations = integrations
+        blobs, checkouts = _stores(database, settings)
+        self._blobs = blobs
         self.native: NativeFiles | None = None
         if self._workers:
             apps: dict[type[NativeFile], App] = {
                 TYPES[craft]: worker for craft, worker in self._workers.items()
             }
             self.native = NativeFiles(
-                *_stores(database, settings),
+                blobs,
+                checkouts,
                 apps,
                 integrations=integrations,
                 readings=settings.uploads.readings,
+{%- if use_diagrams %}
+                # Diagrams name images in the same store, which its collection keeps.
+                naming=(Diagram,),
+{%- endif %}
             )
+{%- if use_diagrams %}
+        self.diagrams = (
+            WorkerConverter.at(DIAGRAMS_URL, token=settings.diagrams_token, transport=transport)
+            if settings.diagrams
+            else None
+        )
+{%- endif %}
 
     @property
-    def types(self) -> list[type[NativeFile]]:
-        """The native types of the apps that run."""
-        return [TYPES[craft] for craft in self._workers]
+    def types(self) -> list[type[{% if use_diagrams %}Artifact{% else %}NativeFile{% endif %}]]:
+        """The native types of the apps that run{% if use_diagrams %}, and diagrams{% endif %}."""
+        return [{% if use_diagrams %}Diagram, {% endif %}*(TYPES[craft] for craft in self._workers)]
 
     def key_of(self, kind: str, data: Mapping[str, JsonValue]) -> str | None:
         """The integration that governs an artifact: its app's, for a native file."""
+{%- if use_diagrams %}
+        if diagram := excalidraw_key_of(kind, data):
+            return diagram
+{%- endif %}
         return self.native.key_of(kind, data) if self.native else None
+{%- if use_diagrams %}
+
+    def checks(self) -> Mapping[str, Check]:
+        """The diagrams' checks, by command type, for ``Workspaces(checks=...)``."""
+        return excalidraw_checks()
+{%- endif %}
 
     def toolsets(self) -> list[AbstractToolset[Session[Any]]]:
-        """The agent's tools for native files, while any app runs."""
-        return [native_file_tools(self.native)] if self.native else []
+        """The agent's tools for native files, while any app runs{% if use_diagrams %}; diagrams', with DIAGRAMS=on{% endif %}."""
+        found: list[AbstractToolset[Session[Any]]] = []
+        if self.native:
+            found.append(native_file_tools(self.native))
+{%- if use_diagrams %}
+        if self.diagrams:
+            found.append(
+                diagram_tools(self.diagrams, blobs=self._blobs, integrations=self._integrations)
+            )
+{%- endif %}
+        return found
 
     async def migrate(self, database: Database) -> None:
         """Upgrade the database to native files' tables, as its owner, even with no app running.
@@ -118,6 +178,10 @@ class Files:
                 another version, than its pin names.
         """
         async with contextlib.AsyncExitStack() as stack:
+{%- if use_diagrams %}
+            if self.diagrams:
+                stack.push_async_callback(self.diagrams.aclose)
+{%- endif %}
             for craft, worker in self._workers.items():
                 stack.push_async_callback(worker.aclose)
                 try:

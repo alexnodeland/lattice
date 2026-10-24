@@ -3,8 +3,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, test } from "vitest";
 import { collect, declaredLicence, packageDirectory } from "./collect";
-import { check, type Policy, readPolicy, staleExceptions, usedUnder } from "./policy";
-import { parseNotices, render } from "./render";
+import { check, type Policy, readPolicy, staleExceptions, UNDECLARED, usedUnder } from "./policy";
+import { parseNotices, preface, render } from "./render";
 
 const root = mkdtempSync(join(tmpdir(), "notices-"));
 afterAll(() => rmSync(root, { recursive: true, force: true }));
@@ -103,6 +103,31 @@ describe("the policy", () => {
       "see@1.0.0: its licence, SEE LICENSE IN LICENSE.md, isn't an SPDX expression",
       "unlicensed@1.0.0: its licence, UNLICENSED, isn't allowed",
     ]);
+  });
+
+  test("a package that declares no licence passes only by an exception for none", () => {
+    const ids = [pack("quiet", {}, { license: "MIT, in its text" })];
+    const excused: Policy = {
+      ...policy,
+      exceptions: [{ package: "quiet", licence: UNDECLARED, kind: "licence", reason: "read" }],
+    };
+    expect(problemsOf(ids)).toEqual(["quiet@1.0.0: declares no licence"]);
+    expect(problemsOf(ids, excused)).toEqual([]);
+    expect(
+      staleExceptions([{ name: "quiet", licence: undefined, hasText: true }], excused),
+    ).toEqual([]);
+    expect(render("worker", collect(ids))).toContain("Licence: none declared");
+  });
+
+  test("a build may say what its notices say first", () => {
+    const text = render(
+      "worker",
+      collect([pack("said", { license: "MIT" })]),
+      new Map(),
+      (ui, n) => [`Notices for the ${ui}: ${n} package`],
+    );
+    expect(text.split("\n")[0]).toBe("Notices for the worker: 1 package");
+    expect(preface("app", 2)[0]).toBe("Third-party notices for the JavaScript in portalr's app UI");
   });
 
   test("a package that ships no licence text fails, whatever it declares", () => {

@@ -8,6 +8,11 @@
 # names), which compose.yaml's files-<app> services build: `files-worker`, the app's CLI behind
 # the worker, and `files-editor`, its browser build on an origin of its own.
 {%- endif %}
+{%- if use_diagrams %}
+#
+# Diagrams add `diagrams-worker`, Excalidraw in headless Chromium, which compose.yaml's
+# diagrams-worker builds (stackr ADR-0049).
+{%- endif %}
 
 {% if use_portal -%}
 # portalr's UIs, which its wheel carries and a git install of it does not: built from the lattice
@@ -144,6 +149,44 @@ USER editor
 EXPOSE 8000
 CMD ["python", "-m", "{{ package_name }}.editor"]
 {%- endif %}
+{%- endif %}
+{%- if use_diagrams %}
+
+
+# The diagrams worker's page and server, from the lattice commit uv.lock pins artifactr at
+# (scripts/build-diagrams-worker.sh), so it answers the converter artifactr calls. XIAOLAI=1 adds
+# Excalidraw's CJK face, Xiaolai, once its licence is confirmed (lattice#679).
+FROM oven/bun:1.4.3@sha256:ec06c3b6cea04192ae6770c434f668ca41d343ad19fa6472216c7b48be39c598 AS diagrams-build
+ARG XIAOLAI=0
+# The Playwright of the image below, which the worker's playwright-core must be: the script
+# checks the one it built, from uv.lock's commit, against it.
+ARG PLAYWRIGHT=1.64.0
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends ca-certificates git \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY uv.lock ./
+COPY scripts/build-diagrams-worker.sh scripts/
+RUN --mount=type=cache,target=/root/.bun/install/cache \
+    XIAOLAI=${XIAOLAI} PLAYWRIGHT=${PLAYWRIGHT} scripts/build-diagrams-worker.sh /worker
+
+# The worker: one warm headless Chromium, the one Playwright's image holds at the version of the
+# playwright-core the worker's lock pins (scripts/check-template holds the two to one version).
+# Noto CJK draws CJK; the image's other CJK faces are removed, so Noto's is the one it draws with.
+FROM mcr.microsoft.com/playwright:v1.64.0-noble@sha256:06a9939e57531807f8d5fd76ce44b53165ffb7d7501d87ab10e285c20b1e971f AS diagrams-worker
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends fonts-noto-cjk \
+    && apt-get purge --yes fonts-wqy-zenhei fonts-ipafont-gothic \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --no-create-home --uid 10005 diagrams
+COPY --from=diagrams-build /worker /opt/diagrams
+ENV NODE_ENV=production \
+    HOME=/tmp \
+    PAGE_DIR=/opt/diagrams/page \
+    PORT=8080
+USER diagrams
+EXPOSE 8080
+CMD ["node", "/opt/diagrams/server.mjs"]
 {%- endif %}
 
 

@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">={{ python_version }}"
 dependencies = [
 {%- if use_artifactr %}
-    "artifactr-ai[sql,postgres,fastapi,mcp,otel,langfuse,litellm{% if use_ui %},forms{% endif %}{% if use_files %},files{% endif %}]",
+    "artifactr-ai[sql,postgres,fastapi,mcp,otel,langfuse,litellm{% if use_ui %},forms{% endif %}{% if use_files %},files{% endif %}{% if use_diagrams %},excalidraw{% endif %}]",
 {%- endif %}
 {%- if use_reflexr %}
     "reflexr[sql,postgres,fastapi,mcp,otel,langfuse,litellm{% if evals %},evals{% endif %}]",

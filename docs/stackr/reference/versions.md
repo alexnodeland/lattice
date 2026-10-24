@@ -18,6 +18,7 @@ Renovate doesn't read this file. To bump a pin, change it here, then run `make d
 | Pin | Value |
 |---|---|
 | `SUPABASE_CLI_VERSION` | `2.118.0` |
+| `EXCALIDRAW_VERSION` | `0.18.1` |
 
 <!-- end generated -->
 

@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# Builds the diagrams worker (stackr ADR-0049) from the repository and commit uv.lock pins
+# artifactr at, so the worker answers the converter that installed artifactr calls.
+#
+# The worker is lattice's packages/stackr/workers/diagrams: its page, Excalidraw at the version
+# its lock pins, which Vite builds; and its server, which Bun bundles for Node. The Dockerfile's
+# diagrams-build stage runs it. Xiaolai, Excalidraw's CJK face, is left out unless XIAOLAI is 1,
+# until its licence is confirmed (lattice#679).
+#
+# The commit must hold the worker: lattice's, from the one that added it (stackr ADR-0049). With
+# PLAYWRIGHT set, the playwright-core it builds must be that version, the image's Chromium's.
+#
+# Usage: scripts/build-diagrams-worker.sh DIR [UV_LOCK]
+#   DIR       where to write server.mjs, page/ and node_modules/playwright-core
+#   UV_LOCK   the lock file (default: uv.lock)
+
+set -euo pipefail
+
+dir=${1:?usage: build-diagrams-worker.sh DIR [UV_LOCK]}
+lock=${2:-uv.lock}
+
+# The lock's entry for artifactr, up to the next package's:
+# `source = { git = "https://host/owner/repo?subdirectory=packages%2Fartifactr&rev=X#SHA" }`.
+source=$(awk '/^\[\[package\]\]/ { name = ""; next }
+  /^name = / { name = $0 }
+  name == "name = \"artifactr-ai\"" && /^source = / { print; exit }' "$lock")
+repo=$(sed -nE 's/.*git = "([^"?#]+)[?#"].*/\1/p' <<<"$source")
+rev=$(sed -nE 's/.*#([0-9a-f]{40})".*/\1/p' <<<"$source")
+[[ -n $repo && -n $rev ]] || { echo "build-diagrams-worker: $lock pins artifactr at no git commit" >&2; exit 1; }
+
+out=$(mkdir -p "$dir" && cd "$dir" && pwd)
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+git init --quiet "$work/lattice"
+cd "$work/lattice"
+git remote add origin "$repo"
+git fetch --quiet --depth 1 origin "$rev"
+git checkout --quiet FETCH_HEAD
+bun install --frozen-lockfile --filter '@stackr/diagrams-worker'
+if [[ ! -d packages/stackr/workers/diagrams ]]; then
+  echo "build-diagrams-worker: lattice at $rev has no diagrams worker: update the libraries (uv lock --upgrade-package artifactr-ai)" >&2
+  exit 1
+fi
+cd packages/stackr/workers/diagrams
+built=$(bun -e 'console.log(require("./node_modules/playwright-core/package.json").version)')
+if [[ -n ${PLAYWRIGHT:-} && $built != "$PLAYWRIGHT" ]]; then
+  echo "build-diagrams-worker: lattice at $rev drives Playwright $built, and the image's Chromium is Playwright $PLAYWRIGHT's: run \`copier update\`, or pin the libraries at a commit whose worker matches" >&2
+  exit 1
+fi
+bun x --bun --no-install vite build --outDir "$out/page" --emptyOutDir
+bun build src/server.ts --target=node --format=esm --external playwright-core --outfile "$out/server.mjs"
+cp FONTS.txt "$out/page/FONTS.txt"
+# Playwright's driver, which has no dependencies of its own: the one the lock pins.
+mkdir -p "$out/node_modules"
+cp -RL node_modules/playwright-core "$out/node_modules/playwright-core"
+chmod -R a+rX,go-w "$out"

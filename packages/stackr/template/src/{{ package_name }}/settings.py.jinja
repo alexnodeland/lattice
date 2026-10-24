@@ -205,6 +205,12 @@ class FilesSettings:
             for each app that runs and has one, its port on this machine, or, with
             ``FILES_EDITOR_DOMAIN``, ``https://<app>.<domain>/``, its name at a single host's edge.
 {%- endif %}
+{%- if use_diagrams %}
+        diagrams: Whether the diagrams worker runs, ``DIAGRAMS=on``, and the agent draws and
+            renders diagrams through it (stackr ADR-0049): off by default.
+        diagrams_token: The diagrams worker's token, ``DIAGRAMS_TOKEN``, which ``make env``
+            generates.
+{%- endif %}
     """
 
     crafts: tuple[str, ...] = ()
@@ -214,6 +220,10 @@ class FilesSettings:
     tenant_quota: Held | None = None
 {%- if use_portal %}
     editors: Mapping[str, str] = field(default_factory=dict[str, str])
+{%- endif %}
+{%- if use_diagrams %}
+    diagrams: bool = False
+    diagrams_token: str = field(default="", repr=False)
 {%- endif %}
 
     def __post_init__(self) -> None:
@@ -227,6 +237,13 @@ class FilesSettings:
                     f"FILES_CRAFTS needs FILES_{craft.upper()}_TOKEN, of at least {TOKEN} "
                     "characters, which `make env` generates"
                 )
+{%- if use_diagrams %}
+        if self.diagrams and len(self.diagrams_token) < TOKEN:
+            raise ValueError(
+                f"DIAGRAMS=on needs DIAGRAMS_TOKEN, of at least {TOKEN} characters, which "
+                "`make env` generates"
+            )
+{%- endif %}
 
     @classmethod
     def from_environ(cls, env: Mapping[str, str]) -> Self:
@@ -268,6 +285,10 @@ class FilesSettings:
             },
 {%- if use_portal %}
             editors={key: str(url) for key, url in editors.items()},
+{%- endif %}
+{%- if use_diagrams %}
+            diagrams=_switch(env.get("DIAGRAMS", "off"), "DIAGRAMS"),
+            diagrams_token=env.get("DIAGRAMS_TOKEN", ""),
 {%- endif %}
         )
 
@@ -596,6 +617,20 @@ def _whole[N: int | None](env: Mapping[str, str], name: str, default: N) -> int 
     if not WHOLE.fullmatch(text) or int(text) < 1:
         raise ValueError(f"{name} is a whole number of at least 1, not {text!r}")
     return int(text)
+{%- if use_diagrams %}
+
+
+def _switch(text: str, name: str) -> bool:
+    """A setting that is ``on`` or ``off``, off if empty.
+
+    Raises:
+        ValueError: If it is anything else, named by its variable.
+    """
+    said = text.strip().lower() or "off"
+    if said not in {"on", "off"}:
+        raise ValueError(f"{name} is on or off, not {text!r}")
+    return said == "on"
+{%- endif %}
 
 
 {% endif -%}

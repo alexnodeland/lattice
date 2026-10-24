@@ -10,7 +10,7 @@ Every command is a `make` target; `make` on its own lists them. The tools run th
 |---|---|
 | `make help` | List the available commands |
 | `make env` | Create or update .env, generating local secrets |
-| `make up` | Start the chosen PROFILES (default: all of them), with the database adapter they need |
+| `make up` | Start the chosen PROFILES (default: observability langfuse gateway), with the database adapter they need |
 | `make down` | Stop the stack, keeping its data |
 | `make reset` | Stop the stack and delete its data volumes, local Supabase's included |
 | `make ps` | Show the stack's containers |

@@ -12,7 +12,7 @@
 # (https://grafana.com/api/plugins/grafana-clickhouse-datasource/versions/<version>, `packages`),
 # and check each against the download itself:
 #   curl -fsSL '<the URL below, at the new version, os and arch>' | sha256sum
-# Fetched with curl, not ADD: ADD has no timeout, and one stalled download held CI for minutes
+# Fetched with curl, not ADD (ADR-0051): ADD has no timeout, and one stalled download held CI for minutes
 # before it failed. Each try is bounded, a failed one is tried again, and the archive is checked
 # against its sha256 before anything uses it, as ADD's --checksum did. The curl image is the one
 # compose.yaml pins.

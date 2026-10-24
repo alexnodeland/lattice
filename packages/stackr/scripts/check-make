@@ -67,6 +67,37 @@ check "make up refuses a stackr-umami that isn't internal" \
   refused env PATH="$scratch/bin:$PATH" FAKE_INTERNAL=false make --no-print-directory up STACKR_DATABASE=postgres PROFILES=umami
 check "and says how to fix it" said "stackr-umami isn't internal"
 
+# make up pulls the pinned images first, trying again after a registry's error: a docker whose
+# networks are as make wants them, whose `compose pull` fails until try FAKE_PULL_OK, and whose
+# `compose up` passes, and a `sleep` that doesn't. It counts its pulls in $scratch/pulls.
+cat >"$scratch/bin/docker" <<'FAKE'
+#!/usr/bin/env bash
+if [[ $1 == network && $2 == inspect ]]; then
+  if [[ $* == *Internal* ]]; then echo true; else echo 127.0.0.1; fi
+  exit 0
+fi
+if [[ $1 == compose && $* == *" pull "* ]]; then
+  echo pull >>"$FAKE_PULLS"
+  (($(grep -c "^pull" "$FAKE_PULLS") >= FAKE_PULL_OK))
+  exit
+fi
+[[ $1 == compose ]]
+FAKE
+cat >"$scratch/bin/sleep" <<'FAKE'
+#!/bin/sh
+echo "slept $1" >>"$FAKE_PULLS"
+FAKE
+chmod +x "$scratch/bin/sleep"
+pulls() {
+  rm -f "$scratch/pulls"
+  env PATH="$scratch/bin:$PATH" FAKE_PULLS="$scratch/pulls" FAKE_PULL_OK="$1" \
+    make --no-print-directory up STACKR_DATABASE=postgres PROFILES=observability
+}
+check "make up pulls again after two failed pulls, and starts the stack" quietly pulls 3
+check "having waited 20s, then 40s" grep -qzF $'pull\nslept 20\npull\nslept 40\npull\n' "$scratch/pulls"
+check "make up stops after three failed pulls" refused pulls 4
+check "and says so" said "the stack's images didn't pull, after 3 tries"
+
 # check-config on a copy whose config.yaml includes no groups, or whose groups lack `fast`.
 copy() {
   rm -rf "$scratch/stack" && mkdir -p "$scratch/stack/scripts" "$scratch/stack/deploy"

@@ -314,6 +314,38 @@ def check_diagrams() -> list[str]:
     return problems
 
 
+def stage(dockerfile: str, name: str) -> str:
+    """A Dockerfile's stage, from its FROM ... AS name to the next FROM."""
+    found = re.search(rf"^FROM [^\n]* AS {name}\n(.*?)(?=^FROM |\Z)", dockerfile, re.M | re.S)
+    return found[1] if found else ""
+
+
+def check_fetches() -> list[str]:
+    """The build-time fetches that are tried again keep their pins (stackr ADR-0051).
+
+    The files worker's resolve is tried again, and still under uv.lock's versions; the Grafana
+    image's ClickHouse plugin is fetched with bounded tries and checked against a sha256 for each
+    architecture it is built for, and for no other.
+    """
+    problems = []
+    worker = stage((ROOT / "template" / "Dockerfile.jinja").read_text(), "worker-venv")
+    for needed in ("uv export --locked", "--constraint /tmp/locked.txt", "for attempt in 1 2 3"):
+        if needed not in worker:
+            problems.append(f"Dockerfile's worker-venv stage has no `{needed}`")
+    plugin = stage((ROOT / "deploy" / "grafana" / "Dockerfile").read_text(), "clickhouse-plugin")
+    arms = dict(re.findall(r"^\s*(amd64|arm64)\) sha256=([0-9a-f]{64}) ;;", plugin, re.M))
+    if sorted(arms) != ["amd64", "arm64"]:
+        problems.append(
+            f"Grafana's plugin stage pins a sha256 for {sorted(arms)}, not amd64 and arm64"
+        )
+    if not re.search(r"^\s*\*\) echo .* exit 1 ;;", plugin, re.M):
+        problems.append("Grafana's plugin stage has no `*)` arm refusing another architecture")
+    for needed in ("sha256sum -c -", "--max-time", "--retry"):
+        if needed not in plugin:
+            problems.append(f"Grafana's plugin stage has no `{needed}`")
+    return problems
+
+
 def check(app: Path, sources: dict[str, dict[str, str]]) -> list[str]:
     """Check one rendered application, which needs these sources; return the problems found."""
     problems = check_sources(app, sources)
@@ -359,6 +391,9 @@ def main() -> int:
         failures += 1
     for problem in check_diagrams():
         print(f"FAIL: diagrams' pins: {problem}", file=sys.stderr)
+        failures += 1
+    for problem in check_fetches():
+        print(f"FAIL: fetches' pins: {problem}", file=sys.stderr)
         failures += 1
     with tempfile.TemporaryDirectory() as scratch:
         base = args.keep or Path(scratch)

@@ -6,7 +6,7 @@ import logging
 import re
 import time
 from collections.abc import AsyncIterator
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, cast
 
@@ -1073,7 +1073,7 @@ async def test_a_replay_is_one_tenants_and_a_removal_deletes_that_tenants_alone(
         if r.url.path == "/api/send"
     ]
     assert sorted(visits) == sorted([f"{ACME}:{ME}", f"{GLOBEX}:{ME}"]), "a session for each tenant"
-    await stack.relay.removed("globex", "alice")
+    await stack.relay.consent.owe_removal("alice", "globex", datetime.now(UTC))
     assert await stack.relay.settle_owed() == 1
     assert set(stack.stand.sessions) == {"s1", "s3"}, "acme's session stays, globex's is gone"
     stack.stand.sent.clear()

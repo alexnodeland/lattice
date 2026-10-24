@@ -66,6 +66,7 @@ A custom role is a tenant's own set of actions, granted wherever `editor` can be
 | `first_operator` | No operator yet |
 | `bootstrap` | The application's configured principal: grants it `application`, and revokes it from any other |
 | `served_tenants` | No one: every tenant, for the deployment's own in-process tools; no surface reaches it |
+| `served_audit` | No one: a tenant's audit entries after a `seq`, for the deployment's own in-process tools, such as a pass that acts on removals; no surface reaches it ([ADR-0037](adr/0037-the-deployments-own-tools-read-a-tenants-audit-log.md)) |
 | `provision_tenant` | The deployment's own tools, in process: a new tenant with its owner, and the admins it lacks ([ADR-0021](adr/0021-the-deployments-own-tools.md)) |
 | `grant_operator`, `revoke_operator` | `grantr:grant_operator` on the deployment |
 | `create_tenant` | `grantr:create_tenant` on the deployment; its owner is made a member and an owner |

@@ -2,11 +2,13 @@
 
 import json
 from collections.abc import AsyncIterator, Awaitable, Callable
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import httpx
 import pytest
 
+from grantr.core import ServicePrincipal, User
 from grantr.grants import Grants
 from portalr.analytics import InMemoryConsent, InMemoryRateLimiter, Relay
 from portalr.analytics.relay import MOST_BYTES, MOST_EVENTS, SESSION_HOURS, Batch, Event, Relayed
@@ -486,3 +488,55 @@ async def test_a_deletion_still_owed_is_read_with_the_answer_until_it_is_done(
     clickhouse.status = 200
     read = await client.get("/v1/analytics/consent", headers=ALICE)
     assert read.json() == {"given": False, "deleting": False}
+
+
+async def test_a_removal_only_owes_and_the_pass_deletes_once_its_grace_has_passed(
+    relay: Relay, clickhouse: ClickHouse, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    await relay.removed("acme", "bob")
+    assert clickhouse.requests == [], "the admin's removal never waits on ClickHouse"
+    ((user, tenant, removed_at),) = await relay.consent.removals_owed(100)
+    assert (user, tenant) == ("bob", "acme")
+    assert await relay.settle_owed() == 0, "not before its grace has passed"
+    assert clickhouse.requests == []
+    monkeypatch.setattr("portalr.analytics.relay.REMOVAL_GRACE", timedelta(0))
+    assert await relay.settle_owed() == 1
+    (deletion,) = clickhouse.requests
+    params = deletion.url.params
+    assert deletion.content.decode() == (
+        "DELETE FROM analytics.events WHERE distinct_id = {person:FixedString(32)}"
+        " AND tenant_id = {tenant:String} AND ts <= {until:DateTime64(3, 'UTC')}"
+    )
+    assert params["param_person"] == distinct_id(KEY, "bob")
+    assert params["param_tenant"] == "acme"
+    # A few seconds past the removal, for a relaying replica's clock that runs ahead.
+    until = datetime.strptime(params["param_until"], "%Y-%m-%d %H:%M:%S.%f").replace(tzinfo=UTC)
+    assert timedelta(seconds=4.99) <= until - removed_at <= timedelta(seconds=5)
+    assert await relay.consent.removals_owed(100) == [], "done, so no longer owed"
+
+
+async def test_a_removals_deletion_clickhouse_refuses_stays_owed_and_is_done_later(
+    relay: Relay, clickhouse: ClickHouse, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("portalr.analytics.relay.REMOVAL_GRACE", timedelta(0))
+    await relay.removed("acme", "bob")
+    clickhouse.status = 503
+    assert await relay.settle_owed() == 0
+    assert [(u, t) for u, t, _ in await relay.consent.removals_owed(100)] == [("bob", "acme")]
+    clickhouse.status = 200
+    assert await relay.settle_owed() == 1
+    assert await relay.consent.removals_owed(100) == []
+    # The same moment, each time it is tried: events written after the removal stay.
+    assert len({r.url.params["param_until"] for r in clickhouse.requests}) == 1
+
+
+async def test_grantrs_hook_owes_a_persons_deletion_and_nothing_for_a_key(
+    relay: Relay, clickhouse: ClickHouse, grants: Grants
+) -> None:
+    grants.on_member_removed(relay.member_removed)
+    await grants.add_member("acme", ServicePrincipal(id="ci"), by=User(id="alice"))
+    await grants.remove_member("acme", ServicePrincipal(id="ci"), by=User(id="alice"))
+    assert await relay.consent.removals_owed(100) == []
+    await grants.remove_member("acme", User(id="bob"), by=User(id="alice"))
+    assert [(u, t) for u, t, _ in await relay.consent.removals_owed(100)] == [("bob", "acme")]
+    assert clickhouse.requests == []

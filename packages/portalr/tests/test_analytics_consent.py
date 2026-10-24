@@ -3,6 +3,7 @@
 import importlib
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from datetime import timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from typing import cast
@@ -74,6 +75,9 @@ async def removals(consent: Consent) -> None:
     await consent.removal_settled("dana", "acme", later)
     assert [(u, t) for u, t, _ in await consent.removals_owed(100)] == [("dana", "globex")]
     assert not await consent.given("dana"), "a removal owed leaves the answer as it was"
+    globex = (await consent.removals_owed(100))[0][2]
+    assert await consent.removals_owed(100, before=globex) == [], "only those removed before"
+    assert len(await consent.removals_owed(100, before=globex + timedelta(seconds=1))) == 1
 
 
 async def test_answers_in_memory() -> None:
@@ -234,3 +238,31 @@ async def test_the_removals_migration_undoes_to_answers_alone(tmp_path: Path) ->
     assert "portalr_analytics_consent" in tables
     await migrate(engine)  # and up again
     await engine.dispose()
+
+
+@pytest.mark.parametrize("dialect", ["sqlite", "postgresql"])
+def test_the_removals_table_has_row_level_security_on_postgresql_alone(
+    dialect: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    migration = importlib.import_module(
+        "portalr.analytics.migrations.versions.0002_analytics_removals_owed"
+    )
+    statements: list[str] = []
+
+    class Op:
+        def get_bind(self) -> object:
+            return SimpleNamespace(dialect=SimpleNamespace(name=dialect))
+
+        def execute(self, statement: str) -> None:
+            statements.append(statement)
+
+        def create_table(self, name: str, *_: object) -> None:
+            statements.append(f"CREATE TABLE {name}")
+
+        def f(self, name: str) -> str:
+            return name
+
+    monkeypatch.setattr(migration, "op", Op())
+    migration.upgrade()
+    secured = "ALTER TABLE portalr_analytics_removals_owed ENABLE ROW LEVEL SECURITY"
+    assert (secured in statements) is (dialect == "postgresql")

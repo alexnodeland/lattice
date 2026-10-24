@@ -90,9 +90,22 @@ async def test_removals_are_the_owners_alone(schema: tuple[AsyncEngine, AsyncEng
     consent = SqlConsent(application, owner=owner)
     at = await consent.owe_removal("alice", "acme")
     assert await consent.removals_owed(100) == [("alice", "acme", at)]
-    async with application.begin() as connection:
-        with pytest.raises(Exception, match="permission denied"):
-            await connection.execute(text("SELECT * FROM portalr_analytics_removals_owed"))
+    for statement in (
+        "SELECT * FROM portalr_analytics_removals_owed",
+        "INSERT INTO portalr_analytics_removals_owed VALUES ('bob', 'acme', now())",
+        "UPDATE portalr_analytics_removals_owed SET removed_at = now()",
+    ):
+        async with application.begin() as connection:
+            with pytest.raises(Exception, match="permission denied"):
+                await connection.execute(text(statement))
+    async with owner.connect() as connection:
+        secured = await connection.scalar(
+            text(
+                "SELECT relrowsecurity FROM pg_class"
+                " WHERE relname = 'portalr_analytics_removals_owed'"
+            )
+        )
+    assert secured, "row-level security, so a grant made by default reads nothing"
     await consent.removal_settled("alice", "acme", at)
     assert await consent.removals_owed(100) == []
 

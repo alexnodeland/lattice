@@ -1,7 +1,15 @@
-/* The canvas in the brand kit's colours, as ui's tokens give them (portalr ADR-0072). */
+/* The canvas in the brand kit's colours, as ui's tokens give them (portalr ADR-0072). In dark mode
+   Excalidraw draws the scene through its own inverting filter, so the elements' colours there are
+   Excalidraw's, not the kit's: only its own UI takes the kit's accent. */
 .excalidraw {
   --color-primary: var(--accent);
   --color-primary-darker: var(--accent-hover);
   --color-primary-darkest: var(--accent-hover);
   --ui-font: var(--font-family-sans);
+}
+
+/* Its main menu and its help, whose items lead out of view mode or off the page, are not shown. */
+.excalidraw .main-menu-trigger,
+.excalidraw .help-icon {
+  display: none;
 }

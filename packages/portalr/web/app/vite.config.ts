@@ -39,8 +39,11 @@ const NATIVE_FILES = new RegExp(
 // application, at PORTALR_APP_URL, so the UI shares its origin as it does when served.
 const application = process.env.PORTALR_APP_URL ?? "http://localhost:8000";
 
+/** Where portalr's router serves the app, which Excalidraw's faces are found under too. */
+const BASE = "/portalr/app/";
+
 export default defineConfig({
-  base: "/portalr/app/",
+  base: BASE,
   // Streamdown's `rehype-raw`, which portalr never passes it, is built as nothing (portalr ADR-0040).
   resolve: {
     alias: { "rehype-raw": fileURLToPath(new URL("../ui/src/rehype-raw.ts", import.meta.url)) },
@@ -48,7 +51,7 @@ export default defineConfig({
   // Each route is a chunk of its own, loaded when it is first visited.
   plugins: [
     // Excalidraw, as the canvas add-on needs it and nothing more (portalr ADR-0072).
-    excalidraw("/portalr/app/"),
+    excalidraw(BASE),
     tanstackRouter({ ...ROUTES, autoCodeSplitting: true }),
     react(),
     tailwindcss(),

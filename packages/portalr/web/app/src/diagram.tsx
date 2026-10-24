@@ -17,7 +17,7 @@ import {
   retry,
   useLoaded,
 } from "@portalr/ui";
-import { useId, useRef, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import { describe } from "./diagram-text";
 
 /** The canvas add-on, loaded the first time someone opens a canvas. */
@@ -26,7 +26,7 @@ const loadCanvas = () => import("./on-demand/canvas");
 const nameOf = (data: Data) => (typeof data.name === "string" ? data.name : "");
 
 /** The text alternative: what the agent reads of the diagram. */
-const textOf = (data: Data) => describe(data.name as never, data.elements as never);
+const textOf = (data: Data) => describe(data.name, data.elements);
 
 const live = (data: Data) => {
   const held = data.elements;
@@ -82,6 +82,7 @@ function Card({ data }: { data: Data }) {
   const about = useId();
   const name = nameOf(data) || "Unnamed diagram";
   const count = live(data);
+  const text = useMemo(() => textOf(data), [data]);
   return (
     <div className="flex flex-col gap-3">
       <p className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -93,7 +94,7 @@ function Card({ data }: { data: Data }) {
       <Disclosure summary="Text version">
         {/* A diagram's words are anyone's in the workspace: text here, never markup. */}
         <pre id={about} className="whitespace-pre-wrap break-words text-fg text-xs">
-          {textOf(data)}
+          {text}
         </pre>
       </Disclosure>
       <div>

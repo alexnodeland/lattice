@@ -27,7 +27,9 @@ Records portalr's half of [lattice RFC-0006](../../rfcs/0006-excalidraw-diagrams
   - Python's white space;
   - CJK;
   - the 4,000-character cut;
-  - numbers as Python's `g` writes them, ties to even, which the port does exactly, from a double's binary value.
+  - numbers as Python's `g` writes them, ties to even, which the port does exactly, from a double's binary value;
+  - what isn't a string or a number. Both sides take only a string as words and only a number, not a boolean, as a place, so what JSON holds reads alike in both.
+  - Both read a diagram's elements in JavaScript's order of an object's keys: keys that are array indexes first, as numbers, then the rest as written. artifactr's `describe` orders them so, since JavaScript can't read them any other way.
 - **A diagram's words are data.** Anyone in the workspace may write them, so they are only ever React text, never markup.
 - **The card is drawn with what the routes that show artifacts already load:** the kit's button and disclosure, and its loader. So neither the first load nor those routes carry more for it.
 
@@ -40,9 +42,17 @@ Records portalr's half of [lattice RFC-0006](../../rfcs/0006-excalidraw-diagrams
   - Escape, or **Close canvas**, closes it, and the focus goes back to Open canvas.
   - Opened from a chat card's full view, it closes alone: the full view stays.
 - **To look at, in this phase.** The canvas is in view mode: it pans and zooms, with no tools.
+  - **A diagram's elements are anyone's to write, so the canvas takes only what it draws.**
+    - No link, so a click opens nothing.
+    - No embedded page (`embeddable`, `iframe`), with `validateEmbeddable` off, so no frame is made.
+    - No image.
+    - No number that isn't finite, and no points that aren't pairs of numbers.
+  - Each element is restored by Excalidraw, together so labels and bindings hold, and one at a time where that throws, passing over the ones it can't mend.
+  - A diagram the canvas still can't draw falls back, inside the dialog, to why, and its text version.
+  - **View mode is kept at the canvas's edge, not only by hiding Excalidraw's UI.** Only Tab, Escape, the arrows and zoom reach it: `?` for help, ⌘/ or ⌘K for the palette, ⌘S and ⌘O never do, nor the browser's own save and open. A drop, a paste and the context menu are refused there too. Its main menu and help aren't shown. The canvas writes nothing to localStorage or IndexedDB.
   - Images aren't loaded yet: an image element shows Excalidraw's placeholder.
   - **Editing, pasted images and their checks come in phase 3b,** before collaboration (PR 4): the TypeScript patch builder, an upload route for a diagram's images with checks of size and type in the app and in the server, no SVG images, and `img-src blob:` in the policy, then and not before.
-- **Its theme is the page's,** and its primary colours are the brand kit's accent.
+- **Its theme is the page's,** and its primary colours are the brand kit's accent. In dark mode Excalidraw draws the scene through its own inverting filter, so the elements' colours there are Excalidraw's, not the kit's.
 
 ### The build (`app/excalidraw.ts`)
 
@@ -58,7 +68,8 @@ Records portalr's half of [lattice RFC-0006](../../rfcs/0006-excalidraw-diagrams
 - **The canvas's modules are its own.**
   - A module both the canvas and the rest of the app import would be split into a chunk of its own, which the first load fetches and every route's chunk names. Excalidraw's radix brings `@floating-ui` and `tslib`, which the kit uses too, and that put 1.3 kB on the first load.
   - The build marks every module the canvas reaches as the canvas's own, so it keeps its own copy. React is the one module shared, as there must be one React.
-- **esbuild's stand-in for `require`,** which Excalidraw's build keeps and a browser never calls, is kept as what it does in a browser: throw. Otherwise the bundler puts its own helper in the runtime every chunk shares.
+- **esbuild's stand-in for `require`,** which Excalidraw's build keeps and a browser never calls, is kept as what it does in a browser: throw. Otherwise the bundler puts its own helper in the runtime every chunk shares. The rewrite matches Excalidraw's production build and its development build, which the vitest projects load; if either stops matching, the build fails, saying so.
+- **Every locale but English** is matched by its file, whatever its code (`kaa`, `kab-KAB`, `ckb-IQ`), and a build check fails if any is built.
 
 ### The policy
 
@@ -117,13 +128,15 @@ ADR-0088 proposed a `canvas` of 402,000 / 375,000 and a `canvas-images` add-on o
 
 - Easier: a diagram reads as itself, in words and on its canvas, at no cost to the first load. The canvas loads only for whoever opens it.
 - Harder:
+  - `bun.lock` now holds Excalidraw's whole tree, which installs and osv read: mermaid-to-excalidraw with mermaid, d3 and cytoscape, sass, cross-env and random-username, though none of it is bundled. The security pins of nanoid and lodash-es at the root's `overrides` are stackr ADR-0049's.
   - The app carries about 480 kB of faces beside it, not counted in its budgets, which count no typeface.
   - The canvas carries its own copies of what the kit shares.
   - Upgrading Excalidraw means checking each rewrite still matches: the face fallback, Xiaolai's registration and esbuild's stand-in. The build fails, saying which, if one doesn't.
   - Numeric element ids lose their order in a JSON object, as JavaScript reads one, so the port lists them first. The fixture has none, and the diagrams worker and the canvas make none.
 - To revisit:
   - Xiaolai once its licence is confirmed (lattice#679);
-  - Excalifont's and Liberation's licences, which ship meanwhile, marked unverified (lattice#679).
+  - Excalifont's and Liberation's licences, which ship meanwhile, marked unverified (lattice#679). Their own metadata gives none: Excalifont's says "All rights reserved", and Liberation Sans' refers to Ascender's licence agreement, not the SIL Open Font License that Liberation 2 is under;
+  - Cascadia Code's, whose metadata names the SIL Open Font License's URL beside Microsoft's text for a font supplied with a product. `web/ui/licenses/excalidraw-faces.txt` carries each face's own notice, as its metadata holds it.
 
 ## Action items
 

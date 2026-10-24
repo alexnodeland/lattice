@@ -93,3 +93,124 @@ test("the canvas is reached and left by the keyboard, and gives the focus back",
   expect(await reported()).toEqual([]);
   await page.context().close();
 });
+
+/** What the page keeps in its storage: localStorage's keys, and IndexedDB's databases. */
+const stored = (page: Page) =>
+  page.evaluate(async () => ({
+    local: Object.keys(localStorage).sort(),
+    indexed: (await indexedDB.databases()).map((each) => each.name).sort(),
+  }));
+
+test("a hostile diagram's links, pages and images open nothing and ask for nothing", async () => {
+  const { page, reported } = await open(browser, "?diagram=hostile");
+  const origin = new URL(page.url()).origin;
+  const seen = requests(page, origin);
+  const windows: string[] = [];
+  page.context().on("page", (opened) => windows.push(opened.url()));
+  await page.getByRole("button", { name: "Open canvas" }).click();
+  await page.locator(".excalidraw canvas").first().waitFor();
+  // A click on each place an element was, and on its link's icon, if one were drawn.
+  for (const [x, y] of [
+    [300, 330],
+    [520, 430],
+    [300, 650],
+    [900, 150],
+    [470, 330],
+  ]) {
+    await page.mouse.click(x as number, y as number);
+  }
+  expect(await page.locator("iframe").count()).toBe(0);
+  expect(
+    await page.locator(".excalidraw-hyperlinkContainer, .excalidraw__embeddable").count(),
+  ).toBe(0);
+  expect(windows).toEqual([]);
+  expect(seen.away()).toEqual([]);
+  expect(await reported()).toEqual([]);
+  await page.context().close();
+});
+
+test("the canvas stays in view mode: no shortcut, drop or paste opens anything or stores anything", async () => {
+  const { page, reported } = await open(browser, "?diagram");
+  const origin = new URL(page.url()).origin;
+  const seen = requests(page, origin);
+  const before = await stored(page);
+  await page.getByRole("button", { name: "Open canvas" }).click();
+  const dialog = page.getByRole("dialog", { name: "Stack" });
+  await page.locator(".excalidraw canvas").first().waitFor();
+  await page
+    .locator(".excalidraw canvas")
+    .last()
+    .click({ position: { x: 50, y: 50 } });
+  const chooser: string[] = [];
+  page.on("filechooser", () => chooser.push("a file dialog"));
+  for (const keys of [
+    "?",
+    "Shift+?",
+    "Control+/",
+    "Meta+/",
+    "Control+s",
+    "Meta+s",
+    "Control+o",
+    "Control+Shift+e",
+    "Control+k",
+    "Meta+k",
+    "Control+Shift+p",
+    "Alt+/",
+  ]) {
+    await page.keyboard.press(keys);
+  }
+  // A file dropped, and text and an image pasted, on the canvas.
+  await page.evaluate(() => {
+    const target = document.querySelector(".excalidraw") as HTMLElement;
+    const moved = new DataTransfer();
+    moved.items.add(new File([new Uint8Array([137, 80, 78, 71])], "x.png", { type: "image/png" }));
+    for (const type of ["dragover", "drop"]) {
+      target.dispatchEvent(
+        new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: moved }),
+      );
+    }
+    const pasted = new DataTransfer();
+    pasted.setData("text/plain", "https://example.com/");
+    pasted.items.add(new File(["<svg/>"], "x.svg", { type: "image/svg+xml" }));
+    target.dispatchEvent(
+      new ClipboardEvent("paste", { bubbles: true, cancelable: true, clipboardData: pasted }),
+    );
+  });
+  await page.waitForTimeout(300);
+  expect(await page.getByRole("dialog").count()).toBe(1);
+  await expect.poll(() => dialog.isVisible()).toBe(true);
+  expect(await page.locator(".HelpDialog, .command-palette, .Modal").count()).toBe(0);
+  expect(await page.getByRole("link").count()).toBe(0);
+  expect(chooser).toEqual([]);
+  expect(seen.away()).toEqual([]);
+  expect(await stored(page)).toEqual(before);
+  expect(await reported()).toEqual([]);
+  await page.context().close();
+});
+
+test("a diagram the canvas can't draw as given is restored, or said to be undrawable, never blank", async () => {
+  const { page, reported } = await open(browser, "?diagram=broken");
+  await page.getByRole("button", { name: "Open canvas" }).click();
+  const dialog = page.getByRole("dialog", { name: "Broken" });
+  await dialog.getByRole("button", { name: "Close canvas" }).waitFor();
+  await expect
+    .poll(
+      async () =>
+        (await page.locator(".excalidraw canvas").count()) > 0 ||
+        (await dialog.getByText("its text version holds it").count()) > 0,
+    )
+    .toBe(true);
+  expect((await reported()).filter((line) => !line.startsWith("console:"))).toEqual([]);
+  await page.context().close();
+});
+
+test("the text version is there to describe the canvas while its disclosure is closed", async () => {
+  const { page } = await open(browser, "?diagram");
+  const opener = page.getByRole("button", { name: "Open canvas" });
+  const about = await opener.getAttribute("aria-describedby");
+  expect(about).not.toBeNull();
+  expect(
+    await page.evaluate((id) => document.getElementById(id ?? "")?.textContent ?? "", about),
+  ).toContain('Diagram "Stack"');
+  await page.context().close();
+});

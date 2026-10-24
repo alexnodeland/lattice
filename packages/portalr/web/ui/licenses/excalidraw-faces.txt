@@ -1,18 +1,103 @@
 Excalidraw's typefaces, as portalr's app carries them beside the diagrams' canvas
 (portalr ADR-0072)
 
-The app copies Excalidraw 0.18.1's faces, as its package ships them, to excalidraw/fonts/,
-and the canvas draws a diagram's words with them. The package ships no licence file for any
-of them. What is known of each comes from lattice artifactr ADR-0088, from pinned upstream
-commits:
+The app copies Excalidraw 0.18.1's faces, as its package ships them, to excalidraw/fonts/, and
+the canvas draws a diagram's words with them. The package ships no licence file for any of them.
+Each face's own notice follows, as its name table holds it (copyright, trademark, licence and the
+licence's URL), read from the faces the app carries.
 
-- Virgil, Assistant, Cascadia and Comic Shanns: verified from their metadata.
-- Nunito and Lilita One: their metadata carries only the URL of the SIL Open Font License 1.1,
-  whose text follows.
-- Excalifont and Liberation: not yet verified (lattice#679). They ship meanwhile, as the owner
-  decided, and this file says so.
-- Xiaolai, the CJK face: not carried until its licence is confirmed (lattice#679). Browsers draw
-  CJK with a face of their own.
+================================================================================
+## Virgil
+
+Copyright (c) 2011 by Your Own Font Foundry. All rights reserved.
+Virgil YOFF is a trademark of Your Own Font Foundry.
+Licence: SIL Open Font License, Version 1.1 (its name table holds the licence's text), below.
+
+================================================================================
+## Assistant
+
+Copyright 2020 The Assistant Project Authors (https://github.com/hafontia/Assistant).
+Copyright 2010 The Source Sans Pro Authors (https://github.com/adobe-fonts/source-sans-pro),
+with Reserved Font Name 'Source'. Source is a trademark of Adobe Systems Incorporated in the
+United States and/or other countries.
+Licence: SIL Open Font License, Version 1.1, below.
+
+================================================================================
+## Nunito
+
+Copyright 2014 The Nunito Project Authors (https://github.com/googlefonts/nunito)
+Licence: its name table names only the URL of the SIL Open Font License, Version 1.1
+(https://scripts.sil.org/OFL), whose text is below.
+
+================================================================================
+## Lilita One
+
+Copyright (c) 2011 Juan Montoreano (juan@remolacha.biz), with Reserved Font Names "Lilita One"
+Licence: its name table names only the URL of the SIL Open Font License, Version 1.1
+(http://scripts.sil.org/OFL), whose text is below.
+
+================================================================================
+## Cascadia Code
+
+© 2020 Microsoft Corporation. All Rights Reserved.
+Cascadia Code is a trademark of the Microsoft group of companies.
+Licence: its name table names the SIL Open Font License's URL (https://scripts.sil.org/OFL),
+and its licence description is Microsoft's text for a font supplied with a Microsoft product.
+Upstream, microsoft/cascadia-code is under the SIL Open Font License, Version 1.1: not yet
+verified against the copy the package ships (lattice#679).
+
+================================================================================
+## Comic Shanns
+
+Its name table holds its licence whole, the MIT License:
+
+MIT License
+
+Copyright (c) 2018 Shannon Miwa
+Copyright (c) 2023 Jesus Gonzalez
+Copyright (c) 2023 Rodrigo Batista de Moraes
+Copyright (c) 2024 Fini Jastrow
+Copyright (c) 2024 Kyle Beechly
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+================================================================================
+## Excalifont and Liberation Sans: unverified (lattice#679)
+
+Excalifont: "Copyright (c) 2024 by Excalidraw. All rights reserved." Its name table names no
+licence.
+Liberation Sans: "Digitized data 2007 Ascender Corporation. All rights reserved." Liberation is a
+trademark of Red Hat, Inc. Its name table says "Use of this Liberation font software is subject
+to the license agreement under which you accepted the Liberation font software", and names
+http://www.ascendercorp.com/liberation.html.
+
+Neither licence is verified yet. Both ship meanwhile, as the owner decided, and this file says
+so.
+
+================================================================================
+## Xiaolai
+
+Not carried until its licence is confirmed (lattice#679). Browsers draw CJK with a face of their
+own.
+
+================================================================================
+## The SIL Open Font License, Version 1.1
 
 -----------------------------------------------------------
 SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007

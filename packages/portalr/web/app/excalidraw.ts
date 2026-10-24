@@ -40,7 +40,7 @@ const IN_EXCALIDRAW = /[\\/]@excalidraw[\\/]excalidraw[\\/]dist[\\/]/;
 const NEVER =
   /(?:^|[\\/])subset-(?:shared|worker)\.chunk\.js$|^@excalidraw\/mermaid-to-excalidraw$|^pica$|^image-blob-reduce$/;
 /** A locale but English. */
-const LOCALE = /(?:^|[\\/])locales[\\/](?!en-)[a-z]{2}-[A-Z]{2}-[A-Z0-9]+\.js$/;
+const LOCALE = /(?:^|[\\/])locales[\\/](?!en-[A-Z0-9]+\.js$)[^\\/]+\.js$/;
 /**
  * esbuild's stand-in for `require`, which Excalidraw's build keeps and a browser never calls: the
  * bundler would put its own in the runtime every chunk shares, and so in the first load. It is
@@ -51,6 +51,10 @@ const REQUIRE =
 
 /** The name Excalidraw gives Xiaolai, its CJK face, in a constant of its own. */
 const XIAOLAI = /[,{\s](\w+)="Xiaolai"/;
+
+/** The same stand-in, in Excalidraw's development build, which the vitest projects load. */
+const DEV_REQUIRE =
+  /var __require = \/\* @__PURE__ \*\/ \(\(x\) => typeof require !== "undefined" \? require : typeof Proxy !== "undefined" \? new Proxy\(x, \{\n {2}get: \(a, b\) => \(typeof require !== "undefined" \? require : a\)\[b\]\n\}\) : x\)\(function\(x\) \{\n {2}if \(typeof require !== "undefined"\)\n {4}return require\.apply\(this, arguments\);\n {2}throw/g;
 
 /** The fallback Excalidraw fetches faces from, a template literal naming esm.sh. */
 const FALLBACK = /("ASSETS_FALLBACK_URL",\s*)`https:\/\/esm\.sh\/[\s\S]{0,300}?\/dist\/prod\/`/;
@@ -88,7 +92,12 @@ export function excalidraw(base: string): Plugin {
     },
     transform(code, id) {
       if (!IN_EXCALIDRAW.test(id)) return null;
-      let changed = code.replace(REQUIRE, "var $1=(function($5){throw");
+      let changed = code
+        .replace(REQUIRE, "var $1=(function($5){throw")
+        .replace(DEV_REQUIRE, "var __require = (function(x) {\n  throw");
+      if (changed.includes("typeof require")) {
+        this.error("esbuild's stand-in for require isn't as it was: check Excalidraw's build");
+      }
       // Xiaolai's faces registered, as `register(XIAOLAI, ...faces)` among the others: not.
       const xiaolai = XIAOLAI.exec(changed)?.[1];
       if (xiaolai !== undefined && changed.includes("._initialized=!0")) {
@@ -111,6 +120,12 @@ export function excalidraw(base: string): Plugin {
       return changed === code ? null : changed;
     },
     generateBundle(_, bundle) {
+      const locales = Object.values(bundle).flatMap((file) =>
+        file.type === "chunk" ? Object.keys(file.modules).filter((id) => LOCALE.test(id)) : [],
+      );
+      if (locales.length > 0) {
+        this.error(`Excalidraw's locales but English are built: ${locales.join(", ")}`);
+      }
       const naming = Object.entries(bundle)
         .filter(([, file]) =>
           (file.type === "chunk" ? file.code : String(file.source)).includes("esm.sh"),

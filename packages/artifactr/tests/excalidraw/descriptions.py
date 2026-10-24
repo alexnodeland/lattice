@@ -161,6 +161,32 @@ CASES: list[dict[str, Any]] = [
         },
     },
     {
+        "case": "only strings are words, only numbers places",
+        "name": "Typed",
+        "elements": {
+            "t-number": {"type": "text", "text": 7, "x": 0, "y": 0},
+            "t-float": {"type": "text", "text": 1.0, "x": 0, "y": 0},
+            "t-true": {"type": "text", "text": True, "x": 0, "y": 0},
+            "t-list": {"type": "text", "text": ["a"], "x": 0, "y": 0},
+            "t-dict": {"type": "text", "text": {"a": 1}, "x": 0, "y": 0},
+            "t-empty": {"type": "text", "text": [], "x": 0, "y": 0},
+            "boolean-place": {"type": "rectangle", "x": True, "y": 0, "width": False},
+            "boolean-size": {"type": "rectangle", "x": 5, "y": 5, "width": True, "height": 1},
+            "big": {"type": "diamond", "x": 1e16, "y": 1e-16, "width": 1.5e300, "height": 0},
+            "typed-kind": {"type": 7, "x": 0, "y": 0},
+            "s": {"type": "rectangle", "x": 0, "y": 0},
+            "s-label": {"type": "text", "containerId": "s", "text": 3},
+        },
+    },
+    {
+        "case": "keys in JavaScript's order: array indexes first, as numbers",
+        "name": "Ordered",
+        "elements": {
+            key: {"type": "rectangle", "x": 0, "y": 0}
+            for key in ["b", "10", "2", "a", "01", "-1", "4294967294", "4294967295", "0", "1.5"]
+        },
+    },
+    {
         "case": "cut past its length",
         "name": "Big",
         "elements": dict(_shape(f"box{n:04}", x=n * 10) for n in range(MAX_DESCRIPTION // 10)),

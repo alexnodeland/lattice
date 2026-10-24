@@ -2,7 +2,9 @@
  * A diagram's description, as artifactr's `describe` writes it for the agent (artifactr's
  * `excalidraw/render.py`), ported: the app's text alternative for a diagram, and the text its
  * revisions are compared by. The two are held equal by one fixture, which artifactr's Python
- * writes and both sides check (`tests/fixtures/diagram-descriptions.json`, portalr ADR-0072).
+ * writes and both sides check (`packages/artifactr/schemas/excalidraw_descriptions.json`, portalr
+ * ADR-0072). Its elements are read in JavaScript's order of an object's keys, which artifactr
+ * reads them in too.
  *
  * It is pure, and never throws on data of any shape. The words in it are a diagram's, which
  * anyone in the workspace may write: they are shown as text, never as markup.
@@ -30,14 +32,8 @@ const SPACES = new Set([
 const isObject = (value: Json | undefined): value is { [key: string]: Json } =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-/** `str(value)` for what a diagram's JSON holds where a word is expected. */
-function pyStr(value: Json | undefined): string {
-  if (value === undefined || value === null) return "None";
-  if (value === true) return "True";
-  if (value === false) return "False";
-  if (typeof value === "number") return Number.isInteger(value) ? String(value) : String(value);
-  return typeof value === "string" ? value : JSON.stringify(value);
-}
+/** A string as words, and anything else as none, as artifactr's `_words` has it. */
+const wordsOf = (value: Json | undefined): string => (typeof value === "string" ? value : "");
 
 /** Python's `" ".join(text.split())`. */
 function collapsed(text: string): string {
@@ -64,11 +60,7 @@ function shown(character: string): boolean {
 
 /** Words written in the diagram, as words: on one line, at most 80 characters, quoted. */
 function quote(text: Json | undefined): string {
-  const words =
-    text === undefined || text === null || text === false || text === 0 || text === ""
-      ? ""
-      : pyStr(text);
-  const kept = [...collapsed(words)].filter(shown).join("");
+  const kept = [...collapsed(wordsOf(text))].filter(shown).join("");
   const said = [...collapsed(kept)].slice(0, 80).join("");
   return `"${said.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`;
 }
@@ -149,8 +141,8 @@ function cut(text: string): string {
 }
 
 /** Describe a diagram's live elements, as the agent and assistive technology read it. */
-export function describe(name: Json | undefined, elements: Json | undefined): string {
-  const all = isObject(elements) ? elements : {};
+export function describe(name: unknown, elements: unknown): string {
+  const all = isObject(elements as Json) ? (elements as { [key: string]: Json }) : {};
   const live = new Map<string, Element>();
   for (const [key, element] of Object.entries(all)) {
     if (isObject(element) && !element.isDeleted) live.set(key, element);
@@ -172,7 +164,7 @@ export function describe(name: Json | undefined, elements: Json | undefined): st
   const arrows: string[] = [];
   const texts: string[] = [];
   for (const [key, element] of live) {
-    const kind = pyStr(element.type);
+    const kind = wordsOf(element.type);
     if (kind === "frame" || kind === "magicframe") {
       const title = element.name;
       frames.push(`- ${typeof title === "string" && title ? `${key} ${quote(title)}` : key}`);
@@ -181,7 +173,7 @@ export function describe(name: Json | undefined, elements: Json | undefined): st
     } else if (LINES.has(kind)) {
       const start = bound(element.startBinding);
       const end = bound(element.endBinding);
-      const label = labels.get(pyStr(element.id));
+      const label = labels.get(wordsOf(element.id));
       const via = label ? `--${label}-->` : "-->";
       const left = start ? named(start) : "(free)";
       const right = end ? named(end) : "(free)";

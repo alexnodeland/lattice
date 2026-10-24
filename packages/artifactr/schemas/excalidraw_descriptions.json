@@ -340,6 +340,145 @@
     "description": "Diagram \"Numbers\": 3 elements\nBounds: x 7 to 7, y 7 to 7\nShapes (3):\n- rectangle e\n- rectangle f\n- ellipse g"
   },
   {
+    "case": "only strings are words, only numbers places",
+    "name": "Typed",
+    "elements": {
+      "t-number": {
+        "type": "text",
+        "text": 7,
+        "x": 0,
+        "y": 0
+      },
+      "t-float": {
+        "type": "text",
+        "text": 1.0,
+        "x": 0,
+        "y": 0
+      },
+      "t-true": {
+        "type": "text",
+        "text": true,
+        "x": 0,
+        "y": 0
+      },
+      "t-list": {
+        "type": "text",
+        "text": [
+          "a"
+        ],
+        "x": 0,
+        "y": 0
+      },
+      "t-dict": {
+        "type": "text",
+        "text": {
+          "a": 1
+        },
+        "x": 0,
+        "y": 0
+      },
+      "t-empty": {
+        "type": "text",
+        "text": [],
+        "x": 0,
+        "y": 0
+      },
+      "boolean-place": {
+        "type": "rectangle",
+        "x": true,
+        "y": 0,
+        "width": false
+      },
+      "boolean-size": {
+        "type": "rectangle",
+        "x": 5,
+        "y": 5,
+        "width": true,
+        "height": 1
+      },
+      "big": {
+        "type": "diamond",
+        "x": 1e+16,
+        "y": 1e-16,
+        "width": 1.5e+300,
+        "height": 0
+      },
+      "typed-kind": {
+        "type": 7,
+        "x": 0,
+        "y": 0
+      },
+      "s": {
+        "type": "rectangle",
+        "x": 0,
+        "y": 0
+      },
+      "s-label": {
+        "type": "text",
+        "containerId": "s",
+        "text": 3
+      }
+    },
+    "description": "Diagram \"Typed\": 12 elements\nBounds: x 0 to 1.5e+300, y 0 to 1e-16\nShapes (4):\n- rectangle boolean-place\n- rectangle boolean-size\n- diamond big\n- rectangle s \"\"\nText (6):\n- \"\"\n- \"\"\n- \"\"\n- \"\"\n- \"\"\n- \"\""
+  },
+  {
+    "case": "keys in JavaScript's order: array indexes first, as numbers",
+    "name": "Ordered",
+    "elements": {
+      "b": {
+        "type": "rectangle",
+        "x": 0,
+        "y": 0
+      },
+      "10": {
+        "type": "rectangle",
+        "x": 0,
+        "y": 0
+      },
+      "2": {
+        "type": "rectangle",
+        "x": 0,
+        "y": 0
+      },
+      "a": {
+        "type": "rectangle",
+        "x": 0,
+        "y": 0
+      },
+      "01": {
+        "type": "rectangle",
+        "x": 0,
+        "y": 0
+      },
+      "-1": {
+        "type": "rectangle",
+        "x": 0,
+        "y": 0
+      },
+      "4294967294": {
+        "type": "rectangle",
+        "x": 0,
+        "y": 0
+      },
+      "4294967295": {
+        "type": "rectangle",
+        "x": 0,
+        "y": 0
+      },
+      "0": {
+        "type": "rectangle",
+        "x": 0,
+        "y": 0
+      },
+      "1.5": {
+        "type": "rectangle",
+        "x": 0,
+        "y": 0
+      }
+    },
+    "description": "Diagram \"Ordered\": 10 elements\nBounds: x 0 to 0, y 0 to 0\nShapes (10):\n- rectangle 0\n- rectangle 2\n- rectangle 10\n- rectangle 4294967294\n- rectangle b\n- rectangle a\n- rectangle 01\n- rectangle -1\n- rectangle 4294967295\n- rectangle 1.5"
+  },
+  {
     "case": "cut past its length",
     "name": "Big",
     "elements": {

@@ -164,10 +164,10 @@ def main() -> int:
         raise SystemExit(f"wire-app: {env} isn't there: run `make env` in {args.app} first")
     given = sys.stdin.read().splitlines() if args.stdin else []
     extra = {m["key"]: m["value"] for m in (LINE.match(line.strip()) for line in given) if m}
+    # The stack's settings as Compose reads them: one set in the environment over its .env, as a
+    # single host's AUTH_PUBLIC_URL may be, and the adapter `make` chose.
     stack = settings(args.stack)
-    # The adapter `make` chose, as it runs this, over the stack's .env.
-    if os.environ.get("STACKR_DATABASE"):
-        stack["STACKR_DATABASE"] = os.environ["STACKR_DATABASE"]
+    stack |= {key: os.environ[key] for key in stack if os.environ.get(key)}
     if why := refused(extra, stack):
         raise SystemExit(f"wire-app: {why}")
     values = wired(args.app, stack, args) | extra

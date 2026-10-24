@@ -131,6 +131,9 @@ check "the analytics and Umami passwords, and ClickHouse on the loopback, asked 
   "$(app_setting PORTAL_ANALYTICS_PASSWORD) $(app_setting PORTAL_UMAMI_PASSWORD) $(app_setting PORTAL_ANALYTICS_URL)" = \
   "$(stack_setting CLICKHOUSE_ANALYTICS_PASSWORD) $(stack_setting UMAMI_PORTALR_PASSWORD) http://127.0.0.1:$(stack_setting CLICKHOUSE_HTTP_PORT)"
 check "and Langfuse's project, asked for" test "$(app_setting PORTAL_LANGFUSE_PROJECT)" = "$(stack_setting LANGFUSE_INIT_PROJECT_ID)"
+printf '' | AUTH_PUBLIC_URL=https://auth.example.test wire
+check "a setting in the environment over the stack's .env, as Compose reads it" test "$(app_setting AUTH_ISSUER)" = https://auth.example.test
+printf '' | wire
 cp "$scratch/wire/app/.env" "$scratch/wire/first"
 printf 'LITELLM_API_KEY=sk-made-up\nAPP_PORT=8801\n' | wire --analytics --umami --langfuse-project
 check "and runs again to the same file, keeping the role's password" cmp -s "$scratch/wire/first" "$scratch/wire/app/.env"

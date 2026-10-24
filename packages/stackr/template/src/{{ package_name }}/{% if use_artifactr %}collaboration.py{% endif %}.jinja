@@ -8,7 +8,7 @@ clients are external agents acting for the user whose token they carry{% endif %
 """
 
 import contextlib
-from collections.abc import AsyncGenerator, Awaitable, Callable
+from collections.abc import AsyncGenerator, Awaitable, Callable{% if use_ui and use_diagrams %}, Mapping{% endif %}
 
 from fastapi import FastAPI{% if access == 'grantr' %}, HTTPException{% endif %}
 from mcp.server.mcpserver.exceptions import ToolError
@@ -20,7 +20,7 @@ from artifactr import InMemoryStorage, Runner, Session, SystemActor, UserActor, 
 {%- if use_relayr %}
 from artifactr.agent import TurnContext
 {%- endif %}
-from artifactr.core import Actor, ExternalAgentActor, {% if access == 'grantr' %}Forbidden, {% endif %}TenantId
+from artifactr.core import Actor, {% if use_ui and use_diagrams %}Command, {% endif %}ExternalAgentActor, {% if access == 'grantr' %}Forbidden, {% endif %}TenantId
 from artifactr.fastapi import Unauthorized, artifactr_router
 {% if not use_relayr -%}
 from artifactr.langfuse import langfuse_turn
@@ -35,7 +35,7 @@ from artifactr.ui import UI_TYPES, ui_checks, ui_key_of
 from artifactr.ui.checks import IsAdmin
 {%- endif %}
 {%- endif %}
-from artifactr.workspace import Authorize, Hidden{% if use_ui or use_files %}, integration_gate{% endif %}
+from artifactr.workspace import Authorize, {% if use_ui and use_diagrams %}Check, {% endif %}Hidden{% if use_ui and use_diagrams %}, Workspace{% endif %}{% if use_ui or use_files %}, integration_gate{% endif %}
 from evalr.langfuse import LangfuseScoreConfigStore, LangfuseScoreSink
 {%- if use_ui or use_files %}
 from lattice_core.integrations import Integrations
@@ -62,6 +62,22 @@ from {{ package_name }}.settings import GatewaySettings
 from {{ package_name }}.telemetry import TelemetryHandle
 
 PREFIX = "/artifactr"
+{%- if use_ui and use_diagrams %}
+
+
+def _together(*each: Mapping[str, Check]) -> dict[str, Check]:
+    """Checks for the same command types, run in turn: artifactr takes one check a type."""
+
+    def joined(found: list[Check]) -> Check:
+        async def check(workspace: Workspace, command: Command) -> None:
+            for one in found:
+                await one(workspace, command)
+
+        return check
+
+    kinds = sorted({kind for checks in each for kind in checks})
+    return {kind: joined([checks[kind] for checks in each if kind in checks]) for kind in kinds}
+{%- endif %}
 
 
 class Collaboration:
@@ -151,8 +167,18 @@ class Collaboration:
             if database
             else InMemoryStorage(),
             types=[Note{% if use_ui %}, *UI_TYPES{% endif %}{% if use_relayr %}, Timeline, Postmortem, RuleDraft{% endif %}{% if use_files %}, *files.types{% endif %}],
-{%- if use_ui %}
+{%- if use_ui and use_diagrams %}
+{%- if access == 'grantr' %}
+            checks=_together(
+                ui_checks(is_admin=is_admin, integrations=integrations), files.checks()
+            ),
+{%- else %}
+            checks=_together(ui_checks(integrations=integrations), files.checks()),
+{%- endif %}
+{%- elif use_ui %}
             checks=ui_checks({% if access == 'grantr' %}is_admin=is_admin, {% endif %}integrations=integrations),
+{%- elif use_diagrams %}
+            checks=files.checks(),
 {%- endif %}
 {%- if use_ui and use_files %}
             gate=integration_gate(

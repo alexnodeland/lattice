@@ -18,6 +18,14 @@
 # this machine's loopback, on a port of its own: an origin of its own, which the portal frames.
 {%- endif %}
 {%- endif %}
+{%- if use_diagrams %}
+#
+# Diagrams: with DIAGRAMS=on, `make up` starts the diagrams worker, diagrams-worker, in the
+# profile `diagrams` (stackr ADR-0049): Excalidraw in headless Chromium, which draws the agent's
+# Mermaid and skeletons and renders diagrams. It is on a network of its own, diagrams, with no
+# route out, with its relay alone, `diagrams`, which the application reaches on `files`, as a
+# native file's worker is.
+{%- endif %}
 
 name: {{ project_slug }}
 {%- if use_files %}
@@ -124,6 +132,10 @@ services:
       # The apps `make up` starts a worker for, from .env or `make up FILES=...`.
       FILES_CRAFTS: ${FILES_CRAFTS:-}
 {%- endif %}
+{%- if use_diagrams %}
+      # Whether `make up` starts the diagrams worker, from .env or `make up DIAGRAMS=on`.
+      DIAGRAMS: ${DIAGRAMS:-off}
+{%- endif %}
     ports:
       - ${APP_BIND:-127.0.0.1}:${APP_PORT:-{{ app_port }}}:8000
 {%- if use_portal and hosting != 'host' %}
@@ -155,6 +167,11 @@ services:
         condition: service_started
         required: false
 {%- endfor %}
+{%- if use_diagrams %}
+      diagrams:
+        condition: service_started
+        required: false
+{%- endif %}
 {%- endif %}
     healthcheck:
       test:
@@ -234,6 +251,60 @@ services:
 {%- endif %}
 {%- endfor %}
 {%- endif %}
+{%- if use_diagrams %}
+
+  # The diagrams worker: one warm Chromium, one job at a time, each within its deadline. It runs
+  # as a native file's worker does: read-only, with nothing to write but its tmpfs, no
+  # capabilities, under its own limits, on its own network with no route out.
+  diagrams-worker:
+    profiles: [diagrams]
+    build:
+      context: .
+      target: diagrams-worker
+      args:
+        # 1 adds Excalidraw's CJK face, Xiaolai, once its licence is confirmed (lattice#679).
+        XIAOLAI: ${DIAGRAMS_XIAOLAI:-0}
+    image: {{ project_slug }}-diagrams:local
+    restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs:
+      # Chromium's profile and its shared memory, which --disable-dev-shm-usage puts here.
+      - /tmp:size=256m,mode=1777,noexec,nosuid,nodev
+    user: "10005"
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: ${DIAGRAMS_MEMORY:-1g}
+    memswap_limit: ${DIAGRAMS_MEMORY:-1g}
+    cpus: ${DIAGRAMS_CPUS:-1}
+    pids_limit: 256
+    environment:
+      WORKER_TOKEN: ${DIAGRAMS_TOKEN:-}
+      # The image the worker runs in: `make up` sets it.
+      WORKER_BUILD: ${DIAGRAMS_BUILD:-}
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - >-
+          fetch('http://127.0.0.1:8080/healthz').then((r) => process.exit(r.ok ? 0 : 1),
+          () => process.exit(1))
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    networks: [diagrams]
+
+  diagrams:
+    <<: *files-relay
+    profiles: [diagrams]
+    command: ["TCP-LISTEN:8080,fork,reuseaddr,max-children=16", "TCP:diagrams-worker:8080"]
+    depends_on:
+      diagrams-worker:
+        condition: service_healthy
+    networks: [files, diagrams]
+{%- endif %}
 
 networks:
   stackr:
@@ -253,6 +324,13 @@ networks:
     driver_opts:
       com.docker.network.bridge.inhibit_ipv4: "true"
 {%- endfor %}
+{%- if use_diagrams %}
+  # The diagrams worker's network: the worker and its relay, with no route out of it.
+  diagrams:
+    internal: true
+    driver_opts:
+      com.docker.network.bridge.inhibit_ipv4: "true"
+{%- endif %}
 {%- if use_portal %}
   # The editors': a network of their own, which only publishes their ports.
   editors: {}

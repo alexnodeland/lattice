@@ -28,6 +28,9 @@ from starlette.requests import HTTPConnection
 
 from artifactr import InMemoryStorage, UserActor, Workspaces
 from artifactr.core import Actor, TenantId
+{%- if use_diagrams %}
+from artifactr.excalidraw import Diagram
+{%- endif %}
 from artifactr.fastapi import ResolveActor
 from artifactr.files import DOCX, FakeApp, WordDocument
 from artifactr.files.app import Inspection
@@ -75,7 +78,7 @@ async def resolve_actor(_connection: HTTPConnection) -> tuple[TenantId, Actor]:
 
 def test_native_files_are_off_until_an_app_runs() -> None:
     files = Files(FilesSettings(), integrations=Defaults())
-    assert (files.native, files.types, files.toolsets()) == (None, [], [])
+    assert (files.native, files.types, files.toolsets()) == (None, {% if use_diagrams %}[Diagram]{% else %}[]{% endif %}, [])
     assert files.key_of("word_document", {}) is None
     application = FastAPI()
     files.mount(application, Workspaces(InMemoryStorage()), resolve_actor=resolve_actor, prefix="")
@@ -84,7 +87,7 @@ def test_native_files_are_off_until_an_app_runs() -> None:
 
 async def test_a_file_is_read_by_its_apps_worker_and_served_beside_artifactr() -> None:
     files = Files(WORDCRAFT, integrations=Defaults(), transport=workers())
-    assert files.types == [WordDocument]
+    assert files.types == [{% if use_diagrams %}Diagram, {% endif %}WordDocument]
     assert files.native is not None
     workspaces = Workspaces(InMemoryStorage(), types=files.types)
     application = FastAPI()

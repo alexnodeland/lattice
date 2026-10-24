@@ -403,7 +403,7 @@ Each is settled in phase 0's ADR or carried as an exit criterion.
 - [ ] artifactr: `Workspaces(gate=...)` and `NotEnabled` (done, [artifactr ADR-0081](../artifactr/adr/0081-a-gate-before-access-integrations-switched-off-answer-not-enabled.md)); the watch commands, presence frames and `PresenceChannel`, with ADRs
 - [ ] artifactr-files: the collector's kinds
 - [ ] artifactr's `excalidraw` extra: its type, patches, checks and `render_for_agent` (done: artifactr ADR-0086, with phase 0's limits, and `excalidraw` off by default); its toolset and converter (done: [artifactr ADR-0090](../artifactr/adr/0090-diagrams-drawn-by-the-agent-through-a-converter.md)); its router
-- [ ] stackr: the worker, its image and the `excalidraw` question
+- [x] stackr: the worker, its image and the `diagrams` question ([stackr ADR-0049](../stackr/adr/0049-the-diagrams-worker-excalidraw-in-headless-chromium-behind-a-relay.md)); Xiaolai in its image waits for lattice#679
 - [ ] portalr: ADR-0041's policy and allow-list test, the `canvas` budget, the renderer, the canvas, presence, the list, the overlay, admin's Integrations page
 - [ ] The `[relayr]` projections and feedback anchors
 - [ ] Docs: the package's guide, its ADRs, and the architecture

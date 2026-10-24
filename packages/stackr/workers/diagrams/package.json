@@ -1,0 +1,17 @@
+{
+  "name": "@stackr/diagrams-worker",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@excalidraw/excalidraw": "0.18.1",
+    "@excalidraw/mermaid-to-excalidraw": "2.2.2",
+    "playwright-core": "1.64.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@portalr/notices": "workspace:*",
+    "@types/node": "24.10.1",
+    "vite": "8.3.4"
+  }
+}

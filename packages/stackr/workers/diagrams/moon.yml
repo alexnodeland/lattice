@@ -1,0 +1,25 @@
+# The diagrams worker (stackr ADR-0049): Excalidraw's conversion and export in headless Chromium,
+# behind HTTP. A generated application's image builds it from the lattice commit uv.lock pins
+# artifactr at (the template's scripts/build-diagrams-worker.sh); scripts/check-files runs it.
+language: 'typescript'
+layer: 'application'
+dependsOn:
+  - 'notices'
+# Its server's rules are tested here; its calls are tested in its image, by scripts/check-files.
+
+tasks:
+  build:
+    description: "Build the worker's page with Vite, and its server with Bun"
+    script: >-
+      bun x --bun --no-install vite build &&
+      bun build src/server.ts --target=node --format=esm --external playwright-core
+      --outfile dist/server.mjs
+    inputs:
+      - 'src/**/*'
+      - 'index.html'
+      - 'policy.json'
+      - 'vite.config.ts'
+      - '/packages/portalr/web/notices/src/**/*'
+      - '!/packages/portalr/web/notices/src/**/*.test.ts'
+    outputs:
+      - 'dist/**/*'

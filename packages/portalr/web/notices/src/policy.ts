@@ -5,7 +5,9 @@ import { allows, elect, offersChoice, parse } from "./spdx";
 
 /**
  * A package that is fine though it breaks the policy, for a reason, as long as it declares the
- * licence named: `licence` where that isn't allowed, `text` where it ships no licence text.
+ * licence named: `licence` where that isn't allowed, `text` where it ships no licence text. A
+ * `licence` exception for {@link UNDECLARED} excuses a package that declares none, whose licence
+ * text it ships says what it is.
  */
 export interface Exception {
   readonly package: string;
@@ -13,6 +15,9 @@ export interface Exception {
   readonly kind: "licence" | "text";
   readonly reason: string;
 }
+
+/** The licence an exception names for a package that declares none. */
+export const UNDECLARED = "none";
 
 export interface Policy {
   readonly allowed: readonly string[];
@@ -91,7 +96,9 @@ export function check(packages: readonly BundledPackage[], policy: Policy): Prob
     const name = `${found.name}@${found.version}`;
     const { licence } = found;
     if (licence === undefined) {
-      problems.push({ package: name, message: "declares no licence" });
+      if (!excused(policy, found.name, UNDECLARED, "licence")) {
+        problems.push({ package: name, message: "declares no licence" });
+      }
     } else if (!permitted(licence, policy) && !excused(policy, found.name, licence, "licence")) {
       const kind = parse(licence) === undefined ? "isn't an SPDX expression" : "isn't allowed";
       problems.push({ package: name, message: `its licence, ${licence}, ${kind}` });
@@ -122,7 +129,7 @@ export function staleExceptions(
     bundled.some(
       (found) =>
         found.name === e.package &&
-        found.licence === e.licence &&
+        (found.licence ?? UNDECLARED) === e.licence &&
         (e.kind === "text" ? !found.hasText : !permitted(e.licence, policy)),
     );
   return policy.exceptions

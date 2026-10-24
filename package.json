@@ -3,7 +3,8 @@
   "private": true,
   "packageManager": "bun@1.4.3",
   "workspaces": [
-    "packages/portalr/web/*"
+    "packages/portalr/web/*",
+    "packages/stackr/workers/*"
   ],
   "devDependencies": {
     "@biomejs/biome": "2.5.15",
@@ -19,6 +20,8 @@
     "form-data": "4.0.6",
     "js-yaml": "4.3.2",
     "katex": "0.19.0",
+    "lodash-es": "4.18.1",
+    "nanoid": "3.3.20",
     "uuid": "11.1.1",
     "yaml": "2.9.1"
   }

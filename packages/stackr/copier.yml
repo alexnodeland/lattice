@@ -97,6 +97,16 @@ native_files:
   default: true
   when: "{{ libraries in ['artifactr', 'both'] }}"
 
+diagrams:
+  type: bool
+  help: >-
+    Include diagrams (Excalidraw's, which the agent draws from Mermaid or shapes and renders, in a
+    worker of its own with no route out: headless Chromium)? They keep their images with native
+    files'. The worker runs only with DIAGRAMS=on: `make up DIAGRAMS=on`. Each workspace switches
+    diagrams on as an integration, off until then.
+  default: true
+  when: "{{ libraries in ['artifactr', 'both'] and native_files }}"
+
 access:
   type: str
   help: Who may do what
@@ -181,6 +191,12 @@ use_ui:
 use_files:
   type: bool
   default: "{{ libraries in ['artifactr', 'both'] and native_files }}"
+  when: false
+
+# Whether the application has diagrams, which keep their images in native files' store.
+use_diagrams:
+  type: bool
+  default: "{{ use_files and diagrams }}"
   when: false
 
 # Whether the application asks lattice-core's port of integrations itself: forms and dashboards,

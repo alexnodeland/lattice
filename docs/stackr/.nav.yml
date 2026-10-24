@@ -78,6 +78,7 @@ nav:
     - adr/0046-native-files-a-relay-a-slimmer-worker-blender-and-the-editors-at-the-edge.md
     - adr/0047-an-upstream-gateway-for-the-model-groups.md
     - adr/0048-grafanas-clickhouse-data-source-and-the-adoption-dashboard.md
+    - adr/0049-the-diagrams-worker-excalidraw-in-headless-chromium-behind-a-relay.md
   - RFCs:
     - rfcs/README.md
     - rfcs/0001-v0.1-implementation-plan.md

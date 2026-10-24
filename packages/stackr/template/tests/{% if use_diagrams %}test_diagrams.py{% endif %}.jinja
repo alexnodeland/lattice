@@ -1,0 +1,83 @@
+"""Diagrams: the agent's tools, and the diagrams worker they call, here a fake standing in."""
+
+import json
+from dataclasses import replace
+
+import httpx
+import pytest
+from fastapi.testclient import TestClient
+
+from artifactr.excalidraw import EXCALIDRAW, Converted, FakeConverter
+from artifactr.excalidraw.converter import Skeleton
+from lattice_core.integrations import Defaults
+
+from {{ package_name }}.files import DIAGRAMS_URL, Files
+from {{ package_name }}.settings import FilesSettings, Settings
+
+from conftest import Script, app, bearer, settings
+
+TOKEN = "the-diagram-workers-token-of-32-characters"
+ON = FilesSettings(diagrams=True, diagrams_token=TOKEN)
+
+
+def worker(seen: list[httpx.Request]) -> httpx.MockTransport:
+    """The diagrams worker, as the application reaches it: the fake converter behind its token."""
+    fake = FakeConverter()
+
+    async def answer(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        if request.headers.get("authorization") != f"Bearer {TOKEN}":
+            return httpx.Response(401, json={"reason": "invalid", "message": "token"})
+        sent = json.loads(request.content)
+        if request.url.path == "/mermaid":
+            drawn: Converted = await fake.mermaid(sent["source"])
+        else:
+            drawn = await fake.skeletons([Skeleton.model_validate(s) for s in sent["skeletons"]])
+        return httpx.Response(200, content=drawn.model_dump_json(by_alias=True))
+
+    return httpx.MockTransport(answer)
+
+
+def test_diagrams_are_off_by_default_and_their_worker_with_them() -> None:
+    assert Settings.from_environ({}).files.diagrams is False
+    files = Files(FilesSettings(), integrations=Defaults())
+    assert files.diagrams is None
+    assert files.key_of("excalidraw_diagram", {}) == EXCALIDRAW, "an integration of their own"
+    assert set(files.checks()) >= {"edit_artifact", "propose_change"}
+
+
+@pytest.mark.parametrize(
+    ("environ", "refusal"),
+    [
+        ({"DIAGRAMS": "on"}, "DIAGRAMS=on needs DIAGRAMS_TOKEN, of at least 32"),
+        ({"DIAGRAMS": "on", "DIAGRAMS_TOKEN": "short"}, "of at least 32"),
+        ({"DIAGRAMS": "yes"}, "DIAGRAMS is on or off, not 'yes'"),
+    ],
+)
+def test_diagrams_settings_are_refused_unless_they_hold(
+    environ: dict[str, str], refusal: str
+) -> None:
+    with pytest.raises(ValueError, match=refusal):
+        Settings.from_environ(environ)
+
+
+def test_diagrams_on_are_read_from_the_environment() -> None:
+    files = Settings.from_environ({"DIAGRAMS": "On", "DIAGRAMS_TOKEN": TOKEN}).files
+    assert (files.diagrams, files.diagrams_token) == (True, TOKEN)
+
+
+async def test_the_worker_is_called_through_its_relay_with_its_token() -> None:
+    seen: list[httpx.Request] = []
+    files = Files(ON, integrations=Defaults(), transport=worker(seen))
+    assert files.diagrams is not None
+    async with files.lifespan():
+        drawn = await files.diagrams.mermaid("flowchart LR\n  API --> DB")
+    assert {e.type for e in drawn.elements} >= {"rectangle", "arrow"}
+    assert str(seen[0].url).startswith(f"{DIAGRAMS_URL}/mermaid")
+    assert len(files.toolsets()) == 1, "the diagrams' tools, with no native file's app running"
+
+
+def test_the_application_starts_with_diagrams_on(script: Script) -> None:
+    config = replace(settings(), files=ON)
+    with TestClient(app(script, config, workers=worker([])), headers=bearer()) as client:
+        assert client.get("/healthz").status_code == 200

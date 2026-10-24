@@ -17,11 +17,13 @@ import json
 import secrets
 import time
 from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
 from importlib import resources
 from typing import Annotated, Final
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
+from grantr.core import Member, User
 from portalr.analytics.consent import Consent
 from portalr.analytics.limiter import InMemoryRateLimiter, RateLimiter
 from portalr.readers.analytics import REGISTRY, Analytics
@@ -104,6 +106,15 @@ class Answered(Answer):
     deleted: bool | None = None
 
 
+REMOVAL_GRACE: Final = timedelta(seconds=30)
+"""How long after a removal its deletion waits: a batch the relay accepted just before it, which
+ClickHouse gathers for up to a second, has landed by then, and is deleted with the rest."""
+
+REMOVAL_MARGIN: Final = timedelta(seconds=5)
+"""How far past a removal its deletion reaches: events are stamped by the replica that relayed
+them, whose clock may run a little ahead of the one that removed the person."""
+
+
 @dataclass(frozen=True)
 class Relay:
     """What the relay needs: the analytics store, people's answers, and their pace.
@@ -170,7 +181,9 @@ class Relay:
         return True
 
     async def settle_owed(self, *, most: int = 100) -> int:
-        """Delete the events of at most `most` people a deletion is owed, in turn: how many.
+        """Delete the events owed deletion, in turn: how many deletions were done.
+
+        At most `most` people's, and at most `most` removals'.
 
         Every replica runs it, now and then: two may delete the same person's events, which does
         no harm, since a deletion done twice deletes nothing more.
@@ -178,7 +191,34 @@ class Relay:
         done = 0
         for user_id, debt in await self.consent.owing(most):
             done += await self.settle(user_id, debt, paced=False)
+        ripe = datetime.now(UTC) - REMOVAL_GRACE
+        for user_id, tenant, removed_at in await self.consent.removals_owed(most, before=ripe):
+            done += await self._forget_removed(user_id, tenant, removed_at)
         return done
+
+    async def removed(self, tenant: str, user_id: str) -> None:
+        """Owe the deletion of a person's events in a tenant they were just removed from.
+
+        grantr runs it once the removal is kept (portalr ADR-0075). It only owes: the background
+        pass, `settle_owed`, deletes, no sooner than ``REMOVAL_GRACE`` after, so an admin's
+        removal never waits on ClickHouse, and a batch accepted just before it has landed.
+        """
+        await self.consent.owe_removal(user_id, tenant)
+
+    async def member_removed(self, tenant: str, member: Member) -> None:
+        """Grantr's hook on a member's removal: a person's events in the tenant are deleted.
+
+        A key's principal records no events, so nothing is owed for one.
+        """
+        if isinstance(member, User):
+            await self.removed(tenant, member.id)
+
+    async def _forget_removed(self, user_id: str, tenant: str, removed_at: datetime) -> bool:
+        until = removed_at + REMOVAL_MARGIN
+        if not await self.analytics.forget_in(tenant, user_id, until):
+            return False
+        await self.consent.removal_settled(user_id, tenant, removed_at)
+        return True
 
     async def record(self, tenant: str, user_id: str, batch: Batch, session_id: str) -> Relayed:
         """Keep the person's batch as the registry says, if they have said yes.

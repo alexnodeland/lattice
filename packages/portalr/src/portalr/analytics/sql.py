@@ -25,6 +25,7 @@ from sqlalchemy import (
     String,
     and_,
     case,
+    delete,
     literal,
     not_,
     select,
@@ -61,6 +62,17 @@ class Answer(Base):
     """The deletion owed the person, by its number; 0 for none."""
     debts: Mapped[int] = mapped_column(Integer, nullable=False)
     """How many deletions the person has been owed: the next one's number is one more."""
+
+
+class Removal(Base):
+    """A deletion owed a person removed from a tenant: their events there, up to the removal."""
+
+    __tablename__ = "portalr_analytics_removals_owed"
+
+    user_id: Mapped[str] = mapped_column(String, primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(String, primary_key=True)
+    removed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    """When they were removed: their events from before it are deleted, and none after."""
 
 
 metadata = Base.metadata
@@ -207,6 +219,48 @@ class SqlConsent:
             )
             return [(row.user_id, row.delete_owed) for row in rows]
 
+    async def owe_removal(self, user_id: str, tenant: str) -> datetime:
+        """Owe the deletion of the person's events in the tenant, up to now: when, as owed.
+
+        Written as the tables' owner. A second removal before the first is settled owes up to
+        the later one.
+        """
+        now = datetime.now(UTC)
+        async with self._owner.begin() as connection:
+            await connection.execute(
+                _upsert(connection)(Removal)
+                .values(user_id=user_id, tenant_id=tenant, removed_at=now)
+                .on_conflict_do_update(
+                    index_elements=[Removal.user_id, Removal.tenant_id],
+                    set_={"removed_at": now},
+                )
+            )
+        return now
+
+    async def removal_settled(self, user_id: str, tenant: str, removed_at: datetime) -> None:
+        """Clear the deletion owed for that removal, only if no later one is owed since."""
+        async with self._owner.begin() as connection:
+            await connection.execute(
+                delete(Removal).where(
+                    Removal.user_id == user_id,
+                    Removal.tenant_id == tenant,
+                    Removal.removed_at == removed_at,
+                )
+            )
+
+    async def removals_owed(
+        self, most: int, *, before: datetime | None = None
+    ) -> list[tuple[str, str, datetime]]:
+        """At most `most` removals whose deletion is owed, the oldest first, removed `before`."""
+        query = select(Removal.user_id, Removal.tenant_id, Removal.removed_at)
+        if before is not None:
+            query = query.where(Removal.removed_at < before)
+        async with self._owner.connect() as connection:
+            rows = await connection.execute(
+                query.order_by(Removal.removed_at, Removal.user_id, Removal.tenant_id).limit(most)
+            )
+            return [(row.user_id, row.tenant_id, _utc(row.removed_at)) for row in rows]
+
 
 def _upsert(connection: AsyncConnection) -> Callable[..., Any]:
     """The dialect's INSERT, which has ON CONFLICT."""
@@ -219,3 +273,8 @@ async def _as_person(connection: AsyncConnection, user_id: str) -> None:
         await connection.execute(
             text("SELECT set_config('portalr.user_id', :person, true)"), {"person": user_id}
         )
+
+
+def _utc(at: datetime) -> datetime:
+    """A moment as the database gave it, in UTC: SQLite gives it without its zone."""
+    return at if at.tzinfo is not None else at.replace(tzinfo=UTC)

@@ -63,7 +63,7 @@ READS: dict[str, Callable[[Analytics], Awaitable[object]]] = {
 
 def test_every_read_of_the_reader_is_listed() -> None:
     public = {name for name in vars(Analytics) if not name.startswith("_")}
-    writes = {"capture", "capture_many", "forget", "url", "key", "writer", "reader"}
+    writes = {"capture", "capture_many", "forget", "forget_in", "url", "key", "writer", "reader"}
     assert public - writes == set(READS)
 
 

@@ -77,5 +77,6 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0069](0069-a-connected-apps-tools-chosen-in-admin-and-a-way-in-for-workspace-admins.md) | A connected app's tools chosen in admin, and a way in for a workspace's admins | Proposed |
 | [0071](0071-adoption-the-tenants-read-and-page.md) | Adoption, the tenant's read and page | Accepted |
 | [0073](0073-a-requests-analytics-session-on-its-trace.md) | A request's analytics session, on its trace | Accepted |
+| [0075](0075-a-person-removed-from-a-tenant-has-their-events-there-deleted.md) | A person removed from a tenant has their events there deleted | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

@@ -368,7 +368,7 @@ Still open:
 
 1. **Browser events carry no workspace**: the workspace isn't the session's to vouch for, and the relay doesn't ask artifactr which workspaces a person may open. A per-workspace adoption view needs that check first.
 2. **The writer's `ALTER DELETE` reaches every tenant's rows** (stackr ADR-0044): portalr deletes only by a person's hash, but the grant isn't narrower.
-3. Whether grantr needs a removal hook, so a person removed from every tenant has their events deleted too; until then, it is their own no, or an operator's delete.
+3. ~~Whether grantr needs a removal hook~~ Settled ([grantr ADR-0036](../grantr/adr/0036-a-hook-on-a-members-removal.md), [portalr ADR-0075](../portalr/adr/0075-a-person-removed-from-a-tenant-has-their-events-there-deleted.md)): removal from a tenant deletes the person's events in that tenant, owed until done.
 
 ## Tracking
 

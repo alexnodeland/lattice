@@ -24,7 +24,7 @@ portalr's side of [stackr ADR-0050](../../stackr/adr/0050-umami-a-profile-for-op
   - At most 100 copies are sent at once. Past that, a batch's copy is dropped, not queued.
   - As the application stops, the portal waits up to 5 seconds for the copies still being sent, then closes their client.
   - **A no that lands while the copy is sent:** the answer is read again after every copy, whatever the send did, since any event of it may have made a session. If the yes is gone, a deletion is owed and tried at once, so no session is left in Umami, as a batch written while a no lands is deleted in ClickHouse. If the answer can't be read again, a deletion is owed anyway, for the background pass.
-- **A person in Umami is `<tenant>:<keyed hash>`,** Umami's distinct id. So each person has a session of their own in each tenant, and never their id.
+- **A person in Umami is `<tenant's tag>:<keyed hash>`,** Umami's distinct id. The tenant's tag is 16 hex digits of a hash of its id, so the distinct id is 49 characters whatever the tenant's id. Umami cuts a distinct id at 50 characters, and a cut one would be found by no exact match, so a deletion would miss it. So each person has a session of their own in each tenant, never named by their id.
 - **Deleting reaches Umami.**
   - Saying no deletes the person's sessions there, with their events, in every tenant. portalr's Umami user, who owns the website, signs in, searches for the hash (every page of the answer), reads each session to check its distinct id is the person's exactly, and deletes it.
   - It searches again until a round finds none of theirs. A deletion that still finds some after 10 rounds isn't done, and stays owed.

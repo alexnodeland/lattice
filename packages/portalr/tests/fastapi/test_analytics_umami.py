@@ -14,13 +14,21 @@ from portalr.analytics.relay import MOST_COPIES, Batch, Event
 from portalr.invites import Invite
 from portalr.readers import Analytics, Readers
 from portalr.readers.analytics import distinct_id
-from portalr.readers.umami import AGENT, MOST_ROUNDS, PAGE
+from portalr.readers.umami import (
+    AGENT,
+    DISTINCT_LENGTH,
+    MOST_ROUNDS,
+    PAGE,
+    distinct,
+    tenant_tag,
+)
 
 from .conftest import app_for
 
 KEY = b"the deployment's key"
 WEBSITE = "446fed1e-11a4-4c5f-9b72-31e6d4cf882d"
 ME = distinct_id(KEY, "alice")
+ACME, GLOBEX = tenant_tag("acme"), tenant_tag("globex")
 BATCH = Batch(session="s", events=[Event(event="app.page.viewed.v1", route="/t/$tenant")])
 
 
@@ -29,7 +37,7 @@ class Stand:
 
     def __init__(self) -> None:
         self.sent: list[httpx.Request] = []
-        self.sessions = {"s1": f"acme:{ME}", "s2": f"globex:{ME}", "s3": f"acme:{ME}x"}
+        self.sessions = {"s1": f"{ACME}:{ME}", "s2": f"{GLOBEX}:{ME}", "s3": f"{ACME}:{ME}x"}
         self.down = False
         self.vanished: str | None = None
         """A session gone by the time it is deleted, as another replica's deletion leaves it."""
@@ -104,7 +112,7 @@ async def test_each_event_goes_as_the_tenants_person(stand: Stand) -> None:
             "hostname": "portalr.internal",
             "url": "/t/$tenant",
             "name": "app.page.viewed.v1",
-            "id": f"acme:{ME}",
+            "id": f"{ACME}:{ME}",
             "data": {"kind": "note"},
         },
     }
@@ -224,7 +232,7 @@ async def test_a_no_while_the_copy_is_sent_deletes_it_from_umami(stand: Stand) -
 
     async def says_no() -> None:
         await relay.consent.give("alice", yes=False)
-        stand.sessions["s9"] = f"acme:{ME}"  # as Umami makes it, from the copy
+        stand.sessions["s9"] = f"{ACME}:{ME}"  # as Umami makes it, from the copy
 
     stand.after_send.append(says_no)
     await relay.record("acme", "alice", BATCH, "s")
@@ -248,8 +256,8 @@ def searches(stand: Stand) -> int:
 
 
 async def test_forgetting_reads_every_page_of_the_search_in_one_round(stand: Stand) -> None:
-    stand.sessions = {f"s{n:03}": f"acme:{ME}" for n in range(PAGE * 2 + 5)}
-    stand.sessions["other"] = "acme:someone"
+    stand.sessions = {f"s{n:03}": f"{ACME}:{ME}" for n in range(PAGE * 2 + 5)}
+    stand.sessions["other"] = f"{ACME}:someone"
     assert await umami_of(stand).forget(ME)
     assert set(stand.sessions) == {"other"}
     # Three pages in the first round, and one page, empty, in the second, which ends it.
@@ -262,7 +270,7 @@ async def test_a_session_made_between_rounds_is_found_by_the_next(stand: Stand) 
     def another() -> None:
         if not made:
             made.append(True)
-            stand.sessions["late"] = f"acme:{ME}"
+            stand.sessions["late"] = f"{ACME}:{ME}"
 
     stand.after_delete.append(another)
     assert await umami_of(stand).forget(ME)
@@ -297,7 +305,7 @@ async def test_the_relay_deletes_with_a_no_and_owes_it_while_umami_is_down(stand
     await relay.answer("alice", yes=True)
     assert (await relay.answer("alice", yes=False)).deleted is True
     assert set(stand.sessions) == {"s3"}
-    stand.sessions["s4"] = f"acme:{ME}"
+    stand.sessions["s4"] = f"{ACME}:{ME}"
     stand.down = True
     await relay.consent.give("alice", yes=True)
     assert (await relay.answer("alice", yes=False)).deleted is False
@@ -335,7 +343,7 @@ async def test_a_no_while_a_copy_fails_halfway_still_deletes_what_it_made(stand:
 
     async def says_no() -> None:
         await relay.consent.give("alice", yes=False)
-        stand.sessions["s9"] = f"acme:{ME}"
+        stand.sessions["s9"] = f"{ACME}:{ME}"
 
     stand.after_send.append(says_no)
     two = Batch(
@@ -410,3 +418,10 @@ async def test_a_deletion_that_cant_be_owed_either_is_said_for_operators(
     await relay.record("acme", "alice", BATCH, "s")
     await asyncio.gather(*relay.copies)
     assert "a deletion couldn't be owed: RuntimeError" in caplog.text
+
+
+def test_a_distinct_id_fits_umamis_whatever_the_tenants_id() -> None:
+    longest = "t" * 256
+    assert len(distinct(longest, ME)) <= DISTINCT_LENGTH
+    assert distinct(longest, ME).rpartition(":")[2] == ME
+    assert distinct("acme", ME) != distinct("globex", ME)

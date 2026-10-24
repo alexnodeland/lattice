@@ -25,7 +25,14 @@ from portalr.invites import InviteFailed, SupabaseInvite
 from portalr.people import SupabasePeople
 from portalr.readers import Analytics
 
-from {{ package_name }}.portal import LARGEST, analytics, invitations, people, readers, umami
+from {{ package_name }}.portal import (
+    LARGEST,
+    analytics,
+    invitations,
+    people,
+    readers,
+    umami,
+)
 from {{ package_name }}.settings import AuthSettings, PortalSettings, Settings
 
 from conftest import TENANT, Script, app, bearer, settings, token

@@ -4,14 +4,16 @@ And a deep link to its website, every tenant's journeys, for operators alone.
 
 ClickHouse stays the record (lattice RFC-0008). The relay sends Umami a copy of each consented
 event, from portalr's own address: no person's network address, browser or user agent reaches
-it, only a fixed agent of portalr's. A person is ``<tenant>:<keyed hash>``, Umami's distinct id,
-so each person has a session of their own in each tenant, and a deletion can find them: all of
+it, only a fixed agent of portalr's. A person is ``<tenant's tag>:<keyed hash>``, Umami's
+distinct id, so each person has a session of their own in each tenant, and a deletion can find
+them: all of
 their sessions when they say no, or one tenant's when they are removed from it (portalr ADR-0076).
 
 Umami's ingest takes anyone's events, so it is reachable only on a network stackr shares with the
 application alone. Its deletions are portalr's user's, who owns the website.
 """
 
+import hashlib
 import logging
 import time
 from dataclasses import dataclass, field
@@ -40,6 +42,23 @@ PAGE: Final = 100
 MOST_ROUNDS: Final = 10
 """How many times a deletion searches again before it says it wasn't done: each round deletes
 every session of the person's that the search found, page by page."""
+
+
+DISTINCT_LENGTH: Final = 50
+"""The longest distinct id Umami keeps: a longer one is cut, and found by no exact match."""
+
+
+def tenant_tag(tenant: str) -> str:
+    """A tenant as Umami knows it: 16 hex digits of its id's hash, whatever its id's length."""
+    return hashlib.sha256(tenant.encode()).hexdigest()[:16]
+
+
+def distinct(tenant: str, person: str) -> str:
+    """A person in a tenant, as Umami's distinct id: the tenant's tag and their keyed hash.
+
+    49 characters, under Umami's ``DISTINCT_LENGTH``, whatever the tenant's id.
+    """
+    return f"{tenant_tag(tenant)}:{person}"
 
 
 class _Rest:
@@ -101,7 +120,7 @@ class Umami:
                     "hostname": HOSTNAME,
                     "url": props.get("route") or "/",
                     "name": name,
-                    "id": f"{tenant}:{person}",
+                    "id": distinct(tenant, person),
                     "data": {key: value for key, value in props.items() if key != "route"},
                 }
                 response = await self.client.post(
@@ -188,7 +207,7 @@ class Umami:
                 read.raise_for_status()
                 named = _SESSION.validate_json(read.content).distinct_id or ""
                 owner, _, whose = named.rpartition(":")
-                if whose == person and (tenant is None or owner == tenant):
+                if whose == person and (tenant is None or owner == tenant_tag(tenant)):
                     theirs.append(session.id)
             if len(listed) < PAGE:
                 return theirs

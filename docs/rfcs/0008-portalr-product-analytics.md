@@ -362,7 +362,7 @@ Decided by the owner (2026-10-22), for the relay's slice:
 
 Settled by the relay's slice: lightweight deletes on 26.9 (below).
 
-Settled by Umami's slice ([stackr ADR-0050](../stackr/adr/0050-umami-a-profile-for-operators-journeys-on-the-postgres-adapter.md), [portalr ADR-0076](../portalr/adr/0076-the-relay-sends-umami-a-copy-and-deletes-there-too.md)): Umami 3.4.0 is MIT and has replays; it runs on the postgres adapter alone, on networks of its own; a person there is their tenant and keyed hash, and their sessions are deleted with a no.
+Settled by Umami's slice ([stackr ADR-0050](../stackr/adr/0050-umami-a-profile-for-operators-journeys-on-the-postgres-adapter.md), [portalr ADR-0076](../portalr/adr/0076-the-relay-sends-umami-a-copy-and-deletes-there-too.md)): Umami 3.4.0 is MIT and has replays; it runs on the postgres adapter alone, on networks of its own; a person there is a hash of their tenant and their keyed hash, and their sessions are deleted with a no.
 
 Settled by the operators' slice ([stackr ADR-0048](../stackr/adr/0048-grafanas-clickhouse-data-source-and-the-adoption-dashboard.md)): the plugin, 4.22.1, signed, is fetched as `stackr-grafana` is built, pinned by version and each architecture's sha256, and Compose builds that image too. `grafana_analytics` reads `analytics.events` across tenants, read-only, with nothing logged; its time ceiling is 30 seconds, since the plugin asks for a little more than its query timeout.
 

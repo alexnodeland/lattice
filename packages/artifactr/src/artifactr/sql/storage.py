@@ -520,6 +520,20 @@ class SqlStorage:
         return True
 
     @awaited_to_the_end
+    async def renew_lease(self, scope: Scope, key: str, holder: str, ttl: timedelta) -> bool:
+        """Renew a lease only if ``holder`` still has it, expired or not; never take one."""
+        # Normalized to UTC, because SQLite compares timestamps as text.
+        now = self._clock().astimezone(UTC)
+        async with self._session(scope.tenant_id) as session, session.begin():
+            connection = await session.connection()
+            renewed = await connection.execute(
+                update(LeaseRow)
+                .where(*_lease(scope, key), LeaseRow.holder == holder)
+                .values(expires_at=now + ttl)
+            )
+        return renewed.rowcount > 0
+
+    @awaited_to_the_end
     async def release_lease(self, scope: Scope, key: str, holder: str) -> None:
         """Release a lease if ``holder`` has it."""
         async with self._session(scope.tenant_id) as session, session.begin():

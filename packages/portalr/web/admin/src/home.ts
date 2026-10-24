@@ -43,7 +43,7 @@ export function unread(tool: string, reading: Unread): Said {
   return reading.status === "unavailable"
     ? {
         figure: null,
-        line: `${tool} isn't answering: ${reading.reason}`,
+        line: `${tool} isn't answering.`,
         badge: { tone: "failed", word: "Unavailable" },
       }
     : {

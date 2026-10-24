@@ -100,12 +100,16 @@ export function ItemTable<T>({
               </Heading>
               {rest.length > 0 && (
                 <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-                  {rest.map((column) => (
-                    <div key={column.key} className="contents">
-                      <dt className="text-muted">{column.label}</dt>
-                      <dd>{column.cell(item)}</dd>
-                    </div>
-                  ))}
+                  {rest.map((column) => {
+                    const cell = column.cell(item);
+                    // A card leaves out what an item has nothing for, rather than a label alone.
+                    return cell === null || cell === undefined || cell === false ? null : (
+                      <div key={column.key} className="contents">
+                        <dt className="text-muted">{column.label}</dt>
+                        <dd>{cell}</dd>
+                      </div>
+                    );
+                  })}
                 </dl>
               )}
               {actions && <div className="flex flex-wrap gap-2">{actions(item)}</div>}

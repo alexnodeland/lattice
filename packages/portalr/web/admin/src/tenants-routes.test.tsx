@@ -110,9 +110,7 @@ test("LiteLLM not answering leaves the tenants, and says that spend isn't shown"
   await expect.element(screen.getByRole("table", { name: "Tenants" })).toBeVisible();
   await expect
     .element(screen.getByRole("status").first())
-    .toHaveTextContent(
-      "LiteLLM isn't answering: litellm answered 502 Spend and budgets are not shown.",
-    );
+    .toHaveTextContent("LiteLLM isn't answering. Spend and budgets are not shown.");
 });
 
 test("LiteLLM not configured is said, and no tenants is said", async () => {

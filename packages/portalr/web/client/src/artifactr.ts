@@ -124,6 +124,8 @@ export interface Run {
   readonly answered: readonly Answered[];
   /** The `seq` it started at: the later, the newer. */
   readonly started: number;
+  /** When it started, as the log's event says; none before it has. */
+  readonly startedAt?: string;
   /** The `seq` it ended at, or null while it hasn't. */
   readonly ended: number | null;
   /** Why it failed, as its `run_ended` says: what happened, and a code for it, where known. */
@@ -321,6 +323,7 @@ const handlers: Handlers = {
       threadId: event.thread_id,
       status: "running",
       started: envelope.seq,
+      startedAt: envelope.ts,
       ...(first && { prompt: first }),
       ...(actor.kind === "agent" &&
         actor.on_behalf_of?.kind === "user" && {

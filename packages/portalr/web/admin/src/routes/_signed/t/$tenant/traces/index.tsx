@@ -3,6 +3,7 @@ import {
   Alert,
   Button,
   Card,
+  CopyButton,
   duration,
   EmptyState,
   ItemTable,
@@ -31,6 +32,7 @@ import {
   startedAt,
   windowOf,
 } from "../../../../../traces";
+import { Unanswered } from "../../../../../unanswered";
 
 const HEADER = <PageHeader title="Traces" meta="What the agents did, step by step" />;
 
@@ -76,6 +78,9 @@ export const Route = createFileRoute("/_signed/t/$tenant/traces/")({
   ),
 });
 
+/** A trace's id as the list shows it: its last 8 digits, which its padding doesn't reach. */
+const shortened = (id: string) => id.slice(-8);
+
 function Traces() {
   const { tenant } = Route.useParams();
   const shown = Route.useSearch();
@@ -84,6 +89,8 @@ function Traces() {
   const { data: reading } = useSuspenseQuery(
     queries.portalr.traces(tenant, window, { session, run, analytics_session: analytics }),
   );
+  // What a row's copy did, said in one status for the table, not one for each of its rows.
+  const [copied, setCopied] = useState("");
   if (reading.status === "unconfigured") {
     return (
       <>
@@ -98,9 +105,7 @@ function Traces() {
     return (
       <>
         {HEADER}
-        <EmptyState title="Tempo isn't answering">
-          <Alert tone="error">{reading.reason}</Alert>
-        </EmptyState>
+        <Unanswered tool="Tempo" reading={reading} />
       </>
     );
   }
@@ -130,14 +135,20 @@ function Traces() {
           {
             key: "trace",
             label: "Trace",
+            // Its last 8 digits, since an id is padded with zeros at its start, and named and
+            // copied whole. Tempo's root span names the trace, but the root may be another
+            // tenant's, so isn't read.
             cell: (trace) => (
               <TextLink
                 variant="subtle"
+                aria-label={`Trace ${trace.trace_id}`}
                 render={
                   <Link to="/t/$tenant/traces/$trace" params={{ tenant, trace: trace.trace_id }} />
                 }
               >
-                <code className="font-mono text-xs">{trace.trace_id}</code>
+                <code className="font-mono text-xs" title={trace.trace_id}>
+                  {shortened(trace.trace_id)}
+                </code>
               </TextLink>
             ),
           },
@@ -149,11 +160,20 @@ function Traces() {
           {
             key: "took",
             label: "Took",
-            cell: (trace) => (trace.duration_ms == null ? "–" : duration(trace.duration_ms)),
+            // Tempo gives a trace's duration only once its root has ended: blank until then.
+            cell: (trace) => (trace.duration_ms == null ? null : duration(trace.duration_ms)),
           },
         ]}
         items={traces}
         keyOf={(trace) => trace.trace_id}
+        // Beside the row, not in its first cell, which names the row.
+        actions={(trace) => (
+          <CopyButton
+            text={trace.trace_id}
+            what={`trace ${shortened(trace.trace_id)}`}
+            onSaid={setCopied}
+          />
+        )}
         empty={
           filtered
             ? { title: "No traces match", body: "Widen the window, or clear the thread or run." }
@@ -163,6 +183,9 @@ function Traces() {
               }
         }
       />
+      <p role="status" className="sr-only">
+        {copied}
+      </p>
     </div>
   );
 }

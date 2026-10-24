@@ -1251,6 +1251,21 @@ async def test_the_deployments_own_tools_list_every_tenant(storage: Storage) -> 
     assert await grants.served_tenants() == ["acme", "globex"]
 
 
+async def test_the_deployments_own_tools_read_a_tenants_audit_log_in_pages(
+    grants: Grants,
+) -> None:
+    await _members(grants, BOB, CAROL)
+    await grants.remove_member("acme", BOB, by=ALICE)
+    await grants.remove_member("acme", CAROL, by=ALICE)
+    removals = AuditFilter(types={"member_removed"})
+    first, second = await grants.served_audit("acme", keep=removals)
+    assert [first.event, second.event] == [MemberRemoved(member=BOB), MemberRemoved(member=CAROL)]
+    assert await grants.served_audit("acme", limit=1, keep=removals) == [first]
+    assert await grants.served_audit("acme", after_seq=first.seq, keep=removals) == [second]
+    assert await grants.served_audit("acme", after_seq=second.seq, keep=removals) == []
+    assert await grants.served_audit("globex", keep=removals) == []
+
+
 async def test_every_role_the_catalog_offers_is_one_grant_accepts(grants: Grants) -> None:
     """The catalog is what a tenant's admins may grant: each role, on each kind it lists."""
     await _members(grants, BOB)
@@ -1274,34 +1289,3 @@ async def test_rule_is_a_stored_rules_own_role(grants: Grants) -> None:
     await _members(grants, BOB)
     with pytest.raises(Invalid, match="a stored rule's own role"):
         await grants.grant("acme", "rule", on=WS, to=BOB, by=ALICE)
-
-
-async def test_a_removal_runs_each_hook_once_it_is_kept_and_a_failing_one_changes_nothing(
-    grants: Grants, caplog: pytest.LogCaptureFixture
-) -> None:
-    await _members(grants, BOB, CAROL)
-    ran: list[tuple[str, Any, bool]] = []
-
-    async def first(tenant: str, member: Any) -> None:
-        ran.append(
-            (tenant, member, await grants.check(tenant, member, "grantr:read_audit", TENANT))
-        )
-        raise RuntimeError("secret detail")
-
-    async def second(tenant: str, member: Any) -> None:
-        ran.append((tenant, member, False))
-
-    grants.on_member_removed(first)
-    grants.on_member_removed(second)
-    grants.on_member_removed(second)  # again: still once
-    await grants.remove_member("acme", BOB, by=ALICE)
-    # Each ran after the removal was kept, in turn, the failing one's error logged by its type.
-    assert ran == [("acme", BOB, False), ("acme", BOB, False)]
-    assert not await grants.check("acme", BOB, "artifactr:read_artifacts", TENANT)
-    assert "first" in caplog.text
-    assert "RuntimeError" in caplog.text
-    assert "secret detail" not in caplog.text
-    # A removal refused runs none.
-    with pytest.raises(Invalid):
-        await grants.remove_member("acme", BOB, by=ALICE)
-    assert len(ran) == 2

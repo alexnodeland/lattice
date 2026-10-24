@@ -20,6 +20,7 @@ last section is what the TLA+ spec in docs/artifactr/spec found, each trace run 
 import asyncio
 import contextlib
 import logging
+import time
 from collections.abc import AsyncGenerator, AsyncIterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -840,6 +841,27 @@ async def test_i3_a_message_asked_while_its_holder_dies_is_taken_once_its_claim_
     await _entered(taking)  # the refused claimant looked again
     await settled(thread.id, living)
     assert script.conversation() == ["Plan the launch", "Also book the big room"]
+
+
+async def test_i3_a_holder_whose_loop_stalls_past_its_claim_keeps_its_run_and_its_message(
+    runners: MakeRunner,
+) -> None:
+    # Only the loop's timer passed the claim's ttl: storage, whose clock stands still, kept the
+    # claim. The run, which took its message as it started, goes on, and the model is given it.
+    storage = InMemoryStorage(clock=_Clock())
+    ws = await Workspaces(storage).open(SCOPE.tenant_id, SCOPE.workspace_id, actor=ALICE)
+    thread = await ws.create_thread("Launch")
+    ttl = timedelta(milliseconds=50)
+
+    def stalls(_: object) -> ModelResponse:
+        time.sleep(ttl.total_seconds() * 3)  # after run_started, the loop stalls
+        return say("ok")
+
+    script = Script(stalls)
+    runner = runners(make_agent(script), claim_ttl=ttl)
+    await started(await runner.send(ws, thread.id, "Plan the launch")).wait()
+    assert script.conversation() == ["Plan the launch"]
+    assert [run.status for run in await ws.runs(thread_id=thread.id)] == ["completed"]
 
 
 async def test_i3_a_runner_that_starts_takes_what_a_dead_holder_was_asked(

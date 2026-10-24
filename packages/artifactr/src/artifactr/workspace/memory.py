@@ -311,6 +311,16 @@ class InMemoryStorage:
             data.leases[key] = (holder, now + ttl)
             return True
 
+    async def renew_lease(self, scope: Scope, key: str, holder: str, ttl: timedelta) -> bool:
+        """Renew a lease only if ``holder`` still has it, expired or not; never take one."""
+        data = self._data(scope)
+        async with data.lock:
+            current = data.leases.get(key)
+            if current is None or current[0] != holder:
+                return False
+            data.leases[key] = (holder, self._clock() + ttl)
+            return True
+
     async def release_lease(self, scope: Scope, key: str, holder: str) -> None:
         """Release a lease if ``holder`` has it."""
         leases = self._data(scope).leases

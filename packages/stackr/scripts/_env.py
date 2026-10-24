@@ -20,15 +20,15 @@ def read_env(path: Path) -> dict[str, str]:
     return {match["key"]: match["value"] for match in matches if match}
 
 
-def settings() -> dict[str, str]:
+def settings(root: Path = ROOT) -> dict[str, str]:
     """The stack's settings: `.env`'s, or `.env.example`'s where `.env` leaves one unset or empty.
 
     `.env.example` gives values only for the settings it doesn't generate, such as the published
     ports; for a secret it has a `generate:...` placeholder, which only `.env` replaces. Compose's
     `${KEY:-default}` reads an empty value as unset too, and its defaults are `.env.example`'s.
     """
-    local = read_env(ROOT / ".env")
-    return read_env(ROOT / ".env.example") | {key: value for key, value in local.items() if value}
+    local = read_env(root / ".env")
+    return read_env(root / ".env.example") | {key: value for key, value in local.items() if value}
 
 
 def published_host(env: dict[str, str]) -> str:

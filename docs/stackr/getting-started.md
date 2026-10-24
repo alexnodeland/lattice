@@ -37,7 +37,7 @@ Langfuse and the gateway run their database migrations on the first start, so th
 
 ### Choosing profiles
 
-`PROFILES` chooses what runs; the default is all three:
+`PROFILES` chooses what runs. The default is `observability`, `langfuse` and `gateway`; `auth`, `analytics` and `umami` start only when chosen:
 
 ```bash
 make up PROFILES=observability              # the Collector, Tempo, Prometheus, Loki, Pyroscope and Grafana

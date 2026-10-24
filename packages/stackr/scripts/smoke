@@ -900,9 +900,9 @@ app_package=${app_name//-/_}
 app_port=${SMOKE_APP_PORT:-8800}
 # The role the application works as, which owns nothing: row-level security holds it.
 app_role=${app_package}_app
-# The database's host and owner, as db-init has them: local Supabase's by default.
+# The database's host, as db-init has it: local Supabase's by default. scripts/wire-app gives the
+# application its owner too.
 app_db_host=${STACKR_DB_HOST:-supabase_db_stackr-supabase}
-app_db_admin_password=${STACKR_DB_ADMIN_PASSWORD:-postgres}
 
 # The application's API as the signed-in user, in a tenant (APP_TENANT, or the one they own);
 # the token goes to curl on stdin.
@@ -1178,7 +1178,7 @@ smoke_scenarios() {
 }
 
 smoke_app() {
-  local adapter=${STACKR_DATABASE:-$(setting STACKR_DATABASE)} issuer jwks admin=""
+  local adapter=${STACKR_DATABASE:-$(setting STACKR_DATABASE)} auth_settings=""
   # The Supabase project the portal's UIs sign in to, as the browser reaches it, and its key: the
   # application's own origin, which passes the sign-in calls on, or a single host's edge.
   local portal_url=/ portal_publishable=sb_publishable_smoke
@@ -1186,21 +1186,17 @@ smoke_app() {
   if [[ $adapter == supabase ]]; then
     auth=supabase
     supabase_status || { log "FAIL: app: local Supabase's status"; return 1; }
-    issuer=$supabase_api/auth/v1
-    jwks=""
     # The scenarios' browser signs in through the application, to local Supabase; the application
     # names people by email, and invites, with its secret key, which stays in its environment (the
     # .env is written mode 0600, never an argument) and is not what the browser is given.
     portal_publishable=$supabase_publishable
-    admin="AUTH_SERVICE_ROLE_KEY=$supabase_secret"
+    auth_settings="AUTH_ISSUER=$supabase_api/auth/v1
+STACK_AUTH_JWKS_URL=
+AUTH_SERVICE_ROLE_KEY=$supabase_secret"
   else
+    # GoTrue's issuer, keys and admin API, which scripts/wire-app sets on the postgres adapter.
     auth=gotrue
     gotrue_ready || { log "FAIL: app: on $adapter, it needs GoTrue, the auth profile"; return 1; }
-    issuer=$(setting AUTH_PUBLIC_URL)
-    jwks=http://gotrue:9999/.well-known/jwks.json
-    # The admin commands find users by email through GoTrue's admin API, on the stack's network.
-    admin="AUTH_SERVICE_ROLE_KEY=$(setting AUTH_SERVICE_ROLE_KEY)
-STACK_AUTH_ADMIN_URL=http://gotrue:9999"
   fi
   unset DOCKER_DEFAULT_PLATFORM
 
@@ -1236,20 +1232,14 @@ STACK_AUTH_ADMIN_URL=http://gotrue:9999"
   fi
   portal_key_made=1
   app_password=$(random_hex 16)
-  (
-    umask 077
-    # .env.example first, as `make env` copies it, then what the smoke test sets: Compose takes a
-    # setting's last line, which is all that reads it here (the local commands would take the first).
-    { cat "$app_dir/.env.example"; cat <<ENV; } >"$app_dir/.env"
+  # .env.example first, as `make env` copies it, then the stack's settings and the smoke test's
+  # own (scripts/wire-app), each on its one line; the keys go on stdin, never as arguments.
+  (umask 077 && cp "$app_dir/.env.example" "$app_dir/.env")
+  if ! uv run scripts/wire-app "$app_dir" 2>/dev/null <<ENV; then
 STACK_DATABASE_URL=postgresql+asyncpg://$app_role:$app_password@$app_db_host:5432/postgres
-STACK_DATABASE_ADMIN_URL=postgresql+asyncpg://postgres:$app_db_admin_password@$app_db_host:5432/postgres
 APP_PORT=$app_port
 OTEL_METRIC_EXPORT_INTERVAL=2000
-LANGFUSE_PUBLIC_KEY=$(setting LANGFUSE_PUBLIC_KEY)
-LANGFUSE_SECRET_KEY=$(setting LANGFUSE_SECRET_KEY)
-AUTH_ISSUER=$issuer
-STACK_AUTH_JWKS_URL=$jwks
-$admin
+${auth_settings}
 LITELLM_API_KEY=$app_key
 LITELLM_MOCK_RESPONSE="stackr smoke ok"
 APP_IMAGE=$app_name:local
@@ -1258,7 +1248,9 @@ PORTAL_SUPABASE_KEY=$portal_publishable
 PORTAL_LITELLM_KEY=$portal_key
 ${domain:+STACKR_DOMAIN=$domain}
 ENV
-  )
+    log "FAIL: app: wiring its .env to the stack"
+    return 1
+  fi
   if ! docker compose --project-directory "$app_dir" --profile app build >/dev/null; then
     log "FAIL: app: building its image"
     return 1

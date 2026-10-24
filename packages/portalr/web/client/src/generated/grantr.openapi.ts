@@ -1125,6 +1125,10 @@ export interface components {
         SettingKind: {
             /** High */
             high?: number | null;
+            /** Labels */
+            labels?: {
+                [key: string]: string;
+            } | null;
             /** Low */
             low?: number | null;
             /**

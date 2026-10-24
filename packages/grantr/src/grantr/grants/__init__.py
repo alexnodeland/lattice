@@ -3,7 +3,7 @@
 With the storage port, and its in-memory implementation.
 """
 
-from grantr.grants.grants import Access, Grants, Hooks, MemberRemovedHook, SubjectOf
+from grantr.grants.grants import Access, Grants, Hooks, SubjectOf
 from grantr.grants.memory import InMemoryStorage
 from grantr.grants.storage import Reads, Storage, Transaction
 
@@ -12,7 +12,6 @@ __all__ = [
     "Grants",
     "Hooks",
     "InMemoryStorage",
-    "MemberRemovedHook",
     "Reads",
     "Storage",
     "SubjectOf",

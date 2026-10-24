@@ -373,7 +373,7 @@ Recommended, for the maintainer to decide, and signed off by the owner on 2026-1
 
 As of 2026-10-22, the CJK fonts are decided; revision growth has a follow-up; viewers' cursors are still open.
 
-- ~~**CJK fonts:** ship Xiaolai's 12 MB in portalr's wheel, or let CJK text fall back to a system face.~~ **Decided (2026-10-22):** Xiaolai ships only in the worker's image, pinned by commit, once its licence is confirmed upstream. Browsers fall back to a system CJK face.
+- ~~**CJK fonts:** ship Xiaolai's 12 MB in portalr's wheel, or let CJK text fall back to a system face.~~ **Decided (2026-10-22):** Xiaolai ships only in the worker's image, pinned by commit, once its licence is confirmed upstream. Browsers fall back to a system CJK face (amended 2026-10-24, lattice#679: it is OFL 1.1, but its README reserves its name, which Excalidraw's copy keeps; it stays out until the author answers).
 - **Revision growth:** whether diagrams need a retention rule for old revisions, which artifactr has for none of its types. Phase 0 measured about 58 MB a person-hour at a 30 KB scene under U4's first cadence. The five-second cadence halves that. A retention rule for diagram revisions is a follow-up, artifactr's own ADR.
 - **Viewers' cursors:** whether a viewer's pointer is shown to editors, or only listed.
 
@@ -403,7 +403,7 @@ Each is settled in phase 0's ADR or carried as an exit criterion.
 - [ ] artifactr: `Workspaces(gate=...)` and `NotEnabled` (done, [artifactr ADR-0081](../artifactr/adr/0081-a-gate-before-access-integrations-switched-off-answer-not-enabled.md)); the watch commands, presence frames and `PresenceChannel`, with ADRs
 - [ ] artifactr-files: the collector's kinds
 - [ ] artifactr's `excalidraw` extra: its type, patches, checks and `render_for_agent` (done: artifactr ADR-0086, with phase 0's limits, and `excalidraw` off by default); its toolset and converter (done: [artifactr ADR-0090](../artifactr/adr/0090-diagrams-drawn-by-the-agent-through-a-converter.md)); its router
-- [x] stackr: the worker, its image and the `diagrams` question ([stackr ADR-0049](../stackr/adr/0049-the-diagrams-worker-excalidraw-in-headless-chromium-behind-a-relay.md)); Xiaolai in its image waits for lattice#679
+- [x] stackr: the worker, its image and the `diagrams` question ([stackr ADR-0049](../stackr/adr/0049-the-diagrams-worker-excalidraw-in-headless-chromium-behind-a-relay.md)); Xiaolai in its image waits for its author's answer to lattice#679
 - [x] portalr, phase 3a: the renderer, its text alternative held to artifactr's by a shared fixture, and the canvas to look at, an add-on with its budget, under the policy unchanged ([portalr ADR-0072](../portalr/adr/0072-a-diagrams-card-and-its-canvas-to-look-at.md))
 - [x] portalr, phase 3b: editing on the canvas, the TypeScript patch builder, an upload route for a diagram's images with checks of size and type, and no SVG images; `img-src blob:` found not needed ([portalr ADR-0074](../portalr/adr/0074-editing-a-diagram-on-its-canvas-and-the-images-put-on-it.md), [artifactr ADR-0092](../artifactr/adr/0092-a-diagrams-images-uploaded-by-a-person-and-read-where-it-names-them.md))
 - [ ] portalr: presence, the list, the overlay, admin's Integrations page

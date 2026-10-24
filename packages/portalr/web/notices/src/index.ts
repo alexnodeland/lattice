@@ -1,5 +1,6 @@
 export { type BundledPackage, collect, declaredLicence, packageDirectory } from "./collect";
 export { bundledLicences, expressionProblems, OWN_LICENCES } from "./expression";
+export { LIBERATION, LIBERATION_URI, replaceLiberation } from "./liberation";
 export { NOTICES_FILE, notices } from "./plugin";
 export {
   check,

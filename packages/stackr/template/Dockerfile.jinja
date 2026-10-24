@@ -57,14 +57,21 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 
 # The worker's environment: artifactr's files extra alone, at the versions uv.lock pins, not the
-# application's whole.
+# application's whole. It resolves against the index, whose copies may lag a release for a few
+# minutes, so a failed resolve is tried again, up to three times, reading the index afresh.
 FROM locked AS worker-venv
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv export --locked --no-dev --no-emit-project --no-hashes --output-file /tmp/locked.txt \
     && artifactr=$(sed -n 's/^artifactr-ai @/artifactr-ai[files] @/p' /tmp/locked.txt) \
     && test -n "$artifactr" \
     && uv venv /opt/worker \
-    && uv pip install --python /opt/worker/bin/python --constraint /tmp/locked.txt "$artifactr"
+    && for attempt in 1 2 3; do \
+         uv pip install ${refresh:-} --python /opt/worker/bin/python --constraint /tmp/locked.txt "$artifactr" \
+           && break; \
+         if [ "$attempt" -eq 3 ]; then echo "the worker's dependencies didn't resolve, after 3 tries" >&2; exit 1; fi; \
+         echo "the worker's dependencies didn't resolve (try $attempt of 3): trying again in $((attempt * 30))s" >&2; \
+         sleep $((attempt * 30)); refresh=--refresh; \
+       done
 
 
 # A crafting app's release, fetched as scripts/crafts pins it and checked against its SHA-256

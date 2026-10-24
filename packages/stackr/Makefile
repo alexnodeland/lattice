@@ -154,6 +154,13 @@ ifneq ($(strip $(START_SUPABASE)),)
 	scripts/binding-probe $(SUPABASE_NETWORK) $(STACKR_BIND)
 	$(SUPABASE) start $(SUPABASE_START_FLAGS)
 endif
+# The pinned images first, each pull tried up to three times: a registry's 502 or 503 passes.
+	@for attempt in 1 2 3; do \
+	  $(COMPOSE_ENV) $(STACK) $(PROFILE_FLAGS) pull --quiet --ignore-buildable && break; \
+	  if [ $$attempt -eq 3 ]; then echo "the stack's images didn't pull, after 3 tries" >&2; exit 1; fi; \
+	  echo "pulling the stack's images failed (try $$attempt of 3): trying again in $$((attempt * 20))s" >&2; \
+	  sleep $$((attempt * 20)); \
+	done
 # Ten minutes: the first start pulls and builds every image. The app stack's up waits five.
 	$(COMPOSE_ENV) $(STACK) $(PROFILE_FLAGS) up --detach --wait --wait-timeout 600 --build
 ifneq ($(filter analytics,$(PROFILES)),)

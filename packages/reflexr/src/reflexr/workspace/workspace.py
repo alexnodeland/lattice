@@ -54,6 +54,7 @@ from reflexr.core import (
     NotFound,
     Outcome,
     Predicates,
+    Problem,
     Publish,
     PublishedOutcome,
     RecordedOutcome,
@@ -1395,7 +1396,7 @@ class Workspace:
             ValidationFailed: Listing the problems.
         """
         context = self._context
-        problems: list[JsonValue] = []
+        problems: list[Problem] = []
         try:
             rule.check(events=context.known, predicates=context.predicates)
         except InvalidRule as invalid:
@@ -1403,7 +1404,8 @@ class Workspace:
         problems.extend(check_stored(rule, config))
         problems.extend(check_provenance(provenance))
         if problems:
-            raise ValidationFailed(f"rule {rule.name} cannot be stored", problems)
+            errors: list[JsonValue] = [problem.error("rule") for problem in problems]
+            raise ValidationFailed(f"rule {rule.name} cannot be stored", errors)
 
     async def _save_version(
         self,

@@ -15,7 +15,14 @@ const ANSWERS: Record<string, () => Response> = {
         rejection: {
           type: "validation_failed",
           message: "rule tickets:echo cannot be stored",
-          errors: ["timeout is required", "when.throttle is required"],
+          errors: [
+            { loc: ["rule", "timeout"], msg: "timeout is required", type: "missing" },
+            {
+              loc: ["rule", "when", "throttle"],
+              msg: "when.throttle is required",
+              type: "missing",
+            },
+          ],
         },
       },
       { status: 422 },
@@ -147,7 +154,7 @@ test("a refusal says the kit's sentence for its reason code, never the server's 
   expect(await commands.reflexr.send("acme", "notes", archive, "problems")).toEqual({
     outcome: "refused",
     status: 422,
-    reasons: ["What was asked for isn't valid."],
+    reasons: ["What was asked for isn't valid: rule.timeout, rule.when.throttle."],
   });
   expect(await commands.reflexr.send("acme", "notes", archive, "conflict")).toEqual({
     outcome: "refused",

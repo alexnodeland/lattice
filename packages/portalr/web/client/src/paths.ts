@@ -28,7 +28,8 @@ const MOST_SAID = 160;
 
 /** Where in a `loc` a field's path starts: after a command frame's own parts, or where it is. */
 function startOf(loc: readonly unknown[]): number {
-  const command = loc.indexOf("command");
+  // After "command" only where a frame puts it, so a field of that name isn't taken for one.
+  const command = loc.slice(0, 2).indexOf("command");
   if (command !== -1) {
     return command + 2;
   }

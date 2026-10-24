@@ -129,7 +129,7 @@ The worker costs an image of about 1 GB and 1 GiB while it runs, for exports tha
 - **`/healthz` answers without the token,** with Excalidraw's version and nothing else, on the worker's own network.
 - **The relay** takes at most 16 connections at once, shared by every tenant, as native files' do. The worker runs one job at a time, so a burst queues, each job within its own deadline. No tenant has a share of its own yet (ADR-0088).
 - **What floats.** The images are pinned by digest. Noto CJK, and the packages it pulls, float with Ubuntu's archive, as the template's other apt packages do.
-- **Licences not yet verified,** as ADR-0088 carried them:
+- **Licences not yet verified:**
   - Excalifont and Liberation (lattice#679), whose own metadata names no SIL licence: Excalifont's says "All rights reserved", and Liberation Sans' refers to Ascender's licence agreement;
   - Cascadia Code, whose metadata names the SIL Open Font License's URL beside Microsoft's text for a font supplied with a product, so it isn't verified from its metadata as artifactr ADR-0088 had it;
   - Nunito and Lilita One, whose metadata gives only the OFL's URL;

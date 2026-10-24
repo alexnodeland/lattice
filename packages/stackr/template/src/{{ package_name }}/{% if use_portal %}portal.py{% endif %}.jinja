@@ -329,6 +329,8 @@ class Portal:
             consent = SqlConsent(self._database.engine, owner=self._database.owner)
             relay = Relay(tools.analytics, consent, InMemoryRateLimiter())
             self._relay = relay
+            # A person removed from a tenant has their events there deleted (portalr ADR-0075).
+            self.grants.on_member_removed(relay.member_removed)
             # A request's analytics session on its server span, where it is the caller's own: added
             # before the server's instrumentation, which runs outside it (portalr ADR-0073).
             app.add_middleware(SessionStamp, relay=relay, resolve_actor=self._access.caller)

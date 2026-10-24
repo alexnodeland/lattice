@@ -281,6 +281,23 @@ class Analytics:
             params={"param_person": distinct_id(self.key, user_id)},
         )
 
+    async def forget_in(self, tenant: str, user_id: str, until: datetime) -> bool:
+        """Delete the person's events in the tenant up to `until`: whether it was done.
+
+        As their removal from the tenant does: their events in other tenants, and after it, stay.
+        """
+        return await self._write(
+            "DELETE FROM analytics.events WHERE distinct_id = {person:FixedString(32)}"
+            " AND tenant_id = {tenant:String} AND ts <= {until:DateTime64(3, 'UTC')}",
+            "",
+            "a removed person's events",
+            params={
+                "param_person": distinct_id(self.key, user_id),
+                "param_tenant": tenant,
+                "param_until": _clickhouse_time(until),
+            },
+        )
+
     async def _write(
         self, query: str, body: str, what: str, *, params: dict[str, str] | None = None
     ) -> bool:

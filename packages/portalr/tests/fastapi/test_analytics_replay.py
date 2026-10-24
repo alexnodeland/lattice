@@ -33,7 +33,7 @@ from portalr.invites import Invite
 from portalr.readers import Analytics, Readers
 
 from .conftest import app_for
-from .test_analytics_umami import ACME, GLOBEX, KEY, ME, Stand, umami_of
+from .test_analytics_umami import ACME, GLOBEX, KEY, ME, WEBSITE, Stand, umami_of
 
 ALICE = {"x-user": "alice", "x-tenant": "acme"}
 
@@ -669,6 +669,9 @@ def test_changes_to_style_survive_as_rrweb_makes_them() -> None:
     assert unmasked([declaration]) is None
     leaked = {"data": {"source": 13, "set": {"property": "top", "value": '"walrus"'}}}
     assert unmasked([leaked]) == "value"
+    for bad_change in (["0px"], ["0px", "urgent"], 5):
+        odd = {"data": {"attributes": [{"id": 1, "attributes": {"style": {"top": bad_change}}}]}}
+        assert unmasked([odd]) == "style", bad_change
     unknown = {"data": {"source": 13, "set": {"property": "content", "value": "none"}}}
     assert unmasked([unknown]) == "property"
 
@@ -1132,3 +1135,46 @@ def test_a_style_must_be_ascii_since_a_kelvin_sign_folds_to_a_k() -> None:
     assert _declarations_ok("position: fixed")
     assert not _declarations_ok("position: fixeD".replace("D", "\u212a"))
     assert not _declarations_ok("display: bloc\u212a")
+
+
+class GivesNoDebt(InMemoryConsent):
+    """Replay's answers, where a no finds nothing owed, as when another replica settled it."""
+
+    async def give(self, user_id: str, *, yes: bool) -> int | None:
+        await super().give(user_id, yes=yes)
+        return None
+
+
+async def test_a_no_to_analytics_where_replay_owes_nothing_settles_nothing_for_it() -> None:
+    stand, replay = Stand(), GivesNoDebt()
+    relay = Relay(
+        Analytics("http://clickhouse:8123", KEY),
+        InMemoryConsent(),
+        InMemoryRateLimiter(),
+        umami=umami_of(stand),
+        replay=replay,
+    )
+    await relay.consent.give("alice", yes=True)
+    await replay.give("alice", yes=True)
+    await relay.answer("alice", yes=False)
+    assert not await replay.given("alice")
+    assert not [r for r in stand.sent if r.method == "DELETE"], "nothing deleted for replay"
+
+
+async def test_many_asking_whether_umami_keeps_replays_at_once_ask_it_once(stack: Stack) -> None:
+    stack.stand.slow = 0.05
+    umami = umami_of(stack.stand)
+    answers = await asyncio.gather(*(umami.replay_enabled() for _ in range(5)))
+    assert answers == [True] * 5
+    asked = [r for r in stack.stand.sent if r.method == "GET" and r.url.path.endswith(WEBSITE)]
+    assert len(asked) == 1
+
+
+async def test_the_visits_remembered_are_bounded(
+    stack: Stack, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("portalr.readers.umami.MOST_VISITS", 1)
+    umami = umami_of(stack.stand)
+    assert await umami.record("acme", "one", [SNAPSHOT])
+    assert await umami.record("acme", "two", [SNAPSHOT])
+    assert len(umami._rest.visits) == 1

@@ -47,6 +47,8 @@ class Stand:
         self.after_send: list[Callable[[], Awaitable[None]]] = []
         self.recorded: list[list[object]] = []
         self.replay_off = False
+        self.slow = 0.0
+        """How long Umami takes to say whether its website keeps replays, in seconds."""
         self.refused: set[str] = set()
         """The events' names Umami refuses, as a 400."""
         self.sends_taken: int | None = None
@@ -68,6 +70,7 @@ class Stand:
                 return httpx.Response(200, json={"ok": False, "reason": "replay_disabled"})
             return httpx.Response(200, json={"ok": True})
         if path == f"/api/websites/{WEBSITE}" and request.method == "GET":
+            await asyncio.sleep(self.slow)
             replay = {} if self.replay_off else {"replayEnabled": True}
             return httpx.Response(200, json={"recorderEnabled": True, "replayConfig": replay})
         if path == "/api/send":

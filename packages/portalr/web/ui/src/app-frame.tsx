@@ -9,7 +9,7 @@
  * once they confirm it in a dialog of the host's, outside the frame.
  */
 
-import type { Session } from "@portalr/client";
+import type { Session, StreamSession } from "@portalr/client";
 import { Bot } from "lucide-react";
 import { createContext, use, useId } from "react";
 import { Alert } from "./alert";
@@ -41,7 +41,7 @@ export interface AppHost {
     /** artifactr's surface, and grantr's, which answers whether the person may edit. */
     readonly surfaces: { readonly artifactr: string; readonly grantr: string };
     /** Who the person is signed in as: their session, read as each request is made. */
-    readonly signed: { session(): Session };
+    readonly signed: { session(): Session; streamSession(tenant: string): StreamSession };
     readonly tenant: string;
     readonly workspace: string;
   };

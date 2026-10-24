@@ -392,7 +392,7 @@ export interface components {
          */
         CommandFrame: {
             /** Command */
-            command: components["schemas"]["CreateArtifact"] | components["schemas"]["EditArtifact"] | components["schemas"]["ArchiveArtifact"] | components["schemas"]["ProposeChange"] | components["schemas"]["RespondToProposal"] | components["schemas"]["CreateThread"] | components["schemas"]["PostMessage"] | components["schemas"]["SetFocus"] | components["schemas"]["SetThreadMode"] | components["schemas"]["AnswerDeferred"] | components["schemas"]["GiveFeedback"] | components["schemas"]["StopRun"] | components["schemas"]["WatchRun"];
+            command: components["schemas"]["CreateArtifact"] | components["schemas"]["EditArtifact"] | components["schemas"]["ArchiveArtifact"] | components["schemas"]["ProposeChange"] | components["schemas"]["RespondToProposal"] | components["schemas"]["CreateThread"] | components["schemas"]["PostMessage"] | components["schemas"]["SetFocus"] | components["schemas"]["SetThreadMode"] | components["schemas"]["AnswerDeferred"] | components["schemas"]["GiveFeedback"] | components["schemas"]["StopRun"] | components["schemas"]["WatchRun"] | components["schemas"]["WatchArtifact"] | components["schemas"]["UnwatchArtifact"];
             /** Command Id */
             command_id: string;
             /**
@@ -412,7 +412,7 @@ export interface components {
             /** Ok */
             ok: boolean;
             /** Outcome */
-            outcome?: (components["schemas"]["Applied"] | components["schemas"]["Proposed"] | components["schemas"]["Resolved"] | components["schemas"]["Recorded"]) | null;
+            outcome?: (components["schemas"]["Applied"] | components["schemas"]["Proposed"] | components["schemas"]["Resolved"] | components["schemas"]["Recorded"] | components["schemas"]["Watching"]) | null;
             /** Rejection */
             rejection?: {
                 [key: string]: components["schemas"]["JsonValue"];
@@ -1342,6 +1342,18 @@ export interface components {
             [key: string]: unknown;
         };
         /**
+         * UnwatchArtifact
+         * @description Stop watching an artifact: the others are told this connection left it.
+         */
+        UnwatchArtifact: {
+            artifact_id: components["schemas"]["ArtifactId"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "unwatch_artifact";
+        };
+        /**
          * UserActor
          * @description A person, identified by the host application's user id.
          */
@@ -1357,6 +1369,20 @@ export interface components {
             name?: string | null;
         };
         /**
+         * WatchArtifact
+         * @description Receive the presence of the others with an artifact open, and send one's own.
+         *
+         *     WebSocket only, as ``watch_run`` is; answered ``watching`` (lattice RFC-0006, ADR-0093).
+         */
+        WatchArtifact: {
+            artifact_id: components["schemas"]["ArtifactId"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "watch_artifact";
+        };
+        /**
          * WatchRun
          * @description Receive a run's live frames on this connection. WebSocket only.
          */
@@ -1367,6 +1393,25 @@ export interface components {
              * @enum {string}
              */
             type: "watch_run";
+        };
+        /**
+         * Watching
+         * @description A watch accepted: what the watcher may do on the artifact, ``view`` or ``edit``.
+         */
+        Watching: {
+            artifact_id: components["schemas"]["ArtifactId"];
+            /** Peer */
+            peer: string;
+            /**
+             * Rights
+             * @enum {string}
+             */
+            rights: "view" | "edit";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "watching";
         };
         WorkspaceId: string;
     };

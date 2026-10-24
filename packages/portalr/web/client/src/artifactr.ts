@@ -492,10 +492,10 @@ function classify(frame: v1.Server): Classified<v1.Server, v1.CommandResult> {
       return { kind: "result", result: frame };
     case "error":
       return { kind: "error", message: frame.message };
-    case "live":
-      return { kind: "other", frame };
     default:
-      return frame satisfies never;
+      // A run's live frames; presence, which only a canvas's own connection asks for (portalr
+      // ADR-0078); and any frame a later server adds, which an older app passes over.
+      return { kind: "other", frame };
   }
 }
 

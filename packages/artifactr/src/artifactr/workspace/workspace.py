@@ -49,6 +49,7 @@ from artifactr.core import (
     Forbidden,
     GiveFeedback,
     InvalidState,
+    JsonPatch,
     MessageId,
     MessageKind,
     MessageTarget,
@@ -841,6 +842,31 @@ class Workspace:
         if artifact is None or not isinstance(artifact.data, artifact_type):
             raise missing
         return seen_artifact(cast("Versioned[A]", artifact), hidden)
+
+    async def watch(self, artifact_id: ArtifactId) -> Literal["view", "edit"]:
+        """Check that this handle's actor may watch an artifact live, and say what they may do.
+
+        A watch is a read: a hidden artifact is missing, as everywhere. While an integration
+        that governs it is off, the gate refuses it as it would an edit that changes nothing,
+        so presence ends with the integration (lattice RFC-0006, ADR-0093).
+
+        Raises:
+            NotFound: If there is no such artifact, or it is hidden from the actor.
+            Forbidden: If the actor may not read artifacts.
+            NotEnabled: If an integration it needs is off.
+        """
+        artifact = await self.artifact(artifact_id)
+        gate = self._context.gate
+        if gate is not None:
+            unchanged = EditArtifact(
+                artifact_id=artifact_id, base_version=artifact.version, patch=JsonPatch(ops=())
+            )
+            await gate(self, unchanged, artifact)
+        try:
+            await self.check(Access(action="artifactr:edit_artifact", artifact_id=artifact_id))
+        except Forbidden:
+            return "view"
+        return "edit"
 
     async def artifact(self, artifact_id: ArtifactId) -> Versioned[Artifact]:
         """Return an artifact's current version, whatever its type.

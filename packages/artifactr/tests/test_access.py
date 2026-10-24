@@ -193,8 +193,18 @@ def _public_methods(cls: type) -> set[str]:
     }
 
 
+TWICE_METHODS = {
+    "watch": (
+        lambda ws: ws.watch(ARTIFACT),
+        ["artifactr:read_artifacts", "artifactr:edit_artifact"],
+    ),
+}
+"""Public ``Workspace`` methods that ask two actions: a watch reads, then asks whether it may
+edit, to say which the watcher may do."""
+
+
 def test_every_public_method_is_listed() -> None:
-    assert _public_methods(Workspace) == set(METHODS) | set(OPEN_METHODS)
+    assert _public_methods(Workspace) == set(METHODS) | set(OPEN_METHODS) | set(TWICE_METHODS)
     assert _public_methods(Workspaces) == set(WORKSPACES_METHODS)
 
 
@@ -207,6 +217,16 @@ async def test_each_method_asks_for_its_action_once(
     await call(ws)
     assert [action for _, action in recorder.asked] == [action]
     assert action in ACTIONS
+
+
+@pytest.mark.parametrize("method", sorted(TWICE_METHODS))
+async def test_each_method_that_asks_twice_asks_its_actions_in_order(
+    workspaces: Workspaces, recorder: Recorder, method: str
+) -> None:
+    ws = await _seed(workspaces, recorder)
+    call, actions = TWICE_METHODS[method]
+    await call(ws)
+    assert [action for _, action in recorder.asked] == actions
 
 
 @pytest.mark.parametrize("method", sorted(WORKSPACES_METHODS))

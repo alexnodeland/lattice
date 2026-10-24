@@ -18,6 +18,16 @@ The `fastapi` extra. See [Serving over WebSocket and REST](../guides/serving.md)
 
 ::: artifactr.fastapi.STATUS_CODES
 
+## Presence
+
+::: artifactr.fastapi.presence.PresenceChannel
+
+::: artifactr.fastapi.presence.LocalPresence
+
+::: artifactr.fastapi.presence.MOST_IN_A_ROOM
+
+::: artifactr.fastapi.presence.SILENT
+
 ## The OpenAPI document
 
 The document committed as `schemas/artifactr.openapi.json`, from a bare application that mounts the router at its root.

@@ -6,6 +6,7 @@
 
 import { expect, type Page } from "@playwright/test";
 import { Then, When } from "./fixtures";
+import { signIn } from "./people";
 import { posted } from "./threads";
 
 const card = (page: Page, name: string) =>
@@ -207,4 +208,49 @@ Then("the canvas offers no edit", async ({ page }) => {
   await expect(page.locator(".excalidraw canvas").first()).toBeVisible();
   await asked.catch(() => undefined);
   await expect(dialog.getByRole("button", { name: "Edit" })).toHaveCount(0);
+});
+
+/** The window a second person opened the same canvas in, beside the first's. */
+const beside = new WeakMap<Page, Page>();
+
+When(
+  "{word} opens it in the thread {string}, in a window of their own",
+  async ({ page }, person: string, thread: string) => {
+    const browser = page.context().browser();
+    if (browser === null) throw new Error("no browser to open a second window in");
+    const context = await browser.newContext({
+      baseURL: new URL("/portalr/app/", page.url()).href,
+    });
+    const other = await context.newPage();
+    beside.set(page, other);
+    await signIn(other, person);
+    await other
+      .getByRole("list", { name: "Workspaces" })
+      .getByRole("link", { name: "notes", exact: true })
+      .click();
+    await other.getByRole("link", { name: thread, exact: true }).first().click();
+    await card(other, "Stack").getByRole("button", { name: "Open canvas" }).click();
+    await expect(other.locator(".excalidraw canvas").first()).toBeVisible();
+  },
+);
+
+Then("the canvas says {string} is here", async ({ page }, name: string) => {
+  const here = page.getByRole("dialog", { name: "Stack" }).getByRole("list", { name: "Here now" });
+  await expect(here).toContainText(name, { timeout: 10_000 });
+});
+
+Then("their canvas says {string} is here", async ({ page }, name: string) => {
+  const other = beside.get(page);
+  if (other === undefined) throw new Error("no one opened it beside them");
+  const here = other.getByRole("dialog", { name: "Stack" }).getByRole("list", { name: "Here now" });
+  await expect(here).toContainText(name, { timeout: 10_000 });
+});
+
+When("the other window closes", async ({ page }) => {
+  await beside.get(page)?.context().close();
+});
+
+Then("the canvas says no one else is here", async ({ page }) => {
+  const dialog = page.getByRole("dialog", { name: "Stack" });
+  await expect(dialog.getByRole("list", { name: "Here now" })).toHaveCount(0, { timeout: 15_000 });
 });

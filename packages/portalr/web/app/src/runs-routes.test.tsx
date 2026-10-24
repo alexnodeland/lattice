@@ -115,3 +115,13 @@ test("with no tracker, relayr is never asked, and the run still links to what fi
   const asked = fetched.mock.calls.map(([input]) => new URL((input as Request).url).pathname);
   expect(asked.filter((path) => path.startsWith("/relayr/"))).toEqual([]);
 });
+
+test("with no turns, the turns say so, rather than draw a table with no rows", async () => {
+  const { screen } = await open("/t/acme/w/notes/runs", serve, () => null, {
+    reflexrLog: LOG,
+    surfaces: { relayr: "" },
+  });
+  await expect.element(screen.getByText("No turns yet")).toBeVisible();
+  expect(screen.getByRole("table", { name: "Turns" }).elements()).toHaveLength(0);
+  await expect.element(run(screen)).toBeVisible();
+});

@@ -26,6 +26,7 @@ import { opening } from "../../../../access";
 import { type Shown, shownOf, unknownDays } from "../../../../feedback";
 import { figure } from "../../../../format";
 import { ReadFailed } from "../../../../read-failed";
+import { Unanswered } from "../../../../unanswered";
 import { WINDOWS, windowOf } from "../../../../window";
 
 type Summary = PortalrApi.components["schemas"]["Feedback"];
@@ -111,9 +112,7 @@ function Feedback() {
     return (
       <>
         {HEADER}
-        <EmptyState title="Langfuse isn't answering">
-          <Alert tone="error">{reading.reason}</Alert>
-        </EmptyState>
+        <Unanswered tool="Langfuse" reason={reading.reason} />
       </>
     );
   }

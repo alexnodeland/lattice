@@ -172,19 +172,26 @@ test("a full list says it is the newest, not all", async () => {
   found = 100;
   const { screen } = await open("/t/acme/traces");
   await expect
-    .element(screen.getByRole("status"))
-    .toHaveTextContent(
-      "The newest 100 are shown. A shorter window, or a thread or a run, finds the rest.",
-    );
+    .element(
+      screen.getByText(
+        "The newest 100 are shown. A shorter window, or a thread or a run, finds the rest.",
+      ),
+    )
+    .toBeVisible();
 });
 
 test("Tempo not configured, or not answering, says so", async () => {
+  const warned = vi.spyOn(console, "warn").mockImplementation(() => undefined);
   tempo = "unconfigured";
   const first = await open("/t/acme/traces");
   await expect.element(first.screen.getByText("Tempo isn't configured")).toBeVisible();
   tempo = "unavailable";
   const second = await open(`/t/acme/traces/${A}`);
-  await expect.element(second.screen.getByRole("alert")).toHaveTextContent("tempo answered 502");
+  // What the reader is told is the tool and to try again; the server's words go to the console.
+  await expect.element(second.screen.getByText("Tempo isn't answering")).toBeVisible();
+  await expect.element(second.screen.getByText(/couldn't read from Tempo just now/)).toBeVisible();
+  expect(second.screen.getByText("tempo answered 502").elements()).toHaveLength(0);
+  await expect.poll(() => String(warned.mock.calls)).toContain("tempo answered 502");
 });
 
 /** The reads that asked for what a span withheld. */
@@ -324,4 +331,16 @@ test("to a tenant's admin, a trace shows no analytics session, even one the serv
   await expect.element(tree.getByRole("treeitem", { name: /^turn,/ })).toBeVisible();
   await new Promise((done) => setTimeout(done, 150));
   await expect.element(screen.getByText(/Analytics session/)).not.toBeInTheDocument();
+});
+
+test("a trace is listed by its first 8 digits, named and copied whole, and took nothing it hasn't said", async () => {
+  const { screen } = await open("/t/acme/traces");
+  const table = screen.getByRole("table", { name: "Traces" });
+  const first = `${"0".repeat(24)}c029eec0`;
+  const link = table.getByRole("link", { name: `Trace ${first}` });
+  await expect.element(link).toHaveTextContent(first.slice(0, 8));
+  await expect
+    .element(table.getByRole("button", { name: "Copy the trace's id" }).first())
+    .toBeVisible();
+  expect(table.getByText("–").elements()).toHaveLength(0);
 });

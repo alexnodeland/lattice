@@ -1,6 +1,7 @@
 import { allowedIn, filedBy, thumbs, useMe, workspaceOf } from "@portalr/client";
 import {
   CommandButton,
+  Moment,
   PageHeader,
   RuleRunStatus,
   RunList,
@@ -91,6 +92,7 @@ function Runs() {
         {turns.state.threads[run.threadId]?.title || "Untitled"}
       </TextLink>
     ),
+    started: run.startedAt === null ? undefined : <Moment at={run.startedAt} />,
     feedback: turnFeedback && (
       <Thumbs
         given={thumbs(run.feedback, me)}
@@ -184,8 +186,14 @@ function Runs() {
           caption="Turns"
           title="Thread"
           runs={turnParts}
+          started
           attempts={false}
           feedback={turnFeedback}
+          empty={
+            turns.status === "live"
+              ? { title: "No turns yet", body: "The agent's turns in a thread are listed here." }
+              : undefined
+          }
         />
       </div>
       <div className="flex flex-col gap-3">
@@ -197,6 +205,11 @@ function Runs() {
           runs={ruleParts}
           attempts
           feedback={runFeedback}
+          empty={
+            automation.status === "live"
+              ? { title: "No rule runs yet", body: "A rule's runs are listed here as it fires." }
+              : undefined
+          }
         />
       </div>
     </>

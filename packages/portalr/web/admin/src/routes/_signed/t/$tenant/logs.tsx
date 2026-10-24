@@ -1,6 +1,5 @@
 import { type createQueries, LOGS_LIMIT, type PortalrApi, type TimeSpan } from "@portalr/client";
 import {
-  Alert,
   Button,
   Card,
   EmptyState,
@@ -23,6 +22,7 @@ import { Health } from "../../../../health";
 import { healthWindow, LOG_RANGES, logWindow, type Shown, shownOf } from "../../../../logs";
 import { ReadFailed } from "../../../../read-failed";
 import { ID_PATTERN } from "../../../../traces";
+import { Unanswered } from "../../../../unanswered";
 
 const HEADER = <PageHeader title="Logs" meta="What the application wrote, and how it is doing" />;
 
@@ -178,11 +178,7 @@ function Records({
         </EmptyState>
       );
     case "unavailable":
-      return (
-        <EmptyState title="Loki isn't answering">
-          <Alert tone="error">{reading.reason}</Alert>
-        </EmptyState>
-      );
+      return <Unanswered tool="Loki" reason={reading.reason} />;
     case "ok":
       return reading.data.records.length === 0 ? (
         <EmptyState title={filtered ? "No records match" : "No log records in this window"}>

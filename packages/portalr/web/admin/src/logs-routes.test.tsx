@@ -256,9 +256,14 @@ test("Loki not configured leaves the charts", async () => {
 });
 
 test("Loki not answering leaves the charts", async () => {
+  const warned = vi.spyOn(console, "warn").mockImplementation(() => undefined);
   loki = "unavailable";
   const { screen } = await open("/t/acme/logs");
-  await expect.element(screen.getByRole("alert")).toHaveTextContent("loki answered 502");
+  // What the reader is told is the tool and to try again; the server's words go to the console.
+  await expect.element(screen.getByText("Loki isn't answering")).toBeVisible();
+  await expect.element(screen.getByText(/couldn't read from Loki just now/)).toBeVisible();
+  expect(screen.getByText("loki answered 502").elements()).toHaveLength(0);
+  await expect.poll(() => String(warned.mock.calls)).toContain("loki answered 502");
   await expect
     .element(screen.getByRole("figure", { name: "Failed turns in each step" }))
     .toBeVisible();

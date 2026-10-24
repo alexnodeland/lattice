@@ -3,6 +3,7 @@ import {
   Alert,
   Button,
   Card,
+  CopyButton,
   duration,
   EmptyState,
   ItemTable,
@@ -31,6 +32,7 @@ import {
   startedAt,
   windowOf,
 } from "../../../../../traces";
+import { Unanswered } from "../../../../../unanswered";
 
 const HEADER = <PageHeader title="Traces" meta="What the agents did, step by step" />;
 
@@ -98,9 +100,7 @@ function Traces() {
     return (
       <>
         {HEADER}
-        <EmptyState title="Tempo isn't answering">
-          <Alert tone="error">{reading.reason}</Alert>
-        </EmptyState>
+        <Unanswered tool="Tempo" reason={reading.reason} />
       </>
     );
   }
@@ -130,15 +130,26 @@ function Traces() {
           {
             key: "trace",
             label: "Trace",
+            // Its first 8 digits, as a commit's are shortened, and named and copied whole. Tempo's
+            // root span names the trace, but the root may be another tenant's, so isn't read.
             cell: (trace) => (
-              <TextLink
-                variant="subtle"
-                render={
-                  <Link to="/t/$tenant/traces/$trace" params={{ tenant, trace: trace.trace_id }} />
-                }
-              >
-                <code className="font-mono text-xs">{trace.trace_id}</code>
-              </TextLink>
+              <span className="flex items-center gap-2">
+                <TextLink
+                  variant="subtle"
+                  aria-label={`Trace ${trace.trace_id}`}
+                  render={
+                    <Link
+                      to="/t/$tenant/traces/$trace"
+                      params={{ tenant, trace: trace.trace_id }}
+                    />
+                  }
+                >
+                  <code className="font-mono text-xs" title={trace.trace_id}>
+                    {trace.trace_id.slice(0, 8)}
+                  </code>
+                </TextLink>
+                <CopyButton text={trace.trace_id} what="the trace's id" />
+              </span>
             ),
           },
           {
@@ -149,7 +160,8 @@ function Traces() {
           {
             key: "took",
             label: "Took",
-            cell: (trace) => (trace.duration_ms == null ? "–" : duration(trace.duration_ms)),
+            // Tempo gives a trace's duration only once its root has ended: blank until then.
+            cell: (trace) => (trace.duration_ms == null ? null : duration(trace.duration_ms)),
           },
         ]}
         items={traces}

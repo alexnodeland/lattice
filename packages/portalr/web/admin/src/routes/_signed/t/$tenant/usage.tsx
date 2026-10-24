@@ -22,6 +22,7 @@ import {
 import { opening } from "../../../../access";
 import { dollars, numbers } from "../../../../format";
 import { ReadFailed } from "../../../../read-failed";
+import { Unanswered } from "../../../../unanswered";
 import {
   askedOf,
   blocksOf,
@@ -106,9 +107,7 @@ function UsagePage() {
     return (
       <>
         {HEADER}
-        <EmptyState title="LiteLLM isn't answering">
-          <Alert tone="error">{reading.reason}</Alert>
-        </EmptyState>
+        <Unanswered tool="LiteLLM" reason={reading.reason} />
       </>
     );
   }

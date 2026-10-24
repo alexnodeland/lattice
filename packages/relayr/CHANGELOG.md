@@ -5,6 +5,22 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0](https://github.com/alexnodeland/lattice/compare/relayr-v0.1.1...relayr-v0.2.0) (2026-10-24)
+
+
+### ⚠ BREAKING CHANGES
+
+* **artifactr,portalr:** `ask_user` takes `questions` (one to four, each with `question`, `header`, two to four `options` of `label`, `description` and `recommended`, and `multiple` and `other`) in place of `question` and `choices`. An `answer_deferred` to it carries `{"answers": [{"selected": [...], "other": ...}, ...]}`, one per question, or `{"reply": ...}`; a plain string is refused as `validation_failed`. The agent's call returns each question beside its answer. The protocol schema names the shapes `ask_user` and `ask_user_answer`. This is a break in the wire contract, which the griffe-based breaks check (lattice ADR-0012) doesn't cover; it is marked here and in the title.
+
+### Features
+
+* **artifactr,portalr:** ask_user asks questions with options, and the chat shows tool calls, sides, failures and its stream ([#423](https://github.com/alexnodeland/lattice/issues/423)) ([7463e94](https://github.com/alexnodeland/lattice/commit/7463e945526c4ce7156d2b279e2da54b82158824))
+* **portalr:** tracker links on runs, and relayr's reads for the portal (lattice RFC-0004, phase 3) ([#391](https://github.com/alexnodeland/lattice/issues/391)) ([d4f3500](https://github.com/alexnodeland/lattice/commit/d4f35002fffc723c4259ddcafd1704df9a886b70))
+* **relayr:** file and change items in Plane and Vikunja, once (lattice RFC-0004, phase 1) ([#348](https://github.com/alexnodeland/lattice/issues/348)) ([7a054d3](https://github.com/alexnodeland/lattice/commit/7a054d3eb3dcec6b66536d0586004e0f8561f867))
+* **relayr:** read back what people change in Plane and Vikunja (lattice RFC-0004, phase 2) ([#380](https://github.com/alexnodeland/lattice/issues/380)) ([857ccdb](https://github.com/alexnodeland/lattice/commit/857ccdb00d7e8be8226193e6396c41ce7fdfd0e6))
+* **ui:** forms and dashboards in the chat, phase 1 of RFC-0005, in artifactr and relayr ([#355](https://github.com/alexnodeland/lattice/issues/355)) ([423f37a](https://github.com/alexnodeland/lattice/commit/423f37a24d2f15a33c23c1586569becb60defd08))
+* **ui:** forms and dashboards in the chat, portalr's renderers, phase 1 of RFC-0005 ([#392](https://github.com/alexnodeland/lattice/issues/392)) ([c78e43e](https://github.com/alexnodeland/lattice/commit/c78e43e03be8dc296700e2e30b7569f3a35ba851))
+
 ## [0.1.1](https://github.com/alexnodeland/lattice/compare/relayr-v0.1.0...relayr-v0.1.1) (2026-10-17)
 
 

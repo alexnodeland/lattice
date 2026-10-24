@@ -364,6 +364,8 @@ Settled by the relay's slice: lightweight deletes on 26.9 (below).
 
 Settled by Umami's slice ([stackr ADR-0050](../stackr/adr/0050-umami-a-profile-for-operators-journeys-on-the-postgres-adapter.md), [portalr ADR-0076](../portalr/adr/0076-the-relay-sends-umami-a-copy-and-deletes-there-too.md)): Umami 3.4.0 is MIT and has replays; it runs on the postgres adapter alone, on networks of its own; a person there is a hash of their tenant and their keyed hash, and their sessions are deleted with a no.
 
+Settled by replay's slice ([portalr ADR-0077](../portalr/adr/0077-session-replay-its-own-yes-masked-in-the-browser-and-checked-at-the-relay.md)): Umami 3.4.0 keeps a replay in the session a send names, says in a 200 when its website's replay is off, and deletes the replay with the session; the recorder is rrweb 2.0.1, which Umami's own `^2.0.1` resolves to, and masks no attribute, so the browser masks them before a batch is sent and the relay checks them again. Replay is built and off until the owner signs off [the privacy review](../portalr/guides/replay-privacy-review.md); whether a replay opens by session id in Umami, and its link to a trace, are still the review's.
+
 Settled by the operators' slice ([stackr ADR-0048](../stackr/adr/0048-grafanas-clickhouse-data-source-and-the-adoption-dashboard.md)): the plugin, 4.22.1, signed, is fetched as `stackr-grafana` is built, pinned by version and each architecture's sha256, and Compose builds that image too. `grafana_analytics` reads `analytics.events` across tenants, read-only, with nothing logged; its time ceiling is 30 seconds, since the plugin asks for a little more than its query timeout.
 
 Still open:

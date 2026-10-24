@@ -339,6 +339,12 @@ Umami (ADR-0050), with the umami profile, on the plain PostgreSQL adapter: its d
 | `UMAMI_ADMIN_PASSWORD` | Generated: 64 hex characters |
 | `UMAMI_PORTALR_PASSWORD` | Generated: 64 hex characters |
 | `UMAMI_WEBSITE_ID` | Generated: a UUID |
+
+Whether portalr's website keeps session replays: false until the privacy review is signed off (portalr ADR-0077); the application's PORTAL_REPLAY must be true as well.
+
+| Setting | In `.env.example` |
+|---|---|
+| `UMAMI_REPLAY` | `false` |
 | `UMAMI_PORT` | `3400` |
 
 <!-- end generated -->

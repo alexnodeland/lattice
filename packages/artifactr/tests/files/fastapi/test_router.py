@@ -36,7 +36,14 @@ from artifactr.files.fastapi import files_router
 from artifactr.files.fastapi.openapi import openapi_app, openapi_document
 from artifactr.files.manifest import DOCX, WordDocument
 from artifactr.files.native import Busy, NativeFiles
-from artifactr.workspace import Access, InMemoryStorage, Workspace, Workspaces, integration_gate
+from artifactr.workspace import (
+    Access,
+    InMemoryStorage,
+    Scope,
+    Workspace,
+    Workspaces,
+    integration_gate,
+)
 from tests.clients import entered
 from tests.files.clock import FakeClock
 from tests.files.conftest import Switch
@@ -74,6 +81,7 @@ class World:
     clock: FakeClock
     ws: Workspace
     files: NativeFiles
+    storage: InMemoryStorage
 
     def as_(self, user: str) -> dict[str, str]:
         return {"x-user": user}
@@ -93,8 +101,9 @@ async def world() -> World:
     switch, app, clock = Switch(), FakeApp(), FakeClock()
     blobs = InMemoryBlobs(limit=2 * LIMIT)
     files = NativeFiles(blobs, InMemoryCheckouts(), app, integrations=switch)
+    storage = InMemoryStorage(clock=clock)
     workspaces = Workspaces(
-        InMemoryStorage(clock=clock),
+        storage,
         authorize=authorize,
         hidden=hidden,
         gate=integration_gate(switch, files.key_of),
@@ -104,7 +113,7 @@ async def world() -> World:
     await files.upload(ws, WordDocument, "c ø.docx", upload, media_type=DOCX, artifact_id="a1")
     server = FastAPI()
     server.include_router(files_router(workspaces, files, resolve_actor=resolve_actor, limit=LIMIT))
-    return World(entered(server), switch, app, clock, ws, files)
+    return World(entered(server), switch, app, clock, ws, files, storage)
 
 
 def test_a_file_says_who_has_it_and_how_it_is_edited(world: World) -> None:
@@ -293,6 +302,16 @@ def test_switched_off_nothing_is_checked_out_but_the_file_is_read(world: World) 
 def test_a_missing_version_or_file_is_not_found(world: World) -> None:
     assert world.client.get(f"{FILE}/versions/7/content").status_code == 404
     assert world.client.get("/workspaces/w1/files/zz").status_code == 404
+
+
+async def test_a_version_thinning_forgot_is_not_found(world: World) -> None:
+    checkout = world.check_out()
+    assert world.check_in(checkout, FakeApp.file("Terms", "Fees")).json()["version"] == 2
+    assert world.check_in(world.check_out(), FakeApp.file("Fees")).json()["version"] == 3
+    assert await world.storage.drop_revisions(Scope("acme", "w1"), "a1", [2]) == 1
+    for read in ("content", "text", "pages/1"):
+        assert world.client.get(f"{FILE}/versions/2/{read}").status_code == 404, read
+    assert world.client.get(f"{FILE}/versions/1/content").status_code == 200
 
 
 async def test_an_agents_edit_holds_the_file_for_no_one_named(world: World) -> None:

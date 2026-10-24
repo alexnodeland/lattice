@@ -121,7 +121,7 @@ except VersionConflict:
 
 A UI can instead show the person what changed and let them decide. Agents never handle this themselves: the capability turns a conflict into a retry that tells the model to read the artifact again.
 
-Revisions are append-only. Each records the version, the patch, the resulting data, the actor and the proposal it came from, if any. Versions never go backwards: restoring old content is a new edit.
+Revisions are append-only. Each records the version, the patch, the resulting data, the actor and the proposal it came from, if any. Versions never go backwards: restoring old content is a new edit. A diagram's revisions older than a day are thinned to one an actor every ten minutes, keeping its first, its current and each one an accepted proposal made ([ADR-0094](../adr/0094-diagrams-revisions-thinned-to-one-an-actor-every-ten-minutes.md)): read a version that may be gone as the latest kept before it, not as `version - 1`.
 
 ## Rejections
 

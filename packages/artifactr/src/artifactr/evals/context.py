@@ -118,7 +118,9 @@ async def read_context(
                 and envelope.event.version == target.version
             )
             thread_id, run_id, seq = made.thread_id, made.run_id, made.seq
-            revision = await _revision(workspace, target.artifact_id, target.version)
+            revisions = await workspace.revisions(target.artifact_id)
+            # None where thinning forgot the version: no other version stands in for it.
+            revision = next((r for r in revisions if r.version == target.version), None)
         case _:
             assert_never(target)
     upto = [envelope for envelope in seen if envelope.seq <= seq]
@@ -169,15 +171,22 @@ async def _followed(
             versions[event.artifact_id] = event.version
     return tuple(
         [
-            _versioned(await _revision(workspace, artifact_id, versions[artifact_id]))
+            _versioned(await _kept_at(workspace, artifact_id, versions[artifact_id]))
             for artifact_id in focus
         ]
     )
 
 
-async def _revision(workspace: Workspace, artifact_id: ArtifactId, version: int) -> Revision:
+async def _kept_at(workspace: Workspace, artifact_id: ArtifactId, version: int) -> Revision:
+    """The artifact at a version; where thinning forgot it, as the latest kept before it.
+
+    An artifact's first revision is never forgotten, so there is always one.
+    """
     revisions = await workspace.revisions(artifact_id)
-    return next(revision for revision in revisions if revision.version == version)
+    return max(
+        (revision for revision in revisions if revision.version <= version),
+        key=lambda revision: revision.version,
+    )
 
 
 def _versioned(revision: Revision) -> Versioned[Artifact]:

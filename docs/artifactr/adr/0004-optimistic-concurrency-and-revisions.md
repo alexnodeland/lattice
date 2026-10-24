@@ -1,6 +1,6 @@
 # ADR-0004: Optimistic concurrency and append-only revisions
 
-**Status:** Accepted; its rejection of pessimistic locks narrowed by [ADR-0071](0071-a-lease-on-an-artifact.md)
+**Status:** Accepted; its rejection of pessimistic locks narrowed by [ADR-0071](0071-a-lease-on-an-artifact.md), and its revisions kept forever narrowed by [ADR-0094](0094-diagrams-revisions-thinned-to-one-an-actor-every-ten-minutes.md): a diagram's old revisions are thinned
 **Date:** 2026-09-28
 **Deciders:** Alex Nodeland
 

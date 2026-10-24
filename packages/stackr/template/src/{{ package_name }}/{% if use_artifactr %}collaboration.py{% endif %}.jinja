@@ -162,10 +162,13 @@ class Collaboration:
                 await FeedbackMirror(workspace, sink, cursor="langfuse").follow()
 
             self._mirrors = Mirrors(follow)
-        self.workspaces = Workspaces(
+        storage = (
             SqlStorage(database.engine, row_level_security=database.row_level_security)
             if database
-            else InMemoryStorage(),
+            else InMemoryStorage()
+        )
+        self.workspaces = Workspaces(
+            storage,
             types=[Note{% if use_ui %}, *UI_TYPES{% endif %}{% if use_relayr %}, Timeline, Postmortem, RuleDraft{% endif %}{% if use_files %}, *files.types{% endif %}],
 {%- if use_ui and use_diagrams %}
 {%- if access == 'grantr' %}
@@ -191,7 +194,15 @@ class Collaboration:
 {%- endif %}
             authorize=authorize,
             hidden=hidden,
-            on_open=opened(self._mirrors.watch if self._mirrors else None{% if use_relayr %}, on_open{% endif %}),
+            on_open=opened(
+                self._mirrors.watch if self._mirrors else None,
+{%- if use_files %}
+                files.opened,
+{%- endif %}
+{%- if use_relayr %}
+                on_open,
+{%- endif %}
+            ),
             tracer_provider=tracer_provider,
             meter_provider=meter_provider,
         )
@@ -225,6 +236,9 @@ class Collaboration:
             tracer_provider=tracer_provider,
             meter_provider=meter_provider,
         )
+{%- if use_files %}
+        files.tend(self.workspaces{% if use_diagrams %}, storage{% endif %})
+{%- endif %}
         self.mcp = ArtifactrMcp(
             self.workspaces,
             self.runner,

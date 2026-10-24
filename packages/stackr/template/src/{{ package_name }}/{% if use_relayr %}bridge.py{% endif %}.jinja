@@ -8,6 +8,10 @@ application starts, for every workspace the ledger knows{% if access == 'grantr'
 An answer to a form, and a submission to one, is ``ui:form_submitted`` instead, through
 relayr.ui's projections, so a rule is written once for both ways of asking.
 {%- endif %}
+{%- if use_diagrams %}
+A commit to a diagram is ``excalidraw:elements_changed`` instead, through relayr.excalidraw's
+projection: the elements it added, changed and removed.
+{%- endif %}
 
 Outbound, rules' runs act back in artifactr as their rules' own participants, within each rule's
 allowlist: proposals and notices by default (``incidents.py``). The ledger, in the application's
@@ -39,8 +43,11 @@ from grantr import Grants, Resource, User
 {%- endif %}
 from reflexr.workspace import Action, Reaction, RunContext, with_params
 from relayr.evals import Outcomes
-{%- if use_ui %}
+{%- if use_ui or use_diagrams %}
 from relayr.events import Projections
+{%- endif %}
+{%- if use_diagrams %}
+from relayr.excalidraw import EXCALIDRAW_PROJECTIONS
 {%- endif %}
 from relayr.inbound import {% if access == 'grantr' %}FOLLOWER, {% endif %}Followers
 from relayr.langfuse import bridged_run, bridged_turns
@@ -179,8 +186,16 @@ class Bridge:
             collaboration.workspaces,
             automation.workspaces,
             self.ledger,
-{%- if use_ui %}
+{%- if use_ui and use_diagrams %}
+            # A diagram's commits as its elements changed, beside the forms' submissions.
+            projections=Projections(
+                artifacts={**UI_PROJECTIONS["artifacts"], **EXCALIDRAW_PROJECTIONS["artifacts"]},
+                deferred=UI_PROJECTIONS["deferred"],
+            ),
+{%- elif use_ui %}
             projections=Projections(**UI_PROJECTIONS),
+{%- elif use_diagrams %}
+            projections=Projections(**EXCALIDRAW_PROJECTIONS),
 {%- endif %}
             tracer_provider=tracer_provider,
             meter_provider=meter_provider,

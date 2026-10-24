@@ -43,6 +43,11 @@ from reflexr.workspace import (
 )
 {%- if use_relayr %}
 from relayr.events import BRIDGED
+{%- endif %}
+{%- if use_relayr and use_diagrams %}
+from relayr.excalidraw import EXCALIDRAW_EVENTS, EXCALIDRAW_PUBLISHERS
+{%- endif %}
+{%- if use_relayr %}
 from relayr.inbound import SOURCE
 {%- endif %}
 {%- if use_tracker %}
@@ -154,6 +159,9 @@ class Automation:
             self._mirrors = Mirrors(follow)
 {%- if use_relayr %}
         events = [*EVENTS, *BRIDGED, *INCIDENT_EVENTS{% if use_tracker %}, *TRACKED{% endif %}{% if use_ui %}, *UI_EVENTS{% endif %}]
+{%- if use_relayr and use_diagrams %}
+        events += EXCALIDRAW_EVENTS
+{%- endif %}
         self.events: Mapping[str, type[Event]] = {t.event_type: t for t in events}
         """The event types the workspaces accept, by name, as rules from chat are checked."""
 {%- endif %}
@@ -169,7 +177,18 @@ class Automation:
             rules={% if use_tracker %}[*RULES, *(BRIDGE_RULES + TRACKER_RULES if actions else [])]{% elif use_relayr %}[*RULES, *(BRIDGE_RULES if actions else [])]{% else %}RULES{% endif %},
             authorize=authorize,
 {%- if use_relayr %}
-            publishers={"artifactr": [SOURCE]{% if use_tracker %}, **PUBLISHERS{% endif %}{% if use_ui %}, **UI_PUBLISHERS{% endif %}},
+            publishers={
+                "artifactr": [SOURCE],
+{%- if use_tracker %}
+                **PUBLISHERS,
+{%- endif %}
+{%- if use_ui %}
+                **UI_PUBLISHERS,
+{%- endif %}
+{%- if use_relayr and use_diagrams %}
+                **EXCALIDRAW_PUBLISHERS,
+{%- endif %}
+            },
             stored_rules=STORED_RULES if actions else None,
 {%- endif %}
             on_open=opened(self._mirrors.watch if self._mirrors else None{% if use_relayr %}, on_open{% endif %}),

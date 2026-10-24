@@ -37,6 +37,7 @@ An application can mount [artifactr](../artifactr/index.md) and [reflexr](../ref
 - **Task trackers (phase 1 built).** A rule's run files, comments on and moves items in Plane's Community edition or Vikunja, each once however often the run is retried, by a key the ledger claims before anything is sent ([lattice RFC-0004](../rfcs/0004-relayr-and-task-trackers.md), [the guide](guides/trackers.md)). Changes people make in the tracker come back as events in its phase 2.
 - **A ledger of its own (built)**, in memory or in SQL, behind the `sql`, `sqlite` and `postgres` extras.
 - **Forms for rules (built).** With the `forms` extra, `relayr.ui` bridges an answer to artifactr's `ask_form`, and a submission to a form, both as `ui:form_submitted`, so a rule is written once for both ways of asking.
+- **Diagrams for rules (built).** With the `excalidraw` extra, `relayr.excalidraw` bridges each commit to a diagram's elements once, as `excalidraw:elements_changed`: what it added, changed and removed, with labels ([ADR-0041](adr/0041-a-diagrams-commits-bridged-as-its-elements-changed-and-comments-on-them.md)).
 
 [RFC-0001](rfcs/0001-v0.1-implementation-plan.md#phases) built these in phases after the foundation, and records what each waited on in the libraries.
 

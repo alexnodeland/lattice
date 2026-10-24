@@ -6,6 +6,7 @@
 
 import { FileUp } from "lucide-react";
 import { type DragEvent, type ReactNode, useId, useState } from "react";
+import { buttonLook } from "./button";
 import { cn } from "./cn";
 import { Icon } from "./icon";
 
@@ -75,21 +76,40 @@ export function FileChooser({
         <Icon icon={FileUp} />
         {label}
       </label>
-      <input
-        id={input}
-        type="file"
-        accept={accept}
-        multiple={multiple}
-        disabled={disabled}
-        aria-describedby={described}
-        // Cleared as the picker opens, so choosing the same file again is a change too, and the
-        // input says what was chosen until then.
-        onClick={(event) => {
-          event.currentTarget.value = "";
-        }}
-        onChange={(event) => given(event.currentTarget.files)}
-        className="max-w-full text-muted text-sm outline-offset-(--focus-offset) file:mr-3 file:cursor-pointer file:rounded-md file:border file:border-edge file:border-solid file:bg-surface file:px-3 file:py-1.5 file:font-sans file:font-semibold file:text-fg file:text-sm focus-visible:outline-(length:--focus-width) focus-visible:outline-focus disabled:file:cursor-not-allowed disabled:file:border-line disabled:file:bg-line disabled:file:text-muted"
-      />
+      {/*
+       * The input itself is out of sight, so the browser's own button and its "No file chosen"
+       * aren't drawn: the keyboard and assistive technology still reach it, named by its label
+       * and by the kit button beside it, its second label, which shows its focus and opens it on
+       * a click (portalr ADR-0049).
+       */}
+      <span className="flex items-center">
+        <input
+          id={input}
+          type="file"
+          accept={accept}
+          multiple={multiple}
+          disabled={disabled}
+          aria-describedby={described}
+          // Cleared as the picker opens, so choosing the same file again is a change too, and the
+          // input says what was chosen until then.
+          onClick={(event) => {
+            event.currentTarget.value = "";
+          }}
+          onChange={(event) => given(event.currentTarget.files)}
+          className="peer sr-only"
+        />
+        <label
+          htmlFor={input}
+          // So the button's own disabled look holds, its hover and press with it.
+          data-disabled={disabled || undefined}
+          className={cn(
+            buttonLook("secondary", "sm"),
+            "cursor-pointer peer-focus-visible:outline-(length:--focus-width) peer-focus-visible:outline-focus",
+          )}
+        >
+          {multiple ? "Choose files" : "Choose a file"}
+        </label>
+      </span>
       <p id={described} className="text-muted">
         {hint}
         {hint && " "}Or drop {multiple ? "them" : "it"} here.

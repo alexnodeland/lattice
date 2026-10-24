@@ -118,6 +118,18 @@ tasks:
       - 'app:build'
       - 'admin:build'
 
+  # The committed Liberation Sans against its upstream tarball (lattice#679). It needs the network,
+  # so `check` doesn't run it.
+  liberation:
+    description: "Fail unless the committed Liberation Sans is the pinned release converted to WOFF2"
+    command: 'uv run --script scripts/check_liberation.py'
+    inputs:
+      - 'scripts/check_liberation.py'
+      - 'web/ui/fonts/*'
+    options:
+      cache: false
+      runInCI: false
+
   ui-in-wheel:
     description: "Check that the built wheel carries both UIs, and their third-party notices"
     command: 'uv run --no-project python scripts/check_wheel.py'

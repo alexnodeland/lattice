@@ -13,7 +13,7 @@ const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
 /** What any other failure says, such as one where the server couldn't be reached. */
 export const GENERIC = "Something went wrong. Try again in a moment.";
 
-/** What values that aren't valid say, as the client's refusals say it too. */
+/** What values that aren't valid say, as the client's refusals say it too (its reasons.ts). */
 export const INVALID = "What was asked for isn't valid.";
 
 /**

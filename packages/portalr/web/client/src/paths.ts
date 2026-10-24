@@ -39,8 +39,8 @@ function startOf(loc: readonly unknown[]): number {
  * Where FastAPI's or Pydantic's errors say the values aren't valid: each error's `loc` as a dotted
  * path, from where `startOf` says. A path is told only if each of its parts is a plain name or
  * index of at most 32 characters, none of them secret-shaped, and it has at most six; at most
- * five paths are told, of at most 160 characters in all. So no text of the server's, nor a
- * secret it put in a key, comes through one.
+ * five paths are told, of at most 160 characters in all. So no text of the server's comes
+ * through one, nor a key named or shaped as a secret; a bare hex or base64 run isn't caught.
  */
 export function pathsOf(errors: unknown): string[] {
   if (!Array.isArray(errors)) {

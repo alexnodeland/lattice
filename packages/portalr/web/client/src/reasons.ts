@@ -20,7 +20,7 @@ const STATE = "That can't be done as things stand.";
 const FORBIDDEN = "You may not see this.";
 /** What a refused command says of the reader not being allowed: it is an action, not a read. */
 const NOT_ALLOWED = "You may not do this here.";
-/** What values that aren't valid say, before where they are. */
+/** What values that aren't valid say, before where they are; ui's failure.ts says it too. */
 const INVALID = "What was asked for isn't valid.";
 const NOT_FOUND = "It isn't there: it may have been moved or archived.";
 
@@ -82,17 +82,27 @@ export function sentenceOf(status: number, body: unknown, acting = false): strin
   return acting && read === FORBIDDEN ? NOT_ALLOWED : read;
 }
 
+/** Whether a refusal carries errors that may say where: FastAPI's list, or a rejection's. */
+function located(body: unknown): boolean {
+  return isRecord(body) && (Array.isArray(body.detail) || Array.isArray(typedOf(body).errors));
+}
+
 /**
  * The sentence a reader is told of a refusal, as `sentenceOf` says it; where it is of values that
- * aren't valid, with where they are. Reading where is rare, so it loads only then.
+ * aren't valid, with where they are. Reading where is rare, so it loads only then; if it can't
+ * load, as offline, the sentence is said without where. It never rejects.
  */
 export async function refusalSaid(status: number, body: unknown, acting = false): Promise<string> {
   const said = sentenceOf(status, body, acting);
-  if (said !== INVALID) {
+  if (said !== INVALID || !located(body)) {
     return said;
   }
-  const { invalidAt } = await import("./paths");
-  return invalidSaid(invalidAt(body));
+  try {
+    const { invalidAt } = await import("./paths");
+    return invalidSaid(invalidAt(body));
+  } catch {
+    return INVALID;
+  }
 }
 
 /**

@@ -106,6 +106,9 @@ test("a refused change is said from what the page shows, never in grantr's words
     `${row.name} wasn't changed: that value isn't allowed here.`,
   );
   expect(refusedWhy(row, 403, 25)).toBe(`${row.name} wasn't changed: it can't be changed here.`);
+  expect(refusedWhy(row, 401, 25)).toBe(
+    `${row.name} wasn't changed: you're not signed in. Sign in, then try again.`,
+  );
   expect(refusedWhy(row, 503, 25)).toBe(
     `${row.name} wasn't changed: the server couldn't do it just now. Try again in a moment.`,
   );

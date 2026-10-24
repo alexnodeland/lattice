@@ -199,6 +199,9 @@ function whyRefused(row: SettingRow, status: number, tried: number | null): stri
   if (status === 403) {
     return "it can't be changed here.";
   }
+  if (status === 401) {
+    return "you're not signed in. Sign in, then try again.";
+  }
   if (status !== 422) {
     return "the server couldn't do it just now. Try again in a moment.";
   }

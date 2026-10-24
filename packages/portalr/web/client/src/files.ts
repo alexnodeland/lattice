@@ -8,7 +8,7 @@
 
 import type { Answer, Refusal } from "./commands";
 import type { components as Files } from "./generated/files.openapi";
-import { refusalSaid } from "./reasons";
+import { refusalSaid, sentenceOf } from "./reasons";
 import { named } from "./rest";
 import { type Session, sessionHeaders } from "./session";
 
@@ -152,15 +152,18 @@ function send<R>(
       const type = detailOf(body, "type");
       const quota = detailOf(body, "quota") as Quota | undefined;
       const { status } = xhr;
-      void refusalSaid(status, body, true).then((said) =>
+      const refused = (said: string) =>
         settle({
           outcome: "refused",
           status,
           reasons: [said],
           ...(type !== undefined && { type }),
           ...(quota !== undefined && { quota }),
-        }),
-      );
+        });
+      // It never rejects; were it to, the upload still settles, with the sentence alone.
+      void refusalSaid(status, body, true)
+        .then(refused)
+        .catch(() => refused(sentenceOf(status, body, true)));
     };
     xhr.onerror = () => unanswered("The connection ended before the server answered.");
     xhr.onabort = () => unanswered(stopped);

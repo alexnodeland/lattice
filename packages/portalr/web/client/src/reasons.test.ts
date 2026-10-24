@@ -75,10 +75,36 @@ test("paths are capped, and none names a secret-shaped key", () => {
       { loc: ["body", "ok"] },
     ]),
   ).toEqual(["ok"]);
-  const long = Array.from({ length: 10 }, (_, at) => ({ loc: ["body", `${"p".repeat(30)}${at}`] }));
-  expect(pathsOf(long).join(", ").length).toBeLessThanOrEqual(170);
+  // A path of 6 parts of 32 characters is 197 long: over the 160 in all by itself.
+  const part = (at: number) => `${"p".repeat(31)}${at}`;
+  expect(pathsOf([{ loc: ["body", ...[0, 1, 2, 3, 4, 5].map(part)] }])).toEqual([]);
+  // 98, then 65, which would make 163, so it isn't told, then 2, which fits: 160 trips first.
+  const told = pathsOf([
+    { loc: ["body", part(0), part(1), part(2)] },
+    { loc: ["body", part(3), part(4)] },
+    { loc: ["body", "ok"] },
+  ]);
+  expect(told).toEqual([[part(0), part(1), part(2)].join("."), "ok"]);
+  expect(told.join("").length).toBeLessThanOrEqual(160);
   expect(invalidSaid([])).toBe("What was asked for isn't valid.");
   expect(invalidSaid(["a", "b"])).toBe("What was asked for isn't valid: a, b.");
+});
+
+test("a part may be 32 characters but not 33, and a path 6 parts but not 7", () => {
+  expect(pathsOf([{ loc: ["body", "a".repeat(32)] }])).toEqual(["a".repeat(32)]);
+  expect(pathsOf([{ loc: ["body", "a".repeat(33)] }])).toEqual([]);
+  expect(pathsOf([{ loc: ["body", "a", "b", "c", "d", "e", "f"] }])).toEqual(["a.b.c.d.e.f"]);
+  expect(pathsOf([{ loc: ["body", "a", "b", "c", "d", "e", "f", "g"] }])).toEqual([]);
+});
+
+test("a bare hex or base64 run in a key isn't taken for a secret, as ADR-0070 says", () => {
+  expect(pathsOf([{ loc: ["body", "deadbeefdeadbeef"] }])).toEqual(["deadbeefdeadbeef"]);
+});
+
+test("a refusal of values with no errors to say where says the sentence alone", async () => {
+  expect(await refusalSaid(422, { detail: "no such subject" })).toBe(
+    "What was asked for isn't valid.",
+  );
 });
 
 test("a reason runs on after a colon in lower case, but a name keeps its capitals", () => {

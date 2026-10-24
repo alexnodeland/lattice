@@ -247,7 +247,9 @@ class Runner[AppDepsT]:
         agent_name: How the agent is named in the workspace.
         claim_ttl: How long a thread claim lasts without renewal, should this process die. Once
             it lapses, the thread's next run records the run left behind as abandoned, and a run
-            of this process whose claim lapsed is cancelled. A claim is renewed every third of
+            of this process whose claim is lost is cancelled. A claim is lost as storage says,
+            not as this process's loop does: one renewed late, after a stall, is kept if no
+            one else had it meanwhile. A claim is renewed every third of
             it, so a run survives one failed renewal, or storage that stalls for about two thirds
             of it. It must exceed the clock skew between replicas.
         look_again_after: How long a claimant that finds its thread claimed waits before it looks

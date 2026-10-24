@@ -545,7 +545,13 @@ export function LineChart({
                 style={{ strokeDasharray: dash(at) }}
                 dot={({ cx, cy, index: point }) =>
                   typeof cx === "number" && typeof cy === "number" ? (
-                    <Marker key={point} at={at} x={cx} y={cy} />
+                    <Marker
+                      key={point}
+                      at={at}
+                      x={cx}
+                      y={cy}
+                      alone={!known(data[point - 1], one.key) && !known(data[point + 1], one.key)}
+                    />
                   ) : (
                     <g key={point} />
                   )
@@ -562,6 +568,9 @@ export function LineChart({
     </Figure>
   );
 }
+
+/** Whether a row has a value for a series: a point a line can reach. */
+const known = (row: Datum | undefined, key: string) => Number.isFinite(row?.[key]);
 
 /** One part of a whole: its key, its name, and how much of it. */
 export interface Part {

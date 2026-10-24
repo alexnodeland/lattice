@@ -42,6 +42,15 @@
     }
   }
 
+  /*
+   * A heading the app moves the focus to (portalr ADR-0068) is where a screen reader starts, not
+   * a control: no key reaches it (its tabindex is -1), so it draws no ring, as nothing else
+   * focused only by the app does. The focus, and what is read from it, are unchanged.
+   */
+  :is(h1, h2, h3, h4, h5, h6)[tabindex="-1"]:focus {
+    outline: none;
+  }
+
   ::selection {
     background-color: var(--selection);
     color: var(--fg);

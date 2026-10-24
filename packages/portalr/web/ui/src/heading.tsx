@@ -37,5 +37,5 @@ export function Heading({
   className?: string;
 }) {
   const Tag = `h${level}` as const;
-  return <Tag className={cn(LOOK[look], "outline-none", className)} {...props} />;
+  return <Tag className={cn(LOOK[look], className)} {...props} />;
 }

@@ -458,6 +458,7 @@ Sets Umami's admin password, and makes portalr's user and website, each time `ma
     | `UMAMI_ADMIN_PASSWORD` | `${UMAMI_ADMIN_PASSWORD:?run make env}` |
     | `UMAMI_PORTALR_PASSWORD` | `${UMAMI_PORTALR_PASSWORD:?run make env}` |
     | `UMAMI_WEBSITE_ID` | `${UMAMI_WEBSITE_ID:?run make env}` |
+    | `UMAMI_REPLAY` | `${UMAMI_REPLAY:-false}` |
 
 ### `langfuse-worker`
 

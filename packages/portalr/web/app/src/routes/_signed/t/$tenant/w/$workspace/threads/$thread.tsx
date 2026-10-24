@@ -274,7 +274,11 @@ function Chat() {
   };
 
   return (
-    <section aria-labelledby="thread" className="flex max-w-190 flex-col gap-6">
+    <section
+      aria-labelledby="thread"
+      data-portalr-replay="block"
+      className="flex max-w-190 flex-col gap-6"
+    >
       <PageHeader
         title={thread.title || "Untitled"}
         breadcrumbs={crumbs}

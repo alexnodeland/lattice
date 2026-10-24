@@ -342,6 +342,8 @@ class PortalSettings:
         umami_website: portalr's website in Umami: stackr's ``UMAMI_WEBSITE_ID``.
         umami_password: portalr's Umami user's password: stackr's ``UMAMI_PORTALR_PASSWORD``.
         umami_ui_url: Umami, as operators' browsers reach it, for a deep link.
+        replay: Whether people may turn on session replay, each with their own yes, sent to
+            Umami (portalr ADR-0077). Off unless ``PORTAL_REPLAY`` is ``true``.
         required: Whether the application must not start without a Supabase project for the UIs
             to sign in to, rather than leave the portal off: set on a single host, where a
             portal that is silently off would be an application that looks deployed and isn't.
@@ -368,6 +370,7 @@ class PortalSettings:
     umami_website: str | None = None
     umami_password: str | None = field(default=None, repr=False)
     umami_ui_url: str | None = None
+    replay: bool = False
     required: bool = False
 
     @classmethod
@@ -395,6 +398,7 @@ class PortalSettings:
             umami_website=env.get("PORTAL_UMAMI_WEBSITE_ID") or None,
             umami_password=env.get("PORTAL_UMAMI_PASSWORD") or None,
             umami_ui_url=env.get("PORTAL_UMAMI_UI_URL") or None,
+            replay=env.get("PORTAL_REPLAY") == "true",
             required=env.get("PORTAL_REQUIRED") == "true",
         )
 

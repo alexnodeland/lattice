@@ -528,6 +528,8 @@ services:
       UMAMI_ADMIN_PASSWORD: ${UMAMI_ADMIN_PASSWORD:?run make env}
       UMAMI_PORTALR_PASSWORD: ${UMAMI_PORTALR_PASSWORD:?run make env}
       UMAMI_WEBSITE_ID: ${UMAMI_WEBSITE_ID:?run make env}
+      # Replays kept for portalr's website: off until the privacy review (portalr ADR-0077).
+      UMAMI_REPLAY: ${UMAMI_REPLAY:-false}
     volumes:
       - ./deploy/umami/init:/init:ro
     networks: [umami-ingest]

@@ -41,6 +41,7 @@ from grantr.grants import Grants
 from lattice_core.refusals import Refused, refusals
 from portalr.access import record_links
 from portalr.actions import READ_DEPLOYMENT, READ_SPEND, READ_TELEMETRY
+from portalr.analytics.consent import Consent
 from portalr.analytics.relay import (
     MOST_BYTES,
     Answer,
@@ -51,6 +52,7 @@ from portalr.analytics.relay import (
     Relayed,
     Session,
 )
+from portalr.analytics.replay import MOST_REPLAY_BYTES, ReplayBatch, expansion
 from portalr.fastapi.site import Site, Surfaces
 from portalr.fastapi.ui import ui_router
 from portalr.invites import Invite, InviteFailed
@@ -164,6 +166,9 @@ class Config(BaseModel):
     """The origin mini apps run on, or None where the deployment runs none."""
     brand: Brand | None = None
     """The deployment's brand kit, or None for portalr's own look."""
+    replay: bool = False
+    """Whether the deployment records session replays, with a person's own yes to them (portalr
+    ADR-0077): off unless an operator turns it on, after the privacy review."""
 
 
 class NewInvite(BaseModel):
@@ -339,6 +344,10 @@ def portalr_router(
             editors=site.editors,
             apps=site.apps,
             brand=Brand.model_validate(site.kit.config()) if site.kit else None,
+            replay=relay is not None
+            and relay.replay is not None
+            and relay.umami is not None
+            and await relay.umami.replay_enabled(),
         )
 
     @api.get("/v1/traces", response_model=reading(list[TraceSummary]))
@@ -532,7 +541,7 @@ def portalr_router(
     if people is not None:
         _naming(api, grants, people, current)
     if relay is not None:
-        _analytics(api, grants, relay, current)
+        _analytics(api, grants, relay, current, ui)
     if invite is not None:
         _invitations(api, grants, invite, current, readers.analytics)
         _tenant_creation(api, grants, invite, operating)
@@ -699,7 +708,7 @@ def _invitations(
         return Invited(tenant=tenant, user=user)
 
 
-def _analytics(router: APIRouter, grants: Grants, relay: Relay, current: Any) -> None:
+def _analytics(router: APIRouter, grants: Grants, relay: Relay, current: Any, ui: Path) -> None:
     """The relay's routes, for a signed-in person only: a key or an agent sends no events.
 
     Each request is counted against the person's pace before anything else is read, and past it
@@ -725,6 +734,7 @@ def _analytics(router: APIRouter, grants: Grants, relay: Relay, current: Any) ->
         return user
 
     signed_in = Depends(person)
+    answering_person = Depends(answering)
 
     @router.get("/v1/analytics/consent", responses={429: TOO_FAST})
     async def read_consent(user: str = signed_in) -> Consented:
@@ -788,9 +798,92 @@ def _analytics(router: APIRouter, grants: Grants, relay: Relay, current: Any) ->
             raise _too_fast(wait)
         return await relay.record(x_tenant, user, batch, session_id)
 
+    if relay.replay is not None and relay.umami is not None:
+        _replay(router, grants, relay, relay.replay, signed_in, answering_person, ui)
+
+
+def _replay(
+    router: APIRouter,
+    grants: Grants,
+    relay: Relay,
+    replay: Consent,
+    signed_in: Any,
+    answering: Any,
+    ui: Path,
+) -> None:
+    """Session replay's routes, where the deployment records replays (portalr ADR-0077)."""
+    # The app's own stylesheets, by file name: the text a replay is given for a stylesheet it names.
+    sheets = {
+        sheet.name: sheet.read_text(encoding="utf-8") for sheet in (ui / "app").glob("assets/*.css")
+    }
+
+    @router.get("/v1/analytics/replay/consent", responses={429: TOO_FAST})
+    async def read_replay_consent(user: str = signed_in) -> Consented:
+        """The person's answer to session replay: no until they say yes, apart from analytics'."""
+        return Consented(
+            given=await replay.given(user), deleting=await replay.owes(user) is not None
+        )
+
+    @router.put("/v1/analytics/replay/consent")
+    async def answer_replay(body: Annotated[Answer, Body()], user: str = answering) -> Answered:
+        """Record the person's answer to replay. Taking a yes back deletes their replays at once.
+
+        A yes needs the person's yes to analytics first; a no is never refused.
+        """
+        try:
+            return await relay.answer_replay(user, yes=body.given)
+        except ValueError as error:
+            raise _refusal("invalid", str(error)) from error
+
+    @router.post(
+        "/v1/analytics/replay",
+        status_code=202,
+        responses={413: REPLAY_TOO_LARGE, 422: INVALID, 429: REPLAY_TOO_FAST},
+        openapi_extra={
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {"schema": _inlined(ReplayBatch.model_json_schema())}
+                },
+            }
+        },
+    )
+    async def replays(
+        request: Request,
+        x_tenant: TenantHeader = None,
+        user: str = signed_in,
+    ) -> Relayed:
+        """A batch of the person's replay events in a tenant they belong to, forwarded to Umami.
+
+        Only with their yes to replay and to analytics; and only if every value in it is masked:
+        a batch with any word, input or address in it is dropped whole.
+        """
+        batch = await _batch(request, ReplayBatch, MOST_REPLAY_BYTES)
+        if x_tenant is None:
+            raise _refusal("tenant_required", "name the tenant with X-Tenant")
+        if await grants.member(x_tenant, user) is None:
+            raise _refusal("forbidden", f"the caller isn't a member of {x_tenant}")
+        if relay.session_of(user, batch.session) is None:
+            raise _refusal("forbidden", "the session isn't one portalr signed for this person")
+        # A batch costs its size and what the stylesheets it names would add to it.
+        _, added = expansion(batch.events, sheets)
+        size = len(batch.model_dump_json().encode()) + added
+        wait = relay.replay_limiter.spend(user, max(size, 8 * 1024))
+        if wait is not None:
+            raise _too_fast(wait)
+        return await relay.record_replay(x_tenant, user, batch, sheets)
+
 
 TOO_LARGE: Final = {"model": Refused, "description": "The body is over 16 KB: `too_large`"}
 TOO_FAST: Final = {"model": Refused, "description": "Past the person's pace: `too_fast`"}
+REPLAY_TOO_LARGE: Final = {
+    "model": Refused,
+    "description": "The body is over 512 KiB: `too_large`",
+}
+REPLAY_TOO_FAST: Final = {
+    "model": Refused,
+    "description": "Past the person's pace in bytes of replay: `too_fast`",
+}
 INVALID: Final = {"model": Refused, "description": "Not a batch the relay takes: `invalid`"}
 
 
@@ -826,22 +919,24 @@ def _too_fast(wait: float) -> HTTPException:
     )
 
 
-async def _batch(request: Request) -> Batch:
+async def _batch[B: BaseModel](
+    request: Request, model: type[B] = Batch, most: int = MOST_BYTES
+) -> B:
     """The request's batch, read no further than its cap: a longer body is refused as it comes."""
     too_large = HTTPException(
         status_code=413,
-        detail={"type": "too_large", "message": f"a batch is {MOST_BYTES} bytes at most"},
+        detail={"type": "too_large", "message": f"a batch is {most} bytes at most"},
     )
     declared = request.headers.get("content-length", "")
-    if declared.isdigit() and int(declared) > MOST_BYTES:
+    if declared.isdigit() and int(declared) > most:
         raise too_large
     raw = bytearray()
     async for chunk in request.stream():
         raw += chunk
-        if len(raw) > MOST_BYTES:
+        if len(raw) > most:
             raise too_large
     try:
-        return Batch.model_validate_json(bytes(raw))
+        return model.model_validate_json(bytes(raw))
     except ValidationError as error:
         raise HTTPException(
             status_code=422,

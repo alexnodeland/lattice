@@ -6,7 +6,13 @@
  */
 
 export { Account } from "./account";
-export { AccountMenu, type AnalyticsAnswer, type Appearance } from "./account-menu";
+export {
+  AccountMenu,
+  type AnalyticsAnswer,
+  type Appearance,
+  NOT_SAVED,
+  type ReplayAnswer,
+} from "./account-menu";
 export { focusPageHeading, useHeadingAfterNavigation } from "./after-navigation";
 export { Alert, type AlertTone } from "./alert";
 export { AnsiText, type Run, runs } from "./ansi";

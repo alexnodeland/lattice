@@ -82,6 +82,17 @@ Where the deployment runs product analytics (lattice RFC-0008), the app's accoun
 - **Being removed from a tenant** deletes what the person shared in that tenant, up to their removal, and keeps what they shared in others. It is owed and retried in the same way ([ADR-0075](../adr/0075-a-person-removed-from-a-tenant-has-their-events-there-deleted.md)).
 - **How long it is kept:** 395 days unless the operator sets otherwise.
 
+## Session replay
+
+Where a deployment turns it on (lattice RFC-0008, [ADR-0077](../adr/0077-session-replay-its-own-yes-masked-in-the-browser-and-checked-at-the-relay.md)), the Privacy group has a second switch, **Record my sessions to improve the app**. It is off until a person turns it on, it needs their yes to sharing how they use the app first, and **it is off in every release until its [privacy review](replay-privacy-review.md) is signed off**.
+
+- **What is recorded:** the layout of the pages a person visits in the app, and where they click and scroll. All text and anything they type is hidden, as asterisks. Links, titles, labels, alternative text and sources are hidden too, and so is every attribute that is not a plain structural one. A replay is styled by the application's own stylesheet; no stylesheet text is sent from a browser.
+- **What is never recorded:** a page's content area is an empty box unless the page is one of those with nothing in it but ids, statuses and counts (today, the runs page). So threads and chats, artifacts and files, mini apps, forms, rules, proposals, and the dialogs that hold who has access, are empty boxes; on the runs page, what names things (a thread's title, a rule's name) and the comment on a thumb are empty boxes too. The admin UI is never recorded at all. The navigation, the switcher and the account menu are recorded, with their text hidden.
+- **Where it goes:** to portalr's relay on the app's own origin, which drops the whole batch if anything in it is not known to be structural, then to Umami, from portalr's own address and agent, under the person's hash. A recording is kept in Umami's database, not in ClickHouse.
+- **Turning it off** deletes the person's recordings. Umami keeps a recording in the session it belongs to, so this deletes the person's sessions there, **with the page journeys that product analytics copied to them**; the events in ClickHouse stay unless sharing is turned off too. So does turning off sharing how they use the app. If Umami can't take the deletion just then, it stays owed, the menu says so ("Deleting your recordings hasn't finished yet. It will be retried until it is done."), and portalr tries again until it is done. A backup taken before then keeps the recordings until it expires.
+- **How long it is kept:** until the person deletes it, or the operator does. Umami 3.4.0 has no setting to expire a recording; an operator job that deletes recordings older than a set number of days (30 by default) is the follow-up the [review](replay-privacy-review.md) waits for.
+- **What is not hidden:** whether a box is ticked or an item chosen, and the numbers on a page, are recorded; "anything you type is hidden" is about text.
+
 ## Where the gate stops
 
 Langfuse and Grafana are not tenant-scoped and have no reveal gate. An operator's links into them show content across tenants, which is why Tools carries a notice and each making of links is [recorded](operators.md#what-is-recorded). Anyone with access to those tools directly has the same reach.

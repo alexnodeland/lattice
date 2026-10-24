@@ -84,32 +84,36 @@ function Runs() {
     name: `Turn ${run.id}`,
     status: <RunStatus status={run.status} />,
     title: (
-      <TextLink
-        variant="subtle"
-        render={
-          <Link
-            to="/t/$tenant/w/$workspace/threads/$thread"
-            params={{ tenant, workspace, thread: run.threadId }}
-          />
-        }
-      >
-        {turns.state.threads[run.threadId]?.title || "Untitled"}
-      </TextLink>
+      <span data-portalr-replay="block">
+        <TextLink
+          variant="subtle"
+          render={
+            <Link
+              to="/t/$tenant/w/$workspace/threads/$thread"
+              params={{ tenant, workspace, thread: run.threadId }}
+            />
+          }
+        >
+          {turns.state.threads[run.threadId]?.title || "Untitled"}
+        </TextLink>
+      </span>
     ),
     // A start the log gave no readable time for is left blank, never "Invalid Date".
     started: readable(run.startedAt) && <Moment at={run.startedAt} />,
     feedback: turnFeedback && (
-      <Thumbs
-        given={thumbs(run.feedback, me)}
-        onThumbs={(up, comment) =>
-          artifactr.send({
-            type: "give_feedback",
-            feedback_type: "thumbs",
-            target: { kind: "turn", run_id: run.id },
-            value: comment === null ? { up } : { up, comment },
-          })
-        }
-      />
+      <span data-portalr-replay="block">
+        <Thumbs
+          given={thumbs(run.feedback, me)}
+          onThumbs={(up, comment) =>
+            artifactr.send({
+              type: "give_feedback",
+              feedback_type: "thumbs",
+              target: { kind: "turn", run_id: run.id },
+              value: comment === null ? { up } : { up, comment },
+            })
+          }
+        />
+      </span>
     ),
     actions: run.status === "running" && allowed.has("artifactr:stop_run") && (
       <CommandButton onSend={() => artifactr.send({ type: "stop_run", run_id: run.id })}>
@@ -131,7 +135,7 @@ function Runs() {
       name: `Run ${run.id}`,
       status: <RuleRunStatus status={run.status} />,
       title: (
-        <span className="flex flex-col">
+        <span className="flex flex-col" data-portalr-replay="block">
           <code className="font-mono">{run.rule}</code>
           {run.retries > 0 && (
             <span className="text-muted text-xs">
@@ -144,17 +148,19 @@ function Runs() {
       ),
       attempts: run.attempt,
       feedback: runFeedback && (
-        <Thumbs
-          given={thumbs(run.feedback, me)}
-          onThumbs={(up, comment) =>
-            reflexr.send({
-              type: "give_feedback",
-              feedback_type: "thumbs",
-              target: { kind: "run", run_id: run.id },
-              value: comment === null ? { up } : { up, comment },
-            })
-          }
-        />
+        <span data-portalr-replay="block">
+          <Thumbs
+            given={thumbs(run.feedback, me)}
+            onThumbs={(up, comment) =>
+              reflexr.send({
+                type: "give_feedback",
+                feedback_type: "thumbs",
+                target: { kind: "run", run_id: run.id },
+                value: comment === null ? { up } : { up, comment },
+              })
+            }
+          />
+        </span>
       ),
       actions: (retry || skip || cancel) && (
         <>
@@ -180,6 +186,10 @@ function Runs() {
 
   return (
     <>
+      {/* The one page that may be recorded: its statuses, counts, times and buttons. What names
+          things (a thread's title, a rule, a tracker item) and a comment on a run are blocked in
+          their cells, and every other text on it is masked (portalr ADR-0077). */}
+      <i hidden data-portalr-replay="allow" />
       <PageHeader
         title="Runs"
         meta={`The agent's turns and the rules' runs in ${workspace}, newest first`}

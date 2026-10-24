@@ -100,9 +100,11 @@ export function FileChooser({
         />
         <label
           htmlFor={input}
+          // So the button's own disabled look holds, its hover and press with it.
+          data-disabled={disabled || undefined}
           className={cn(
             buttonLook("secondary", "sm"),
-            "cursor-pointer peer-focus-visible:outline-(length:--focus-width) peer-focus-visible:outline-focus peer-disabled:cursor-not-allowed peer-disabled:border-line peer-disabled:bg-line peer-disabled:text-muted",
+            "cursor-pointer peer-focus-visible:outline-(length:--focus-width) peer-focus-visible:outline-focus",
           )}
         >
           {multiple ? "Choose files" : "Choose a file"}

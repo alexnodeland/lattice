@@ -1,5 +1,5 @@
-import { expect, test } from "vitest";
-import { userEvent } from "vitest/browser";
+import { expect, onTestFinished, test } from "vitest";
+import { commands, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { FileChooser } from "./file-chooser";
 import { Progress } from "./progress";
@@ -112,4 +112,38 @@ test("the browser's own control isn't drawn: a kit button stands for it, shows i
   expect(input.element()).toBe(document.activeElement);
   expect(getComputedStyle(button.element()).outlineColor).toBe(token("focus"));
   expect(screen.getByText("No file chosen").elements()).toHaveLength(0);
+});
+
+test("the kit button opens the input, and says a file where one is chosen", async () => {
+  const screen = await render(<FileChooser label="The edited file" onFile={() => undefined} />);
+  const input = screen.getByLabelText("The edited file").element();
+  let opened = 0;
+  // A click on the button is a click on the input it labels, which opens the picker.
+  input.addEventListener("click", (event) => {
+    opened += 1;
+    event.preventDefault();
+  });
+  await screen.getByText("Choose a file").click();
+  expect(opened).toBe(1);
+});
+
+test("a disabled chooser's button keeps its disabled look under the pointer", async () => {
+  const screen = await render(
+    <FileChooser label="The edited file" disabled onFile={() => undefined} />,
+  );
+  const button = screen.getByText("Choose a file");
+  await button.hover();
+  expect(getComputedStyle(button.element()).backgroundColor).toBe(token("line"));
+});
+
+test("under forced colours the button still shows the input's focus", async () => {
+  onTestFinished(() => commands.forcedColors(false));
+  await commands.forcedColors(true);
+  const screen = await render(
+    <FileChooser label="Upload files" multiple onFile={() => undefined} />,
+  );
+  await userEvent.tab();
+  expect(getComputedStyle(screen.getByText("Choose files").element()).outlineStyle).not.toBe(
+    "none",
+  );
 });

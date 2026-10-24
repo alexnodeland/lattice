@@ -90,9 +90,6 @@ from lattice_core.settings import KNOWN_SETTINGS, Setting, Value, floor, operato
 
 logger = logging.getLogger(__name__)
 
-type MemberRemovedHook = Callable[[TenantId, Member], Awaitable[None]]
-"""What another package runs once a member is removed from a tenant: the tenant and the member."""
-
 type Record = Callable[[TenantId | None, Subject | None, AuditEvent], Awaitable[AuditEntry]]
 """Appends an audit entry in a change's transaction."""
 
@@ -201,19 +198,6 @@ class Grants:
         self._telemetry = Telemetry(
             tracer_provider=tracer_provider, meter_provider=meter_provider, slow_check=slow_check
         )
-        self._on_member_removed: list[MemberRemovedHook] = []
-
-    def on_member_removed(self, hook: MemberRemovedHook) -> None:
-        """Run ``hook`` each time a member is removed from a tenant, once the removal is kept.
-
-        Each hook is awaited in turn after the removal commits, with the tenant and the member.
-        One that fails is logged, by its error's type, and changes nothing: the removal stands,
-        and the other hooks run. A hook that must not miss a removal keeps its own work owed, as
-        portalr's does (grantr ADR-0036). Registering the same hook again changes nothing. A
-        removal cancelled while its hooks run, as its request is, skips the hooks still to run.
-        """
-        if hook not in self._on_member_removed:
-            self._on_member_removed.append(hook)
 
     # ─── checks ──────────────────────────────────────────────────────────────
 
@@ -374,6 +358,24 @@ class Grants:
         Surfaces list tenants with :meth:`tenants`, for an operator.
         """
         return await self._storage.tenants()
+
+    async def served_audit(
+        self,
+        tenant: TenantId,
+        *,
+        after_seq: int = 0,
+        limit: int = DEFAULT_PAGE,
+        keep: AuditFilter,
+    ) -> list[AuditEntry]:
+        """A tenant's audit entries after ``after_seq``, for the deployment's own in-process tools.
+
+        The first ``limit`` of those ``keep`` keeps, oldest first, checking no one: no surface
+        reaches it, as none reaches :meth:`served_tenants`. A tenant's entries commit in the
+        order of their ``seq``, so a reader that has read up to one has read every entry before
+        it, and catches up from the newest it read, as :meth:`audit`'s clients do. A background
+        pass uses it to act on changes it hasn't yet, such as removals (grantr ADR-0037).
+        """
+        return await self._storage.audit(tenant, after_seq=after_seq, limit=limit, keep=keep)
 
     async def tenants(self, *, by: Subject) -> list[TenantId]:
         """Every tenant, for an operator.
@@ -656,14 +658,7 @@ class Grants:
             await self._bounded(tx, tenant, by, own)
             await self._keeps_an_owner(tx, tenant, leaving=member)
             await tx.remove_member(tenant, member)
-            entry = await record(tenant, by, MemberRemoved(member=member))
-        for hook in self._on_member_removed:
-            try:
-                await hook(tenant, member)
-            except Exception as error:  # A hook never undoes, or fails, the removal it follows.
-                named = getattr(hook, "__qualname__", "hook")
-                logger.warning("member-removed hook %s failed: %s", named, type(error).__name__)
-        return entry
+            return await record(tenant, by, MemberRemoved(member=member))
 
     async def define_group(
         self, tenant: TenantId, group: Group, members: frozenset[Member], *, by: Subject

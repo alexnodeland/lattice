@@ -23,6 +23,7 @@ from reflexr.core import (
     Evaluation,
     Fact,
     InvalidRule,
+    Problem,
     RuleName,
     StoredRules,
     Tick,
@@ -159,7 +160,10 @@ class Reactor[D]:
         for rule in workspaces.rules.values():
             action = chosen.get(rule.then.action)
             if action is None:
-                raise InvalidRule(rule.name, [f"no action {rule.then.action!r}"])
+                raise InvalidRule(
+                    rule.name,
+                    [Problem(f"no action {rule.then.action!r}", "unknown", ("then", "action"))],
+                )
             load_params(rule, params_model(action))
         if workspaces.stored_rules is not None:
             _check_stored_actions(workspaces.stored_rules, chosen)

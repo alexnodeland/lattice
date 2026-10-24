@@ -4,7 +4,8 @@ Every rejection has a stable ``code``, which is what the stream protocol sends t
 ``command_result`` frame, and a :meth:`Rejection.payload` with its typed details.
 """
 
-from typing import ClassVar, override
+from collections.abc import Iterable
+from typing import ClassVar, Self, override
 
 from pydantic import JsonValue
 
@@ -94,6 +95,49 @@ class UnsupportedProtocol(Rejection):
     code: ClassVar[str] = "unsupported_protocol"
 
 
+class Problem(str):
+    """One thing wrong with a rule: its message, as a string.
+
+    It carries the rest as Pydantic reports a field's error, so a client can name the field
+    without reading the message. A problem found in a filter, or in the rule's size, names no
+    field. Two problems are equal if their messages are.
+    """
+
+    __slots__ = ("loc", "type")
+
+    loc: tuple[str | int, ...]
+    """The path to the field within the rule: names, and the numbers of a list's items. A
+    problem that belongs to no field, such as a filter's unknown event type, has none."""
+
+    type: str
+    """What is wrong. Pydantic's own name where it has one (``missing``, ``string_too_long``,
+    ``less_than_equal``, or a params field's); reflexr's own for the rest: ``not_allowed``,
+    ``too_large`` (a size) and ``unknown`` (a name that is not registered)."""
+
+    def __new__(cls, msg: str, type: str, loc: Iterable[str | int] = ()) -> Self:
+        """Return a problem with its message, type and path."""
+        problem = super().__new__(cls, msg)
+        problem.type = type
+        problem.loc = tuple(loc)
+        return problem
+
+    @override
+    def __reduce__(self) -> tuple[object, ...]:
+        """Return how copying and pickling rebuild a problem: from its message, type and path."""
+        return type(self), (str(self), self.type, self.loc)
+
+    def error(self, *within: str) -> dict[str, JsonValue]:
+        """Return the problem as a Pydantic error.
+
+        Args:
+            within: Where the rule is in the command, such as ``rule``, which a path to a field
+                starts with, as Pydantic's errors for a command do. A problem that names no
+                field has an empty ``loc``.
+        """
+        loc = [*within, *self.loc] if self.loc else []
+        return {"loc": list(loc), "msg": str(self), "type": self.type}
+
+
 class InvalidRule(ValueError):
     """A rule refers to event types, fields, predicates or actions that do not exist.
 
@@ -101,7 +145,7 @@ class InvalidRule(ValueError):
     matching.
     """
 
-    def __init__(self, rule: str, problems: list[str]) -> None:
+    def __init__(self, rule: str, problems: list[Problem]) -> None:
         super().__init__(f"rule {rule!r} is invalid: " + "; ".join(problems))
         self.rule = rule
         self.problems = problems

@@ -487,7 +487,9 @@ async def test_no_other_tenant_or_workspace_sees_a_stored_rule(client: httpx.Asy
             {
                 "type": "validation_failed",
                 "message": "rule chat:releases cannot be stored",
-                "errors": ["timeout is required"],
+                "errors": [
+                    {"loc": ["rule", "timeout"], "msg": "timeout is required", "type": "missing"}
+                ],
             },
             id="beyond the limits",
         ),

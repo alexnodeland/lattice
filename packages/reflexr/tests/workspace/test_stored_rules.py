@@ -385,15 +385,29 @@ async def test_a_rule_is_refused_with_every_problem_it_has(relayr: Workspace) ->
         with pytest.raises(ValidationFailed, match="rule chat:deploys cannot be stored") as refused:
             await change
         assert refused.value.errors == [
-            "no event type 'app:nope'",
-            "when.throttle is required",
-            "timeout is required",
-            'ordering must be "none"',
-            "provenance must be at most 4096 bytes of JSON",
+            {"loc": [], "msg": "no event type 'app:nope'", "type": "unknown"},
+            {
+                "loc": ["rule", "when", "throttle"],
+                "msg": "when.throttle is required",
+                "type": "missing",
+            },
+            {"loc": ["rule", "timeout"], "msg": "timeout is required", "type": "missing"},
+            {"loc": ["rule", "ordering"], "msg": 'ordering must be "none"', "type": "not_allowed"},
+            {
+                "loc": [],
+                "msg": "provenance must be at most 4096 bytes of JSON",
+                "type": "too_large",
+            },
         ]
     with pytest.raises(ValidationFailed) as refused:
         await relayr.install_rule(deploys("ops:deploys"))
-    assert refused.value.errors == ["the namespace 'ops' is not one stored rules may use"]
+    assert refused.value.errors == [
+        {
+            "loc": ["rule", "name"],
+            "msg": "the namespace 'ops' is not one stored rules may use",
+            "type": "not_allowed",
+        }
+    ]
     assert await relayr.head_seq() == 0
 
 

@@ -36,7 +36,7 @@ Feature: Rules
     And they install "not json"
     Then the field says "That isn't JSON"
     When they install a rule with no throttle
-    Then the field says "The rule wasn't installed: what was asked for isn't valid."
+    Then the field says "The rule wasn't installed: what was asked for isn't valid: rule.when.throttle."
     When they install a rule whose throttle allows "ten"
     Then the field says "rule.when.throttle.at_most"
 

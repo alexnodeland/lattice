@@ -27,7 +27,7 @@ from reflexr.core.conditions import (
     WhereFilter,
     walk,
 )
-from reflexr.core.errors import InvalidRule
+from reflexr.core.errors import InvalidRule, Problem
 from reflexr.core.rules import Rule, load_params
 
 MAX_STORED_FIRINGS_PER_HOUR = 60
@@ -114,7 +114,7 @@ class StoredRules:
             raise ValueError("the reflexr namespace is reserved")
 
 
-def check_stored(rule: Rule, config: StoredRules) -> list[str]:
+def check_stored(rule: Rule, config: StoredRules) -> list[Problem]:
     """Return every problem with a rule as a stored rule, under ``config`` and core's limits.
 
     It is pure, beside :meth:`Rule.check`, so a draft can be checked with both before it is
@@ -122,91 +122,126 @@ def check_stored(rule: Rule, config: StoredRules) -> list[str]:
     rule may be stored.
     """
     namespace = rule.name.partition(":")[0]
-    problems: list[str] = []
+    problems: list[Problem] = []
     if namespace not in config.namespaces:
-        problems.append(f"the namespace {namespace!r} is not one stored rules may use")
+        problems.append(
+            Problem(
+                f"the namespace {namespace!r} is not one stored rules may use",
+                "not_allowed",
+                ("name",),
+            )
+        )
     if len(rule.description) > MAX_STORED_DESCRIPTION:
-        problems.append(f"description must be at most {MAX_STORED_DESCRIPTION} characters")
+        problems.append(
+            Problem(
+                f"description must be at most {MAX_STORED_DESCRIPTION} characters",
+                "string_too_long",
+                ("description",),
+            )
+        )
     problems.extend(_condition_problems(rule))
     if rule.scope.fields:
-        problems.append("scope.fields must be empty")
+        problems.append(Problem("scope.fields must be empty", "not_allowed", ("scope", "fields")))
     problems.extend(_action_problems(rule, config))
     if rule.retry.max_attempts > MAX_STORED_ATTEMPTS:
-        problems.append(f"retry.max_attempts must be at most {MAX_STORED_ATTEMPTS}")
+        problems.append(
+            Problem(
+                f"retry.max_attempts must be at most {MAX_STORED_ATTEMPTS}",
+                "less_than_equal",
+                ("retry", "max_attempts"),
+            )
+        )
     if rule.timeout is None:
-        problems.append("timeout is required")
+        problems.append(Problem("timeout is required", "missing", ("timeout",)))
     elif rule.timeout > MAX_STORED_TIMEOUT:
-        problems.append(f"timeout must be at most {to_jsonable_python(MAX_STORED_TIMEOUT)}")
+        problems.append(
+            Problem(
+                f"timeout must be at most {to_jsonable_python(MAX_STORED_TIMEOUT)}",
+                "less_than_equal",
+                ("timeout",),
+            )
+        )
     held = rule.model_dump(mode="json", include=set(_FIXED))
     problems.extend(
-        f"{name} must be {json.dumps(value)}"
+        Problem(f"{name} must be {json.dumps(value)}", "not_allowed", (name,))
         for name, value in _FIXED.items()
         if held[name] != value
     )
     if len(rule.model_dump_json().encode()) > MAX_STORED_BYTES:
-        problems.append(f"the rule's JSON must be at most {MAX_STORED_BYTES} bytes")
+        problems.append(
+            Problem(f"the rule's JSON must be at most {MAX_STORED_BYTES} bytes", "too_large")
+        )
     return list(dict.fromkeys(problems))
 
 
-def check_provenance(provenance: Mapping[str, JsonValue]) -> list[str]:
+def check_provenance(provenance: Mapping[str, JsonValue]) -> list[Problem]:
     """Return the problem with a change's provenance, if its JSON is over core's limit.
 
     Provenance is opaque to reflexr, so its size is all there is to check. It is measured as a
     rule's JSON is: compact, in UTF-8 bytes.
     """
     if len(to_json(provenance)) > MAX_STORED_PROVENANCE:
-        return [f"provenance must be at most {MAX_STORED_PROVENANCE} bytes of JSON"]
+        message = f"provenance must be at most {MAX_STORED_PROVENANCE} bytes of JSON"
+        return [Problem(message, "too_large")]
     return []
 
 
-def _condition_problems(rule: Rule) -> list[str]:
+def _condition_problems(rule: Rule) -> list[Problem]:
     """What a stored rule's condition may not have, stage by stage."""
     condition = rule.when
     problems = _filter_problems(condition.filter)
     if condition.dedupe is not None:
-        problems.extend(_window_problems("when.dedupe.within", condition.dedupe.within))
+        problems.extend(_window_problems(("when", "dedupe", "within"), condition.dedupe.within))
     pattern = condition.pattern
     if isinstance(pattern, SequencePattern):
         for step in pattern.steps:
             problems.extend(_filter_problems(step))
     if not isinstance(pattern, EachPattern):
-        problems.extend(_window_problems("when.pattern.within", pattern.within))
+        problems.extend(_window_problems(("when", "pattern", "within"), pattern.within))
     throttle = condition.throttle
     if throttle is None:
-        problems.append("when.throttle is required")
+        problems.append(Problem("when.throttle is required", "missing", ("when", "throttle")))
     else:
-        problems.extend(_window_problems("when.throttle.per", throttle.per))
+        problems.extend(_window_problems(("when", "throttle", "per"), throttle.per))
         # at_most firings in any period of per, so that many in each period an hour spans.
         if throttle.at_most * math.ceil(_HOUR / throttle.per) > MAX_STORED_FIRINGS_PER_HOUR:
             limit = MAX_STORED_FIRINGS_PER_HOUR
-            problems.append(f"when.throttle must allow at most {limit} firings in any hour")
+            problems.append(
+                Problem(
+                    f"when.throttle must allow at most {limit} firings in any hour",
+                    "less_than_equal",
+                    ("when", "throttle", "at_most"),
+                )
+            )
     return problems
 
 
-def _filter_problems(filter: Filter) -> list[str]:
+def _filter_problems(filter: Filter) -> list[Problem]:
     """The predicates and ``matches`` a filter may not have."""
     filters = list(walk(filter))
     problems = [
-        f"the predicate {f.name!r} is not allowed"
+        Problem(f"the predicate {f.name!r} is not allowed", "not_allowed")
         for f in filters
         if isinstance(f, PredicateFilter)
     ]
     if any(isinstance(f, WhereFilter) and f.op == "matches" for f in filters):
-        problems.append("the 'matches' operator is not allowed")
+        problems.append(Problem("the 'matches' operator is not allowed", "not_allowed"))
     return problems
 
 
-def _window_problems(path: str, window: timedelta) -> list[str]:
+def _window_problems(loc: tuple[str, ...], window: timedelta) -> list[Problem]:
     if window > MAX_STORED_WINDOW:
-        return [f"{path} must be at most {to_jsonable_python(MAX_STORED_WINDOW)}"]
+        message = f"{'.'.join(loc)} must be at most {to_jsonable_python(MAX_STORED_WINDOW)}"
+        return [Problem(message, "less_than_equal", loc)]
     return []
 
 
-def _action_problems(rule: Rule, config: StoredRules) -> list[str]:
+def _action_problems(rule: Rule, config: StoredRules) -> list[Problem]:
     """Whether a stored rule's action is allowed, and its params validate as its model."""
     action = rule.then.action
     if action not in config.actions:
-        return [f"the action {action!r} is not one stored rules may run"]
+        message = f"the action {action!r} is not one stored rules may run"
+        return [Problem(message, "not_allowed", ("then", "action"))]
     try:
         load_params(rule, config.actions[action])
     except InvalidRule as invalid:

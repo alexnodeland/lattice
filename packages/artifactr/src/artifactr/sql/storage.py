@@ -16,9 +16,9 @@ import contextlib
 from collections.abc import AsyncGenerator, Callable, Collection, Sequence
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
-from typing import Literal
+from typing import Final, Literal
 
-from sqlalchemy import ColumnElement, Select, delete, insert, or_, select, update
+from sqlalchemy import ColumnElement, Select, delete, func, insert, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import Session
@@ -271,6 +271,10 @@ def _run(row: RunRow) -> Run:
     return Run.model_validate(row.body)
 
 
+DROPPED_AT_ONCE: Final = 500
+"""The most revisions one statement forgets: a database takes a bounded number of parameters."""
+
+
 class SqlStorage:
     """Storage in a SQL database, through SQLAlchemy's asyncio extension.
 
@@ -370,6 +374,43 @@ class SqlStorage:
             .order_by(RevisionRow.version)
         )
         return [Revision.model_validate(row.body) for row in await self._all(scope, query)]
+
+    @awaited_to_the_end
+    async def drop_revisions(
+        self, scope: Scope, artifact_id: ArtifactId, versions: Collection[int]
+    ) -> int:
+        """Forget some of an artifact's earlier revisions; never its current version.
+
+        In one transaction, a statement for each 500 versions, so no
+        statement holds more parameters than a database takes.
+        """
+        chosen = sorted(set(versions))
+        if not chosen:
+            return 0
+        dropped = 0
+        async with self._session(scope.tenant_id) as session, session.begin():
+            head = (
+                select(ArtifactRow.version)
+                .where(
+                    ArtifactRow.tenant_id == scope.tenant_id,
+                    ArtifactRow.workspace_id == scope.workspace_id,
+                    ArtifactRow.id == artifact_id,
+                )
+                .scalar_subquery()
+            )
+            connection = await session.connection()
+            for at in range(0, len(chosen), DROPPED_AT_ONCE):
+                done = await connection.execute(
+                    delete(RevisionRow).where(
+                        RevisionRow.tenant_id == scope.tenant_id,
+                        RevisionRow.workspace_id == scope.workspace_id,
+                        RevisionRow.artifact_id == artifact_id,
+                        RevisionRow.version.in_(chosen[at : at + DROPPED_AT_ONCE]),
+                        RevisionRow.version != func.coalesce(head, 0),
+                    )
+                )
+                dropped += done.rowcount
+        return dropped
 
     async def thread(self, scope: Scope, thread_id: ThreadId) -> Thread | None:
         """Return a thread, or None."""

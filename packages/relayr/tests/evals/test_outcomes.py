@@ -9,7 +9,9 @@ import artifactr.core as a
 import reflexr
 import reflexr.core
 import reflexr.workspace as r
+from artifactr.workspace import Scope
 from relayr.evals import RULES, Outcomes, ProposalRates, proposal_rates
+from relayr.evals.outcomes import _how
 from relayr.events import ArtifactCreated, ProposalResolved
 from relayr.ledger import Cause, Ledger
 from relayr.outbound import Outbound, rule_actor
@@ -194,6 +196,22 @@ async def test_a_proposal_valid_only_with_the_persons_changes_is_edited(
     fix = a.JsonPatch(ops=({"op": "replace", "path": "/high", "value": 8},))
     await scene_.resolve(proposal, accept=True, changes=fix)
     assert await scene_.rates() == {"app:propose": ProposalRates(edited=1)}
+
+
+async def test_an_edit_is_scored_against_the_kept_version_before_it() -> None:
+    storage = artifactr.InMemoryStorage()
+    ws = await artifactr.Workspaces(storage).open(*KEY, actor=ALICE)
+    await ws.create(Note(text="draft"), artifact_id="art_note")
+    note = await ws.get(Note, "art_note")
+    await ws.commit(note.edit(lambda n: setattr(n, "text", "second")))  # 2
+    agent = a.AgentActor(thread_id="t1", run_id="r1", name="assistant", on_behalf_of=ALICE)
+    change = a.EditArtifact(artifact_id="art_note", base_version=2, patch=text("proposed"))
+    await ws.as_actor(agent).commit(a.ProposeChange(change=change))
+    [proposal] = await ws.proposals()
+    await ws.commit(a.RespondToProposal(proposal_id=proposal.id, decision="accept"))  # 3
+    await ws.commit((await ws.get(Note, "art_note")).edit(lambda n: setattr(n, "text", "x")))
+    assert await storage.drop_revisions(Scope(*KEY), "art_note", [2]) == 1
+    assert await _how(ws, proposal) == "accepted", "against version 1, the kept one before"
 
 
 async def test_a_second_resolution_scores_nothing_more(ledger: Ledger, stack: Stack) -> None:

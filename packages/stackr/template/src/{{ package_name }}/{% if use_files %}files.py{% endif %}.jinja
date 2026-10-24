@@ -20,10 +20,25 @@ the ``files`` network as a native file's worker is (stackr ADR-0049): ``read_dia
 ``draw_mermaid``, ``draw`` and ``edit_elements``. Diagrams are the integration ``excalidraw``,
 off in every workspace until switched on.
 {%- endif %}
+
+Every hour, each workspace opened in the last three days is tended, as the application's own
+actor (stackr ADR-0052): while an app runs, native files' bytes that nothing names are collected
+{%- if use_diagrams %};
+and its diagrams' tombstones a day old are swept, their revisions thinned to one an actor every
+ten minutes after a day (artifactr ADR-0091, ADR-0094).
+{%- else %}.
+{%- endif %}
 """
 
+import asyncio
 import contextlib
+import logging
+import secrets
+import time
 from collections.abc import AsyncGenerator, Mapping
+from contextvars import ContextVar
+from dataclasses import dataclass
+from datetime import {% if use_diagrams %}UTC, datetime, {% endif %}timedelta
 from typing import Any, Final
 
 import httpx
@@ -31,14 +46,17 @@ from fastapi import FastAPI
 from pydantic import JsonValue, ValidationError
 from pydantic_ai.toolsets import AbstractToolset
 
-from artifactr import {% if use_diagrams %}Artifact, {% endif %}Session, Workspaces
+from artifactr import {% if use_diagrams %}Artifact, {% endif %}Session, {% if not use_diagrams %}SystemActor, {% endif %}Workspaces
 {%- if use_diagrams %}
 from artifactr.excalidraw import (
+    SWEEPER,
     Diagram,
     WorkerConverter,
     diagram_tools,
     excalidraw_checks,
     excalidraw_key_of,
+    sweep_tombstones,
+    thin_revisions,
 )
 {%- endif %}
 {%- if use_diagrams %}
@@ -56,7 +74,7 @@ from artifactr.files.sql import SqlBlobs, SqlCheckouts, migrate
 from artifactr.files.tools import native_file_tools
 from artifactr.files.worker import Worker
 {%- if use_diagrams %}
-from artifactr.workspace import Check
+from artifactr.workspace import Check, Scope, Storage
 {%- endif %}
 from lattice_core.integrations import Integrations
 
@@ -79,7 +97,40 @@ def worker_url(craft: str) -> str:
 
 DIAGRAMS_URL: Final = "http://diagrams:8080"
 """Where the diagrams worker answers: its relay, on the ``files`` network."""
+
+TENDER: Final = SWEEPER
+"""Who tends: the sweep's own actor, which sees everything."""
+{%- else %}
+
+
+TENDER: Final = SystemActor(name="files-tend")
+"""Who tends: the application's own actor, which sees everything."""
 {%- endif %}
+
+TEND_EVERY: Final = 3600.0
+"""Seconds between tendings, about: each waits between half and one and a half of it."""
+
+TENDED: Final = timedelta(days=3)
+"""How long after a person last opened a workspace it is still tended: long enough for{% if use_diagrams %} a
+tombstone, a day old, to be swept, and revisions a day old thinned{% else %} bytes
+dropped from it to be collected{% endif %}."""
+
+LOGGER = logging.getLogger(__name__)
+
+_TENDING: ContextVar[bool] = ContextVar("tending", default=False)
+"""Whether this task is tending: tending's own opens are no person's, and aren't noted."""
+
+
+@dataclass(frozen=True)
+class Tended:
+    """What a tending did: {% if use_diagrams %}tombstones swept, revisions thinned, {% endif %}unnamed bytes collected."""
+
+    workspaces: int = 0
+{%- if use_diagrams %}
+    swept: int = 0
+    thinned: int = 0
+{%- endif %}
+    collected: int = 0
 
 
 class Files:
@@ -132,6 +183,12 @@ class Files:
             else None
         )
 {%- endif %}
+        self._opened: dict[tuple[str, str], float] = {}
+        """Workspaces people opened lately, by tenant and id: when, by this process's clock."""
+        self._workspaces: Workspaces | None = None
+{%- if use_diagrams %}
+        self._storage: Storage | None = None
+{%- endif %}
 
     @property
     def types(self) -> list[type[{% if use_diagrams %}Artifact{% else %}NativeFile{% endif %}]]:
@@ -172,6 +229,105 @@ class Files:
         """
         await migrate(database.owner, application_role=database.role)
 
+    async def opened(self, tenant_id: str, workspace_id: str) -> None:
+        """Note a workspace a person opened, to tend it: the libraries' ``on_open`` hook."""
+        if _TENDING.get():
+            return
+        self._opened[(tenant_id, workspace_id)] = time.monotonic()
+
+    def tend(self, workspaces: Workspaces{% if use_diagrams %}, storage: Storage{% endif %}) -> None:
+        """Tend these workspaces{% if use_diagrams %}, on this storage,{% endif %} while the application runs."""
+        self._workspaces = workspaces
+{%- if use_diagrams %}
+        self._storage = storage
+{%- endif %}
+
+    async def tend_once(self{% if use_diagrams %}, *, now: datetime | None = None{% endif %}) -> Tended:
+        """Tend each workspace a person opened in the last :data:`TENDED`; what it did.
+
+        Each is tended as :data:`TENDER`. One that fails is left, said in the log by its id and
+        the error's type alone, for the next tending, and the rest are tended. Each process
+        tends the workspaces it opened{% if use_diagrams %}: two that tend one workspace sweep and thin it alike,
+        and a sweep that loses to another's is skipped as a diagram changed meanwhile is{% endif %}.
+        """
+        workspaces = self._workspaces
+{%- if use_diagrams %}
+        storage = self._storage
+        if workspaces is None or storage is None:
+{%- else %}
+        if workspaces is None:
+{%- endif %}
+            return Tended()
+{%- if use_diagrams %}
+        now = now or datetime.now(UTC)
+{%- endif %}
+        done = Tended()
+        token = _TENDING.set(True)
+        try:
+            for key in list(self._opened):
+                done = await self._tend_one(key, done{% if use_diagrams %}, now, storage{% endif %}, workspaces)
+        finally:
+            _TENDING.reset(token)
+        return done
+
+    async def _tend_one(
+        self,
+        key: tuple[str, str],
+        done: Tended,
+{%- if use_diagrams %}
+        now: datetime,
+        storage: Storage,
+{%- endif %}
+        workspaces: Workspaces,
+    ) -> Tended:
+        """Tend one workspace, unless no person opened it in the last :data:`TENDED`."""
+        # Read now, not from the pass's start: a person may have opened it meanwhile.
+        if self._opened.get(key, 0.0) < time.monotonic() - TENDED.total_seconds():
+            self._opened.pop(key, None)
+            return done
+        tenant_id, workspace_id = key
+        try:
+            ws = await workspaces.open(tenant_id, workspace_id, actor=TENDER)
+{%- if use_diagrams %}
+            swept = await sweep_tombstones(ws, now=now)
+            thinned = await thin_revisions(
+                storage,
+                Scope(tenant_id, workspace_id),
+                now=now,
+                integrations=self._integrations,
+            )
+{%- endif %}
+            collected = await self.native.collect(ws) if self.native else 0
+        except Exception as error:
+            # The id and the type alone: an error's words may quote what the workspace holds.
+            LOGGER.warning(
+                "files: workspace %s wasn't tended (%s); tried again next time",
+                workspace_id,
+                type(error).__name__,
+            )
+            return done
+        return Tended(
+            done.workspaces + 1,
+{%- if use_diagrams %}
+            done.swept + swept,
+            done.thinned + thinned,
+{%- endif %}
+            done.collected + collected,
+        )
+
+    async def _tend(self) -> None:
+        """Tend now, then about every :data:`TEND_EVERY`, until cancelled."""
+        jitter = secrets.SystemRandom()
+        while True:
+            try:
+                done = await self.tend_once()
+            except Exception:
+                LOGGER.exception("files: the workspaces weren't tended; tried again later")
+            else:
+                if {% if use_diagrams %}done.swept or done.thinned or {% endif %}done.collected:
+                    LOGGER.info("files: tended %s", done)
+            await asyncio.sleep(TEND_EVERY * jitter.uniform(0.5, 1.5))
+
     @contextlib.asynccontextmanager
     async def lifespan(self) -> AsyncGenerator[None]:
         """Ask each worker which app it runs, as the application starts; close them as it stops.
@@ -185,6 +341,14 @@ class Files:
             if self.diagrams:
                 stack.push_async_callback(self.diagrams.aclose)
 {%- endif %}
+            tending = asyncio.create_task(self._tend())
+
+            async def stop_tending() -> None:
+                tending.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await tending
+
+            stack.push_async_callback(stop_tending)
             for craft, worker in self._workers.items():
                 stack.push_async_callback(worker.aclose)
                 try:

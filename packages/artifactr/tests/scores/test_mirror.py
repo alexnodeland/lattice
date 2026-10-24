@@ -24,7 +24,7 @@ from artifactr.core import (
     UserActor,
 )
 from artifactr.scores import FeedbackMirror, sync_score_configs
-from artifactr.workspace import InMemoryStorage, Workspace, Workspaces
+from artifactr.workspace import InMemoryStorage, Scope, Workspace, Workspaces
 from evalr.core import Score
 from evalr.memory import InMemoryScoreSink
 from tests.agent.conftest import asking
@@ -134,6 +134,19 @@ async def test_artifact_feedback_is_scored_on_the_trace_of_the_version(
     on_late = [s for s in scores if s.trace_id is None]
     assert {s.session_id for s in on_late} == {thread.id}, "the agent's thread, untraced"
     assert len(scores) == 8, "a person's untraced version has nowhere to go"
+
+
+async def test_feedback_on_a_version_thinning_forgot_has_nowhere_to_go(
+    ws: Workspace, storage: InMemoryStorage
+) -> None:
+    await ws.create(Note(text="a"), artifact_id="n1")
+    for text in ("b", "c"):
+        note = await ws.get(Note, "n1")
+        await ws.commit(note.edit_text(note.data.text, text))
+    target = ArtifactTarget(artifact_id="n1", version=2)
+    await ws.commit(GiveFeedback(feedback_type="accuracy", target=target, value={"correct": 1}))
+    assert await storage.drop_revisions(Scope("t1", "w1"), "n1", [2]) == 1
+    assert await mirrored(ws, InMemoryScoreSink()) == []
 
 
 async def test_mirroring_again_replaces_scores(ws: Workspace) -> None:

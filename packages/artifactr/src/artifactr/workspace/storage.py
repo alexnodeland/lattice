@@ -156,6 +156,17 @@ class Storage(Protocol):
         """Return an artifact's revisions, oldest first."""
         ...
 
+    async def drop_revisions(
+        self, scope: Scope, artifact_id: ArtifactId, versions: Collection[int]
+    ) -> int:
+        """Forget some of an artifact's earlier revisions, as retention thins them; how many.
+
+        Its current version is never forgotten, whatever `versions` names: what is read of an
+        artifact, its head, stays. The log's events, which say what each revision changed, stay
+        too. A version it doesn't hold is passed over.
+        """
+        ...
+
     async def thread(self, scope: Scope, thread_id: ThreadId) -> Thread | None:
         """Return a thread, or None."""
         ...

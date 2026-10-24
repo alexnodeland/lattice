@@ -395,7 +395,7 @@ Each is settled in phase 0's ADR or carried as an exit criterion.
 ## Tracking
 
 - [x] Phase 0: the spike and its ADR ([artifactr ADR-0088](../artifactr/adr/0088-excalidraws-phase-0-what-the-canvas-costs-and-needs.md), 2026-10-22)
-- [ ] artifactr: a retention rule for diagram revisions: ratified in [artifactr ADR-0091](../artifactr/adr/0091-diagrams-tombstones-swept-and-their-revisions-thinned.md), to be built with phase 4
+- [x] artifactr: a retention rule for diagram revisions: ratified in [artifactr ADR-0091](../artifactr/adr/0091-diagrams-tombstones-swept-and-their-revisions-thinned.md), built in [artifactr ADR-0094](../artifactr/adr/0094-diagrams-revisions-thinned-to-one-an-actor-every-ten-minutes.md), and run every hour with the sweep by stackr's template ([stackr ADR-0052](../stackr/adr/0052-diagrams-tended-every-hour-sweep-thinning-and-collection.md))
 - [x] artifactr: the tombstone sweep (U3) ([artifactr ADR-0091](../artifactr/adr/0091-diagrams-tombstones-swept-and-their-revisions-thinned.md))
 - [x] RFC-0003, RFC-0004 and RFC-0005 amended to name the shared `Integrations` port
 - [x] Sign-off on U1 to U6 (2026-10-22)

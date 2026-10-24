@@ -17,11 +17,12 @@ from artifactr.core import (
     UserActor,
 )
 from artifactr.evals import FeedbackContext, LogFeedbackSource, TargetContext, target_context
-from artifactr.workspace import Workspace
+from artifactr.evals.context import read_context
+from artifactr.workspace import InMemoryStorage, Scope, Workspace, Workspaces
 from evalr.contracts import check_feedback_source
 from evalr.core import collect
 from tests.artifact_types import Accuracy, Helpfulness, Note
-from tests.evals.conftest import Said, chat, said
+from tests.evals.conftest import ALICE, Said, chat, said
 from tests.telemetry.conftest import Recorder
 
 BOB = UserActor(id="bob", name="Bob")
@@ -177,6 +178,27 @@ async def test_an_artifact_version_is_judged_with_its_revision_and_its_run(
     assert second.artifact.data == Note(text="Ship Tuesday")
     assert (second.thread, second.transcript, second.events) == (None, (), ())
     assert by_alice.verdict == Accuracy(correct=True)
+
+
+async def test_a_version_thinning_forgot_is_followed_as_the_one_kept_before_it(
+    recorder: Recorder,
+) -> None:
+    storage = InMemoryStorage()
+    ws = await Workspaces(storage, **recorder.providers).open("t", "w", actor=ALICE)
+    done = await chat(ws, recorder)
+    [note] = await ws.artifacts(Note)
+    await ws.commit(note.edit_text("Monday", "Tuesday"))  # 2
+    asked = (await ws.read())[-1].seq
+    note = await ws.get(Note, note.id)
+    await ws.commit(note.edit_text("Tuesday", "Friday"))  # 3
+    assert await storage.drop_revisions(Scope("t", "w"), note.id, [2]) == 1
+    log = await ws.read()
+    then = await read_context(ws, ThreadTarget(thread_id=done.thread.id), log, limit=asked)
+    [followed] = then.artifacts
+    assert (followed.version, followed.data) == (1, Note(text="Ship Monday"))
+    target = ArtifactTarget(artifact_id=note.id, version=2)
+    forgotten = await read_context(ws, target, log, limit=log[-1].seq)
+    assert (forgotten.revision, forgotten.artifact) == (None, None), "none stands in for it"
 
 
 async def test_other_types_targets_and_evaluators_verdicts_are_left_out(

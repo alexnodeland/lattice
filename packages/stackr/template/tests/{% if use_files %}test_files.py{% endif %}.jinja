@@ -3,15 +3,19 @@ in for a crafting app's CLI."""
 
 import asyncio
 import contextlib
+import contextvars
 import hashlib
+import logging
 {% if use_portal -%}
 import runpy
 import sys
 {% endif -%}
 import threading
-from collections.abc import AsyncIterator
+import time
+from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 {%- if use_portal %}
 from typing import Any
 {%- endif %}
@@ -36,10 +40,12 @@ from artifactr.files import DOCX, FakeApp, WordDocument
 from artifactr.files.app import Inspection
 from artifactr.files.blobs import once
 from artifactr.files.worker import Limits, worker_app
+from artifactr.workspace import Access
 from lattice_core.integrations import Defaults
 
+from {{ package_name }} import files as files_module
 from {{ package_name }}.database import open_database
-from {{ package_name }}.files import Files
+from {{ package_name }}.files import TENDED, TENDER, Files, Tended
 from {{ package_name }}.settings import (
     CRAFTS,
     FilesSettings,
@@ -111,6 +117,99 @@ async def test_a_file_is_read_by_its_apps_worker_and_served_beside_artifactr() -
             head = await client.get("/artifactr/v1/workspaces/main/files/a1")
     assert head.status_code == 200
     assert (head.json()["name"], head.json()["enabled"]) == ("brief.docx", True)
+
+
+def _tended(
+    files: Files, *, refuse: bool = False, meanwhile: Callable[[], Awaitable[None]] | None = None
+) -> Workspaces:
+    """Workspaces the files tend, which may refuse the tender, or do something as it opens."""
+
+    async def authorize(tenant: str, workspace: str | None, actor: Actor, access: Access) -> bool:
+        if actor == TENDER and meanwhile is not None:
+            await meanwhile()
+        return not (refuse and actor == TENDER)
+
+    storage = InMemoryStorage()
+    workspaces = Workspaces(storage, types=files.types, authorize=authorize, on_open=files.opened)
+    files.tend(workspaces{% if use_diagrams %}, storage{% endif %})
+    return workspaces
+
+
+async def test_a_workspace_a_person_opened_is_tended_for_a_while_after(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clock = SimpleNamespace(monotonic=time.monotonic)
+    monkeypatch.setattr(files_module, "time", clock)
+    now = time.monotonic()
+    clock.monotonic = lambda: now
+    files = Files(WORDCRAFT, integrations=Defaults(), transport=workers())
+    assert await files.tend_once() == Tended(), "nothing to tend before it is asked to"
+    workspaces = _tended(files)
+    await workspaces.open(TENANT, "main", actor=ALICE)
+    later = now + TENDED.total_seconds() - 1
+    clock.monotonic = lambda: later
+    assert await files.tend_once() == Tended(workspaces=1)
+    after = now + TENDED.total_seconds() + 1
+    clock.monotonic = lambda: after
+    assert await files.tend_once() == Tended(), "tending's own open kept it no longer"
+    assert await files.tend_once() == Tended(), "forgotten until a person opens it again"
+
+
+async def test_a_persons_open_while_it_is_tended_is_noted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clock = SimpleNamespace(monotonic=time.monotonic)
+    monkeypatch.setattr(files_module, "time", clock)
+    now = time.monotonic()
+    clock.monotonic = lambda: now
+    files = Files(FilesSettings(), integrations=Defaults())
+
+    async def a_person_opens() -> None:
+        # A person's request runs in a context of its own, as a server's tasks do.
+        person = workspaces.open(TENANT, "main", actor=ALICE)
+        await asyncio.create_task(person, context=contextvars.Context())
+
+    workspaces = _tended(files, meanwhile=a_person_opens)
+    await workspaces.open(TENANT, "main", actor=ALICE)
+    later = now + TENDED.total_seconds() - 1
+    clock.monotonic = lambda: later
+    assert await files.tend_once() == Tended(workspaces=1), "a person opened it meanwhile"
+    after = now + TENDED.total_seconds() + 1
+    clock.monotonic = lambda: after
+    assert await files.tend_once() == Tended(workspaces=1), "noted as the person opened it"
+
+
+async def test_a_workspace_that_fails_is_said_by_its_id_and_left_for_next_time(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    files = Files(FilesSettings(), integrations=Defaults())
+    await _tended(files, refuse=True).open(TENANT, "main", actor=ALICE)
+    with caplog.at_level(logging.WARNING):
+        assert await files.tend_once() == Tended()
+    assert "files: workspace main wasn't tended (Forbidden)" in caplog.text
+
+
+async def test_the_application_tends_as_it_starts_and_on_after_a_failure(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    files = Files(FilesSettings(), integrations=Defaults())
+    passes: list[None] = []
+    second = asyncio.Event()
+
+    async def once() -> Tended:
+        passes.append(None)
+        if len(passes) == 1:
+            raise RuntimeError("the storage is away")
+        second.set()
+        return Tended(workspaces=1, collected=2)
+
+    monkeypatch.setattr(files, "tend_once", once)
+    monkeypatch.setattr(files_module, "TEND_EVERY", 0.0)
+    with caplog.at_level(logging.INFO):
+        async with files.lifespan():
+            await asyncio.wait_for(second.wait(), timeout=5)
+    assert "files: the workspaces weren't tended; tried again later" in caplog.text
+    assert "files: tended Tended(workspaces=1" in caplog.text
 
 
 async def test_a_worker_that_doesnt_answer_says_which_one() -> None:

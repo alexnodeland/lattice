@@ -15,6 +15,7 @@ evaluator, they say where the feedback came from in their ``source``, and they n
 since feedback judges a trace or a session, never one of its spans.
 """
 
+import logging
 import uuid
 from datetime import UTC, datetime
 from typing import assert_never
@@ -37,6 +38,8 @@ from artifactr.scores.mapping import score_configs, score_values
 from artifactr.telemetry import untraced
 from artifactr.workspace import Workspace
 from evalr.core import Score, ScoreConfigStore, ScoreSink
+
+logger = logging.getLogger(__name__)
 
 _SCORE_IDS = uuid.UUID("8d0e3b5c-3f7a-4a51-9c1e-6f2b7d4a9e10")
 """The namespace of score ids."""
@@ -151,7 +154,15 @@ class FeedbackMirror:
                 return trace, target.thread_id
             case ArtifactTarget():
                 revisions = await self._workspace.revisions(target.artifact_id)
-                revision = next(r for r in revisions if r.version == target.version)
+                revision = next((r for r in revisions if r.version == target.version), None)
+                if revision is None:
+                    # A version thinning forgot: whose it was is gone.
+                    logger.debug(
+                        "feedback on %s@%d skipped: the version was thinned",
+                        target.artifact_id,
+                        target.version,
+                    )
+                    return None, None
                 author = revision.actor
                 session = author.thread_id if isinstance(author, AgentActor) else None
                 return revision.trace_id, session

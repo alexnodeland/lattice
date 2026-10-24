@@ -169,15 +169,15 @@ make dev            # at lattice's root; again is safe
 make first-run EMAIL=you@example.com   # in .local/run/portal: the first person in, with a password
 make dev-status     # both projects' containers
 make dev-down       # stop both, keeping their data
-make dev-reset      # delete both projects' containers and volumes, once you confirm
+make dev-reset      # delete both projects' containers and volumes, once you confirm; the next make dev makes new gateway keys
 ```
 
 `make dev` (`scripts/dev`, [ADR-0053](adr/0053-run-everything-together.md)) does what this page does by hand:
 
 1. It starts the stack on the postgres adapter, with GoTrue: `make up PROFILES="observability langfuse gateway auth analytics umami"`. A stackr with no `.env` gets `STACKR_DATABASE=postgres`; one whose `.env` chooses local Supabase is refused, rather than switched.
-2. It generates an application with the template's defaults, the portal among them, into `.local/run/portal`, which git ignores, as a repository of its own. It is generated once, from lattice's `HEAD`, which must be on GitHub: the image installs the libraries from there, at that commit. `DEV_REF` names another commit, `DEV_APP_DIR` another directory, and `DEV_APP_NAME` another name.
+2. Before anything starts, it generates an application with the template's defaults, the portal among them, into `.local/run/portal`, which git ignores, as a repository of its own (committed with an identity of its own where git has none). It is generated once, from lattice's `HEAD`, which must be on GitHub: the image installs the libraries from there, at that commit. `DEV_REF` names another commit, `DEV_APP_DIR` another directory, and `DEV_APP_NAME` another name.
 3. It makes the application's gateway keys once: a tenant's (`DEV_TENANT`, `dev`), and the read-only key portalr's admin reads spend with. Each goes into the application's `.env`, mode 0600, as soon as it is made, and neither is printed.
-4. `scripts/wire-app` gives the application's `.env` the stack's settings: Langfuse's keys and project, the database, GoTrue, and analytics' and Umami's passwords. While `.env` doesn't choose them, it also turns on every crafting app built for every platform (all but Blender, which is amd64's alone) and diagrams. Replay stays off, and everything binds to `127.0.0.1`.
+4. `scripts/wire-app` gives the application's `.env` the stack's settings: Langfuse's keys and project, the database, GoTrue, and analytics' and Umami's passwords. While `.env` doesn't choose them, it also turns on every crafting app `copier.yml` names without a `platform:`, so not Blender, on any machine. `DIAGRAMS` comes from `DEV_DIAGRAMS` (`on`) on every run. Replay stays off, and everything binds to `127.0.0.1`.
 5. It builds the application, creates the role it works as, and starts it in the app profile at `http://127.0.0.1:8800`. These run every time, and change nothing already so.
 
 The two stay Compose projects of their own, `stackr` and the application's, joined by the stack's networks, so each one's `make` works in its own directory as this page describes.

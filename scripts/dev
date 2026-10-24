@@ -1,27 +1,30 @@
 #!/usr/bin/env bash
 # Run everything together on this machine (stackr ADR-0053): stackr's stack, on plain PostgreSQL
 # with GoTrue, and an application from the template beside it, with the portal, every crafting
-# app that runs on this machine's architecture, and diagrams. They stay two Compose projects,
-# `stackr` and the application's, joined by the stack's networks, as `make smoke-app` runs them.
+# app copier.yml names without a `platform:` (so not Blender, on any machine), and diagrams. They
+# stay two Compose projects, `stackr` and the application's, joined by the stack's networks, as
+# `make smoke-app` runs them.
 #
 # Usage, from lattice's root, as `make dev`, `make dev-down`, `make dev-status` and `make dev-reset`:
 #   scripts/dev up|down|status|reset
-#   DEV_APP_DIR   where the application is generated (default: .local/run/portal, gitignored)
-#   DEV_APP_NAME  its name, from which its package and Compose project are named (default: Portal)
-#   DEV_REF       the commit it is generated from, which must be on origin, since the image
-#                 installs the libraries from GitHub at it (default: HEAD)
-#   DEV_TENANT    the gateway's tenant whose key the application uses (default: dev)
+#   DEV_APP_DIR     where the application is generated (default: .local/run/portal, gitignored)
+#   DEV_APP_NAME    its name, from which its package and Compose project are named (default: Portal)
+#   DEV_REF         the commit it is generated from, which must be on origin, since the image
+#                   installs the libraries from GitHub at it (default: HEAD)
+#   DEV_TENANT      the gateway's tenant whose key the application uses (default: dev)
+#   DEV_DIAGRAMS    the application's DIAGRAMS, set on every run (default: on)
 #   DEV_STACKR_DIR  stackr's directory, for scripts/check-dev (default: packages/stackr)
 #
 # `up` is safe to run again. It generates the application and makes its two gateway keys once,
 # writing each key into the application's .env (mode 0600) as soon as it is made, and never
-# printing it; it sets FILES_CRAFTS and DIAGRAMS there only while they are unset, so your own
-# choice stays. The image build, the database role (`db-roles`) and the start are idempotent and
-# run every time. `down` stops both projects and keeps their data; `reset` deletes the containers
-# and volumes of these two projects alone, the application's first, once you confirm.
+# printing it. It sets FILES_CRAFTS there only while it is unset, so your choice stays, and
+# DIAGRAMS from DEV_DIAGRAMS every time. The image build, the database role (`db-roles`) and the
+# start are idempotent and run every time. `down` stops both projects and keeps their data;
+# `reset` deletes the containers and volumes of these two projects alone, the application's
+# first, once you confirm, and takes the gateway keys, which went with the stack, out of its .env.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-root=$PWD
+root=$(pwd -P)
 stackr=${DEV_STACKR_DIR:-$root/packages/stackr}
 app=${DEV_APP_DIR:-.local/run/portal}
 [[ $app == /* ]] || app=$root/$app
@@ -30,6 +33,8 @@ app=${app%/}
 # directory names: settings exported for other work would change either.
 unset DOCKER_DEFAULT_PLATFORM COMPOSE_PROJECT_NAME COMPOSE_FILE COMPOSE_PROFILES COMPOSE_PATH_SEPARATOR
 PROFILES="observability langfuse gateway auth analytics umami"
+# The gateway keys the application's .env holds, which the stack's data holds too.
+KEYS=(LITELLM_API_KEY PORTAL_LITELLM_KEY)
 
 say() { printf 'dev: %s\n' "$*" >&2; }
 die() {
@@ -44,6 +49,8 @@ setting() {
   printf '%s' "${value:-${3:-}}"
 }
 app_compose() { docker compose --project-directory "$app" "$@"; }
+# Whether DEV_APP_DIR holds an application make dev generated.
+generated() { [[ -f $app/.copier-answers.yml ]]; }
 # The application's Compose project, as its compose.yaml names it; refused unless it is a name
 # Compose takes, and not the stack's.
 app_project() {
@@ -53,11 +60,19 @@ app_project() {
     die "$app/compose.yaml names the project '$name', which isn't an application's"
   printf '%s' "$name"
 }
-# The commit the application was generated from, as Copier recorded it.
-rendered_from() { sed -n 's/^_commit: *//p' "$app/.copier-answers.yml" | head -n 1; }
+# A path with `..` and links resolved, whether or not it is there yet.
+resolved() { uv run --no-sync python -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' "$1"; }
+# git, with an identity of its own where this machine has none, for the application's first
+# commit, and no hooks: it is the template's output, as generated.
+git_quietly() {
+  local identity=()
+  [[ -n $(git config user.email || true) ]] ||
+    identity=(-c user.name="make dev" -c user.email="make-dev@localhost")
+  git ${identity[@]+"${identity[@]}"} -c commit.gpgsign=false "$@"
+}
 
-# The crafting apps whose workers run here: every one copier.yml pins, but those built for one
-# platform alone (Blender's, amd64), as an arm64 machine can't run them natively.
+# The crafting apps whose workers run: every one copier.yml pins without a `platform:`, so not
+# those built for one platform alone (Blender's, amd64's), on any machine.
 crafts() {
   uv run --no-sync python -c '
 import sys, yaml
@@ -70,44 +85,49 @@ print(",".join(name for name, craft in crafts.items() if "platform" not in craft
 # goes, and, for an application not generated yet, a commit on origin (into `commit`).
 preflight() {
   need docker "Docker, with Compose v2, runs both projects"
+  docker compose version >/dev/null 2>&1 || die "Docker has no Compose v2 (\`docker compose\`)"
   need uv "https://docs.astral.sh/uv/"
   need git "the application is a repository of its own"
   need make "both projects' commands are make targets"
   uv run --no-sync python -c 'import copier, yaml' 2>/dev/null ||
     die "lattice's environment has no Copier: run \`make install\` at lattice's root"
-  local adapter
+  local adapter want recorded where
   adapter=$(setting "$stackr/.env" STACKR_DATABASE)
   [[ ! -f $stackr/.env || $adapter == postgres ]] ||
     die "stackr's .env chooses STACKR_DATABASE=${adapter:-supabase}; this runs on postgres, with GoTrue: set it there, after \`make down\` in packages/stackr, or run the stack as it is and wire an application by hand (docs/stackr/getting-started.md)"
-  [[ $app != "$root" && $root/ != "$app"/* ]] || die "DEV_APP_DIR=$app would hold lattice itself"
-  # A run that died while generating left this: it is started again from nothing.
-  rm -rf "$app.rendering"
-  if [[ -f $app/.copier-answers.yml ]]; then
-    [[ $(rendered_from) == "$(git rev-parse HEAD)" ]] ||
-      say "$app was generated from $(rendered_from), and lattice is at $(git rev-parse HEAD): \`copier update\` there moves it, or \`make dev-reset\` and removing it starts again"
+  [[ ! -L $app ]] || die "DEV_APP_DIR=$app is a link: name the directory itself"
+  where=$(resolved "$app")
+  [[ $where != "$root" && $root/ != "$where"/* ]] || die "DEV_APP_DIR=$app would hold lattice itself"
+  want=$(git rev-parse --verify "${DEV_REF:-HEAD}^{commit}") || die "DEV_REF=${DEV_REF:-HEAD} isn't a commit"
+  if generated; then
+    recorded=$(sed -n 's/^_commit: *//p' "$app/.copier-answers.yml" | head -n 1)
+    [[ $(git rev-parse --verify --quiet "$recorded^{commit}" || true) == "$want" ]] ||
+      say "$app was generated from $recorded, not ${DEV_REF:-HEAD} ($want): \`copier update\` there moves it, or \`make dev-reset\` and removing it starts again"
     return
   fi
   [[ ! -e $app || -z $(ls -A "$app") ]] ||
     die "$app is there, and isn't an application make dev generated: set DEV_APP_DIR to another directory"
+  # A run that died while generating left this: it is started again from nothing, if it is that.
+  if [[ -e $app.rendering ]]; then
+    [[ -z $(ls -A "$app.rendering") || -f $app.rendering/.copier-answers.yml ]] ||
+      die "$app.rendering is there, and isn't one make dev was generating: remove it, or set DEV_APP_DIR"
+    rm -rf "$app.rendering"
+  fi
   [[ -z $(git status --porcelain) ]] ||
     say "lattice's working tree has changes, which aren't generated: the application is lattice at a commit"
-  commit=$(git rev-parse --verify "${DEV_REF:-HEAD}^{commit}") || die "DEV_REF=${DEV_REF:-HEAD} isn't a commit"
+  commit=$want
+  git remote get-url origin >/dev/null 2>&1 ||
+    die "this clone has no remote origin: the image installs the libraries from GitHub, at a commit there"
   git fetch --quiet origin ||
     die "offline: can't tell whether $commit is on origin: set DEV_REF to a commit you know is pushed"
   [[ -n $(git for-each-ref --contains "$commit" refs/remotes/origin) ]] ||
     die "$commit isn't on origin ($(git remote get-url origin)): the image installs the libraries from GitHub at it, so push it, or set DEV_REF to a commit that is"
 }
 
-# stackr's .env, on the postgres adapter: chosen when there is none (preflight refused another).
-stack_env() {
-  [[ -f $stackr/.env ]] || (umask 077 && echo STACKR_DATABASE=postgres >"$stackr/.env")
-  make -s -C "$stackr" env STACKR_DATABASE=postgres
-}
-
 # The application, generated from the commit preflight checked, in a repository of its own, as
 # `copier update` and its hooks need: beside where it goes, and moved there once it is whole.
 render() {
-  [[ -f $app/.copier-answers.yml ]] && return
+  generated && return
   local rendering=$app.rendering
   say "generating ${DEV_APP_NAME:-Portal} in $app, from $commit"
   mkdir -p "$(dirname "$app")"
@@ -116,14 +136,27 @@ render() {
   uv lock --quiet --directory "$rendering"
   git -C "$rendering" init --quiet
   git -C "$rendering" add --all
-  git -C "$rendering" commit --quiet --message "Generated from lattice at $commit"
+  git_quietly -C "$rendering" commit --quiet --no-verify --message "Generated from lattice at $commit"
   rmdir "$app" 2>/dev/null || true
   mv "$rendering" "$app"
 }
 
-# Settings into the application's .env, through stackr's scripts/wire-app, from stdin.
+# stackr's .env, on the postgres adapter: chosen when there is none (preflight refused another).
+stack_env() {
+  [[ -f $stackr/.env ]] || (umask 077 && echo STACKR_DATABASE=postgres >"$stackr/.env")
+  make -s -C "$stackr" env STACKR_DATABASE=postgres
+}
+
+# Settings into the application's .env, through stackr's scripts/wire-app, from stdin. It says
+# the names of what it set, never a value.
 wire() {
-  (cd "$stackr" && uv run --no-sync scripts/wire-app "$app" --analytics --umami --langfuse-project --stdin 2>/dev/null)
+  (cd "$stackr" && uv run --no-sync scripts/wire-app "$app" --analytics --umami --langfuse-project --stdin)
+}
+
+# A key just made, into the application's .env; if it can't be written, how to get another.
+keep() {
+  printf '%s=%s\n' "$1" "$2" | wire ||
+    die "$1 was made, and couldn't be written into $app/.env: $3"
 }
 
 # The application's two gateway keys, each made once, and written into its .env as soon as it is
@@ -131,47 +164,45 @@ wire() {
 keys() {
   local tenant=${DEV_TENANT:-dev} alias key status
   alias="$tenant-$(basename "$app")"
+  local again="delete the key $alias on the gateway (LiteLLM's /key/delete, by its alias), or set DEV_TENANT to another tenant"
   if [[ -z $(setting "$app/.env" LITELLM_API_KEY) ]]; then
     key=$(cd "$stackr" && uv run --no-sync scripts/create-tenant "$tenant" --quiet --key-alias "$alias") ||
       die "making the gateway key for tenant $tenant failed: see above"
-    [[ -n $key ]] ||
-      die "the gateway has a key $alias already, whose value can't be read back: delete it on the gateway (LiteLLM's /key/delete, by its alias), or set DEV_TENANT to another tenant"
-    printf 'LITELLM_API_KEY=%s\n' "$key" | wire
+    [[ -n $key ]] || die "the gateway has a key $alias already, whose value can't be read back: $again"
+    keep LITELLM_API_KEY "$key" "$again"
   fi
   if [[ -z $(setting "$app/.env" PORTAL_LITELLM_KEY) ]]; then
+    local rotate="\`make portal-key ARGS=--rotate\` in packages/stackr replaces it, then run this again"
     status=0
     key=$(cd "$stackr" && uv run --no-sync scripts/create-portal-key --quiet) || status=$?
     ((status != 3)) ||
-      die "the gateway has portalr's spend-read key already, whose value can't be read back: \`make portal-key ARGS=--rotate\` in packages/stackr replaces it, then run this again"
+      die "the gateway has portalr's spend-read key already, whose value can't be read back: $rotate"
     ((status == 0)) && [[ -n $key ]] || die "making portalr's spend-read key failed: see above"
-    printf 'PORTAL_LITELLM_KEY=%s\n' "$key" | wire
+    keep PORTAL_LITELLM_KEY "$key" "$rotate"
   fi
 }
 
-# The crafting apps and diagrams, where .env doesn't choose them yet.
+# The crafting apps, while .env doesn't choose them, and diagrams, from DEV_DIAGRAMS.
 choices() {
-  local list
+  local list settings="DIAGRAMS=${DEV_DIAGRAMS:-on}"$'\n'
   if [[ -z $(setting "$app/.env" FILES_CRAFTS) ]]; then
     list=$(crafts)
     [[ -n $list ]] || die "copier.yml names no crafting app this machine runs"
-    printf 'FILES_CRAFTS=%s\n' "$list" | wire
+    settings+="FILES_CRAFTS=$list"$'\n'
   fi
-  if [[ $(setting "$app/.env" DIAGRAMS off) == off ]]; then
-    printf 'DIAGRAMS=on\n' | wire
-  fi
+  printf '%s' "$settings" | wire
 }
 
 up() {
   local commit="" admin
   preflight
+  render
   stack_env
   say "starting stackr's stack: $PROFILES"
   make -s -C "$stackr" up PROFILES="$PROFILES" STACKR_DATABASE=postgres
-  render
   [[ -f $app/.env ]] || make -s -C "$app" env
   keys
   choices
-  printf '' | wire
   admin="$(uv run --no-sync python -c 'import sys, tomllib; print(tomllib.load(open(sys.argv[1], "rb"))["project"]["name"])' "$app/pyproject.toml")-admin"
   say "building the application, and creating the role it works as"
   app_compose --profile app build app
@@ -194,10 +225,11 @@ status() {
 
 # Deletes the two projects' containers and volumes, by their names alone, once confirmed: the
 # application's first, since it is on the stack's networks. Local images, networks and anything
-# else of Docker's are left as they are.
+# else of Docker's are left as they are. The gateway's keys went with the stack's data, so they
+# are taken out of the application's .env, and the next `up` makes new ones.
 reset() {
   local projects=() answer project
-  [[ -f $app/compose.yaml ]] && projects+=("$(app_project)")
+  generated && [[ -f $app/compose.yaml ]] && projects+=("$(app_project)")
   projects+=(stackr)
   [[ -t 0 ]] || die "reset deletes the data of ${projects[*]}: run it in a terminal, to confirm"
   say "Docker context: $(docker context show). The project stackr is the stack's, which every clone and worktree of lattice on this machine shares."
@@ -206,6 +238,11 @@ reset() {
   for project in "${projects[@]}"; do
     docker compose -p "$project" down --volumes
   done
+  if [[ -f $app/.env ]]; then
+    (umask 077 && grep -v -E "^($(IFS='|' && echo "${KEYS[*]}"))=" "$app/.env" >"$app/.env.reset" || true)
+    mv "$app/.env.reset" "$app/.env"
+    say "took ${KEYS[*]} out of $app/.env: the next \`make dev\` makes new ones"
+  fi
 }
 
 case ${1:-} in

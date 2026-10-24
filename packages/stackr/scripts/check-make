@@ -108,13 +108,11 @@ echo STACKR_DATABASE=postgres >"$scratch/wire/stack/.env"
 uv run scripts/setup-env --example "$scratch/wire/stack/.env.example" --env-file "$scratch/wire/stack/.env" 2>/dev/null
 printf '[project]\nname = "demo-app"\n' >"$scratch/wire/app/pyproject.toml"
 printf '# the app\nAPP_PORT=8800\nLITELLM_API_KEY=\nAPP_PORT=9900\nPORTAL_SUPABASE_KEY=\n' >"$scratch/wire/app/.env"
-# A file a run that died left, readable by anyone: wire-app writes through a file of its own.
-(umask 022 && echo stale >"$scratch/wire/app/.env.wiring")
 wire() { uv run scripts/wire-app "$scratch/wire/app" --stack "$scratch/wire/stack" --stdin "$@" >"$scratch/wired" 2>&1; }
 app_setting() { sed -n "s/^$1=//p" "$scratch/wire/app/.env"; }
 stack_setting() { sed -n "s/^$1=//p" "$scratch/wire/stack/.env"; }
 mode() { uv run python -c 'import os, sys; print(oct(os.stat(sys.argv[1]).st_mode & 0o777))' "$1"; }
-staged() { find "$scratch/wire/app" -name '.env.*' ! -name .env.wiring | grep -q .; }
+staged() { find "$scratch/wire/app" -name '.env.*' | grep -q .; }
 printf 'LITELLM_API_KEY=sk-made-up\nAPP_PORT=8801\n' | wire --analytics --umami --langfuse-project
 check "wire-app writes .env mode 0600" test "$(mode "$scratch/wire/app/.env")" = 0o600
 check "and leaves no file of its own beside it" refused staged
@@ -124,6 +122,11 @@ check "with what stdin gives it over the rest" test "$(app_setting LITELLM_API_K
 check "and prints no secret" refused grep -qF -e sk-made-up -e "$(stack_setting LANGFUSE_SECRET_KEY)" "$scratch/wired"
 check "GoTrue's addresses, on the postgres adapter" test "$(app_setting STACK_AUTH_JWKS_URL) $(app_setting STACK_AUTH_ADMIN_URL) $(app_setting AUTH_ISSUER)" = \
   "http://gotrue:9999/.well-known/jwks.json http://gotrue:9999 $(stack_setting AUTH_PUBLIC_URL)"
+check "and the database and GoTrue as this machine reaches them, for the local commands" test \
+  "$(app_setting DATABASE_ADMIN_URL) $(app_setting AUTH_ADMIN_URL)" = \
+  "postgresql+asyncpg://postgres:$(stack_setting POSTGRES_ADMIN_PASSWORD)@127.0.0.1:$(stack_setting POSTGRES_PORT)/postgres http://127.0.0.1:$(stack_setting AUTH_PORT)"
+check "the application's role, the same on both" test \
+  "$(app_setting DATABASE_URL | sed 's/@.*//')" = "$(app_setting STACK_DATABASE_URL | sed 's/@.*//')"
 check "a placeholder for the publishable key GoTrue asks none for" test "$(app_setting PORTAL_SUPABASE_KEY)" = sb_publishable_local
 check "plain PostgreSQL, as its owner" grep -qE \
   "^STACK_DATABASE_ADMIN_URL=postgresql\+asyncpg://postgres:$(stack_setting POSTGRES_ADMIN_PASSWORD)@postgres:5432/postgres$" "$scratch/wire/app/.env"

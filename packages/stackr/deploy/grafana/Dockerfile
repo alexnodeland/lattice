@@ -20,7 +20,7 @@ ADD --checksum=sha256:c9140657df5c87d1736cee522dd4f213395138fa88c84559660376f3b6
   "https://grafana.com/api/plugins/grafana-clickhouse-datasource/versions/4.22.1/download?os=linux&arch=arm64" /plugin.zip
 FROM clickhouse-plugin-${TARGETARCH} AS clickhouse-plugin
 
-FROM grafana/grafana:13.2.2@sha256:ac461fb352abc50da10a51c7d02462e9c05488f11f53f14b3ad79a8145f638a0
+FROM grafana/grafana:13.2.4@sha256:dbbc38ea21103cefb50396340cd88afec779c7e070b0a7bf5a75b4ce46651d3f
 LABEL org.opencontainers.image.source="https://github.com/alexnodeland/lattice"
 
 ENV PROMETHEUS_ADDRESS=prometheus \

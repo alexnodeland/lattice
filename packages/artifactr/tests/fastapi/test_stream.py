@@ -185,7 +185,7 @@ def test_commands_invalid_frames_and_rejections(client: TestClient) -> None:
         ws.send_json({"type": "nonsense"})
         error = ws.receive_json()
         assert error["type"] == "error"
-        assert error["message"].startswith("not a command frame: ")
+        assert error["message"].startswith("not a command or presence frame: ")
         ws.send_json(command("c2", type="watch_run", run_id="r9"))
         rejected = ws.receive_json()
         assert (rejected["ok"], rejected["rejection"]["type"]) == (False, "not_found")

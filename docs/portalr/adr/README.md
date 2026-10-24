@@ -83,5 +83,6 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0075](0075-a-person-removed-from-a-tenant-has-their-events-there-deleted.md) | A person removed from a tenant has their events there deleted | Accepted |
 | [0076](0076-the-relay-sends-umami-a-copy-and-deletes-there-too.md) | The relay sends Umami a copy, and deletes there too | Accepted |
 | [0077](0077-session-replay-its-own-yes-masked-in-the-browser-and-checked-at-the-relay.md) | Session replay, its own yes, masked in the browser and checked at the relay | Accepted |
+| [0078](0078-the-others-on-a-diagrams-canvas-and-their-revisions-as-they-arrive.md) | The others on a diagram's canvas, and their revisions as they arrive | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

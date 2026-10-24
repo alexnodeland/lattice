@@ -29,3 +29,9 @@
 .excalidraw .App-toolbar__extra-tools-trigger {
   display: none;
 }
+
+/* Nor its own list of who is here, its avatars, where the canvas's list, "Here now", is: the two
+   would sit over each other (portalr ADR-0078). */
+.excalidraw .UserList {
+  display: none;
+}

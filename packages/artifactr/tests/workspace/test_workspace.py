@@ -716,6 +716,7 @@ NUL_CALLS: dict[str, NulCall] = {
     "record: cursor": lambda w, ws: ws.record(AppEvent(name="noted"), cursor=(NUL, 1)),
     "get": lambda w, ws: ws.get(Note, NUL),
     "artifact": lambda w, ws: ws.artifact(NUL),
+    "watch": lambda w, ws: ws.watch(NUL),
     "artifacts": lambda w, ws: ws.artifacts(kind=NUL),
     "revisions": lambda w, ws: ws.revisions(NUL),
     "thread": lambda w, ws: ws.thread(NUL),

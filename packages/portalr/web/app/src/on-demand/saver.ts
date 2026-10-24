@@ -3,8 +3,10 @@
  * when they let go of what they drew, or after two seconds of quiet, and at most once every five
  * seconds; one at a time. Each is the element-scoped patch every writer sends (`patch.ts`), against
  * the version they last saved on. Applied, that version moves on; stale, their edit is moved onto
- * the head and sent again, once; proposed or refused, the canvas stops saving and says why. From a
- * change until it is saved, the canvas says "Saving…". When it closes, what isn't saved is sent.
+ * the head and sent again, three times at most, then kept until the next revision arrives;
+ * proposed or refused, the canvas stops saving and says why. From a change until it is saved, the
+ * canvas says "Saving…". When it closes, what isn't saved is sent. A revision someone else saved,
+ * drawn on the canvas as it arrives, is what the next save is an edit of.
  */
 
 import type { Committed } from "./canvas-host";
@@ -46,6 +48,25 @@ export type Said =
   | { readonly state: "saving" | "saved" }
   | { readonly state: "stopped"; readonly text: string }
   | null;
+
+/** How often an edit is moved onto a head that moved on before it waits for the next revision. */
+const MOVES = 3;
+
+/**
+ * A head as what an edit is of: an element no one changed held as the canvas drew it, so it isn't
+ * sent again. One Excalidraw changed as it drew it, such as one it gave an order to, is sent
+ * again, tested at the head's version, which it is.
+ */
+function onto(head: Saved, drawn: Readonly<Record<string, ElementJson>>): Saved {
+  const held: Record<string, ElementJson> = { ...head.scene.elements };
+  for (const [key, element] of Object.entries(drawn)) {
+    const theirs = held[key];
+    if (theirs?.version === element.version && theirs.versionNonce === element.versionNonce) {
+      held[key] = element;
+    }
+  }
+  return { version: head.version, scene: { ...head.scene, elements: held } };
+}
 
 /** What a save's patch changes, said for its revision. */
 export function summary(ops: readonly Op[]): string {
@@ -90,6 +111,8 @@ export class Saver {
   #dirty = false;
   #stopped = false;
   #closing = false;
+  /** An edit that moved onto a head too often, kept to send with the next revision. */
+  #parked = false;
   #saidLast: string | null = null;
   /** What was drawn after a move onto the head: what the next save sends, not a read. */
   #drawn: Scene | null = null;
@@ -148,6 +171,21 @@ export class Saver {
     if (this.#dirty) void this.flush();
   }
 
+  /**
+   * A newer revision was drawn, someone else's, as Excalidraw reconciles it: what is saved next
+   * is an edit of it. An edit kept here after moving too often goes now.
+   */
+  merged(head: Saved, drawn: Readonly<Record<string, ElementJson>>): void {
+    // While a save is in flight, its answer says what follows: applied, the version moves on; a
+    // conflict, the head is read again. Either way this revision is in what comes next.
+    if (this.#stopped || this.#inFlight || head.version <= this.#base.version) return;
+    this.#base = onto(head, drawn);
+    if (this.#parked) {
+      this.#parked = false;
+      this.#schedule(0);
+    }
+  }
+
   /** Stop saving, and say nothing more. */
   stop(): void {
     this.#stopped = true;
@@ -162,7 +200,7 @@ export class Saver {
   }
 
   /** Save what has changed since the version last saved on, now: one save at a time. */
-  async flush(moves = 1): Promise<void> {
+  async flush(moves = MOVES): Promise<void> {
     if (this.#stopped || this.#inFlight) return;
     this.#cancel = null;
     const now = this.#drawn ?? this.#read();
@@ -207,8 +245,14 @@ export class Saver {
         return;
       case "conflict": {
         const head = await this.#saving.head().catch(() => null);
-        if (head === null || moves <= 0) {
-          this.#stop("Not saved. Someone else changed it meanwhile: close it, and open it again.");
+        if (head === null) {
+          this.#stop("Not saved. It couldn't be read again: close it, and open it again.");
+          return;
+        }
+        if (moves <= 0) {
+          // Moved too often: the edit stays here, unsaved, and goes with the next revision.
+          this.#dirty = true;
+          this.#parked = true;
           return;
         }
         // Drawn as the canvas takes any diagram: what the head holds that it never draws, such
@@ -216,15 +260,7 @@ export class Saver {
         // The head's images, a peer's or an agent's, with this person's: what may be drawn.
         const files = { ...head.scene.files, ...now.files };
         const drawn = this.#moved(rebase(base.scene, now.elements, head.scene), files);
-        // An element no one changed is held as the canvas drew it, so it isn't sent again.
-        const held: Record<string, ElementJson> = { ...head.scene.elements };
-        for (const [key, element] of Object.entries(drawn)) {
-          const theirs = held[key];
-          if (theirs?.version === element.version && theirs.versionNonce === element.versionNonce) {
-            held[key] = element;
-          }
-        }
-        this.#base = { version: head.version, scene: { ...head.scene, elements: held } };
+        this.#base = onto(head, drawn);
         // The next save sends what was drawn, even as the canvas closes and can't be read again.
         this.#drawn = { elements: drawn, files };
         await this.flush(moves - 1);

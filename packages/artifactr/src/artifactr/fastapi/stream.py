@@ -2,24 +2,31 @@
 
 import asyncio
 import logging
+import time
+import uuid
 from collections.abc import Awaitable, Callable, Collection, Coroutine
-from typing import Any, Final
+from typing import Annotated, Any, Final, Literal
 
 from fastapi import HTTPException, WebSocket, WebSocketDisconnect
 from opentelemetry.trace import SpanKind
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, Field, TypeAdapter, ValidationError
 from starlette.requests import HTTPConnection
 
 from artifactr.agent import Runner
 from artifactr.core import (
     PROTOCOL,
     ActiveRun,
+    ArtifactId,
     CommandFrame,
     CommandResult,
     ErrorFrame,
     EventFrame,
     Forbidden,
     Hello,
+    InvalidState,
+    PeerLeft,
+    PeerPresence,
+    Presence,
     Recorded,
     Rejection,
     ReplayComplete,
@@ -27,13 +34,18 @@ from artifactr.core import (
     RunStarted,
     ThreadId,
     UnsupportedProtocol,
+    UnwatchArtifact,
     ValidationFailed,
+    WatchArtifact,
+    Watching,
     WatchRun,
     Welcome,
     WorkspaceId,
     delivered_to,
     resume,
 )
+from artifactr.core.protocol import MAX_PRESENCE
+from artifactr.fastapi.presence import LocalPresence, PresenceChannel, Room
 from artifactr.telemetry import Telemetry
 from artifactr.telemetry.attributes import CLOSE_CODE, TENANT_ID, WORKSPACE_ID
 from artifactr.telemetry.metrics import STREAM_CONNECTIONS, STREAM_DISCONNECTS
@@ -45,6 +57,37 @@ REPLAY_PAGE: Final = 500
 """How many envelopes a stream replays from storage at a time."""
 
 OpenWorkspace = Callable[[HTTPConnection, WorkspaceId], Awaitable[Workspace]]
+
+PRESENCE_PER_SECOND: Final = 30
+"""The most presence frames a connection may send a second, across what it watches."""
+
+MOST_WATCHED: Final = 20
+"""The most artifacts one connection may watch at once."""
+
+RECHECK: Final = 30.0
+"""Seconds between reads of a watcher's rights, which live outside the log (lattice RFC-0006)."""
+
+_INBOUND: Final = TypeAdapter[CommandFrame | Presence](
+    Annotated[CommandFrame | Presence, Field(discriminator="type")]
+)
+"""A client's frame after hello: a command, or presence."""
+
+_ENDED: Final = "a watch ended: the artifact can't be watched now"
+"""What a watcher is told as its watch ends; its UI says it in its own words."""
+
+
+class _Watch:
+    """One artifact this connection watches: its room, and what the watcher may do there."""
+
+    def __init__(
+        self, room: Room, rights: Literal["view", "edit"], recheck: asyncio.Task[None]
+    ) -> None:
+        self.room = room
+        self.rights = rights
+        self.recheck = recheck
+        self.warned = False
+        self.peers: set[str] = set()
+        """The peers it has been told are here, to tell they left if the watch ends."""
 
 
 class Stream:
@@ -69,6 +112,9 @@ class Stream:
         hello_timeout: float,
         outbox_size: int,
         telemetry: Telemetry,
+        presence: PresenceChannel | None = None,
+        recheck: float = RECHECK,
+        clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self._ws = websocket
         self._workspace_id = workspace_id
@@ -84,6 +130,20 @@ class Stream:
         self._tenancy: dict[str, str] = {WORKSPACE_ID: workspace_id}
         self._close_code: int | None = None
         self._connected = False
+        # Without a channel, the connection is alone in its rooms: it is told of no one.
+        self._presence = presence if presence is not None else LocalPresence()
+        self._recheck = recheck
+        self._clock = clock
+        self._peer = uuid.uuid4().hex
+        """This connection, as its peers know it: opaque, and new each time it connects."""
+        self._watches: dict[ArtifactId, _Watch] = {}
+        self._peers: dict[tuple[str, ArtifactId], str] = {}
+        """Presence to send: each peer's latest frame for each artifact, sent after events."""
+        self._wake = asyncio.Event()
+        self._heard: list[float] = []
+        """When this connection's last presence frames arrived, for its pace."""
+        self._paced = 0.0
+        """When it was last told its presence was dropped for its pace: once a second at most."""
 
     async def serve(self) -> None:
         """Run the connection until the client leaves."""
@@ -104,6 +164,8 @@ class Stream:
                 code = str(self._close_code or 1011)
                 span.set_attribute(CLOSE_CODE, code)
                 self._telemetry.add(STREAM_DISCONNECTS, 1, {**self._tenancy, CLOSE_CODE: code})
+                for artifact_id in list(self._watches):
+                    self._unwatch(artifact_id)
                 for task in self._tasks:
                     task.cancel()
                 await asyncio.gather(*self._tasks, return_exceptions=True)
@@ -146,14 +208,17 @@ class Stream:
         self._connected = True
         self._telemetry.add(STREAM_CONNECTIONS, 1, self._tenancy)
         self._spawn(self._write())
-        self._spawn(self._follow(workspace, plan.replay_after, head, hello.threads))
-        # Runs running as the client joined are watched from this list, each as the turn its
-        # latest run_started began, so that run_started, if the log has it after head_seq, is
-        # the same turn and not watched twice; later turns as they start.
-        for run in running:
-            if hello.threads is None or run.thread_id in hello.threads:
-                turn = await _started(workspace, run.id, run.thread_id)
-                self._watch(workspace, run.id, run.thread_id, turn=turn)
+        if hello.events:
+            self._spawn(self._follow(workspace, plan.replay_after, head, hello.threads))
+            # Runs running as the client joined are watched from this list, each as the turn
+            # its latest run_started began, so that run_started, if the log has it after
+            # head_seq, is the same turn and not watched twice; later turns as they start.
+            for run in running:
+                if hello.threads is None or run.thread_id in hello.threads:
+                    turn = await _started(workspace, run.id, run.thread_id)
+                    self._watch(workspace, run.id, run.thread_id, turn=turn)
+        else:
+            self._put(ReplayComplete(up_to_seq=head))  # for presence alone: no events
         await self._read(workspace)
 
     async def _hello(self) -> Hello | None:
@@ -194,23 +259,58 @@ class Stream:
         while True:
             raw = await self._ws.receive_text()
             try:
-                frame = CommandFrame.model_validate_json(raw)
+                frame = _INBOUND.validate_json(raw)
             except ValidationError as error:
                 first = error.errors(include_url=False)[0]
-                self._put(ErrorFrame(message=f"not a command frame: {first['msg']}"))
+                self._put(ErrorFrame(message=f"not a command or presence frame: {first['msg']}"))
                 continue
-            self._spawn(self._handle(workspace, frame))
+            if isinstance(frame, Presence):
+                self._said(workspace, frame, len(raw))
+            else:
+                self._spawn(self._handle(workspace, frame))
+
+    def _said(self, workspace: Workspace, frame: Presence, size: int) -> None:
+        """Pass on a presence frame to the artifact's other watchers, or drop it.
+
+        Dropped: one past :data:`MAX_PRESENCE` characters of JSON, or past the pace, with an
+        ``error`` at most once a second; one for an artifact not watched here, silently;
+        ``editing`` from a watcher who may only view, with one ``error``.
+        """
+        now = self._clock()
+        self._heard = [at for at in self._heard if now - at < 1.0]
+        if size > MAX_PRESENCE or len(self._heard) >= PRESENCE_PER_SECOND:
+            if now - self._paced >= 1.0:
+                self._paced = now
+                self._put(ErrorFrame(message="presence dropped: too large, or too many a second"))
+            return
+        self._heard.append(now)
+        watch = self._watches.get(frame.artifact_id)
+        if watch is None:
+            return
+        if frame.editing and watch.rights != "edit":
+            if not watch.warned:
+                watch.warned = True
+                self._put(ErrorFrame(message="presence dropped: this watch may only view"))
+            return
+        fields = frame.model_dump(exclude={"type"})
+        said = PeerPresence(**fields, peer=self._peer, actor=workspace.actor)
+        self._presence.say(watch.room, said)
 
     async def _handle(self, workspace: Workspace, frame: CommandFrame) -> None:
         try:
-            if isinstance(frame.command, WatchRun):
-                run = await workspace.run(frame.command.run_id)  # it must belong to this workspace
+            command = frame.command
+            if isinstance(command, WatchRun):
+                run = await workspace.run(command.run_id)  # it must belong to this workspace
                 self._watch(workspace, run.id, run.thread_id)
                 self._put(CommandResult(command_id=frame.command_id, ok=True, outcome=Recorded()))
+            elif isinstance(command, WatchArtifact):
+                watching = await self._watch_artifact(workspace, command.artifact_id)
+                self._put(CommandResult(command_id=frame.command_id, ok=True, outcome=watching))
+            elif isinstance(command, UnwatchArtifact):
+                self._unwatch(command.artifact_id)
+                self._put(CommandResult(command_id=frame.command_id, ok=True, outcome=Recorded()))
             else:
-                result = await self._runner.execute(
-                    workspace, frame.command, command_id=frame.command_id
-                )
+                result = await self._runner.execute(workspace, command, command_id=frame.command_id)
                 self._put(result)
         except Rejection as rejection:
             result = CommandResult(
@@ -242,19 +342,106 @@ class Stream:
 
         self._spawn(forward())
 
+    async def _watch_artifact(self, workspace: Workspace, artifact_id: ArtifactId) -> Watching:
+        """Watch an artifact: checked as a read, then the others there sent, latest first."""
+        rights = await workspace.watch(artifact_id)
+        watching = Watching(artifact_id=artifact_id, rights=rights, peer=self._peer)
+        current = self._watches.get(artifact_id)
+        if current is not None:
+            current.rights = rights
+            return watching
+        if len(self._watches) >= MOST_WATCHED:
+            raise InvalidState(f"one connection watches at most {MOST_WATCHED} artifacts")
+        room = (workspace.tenant_id, workspace.workspace_id, artifact_id)
+        here = self._presence.join(room, self._peer, self._told)  # a full room refuses it
+        recheck = asyncio.create_task(self._rechecked(workspace, artifact_id))
+        self._watches[artifact_id] = _Watch(room, rights, recheck)
+        for frame in here:
+            self._told(frame)
+        return watching
+
+    async def _rechecked(self, workspace: Workspace, artifact_id: ArtifactId) -> None:
+        """Read a watcher's rights again every :data:`RECHECK` seconds.
+
+        The watch ends once they are gone: a grant lost, an integration turned off, or the
+        artifact hidden, none of which the log says.
+        """
+        while True:  # until it ends here, or is cancelled as the watch is unwatched
+            await asyncio.sleep(self._recheck)
+            try:
+                # A grants store that doesn't answer in time is one that can't be read.
+                async with asyncio.timeout(self._recheck):
+                    rights = await workspace.watch(artifact_id)
+            except Rejection:
+                self._end(artifact_id)
+                return
+            except Exception as error:
+                # Its rights can't be read: it fails closed, never watching on unchecked.
+                logger.warning("a watch's rights couldn't be read: %s", type(error).__name__)
+                self._end(artifact_id)
+                return
+            self._watches[artifact_id].rights = rights
+
+    def _end(self, artifact_id: ArtifactId) -> None:
+        """End a watch the watcher may no longer hold: every peer leaves it, and so does it.
+
+        Its own ``peer_left`` is what says its watch ended; an ``error`` says so to a client that
+        doesn't read it.
+        """
+        # Those it was told are here, and those it is yet to be told of, who leave as it does.
+        waiting = {peer for peer, watched in self._peers if watched == artifact_id}
+        peers = self._watches[artifact_id].peers | waiting
+        self._unwatch(artifact_id)
+        for peer in [*sorted(peers), self._peer]:
+            self._told(PeerLeft(artifact_id=artifact_id, peer=peer))
+        self._put(ErrorFrame(message=_ENDED))
+
+    def _unwatch(self, artifact_id: ArtifactId) -> None:
+        watch = self._watches.pop(artifact_id, None)
+        if watch is None:
+            return
+        watch.recheck.cancel()
+        # What it was yet to be sent of the others there still goes: it says nothing new.
+        self._presence.leave(watch.room, self._peer)
+
+    def _told(self, frame: PeerPresence | PeerLeft, text: str | None = None) -> None:
+        """Hold a peer's latest frame to send after any events, in place of what it held.
+
+        The channel tells each peer's frames in the order it said them, so the latest told is
+        the latest said.
+        """
+        key = (frame.peer, frame.artifact_id)
+        watch = self._watches.get(frame.artifact_id)
+        if watch is not None:
+            if isinstance(frame, PeerLeft):
+                watch.peers.discard(frame.peer)
+            else:
+                watch.peers.add(frame.peer)
+        self._peers.pop(key, None)  # to the back: the oldest waiting goes first
+        self._peers[key] = frame.model_dump_json() if text is None else text
+        self._wake.set()
+
     def _put(self, frame: BaseModel) -> None:
         try:
             self._outbox.put_nowait(frame.model_dump_json())
         except asyncio.QueueFull:
             self._overflowed = True
+        self._wake.set()
 
     async def _write(self) -> None:
+        """Send events first, then presence; presence never fills the outbox, nor closes it."""
         while True:
-            text = await self._outbox.get()
             if self._overflowed:
                 await self._close(4429, "the client is not keeping up")
                 return
-            await self._ws.send_text(text)
+            if not self._outbox.empty():
+                await self._ws.send_text(self._outbox.get_nowait())
+            elif self._peers:
+                key = next(iter(self._peers))
+                await self._ws.send_text(self._peers.pop(key))
+            else:
+                self._wake.clear()
+                await self._wake.wait()
 
     def _spawn(self, work: Coroutine[Any, Any, None]) -> None:
         task = asyncio.create_task(work)

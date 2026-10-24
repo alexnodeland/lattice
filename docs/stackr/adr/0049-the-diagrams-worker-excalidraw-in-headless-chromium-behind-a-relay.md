@@ -11,7 +11,7 @@ Records stackr's half of [lattice RFC-0006](../../rfcs/0006-excalidraw-diagrams-
 - **artifactr draws through a port,** `Converter`, with three calls: Mermaid to elements, skeletons to elements, and a diagram rendered as SVG or PNG. `WorkerConverter` calls them over HTTP, with a token, and holds every reply to limits and checks (ADR-0090). Nothing answered it.
 - **Only Excalidraw's own code draws as Excalidraw does.** `parseMermaidToExcalidraw`, `convertToExcalidrawElements` and `exportToSvg` are browser code. ADR-0088 measured them in headless Chromium and in jsdom with resvg, and chose Chromium: its PNGs are right, and it is faster at the 2,000-element limit.
 - **Font subsetting needs `'unsafe-eval'`.** Without it, an export embeds whole faces: an SVG of 299 kB against 15 kB. The portal's policy never allows it (ADR-0088), so a small export is the worker's.
-- **Xiaolai, Excalidraw's CJK face, is unlicensed as far as lattice can tell** (lattice#679). Without a CJK face, Chromium draws tofu.
+- **Xiaolai, Excalidraw's CJK face, stays out of the worker's image** until its author answers (lattice#679): it is OFL 1.1, but its README reserves the names Xiaolai and Kose, and Excalidraw's modified copy keeps the name. Without a CJK face, Chromium draws tofu.
 
 ## Decision
 
@@ -58,7 +58,7 @@ Records stackr's half of [lattice RFC-0006](../../rfcs/0006-excalidraw-diagrams-
   - **`diagrams-build`** is the Bun lattice uses, pinned by digest. `scripts/build-diagrams-worker.sh` clones lattice at the commit `uv.lock` pins artifactr at, so the worker and the converter that calls it come from one commit. It runs `bun install --frozen-lockfile` and builds the page and the server.
   - **`diagrams-worker`** is Playwright's image, `mcr.microsoft.com/playwright:v1.64.0-noble`, pinned by digest. Its Chromium is the one Playwright 1.64.0 drives, and the worker's `playwright-core` is 1.64.0.
 - **It runs as user 10005,** with `HOME` in its tmpfs.
-- **Noto CJK draws CJK.** The image installs Debian's `fonts-noto-cjk` (SIL OFL 1.1), and removes the image's other CJK faces, WenQuanYi Zen Hei and IPAGothic, so Noto is the one it draws with. Xiaolai is left out of the page's faces unless the build argument `XIAOLAI` is 1, which `.env`'s `DIAGRAMS_XIAOLAI=1` sets, and which waits for lattice#679.
+- **Noto CJK draws CJK.** The image installs Debian's `fonts-noto-cjk` (SIL OFL 1.1), and removes the image's other CJK faces, WenQuanYi Zen Hei and IPAGothic, so Noto is the one it draws with. Xiaolai is left out of the page's faces unless the build argument `XIAOLAI` is 1, which `.env`'s `DIAGRAMS_XIAOLAI=1` sets, and which waits for its author's answer (lattice#679).
 - **The build checks its Playwright.** The worker's `playwright-core` comes from the lattice commit `uv.lock` pins; the image's Chromium, from the template. The Dockerfile's `ARG PLAYWRIGHT` names the image's version, and the build fails, saying so, if the worker it built drives another: an application whose libraries and template were updated apart can't run a Chromium its driver doesn't know.
 - **The commit must hold the worker.** An application whose `uv.lock` pins artifactr at a commit before this record's has no `packages/stackr/workers/diagrams` to build, and the build says to update the libraries. Generated from the template once this record is in lattice, an application's lock pins a commit that has it.
 - **Its notices are beside its page:**
@@ -129,10 +129,9 @@ The worker costs an image of about 1 GB and 1 GiB while it runs, for exports tha
 - **`/healthz` answers without the token,** with Excalidraw's version and nothing else, on the worker's own network.
 - **The relay** takes at most 16 connections at once, shared by every tenant, as native files' do. The worker runs one job at a time, so a burst queues, each job within its own deadline. No tenant has a share of its own yet (ADR-0088).
 - **What floats.** The images are pinned by digest. Noto CJK, and the packages it pulls, float with Ubuntu's archive, as the template's other apt packages do.
-- **Licences not yet verified:**
-  - Excalifont and Liberation (lattice#679), whose own metadata names no SIL licence: Excalifont's says "All rights reserved", and Liberation Sans' refers to Ascender's licence agreement;
-  - Cascadia Code, whose metadata names the SIL Open Font License's URL beside Microsoft's text for a font supplied with a product, so it isn't verified from its metadata as artifactr ADR-0088 had it;
-  - Nunito and Lilita One, whose metadata gives only the OFL's URL;
+- **Licences** (amended 2026-10-24, lattice#679): each face's is read from its pinned upstream, and `FONTS.txt` carries the notices and pins. Liberation Sans is Liberation 2.1.5 (SIL OFL 1.1), copied over Excalidraw's 1.05, whose name table refers to Ascender's licence agreement. Not verified:
+  - Excalifont, which has no standalone licence file upstream, only its name table's text in Excalidraw's source;
+  - whether Excalidraw's modified Xiaolai may keep the name its author reserves, which keeps it out;
   - the WebAssembly modules subsetting runs: harfbuzz and woff2.
 
 ## Measured
@@ -152,7 +151,6 @@ On the scoped stack, with the image from this record on Docker Desktop's Linux V
 - Harder: a running application with diagrams is two more containers, and an image of about 1 GB, whose first build clones lattice. Upgrading Excalidraw means re-running ADR-0088's method, with `versions.env`, the worker and the canvas moved together.
 - Harder: Renovate bumps `@excalidraw/*` and `playwright-core` in the worker's `package.json` alone, and `scripts/check-template` then fails until `versions.env`, and the Dockerfile's Playwright tag and digest, move with them, as `.prototools` and the portal's Bun do.
 - To revisit:
-  - Xiaolai in the image, once its licence is confirmed (lattice#679);
   - a per-tenant share of the worker;
   - a slimmer image, once Playwright publishes one with Chromium alone.
 
@@ -161,6 +159,6 @@ On the scoped stack, with the image from this record on Docker Desktop's Linux V
 1. [x] The worker, its page and its server, in lattice's Bun workspace.
 2. [x] The template's `diagrams` question, the image's targets, the relay and the profile.
 3. [x] `scripts/check-template`'s pins, and `scripts/check-files`' posture, egress and probe of the worker.
-4. [ ] Xiaolai, behind `XIAOLAI=1`, once lattice#679 is answered.
+4. [ ] Xiaolai, behind `XIAOLAI=1`, once its author answers lattice#679.
 5. [ ] portalr's canvas, held to `EXCALIDRAW_VERSION` (phase 3).
 6. [ ] The tombstone sweep, run on a schedule by the application (artifactr ADR-0091).

@@ -2,15 +2,17 @@ Typefaces in stackr's diagrams worker (stackr ADR-0049)
 
 The worker draws with two kinds of typeface: Excalidraw's own, beside its page in fonts/, which
 its SVG exports embed as subsets; and Noto CJK, which Debian's fonts-noto-cjk package installs
-in the image, and which draws CJK text in its PNGs, as Xiaolai, Excalidraw's CJK face, isn't
-in the image (lattice#679).
+in the image, and which draws CJK text in its PNGs, as Xiaolai, Excalidraw's CJK face, isn't in
+the image unless it is built with XIAOLAI=1 (lattice#679). Liberation Sans is not Excalidraw's own
+file but Liberation 2.1.5 (lattice#679).
 
 ================================================================================
 ## Excalidraw's faces
 
-Excalidraw's package ships its faces with no licence file for any of them. Each face's own notice
-follows, as its name table holds it (copyright, trademark, licence and the licence's URL), read
-from the faces the worker carries; the faces portalr's app carries are the same
+Excalidraw's package ships its faces with no licence file for any of them. Each face's notice
+follows: for Virgil, Assistant and Comic Shanns, as its name table holds it (copyright, trademark,
+licence and the licence's URL), read from the faces the worker carries; for the others, as its
+upstream repository holds it, at the commit named. The faces portalr's app carries are the same
 (packages/portalr/web/ui/licenses/excalidraw-faces.txt).
 
 ================================================================================
@@ -33,25 +35,31 @@ Licence: SIL Open Font License, Version 1.1, below.
 ## Nunito
 
 Copyright 2014 The Nunito Project Authors (https://github.com/googlefonts/nunito)
-Licence: its name table names only the URL of the SIL Open Font License, Version 1.1
-(https://scripts.sil.org/OFL), whose text is below.
+Licence: SIL Open Font License, Version 1.1, below. No Reserved Font Name.
+Source: github.com/googlefonts/nunito at 8c6a9bb9732545b9ed53f29ec5e1ab0ff53c4e6f (Nunito 3.602),
+OFL.txt, SHA-256 580df76c95a1ec5ab878ceb25bb3d85c6a076804e9c970c8c6972aea775fdf65. The face's own
+name table names only the licence's URL (https://scripts.sil.org/OFL).
 
 ================================================================================
 ## Lilita One
 
-Copyright (c) 2011 Juan Montoreano (juan@remolacha.biz), with Reserved Font Names "Lilita One"
-Licence: its name table names only the URL of the SIL Open Font License, Version 1.1
-(http://scripts.sil.org/OFL), whose text is below.
+Copyright (c) 2011 Juan Montoreano (juan@remolacha.biz), with Reserved Font Name Lilita
+Licence: SIL Open Font License, Version 1.1, below.
+Source: github.com/google/fonts, ofl/lilitaone/OFL.txt at
+90abd17b4f97671435798b6147b698aa9087612f (Lilita One 1.002), SHA-256
+255d5debbb80eb2ea762644311f266a279e8778f00156655a516e2b7781a63e1. The face's own name table names
+only the licence's URL (http://scripts.sil.org/OFL).
 
 ================================================================================
 ## Cascadia Code
 
-© 2020 Microsoft Corporation. All Rights Reserved.
-Cascadia Code is a trademark of the Microsoft group of companies.
-Licence: its name table names the SIL Open Font License's URL (https://scripts.sil.org/OFL),
-and its licence description is Microsoft's text for a font supplied with a Microsoft product.
-Upstream, microsoft/cascadia-code is under the SIL Open Font License, Version 1.1: not yet
-verified against the copy the package ships (lattice#679).
+Copyright (c) 2019 - Present, Microsoft Corporation, with Reserved Font Name Cascadia Code.
+Licence: SIL Open Font License, Version 1.1, below.
+Source: github.com/microsoft/cascadia-code, LICENSE at tag v2005.15
+(0610f2df4356200adb93cb5bca2221b92ad6ee7e), SHA-256
+51882cd3cdba4e16f220f44ddb08a635c38c44ea6e0975db2574f4be6f958238. The face's own name table says
+"Cascadia Code is a trademark of the Microsoft group of companies" and gives Microsoft's text for a
+font supplied with a Microsoft product, which differs; the repository's LICENSE governs.
 
 ================================================================================
 ## Comic Shanns
@@ -85,22 +93,80 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ================================================================================
-## Excalifont and Liberation Sans: unverified (lattice#679)
+## Excalifont
 
-Excalifont: "Copyright (c) 2024 by Excalidraw. All rights reserved." Its name table names no
-licence.
-Liberation Sans: "Digitized data 2007 Ascender Corporation. All rights reserved." Liberation is a
-trademark of Red Hat, Inc. Its name table says "Use of this Liberation font software is subject
-to the license agreement under which you accepted the Liberation font software", and names
-http://www.ascendercorp.com/liberation.html.
-
-Neither licence is verified yet. Both ship meanwhile, as the owner decided, and this file says
-so.
+Copyright (c) 2024 by Excalidraw. All rights reserved.
+Designers: Your Own Font Foundry (Virgil); Jan Filipek / DizajnDesign (Excalifont, modifications).
+Licence: SIL Open Font License, Version 1.1, below. No Reserved Font Name is named.
+Source: the header of packages/excalidraw/fonts/Excalifont/index.ts in excalidraw v0.18.0
+(817d8c553c3389650f8b4503984a6d4a5d2f0c11), which records the face's name table. "All rights
+reserved" is that table's wording of the copyright; its licence field is the OFL's text and its
+licence URL http://scripts.sil.org/OFL. Excalifont has no standalone LICENSE file upstream: that
+header is the only source of its licence found, so the claim that it is under the OFL rests on the
+header alone and is unverified (lattice#679).
 
 ================================================================================
-## Xiaolai
+## Liberation Sans
 
-Not in this image until its licence is confirmed (lattice#679).
+Liberation Sans 2.1.5, which this build ships in place of the Liberation Sans 1.05 that Excalidraw
+0.18.1 carries: that one's name table refers to Ascender's licence agreement, not the SIL Open Font
+License. Digitized data copyright (c) 2010 Google Corporation, with Reserved Font Arimo, Tinos and
+Cousine. Copyright (c) 2012 Red Hat, Inc., with Reserved Font Name Liberation.
+Licence: SIL Open Font License, Version 1.1, below.
+Source: github.com/liberationfonts/liberation-fonts, tag 2.1.5
+(4b0192046158094654e865245832c66d2104219e); LICENSE there, SHA-256
+93fed46019c38bbe566b479d22148e2e8a1e85ada614accb0211c37b2c61c19b.
+The face is LiberationSans-Regular.ttf of the release's liberation-fonts-ttf-2.1.5.tar.gz (SHA-256
+7191c669bf38899f73a2094ed00f7b800553364f90e2637010a69c0e268f25d0); the TTF's SHA-256 is
+76d04c18ea243f426b7de1f3ad208e927008f961dc5945e5aad352d0dfde8ee8.
+It is converted to WOFF2 with fontTools 4.62.1 and brotli 1.2.1 (`TTFont(ttf,
+recalcTimestamp=False)`, `flavor = "woff2"`) and nothing else. No glyph, name or outline data is
+changed: the decompiled glyphs, glyph order, names and character map equal the TTF's. WOFF2's
+encoding re-encodes glyf and loca, sets head flag bit 11 and writes a new checkSumAdjustment. The
+result, packages/portalr/web/ui/fonts/LiberationSans-Regular.woff2, has SHA-256
+455f80807d01a6920a653ed102161cb886594fba540db52be52502f11fbf8322.
+`packages/portalr/scripts/check_liberation.py` downloads the tarball, checks both checksums,
+converts and compares. Both builds copy the result over Excalidraw's file.
+Whether that conversion is "unchanged except for WOFF compression" in the sense of OFL-FAQ 2.2.1
+is a reading, not settled by the FAQ (see below); it is unverified.
+
+================================================================================
+## Xiaolai: not carried until its author answers (lattice#679)
+
+Xiaolai SC 3.11, as Excalidraw 0.18.1 ships it, modified by Excalidraw: non-CJK codepoints removed,
+Hangul side-bearings reduced to 40%, and improperly centred CJK codepoints centred in their width
+(the header of packages/excalidraw/fonts/Xiaolai/index.ts in excalidraw v0.18.0, commit
+817d8c553c3389650f8b4503984a6d4a5d2f0c11).
+Copyright 2020-2024 LXGW (https://github.com/lxgw/kose-font)
+Copyright 2014 Nozomi Seto (https://ja.osdn.net/projects/setofont/)
+Licence: SIL Open Font License, Version 1.1, below.
+Source: github.com/lxgw/kose-font, OFL.txt at tag v3.126 (58beef8eceeab3ed51d5da173e016842dd5681fd),
+SHA-256 0df7e09be4c2c850a48bd8beb9cd64b343aad49cd5d3f6cfb2ad2e3d28a56ca4. That file names no
+Reserved Font Name, but the repository's README, in its licence section, reserves the names
+"Xiaolai", "Kose" and their Chinese spellings, and Excalidraw's modified copy keeps the name
+Xiaolai. Whether the author permits that is unverified, so Xiaolai stays out: the worker builds
+without it unless XIAOLAI=1, and portalr's canvas leaves it out.
+
+================================================================================
+## Web fonts, embedding and Reserved Font Names: the OFL-FAQ, as read here
+
+Read at https://openfontlicense.org/ofl-faq/ on 2026-10-24. Liberation (Reserved Font Name
+Liberation), Lilita One (Lilita), Cascadia Code (Cascadia Code) and Xiaolai (see above) reserve
+names; the builds keep every face's name.
+- Entry 2.2 and 2.2.1: a WOFF/WOFF2 version may keep the name only if "the original font data
+  remains unchanged except for WOFF compression" and WOFF metadata is omitted or complete. Entry
+  2.2.2 adds that some conversion tools do not meet this. The Liberation conversion above is
+  held to it by the checks listed there, but whether re-encoded glyf and loca, head flag bit 11 and
+  a new checkSumAdjustment are "WOFF compression" is a reading, not stated by the FAQ: unverified.
+  The other faces are Excalidraw's own WOFF2 files, whose conversion was Excalidraw's.
+- Entry 2.6: removing parts of a font when delivering a webfont, "including unused glyphs", is
+  modification, "permitted by the OFL but would not normally allow the use of RFNs".
+- Entries 1.11 and 1.12: embedding a font in a document or file, "either in full or a subset", is
+  not distribution, and the restrictions on modification and redistribution "do not apply, as the
+  font is not intended for use outside the document". The worker's SVG exports embed subsets of
+  the faces they use, among them Liberation, Lilita One and Cascadia Code, under their own names;
+  the canvas's exports embed whole faces. That they are documents in the FAQ's sense, and not an
+  extractable distribution of the font, is a reading, unverified.
 
 ================================================================================
 ## Noto CJK (Debian's fonts-noto-cjk)

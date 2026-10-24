@@ -19,6 +19,7 @@ tasks:
       - 'index.html'
       - 'policy.json'
       - 'vite.config.ts'
+      - '/packages/portalr/web/ui/fonts/*.woff2'
       - '/packages/portalr/web/notices/src/**/*'
       - '!/packages/portalr/web/notices/src/**/*.test.ts'
     outputs:

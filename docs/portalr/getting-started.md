@@ -201,7 +201,7 @@ from httpx import ASGITransport, AsyncClient
 
 async with AsyncClient(transport=ASGITransport(app=app), base_url="http://app") as client:
     config = (await client.get("/portalr/config.json")).json()
-    assert sorted(config) == ["apps", "brand", "editors", "people", "readers", "supabase", "surfaces"]
+    assert sorted(config) == ["apps", "brand", "editors", "people", "readers", "replay", "supabase", "surfaces"]
     assert config["readers"]["tempo"] is False
     assert config["people"] is True
 ```

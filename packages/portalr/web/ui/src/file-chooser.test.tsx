@@ -1,8 +1,10 @@
-import { expect, test } from "vitest";
+import { expect, onTestFinished, test } from "vitest";
+import { commands, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { FileChooser } from "./file-chooser";
 import { Progress } from "./progress";
 import { axeViolations } from "./test/axe";
+import { token } from "./test/colours";
 
 /** Drop files on an element, as a drag from the desktop would. */
 function drop(on: Element, ...files: File[]) {
@@ -93,4 +95,55 @@ test("progress names what it measures, and says its share", async () => {
     .element(screen.getByRole("progressbar", { name: "Nothing yet" }))
     .toHaveAttribute("aria-valuenow", "0");
   expect(await axeViolations(screen.container)).toEqual([]);
+});
+
+test("the browser's own control isn't drawn: a kit button stands for it, shows its focus, and opens it", async () => {
+  const screen = await render(
+    <FileChooser label="Upload files" multiple onFile={() => undefined} />,
+  );
+  const input = screen.getByLabelText("Upload files");
+  // Named by its label, and by the button's words, which are its second label.
+  await expect.element(input).toHaveAccessibleName("Upload files Choose files");
+  expect(input.element().getBoundingClientRect().width).toBeLessThanOrEqual(1);
+  const button = screen.getByText("Choose files");
+  await expect.element(button).toBeVisible();
+  expect(button.element().getAttribute("for")).toBe(input.element().id);
+  await userEvent.tab();
+  expect(input.element()).toBe(document.activeElement);
+  expect(getComputedStyle(button.element()).outlineColor).toBe(token("focus"));
+  expect(screen.getByText("No file chosen").elements()).toHaveLength(0);
+});
+
+test("the kit button opens the input, and says a file where one is chosen", async () => {
+  const screen = await render(<FileChooser label="The edited file" onFile={() => undefined} />);
+  const input = screen.getByLabelText("The edited file").element();
+  let opened = 0;
+  // A click on the button is a click on the input it labels, which opens the picker.
+  input.addEventListener("click", (event) => {
+    opened += 1;
+    event.preventDefault();
+  });
+  await screen.getByText("Choose a file").click();
+  expect(opened).toBe(1);
+});
+
+test("a disabled chooser's button keeps its disabled look under the pointer", async () => {
+  const screen = await render(
+    <FileChooser label="The edited file" disabled onFile={() => undefined} />,
+  );
+  const button = screen.getByText("Choose a file");
+  await button.hover();
+  expect(getComputedStyle(button.element()).backgroundColor).toBe(token("line"));
+});
+
+test("under forced colours the button still shows the input's focus", async () => {
+  onTestFinished(() => commands.forcedColors(false));
+  await commands.forcedColors(true);
+  const screen = await render(
+    <FileChooser label="Upload files" multiple onFile={() => undefined} />,
+  );
+  await userEvent.tab();
+  expect(getComputedStyle(screen.getByText("Choose files").element()).outlineStyle).not.toBe(
+    "none",
+  );
 });

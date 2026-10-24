@@ -31,6 +31,16 @@ networks:
   supabase:
     name: supabase_network_stackr-supabase
     external: true
+  # Umami's (ADR-0050): its ingest takes anyone's events, so it shares no network with the stack's
+  # other services. `umami-ingest` is the application's way in, which `make up` creates as the
+  # stack starts, internal, for the applications to join; `umami-db` is plain PostgreSQL's and
+  # Umami's alone; `umami-ui` publishes its port, and nothing else is on it.
+  umami-ingest:
+    name: stackr-umami
+    external: true
+  umami-db:
+    internal: true
+  umami-ui: {}
 
 volumes:
   prometheus-data:
@@ -258,6 +268,7 @@ services:
       - postgres-data:/var/lib/postgresql/data
     ports:
       - ${STACKR_BIND:-127.0.0.1}:${POSTGRES_PORT:-55432}:5432
+    networks: [default, umami-db]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d postgres"]
       interval: 3s
@@ -451,6 +462,77 @@ services:
       - ./deploy/clickhouse/analytics.sql:/analytics.sql:ro
     depends_on:
       clickhouse:
+        condition: service_healthy
+
+  # Journeys, for operators, from portalr's relay (lattice RFC-0008, ADR-0050), on the plain
+  # PostgreSQL adapter alone: `make up` refuses the profile beside local Supabase, whose database's
+  # network the stack's other services share. Its data is in its own database there, as its role's.
+  umami:
+    image: ghcr.io/umami-software/umami:3.4.0@sha256:85909afc45bdcda1917394594a087421fdbb05610fded0fa9f6fb861abb2f367
+    # And umami-init's, which `make up` runs after it.
+    profiles: [umami, umami-init]
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://umami:${UMAMI_DB_PASSWORD:?run make env}@postgres:5432/umami?schema=umami
+      APP_SECRET: ${UMAMI_APP_SECRET:?run make env}
+      # Nothing leaves for Umami's makers, and no update is looked for.
+      DISABLE_TELEMETRY: "1"
+      DISABLE_UPDATES: "1"
+      # Every event comes from portalr's relay, with portalr's own agent, never a browser's.
+      DISABLE_BOT_CHECK: "1"
+    networks: [umami-ingest, umami-db, umami-ui]
+    # On the loopback alone, whatever STACKR_BIND says: this port is the UI's, and Umami's ingest
+    # too, which takes anyone's events, so only this machine may reach it (ADR-0050).
+    ports:
+      - 127.0.0.1:${UMAMI_PORT:-3400}:3000
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/api/heartbeat"]
+      interval: 5s
+      timeout: 3s
+      retries: 60
+    depends_on:
+      umami-db-init:
+        condition: service_completed_successfully
+
+  # Umami's role and database on plain PostgreSQL (deploy/postgres/umami.sql), with its profile
+  # alone; then it exits.
+  umami-db-init:
+    image: postgres:17.11-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
+    profiles: [umami, umami-init]
+    restart: "no"
+    command: ["psql", "--no-psqlrc", "--quiet", "--file=/umami.sql"]
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGDATABASE: postgres
+      PGUSER: postgres
+      PGPASSWORD: ${POSTGRES_ADMIN_PASSWORD:?run make env}
+      PGCONNECT_TIMEOUT: "10"
+      UMAMI_DB_PASSWORD: ${UMAMI_DB_PASSWORD:?run make env}
+    volumes:
+      - ./deploy/postgres/umami.sql:/umami.sql:ro
+    # `make up` starts plain PostgreSQL beside it, and refuses the profile without it.
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
+
+  # Umami's accounts and portalr's website (deploy/umami/init); `make up` runs it once Umami is
+  # up, with `docker compose run`, as it does clickhouse-init.
+  umami-init:
+    image: curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
+    profiles: [umami-init]
+    restart: "no"
+    entrypoint: ["sh", "/init"]
+    environment:
+      UMAMI_ADMIN_PASSWORD: ${UMAMI_ADMIN_PASSWORD:?run make env}
+      UMAMI_PORTALR_PASSWORD: ${UMAMI_PORTALR_PASSWORD:?run make env}
+      UMAMI_WEBSITE_ID: ${UMAMI_WEBSITE_ID:?run make env}
+    volumes:
+      - ./deploy/umami/init:/init:ro
+    networks: [umami-ingest]
+    depends_on:
+      umami:
         condition: service_healthy
 
   langfuse-worker:

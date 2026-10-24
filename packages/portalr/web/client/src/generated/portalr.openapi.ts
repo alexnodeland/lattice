@@ -108,7 +108,7 @@ export interface paths {
         };
         /**
          * Links
-         * @description Deep links into Langfuse and Grafana, which aren't tenant-scoped, for operators.
+         * @description Deep links into Langfuse, Grafana and Umami, which aren't tenant-scoped, for operators.
          *
          *     What those tools show isn't behind portalr's gates, so each call that makes a link is
          *     recorded: who, the kinds of id, and the tenant's id if one was asked for, never a trace's,
@@ -730,6 +730,8 @@ export interface components {
             langfuse_tenant?: string | null;
             /** Langfuse Trace */
             langfuse_trace?: string | null;
+            /** Umami Journeys */
+            umami_journeys?: string | null;
         };
         /**
          * LogRecord

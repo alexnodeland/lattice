@@ -11,9 +11,11 @@ browser's; no address or browser is kept.
 deletes their events at once, by their keyed hash.
 """
 
+import asyncio
 import hashlib
 import hmac
 import json
+import logging
 import secrets
 import time
 from dataclasses import dataclass, field
@@ -24,7 +26,8 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from portalr.analytics.consent import Consent
 from portalr.analytics.limiter import InMemoryRateLimiter, RateLimiter
-from portalr.readers.analytics import REGISTRY, Analytics
+from portalr.readers.analytics import REGISTRY, Analytics, distinct_id
+from portalr.readers.umami import Umami
 
 ROUTES: Final = frozenset(
     json.loads(resources.files("portalr.analytics").joinpath("routes.json").read_text())["routes"]
@@ -104,6 +107,13 @@ class Answered(Answer):
     deleted: bool | None = None
 
 
+log = logging.getLogger("portalr.analytics")
+
+MOST_COPIES: Final = 100
+"""How many copies to Umami may be sending at once: past it, a batch's copy is dropped, not
+queued, so an Umami that is slow holds no more than this."""
+
+
 @dataclass(frozen=True)
 class Relay:
     """What the relay needs: the analytics store, people's answers, and their pace.
@@ -127,6 +137,13 @@ class Relay:
     deletes: RateLimiter = field(
         default_factory=lambda: InMemoryRateLimiter(per_second=10 / 3600, burst=10)
     )
+    umami: Umami | None = None
+    """Umami, sent a copy of each consented event, for operators' journeys (portalr ADR-0076);
+    a person's deletion deletes their sessions there too."""
+    copies: set[asyncio.Future[None]] = field(
+        default_factory=lambda: set[asyncio.Future[None]](), repr=False, compare=False
+    )
+    """The copies to Umami still being sent, kept so none is lost before it is done."""
 
     def sign(self, user_id: str, *, now: float | None = None) -> str:
         """A new session id for the person, signed so no one else can send under it."""
@@ -166,6 +183,8 @@ class Relay:
             return False
         if not await self.analytics.forget(user_id):
             return False
+        if self.umami is not None and not await self.umami.forget(self._person(user_id)):
+            return False
         await self.consent.settled(user_id, debt)
         return True
 
@@ -202,7 +221,38 @@ class Relay:
             await self.settle(user_id, await self.consent.owe(user_id))
             return Relayed(recorded=0, dropped=len(batch.events))
         recorded = len(named) if written else 0
+        if written and self.umami is not None and len(self.copies) < MOST_COPIES:
+            # A copy for Umami, of what was kept, after the yes was read again: never the record,
+            # and never waited on, so Umami down slows no request.
+            copy = asyncio.ensure_future(self._copy(self.umami, tenant, user_id, named))
+            self.copies.add(copy)
+            copy.add_done_callback(self.copies.discard)
         return Relayed(recorded=recorded, dropped=len(batch.events) - recorded)
+
+    async def _copy(
+        self, umami: Umami, tenant: str, user_id: str, named: list[tuple[str, dict[str, str]]]
+    ) -> None:
+        """Send Umami its copy, then read the person's answer again, whatever the send did.
+
+        Any event of it may have made a session, so a no that landed meanwhile owes a deletion,
+        tried at once, as a batch written while a no lands is in ClickHouse. If the answer can't
+        be read again, a deletion is owed anyway: the background pass settles it.
+        """
+        await umami.send(tenant, self._person(user_id), named)
+        try:
+            if await self.consent.given(user_id):
+                return
+            await self.settle(user_id, await self.consent.owe(user_id))
+        except Exception as error:  # The copy is never the request's: it is said, and owed.
+            log.warning("analytics: Umami's copy couldn't be checked: %s", type(error).__name__)
+            try:
+                await self.consent.owe(user_id)
+            except Exception as owing:  # Nothing more can be done: said, for operators.
+                log.error("analytics: a deletion couldn't be owed: %s", type(owing).__name__)
+
+    def _person(self, user_id: str) -> str:
+        """A person as Umami knows them: the deployment's keyed hash, as ClickHouse does."""
+        return distinct_id(self.analytics.key, user_id)
 
     async def settle_if_owed(self, user_id: str) -> None:
         """Try again a deletion owed the person, on their next request."""

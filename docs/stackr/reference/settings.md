@@ -330,6 +330,17 @@ Vikunja, at VIKUNJA_URL, published on VIKUNJA_PORT. Sign-up stays off: the opera
 | `VIKUNJA_DB_PASSWORD` | Generated: 64 hex characters |
 | `VIKUNJA_REGISTRATION` | `false` |
 
+Umami (ADR-0050), with the umami profile, on the plain PostgreSQL adapter: its database role's password, its own secret, its admin's password, portalr's user's password (which the application's PORTAL_UMAMI_PASSWORD copies), and the website portalr's relay sends to (PORTAL_UMAMI_WEBSITE_ID). Its UI is on 127.0.0.1 only, for operators.
+
+| Setting | In `.env.example` |
+|---|---|
+| `UMAMI_DB_PASSWORD` | Generated: 64 hex characters |
+| `UMAMI_APP_SECRET` | Generated: 64 hex characters |
+| `UMAMI_ADMIN_PASSWORD` | Generated: 64 hex characters |
+| `UMAMI_PORTALR_PASSWORD` | Generated: 64 hex characters |
+| `UMAMI_WEBSITE_ID` | Generated: a UUID |
+| `UMAMI_PORT` | `3400` |
+
 <!-- end generated -->
 
 ## The file

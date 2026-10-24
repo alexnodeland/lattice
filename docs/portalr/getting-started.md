@@ -71,7 +71,7 @@ portalr needs Python 3.12 or newer. Its wheel carries the two built UIs, which V
 | `invite` | Supabase Auth's admin API, as a function from an email to a user id. Without it, there is no invitation route and no way to create a tenant from admin |
 | `site` | Your Supabase project's URL and *publishable* key, and where you mounted each router |
 | `people` | Optional. Names people by email: a function from user ids to the emails it can find, such as `portalr.people.SupabasePeople(url=, secret_key=)` over Supabase Auth's admin API. Without it, there is no people route, and the UIs show people by a short id |
-| `relay` | Optional. Product analytics from people's browsers, with their consent ([lattice RFC-0008](../rfcs/0008-portalr-product-analytics.md)): `portalr.analytics.Relay(analytics, consent, limiter)`, over ClickHouse, people's answers (`portalr.analytics.sql.SqlConsent`, with the `sql` extra) and their pace. Without it, there are no analytics routes |
+| `relay` | Optional. Product analytics from people's browsers, with their consent ([lattice RFC-0008](../rfcs/0008-portalr-product-analytics.md)): `portalr.analytics.Relay(analytics, consent, limiter, grants=grants)`, over ClickHouse, people's answers (`portalr.analytics.sql.SqlConsent`, with the `sql` extra) and their pace. Without it, there are no analytics routes |
 
 ```python
 from fastapi import FastAPI

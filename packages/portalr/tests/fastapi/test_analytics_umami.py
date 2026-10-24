@@ -9,6 +9,7 @@ from pathlib import Path
 import httpx
 import pytest
 
+from grantr.core import User
 from grantr.grants import Grants
 from portalr.analytics import InMemoryConsent, InMemoryRateLimiter, Relay, Umami
 from portalr.analytics.relay import MOST_COPIES, Batch, Event
@@ -341,13 +342,16 @@ async def test_a_session_gone_before_it_is_deleted_is_no_failure(stand: Stand) -
     assert await umami.sessions(ME) == ["s2"]
 
 
-def relay_of(stand: Stand, consent: InMemoryConsent | None = None) -> Relay:
+def relay_of(
+    stand: Stand, consent: InMemoryConsent | None = None, grants: Grants | None = None
+) -> Relay:
     writer = httpx.AsyncClient(transport=httpx.MockTransport(lambda _: httpx.Response(200)))
     return Relay(
         Analytics("http://clickhouse:8123", KEY, writer=writer),
         consent or InMemoryConsent(),
         InMemoryRateLimiter(),
         umami=umami_of(stand),
+        grants=grants,
     )
 
 
@@ -443,11 +447,12 @@ def test_a_distinct_id_fits_umamis_whatever_the_tenants_id() -> None:
 
 
 async def test_a_removal_from_a_tenant_deletes_that_tenants_session_in_umami_alone(
-    stand: Stand, monkeypatch: pytest.MonkeyPatch
+    stand: Stand, grants: Grants, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr("portalr.analytics.relay.REMOVAL_GRACE", timedelta(0))
-    relay = relay_of(stand)
-    await relay.removed("globex", "alice")
+    relay = relay_of(stand, grants=grants)
+    await grants.add_member("globex", User(id="alice"), by=User(id="carol"))
+    await grants.remove_member("globex", User(id="alice"), by=User(id="carol"))
     stand.down = True
     assert await relay.settle_owed() == 0, "owed while Umami is down"
     stand.down = False

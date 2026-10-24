@@ -1,5 +1,7 @@
-# CodeQL (stackr's RFC-0003, CI and tooling: supply chain), on every pull request, on every push to
-# main, and every week, so new queries reach code that hasn't changed. Its alerts are in the
+# CodeQL (stackr's RFC-0003, CI and tooling: supply chain), on every pull request that changes code
+# it analyses, on every push to main, and every week, so new queries reach code that hasn't
+# changed. It is not a required check (the ruleset's are `CI` and `Title`), so a pull request that
+# changes no such file simply has no analysis. Its alerts are in the
 # repository's code scanning, and a pull request's show on it. The Python and portalr's TypeScript
 # are analysed from source, with no build; zizmor already checks the workflows.
 
@@ -7,6 +9,13 @@ name: CodeQL
 
 on:
   pull_request:
+    paths:
+      - "**/*.py"
+      - "**/*.[cm]js"
+      - "**/*.[cm]ts"
+      - "**/*.[jt]s"
+      - "**/*.[jt]sx"
+      - .github/workflows/codeql.yml
   push:
     branches: [main]
   schedule:

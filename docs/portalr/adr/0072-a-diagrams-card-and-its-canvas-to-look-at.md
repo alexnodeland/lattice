@@ -10,7 +10,7 @@ Records portalr's half of [lattice RFC-0006](../../rfcs/0006-excalidraw-diagrams
 
 - **The agent draws diagrams** (artifactr ADR-0090), and the app showed them as JSON.
 - **Excalidraw is large.** Its canvas, with the code it reaches, is hundreds of kilobytes gzipped. The app's first load had about 600 bytes of room below its ceiling, and its total about 12 kB.
-- **Excalidraw's build reaches for more than the canvas needs.** It has font subsetting (741 kB, with WebAssembly), Mermaid's converter, image resizing, 55 locales, esm.sh as a fallback for its faces, and Xiaolai, a CJK face whose licence is unconfirmed (lattice#679).
+- **Excalidraw's build reaches for more than the canvas needs.** It has font subsetting (741 kB, with WebAssembly), Mermaid's converter, image resizing, 55 locales, esm.sh as a fallback for its faces, and Xiaolai, a CJK face of 12 MB whose reserved name Excalidraw's copy keeps (lattice#679).
 - **Editing needs more than this phase has.** An edit needs three things that don't exist yet:
   - a TypeScript port of the element-scoped patch (artifactr ADR-0086);
   - a route to upload a pasted image to;
@@ -134,9 +134,8 @@ ADR-0088 proposed a `canvas` of 402,000 / 375,000 and a `canvas-images` add-on o
   - Upgrading Excalidraw means checking each rewrite still matches: the face fallback, Xiaolai's registration and esbuild's stand-in. The build fails, saying which, if one doesn't.
   - Numeric element ids lose their order in a JSON object, as JavaScript reads one, so the port lists them first. The fixture has none, and the diagrams worker and the canvas make none.
 - To revisit:
-  - Xiaolai once its licence is confirmed (lattice#679);
-  - Excalifont's and Liberation's licences, which ship meanwhile, marked unverified (lattice#679). Their own metadata gives none: Excalifont's says "All rights reserved", and Liberation Sans' refers to Ascender's licence agreement, not the SIL Open Font License that Liberation 2 is under;
-  - Cascadia Code's, whose metadata names the SIL Open Font License's URL beside Microsoft's text for a font supplied with a product. `web/ui/licenses/excalidraw-faces.txt` carries each face's own notice, as its metadata holds it.
+  - Xiaolai, until its author answers whether Excalidraw's modified copy may keep the name its README reserves (lattice#679);
+  - Excalifont's licence, which rests on its name table's text in Excalidraw's source alone, there being no licence file upstream (lattice#679). Liberation Sans is Liberation 2.1.5, copied over Excalidraw's 1.05, which isn't under the SIL Open Font License. `web/ui/licenses/excalidraw-faces.txt` carries each face's notice and the commit it was read from.
 
 ## Action items
 

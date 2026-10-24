@@ -49,6 +49,7 @@ nav:
   - adr/0034-integrations-switched-per-tenant-and-workspace-in-grantrs-table-audited.md
   - adr/0035-settings-narrowed-per-tenant-and-workspace-in-grantrs-table-versioned-audited.md
   - adr/0036-a-hook-on-a-members-removal.md
+  - adr/0037-the-deployments-own-tools-read-a-tenants-audit-log.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

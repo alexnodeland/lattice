@@ -337,6 +337,7 @@ test("forced colours turn on exactly the patterns colour-blind mode does: the tw
     "--chart-dash-2",
     "--chart-dash-3",
     "--chart-marker-size",
+    "--chart-marker-shown",
     "--chart-marker-corner-2",
     "--chart-marker-corner-3",
     "--chart-marker-turn-3",

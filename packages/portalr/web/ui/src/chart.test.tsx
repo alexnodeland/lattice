@@ -534,3 +534,31 @@ test("nothing the keyboard reaches is inside a chart's drawing, which is hidden 
   );
   expect([...reached].map((element) => element.outerHTML.slice(0, 80))).toEqual([]);
 });
+
+test("a line's markers are drawn in colour-blind mode, and elsewhere only where no line reaches", async () => {
+  await page.viewport(1024, 768);
+  render(
+    <LineChart
+      label="How long a turn takes"
+      index={days}
+      series={[{ key: "p95", name: "95th percentile" }]}
+      data={[
+        { day: "2026-10-12", p95: 0.2 },
+        { day: "2026-10-13", p95: 0.24 },
+        { day: "2026-10-14", p95: null },
+        { day: "2026-10-15", p95: 0.1 },
+        { day: "2026-10-16", p95: null },
+      ]}
+      format={(value) => `${value.toFixed(2)} s`}
+    />,
+  );
+  const drawn = () =>
+    [...document.querySelectorAll("svg rect")]
+      .filter((marker) => marker.closest(".recharts-line-dots, figure svg[aria-hidden]"))
+      .filter((marker) => marker.getClientRects().length > 0).length;
+  // Only 2026-10-15's point stands alone: the others are on the line, and its legend is a line.
+  await expect.poll(drawn).toBe(1);
+  colourBlind();
+  // Each of its three points, and the legend's mark.
+  await expect.poll(drawn).toBe(4);
+});

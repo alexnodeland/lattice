@@ -1,6 +1,6 @@
 # ADR-0036: The chart theme: violet-led series, patterns only where marks touch, and a hook for colour-blind mode
 
-**Status:** Accepted
+**Status:** Accepted, amended 2026-10-23 (a line's markers only in the modes that need them)
 **Date:** 2026-10-16
 **Deciders:** Alex Nodeland
 **Amends:** the chart rule of [ADR-0021](0021-the-areas-on-the-frame-and-what-admin-needs.md) and [ADR-0027](0027-feedback-and-evaluations.md), and the tokens of [ADR-0019](0019-the-kits-look.md)
@@ -26,7 +26,7 @@ The "$60 . 40" is not a monospace decimal point, as the audit took it to be. It 
   - The legend, and the number and date formatters: `formatNumber`, `formatDay` ("Oct 15") and `formatMoment` ("Oct 15 04:11", or "04:11"). Tables and tooltips keep a whole day or moment, `2026-10-15`; only an axis writes it shorter.
 - **The palette is violet-led, with solid fills.** `--chart-1` is the brand violet, `--chart-2` a lighter tint of it, and `--chart-3` the one accent, a teal. Each is 3:1 or more on the paper and the surface in both schemes, and each pair is 20 or more apart, to CIEDE2000, to a reader with no deficiency and, simulated with Machado's matrices, with protanopia, deuteranopia or tritanopia, which tests hold. The floor of 20 is the bar this record sets, a few times what a person sees as a difference (about 1), and it is held under CIEDE2000, which weighs lightness, chroma and hue as the eye does, not CIE76's plain distance. The two violets differ mainly in lightness, and a test holds that too. The inks stay marks and never text (ADR-0021). The values, light and dark: `#6b2fa0` and `#c8aaf2`, `#a570e1` and `#864fc4`, `#0b8478` and `#347969`. The span bars of `TraceView` use `--chart-1`, so they take the theme's violet, and the colour-blind mode's blue, as the charts do.
 - **A pattern is for marks that touch, or that are over a budget.** This replaces ADR-0021's pattern for every series and ADR-0027's dashed and dotted lines. By default:
-  - Bars, lines and the donut's slices are solid, and a line is unbroken, its markers small circles.
+  - Bars, lines and the donut's slices are solid, and a line is unbroken, with no markers: its points' markers are drawn only in colour-blind mode and under forced colours, where their shapes tell series apart (`--chart-marker-shown`). A point no line reaches, with no value on either side, keeps its marker always, or it wouldn't be drawn at all. (Amended 2026-10-23, from #214's audit, which found a single series's markers busy and read as dashes.)
   - A diverging chart's two halves meet at the baseline, so its second is hatched, and the Tracker's block over its share is hatched too.
   - What is folded into "Other" stays dotted in the muted ink.
   - Colour is never the only cue, as ADR-0021 asked: a series is named in the legend, and, where a chart has several, directly at its end; a diverging chart names its halves at its axis; and every chart's figures are the table under "Show the figures". The charts keep their aria text alternatives.

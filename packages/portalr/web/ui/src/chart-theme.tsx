@@ -99,12 +99,27 @@ export function Hatch({ id, at }: { id: string; at: number }) {
 /** A series' fill: its ink where it is first, else its pattern, under `id`, which `Hatch` defines. */
 export const fill = (id: string, at: number) => (at === 0 ? ink(0) : `url(#${id}-${at})`);
 
-/** A marker on a line, at a point: a shape of the mode's choosing, in the series' ink. */
-export function Marker({ at, x, y }: { at: number; x: number; y: number }) {
+/**
+ * A marker on a line, at a point: a shape of the mode's choosing, in the series' ink. A line's
+ * markers are drawn only in colour-blind mode, where their shapes tell series apart; elsewhere
+ * the line alone is drawn (portalr ADR-0019), but for a point with no neighbour, which is `alone`
+ * and drawn always, since no line reaches it.
+ */
+export function Marker({
+  at,
+  x,
+  y,
+  alone = false,
+}: {
+  at: number;
+  x: number;
+  y: number;
+  alone?: boolean;
+}) {
   const place = slot(at);
   const size = "var(--chart-marker-size)";
   return (
-    <g transform={`translate(${x} ${y})`}>
+    <g transform={`translate(${x} ${y})`} className={alone ? undefined : "chart-marker"}>
       <rect
         fill={ink(at)}
         stroke="var(--surface)"

@@ -19,7 +19,7 @@ ADR-0055, ADR-0058 and ADR-0059 set no rule for any of these.
 ## Decision
 
 - **After a navigation, the focus goes to the new page's `h1`,** where the focus was lost: to the document's body, as it is when the link followed went with its page.
-  - `useHeadingAfterNavigation` in ui subscribes to the router's `onResolved`. When the path changed, two frames later, it focuses `#main h1`, with `tabIndex=-1` and no ring.
+  - `useHeadingAfterNavigation` in ui subscribes to the router's `onResolved`. When the path changed, two frames later, it focuses `#main h1`, with `tabIndex=-1` and no ring. No ring is ui's base style for any heading with `tabIndex=-1` that has the focus, since no key reaches one; Chromium drew its default ring on a first load's focus otherwise (#214's audit). A screen reader reads from it as before, and a control the keyboard reaches keeps the kit's ring; a test holds both.
   - The first load starts at the document, as a browser's does, so a plain page's heading isn't focused on a first load.
   - Focus that is still somewhere stays there: a rail's or a drawer's link that stays, or a page that placed it itself.
   - A page that draws its heading late, such as a thread before its stream is live, is watched for it for two seconds.

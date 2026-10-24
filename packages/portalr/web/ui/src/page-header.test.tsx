@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { PageHeader } from "./page-header";
 
@@ -36,4 +37,20 @@ test("a page header's heading can name the region around it", async () => {
 test("a page that takes the focus puts it on its heading, as it appears", async () => {
   const screen = await render(<PageHeader title="Settings" focus />);
   await expect.element(screen.getByRole("heading", { level: 1, name: "Settings" })).toHaveFocus();
+});
+
+test("a heading the page focuses has the focus, and draws no ring, while a key's focus does", async () => {
+  const screen = await render(
+    <>
+      <PageHeader title="Runs" focus />
+      <button type="button">More</button>
+    </>,
+  );
+  const heading = screen.getByRole("heading", { level: 1, name: "Runs" }).element();
+  await expect.poll(() => document.activeElement).toBe(heading);
+  expect(getComputedStyle(heading).outlineStyle).toBe("none");
+  await userEvent.tab();
+  const button = screen.getByRole("button", { name: "More" }).element();
+  expect(button.matches(":focus-visible")).toBe(true);
+  expect(getComputedStyle(button).outlineStyle).not.toBe("none");
 });

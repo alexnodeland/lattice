@@ -17,6 +17,7 @@ from typing import Any, Final
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     Connection,
     DateTime,
@@ -83,6 +84,16 @@ class Removal(Base):
     tenant_id: Mapped[str] = mapped_column(String, primary_key=True)
     removed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     """When they were removed: their events from before it are deleted, and none after."""
+
+
+class AuditCursor(Base):
+    """How far a tenant's audit log in grantr has been read for removals."""
+
+    __tablename__ = "portalr_analytics_audit_cursor"
+
+    tenant_id: Mapped[str] = mapped_column(String, primary_key=True)
+    seq: Mapped[int] = mapped_column(BigInteger().with_variant(Integer(), "sqlite"), nullable=False)
+    """The `seq` of the last entry read: the log is read on from after it."""
 
 
 metadata = Base.metadata
@@ -237,23 +248,22 @@ class SqlConsent:
             )
             return [(row.user_id, row.delete_owed) for row in rows]
 
-    async def owe_removal(self, user_id: str, tenant: str) -> datetime:
-        """Owe the deletion of the person's events in the tenant, up to now: when, as owed.
+    async def owe_removal(self, user_id: str, tenant: str, removed_at: datetime) -> None:
+        """Owe the deletion of the person's events in the tenant, up to `removed_at` or later.
 
         Written as the tables' owner. A second removal before the first is settled owes up to
-        the later one.
+        the later one, whichever is read first.
         """
-        now = datetime.now(UTC)
+        owed = Removal.__table__.c.removed_at
         async with self._owner.begin() as connection:
             await connection.execute(
                 _upsert(connection)(Removal)
-                .values(user_id=user_id, tenant_id=tenant, removed_at=now)
+                .values(user_id=user_id, tenant_id=tenant, removed_at=removed_at)
                 .on_conflict_do_update(
                     index_elements=[Removal.user_id, Removal.tenant_id],
-                    set_={"removed_at": now},
+                    set_={"removed_at": case((owed < removed_at, removed_at), else_=owed)},
                 )
             )
-        return now
 
     async def removal_settled(self, user_id: str, tenant: str, removed_at: datetime) -> None:
         """Clear the deletion owed for that removal, only if no later one is owed since."""
@@ -278,6 +288,30 @@ class SqlConsent:
                 query.order_by(Removal.removed_at, Removal.user_id, Removal.tenant_id).limit(most)
             )
             return [(row.user_id, row.tenant_id, _utc(row.removed_at)) for row in rows]
+
+    async def audit_cursor(self, tenant: str) -> int:
+        """The `seq` up to which the tenant's audit log has been read for removals.
+
+        Read as the tables' owner.
+        """
+        async with self._owner.connect() as connection:
+            seq = await connection.scalar(
+                select(AuditCursor.seq).where(AuditCursor.tenant_id == tenant)
+            )
+        return seq or 0
+
+    async def advance_audit(self, tenant: str, seq: int) -> None:
+        """Record that the tenant's audit log is read up to `seq`, if that is further."""
+        read = AuditCursor.__table__.c.seq
+        async with self._owner.begin() as connection:
+            await connection.execute(
+                _upsert(connection)(AuditCursor)
+                .values(tenant_id=tenant, seq=seq)
+                .on_conflict_do_update(
+                    index_elements=[AuditCursor.tenant_id],
+                    set_={"seq": case((read < seq, seq), else_=read)},
+                )
+            )
 
 
 class SqlReplayConsent(SqlConsent):

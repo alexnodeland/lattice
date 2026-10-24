@@ -319,7 +319,9 @@ class Portal:
             try:
                 settled = await relay.settle_owed()
             except Exception:
-                LOGGER.exception("analytics: the deletions owed weren't read; tried again later")
+                LOGGER.exception(
+                    "analytics: the removals and deletions owed weren't read; tried again later"
+                )
             else:
                 if settled:
                     LOGGER.info("analytics: deleted the events of %d people owed it", settled)
@@ -374,10 +376,11 @@ class Portal:
                 InMemoryRateLimiter(),
                 umami=umami(self._settings, self._clients),
                 replay=replay,
+                # A person removed from a tenant has their events there deleted, as grantr's
+                # audit log says (portalr ADR-0075).
+                grants=self.grants,
             )
             self._relay = relay
-            # A person removed from a tenant has their events there deleted (portalr ADR-0075).
-            self.grants.on_member_removed(relay.member_removed)
             # A request's analytics session on its server span, where it is the caller's own: added
             # before the server's instrumentation, which runs outside it (portalr ADR-0073).
             app.add_middleware(SessionStamp, relay=relay, resolve_actor=self._access.caller)

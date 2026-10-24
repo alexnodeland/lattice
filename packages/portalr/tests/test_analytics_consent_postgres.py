@@ -10,6 +10,7 @@ import asyncio
 import os
 import uuid
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime
 
 import pytest
 from sqlalchemy import text
@@ -85,37 +86,43 @@ async def test_the_owner_reads_every_deletion_owed(
     assert await consent.owing(100) == owed
 
 
-async def test_removals_are_the_owners_alone(schema: tuple[AsyncEngine, AsyncEngine]) -> None:
+OWNERS = {
+    "portalr_analytics_removals_owed": "('bob', 'acme', now())",
+    "portalr_analytics_audit_cursor": "('acme', 1)",
+}
+"""The tables the owner alone reads and writes, each with a row to try to insert."""
+
+
+async def test_what_is_owed_and_read_is_the_owners_alone(
+    schema: tuple[AsyncEngine, AsyncEngine],
+) -> None:
     owner, application = schema
     consent = SqlConsent(application, owner=owner)
-    at = await consent.owe_removal("alice", "acme")
+    at = datetime.now(UTC)
+    await consent.owe_removal("alice", "acme", at)
     assert await consent.removals_owed(100) == [("alice", "acme", at)]
-    for statement in (
-        "SELECT * FROM portalr_analytics_removals_owed",
-        "INSERT INTO portalr_analytics_removals_owed VALUES ('bob', 'acme', now())",
-        "UPDATE portalr_analytics_removals_owed SET removed_at = now()",
-    ):
-        async with application.begin() as connection:
-            with pytest.raises(Exception, match="permission denied"):
-                await connection.execute(text(statement))
-    async with owner.connect() as connection:
-        secured = await connection.scalar(
-            text(
-                "SELECT relrowsecurity FROM pg_class"
-                " WHERE relname = 'portalr_analytics_removals_owed'"
+    await consent.advance_audit("acme", 4)
+    assert await consent.audit_cursor("acme") == 4
+    for table, row in OWNERS.items():
+        for statement in (
+            f"SELECT * FROM {table}",
+            f"INSERT INTO {table} VALUES {row}",
+            f"DELETE FROM {table}",
+        ):
+            async with application.begin() as connection:
+                with pytest.raises(Exception, match="permission denied"):
+                    await connection.execute(text(statement))
+        async with owner.connect() as connection:
+            secured = await connection.scalar(
+                text(f"SELECT relrowsecurity FROM pg_class WHERE relname = '{table}'")
             )
-        )
-    assert secured, "row-level security, so a grant made by default reads nothing"
-    async with owner.connect() as connection:
-        policies = await connection.scalar(
-            text(
-                "SELECT count(*) FROM pg_policies"
-                " WHERE tablename = 'portalr_analytics_removals_owed'"
+            policies = await connection.scalar(
+                text(f"SELECT count(*) FROM pg_policies WHERE tablename = '{table}'")
             )
+        assert secured, "row-level security, so a grant made by default reads nothing"
+        assert policies == 1, (
+            "a policy, as stackr's smoke test holds every table of the application's to"
         )
-    assert policies == 1, (
-        "a policy, as stackr's smoke test holds every table of the application's to"
-    )
     await consent.removal_settled("alice", "acme", at)
     assert await consent.removals_owed(100) == []
 

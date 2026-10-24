@@ -78,6 +78,9 @@ export const Route = createFileRoute("/_signed/t/$tenant/traces/")({
   ),
 });
 
+/** A trace's id as the list shows it: its last 8 digits, which its padding doesn't reach. */
+const shortened = (id: string) => id.slice(-8);
+
 function Traces() {
   const { tenant } = Route.useParams();
   const shown = Route.useSearch();
@@ -132,30 +135,21 @@ function Traces() {
           {
             key: "trace",
             label: "Trace",
-            // Its first 8 digits, as a commit's are shortened, and named and copied whole. Tempo's
-            // root span names the trace, but the root may be another tenant's, so isn't read.
+            // Its last 8 digits, since an id is padded with zeros at its start, and named and
+            // copied whole. Tempo's root span names the trace, but the root may be another
+            // tenant's, so isn't read.
             cell: (trace) => (
-              <span className="flex items-center gap-2">
-                <TextLink
-                  variant="subtle"
-                  aria-label={`Trace ${trace.trace_id}`}
-                  render={
-                    <Link
-                      to="/t/$tenant/traces/$trace"
-                      params={{ tenant, trace: trace.trace_id }}
-                    />
-                  }
-                >
-                  <code className="font-mono text-xs" title={trace.trace_id}>
-                    {trace.trace_id.slice(0, 8)}
-                  </code>
-                </TextLink>
-                <CopyButton
-                  text={trace.trace_id}
-                  what={`trace ${trace.trace_id.slice(0, 8)}`}
-                  onSaid={setCopied}
-                />
-              </span>
+              <TextLink
+                variant="subtle"
+                aria-label={`Trace ${trace.trace_id}`}
+                render={
+                  <Link to="/t/$tenant/traces/$trace" params={{ tenant, trace: trace.trace_id }} />
+                }
+              >
+                <code className="font-mono text-xs" title={trace.trace_id}>
+                  {shortened(trace.trace_id)}
+                </code>
+              </TextLink>
             ),
           },
           {
@@ -172,6 +166,14 @@ function Traces() {
         ]}
         items={traces}
         keyOf={(trace) => trace.trace_id}
+        // Beside the row, not in its first cell, which names the row.
+        actions={(trace) => (
+          <CopyButton
+            text={trace.trace_id}
+            what={`trace ${shortened(trace.trace_id)}`}
+            onSaid={setCopied}
+          />
+        )}
         empty={
           filtered
             ? { title: "No traces match", body: "Widen the window, or clear the thread or run." }

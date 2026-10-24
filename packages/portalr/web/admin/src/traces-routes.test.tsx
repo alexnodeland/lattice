@@ -334,20 +334,22 @@ test("to a tenant's admin, a trace shows no analytics session, even one the serv
   await expect.element(screen.getByText(/Analytics session/)).not.toBeInTheDocument();
 });
 
-test("a trace is listed by its first 8 digits, named and copied whole, with no duration until Tempo has one", async () => {
+test("a trace is listed by its last 8 digits, named and copied whole, with no duration until Tempo has one", async () => {
   const { screen } = await open("/t/acme/traces");
   const table = screen.getByRole("table", { name: "Traces" });
   const first = `${"0".repeat(24)}c029eec0`;
   const link = table.getByRole("link", { name: `Trace ${first}` });
-  await expect.element(link).toHaveTextContent(first.slice(0, 8));
+  // Padded with zeros at its start, as Tempo pads an id: its last 8 digits tell it apart.
+  await expect.element(link).toHaveTextContent("c029eec0");
+  // The row is named by its trace alone: its copy is beside it, not in the cell that names it.
+  await expect
+    .element(table.getByRole("row", { name: `Trace ${first}`, exact: true }))
+    .toBeVisible();
   expect(table.getByText("–").elements()).toHaveLength(0);
   // Each row's copy is named by its trace, and what it did is said once, for the table.
   expect(table.getByRole("status").elements()).toHaveLength(0);
-  await table
-    .getByRole("button", { name: `Copy trace ${first.slice(0, 8)}` })
-    .first()
-    .click();
+  await table.getByRole("button", { name: "Copy trace c029eec0" }).click();
   await expect
-    .element(screen.getByRole("status").filter({ hasText: "trace 00000000" }))
+    .element(screen.getByRole("status").filter({ hasText: "trace c029eec0" }))
     .toBeInTheDocument();
 });

@@ -190,7 +190,7 @@ bad.check(events={"ops:service.error": ServiceError}, actions={"page"})
 reflexr.core.errors.InvalidRule: rule 'ops:bad' is invalid: no event type 'ops:service.eror'; no predicate 'business_hours'; no action 'triage'
 ```
 
-`InvalidRule` is a `ValueError`, and its `problems` attribute lists the problems one by one, each once. A name without a namespace fails before that, as the rule is built or loaded: `on("service.error")` raises `ValidationError` with `event type 'service.error' has no namespace; did you mean 'ops:service.error'?`.
+`InvalidRule` is a `ValueError`, and its `problems` attribute lists the problems one by one, each once. Each is a `Problem`: a string of its message, which also holds the `type` of what is wrong and, where it belongs to a field of the rule, that field's `loc`, such as `("when", "throttle")`. `check_stored` lists them the same way. A name without a namespace fails before that, as the rule is built or loaded: `on("service.error")` raises `ValidationError` with `event type 'service.error' has no namespace; did you mean 'ops:service.error'?`.
 
 You rarely call it yourself:
 

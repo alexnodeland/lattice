@@ -164,6 +164,50 @@ def test_a_bad_stored_rule_is_refused(changes: dict[str, Any], problems: list[st
     assert check_stored(stored(**changes), CONFIG) == problems
 
 
+@pytest.mark.parametrize(
+    ("changes", "loc", "kind"),
+    [
+        ({"name": "oncall:x"}, ["name"], "not_allowed"),
+        ({"description": "x" * 2001}, ["description"], "string_too_long"),
+        ({"when": when(throttle=None)}, ["when", "throttle"], "missing"),
+        (
+            {"when": when(throttle={"at_most": 2, "per": "PT1M"})},
+            ["when", "throttle", "at_most"],
+            "less_than_equal",
+        ),
+        (
+            {"when": when(dedupe={"key": ["service"], "within": "P2D"})},
+            ["when", "dedupe", "within"],
+            "less_than_equal",
+        ),
+        ({"scope": {"fields": ["service"]}}, ["scope", "fields"], "not_allowed"),
+        ({"then": {"action": "restart"}}, ["then", "action"], "not_allowed"),
+        ({"then": {"action": "notify"}}, ["then", "params", "thread_id"], "missing"),
+        ({"retry": {"max_attempts": 6}}, ["retry", "max_attempts"], "less_than_equal"),
+        ({"ordering": "scope"}, ["ordering"], "not_allowed"),
+        ({"timeout": None}, ["timeout"], "missing"),
+        ({"timeout": "PT10M"}, ["timeout"], "less_than_equal"),
+    ],
+)
+def test_a_problem_names_the_field_to_fix(
+    changes: dict[str, Any], loc: list[str], kind: str
+) -> None:
+    [problem] = check_stored(stored(**changes), CONFIG)
+    assert (list(problem.loc), problem.type) == (loc, kind)
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"when": when(filter=only({"kind": "predicate", "name": "business_hours"}))},
+        {"when": when(filter=only({"kind": "where", "field": "f", "op": "matches", "value": "a"}))},
+    ],
+)
+def test_a_problem_in_a_filter_names_no_field(changes: dict[str, Any]) -> None:
+    [problem] = check_stored(stored(**changes), CONFIG)
+    assert (problem.loc, problem.type) == ((), "not_allowed")
+
+
 def test_every_problem_is_listed_together() -> None:
     rule = stored(
         name="oncall:everything",

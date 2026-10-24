@@ -25,6 +25,8 @@
   --chart-dash-3: none;
   /* A marker's size, and how round it is: its corner is that fraction of its size, so a half is a circle. */
   --chart-marker-size: 5px;
+  /* A line's markers are drawn where they tell series apart: in the modes below, not here. */
+  --chart-marker-display: none;
   --chart-marker-corner-1: 0.5;
   --chart-marker-corner-2: 0.5;
   --chart-marker-corner-3: 0.5;
@@ -88,6 +90,7 @@
   --chart-dash-2: 6 4;
   --chart-dash-3: 2 3;
   --chart-marker-size: 8px;
+  --chart-marker-display: inline;
   --chart-marker-corner-2: 0;
   --chart-marker-corner-3: 0;
   --chart-marker-turn-3: 45deg;
@@ -130,6 +133,7 @@
     --chart-dash-2: 6 4;
     --chart-dash-3: 2 3;
     --chart-marker-size: 8px;
+    --chart-marker-display: inline;
     --chart-marker-corner-2: 0;
     --chart-marker-corner-3: 0;
     --chart-marker-turn-3: 45deg;

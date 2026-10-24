@@ -10,13 +10,15 @@
  * - no face is fetched from esm.sh: the fallback Excalidraw names is the app's own copy, and the
  *   build fails if any file it writes names esm.sh;
  * - the faces but Xiaolai are copied beside the app, at `excalidraw/fonts/`, which
- *   `EXCALIDRAW_ASSET_PATH` names. Xiaolai, the CJK face, waits for its licence (lattice#679):
- *   it isn't registered, so nothing asks for it, and browsers draw CJK with a face of their own.
+ *   `EXCALIDRAW_ASSET_PATH` names. Xiaolai, the CJK face, waits for its author's answer (lattice#679;
+ *   12 MB, stackr ADR-0049): it isn't registered, so nothing asks for it, and browsers draw CJK with a
+ *   face of their own. Liberation Sans is replaced (@portalr/notices' liberation.ts).
  */
 
 import { cpSync, readdirSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
+import { LIBERATION_URI, replaceLiberation } from "@portalr/notices";
 import type { Plugin } from "vite";
 
 /** Where the app serves Excalidraw's faces, under its base. */
@@ -190,6 +192,14 @@ export function excalidraw(base: string): Plugin {
       if (locales.length > 0) {
         this.error(`Excalidraw's locales but English are built: ${locales.join(", ")}`);
       }
+      const liberation = Object.values(bundle).some(
+        (file) => file.type === "chunk" && file.code.includes(LIBERATION_URI),
+      );
+      if (!liberation) {
+        this.error(
+          `no chunk names ${LIBERATION_URI}: Excalidraw's Liberation Sans isn't where it was`,
+        );
+      }
       const naming = Object.entries(bundle)
         .filter(([, file]) =>
           (file.type === "chunk" ? file.code : String(file.source)).includes("esm.sh"),
@@ -204,6 +214,7 @@ export function excalidraw(base: string): Plugin {
       for (const face of readdirSync(fonts())) {
         if (face !== "Xiaolai") cpSync(join(fonts(), face), join(out, face), { recursive: true });
       }
+      replaceLiberation(out);
     },
   };
 }

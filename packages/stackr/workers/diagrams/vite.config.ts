@@ -1,11 +1,13 @@
-// The worker's page, and Excalidraw's faces beside it, which its exports embed. Xiaolai, the CJK
-// face, is left out unless XIAOLAI is 1, until its licence is confirmed (lattice#679): Noto CJK,
-// the image's system face, draws CJK meanwhile (stackr ADR-0049).
+// The worker's page, and Excalidraw's faces beside it, which its exports embed, but for Liberation
+// Sans, which is replaced (@portalr/notices' liberation.ts). Xiaolai, the CJK face, is left out
+// unless XIAOLAI is 1, until its author answers whether Excalidraw's modified copy may keep the
+// name its README reserves (lattice#679): Noto CJK, the image's system face, draws CJK meanwhile
+// (stackr ADR-0049).
 
 import { cpSync, readdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
-import { notices, readPolicy } from "@portalr/notices";
+import { notices, readPolicy, replaceLiberation } from "@portalr/notices";
 import { defineConfig, type Plugin } from "vite";
 
 const fonts = join(
@@ -23,6 +25,7 @@ function faces(): Plugin {
         if (face === "Xiaolai" && process.env.XIAOLAI !== "1") continue;
         cpSync(join(fonts, face), join(out, face), { recursive: true });
       }
+      replaceLiberation(out);
     },
   };
 }

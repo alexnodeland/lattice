@@ -316,7 +316,10 @@ async def test_agents_install_update_and_archive_stored_rules(server: Server) ->
         pytest.param(
             "update_rule",
             chat_rule() | {"timeout": None},
-            'rule chat:deploys cannot be stored: ["timeout is required"]',
+            (
+                "rule chat:deploys cannot be stored: "
+                '[{"loc": ["rule", "timeout"], "msg": "timeout is required", "type": "missing"}]'
+            ),
             id="beyond the limits",
         ),
         pytest.param(

@@ -30,7 +30,7 @@ Run commands answer with `run`: the run as it now is; `replay_rule` answers with
 
 Stored rules are off unless the application configures them: without them, a change is `forbidden`, as it is for a code rule's name, or one `authorize` refuses; it hears each change with the rule's name. `provenance` is an opaque JSON object of at most 4 KiB, kept on the rule and its fact. A rule that fails `Rule.check` or `check_stored`, or provenance over 4 KiB, is `validation_failed`, with every problem in `errors`. Updating or archiving a name no stored rule has is `not_found`. A change that would leave the rule as it is appends nothing and answers `duplicate: true`, checked before `expected_version`, so a retried change is no conflict; its `seq` is the head of the log.
 
-Rejections carry a stable `type` and a `message`: `not_found`, `invalid_state`, `validation_failed` (with Pydantic's `errors`), `forbidden`, `depth_exceeded` (a publish beyond the causation limit), and `unsupported_protocol`.
+Rejections carry a stable `type` and a `message`: `not_found`, `invalid_state`, `validation_failed` (with Pydantic's `errors`, each `{loc, msg, type}`; for a rule that cannot be stored, `loc` starts with `rule` as Pydantic's does for a command, then the field's path, such as `["rule", "when", "throttle"]`, with a list's items by number, such as `["rule", "scope", "fields", 0]`, and is empty for a problem that names no field, such as a filter's unknown event type. `type` is Pydantic's name where it has one, such as `missing`, `string_too_long` or `less_than_equal`, and otherwise reflexr's own: `not_allowed`, `too_large` and `unknown`), `forbidden`, `depth_exceeded` (a publish beyond the causation limit), and `unsupported_protocol`.
 
 ### Deduplication
 

@@ -1,5 +1,6 @@
 """Rules: scopes, actions, retries, definitions and checks."""
 
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -85,9 +86,16 @@ def test_params_load_as_the_actions_model() -> None:
         "then.params.thread_id: Field required",
         "then.params.loud: Input should be a valid boolean, unable to interpret input",
     ]
+    assert [(p.loc, p.type) for p in invalid.value.problems] == [
+        (("then", "params", "thread_id"), "missing"),
+        (("then", "params", "loud"), "bool_parsing"),
+    ]
     with pytest.raises(InvalidRule) as invalid:
         load_params(notify, None)
     assert invalid.value.problems == ["then.params must be empty"]
+    assert [(p.loc, p.type) for p in invalid.value.problems] == [
+        (("then", "params"), "not_allowed")
+    ]
 
 
 class Since(BaseModel, strict=True):
@@ -159,6 +167,11 @@ def test_the_check_lists_every_problem() -> None:
         "no predicate 'missing'",
         "no action 'absent'",
     ]
+    assert [(p.loc, p.type) for p in invalid.value.problems] == [
+        ((), "unknown"),
+        ((), "unknown"),
+        (("then", "action"), "unknown"),
+    ]
     heartbeats = Rule.model_validate(
         {
             "name": "app:quiet",
@@ -181,6 +194,41 @@ def test_the_check_lists_every_problem() -> None:
         "no field 'severity' on app:heartbeat",
         "no field 'region' on app:heartbeat",
     ]
+    assert [p.loc for p in invalid.value.problems] == [(), ("scope", "fields", 0)]
+
+
+def test_a_field_named_twice_is_listed_once_at_the_first_place_the_rule_names_it() -> None:
+    rule = Rule.model_validate(
+        {
+            "name": "app:twice",
+            "when": {
+                "filter": {"kind": "on", "types": ["app:heartbeat"]},
+                "dedupe": {"key": ["region"], "within": "PT1M"},
+            },
+            "scope": {"fields": ["region"]},
+            "then": {"action": "page"},
+        }
+    )
+    with pytest.raises(InvalidRule) as invalid:
+        rule.check(events=DEFAULT_REGISTRY, actions={"page"})
+    assert [(str(p), p.loc) for p in invalid.value.problems] == [
+        ("no field 'region' on app:heartbeat", ("scope", "fields", 0))
+    ]
+    keyed = rule.model_copy(update={"scope": Scope()})
+    with pytest.raises(InvalidRule) as invalid:
+        keyed.check(events=DEFAULT_REGISTRY, actions={"page"})
+    assert [p.loc for p in invalid.value.problems] == [("when", "dedupe", "key", 0)]
+
+
+class Targets(BaseModel):
+    threads: list[int]
+
+
+def test_a_params_field_in_a_list_names_its_index() -> None:
+    rule = spike(then=run("notify", threads=[1, "x"]))
+    with pytest.raises(InvalidRule) as invalid:
+        load_params(rule, Targets)
+    assert [p.loc for p in invalid.value.problems] == [("then", "params", "threads", 1)]
 
 
 def test_sequence_steps_are_checked_too() -> None:
@@ -201,7 +249,7 @@ DEPLOYS = OnFilter(types=("app:deploy.finished",))
 SEVERE = F.severity >= 7
 
 
-def problems(filter: Filter, **condition: object) -> list[str]:
+def problems(filter: Filter, **condition: object) -> Sequence[str]:
     """Check a rule with this filter, and return its problems."""
     when = Condition.model_validate({"filter": filter, **condition})
     rule = Rule(name="app:checked", when=when, scope=by(F.service), then=run("act"))

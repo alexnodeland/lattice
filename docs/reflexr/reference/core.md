@@ -316,6 +316,8 @@ The ways a command can fail, and the error for an invalid rule. See [Rejections]
 
 ::: reflexr.core.InvalidRule
 
+::: reflexr.core.Problem
+
 ## Protocol
 
 The stream protocol's commands, outcomes, frames and resume rule. See the [stream protocol](../protocol.md).

@@ -44,7 +44,7 @@ from reflexr.core.conditions import (
     walk,
     where_fields,
 )
-from reflexr.core.errors import InvalidRule
+from reflexr.core.errors import InvalidRule, Problem
 from reflexr.core.events import SYSTEM_EVENTS, Event
 from reflexr.core.ids import RuleName, ScopeKey
 
@@ -210,10 +210,19 @@ class Rule(BaseModel):
             # The steps see only envelopes that passed the filter.
             for step in condition.pattern.steps:
                 problems.extend(_check_filter(step, passing, known, predicates))
-        fields = [*self.scope.fields, *(condition.dedupe.key if condition.dedupe else ())]
-        problems.extend(_missing_fields([(path, passing) for path in fields], known))
+        keyed = condition.dedupe.key if condition.dedupe else ()
+        fields = [
+            *(
+                (path, passing, ("scope", "fields", at))
+                for at, path in enumerate(self.scope.fields)
+            ),
+            *((path, passing, ("when", "dedupe", "key", at)) for at, path in enumerate(keyed)),
+        ]
+        problems.extend(_missing_fields(fields, known))
         if actions is not None and self.then.action not in actions:
-            problems.append(f"no action {self.then.action!r}")
+            problems.append(
+                Problem(f"no action {self.then.action!r}", "unknown", ("then", "action"))
+            )
         if problems:
             raise InvalidRule(self.name, list(dict.fromkeys(problems)))
 
@@ -239,13 +248,20 @@ def load_params(rule: Rule, model: type[BaseModel] | None) -> BaseModel | None:
     params = rule.then.params
     if model is None:
         if params:
-            raise InvalidRule(rule.name, ["then.params must be empty"])
+            raise InvalidRule(
+                rule.name,
+                [Problem("then.params must be empty", "not_allowed", ("then", "params"))],
+            )
         return None
     try:
         return model.model_validate_json(json.dumps(params))
     except ValidationError as error:
         problems = [
-            f"{'.'.join(('then', 'params', *map(str, e['loc'])))}: {e['msg']}"
+            Problem(
+                f"{'.'.join(('then', 'params', *map(str, e['loc'])))}: {e['msg']}",
+                e["type"],
+                ("then", "params", *e["loc"]),
+            )
             for e in error.errors(include_input=False)
         ]
         raise InvalidRule(rule.name, problems) from None
@@ -256,35 +272,39 @@ def _check_filter(
     within: Admitted,
     known: Mapping[str, type[Event]],
     predicates: Collection[str],
-) -> list[str]:
+) -> list[Problem]:
     filters = list(walk(filter))
     return [
         *(
-            f"no event type {name!r}"
+            Problem(f"no event type {name!r}", "unknown")
             for f in filters
             if isinstance(f, OnFilter)
             for name in f.types
             if name not in known
         ),
         *(
-            f"no predicate {f.name!r}"
+            Problem(f"no predicate {f.name!r}", "unknown")
             for f in filters
             if isinstance(f, PredicateFilter) and f.name not in predicates
         ),
-        *_missing_fields(where_fields(filter, within), known),
+        *_missing_fields(
+            [(path, types, ()) for path, types in where_fields(filter, within)], known
+        ),
     ]
 
 
 def _missing_fields(
-    fields: list[tuple[str, Admitted]], known: Mapping[str, type[Event]]
-) -> list[str]:
+    fields: list[tuple[str, Admitted, tuple[str | int, ...]]], known: Mapping[str, type[Event]]
+) -> list[Problem]:
     """Return a problem for each field that a type it is compared on does not have.
+
+    Each field comes with its place in the rule, empty for one in a filter.
 
     Types that are not known cannot be checked, and a field any type can reach cannot either.
     """
     return [
-        f"no field {path!r} on {event_type.event_type}"
-        for path, types in fields
+        Problem(f"no field {path!r} on {event_type.event_type}", "unknown", loc)
+        for path, types, loc in fields
         for name in types or ()
         if (event_type := known.get(name)) is not None and not has_field(event_type, path)
     ]

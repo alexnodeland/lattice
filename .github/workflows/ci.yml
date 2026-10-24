@@ -240,6 +240,22 @@ jobs:
       - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
       - run: uv run --no-project python scripts/affected.py files
 
+  # Umami's replay retention (portalr ADR-0077), against the pinned Umami and PostgreSQL: old
+  # recordings are deleted and nothing else, it is bounded and idempotent, and it fails loudly.
+  umami-retention:
+    name: Umami retention
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
+      - run: uv run --no-project python scripts/affected.py umami-retention
+
   # A stackr release's image path (stackr ADR-0035), short of GHCR, when the images change: each
   # architecture's OCI archives, built by deploy/image-archive on a runner of that architecture,
   # as release.yml builds them. They are kept a week.
@@ -706,7 +722,7 @@ jobs:
   ci:
     name: CI
     if: always()
-    needs: [check, tests, images, specs, floors, thin-images, files, gotrue, release-images, release-images-publish, acceptance, aws, aws-tier2-affected, aws-tier2, template, smoke, dependency-review, osv]
+    needs: [check, tests, images, specs, floors, thin-images, files, umami-retention, gotrue, release-images, release-images-publish, acceptance, aws, aws-tier2-affected, aws-tier2, template, smoke, dependency-review, osv]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions: {}

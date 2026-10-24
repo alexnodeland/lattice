@@ -1,0 +1,243 @@
+#!/usr/bin/env bash
+# Check deploy/umami/retention against a real Umami (stackr ADR-0050, portalr ADR-0077): the
+# pinned Umami and PostgreSQL, on a network of their own, replay on. Four replays are kept through
+# portalr's client; two chunks are made old; then the sweep, run as compose.yaml runs the service
+# (the image, user, read-only root, tmpfs, dropped capabilities, init and environment it names):
+# - refuses a bad or too large number of days and a wrong password, loudly, deleting nothing, and
+#   keeps everything at 0 days;
+# - is bounded: a batch of one, one batch, deletes one and says there may be more;
+# - deletes only the old recordings, replay on or off: sessions, events and a recent chunk of the
+#   same session stay, a saved replay left with no recording goes and one with a recording stays;
+# - is idempotent: a second run finds nothing; and Umami still serves what is left;
+# - in loop mode, writes the marker the healthcheck reads, and stops at once when told to.
+#
+# Usage: scripts/check-umami-retention   (needs Docker and the network, to pull the images)
+# Everything it makes is named stackr-retention-check-<hex>, and removed by those exact names when
+# it ends. It publishes Umami on 127.0.0.1 alone, at a port the system picks.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+name=stackr-retention-check-$(od -An -N4 -tx1 /dev/urandom | tr -d ' \n')
+umami_image=$(sed -n 's|^    image: \(ghcr.io/umami-software/umami:[^ ]*\)$|\1|p' compose.yaml |
+  head -1)
+pg_image=$(awk '/^  umami-db-init:/{found=1} found && /image:/{print $2; exit}' compose.yaml)
+password=$(od -An -N12 -tx1 /dev/urandom | tr -d ' \n')
+website=$(uuidgen | tr '[:upper:]' '[:lower:]')
+status=0
+
+cleanup() {
+  docker rm -fv "$name-umami" "$name-pg" "$name-loop" "$name-sweep" >/dev/null 2>&1 || true
+  docker network rm "$name-net" >/dev/null 2>&1 || true
+}
+trap cleanup EXIT
+
+die() {
+  printf 'check-umami-retention: %s\n' "$*" >&2
+  exit 1
+}
+[[ -n $umami_image && -n $pg_image ]] || die "no image pins in compose.yaml"
+ok() { printf 'ok: %s\n' "$*"; }
+fail() { printf 'FAIL: %s\n' "$*" >&2; status=1; }
+said_has() { # description, text, what was said
+  if grep -q "$2" <<<"$3"; then ok "$1"; else fail "$1: it said: $3"; fi
+}
+expect() { # description, expected, actual
+  if [[ $2 == "$3" ]]; then ok "$1"; else fail "$1: expected '$2', got '$3'"; fi
+}
+q() {
+  docker exec -e PGPASSWORD="$password" "$name-pg" psql -h 127.0.0.1 -U umami -d umami -At -c "$1"
+}
+
+rows() { q "SELECT count(*) FROM $1"; }
+
+# The service's own settings, read from compose.yaml: the flags it runs with, one per line.
+service_flags() {
+  uv run --quiet python - <<'PY'
+import yaml
+
+service = yaml.safe_load(open("compose.yaml"))["services"]["umami-retention"]
+assert service["init"] is True and service["read_only"] is True
+assert service["entrypoint"] == ["sh", "/retention"]
+flags = ["--user", service["user"], "--cap-drop", service["cap_drop"][0]]
+flags += ["--read-only", "--tmpfs", service["tmpfs"][0], "--init"]
+for option in service["security_opt"]:
+    flags += ["--security-opt", option]
+for key in ("PGOPTIONS", "PGCONNECT_TIMEOUT"):
+    flags += ["--env", f"{key}={service['environment'][key]}"]
+print("\n".join(flags))
+PY
+}
+flags=()
+while IFS= read -r line; do flags+=("$line"); done < <(service_flags)
+# Exactly the hardening the service is meant to have: a change to compose.yaml is seen here.
+expected=(--user 70 --cap-drop ALL --read-only --tmpfs /tmp --init
+  --security-opt no-new-privileges:true
+  --env "PGOPTIONS=-c lock_timeout=10s -c statement_timeout=5min" --env PGCONNECT_TIMEOUT=10)
+[[ "${flags[*]}" == "${expected[*]}" ]] || die "compose.yaml's service runs with: ${flags[*]}"
+
+# The sweep, as the service: the same image and flags, on the check's own network, as Umami's role.
+sweep() {
+  docker run --rm --name "$name-sweep" --network "$name-net" "${flags[@]}" \
+    -v "$PWD/deploy/umami/retention:/retention:ro" \
+    -e PGHOST=postgres -e PGUSER=umami -e PGDATABASE=umami \
+    -e PGPASSWORD="${PGPASSWORD_USED:-$password}" "$@" "$pg_image" sh /retention --once 2>&1
+}
+
+docker network create "$name-net" >/dev/null
+docker run -d --name "$name-pg" --network "$name-net" --network-alias postgres \
+  -e POSTGRES_PASSWORD="$password" "$pg_image" >/dev/null
+for _ in $(seq 60); do
+  # The server that initialises the data directory doesn't listen on TCP; the real one does.
+  docker exec -e PGPASSWORD="$password" "$name-pg" psql -h 127.0.0.1 -U postgres -d postgres \
+    -Atc 'select 1' >/dev/null 2>&1 && break
+  sleep 1
+done
+docker exec -e PGPASSWORD="$password" "$name-pg" psql -h 127.0.0.1 -U postgres -d postgres \
+  -Atc 'select 1' >/dev/null || die "PostgreSQL didn't start"
+docker exec -i -e UMAMI_DB_PASSWORD="$password" -e PGPASSWORD="$password" "$name-pg" \
+  psql --no-psqlrc --quiet -h 127.0.0.1 -U postgres -d postgres <deploy/postgres/umami.sql
+docker run -d --name "$name-umami" --network "$name-net" -p 127.0.0.1::3000 \
+  -e DATABASE_URL="postgresql://umami:$password@postgres:5432/umami?schema=umami" \
+  -e APP_SECRET="$password$password" -e DISABLE_TELEMETRY=1 -e DISABLE_UPDATES=1 \
+  -e DISABLE_BOT_CHECK=1 "$umami_image" >/dev/null
+url="http://127.0.0.1:$(docker port "$name-umami" 3000/tcp | head -1 | sed 's/.*://')"
+beating=false
+for _ in $(seq 90); do
+  if curl -fsS -o /dev/null "$url/api/heartbeat" 2>/dev/null; then beating=true; break; fi
+  sleep 2
+done
+[[ $beating == true ]] || die "Umami didn't answer in 180 seconds"
+UMAMI_URL=$url UMAMI_ADMIN_PASSWORD="adm$password" UMAMI_PORTALR_PASSWORD="prt$password" \
+  UMAMI_WEBSITE_ID=$website UMAMI_REPLAY=true sh deploy/umami/init >/dev/null
+
+# Four replays, through portalr's client; p1 has two chunks, in two visits.
+(
+  cd ../portalr
+  PROBE_URL=$url PROBE_WEBSITE=$website PROBE_PASSWORD="prt$password" \
+    uv run --locked python - <<'PY'
+import asyncio
+import json
+import os
+from pathlib import Path
+
+import httpx
+
+from portalr.analytics import Umami
+
+events = json.loads(Path("tests/fixtures/replay_chromium.json").read_text())
+
+
+async def main() -> None:
+    async with httpx.AsyncClient() as client:
+        for person in ("p1", "p1", "p2", "p3"):
+            # Each in a Umami of its own, so a second chunk of p1's is in a visit of its own.
+            umami = Umami(
+                os.environ["PROBE_URL"],
+                os.environ["PROBE_WEBSITE"],
+                os.environ["PROBE_PASSWORD"],
+                client,
+            )
+            assert await umami.record("acme", person, events), person
+
+
+asyncio.run(main())
+PY
+)
+expect "four recordings are kept" 4 "$(q "SELECT count(*) FROM umami.session_replay")"
+sessions=$(q "SELECT count(*) FROM umami.session")
+events=$(q "SELECT count(*) FROM umami.website_event")
+
+# Two old chunks: the first and the third stored (p1's first, and p2's). Two saved replays.
+q "WITH ordered AS (
+     SELECT replay_id, row_number() OVER (ORDER BY created_at, replay_id) AS n
+     FROM umami.session_replay)
+   UPDATE umami.session_replay r SET created_at = now() - interval '40 days'
+   FROM ordered o WHERE r.replay_id = o.replay_id AND o.n IN (1, 3)" >/dev/null
+# And a third, with no time stored for the chunk, whose start is old: the fallback to started_at.
+q "UPDATE umami.session_replay SET created_at = NULL, started_at = now() - interval '40 days',
+     ended_at = now() - interval '40 days'
+   WHERE replay_id = (SELECT replay_id FROM umami.session_replay WHERE created_at IS NOT NULL
+     AND created_at >= now() - interval '30 days'
+     ORDER BY created_at DESC, replay_id LIMIT 1)" >/dev/null
+old_ones="SELECT count(*) FROM umami.session_replay
+  WHERE COALESCE(created_at, started_at) < now() - interval '30 days'"
+expect "three recordings are old, one by its start" 3 "$(q "$old_ones")"
+q "INSERT INTO umami.session_replay_saved (saved_replay_id, name, website_id, visit_id)
+   SELECT gen_random_uuid(), 'old', website_id, visit_id FROM umami.session_replay
+   WHERE COALESCE(created_at, started_at) < now() - interval '30 days' AND visit_id NOT IN
+     (SELECT visit_id FROM umami.session_replay
+      WHERE COALESCE(created_at, started_at) >= now() - interval '30 days')
+   ORDER BY created_at, replay_id LIMIT 1" >/dev/null
+q "INSERT INTO umami.session_replay_saved (saved_replay_id, name, website_id, visit_id)
+   SELECT gen_random_uuid(), 'new', website_id, visit_id FROM umami.session_replay
+   WHERE created_at >= now() - interval '30 days' ORDER BY created_at, replay_id LIMIT 1" >/dev/null
+expect "two saved replays" 2 "$(q "SELECT count(*) FROM umami.session_replay_saved")"
+
+sweep -e UMAMI_REPLAY_RETENTION_DAYS=0 >/dev/null
+expect "0 days keeps them for ever" 4 "$(q "SELECT count(*) FROM umami.session_replay")"
+
+for bad in thirty 36501 123456 -1; do
+  if said=$(sweep -e UMAMI_REPLAY_RETENTION_DAYS="$bad"); then
+    fail "'$bad' days was taken: $said"
+  else
+    said_has "'$bad' days fails loudly" FAILED "$said"
+  fi
+done
+if said=$(PGPASSWORD_USED=wrong sweep -e UMAMI_REPLAY_RETENTION_DAYS=30); then
+  fail "a wrong password was taken: $said"
+else
+  said_has "a wrong password fails loudly" FAILED "$said"
+fi
+expect "and none of them deleted anything" 4 "$(rows umami.session_replay)"
+
+said=$(sweep -e UMAMI_REPLAY=false -e UMAMI_REPLAY_RETENTION_DAYS=30 \
+  -e UMAMI_RETENTION_BATCH=1 -e UMAMI_RETENTION_BATCHES=1)
+expect "replay off still deletes: a batch of one deletes one" 3 "$(rows umami.session_replay)"
+said_has "and says there may be more" "there may be more" "$said"
+
+said=$(sweep -e UMAMI_REPLAY_RETENTION_DAYS=30)
+expect "the next run deletes the other two old ones" 1 "$(rows umami.session_replay)"
+expect "no recording older than 30 days is left" 0 "$(q "$old_ones")"
+expect "sessions stay" "$sessions" "$(rows umami.session)"
+expect "events stay" "$events" "$(rows umami.website_event)"
+expect "the recent recording stays" 1 \
+  "$(q "SELECT count(DISTINCT session_id) FROM umami.session_replay")"
+expect "a saved replay left with none goes, one with a recording stays" 1 \
+  "$(rows umami.session_replay_saved)"
+expect "and the one that stays has its recording" 1 \
+  "$(rows "umami.session_replay_saved s JOIN umami.session_replay r ON r.visit_id = s.visit_id")"
+
+said=$(sweep -e UMAMI_REPLAY_RETENTION_DAYS=30)
+said_has "idempotent: a second run finds nothing" "deleted 0 recordings" "$said"
+
+login=$(curl -fsS -X POST "$url/api/auth/login" -H 'content-type: application/json' \
+  -d "{\"username\":\"portalr\",\"password\":\"prt$password\"}")
+token=$(sed -n 's/.*"token":"\([^"]*\)".*/\1/p' <<<"$login")
+count=$(curl -fsS "$url/api/websites/$website/replays?startAt=0&endAt=9999999999999" \
+  -H "Authorization: Bearer $token" | sed -n 's/.*"count":\([0-9]*\).*/\1/p')
+expect "Umami still serves what is left" 1 "$count"
+
+# Loop mode, as the service runs it: a marker the healthcheck reads, and a stop that is prompt.
+docker run -d --name "$name-loop" --network "$name-net" "${flags[@]}" \
+  -v "$PWD/deploy/umami/retention:/retention:ro" \
+  -e PGHOST=postgres -e PGUSER=umami -e PGDATABASE=umami -e PGPASSWORD="$password" \
+  -e UMAMI_REPLAY_RETENTION_DAYS=30 "$pg_image" sh /retention >/dev/null
+marked=false
+for _ in $(seq 30); do
+  marker="test -n \"\$(find /tmp/umami-retention-ok -mmin -1440 2>/dev/null)\""
+  if docker exec "$name-loop" sh -c "$marker"; then
+    marked=true
+    break
+  fi
+  sleep 1
+done
+expect "loop mode writes the marker the healthcheck looks for" true "$marked"
+started=$SECONDS
+docker stop "$name-loop" >/dev/null
+if (( SECONDS - started < 5 )); then
+  ok "and stops when told to, at once"
+else
+  fail "it took $((SECONDS - started)) seconds to stop"
+fi
+
+exit "$status"

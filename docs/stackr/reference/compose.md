@@ -16,7 +16,7 @@
 | `clickhouse` | `clickhouse` | no |
 | `analytics` | `clickhouse` | no |
 | `analytics-init` | `clickhouse`, `clickhouse-init` | no |
-| `umami` | `umami`, `umami-db-init` | no |
+| `umami` | `umami`, `umami-db-init`, `umami-retention` | no |
 | `umami-init` | `umami`, `umami-db-init`, `umami-init` | no |
 | `smoke` | `telemetrygen`, `probe` | no |
 
@@ -33,7 +33,7 @@
 | `stackr` | by Compose | `otel-collector`, `tempo`, `prometheus`, `prom-label-proxy`, `loki`, `pyroscope`, `grafana`, `postgres`, `db-init`, `gotrue`, `redis`, `minio`, `clickhouse`, `clickhouse-init`, `umami-db-init`, `langfuse-worker`, `langfuse-web`, `litellm`, `telemetrygen`, `probe` |
 | `supabase_network_stackr-supabase` | by `make up`, if missing | `db-init`, `langfuse-worker`, `langfuse-web`, `litellm`, `probe` |
 | `stackr-umami` | by `make up`, if missing | `umami`, `umami-init` |
-| `umami-db` | by Compose | `postgres`, `umami` |
+| `umami-db` | by Compose | `postgres`, `umami`, `umami-retention` |
 | `umami-ui` | by Compose | `umami` |
 
 <!-- end generated -->
@@ -459,6 +459,34 @@ Sets Umami's admin password, and makes portalr's user and website, each time `ma
     | `UMAMI_PORTALR_PASSWORD` | `${UMAMI_PORTALR_PASSWORD:?run make env}` |
     | `UMAMI_WEBSITE_ID` | `${UMAMI_WEBSITE_ID:?run make env}` |
     | `UMAMI_REPLAY` | `${UMAMI_REPLAY:-false}` |
+
+### `umami-retention`
+
+Deletes Umami's session replays older than UMAMI_REPLAY_RETENTION_DAYS (30 by default; 0 keeps them), every six hours, as Umami's own database role. Sessions and journeys stay. It runs whether or not replay is on, so recordings made before it was turned off still expire (portalr ADR-0077).
+
+| Property | Value |
+|---|---|
+| Profiles | `umami` |
+| Image | `postgres`, pinned by tag and digest in `compose.yaml` |
+| Published ports | none |
+| Networks | `umami-db` |
+| Volumes | `./deploy/umami/retention` → `/retention` (read-only) |
+| Depends on | `umami` (healthy) |
+| Runs | `sh /retention` |
+| Health check | `test -n "$(find /tmp/umami-retention-ok -mmin -1440)"`, every 5m |
+| Restart | `unless-stopped` |
+
+??? note "Environment"
+
+    | Variable | Value |
+    |---|---|
+    | `PGHOST` | `postgres` |
+    | `PGDATABASE` | `umami` |
+    | `PGUSER` | `umami` |
+    | `PGPASSWORD` | `${UMAMI_DB_PASSWORD:?run make env}` |
+    | `PGCONNECT_TIMEOUT` | `10` |
+    | `PGOPTIONS` | `-c lock_timeout=10s -c statement_timeout=5min` |
+    | `UMAMI_REPLAY_RETENTION_DAYS` | `${UMAMI_REPLAY_RETENTION_DAYS:-30}` |
 
 ### `langfuse-worker`
 

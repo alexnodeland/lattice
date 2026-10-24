@@ -1,10 +1,15 @@
 """Rejections and identifiers."""
 
+import pickle
+from copy import copy as copy_of
+from copy import deepcopy
+
 from reflexr.core import (
     DepthExceeded,
     Forbidden,
     InvalidState,
     NotFound,
+    Problem,
     Rejection,
     UnsupportedProtocol,
     ValidationFailed,
@@ -32,6 +37,27 @@ def test_rejections_have_stable_codes_and_payloads() -> None:
         "depth": 9,
         "limit": 8,
     }
+
+
+def test_a_problem_is_its_message_with_the_field_it_names() -> None:
+    problem = Problem("timeout is required", "missing", ("timeout",))
+    assert problem == "timeout is required"
+    assert problem.error() == {"loc": ["timeout"], "msg": "timeout is required", "type": "missing"}
+    assert problem.error("rule")["loc"] == ["rule", "timeout"]
+    unplaced = Problem("no predicate 'p'", "unknown")
+    assert unplaced.error("rule") == {"loc": [], "msg": "no predicate 'p'", "type": "unknown"}
+    assert Problem("x", "invalid", ("scope", "fields", 0)).error()["loc"] == ["scope", "fields", 0]
+
+
+def test_two_problems_with_one_message_are_equal_whatever_else_they_hold() -> None:
+    assert Problem("x", "a", ("one",)) == Problem("x", "b", ("two",))
+
+
+def test_a_problem_survives_copying_and_pickling() -> None:
+    problem = Problem("timeout is required", "missing", ("timeout",))
+    for copy in (copy_of(problem), deepcopy(problem), pickle.loads(pickle.dumps(problem))):
+        assert isinstance(copy, Problem)
+        assert (str(copy), copy.type, copy.loc) == ("timeout is required", "missing", ("timeout",))
 
 
 def test_identifiers() -> None:

@@ -628,13 +628,15 @@ def test_the_portal_waits_for_umamis_copies_as_it_stops(
 
 
 def test_a_person_removed_from_a_tenant_is_owed_their_events_deletion_there(
-    script: Script, ui: Path, tmp_path: Path
+    script: Script, ui: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    monkeypatch.setattr("{{ package_name }}.portal.SETTLE_EVERY", 0.01)
     database = tmp_path / "app.db"
     named = replace(
         with_portal(ui_dir=str(ui), **ANALYTICS), database_url=f"sqlite+aiosqlite:///{database}"
     )
     grants = seeded()
+    owed: list[tuple[str, str]] = []
     with TestClient(app(script, named, grants=grants)) as client:
         remove = functools.partial(
             grants.remove_member, TENANT, User(id="bob"), by=User(id="alice")
@@ -642,11 +644,15 @@ def test_a_person_removed_from_a_tenant_is_owed_their_events_deletion_there(
         # On the application's own loop, where its database engine runs.
         assert client.portal is not None
         client.portal.call(remove)
-    # No ClickHouse answers here, so the deletion is owed, to be tried again (portalr ADR-0075).
-    with sqlite3.connect(database) as connection:
-        owed = connection.execute(
-            "SELECT user_id, tenant_id FROM portalr_analytics_removals_owed"
-        ).fetchall()
+        # The background pass reads the removal from grantr's audit log, and owes its deletion;
+        # no ClickHouse answers here, so it stays owed, to be tried again (portalr ADR-0075).
+        deadline = time.monotonic() + 10
+        while not owed and time.monotonic() < deadline:
+            with sqlite3.connect(database) as connection:
+                owed = connection.execute(
+                    "SELECT user_id, tenant_id FROM portalr_analytics_removals_owed"
+                ).fetchall()
+            time.sleep(0.01)
     assert owed == [("bob", TENANT)]
 
 
@@ -779,8 +785,8 @@ def test_a_pass_that_fails_is_logged_and_the_application_still_stops(
     )
     with caplog.at_level(logging.ERROR), TestClient(app(script, named)) as client:
         for _ in range(50):
-            if "the deletions owed weren't read" in caplog.text:
+            if "the removals and deletions owed weren't read" in caplog.text:
                 break
             client.get("/healthz")
             time.sleep(0.01)
-    assert "the deletions owed weren't read" in caplog.text
+    assert "the removals and deletions owed weren't read" in caplog.text

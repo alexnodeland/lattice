@@ -56,3 +56,17 @@ def test_every_task_that_starts_a_stack_runs_one_project_at_a_time() -> None:
                 starting.setdefault(name, []).append(str(moon.parent.relative_to(ROOT)))
     assert starting, "no task starts a stack: update STACK_SCRIPTS"
     assert [name for name in starting if name not in one_at_a_time] == []
+
+
+def test_a_language_narrows_the_projects_that_run_a_task() -> None:
+    targets_of = AFFECTED["targets_of"]
+    projects = {
+        "evalr": {"tasks": {"test": {}}, "language": "python"},
+        "lattice": {"tasks": {"test": {}}, "language": "python"},
+        "ui": {"tasks": {"test": {}}, "language": "typescript"},
+        "stackr": {"tasks": {}, "language": "bash"},
+    }
+    everyone = {"evalr", "lattice", "ui", "stackr"}
+    assert targets_of("test", everyone, projects) == ["evalr:test", "lattice:test", "ui:test"]
+    assert targets_of("test", everyone, projects, "python") == ["evalr:test", "lattice:test"]
+    assert targets_of("test", {"ui", "stackr"}, projects, "python") == []

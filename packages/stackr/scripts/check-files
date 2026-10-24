@@ -250,7 +250,14 @@ const attempts = [
 # Run inside the worker: what was planted is there (`there`), or gone (`gone`).
 left='
 import os, sys
-strays = [p for p in os.listdir("/proc") if p.isdigit() and open(f"/proc/{p}/cmdline", "rb").read().split(b"\0")[0] == b"sleep"]
+def command(pid):
+    # A process may end between listing /proc and reading it: then it is no stray.
+    try:
+        with open(f"/proc/{pid}/cmdline", "rb") as cmdline:
+            return cmdline.read().split(b"\0")[0]
+    except (FileNotFoundError, ProcessLookupError):
+        return None
+strays = [p for p in os.listdir("/proc") if p.isdigit() and command(p) == b"sleep"]
 planted = sorted(os.listdir("/tmp"))
 print(f"  processes: {strays}; in /tmp: {planted}")
 there = bool(strays) and planted == ["planted", "sealed"]

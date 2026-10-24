@@ -336,6 +336,12 @@ class PortalSettings:
             ``make env`` generates. It never reaches ClickHouse.
         analytics_writer_password: ClickHouse's ``portalr_analytics_writer``'s password.
         analytics_password: ClickHouse's ``portalr_analytics``'s password.
+        umami_url: Umami's ingest on its network, which only the application joins (stackr
+            ADR-0050), for a copy of each consented event; with ``umami_website`` and
+            ``umami_password``, and analytics.
+        umami_website: portalr's website in Umami: stackr's ``UMAMI_WEBSITE_ID``.
+        umami_password: portalr's Umami user's password: stackr's ``UMAMI_PORTALR_PASSWORD``.
+        umami_ui_url: Umami, as operators' browsers reach it, for a deep link.
         required: Whether the application must not start without a Supabase project for the UIs
             to sign in to, rather than leave the portal off: set on a single host, where a
             portal that is silently off would be an application that looks deployed and isn't.
@@ -358,6 +364,10 @@ class PortalSettings:
     analytics_key: str | None = field(default=None, repr=False)
     analytics_writer_password: str | None = field(default=None, repr=False)
     analytics_password: str | None = field(default=None, repr=False)
+    umami_url: str | None = None
+    umami_website: str | None = None
+    umami_password: str | None = field(default=None, repr=False)
+    umami_ui_url: str | None = None
     required: bool = False
 
     @classmethod
@@ -381,6 +391,10 @@ class PortalSettings:
             analytics_key=env.get("PORTAL_ANALYTICS_KEY") or None,
             analytics_writer_password=env.get("PORTAL_ANALYTICS_WRITER_PASSWORD") or None,
             analytics_password=env.get("PORTAL_ANALYTICS_PASSWORD") or None,
+            umami_url=env.get("PORTAL_UMAMI_URL") or None,
+            umami_website=env.get("PORTAL_UMAMI_WEBSITE_ID") or None,
+            umami_password=env.get("PORTAL_UMAMI_PASSWORD") or None,
+            umami_ui_url=env.get("PORTAL_UMAMI_UI_URL") or None,
             required=env.get("PORTAL_REQUIRED") == "true",
         )
 

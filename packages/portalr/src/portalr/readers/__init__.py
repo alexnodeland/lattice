@@ -17,6 +17,7 @@ from portalr.readers.prometheus import Metric, MetricQuery, Point, Prometheus
 from portalr.readers.query import Window
 from portalr.readers.reading import Ok, Unavailable, Unconfigured, reading
 from portalr.readers.tempo import Span, Tempo, Trace, TraceQuery, TraceSummary
+from portalr.readers.umami import UmamiLinks
 from portalr.readers.usage import Usage, UsageQuery, read_usage
 
 
@@ -33,6 +34,8 @@ class Readers:
     """Grafana, for operators' deep links into Tempo's and Loki's views."""
     analytics: Analytics | None = None
     """portalr's product analytics on ClickHouse (lattice RFC-0008)."""
+    umami: UmamiLinks | None = None
+    """Umami, for operators' deep link to its journeys (portalr ADR-0076)."""
 
     def configured(self) -> dict[str, bool]:
         """Which tools are configured, by name, for the UIs' ``config.json``."""
@@ -44,6 +47,7 @@ class Readers:
             "litellm": self.litellm is not None,
             "grafana": self.grafana is not None,
             "analytics": self.analytics is not None,
+            "umami": self.umami is not None,
         }
 
 
@@ -76,6 +80,7 @@ __all__ = [
     "Trace",
     "TraceQuery",
     "TraceSummary",
+    "UmamiLinks",
     "Unavailable",
     "Unconfigured",
     "Usage",

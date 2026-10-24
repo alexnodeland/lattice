@@ -153,10 +153,13 @@ services:
 {%- if use_files %}
       files: {}
 {%- endif %}
+{%- if use_portal %}
+      umami: {}
+{%- endif %}
 {%- elif use_files %}
-    networks: [stackr, supabase, files]
+    networks: [stackr, supabase, files{% if use_portal %}, umami{% endif %}]
 {%- else %}
-    networks: [stackr, supabase]
+    networks: [stackr, supabase{% if use_portal %}, umami{% endif %}]
 {%- endif %}
 {%- if use_files %}
     # The relays FILES_CRAFTS starts, each after its worker answers, before the application asks
@@ -312,6 +315,13 @@ networks:
   supabase:
     name: supabase_network_stackr-supabase
     external: true
+{%- if use_portal %}
+  # Umami's ingest network, internal, which stackr's `make up` creates: the application alone
+  # joins it, for the relay's copy of consented events (stackr ADR-0050).
+  umami:
+    name: stackr-umami
+    external: true
+{%- endif %}
 {%- if use_files %}
   # The application's side of the relays: the application and the relays alone.
   files:

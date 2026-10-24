@@ -43,6 +43,10 @@ tasks:
       - 'packages/portalr/web/*/src/**/*'
       - 'packages/portalr/web/*/*.{json,ts,yml}'
       - 'docs/*/spec/**/*'
+      # The typefaces' notices, which test_font_notices.py holds to each other and to the font.
+      - 'packages/stackr/workers/diagrams/FONTS.txt'
+      - 'packages/portalr/web/ui/licenses/*'
+      - 'packages/portalr/web/ui/fonts/*'
       - 'scripts/tlc'
       - 'scripts/tlc.sha256'
       - 'scripts/craft'

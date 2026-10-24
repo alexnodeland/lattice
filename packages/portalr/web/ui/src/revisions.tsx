@@ -3,7 +3,8 @@
  * summary says which version it is, who made it, when, and what it changed, the latest open and
  * the rest closed. Open, a revision shows its kind's title and summary where it has them, then
  * its Preview, its Source and its Changes, as tabs: its content through its kind's renderer, its
- * sources numbered and highlighted, and what changed since the version before, part by part, a
+ * sources numbered and highlighted, and what changed since the previous kept version, part by
+ * part, a
  * source's line by line and a title's word by word. A kind whose preview runs what it holds, a mini
  * app, runs one revision at a time, when asked, and only where apps run; what is done in a preview
  * is not saved.
@@ -50,7 +51,7 @@ export interface RevisionShown {
 /** How two texts differ: `client`'s `changes`, which the page gives. */
 export type Compare = (before: string, after: string, by: Granularity) => Change[] | null;
 
-/** A part that changed since the version before, and how. */
+/** A part that changed since the previous kept version, and how. */
 interface Changed {
   readonly part: RevisionPart;
   readonly changes: Change[] | null;
@@ -64,7 +65,8 @@ interface Pair {
 }
 
 /**
- * The parts that changed since the version before, cheaply, by their text alone: a part it has, or
+ * The parts that changed since the previous kept version, cheaply, by their text alone: a part it
+ * has, or
  * one the version before had and it hasn't, which is removed. Null for a first version.
  */
 function changedNames(pair: Pair): RevisionPart[] | null {
@@ -86,7 +88,7 @@ function changedNames(pair: Pair): RevisionPart[] | null {
 /** Each pair's changes, kept by its data's identity, so a revision read again isn't compared again. */
 const compared = new WeakMap<Compare, WeakMap<Data, WeakMap<Data, Changed[]>>>();
 
-/** What a revision changed, part by part, since the version before it, or null for the first. */
+/** What a revision changed, part by part, since the previous kept version, or null for the first. */
 function changedParts(pair: Pair, compare: Compare): Changed[] | null {
   const parts = changedNames(pair);
   if (parts === null || pair.before === null) {
@@ -432,7 +434,8 @@ function Revision({
 
 /**
  * An artifact's revisions, newest first, whatever order they come in: the latest open, the rest
- * closed, each with what it changed since the one before. `compare` is `client`'s `changes`.
+ * closed, each with what it changed since the previous kept version. `compare` is `client`'s
+ * `changes`.
  */
 export function Revisions({
   id,

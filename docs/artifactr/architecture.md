@@ -195,7 +195,7 @@ erDiagram
 ```
 
 - **Artifacts belong to the workspace**, not to a chat, so several chats and people can work on the same plan. A thread lists the artifacts it is focused on.
-- **Revisions are append-only.** Every committed change writes a revision with its version, patch, resulting data and actor. Reverting writes a new revision; versions never go backwards.
+- **Revisions are append-only.** Every committed change writes a revision with its version, patch, resulting data and actor. Reverting writes a new revision; versions never go backwards. Only maintenance forgets one: a diagram's old revisions are thinned, never its first, its current or an accepted proposal's, so a version can be missing ([ADR-0094](adr/0094-diagrams-revisions-thinned-to-one-an-actor-every-ten-minutes.md)).
 - **One event log per workspace**, with a single gap-free `seq`. Events carry an optional `thread_id` and `run_id`, and subscribers filter on them.
 - **Proposals** are durable objects that wrap the command they would execute (create, edit or archive), with its base version, the proposer and a rationale.
 - **Messages are events, not entities** ([ADR-0037](adr/0037-feedback-targets-and-evaluators.md)). Each workspace also records the message ids it has used, so core can refuse a message id that is already used without reading the log ([ADR-0045](adr/0045-a-message-id-is-used-once.md)).
@@ -434,6 +434,10 @@ class Storage(Protocol):
     # renews only while the lease is still holder's, expired or not; never takes one
     async def renew_lease(self, scope: Scope, key: str, holder: str, ttl: timedelta) -> bool: ...
     async def save_cursor(self, scope: Scope, name: str, seq: int) -> None: ...
+    # forgets earlier revisions, never the current one; maintenance's, not a command's
+    async def drop_revisions(
+        self, scope: Scope, artifact_id: ArtifactId, versions: Collection[int]
+    ) -> int: ...
 
     # plus reads: artifact(s), revisions, thread(s), proposal(s), run, head_seq, history, cursor
 ```

@@ -210,6 +210,21 @@ class InMemoryStorage:
         """Return an artifact's revisions, oldest first."""
         return list(self._data(scope).revisions.get(artifact_id, []))
 
+    async def drop_revisions(
+        self, scope: Scope, artifact_id: ArtifactId, versions: Collection[int]
+    ) -> int:
+        """Forget some of an artifact's earlier revisions; never its current version."""
+        data = self._data(scope)
+        held = data.revisions.get(artifact_id)
+        if not held:
+            return 0
+        current = data.artifacts.get(artifact_id)
+        head = current.version if current is not None else None
+        dropped = {v for v in versions if v != head}
+        kept = [revision for revision in held if revision.version not in dropped]
+        data.revisions[artifact_id] = kept
+        return len(held) - len(kept)
+
     async def thread(self, scope: Scope, thread_id: ThreadId) -> Thread | None:
         """Return a thread, or None."""
         return self._data(scope).threads.get(thread_id)

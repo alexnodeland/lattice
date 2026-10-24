@@ -15,6 +15,7 @@
 #   TEMPLATE_TRACKER     none, plane or vikunja, with the bridge: relayr's task tracker (default: none)
 #   TEMPLATE_UI          true or false, with artifactr: artifactr's forms and dashboards, artifactr.ui (default: true)
 #   TEMPLATE_FILES       true or false, with artifactr: native files, each app's worker and editor (default: true)
+#   TEMPLATE_DIAGRAMS    true or false, with native files: Excalidraw's diagrams (default: true)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -29,6 +30,7 @@ uv run copier copy --quiet --defaults --vcs-ref HEAD \
   --data tracker="${TEMPLATE_TRACKER:-none}" \
   --data ui="${TEMPLATE_UI:-true}" \
   --data native_files="${TEMPLATE_FILES:-true}" \
+  --data diagrams="${TEMPLATE_DIAGRAMS:-true}" \
   --data python_version="${TEMPLATE_PYTHON:-3.12}" \
   --data libraries_path="$(dirname "$PWD")" \
   ../.. "$scratch/app"

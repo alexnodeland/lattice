@@ -94,7 +94,8 @@ Each record captures one decision: the context that forced it, the options consi
 | [0088](0088-excalidraws-phase-0-what-the-canvas-costs-and-needs.md) | Excalidraw's phase 0: what the canvas costs and needs | Proposed |
 | [0089](0089-a-connected-apps-tools-narrowed-per-workspace.md) | A connected app's tools, narrowed per workspace | Proposed |
 | [0090](0090-diagrams-drawn-by-the-agent-through-a-converter.md) | Diagrams drawn by the agent, through a converter | Proposed |
-| [0091](0091-diagrams-tombstones-swept-and-their-revisions-thinned.md) | Diagrams' tombstones swept, and their revisions thinned | Proposed |
+| [0091](0091-diagrams-tombstones-swept-and-their-revisions-thinned.md) | Diagrams' tombstones swept, and their revisions thinned | Accepted, amended by [0094](0094-diagrams-revisions-thinned-to-one-an-actor-every-ten-minutes.md) |
 | [0092](0092-a-diagrams-images-uploaded-by-a-person-and-read-where-it-names-them.md) | A diagram's images, uploaded by a person and read where it names them | Accepted |
+| [0094](0094-diagrams-revisions-thinned-to-one-an-actor-every-ten-minutes.md) | Diagrams' revisions thinned to one an actor every ten minutes | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

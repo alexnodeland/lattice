@@ -111,7 +111,10 @@ async def _how(source: artifactr.Workspace, proposal: a.Proposal) -> Outcome:
         if isinstance(change, a.CreateArtifact):
             alone = a.load_artifact(change.kind, change.data).to_json()
         else:
-            [before] = [r for r in revisions if r.version == made.version - 1]
+            # The kept revision before it: thinning may have forgotten the one just before.
+            before = max(
+                (r for r in revisions if r.version < made.version), key=lambda r: r.version
+            )
             alone = a.load_artifact(made.kind, a.apply_patch(before.data, change.patch)).to_json()
     except (a.PatchFailed, a.ValidationFailed):
         return "edited"  # the proposal alone made no valid artifact: the person's changes did

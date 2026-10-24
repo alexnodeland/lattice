@@ -3,7 +3,7 @@
 import importlib
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from typing import cast
@@ -62,14 +62,16 @@ async def a_late_settling_clears_only_its_own_debt(consent: Consent) -> None:
 
 async def removals(consent: Consent) -> None:
     assert await consent.removals_owed(100) == []
-    first = await consent.owe_removal("dana", "acme")
-    await consent.owe_removal("dana", "globex")
+    first = datetime(2026, 10, 24, 9, tzinfo=UTC)
+    await consent.owe_removal("dana", "acme", first)
+    await consent.owe_removal("dana", "globex", first + timedelta(hours=1))
     owed = await consent.removals_owed(100)
     assert [(user, tenant) for user, tenant, _ in owed] == [("dana", "acme"), ("dana", "globex")]
     assert owed[0][2] == first
     assert len(await consent.removals_owed(1)) == 1, "at most so many"
     # A second removal from acme, before the first is settled: settling the first clears nothing.
-    later = await consent.owe_removal("dana", "acme")
+    later = first + timedelta(minutes=5)
+    await consent.owe_removal("dana", "acme", later)
     await consent.removal_settled("dana", "acme", first)
     assert ("dana", "acme", later) in await consent.removals_owed(100)
     await consent.removal_settled("dana", "acme", later)
@@ -80,10 +82,33 @@ async def removals(consent: Consent) -> None:
     assert len(await consent.removals_owed(100, before=globex + timedelta(seconds=1))) == 1
 
 
+async def a_removal_is_never_owed_for_less(consent: Consent) -> None:
+    async def erin() -> list[datetime]:
+        return [at for user, _, at in await consent.removals_owed(100) if user == "erin"]
+
+    at = datetime(2026, 10, 24, 9, tzinfo=UTC)
+    await consent.owe_removal("erin", "acme", at)
+    await consent.owe_removal("erin", "acme", at - timedelta(minutes=1))
+    assert await erin() == [at]
+    await consent.owe_removal("erin", "acme", at + timedelta(minutes=1))
+    assert await erin() == [at + timedelta(minutes=1)]
+
+
+async def audit_logs(consent: Consent) -> None:
+    assert await consent.audit_cursor("acme") == 0
+    await consent.advance_audit("acme", 7)
+    await consent.advance_audit("globex", 3)
+    await consent.advance_audit("acme", 5)
+    assert await consent.audit_cursor("acme") == 7, "it never goes back"
+    assert await consent.audit_cursor("globex") == 3
+
+
 async def test_answers_in_memory() -> None:
     await answers(InMemoryConsent())
     await a_late_settling_clears_only_its_own_debt(InMemoryConsent())
     await removals(InMemoryConsent())
+    await a_removal_is_never_owed_for_less(InMemoryConsent())
+    await audit_logs(InMemoryConsent())
 
 
 async def test_answers_in_the_applications_database(tmp_path: Path) -> None:
@@ -97,6 +122,8 @@ async def test_answers_in_the_applications_database(tmp_path: Path) -> None:
     await answers(SqlReplayConsent(engine))
     await SqlReplayConsent(engine).give("carol", yes=True)
     assert not await SqlConsent(engine).given("carol"), "a replay yes isn't an analytics yes"
+    await a_removal_is_never_owed_for_less(SqlConsent(engine))
+    await audit_logs(SqlConsent(engine))
     async with engine.connect() as connection:
         tables = await connection.run_sync(lambda sync: inspect(sync).get_table_names())
         version = await connection.scalar(text("SELECT version_num FROM portalr_alembic_version"))
@@ -104,9 +131,10 @@ async def test_answers_in_the_applications_database(tmp_path: Path) -> None:
         "portalr_analytics_consent",
         "portalr_analytics_removals_owed",
         "portalr_replay_consent",
+        "portalr_analytics_audit_cursor",
         "portalr_alembic_version",
     } <= set(tables)
-    assert version == "0003"
+    assert version == "0004"
     await engine.dispose()
 
 
@@ -241,18 +269,24 @@ async def test_the_removals_migration_undoes_to_answers_alone(tmp_path: Path) ->
     async with engine.begin() as connection:
         tables = await connection.run_sync(down)
     assert "portalr_analytics_removals_owed" not in tables
+    assert "portalr_analytics_audit_cursor" not in tables
     assert "portalr_analytics_consent" in tables
     await migrate(engine)  # and up again
     await engine.dispose()
 
 
 @pytest.mark.parametrize("dialect", ["sqlite", "postgresql"])
-def test_the_removals_table_has_row_level_security_on_postgresql_alone(
-    dialect: str, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(
+    ("module", "table"),
+    [
+        ("0002_analytics_removals_owed", "portalr_analytics_removals_owed"),
+        ("0004_analytics_audit_cursor", "portalr_analytics_audit_cursor"),
+    ],
+)
+def test_the_owners_tables_have_row_level_security_on_postgresql_alone(
+    dialect: str, module: str, table: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    migration = importlib.import_module(
-        "portalr.analytics.migrations.versions.0002_analytics_removals_owed"
-    )
+    migration = importlib.import_module(f"portalr.analytics.migrations.versions.{module}")
     statements: list[str] = []
 
     class Op:
@@ -274,17 +308,16 @@ def test_the_removals_table_has_row_level_security_on_postgresql_alone(
     monkeypatch.setattr(migration, "op", Op())
     migration.upgrade()
     secured = [
-        "ALTER TABLE portalr_analytics_removals_owed ENABLE ROW LEVEL SECURITY",
+        f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY",
         # A policy too: stackr's smoke test holds every table of the application's to one.
-        "CREATE POLICY portalr_analytics_removals_owed_none ON portalr_analytics_removals_owed"
-        " USING (false) WITH CHECK (false)",
+        f"CREATE POLICY {table}_none ON {table} USING (false) WITH CHECK (false)",
     ]
     assert statements[1:] == (secured if dialect == "postgresql" else [])
     migration.downgrade()
     if dialect == "postgresql":
         assert statements[-2:] == [
-            "DROP POLICY portalr_analytics_removals_owed_none ON portalr_analytics_removals_owed",
-            "DROP TABLE portalr_analytics_removals_owed",
+            f"DROP POLICY {table}_none ON {table}",
+            f"DROP TABLE {table}",
         ]
 
 

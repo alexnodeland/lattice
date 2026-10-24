@@ -1,6 +1,6 @@
 # ADR-0036: A hook on a member's removal
 
-**Status:** Accepted
+**Status:** Superseded by [ADR-0037](0037-the-deployments-own-tools-read-a-tenants-audit-log.md)
 **Date:** 2026-10-23
 **Deciders:** Alex Nodeland
 

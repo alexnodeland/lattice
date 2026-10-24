@@ -3,6 +3,7 @@
 import asyncio
 import json
 from collections.abc import Awaitable, Callable
+from datetime import timedelta
 from pathlib import Path
 
 import httpx
@@ -425,3 +426,17 @@ def test_a_distinct_id_fits_umamis_whatever_the_tenants_id() -> None:
     assert len(distinct(longest, ME)) <= DISTINCT_LENGTH
     assert distinct(longest, ME).rpartition(":")[2] == ME
     assert distinct("acme", ME) != distinct("globex", ME)
+
+
+async def test_a_removal_from_a_tenant_deletes_that_tenants_session_in_umami_alone(
+    stand: Stand, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("portalr.analytics.relay.REMOVAL_GRACE", timedelta(0))
+    relay = relay_of(stand)
+    await relay.removed("globex", "alice")
+    stand.down = True
+    assert await relay.settle_owed() == 0, "owed while Umami is down"
+    stand.down = False
+    assert await relay.settle_owed() == 1
+    assert set(stand.sessions) == {"s1", "s3"}, "acme's stays, found by globex's hash alone"
+    assert await relay.consent.removals_owed(100) == []

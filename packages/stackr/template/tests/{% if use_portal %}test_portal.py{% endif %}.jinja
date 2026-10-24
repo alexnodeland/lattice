@@ -557,7 +557,6 @@ def test_without_analytics_there_is_no_stamp(script: Script, ui: Path) -> None:
     assert not any(m.cls is SessionStamp for m in application.user_middleware)
 
 
-<<<<<<< HEAD
 UMAMI = {
     "umami_url": "http://umami:3000",
     "umami_website": "446fed1e-11a4-4c5f-9b72-31e6d4cf882d",
@@ -626,8 +625,8 @@ def test_the_portal_waits_for_umamis_copies_as_it_stops(
     finally:
         server.shutdown()
         server.server_close()
-||||||| parent of 873f4805 (feat(grantr,portalr): a person removed from a tenant has their analytics events there deleted)
-=======
+
+
 def test_a_person_removed_from_a_tenant_is_owed_their_events_deletion_there(
     script: Script, ui: Path, tmp_path: Path
 ) -> None:
@@ -649,7 +648,6 @@ def test_a_person_removed_from_a_tenant_is_owed_their_events_deletion_there(
             "SELECT user_id, tenant_id FROM portalr_analytics_removals_owed"
         ).fetchall()
     assert owed == [("bob", TENANT)]
->>>>>>> 873f4805 (feat(grantr,portalr): a person removed from a tenant has their analytics events there deleted)
 
 
 def test_without_a_database_there_is_no_relay(script: Script, ui: Path) -> None:

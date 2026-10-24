@@ -82,12 +82,8 @@ nav:
   - adr/0069-a-connected-apps-tools-chosen-in-admin-and-a-way-in-for-workspace-admins.md
   - adr/0071-adoption-the-tenants-read-and-page.md
   - adr/0073-a-requests-analytics-session-on-its-trace.md
-<<<<<<< HEAD
-  - adr/0076-the-relay-sends-umami-a-copy-and-deletes-there-too.md
-||||||| parent of 873f4805 (feat(grantr,portalr): a person removed from a tenant has their analytics events there deleted)
-=======
   - adr/0075-a-person-removed-from-a-tenant-has-their-events-there-deleted.md
->>>>>>> 873f4805 (feat(grantr,portalr): a person removed from a tenant has their analytics events there deleted)
+  - adr/0076-the-relay-sends-umami-a-copy-and-deletes-there-too.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

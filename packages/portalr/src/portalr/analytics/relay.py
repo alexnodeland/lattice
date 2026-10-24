@@ -234,6 +234,10 @@ class Relay:
         until = removed_at + REMOVAL_MARGIN
         if not await self.analytics.forget_in(tenant, user_id, until):
             return False
+        # The tenant's session alone in Umami, found by the tenant's hash: the person's others
+        # stay (portalr ADR-0076).
+        if self.umami is not None and not await self.umami.forget(self._person(user_id), tenant):
+            return False
         await self.consent.removal_settled(user_id, tenant, removed_at)
         return True
 

@@ -570,7 +570,7 @@ export function LineChart({
 }
 
 /** Whether a row has a value for a series: a point a line can reach. */
-const known = (row: Datum | undefined, key: string) => typeof row?.[key] === "number";
+const known = (row: Datum | undefined, key: string) => Number.isFinite(row?.[key]);
 
 /** One part of a whole: its key, its name, and how much of it. */
 export interface Part {

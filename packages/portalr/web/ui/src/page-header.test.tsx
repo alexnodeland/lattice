@@ -1,7 +1,9 @@
 import { expect, test } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
+import { Button } from "./button";
 import { PageHeader } from "./page-header";
+import { token } from "./test/colours";
 
 test("a page header's title is the page's one heading, with its way back, its line and its actions", async () => {
   const screen = await render(
@@ -39,11 +41,11 @@ test("a page that takes the focus puts it on its heading, as it appears", async 
   await expect.element(screen.getByRole("heading", { level: 1, name: "Settings" })).toHaveFocus();
 });
 
-test("a heading the page focuses has the focus, and draws no ring, while a key's focus does", async () => {
+test("a heading the page focuses has the focus and draws no ring, while a button Tab reaches keeps the kit's", async () => {
   const screen = await render(
     <>
       <PageHeader title="Runs" focus />
-      <button type="button">More</button>
+      <Button>More</Button>
     </>,
   );
   const heading = screen.getByRole("heading", { level: 1, name: "Runs" }).element();
@@ -51,6 +53,7 @@ test("a heading the page focuses has the focus, and draws no ring, while a key's
   expect(getComputedStyle(heading).outlineStyle).toBe("none");
   await userEvent.tab();
   const button = screen.getByRole("button", { name: "More" }).element();
+  await expect.poll(() => document.activeElement).toBe(button);
   expect(button.matches(":focus-visible")).toBe(true);
-  expect(getComputedStyle(button).outlineStyle).not.toBe("none");
+  expect(getComputedStyle(button).outlineColor).toBe(token("focus"));
 });

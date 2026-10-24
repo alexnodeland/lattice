@@ -101,9 +101,9 @@ export const fill = (id: string, at: number) => (at === 0 ? ink(0) : `url(#${id}
 
 /**
  * A marker on a line, at a point: a shape of the mode's choosing, in the series' ink. A line's
- * markers are drawn only in colour-blind mode, where their shapes tell series apart; elsewhere
- * the line alone is drawn (portalr ADR-0019), but for a point with no neighbour, which is `alone`
- * and drawn always, since no line reaches it.
+ * markers are drawn only in colour-blind mode and under forced colours, where their shapes tell
+ * series apart (`--chart-marker-display`, portalr ADR-0036); elsewhere the line alone is drawn,
+ * but for a point with no neighbour, which is `alone` and drawn always, since no line reaches it.
  */
 export function Marker({
   at,
@@ -119,7 +119,10 @@ export function Marker({
   const place = slot(at);
   const size = "var(--chart-marker-size)";
   return (
-    <g transform={`translate(${x} ${y})`} className={alone ? undefined : "chart-marker"}>
+    <g
+      transform={`translate(${x} ${y})`}
+      style={{ display: alone ? undefined : "var(--chart-marker-display)" }}
+    >
       <rect
         fill={ink(at)}
         stroke="var(--surface)"

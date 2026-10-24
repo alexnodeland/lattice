@@ -63,12 +63,14 @@ export { Checkbox, type CheckboxChoice, CheckboxGroup } from "./checkbox";
 export { useColourBlind } from "./colour-blind";
 export { ComposerDock } from "./composer-dock";
 export { ConfirmDialog } from "./confirm-dialog";
+export { CopyButton } from "./copy-button";
 export { type FormOf, PANELS, type PanelProps, type PanelRenderers } from "./dashboard-panels";
 export { DashboardView } from "./dashboard-view";
 export { Dialog } from "./dialog";
 export { Disclosure } from "./disclosure";
 export { EmptyState } from "./empty-state";
 export { ErrorState } from "./error-state";
+export { failureLogged } from "./failure";
 export { FailureAlert } from "./failure-alert";
 export { FileChooser } from "./file-chooser";
 export {

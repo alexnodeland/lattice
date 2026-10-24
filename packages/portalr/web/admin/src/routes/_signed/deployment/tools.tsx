@@ -4,6 +4,7 @@ import {
   Button,
   Card,
   EmptyState,
+  FailureAlert,
   PageHeader,
   Reading,
   SectionTitle,
@@ -162,12 +163,7 @@ function Links({ ids }: { ids: Required<ToolIds> }) {
     return <Reading>Making the links…</Reading>;
   }
   if (links.isError) {
-    return (
-      <Alert tone="error">
-        The links couldn't be made:{" "}
-        {links.error instanceof Error ? links.error.message : "an error"}.
-      </Alert>
-    );
+    return <FailureAlert lead="The links couldn't be made." error={links.error} />;
   }
   const readers = config.readers;
   const doors = DOORS.filter((door) => ids[door.kind] !== undefined);

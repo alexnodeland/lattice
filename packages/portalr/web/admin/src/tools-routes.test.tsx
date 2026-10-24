@@ -201,11 +201,22 @@ test("an address with only an id that isn't one asks for nothing", async () => {
 
 test("a refusal is said, with no link", async () => {
   refusal = Response.json(
-    { detail: { type: "invalid", message: "no tenant nowhere" } },
+    {
+      detail: {
+        type: "invalid",
+        message: `${String.fromCodePoint(0x202e)}<img src=x onerror=alert(1)>\npassword=hunter2 ${"x".repeat(3000)}`,
+      },
+    },
     { status: 422 },
   );
   const { screen } = await open("/deployment/tools?tenant=nowhere");
-  await expect.element(screen.getByRole("alert")).toBeVisible();
+  const alert = screen.getByRole("alert");
+  await expect
+    .element(alert)
+    .toHaveTextContent("The links couldn't be made. What was asked for isn't valid.");
+  for (const part of ["hunter2", "img", "xxx", String.fromCodePoint(0x202e)]) {
+    expect(alert.element().textContent).not.toContain(part);
+  }
   expect(
     screen
       .getByRole("link")

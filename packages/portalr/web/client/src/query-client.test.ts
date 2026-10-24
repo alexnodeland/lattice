@@ -52,11 +52,11 @@ test("a read refused as busy is asked again once the server's wait has passed", 
   }
 });
 
-test("a refusal carries the server's Retry-After, in seconds, or none", () => {
+test("a refusal carries the server's Retry-After, in seconds, or none", async () => {
   const answered = (headers: Record<string, string>) =>
     new Response(null, { status: 429, headers });
-  expect(refusal(answered({ "retry-after": "5" }), null).retryAfter).toBe(5);
-  expect(refusal(answered({}), null).retryAfter).toBeNull();
-  expect(refusal(answered({ "retry-after": "soon" }), null).retryAfter).toBeNull();
-  expect(refusal(answered({}), null).status).toBe(429);
+  expect((await refusal(answered({ "retry-after": "5" }), null)).retryAfter).toBe(5);
+  expect((await refusal(answered({}), null)).retryAfter).toBeNull();
+  expect((await refusal(answered({ "retry-after": "soon" }), null)).retryAfter).toBeNull();
+  expect((await refusal(answered({}), null)).status).toBe(429);
 });

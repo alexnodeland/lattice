@@ -27,7 +27,7 @@ import {
   MOST_ASKED,
   numberOf,
   type Places,
-  refusedAs,
+  refusedWhy,
   type SettingRow,
   said,
   settersOf,
@@ -177,15 +177,6 @@ function LevelSettings({ tenant, workspace }: { tenant: string; workspace: strin
   );
 }
 
-/** Why a change wasn't made, in words the field says, for each status grantr answers it with. */
-function refusedWhy(row: SettingRow, status: number, reasons: readonly string[]): string {
-  if (status === 403 || status === 422) {
-    // Admins are told the ceiling and the layer that sets it, which they need to act on.
-    return `${row.name} wasn't changed: ${refusedAs(reasons.join("; "), row)}`;
-  }
-  return `${row.name} wasn't changed: the server couldn't do it just now. Try again in a moment.`;
-}
-
 /**
  * Focus something of a row's, only where the reader hasn't moved on: from nowhere, or from within
  * the row's form; never from another row they have started on.
@@ -322,7 +313,7 @@ function Setting({
         }, and ${now ? said(now.effective) : "what it was"} applies. You tried to ${what}, which wasn't saved: save again if you still want it.`,
       );
     } else {
-      setError(refusedWhy(row, answer.status, answer.reasons));
+      setError(refusedWhy(row, answer.status, typeof value === "number" ? value : null));
     }
     if (answer.outcome === "done") {
       await queryClient.invalidateQueries({ queryKey: keys.grantr.settings(tenant) });

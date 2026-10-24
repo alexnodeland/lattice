@@ -3,7 +3,7 @@ import type { Server } from "bun";
 import { afterAll, beforeAll, expect, test } from "vitest";
 import type * as v1 from "./generated/artifactr.v1";
 import type * as reflexrV1 from "./generated/reflexr.v1";
-import { AUDIT_PAGE, createQueries, keys, LOGS_LIMIT, Refused, stale } from "./queries";
+import { AUDIT_PAGE, createQueries, keys, LOGS_LIMIT, Refused, refusal, stale } from "./queries";
 import { createApi, readConfig } from "./rest";
 
 interface Seen {
@@ -439,32 +439,32 @@ test("a workspace's grants and the tenant's are read apart", () => {
   expect(queries.grantr.grants("acme").queryKey).toEqual(keys.grantr.grants("acme"));
 });
 
-test("a refusal says why, and never shows its body as it came", () => {
-  const said = (status: number, detail: unknown) => new Refused(status, detail).message;
-  expect(said(422, { detail: "no such subject" })).toBe(
-    "the server refused the read (422): no such subject",
+test("a refusal says the kit's sentence for it, and never the server's words", async () => {
+  const said = async (status: number, detail: unknown) =>
+    (await refusal(new Response(null, { status }), detail)).message;
+  expect(await said(422, { detail: "no such subject" })).toBe(
+    "the server refused the read (422): What was asked for isn't valid.",
   );
-  expect(said(403, { detail: { type: "forbidden", message: "not an operator" } })).toBe(
-    "the server refused the read (403): not an operator",
+  expect(await said(403, { detail: { type: "forbidden", message: "not an operator" } })).toBe(
+    "the server refused the read (403): You may not see this.",
   );
   expect(
-    said(422, {
+    await said(422, {
       detail: [
         { loc: ["query", "start"], msg: "Input should be a valid datetime", input: "x", ctx: {} },
         { loc: ["query", "end"], msg: "Field required", url: "https://errors.pydantic.dev" },
       ],
     }),
-  ).toBe(
-    "the server refused the read (422): start: Input should be a valid datetime; end: Field required",
+  ).toBe("the server refused the read (422): What was asked for isn't valid: start, end.");
+  const trouble = "The server had a problem. Try again in a moment.";
+  expect(await said(502, "<html>Bad gateway</html>")).toBe(
+    `the server refused the read (502): ${trouble}`,
   );
-  expect(said(502, "<html>Bad gateway</html>")).toBe(
-    "the server refused the read (502): The server answered 502.",
+  expect(await said(403, { detail: { type: "forbidden", message: { nested: true } } })).toBe(
+    "the server refused the read (403): You may not see this.",
   );
-  expect(said(403, { detail: { type: "forbidden", message: { nested: true } } })).toBe(
-    "the server refused the read (403): The server answered 403.",
-  );
-  expect(said(500, null)).toBe("the server refused the read (500): The server answered 500.");
-  expect(said(500, undefined)).toBe("the server refused the read (500): The server answered 500.");
+  expect(await said(500, null)).toBe(`the server refused the read (500): ${trouble}`);
+  expect(await said(500, undefined)).toBe(`the server refused the read (500): ${trouble}`);
 });
 
 test("a traces read names its window, its limit and its filter; a trace read, whether it wants content", async () => {

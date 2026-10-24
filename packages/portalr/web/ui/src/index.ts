@@ -71,7 +71,7 @@ export { Dialog, WholeDialog } from "./dialog";
 export { Disclosure } from "./disclosure";
 export { EmptyState } from "./empty-state";
 export { ErrorState } from "./error-state";
-export { failureLogged } from "./failure";
+export { failureLogged, failureSaid, signInRefused } from "./failure";
 export { FailureAlert } from "./failure-alert";
 export { FileChooser } from "./file-chooser";
 export {

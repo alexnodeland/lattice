@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { nameOf, numberOf, refusedAs, said, settersOf, settingRowsOf } from "./settings";
+import { nameOf, numberOf, refusedWhy, said, settersOf, settingRowsOf } from "./settings";
 
 const RANGE = { type: "int_range", low: 0, high: 1000, universe: null } as const;
 
@@ -55,13 +55,6 @@ test("a clamped value says why: the settings now allow more, or less", () => {
   );
 });
 
-test("grantr's refusal names the setting as the page does, never by its key", () => {
-  const row = { key: "connect-per-hour:freecad", name: "FreeCAD's tries an hour" };
-  expect(
-    refusedAs("connect-per-hour:freecad may be at most 20 here: the tenant's value", row),
-  ).toBe("FreeCAD's tries an hour may be at most 20 here: the tenant's value");
-});
-
 test("a value is said as a number, or names, or none", () => {
   expect([said(5), said(["read", "run"]), said([])]).toEqual(["5", "read, run", "none"]);
 });
@@ -92,4 +85,31 @@ test("a number field takes a whole number within the level's range, and says why
   }
   expect(numberOf("31", 10, 30)).toEqual({ error: "Enter a whole number from 10 to 30." });
   expect(numberOf("5", 10, 30)).toHaveProperty("error");
+});
+
+test("a refused change is said from what the page shows, never in grantr's words", () => {
+  const [row] = settingRowsOf(
+    [state({ ceiling: 20, ceiling_set_by: "tenant", effective: 20 })],
+    true,
+    (id) => id,
+  );
+  if (row === undefined) {
+    throw new Error("no row");
+  }
+  expect(refusedWhy(row, 422, 25)).toBe(
+    `${row.name} wasn't changed: it may be at most 20 here, as the tenant set it.`,
+  );
+  expect(refusedWhy(row, 422, 5)).toBe(
+    `${row.name} wasn't changed: that value isn't allowed here.`,
+  );
+  expect(refusedWhy(row, 422, null)).toBe(
+    `${row.name} wasn't changed: that value isn't allowed here.`,
+  );
+  expect(refusedWhy(row, 403, 25)).toBe(`${row.name} wasn't changed: it can't be changed here.`);
+  expect(refusedWhy(row, 401, 25)).toBe(
+    `${row.name} wasn't changed: you're not signed in. Sign in, then try again.`,
+  );
+  expect(refusedWhy(row, 503, 25)).toBe(
+    `${row.name} wasn't changed: the server couldn't do it just now. Try again in a moment.`,
+  );
 });

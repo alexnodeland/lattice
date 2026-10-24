@@ -19,7 +19,7 @@ import type {
 import type { components as Portalr } from "./generated/portalr.openapi";
 import type * as reflexrV1 from "./generated/reflexr.v1";
 import type { components as Relayr } from "./generated/relayr.openapi";
-import { reasons } from "./reasons";
+import { refusalSaid, sentenceOf } from "./reasons";
 import * as reflexr from "./reflexr";
 import { type Api, named } from "./rest";
 import type { Result } from "./stream";
@@ -222,15 +222,19 @@ async function body<D>(
 ): Promise<D> {
   const { data, error, response: answered } = await response;
   if (data === undefined) {
-    throw refusal(answered, error);
+    throw await refusal(answered, error);
   }
   return data;
 }
 
-/** The server's refusal of a read: its status, its detail, and the seconds it said to wait. */
-export function refusal(answered: Response, detail: unknown): Refused {
+/**
+ * The server's refusal of a read: its status, its detail, the seconds it said to wait, and what a
+ * reader is told of it, where values aren't valid with where they are.
+ */
+export async function refusal(answered: Response, detail: unknown): Promise<Refused> {
   const wait = Number.parseInt(answered.headers.get("retry-after") ?? "", 10);
-  return new Refused(answered.status, detail, Number.isNaN(wait) ? null : wait);
+  const said = await refusalSaid(answered.status, detail);
+  return new Refused(answered.status, detail, Number.isNaN(wait) ? null : wait, said);
 }
 
 /** A text read's words, or null where the server has none to give (`409`, nothing to read). */
@@ -272,12 +276,20 @@ export class Refused extends Error {
   readonly status: number;
   readonly detail: unknown;
   readonly retryAfter: number | null;
+  /** What a reader is told of it: the kit's sentence, never the server's words (ADR-0070). */
+  readonly said: string;
 
-  constructor(status: number, detail: unknown, retryAfter: number | null = null) {
-    super(`the server refused the read (${status}): ${reasons(status, detail).join("; ")}`);
+  constructor(
+    status: number,
+    detail: unknown,
+    retryAfter: number | null = null,
+    said = sentenceOf(status, detail),
+  ) {
+    super(`the server refused the read (${status}): ${said}`);
     this.status = status;
     this.detail = detail;
     this.retryAfter = retryAfter;
+    this.said = said;
   }
 }
 

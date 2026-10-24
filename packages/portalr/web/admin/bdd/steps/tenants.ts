@@ -71,9 +71,9 @@ Then("the owner's email is not on the page", async ({ page }) => {
   await expect(page.getByText("founder@portalr.test")).toHaveCount(0);
 });
 
-Then("they are told the tenant exists", async ({ page, made }) => {
+Then("they are told it isn't valid", async ({ page }) => {
   await expect(page.getByRole("alertdialog").getByRole("alert")).toHaveText(
-    `Not created: ${made.get("tenant")} exists`,
+    "Not created: what was asked for isn't valid.",
   );
 });
 

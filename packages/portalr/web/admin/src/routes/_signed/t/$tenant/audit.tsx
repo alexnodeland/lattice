@@ -1,9 +1,9 @@
 import type { AuditFilter } from "@portalr/client";
 import {
-  Alert,
   Button,
   Card,
   EmptyState,
+  FailureAlert,
   ItemTable,
   Moment,
   PageHeader,
@@ -90,10 +90,7 @@ function Audit() {
         {entries.length === 1 ? "1 change shown" : `${entries.length} changes shown`}
       </p>
       {isFetchNextPageError && (
-        <Alert tone="error">
-          The changes before these couldn't be read:{" "}
-          {error instanceof Error ? error.message : String(error)}
-        </Alert>
+        <FailureAlert lead="The changes before these couldn't be read." error={error} />
       )}
       {hasNextPage && (
         <Button

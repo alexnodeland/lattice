@@ -1,70 +1,41 @@
 /**
- * What a failure says, as every screen shows it (lattice issue 552, portalr ADR-0065). A reader
- * sees a sentence of the kit's own, chosen by the refusal's status and its known reason code; no
- * words of the server's reach them, as they may hold what a tenant shouldn't read. The whole
- * failure is for operators: `failureLogged` writes it to the console, once, as one line, with
- * what looks like a secret taken out.
+ * What a failure says, as every screen shows it (lattice issue 552, portalr ADR-0065 and
+ * ADR-0070). A reader sees a sentence of the kit's own, chosen by the refusal's status and its
+ * known reason code, and where values aren't valid, the fields' paths; no words of the server's
+ * reach them, as they may hold what a tenant shouldn't read. The whole failure, the server's
+ * words included, goes to the console of the reader's own browser: `failureLogged` writes it
+ * once, as one line, with what looks like a secret taken out.
  */
 
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-const AGAIN = " Try again in a moment.";
-
 /** What any other failure says, such as one where the server couldn't be reached. */
-export const GENERIC = `Something went wrong.${AGAIN}`;
+export const GENERIC = "Something went wrong. Try again in a moment.";
 
-const CHANGED = `It changed while you were reading it.${AGAIN}`;
-const STATE = "That can't be done as things stand.";
-const FORBIDDEN = "You may not see this.";
-const INVALID = "What was asked for isn't valid.";
-const NOT_FOUND = "It isn't there: it may have been moved or archived.";
+/** What values that aren't valid say, as the client's refusals say it too (its reasons.ts). */
+export const INVALID = "What was asked for isn't valid.";
 
-/** What each reason code a refusal may carry says, in plain words. */
-const REASONS = new Map<string, string>([
-  ["forbidden", FORBIDDEN],
-  ["not_found", NOT_FOUND],
-  ["not_enabled", "This is switched off for this workspace. Ask an admin to switch it on."],
-  ["invalid_state", STATE],
-  ["version_conflict", CHANGED],
-  ["validation_failed", INVALID],
-]);
-
-/** What each status says, where no reason code a reader is told of came with it. */
-const STATUSES = new Map<number, string>([
-  [401, "You're not signed in. Sign in, then try again."],
-  [403, FORBIDDEN],
-  [404, NOT_FOUND],
-  [422, INVALID],
-  [429, `Too much was asked at once.${AGAIN}`],
-]);
-
-/** A refusal's reason code: its `detail`'s `type`, or its rejection's. */
-function reasonOf(body: unknown): string | undefined {
-  if (!isRecord(body)) {
-    return undefined;
-  }
-  const typed = isRecord(body.detail) ? body.detail : body.rejection;
-  return isRecord(typed) && typeof typed.type === "string" ? typed.type : undefined;
+/**
+ * The sentence a reader sees for a failure: a refused read's `said`, which the client chose by
+ * its reason code and status (portalr ADR-0070), else the generic one. No words of the server's
+ * are read here.
+ */
+export function failureSaid(error: unknown): string {
+  return isRecord(error) && typeof error.said === "string" ? error.said : GENERIC;
 }
 
 /**
- * The sentence a reader sees for a failure: by its reason code, then its status, else the
- * generic one. A refusal is anything with a numeric `status` and the body in `detail`, as the
- * client's `Refused` is.
+ * Why signing in was refused, in the kit's words: Supabase Auth's own message isn't shown
+ * (portalr ADR-0070), and the whole error goes to the console.
  */
-export function failureSaid(error: unknown): string {
-  if (!isRecord(error) || typeof error.status !== "number") {
-    return GENERIC;
+export function signInRefused(error: unknown): string {
+  failureLogged(error);
+  const record = isRecord(error) ? error : {};
+  if (record.code === "invalid_credentials" || record.status === 400) {
+    return "That email and password don't match an account.";
   }
-  const reason = REASONS.get(reasonOf(error.detail) ?? "");
-  if (reason !== undefined) {
-    return reason;
-  }
-  if (error.status >= 500) {
-    return `The server had a problem.${AGAIN}`;
-  }
-  return STATUSES.get(error.status) ?? GENERIC;
+  return record.status === 429 ? "Too many tries. Wait a moment, then try again." : GENERIC;
 }
 
 /** The most graphemes of a failure's text the console line keeps. */
@@ -100,13 +71,33 @@ const SECRETS: readonly (readonly [RegExp, string])[] = [
 ];
 
 /**
+ * A failure whole, as text: an error's message, and a refusal's status and the server's body, as
+ * JSON, which is where the server's own words are. Nothing of it is shown to the reader.
+ */
+function wholeOf(error: unknown): string {
+  if (!isRecord(error)) {
+    return String(error);
+  }
+  const message = error instanceof Error ? error.message : "";
+  if (!("status" in error || "detail" in error)) {
+    return message;
+  }
+  let detail: string;
+  try {
+    detail = JSON.stringify(error.detail) ?? "";
+  } catch {
+    detail = String(error.detail);
+  }
+  return `${message} status=${String(error.status)} detail=${detail}`;
+}
+
+/**
  * A failure's text as the console line keeps it: one line, nothing hidden, what looks like a
  * secret out, and no longer than `LONGEST` graphemes, cut between them.
  */
 export function failureLine(error: unknown): string {
   // A joiner stays, so an emoji made of parts does.
-  const whole = error instanceof Error ? error.message : String(error);
-  let line = whole
+  let line = wholeOf(error)
     .replace(HIDDEN, (hidden) => (hidden === JOINER ? hidden : ""))
     .replace(BREAKS, " ")
     .trim();

@@ -1,6 +1,9 @@
 """Run a task in every project a change affects, and in every project that depends on one.
 
-Usage: scripts/affected.py TASK   (MOON_BASE and MOON_HEAD name the change)
+Usage: scripts/affected.py TASK [--language LANGUAGE]   (MOON_BASE and MOON_HEAD name the change)
+
+With --language, only the projects of that language run the task, as their moon.yml declares it:
+the jobs that repeat one language's tests, such as `python`, leave the others to those that don't.
 
 `moon ci --downstream deep` follows the task graph, so it reaches a dependent's task only
 through that task's own dependencies: a change to evalr alone would run evalr's checks and no
@@ -13,6 +16,7 @@ A task in ONE_AT_A_TIME runs in one project after another, rather than all at on
 the projects tagged BROWSER run theirs first, in a `moon run` of their own, and then the rest.
 """
 
+import argparse
 import json
 import subprocess
 import sys
@@ -55,9 +59,25 @@ def batches(task: str, targets: list[str], browser: Collection[str] = ()) -> lis
     return [batch for batch in (first, rest) if batch]
 
 
+def targets_of(
+    task: str, affected: Collection[str], projects: dict[str, Any], language: str | None = None
+) -> list[str]:
+    """The tasks to run, in the affected projects that have one, of `language` if it is given."""
+    return [
+        f"{name}:{task}"
+        for name in sorted(affected)
+        if task in projects[name]["tasks"]
+        and (language is None or projects[name].get("language") == language)
+    ]
+
+
 def main() -> int:
     """Run the task in the affected projects and their dependents; nothing if there are none."""
-    task = sys.argv[1]
+    arguments = argparse.ArgumentParser(description=(__doc__ or "").split("\n\n")[0])
+    arguments.add_argument("task")
+    arguments.add_argument("--language")
+    given = arguments.parse_args()
+    task: str = given.task
     projects = {project["id"]: project for project in query("projects")["projects"]}
     dependents: dict[str, set[str]] = {name: set() for name in projects}
     for name, project in projects.items():
@@ -72,7 +92,7 @@ def main() -> int:
             affected.add(dependent)
             pending.append(dependent)
 
-    targets = [f"{name}:{task}" for name in sorted(affected) if task in projects[name]["tasks"]]
+    targets = targets_of(task, affected, projects, given.language)
     if not targets:
         sys.stdout.write(f"affected: no affected project has a {task} task\n")
         return 0

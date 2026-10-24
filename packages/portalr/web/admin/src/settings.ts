@@ -187,8 +187,9 @@ export const anywhere = (places: Places) => places.tenant || places.workspaces.l
 
 /**
  * Why grantr refused to set a value, in the page's words from what the page shows, never grantr's
- * own (portalr ADR-0070): a number over the ceiling is told the ceiling and who set it; any other
- * value refused, that it isn't allowed; a 403, that it can't be changed here.
+ * own (portalr ADR-0070): a number over the ceiling is told the ceiling and who set it; a choice
+ * of tools, that only what the ceiling offers may be checked; any other value refused, that it
+ * isn't allowed; a 403, that it can't be changed here.
  */
 export function refusedWhy(row: SettingRow, status: number, tried: number | null): string {
   return `${row.name} wasn't changed: ${whyRefused(row, status, tried)}`;
@@ -200,6 +201,9 @@ function whyRefused(row: SettingRow, status: number, tried: number | null): stri
   }
   if (status !== 422) {
     return "the server couldn't do it just now. Try again in a moment.";
+  }
+  if (Array.isArray(row.ceilingValue)) {
+    return `only what ${row.ceilingBy} offers may be checked here.`;
   }
   const over = typeof row.ceilingValue === "number" && tried !== null && tried > row.ceilingValue;
   return over

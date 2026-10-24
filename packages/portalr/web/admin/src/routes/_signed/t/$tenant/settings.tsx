@@ -26,8 +26,8 @@ import {
   anywhere,
   MOST_ASKED,
   numberOf,
-  refusedWhy,
   type Places,
+  refusedWhy,
   type SettingRow,
   said,
   settersOf,
@@ -313,7 +313,7 @@ function Setting({
         }, and ${now ? said(now.effective) : "what it was"} applies. You tried to ${what}, which wasn't saved: save again if you still want it.`,
       );
     } else {
-      setError(refusedWhy(row, answer.status, value));
+      setError(refusedWhy(row, answer.status, typeof value === "number" ? value : null));
     }
     if (answer.outcome === "done") {
       await queryClient.invalidateQueries({ queryKey: keys.grantr.settings(tenant) });

@@ -467,7 +467,9 @@ test("a refused change of tools is said on the group, and its first box takes th
   const group = screen.getByRole("group", { name: "FreeCAD's tools" });
   await expect
     .element(group)
-    .toHaveAccessibleDescription(/FreeCAD's tools wasn't changed: FreeCAD's tools may be at most/);
+    .toHaveAccessibleDescription(
+      /FreeCAD's tools wasn't changed: only what the tenant offers may be checked here\./,
+    );
   await expect.element(group.getByRole("checkbox", { name: "get_objects (reads)" })).toHaveFocus();
 });
 

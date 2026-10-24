@@ -38,7 +38,9 @@ When("they try to raise {string} to {int}", async ({ page }, name: string, value
 Then("they are told it may be at most {int}, the default", async ({ page }, ceiling: number) => {
   await expect(
     page.getByRole("textbox", { name: "FreeCAD's tries an hour" }),
-  ).toHaveAccessibleDescription(new RegExp(`it may be at most ${ceiling} here: the default\\.`));
+  ).toHaveAccessibleDescription(
+    new RegExp(`it may be at most ${ceiling} here, as the deployment set it\\.`),
+  );
 });
 
 When("they set {string} back to the default", async ({ page }, name: string) => {

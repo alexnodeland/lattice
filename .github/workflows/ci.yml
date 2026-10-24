@@ -20,6 +20,41 @@ env:
   MOON_HEAD: HEAD
 
 jobs:
+  # Whether a pull request changes tier 2's inputs: the recipe, the images' files, or the template
+  # it generates the application from. Asked on a small runner, so an unaffected pull request
+  # starts no arm64 one. Listed first, which in practice starts it earlier when runners are scarce: it
+  # gates the longest job after Check.
+  aws-tier2-affected:
+    name: AWS (tier 2) affected
+    runs-on: ubuntu-latest
+    # 20: the checkout alone stalled for 15 minutes in one run, and a timed-out job is a failed
+    # `CI`, which dequeues the batch.
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    outputs:
+      affected: ${{ steps.affected.outputs.affected }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
+      - id: affected
+        shell: bash
+        run: |
+          # moon's answer first, on its own: if moon fails, so does this, rather than skipping.
+          echo "Comparing $MOON_HEAD with $MOON_BASE: $(git diff --name-only "$MOON_BASE...$MOON_HEAD" | wc -l) files changed"
+          affected=$(moon query tasks --affected --id aws-tier2)
+          # An answer of moon's shape, or fail: a malformed one isn't "not affected".
+          jq --exit-status '.tasks | type == "object"' <<<"$affected" >/dev/null
+          if jq --exit-status '.tasks.stackr["aws-tier2"]' <<<"$affected" >/dev/null; then
+            echo "affected=true" >>"$GITHUB_OUTPUT"
+            echo "stackr:aws-tier2 is affected"
+          else
+            echo "stackr:aws-tier2 isn't affected"
+          fi
+
   check:
     name: Check
     runs-on: ubuntu-latest
@@ -92,11 +127,9 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
       - run: uv sync --locked --all-packages --all-groups --all-extras
-      - run: bun install --frozen-lockfile
-      # ui's tests run in Chromium, through Vitest's browser mode; ui holds Playwright.
-      - run: bun x --bun --no-install playwright install --with-deps --only-shell chromium
-        working-directory: packages/portalr/web/ui
-      - run: uv run --no-project python scripts/affected.py test
+      # The Python projects only: the web packages' tests don't depend on the interpreter, and ran
+      # in Check, which also installs their packages and Chromium. No Python test needs either.
+      - run: uv run --no-project python scripts/affected.py test --language python
 
   # docplan's and oncall's images, each built from the root and started on PostgreSQL.
   images:
@@ -390,7 +423,9 @@ jobs:
       - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
       # OpenTofu's and TFLint's plugins are lattice's own, which proto loads from a trusted file.
       - run: proto trust .prototools && proto install tofu && proto install tflint
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      # Restored only: nightly.yml saves it from main. Saved from every pull request's ref, its
+      # 135 MB evicted main's own caches.
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.terraform.d/plugin-cache
           key: opentofu-providers-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('packages/stackr/deploy/aws/**/.terraform.lock.hcl') }}
@@ -399,42 +434,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
-  # Whether a pull request changes tier 2's inputs: the recipe, the images' files, or the template
-  # it generates the application from. Asked on a small runner, so an unaffected pull request
-  # starts no arm64 one.
-  aws-tier2-affected:
-    name: AWS (tier 2) affected
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-    outputs:
-      affected: ${{ steps.affected.outputs.affected }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
-      - id: affected
-        shell: bash
-        run: |
-          # moon's answer first, on its own: if moon fails, so does this, rather than skipping.
-          echo "Comparing $MOON_HEAD with $MOON_BASE: $(git diff --name-only "$MOON_BASE...$MOON_HEAD" | wc -l) files changed"
-          affected=$(moon query tasks --affected --id aws-tier2)
-          # An answer of moon's shape, or fail: a malformed one isn't "not affected".
-          jq --exit-status '.tasks | type == "object"' <<<"$affected" >/dev/null
-          if jq --exit-status '.tasks.stackr["aws-tier2"]' <<<"$affected" >/dev/null; then
-            echo "affected=true" >>"$GITHUB_OUTPUT"
-            echo "stackr:aws-tier2 is affected"
-          else
-            echo "stackr:aws-tier2 isn't affected"
-          fi
-
   # stackr's AWS recipe, tier 2 (stackr RFC-0004, ADR-0036): envs/floci applied against Floci,
-  # with the thin images and an application from the template, smoked and destroyed, when the
-  # job above finds its inputs changed. On arm64, as Fargate runs the tasks. What it starts is
-  # published on the runner's 127.0.0.1 alone, and it never reaches AWS.
+  # with the thin images and an application from the template, smoked and destroyed, when
+  # `aws-tier2-affected` finds its inputs changed. On arm64, as Fargate runs the tasks. What it
+  # starts is published on the runner's 127.0.0.1 alone, and it never reaches AWS.
   aws-tier2:
     name: AWS (tier 2)
     needs: aws-tier2-affected
@@ -451,7 +454,9 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
       - run: proto trust .prototools && proto install tofu
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      # Restored only: nightly.yml saves it from main. Saved from every pull request's ref, its
+      # 135 MB evicted main's own caches.
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.terraform.d/plugin-cache
           key: opentofu-providers-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('packages/stackr/deploy/aws/**/.terraform.lock.hcl') }}
@@ -682,23 +687,39 @@ jobs:
           docker rm -f backups >/dev/null 2>&1 || true
           make reset
 
+  # Not on a merge queue's batch: its pull requests passed this, and OSV below, on their own heads.
+  # The batch is title.yml's, by its three parts: Mergify's App opened it, in this repository, on a
+  # branch of the queue's, so a fork can't name its branch to be skipped. A job-level `if` can't
+  # read `env`, so each job spells the guard; a skipped job is an allowed skip of `CI`.
+  # 15 minutes: the action stalled past 5 in one run, which dequeued the batch.
   dependency-review:
     name: Dependency review
+    if: >-
+      !(github.event.pull_request.user.login == 'mergify[bot]'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && startsWith(github.head_ref, 'mergify/merge-queue/'))
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+      # Bounded apart from the checkout, so a stalled action is what times out: it ran 6 minutes
+      # in the run that stalled, and a quiet one takes under 1.
+      - timeout-minutes: 10
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
 
   # GitHub's dependency graph doesn't read uv.lock or bun.lock, so osv-scanner compares the pull
   # request's lockfiles with its base's. It finds every lockfile git doesn't ignore, uv.lock and
   # bun.lock, on either side, even one the pull request adds.
   osv:
     name: OSV
+    if: >-
+      !(github.event.pull_request.user.login == 'mergify[bot]'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && startsWith(github.head_ref, 'mergify/merge-queue/'))
     permissions:
       actions: read
       contents: read
@@ -719,6 +740,6 @@ jobs:
     steps:
       - uses: re-actors/alls-green@b5b5b37504aa4183270bd3d855c52a67f212be35 # v1.3.0
         with:
-          # Each runs only when its inputs changed.
-          allowed-skips: release-images-publish, aws-tier2
+          # Each runs only when its inputs changed, or, the last two, not on a merge queue's batch.
+          allowed-skips: release-images-publish, aws-tier2, dependency-review, osv
           jobs: ${{ toJSON(needs) }}

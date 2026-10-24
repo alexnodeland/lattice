@@ -1,6 +1,6 @@
 # ADR-0003: CI on pull requests, Nightly on main, and a required Title check
 
-**Status:** Accepted, amended by [ADR-0012](0012-title-checks-the-breaks-in-the-public-apis.md), [ADR-0016](0016-a-merge-queue-on-mergify.md) and [ADR-0017](0017-ci-installs-its-toolchain-from-a-cache-with-retries.md)
+**Status:** Accepted, amended by [ADR-0012](0012-title-checks-the-breaks-in-the-public-apis.md), [ADR-0016](0016-a-merge-queue-on-mergify.md) and [ADR-0017](0017-ci-installs-its-toolchain-from-a-cache-with-retries.md), and amended 2026-10-24 (see Amendment)
 **Date:** 2026-09-30
 **Deciders:** Alex Nodeland
 
@@ -43,3 +43,10 @@ The setup found two problems with that:
 - Easier: `main` is checked once per push, in full, by `nightly.yml`.
 - Harder: a failure on `main` shows in Nightly, after the merge, not in CI. Branches must be up to date with `main`, so what merges is what CI tested; what CI didn't select is what Nightly can still catch.
 - Harder: a pull request opened with a workflow's own token starts no workflows, so it could never pass either check. release-please and Renovate act as lattice's App for that reason ([ADR-0004](0004-one-github-app-for-release-please-and-renovate.md)).
+
+## Amendment (2026-10-24)
+
+The queue's drafts run `CI` on the tree that is merged, so Nightly no longer repeats it on every push (queue study, 2026-10-24: Nightly's 23 jobs per push competed with the next draft for 20 runners).
+
+- **A push to `main` runs only what no pull request ran:** the toolchain's caches, the crafting apps' fidelity, a release image's reproducibility, and the links. Every project's `check`, the formal specs, the reference implementations' and thin images, and osv-scanner run on the nightly schedule (03:17 UTC) and by hand.
+- **The trade-off:** a push to `main` that bypasses the queue is fully checked only at the next 03:17 UTC; a failure that only a full check finds shows then, not on the push. OSV likewise runs only on a pull request's head and at night, not on a batch's draft, so a batch's combined lockfile changes are not scanned together: accepted, since each pull request passed it alone.

@@ -1,6 +1,10 @@
 # lattice, the root-level project: lattice's own tests, lint and types for the root's Python,
 # the site, and knip over the Bun workspace. It inherits none of the projects' tasks, which would
 # check every package again.
+# Python, though it holds the root's TypeScript tooling too: its tests are the root's pytest, which
+# scripts/affected.py's --language python must reach.
+language: 'python'
+
 workspace:
   inheritedTasks:
     include: []

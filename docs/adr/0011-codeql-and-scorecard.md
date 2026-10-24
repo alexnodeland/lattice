@@ -44,3 +44,7 @@ The default setup is less to keep, but it hides the analysis in a setting and ca
 - Easier: an injection, a path traversal or an unsafe deserialisation that CodeQL knows shows on the pull request that adds it.
 - Easier: Scorecard's public score says how lattice is run, and its findings name what would raise it.
 - Harder: Scorecard runs only on `main`, so this workflow is first run after it merges, by hand.
+
+## Amendment (2026-10-24)
+
+On a pull request, CodeQL runs only when a Python, TypeScript or JavaScript file changes (`paths` on `pull_request`), not for documentation or workflow changes alone: 157 runs a day competed with `CI` for 20 runners. It is not a required check, so a pull request that doesn't trigger it leaves nothing pending. Pushes to `main` and the weekly run are unchanged.

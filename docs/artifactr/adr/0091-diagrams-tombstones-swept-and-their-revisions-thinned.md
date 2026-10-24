@@ -1,9 +1,11 @@
 # ADR-0091: Diagrams' tombstones swept, and their revisions thinned
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-10-23
 **Deciders:** Alex Nodeland
 **Implements:** [lattice RFC-0006](../../rfcs/0006-excalidraw-diagrams-drawn-live.md)'s U3, and the retention rule [ADR-0088](0088-excalidraws-phase-0-what-the-canvas-costs-and-needs.md) left to a record of its own, both as the owner ratified them on 2026-10-23
+
+> **Amended (2026-10-24):** the thinning landed, as [ADR-0094](0094-diagrams-revisions-thinned-to-one-an-actor-every-ten-minutes.md) records, keeping the first revision and each one an accepted proposal made, as the owner approved, and stackr's template runs the sweep and the thinning every hour ([stackr ADR-0052](../../stackr/adr/0052-diagrams-tended-every-hour-sweep-thinning-and-collection.md)).
 
 ## Context
 

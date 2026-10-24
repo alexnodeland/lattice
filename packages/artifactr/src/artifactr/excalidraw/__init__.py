@@ -31,6 +31,7 @@ from artifactr.excalidraw.converter import (
 from artifactr.excalidraw.integrations import EXCALIDRAW, excalidraw_key_of
 from artifactr.excalidraw.patches import element_patch, rebase, reconcile
 from artifactr.excalidraw.render import describe
+from artifactr.excalidraw.retention import thin_revisions
 from artifactr.excalidraw.sweep import SWEEPER, sweep_tombstones
 from artifactr.excalidraw.tools import diagram_tools
 from artifactr.excalidraw.types import EXCALIDRAW_TYPES, Diagram, DiagramFile, Element, Scene
@@ -56,4 +57,5 @@ __all__ = [
     "rebase",
     "reconcile",
     "sweep_tombstones",
+    "thin_revisions",
 ]

@@ -21,6 +21,7 @@ from artifactr.core import (
     commit,
     needs,
 )
+from artifactr.sql import storage as sql_storage
 from artifactr.workspace import Scope, Storage, Transaction, Workspace, Workspaces
 from tests.artifact_types import Note
 from tests.workspace.conftest import StorageFactory
@@ -169,6 +170,41 @@ async def test_a_revision_is_dated_as_its_events_are(storage_factory: StorageFac
     stamped = [envelope.ts for envelope in await storage.read(SCOPE)]
     assert [revision.at for revision in await ws.revisions("n1")] == stamped
     assert stamped == [datetime(2026, 10, 1, 9, tzinfo=UTC), datetime(2026, 10, 2, 17, tzinfo=UTC)]
+
+
+async def test_earlier_revisions_are_dropped_and_the_current_one_never(storage: Storage) -> None:
+    ws = await Workspaces(storage).open("tenant_a", "ws_1", actor=ALICE)
+    other = await Workspaces(storage).open("tenant_b", "ws_1", actor=ALICE)
+    for handle in (ws, other):
+        await handle.create(Note(text="a"), artifact_id="n1")
+        for text in ("b", "c", "d"):
+            note = await handle.get(Note, "n1")
+            await handle.commit(note.edit_text(note.data.text, text))
+    # 4 is the current version: named, it is kept; 9 isn't held, and is passed over.
+    assert await storage.drop_revisions(SCOPE, "n1", [2, 3, 4, 9]) == 2
+    assert [revision.version for revision in await ws.revisions("n1")] == [1, 4]
+    assert (await ws.get(Note, "n1")).data.text == "d"
+    assert await storage.drop_revisions(SCOPE, "n1", []) == 0
+    assert await storage.drop_revisions(SCOPE, "n9", [1]) == 0
+    # The same artifact in another tenant keeps every revision.
+    assert [revision.version for revision in await other.revisions("n1")] == [1, 2, 3, 4]
+
+
+async def test_revisions_are_dropped_a_few_at_a_time_and_in_their_workspace_alone(
+    storage: Storage, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(sql_storage, "DROPPED_AT_ONCE", 2)
+    ws = await Workspaces(storage).open("tenant_a", "ws_1", actor=ALICE)
+    beside = await Workspaces(storage).open("tenant_a", "ws_2", actor=ALICE)
+    for handle in (ws, beside):
+        await handle.create(Note(text="a"), artifact_id="n1")
+        for text in ("b", "c", "d", "e", "f"):
+            note = await handle.get(Note, "n1")
+            await handle.commit(note.edit_text(note.data.text, text))
+    assert await storage.drop_revisions(SCOPE, "n1", [5, 2, 3, 4, 2]) == 4
+    assert [revision.version for revision in await ws.revisions("n1")] == [1, 6]
+    # The same artifact in another workspace of the tenant keeps every revision.
+    assert [revision.version for revision in await beside.revisions("n1")] == [1, 2, 3, 4, 5, 6]
 
 
 def test_a_revision_saved_before_revisions_were_dated_reads_as_undated() -> None:

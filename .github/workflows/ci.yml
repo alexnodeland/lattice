@@ -462,7 +462,7 @@ jobs:
   # it runs when stackr or a library changes, and checks the two together (stackr ADR-0018). The
   # matrix values aren't the task's inputs: moon counts a variable that is set as a change.
   template:
-    name: Template (${{ matrix.libraries }}${{ matrix.evals && ', evals' || '' }}${{ matrix.access == 'none' && ', no access' || '' }}${{ matrix.bridge == 'false' && ', no bridge' || '' }}${{ matrix.portal == 'false' && ', no portal' || '' }}${{ matrix.ui == 'false' && ', no ui' || '' }}${{ matrix.files == 'false' && ', no native files' || '' }}${{ matrix.tracker && matrix.tracker != 'none' && format(', {0}', matrix.tracker) || '' }}, Python ${{ matrix.python }})
+    name: Template (${{ matrix.libraries }}${{ matrix.evals && ', evals' || '' }}${{ matrix.access == 'none' && ', no access' || '' }}${{ matrix.bridge == 'false' && ', no bridge' || '' }}${{ matrix.portal == 'false' && ', no portal' || '' }}${{ matrix.ui == 'false' && ', no ui' || '' }}${{ matrix.files == 'false' && ', no native files' || '' }}${{ matrix.diagrams == 'false' && ', no diagrams' || '' }}${{ matrix.tracker && matrix.tracker != 'none' && format(', {0}', matrix.tracker) || '' }}, Python ${{ matrix.python }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -519,6 +519,11 @@ jobs:
             python: "3.12"
             access: grantr
             files: "false"
+          - libraries: both
+            evals: true
+            python: "3.12"
+            access: grantr
+            diagrams: "false"
     env:
       TEMPLATE_LIBRARIES: ${{ matrix.libraries }}
       TEMPLATE_EVALS: ${{ matrix.evals }}
@@ -529,6 +534,7 @@ jobs:
       TEMPLATE_TRACKER: ${{ matrix.tracker || 'none' }}
       TEMPLATE_UI: ${{ matrix.ui || 'true' }}
       TEMPLATE_FILES: ${{ matrix.files || 'true' }}
+      TEMPLATE_DIAGRAMS: ${{ matrix.diagrams || 'true' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

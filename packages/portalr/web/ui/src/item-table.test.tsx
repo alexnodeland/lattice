@@ -103,3 +103,25 @@ test("named by a heading beside it, the table, and on a phone the list, take its
   await page.viewport(414, 896);
   await expect.element(screen.getByRole("list", { name: "Workspace notes" })).toBeVisible();
 });
+
+test("on a phone a card leaves out what its item has nothing for, label and all", async () => {
+  await page.viewport(390, 844);
+  const screen = await render(
+    <ItemTable
+      caption="Traces"
+      columns={[
+        { key: "trace", label: "Trace", cell: (trace) => trace.id },
+        { key: "took", label: "Took", cell: (trace) => trace.took },
+      ]}
+      items={[
+        { id: "a1", took: "47 ms" },
+        { id: "b2", took: null },
+      ]}
+      keyOf={(trace) => trace.id}
+      empty={{ title: "No traces", body: "None yet." }}
+    />,
+  );
+  const list = screen.getByRole("list", { name: "Traces" });
+  await expect.element(list.getByRole("listitem", { name: "a1" }).getByText("Took")).toBeVisible();
+  expect(list.getByRole("listitem", { name: "b2" }).getByText("Took").elements()).toHaveLength(0);
+});

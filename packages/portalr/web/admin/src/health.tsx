@@ -1,6 +1,5 @@
 import type { PortalrApi, TimeSpan } from "@portalr/client";
 import {
-  Alert,
   BarChart,
   EmptyState,
   formatMoment,
@@ -11,6 +10,7 @@ import {
 import type { ReactNode } from "react";
 import { figure } from "./format";
 import { HEALTH_RANGES, type HealthHours, onGrid, pointAt, stepSaid } from "./logs";
+import { Unanswered } from "./unanswered";
 
 type Points = PortalrApi.components["schemas"]["Ok_list_Point__"];
 export type Reading =
@@ -40,11 +40,7 @@ function Drawn({
         </EmptyState>
       );
     case "unavailable":
-      return (
-        <EmptyState title="Prometheus isn't answering">
-          <Alert tone="error">{reading.reason}</Alert>
-        </EmptyState>
-      );
+      return <Unanswered tool="Prometheus" reading={reading} />;
     case "ok":
       return reading.data.length === 0 ? (
         <EmptyState title={none.title}>{none.body}</EmptyState>

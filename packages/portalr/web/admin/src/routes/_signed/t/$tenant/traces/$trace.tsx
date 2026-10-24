@@ -1,6 +1,5 @@
 import { outline, said, type Trace, wholeTrace } from "@portalr/client";
 import {
-  Alert,
   CRUMB,
   EmptyState,
   PageHeader,
@@ -15,6 +14,7 @@ import { useMemo, useState } from "react";
 import { opening } from "../../../../../access";
 import { ReadFailed } from "../../../../../read-failed";
 import { analyticsSessionOf, isId } from "../../../../../traces";
+import { Unanswered } from "../../../../../unanswered";
 
 const HEADER = <PageHeader title="Trace" />;
 
@@ -129,9 +129,7 @@ function Body({ trace }: { trace: string }) {
       return (
         <>
           {header}
-          <EmptyState title="Tempo isn't answering">
-            <Alert tone="error">{reading.reason}</Alert>
-          </EmptyState>
+          <Unanswered tool="Tempo" reading={reading} />
         </>
       );
     default:

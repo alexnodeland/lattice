@@ -1,0 +1,3578 @@
+[
+  {
+    "case": "empty",
+    "name": "Nothing yet",
+    "elements": {},
+    "description": "Diagram \"Nothing yet\": 0 elements"
+  },
+  {
+    "case": "a labelled flow",
+    "name": "Stack",
+    "elements": {
+      "api": {
+        "id": "api",
+        "type": "rectangle",
+        "x": 0,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "api-label": {
+        "id": "api-label",
+        "type": "text",
+        "containerId": "api",
+        "text": "API",
+        "x": 10,
+        "y": 10
+      },
+      "db": {
+        "id": "db",
+        "type": "ellipse",
+        "x": 300,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "db-label": {
+        "id": "db-label",
+        "type": "text",
+        "containerId": "db",
+        "text": "DB",
+        "x": 10,
+        "y": 10
+      },
+      "reads": {
+        "id": "reads",
+        "type": "arrow",
+        "x": 100,
+        "y": 25,
+        "width": 100,
+        "height": 0,
+        "startBinding": {
+          "elementId": "api"
+        },
+        "endBinding": {
+          "elementId": "db"
+        }
+      },
+      "reads-label": {
+        "id": "reads-label",
+        "type": "text",
+        "containerId": "reads",
+        "text": "reads",
+        "x": 10,
+        "y": 10
+      },
+      "loose": {
+        "id": "loose",
+        "type": "arrow",
+        "x": 100,
+        "y": 25,
+        "width": 100,
+        "height": 0,
+        "startBinding": null,
+        "endBinding": {
+          "elementId": "db"
+        }
+      }
+    },
+    "description": "Diagram \"Stack\": 7 elements\nBounds: x 0 to 400, y 0 to 50\nShapes (2):\n- rectangle api \"API\"\n- ellipse db \"DB\"\nArrows (2):\n- arrow reads: api \"API\" --\"reads\"--> db \"DB\"\n- arrow loose: (free) --> db \"DB\""
+  },
+  {
+    "case": "frames, free text, deleted",
+    "name": "Plan",
+    "elements": {
+      "f1": {
+        "type": "frame",
+        "name": "Phase 1",
+        "x": -50,
+        "y": -50,
+        "width": 500,
+        "height": 400
+      },
+      "f2": {
+        "type": "magicframe",
+        "x": 0,
+        "y": 0
+      },
+      "t1": {
+        "type": "text",
+        "text": "A note",
+        "x": 5,
+        "y": 300
+      },
+      "gone": {
+        "id": "gone",
+        "type": "rectangle",
+        "x": 0,
+        "y": 0,
+        "width": 100,
+        "height": 50,
+        "isDeleted": true
+      },
+      "l1": {
+        "type": "line",
+        "x": 0,
+        "y": 0,
+        "width": 10,
+        "height": 10
+      },
+      "img": {
+        "type": "image",
+        "x": 1,
+        "y": 1
+      }
+    },
+    "description": "Diagram \"Plan\": 5 elements\nBounds: x -50 to 450, y -50 to 350\nFrames (2):\n- f1 \"Phase 1\"\n- f2\nShapes (1):\n- image img\nArrows (1):\n- line l1: (free) --> (free)\nText (1):\n- \"A note\""
+  },
+  {
+    "case": "untrusted words",
+    "name": "Quotes \" and \\ backslashes",
+    "elements": {
+      "s1": {
+        "id": "s1",
+        "type": "rectangle",
+        "x": 0,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "s1-label": {
+        "id": "s1-label",
+        "type": "text",
+        "containerId": "s1",
+        "text": "<script>alert(1)</script> <b>bold</b>",
+        "x": 10,
+        "y": 10
+      },
+      "t-bidi": {
+        "type": "text",
+        "text": "safe‮exe.txt⁦x⁩",
+        "x": 0,
+        "y": 0
+      },
+      "t-tags": {
+        "type": "text",
+        "text": "hi󠁁󠁿 there",
+        "x": 0,
+        "y": 0
+      },
+      "t-ctrl": {
+        "type": "text",
+        "text": "a\u001b[31mred\u0000 b",
+        "x": 0,
+        "y": 0
+      },
+      "t-space": {
+        "type": "text",
+        "text": "x  y\u001c\u001fz\n\tw　v",
+        "x": 0,
+        "y": 0
+      },
+      "t-zwj": {
+        "type": "text",
+        "text": "👩‍💻 می‌خواهم",
+        "x": 0,
+        "y": 0
+      },
+      "t-cjk": {
+        "type": "text",
+        "text": "设计 日本語 한국어",
+        "x": 0,
+        "y": 0
+      },
+      "t-long": {
+        "type": "text",
+        "text": "word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word ",
+        "x": 0,
+        "y": 0
+      },
+      "t-none": {
+        "type": "text",
+        "text": null,
+        "x": 0,
+        "y": 0
+      }
+    },
+    "description": "Diagram \"Quotes \\\" and \\\\ backslashes\": 10 elements\nBounds: x 0 to 100, y 0 to 50\nShapes (1):\n- rectangle s1 \"<script>alert(1)</script> <b>bold</b>\"\nText (8):\n- \"safeexe.txtx\"\n- \"hi there\"\n- \"a[31mred b\"\n- \"x y z w v\"\n- \"👩‍💻 می‌خواهم\"\n- \"设计 日本語 한국어\"\n- \"word word word word word word word word word word word word word word word word \"\n- \"\""
+  },
+  {
+    "case": "bounds: 88.515625, -0.0",
+    "name": "Numbers",
+    "elements": {
+      "n": {
+        "id": "n",
+        "type": "rectangle",
+        "x": 88.515625,
+        "y": -0.0,
+        "width": 0,
+        "height": 0
+      }
+    },
+    "description": "Diagram \"Numbers\": 1 elements\nBounds: x 88.5156 to 88.5156, y -0 to 0\nShapes (1):\n- rectangle n"
+  },
+  {
+    "case": "bounds: 1234567, 1234565",
+    "name": "Numbers",
+    "elements": {
+      "n": {
+        "id": "n",
+        "type": "rectangle",
+        "x": 1234567,
+        "y": 1234565,
+        "width": 0,
+        "height": 0
+      }
+    },
+    "description": "Diagram \"Numbers\": 1 elements\nBounds: x 1.23457e+06 to 1.23457e+06, y 1.23456e+06 to 1.23456e+06\nShapes (1):\n- rectangle n"
+  },
+  {
+    "case": "bounds: 123456.5, 999999.5",
+    "name": "Numbers",
+    "elements": {
+      "n": {
+        "id": "n",
+        "type": "rectangle",
+        "x": 123456.5,
+        "y": 999999.5,
+        "width": 0,
+        "height": 0
+      }
+    },
+    "description": "Diagram \"Numbers\": 1 elements\nBounds: x 123456 to 123456, y 1e+06 to 1e+06\nShapes (1):\n- rectangle n"
+  },
+  {
+    "case": "bounds: 0.0001, 1e-05",
+    "name": "Numbers",
+    "elements": {
+      "n": {
+        "id": "n",
+        "type": "rectangle",
+        "x": 0.0001,
+        "y": 1e-05,
+        "width": 0,
+        "height": 0
+      }
+    },
+    "description": "Diagram \"Numbers\": 1 elements\nBounds: x 0.0001 to 0.0001, y 1e-05 to 1e-05\nShapes (1):\n- rectangle n"
+  },
+  {
+    "case": "bounds: 1e+21, -1e-07",
+    "name": "Numbers",
+    "elements": {
+      "n": {
+        "id": "n",
+        "type": "rectangle",
+        "x": 1e+21,
+        "y": -1e-07,
+        "width": 0,
+        "height": 0
+      }
+    },
+    "description": "Diagram \"Numbers\": 1 elements\nBounds: x 1e+21 to 1e+21, y -1e-07 to -1e-07\nShapes (1):\n- rectangle n"
+  },
+  {
+    "case": "bounds: 0.5, 2.5",
+    "name": "Numbers",
+    "elements": {
+      "n": {
+        "id": "n",
+        "type": "rectangle",
+        "x": 0.5,
+        "y": 2.5,
+        "width": 0,
+        "height": 0
+      }
+    },
+    "description": "Diagram \"Numbers\": 1 elements\nBounds: x 0.5 to 0.5, y 2.5 to 2.5\nShapes (1):\n- rectangle n"
+  },
+  {
+    "case": "bounds: 100000, 1000000",
+    "name": "Numbers",
+    "elements": {
+      "n": {
+        "id": "n",
+        "type": "rectangle",
+        "x": 100000,
+        "y": 1000000,
+        "width": 0,
+        "height": 0
+      }
+    },
+    "description": "Diagram \"Numbers\": 1 elements\nBounds: x 100000 to 100000, y 1e+06 to 1e+06\nShapes (1):\n- rectangle n"
+  },
+  {
+    "case": "bounds: -123.456789, 5e-324",
+    "name": "Numbers",
+    "elements": {
+      "n": {
+        "id": "n",
+        "type": "rectangle",
+        "x": -123.456789,
+        "y": 5e-324,
+        "width": 0,
+        "height": 0
+      }
+    },
+    "description": "Diagram \"Numbers\": 1 elements\nBounds: x -123.457 to -123.457, y 4.94066e-324 to 4.94066e-324\nShapes (1):\n- rectangle n"
+  },
+  {
+    "case": "what isn't a place is passed over",
+    "name": "Numbers",
+    "elements": {
+      "e": {
+        "type": "rectangle",
+        "x": 1,
+        "y": 1,
+        "width": null
+      },
+      "f": {
+        "type": "rectangle",
+        "x": "far",
+        "y": 1
+      },
+      "g": {
+        "type": "ellipse",
+        "x": 7,
+        "y": 7
+      }
+    },
+    "description": "Diagram \"Numbers\": 3 elements\nBounds: x 7 to 7, y 7 to 7\nShapes (3):\n- rectangle e\n- rectangle f\n- ellipse g"
+  },
+  {
+    "case": "cut past its length",
+    "name": "Big",
+    "elements": {
+      "box0000": {
+        "id": "box0000",
+        "type": "rectangle",
+        "x": 0,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0001": {
+        "id": "box0001",
+        "type": "rectangle",
+        "x": 10,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0002": {
+        "id": "box0002",
+        "type": "rectangle",
+        "x": 20,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0003": {
+        "id": "box0003",
+        "type": "rectangle",
+        "x": 30,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0004": {
+        "id": "box0004",
+        "type": "rectangle",
+        "x": 40,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0005": {
+        "id": "box0005",
+        "type": "rectangle",
+        "x": 50,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0006": {
+        "id": "box0006",
+        "type": "rectangle",
+        "x": 60,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0007": {
+        "id": "box0007",
+        "type": "rectangle",
+        "x": 70,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0008": {
+        "id": "box0008",
+        "type": "rectangle",
+        "x": 80,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0009": {
+        "id": "box0009",
+        "type": "rectangle",
+        "x": 90,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0010": {
+        "id": "box0010",
+        "type": "rectangle",
+        "x": 100,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0011": {
+        "id": "box0011",
+        "type": "rectangle",
+        "x": 110,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0012": {
+        "id": "box0012",
+        "type": "rectangle",
+        "x": 120,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0013": {
+        "id": "box0013",
+        "type": "rectangle",
+        "x": 130,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0014": {
+        "id": "box0014",
+        "type": "rectangle",
+        "x": 140,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0015": {
+        "id": "box0015",
+        "type": "rectangle",
+        "x": 150,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0016": {
+        "id": "box0016",
+        "type": "rectangle",
+        "x": 160,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0017": {
+        "id": "box0017",
+        "type": "rectangle",
+        "x": 170,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0018": {
+        "id": "box0018",
+        "type": "rectangle",
+        "x": 180,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0019": {
+        "id": "box0019",
+        "type": "rectangle",
+        "x": 190,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0020": {
+        "id": "box0020",
+        "type": "rectangle",
+        "x": 200,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0021": {
+        "id": "box0021",
+        "type": "rectangle",
+        "x": 210,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0022": {
+        "id": "box0022",
+        "type": "rectangle",
+        "x": 220,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0023": {
+        "id": "box0023",
+        "type": "rectangle",
+        "x": 230,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0024": {
+        "id": "box0024",
+        "type": "rectangle",
+        "x": 240,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0025": {
+        "id": "box0025",
+        "type": "rectangle",
+        "x": 250,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0026": {
+        "id": "box0026",
+        "type": "rectangle",
+        "x": 260,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0027": {
+        "id": "box0027",
+        "type": "rectangle",
+        "x": 270,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0028": {
+        "id": "box0028",
+        "type": "rectangle",
+        "x": 280,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0029": {
+        "id": "box0029",
+        "type": "rectangle",
+        "x": 290,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0030": {
+        "id": "box0030",
+        "type": "rectangle",
+        "x": 300,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0031": {
+        "id": "box0031",
+        "type": "rectangle",
+        "x": 310,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0032": {
+        "id": "box0032",
+        "type": "rectangle",
+        "x": 320,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0033": {
+        "id": "box0033",
+        "type": "rectangle",
+        "x": 330,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0034": {
+        "id": "box0034",
+        "type": "rectangle",
+        "x": 340,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0035": {
+        "id": "box0035",
+        "type": "rectangle",
+        "x": 350,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0036": {
+        "id": "box0036",
+        "type": "rectangle",
+        "x": 360,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0037": {
+        "id": "box0037",
+        "type": "rectangle",
+        "x": 370,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0038": {
+        "id": "box0038",
+        "type": "rectangle",
+        "x": 380,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0039": {
+        "id": "box0039",
+        "type": "rectangle",
+        "x": 390,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0040": {
+        "id": "box0040",
+        "type": "rectangle",
+        "x": 400,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0041": {
+        "id": "box0041",
+        "type": "rectangle",
+        "x": 410,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0042": {
+        "id": "box0042",
+        "type": "rectangle",
+        "x": 420,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0043": {
+        "id": "box0043",
+        "type": "rectangle",
+        "x": 430,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0044": {
+        "id": "box0044",
+        "type": "rectangle",
+        "x": 440,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0045": {
+        "id": "box0045",
+        "type": "rectangle",
+        "x": 450,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0046": {
+        "id": "box0046",
+        "type": "rectangle",
+        "x": 460,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0047": {
+        "id": "box0047",
+        "type": "rectangle",
+        "x": 470,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0048": {
+        "id": "box0048",
+        "type": "rectangle",
+        "x": 480,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0049": {
+        "id": "box0049",
+        "type": "rectangle",
+        "x": 490,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0050": {
+        "id": "box0050",
+        "type": "rectangle",
+        "x": 500,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0051": {
+        "id": "box0051",
+        "type": "rectangle",
+        "x": 510,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0052": {
+        "id": "box0052",
+        "type": "rectangle",
+        "x": 520,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0053": {
+        "id": "box0053",
+        "type": "rectangle",
+        "x": 530,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0054": {
+        "id": "box0054",
+        "type": "rectangle",
+        "x": 540,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0055": {
+        "id": "box0055",
+        "type": "rectangle",
+        "x": 550,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0056": {
+        "id": "box0056",
+        "type": "rectangle",
+        "x": 560,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0057": {
+        "id": "box0057",
+        "type": "rectangle",
+        "x": 570,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0058": {
+        "id": "box0058",
+        "type": "rectangle",
+        "x": 580,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0059": {
+        "id": "box0059",
+        "type": "rectangle",
+        "x": 590,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0060": {
+        "id": "box0060",
+        "type": "rectangle",
+        "x": 600,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0061": {
+        "id": "box0061",
+        "type": "rectangle",
+        "x": 610,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0062": {
+        "id": "box0062",
+        "type": "rectangle",
+        "x": 620,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0063": {
+        "id": "box0063",
+        "type": "rectangle",
+        "x": 630,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0064": {
+        "id": "box0064",
+        "type": "rectangle",
+        "x": 640,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0065": {
+        "id": "box0065",
+        "type": "rectangle",
+        "x": 650,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0066": {
+        "id": "box0066",
+        "type": "rectangle",
+        "x": 660,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0067": {
+        "id": "box0067",
+        "type": "rectangle",
+        "x": 670,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0068": {
+        "id": "box0068",
+        "type": "rectangle",
+        "x": 680,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0069": {
+        "id": "box0069",
+        "type": "rectangle",
+        "x": 690,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0070": {
+        "id": "box0070",
+        "type": "rectangle",
+        "x": 700,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0071": {
+        "id": "box0071",
+        "type": "rectangle",
+        "x": 710,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0072": {
+        "id": "box0072",
+        "type": "rectangle",
+        "x": 720,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0073": {
+        "id": "box0073",
+        "type": "rectangle",
+        "x": 730,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0074": {
+        "id": "box0074",
+        "type": "rectangle",
+        "x": 740,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0075": {
+        "id": "box0075",
+        "type": "rectangle",
+        "x": 750,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0076": {
+        "id": "box0076",
+        "type": "rectangle",
+        "x": 760,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0077": {
+        "id": "box0077",
+        "type": "rectangle",
+        "x": 770,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0078": {
+        "id": "box0078",
+        "type": "rectangle",
+        "x": 780,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0079": {
+        "id": "box0079",
+        "type": "rectangle",
+        "x": 790,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0080": {
+        "id": "box0080",
+        "type": "rectangle",
+        "x": 800,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0081": {
+        "id": "box0081",
+        "type": "rectangle",
+        "x": 810,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0082": {
+        "id": "box0082",
+        "type": "rectangle",
+        "x": 820,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0083": {
+        "id": "box0083",
+        "type": "rectangle",
+        "x": 830,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0084": {
+        "id": "box0084",
+        "type": "rectangle",
+        "x": 840,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0085": {
+        "id": "box0085",
+        "type": "rectangle",
+        "x": 850,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0086": {
+        "id": "box0086",
+        "type": "rectangle",
+        "x": 860,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0087": {
+        "id": "box0087",
+        "type": "rectangle",
+        "x": 870,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0088": {
+        "id": "box0088",
+        "type": "rectangle",
+        "x": 880,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0089": {
+        "id": "box0089",
+        "type": "rectangle",
+        "x": 890,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0090": {
+        "id": "box0090",
+        "type": "rectangle",
+        "x": 900,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0091": {
+        "id": "box0091",
+        "type": "rectangle",
+        "x": 910,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0092": {
+        "id": "box0092",
+        "type": "rectangle",
+        "x": 920,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0093": {
+        "id": "box0093",
+        "type": "rectangle",
+        "x": 930,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0094": {
+        "id": "box0094",
+        "type": "rectangle",
+        "x": 940,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0095": {
+        "id": "box0095",
+        "type": "rectangle",
+        "x": 950,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0096": {
+        "id": "box0096",
+        "type": "rectangle",
+        "x": 960,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0097": {
+        "id": "box0097",
+        "type": "rectangle",
+        "x": 970,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0098": {
+        "id": "box0098",
+        "type": "rectangle",
+        "x": 980,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0099": {
+        "id": "box0099",
+        "type": "rectangle",
+        "x": 990,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0100": {
+        "id": "box0100",
+        "type": "rectangle",
+        "x": 1000,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0101": {
+        "id": "box0101",
+        "type": "rectangle",
+        "x": 1010,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0102": {
+        "id": "box0102",
+        "type": "rectangle",
+        "x": 1020,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0103": {
+        "id": "box0103",
+        "type": "rectangle",
+        "x": 1030,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0104": {
+        "id": "box0104",
+        "type": "rectangle",
+        "x": 1040,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0105": {
+        "id": "box0105",
+        "type": "rectangle",
+        "x": 1050,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0106": {
+        "id": "box0106",
+        "type": "rectangle",
+        "x": 1060,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0107": {
+        "id": "box0107",
+        "type": "rectangle",
+        "x": 1070,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0108": {
+        "id": "box0108",
+        "type": "rectangle",
+        "x": 1080,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0109": {
+        "id": "box0109",
+        "type": "rectangle",
+        "x": 1090,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0110": {
+        "id": "box0110",
+        "type": "rectangle",
+        "x": 1100,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0111": {
+        "id": "box0111",
+        "type": "rectangle",
+        "x": 1110,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0112": {
+        "id": "box0112",
+        "type": "rectangle",
+        "x": 1120,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0113": {
+        "id": "box0113",
+        "type": "rectangle",
+        "x": 1130,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0114": {
+        "id": "box0114",
+        "type": "rectangle",
+        "x": 1140,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0115": {
+        "id": "box0115",
+        "type": "rectangle",
+        "x": 1150,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0116": {
+        "id": "box0116",
+        "type": "rectangle",
+        "x": 1160,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0117": {
+        "id": "box0117",
+        "type": "rectangle",
+        "x": 1170,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0118": {
+        "id": "box0118",
+        "type": "rectangle",
+        "x": 1180,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0119": {
+        "id": "box0119",
+        "type": "rectangle",
+        "x": 1190,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0120": {
+        "id": "box0120",
+        "type": "rectangle",
+        "x": 1200,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0121": {
+        "id": "box0121",
+        "type": "rectangle",
+        "x": 1210,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0122": {
+        "id": "box0122",
+        "type": "rectangle",
+        "x": 1220,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0123": {
+        "id": "box0123",
+        "type": "rectangle",
+        "x": 1230,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0124": {
+        "id": "box0124",
+        "type": "rectangle",
+        "x": 1240,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0125": {
+        "id": "box0125",
+        "type": "rectangle",
+        "x": 1250,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0126": {
+        "id": "box0126",
+        "type": "rectangle",
+        "x": 1260,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0127": {
+        "id": "box0127",
+        "type": "rectangle",
+        "x": 1270,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0128": {
+        "id": "box0128",
+        "type": "rectangle",
+        "x": 1280,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0129": {
+        "id": "box0129",
+        "type": "rectangle",
+        "x": 1290,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0130": {
+        "id": "box0130",
+        "type": "rectangle",
+        "x": 1300,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0131": {
+        "id": "box0131",
+        "type": "rectangle",
+        "x": 1310,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0132": {
+        "id": "box0132",
+        "type": "rectangle",
+        "x": 1320,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0133": {
+        "id": "box0133",
+        "type": "rectangle",
+        "x": 1330,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0134": {
+        "id": "box0134",
+        "type": "rectangle",
+        "x": 1340,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0135": {
+        "id": "box0135",
+        "type": "rectangle",
+        "x": 1350,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0136": {
+        "id": "box0136",
+        "type": "rectangle",
+        "x": 1360,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0137": {
+        "id": "box0137",
+        "type": "rectangle",
+        "x": 1370,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0138": {
+        "id": "box0138",
+        "type": "rectangle",
+        "x": 1380,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0139": {
+        "id": "box0139",
+        "type": "rectangle",
+        "x": 1390,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0140": {
+        "id": "box0140",
+        "type": "rectangle",
+        "x": 1400,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0141": {
+        "id": "box0141",
+        "type": "rectangle",
+        "x": 1410,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0142": {
+        "id": "box0142",
+        "type": "rectangle",
+        "x": 1420,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0143": {
+        "id": "box0143",
+        "type": "rectangle",
+        "x": 1430,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0144": {
+        "id": "box0144",
+        "type": "rectangle",
+        "x": 1440,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0145": {
+        "id": "box0145",
+        "type": "rectangle",
+        "x": 1450,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0146": {
+        "id": "box0146",
+        "type": "rectangle",
+        "x": 1460,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0147": {
+        "id": "box0147",
+        "type": "rectangle",
+        "x": 1470,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0148": {
+        "id": "box0148",
+        "type": "rectangle",
+        "x": 1480,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0149": {
+        "id": "box0149",
+        "type": "rectangle",
+        "x": 1490,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0150": {
+        "id": "box0150",
+        "type": "rectangle",
+        "x": 1500,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0151": {
+        "id": "box0151",
+        "type": "rectangle",
+        "x": 1510,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0152": {
+        "id": "box0152",
+        "type": "rectangle",
+        "x": 1520,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0153": {
+        "id": "box0153",
+        "type": "rectangle",
+        "x": 1530,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0154": {
+        "id": "box0154",
+        "type": "rectangle",
+        "x": 1540,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0155": {
+        "id": "box0155",
+        "type": "rectangle",
+        "x": 1550,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0156": {
+        "id": "box0156",
+        "type": "rectangle",
+        "x": 1560,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0157": {
+        "id": "box0157",
+        "type": "rectangle",
+        "x": 1570,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0158": {
+        "id": "box0158",
+        "type": "rectangle",
+        "x": 1580,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0159": {
+        "id": "box0159",
+        "type": "rectangle",
+        "x": 1590,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0160": {
+        "id": "box0160",
+        "type": "rectangle",
+        "x": 1600,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0161": {
+        "id": "box0161",
+        "type": "rectangle",
+        "x": 1610,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0162": {
+        "id": "box0162",
+        "type": "rectangle",
+        "x": 1620,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0163": {
+        "id": "box0163",
+        "type": "rectangle",
+        "x": 1630,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0164": {
+        "id": "box0164",
+        "type": "rectangle",
+        "x": 1640,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0165": {
+        "id": "box0165",
+        "type": "rectangle",
+        "x": 1650,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0166": {
+        "id": "box0166",
+        "type": "rectangle",
+        "x": 1660,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0167": {
+        "id": "box0167",
+        "type": "rectangle",
+        "x": 1670,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0168": {
+        "id": "box0168",
+        "type": "rectangle",
+        "x": 1680,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0169": {
+        "id": "box0169",
+        "type": "rectangle",
+        "x": 1690,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0170": {
+        "id": "box0170",
+        "type": "rectangle",
+        "x": 1700,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0171": {
+        "id": "box0171",
+        "type": "rectangle",
+        "x": 1710,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0172": {
+        "id": "box0172",
+        "type": "rectangle",
+        "x": 1720,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0173": {
+        "id": "box0173",
+        "type": "rectangle",
+        "x": 1730,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0174": {
+        "id": "box0174",
+        "type": "rectangle",
+        "x": 1740,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0175": {
+        "id": "box0175",
+        "type": "rectangle",
+        "x": 1750,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0176": {
+        "id": "box0176",
+        "type": "rectangle",
+        "x": 1760,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0177": {
+        "id": "box0177",
+        "type": "rectangle",
+        "x": 1770,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0178": {
+        "id": "box0178",
+        "type": "rectangle",
+        "x": 1780,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0179": {
+        "id": "box0179",
+        "type": "rectangle",
+        "x": 1790,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0180": {
+        "id": "box0180",
+        "type": "rectangle",
+        "x": 1800,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0181": {
+        "id": "box0181",
+        "type": "rectangle",
+        "x": 1810,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0182": {
+        "id": "box0182",
+        "type": "rectangle",
+        "x": 1820,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0183": {
+        "id": "box0183",
+        "type": "rectangle",
+        "x": 1830,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0184": {
+        "id": "box0184",
+        "type": "rectangle",
+        "x": 1840,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0185": {
+        "id": "box0185",
+        "type": "rectangle",
+        "x": 1850,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0186": {
+        "id": "box0186",
+        "type": "rectangle",
+        "x": 1860,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0187": {
+        "id": "box0187",
+        "type": "rectangle",
+        "x": 1870,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0188": {
+        "id": "box0188",
+        "type": "rectangle",
+        "x": 1880,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0189": {
+        "id": "box0189",
+        "type": "rectangle",
+        "x": 1890,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0190": {
+        "id": "box0190",
+        "type": "rectangle",
+        "x": 1900,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0191": {
+        "id": "box0191",
+        "type": "rectangle",
+        "x": 1910,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0192": {
+        "id": "box0192",
+        "type": "rectangle",
+        "x": 1920,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0193": {
+        "id": "box0193",
+        "type": "rectangle",
+        "x": 1930,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0194": {
+        "id": "box0194",
+        "type": "rectangle",
+        "x": 1940,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0195": {
+        "id": "box0195",
+        "type": "rectangle",
+        "x": 1950,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0196": {
+        "id": "box0196",
+        "type": "rectangle",
+        "x": 1960,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0197": {
+        "id": "box0197",
+        "type": "rectangle",
+        "x": 1970,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0198": {
+        "id": "box0198",
+        "type": "rectangle",
+        "x": 1980,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0199": {
+        "id": "box0199",
+        "type": "rectangle",
+        "x": 1990,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0200": {
+        "id": "box0200",
+        "type": "rectangle",
+        "x": 2000,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0201": {
+        "id": "box0201",
+        "type": "rectangle",
+        "x": 2010,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0202": {
+        "id": "box0202",
+        "type": "rectangle",
+        "x": 2020,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0203": {
+        "id": "box0203",
+        "type": "rectangle",
+        "x": 2030,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0204": {
+        "id": "box0204",
+        "type": "rectangle",
+        "x": 2040,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0205": {
+        "id": "box0205",
+        "type": "rectangle",
+        "x": 2050,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0206": {
+        "id": "box0206",
+        "type": "rectangle",
+        "x": 2060,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0207": {
+        "id": "box0207",
+        "type": "rectangle",
+        "x": 2070,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0208": {
+        "id": "box0208",
+        "type": "rectangle",
+        "x": 2080,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0209": {
+        "id": "box0209",
+        "type": "rectangle",
+        "x": 2090,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0210": {
+        "id": "box0210",
+        "type": "rectangle",
+        "x": 2100,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0211": {
+        "id": "box0211",
+        "type": "rectangle",
+        "x": 2110,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0212": {
+        "id": "box0212",
+        "type": "rectangle",
+        "x": 2120,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0213": {
+        "id": "box0213",
+        "type": "rectangle",
+        "x": 2130,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0214": {
+        "id": "box0214",
+        "type": "rectangle",
+        "x": 2140,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0215": {
+        "id": "box0215",
+        "type": "rectangle",
+        "x": 2150,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0216": {
+        "id": "box0216",
+        "type": "rectangle",
+        "x": 2160,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0217": {
+        "id": "box0217",
+        "type": "rectangle",
+        "x": 2170,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0218": {
+        "id": "box0218",
+        "type": "rectangle",
+        "x": 2180,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0219": {
+        "id": "box0219",
+        "type": "rectangle",
+        "x": 2190,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0220": {
+        "id": "box0220",
+        "type": "rectangle",
+        "x": 2200,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0221": {
+        "id": "box0221",
+        "type": "rectangle",
+        "x": 2210,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0222": {
+        "id": "box0222",
+        "type": "rectangle",
+        "x": 2220,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0223": {
+        "id": "box0223",
+        "type": "rectangle",
+        "x": 2230,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0224": {
+        "id": "box0224",
+        "type": "rectangle",
+        "x": 2240,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0225": {
+        "id": "box0225",
+        "type": "rectangle",
+        "x": 2250,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0226": {
+        "id": "box0226",
+        "type": "rectangle",
+        "x": 2260,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0227": {
+        "id": "box0227",
+        "type": "rectangle",
+        "x": 2270,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0228": {
+        "id": "box0228",
+        "type": "rectangle",
+        "x": 2280,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0229": {
+        "id": "box0229",
+        "type": "rectangle",
+        "x": 2290,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0230": {
+        "id": "box0230",
+        "type": "rectangle",
+        "x": 2300,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0231": {
+        "id": "box0231",
+        "type": "rectangle",
+        "x": 2310,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0232": {
+        "id": "box0232",
+        "type": "rectangle",
+        "x": 2320,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0233": {
+        "id": "box0233",
+        "type": "rectangle",
+        "x": 2330,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0234": {
+        "id": "box0234",
+        "type": "rectangle",
+        "x": 2340,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0235": {
+        "id": "box0235",
+        "type": "rectangle",
+        "x": 2350,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0236": {
+        "id": "box0236",
+        "type": "rectangle",
+        "x": 2360,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0237": {
+        "id": "box0237",
+        "type": "rectangle",
+        "x": 2370,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0238": {
+        "id": "box0238",
+        "type": "rectangle",
+        "x": 2380,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0239": {
+        "id": "box0239",
+        "type": "rectangle",
+        "x": 2390,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0240": {
+        "id": "box0240",
+        "type": "rectangle",
+        "x": 2400,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0241": {
+        "id": "box0241",
+        "type": "rectangle",
+        "x": 2410,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0242": {
+        "id": "box0242",
+        "type": "rectangle",
+        "x": 2420,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0243": {
+        "id": "box0243",
+        "type": "rectangle",
+        "x": 2430,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0244": {
+        "id": "box0244",
+        "type": "rectangle",
+        "x": 2440,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0245": {
+        "id": "box0245",
+        "type": "rectangle",
+        "x": 2450,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0246": {
+        "id": "box0246",
+        "type": "rectangle",
+        "x": 2460,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0247": {
+        "id": "box0247",
+        "type": "rectangle",
+        "x": 2470,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0248": {
+        "id": "box0248",
+        "type": "rectangle",
+        "x": 2480,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0249": {
+        "id": "box0249",
+        "type": "rectangle",
+        "x": 2490,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0250": {
+        "id": "box0250",
+        "type": "rectangle",
+        "x": 2500,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0251": {
+        "id": "box0251",
+        "type": "rectangle",
+        "x": 2510,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0252": {
+        "id": "box0252",
+        "type": "rectangle",
+        "x": 2520,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0253": {
+        "id": "box0253",
+        "type": "rectangle",
+        "x": 2530,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0254": {
+        "id": "box0254",
+        "type": "rectangle",
+        "x": 2540,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0255": {
+        "id": "box0255",
+        "type": "rectangle",
+        "x": 2550,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0256": {
+        "id": "box0256",
+        "type": "rectangle",
+        "x": 2560,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0257": {
+        "id": "box0257",
+        "type": "rectangle",
+        "x": 2570,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0258": {
+        "id": "box0258",
+        "type": "rectangle",
+        "x": 2580,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0259": {
+        "id": "box0259",
+        "type": "rectangle",
+        "x": 2590,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0260": {
+        "id": "box0260",
+        "type": "rectangle",
+        "x": 2600,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0261": {
+        "id": "box0261",
+        "type": "rectangle",
+        "x": 2610,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0262": {
+        "id": "box0262",
+        "type": "rectangle",
+        "x": 2620,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0263": {
+        "id": "box0263",
+        "type": "rectangle",
+        "x": 2630,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0264": {
+        "id": "box0264",
+        "type": "rectangle",
+        "x": 2640,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0265": {
+        "id": "box0265",
+        "type": "rectangle",
+        "x": 2650,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0266": {
+        "id": "box0266",
+        "type": "rectangle",
+        "x": 2660,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0267": {
+        "id": "box0267",
+        "type": "rectangle",
+        "x": 2670,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0268": {
+        "id": "box0268",
+        "type": "rectangle",
+        "x": 2680,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0269": {
+        "id": "box0269",
+        "type": "rectangle",
+        "x": 2690,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0270": {
+        "id": "box0270",
+        "type": "rectangle",
+        "x": 2700,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0271": {
+        "id": "box0271",
+        "type": "rectangle",
+        "x": 2710,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0272": {
+        "id": "box0272",
+        "type": "rectangle",
+        "x": 2720,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0273": {
+        "id": "box0273",
+        "type": "rectangle",
+        "x": 2730,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0274": {
+        "id": "box0274",
+        "type": "rectangle",
+        "x": 2740,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0275": {
+        "id": "box0275",
+        "type": "rectangle",
+        "x": 2750,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0276": {
+        "id": "box0276",
+        "type": "rectangle",
+        "x": 2760,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0277": {
+        "id": "box0277",
+        "type": "rectangle",
+        "x": 2770,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0278": {
+        "id": "box0278",
+        "type": "rectangle",
+        "x": 2780,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0279": {
+        "id": "box0279",
+        "type": "rectangle",
+        "x": 2790,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0280": {
+        "id": "box0280",
+        "type": "rectangle",
+        "x": 2800,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0281": {
+        "id": "box0281",
+        "type": "rectangle",
+        "x": 2810,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0282": {
+        "id": "box0282",
+        "type": "rectangle",
+        "x": 2820,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0283": {
+        "id": "box0283",
+        "type": "rectangle",
+        "x": 2830,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0284": {
+        "id": "box0284",
+        "type": "rectangle",
+        "x": 2840,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0285": {
+        "id": "box0285",
+        "type": "rectangle",
+        "x": 2850,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0286": {
+        "id": "box0286",
+        "type": "rectangle",
+        "x": 2860,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0287": {
+        "id": "box0287",
+        "type": "rectangle",
+        "x": 2870,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0288": {
+        "id": "box0288",
+        "type": "rectangle",
+        "x": 2880,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0289": {
+        "id": "box0289",
+        "type": "rectangle",
+        "x": 2890,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0290": {
+        "id": "box0290",
+        "type": "rectangle",
+        "x": 2900,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0291": {
+        "id": "box0291",
+        "type": "rectangle",
+        "x": 2910,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0292": {
+        "id": "box0292",
+        "type": "rectangle",
+        "x": 2920,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0293": {
+        "id": "box0293",
+        "type": "rectangle",
+        "x": 2930,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0294": {
+        "id": "box0294",
+        "type": "rectangle",
+        "x": 2940,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0295": {
+        "id": "box0295",
+        "type": "rectangle",
+        "x": 2950,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0296": {
+        "id": "box0296",
+        "type": "rectangle",
+        "x": 2960,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0297": {
+        "id": "box0297",
+        "type": "rectangle",
+        "x": 2970,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0298": {
+        "id": "box0298",
+        "type": "rectangle",
+        "x": 2980,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0299": {
+        "id": "box0299",
+        "type": "rectangle",
+        "x": 2990,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0300": {
+        "id": "box0300",
+        "type": "rectangle",
+        "x": 3000,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0301": {
+        "id": "box0301",
+        "type": "rectangle",
+        "x": 3010,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0302": {
+        "id": "box0302",
+        "type": "rectangle",
+        "x": 3020,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0303": {
+        "id": "box0303",
+        "type": "rectangle",
+        "x": 3030,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0304": {
+        "id": "box0304",
+        "type": "rectangle",
+        "x": 3040,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0305": {
+        "id": "box0305",
+        "type": "rectangle",
+        "x": 3050,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0306": {
+        "id": "box0306",
+        "type": "rectangle",
+        "x": 3060,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0307": {
+        "id": "box0307",
+        "type": "rectangle",
+        "x": 3070,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0308": {
+        "id": "box0308",
+        "type": "rectangle",
+        "x": 3080,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0309": {
+        "id": "box0309",
+        "type": "rectangle",
+        "x": 3090,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0310": {
+        "id": "box0310",
+        "type": "rectangle",
+        "x": 3100,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0311": {
+        "id": "box0311",
+        "type": "rectangle",
+        "x": 3110,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0312": {
+        "id": "box0312",
+        "type": "rectangle",
+        "x": 3120,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0313": {
+        "id": "box0313",
+        "type": "rectangle",
+        "x": 3130,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0314": {
+        "id": "box0314",
+        "type": "rectangle",
+        "x": 3140,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0315": {
+        "id": "box0315",
+        "type": "rectangle",
+        "x": 3150,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0316": {
+        "id": "box0316",
+        "type": "rectangle",
+        "x": 3160,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0317": {
+        "id": "box0317",
+        "type": "rectangle",
+        "x": 3170,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0318": {
+        "id": "box0318",
+        "type": "rectangle",
+        "x": 3180,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0319": {
+        "id": "box0319",
+        "type": "rectangle",
+        "x": 3190,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0320": {
+        "id": "box0320",
+        "type": "rectangle",
+        "x": 3200,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0321": {
+        "id": "box0321",
+        "type": "rectangle",
+        "x": 3210,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0322": {
+        "id": "box0322",
+        "type": "rectangle",
+        "x": 3220,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0323": {
+        "id": "box0323",
+        "type": "rectangle",
+        "x": 3230,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0324": {
+        "id": "box0324",
+        "type": "rectangle",
+        "x": 3240,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0325": {
+        "id": "box0325",
+        "type": "rectangle",
+        "x": 3250,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0326": {
+        "id": "box0326",
+        "type": "rectangle",
+        "x": 3260,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0327": {
+        "id": "box0327",
+        "type": "rectangle",
+        "x": 3270,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0328": {
+        "id": "box0328",
+        "type": "rectangle",
+        "x": 3280,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0329": {
+        "id": "box0329",
+        "type": "rectangle",
+        "x": 3290,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0330": {
+        "id": "box0330",
+        "type": "rectangle",
+        "x": 3300,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0331": {
+        "id": "box0331",
+        "type": "rectangle",
+        "x": 3310,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0332": {
+        "id": "box0332",
+        "type": "rectangle",
+        "x": 3320,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0333": {
+        "id": "box0333",
+        "type": "rectangle",
+        "x": 3330,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0334": {
+        "id": "box0334",
+        "type": "rectangle",
+        "x": 3340,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0335": {
+        "id": "box0335",
+        "type": "rectangle",
+        "x": 3350,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0336": {
+        "id": "box0336",
+        "type": "rectangle",
+        "x": 3360,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0337": {
+        "id": "box0337",
+        "type": "rectangle",
+        "x": 3370,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0338": {
+        "id": "box0338",
+        "type": "rectangle",
+        "x": 3380,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0339": {
+        "id": "box0339",
+        "type": "rectangle",
+        "x": 3390,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0340": {
+        "id": "box0340",
+        "type": "rectangle",
+        "x": 3400,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0341": {
+        "id": "box0341",
+        "type": "rectangle",
+        "x": 3410,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0342": {
+        "id": "box0342",
+        "type": "rectangle",
+        "x": 3420,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0343": {
+        "id": "box0343",
+        "type": "rectangle",
+        "x": 3430,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0344": {
+        "id": "box0344",
+        "type": "rectangle",
+        "x": 3440,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0345": {
+        "id": "box0345",
+        "type": "rectangle",
+        "x": 3450,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0346": {
+        "id": "box0346",
+        "type": "rectangle",
+        "x": 3460,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0347": {
+        "id": "box0347",
+        "type": "rectangle",
+        "x": 3470,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0348": {
+        "id": "box0348",
+        "type": "rectangle",
+        "x": 3480,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0349": {
+        "id": "box0349",
+        "type": "rectangle",
+        "x": 3490,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0350": {
+        "id": "box0350",
+        "type": "rectangle",
+        "x": 3500,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0351": {
+        "id": "box0351",
+        "type": "rectangle",
+        "x": 3510,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0352": {
+        "id": "box0352",
+        "type": "rectangle",
+        "x": 3520,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0353": {
+        "id": "box0353",
+        "type": "rectangle",
+        "x": 3530,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0354": {
+        "id": "box0354",
+        "type": "rectangle",
+        "x": 3540,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0355": {
+        "id": "box0355",
+        "type": "rectangle",
+        "x": 3550,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0356": {
+        "id": "box0356",
+        "type": "rectangle",
+        "x": 3560,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0357": {
+        "id": "box0357",
+        "type": "rectangle",
+        "x": 3570,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0358": {
+        "id": "box0358",
+        "type": "rectangle",
+        "x": 3580,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0359": {
+        "id": "box0359",
+        "type": "rectangle",
+        "x": 3590,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0360": {
+        "id": "box0360",
+        "type": "rectangle",
+        "x": 3600,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0361": {
+        "id": "box0361",
+        "type": "rectangle",
+        "x": 3610,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0362": {
+        "id": "box0362",
+        "type": "rectangle",
+        "x": 3620,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0363": {
+        "id": "box0363",
+        "type": "rectangle",
+        "x": 3630,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0364": {
+        "id": "box0364",
+        "type": "rectangle",
+        "x": 3640,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0365": {
+        "id": "box0365",
+        "type": "rectangle",
+        "x": 3650,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0366": {
+        "id": "box0366",
+        "type": "rectangle",
+        "x": 3660,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0367": {
+        "id": "box0367",
+        "type": "rectangle",
+        "x": 3670,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0368": {
+        "id": "box0368",
+        "type": "rectangle",
+        "x": 3680,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0369": {
+        "id": "box0369",
+        "type": "rectangle",
+        "x": 3690,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0370": {
+        "id": "box0370",
+        "type": "rectangle",
+        "x": 3700,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0371": {
+        "id": "box0371",
+        "type": "rectangle",
+        "x": 3710,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0372": {
+        "id": "box0372",
+        "type": "rectangle",
+        "x": 3720,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0373": {
+        "id": "box0373",
+        "type": "rectangle",
+        "x": 3730,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0374": {
+        "id": "box0374",
+        "type": "rectangle",
+        "x": 3740,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0375": {
+        "id": "box0375",
+        "type": "rectangle",
+        "x": 3750,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0376": {
+        "id": "box0376",
+        "type": "rectangle",
+        "x": 3760,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0377": {
+        "id": "box0377",
+        "type": "rectangle",
+        "x": 3770,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0378": {
+        "id": "box0378",
+        "type": "rectangle",
+        "x": 3780,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0379": {
+        "id": "box0379",
+        "type": "rectangle",
+        "x": 3790,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0380": {
+        "id": "box0380",
+        "type": "rectangle",
+        "x": 3800,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0381": {
+        "id": "box0381",
+        "type": "rectangle",
+        "x": 3810,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0382": {
+        "id": "box0382",
+        "type": "rectangle",
+        "x": 3820,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0383": {
+        "id": "box0383",
+        "type": "rectangle",
+        "x": 3830,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0384": {
+        "id": "box0384",
+        "type": "rectangle",
+        "x": 3840,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0385": {
+        "id": "box0385",
+        "type": "rectangle",
+        "x": 3850,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0386": {
+        "id": "box0386",
+        "type": "rectangle",
+        "x": 3860,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0387": {
+        "id": "box0387",
+        "type": "rectangle",
+        "x": 3870,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0388": {
+        "id": "box0388",
+        "type": "rectangle",
+        "x": 3880,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0389": {
+        "id": "box0389",
+        "type": "rectangle",
+        "x": 3890,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0390": {
+        "id": "box0390",
+        "type": "rectangle",
+        "x": 3900,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0391": {
+        "id": "box0391",
+        "type": "rectangle",
+        "x": 3910,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0392": {
+        "id": "box0392",
+        "type": "rectangle",
+        "x": 3920,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0393": {
+        "id": "box0393",
+        "type": "rectangle",
+        "x": 3930,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0394": {
+        "id": "box0394",
+        "type": "rectangle",
+        "x": 3940,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0395": {
+        "id": "box0395",
+        "type": "rectangle",
+        "x": 3950,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0396": {
+        "id": "box0396",
+        "type": "rectangle",
+        "x": 3960,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0397": {
+        "id": "box0397",
+        "type": "rectangle",
+        "x": 3970,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0398": {
+        "id": "box0398",
+        "type": "rectangle",
+        "x": 3980,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      },
+      "box0399": {
+        "id": "box0399",
+        "type": "rectangle",
+        "x": 3990,
+        "y": 0,
+        "width": 100,
+        "height": 50
+      }
+    },
+    "description": "Diagram \"Big\": 400 elements\nBounds: x 0 to 4090, y 0 to 50\nShapes (400):\n- rectangle box0000\n- rectangle box0001\n- rectangle box0002\n- rectangle box0003\n- rectangle box0004\n- rectangle box0005\n- rectangle box0006\n- rectangle box0007\n- rectangle box0008\n- rectangle box0009\n- rectangle box0010\n- rectangle box0011\n- rectangle box0012\n- rectangle box0013\n- rectangle box0014\n- rectangle box0015\n- rectangle box0016\n- rectangle box0017\n- rectangle box0018\n- rectangle box0019\n- rectangle box0020\n- rectangle box0021\n- rectangle box0022\n- rectangle box0023\n- rectangle box0024\n- rectangle box0025\n- rectangle box0026\n- rectangle box0027\n- rectangle box0028\n- rectangle box0029\n- rectangle box0030\n- rectangle box0031\n- rectangle box0032\n- rectangle box0033\n- rectangle box0034\n- rectangle box0035\n- rectangle box0036\n- rectangle box0037\n- rectangle box0038\n- rectangle box0039\n- rectangle box0040\n- rectangle box0041\n- rectangle box0042\n- rectangle box0043\n- rectangle box0044\n- rectangle box0045\n- rectangle box0046\n- rectangle box0047\n- rectangle box0048\n- rectangle box0049\n- rectangle box0050\n- rectangle box0051\n- rectangle box0052\n- rectangle box0053\n- rectangle box0054\n- rectangle box0055\n- rectangle box0056\n- rectangle box0057\n- rectangle box0058\n- rectangle box0059\n- rectangle box0060\n- rectangle box0061\n- rectangle box0062\n- rectangle box0063\n- rectangle box0064\n- rectangle box0065\n- rectangle box0066\n- rectangle box0067\n- rectangle box0068\n- rectangle box0069\n- rectangle box0070\n- rectangle box0071\n- rectangle box0072\n- rectangle box0073\n- rectangle box0074\n- rectangle box0075\n- rectangle box0076\n- rectangle box0077\n- rectangle box0078\n- rectangle box0079\n- rectangle box0080\n- rectangle box0081\n- rectangle box0082\n- rectangle box0083\n- rectangle box0084\n- rectangle box0085\n- rectangle box0086\n- rectangle box0087\n- rectangle box0088\n- rectangle box0089\n- rectangle box0090\n- rectangle box0091\n- rectangle box0092\n- rectangle box0093\n- rectangle box0094\n- rectangle box0095\n- rectangle box0096\n- rectangle box0097\n- rectangle box0098\n- rectangle box0099\n- rectangle box0100\n- rectangle box0101\n- rectangle box0102\n- rectangle box0103\n- rectangle box0104\n- rectangle box0105\n- rectangle box0106\n- rectangle box0107\n- rectangle box0108\n- rectangle box0109\n- rectangle box0110\n- rectangle box0111\n- rectangle box0112\n- rectangle box0113\n- rectangle box0114\n- rectangle box0115\n- rectangle box0116\n- rectangle box0117\n- rectangle box0118\n- rectangle box0119\n- rectangle box0120\n- rectangle box0121\n- rectangle box0122\n- rectangle box0123\n- rectangle box0124\n- rectangle box0125\n- rectangle box0126\n- rectangle box0127\n- rectangle box0128\n- rectangle box0129\n- rectangle box0130\n- rectangle box0131\n- rectangle box0132\n- rectangle box0133\n- rectangle box0134\n- rectangle box0135\n- rectangle box0136\n- rectangle box0137\n- rectangle box0138\n- rectangle box0139\n- rectangle box0140\n- rectangle box0141\n- rectangle box0142\n- rectangle box0143\n- rectangle box0144\n- rectangle box0145\n- rectangle box0146\n- rectangle box0147\n- rectangle box0148\n- rectangle box0149\n- rectangle box0150\n- rectangle box0151\n- rectangle box0152\n- rectangle box0153\n- rectangle box0154\n- rectangle box0155\n- rectangle box0156\n- rectangle box0157\n- rectangle box0158\n- rectangle box0159\n- rectangle box0160\n- rectangle box0161\n- rectangle box0162\n- rectangle box0163\n- rectangle box0164\n- rectangle box0165\n- rectangle box0166\n- rectangle box0167\n- rectangle box0168\n- rectangle box0169\n- rectangle box0170\n- rectangle box0171\n- rectangle box0172\n- rectangle box0173\n- rectangle box0174\n- rectangle box0175\n- rectangle box0176\n- rectangle box0177\n- rectangle box0178\n- rectangle box0179\n- rectangle box0180\n- rectangle box0181\n- rectangle box0182\n- rectangle box0183\n- rectangle box0184\n- rectangle box0185\n- rectangle box0186\n- rectangle box0187\n- rectangle box0188\n- rectangle box0189\n- rectangle box0190\n- rectangle box0191\n- rectangle box0192\n- rectangle box0193\n- rectan\n… (cut: read the diagram for the rest)"
+  },
+  {
+    "case": "odd shapes of data",
+    "name": "Odd",
+    "elements": {
+      "no-type": {
+        "x": 0,
+        "y": 0
+      },
+      "bad-binding": {
+        "type": "arrow",
+        "startBinding": "x",
+        "endBinding": {
+          "elementId": 3
+        }
+      },
+      "dangling": {
+        "type": "arrow",
+        "startBinding": {
+          "elementId": "missing"
+        }
+      },
+      "labelled-missing": {
+        "type": "text",
+        "containerId": "nobody",
+        "text": "orphan"
+      }
+    },
+    "description": "Diagram \"Odd\": 4 elements\nBounds: x 0 to 0, y 0 to 0\nArrows (2):\n- arrow bad-binding: (free) --> (free)\n- arrow dangling: (free) --> (free)"
+  }
+]

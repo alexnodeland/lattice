@@ -9,13 +9,15 @@ tighter plan``, is what the note is about, so two proposals aren't one. ``draft`
 Word document about what follows, as ``documents.py`` does, which it names in its answer; ``revise``
 and a document's id make it read the document and edit it by the app's commands, which is a
 proposal, or, while someone has it checked out, an answer that says who, and that it plans again
-after the check-in. ``wait`` keeps its turn running until it is stopped, and ``fail`` fails its
-turn, for admin's count of failed turns. Anything else gets its words back. Each run streams, as
-every run does.
+after the check-in. ``draw`` makes it draw a flowchart of the stack from Mermaid, a diagram it
+proposes (lattice RFC-0006). ``wait`` keeps its turn running until it is stopped, and ``fail``
+fails its turn, for admin's count of failed turns. Anything else gets its words back. Each run
+streams, as every run does.
 """
 
 import asyncio
 import re
+from collections.abc import Mapping
 from typing import Any
 
 from pydantic_ai import (
@@ -46,16 +48,24 @@ from artifactr import (
     Workspaces,
 )
 from artifactr.agent import function_model
-from artifactr.core import Actor
+from artifactr.core import Actor, Command
+from artifactr.excalidraw import (
+    Diagram,
+    FakeConverter,
+    diagram_tools,
+    excalidraw_checks,
+    excalidraw_key_of,
+)
 from artifactr.files.manifest import WordDocument
 from artifactr.files.native import NativeFiles
 from artifactr.files.tools import native_file_tools
 from artifactr.ui import UI_TYPES, ui_checks
 from artifactr.ui.agent import ui_tools
-from artifactr.workspace import integration_gate
+from artifactr.workspace import Check, Workspace, integration_gate
 from grantr.core import Agent as AgentSubject
 from grantr.core import ServicePrincipal, Subject, User
 from grantr.grants import Grants
+from lattice_core.integrations import Integrations
 from tests.app.documents import document_tools, native_files
 
 CREATED = re.compile(r"^Done: (?P<note>\S+) is now at version")
@@ -120,6 +130,10 @@ DEFAULT_TOPIC = "launch"
 """What a note is about when ``propose`` says no more than "an edit"."""
 
 
+STACK = "flowchart LR\n  API -- reads --> DB\n  DB -- copies --> Backup"
+"""The diagram ``draw`` makes: a flowchart, which the fake converter draws as the worker would."""
+
+
 def topic_of(prompt: str) -> str:
     """What ``propose ...`` or ``draft ...`` is about: the words after it, without their article."""
     words = re.sub(r"^(?:an?|the)\s+", "", prompt.partition(" ")[2].strip())
@@ -162,6 +176,9 @@ async def answer(messages: list[ModelMessage], _info: AgentInfo) -> ModelRespons
             # The document's id, and none of the change notes that may follow it.
             document = (prompt.split()[1:] or [""])[0]
             return ModelResponse(parts=[ToolCallPart("read_artifact", {"artifact_id": document})])
+        case ["draw"]:
+            drawn = {"mermaid": STACK, "summary": "the stack", "name": "Stack"}
+            return ModelResponse(parts=[ToolCallPart("draw_mermaid", drawn)])
         case ["publish"]:
             return ModelResponse(parts=[ToolCallPart("publish", {"note": "the notes"})])
         case ["ask"]:
@@ -203,6 +220,8 @@ def after(returned: ToolReturnPart, messages: list[ModelMessage]) -> ModelRespon
     if returned.tool_name == "edit_text":
         note = called(returned, messages)["artifact_id"]
         return ModelResponse(parts=[TextPart(f"Done: proposed an edit to {note}")])
+    if returned.tool_name == "draw_mermaid":
+        return ModelResponse(parts=[TextPart("Drew the stack.")])
     if returned.tool_name == "draft_document" and (created := CREATED.search(told)):
         return ModelResponse(parts=[TextPart(f"Drafted {created['note']}")])
     if returned.tool_name == "read_artifact" and (read := VERSION.search(told)):
@@ -233,10 +252,10 @@ def publish(note: str) -> str:
 
 
 def build_agent(
-    workspaces: Workspaces, files: NativeFiles
+    workspaces: Workspaces, files: NativeFiles, integrations: Integrations
 ) -> Agent[Session[None], str | DeferredToolRequests]:
     """The notes agent, on the script, with a tool that waits for a person's approval, and the
-    tools for native files."""
+    tools for native files and diagrams."""
     return Agent[Session[None], str | DeferredToolRequests](
         function_model(answer),
         deps_type=Session[None],
@@ -246,8 +265,9 @@ def build_agent(
             ui_tools(dashboards=False),
             native_file_tools(files),
             document_tools(workspaces, files),
+            diagram_tools(FakeConverter(), integrations=integrations),
         ],
-        capabilities=[ArtifactWorkspace(types=[Note, WordDocument], ask=True)],
+        capabilities=[ArtifactWorkspace(types=[Note, WordDocument, Diagram], ask=True)],
     )
 
 
@@ -272,6 +292,20 @@ def subject_of(tenant: str, workspace: str | None, actor: Actor) -> Subject:
             return AgentSubject()
 
 
+def _together(*each: Mapping[str, Check]) -> dict[str, Check]:
+    """Checks for the same command types, run in turn: artifactr takes one check a type."""
+
+    def joined(found: list[Check]) -> Check:
+        async def check(workspace: Workspace, command: Command) -> None:
+            for one in found:
+                await one(workspace, command)
+
+        return check
+
+    kinds = sorted({kind for checks in each for kind in checks})
+    return {kind: joined([checks[kind] for checks in each if kind in checks]) for kind in kinds}
+
+
 def collaboration(grants: Grants) -> tuple[Workspaces, Runner[None], NativeFiles]:
     """artifactr's workspaces, checked by grantr and switched by its integrations, its runner, and
     its native files."""
@@ -279,11 +313,13 @@ def collaboration(grants: Grants) -> tuple[Workspaces, Runner[None], NativeFiles
     files = native_files(grants)
     workspaces = Workspaces(
         InMemoryStorage(),
-        types=[Note, WordDocument, *UI_TYPES],
-        checks=ui_checks(),
+        types=[Note, WordDocument, Diagram, *UI_TYPES],
+        checks=_together(ui_checks(), excalidraw_checks()),
         authorize=hooks.authorize,
         hidden=hooks.hidden,
-        gate=integration_gate(grants, files.key_of),
+        gate=integration_gate(
+            grants, lambda kind, data: excalidraw_key_of(kind, data) or files.key_of(kind, data)
+        ),
     )
-    runner = Runner[None](build_agent(workspaces, files), app=None, agent_name="assistant")
+    runner = Runner[None](build_agent(workspaces, files, grants), app=None, agent_name="assistant")
     return workspaces, runner, files

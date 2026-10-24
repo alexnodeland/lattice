@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@excalidraw/excalidraw": "0.18.1",
     "@portalr/client": "workspace:*",
     "@portalr/ui": "workspace:*",
     "@tanstack/react-query": "5.104.1",

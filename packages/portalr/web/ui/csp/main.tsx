@@ -6,17 +6,21 @@
  * agent's run writes it, with the integrations `&on=` and `&off=` name, such as `markdown:math`,
  * switched so and the rest their defaults, and on the root `data-drawn` once it is whole, or
  * `data-error` if it stopped; `?dashboard` the dashboard gallery; `?eval` an evaluated string; and
- * `?app=` a mini app of that HTML, run in the sandbox at `&apps=` (portalr ADR-0051).
+ * `?app=` a mini app of that HTML, run in the sandbox at `&apps=` (portalr ADR-0051); and `?diagram`
+ * the app's card of a diagram, whose canvas the test opens (portalr ADR-0072).
  */
 
 import type { IntegrationKey } from "@portalr/client";
 import "../src/styles.css";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
+// The app's diagram card and its canvas add-on, built as app's build builds them (portalr ADR-0072).
+import { diagram } from "../../app/src/diagram";
 import { AppHostContext, DashboardView, IntegrationsContext, Markdown } from "../src";
 import { AppFrame } from "../src/app-frame";
 import { byDefault } from "../src/integrations";
 import { SUPPORT } from "../src/test/dashboards";
+import SAMPLE from "./diagram.json";
 
 /** The characters a stream renders, one at a time, before it yields. */
 const STEP = 25;
@@ -97,4 +101,8 @@ if (html !== null) {
       </IntegrationsContext>,
     ),
   );
+}
+if (asked.has("diagram")) {
+  // A diagram as the diagrams worker draws one from Mermaid, its first label holding markup.
+  flushSync(() => root.render(diagram.render(SAMPLE)));
 }

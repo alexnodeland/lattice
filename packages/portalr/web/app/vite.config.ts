@@ -6,6 +6,7 @@ import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import { absent, lean, onlyWithAddOn, RAW_HTML } from "../ui/bundle-checks";
+import { excalidraw } from "./excalidraw";
 
 /**
  * Where the app's routes are, and the route tree TanStack Router generates from them, which is
@@ -46,12 +47,18 @@ export default defineConfig({
   },
   // Each route is a chunk of its own, loaded when it is first visited.
   plugins: [
+    // Excalidraw, as the canvas add-on needs it and nothing more (portalr ADR-0072).
+    excalidraw("/portalr/app/"),
     tanstackRouter({ ...ROUTES, autoCodeSplitting: true }),
     react(),
     tailwindcss(),
     // The diff library is the file views' and proposals', never the first page's.
     lean(/[\\/]node_modules[\\/]diff[\\/]/),
     absent(RAW_HTML),
+    // Mermaid runs only in the diagrams worker: the canvas holds none of it (lattice RFC-0006).
+    absent(
+      /[\\/]node_modules[\\/](mermaid|@excalidraw[\\/]mermaid-to-excalidraw|pica|image-blob-reduce)[\\/]/,
+    ),
     // A native file's parts are the native files' add-on's, never a route's (portalr ADR-0044).
     onlyWithAddOn(NATIVE_FILES),
     // The licences of the packages bundled, beside the UI (portalr ADR-0033).

@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.2.0](https://github.com/alexnodeland/lattice/compare/grantr-v0.1.0...grantr-v0.2.0) (2026-10-24)
+
+
+### Features
+
+* **artifactr:** diagrams' data: an element-scoped patch, its checks and what the agent reads, with diagrams off by default ([#563](https://github.com/alexnodeland/lattice/issues/563)) ([9f8f2d5](https://github.com/alexnodeland/lattice/commit/9f8f2d571a766e78c8a3e86693732608dbb9a6d8))
+* **files,portalr:** a person's upload over HTTP, told by its bytes, read before it is committed, and held to quotas ([#454](https://github.com/alexnodeland/lattice/issues/454)) ([8a59dd9](https://github.com/alexnodeland/lattice/commit/8a59dd9fe4fe9e8d48065e37d1ebe1766092953c))
+* **files:** every crafting app declared once, on two dialects' adapters, pinned on its own ([#394](https://github.com/alexnodeland/lattice/issues/394)) ([3d1c635](https://github.com/alexnodeland/lattice/commit/3d1c635b07c7cb2eb4dad039c206a08196bc6760))
+* **grantr,portalr:** a person removed from a tenant has their analytics events there deleted ([#695](https://github.com/alexnodeland/lattice/issues/695)) ([d0eedbf](https://github.com/alexnodeland/lattice/commit/d0eedbf9915c1cdace51ecfd15547fbf69c0c3b3))
+* **integrations:** one switch per workspace for every integration: lattice-core's port, grantr's store and artifactr's gate ([#369](https://github.com/alexnodeland/lattice/issues/369)) ([bec7dfd](https://github.com/alexnodeland/lattice/commit/bec7dfd99b4d35a74bea8cd757e941b0d9df315b))
+* **lattice-core,artifactr:** a connected app's tools narrowed per workspace, and the operator's offer of reads and edits ([#645](https://github.com/alexnodeland/lattice/issues/645)) ([b50d261](https://github.com/alexnodeland/lattice/commit/b50d2617f7a5259d0bedf374b2f942971447d287))
+* **lattice-core,grantr,artifactr:** settings each tier may only narrow, stored and audited in grantr, and a connected app's hourly limit read from them ([#609](https://github.com/alexnodeland/lattice/issues/609)) ([8b23639](https://github.com/alexnodeland/lattice/commit/8b236399fdcf3bd7cfb87dd89f3cdaec89e1022c))
+* **portalr,grantr,lattice-core:** admin's Settings page, where a level's limits are lowered at the version read, and a changed registry's clamping flagged ([#625](https://github.com/alexnodeland/lattice/issues/625)) ([759505c](https://github.com/alexnodeland/lattice/commit/759505ca8ff08ade1929a2b165c7d00d054311b9))
+* **portalr,lattice-core,grantr:** a connected app's tools chosen in admin by checkbox, each with its risk, and Settings opened to a workspace's admins ([#661](https://github.com/alexnodeland/lattice/issues/661)) ([1cf8395](https://github.com/alexnodeland/lattice/commit/1cf83959913d9ba7b5681e861a98be76be157fc9))
+
 ## 0.1.0 (2026-10-17)
 
 

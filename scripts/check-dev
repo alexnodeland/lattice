@@ -87,6 +87,7 @@ dev() {
   shift
   rm -f "$scratch/stackr/.env"
   [[ $adapter == none ]] || echo "STACKR_DATABASE=$adapter" >"$scratch/stackr/.env"
+  [[ -z ${STACK_EXTRA:-} ]] || echo "$STACK_EXTRA" >>"$scratch/stackr/.env"
   : >"$scratch/calls"
   env PATH="$scratch/bin:$PATH" CALLS="$scratch/calls" APP="$scratch/app" DEV_APP_DIR="$scratch/app" \
     DEV_STACKR_DIR="$scratch/stackr" "$@"
@@ -144,6 +145,18 @@ fresh
 check "up generates the application with no git identity on this machine" up env -u GIT_AUTHOR_NAME -u GIT_AUTHOR_EMAIL \
   -u GIT_COMMITTER_NAME -u GIT_COMMITTER_EMAIL GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 check "and commits it" test -n "$(git -C "$scratch/app" rev-parse --verify --quiet HEAD)"
+fresh
+printf '[user]\n\temail = mine@example.test\n' >"$scratch/gitconfig"
+check "up generates it with this machine's email and a name of its own" up env -u GIT_AUTHOR_NAME -u GIT_AUTHOR_EMAIL \
+  -u GIT_COMMITTER_NAME -u GIT_COMMITTER_EMAIL GIT_CONFIG_GLOBAL="$scratch/gitconfig" GIT_CONFIG_NOSYSTEM=1
+check "and commits it as that email" test "$(git -C "$scratch/app" log -1 --format=%ae)" = mine@example.test
+
+# up, with stackr's stack published on every interface.
+lan_up() { STACK_EXTRA=STACKR_BIND=0.0.0.0 dev postgres "$@" scripts/dev up >"$scratch/out" 2>&1; }
+check "up refuses a stack published beyond the loopback" refused lan_up
+check "and says how to choose it" said "DEV_LAN=yes"
+check "and starts nothing" nothing_started
+check "up takes it with DEV_LAN=yes" lan_up env DEV_LAN=yes
 
 fresh && mkdir -p "$scratch/app" && echo mine >"$scratch/app/notes"
 check "up refuses a directory that isn't an application it generated" refused up
@@ -174,11 +187,15 @@ in_terminal no >"$scratch/out" 2>&1 || true
 check "reset deletes nothing unless told yes" refused grep -q down "$scratch/calls"
 in_terminal yes >"$scratch/out" 2>&1
 check "reset deletes the application's project, then the stack's, by name" test \
-  "$(grep '^docker compose' "$scratch/calls" | tr '\n' '|')" = \
+  "$(grep '^docker compose -p' "$scratch/calls" | tr '\n' '|')" = \
   "docker compose -p portal down --volumes|docker compose -p stackr down --volumes|"
 check "and takes the gateway's keys out of the application's .env" test -z "$(key LITELLM_API_KEY)$(key PORTAL_LITELLM_KEY)"
 up
 check "so the next up makes new ones" test "$(grep -cE "create-tenant|create-portal-key" "$scratch/calls")" = 2
+mv "$scratch/app/.env" "$scratch/env-elsewhere" && ln -s "$scratch/env-elsewhere" "$scratch/app/.env"
+in_terminal yes >"$scratch/out" 2>&1
+check "reset writes a linked .env where it points, and leaves the link" test -L "$scratch/app/.env" -a -z "$(sed -n 's/^LITELLM_API_KEY=//p' "$scratch/env-elsewhere")"
+up
 printf 'name: stackr\n' >"$scratch/app/compose.yaml"
 in_terminal yes >"$scratch/out" 2>&1 || true
 check "reset refuses an application named as the stack" said "which isn't an application's"

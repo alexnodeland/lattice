@@ -13,6 +13,7 @@
 #                   installs the libraries from GitHub at it (default: HEAD)
 #   DEV_TENANT      the gateway's tenant whose key the application uses (default: dev)
 #   DEV_DIAGRAMS    the application's DIAGRAMS, set on every run (default: on)
+#   DEV_LAN         yes, to start with STACKR_BIND or APP_BIND beyond the loopback (default: no)
 #   DEV_STACKR_DIR  stackr's directory, for scripts/check-dev (default: packages/stackr)
 #
 # `up` is safe to run again. It generates the application and makes its two gateway keys once,
@@ -66,8 +67,8 @@ resolved() { uv run --no-sync python -c 'import os, sys; print(os.path.realpath(
 # commit, and no hooks: it is the template's output, as generated.
 git_quietly() {
   local identity=()
-  [[ -n $(git config user.email || true) ]] ||
-    identity=(-c user.name="make dev" -c user.email="make-dev@localhost")
+  [[ -n $(git config user.name || true) ]] || identity+=(-c user.name="make dev")
+  [[ -n $(git config user.email || true) ]] || identity+=(-c user.email="make-dev@localhost")
   git ${identity[@]+"${identity[@]}"} -c commit.gpgsign=false "$@"
 }
 
@@ -89,6 +90,12 @@ preflight() {
   need uv "https://docs.astral.sh/uv/"
   need git "the application is a repository of its own"
   need make "both projects' commands are make targets"
+  # The ports publish on the loopback alone, unless DEV_LAN=yes chooses otherwise.
+  local bind
+  for bind in "$(setting "$stackr/.env" STACKR_BIND 127.0.0.1)" "$(setting "$app/.env" APP_BIND 127.0.0.1)"; do
+    [[ $bind == 127.* || $bind == localhost || $bind == ::1 || ${DEV_LAN:-} == yes ]] ||
+      die "STACKR_BIND or APP_BIND publishes on $bind, beyond this machine: set DEV_LAN=yes to choose that"
+  done
   uv run --no-sync python -c 'import copier, yaml' 2>/dev/null ||
     die "lattice's environment has no Copier: run \`make install\` at lattice's root"
   local adapter want recorded where
@@ -235,12 +242,18 @@ reset() {
   say "Docker context: $(docker context show). The project stackr is the stack's, which every clone and worktree of lattice on this machine shares."
   read -r -p "Delete the containers and volumes of ${projects[*]}? Type yes: " answer
   [[ $answer == yes ]] || die "nothing was deleted"
+  # By its name alone: Compose v2 finds a project's containers and volumes by its labels, with no
+  # compose file, and removes that project's and nothing else.
+  docker compose version >/dev/null 2>&1 || die "Docker has no Compose v2 (\`docker compose\`)"
   for project in "${projects[@]}"; do
     docker compose -p "$project" down --volumes
   done
   if [[ -f $app/.env ]]; then
-    (umask 077 && grep -v -E "^($(IFS='|' && echo "${KEYS[*]}"))=" "$app/.env" >"$app/.env.reset" || true)
-    mv "$app/.env.reset" "$app/.env"
+    # Where .env is, a link's target, so a link stays one.
+    local env
+    env=$(resolved "$app/.env")
+    (umask 077 && grep -v -E "^($(IFS='|' && echo "${KEYS[*]}"))=" "$env" >"$env.reset" || true)
+    mv "$env.reset" "$env"
     say "took ${KEYS[*]} out of $app/.env: the next \`make dev\` makes new ones"
   fi
 }

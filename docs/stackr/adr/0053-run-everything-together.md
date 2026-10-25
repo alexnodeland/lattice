@@ -26,7 +26,7 @@ Only the smoke test's `make smoke-app` did all of this, and only for itself.
 - **The defaults:**
   - The template's defaults, the portal among them.
   - Every crafting app the template pins without a `platform:`, so none built for one platform alone, on any machine: today that leaves out Blender. The list comes from `copier.yml`, so it doesn't drift.
-  - Diagrams on, replay off, and everything bound to `127.0.0.1`.
+  - Diagrams on, replay off, and everything bound to `127.0.0.1`. A `STACKR_BIND` or `APP_BIND` beyond the loopback is refused before anything starts; the LAN needs an explicit opt-in, `DEV_LAN=yes`.
   - The crafting apps are written only while `.env` doesn't choose them, so a choice of your own stays. `DIAGRAMS` comes from `DEV_DIAGRAMS` (`on`) on every run, since the template's own default, `off`, can't be told from a choice.
 - **Secrets stay in files.**
   - The gateway keys are made once, by stackr's `create-tenant` (as `DEV_TENANT`) and `create-portal-key`, each only when the application's `.env` lacks it.
@@ -34,7 +34,7 @@ Only the smoke test's `make smoke-app` did all of this, and only for itself.
   - `scripts/wire-app` gives the `.env` the rest of the stack's settings. Each key has one line, so `make` and Compose read the same value. The smoke test now uses it too.
 - **The database role is made with `db-roles` in the application's container before it starts,** as the smoke test does. That, the image's build and the start run every time, and change nothing that is already so. The first person in, which asks for a password, is `make first-run` in the application's directory, and `make dev` says so; `scripts/wire-app` gives the local commands the database and GoTrue as this machine reaches them.
 - **Running it again is safe.** It generates the application and makes the keys once.
-- **`make dev-down` runs each project's own `make down`, the application's first, which keeps their data.** `make dev-reset` deletes the containers and volumes of exactly the two projects, the application's (as its `compose.yaml` names it, which must be a project name and not `stackr`) and then `stackr`, with `docker compose -p <name> down --volumes`, once you type `yes` in a terminal. It shows the Docker context first, and says that `stackr` is the one stack every clone and worktree on the machine shares. `COMPOSE_PROJECT_NAME` and the other `COMPOSE_*` settings are unset, so neither project is renamed. Nothing else of Docker's is removed. The gateway's keys went with the stack's data, so reset takes them out of the application's `.env`, and the next `make dev` makes new ones.
+- **`make dev-down` runs each project's own `make down`, the application's first, which keeps their data.** `make dev-reset` deletes the containers and volumes of exactly the two projects, the application's (as its `compose.yaml` names it, which must be a project name and not `stackr`) and then `stackr`, with `docker compose -p <name> down --volumes`, once you type `yes` in a terminal. It shows the Docker context first, and says that `stackr` is the one stack every clone and worktree on the machine shares. `COMPOSE_PROJECT_NAME` and the other `COMPOSE_*` settings are unset, so neither project is renamed. `down -p <name>` needs no compose file: Compose v2, which `make dev` checks for, finds a project's containers and volumes by its labels. Nothing else of Docker's is removed. The gateway's keys went with the stack's data, so reset takes them out of the application's `.env`, and the next `make dev` makes new ones.
 
 ## Consequences
 

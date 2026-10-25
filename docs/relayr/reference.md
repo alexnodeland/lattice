@@ -129,3 +129,12 @@ The `forms` extra: `ui:form_submitted` and `ui:app_submitted` from artifactr's f
     options:
       show_root_heading: false
       show_root_toc_entry: false
+
+## relayr.excalidraw
+
+The `excalidraw` extra: `excalidraw:elements_changed` from artifactr's diagrams, once a commit ([ADR-0041](adr/0041-a-diagrams-commits-bridged-as-its-elements-changed-and-comments-on-them.md)).
+
+::: relayr.excalidraw
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false

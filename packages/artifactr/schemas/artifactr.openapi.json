@@ -470,6 +470,8 @@
                 "set_focus": "#/components/schemas/SetFocus",
                 "set_thread_mode": "#/components/schemas/SetThreadMode",
                 "stop_run": "#/components/schemas/StopRun",
+                "unwatch_artifact": "#/components/schemas/UnwatchArtifact",
+                "watch_artifact": "#/components/schemas/WatchArtifact",
                 "watch_run": "#/components/schemas/WatchRun"
               },
               "propertyName": "type"
@@ -513,6 +515,12 @@
               },
               {
                 "$ref": "#/components/schemas/WatchRun"
+              },
+              {
+                "$ref": "#/components/schemas/WatchArtifact"
+              },
+              {
+                "$ref": "#/components/schemas/UnwatchArtifact"
               }
             ],
             "title": "Command"
@@ -556,7 +564,8 @@
                     "applied": "#/components/schemas/Applied",
                     "proposed": "#/components/schemas/Proposed",
                     "recorded": "#/components/schemas/Recorded",
-                    "resolved": "#/components/schemas/Resolved"
+                    "resolved": "#/components/schemas/Resolved",
+                    "watching": "#/components/schemas/Watching"
                   },
                   "propertyName": "type"
                 },
@@ -572,6 +581,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/Recorded"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Watching"
                   }
                 ]
               },
@@ -2815,6 +2827,27 @@
         "title": "UnknownEvent",
         "type": "object"
       },
+      "UnwatchArtifact": {
+        "additionalProperties": false,
+        "description": "Stop watching an artifact: the others are told this connection left it.",
+        "properties": {
+          "artifact_id": {
+            "$ref": "#/components/schemas/ArtifactId"
+          },
+          "type": {
+            "const": "unwatch_artifact",
+            "default": "unwatch_artifact",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "artifact_id",
+          "type"
+        ],
+        "title": "UnwatchArtifact",
+        "type": "object"
+      },
       "UserActor": {
         "description": "A person, identified by the host application's user id.",
         "properties": {
@@ -2847,6 +2880,27 @@
         "title": "UserActor",
         "type": "object"
       },
+      "WatchArtifact": {
+        "additionalProperties": false,
+        "description": "Receive the presence of the others with an artifact open, and send one's own.\n\nWebSocket only, as ``watch_run`` is; answered ``watching`` (lattice RFC-0006, ADR-0093).",
+        "properties": {
+          "artifact_id": {
+            "$ref": "#/components/schemas/ArtifactId"
+          },
+          "type": {
+            "const": "watch_artifact",
+            "default": "watch_artifact",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "artifact_id",
+          "type"
+        ],
+        "title": "WatchArtifact",
+        "type": "object"
+      },
       "WatchRun": {
         "additionalProperties": false,
         "description": "Receive a run's live frames on this connection. WebSocket only.",
@@ -2866,6 +2920,40 @@
           "type"
         ],
         "title": "WatchRun",
+        "type": "object"
+      },
+      "Watching": {
+        "description": "A watch accepted: what the watcher may do on the artifact, ``view`` or ``edit``.",
+        "properties": {
+          "artifact_id": {
+            "$ref": "#/components/schemas/ArtifactId"
+          },
+          "peer": {
+            "title": "Peer",
+            "type": "string"
+          },
+          "rights": {
+            "enum": [
+              "view",
+              "edit"
+            ],
+            "title": "Rights",
+            "type": "string"
+          },
+          "type": {
+            "const": "watching",
+            "default": "watching",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "artifact_id",
+          "rights",
+          "peer",
+          "type"
+        ],
+        "title": "Watching",
         "type": "object"
       },
       "WorkspaceId": {

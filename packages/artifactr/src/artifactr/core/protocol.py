@@ -10,12 +10,13 @@ from typing import Annotated, Final, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
+from artifactr.core.actors import Actor
 from artifactr.core.commands import Command
 from artifactr.core.errors import UnsupportedProtocol, ValidationFailed
 from artifactr.core.events import Envelope
-from artifactr.core.ids import RunId, ThreadId, WorkspaceId
+from artifactr.core.ids import ArtifactId, RunId, ThreadId, WorkspaceId
 from artifactr.core.live import LiveFrame
-from artifactr.core.state import Outcome
+from artifactr.core.state import Applied, Proposed, Recorded, Resolved
 from artifactr.core.tagged import tag_required
 
 PROTOCOL: Final = "artifactr.v1"
@@ -38,6 +39,11 @@ class Hello(BaseModel):
 
     threads: tuple[ThreadId, ...] | None = None
     """Thread-scoped events to receive; ``None`` means every thread."""
+
+    events: bool = True
+    """Whether to receive the log's events, and runs' live frames, at all. A connection that is
+    only for presence, such as a canvas's, asks for none: it is welcomed, told replay is
+    complete, and sent only what it asks for (ADR-0093)."""
 
 
 class ResumePlan(BaseModel):
@@ -100,7 +106,30 @@ class WatchRun(BaseModel):
     run_id: RunId
 
 
-FrameCommand = Annotated[Command | StopRun | WatchRun, Field(discriminator="type")]
+class WatchArtifact(BaseModel):
+    """Receive the presence of the others with an artifact open, and send one's own.
+
+    WebSocket only, as ``watch_run`` is; answered ``watching`` (lattice RFC-0006, ADR-0093).
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid", json_schema_extra=tag_required)
+
+    type: Literal["watch_artifact"] = "watch_artifact"
+    artifact_id: ArtifactId
+
+
+class UnwatchArtifact(BaseModel):
+    """Stop watching an artifact: the others are told this connection left it."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid", json_schema_extra=tag_required)
+
+    type: Literal["unwatch_artifact"] = "unwatch_artifact"
+    artifact_id: ArtifactId
+
+
+FrameCommand = Annotated[
+    Command | StopRun | WatchRun | WatchArtifact | UnwatchArtifact, Field(discriminator="type")
+]
 """Anything a client can ask for in a command frame."""
 
 
@@ -117,7 +146,41 @@ class CommandFrame(BaseModel):
     command: FrameCommand
 
 
-ClientFrame = Annotated[Hello | CommandFrame, Field(discriminator="type")]
+MAX_PRESENCE: Final = 64 * 1024
+"""The most characters of JSON a presence frame may be; a longer one is dropped, once read."""
+
+
+class Pointer(BaseModel):
+    """Where a person's pointer is on a canvas, in the scene's own coordinates."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid", json_schema_extra=tag_required)
+
+    x: float = Field(allow_inf_nan=False)
+    y: float = Field(allow_inf_nan=False)
+    tool: Literal["pointer", "laser"] = "pointer"
+    button: Literal["up", "down"] = "up"
+
+
+class Presence(BaseModel):
+    """Where a person is on an artifact they watch, and what they are changing right now.
+
+    Never stored. ``editing`` holds whole elements, relative to ``base_version``.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid", json_schema_extra=tag_required)
+
+    type: Literal["presence"] = "presence"
+    artifact_id: ArtifactId
+    seq: int = Field(ge=0)
+    """Per connection, increasing. The others are told each peer's frames in the order it sent
+    them, and a watcher keeps only the latest it was told."""
+    base_version: int = Field(ge=1)
+    pointer: Pointer | None = None
+    selection: tuple[str, ...] = Field((), max_length=500)
+    editing: tuple[dict[str, JsonValue], ...] = Field((), max_length=100)
+
+
+ClientFrame = Annotated[Hello | CommandFrame | Presence, Field(discriminator="type")]
 """Any frame a client sends."""
 
 
@@ -158,6 +221,54 @@ class ReplayComplete(BaseModel):
     up_to_seq: int
 
 
+class Watching(BaseModel):
+    """A watch accepted: what the watcher may do on the artifact, ``view`` or ``edit``."""
+
+    model_config = ConfigDict(frozen=True, json_schema_extra=tag_required)
+
+    type: Literal["watching"] = "watching"
+    artifact_id: ArtifactId
+    rights: Literal["view", "edit"]
+    peer: str
+    """This connection, as the others know it: a ``peer_left`` naming it says its watch ended."""
+
+
+ResultOutcome = Annotated[
+    Applied | Proposed | Resolved | Recorded | Watching, Field(discriminator="type")
+]
+"""What a command frame did: a command's outcome, or a watch accepted."""
+
+
+class PeerPresence(BaseModel):
+    """Another connection's presence on an artifact this one watches.
+
+    ``peer`` is opaque, one per connection; ``actor`` is whom the server says it is, never what
+    the client said.
+    """
+
+    model_config = ConfigDict(frozen=True, json_schema_extra=tag_required)
+
+    type: Literal["peer_presence"] = "peer_presence"
+    artifact_id: ArtifactId
+    peer: str
+    actor: Actor
+    seq: int
+    base_version: int
+    pointer: Pointer | None = None
+    selection: tuple[str, ...] = ()
+    editing: tuple[dict[str, JsonValue], ...] = ()
+
+
+class PeerLeft(BaseModel):
+    """A peer closed an artifact, left, lost its access, or fell silent."""
+
+    model_config = ConfigDict(frozen=True, json_schema_extra=tag_required)
+
+    type: Literal["peer_left"] = "peer_left"
+    artifact_id: ArtifactId
+    peer: str
+
+
 class CommandResult(BaseModel):
     """The result of one command frame."""
 
@@ -166,7 +277,7 @@ class CommandResult(BaseModel):
     type: Literal["command_result"] = "command_result"
     command_id: str
     ok: bool
-    outcome: Outcome | None = None
+    outcome: ResultOutcome | None = None
     rejection: dict[str, JsonValue] | None = None
 
 
@@ -180,7 +291,14 @@ class ErrorFrame(BaseModel):
 
 
 ServerFrame = Annotated[
-    Welcome | EventFrame | ReplayComplete | LiveFrame | CommandResult | ErrorFrame,
+    Welcome
+    | EventFrame
+    | ReplayComplete
+    | LiveFrame
+    | CommandResult
+    | ErrorFrame
+    | PeerPresence
+    | PeerLeft,
     Field(discriminator="type"),
 ]
 """Any frame the server sends."""

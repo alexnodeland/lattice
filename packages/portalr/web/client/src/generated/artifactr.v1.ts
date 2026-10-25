@@ -28,7 +28,8 @@ export type Other1 = string | null;
 export type Selected = string[];
 export type Answers1 = Chosen[];
 export type Reply1 = string;
-export type Client = Hello | CommandFrame;
+export type Client = Hello | CommandFrame | Presence;
+export type Events = boolean;
 export type FromHead = boolean;
 export type Protocol = string;
 export type ResumeAfterSeq = number;
@@ -52,7 +53,9 @@ export type Command =
   | AnswerDeferred
   | GiveFeedback
   | StopRun
-  | WatchRun;
+  | WatchRun
+  | WatchArtifact
+  | UnwatchArtifact;
 /**
  * This interface was referenced by `ArtifactrV1`'s JSON-Schema
  * via the `definition` "ArtifactId".
@@ -131,14 +134,41 @@ export type Kind7 = "message";
 export type Type11 = "give_feedback";
 export type Type12 = "stop_run";
 export type Type13 = "watch_run";
+export type Type14 = "watch_artifact";
+export type Type15 = "unwatch_artifact";
 export type CommandId = string;
-export type Type14 = "command";
-export type Server = Welcome | EventFrame | ReplayComplete | LiveFrame | CommandResult | ErrorFrame;
+export type Type16 = "command";
+export type BaseVersion2 = number;
+/**
+ * @maxItems 100
+ */
+export type Editing = {
+  [k: string]: JsonValue;
+}[];
+export type Button = "up" | "down";
+export type Tool = "pointer" | "laser";
+export type X = number;
+export type Y = number;
+/**
+ * @maxItems 500
+ */
+export type Selection = string[];
+export type Seq = number;
+export type Type17 = "presence";
+export type Server =
+  | Welcome
+  | EventFrame
+  | ReplayComplete
+  | LiveFrame
+  | CommandResult
+  | ErrorFrame
+  | PeerPresence
+  | PeerLeft;
 export type ActiveRuns = ActiveRun[];
 export type HeadSeq = number;
 export type Protocol1 = string;
 export type Reset = boolean;
-export type Type15 = "welcome";
+export type Type18 = "welcome";
 /**
  * This interface was referenced by `ArtifactrV1`'s JSON-Schema
  * via the `definition` "WorkspaceId".
@@ -179,33 +209,33 @@ export type Event =
   | AppEvent
   | UnknownEvent;
 export type Title1 = string;
-export type Type16 = "thread_created";
+export type Type19 = "thread_created";
 export type Mode1 = "edit" | "suggest";
-export type Type17 = "thread_mode_changed";
+export type Type20 = "thread_mode_changed";
 export type ArtifactIds1 = ArtifactId[];
-export type Type18 = "focus_changed";
+export type Type21 = "focus_changed";
 export type Content1 = string;
 export type Kind13 = "message" | "notice";
-export type Type19 = "message_posted";
+export type Type22 = "message_posted";
 export type Kind14 = string;
-export type Type20 = "artifact_created";
+export type Type23 = "artifact_created";
 export type Version2 = number;
 export type Kind15 = string;
 export type Patch1 = JsonPatch | TextEdits;
 export type Summary1 = string;
-export type Type21 = "artifact_changed";
+export type Type24 = "artifact_changed";
 export type Version3 = number;
 export type Kind16 = string;
-export type Type22 = "artifact_archived";
+export type Type25 = "artifact_archived";
 export type Version4 = number;
 export type Change1 = CreateArtifact | EditArtifact | ArchiveArtifact;
 export type Rationale1 = string | null;
-export type Type23 = "proposal_created";
+export type Type26 = "proposal_created";
 export type Changes1 = (JsonPatch | TextEdits) | null;
 export type Decision1 = "accept" | "reject";
 export type ProposedBy = UserActor | AgentActor | ExternalAgentActor | SystemActor | EvaluatorActor;
 export type Reason1 = string | null;
-export type Type24 = "proposal_resolved";
+export type Type27 = "proposal_resolved";
 export type Version5 = number | null;
 export type MessageIds = MessageId[];
 /**
@@ -214,18 +244,18 @@ export type MessageIds = MessageId[];
  */
 export type TraceId = string;
 export type Trigger = "message" | "resume" | "api";
-export type Type25 = "run_started";
+export type Type28 = "run_started";
 export type ArgsSummary = string;
 export type ArgsTruncated = boolean;
 export type ToolCallId1 = string;
 export type ToolName = string;
-export type Type26 = "tool_called";
+export type Type29 = "tool_called";
 export type Status = "ok" | "error" | "retry";
 export type Summary2 = string;
 export type ToolCallId2 = string;
 export type ToolName1 = string;
 export type Truncated = boolean;
-export type Type27 = "tool_returned";
+export type Type30 = "tool_returned";
 /**
  * @minItems 1
  */
@@ -233,72 +263,86 @@ export type Requests = [DeferredRequest, ...DeferredRequest[]];
 export type Kind17 = "question" | "approval";
 export type ToolCallId3 = string;
 export type ToolName2 = string;
-export type Type28 = "run_paused";
+export type Type31 = "run_paused";
 export type InputTokens = number;
 export type OutputTokens = number;
 export type Requests1 = number;
 export type Approved1 = boolean | null;
 export type ToolCallId4 = string;
 export type ToolName3 = string | null;
-export type Type29 = "deferred_answered";
+export type Type32 = "deferred_answered";
 export type Error = string | null;
 export type Reason2 = string | null;
 export type Status1 = "completed" | "stopped" | "failed";
-export type Type30 = "run_ended";
+export type Type33 = "run_ended";
 export type FeedbackType1 = string;
-export type Type31 = "feedback_given";
+export type Type34 = "feedback_given";
 export type Name5 = string;
-export type Type32 = "app_event";
-export type Type33 = string;
+export type Type35 = "app_event";
+export type Type36 = string;
 export type Id1 = string;
-export type Seq = number;
+export type Seq1 = number;
 export type Traceparent = string | null;
 export type Ts = string;
-export type Type34 = "event";
-export type Type35 = "replay_complete";
+export type Type37 = "event";
+export type Type38 = "replay_complete";
 export type UpToSeq = number;
 export type Event1 =
   PartStarted | TextDelta | ThinkingDelta | ToolArgsDelta | PartEnded | Draft | AppLive;
 export type Part = number;
 export type PartKind = "text" | "thinking" | "tool_call";
 export type ToolName4 = string | null;
-export type Type36 = "part_started";
+export type Type39 = "part_started";
 export type Delta = string;
 export type Part1 = number;
-export type Type37 = "text_delta";
+export type Type40 = "text_delta";
 export type Delta1 = string;
 export type Part2 = number;
-export type Type38 = "thinking_delta";
+export type Type41 = "thinking_delta";
 export type Delta2 = string;
 export type Part3 = number;
-export type Type39 = "tool_args_delta";
+export type Type42 = "tool_args_delta";
 export type Part4 = number;
-export type Type40 = "part_ended";
+export type Type43 = "part_ended";
 export type Kind18 = string;
-export type Type41 = "draft";
+export type Type44 = "draft";
 export type Name6 = string;
-export type Type42 = "app_live";
-export type Type43 = "live";
+export type Type45 = "app_live";
+export type Type46 = "live";
 export type CommandId1 = string;
 export type Ok = boolean;
-export type Outcome = (Applied | Proposed | Resolved | Recorded) | null;
-export type Seq1 = number | null;
-export type Type44 = "applied";
-export type Version6 = number;
+export type Outcome = (Applied | Proposed | Resolved | Recorded | Watching) | null;
 export type Seq2 = number | null;
-export type Type45 = "proposed";
-export type Decision2 = "accept" | "reject";
+export type Type47 = "applied";
+export type Version6 = number;
 export type Seq3 = number | null;
-export type Type46 = "resolved";
-export type Version7 = number | null;
+export type Type48 = "proposed";
+export type Decision2 = "accept" | "reject";
 export type Seq4 = number | null;
-export type Type47 = "recorded";
+export type Type49 = "resolved";
+export type Version7 = number | null;
+export type Seq5 = number | null;
+export type Type50 = "recorded";
+export type Peer = string;
+export type Rights = "view" | "edit";
+export type Type51 = "watching";
 export type Rejection = {
   [k: string]: JsonValue;
 } | null;
-export type Type48 = "command_result";
+export type Type52 = "command_result";
 export type Message = string;
-export type Type49 = "error";
+export type Type53 = "error";
+export type Actor1 = UserActor | AgentActor | ExternalAgentActor | SystemActor | EvaluatorActor;
+export type BaseVersion3 = number;
+export type Editing1 = {
+  [k: string]: JsonValue;
+}[];
+export type Peer1 = string;
+export type Selection1 = string[];
+export type Seq6 = number;
+export type Type54 = "peer_presence";
+export type Peer2 = string;
+export type Type55 = "peer_left";
 
 /**
  * Frames of the artifactr.v1 thread protocol: `client` is any frame a client sends, `server` any frame a server sends. `ask_user` is the `args` of a paused request whose `tool_name` is `ask_user`, and `ask_user_answer` the `answer` it takes.
@@ -377,6 +421,7 @@ export interface Reply {
  * via the `definition` "Hello".
  */
 export interface Hello {
+  events?: Events;
   from_head?: FromHead;
   protocol: Protocol;
   resume_after_seq?: ResumeAfterSeq;
@@ -394,7 +439,7 @@ export interface Hello {
 export interface CommandFrame {
   command: Command;
   command_id: CommandId;
-  type: Type14;
+  type: Type16;
 }
 /**
  * Create an artifact.
@@ -654,6 +699,57 @@ export interface WatchRun {
   type: Type13;
 }
 /**
+ * Receive the presence of the others with an artifact open, and send one's own.
+ *
+ * WebSocket only, as ``watch_run`` is; answered ``watching`` (lattice RFC-0006, ADR-0093).
+ *
+ * This interface was referenced by `ArtifactrV1`'s JSON-Schema
+ * via the `definition` "WatchArtifact".
+ */
+export interface WatchArtifact {
+  artifact_id: ArtifactId;
+  type: Type14;
+}
+/**
+ * Stop watching an artifact: the others are told this connection left it.
+ *
+ * This interface was referenced by `ArtifactrV1`'s JSON-Schema
+ * via the `definition` "UnwatchArtifact".
+ */
+export interface UnwatchArtifact {
+  artifact_id: ArtifactId;
+  type: Type15;
+}
+/**
+ * Where a person is on an artifact they watch, and what they are changing right now.
+ *
+ * Never stored. ``editing`` holds whole elements, relative to ``base_version``.
+ *
+ * This interface was referenced by `ArtifactrV1`'s JSON-Schema
+ * via the `definition` "Presence".
+ */
+export interface Presence {
+  artifact_id: ArtifactId;
+  base_version: BaseVersion2;
+  editing?: Editing;
+  pointer?: Pointer | null;
+  selection?: Selection;
+  seq: Seq;
+  type: Type17;
+}
+/**
+ * Where a person's pointer is on a canvas, in the scene's own coordinates.
+ *
+ * This interface was referenced by `ArtifactrV1`'s JSON-Schema
+ * via the `definition` "Pointer".
+ */
+export interface Pointer {
+  button?: Button;
+  tool?: Tool;
+  x: X;
+  y: Y;
+}
+/**
  * The server's answer to ``hello``.
  *
  * This interface was referenced by `ArtifactrV1`'s JSON-Schema
@@ -664,7 +760,7 @@ export interface Welcome {
   head_seq: HeadSeq;
   protocol?: Protocol1;
   reset?: Reset;
-  type: Type15;
+  type: Type18;
   workspace_id: WorkspaceId;
 }
 /**
@@ -688,11 +784,11 @@ export interface EventFrame {
   event: Event;
   id: Id1;
   run_id?: RunId | null;
-  seq: Seq;
+  seq: Seq1;
   thread_id?: ThreadId | null;
   traceparent?: Traceparent;
   ts: Ts;
-  type: Type34;
+  type: Type37;
   workspace_id: WorkspaceId;
 }
 /**
@@ -770,7 +866,7 @@ export interface EvaluatorActor {
 export interface ThreadCreated {
   thread_id: ThreadId;
   title: Title1;
-  type: Type16;
+  type: Type19;
 }
 /**
  * A thread switched between ``edit`` and ``suggest`` mode.
@@ -781,7 +877,7 @@ export interface ThreadCreated {
 export interface ThreadModeChanged {
   mode: Mode1;
   thread_id: ThreadId;
-  type: Type17;
+  type: Type20;
 }
 /**
  * The set of artifacts a thread is focused on changed.
@@ -792,7 +888,7 @@ export interface ThreadModeChanged {
 export interface FocusChanged {
   artifact_ids: ArtifactIds1;
   thread_id: ThreadId;
-  type: Type18;
+  type: Type21;
 }
 /**
  * A message, or a notice, was posted in a thread. Its author is the envelope's actor.
@@ -806,7 +902,7 @@ export interface MessagePosted {
   message_id: MessageId;
   run_id?: RunId | null;
   thread_id: ThreadId;
-  type: Type19;
+  type: Type22;
 }
 /**
  * An artifact was created at version 1.
@@ -821,7 +917,7 @@ export interface ArtifactCreated {
   proposal_id?: ProposalId | null;
   run_id?: RunId | null;
   thread_id?: ThreadId | null;
-  type: Type20;
+  type: Type23;
   version: Version2;
 }
 export interface Data1 {
@@ -841,7 +937,7 @@ export interface ArtifactChanged {
   run_id?: RunId | null;
   summary: Summary1;
   thread_id?: ThreadId | null;
-  type: Type21;
+  type: Type24;
   version: Version3;
 }
 /**
@@ -856,7 +952,7 @@ export interface ArtifactArchived {
   proposal_id?: ProposalId | null;
   run_id?: RunId | null;
   thread_id?: ThreadId | null;
-  type: Type22;
+  type: Type25;
   version: Version4;
 }
 /**
@@ -871,7 +967,7 @@ export interface ProposalCreated {
   rationale?: Rationale1;
   run_id?: RunId | null;
   thread_id?: ThreadId | null;
-  type: Type23;
+  type: Type26;
 }
 /**
  * A proposal was accepted or rejected.
@@ -888,7 +984,7 @@ export interface ProposalResolved {
   reason?: Reason1;
   run_id?: RunId | null;
   thread_id?: ThreadId | null;
-  type: Type24;
+  type: Type27;
   version?: Version5;
 }
 /**
@@ -903,7 +999,7 @@ export interface RunStarted {
   thread_id: ThreadId;
   trace_id?: TraceId | null;
   trigger?: Trigger;
-  type: Type25;
+  type: Type28;
 }
 /**
  * The agent called a tool.
@@ -919,7 +1015,7 @@ export interface ToolCalled {
   thread_id: ThreadId;
   tool_call_id: ToolCallId1;
   tool_name: ToolName;
-  type: Type26;
+  type: Type29;
 }
 /**
  * A tool call finished.
@@ -936,7 +1032,7 @@ export interface ToolReturned {
   tool_call_id: ToolCallId2;
   tool_name?: ToolName1;
   truncated?: Truncated;
-  type: Type27;
+  type: Type30;
 }
 /**
  * A run paused until the listed requests are answered.
@@ -948,7 +1044,7 @@ export interface RunPaused {
   requests: Requests;
   run_id: RunId;
   thread_id: ThreadId;
-  type: Type28;
+  type: Type31;
   usage?: RunUsage | null;
 }
 /**
@@ -994,7 +1090,7 @@ export interface DeferredAnswered {
   thread_id: ThreadId;
   tool_call_id: ToolCallId4;
   tool_name?: ToolName3;
-  type: Type29;
+  type: Type32;
 }
 /**
  * An agent run ended.
@@ -1008,7 +1104,7 @@ export interface RunEnded {
   run_id: RunId;
   status: Status1;
   thread_id: ThreadId;
-  type: Type30;
+  type: Type33;
   usage?: RunUsage | null;
 }
 /**
@@ -1025,7 +1121,7 @@ export interface FeedbackGiven {
   run_id?: RunId | null;
   target: FeedbackTarget;
   thread_id?: ThreadId | null;
-  type: Type31;
+  type: Type34;
   value: Value1;
 }
 export interface Value1 {
@@ -1042,7 +1138,7 @@ export interface AppEvent {
   name: Name5;
   run_id?: RunId | null;
   thread_id?: ThreadId | null;
-  type: Type32;
+  type: Type35;
 }
 /**
  * An event type this version does not know, kept as-is so it round-trips.
@@ -1051,7 +1147,7 @@ export interface AppEvent {
  * via the `definition` "UnknownEvent".
  */
 export interface UnknownEvent {
-  type: Type33;
+  type: Type36;
   [k: string]: unknown;
 }
 /**
@@ -1061,7 +1157,7 @@ export interface UnknownEvent {
  * via the `definition` "ReplayComplete".
  */
 export interface ReplayComplete {
-  type: Type35;
+  type: Type38;
   up_to_seq: UpToSeq;
 }
 /**
@@ -1073,7 +1169,7 @@ export interface ReplayComplete {
 export interface LiveFrame {
   event: Event1;
   run_id: RunId;
-  type: Type43;
+  type: Type46;
 }
 /**
  * The model started a response part: text, thinking, or a tool call.
@@ -1085,7 +1181,7 @@ export interface PartStarted {
   part: Part;
   part_kind: PartKind;
   tool_name?: ToolName4;
-  type: Type36;
+  type: Type39;
 }
 /**
  * More text for a text part.
@@ -1096,7 +1192,7 @@ export interface PartStarted {
 export interface TextDelta {
   delta: Delta;
   part: Part1;
-  type: Type37;
+  type: Type40;
 }
 /**
  * More text for a thinking part.
@@ -1107,7 +1203,7 @@ export interface TextDelta {
 export interface ThinkingDelta {
   delta: Delta1;
   part: Part2;
-  type: Type38;
+  type: Type41;
 }
 /**
  * More of a tool call's JSON arguments.
@@ -1118,7 +1214,7 @@ export interface ThinkingDelta {
 export interface ToolArgsDelta {
   delta: Delta2;
   part: Part3;
-  type: Type39;
+  type: Type42;
 }
 /**
  * A response part is complete.
@@ -1128,7 +1224,7 @@ export interface ToolArgsDelta {
  */
 export interface PartEnded {
   part: Part4;
-  type: Type40;
+  type: Type43;
 }
 /**
  * A full snapshot of an artifact being generated, not yet committed.
@@ -1140,7 +1236,7 @@ export interface Draft {
   artifact_id?: ArtifactId | null;
   data: Data2;
   kind: Kind18;
-  type: Type41;
+  type: Type44;
 }
 export interface Data2 {
   [k: string]: JsonValue;
@@ -1154,7 +1250,7 @@ export interface Data2 {
 export interface AppLive {
   data?: JsonValue;
   name: Name6;
-  type: Type42;
+  type: Type45;
 }
 /**
  * The result of one command frame.
@@ -1167,7 +1263,7 @@ export interface CommandResult {
   ok: Ok;
   outcome?: Outcome;
   rejection?: Rejection;
-  type: Type48;
+  type: Type52;
 }
 /**
  * The change was applied: the artifact is now at ``version``.
@@ -1177,8 +1273,8 @@ export interface CommandResult {
  */
 export interface Applied {
   artifact_id: ArtifactId;
-  seq?: Seq1;
-  type: Type44;
+  seq?: Seq2;
+  type: Type47;
   version: Version6;
 }
 /**
@@ -1189,8 +1285,8 @@ export interface Applied {
  */
 export interface Proposed {
   proposal_id: ProposalId;
-  seq?: Seq2;
-  type: Type45;
+  seq?: Seq3;
+  type: Type48;
 }
 /**
  * A proposal was accepted (the artifact is now at ``version``) or rejected.
@@ -1201,8 +1297,8 @@ export interface Proposed {
 export interface Resolved {
   decision: Decision2;
   proposal_id: ProposalId;
-  seq?: Seq3;
-  type: Type46;
+  seq?: Seq4;
+  type: Type49;
   version?: Version7;
 }
 /**
@@ -1213,8 +1309,20 @@ export interface Resolved {
  */
 export interface Recorded {
   run_id?: RunId | null;
-  seq?: Seq4;
-  type: Type47;
+  seq?: Seq5;
+  type: Type50;
+}
+/**
+ * A watch accepted: what the watcher may do on the artifact, ``view`` or ``edit``.
+ *
+ * This interface was referenced by `ArtifactrV1`'s JSON-Schema
+ * via the `definition` "Watching".
+ */
+export interface Watching {
+  artifact_id: ArtifactId;
+  peer: Peer;
+  rights: Rights;
+  type: Type51;
 }
 /**
  * A frame the server could not understand, or a failure it could not attribute.
@@ -1224,5 +1332,36 @@ export interface Recorded {
  */
 export interface ErrorFrame {
   message: Message;
-  type: Type49;
+  type: Type53;
+}
+/**
+ * Another connection's presence on an artifact this one watches.
+ *
+ * ``peer`` is opaque, one per connection; ``actor`` is whom the server says it is, never what
+ * the client said.
+ *
+ * This interface was referenced by `ArtifactrV1`'s JSON-Schema
+ * via the `definition` "PeerPresence".
+ */
+export interface PeerPresence {
+  actor: Actor1;
+  artifact_id: ArtifactId;
+  base_version: BaseVersion3;
+  editing?: Editing1;
+  peer: Peer1;
+  pointer?: Pointer | null;
+  selection?: Selection1;
+  seq: Seq6;
+  type: Type54;
+}
+/**
+ * A peer closed an artifact, left, lost its access, or fell silent.
+ *
+ * This interface was referenced by `ArtifactrV1`'s JSON-Schema
+ * via the `definition` "PeerLeft".
+ */
+export interface PeerLeft {
+  artifact_id: ArtifactId;
+  peer: Peer2;
+  type: Type55;
 }

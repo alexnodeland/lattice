@@ -107,7 +107,7 @@ test("a proposed edit, or a refused one, stops the saving and says why", async (
   expect(refused.said.at(-1)).toEqual({ state: "stopped", text: "Not saved. you may not." });
 });
 
-test("a stale edit is moved onto the head and sent again, once", async () => {
+test("a stale edit is moved onto the head and sent again, three times at most", async () => {
   const head: Scene = { elements: { r1: rect("r1", 1), r2: rect("r2", 4) }, files: {} };
   const { commits, moved, draw, advance, said } = harness([{ outcome: "conflict" }], head);
   draw({ r1: rect("r1", 2, 30) });
@@ -116,14 +116,38 @@ test("a stale edit is moved onto the head and sent again, once", async () => {
   expect(moved[0]?.r2).toEqual(head.elements.r2);
   expect(commits[1]?.ops.map((op) => op.path)).toEqual(["/elements/r1/version", "/elements/r1"]);
   expect(said.at(-1)).toEqual({ state: "saved" });
-  const twice = harness([{ outcome: "conflict" }, { outcome: "conflict" }], head);
-  twice.draw({ r1: rect("r1", 2, 30) });
-  await twice.advance(QUIET);
-  expect(twice.said.at(-1)).toMatchObject({ state: "stopped", text: /someone else/ });
+  // Moved four times over: kept here, still said as saving, and sent with the next revision.
+  const busy = harness(
+    Array.from({ length: 4 }, () => ({ outcome: "conflict" as const })),
+    head,
+  );
+  busy.draw({ r1: rect("r1", 2, 30) });
+  await busy.advance(QUIET);
+  expect(busy.commits).toHaveLength(4);
+  expect(busy.said.at(-1)).toEqual({ state: "saving" });
+  busy.saver.merged({ version: 6, scene: head }, {});
+  await busy.advance(EVERY);
+  expect(busy.commits.at(-1)?.baseVersion).toBe(6);
+  expect(busy.said.at(-1)).toEqual({ state: "saved" });
   const unread = harness([{ outcome: "conflict" }], null);
   unread.draw({ r1: rect("r1", 2, 30) });
   await unread.advance(QUIET);
   expect(unread.said.at(-1)).toMatchObject({ state: "stopped" });
+});
+
+test("a revision someone else saved is what the next save is an edit of", async () => {
+  const { saver, commits, draw, advance } = harness([]);
+  // Theirs: r1 moved to version 3. Drawn here as it is, it is not sent back.
+  const theirs: Scene = { elements: { r1: rect("r1", 3, 40) }, files: {} };
+  saver.merged({ version: 2, scene: theirs }, { r1: rect("r1", 3, 40) });
+  expect(saver.version).toBe(2);
+  saver.merged({ version: 1, scene: theirs }, {});
+  expect(saver.version).toBe(2); // an older revision changes nothing
+  draw({ r1: rect("r1", 3, 40), r2: rect("r2", 1) });
+  await advance(QUIET);
+  expect(commits.map((edit) => [edit.baseVersion, edit.ops.map((op) => op.path)])).toEqual([
+    [2, ["/elements/r2"]],
+  ]);
 });
 
 test("a diagram past its limits isn't sent", async () => {

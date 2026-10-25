@@ -377,3 +377,105 @@ test("the harness would see a blob: image the policy refuses: the canvas's own m
   await expect.poll(async () => (await reported()).length).toBeGreaterThan(0);
   await page.context().close();
 });
+
+test("the others are shown as they draw, sanitised, and a revision they save is merged", async () => {
+  const { page, reported } = await open(browser, "?diagram=edit");
+  const origin = new URL(page.url()).origin;
+  const seen = requests(page, origin);
+  await page.getByRole("button", { name: "Open canvas" }).click();
+  const dialog = page.getByRole("dialog", { name: "Stack" });
+  await page.locator(".excalidraw canvas").first().waitFor();
+  await dialog.getByRole("button", { name: "Edit" }).click();
+  // Bob, mid-stroke: a rectangle with a link, and a page embedded, which no one should see.
+  await page.evaluate(() => {
+    const at = { x: 0, y: 0, width: 80, height: 40, version: 1, versionNonce: 1 };
+    window.canvasHeard({
+      rights: "edit",
+      peers: new Map([
+        [
+          "p-bob",
+          {
+            type: "peer_presence",
+            artifact_id: "d1",
+            peer: "p-bob",
+            actor: { type: "user", id: "bob", name: "Bob" },
+            seq: 1,
+            base_version: 1,
+            pointer: { x: 120, y: 90, tool: "pointer", button: "down" },
+            selection: ["API"],
+            editing: [
+              { ...at, id: "g1", type: "rectangle", x: 300, y: 300, link: "https://x.test/" },
+              { ...at, id: "g2", type: "embeddable", link: "https://www.youtube.com/watch?v=x" },
+              // A colour that would fetch, an image, and one far out of reach.
+              {
+                ...at,
+                id: "g3",
+                type: "ellipse",
+                x: 320,
+                y: 320,
+                strokeColor: "url(https://x.test/a.svg#p)",
+                backgroundColor: "url(https://x.test/b.svg#p)",
+              },
+              { ...at, id: "g4", type: "image", fileId: "a".repeat(64), status: "saved" },
+              { ...at, id: "g5", type: "rectangle", x: 9e8, y: 9e8 },
+            ],
+          },
+        ],
+      ]) as never,
+    });
+  });
+  const ghost = page.locator('[data-peer="p-bob"] svg');
+  await ghost.first().waitFor();
+  expect(await ghost.count()).toBe(1);
+  await expect.poll(() => page.getByRole("list", { name: "Here now" }).textContent()).toBe("Bob");
+  // Excalidraw's own list of who is here is there, and hidden: the canvas's says it.
+  const theirs = page.locator(".excalidraw .UserList");
+  expect(await theirs.count()).toBeGreaterThan(0);
+  expect(await theirs.first().isVisible()).toBe(false);
+  expect(await ghost.locator("a, foreignObject, iframe").count()).toBe(0);
+  expect(await ghost.locator("image").count()).toBe(0);
+  const markup = await ghost.first().evaluate((svg) => svg.outerHTML);
+  expect(markup).not.toContain("url(");
+  expect(markup).not.toContain("x.test");
+  expect(await page.locator("iframe, .excalidraw__embeddable").count()).toBe(0);
+  // What this person says: where their pointer is.
+  await page.mouse.move(500, 400);
+  await page.mouse.move(510, 410);
+  await expect.poll(() => page.evaluate(() => window.canvasSent.said.length)).toBeGreaterThan(0);
+  // Bob saves: version 2 holds a new element, merged in, and not sent back as this person's.
+  await page.evaluate(() => {
+    const element = {
+      id: "N2",
+      type: "rectangle",
+      // Ordered, as a canvas orders what it draws: Excalidraw draws it as it is.
+      index: "a9",
+      x: 600,
+      y: 100,
+      width: 50,
+      height: 50,
+      version: 1,
+      versionNonce: 7,
+    };
+    const sample = JSON.parse(JSON.stringify(window.canvasSample));
+    window.canvasPush({ ...sample, elements: { ...sample.elements, N2: element } });
+  });
+  await page
+    .locator(".excalidraw canvas")
+    .last()
+    .click({ position: { x: 900, y: 650 } });
+  await page.keyboard.press("r");
+  await page.mouse.move(900, 600);
+  await page.mouse.down();
+  await page.mouse.move(1000, 680, { steps: 5 });
+  await page.mouse.up();
+  await expect.poll(() => page.evaluate(() => window.canvasSent.commits.length)).toBe(1);
+  const [commit] = (await page.evaluate(() => window.canvasSent.commits)) as {
+    baseVersion: number;
+    ops: { path: string }[];
+  }[];
+  expect(commit?.baseVersion).toBe(2);
+  expect(commit?.ops.some((op) => op.path === "/elements/N2")).toBe(false);
+  expect(seen.away()).toEqual([]);
+  expect(await reported()).toEqual([]);
+  await page.context().close();
+});

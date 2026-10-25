@@ -96,6 +96,7 @@ Each record captures one decision: the context that forced it, the options consi
 | [0090](0090-diagrams-drawn-by-the-agent-through-a-converter.md) | Diagrams drawn by the agent, through a converter | Proposed |
 | [0091](0091-diagrams-tombstones-swept-and-their-revisions-thinned.md) | Diagrams' tombstones swept, and their revisions thinned | Accepted, amended by [0094](0094-diagrams-revisions-thinned-to-one-an-actor-every-ten-minutes.md) |
 | [0092](0092-a-diagrams-images-uploaded-by-a-person-and-read-where-it-names-them.md) | A diagram's images, uploaded by a person and read where it names them | Accepted |
+| [0093](0093-presence-who-has-an-artifact-open-passed-on-and-never-stored.md) | Presence: who has an artifact open, passed on and never stored | Accepted |
 | [0094](0094-diagrams-revisions-thinned-to-one-an-actor-every-ten-minutes.md) | Diagrams' revisions thinned to one an actor every ten minutes | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

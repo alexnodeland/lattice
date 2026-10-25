@@ -347,6 +347,12 @@ Whether portalr's website keeps session replays: false until the privacy review 
 | `UMAMI_REPLAY` | `false` |
 | `UMAMI_PORT` | `3400` |
 
+How many days Umami's replays are kept: older ones are deleted every six hours, whether or not UMAMI_REPLAY is true (deploy/umami/retention, portalr ADR-0077). Their sessions and journeys stay. 0 keeps them for ever; at most 36500.
+
+| Setting | In `.env.example` |
+|---|---|
+| `UMAMI_REPLAY_RETENTION_DAYS` | `30` |
+
 <!-- end generated -->
 
 ## The file

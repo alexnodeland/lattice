@@ -1,0 +1,99 @@
+#!/bin/sh
+# Deletes Umami's session replays older than UMAMI_REPLAY_RETENTION_DAYS (portalr ADR-0077, stackr
+# ADR-0050). Umami 3.4.0 has no retention setting, and its API deletes a replay only with its whole
+# session and the journeys in it, so this deletes the recordings' rows alone, as the role that owns
+# them: `umami.session_replay`, by the time each chunk was stored, and a saved replay's bookmark
+# (`umami.session_replay_saved`) left with no recording. Sessions, events and journeys stay.
+#
+# Usage: sh retention [--once]
+#   Without --once it runs every UMAMI_RETENTION_HOURS (6) hours. A run that fails exits non-zero,
+#   so the container is restarted, and with the marker file gone it is unhealthy after a while.
+#
+# It deletes only, so it runs whether or not replay is on: recordings made before replay was
+# turned off still expire. UMAMI_REPLAY_RETENTION_DAYS (30; at most 36500) is how old a recording
+# may be; 0 keeps them for ever. A run deletes at most UMAMI_RETENTION_BATCH rows (1000) a batch
+# and UMAMI_RETENTION_BATCHES batches (100), and says when there may be more; the next run takes
+# them. It is idempotent: a second run finds nothing. UMAMI_RETENTION_BATCH, _BATCHES, _HOURS and
+# _OK are seams for the check (scripts/check-umami-retention), not settings.
+# The connection is PGHOST, PGUSER, PGPASSWORD and PGDATABASE, as psql reads them, and PGOPTIONS
+# can bound its waits.
+set -eu
+
+days=${UMAMI_REPLAY_RETENTION_DAYS:-30}
+batch=${UMAMI_RETENTION_BATCH:-1000}
+batches=${UMAMI_RETENTION_BATCHES:-100}
+every=${UMAMI_RETENTION_HOURS:-6}
+ok=${UMAMI_RETENTION_OK:-/tmp/umami-retention-ok}
+
+say() { printf 'umami-retention: %s\n' "$*"; }
+fail() {
+  printf 'umami-retention: FAILED: %s\n' "$*" >&2
+  exit 1
+}
+
+# A whole number of at most five digits.
+whole() { case $1 in '' | *[!0-9]*) return 1 ;; *) [ "${#1}" -le 5 ] ;; esac }
+
+run() {
+  whole "$days" && [ "$days" -le 36500 ] ||
+    fail "UMAMI_REPLAY_RETENTION_DAYS must be a whole number of days, at most 36500, not '$days'"
+  whole "$batch" && [ "$batch" -gt 0 ] || fail "UMAMI_RETENTION_BATCH must be a positive number"
+  whole "$batches" && [ "$batches" -gt 0 ] ||
+    fail "UMAMI_RETENTION_BATCHES must be a positive number"
+  if [ "$days" -eq 0 ]; then
+    say "recordings are kept for ever (UMAMI_REPLAY_RETENTION_DAYS is 0)"
+    return 0
+  fi
+  sql() {
+    psql --no-psqlrc --quiet --tuples-only --no-align --set ON_ERROR_STOP=1 \
+      --variable days="$days" --variable batch="$batch" "$@"
+  }
+  sql --command "SELECT 1 FROM umami.session_replay LIMIT 1" >/dev/null ||
+    fail "Umami's recordings can't be read: its database, its role or its tables"
+  total=0 round=0 more=false
+  while [ "$round" -lt "$batches" ]; do
+    round=$((round + 1))
+    gone=$(echo "
+      WITH deleted AS (
+        DELETE FROM umami.session_replay WHERE replay_id IN (
+          SELECT replay_id FROM umami.session_replay
+          WHERE created_at < now() - make_interval(days => :days)
+             OR (created_at IS NULL AND started_at < now() - make_interval(days => :days))
+          ORDER BY created_at, replay_id
+          LIMIT :batch
+        ) RETURNING 1
+      )
+      SELECT count(*) FROM deleted" | sql) || fail "deleting recordings older than $days days"
+    total=$((total + gone))
+    [ "$gone" -lt "$batch" ] && break
+    [ "$round" -eq "$batches" ] && more=true
+  done
+  saved=$(sql --command "
+    WITH deleted AS (
+      DELETE FROM umami.session_replay_saved s
+      WHERE NOT EXISTS (SELECT 1 FROM umami.session_replay r WHERE r.visit_id = s.visit_id)
+      RETURNING 1
+    )
+    SELECT count(*) FROM deleted") || fail "deleting saved replays with no recording"
+  say "deleted $total recordings older than $days days, and $saved saved replays left with none"
+  if [ "$more" = true ]; then
+    say "there may be more past the $batches batches of $batch a run, for the next run"
+  fi
+}
+
+whole "$every" && [ "$every" -gt 0 ] || fail "UMAMI_RETENTION_HOURS must be a positive number"
+# Without leading zeros, which sh's arithmetic would read as octal: 08 is not a number there.
+every=${every#"${every%%[!0]*}"}
+if [ "${1:-}" = --once ]; then
+  run
+  exit 0
+fi
+# Stopped by either signal at once: a shell waiting on a command defers none, but one in the
+# foreground of `sleep` ignores what the image's STOPSIGNAL sends it.
+trap 'exit 0' TERM INT
+while :; do
+  run
+  : >"$ok"
+  sleep "$((every * 3600))" &
+  wait $!
+done

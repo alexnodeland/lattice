@@ -33,6 +33,7 @@ For phase 6 of [lattice RFC-0008](../../rfcs/0008-portalr-product-analytics.md) 
   - It makes portalr's website, owned by that user, with the fixed id `UMAMI_WEBSITE_ID`.
   - Passwords go in request bodies, escaped as JSON, and tokens in a header file, never on a command line.
   - Until it has run, Umami's first admin login, `admin` / `umami`, works. `make up` runs it at once. Someone who starts the profile with plain `docker compose --profile umami up` must run `umami-init` too, before anyone else on the machine reaches the loopback port.
+- **`umami-retention`** deletes Umami's session replays older than `UMAMI_REPLAY_RETENTION_DAYS` (30; 0 keeps them) every six hours, whether or not `UMAMI_REPLAY` is true, as Umami's own database role on `umami-db` (portalr ADR-0077). Umami has no retention setting and its API deletes a recording only with its session, so it deletes the recordings' rows alone; sessions, events and journeys stay. It uses Umami's own role and credential, with no role of its own: that role already owns the tables, a narrower one would need grants on a schema Umami's migrations change, and the service is on the database network alone (`umami-db`, which Umami and PostgreSQL share) and talks only to PostgreSQL, never to Umami's HTTP port. `scripts/check-umami-retention` checks it against the pinned Umami.
 - **Checks:** the smoke test, in CI's single-host row, checks that:
   - the applications' network can post to the ingest, and the stack's network can't;
   - the UI answers on the loopback, and takes events there, as stated above;

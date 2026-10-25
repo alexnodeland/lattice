@@ -1,5 +1,6 @@
 """The portal: portalr's router and UIs over the same grantr, off without a Supabase project."""
 
+import contextlib
 import functools
 import json
 import logging
@@ -648,7 +649,8 @@ def test_a_person_removed_from_a_tenant_is_owed_their_events_deletion_there(
         # no ClickHouse answers here, so it stays owed, to be tried again (portalr ADR-0075).
         deadline = time.monotonic() + 10
         while not owed and time.monotonic() < deadline:
-            with sqlite3.connect(database) as connection:
+            # sqlite3's own `with` commits and leaves the connection open; this closes it.
+            with contextlib.closing(sqlite3.connect(database)) as connection:
                 owed = connection.execute(
                     "SELECT user_id, tenant_id FROM portalr_analytics_removals_owed"
                 ).fetchall()

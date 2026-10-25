@@ -107,11 +107,21 @@ tasks:
       - 'bun.lock'
       - 'tsconfig.base.json'
 
+  # scripts/dev against fakes: what `make dev` runs and refuses, starting nothing.
+  check-dev:
+    description: "Check scripts/dev, which `make dev` runs, against fakes"
+    command: 'scripts/check-dev'
+    inputs:
+      - 'scripts/dev'
+      - 'scripts/check-dev'
+      - 'packages/stackr/copier.yml'
+
   check:
     description: "Run the root's checks, as CI does"
     command: 'noop'
     deps:
       - 'lint'
+      - 'check-dev'
       - 'typecheck'
       - 'test'
       - 'docs'

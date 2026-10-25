@@ -44,6 +44,8 @@ package = false
 
 [tool.uv.workspace]
 members = ["packages/*", "examples/*"]
+# `make dev`'s application (scripts/dev), a project of its own, never a member.
+exclude = [".local"]
 
 # ─── lint and format ──────────────────────────────────────────────────────────
 # One configuration for every package. A package that needs its own settings has a [tool.ruff]

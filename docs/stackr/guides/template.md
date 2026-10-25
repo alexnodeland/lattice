@@ -119,16 +119,13 @@ So start the stack first: stackr's default `make up`, with local Supabase, or th
 With grantr and the portal, a person signs in to the app and chats with its agent through the gateway after these steps, on either of stackr's database adapters:
 
 1. In stackr: `make up`, then `make tenant NAME=home`, which prints a gateway key for the tenant's team.
-2. In the application: `make install` and `make env`, then fill in `.env` (`scripts/wire-app <app>` in stackr writes all but the gateway keys from stackr's `.env`, with `--analytics`, `--umami` and `--langfuse-project` as you run them): `LITELLM_API_KEY`, the key from step 1; `AUTH_SERVICE_ROLE_KEY`; `PORTAL_SUPABASE_KEY`; and, for Langfuse, its keys and `PORTAL_LANGFUSE_PROJECT`. On local Supabase the two keys are `supabase status`'s secret and publishable keys. On the PostgreSQL adapter, GoTrue alone, `AUTH_SERVICE_ROLE_KEY` is stackr's own (its `.env`), `PORTAL_SUPABASE_KEY` any name such as `sb_publishable_local`, since GoTrue asks for none, and these lines, in place of `.env.example`'s (the local commands read a setting's first line, Compose its last), point the application at GoTrue (`AUTH_ISSUER` is stackr's `AUTH_PUBLIC_URL`) and the stack's PostgreSQL:
+2. In the application: `make install` and `make env`. Then, in stackr, wire its `.env` to the stack, with the key from step 1 on stdin:
 
    ```bash
-   AUTH_ISSUER=http://localhost:9999
-   AUTH_JWKS_URL=http://localhost:9999/.well-known/jwks.json
-   DATABASE_URL=postgresql+asyncpg://postgres:<POSTGRES_ADMIN_PASSWORD>@127.0.0.1:<POSTGRES_PORT>/postgres
-   STACK_AUTH_JWKS_URL=http://gotrue:9999/.well-known/jwks.json
-   STACK_AUTH_ADMIN_URL=http://gotrue:9999
-   STACK_DATABASE_URL=postgresql+asyncpg://postgres:<POSTGRES_ADMIN_PASSWORD>@postgres:5432/postgres
+   echo "LITELLM_API_KEY=<the key>" | uv run scripts/wire-app <the application> --langfuse-project --stdin
    ```
+
+   `scripts/wire-app` writes Langfuse's keys and project, the database's addresses, and on the PostgreSQL adapter GoTrue's addresses, `AUTH_SERVICE_ROLE_KEY` and a `PORTAL_SUPABASE_KEY`, from stackr's `.env`. `--analytics` and `--umami` add those profiles' passwords. On local Supabase, also give it `AUTH_ISSUER`, `AUTH_SERVICE_ROLE_KEY` and `PORTAL_SUPABASE_KEY` on stdin: `supabase status`'s API URL plus `/auth/v1`, and its secret and publishable keys. `make dev` at lattice's root does every step.
 
 3. `make up`, then `make first-run EMAIL=you@example.com`, which asks for your password.
 4. Sign in at <http://localhost:8800/portalr/app/>, open `home`'s `main`, and start a thread. The agent asks the gateway's `default` model group with the tenant's key, and its trace reaches Tempo and Langfuse through the Collector.

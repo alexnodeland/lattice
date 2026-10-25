@@ -537,6 +537,45 @@ services:
       umami:
         condition: service_healthy
 
+  # Deletes replays older than UMAMI_REPLAY_RETENTION_DAYS (deploy/umami/retention, portalr
+  # ADR-0077): Umami has no retention setting, and its API deletes a replay only with its whole
+  # session. It runs as Umami's own database role, on Umami's database network alone, every six
+  # hours, whether or not replay is on, so recordings made before it was turned off still expire.
+  # It is unhealthy when no run has finished for a day: a failed run exits and is restarted, with
+  # nothing to show, and one stuck for a day shows the same. 0 days keeps them for ever.
+  umami-retention:
+    image: postgres:17.11-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
+    profiles: [umami]
+    restart: unless-stopped
+    entrypoint: ["sh", "/retention"]
+    init: true
+    stop_signal: SIGTERM
+    user: "70"
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      PGHOST: postgres
+      PGDATABASE: umami
+      PGUSER: umami
+      PGPASSWORD: ${UMAMI_DB_PASSWORD:?run make env}
+      PGCONNECT_TIMEOUT: "10"
+      PGOPTIONS: "-c lock_timeout=10s -c statement_timeout=5min"
+      UMAMI_REPLAY_RETENTION_DAYS: ${UMAMI_REPLAY_RETENTION_DAYS:-30}
+    volumes:
+      - ./deploy/umami/retention:/retention:ro
+    networks: [umami-db]
+    healthcheck:
+      test: ["CMD-SHELL", "test -n \"$$(find /tmp/umami-retention-ok -mmin -1440)\""]
+      interval: 5m
+      timeout: 5s
+      retries: 1
+      start_period: 5m
+    depends_on:
+      umami:
+        condition: service_healthy
+
   langfuse-worker:
     image: langfuse/langfuse-worker:4.46.0@sha256:3568d2d1eb5dd570f4087b37972ddffa3f6ae4f872553e0b0e2eedf4896a29e9
     profiles: [langfuse]

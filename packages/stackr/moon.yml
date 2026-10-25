@@ -153,6 +153,22 @@ tasks:
     options:
       cache: false
 
+  # Online, and it runs Umami and PostgreSQL, so not one of check's dependencies: CI's "Umami retention"
+  # job runs it (portalr ADR-0077). Everything it makes is named stackr-retention-check-<hex>.
+  umami-retention:
+    description: "Check deploy/umami/retention against the pinned Umami: old replays deleted, nothing else"
+    command: 'scripts/check-umami-retention'
+    inputs:
+      - 'scripts/check-umami-retention'
+      - 'deploy/umami/*'
+      - 'deploy/postgres/umami.sql'
+      - 'compose.yaml'
+      - '/packages/portalr/src/portalr/readers/umami.py'
+      - '/packages/portalr/tests/fixtures/replay_chromium.json'
+      - '/uv.lock'
+    options:
+      cache: false
+
   check:
     description: "Run the project's checks, as CI does"
     command: 'noop'

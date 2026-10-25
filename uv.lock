@@ -4402,6 +4402,9 @@ dependencies = [
 evals = [
     { name = "evalr" },
 ]
+excalidraw = [
+    { name = "artifactr-ai", extra = ["excalidraw"] },
+]
 fastapi = [
     { name = "fastapi" },
     { name = "lattice-core-ai" },
@@ -4479,6 +4482,7 @@ requires-dist = [
     { name = "aiosqlite", marker = "extra == 'sqlite'", specifier = ">=0.22" },
     { name = "alembic", marker = "extra == 'sql'", specifier = ">=1.20" },
     { name = "artifactr-ai", editable = "packages/artifactr" },
+    { name = "artifactr-ai", extras = ["excalidraw"], marker = "extra == 'excalidraw'", editable = "packages/artifactr" },
     { name = "artifactr-ai", extras = ["forms"], marker = "extra == 'forms'", editable = "packages/artifactr" },
     { name = "artifactr-ai", extras = ["langfuse"], marker = "extra == 'langfuse'", editable = "packages/artifactr" },
     { name = "asyncpg", marker = "extra == 'postgres'", specifier = ">=0.31" },
@@ -4503,7 +4507,7 @@ requires-dist = [
     { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'sql'", specifier = ">=2.1" },
     { name = "starlette", marker = "extra == 'fastapi'", specifier = ">=0.46.0" },
 ]
-provides-extras = ["sql", "sqlite", "postgres", "otel", "evals", "plane", "vikunja", "fastapi", "forms", "langfuse"]
+provides-extras = ["sql", "sqlite", "postgres", "otel", "evals", "plane", "vikunja", "fastapi", "forms", "excalidraw", "langfuse"]
 
 [package.metadata.requires-dev]
 dev = [

@@ -12,8 +12,12 @@ stack, as the app profile reaches it:
   postgres adapter, unless STACKR_DB_HOST and STACKR_DB_ADMIN_PASSWORD name another, as `make`
   does. STACK_DATABASE_URL is the role the application works as, which owns nothing, with a
   password of its own, kept from an earlier run; STACK_DATABASE_ADMIN_URL is the tables' owner.
-- On the postgres adapter, GoTrue (the auth profile): its issuer, its keys and its admin API, the
-  service role's key, and a placeholder publishable key, since GoTrue asks for none. On local
+  On the postgres adapter, DATABASE_URL and DATABASE_ADMIN_URL are the same two as this machine
+  reaches them, at the port stackr publishes, for the local commands (`make first-run`); on
+  local Supabase, `.env.example`'s already are.
+- On the postgres adapter, GoTrue (the auth profile): its issuer, its keys and its admin API, in
+  the app profile and on this machine, the service role's key, and a placeholder publishable
+  key, since GoTrue asks for none. On local
   Supabase, GoTrue's addresses are emptied, so a file wired for the other adapter doesn't keep
   them. Invitations need Supabase's gateway, which GoTrue alone hasn't, so PORTAL_AUTH_URL is
   left as it is.
@@ -47,7 +51,7 @@ import tomllib
 from pathlib import Path
 from urllib.parse import quote, urlsplit
 
-from _env import LINE, ROOT, read_env, settings
+from _env import LINE, ROOT, published_host, read_env, settings
 
 # Local Supabase's PostgreSQL, as the stack's services reach it, and its fixed admin password.
 SUPABASE_DB = ("supabase_db_stackr-supabase", "postgres")
@@ -57,17 +61,23 @@ PUBLISHABLE = "sb_publishable_local"
 
 
 def database(stack: dict[str, str], postgres: bool, role: str, current: str) -> dict[str, str]:
-    """The database's two URLs, as the app profile reaches them, by the stack's adapter."""
+    """The database's URLs, by the stack's adapter: as the app profile reaches it, and on the
+    postgres adapter as this machine does too, for the local commands (`make first-run`)."""
     host, admin = ("postgres", stack["POSTGRES_ADMIN_PASSWORD"]) if postgres else SUPABASE_DB
     host = os.environ.get("STACKR_DB_HOST") or host
-    admin = os.environ.get("STACKR_DB_ADMIN_PASSWORD") or admin
+    admin = quote(os.environ.get("STACKR_DB_ADMIN_PASSWORD") or admin, safe="")
     password = urlsplit(current).password or secrets.token_hex(16)
-    return {
+    urls = {
         "STACK_DATABASE_URL": f"postgresql+asyncpg://{role}:{password}@{host}:5432/postgres",
-        "STACK_DATABASE_ADMIN_URL": (
-            f"postgresql+asyncpg://postgres:{quote(admin, safe='')}@{host}:5432/postgres"
-        ),
+        "STACK_DATABASE_ADMIN_URL": f"postgresql+asyncpg://postgres:{admin}@{host}:5432/postgres",
     }
+    if postgres:
+        here = f"{published_host(stack)}:{stack['POSTGRES_PORT']}"
+        urls |= {
+            "DATABASE_URL": f"postgresql+asyncpg://{role}:{password}@{here}/postgres",
+            "DATABASE_ADMIN_URL": f"postgresql+asyncpg://postgres:{admin}@{here}/postgres",
+        }
+    return urls
 
 
 def wired(app: Path, stack: dict[str, str], flags: argparse.Namespace) -> dict[str, str]:
@@ -89,6 +99,9 @@ def wired(app: Path, stack: dict[str, str], flags: argparse.Namespace) -> dict[s
             "AUTH_SERVICE_ROLE_KEY": stack["AUTH_SERVICE_ROLE_KEY"],
             "STACK_AUTH_JWKS_URL": f"{GOTRUE}/.well-known/jwks.json",
             "STACK_AUTH_ADMIN_URL": GOTRUE,
+            # GoTrue as this machine reaches it, for the local commands.
+            "AUTH_JWKS_URL": f"http://{published_host(stack)}:{stack['AUTH_PORT']}/.well-known/jwks.json",
+            "AUTH_ADMIN_URL": f"http://{published_host(stack)}:{stack['AUTH_PORT']}",
             "PORTAL_SUPABASE_KEY": current.get("PORTAL_SUPABASE_KEY") or PUBLISHABLE,
         }
     else:
@@ -111,7 +124,9 @@ def write(path: Path, values: dict[str, str]) -> None:
     """Set each value on its key's one line, where it is, or on a new line at the end; mode 0600.
 
     A key that was set twice keeps its first line, the one `make` reads, and loses the others.
+    A `.env` that is a link is written where it points, and stays a link.
     """
+    path = path.resolve()
     lines, seen = [], set()
     for line in path.read_text(encoding="utf-8").splitlines():
         match = LINE.match(line.strip())
@@ -170,7 +185,12 @@ def main() -> int:
     stack |= {key: os.environ[key] for key in stack if os.environ.get(key)}
     if why := refused(extra, stack):
         raise SystemExit(f"wire-app: {why}")
-    values = wired(args.app, stack, args) | extra
+    try:
+        values = wired(args.app, stack, args) | extra
+    except KeyError as missing:
+        raise SystemExit(
+            f"wire-app: stackr's .env has no {missing}: run `make env` in stackr first"
+        ) from None
     if why := refused(values, {}):
         raise SystemExit(f"wire-app: {why}")
     write(env, values)

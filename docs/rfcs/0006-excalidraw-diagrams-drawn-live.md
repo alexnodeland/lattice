@@ -409,7 +409,7 @@ Each is settled in phase 0's ADR or carried as an exit criterion.
 - [x] portalr, phase 3a: the renderer, its text alternative held to artifactr's by a shared fixture, and the canvas to look at, an add-on with its budget, under the policy unchanged ([portalr ADR-0072](../portalr/adr/0072-a-diagrams-card-and-its-canvas-to-look-at.md))
 - [x] portalr, phase 3b: editing on the canvas, the TypeScript patch builder, an upload route for a diagram's images with checks of size and type, and no SVG images; `img-src blob:` found not needed ([portalr ADR-0074](../portalr/adr/0074-editing-a-diagram-on-its-canvas-and-the-images-put-on-it.md), [artifactr ADR-0092](../artifactr/adr/0092-a-diagrams-images-uploaded-by-a-person-and-read-where-it-names-them.md))
 - [ ] portalr: presence, the list ("Here now"), the overlay, and revisions merged as they arrive (done, [portalr ADR-0078](../portalr/adr/0078-the-others-on-a-diagrams-canvas-and-their-revisions-as-they-arrive.md)); agents as peers; admin's Integrations page
-- [ ] The `[relayr]` projections and feedback anchors
+- [x] The `[relayr]` projections and feedback anchors ([relayr ADR-0041](../relayr/adr/0041-a-diagrams-commits-bridged-as-its-elements-changed-and-comments-on-them.md)); commenting from the canvas is portalr's, still to do
 - [ ] Docs: the package's guide, its ADRs, and the architecture
 
 ## Evidence

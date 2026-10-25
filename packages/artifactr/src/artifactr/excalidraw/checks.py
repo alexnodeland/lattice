@@ -19,13 +19,15 @@ core's to refuse when it validates the result.
 
 from collections.abc import Mapping
 from types import MappingProxyType
-from typing import Final, cast
+from typing import Final, NoReturn, cast
 
 from pydantic import JsonValue
 
 from artifactr.core import (
+    ArtifactTarget,
     Command,
     EditArtifact,
+    GiveFeedback,
     JsonPatch,
     ProposeChange,
     RespondToProposal,
@@ -34,7 +36,7 @@ from artifactr.core import (
     load_artifact,
 )
 from artifactr.excalidraw.sweep import SWEEPER
-from artifactr.excalidraw.types import Diagram
+from artifactr.excalidraw.types import Diagram, DiagramComment
 from artifactr.workspace import Check, Workspace
 
 __all__ = ["excalidraw_checks"]
@@ -49,7 +51,12 @@ def excalidraw_checks() -> Mapping[str, Check]:
     one check a type.
     """
     return MappingProxyType(
-        {"edit_artifact": _check, "propose_change": _check, "respond_to_proposal": _check}
+        {
+            "edit_artifact": _check,
+            "propose_change": _check,
+            "respond_to_proposal": _check,
+            "give_feedback": _check,
+        }
     )
 
 
@@ -63,8 +70,39 @@ async def _check(workspace: Workspace, command: Command) -> None:
             proposal = await workspace.proposal(command.proposal_id)
             if proposal.status == "pending" and isinstance(proposal.change, EditArtifact):
                 await _edited(workspace, proposal.change, on_head=True)
-        case _:  # a rejection, or a proposal to make or archive one
+        case GiveFeedback(feedback_type=DiagramComment.feedback_type):
+            await _commented(workspace, command)
+        case _:  # a rejection, or a proposal to make or archive one; another feedback
             pass
+
+
+async def _commented(workspace: Workspace, command: GiveFeedback) -> None:
+    """Refuse a comment on an element the diagram's version doesn't hold, live.
+
+    Core has checked the value is a comment's, the target an artifact's version that exists.
+    The version's own revision says what it held; one thinned away (ADR-0094), the head does.
+    """
+    target = command.target
+    assert isinstance(target, ArtifactTarget), "core refuses a comment on all but an artifact"
+    comment = DiagramComment.model_validate(command.value)
+    artifact = await workspace.artifact(target.artifact_id)
+    if not isinstance(artifact.data, Diagram):
+        _refuse(["target", "artifact_id"], "a comment on an element is on a diagram")
+    held, kept = artifact.data, False
+    # Every revision is read to find one: a comment is rare beside a save, and thinning
+    # (ADR-0094) keeps a diagram's revisions few after a day.
+    for revision in await workspace.revisions(target.artifact_id):
+        if revision.version == target.version:
+            held, kept = Diagram.model_validate(revision.data), True
+    element = held.elements.get(comment.element_id)
+    if element is None or element.is_deleted:
+        said = (
+            f"version {target.version} of the diagram holds no element {comment.element_id}"
+            if kept
+            else f"version {target.version} is no longer kept, and the head holds no live "
+            f"element {comment.element_id}"
+        )
+        _refuse(["value", "element_id"], said)
 
 
 async def _edited(workspace: Workspace, command: EditArtifact, *, on_head: bool) -> None:
@@ -115,5 +153,5 @@ def _grown(head: Diagram, after: Diagram, *, sweeping: bool) -> None:
             )
 
 
-def _refuse(loc: list[JsonValue], message: str) -> None:
+def _refuse(loc: list[JsonValue], message: str) -> NoReturn:
     raise ValidationFailed(message, [{"type": "value_error", "loc": loc, "msg": message}])

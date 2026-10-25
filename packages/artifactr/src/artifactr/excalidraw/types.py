@@ -21,18 +21,20 @@ from typing import Annotated, ClassVar, Final, Self, cast, override
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, StrictInt, model_validator
 
-from artifactr.core import Artifact, WritePolicy
+from artifactr.core import Artifact, Feedback, WritePolicy
 from artifactr.excalidraw.integrations import DIAGRAM_KIND
 from artifactr.excalidraw.render import describe
 
 __all__ = [
     "EXCALIDRAW_TYPES",
+    "MAX_COMMENT",
     "MAX_DIAGRAM_BYTES",
     "MAX_ELEMENTS",
     "MAX_NAME",
     "MAX_NONCE",
     "MAX_VERSION",
     "Diagram",
+    "DiagramComment",
     "DiagramFile",
     "Element",
     "ElementId",
@@ -194,3 +196,23 @@ def _size(data: JsonValue) -> int:
 
 EXCALIDRAW_TYPES: Final[tuple[type[Artifact], ...]] = (Diagram,)
 """The types to register: ``Workspaces(types=(*mine, *EXCALIDRAW_TYPES))``."""
+
+
+MAX_COMMENT: Final = 4_000
+"""The most characters a comment on a diagram's element may be."""
+
+
+class DiagramComment(Feedback, name="diagram_comment", targets={"artifact"}):
+    """A comment on one element of a diagram, at one version.
+
+    It is feedback, anchored outside the drawing, so no comment is ever an element (lattice
+    RFC-0006).
+
+    The diagrams' checks refuse one whose element isn't in that version of the diagram. A rule
+    finds the shape by ``element_id``, in ``artifactr:feedback_given``'s value, and may propose a
+    fix for it. A comment keeps its version after that revision is thinned away, and its
+    element may since have gone from the head: a rule that proposes a fix reads the head.
+    """
+
+    element_id: ElementId
+    text: Annotated[str, Field(min_length=1, max_length=MAX_COMMENT)]

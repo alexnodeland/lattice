@@ -34,7 +34,14 @@ from artifactr.excalidraw.render import describe
 from artifactr.excalidraw.retention import thin_revisions
 from artifactr.excalidraw.sweep import SWEEPER, sweep_tombstones
 from artifactr.excalidraw.tools import diagram_tools
-from artifactr.excalidraw.types import EXCALIDRAW_TYPES, Diagram, DiagramFile, Element, Scene
+from artifactr.excalidraw.types import (
+    EXCALIDRAW_TYPES,
+    Diagram,
+    DiagramComment,
+    DiagramFile,
+    Element,
+    Scene,
+)
 
 __all__ = [
     "EXCALIDRAW",
@@ -44,6 +51,7 @@ __all__ = [
     "Converted",
     "Converter",
     "Diagram",
+    "DiagramComment",
     "DiagramFile",
     "Element",
     "FakeConverter",

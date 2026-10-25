@@ -27,10 +27,17 @@ nothing_started() { ! grep -v '^docker compose version$' "$scratch/calls" | grep
 real_uv=$(command -v uv)
 mkdir -p "$scratch/bin" "$scratch/stackr"
 cp packages/stackr/copier.yml "$scratch/stackr/"
+# docker, with a `stackr` PostgreSQL volume where FAKE_VOLUME says, which takes the password
+# FAKE_PASSWORD, given to psql in its environment.
 cat >"$scratch/bin/docker" <<'FAKE'
 #!/usr/bin/env bash
 echo "docker $*" >>"$CALLS"
 [[ $* == "context show" ]] && echo default
+[[ $1 == volume && -n ${FAKE_VOLUME:-} ]] && echo stackr_postgres-data
+if [[ $* == *" exec "*psql* ]]; then
+  [[ $* == *"-e PGPASSWORD "* && ${PGPASSWORD:-} == "${FAKE_PASSWORD:-}" ]]
+  exit
+fi
 exit 0
 FAKE
 cat >"$scratch/bin/make" <<'FAKE'
@@ -43,10 +50,15 @@ exit 0
 FAKE
 # uv runs Python itself; Copier, the lock and stackr's scripts are made up, each call logged with
 # its arguments. Copier records the commit as `git describe` says it, as Copier does.
+# Without Copier where FAKE_NO_COPIER says, until stackr's dev group is synced.
 cat >"$scratch/bin/uv" <<FAKE
 #!/usr/bin/env bash
+if [[ -n \${FAKE_NO_COPIER:-} && \$* == *"import copier"* && ! -e "$scratch/synced" ]]; then
+  exit 1
+fi
 case "\$*" in
   *"python -c"*) exec "$real_uv" "\$@" ;;
+  sync*) echo "uv \$*" >>"\$CALLS"; touch "$scratch/synced"; exit 0 ;;
 esac
 echo "uv \$*" >>"\$CALLS"
 case "\$*" in
@@ -170,6 +182,21 @@ check "and says so" said "is a link"
 rm -f "$scratch/app"
 check "up refuses DEV_APP_DIR around lattice" refused dev postgres env DEV_APP_DIR="$root/.." scripts/dev up
 check "and says so" said "would hold lattice itself"
+
+fresh && rm -f "$scratch/synced"
+check "up installs stackr's dev group where Copier isn't" up env FAKE_NO_COPIER=1
+check "with uv, beside what .venv has" grep -qx "uv sync --quiet --locked --inexact --package stackr --only-group dev" "$scratch/calls"
+check "and runs no make install" refused grep -q "make .*install" "$scratch/calls"
+
+# up, with a `stackr` PostgreSQL volume from an earlier stack, and .env's password for it.
+volume_up() {
+  STACK_EXTRA=POSTGRES_ADMIN_PASSWORD=pw-made-up dev postgres env FAKE_VOLUME=1 "$@" scripts/dev up >"$scratch/out" 2>&1
+}
+check "up refuses a stack volume made with another password" refused volume_up env FAKE_PASSWORD=other
+check "and says the two ways out" said "use the .env that made it, or \`make dev-reset\`"
+check "having started PostgreSQL alone" test "$(grep -c "up --detach --wait postgres$" "$scratch/calls") $(grep -c "make .* up " "$scratch/calls")" = "1 0"
+check "and never passed the password as an argument" refused grep -q pw-made-up "$scratch/calls"
+check "up takes a stack volume its password opens" volume_up env FAKE_PASSWORD=pw-made-up
 
 fresh && up
 dev postgres scripts/dev down >/dev/null 2>&1

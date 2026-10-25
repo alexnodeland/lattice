@@ -96,8 +96,15 @@ preflight() {
     [[ $bind == 127.* || $bind == localhost || $bind == ::1 || ${DEV_LAN:-} == yes ]] ||
       die "STACKR_BIND or APP_BIND publishes on $bind, beyond this machine: set DEV_LAN=yes to choose that"
   done
-  uv run --no-sync python -c 'import copier, yaml' 2>/dev/null ||
-    die "lattice's environment has no Copier: run \`make install\` at lattice's root"
+  # Copier and PyYAML are stackr's dev group's, at uv.lock's versions: where lattice's
+  # environment hasn't them, that group alone is installed into .venv, beside what is there, and
+  # no file of lattice's changes.
+  if ! uv run --no-sync python -c 'import copier, yaml' 2>/dev/null; then
+    say "installing stackr's dev group, Copier among it, into .venv"
+    uv sync --quiet --locked --inexact --package stackr --only-group dev
+    uv run --no-sync python -c 'import copier, yaml' 2>/dev/null ||
+      die "lattice's environment still has no Copier, after \`uv sync --package stackr --only-group dev\`"
+  fi
   local adapter want recorded where
   adapter=$(setting "$stackr/.env" STACKR_DATABASE)
   [[ ! -f $stackr/.env || $adapter == postgres ]] ||
@@ -154,6 +161,22 @@ stack_env() {
   make -s -C "$stackr" env STACKR_DATABASE=postgres
 }
 
+# A `stackr` project's PostgreSQL volume, from an earlier stack, keeps the admin password it was
+# made with, whatever .env says now: then the stack's db-init would fail halfway. So where there
+# is one, PostgreSQL alone is started (or the running one used) and signed in to with .env's
+# password, which goes to psql in its environment, never on a command line; if that fails,
+# nothing else starts.
+stack_volume() {
+  [[ -n $(docker volume ls --quiet --filter label=com.docker.compose.project=stackr \
+    --filter label=com.docker.compose.volume=postgres-data) ]] || return 0
+  local stack=(docker compose --project-directory "$stackr" --profile postgres)
+  "${stack[@]}" up --detach --wait postgres
+  PGPASSWORD=$(setting "$stackr/.env" POSTGRES_ADMIN_PASSWORD) "${stack[@]}" exec -T -e PGPASSWORD \
+    postgres psql --host 127.0.0.1 --username postgres --dbname postgres --command 'SELECT 1' \
+    >/dev/null 2>&1 ||
+    die "the stack's PostgreSQL volume (project stackr, postgres-data) was made with another POSTGRES_ADMIN_PASSWORD than packages/stackr/.env has: use the .env that made it, or \`make dev-reset\`, which deletes the stack's data"
+}
+
 # Settings into the application's .env, through stackr's scripts/wire-app, from stdin. It says
 # the names of what it set, never a value.
 wire() {
@@ -205,6 +228,7 @@ up() {
   preflight
   render
   stack_env
+  stack_volume
   say "starting stackr's stack: $PROFILES"
   make -s -C "$stackr" up PROFILES="$PROFILES" STACKR_DATABASE=postgres
   [[ -f $app/.env ]] || make -s -C "$app" env

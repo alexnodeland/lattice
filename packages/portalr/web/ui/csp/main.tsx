@@ -14,11 +14,13 @@
 
 import type { IntegrationKey } from "@portalr/client";
 import "../src/styles.css";
+import { useState } from "react";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 // The app's diagram card and its canvas add-on, built as app's build builds them (portalr ADR-0072).
 import { diagram } from "../../app/src/diagram";
 import { type CanvasHost, CanvasHostContext } from "../../app/src/on-demand/canvas-host";
+import type { Heard } from "../../app/src/on-demand/presence";
 import { AppHostContext, DashboardView, IntegrationsContext, Markdown } from "../src";
 import { AppFrame } from "../src/app-frame";
 import { ShownContext } from "../src/artifacts";
@@ -181,7 +183,13 @@ const DIAGRAMS: Record<string, object> = {
 
 declare global {
   interface Window {
-    canvasSent: { commits: unknown[]; uploads: string[] };
+    canvasSent: { commits: unknown[]; uploads: string[]; said: unknown[] };
+    /** Tell the canvas who else is there, as its connection would. */
+    canvasHeard: (heard: Heard) => void;
+    /** A newer revision of the diagram, as the page would read it. */
+    canvasPush: (data: object) => void;
+    /** The diagram the page opens on, to make a newer revision of. */
+    canvasSample: object;
   }
 }
 
@@ -189,7 +197,7 @@ declare global {
 function keeping(): CanvasHost {
   const images = new Map<string, Blob>();
   let version = 1;
-  window.canvasSent = { commits: [], uploads: [] };
+  window.canvasSent = { commits: [], uploads: [], said: [] };
   return {
     async commit(_, edit) {
       window.canvasSent.commits.push(edit);
@@ -212,7 +220,24 @@ function keeping(): CanvasHost {
     },
     read: async (_, sha256) => images.get(sha256) ?? null,
     mayEdit: async () => true,
+    presence: (_, heard) => {
+      window.canvasHeard = heard;
+      return { say: (said) => window.canvasSent.said.push(said), close: () => undefined };
+    },
   };
+}
+
+/** A diagram the test may edit, through a host of the page's own, and push newer revisions of. */
+function Editable() {
+  const [host] = useState(keeping);
+  const [shown, setShown] = useState({ data: SAMPLE as object, version: 1 });
+  window.canvasSample = SAMPLE;
+  window.canvasPush = (data) => setShown((now) => ({ data, version: now.version + 1 }));
+  return (
+    <ShownContext value={{ id: "d1", version: shown.version }}>
+      <CanvasHostContext value={host}>{diagram.render(shown.data as never)}</CanvasHostContext>
+    </ShownContext>
+  );
 }
 
 const drawing = asked.get("diagram");
@@ -220,15 +245,5 @@ if (drawing !== null) {
   // A diagram as the diagrams worker draws one from Mermaid, its first label holding markup; or
   // one written by a hostile hand; or one that can't be drawn as given.
   const card = diagram.render((DIAGRAMS[drawing] ?? SAMPLE) as never);
-  flushSync(() =>
-    root.render(
-      drawing === "edit" ? (
-        <ShownContext value={{ id: "d1", version: 1 }}>
-          <CanvasHostContext value={keeping()}>{card}</CanvasHostContext>
-        </ShownContext>
-      ) : (
-        card
-      ),
-    ),
-  );
+  flushSync(() => root.render(drawing === "edit" ? <Editable /> : card));
 }

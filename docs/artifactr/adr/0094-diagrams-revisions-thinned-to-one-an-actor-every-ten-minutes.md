@@ -6,8 +6,6 @@
 **Implements:** the retention rule of [ADR-0091](0091-diagrams-tombstones-swept-and-their-revisions-thinned.md), as the owner ratified it on 2026-10-23, and [lattice RFC-0006](../../rfcs/0006-excalidraw-diagrams-drawn-live.md)'s phase 4 thinning
 **Narrows:** [ADR-0004](0004-optimistic-concurrency-and-revisions.md): revisions are no longer kept forever
 
-ADR-0093 is not missing: it is portalr's presence's, on its own pull request.
-
 ## Context
 
 - **Every save of a canvas is a revision**, and every revision holds the whole scene. Phase 0 measured about 29 MB a person-hour at a 30 KB scene under the five-second cadence ([ADR-0088](0088-excalidraws-phase-0-what-the-canvas-costs-and-needs.md)).

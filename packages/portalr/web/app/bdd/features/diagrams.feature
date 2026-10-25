@@ -50,3 +50,14 @@ Feature: Diagrams
     And they open its canvas
     Then the canvas draws it, under the portal's policy, from the portal's origin alone
     And the canvas offers no edit
+
+  Scenario: Two people on one diagram see each other there, and the one who leaves is gone
+    When they start the thread "Together"
+    And they post "draw the stack"
+    And they accept the diagram the assistant proposed
+    And they open its canvas
+    And alice opens it in the thread "Together", in a window of their own
+    Then the canvas says "alice" is here
+    And their canvas says "bob" is here
+    When the other window closes
+    Then the canvas says no one else is here

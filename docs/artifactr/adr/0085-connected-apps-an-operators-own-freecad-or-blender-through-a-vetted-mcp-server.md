@@ -1,6 +1,6 @@
 # ADR-0085: Connected apps: an operator's own FreeCAD or Blender, through a vetted MCP server
 
-**Status:** Proposed, amended by [ADR-0087](0087-a-connected-apps-hourly-limit-read-from-settings.md) (the hourly limit read from settings) and [ADR-0089](0089-a-connected-apps-tools-narrowed-per-workspace.md) (a connected app's tools narrowed per workspace)
+**Status:** Accepted, amended by [ADR-0087](0087-a-connected-apps-hourly-limit-read-from-settings.md) (the hourly limit read from settings) and [ADR-0089](0089-a-connected-apps-tools-narrowed-per-workspace.md) (a connected app's tools narrowed per workspace)
 **Date:** 2026-10-20
 **Deciders:** Alex Nodeland
 **Beside:** native files' [ADR-0014](../files/adr/0014-freecad-on-a-third-dialect-and-no-python-a-file-or-an-agent-brings.md) (FreeCAD) and Blender's native files (in review, #445), which stay as they are

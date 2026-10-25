@@ -1,6 +1,6 @@
 # ADR-0090: Diagrams drawn by the agent, through a converter
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-10-23
 **Deciders:** Alex Nodeland
 **Implements:** the agent's part of [lattice RFC-0006](../../rfcs/0006-excalidraw-diagrams-drawn-live.md)'s phase 2 (O6, O7), on [ADR-0086](0086-diagrams-data-an-element-scoped-patch-and-its-checks.md)'s data and [ADR-0088](0088-excalidraws-phase-0-what-the-canvas-costs-and-needs.md)'s worker

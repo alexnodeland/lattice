@@ -1,6 +1,6 @@
 # ADR-0069: A connected app's tools chosen in admin, and a way in for a workspace's admins
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-10-23
 **Deciders:** Alex Nodeland
 **Amends:** [ADR-0067](0067-settings-in-admin.md), whose page was the tenant's admins' alone and had a field for numbers only; implements the screen of artifactr [ADR-0089](../../artifactr/adr/0089-a-connected-apps-tools-narrowed-per-workspace.md) and closes [#627](https://github.com/alexnodeland/lattice/issues/627)

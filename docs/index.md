@@ -28,7 +28,7 @@ Libraries for applications in which people and agents work together, and the sta
 | [portalr](portalr/index.md) | The portal into an application: an app UI to chat with its agents and see their artifacts, proposals and runs, and an admin UI to run it |
 | [lattice-core](lattice-core/index.md) | What the packages share and must keep identical: infrastructure each depends on and re-exports, never imported by an application |
 
-artifactr, reflexr, evalr and grantr have reached v0.1. relayr's [plan](relayr/rfcs/0001-v0.1-implementation-plan.md) is finishing rules from chat, then evaluation and its docs. portalr's [plan](portalr/rfcs/0001-v0.1-implementation-plan.md) is building the app's areas and then the admin UI. stackr's template is built, and its [hosting recipes](stackr/rfcs/0004-hosting-recipes.md) are being built.
+Every package is released: the libraries on PyPI, and stackr's images on GHCR. stackr's [hosting recipes](stackr/rfcs/0004-hosting-recipes.md) are being built.
 
 lattice's mark is one cell of the lattice that every package's mark is drawn on. Its [brand page](assets/brand/README.md) has the mark, the colours and the brand system every package shares, and [ADR-0001](adr/0001-lattices-brand.md) records why.
 

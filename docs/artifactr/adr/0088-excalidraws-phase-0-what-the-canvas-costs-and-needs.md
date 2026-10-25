@@ -1,6 +1,6 @@
 # ADR-0088: Excalidraw's phase 0, what the canvas costs and needs
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-10-22
 **Deciders:** Alex Nodeland
 **Records:** [lattice RFC-0006](../../rfcs/0006-excalidraw-diagrams-drawn-live.md)'s phase 0, the spike, and the owner's decisions on it

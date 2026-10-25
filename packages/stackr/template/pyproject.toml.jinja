@@ -65,9 +65,9 @@ dev = [
 requires = ["uv_build>=0.12,<0.13"]
 build-backend = "uv_build"
 
-# The libraries are not on PyPI: each comes from lattice, at the commit the template was rendered
-# from, so `copier update` moves them with the template's code. To try another commit, change
-# every rev here to it, then `uv lock`.{% if use_portal %}
+# The libraries are on PyPI, but the template takes each from lattice, at the commit the template
+# was rendered from, so `copier update` moves them with the template's code. To try another
+# commit, change every rev here to it, then `uv lock`.{% if use_portal %}
 #
 # portalr's wheel carries its two UIs, which Vite builds; its source has none. The Dockerfile
 # builds them from the same commit (PORTAL_UI_DIR); a checkout's `make portal-ui` does too.{% endif %}

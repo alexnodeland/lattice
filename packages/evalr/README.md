@@ -14,7 +14,7 @@
 
 **evalr** is a Python library for typed evaluation of agent systems. An evaluator judges an input (a chat thread, a workflow run, an artifact version) and returns a verdict: an instance of a Pydantic type, typically one of the feedback types people also give. Because people and evaluators produce the same types, evaluators can be trained on people's feedback and measured against it.
 
-> **Status:** pre-release. v0.1 is built, as planned in [RFC-0001](https://lattice.alexnodeland.com/evalr/rfcs/0001-v0.1-implementation-plan/), and not yet released. The API may still change before 1.0.
+> **Status:** alpha, on PyPI. v0.1 is built, as planned in [RFC-0001](https://lattice.alexnodeland.com/evalr/rfcs/0001-v0.1-implementation-plan/), and released. The API may still change before 1.0.
 
 ## Why
 

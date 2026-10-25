@@ -5,7 +5,7 @@ import json
 import logging
 import re
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, cast
@@ -606,29 +606,74 @@ def _every_regex() -> list[tuple[str, re.Pattern[str]]]:
 HOSTILE = ["7", "a", " ", "-", ".", "/*", "url(", "x:", "'", '"', "\\", "px", "a b", "\n"]
 
 
+def _best(work: Callable[[], object]) -> float:
+    """Seconds the fastest of several runs of `work` takes, after one to warm up.
+
+    A loaded runner makes a run slower, never faster, so the minimum is the cost of the work.
+    """
+    work()
+    best = float("inf")
+    for _ in range(5):
+        started = time.perf_counter()
+        work()
+        best = min(best, time.perf_counter() - started)
+    return best
+
+
+def _scales_linearly(work: Callable[[int], object], small: int, large: int) -> bool:
+    """Whether twice the input takes about twice the time: linear doubles, quadratic quadruples."""
+    less = _best(lambda: work(small))
+    more = _best(lambda: work(large))
+    return more < 3.0 * less + 0.01
+
+
+def test_the_timing_test_tells_a_linear_cost_from_a_quadratic_one() -> None:
+    def linear(size: int) -> int:
+        return sum(at % 7 for at in range(size * 50))
+
+    def quadratic(size: int) -> int:
+        return sum(again % 7 for _ in range(size) for again in range(size))
+
+    assert _scales_linearly(linear, 20_000, 40_000)
+    assert not _scales_linearly(quadratic, 1_200, 2_400)
+
+
 @pytest.mark.parametrize(("name", "pattern"), _every_regex(), ids=lambda each: str(each)[:40])
 def test_every_pattern_is_matched_in_time_linear_in_what_is_matched(
     name: str, pattern: re.Pattern[str]
 ) -> None:
-    started = time.perf_counter()
     for unit in HOSTILE:
-        for size in (8_000, 16_000):
+
+        def match(size: int, unit: str = unit) -> None:
             text = (unit * size)[:size] + "!"
             pattern.fullmatch(text)
             pattern.fullmatch("!" + text)
-    assert time.perf_counter() - started < 0.5, name
+
+        assert _scales_linearly(match, 8_000, 16_000), f"{name} on {unit!r}"
 
 
 def test_the_checks_cost_no_more_time_for_a_hostile_string_than_a_plain_one() -> None:
-    started = time.perf_counter()
-    for unit in HOSTILE:
+    def check(unit: str) -> float:
         text = unit * 100_000
         attributes = dict.fromkeys(("width", "style", "class", "d", "id", "title", "rel"), text)
-        unmasked([{"type": 2, "tagName": text, "attributes": attributes, "childNodes": []}])
-        unmasked(
-            [{"type": 3, "textContent": text, "data": {"source": 0, "texts": [{"value": text}]}}]
-        )
-    assert time.perf_counter() - started < 1.0
+
+        def work() -> None:
+            unmasked([{"type": 2, "tagName": text, "attributes": attributes, "childNodes": []}])
+            unmasked(
+                [
+                    {
+                        "type": 3,
+                        "textContent": text,
+                        "data": {"source": 0, "texts": [{"value": text}]},
+                    }
+                ]
+            )
+
+        return _best(work)
+
+    plain = check("a")
+    for unit in HOSTILE:
+        assert check(unit) < 10 * plain + 0.25, repr(unit)
 
 
 def test_a_string_is_capped_before_any_pattern_is_tried() -> None:

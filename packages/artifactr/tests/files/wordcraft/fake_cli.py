@@ -61,7 +61,7 @@ def main() -> None:
 
 
 def serve(mode: str, read_root: Path, write_root: Path) -> None:
-    server = MCPServer("wordcraft", version="0.0.1" if mode == "version" else "0.7.0")
+    server = MCPServer("wordcraft", version="0.0.1" if mode == "version" else "0.11.0")
     document: dict[str, Any] = {"blocks": [], "comments": [], "saves": 0}
 
     async def misbehave() -> None:

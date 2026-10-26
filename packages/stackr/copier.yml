@@ -215,7 +215,7 @@ use_integrations:
 crafts:
   type: yaml
   default:
-    wordcraft: {version: "0.7.0", type: WordDocument}
+    wordcraft: {version: "0.11.0", type: WordDocument}
     gridcraft: {version: "0.8.0", type: Workbook, editor: 2}
     deckcraft: {version: "0.7.0", type: Presentation}
     pdfcraft: {version: "0.8.0", type: PdfDocument, editor: 3}

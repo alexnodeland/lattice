@@ -109,7 +109,7 @@ The lease is advisory: artifactr's core doesn't know of it, so `edit_artifact` o
 ```python
 from artifactr.files.wordcraft import Subprocess
 
-app = Subprocess("/opt/wordcraft/bin/wordcraft-cli", version="0.7.0")
+app = Subprocess("/opt/wordcraft/bin/wordcraft-cli", version="0.11.0")
 files = NativeFiles(blobs, checkouts, app)
 ```
 
@@ -363,7 +363,7 @@ An upload asks `authorize` for `artifactr:create_native_file`, an editor's in gr
 The person edits in the app's browser build, as released. Serve it with `editor_app`, on a host name of its own for which your portal sets no cookies, so it never sees a token:
 
 ```python
-editor = editor_app(Path("/srv/wordcraft-web-0.7.0"))  # what `scripts/craft wordcraft web` prints
+editor = editor_app(Path("/srv/wordcraft-web-0.11.0"))  # what `scripts/craft wordcraft web` prints
 ```
 
 It adds headers only: a policy that runs the build's own code and its inline script by its hash, and reaches no other origin, with no framing; and caching for its hashed files. The check-out flow is then: check out, download the version, open it in the editor, edit, save it to disk, and check it in.
@@ -386,7 +386,7 @@ Where people check in files you don't trust, give `NativeFiles` the `Worker`: th
 
 ### The shim, for a build with a host surface
 
-GridCraft's, PdfCraft's and CADCraft's builds have a `?host=parent` bridge, on which a page of their own origin opens a file in them and hears each save and whether there are unsaved changes. Serve the editor with the shim, lattice's page beside the build, and frame it from your portal:
+WordCraft's, GridCraft's, PdfCraft's and CADCraft's builds have a `?host=parent` bridge, on which a page of their own origin opens a file in them and hears each save and whether there are unsaved changes. Serve the editor with the shim, lattice's page beside the build, and frame it from your portal:
 
 ```python
 editor = editor_app(build, craft=CRAFTS["gridcraft"], portal="https://portal.example")

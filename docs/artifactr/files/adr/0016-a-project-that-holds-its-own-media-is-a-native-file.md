@@ -30,6 +30,8 @@ On 2026-10-20 we ran each app's pinned CLI on macOS, headless, on files it made 
 - **FilmCraft's browser build has no host surface,** which ADR-0009 recorded as a JavaScript API: its `bridge` is none, corrected in place. Each app's talk level stays `save` ([ADR-0010](0010-a-shim-beside-the-build-and-talk-level-one-plus.md)).
 - **Each corpus is made by its app.** These projects hold every field their apps write, too many to write by hand and still be read, so each feature's file is what its adapter saves of a script of the app's own commands on a blank project, and the live tests hold the committed files to what the pinned release makes. Each app's hostile files are refused within their deadline: a project too large, nested too deep or not JSON, media and LUTs at a path or up the tree, and, as the app reads them, a newer schema, an older one, and a frame or composition too large.
 
+> **Amended (2026-10-26) by [ADR-0010](0010-a-shim-beside-the-build-and-talk-level-one-plus.md):** the correction was itself wrong. FilmCraft's build has a JavaScript API: loaded in Chromium from `127.0.0.1` at 0.8.0, the pinned release, `window.filmcraft` is an object with `request`, `execute`, `commands`, `inspect`, `screenshot`, `info`, `files`, `readFile`, `importFiles`, `importUrl` and `openProject`. A grep of the build's files missed it, since no file's text names it as the page's; it is there once the build has started. The descriptor's `bridge` stays none until a pilot runs the API through the shim, as ADR-0010 asks of each JavaScript API; the talk level stays `save`.
+
 ## Options considered
 
 ### Option A: The project, kept only whole (chosen)

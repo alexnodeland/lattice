@@ -51,6 +51,8 @@ Level 1 is what the unmodified build offers. The routes and the editor prove the
 - Deferred: portalr's renderer, its previews and diffs, its check-out and check-in screens, and the `bdd` scenarios that drive them; and stackr's hosting of the build at its edge, with the pin check against the worker's image.
 - Revisit: the talk level, and these routes' check-in, when WordCraft's host bridge lands in a release.
 
+> **Amended (2026-10-26) by [ADR-0010](0010-a-shim-beside-the-build-and-talk-level-one-plus.md):** the bridge landed, as `storytold/wordcraft#3822` (not `#405` or `#1655`), in WordCraft 0.11.0, which is pinned: its talk level is 1+, `bridged`, through the shim, and the routes' check-in is unchanged, since the shim's saves reach it as any upload. The note above is closed. Styles stay allowed inline: the bridged build's File, Open still opens its picker, whose stylesheet a stricter policy blocks (checked 2026-10-26).
+
 ## Action items
 
 1. [x] `files_router`, its OpenAPI document and its tests.

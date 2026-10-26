@@ -6,6 +6,7 @@
 import { Field } from "@base-ui/react/field";
 import type { Artifactr, ArtifactrV1, Thumb } from "@portalr/client";
 import {
+  type DragEvent,
   type FormEvent,
   type KeyboardEvent,
   type ReactElement,
@@ -349,6 +350,8 @@ export function InlineArtifact({
 export function Composer({
   onSend,
   disabled = false,
+  attach,
+  onFiles,
 }: {
   /**
    * Post the message; the text is cleared as it is sent, and comes back if the server refused
@@ -356,6 +359,10 @@ export function Composer({
    */
   onSend: (text: string) => Sent;
   disabled?: boolean;
+  /** A way to attach files, such as the page's uploader, at the start of the composer's row (portalr ADR-0080). */
+  attach?: ReactNode;
+  /** Files dropped on the composer, where the page takes them. */
+  onFiles?: (files: FileList) => void;
 }) {
   const [text, setText] = useState("");
   const box = useRef<HTMLTextAreaElement>(null);
@@ -400,8 +407,22 @@ export function Composer({
   }
   return (
     <form
-      className="flex flex-col gap-1 rounded-(--composer-radius) border border-edge bg-surface p-(--composer-pad) outline-offset-(--focus-offset) has-[textarea:focus-visible]:outline-(length:--focus-width) has-[textarea:focus-visible]:outline-focus"
+      className="flex flex-col gap-1 rounded-(--composer-radius) border border-edge bg-surface p-(--composer-pad) outline-offset-(--focus-offset) has-[textarea:focus-visible]:outline-(length:--focus-width) has-[textarea:focus-visible]:outline-focus data-over:border-accent"
       onSubmit={submit}
+      {...(onFiles && {
+        onDragOver: (event: DragEvent<HTMLFormElement>) => {
+          event.preventDefault();
+          event.currentTarget.dataset.over = "";
+        },
+        onDragLeave: (event: DragEvent<HTMLFormElement>) => {
+          delete event.currentTarget.dataset.over;
+        },
+        onDrop: (event: DragEvent<HTMLFormElement>) => {
+          event.preventDefault();
+          delete event.currentTarget.dataset.over;
+          onFiles(event.dataTransfer.files);
+        },
+      })}
     >
       <Field.Root className="flex flex-col" disabled={disabled}>
         <Field.Label className="sr-only">Message</Field.Label>
@@ -416,6 +437,7 @@ export function Composer({
         />
       </Field.Root>
       <div className="flex items-center justify-between gap-2 px-2.5 pb-1">
+        {attach}
         <span className="text-muted text-xs max-sm:hidden">
           Enter sends, Shift+Enter starts a new line
         </span>

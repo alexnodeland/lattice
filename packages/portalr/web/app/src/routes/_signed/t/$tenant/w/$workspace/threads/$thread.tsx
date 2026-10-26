@@ -158,6 +158,8 @@ function Chat() {
   const { threads, runs, proposals, artifacts } = snapshot.state;
   const thread = threads[id];
   const { posting, post } = usePosting(thread?.messages);
+  // Files dropped on the composer, for the uploader it holds (portalr ADR-0080).
+  const [dropped, setDropped] = useState<FileList | null>(null);
   // The people who posted without a name of their own, named when drawn: the stream's state
   // holds the actors as the server sent them, never an email.
   const names = usePeople(
@@ -439,10 +441,24 @@ function Chat() {
       ))}
       {snapshot.status !== "closed" && allowed.has("artifactr:post_message") && (
         <ComposerDock>
-          <Composer disabled={snapshot.status !== "live"} onSend={send} />
+          <Composer
+            disabled={snapshot.status !== "live"}
+            onSend={send}
+            onFiles={setDropped}
+            attach={
+              <Uploader
+                context={context}
+                tenant={tenant}
+                workspace={workspace}
+                thread={id}
+                attach
+                files={dropped}
+              />
+            }
+          />
         </ComposerDock>
       )}
-      {snapshot.status !== "closed" && (
+      {snapshot.status !== "closed" && !allowed.has("artifactr:post_message") && (
         <Uploader context={context} tenant={tenant} workspace={workspace} thread={id} />
       )}
     </section>

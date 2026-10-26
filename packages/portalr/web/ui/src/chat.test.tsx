@@ -911,3 +911,27 @@ test("a long message is folded past its first lines, and opens whole; Copy copie
   await expect.element(whole).not.toBeInTheDocument();
   expect(getComputedStyle(body).overflow).not.toBe("hidden");
 });
+
+test("the composer holds a way to attach at the start of its row, and hands dropped files to the page", async () => {
+  const onFiles = vi.fn();
+  const screen = await render(
+    <Composer onSend={sent()} onFiles={onFiles} attach={<button type="button">Attach</button>} />,
+  );
+  const attach = screen.getByRole("button", { name: "Attach" }).element();
+  const send = screen.getByRole("button", { name: "Send" }).element();
+  expect(attach.compareDocumentPosition(send) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  const form = attach.closest("form") as HTMLFormElement;
+  const files = new DataTransfer();
+  files.items.add(new File(["hello"], "notes.txt", { type: "text/plain" }));
+  form.dispatchEvent(
+    new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: files }),
+  );
+  expect(form.dataset.over).toBe("");
+  form.dispatchEvent(
+    new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: files }),
+  );
+  expect(onFiles).toHaveBeenCalledTimes(1);
+  const given = onFiles.mock.calls[0]?.[0] as FileList;
+  expect(given[0]?.name).toBe("notes.txt");
+  expect(form.dataset.over).toBeUndefined();
+});

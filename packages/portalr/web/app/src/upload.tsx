@@ -12,8 +12,11 @@
 
 import { newArtifactId, type UploadAnswer, uploadFile } from "@portalr/client";
 import {
+  Button,
   FileChooser,
   fileSize,
+  glyphs,
+  Icon,
   plainName,
   TextLink,
   type UploadItem,
@@ -152,12 +155,21 @@ export function Uploader({
   tenant,
   workspace,
   thread,
+  attach = false,
+  files = null,
 }: {
   context: Context;
   tenant: string;
   workspace: string;
   /** The thread the files are made in, if any. */
   thread?: string;
+  /**
+   * In a thread's composer: an Attach button that opens the chooser above the composer, and the
+   * list of what is going there, rather than a zone at the page's end (portalr ADR-0080).
+   */
+  attach?: boolean;
+  /** Files dropped on the composer, taken as chosen ones. */
+  files?: FileList | null;
 }) {
   const { data: offered } = useQuery(context.queries.files.uploads(tenant, workspace));
   const [items, setItems] = useState<readonly Queued[]>([]);
@@ -235,6 +247,25 @@ export function Uploader({
     }
   }, [items, offered, send]);
 
+  const [open, setOpen] = useState(false);
+  const chooser = useRef<HTMLDivElement>(null);
+  // This render's `choose`, for files dropped on the composer: each is chosen, and the list
+  // opens to show it going. Each drop is a new FileList, and the files it holds are taken once.
+  const choosing = useRef<(file: File) => void>(() => {});
+  useEffect(() => {
+    if (files && files.length > 0) {
+      for (const file of Array.from(files)) {
+        choosing.current(file);
+      }
+      setOpen(true);
+    }
+  }, [files]);
+  useEffect(() => {
+    if (open && attach) {
+      chooser.current?.querySelector<HTMLElement>("input[type=file]")?.focus();
+    }
+  }, [open, attach]);
+
   if (offered === undefined || !offered.allowed) {
     return null;
   }
@@ -286,6 +317,64 @@ export function Uploader({
     .sort(([a], [b]) => b - a)
     .map(([most, shown]) => `${shown.join(", ")}, up to ${fileSize(most)} each`)
     .join("; ");
+  const list = (
+    <UploadList
+      items={items}
+      onStop={() => stop.current?.abort()}
+      onRemove={(id) => setItems((now) => now.filter((item) => item.id !== id))}
+      onRetry={(id) =>
+        setItems((now) =>
+          now.map((item) =>
+            item.id === id
+              ? { ...item, state: "waiting", said: undefined, tries: item.tries + 1 }
+              : item,
+          ),
+        )
+      }
+    />
+  );
+  choosing.current = choose;
+  if (attach) {
+    return (
+      <div className="relative flex min-w-0 flex-col">
+        <Button
+          variant="ghost"
+          size="sm"
+          aria-expanded={open}
+          onClick={() => setOpen((was) => !was)}
+        >
+          <Icon icon={glyphs.fileUp} className="size-3.5" />
+          Attach
+          {items.length > 0 && (
+            <span className="sr-only">
+              , {items.length === 1 ? "1 file" : `${items.length} files`}
+            </span>
+          )}
+        </Button>
+        {open && (
+          <div
+            ref={chooser}
+            className="absolute bottom-full left-0 z-10 mb-2 flex w-[min(28rem,80vw)] flex-col gap-3 rounded-(--card-radius) border border-line bg-surface p-(--card-pad) shadow-(--popover-shadow)"
+          >
+            <FileChooser
+              label="Add files to this thread"
+              hint={
+                on.length === 0
+                  ? "No app for files is on in this workspace: an admin can switch one on in its integrations."
+                  : `${sizes}.`
+              }
+              accept={extensions.join(",")}
+              multiple
+              disabled={on.length === 0}
+              onFile={choose}
+            />
+            {list}
+          </div>
+        )}
+        {!open && items.length > 0 && <div className="mt-2">{list}</div>}
+      </div>
+    );
+  }
   return (
     <div className="flex min-w-0 flex-col gap-3">
       <FileChooser
@@ -300,20 +389,7 @@ export function Uploader({
         disabled={on.length === 0}
         onFile={choose}
       />
-      <UploadList
-        items={items}
-        onStop={() => stop.current?.abort()}
-        onRemove={(id) => setItems((now) => now.filter((item) => item.id !== id))}
-        onRetry={(id) =>
-          setItems((now) =>
-            now.map((item) =>
-              item.id === id
-                ? { ...item, state: "waiting", said: undefined, tries: item.tries + 1 }
-                : item,
-            ),
-          )
-        }
-      />
+      {list}
       <p role="status" className="sr-only">
         {announced}
       </p>

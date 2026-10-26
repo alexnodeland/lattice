@@ -28,15 +28,24 @@ real_uv=$(command -v uv)
 mkdir -p "$scratch/bin" "$scratch/stackr"
 cp packages/stackr/copier.yml "$scratch/stackr/"
 # docker, with a `stackr` PostgreSQL volume where FAKE_VOLUME says, which takes the password
-# FAKE_PASSWORD, given to psql in its environment.
+# FAKE_PASSWORD, given to psql in its environment; FAKE_PSQL says what else psql answers, and
+# FAKE_PG_UP=fail fails PostgreSQL's start. It stands for the logic alone: that a wrong password
+# fails over the container's own address, and passes on its loopback, which the image trusts, was
+# checked against a real PostgreSQL, which this check can't start.
 cat >"$scratch/bin/docker" <<'FAKE'
 #!/usr/bin/env bash
 echo "docker $*" >>"$CALLS"
 [[ $* == "context show" ]] && echo default
 [[ $1 == volume && -n ${FAKE_VOLUME:-} ]] && echo stackr_postgres-data
+[[ $* == *"up --detach --wait postgres" && ${FAKE_PG_UP:-} == fail ]] && exit 1
 if [[ $* == *" exec "*psql* ]]; then
-  [[ $* == *"-e PGPASSWORD "* && ${PGPASSWORD:-} == "${FAKE_PASSWORD:-}" ]]
-  exit
+  if [[ -n ${FAKE_PSQL:-} ]]; then
+    echo "$FAKE_PSQL" >&2
+    exit 2
+  fi
+  [[ $* == *"-e PGPASSWORD "* && ${PGPASSWORD:-} == "${FAKE_PASSWORD:-}" ]] && exit 0
+  echo 'psql: error: FATAL:  password authentication failed for user "postgres"' >&2
+  exit 2
 fi
 exit 0
 FAKE
@@ -58,7 +67,7 @@ if [[ -n \${FAKE_NO_COPIER:-} && \$* == *"import copier"* && ! -e "$scratch/sync
 fi
 case "\$*" in
   *"python -c"*) exec "$real_uv" "\$@" ;;
-  sync*) echo "uv \$*" >>"\$CALLS"; touch "$scratch/synced"; exit 0 ;;
+  sync*) echo "uv \$*" >>"\$CALLS"; [[ -z \${FAKE_SYNC:-} ]] || exit 1; touch "$scratch/synced"; exit 0 ;;
 esac
 echo "uv \$*" >>"\$CALLS"
 case "\$*" in
@@ -187,6 +196,9 @@ fresh && rm -f "$scratch/synced"
 check "up installs stackr's dev group where Copier isn't" up env FAKE_NO_COPIER=1
 check "with uv, beside what .venv has" grep -qx "uv sync --quiet --locked --inexact --package stackr --only-group dev" "$scratch/calls"
 check "and runs no make install" refused grep -q "make .*install" "$scratch/calls"
+fresh && rm -f "$scratch/synced"
+check "up stops when stackr's dev group can't be installed" refused up env FAKE_NO_COPIER=1 FAKE_SYNC=fail
+check "and says so" said "couldn't install stackr's dev group (offline?)"
 
 # up, with a `stackr` PostgreSQL volume from an earlier stack, and .env's password for it.
 volume_up() {
@@ -194,9 +206,16 @@ volume_up() {
 }
 check "up refuses a stack volume made with another password" refused volume_up env FAKE_PASSWORD=other
 check "and says the two ways out" said "use the .env that made it, or \`make dev-reset\`"
+check "and says the PostgreSQL left running stops with make dev-down" said "\`make dev-down\` stops it"
 check "having started PostgreSQL alone" test "$(grep -c "up --detach --wait postgres$" "$scratch/calls") $(grep -c "make .* up " "$scratch/calls")" = "1 0"
 check "and never passed the password as an argument" refused grep -q pw-made-up "$scratch/calls"
+check "signing in over the container's own address, not its loopback, which the image trusts" \
+  test "$(grep -c 'hostname -i' "$scratch/calls") $(grep -c 'host 127.0.0.1' "$scratch/calls")" = "1 0"
 check "up takes a stack volume its password opens" volume_up env FAKE_PASSWORD=pw-made-up
+check "up says what psql said, when it isn't the password" refused volume_up env FAKE_PSQL="could not translate host name"
+check "and doesn't blame the password" test "$(grep -c "could not translate host name" "$scratch/out") $(grep -c "another POSTGRES_ADMIN_PASSWORD" "$scratch/out")" = "1 0"
+check "up stops when PostgreSQL doesn't start" refused volume_up env FAKE_PG_UP=fail
+check "and says so" said "PostgreSQL didn't start"
 
 fresh && up
 dev postgres scripts/dev down >/dev/null 2>&1

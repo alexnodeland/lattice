@@ -13,7 +13,6 @@ import {
   Alert,
   ASK_FORM,
   ASK_USER,
-  Button,
   ButtonLink,
   Composer,
   ComposerDock,
@@ -26,8 +25,8 @@ import {
   Questions,
   Request,
   RunFailed,
-  RunStatus,
   RunSteps,
+  RunStrip,
   rendererFor,
   Streaming,
 } from "@portalr/ui";
@@ -55,6 +54,7 @@ import { Connection, useStream, useWorkspace } from "../../../../../../../worksp
 const ACTIONS = [
   "artifactr:read_threads",
   "artifactr:post_message",
+  "artifactr:stop_run",
   "grantr:grant",
   "grantr:revoke",
   "grantr:restrict",
@@ -286,11 +286,6 @@ function Chat() {
         id="thread"
         actions={
           <>
-            {latestRequest !== undefined && (
-              <Button variant="secondary" size="sm" onClick={toQuestion}>
-                Go to the question
-              </Button>
-            )}
             {(allowed.has("grantr:grant") || allowed.has("grantr:restrict")) && (
               <CatchBoundary
                 getResetKey={() => id}
@@ -402,7 +397,14 @@ function Chat() {
       </Messages>
       {active.map((run) => (
         <div key={run.id} className="flex flex-col gap-2">
-          <RunStatus status={run.status} />
+          <RunStrip
+            run={run}
+            {...(run.status === "running" &&
+              allowed.has("artifactr:stop_run") && {
+                onStop: () => stream.send({ type: "stop_run", run_id: run.id }),
+              })}
+            {...(run.requests.length > 0 && { onQuestion: toQuestion })}
+          />
           {[
             ...run.requests
               .filter((request) => request.tool_name !== ASK_USER)

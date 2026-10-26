@@ -66,6 +66,7 @@ export {
   proposedOn,
   Request,
   RunStatus,
+  RunStrip,
   Streaming,
   Thumbs,
 } from "./chat";

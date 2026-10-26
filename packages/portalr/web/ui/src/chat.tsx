@@ -874,6 +874,68 @@ const RUN_STATUS: Record<Artifactr.Run["status"], readonly [Tone, string]> = {
   stopped: ["stopped", "Stopped"],
 };
 
+/** Minutes and seconds since `from`, as "1:05", once the run has said when it started. */
+function elapsed(from: string | undefined, now: Date): string | null {
+  if (from === undefined) {
+    return null;
+  }
+  const seconds = Math.max(0, Math.floor((now.getTime() - new Date(from).getTime()) / 1000));
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
+/**
+ * The strip over a turn under way (portalr ADR-0080): how it is going, for how long, and what
+ * can be done about it: Stop while it works, where the reader may; and the way to its question
+ * while it waits.
+ */
+export function RunStrip({
+  run,
+  onStop,
+  onQuestion,
+  now,
+}: {
+  run: Artifactr.Run;
+  /** Stop it, where the reader may; none hides Stop. */
+  onStop?: () => Sent;
+  /** Go to the question it waits on; none hides the way. */
+  onQuestion?: () => void;
+  /** The moment the elapsed time is counted to, pinned by a test; the strip's own clock otherwise. */
+  now?: Date;
+}) {
+  const active = run.status === "running" || run.status === "paused";
+  const [tick, setTick] = useState(() => new Date());
+  useEffect(() => {
+    if (!active || now !== undefined) {
+      return;
+    }
+    const timer = setInterval(() => setTick(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, [active, now]);
+  const since = elapsed(run.startedAt, now ?? tick);
+  return (
+    <fieldset
+      aria-label="This turn"
+      className="m-0 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-(--card-radius) border border-line bg-surface px-3 py-2"
+    >
+      <RunStatus status={run.status} />
+      {since !== null && active && (
+        <span className={cn(TYPE.note, "tabular-nums")}>
+          <span className="sr-only">for </span>
+          {since}
+        </span>
+      )}
+      <span className="ml-auto flex items-center gap-2">
+        {run.status === "paused" && onQuestion && (
+          <Button variant="secondary" size="sm" onClick={onQuestion}>
+            Go to the question
+          </Button>
+        )}
+        {run.status === "running" && onStop && <CommandButton onSend={onStop}>Stop</CommandButton>}
+      </span>
+    </fieldset>
+  );
+}
+
 /** How a run is going, announced as it changes. */
 export function RunStatus({ status }: { status: Artifactr.Run["status"] }) {
   const [tone, words] = RUN_STATUS[status];

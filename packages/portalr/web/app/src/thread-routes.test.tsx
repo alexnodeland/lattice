@@ -372,3 +372,24 @@ test("a thread marks itself, with its chat and its sharing, to be blocked whole 
   await expect.element(log.getByText("Planned for next week.")).toBeVisible();
   expect(log.element().closest('[data-portalr-replay="block"]')).not.toBeNull();
 });
+
+test("a turn under way has a strip with Stop, which asks the run to stop", async () => {
+  const sent: { type: string; run_id?: string }[] = [];
+  const working = LOG.slice(
+    0,
+    LOG.findIndex((entry) => entry.event.type === "run_ended" && entry.event.run_id === "run_2"),
+  );
+  const { screen } = await open(
+    "/t/acme/w/notes/threads/thr_1",
+    serve,
+    (command) => {
+      sent.push(command);
+      return null;
+    },
+    { artifactrLog: working },
+  );
+  const strip = screen.getByRole("group", { name: "This turn" });
+  await expect.element(strip.getByRole("status")).toHaveTextContent("Working");
+  await strip.getByRole("button", { name: "Stop" }).click();
+  expect(sent.at(-1)).toMatchObject({ type: "stop_run", run_id: "run_2" });
+});

@@ -12,6 +12,7 @@ import {
   proposedOn,
   Request,
   RunStatus,
+  RunStrip,
   Streaming,
   Thumbs,
   unhidden,
@@ -956,4 +957,43 @@ test("a page's actions menu holds thumbs as checked items, then asks why", async
   await screen.getByRole("textbox", { name: "Why? (optional)" }).fill("It missed the date");
   await screen.getByRole("button", { name: "Add" }).click();
   expect(onThumbs).toHaveBeenLastCalledWith(false, "It missed the date");
+});
+
+const run = (status: Artifactr.Run["status"], requests: ArtifactrV1.DeferredRequest[] = []) =>
+  ({
+    id: "run_1",
+    threadId: "t_1",
+    status,
+    tools: {},
+    text: "",
+    requests,
+    answered: [],
+    started: 1,
+    startedAt: "2026-10-20T00:00:00Z",
+    ended: null,
+    error: null,
+  }) as unknown as Artifactr.Run;
+
+test("the strip over a turn says how it goes, for how long, and offers Stop while it works", async () => {
+  const onStop = sent();
+  const now = new Date("2026-10-20T00:01:05Z");
+  const screen = await render(<RunStrip run={run("running")} onStop={onStop} now={now} />);
+  const strip = screen.getByRole("group", { name: "This turn" });
+  await expect.element(strip.getByRole("status")).toHaveTextContent("Working");
+  await expect.element(strip.getByText("for 1:05")).toBeVisible();
+  await strip.getByRole("button", { name: "Stop" }).click();
+  expect(onStop).toHaveBeenCalledOnce();
+  expect(strip.getByRole("button", { name: "Go to the question" }).elements()).toHaveLength(0);
+});
+
+test("the strip over a paused turn offers the way to its question, and no Stop", async () => {
+  const onQuestion = vi.fn();
+  const screen = await render(
+    <RunStrip run={run("paused")} onStop={sent()} onQuestion={onQuestion} now={new Date()} />,
+  );
+  const strip = screen.getByRole("group", { name: "This turn" });
+  await expect.element(strip.getByRole("status")).toHaveTextContent("Waiting for you");
+  expect(strip.getByRole("button", { name: "Stop" }).elements()).toHaveLength(0);
+  await strip.getByRole("button", { name: "Go to the question" }).click();
+  expect(onQuestion).toHaveBeenCalledOnce();
 });

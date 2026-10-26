@@ -8,6 +8,7 @@ import {
   Composer,
   Message,
   Messages,
+  ModeSwitch,
   ProposalCard,
   proposedOn,
   Request,
@@ -1020,4 +1021,14 @@ test("away from the end, the way back to the latest is offered once more arrives
   await expect.element(jump).not.toBeInTheDocument();
   expect(document.activeElement?.textContent).toBe("Message 7");
   expect(window.scrollY).toBeGreaterThan(0);
+});
+
+test("the mode switch sends the mode chosen, and says when it is refused", async () => {
+  const onChange = sent("refused");
+  const screen = await render(<ModeSwitch mode="edit" onChange={onChange} />);
+  const group = screen.getByRole("radiogroup", { name: "Mode" });
+  await expect.element(group.getByRole("radio", { name: "Agent edits" })).toBeChecked();
+  await group.getByRole("radio", { name: "Agent proposes" }).click();
+  expect(onChange).toHaveBeenCalledWith("suggest");
+  await expect.element(screen.getByRole("alert")).toBeVisible();
 });

@@ -32,6 +32,7 @@ import { Markdown } from "./markdown";
 import { Menu, type MenuItem } from "./menu";
 import { Questions, type QuestionsAnswer } from "./questions";
 import { SchemaForm } from "./schema-form";
+import { type Segment, SegmentedFilter } from "./segmented-filter";
 import { type Sent, Unsent, useSending } from "./sending";
 import { FOLDED_LINES, SourceView } from "./source-view";
 import { StatusBadge, type Tone } from "./status-badge";
@@ -989,6 +990,39 @@ export function RunStrip({
     </fieldset>
   );
 }
+
+/**
+ * The thread's mode in its head (portalr ADR-0080): whether the agent edits artifacts itself or
+ * proposes changes for someone to accept, switched where the reader may.
+ */
+export function ModeSwitch({
+  mode,
+  onChange,
+  disabled = false,
+}: {
+  mode: Artifactr.Thread["mode"];
+  onChange: (mode: Artifactr.Thread["mode"]) => Sent;
+  disabled?: boolean;
+}) {
+  const { pending, unsent, send } = useSending();
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <SegmentedFilter
+        label="Mode"
+        value={mode}
+        disabled={disabled || pending}
+        segments={MODES}
+        onValueChange={(chosen) => void send(() => onChange(chosen))}
+      />
+      <Unsent reason={unsent} />
+    </div>
+  );
+}
+
+const MODES: readonly Segment<Artifactr.Thread["mode"]>[] = [
+  { value: "edit", label: "Agent edits" },
+  { value: "suggest", label: "Agent proposes" },
+];
 
 /** How a run is going, announced as it changes. */
 export function RunStatus({ status }: { status: Artifactr.Run["status"] }) {

@@ -406,3 +406,24 @@ test("a turn under way has a strip with Stop, which asks the run to stop", async
   await strip.getByRole("button", { name: "Stop" }).click();
   expect(sent.at(-1)).toMatchObject({ type: "stop_run", run_id: "run_2" });
 });
+
+test("the thread's mode is switched in its head, where the reader may", async () => {
+  const sent: { type: string; thread_id?: string; mode?: string }[] = [];
+  const { screen } = await open(
+    "/t/acme/w/notes/threads/thr_1",
+    serve,
+    (command) => {
+      sent.push(command);
+      return null;
+    },
+    { artifactrLog: LOG },
+  );
+  const mode = screen.getByRole("radiogroup", { name: "Mode" });
+  await expect.element(mode.getByRole("radio", { name: "Agent edits" })).toBeChecked();
+  await mode.getByRole("radio", { name: "Agent proposes" }).click();
+  expect(sent.at(-1)).toMatchObject({
+    type: "set_thread_mode",
+    thread_id: "thr_1",
+    mode: "suggest",
+  });
+});

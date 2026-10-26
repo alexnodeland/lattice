@@ -19,6 +19,7 @@ import {
   CRUMB,
   Message,
   Messages,
+  ModeSwitch,
   NotFound as NotFoundPage,
   PageHeader,
   ProposalCard,
@@ -55,6 +56,7 @@ const ACTIONS = [
   "artifactr:read_threads",
   "artifactr:post_message",
   "artifactr:stop_run",
+  "artifactr:set_thread_mode",
   "grantr:grant",
   "grantr:revoke",
   "grantr:restrict",
@@ -286,6 +288,13 @@ function Chat() {
         id="thread"
         actions={
           <>
+            {snapshot.status !== "closed" && allowed.has("artifactr:set_thread_mode") && (
+              <ModeSwitch
+                mode={thread.mode}
+                disabled={snapshot.status !== "live"}
+                onChange={(mode) => stream.send({ type: "set_thread_mode", thread_id: id, mode })}
+              />
+            )}
             {(allowed.has("grantr:grant") || allowed.has("grantr:restrict")) && (
               <CatchBoundary
                 getResetKey={() => id}

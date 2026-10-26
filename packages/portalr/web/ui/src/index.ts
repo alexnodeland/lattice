@@ -62,6 +62,7 @@ export {
   InlineArtifact,
   Message,
   Messages,
+  ModeSwitch,
   ProposalCard,
   proposedOn,
   Request,

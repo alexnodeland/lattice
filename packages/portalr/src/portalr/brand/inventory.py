@@ -301,7 +301,7 @@ COMPONENTS: tuple[Group, ...] = (
         ),
     ),
     Group(
-        "The frame's navigation: a nav link's corners and padding, its count's pill, the "
+        "The frame's navigation: a nav link's corners and padding, its count's corners, the "
         "header's triggers (the switcher, the account menu, the home link), the room a narrow "
         "window's pinned header takes, which a scroll stops below, the rail's width, and the "
         "drawer's width, shadow and slide.",

@@ -1,6 +1,8 @@
 import { useMe } from "@portalr/client";
 import {
   Ago,
+  ASK_FORM,
+  ASK_USER,
   Button,
   Composer,
   EmptyState,
@@ -10,6 +12,8 @@ import {
   RowLink,
   Rows,
   RunStatus,
+  SectionTitle,
+  StatusBadge,
   TextField,
 } from "@portalr/ui";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
@@ -72,6 +76,19 @@ function Threads() {
   };
   const [naming, setNaming] = useState(false);
   const live = snapshot.status === "live";
+  // What waits on a person across the workspace's threads (portalr ADR-0080): calls to approve
+  // first, the riskier before the rest, then questions; each opens its thread at the request.
+  const needed = Object.values(snapshot.state.runs)
+    .filter((run) => run.status === "paused")
+    .flatMap((run) => run.requests.map((request) => ({ request, thread: run.threadId })))
+    .map(({ request, thread }) => {
+      const question = request.tool_name === ASK_USER || request.tool_name === ASK_FORM;
+      const risk = request.review?.risk;
+      const rank = question ? 3 : risk === "network" ? 0 : risk === undefined ? 2 : 1;
+      const title = snapshot.state.threads[thread]?.title || "Untitled";
+      return { request, thread, title, rank, question, risk };
+    })
+    .sort((a, b) => a.rank - b.rank);
   // Each thread's run that is going, or waits on someone, said beside it.
   const going = new Map(
     Object.values(snapshot.state.runs)
@@ -106,6 +123,39 @@ function Threads() {
       />
       {starting}
       <Connection snapshot={snapshot} waiting="the workspace" />
+      {needed.length > 0 && (
+        <section aria-labelledby="needs-you" className="flex flex-col gap-3">
+          <SectionTitle id="needs-you">Needs you</SectionTitle>
+          <Rows label="Needs you">
+            {needed.map(({ request, thread, title, question, risk }) => (
+              <Row
+                key={request.tool_call_id}
+                name={
+                  <RowLink
+                    render={
+                      <Link
+                        to="/t/$tenant/w/$workspace/threads/$thread"
+                        params={{ tenant, workspace, thread }}
+                        hash={`request-${request.tool_call_id}`}
+                      />
+                    }
+                  >
+                    {question ? "A question" : `Approve ${request.tool_name}`}
+                  </RowLink>
+                }
+                meta={`in ${title}`}
+                end={
+                  risk !== undefined && (
+                    <StatusBadge tone="retrying">
+                      {risk === "network" ? "Downloads from the internet" : "Runs code"}
+                    </StatusBadge>
+                  )
+                }
+              />
+            ))}
+          </Rows>
+        </section>
+      )}
       {live && listed.length === 0 && (
         <EmptyState title="No threads yet">
           Write to the agent above to start one, or name one first.

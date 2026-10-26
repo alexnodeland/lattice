@@ -295,6 +295,19 @@ test("a question waiting when the thread is opened leaves the focus be, and is r
   expect(document.activeElement?.closest("#request-q1")).not.toBeNull();
 });
 
+test("opened at a request, as from Needs you, the page goes to it once the thread is shown", async () => {
+  const waiting = LOG.slice(
+    0,
+    LOG.findIndex((entry) => entry.event.type === "deferred_answered"),
+  );
+  const { screen } = await open("/t/acme/w/notes/threads/thr_1#request-q1", serve, () => null, {
+    artifactrLog: waiting,
+  });
+  await expect.element(screen.getByRole("radio", { name: "This week" })).toBeVisible();
+  await expect.poll(() => document.activeElement?.closest("#request-q1")).not.toBeNull();
+  expect(document.activeElement?.getAttribute("aria-label")).toBe("The agent asks");
+});
+
 test("another thread's question waiting when its page opens leaves the focus be too", async () => {
   const waiting = LOG.slice(
     0,

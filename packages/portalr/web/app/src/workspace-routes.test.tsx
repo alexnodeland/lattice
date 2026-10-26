@@ -86,3 +86,65 @@ test("a thread refused as it is written keeps the words in the composer", async 
   await expect.element(message).toHaveValue("Plan the launch");
   expect(router.state.location.pathname).toBe("/t/acme/w/notes");
 });
+
+test("what waits on a person across the workspace is listed first, approvals before questions, each opening its thread at the request", async () => {
+  const at = (seq: number, actor: unknown, event: unknown) => ({
+    type: "event",
+    seq,
+    id: `evt_${seq}`,
+    ts: "2026-10-20T00:00:00Z",
+    workspace_id: "notes",
+    actor,
+    event,
+  });
+  const alice = { kind: "user", id: "alice" };
+  const agent = (run: string) => ({ kind: "agent", id: "agent", run_id: run });
+  const log = [
+    at(1, alice, { type: "thread_created", thread_id: "thr_1", title: "Launch" }),
+    at(2, alice, { type: "thread_created", thread_id: "thr_2", title: "Invoices" }),
+    at(3, agent("run_1"), { type: "run_started", run_id: "run_1", thread_id: "thr_1" }),
+    at(4, agent("run_1"), {
+      type: "run_paused",
+      run_id: "run_1",
+      thread_id: "thr_1",
+      requests: [
+        {
+          kind: "question",
+          tool_call_id: "q1",
+          tool_name: "ask_user",
+          args: { questions: [{ question: "When?", options: [{ label: "Now" }] }] },
+        },
+      ],
+    }),
+    at(5, agent("run_2"), { type: "run_started", run_id: "run_2", thread_id: "thr_2" }),
+    at(6, agent("run_2"), {
+      type: "run_paused",
+      run_id: "run_2",
+      thread_id: "thr_2",
+      requests: [
+        {
+          kind: "approval",
+          tool_call_id: "a1",
+          tool_name: "run_script",
+          args: {},
+          review: { app: "Blender", runs: "It runs a script.", risk: "network" },
+        },
+      ],
+    }),
+  ];
+  const { screen } = await open(
+    "/t/acme/w/notes",
+    async (_request, path) => (path === FLAGS ? Response.json({}) : undefined),
+    () => null,
+    { artifactrLog: log },
+  );
+  const needed = screen.getByRole("list", { name: "Needs you" });
+  const rows = needed.getByRole("listitem");
+  await expect
+    .element(rows.nth(0))
+    .toHaveTextContent("Approve run_scriptin InvoicesDownloads from the internet");
+  await expect.element(rows.nth(1)).toHaveTextContent("A questionin Launch");
+  await expect
+    .element(rows.nth(0).getByRole("link"))
+    .toHaveAttribute("href", "/t/acme/w/notes/threads/thr_2#request-a1");
+});

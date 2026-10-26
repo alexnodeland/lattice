@@ -35,7 +35,7 @@ import {
   useSuspenseQueries,
   useSuspenseQuery,
 } from "@tanstack/react-query";
-import { CatchBoundary, createFileRoute, Link } from "@tanstack/react-router";
+import { CatchBoundary, createFileRoute, Link, useRouterState } from "@tanstack/react-router";
 import { type ReactNode, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { author, unnamedPeople } from "../../../../../../../author";
 import { usePosting } from "../../../../../../../posting";
@@ -194,6 +194,14 @@ function Chat() {
       });
     }
   }, [snapshot.status, runs, id, atLoad]);
+  // Opened at a request, as from Needs you (portalr ADR-0080): once the thread is shown live, the
+  // page goes to it, as Go to the question does.
+  const hash = useRouterState({ select: (state) => state.location.hash });
+  useEffect(() => {
+    if (atLoad?.id === id && hash.startsWith("request-")) {
+      toRequest(hash.slice("request-".length));
+    }
+  }, [atLoad, id, hash]);
   if (thread === undefined) {
     return snapshot.status === "live" ? (
       <NotFoundPage
@@ -264,15 +272,7 @@ function Chat() {
     latestRequest !== undefined &&
     atLoad?.id === id &&
     !atLoad.waiting.has(latestRequest.tool_call_id);
-  // To the question's own named part, such as "The agent asks", or else to where it is.
-  const toQuestion = () => {
-    const at = document.getElementById(`request-${latestRequest?.tool_call_id}`);
-    const named = at?.querySelector<HTMLElement>("[aria-label], [aria-labelledby]") ?? at;
-    if (named && !named.hasAttribute("tabindex")) {
-      named.tabIndex = -1;
-    }
-    named?.focus();
-  };
+  const toQuestion = () => toRequest(latestRequest?.tool_call_id);
 
   return (
     <section
@@ -631,4 +631,14 @@ function Sharing({
       )}
     </div>
   );
+}
+
+/** To a request's own named part, such as "The agent asks", or else to where it is. */
+function toRequest(toolCallId: string | undefined) {
+  const at = document.getElementById(`request-${toolCallId}`);
+  const named = at?.querySelector<HTMLElement>("[aria-label], [aria-labelledby]") ?? at;
+  if (named && !named.hasAttribute("tabindex")) {
+    named.tabIndex = -1;
+  }
+  named?.focus();
 }

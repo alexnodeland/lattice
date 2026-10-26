@@ -42,7 +42,7 @@ When("they invite someone new", async ({ page, made }) => {
   const person = fresh(made, "invitee");
   await page.getByRole("button", { name: "Invite…" }).click();
   await page.getByRole("textbox", { name: "Email" }).fill(`${person}@portalr.test`);
-  await page.getByRole("button", { name: "Invite" }).click();
+  await page.getByRole("button", { name: "Invite", exact: true }).click();
   await expect(page.getByRole("status")).toContainText(`${person}@portalr.test is invited`);
 });
 
@@ -73,7 +73,7 @@ When("they issue it a key", async ({ page, made }) => {
     page.getByRole("combobox", { name: "Service principal" }),
     madeAs(made, "principal"),
   );
-  await page.getByRole("button", { name: "Issue" }).click();
+  await page.getByRole("button", { name: "Issue", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("Copy it now");
   await expect(page.getByLabel("The key")).not.toHaveValue("");
 });

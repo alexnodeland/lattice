@@ -8,7 +8,8 @@ import { FEEDBACK, RING } from "./states";
 /**
  * How a disclosure's trigger looks (portalr ADR-0063):
  * - `quiet`, a muted line such as "Show the figures";
- * - `link`, in the working colour, underlined on hover, for a part that reads as a way on;
+ * - `link`, in the working colour, underlined on hover, for a part that reads as a way on, as a
+ *   proposal's Compare does (`native-proposal.tsx`): the one text-link look a disclosure may take;
  * - `block`, the whole width of what it opens, laid out by its summary, as a card's header is.
  */
 const LOOK = {

@@ -42,7 +42,8 @@ When("they choose {string}", async ({ page }, label: string) => {
     .getByRole("radio", { name: new RegExp(`^${label}( Recommended)?$`) })
     .or(asked.getByRole("checkbox", { name: label, exact: true }));
   await asked.waitFor();
-  if ((await option.count()) === 0) {
+  // On to the step that holds it, however many steps on it is; a set has a handful at most.
+  for (let step = 0; step < 8 && (await option.count()) === 0; step += 1) {
     await asked.getByRole("button", { name: "Next" }).click();
   }
   await option.click();
@@ -56,7 +57,7 @@ When("they write {string}", async ({ page }, words: string) => {
 When("they answer", async ({ page }) => {
   const asked = page.getByRole("form", { name: "The agent asks" });
   const next = asked.getByRole("button", { name: "Next" });
-  while ((await next.count()) > 0) {
+  for (let step = 0; step < 8 && (await next.count()) > 0; step += 1) {
     await next.click();
   }
   await asked.getByRole("button", { name: "Answer" }).click();

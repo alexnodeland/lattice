@@ -106,7 +106,7 @@ export function ButtonLink({
         "data-button": "",
         className: cn(
           buttonLook(variant, big),
-          "relative aria-[current=page]:font-semibold aria-[current=page]:text-fg aria-[current=page]:before:absolute aria-[current=page]:before:inset-y-1 aria-[current=page]:before:left-0 aria-[current=page]:before:w-0.5 aria-[current=page]:before:rounded-full aria-[current=page]:before:bg-accent aria-[current=page]:before:content-['']",
+          "relative aria-[current=page]:font-semibold aria-[current=page]:text-fg aria-[current=page]:before:absolute aria-[current=page]:before:inset-y-1 aria-[current=page]:before:start-0 aria-[current=page]:before:w-0.5 aria-[current=page]:before:rounded-full aria-[current=page]:before:bg-accent aria-[current=page]:before:content-['']",
           className,
         ),
       } as ComponentProps<"a">,

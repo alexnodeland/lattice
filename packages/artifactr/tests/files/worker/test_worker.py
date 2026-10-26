@@ -84,13 +84,13 @@ async def connect() -> AsyncIterator[Connect]:
 
 
 def wordcraft(cli: Path, limits: Limits = LIMITS) -> Subprocess:
-    return Subprocess(cli, version="0.7.0", limit=limits.files, launcher=limits.launcher())
+    return Subprocess(cli, version="0.11.0", limit=limits.files, launcher=limits.launcher())
 
 
 async def test_it_is_the_app_the_worker_runs_in_its_image(connect: Connect, tmp_path: Path) -> None:
     app: App = await connect(wordcraft(stand_in(tmp_path)), build="sha256:abc")
-    assert (app.name, app.version, app.build) == ("wordcraft", "0.7.0", "sha256:abc")
-    assert (app.talk, app.integration) == ("save", "files:wordcraft")
+    assert (app.name, app.version, app.build) == ("wordcraft", "0.11.0", "sha256:abc")
+    assert (app.talk, app.integration) == ("bridged", "files:wordcraft")
 
 
 async def test_its_calls_are_the_apps_own(connect: Connect, tmp_path: Path) -> None:
@@ -351,7 +351,7 @@ def test_the_environment_says_which_wordcraft_it_runs(tmp_path: Path) -> None:
         {
             "WORKER_TOKEN": TOKEN,
             "WORKER_CLI": str(stand_in(tmp_path)),
-            "WORKER_VERSION": "0.7.0",
+            "WORKER_VERSION": "0.11.0",
             "WORKER_BUILD": "sha256:abc",
             "WORKER_LIMITS": '{"edit": 5}',
         }
@@ -379,7 +379,7 @@ async def test_the_environment_says_which_app_it_runs_under_the_limits(
 
 
 def test_a_short_token_or_wordcrafts_old_names_are_refused(tmp_path: Path) -> None:
-    cli = {"WORKER_CLI": str(stand_in(tmp_path)), "WORKER_VERSION": "0.7.0"}
+    cli = {"WORKER_CLI": str(stand_in(tmp_path)), "WORKER_VERSION": "0.11.0"}
     with pytest.raises(ValueError, match="at least 32 characters"):
         worker_from_environment({**cli, "WORKER_TOKEN": "s3cret"})
     with pytest.raises(ValueError, match="are now WORKER_CLI and WORKER_VERSION"):
@@ -388,7 +388,7 @@ def test_a_short_token_or_wordcrafts_old_names_are_refused(tmp_path: Path) -> No
 
 def test_empty_limits_are_the_defaults(tmp_path: Path) -> None:
     environ = {"WORKER_TOKEN": TOKEN, "WORKER_CLI": str(stand_in(tmp_path)), "WORKER_LIMITS": ""}
-    assert worker_from_environment({**environ, "WORKER_VERSION": "0.7.0"}).routes
+    assert worker_from_environment({**environ, "WORKER_VERSION": "0.11.0"}).routes
 
 
 def test_a_worker_runs_every_app_whose_files_lattice_keeps_trusting_only_its_own_confinement() -> (
@@ -503,7 +503,7 @@ def test_the_module_serves_the_worker_on_loopback(
     monkeypatch.setattr(uvicorn, "run", lambda _app, host, port, **_: served.append((host, port)))
     monkeypatch.setenv("WORKER_TOKEN", TOKEN)
     monkeypatch.setenv("WORKER_CLI", str(stand_in(tmp_path)))
-    monkeypatch.setenv("WORKER_VERSION", "0.7.0")
+    monkeypatch.setenv("WORKER_VERSION", "0.11.0")
     monkeypatch.delitem(sys.modules, "artifactr.files.worker.__main__")
     runpy.run_module("artifactr.files.worker", run_name="__main__")
     assert served == [("127.0.0.1", 8080)]

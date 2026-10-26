@@ -22,7 +22,7 @@ The application template's questions are in stackr's `copier.yml`, which the `co
 | `portal` | bool | yes |  | `access == 'grantr'` | Include portalr (an app UI to chat with the agents and see their work, and an admin UI for access, feedback, traces and spend)? It signs people in through a Supabase project, which the application is told of in PORTAL_SUPABASE_URL and PORTAL_SUPABASE_KEY: without one it is off. It adds a Bun build and a network fetch to the image. |
 | `hosting` | str | `none` | `none`, `host` | always | Where it is hosted, beside stackr's recipe for it (stackr RFC-0004) |
 | `python_version` | str | `3.12` | `3.12`, `3.13`, `3.14` | always | The Python version it runs on |
-| `app_port` | int | `8800` |  | always | The port it is published on, on this machine; the next four are its mini apps' and editors' |
+| `app_port` | int | `8800` |  | always | The port it is published on, on this machine; the next five are its mini apps' and editors' |
 
 <!-- end generated -->
 
@@ -46,7 +46,7 @@ These are computed from the answers, apart from `libraries_path`, which `scripts
 | `use_files` | bool | `{{ libraries in ['artifactr', 'both'] and native_files }}` |
 | `use_diagrams` | bool | `{{ use_files and diagrams }}` |
 | `use_integrations` | bool | `{{ use_ui or use_files or use_tracker }}` |
-| `crafts` | yaml | `{'wordcraft': {'version': '0.7.0', 'type': 'WordDocument'}, 'gridcraft': {'version': '0.8.0', 'type': 'Workbook', 'editor': 2}, 'deckcraft': {'version': '0.7.0', 'type': 'Presentation'}, 'pdfcraft': {'version': '0.8.0', 'type': 'PdfDocument', 'editor': 3}, 'cadcraft': {'version': '0.8.0', 'type': 'Drawing', 'editor': 4}, 'photocraft': {'version': '0.9.0', 'type': 'LayeredImage'}, 'vectorcraft': {'version': '0.12.0', 'type': 'VectorImage'}, 'designcraft': {'version': '0.9.0', 'type': 'PageLayout'}, 'figcraft': {'version': '0.6.0', 'type': 'Design'}, 'freecad': {'version': '1.1.4', 'type': 'CadModel'}, 'blender': {'version': '5.2.2', 'type': 'Scene', 'platform': 'linux/amd64', 'memory': 4, 'packages': ['libx11-6', 'libxi6', 'libxxf86vm1', 'libxfixes3', 'libxrender1', 'libxkbcommon0', 'libsm6', 'libice6', 'libgl1', 'libegl1', 'libegl-mesa0', 'libgl1-mesa-dri'], 'source': 'https://download.blender.org/source/blender-5.2.2.tar.xz', 'source_sha256': '56a3b1ec97479ff24dce65d2f09f8a1895005cece279b701fe4fcf74bce3f77e'}}` |
+| `crafts` | yaml | `{'wordcraft': {'version': '0.11.0', 'type': 'WordDocument', 'editor': 5}, 'gridcraft': {'version': '0.8.0', 'type': 'Workbook', 'editor': 2}, 'deckcraft': {'version': '0.7.0', 'type': 'Presentation'}, 'pdfcraft': {'version': '0.8.0', 'type': 'PdfDocument', 'editor': 3}, 'cadcraft': {'version': '0.8.0', 'type': 'Drawing', 'editor': 4}, 'photocraft': {'version': '0.9.0', 'type': 'LayeredImage'}, 'vectorcraft': {'version': '0.12.0', 'type': 'VectorImage'}, 'designcraft': {'version': '0.9.0', 'type': 'PageLayout'}, 'figcraft': {'version': '0.6.0', 'type': 'Design'}, 'freecad': {'version': '1.1.4', 'type': 'CadModel'}, 'blender': {'version': '5.2.2', 'type': 'Scene', 'platform': 'linux/amd64', 'memory': 4, 'packages': ['libx11-6', 'libxi6', 'libxxf86vm1', 'libxfixes3', 'libxrender1', 'libxkbcommon0', 'libsm6', 'libice6', 'libgl1', 'libegl1', 'libegl-mesa0', 'libgl1-mesa-dri'], 'source': 'https://download.blender.org/source/blender-5.2.2.tar.xz', 'source_sha256': '56a3b1ec97479ff24dce65d2f09f8a1895005cece279b701fe4fcf74bce3f77e'}}` |
 | `use_portal` | bool | `{{ access == 'grantr' and portal }}` |
 
 | Copier setting | Value |

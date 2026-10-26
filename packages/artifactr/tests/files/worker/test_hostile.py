@@ -1,7 +1,7 @@
 """The hostile corpus, through the worker, over WordCraft itself.
 
 Every hostile file ends within its deadline, inspected and rendered: the zip bomb and the nested
-XML refused by WordCraft's own limits, and the enormous image, which WordCraft 0.7.0 reads without
+XML refused by WordCraft's own limits, and the enormous image, which WordCraft 0.11.0 reads without
 decoding its pixels, read, with a page no larger than any other (native files ADR-0013). These
 run only where `ARTIFACTR_TEST_CRAFT` is `wordcraft` and `ARTIFACTR_TEST_CRAFT_CLI` names its
 CLI, as `moon run artifactr:fidelity` sets them; the limits themselves are tested on every pull
@@ -28,7 +28,7 @@ REFUSED = {
     "zip_bomb": "part word/document.xml declares 4294967956 bytes",
     "nested_xml": "XML nesting too deep",
 }
-"""What WordCraft 0.7.0's own limits refuse each with."""
+"""What WordCraft 0.11.0's own limits refuse each with."""
 
 
 @pytest.fixture

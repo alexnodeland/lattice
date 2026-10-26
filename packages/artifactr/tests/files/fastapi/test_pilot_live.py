@@ -1,10 +1,10 @@
-"""The check-out pilot with WordCraft itself: its browser build served, and a check-out over HTTP.
+"""The check-out pilot with WordCraft itself: its browser build and shim served, and a check-out.
 
 These run where `ARTIFACTR_TEST_CRAFT` is `wordcraft`, with `ARTIFACTR_TEST_CRAFT_CLI` and
 `ARTIFACTR_TEST_CRAFT_WEB` from `scripts/craft wordcraft cli` and `scripts/craft wordcraft web`.
 The person's edit in the browser is played by the headless CLI, which shares the browser build's
-engine; that the browser build opens and saves under the policy was checked by hand, in Chromium
-(lattice RFC-0003, phase 4).
+engine; that the browser build opens and saves through the shim under the policy was checked by
+hand, in Chromium (lattice RFC-0003, phase 4; native files ADR-0010).
 """
 
 import os
@@ -18,7 +18,9 @@ from artifactr.core import Actor, TenantId, UserActor
 from artifactr.files.app import AppCommand
 from artifactr.files.blobs import InMemoryBlobs, once
 from artifactr.files.checkouts import InMemoryCheckouts
+from artifactr.files.craft import CRAFTS
 from artifactr.files.fastapi import editor_app, editor_policy, files_router
+from artifactr.files.fastapi.shim import PATH, shim_page
 from artifactr.files.manifest import DOCX, WordDocument
 from artifactr.files.native import NativeFiles
 from artifactr.files.wordcraft import Subprocess
@@ -29,19 +31,22 @@ from tests.files.wordcraft.test_live import DEADLINE, VERSION
 
 pytestmark = [pytest.mark.craft("wordcraft"), pytest.mark.timeout(120)]
 ALICE = UserActor(id="alice")
+PORTAL = "https://portal.example"
 
 
 async def alice(_connection: HTTPConnection) -> tuple[TenantId, Actor]:
     return "acme", ALICE
 
 
-def test_the_browser_build_is_served_as_released_under_its_policy() -> None:
+def test_the_browser_build_is_served_as_released_under_its_policy_beside_the_shim() -> None:
     build = Path(os.environ["ARTIFACTR_TEST_CRAFT_WEB"])
-    client = entered(editor_app(build))
+    client = entered(editor_app(build, craft=CRAFTS["wordcraft"], portal=PORTAL))
     page = client.get("/")
     assert page.content == (build / "index.html").read_bytes()
-    assert page.headers["content-security-policy"] == editor_policy(page.text)
-    assert "'sha256-" in page.headers["content-security-policy"], "its inline script, by hash"
+    policy = page.headers["content-security-policy"]
+    assert policy == editor_policy(page.text, portal=PORTAL)
+    assert "'sha256-" in policy, "its inline script, by hash"
+    assert client.get(PATH).text == shim_page(CRAFTS["wordcraft"], PORTAL)
     [wasm] = build.glob("*_bg.wasm")
     assert client.get(f"/{wasm.name}").headers["content-type"] == "application/wasm"
 

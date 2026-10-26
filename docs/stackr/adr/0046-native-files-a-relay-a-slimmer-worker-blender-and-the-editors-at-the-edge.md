@@ -44,7 +44,7 @@ ADR-0043 put each crafting app's worker on a network of its own, which the appli
 ### The editors at a single host's edge
 
 - **Each at `https://<app>.<domain>/`.** The host overlay puts each editor on the `stackr` network, with no port, and `PORTAL_URL` at `https://app.<domain>`, the only page that may frame it. It tells the application `FILES_EDITOR_DOMAIN`, from which each editor's address is made, unless `FILES_EDITORS` says otherwise. The application joins `files` there too, so it reaches its workers on a host as it does locally.
-- **stackr's Caddy serves the names `STACKR_EDITOR_HOSTS` lists,** such as `gridcraft.example.com, pdfcraft.example.com`, each passed by its first label to `files-<app>-editor:8000`, for the three apps with an editor. Anything else is 404. Only the listed names are served, so a certificate is asked for each only when its app runs. With none listed, `editors.localhost` stands in, which Caddy's own CA signs.
+- **stackr's Caddy serves the names `STACKR_EDITOR_HOSTS` lists,** such as `gridcraft.example.com, pdfcraft.example.com`, each passed by its first label to `files-<app>-editor:8000`, for the apps with an editor, the three then and WordCraft since ([stackr ADR-0043](0043-native-files-in-the-template.md)'s amendment). Anything else is 404. Only the listed names are served, so a certificate is asked for each only when its app runs. With none listed, `editors.localhost` stands in, which Caddy's own CA signs.
 
 ## Options considered
 

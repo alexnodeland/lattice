@@ -1,6 +1,6 @@
 # ADR-0019: The kit's look: a side rail, labelled icons, raised surfaces and quiet statuses
 
-**Status:** Accepted, amended by [ADR-0079](0079-interaction-states-feedback-pending-and-a-refusals-mark.md) (the paper, the edges and elevation), [ADR-0036](0036-the-chart-theme-and-colour-blind-mode.md) (the chart series' tokens), [ADR-0037](0037-form-controls-and-row-actions.md) (controls and buttons) and [ADR-0039](0039-elevation-status-colour-states-and-density.md) (status colours, elevation and density)
+**Status:** Accepted, amended by [ADR-0036](0036-the-chart-theme-and-colour-blind-mode.md) (the chart series' tokens), [ADR-0037](0037-form-controls-and-row-actions.md) (controls and buttons) and [ADR-0039](0039-elevation-status-colour-states-and-density.md) (status colours, elevation and density) and [ADR-0080](0080-ink-on-paper-the-products-visual-language.md) (the paper, the edges, elevation)
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 

@@ -1,6 +1,6 @@
 # ADR-0062: Badges and headings
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0080](0080-ink-on-paper-the-products-visual-language.md) (the badge's shape)
 **Date:** 2026-10-21
 **Deciders:** Alex Nodeland
 

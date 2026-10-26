@@ -91,6 +91,7 @@ nav:
   - adr/0077-session-replay-its-own-yes-masked-in-the-browser-and-checked-at-the-relay.md
   - adr/0078-the-others-on-a-diagrams-canvas-and-their-revisions-as-they-arrive.md
   - adr/0079-interaction-states-feedback-pending-and-a-refusals-mark.md
+  - adr/0080-ink-on-paper-the-products-visual-language.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

@@ -831,3 +831,27 @@ test("the composer grows with its lines, up to a height, and scrolls past it", a
   expect(forty).toBeLessThanOrEqual(256);
   expect(box.element().scrollHeight).toBeGreaterThan(forty);
 });
+
+test("sent with the button, the composer keeps the focus in its words", async () => {
+  const screen = await render(<Composer onSend={sent()} />);
+  const box = screen.getByRole("textbox", { name: "Message" });
+  await box.fill("Draft the plan");
+  await screen.getByRole("button", { name: "Send" }).click();
+  await expect.element(box).toHaveValue("");
+  expect(document.activeElement).toBe(box.element());
+});
+
+test("a question's answer field is read-only once sent, so the focus stays in it", async () => {
+  const request: ArtifactrV1.DeferredRequest = {
+    kind: "question",
+    tool_call_id: "q9",
+    tool_name: "ask",
+    args: { question: "Which?" } as ArtifactrV1.Args,
+  };
+  const screen = await render(<Request request={request} onAnswer={sent()} />);
+  const field = screen.getByRole("textbox", { name: "Answer" });
+  await field.fill("That one");
+  await userEvent.keyboard("{Enter}");
+  await expect.element(field).toHaveAttribute("readonly");
+  expect(document.activeElement).toBe(field.element());
+});

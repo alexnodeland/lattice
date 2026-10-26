@@ -331,6 +331,7 @@ export function Composer({
   disabled?: boolean;
 }) {
   const [text, setText] = useState("");
+  const box = useRef<HTMLTextAreaElement>(null);
   const { pending, unsent, send: sending } = useSending();
   // A draft not yet sent: leaving the page, or reloading it, asks first.
   const drafted = text.trim() !== "";
@@ -346,6 +347,9 @@ export function Composer({
     const message = text.trim();
     if (message && !pending) {
       setText("");
+      // Sent with the button, the focus comes back to the words: with nothing left to send the
+      // button is disabled, and a disabled button would drop it (portalr ADR-0079).
+      box.current?.focus();
       let refused = false;
       const told = (settled: { outcome: string }) => {
         refused = settled.outcome === "refused";
@@ -375,6 +379,7 @@ export function Composer({
       <Field.Root className="flex flex-col" disabled={disabled}>
         <Field.Label className="sr-only">Message</Field.Label>
         <Field.Control
+          ref={box}
           render={<textarea rows={2} />}
           value={text}
           placeholder="Write to the assistant"
@@ -578,7 +583,8 @@ function Question({
   return (
     <form className={card} aria-label="The agent asks" onSubmit={submit}>
       <p>{typeof asked === "string" ? asked : `The agent asks, through ${request.tool_name}.`}</p>
-      <TextField label="Answer" name="answer" ref={first} disabled={closed} required />
+      {/* Read-only once sent, not disabled: Enter in it doesn't drop the focus (portalr ADR-0079). */}
+      <TextField label="Answer" name="answer" ref={first} readOnly={closed} required />
       <Button type="submit" disabled={answered} pending={pending}>
         Answer
       </Button>

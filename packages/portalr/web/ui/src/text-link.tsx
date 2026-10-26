@@ -8,11 +8,14 @@ import { FEEDBACK, RING } from "./states";
 
 /**
  * A link's variants (portalr ADR-0059, ADR-0080):
- * - `inline`, in running text: the working colour, with a quiet rule under it that takes the
- *   working colour when hovered, never the browser's own underline.
- * - `subtle`, an id or a name standing alone, in a table's cell: the text's colour and weight,
- *   the working colour when hovered or reached. Never in running text, where nothing would tell
- *   it from the words around it.
+ * - `inline`, in running text: the working colour, with a rule under it (the browser's underline,
+ *   recoloured to the kit's edge at rest and the working colour when hovered, at the kit's
+ *   offset). The rule is the one cue beside colour that it is a link, so the edge holds 3:1 on
+ *   the paper and the surface, which a test keeps.
+ * - `subtle`, an id or a name standing alone in a table's cell or a row's end: the text's colour
+ *   and weight, the working colour when hovered or reached, and no underline. Never in running
+ *   text, where nothing would tell it from the words around it; a row's name is a `RowLink`,
+ *   whose row carries the chevron.
  * - `external`, inline, opening another site in a new tab, which a mark and words say.
  * A way on that is an action, "All threads", is a `ButtonLink`; a list's row is its own
  * component; the places above a page are `Breadcrumbs`.

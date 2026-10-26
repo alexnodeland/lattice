@@ -217,3 +217,34 @@ test("a link in a button's look stays a link: an anchor with its href, no button
   expect(getComputedStyle(link).borderTopColor).toBe(token("edge"));
   expect(getComputedStyle(link).textDecorationLine).toBe("none");
 });
+
+test("a link in a button's look follows on Enter and not on Space, and shows the ring from the keyboard", async () => {
+  onTestFinished(() => history.replaceState(null, "", location.pathname + location.search));
+  const screen = await render(<ButtonLink href="#threads">All threads</ButtonLink>);
+  await userEvent.tab();
+  const link = screen.getByRole("link", { name: "All threads" }).element();
+  expect(link).toBe(document.activeElement);
+  expect(getComputedStyle(link).outlineColor).toBe(token("focus"));
+  await userEvent.keyboard(" ");
+  expect(location.hash).toBe("");
+  await userEvent.keyboard("{Enter}");
+  expect(location.hash).toBe("#threads");
+});
+
+test("a link in a button's look that is the current page is told by its weight and a rule, not colour alone", async () => {
+  const screen = await render(
+    <>
+      <ButtonLink variant="ghost" size="sm" href="#runs" aria-current="page">
+        Runs
+      </ButtonLink>
+      <ButtonLink variant="ghost" size="sm" href="#rules">
+        Rules
+      </ButtonLink>
+    </>,
+  );
+  const current = screen.getByRole("link", { name: "Runs" }).element();
+  const other = screen.getByRole("link", { name: "Rules" }).element();
+  expect(getComputedStyle(current).fontWeight).toBe("600");
+  expect(getComputedStyle(current, "::before").backgroundColor).toBe(token("accent"));
+  expect(getComputedStyle(other, "::before").backgroundColor).toBe("rgba(0, 0, 0, 0)");
+});

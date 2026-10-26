@@ -78,8 +78,11 @@ export function Button({
 /**
  * A link in a button's look (portalr ADR-0080): a way on that is an action, such as "All threads"
  * under a not-found or "Start again" on a plain page. It stays a link, the router's through
- * `render` or an `<a>`, so it opens in a new tab and a screen reader hears a link; the census
- * counts it with the buttons (`data-button`).
+ * `render` or an `<a>`, so it opens in a new tab, Enter follows it and Space doesn't, and a
+ * screen reader hears a link; it has no disabled state, as a link hasn't. Where the router marks
+ * it the current page (`aria-current="page"`), it is the text's weight with the nav's rule at
+ * its start, so the current place is told by more than colour. The census counts it with the
+ * buttons (`data-button`).
  */
 export function ButtonLink({
   variant = "secondary",
@@ -101,7 +104,11 @@ export function ButtonLink({
       // What the style census counts a button by, as a link (`data-*` is past the anchor's type).
       {
         "data-button": "",
-        className: cn(buttonLook(variant, big), className),
+        className: cn(
+          buttonLook(variant, big),
+          "relative aria-[current=page]:font-semibold aria-[current=page]:text-fg aria-[current=page]:before:absolute aria-[current=page]:before:inset-y-1 aria-[current=page]:before:left-0 aria-[current=page]:before:w-0.5 aria-[current=page]:before:rounded-full aria-[current=page]:before:bg-accent aria-[current=page]:before:content-['']",
+          className,
+        ),
       } as ComponentProps<"a">,
       props,
     ),

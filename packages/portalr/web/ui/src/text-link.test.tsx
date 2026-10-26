@@ -105,3 +105,10 @@ test("a long external link wraps, and its mark stays on the line of its last wor
   expect(middle).toBeGreaterThan(word.top);
   expect(middle).toBeLessThan(word.bottom);
 });
+
+test("an inline link's rule is a mark: 3:1 on the paper and the surface, in each scheme", () => {
+  for (const ground of ["paper", "surface"]) {
+    expect(contrast(token("edge"), token(ground))).toBeGreaterThanOrEqual(3);
+    expect(contrast(token("accent"), token(ground))).toBeGreaterThanOrEqual(4.5);
+  }
+});

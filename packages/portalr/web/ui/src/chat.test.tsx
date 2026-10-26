@@ -857,3 +857,32 @@ test("a question's answer field is read-only once sent, so the focus stays in it
   await expect.element(field).toHaveAttribute("readonly");
   expect(document.activeElement).toBe(field.element());
 });
+
+test("a message refused comes back to the composer with the focus still in it", async () => {
+  const screen = await render(<Composer onSend={sent("refused")} />);
+  const box = screen.getByRole("textbox", { name: "Message" });
+  await box.fill("Draft the plan");
+  await screen.getByRole("button", { name: "Send" }).click();
+  await expect.element(box).toHaveValue("Draft the plan");
+  await expect.element(screen.getByRole("alert")).toBeVisible();
+  expect(document.activeElement).toBe(box.element());
+});
+
+test("Enter twice while a send is in flight sends once", async () => {
+  const held: { settle?: () => void } = {};
+  const onSend = vi.fn(
+    () =>
+      new Promise<{ outcome: "done" }>((resolve) => {
+        held.settle = () => resolve({ outcome: "done" });
+      }),
+  );
+  const screen = await render(<Composer onSend={onSend} />);
+  const box = screen.getByRole("textbox", { name: "Message" });
+  await box.fill("Draft the plan");
+  await userEvent.keyboard("{Enter}");
+  await box.fill("Another");
+  await userEvent.keyboard("{Enter}");
+  expect(onSend).toHaveBeenCalledTimes(1);
+  held.settle?.();
+  await expect.element(screen.getByRole("button", { name: "Send" })).not.toBeDisabled();
+});

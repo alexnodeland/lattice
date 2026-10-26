@@ -405,3 +405,11 @@ test("TeX that expands without end is refused, and shown as its source", async (
     .toBeVisible();
   expect(screen.container.querySelector("math")).toBeNull();
 });
+
+test("an svg a message writes with the kit's own mark on it is still no drawing", async () => {
+  const screen = await render(
+    <Markdown>{'<svg data-glyph=""><path d="M0 0h16v16z"/></svg> words'}</Markdown>,
+  );
+  expect(screen.container.querySelector("svg")).toBeNull();
+  await expect.element(screen.getByText(/words/)).toBeVisible();
+});

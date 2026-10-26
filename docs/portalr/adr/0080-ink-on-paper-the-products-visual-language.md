@@ -34,7 +34,7 @@ A neutral paper with no violet in it, `#f6f6f8` and `#121216`; surfaces told apa
 
 ## Built and planned
 
-Built in the pull request that adds this record: the neutral kit (paper, hairlines, edges, elevation, radii, dark), the icons, ButtonLink and the links, the crumb trail, rows as a bounded list with a chevron, the table's header and figures, the rail unboxed with the start rule, quiet badges, the flat segmented track, the cards' start rule, the 3xl title and the 64rem measure, the fade in place of the turn. Planned in the same pull request, as the owner approved, and recorded here only once built: the stepped question sets, tool calls grouped per run, the attach button in the composer, admin's forms behind New… and folding filter bars, revisions one open at a time, the artifact page's overflow menu, long messages folded, the run status strip, composer-first new threads, the needs-you queue, jump to latest, the thread's mode switch, message actions on hover, thread search and the unread dot, and reconnecting without a reload.
+Built in the pull request that adds this record: the neutral kit (paper, hairlines, edges, elevation, radii, dark), the icons, ButtonLink and the links, the crumb trail, rows as a bounded list with a chevron, the table's header and figures, the rail unboxed with the start rule, quiet badges, the flat segmented track, the cards' start rule, the 3xl title and the 64rem measure, the fade in place of the turn; and, as the owner approved, the interactions: the stepped question sets, tool calls grouped per run, the attach button in the composer, admin's forms behind a line and its folding filter bars, revisions one open at a time, the artifact page's overflow menu, long messages folded, the run status strip, composer-first new threads, the needs-you list, jump to latest, the thread's mode switch, message actions as the pointer rests or as a menu a long press opens, thread search with the view in the URL and the moved-since mark, and connecting again without a reload. The small screens below are built here too, but their sheets and the thumb bar in a pull request stacked on this one.
 
 ## The language, part by part
 
@@ -59,6 +59,19 @@ The owner then asked for more than a restyle: components of the product's own al
 - **Dark.** Designed on the same neutrals, with the kit's own lighter violet as the accent while the marks keep lattice's ink.
 
 The style census counts 10 link looks (from 12) and 4 badge looks (from 6); Biome's raw-element list has 2 files (from 3).
+
+## Small screens
+
+A phone is a first target, not a narrowing of the desktop. The fundamentals are in the kit's base styles and the shell, so every page has them:
+
+- **A finger's targets.** Where the pointer can't hover (`pointer: coarse`), every control is 44px or taller: the icon button, a disclosure's line, a crumb, a table row, the header's trigger, and every button, select and text input by a floor on their height. Admin's compact density holds for a mouse and gives way to the same floor for a finger.
+- **Fields a phone won't zoom.** A field's text is 16px to a finger, so iOS keeps the page where it is when one is focused. The composer's keyboard offers Send; the search field's offers Search; the sign-in's fields say what they are for autofill.
+- **A tap answers at once.** No tap flash of the browser's (the kit's feedback is the answer), and no double-tap zoom on a control (`touch-action: manipulation`).
+- **No hover-only path.** What a hover reveals, a message's actions, is on the surface to a finger as a menu, which a long press on the message opens too; the keyboard reaches everything either way.
+- **Safe areas.** The viewport reaches the screen's edges (`viewport-fit=cover`); the page keeps the top and sides clear, the composer's dock keeps the home indicator clear, and the drawer, which stands over the page, keeps the top and its own side clear.
+- **Short windows.** The composer pinned to the bottom gives way to the flow under 30rem of height, as on a phone turned on its side or at a high zoom, so it never covers most of the page; Jump to latest returns the reader to the end.
+- **Nothing wider than the page.** At 320 and 360 nothing widens the page: a long unbroken word wraps in a message, a code block, a table and a preview scroll inside their own box, and a part that scrolls inside keeps its scroll to itself (`overscroll-behavior: contain`), so reaching its end never pulls the page or refreshes it. A test holds this for the thread's parts at both widths.
+- **Still to come, stacked on this pull request:** menus, popovers and dialogs as bottom sheets on a phone (loaded on first open, not in the first paint), the active request's action in a thumb bar above the composer, tables as stacked rows, swipe on a thread's row, the on-screen keyboard kept clear of the composer, and the full emulated evidence.
 
 ## Consequences
 

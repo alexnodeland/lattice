@@ -26,7 +26,7 @@ export function ComposerDock({ children }: { children: ReactNode }) {
     };
   }, []);
   return (
-    <div ref={dock} data-composer-dock="" className="sticky bottom-0 z-10 bg-paper pt-2 pb-4">
+    <div ref={dock} data-composer-dock="" className="sticky bottom-0 z-10 bg-paper pt-2">
       {children}
     </div>
   );

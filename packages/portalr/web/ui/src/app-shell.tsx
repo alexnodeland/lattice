@@ -106,6 +106,7 @@ export function AppShell({
               onClick={followed}
               // Tab kept in it at once, never on Base UI's guards outside it (portalr ADR-0068).
               onKeyDown={(event) => keepTabWithin(event.currentTarget, event.nativeEvent)}
+              data-frame-drawer=""
               className="fixed inset-y-0 left-0 z-50 flex w-[min(var(--drawer-width),85vw)] flex-col gap-4 border-line border-r bg-surface p-3 text-fg shadow-(--drawer-shadow) outline-none transition-transform duration-(--drawer-duration) data-ending-style:-translate-x-full data-starting-style:-translate-x-full motion-reduce:transition-none"
             >
               <div className="flex items-center justify-between pl-2">

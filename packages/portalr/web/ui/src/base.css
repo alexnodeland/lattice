@@ -130,6 +130,46 @@
  * colours replace it. So every pattern, dash and marker shape is on as in colour-blind mode, whether
  * or not it was chosen; the inks themselves are the system's.
  */
+/*
+ * Small screens and fingers (portalr ADR-0080). A pointer that can't hover is a finger: every
+ * control is 44px or taller to it, admin's compact density included, which holds for a mouse; a
+ * field's text is 16px, so iOS doesn't zoom to it; a control answers at once, with no tap flash of
+ * the browser's (the kit's feedback is the answer) and no double-tap zoom. Whatever the pointer,
+ * a part that scrolls inside the page keeps its scroll to itself, so reaching its end never
+ * pulls the page or refreshes it.
+ */
+@media (pointer: coarse) {
+  :root,
+  [data-density="compact"] {
+    --icon-button-size: 2.75rem;
+    --disclosure-target: 2.75rem;
+    --breadcrumb-target: 2.75rem;
+    --row-height: 2.75rem;
+    --header-trigger-pad-y: var(--space-3);
+  }
+  :where(
+    button,
+    [role="button"],
+    [data-button],
+    select,
+    input:not([type="checkbox"], [type="radio"])
+  ) {
+    min-height: 2.75rem;
+  }
+  :where(input, select, textarea) {
+    font-size: max(1rem, 1em);
+  }
+}
+:root {
+  -webkit-tap-highlight-color: transparent;
+}
+:where(a, button, [role="button"], input, select, textarea, label, summary) {
+  touch-action: manipulation;
+}
+:where(.overflow-auto, .overflow-x-auto, .overflow-y-auto) {
+  overscroll-behavior: contain;
+}
+
 @media (forced-colors: active) {
   :root {
     --chart-hatch: var(--chart-hatched);

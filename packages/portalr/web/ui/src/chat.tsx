@@ -233,7 +233,7 @@ const FOLDED_AFTER = 40;
 /** A message's bubble: the reader's at the end of the line, everyone else's at its start. */
 const bubble = (mine: boolean) =>
   cn(
-    "min-w-0 max-w-full rounded-(--bubble-radius) border px-(--bubble-pad-x) py-(--bubble-pad-y)",
+    "min-w-0 max-w-full break-words rounded-(--bubble-radius) border px-(--bubble-pad-x) py-(--bubble-pad-y)",
     mine
       ? "rounded-se-(--bubble-tail-radius) border-transparent bg-line"
       : "rounded-ss-(--bubble-tail-radius) border-line bg-surface",
@@ -630,7 +630,7 @@ export function Composer({
         <Field.Label className="sr-only">Message</Field.Label>
         <Field.Control
           ref={box}
-          render={<textarea rows={2} />}
+          render={<textarea rows={2} enterKeyHint="send" />}
           value={text}
           placeholder="Write to the assistant"
           onValueChange={(value) => setText(String(value))}

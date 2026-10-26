@@ -80,6 +80,24 @@
       position: static;
     }
   }
+
+  /*
+   * A phone's safe areas (portalr ADR-0080): the viewport reaches the screen's edges, so the page
+   * keeps the top and sides clear, a composer pinned to the bottom keeps the home indicator clear,
+   * and the drawer, which stands over the page, keeps the top and its own side clear itself.
+   */
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-right: env(safe-area-inset-right);
+    padding-left: env(safe-area-inset-left);
+  }
+  [data-composer-dock] {
+    padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+  }
+  [data-frame-drawer] {
+    padding-top: calc(var(--space-3) + env(safe-area-inset-top));
+    padding-left: calc(var(--space-3) + env(safe-area-inset-left));
+  }
 }
 
 @theme inline {

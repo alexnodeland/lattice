@@ -29,7 +29,7 @@
 | Cyan | `#009FE3` | `#38C6F4` | The upper-left side; the UIs' focus ring on dark backgrounds |
 | Magenta | `#E4007C` | `#FF4DA6` | The lower-left side in `app`'s mark, the upper-right in `admin`'s |
 | Yellow | `#FFC400` | `#FFD54A` | The lower-right side. Never text |
-| Violet | `#6B2FA0` | `#D9BFF3` | The overprint, where two sides cross; the wordmark; the UIs' working colour, for actions and links, and their focus ring on light backgrounds, where cyan is too light (2.73:1 on the paper) |
+| Violet | `#6B2FA0` | `#E2CCF5` | The overprint, where two sides cross; the wordmark; the UIs' working colour in light, for actions and links, and their focus ring on light backgrounds, where cyan is too light (2.73:1 on the paper). In dark the UIs' accent is the kit's own `#D9BFF3` (portalr ADR-0079), and the marks keep the ink |
 | Paper | `#F7F4FB` | `#17111F` | The banner's background. The UIs' paper is neutral since portalr ADR-0079, `#F6F6F8` and `#121216`, so the violet is the accent alone |
 | Graphite | `#5E5470` | `#BDB2CC` | Secondary text, such as the banner's tagline; the UIs' quiet text is neutral, `#5D5D68` and `#A6A6B0` |
 

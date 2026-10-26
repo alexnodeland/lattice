@@ -9,7 +9,7 @@
   --portalr-cyan: light-dark(#009fe3, #38c6f4);
   --portalr-magenta: light-dark(#e4007c, #ff4da6);
   --portalr-yellow: light-dark(#ffc400, #ffd54a);
-  --portalr-violet: light-dark(#6b2fa0, #d9bff3);
+  --portalr-violet: light-dark(#6b2fa0, #e2ccf5);
 
   /* Space: steps of a quarter rem, and a hairline and a half step below them. */
   --space-px: 1px;
@@ -83,7 +83,7 @@
   --fg: light-dark(#16161d, #ececf1);
   --muted: light-dark(#5d5d68, #a6a6b0);
   --line: light-dark(#e3e3e8, #2b2b33);
-  --accent: var(--portalr-violet);
+  --accent: light-dark(var(--portalr-violet), #d9bff3);
   --on-accent: light-dark(#ffffff, #121216);
 
   /*

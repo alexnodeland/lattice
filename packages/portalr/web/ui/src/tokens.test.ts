@@ -3,7 +3,7 @@ import { commands } from "vitest/browser";
 import { contrast, dark, deltaE2000, distance, luminance, token } from "./test/colours";
 
 test("the working colour is the scheme's violet", () => {
-  expect(token("accent")).toBe(dark ? "rgb(226, 204, 245)" : "rgb(107, 47, 160)");
+  expect(token("accent")).toBe(dark ? "rgb(217, 191, 243)" : "rgb(107, 47, 160)");
 });
 
 test("text is readable on every surface, and on the working colour", () => {
@@ -110,7 +110,7 @@ test("a page asks for a scheme with data-theme", () => {
     delete html.dataset.theme;
   });
   html.dataset.theme = dark ? "light" : "dark";
-  expect(token("accent")).toBe(dark ? "rgb(107, 47, 160)" : "rgb(226, 204, 245)");
+  expect(token("accent")).toBe(dark ? "rgb(107, 47, 160)" : "rgb(217, 191, 243)");
 });
 
 const SERIES = ["chart-1", "chart-2", "chart-3"];

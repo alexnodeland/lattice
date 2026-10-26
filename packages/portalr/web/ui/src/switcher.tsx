@@ -6,9 +6,9 @@ import { Icon } from "./icon";
 import { groupLabel, item, popup, separator } from "./menu";
 import { FEEDBACK, RING } from "./states";
 
-/** The switchers' trigger: where the person is, on the paper, with a control's edge. */
+/** The switchers' trigger: where the person is, bare until hovered, as the header's other triggers are. */
 const trigger = cn(
-  "inline-flex min-w-0 items-center gap-1.5 rounded-(--header-trigger-radius) border border-edge bg-paper px-(--header-trigger-pad-x) py-(--header-trigger-pad-y) font-semibold text-fg text-sm hover:bg-wash",
+  "inline-flex min-w-0 items-center gap-1.5 rounded-(--header-trigger-radius) px-(--header-trigger-pad-x) py-(--header-trigger-pad-y) font-semibold text-fg text-sm hover:bg-wash",
   RING,
   FEEDBACK,
 );

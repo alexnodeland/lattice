@@ -29,9 +29,9 @@
 | Cyan | `#009FE3` | `#38C6F4` | The upper-left side; the UIs' focus ring on dark backgrounds |
 | Magenta | `#E4007C` | `#FF4DA6` | The lower-left side in `app`'s mark, the upper-right in `admin`'s |
 | Yellow | `#FFC400` | `#FFD54A` | The lower-right side. Never text |
-| Violet | `#6B2FA0` | `#E2CCF5` | The overprint, where two sides cross; the wordmark; the UIs' working colour, for actions and links, and their focus ring on light backgrounds, where cyan is too light (2.73:1 on the paper) |
-| Paper | `#F7F4FB` | `#17111F` | The banner's background, and the UIs' paper |
-| Graphite | `#5E5470` | `#BDB2CC` | Secondary text, such as the banner's tagline |
+| Violet | `#6B2FA0` | `#D9BFF3` | The overprint, where two sides cross; the wordmark; the UIs' working colour, for actions and links, and their focus ring on light backgrounds, where cyan is too light (2.73:1 on the paper) |
+| Paper | `#F7F4FB` | `#17111F` | The banner's background. The UIs' paper is neutral since portalr ADR-0079, `#F6F6F8` and `#121216`, so the violet is the accent alone |
+| Graphite | `#5E5470` | `#BDB2CC` | Secondary text, such as the banner's tagline; the UIs' quiet text is neutral, `#5D5D68` and `#A6A6B0` |
 
 Violet is 8.27:1 on white and 12.06:1 on the site's dark background, `#0D1920`; graphite is 6.48:1 and 9.16:1 on the papers.
 

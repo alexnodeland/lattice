@@ -3,7 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-10-26
 **Deciders:** Alex Nodeland
-**Amends:** [ADR-0037](0037-form-controls-and-row-actions.md) (a field's refusal), [ADR-0053](0053-the-chats-questions-tool-calls-sides-failures-and-streaming.md) (the composer) and [ADR-0068](0068-where-the-focus-goes-and-one-not-found.md) (a download keeps the focus, now every command)
+**Amends:** [ADR-0019](0019-the-kits-look.md) (the default kit's paper, edges and elevation), [ADR-0037](0037-form-controls-and-row-actions.md) (a field's refusal), [ADR-0053](0053-the-chats-questions-tool-calls-sides-failures-and-streaming.md) (the composer) and [ADR-0068](0068-where-the-focus-goes-and-one-not-found.md) (a download keeps the focus, now every command)
 
 ## Context
 
@@ -23,11 +23,25 @@ A design pass of 2026-10-26 read the app and admin against the kit for consisten
 - **The composer grows with its lines**, from two to sixteen rem, then scrolls: `field-sizing: content`, no script.
 - **Folded onto the kit:** a sortable column's header is the kit's small ghost button, 24px tall, its words set back by the button's own padding so they stay at the column's edge, and the dashboards' add-on leaves Biome's raw-element list; a Markdown link is the kit's inline link (`linkLook`), with its ring; a dialog's title is `TYPE.section` and its description `TYPE.meta`, a whole dialog's title `TYPE.subsection`; a question's words are `TYPE.subsection`; sign-in's button has the button's padding; an item table's card is headed one level under what names the table, `h2` under a caption, `h3` under the heading named, or `level`; the selection is the accent at 30% on the paper, 1.6:1 from it and still 7:1 under the text.
 
+## The default kit, modernised
+
+The owner read the first pass and said the UIs still looked like Windows Vista. Read again for that, with the tokens beside the screens, the look came from five things, none of them a component's:
+
+- **A lavender paper.** `--paper` was `#f7f4fb` in light and `#17111f` in dark, a tint of the violet, so every page sat on a violet pane with white cards on it: the tinted glass of that era. Three more tints of the same violet shared each screen: the current nav item's wash, the reader's message bubble, the switcher's chip.
+- **Violet-grey chrome.** `--edge`, a control's boundary, was `#857a97`, and `--line` `#dcd5e6`: fields, secondary buttons, the switcher and the upload zone (a 2px dashed edge) were boxed in a purple grey, which reads as window chrome.
+- **Stacked elevation.** A card had both a hairline and a shadow, and the shadow was cast in violet (`#281446` at 16%); dialogs and popovers stacked two shadows of it.
+- **Pills.** Badges were full-radius pills with coloured edges; the nav's count and "Waiting for you" were solid violet pills; a message bubble had 16px corners and a tail.
+- **A bordered switcher.** The workspace switcher was a bordered, paper-filled combobox inside the surface rail.
+
+Gradients, bevels, gloss and inner highlights there were none; the type (Schibsted Grotesk, Fragment Mono) and the icons (Lucide, 2px) were already current.
+
+**The direction: ink on paper.** A neutral paper with no violet in it, `#f6f6f8` and `#121216`; surfaces told apart by hairlines (`#e3e3e8`, `#2b2b33`) and spacing, a card's shadow a whisper (1px at 8% of a neutral) and elevation kept for what floats; a neutral control edge (`#74747f`, `#75757f`) that still holds 3:1 on every surface; the violet kept as the one accent, for the primary action, links, the focus ring and the current place, so a screen carries one tint where it carried four; crisp radii, 6px on controls and 8px on cards as before, 12px on a bubble (from 16) and 4px on a badge (from a pill); and a dark scheme designed on the same neutrals, with the accent a lighter violet (`#d9bff3`) that reads 4.5:1 on its surfaces. The switcher is a bare trigger, as the header's others are, and the upload zone is a 1px dashed card. The example kits, nightshade and calm, set their own colours and keep their character; the inventory, the schema and the validator are unchanged, and every pair in the manifest holds in both schemes.
+
 ## Consequences
 
 - Easier: a kit sets how every control answers the pointer with two tokens, and a reader who presses a button by the keyboard is still on it when the answer comes.
 - Harder: `pending` and `disabled` are two props with one look; a caller says which it means. `focusableWhenDisabled` stays for a control that can't be used yet but should be reached, such as a pager's end.
-- The computed-style snapshots move for every control that gained feedback (its `transition-*` lines) and for a refused field's edge and mark; the screenshot baselines move where a refusal, a dialog's title or the selection is in a gallery.
+- Every screenshot baseline moves with the paper; the computed-style snapshots move for every control that gained feedback (its `transition-*` lines) and for a refused field's edge and mark; the screenshot baselines move where a refusal, a dialog's title or the selection is in a gallery.
 - The style census's counts don't move: a pending button looks disabled, and the sortable header is a ghost button the kit already counts.
 - The app's initial size stays under its ceiling (ADR-0040) without raising it; the shared `RING` and `FEEDBACK` strings replace a focus-ring string each control carried.
 - Not done here, from the audit's nits: an artifact's window title by its name (N1, ADR-0068's reason holds), a dashboard's repeated landmark names (N4), one status region for a thread's loading files (N5), a tooltip's description (N7) and Share's first focus on its heading (N9).

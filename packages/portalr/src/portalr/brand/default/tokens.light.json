@@ -21,7 +21,7 @@
       }
     },
     "paper": {
-      "$value": "#f7f4fb",
+      "$value": "#f6f6f8",
       "$type": "color"
     },
     "surface": {
@@ -29,15 +29,15 @@
       "$type": "color"
     },
     "fg": {
-      "$value": "#1c1d26",
+      "$value": "#16161d",
       "$type": "color"
     },
     "muted": {
-      "$value": "#5e5470",
+      "$value": "#5d5d68",
       "$type": "color"
     },
     "line": {
-      "$value": "#dcd5e6",
+      "$value": "#e3e3e8",
       "$type": "color"
     },
     "accent": {
@@ -53,7 +53,7 @@
       "$type": "color"
     },
     "edge": {
-      "$value": "#857a97",
+      "$value": "#74747f",
       "$type": "color"
     },
     "status": {
@@ -182,12 +182,12 @@
     "scrim": {
       "$value": {
         "colorSpace": "srgb",
-        "hex": "#1c1d26",
-        "alpha": 0.45,
+        "hex": "#101018",
+        "alpha": 0.4,
         "components": [
-          0.1098,
-          0.1137,
-          0.149
+          0.0627,
+          0.0627,
+          0.0941
         ]
       },
       "$type": "color"
@@ -195,12 +195,12 @@
     "shadow": {
       "$value": {
         "colorSpace": "srgb",
-        "hex": "#281446",
-        "alpha": 0.16,
+        "hex": "#101018",
+        "alpha": 0.08,
         "components": [
-          0.1569,
-          0.0784,
-          0.2745
+          0.0627,
+          0.0627,
+          0.0941
         ]
       },
       "$type": "color"
@@ -450,7 +450,7 @@
           "unit": "px"
         },
         "blur": {
-          "value": 2,
+          "value": 1,
           "unit": "px"
         }
       },
@@ -934,7 +934,7 @@
     },
     "badge": {
       "radius": {
-        "$value": "{radius.full}"
+        "$value": "{radius.2}"
       },
       "pad-y": {
         "$value": "{space.half}"
@@ -1038,7 +1038,7 @@
     },
     "bubble": {
       "radius": {
-        "$value": "{radius.6}"
+        "$value": "{radius.5}"
       },
       "max-width": {
         "$value": {
@@ -1047,7 +1047,7 @@
         }
       },
       "tail-radius": {
-        "$value": "{radius.2}"
+        "$value": "{radius.1}"
       },
       "pad-x": {
         "$value": {
@@ -1091,7 +1091,7 @@
     },
     "sign-in": {
       "radius": {
-        "$value": "{radius.5}"
+        "$value": "{radius.4}"
       },
       "pad": {
         "$value": {

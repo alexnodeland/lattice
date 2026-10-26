@@ -67,7 +67,7 @@ export function FileChooser({
       onDrop={dropped}
       data-over={over || undefined}
       className={cn(
-        "flex min-w-0 flex-col items-start gap-2 rounded-lg border-2 border-edge border-dashed bg-surface p-4 text-fg text-sm data-over:border-accent data-over:bg-wash forced-colors:data-over:border-system-highlight",
+        "flex min-w-0 flex-col items-start gap-2 rounded-(--card-radius) border border-edge border-dashed bg-surface p-(--card-pad) text-fg text-sm data-over:border-accent data-over:bg-wash forced-colors:data-over:border-system-highlight",
         disabled && "border-line text-muted",
         className,
       )}

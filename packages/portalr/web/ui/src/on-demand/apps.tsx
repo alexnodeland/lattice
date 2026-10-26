@@ -7,7 +7,6 @@
  */
 
 import { AlertDialog } from "@base-ui/react/alert-dialog";
-import { Maximize2, Minimize2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Alert } from "../alert";
 import {
@@ -25,6 +24,7 @@ import { cn } from "../cn";
 import { actions, backdrop, description, title as heading, popup } from "../dialog";
 import { inertOutside } from "../full-view";
 import { Icon } from "../icon";
+import { glyphs } from "../icons";
 import { offSaid } from "../integrations";
 import { isObject } from "../json";
 import type { Sent } from "../sending";
@@ -304,7 +304,7 @@ export function Running({
             className="ml-auto shrink-0 border-line px-2 py-1 text-xs"
             onClick={() => setFull(!full)}
           >
-            <Icon icon={full ? Minimize2 : Maximize2} className="size-3.5" />
+            <Icon icon={full ? glyphs.minimize2 : glyphs.maximize2} className="size-3.5" />
             {full ? "Back to the page" : "Full view"}
           </Button>
         </div>

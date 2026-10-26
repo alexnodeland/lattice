@@ -1,4 +1,3 @@
-import { Square, SquareCheck } from "lucide-react";
 import {
   type ComponentProps,
   createContext,
@@ -23,6 +22,7 @@ import { cn } from "./cn";
 import { CodeBlock } from "./code-block";
 import { useHighlighted } from "./highlighting";
 import { Icon } from "./icon";
+import { glyphs } from "./icons";
 import { useOnDemand } from "./on-demand";
 import { ScrollRegion } from "./scroll-region";
 import { linkLook } from "./text-link";
@@ -246,7 +246,7 @@ const COMPONENTS: Components = {
   input: ({ checked }) => (
     <>
       <Icon
-        icon={checked ? SquareCheck : Square}
+        icon={checked ? glyphs.squareCheck : glyphs.square}
         className="mr-1.5 inline size-4 align-text-bottom"
       />
       <span className="sr-only">{checked ? "Done:" : "To do:"}</span>

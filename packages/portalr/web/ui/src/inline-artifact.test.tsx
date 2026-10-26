@@ -1,4 +1,3 @@
-import { Maximize2 } from "lucide-react";
 import { useState } from "react";
 import { expect, test } from "vitest";
 import { page, userEvent } from "vitest/browser";
@@ -6,6 +5,7 @@ import { render } from "vitest-browser-react";
 import { json, markdown } from "./artifacts";
 import { InlineArtifact, Messages } from "./chat";
 import { IconButton } from "./icon-button";
+import { glyphs } from "./icons";
 import { nativeFile } from "./native-file";
 import { axeViolations } from "./test/axe";
 import { UI_RENDERERS } from "./ui-renderers";
@@ -139,7 +139,7 @@ test("in the full view, Escape on another icon button's tooltip closes the toolt
     <Messages>
       <InlineArtifact name="Plan" kind="Note" open={null}>
         <Draft />
-        <IconButton label="Zoom in" icon={Maximize2} />
+        <IconButton label="Zoom in" icon={glyphs.maximize2} />
       </InlineArtifact>
     </Messages>,
   );

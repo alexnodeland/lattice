@@ -1,9 +1,9 @@
 import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
-import type { LucideIcon } from "lucide-react";
 import type { ComponentProps, ReactElement, ReactNode } from "react";
 import { cn } from "./cn";
 import { Icon } from "./icon";
+import type { Glyph } from "./icons";
 import { FEEDBACK, RING } from "./states";
 
 /** The areas of a workspace, as a list of links, the current one marked. */
@@ -19,7 +19,7 @@ type NavLinkProps = Omit<ComponentProps<"a">, "className" | "children"> & {
   /** What to render as the link, such as the router's own, which marks the current page. */
   render?: ReactElement;
   /** The area's icon, beside its word. */
-  icon?: LucideIcon;
+  icon?: Glyph;
   /** How many wait for the reader there, said as such. */
   count?: number;
   children: string;

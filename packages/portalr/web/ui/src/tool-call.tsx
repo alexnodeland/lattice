@@ -5,11 +5,11 @@
  */
 
 import type { Artifactr } from "@portalr/client";
-import { Wrench } from "lucide-react";
 import type { ReactNode } from "react";
 import { CopyButton } from "./copy-button";
 import { Disclosure } from "./disclosure";
 import { Icon } from "./icon";
+import { glyphs } from "./icons";
 import { ScrollRegion } from "./scroll-region";
 import { StatusBadge, type Tone } from "./status-badge";
 import { TYPE } from "./type";
@@ -79,7 +79,7 @@ export function ToolCall({ tool }: { tool: Artifactr.Tool }) {
         panelClassName="data-open:pt-0"
         summary={
           <>
-            <Icon icon={Wrench} className="size-3.5 shrink-0 text-muted" />
+            <Icon icon={glyphs.wrench} className="size-3.5 shrink-0 text-muted" />
             <code className="shrink-0 font-mono">{tool.name}</code>
             <span className="min-w-0 flex-1 truncate text-muted text-xs">{line}</span>
             <StatusBadge tone={tone} className="shrink-0">

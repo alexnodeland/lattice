@@ -252,7 +252,7 @@ test.each(HOSTILE)("hostile Markdown runs, loads and links nothing: %s", async (
     "iframe",
     "style",
     "img",
-    "svg:not(.lucide)",
+    "svg:not([data-glyph])",
     "[style], [onerror]",
   ]) {
     expect(screen.container.querySelector(element)).toBeNull();

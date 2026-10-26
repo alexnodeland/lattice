@@ -1,10 +1,10 @@
-import { WrapText } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import { Button } from "./button";
 import { cn } from "./cn";
 import { CopyButton } from "./copy-button";
 import { Token, useHighlightedLines } from "./highlighting";
 import { Icon } from "./icon";
+import { glyphs } from "./icons";
 import { ScrollRegion } from "./scroll-region";
 
 /** The most lines shown before the rest are asked for. */
@@ -65,7 +65,7 @@ export function SourceView({
             aria-pressed={wrapped}
             onClick={() => setWrapped(!wrapped)}
           >
-            <Icon icon={WrapText} className="size-3.5" />
+            <Icon icon={glyphs.wrapText} className="size-3.5" />
             Wrap
           </Button>
           <CopyButton text={code} what={what} />

@@ -1,9 +1,9 @@
 import { Select } from "@base-ui/react/select";
-import { Check, ChevronDown } from "lucide-react";
 import { type ReactNode, type Ref, useMemo, useState } from "react";
 import { cn } from "./cn";
 import { FormField } from "./form-field";
 import { Icon } from "./icon";
+import { glyphs } from "./icons";
 import { item, popover } from "./menu";
 import { FEEDBACK, RING } from "./states";
 
@@ -85,7 +85,7 @@ export function SelectField({
         >
           <Select.Value className="truncate" />
           <Select.Icon className="text-muted">
-            <Icon icon={ChevronDown} />
+            <Icon icon={glyphs.chevronDown} />
           </Select.Icon>
         </Select.Trigger>
         <Select.Portal>
@@ -103,7 +103,7 @@ export function SelectField({
                   >
                     <Select.ItemText>{option.label}</Select.ItemText>
                     <Select.ItemIndicator className="text-accent">
-                      <Icon icon={Check} />
+                      <Icon icon={glyphs.check} />
                     </Select.ItemIndicator>
                   </Select.Item>
                 ))}

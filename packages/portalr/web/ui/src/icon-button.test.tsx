@@ -1,13 +1,13 @@
-import { Maximize2 } from "lucide-react";
 import type { ComponentProps } from "react";
 import { expect, onTestFinished, test } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { IconButton } from "./icon-button";
+import { glyphs } from "./icons";
 import { token } from "./test/colours";
 
 test("an icon button is named by its label, a target 24px or more, its icon hidden", async () => {
-  const screen = await render(<IconButton label="Full view" icon={Maximize2} />);
+  const screen = await render(<IconButton label="Full view" icon={glyphs.maximize2} />);
   const button = screen.getByRole("button", { name: "Full view" }).element();
   const box = button.getBoundingClientRect();
   expect(box.width).toBeGreaterThanOrEqual(24);
@@ -16,7 +16,7 @@ test("an icon button is named by its label, a target 24px or more, its icon hidd
 });
 
 test("its label shows as a tooltip when the keyboard reaches it", async () => {
-  await render(<IconButton label="Full view" icon={Maximize2} />);
+  await render(<IconButton label="Full view" icon={glyphs.maximize2} />);
   await userEvent.tab();
   const tip = page.getByText("Full view", { exact: true });
   await expect.element(tip).toBeVisible();
@@ -24,14 +24,14 @@ test("its label shows as a tooltip when the keyboard reaches it", async () => {
 });
 
 test("a pressed icon button says so, in the wash", async () => {
-  const screen = await render(<IconButton label="Helpful" icon={Maximize2} aria-pressed />);
+  const screen = await render(<IconButton label="Helpful" icon={glyphs.maximize2} aria-pressed />);
   const button = screen.getByRole("button", { name: "Helpful", pressed: true }).element();
   expect(getComputedStyle(button).color).toBe(token("accent"));
 });
 
 test("an icon button can be a link, such as the router's", async () => {
   const screen = await render(
-    <IconButton label="Open its page" icon={Maximize2} render={<a href="#page">page</a>} />,
+    <IconButton label="Open its page" icon={glyphs.maximize2} render={<a href="#page">page</a>} />,
   );
   const link = screen.getByRole("link", { name: "Open its page" }).element();
   expect(link.getAttribute("href")).toBe("#page");
@@ -39,7 +39,11 @@ test("an icon button can be a link, such as the router's", async () => {
 
 test("a link icon button has the button's look, named by its label, not its element's words", async () => {
   const screen = await render(
-    <IconButton label="Open its page" icon={Maximize2} render={<a href="#page">its words</a>} />,
+    <IconButton
+      label="Open its page"
+      icon={glyphs.maximize2}
+      render={<a href="#page">its words</a>}
+    />,
   );
   const link = screen.getByRole("link", { name: "Open its page" }).element();
   expect(getComputedStyle(link).borderTopStyle).toBe("solid");
@@ -49,7 +53,7 @@ test("a link icon button has the button's look, named by its label, not its elem
 });
 
 test("Escape dismisses its tooltip", async () => {
-  await render(<IconButton label="Full view" icon={Maximize2} />);
+  await render(<IconButton label="Full view" icon={glyphs.maximize2} />);
   await userEvent.tab();
   await expect.element(page.getByText("Full view", { exact: true })).toBeVisible();
   await userEvent.keyboard("{Escape}");
@@ -59,7 +63,7 @@ test("Escape dismisses its tooltip", async () => {
 test("a disabled icon button keeps its name, and isn't a stop for the keyboard", async () => {
   const screen = await render(
     <>
-      <IconButton label="Helpful" icon={Maximize2} disabled />
+      <IconButton label="Helpful" icon={glyphs.maximize2} disabled />
       <button type="button">After</button>
     </>,
   );
@@ -73,7 +77,7 @@ test("a link icon button keeps the link element's own handlers", async () => {
   await render(
     <IconButton
       label="Open its page"
-      icon={Maximize2}
+      icon={glyphs.maximize2}
       render={
         <a href="#page" onFocus={() => (focused = true)}>
           page
@@ -88,7 +92,7 @@ test("a link icon button keeps the link element's own handlers", async () => {
 
 test("a pending icon button stays in reach of the keyboard, disabled", async () => {
   const screen = await render(
-    <IconButton label="Helpful" icon={Maximize2} disabled focusableWhenDisabled />,
+    <IconButton label="Helpful" icon={glyphs.maximize2} disabled focusableWhenDisabled />,
   );
   await userEvent.tab();
   const button = screen.getByRole("button", { name: "Helpful" }).element();
@@ -101,7 +105,7 @@ test("Enter and Space on a disabled icon button in reach of the keyboard do noth
   await render(
     <IconButton
       label="Helpful"
-      icon={Maximize2}
+      icon={glyphs.maximize2}
       disabled
       focusableWhenDisabled
       onClick={() => (pressed += 1)}
@@ -124,7 +128,7 @@ test("a link icon button's own click runs, as a router's does to follow it", asy
   const screen = await render(
     <IconButton
       label="Open its page"
-      icon={Maximize2}
+      icon={glyphs.maximize2}
       render={
         <RouterLink
           href="#page"

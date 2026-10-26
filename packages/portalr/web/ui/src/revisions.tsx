@@ -12,7 +12,6 @@
 
 import { Tabs } from "@base-ui/react/tabs";
 import type { Change, Granularity } from "@portalr/client/diff";
-import { Play, Square } from "lucide-react";
 import { createContext, type ReactNode, use, useEffect, useId, useMemo, useState } from "react";
 import { type AppHost, AppHostContext, MINI_APPS, stillWhy } from "./app-frame";
 import {
@@ -31,6 +30,7 @@ import { cn } from "./cn";
 import { Disclosure } from "./disclosure";
 import { Heading } from "./heading";
 import { Icon } from "./icon";
+import { glyphs } from "./icons";
 import { IntegrationsContext } from "./integrations";
 import { LineDiff, lineCounts } from "./line-diff";
 import { ago } from "./moment";
@@ -197,7 +197,7 @@ function RunPreview({ id, revision, renderer, runs }: Previewed & { runs: boolea
           size="sm"
           onClick={() => running.run(() => (live ? null : revision.version))}
         >
-          <Icon icon={live ? Square : Play} className="size-3.5" />
+          <Icon icon={live ? glyphs.square : glyphs.play} className="size-3.5" />
           {live ? `Stop version ${revision.version}` : `Run version ${revision.version}`}
         </Button>
         <p className={TYPE.note}>

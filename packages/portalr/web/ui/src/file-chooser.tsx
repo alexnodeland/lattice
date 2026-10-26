@@ -4,11 +4,11 @@
  * Dropping is the alternative, never the only way (portalr ADR-0049).
  */
 
-import { FileUp } from "lucide-react";
 import { type DragEvent, type ReactNode, useId, useState } from "react";
 import { buttonLook } from "./button";
 import { cn } from "./cn";
 import { Icon } from "./icon";
+import { glyphs } from "./icons";
 
 export function FileChooser({
   label,
@@ -73,7 +73,7 @@ export function FileChooser({
       )}
     >
       <label htmlFor={input} className="flex items-center gap-2 font-semibold">
-        <Icon icon={FileUp} />
+        <Icon icon={glyphs.fileUp} />
         {label}
       </label>
       {/*

@@ -94,6 +94,7 @@ export { PageViewer, SheetTable, sheetsOf } from "./file-preview";
 export { Heading } from "./heading";
 export { Icon } from "./icon";
 export { IconButton } from "./icon-button";
+export { type Glyph, type GlyphName, glyphs } from "./icons";
 export { IntegrationList, type IntegrationRow, type IntegrationSource } from "./integration-list";
 export { IntegrationsContext, type IsEnabled } from "./integrations";
 export { type Column, ItemTable } from "./item-table";

@@ -1,8 +1,8 @@
 import { Menu } from "@base-ui/react/menu";
-import { Check, LogOut } from "lucide-react";
 import { type ReactNode, useId } from "react";
 import { cn } from "./cn";
 import { Icon } from "./icon";
+import { glyphs } from "./icons";
 import { groupLabel, item, popup, separator } from "./menu";
 import { FEEDBACK, RING } from "./states";
 
@@ -115,7 +115,7 @@ function PrivacySwitch({
           </span>
         </span>
         <Menu.CheckboxItemIndicator className="text-accent">
-          <Icon icon={Check} />
+          <Icon icon={glyphs.check} />
         </Menu.CheckboxItemIndicator>
       </Menu.CheckboxItem>
       {pending && <Note>{pending}</Note>}
@@ -185,7 +185,7 @@ export function AccountMenu({
               </Menu.GroupLabel>
               <Menu.Item className={item} onClick={onSignOut}>
                 Sign out
-                <Icon icon={LogOut} />
+                <Icon icon={glyphs.logOut} />
               </Menu.Item>
             </Menu.Group>
             <Menu.Separator className={separator} />
@@ -199,7 +199,7 @@ export function AccountMenu({
                   <Menu.RadioItem key={value} value={value} className={item}>
                     {label}
                     <Menu.RadioItemIndicator className="text-accent">
-                      <Icon icon={Check} />
+                      <Icon icon={glyphs.check} />
                     </Menu.RadioItemIndicator>
                   </Menu.RadioItem>
                 ))}
@@ -221,7 +221,7 @@ export function AccountMenu({
                   </span>
                 </span>
                 <Menu.CheckboxItemIndicator className="text-accent">
-                  <Icon icon={Check} />
+                  <Icon icon={glyphs.check} />
                 </Menu.CheckboxItemIndicator>
               </Menu.CheckboxItem>
             </Menu.Group>

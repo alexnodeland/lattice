@@ -1,9 +1,9 @@
 import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
-import { ExternalLink } from "lucide-react";
 import type { ComponentProps, ReactElement, ReactNode } from "react";
 import { cn } from "./cn";
 import { Icon } from "./icon";
+import { glyphs } from "./icons";
 import { FEEDBACK, RING } from "./states";
 
 /**
@@ -56,7 +56,7 @@ function withMark(children: ReactNode) {
       <span className="whitespace-nowrap">
         {tail}
         <Icon
-          icon={ExternalLink}
+          icon={glyphs.externalLink}
           className="ms-(--link-mark-gap) inline size-(--link-mark-size) align-baseline"
         />
       </span>

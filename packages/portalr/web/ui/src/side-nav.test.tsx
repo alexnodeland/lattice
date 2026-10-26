@@ -1,14 +1,14 @@
-import { MessageSquare } from "lucide-react";
 import { expect, onTestFinished, test } from "vitest";
 import { commands, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
+import { glyphs } from "./icons";
 import { NavLink, SideNav } from "./side-nav";
 import { contrast, token } from "./test/colours";
 
 function Nav() {
   return (
     <SideNav label="Workspace">
-      <NavLink href="#threads" icon={MessageSquare} count={1} aria-current="page">
+      <NavLink href="#threads" icon={glyphs.messageSquare} count={1} aria-current="page">
         Threads
       </NavLink>
       <NavLink href="#artifacts">Artifacts</NavLink>

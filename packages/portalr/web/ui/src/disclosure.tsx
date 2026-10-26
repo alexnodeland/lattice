@@ -1,8 +1,8 @@
 import { Collapsible } from "@base-ui/react/collapsible";
-import { ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "./cn";
 import { Icon } from "./icon";
+import { glyphs } from "./icons";
 import { FEEDBACK, RING } from "./states";
 
 /**
@@ -72,7 +72,7 @@ export function Disclosure({
         )}
       >
         <Icon
-          icon={ChevronRight}
+          icon={glyphs.chevronRight}
           className={cn(
             "size-3.5 shrink-0 text-muted transition-transform duration-(--disclosure-duration) group-data-panel-open:rotate-90 motion-reduce:transition-none rtl:-scale-x-100 rtl:group-data-panel-open:rotate-90",
             look === "block" && "mt-0.5 size-4",

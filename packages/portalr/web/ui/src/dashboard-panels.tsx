@@ -7,7 +7,6 @@
  * as `Markdown`; and a form as its caller shows it.
  */
 
-import { ArrowDownRight, ArrowRight, ArrowUpRight } from "lucide-react";
 import { type ComponentType, type ReactNode, useId, useMemo } from "react";
 import type { Panel, StatPanel, TablePanel } from "./artifactr-ui";
 import { MAX_TABLE_ROWS } from "./artifactr-ui";
@@ -17,6 +16,7 @@ import type { ChartTokens } from "./chart-tokens";
 import { Figures, PlainTable } from "./dashboard-figures";
 import { Heading } from "./heading";
 import { Icon } from "./icon";
+import { glyphs } from "./icons";
 import { DASHBOARDS, offSaid, useOff } from "./integrations";
 import { isNumber } from "./json";
 import { Markdown } from "./markdown";
@@ -58,10 +58,10 @@ function Change({ change, unit }: { change: number; unit: string | null | undefi
   const by = `${formatNumber(Math.abs(change))}${unit === "%" ? " points" : unit ? ` ${unit}` : ""}`;
   const [icon, words] =
     change > 0
-      ? [ArrowUpRight, `Up ${by}`]
+      ? [glyphs.arrowUpRight, `Up ${by}`]
       : change < 0
-        ? [ArrowDownRight, `Down ${by}`]
-        : [ArrowRight, "No change"];
+        ? [glyphs.arrowDownRight, `Down ${by}`]
+        : [glyphs.arrowRight, "No change"];
   return (
     <span className="inline-flex items-center gap-1">
       <Icon icon={icon} className="size-3.5" />

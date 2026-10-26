@@ -1,12 +1,12 @@
 import { Dialog } from "@base-ui/react/dialog";
 import { useRender } from "@base-ui/react/use-render";
-import { Menu as MenuGlyph, X } from "lucide-react";
 import { type MouseEvent, type ReactElement, type ReactNode, useEffect, useState } from "react";
 import { useBrand, useUiName } from "./brand";
 import { cn } from "./cn";
 import { backdrop } from "./dialog";
 import { keepTabWithin } from "./full-view";
 import { Icon } from "./icon";
+import { glyphs } from "./icons";
 import { Lockup, Mark, type Ui } from "./marks";
 import { SkipLink } from "./skip-link";
 import { FEEDBACK, RING } from "./states";
@@ -96,7 +96,7 @@ export function AppShell({
       >
         <Dialog.Root open={open} onOpenChange={setOpen}>
           <Dialog.Trigger className={`${button} lg:hidden`}>
-            <Icon icon={MenuGlyph} />
+            <Icon icon={glyphs.menu} />
             Menu
           </Dialog.Trigger>
           <Dialog.Portal>
@@ -114,7 +114,7 @@ export function AppShell({
                   <Lockup ui={ui} />
                 </Home>
                 <Dialog.Close className={button}>
-                  <Icon icon={X} />
+                  <Icon icon={glyphs.x} />
                   Close
                 </Dialog.Close>
               </div>

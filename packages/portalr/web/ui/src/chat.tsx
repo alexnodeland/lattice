@@ -5,7 +5,6 @@
 
 import { Field } from "@base-ui/react/field";
 import type { Artifactr, ArtifactrV1, Thumb } from "@portalr/client";
-import { Bot, FileText, Maximize2, Minimize2, ThumbsDown, ThumbsUp } from "lucide-react";
 import {
   type FormEvent,
   type KeyboardEvent,
@@ -26,6 +25,7 @@ import { endedBy, readAskForm } from "./form-schema";
 import { useFullView } from "./full-view";
 import { Icon } from "./icon";
 import { IconButton } from "./icon-button";
+import { glyphs } from "./icons";
 import { FeatureOff, useFormLock } from "./integrations";
 import { Markdown } from "./markdown";
 import { Questions, type QuestionsAnswer } from "./questions";
@@ -88,7 +88,7 @@ export function Thumbs({ given, onThumbs }: { given: Thumb | null; onThumbs: Giv
       <span className="flex gap-1">
         <IconButton
           label="Helpful"
-          icon={ThumbsUp}
+          icon={glyphs.thumbsUp}
           aria-pressed={given?.up === true}
           disabled={pending}
           focusableWhenDisabled
@@ -96,7 +96,7 @@ export function Thumbs({ given, onThumbs }: { given: Thumb | null; onThumbs: Giv
         />
         <IconButton
           label="Not helpful"
-          icon={ThumbsDown}
+          icon={glyphs.thumbsDown}
           aria-pressed={given?.up === false}
           disabled={pending}
           focusableWhenDisabled
@@ -298,12 +298,14 @@ export function InlineArtifact({
           <span className="flex shrink-0 items-center gap-1">
             {/* In the full view, the way back alone (portalr ADR-0061). */}
             {!full && actions}
-            {open && !full && <IconButton label="Open its page" icon={FileText} render={open} />}
+            {open && !full && (
+              <IconButton label="Open its page" icon={glyphs.fileText} render={open} />
+            )}
             <IconButton
               ref={back}
               escapeThrough={full}
               label={full ? "Back to the page" : "Full view"}
-              icon={full ? Minimize2 : Maximize2}
+              icon={full ? glyphs.minimize2 : glyphs.maximize2}
               onClick={() => setFull(!full)}
             />
           </span>
@@ -459,7 +461,7 @@ function FormRequest({
   return (
     <div className={cn(card, "gap-3", ended === undefined && off === null && "border-accent")}>
       <p className={cn(TYPE.note, "inline-flex items-center gap-1.5")}>
-        <Icon icon={Bot} className="size-3.5" />
+        <Icon icon={glyphs.bot} className="size-3.5" />
         The agent asks
       </p>
       {asked === null ? (

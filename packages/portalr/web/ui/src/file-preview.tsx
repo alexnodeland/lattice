@@ -5,12 +5,12 @@
  * a page is the app's PNG, and a sheet is the text the server keeps.
  */
 
-import { ChevronLeft, ChevronRight, Maximize, Minimize } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { Button } from "./button";
 import { cn } from "./cn";
 import type { PageShown } from "./file-pages";
 import { Icon } from "./icon";
+import { glyphs } from "./icons";
 import { ScrollRegion } from "./scroll-region";
 import { Skeleton } from "./skeleton";
 import { TYPE } from "./type";
@@ -61,7 +61,7 @@ export function PageViewer({
           disabled={page <= 1}
           onClick={() => go(page - 1)}
         >
-          <Icon icon={ChevronLeft} className="size-4 rtl:rotate-180" />
+          <Icon icon={glyphs.chevronLeft} className="size-4 rtl:rotate-180" />
         </Button>
         <p aria-live="polite" className={cn(TYPE.meta, "tabular-nums")}>
           {name}
@@ -73,7 +73,7 @@ export function PageViewer({
           disabled={page >= total}
           onClick={() => go(page + 1)}
         >
-          <Icon icon={ChevronRight} className="size-4 rtl:rotate-180" />
+          <Icon icon={glyphs.chevronRight} className="size-4 rtl:rotate-180" />
         </Button>
         <Button
           variant="ghost"
@@ -82,7 +82,7 @@ export function PageViewer({
           aria-pressed={actual}
           onClick={() => setActual(!actual)}
         >
-          <Icon icon={actual ? Minimize : Maximize} className="size-3.5" />
+          <Icon icon={actual ? glyphs.minimize : glyphs.maximize} className="size-3.5" />
           Actual size
         </Button>
       </div>

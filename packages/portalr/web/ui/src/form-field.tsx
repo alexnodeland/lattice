@@ -1,8 +1,8 @@
 import { Field } from "@base-ui/react/field";
-import { CircleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "./cn";
 import { Icon } from "./icon";
+import { glyphs } from "./icons";
 import { TYPE } from "./type";
 
 /**
@@ -13,7 +13,7 @@ export const refusal = "flex items-start gap-1.5 text-fg text-sm";
 
 /** The failed mark before a refusal's words, on their first line. */
 export function RefusalMark() {
-  return <Icon icon={CircleAlert} className="mt-0.5 text-status-failed" />;
+  return <Icon icon={glyphs.circleAlert} className="mt-0.5 text-status-failed" />;
 }
 
 /**

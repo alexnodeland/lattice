@@ -10,7 +10,6 @@ import { CheckboxGroup } from "@base-ui/react/checkbox-group";
 import { Radio } from "@base-ui/react/radio";
 import { RadioGroup } from "@base-ui/react/radio-group";
 import type { ArtifactrV1 } from "@portalr/client";
-import { Bot, Check } from "lucide-react";
 import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { Alert } from "./alert";
 import { Badge } from "./badge";
@@ -18,6 +17,7 @@ import { Button } from "./button";
 import { cn } from "./cn";
 import { FieldGroup } from "./field-group";
 import { Icon } from "./icon";
+import { glyphs } from "./icons";
 import { isObject, isString, own } from "./json";
 import { type Sent, Unsent, useSending } from "./sending";
 import { FEEDBACK, RING } from "./states";
@@ -113,7 +113,7 @@ export function Questions({
       )}
     >
       <p className={cn(TYPE.note, "inline-flex items-center gap-1.5")}>
-        <Icon icon={Bot} className="size-3.5" />
+        <Icon icon={glyphs.bot} className="size-3.5" />
         {given === null ? "The agent asks" : "The agent asked"}
       </p>
       {questions === null ? (
@@ -356,7 +356,7 @@ function OptionRow({
     <Checkbox.Root {...named} value={option.value} className={ROW}>
       <span className={cn(MARK, "rounded group-data-checked:bg-accent")}>
         <Checkbox.Indicator className="text-on-accent">
-          <Icon icon={Check} className="size-3" />
+          <Icon icon={glyphs.check} className="size-3" />
         </Checkbox.Indicator>
       </span>
       {words}

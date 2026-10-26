@@ -1,8 +1,8 @@
 import { Menu } from "@base-ui/react/menu";
-import { Check, ChevronDown } from "lucide-react";
 import type { ReactElement } from "react";
 import { cn } from "./cn";
 import { Icon } from "./icon";
+import { glyphs } from "./icons";
 import { groupLabel, item, popup, separator } from "./menu";
 import { FEEDBACK, RING } from "./states";
 
@@ -38,7 +38,7 @@ function Choices({
             <span className="flex items-center gap-2 text-muted text-xs">
               {detail}
               <Menu.RadioItemIndicator className="text-accent">
-                <Icon icon={Check} />
+                <Icon icon={glyphs.check} />
               </Menu.RadioItemIndicator>
             </span>
           </Menu.RadioItem>
@@ -97,7 +97,7 @@ export function Switcher({
             {tenant}
           </span>
         )}
-        <Icon icon={ChevronDown} className="ml-auto text-muted" />
+        <Icon icon={glyphs.chevronDown} className="ml-auto text-muted" />
       </Menu.Trigger>
       <Menu.Portal>
         <Menu.Positioner sideOffset={6} align="start" className="z-30">
@@ -147,7 +147,7 @@ export function TenantSwitcher({
         <span aria-hidden="true" className="truncate">
           {named}
         </span>
-        <Icon icon={ChevronDown} className="ml-auto text-muted" />
+        <Icon icon={glyphs.chevronDown} className="ml-auto text-muted" />
       </Menu.Trigger>
       <Menu.Portal>
         <Menu.Positioner sideOffset={6} align="start" className="z-30">

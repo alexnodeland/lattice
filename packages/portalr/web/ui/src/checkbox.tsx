@@ -1,11 +1,11 @@
 import { Checkbox as BaseCheckbox } from "@base-ui/react/checkbox";
 import { CheckboxGroup as BaseCheckboxGroup } from "@base-ui/react/checkbox-group";
 import { Field } from "@base-ui/react/field";
-import { Check } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 import { cn } from "./cn";
 import { FieldGroup } from "./field-group";
 import { Icon } from "./icon";
+import { glyphs } from "./icons";
 import { FEEDBACK, RING } from "./states";
 
 /** One of a checkbox group's choices: what it submits, and the words beside it. */
@@ -33,7 +33,7 @@ export function Checkbox(props: Omit<ComponentProps<typeof BaseCheckbox.Root>, "
       {...props}
     >
       <BaseCheckbox.Indicator className="text-on-accent">
-        <Icon icon={Check} className="size-3" />
+        <Icon icon={glyphs.check} className="size-3" />
       </BaseCheckbox.Indicator>
     </BaseCheckbox.Root>
   );

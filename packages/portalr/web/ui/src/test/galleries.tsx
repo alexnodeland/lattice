@@ -4,17 +4,6 @@
  */
 
 import type { Artifactr, ArtifactrV1 } from "@portalr/client";
-import {
-  House,
-  KeyRound,
-  Maximize2,
-  MessageSquare,
-  Play,
-  Plus,
-  ScrollText,
-  ThumbsUp,
-  Zap,
-} from "lucide-react";
 import { AccountMenu } from "../account-menu";
 import { Alert } from "../alert";
 import { AppShell } from "../app-shell";
@@ -30,6 +19,7 @@ import { Dialog } from "../dialog";
 import { EmptyState } from "../empty-state";
 import { Icon } from "../icon";
 import { IconButton } from "../icon-button";
+import { glyphs } from "../icons";
 import { Menu } from "../menu";
 import { PageHeader } from "../page-header";
 import { Progress } from "../progress";
@@ -81,16 +71,16 @@ export function Gallery() {
       }
       nav={
         <SideNav label="Workspace">
-          <NavLink href="#threads" icon={MessageSquare} count={1}>
+          <NavLink href="#threads" icon={glyphs.messageSquare} count={1}>
             Threads
           </NavLink>
-          <NavLink href="#artifacts" icon={ScrollText}>
+          <NavLink href="#artifacts" icon={glyphs.scrollText}>
             Artifacts
           </NavLink>
-          <NavLink href="#runs" icon={Play} aria-current="page">
+          <NavLink href="#runs" icon={glyphs.play} aria-current="page">
             Runs
           </NavLink>
-          <NavLink href="#rules" icon={Zap}>
+          <NavLink href="#rules" icon={glyphs.zap}>
             Rules
           </NavLink>
         </SideNav>
@@ -157,7 +147,7 @@ export function Gallery() {
           <TextField label="Why? (optional)" defaultValue="The ticket had no subject" />
           <span className="flex gap-2">
             <Button>
-              <Icon icon={Plus} />
+              <Icon icon={glyphs.plus} />
               Approve
             </Button>
             <Button variant="secondary">Deny</Button>
@@ -225,10 +215,10 @@ export function AdminGallery() {
       }
       nav={
         <SideNav label="Tenant">
-          <NavLink href="#home" icon={House} aria-current="page">
+          <NavLink href="#home" icon={glyphs.house} aria-current="page">
             Home
           </NavLink>
-          <NavLink href="#access" icon={KeyRound}>
+          <NavLink href="#access" icon={glyphs.keyRound}>
             Access
           </NavLink>
         </SideNav>
@@ -621,8 +611,8 @@ export function Kit() {
       <Menu label="Actions" items={[{ label: "Open", onSelect: () => undefined }]} />
       <CopyButton text="portalr" what="the name" />
       <span className="flex gap-1">
-        <IconButton label="Helpful" icon={ThumbsUp} aria-pressed />
-        <IconButton label="Full view" icon={Maximize2} />
+        <IconButton label="Helpful" icon={glyphs.thumbsUp} aria-pressed />
+        <IconButton label="Full view" icon={glyphs.maximize2} />
       </span>
       <CodeBlock code={'const a = "b";'} language="text" />
     </div>

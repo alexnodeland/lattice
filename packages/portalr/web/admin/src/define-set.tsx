@@ -6,17 +6,10 @@
  */
 
 import { type Answer, orThrow, refusal } from "@portalr/client";
-import {
-  Alert,
-  Button,
-  Card,
-  CheckboxGroup,
-  ConfirmDialog,
-  SectionTitle,
-  TextField,
-} from "@portalr/ui";
-import { type ReactNode, useActionState, useEffect, useId, useRef, useState } from "react";
+import { Alert, Button, CheckboxGroup, ConfirmDialog, TextField } from "@portalr/ui";
+import { type ReactNode, useActionState, useEffect, useRef, useState } from "react";
 import { refused } from "./access";
+import { Folded } from "./folded";
 
 /** A set being changed: its name, and what is in it, as grantr last said, read afresh. */
 export interface Changing {
@@ -81,7 +74,6 @@ export function DefineSet({
   onSaved,
   onCancel,
 }: DefineSetProps) {
-  const headingId = useId();
   const heading = useRef<HTMLHeadingElement>(null);
   const choices = "choices" in picking ? picking.choices : null;
   const offered = (key: string) => choices === null || choices.some((one) => one.value === key);
@@ -104,6 +96,7 @@ export function DefineSet({
     return reason === null ? save(named, keys) : refused(reason);
   }
 
+  const [opened, setOpened] = useState(false);
   const [said, submit, pending] = useActionState(async (_last: string | null) => {
     const saved = await saving();
     if (saved.outcome === "refused") {
@@ -115,10 +108,13 @@ export function DefineSet({
 
   const lost = removed.length > 0 ? losing(removed, named) : null;
   return (
-    <Card render={<section aria-labelledby={headingId} />} className="flex flex-col gap-3">
-      <SectionTitle id={headingId} ref={heading} tabIndex={-1}>
-        {changing ? words.change(changing.name) : words.create}
-      </SectionTitle>
+    <Folded
+      title={changing ? words.change(changing.name) : words.create}
+      action={changing ? "Change…" : "Create…"}
+      open={changing !== null || opened}
+      onOpenChange={setOpened}
+      heading={{ ref: heading, tabIndex: -1 }}
+    >
       {changing && note}
       <form className="flex flex-col gap-3" action={submit}>
         {changing === null && (
@@ -171,7 +167,7 @@ export function DefineSet({
           )}
         </div>
       </form>
-    </Card>
+    </Folded>
   );
 }
 

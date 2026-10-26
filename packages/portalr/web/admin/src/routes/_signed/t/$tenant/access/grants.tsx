@@ -2,7 +2,6 @@ import { type Answer, type GrantrApi, type Names, orThrow, refusal } from "@port
 import {
   Alert,
   Button,
-  Card,
   type Column,
   ConfirmDialog,
   EmptyState,
@@ -29,6 +28,7 @@ import {
   whom,
   whomIn,
 } from "../../../../../access";
+import { Folded } from "../../../../../folded";
 
 type Grant = GrantrApi.components["schemas"]["Grant"];
 type AuditEntry = GrantrApi.components["schemas"]["AuditEntry"];
@@ -289,7 +289,6 @@ function Granting({
 }) {
   const { queries, commands } = Route.useRouteContext();
   const { changed } = useAccess(tenant);
-  const heading = useId();
   const suggestedWorkspaces = useId();
   const suggestedGrantees = useId();
   // Suggestions alone, so the form works without them.
@@ -352,8 +351,7 @@ function Granting({
   }
 
   return (
-    <Card render={<section aria-labelledby={heading} />} className="flex flex-col gap-3">
-      <SectionTitle id={heading}>Grant a role</SectionTitle>
+    <Folded title="Grant a role" action="Grant…">
       <form className="flex flex-col gap-3" onSubmit={(event) => void submit(event)}>
         <SelectField
           label="Role"
@@ -469,6 +467,6 @@ function Granting({
           </Button>
         )}
       </form>
-    </Card>
+    </Folded>
   );
 }

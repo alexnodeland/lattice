@@ -1,18 +1,10 @@
 import { orThrow, refusal } from "@portalr/client";
-import {
-  Alert,
-  Button,
-  Card,
-  ConfirmDialog,
-  ItemTable,
-  SectionTitle,
-  SelectField,
-  TextField,
-} from "@portalr/ui";
+import { Alert, Button, ConfirmDialog, ItemTable, SelectField, TextField } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { useActionState, useId, useState } from "react";
+import { useActionState, useState } from "react";
 import { allowedNow, opening, useAccess } from "../../../../../access";
+import { Folded } from "../../../../../folded";
 
 /** A key just issued: its public id, its principal, and its secret, held by this screen alone. */
 interface Issued {
@@ -130,7 +122,6 @@ function Issue({
 }) {
   const { commands } = Route.useRouteContext();
   const { changed } = useAccess(tenant);
-  const heading = useId();
   const [copied, setCopied] = useState<boolean | null>(null);
   const [refused, issue, issuing] = useActionState(async (_last: string | null, form: FormData) => {
     setCopied(null);
@@ -152,8 +143,7 @@ function Issue({
     return null;
   }, null);
   return (
-    <Card render={<section aria-labelledby={heading} />} className="flex flex-col gap-3">
-      <SectionTitle id={heading}>Issue a key</SectionTitle>
+    <Folded title="Issue a key" action="Issue…">
       <form className="flex flex-col gap-3" action={issue}>
         {principals === null ? (
           <TextField label="Service principal" name="principal" autoComplete="off" required />
@@ -210,6 +200,6 @@ function Issue({
           </div>
         </div>
       )}
-    </Card>
+    </Folded>
   );
 }

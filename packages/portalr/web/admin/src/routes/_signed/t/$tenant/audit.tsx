@@ -1,19 +1,17 @@
 import type { AuditFilter } from "@portalr/client";
 import {
   Button,
-  Card,
   EmptyState,
   FailureAlert,
   ItemTable,
   Moment,
   PageHeader,
-  SectionTitle,
   SelectField,
   TextField,
 } from "@portalr/ui";
 import { useSuspenseInfiniteQuery } from "@tanstack/react-query";
 import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-router";
-import { type FormEvent, useId, useState } from "react";
+import { type FormEvent, useState } from "react";
 import { opening, useNames } from "../../../../access";
 import {
   actor,
@@ -25,6 +23,7 @@ import {
   searchOf,
   TYPES,
 } from "../../../../audit";
+import { Folded } from "../../../../folded";
 import { ReadFailed } from "../../../../read-failed";
 
 const HEADER = <PageHeader title="Audit" meta="Every change to who may see and do what" />;
@@ -114,15 +113,18 @@ function Audit() {
  */
 function Filter({ filter }: { filter: AuditFilter }) {
   const navigate = Route.useNavigate();
-  const heading = useId();
   const [kind, setKind] = useState<string>(filter.actor_kind ?? "");
   function apply(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     void navigate({ search: filterOf(Object.fromEntries(new FormData(event.currentTarget))) });
   }
   return (
-    <Card render={<section aria-labelledby={heading} />} className="flex flex-col gap-3">
-      <SectionTitle id={heading}>Filter</SectionTitle>
+    <Folded
+      title="Filter"
+      action="Filter…"
+      said={Object.values(filter).some(Boolean) ? "filtered" : null}
+      defaultOpen={Object.values(filter).some(Boolean)}
+    >
       <form className="grid gap-3 sm:grid-cols-2" onSubmit={apply}>
         <SelectField
           label="Change"
@@ -165,7 +167,7 @@ function Filter({ filter }: { filter: AuditFilter }) {
           </Button>
         </div>
       </form>
-    </Card>
+    </Folded>
   );
 }
 

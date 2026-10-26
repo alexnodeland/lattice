@@ -1,17 +1,9 @@
 import { keys, orThrow } from "@portalr/client";
-import {
-  Alert,
-  Button,
-  Card,
-  ConfirmDialog,
-  ItemTable,
-  PageHeader,
-  SectionTitle,
-  TextField,
-} from "@portalr/ui";
+import { Alert, Button, ConfirmDialog, ItemTable, PageHeader, TextField } from "@portalr/ui";
 import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-router";
-import { useId, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { Folded } from "../../../folded";
 import { unread } from "../../../home";
 import { ReadFailed } from "../../../read-failed";
 import { budgetSaid, isEmail, isTenantId, PAGE, rowsFor, spendSaid } from "../../../tenants";
@@ -84,18 +76,13 @@ function Tenants() {
 function Create() {
   const { commands, user } = Route.useRouteContext();
   const queryClient = useQueryClient();
-  const heading = useId();
   const [tenant, setTenant] = useState("");
   const [email, setEmail] = useState("");
   const [made, setMade] = useState<string | null>(null);
   const field = useRef<HTMLInputElement>(null);
   const ready = isTenantId(tenant) && isEmail(email.trim());
   return (
-    <Card
-      render={<section aria-labelledby={heading} />}
-      className="flex flex-col gap-3 sm:max-w-xl"
-    >
-      <SectionTitle id={heading}>Create a tenant</SectionTitle>
+    <Folded title="Create a tenant" action="Create…" className="sm:max-w-xl">
       <TextField
         ref={field}
         label="Tenant"
@@ -145,6 +132,6 @@ function Create() {
         </p>
       </ConfirmDialog>
       {made && <Alert tone="info">{made}</Alert>}
-    </Card>
+    </Folded>
   );
 }

@@ -2,14 +2,12 @@ import { TRACES_LIMIT } from "@portalr/client";
 import {
   Alert,
   Button,
-  Card,
   CopyButton,
   duration,
   EmptyState,
   ItemTable,
   Moment,
   PageHeader,
-  SectionTitle,
   SegmentedFilter,
   TextField,
   TextLink,
@@ -21,8 +19,9 @@ import {
   Link,
   type SearchSchemaInput,
 } from "@tanstack/react-router";
-import { type FormEvent, useId, useState } from "react";
+import { type FormEvent, useState } from "react";
 import { opening } from "../../../../../access";
+import { Folded } from "../../../../../folded";
 import { ReadFailed } from "../../../../../read-failed";
 import {
   ID_PATTERN,
@@ -193,7 +192,6 @@ function Traces() {
 /** The window, and a thread's or a run's id: applying them puts them in the address. */
 function Filter({ shown }: { shown: Required<Shown> }) {
   const navigate = Route.useNavigate();
-  const heading = useId();
   const [hours, setHours] = useState(String(shown.hours));
   function apply(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -201,8 +199,18 @@ function Filter({ shown }: { shown: Required<Shown> }) {
     void navigate({ search: shownOf(form) });
   }
   return (
-    <Card render={<section aria-labelledby={heading} />} className="flex flex-col gap-3">
-      <SectionTitle id={heading}>Find</SectionTitle>
+    <Folded
+      title="Find"
+      action="Find…"
+      said={[
+        RANGES.find((range) => range.hours === shown.hours)?.label,
+        shown.thread && `thread ${shown.thread}`,
+        shown.run && `run ${shown.run}`,
+      ]
+        .filter(Boolean)
+        .join(", ")}
+      defaultOpen={Boolean(shown.thread || shown.run)}
+    >
       <form className="grid gap-3 sm:grid-cols-3" onSubmit={apply}>
         <SegmentedFilter
           label="Window"
@@ -240,6 +248,6 @@ function Filter({ shown }: { shown: Required<Shown> }) {
           </Button>
         </div>
       </form>
-    </Card>
+    </Folded>
   );
 }

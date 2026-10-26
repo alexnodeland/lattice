@@ -221,6 +221,7 @@ test("Grants names whom each is to, and the revoke dialog says it the same way",
     .element(screen.getByRole("rowheader", { name: "ada@acme.test (person)" }))
     .toBeVisible();
   await expect.element(screen.getByRole("rowheader", { name: "c0ffee00… (person)" })).toBeVisible();
+  await screen.getByRole("button", { name: "Grant…" }).click();
   expect(await optionsOf(screen, "To")).toContain("ben@acme.test (person)");
 });
 

@@ -997,3 +997,27 @@ test("the strip over a paused turn offers the way to its question, and no Stop",
   await strip.getByRole("button", { name: "Go to the question" }).click();
   expect(onQuestion).toHaveBeenCalledOnce();
 });
+
+test("away from the end, the way back to the latest is offered once more arrives, and not before", async () => {
+  const lines = (count: number, from = 0) =>
+    Array.from({ length: count }, (_, at) => (
+      <li key={from + at} style={{ height: "40vh" }}>
+        Message {from + at + 1}
+      </li>
+    ));
+  const screen = await render(<Messages>{lines(6)}</Messages>);
+  window.scrollTo(0, document.documentElement.scrollHeight);
+  await expect.poll(() => window.scrollY).toBeGreaterThan(0);
+  window.scrollTo(0, 0);
+  await expect.poll(() => window.scrollY).toBe(0);
+  // Away, but nothing new: nothing is offered.
+  await new Promise((settled) => setTimeout(settled, 100));
+  expect(screen.getByRole("button", { name: "Jump to latest" }).elements()).toHaveLength(0);
+  await screen.rerender(<Messages>{lines(7)}</Messages>);
+  const jump = screen.getByRole("button", { name: "Jump to latest" });
+  await expect.element(jump).toBeVisible();
+  await jump.click();
+  await expect.element(jump).not.toBeInTheDocument();
+  expect(document.activeElement?.textContent).toBe("Message 7");
+  expect(window.scrollY).toBeGreaterThan(0);
+});

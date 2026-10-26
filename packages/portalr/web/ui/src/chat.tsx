@@ -315,9 +315,63 @@ function Thinking() {
 
 /** A thread's messages, oldest first, and what is streaming after them, announced as they come. */
 export function Messages({ children, className }: { children: ReactNode; className?: string }) {
+  const list = useRef<HTMLOListElement>(null);
+  const end = useRef<HTMLDivElement>(null);
+  // Away from the end, and more arrived since (portalr ADR-0080): the way back to the latest is
+  // offered, and never while the end is in view, where the page follows what arrives on its own.
+  const [away, setAway] = useState(false);
+  const [arrived, setArrived] = useState(false);
+  useEffect(() => {
+    if (end.current === null || list.current === null) {
+      return;
+    }
+    const seeing = new IntersectionObserver(([entry]) => {
+      const visible = entry?.isIntersecting ?? true;
+      setAway(!visible);
+      if (visible) {
+        setArrived(false);
+      }
+    });
+    seeing.observe(end.current);
+    const growing = new MutationObserver(() => setArrived(true));
+    growing.observe(list.current, { childList: true });
+    return () => {
+      seeing.disconnect();
+      growing.disconnect();
+    };
+  }, []);
+  const toLatest = () => {
+    const last = list.current?.lastElementChild;
+    if (last instanceof HTMLElement) {
+      if (!last.hasAttribute("tabindex")) {
+        last.tabIndex = -1;
+      }
+      last.focus({ preventScroll: true });
+    }
+    end.current?.scrollIntoView({
+      block: "end",
+      behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+    });
+  };
   return (
-    <div role="log" aria-label="Messages">
-      <ol className={cn("flex flex-col gap-4", className)}>{children}</ol>
+    <div role="log" aria-label="Messages" className="relative">
+      <ol ref={list} className={cn("flex flex-col gap-4", className)}>
+        {children}
+      </ol>
+      <div ref={end} aria-hidden="true" className="h-px" />
+      {away && arrived && (
+        <div className="pointer-events-none sticky bottom-(--composer-clearance,0px) flex justify-center pb-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            className="pointer-events-auto shadow-(--popover-shadow)"
+            onClick={toLatest}
+          >
+            <Icon icon={glyphs.arrowDown} className="size-3.5" />
+            Jump to latest
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

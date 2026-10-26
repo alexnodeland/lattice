@@ -63,6 +63,16 @@
   html:has([data-composer-dock]:focus-within) {
     scroll-padding-bottom: 0;
   }
+
+  /*
+   * In a short window, as at a high zoom or a phone turned on its side, a composer pinned to the
+   * bottom would cover most of the page: it stays in the flow instead, at the thread's end.
+   */
+  @media (max-height: 30rem) {
+    [data-composer-dock] {
+      position: static;
+    }
+  }
 }
 
 @theme inline {

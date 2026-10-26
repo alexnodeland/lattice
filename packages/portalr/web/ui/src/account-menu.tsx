@@ -4,6 +4,7 @@ import { type ReactNode, useId } from "react";
 import { cn } from "./cn";
 import { Icon } from "./icon";
 import { groupLabel, item, popup, separator } from "./menu";
+import { FEEDBACK, RING } from "./states";
 
 /** The scheme a person chose: the system's, or one of the two. */
 export type Appearance = "system" | "light" | "dark";
@@ -158,7 +159,11 @@ export function AccountMenu({
     <Menu.Root>
       <Menu.Trigger
         aria-label={`Account: ${name}`}
-        className="inline-flex min-w-0 items-center gap-2 rounded-(--header-trigger-radius) p-1 pr-2 font-medium text-fg text-sm outline-offset-(--focus-offset) hover:bg-wash focus-visible:outline-(length:--focus-width) focus-visible:outline-focus"
+        className={cn(
+          "inline-flex min-w-0 items-center gap-2 rounded-(--header-trigger-radius) p-1 pr-2 font-medium text-fg text-sm hover:bg-wash",
+          RING,
+          FEEDBACK,
+        )}
       >
         <span
           aria-hidden="true"

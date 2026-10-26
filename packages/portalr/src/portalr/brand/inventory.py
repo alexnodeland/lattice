@@ -200,6 +200,15 @@ COMPONENTS: tuple[Group, ...] = (
         ),
     ),
     Group(
+        "A control's feedback: how long its colours take to follow the pointer and the keyboard"
+        " when it is hovered, pressed or chosen, and how they ease; a button's are its own"
+        " (portalr ADR-0079).",
+        (
+            Row("component.feedback.duration", "--feedback-duration", "duration"),
+            Row("component.feedback.ease", "--feedback-ease", "cubicBezier"),
+        ),
+    ),
+    Group(
         "A button: its corners, its padding at each size, its words' weight, how far it moves"
         " down when pressed, and how its colours change (portalr ADR-0037).",
         (

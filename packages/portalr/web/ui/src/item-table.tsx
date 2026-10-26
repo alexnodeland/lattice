@@ -21,7 +21,9 @@ export interface Column<T> {
  * shown, so only one is in the accessibility tree: the table named by `caption`, or by the
  * heading `labelledBy` names, each row named by its first cell, or the list, named the same, each
  * card headed and named by its first cell, with the others beside their labels and the item's
- * actions last. With no items, it says so. Columns given widths are laid out to them.
+ * actions last. A card's heading is one level under what names the table: the page's, for one
+ * named by a caption, or the heading named, taken as a section's, unless `level` says where
+ * (portalr ADR-0079). With no items, it says so. Columns given widths are laid out to them.
  */
 export function ItemTable<T>({
   columns,
@@ -30,8 +32,11 @@ export function ItemTable<T>({
   named,
   actions,
   empty,
+  level,
   ...naming
 }: ({ caption: string } | { labelledBy: string }) & {
+  /** The level of each card's heading, where the outline above the table isn't the usual. */
+  level?: 2 | 3 | 4;
   columns: readonly [Column<T>, ...Column<T>[]];
   items: readonly T[];
   keyOf: (item: T) => string;
@@ -46,6 +51,7 @@ export function ItemTable<T>({
   const caption = "caption" in naming ? naming.caption : undefined;
   const labelledBy = "labelledBy" in naming ? naming.labelledBy : undefined;
   const fixed = columns.some((column) => column.width !== undefined);
+  const headed = level ?? ("caption" in naming ? 2 : 3);
   if (items.length === 0) {
     return <EmptyState title={empty.title}>{empty.body}</EmptyState>;
   }
@@ -95,7 +101,7 @@ export function ItemTable<T>({
         {items.map((item, index) => (
           <li key={keyOf(item)} {...name(item, index, "card")}>
             <Card className="flex flex-col gap-2">
-              <Heading id={id(index, "card")} level={3} look="subsection">
+              <Heading id={id(index, "card")} level={headed} look="subsection">
                 {first.cell(item)}
               </Heading>
               {rest.length > 0 && (

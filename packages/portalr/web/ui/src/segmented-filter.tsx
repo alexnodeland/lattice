@@ -1,7 +1,9 @@
 import { Radio } from "@base-ui/react/radio";
 import { RadioGroup } from "@base-ui/react/radio-group";
 import type { ReactNode } from "react";
+import { cn } from "./cn";
 import { FieldGroup, type Grouped } from "./field-group";
+import { FEEDBACK, RING } from "./states";
 
 /** One way to filter, with how many it shows, if known. */
 export type Segment<V extends string> = {
@@ -50,7 +52,7 @@ export function SegmentedFilter<V extends string>({
       value={value}
       disabled={disabled}
       onValueChange={(chosen) => onValueChange(chosen)}
-      className="inline-flex flex-wrap gap-0.5 self-start rounded-(--segmented-radius) border border-edge bg-surface p-(--segmented-pad) aria-invalid:border-fg"
+      className="inline-flex flex-wrap gap-0.5 self-start rounded-(--segmented-radius) border border-edge bg-surface p-(--segmented-pad) aria-invalid:border-status-failed"
     >
       {segments.map((segment) => (
         <Radio.Root
@@ -59,7 +61,11 @@ export function SegmentedFilter<V extends string>({
           aria-label={
             segment.count === undefined ? undefined : `${segment.label}, ${segment.count}`
           }
-          className="inline-flex cursor-default items-center gap-1.5 rounded-(--segmented-item-radius) border border-transparent px-(--segmented-item-pad-x) py-(--segmented-item-pad-y) font-medium text-fg text-sm outline-offset-(--focus-offset) hover:not-data-disabled:bg-wash focus-visible:outline-(length:--focus-width) focus-visible:outline-focus data-checked:border-accent data-checked:bg-wash data-checked:font-semibold data-checked:text-accent data-disabled:cursor-not-allowed data-disabled:text-muted data-checked:data-disabled:border-line data-checked:data-disabled:text-fg"
+          className={cn(
+            "inline-flex cursor-default items-center gap-1.5 rounded-(--segmented-item-radius) border border-transparent px-(--segmented-item-pad-x) py-(--segmented-item-pad-y) font-medium text-fg text-sm hover:not-data-disabled:bg-wash data-checked:border-accent data-checked:bg-wash data-checked:font-semibold data-checked:text-accent data-disabled:cursor-not-allowed data-disabled:text-muted data-checked:data-disabled:border-line data-checked:data-disabled:text-fg",
+            RING,
+            FEEDBACK,
+          )}
         >
           {segment.label}
           {segment.count !== undefined && (

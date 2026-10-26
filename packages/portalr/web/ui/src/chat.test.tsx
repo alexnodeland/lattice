@@ -817,3 +817,17 @@ describe("a form the agent asks", () => {
     expect(getComputedStyle(card).borderTopColor).toBe(token("line"));
   });
 });
+
+test("the composer grows with its lines, up to a height, and scrolls past it", async () => {
+  const screen = await render(<Composer onSend={sent()} />);
+  const box = screen.getByRole("textbox", { name: "Message" });
+  const two = box.element().getBoundingClientRect().height;
+  await box.fill("one\ntwo\nthree\nfour\nfive");
+  const five = box.element().getBoundingClientRect().height;
+  expect(five).toBeGreaterThan(two);
+  await box.fill(Array.from({ length: 40 }, (_, at) => `line ${at}`).join("\n"));
+  const forty = box.element().getBoundingClientRect().height;
+  expect(forty).toBeGreaterThan(five);
+  expect(forty).toBeLessThanOrEqual(256);
+  expect(box.element().scrollHeight).toBeGreaterThan(forty);
+});

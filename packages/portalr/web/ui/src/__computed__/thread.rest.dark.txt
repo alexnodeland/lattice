@@ -432,8 +432,8 @@ div0>div0>div0>ol0>li1>section0>form1>div0>div0>span0>span0
 div0>div0>div0>ol0>li1>section0>form1>div0>div0>span0>span0>span0
 div0>div0>div0>ol0>li1>section0>form1>div0>div0>span0>span0>span1
 div0>div0>div0>ol0>li1>section0>form1>div0>div0>div1
-div0>div0>div0>ol0>li1>section0>form1>div0>div0>div1>span0
-div0>div0>div0>ol0>li1>section0>form1>div0>div0>div1>span0>span0
+div0>div0>div0>ol0>li1>section0>form1>div0>div0>div1>span0 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
+div0>div0>div0>ol0>li1>section0>form1>div0>div0>div1>span0>span0 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>div0>ol0>li1>section0>form1>div0>div0>div1>span0>span1
 div0>div0>div0>ol0>li1>section0>form1>div0>div0>div1>span0>span1>span0
 div0>div0>div0>ol0>li1>section0>form1>div0>div0>div1>span0>span1>span0>span0
@@ -441,16 +441,16 @@ div0>div0>div0>ol0>li1>section0>form1>div0>div0>div1>span0>span1>span0>span1
 div0>div0>div0>ol0>li1>section0>form1>div0>div0>div1>span0>span1>span1
 div0>div0>div0>ol0>li1>section0>form1>div0>div0>div1>input1
 div0>div0>div0>ol0>li1>section0>form1>div0>div0>div1>input1::placeholder
-div0>div0>div0>ol0>li1>section0>form1>div0>div0>div1>span2
-div0>div0>div0>ol0>li1>section0>form1>div0>div0>div1>span2>span0
+div0>div0>div0>ol0>li1>section0>form1>div0>div0>div1>span2 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
+div0>div0>div0>ol0>li1>section0>form1>div0>div0>div1>span2>span0 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>div0>ol0>li1>section0>form1>div0>div0>div1>span2>span1
 div0>div0>div0>ol0>li1>section0>form1>div0>div0>div1>span2>span1>span0
 div0>div0>div0>ol0>li1>section0>form1>div0>div0>div1>span2>span1>span0>span0
 div0>div0>div0>ol0>li1>section0>form1>div0>div0>div1>span2>span1>span1
 div0>div0>div0>ol0>li1>section0>form1>div0>div0>div1>input3
 div0>div0>div0>ol0>li1>section0>form1>div0>div0>div1>input3::placeholder
-div0>div0>div0>ol0>li1>section0>form1>div0>div0>div1>span4
-div0>div0>div0>ol0>li1>section0>form1>div0>div0>div1>span4>span0
+div0>div0>div0>ol0>li1>section0>form1>div0>div0>div1>span4 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
+div0>div0>div0>ol0>li1>section0>form1>div0>div0>div1>span4>span0 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>div0>ol0>li1>section0>form1>div0>div0>div1>span4>span1
 div0>div0>div0>ol0>li1>section0>form1>div0>div0>div1>span4>span1>span0
 div0>div0>div0>ol0>li1>section0>form1>div0>div0>div1>span4>span1>span0>span0
@@ -464,8 +464,8 @@ div0>div0>div0>ol0>li1>section0>form1>div1>div0>span0>span0
 div0>div0>div0>ol0>li1>section0>form1>div1>div0>span0>span0>span0
 div0>div0>div0>ol0>li1>section0>form1>div1>div0>span0>span0>span1
 div0>div0>div0>ol0>li1>section0>form1>div1>div0>div1
-div0>div0>div0>ol0>li1>section0>form1>div1>div0>div1>span0
-div0>div0>div0>ol0>li1>section0>form1>div1>div0>div1>span0>span0
+div0>div0>div0>ol0>li1>section0>form1>div1>div0>div1>span0 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
+div0>div0>div0>ol0>li1>section0>form1>div1>div0>div1>span0>span0 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>div0>ol0>li1>section0>form1>div1>div0>div1>span0>span1
 div0>div0>div0>ol0>li1>section0>form1>div1>div0>div1>span0>span1>span0
 div0>div0>div0>ol0>li1>section0>form1>div1>div0>div1>span0>span1>span0>span0
@@ -473,16 +473,16 @@ div0>div0>div0>ol0>li1>section0>form1>div1>div0>div1>span0>span1>span0>span1
 div0>div0>div0>ol0>li1>section0>form1>div1>div0>div1>span0>span1>span1
 div0>div0>div0>ol0>li1>section0>form1>div1>div0>div1>input1
 div0>div0>div0>ol0>li1>section0>form1>div1>div0>div1>input1::placeholder
-div0>div0>div0>ol0>li1>section0>form1>div1>div0>div1>span2
-div0>div0>div0>ol0>li1>section0>form1>div1>div0>div1>span2>span0
+div0>div0>div0>ol0>li1>section0>form1>div1>div0>div1>span2 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
+div0>div0>div0>ol0>li1>section0>form1>div1>div0>div1>span2>span0 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>div0>ol0>li1>section0>form1>div1>div0>div1>span2>span1
 div0>div0>div0>ol0>li1>section0>form1>div1>div0>div1>span2>span1>span0
 div0>div0>div0>ol0>li1>section0>form1>div1>div0>div1>span2>span1>span0>span0
 div0>div0>div0>ol0>li1>section0>form1>div1>div0>div1>span2>span1>span1
 div0>div0>div0>ol0>li1>section0>form1>div1>div0>div1>input3
 div0>div0>div0>ol0>li1>section0>form1>div1>div0>div1>input3::placeholder
-div0>div0>div0>ol0>li1>section0>form1>div1>div0>div1>span4
-div0>div0>div0>ol0>li1>section0>form1>div1>div0>div1>span4>span0
+div0>div0>div0>ol0>li1>section0>form1>div1>div0>div1>span4 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
+div0>div0>div0>ol0>li1>section0>form1>div1>div0>div1>span4>span0 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>div0>ol0>li1>section0>form1>div1>div0>div1>span4>span1
 div0>div0>div0>ol0>li1>section0>form1>div1>div0>div1>span4>span1>span0
 div0>div0>div0>ol0>li1>section0>form1>div1>div0>div1>span4>span1>span0>span0
@@ -499,7 +499,7 @@ div0>div0>div0>ol0>li2>ul0
 div0>div0>div0>ol0>li2>ul0>li0
 div0>div0>div0>ol0>li2>ul0>li0::marker
 div0>div0>div0>ol0>li2>ul0>li0>div0
-div0>div0>div0>ol0>li2>ul0>li0>div0>button0
+div0>div0>div0>ol0>li2>ul0>li0>div0>button0 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>div0>ol0>li2>ul0>li0>div0>button0>svg0 | transition-property: transform, translate, scale, rotate; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>div0>ol0>li2>ul0>li0>div0>button0>svg0>path0
 div0>div0>div0>ol0>li2>ul0>li0>div0>button0>svg1
@@ -533,7 +533,7 @@ div0>div0>div0>ol0>li2>ul0>li0>div0>div1>div0>div1>section1>pre0
 div0>div0>div0>ol0>li2>ul0>li1
 div0>div0>div0>ol0>li2>ul0>li1::marker
 div0>div0>div0>ol0>li2>ul0>li1>div0
-div0>div0>div0>ol0>li2>ul0>li1>div0>button0
+div0>div0>div0>ol0>li2>ul0>li1>div0>button0 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>div0>ol0>li2>ul0>li1>div0>button0>svg0 | transition-property: transform, translate, scale, rotate; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>div0>ol0>li2>ul0>li1>div0>button0>svg0>path0
 div0>div0>div0>ol0>li2>ul0>li1>div0>button0>svg1

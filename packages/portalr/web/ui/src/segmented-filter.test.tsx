@@ -139,5 +139,6 @@ test("a shown filter's refusal is said under it, describes it, and marks it inva
   const group = screen.getByRole("radiogroup", { name: "Show" });
   await expect.element(group).toHaveAttribute("aria-invalid", "true");
   await expect.element(group).toHaveAccessibleDescription("What to list. Choose one.");
-  expect(getComputedStyle(group.element()).borderTopColor).toBe(token("fg"));
+  // Its edge is the failed mark's colour, as a refused field's is (portalr ADR-0079).
+  expect(getComputedStyle(group.element()).borderTopColor).toBe(token("status-failed"));
 });

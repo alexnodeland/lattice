@@ -1,4 +1,6 @@
 import { type ReactNode, useId } from "react";
+import { RefusalMark, refusal } from "./form-field";
+import { TYPE } from "./type";
 
 /** What names, describes and marks a group of controls, for the element that is the group. */
 export interface Grouped {
@@ -32,7 +34,7 @@ export function FieldGroup({
   const described = [hint !== undefined && hintId, error !== null && errorId].filter(Boolean);
   return (
     <div className="flex flex-col gap-1">
-      <span id={labelId} className="font-semibold text-fg text-sm">
+      <span id={labelId} className={TYPE.label}>
         {label}
       </span>
       {children({
@@ -41,13 +43,14 @@ export function FieldGroup({
         ...(error !== null && { "aria-invalid": true }),
       })}
       {hint !== undefined && (
-        <p id={hintId} className="text-muted text-xs">
+        <p id={hintId} className={TYPE.note}>
           {hint}
         </p>
       )}
       {error !== null && (
-        <p id={errorId} className="text-fg text-sm">
-          {error}
+        <p id={errorId} className={refusal}>
+          <RefusalMark />
+          <span>{error}</span>
         </p>
       )}
     </div>

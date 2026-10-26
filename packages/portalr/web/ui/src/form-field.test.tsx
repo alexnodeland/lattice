@@ -53,3 +53,14 @@ test("a control beside its label is named by it, and described by its hint and r
   const label = input.element().closest("label") as Element;
   expect(label.firstElementChild).toBe(input.element());
 });
+
+test("a refusal is described by its words alone: the mark before them is hidden", async () => {
+  const screen = await render(
+    <FormField label="Name" error="Too short.">
+      <Field.Control />
+    </FormField>,
+  );
+  await expect
+    .element(screen.getByRole("textbox", { name: "Name" }))
+    .toHaveAccessibleDescription("Too short.");
+});

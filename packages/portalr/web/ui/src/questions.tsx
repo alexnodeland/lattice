@@ -20,6 +20,7 @@ import { FieldGroup } from "./field-group";
 import { Icon } from "./icon";
 import { isObject, isString, own } from "./json";
 import { type Sent, Unsent, useSending } from "./sending";
+import { FEEDBACK, RING } from "./states";
 import { TextField } from "./text-field";
 import { TYPE } from "./type";
 
@@ -194,7 +195,7 @@ function Asking({
         />
       ))}
       <div className="flex flex-col gap-1">
-        <Button type="submit" className="self-start" disabled={closed}>
+        <Button type="submit" className="self-start" disabled={sent} pending={pending}>
           Answer
         </Button>
         <p className={TYPE.note}>Or reply in a message, in your own words.</p>
@@ -255,7 +256,7 @@ function Asked({
   const label = (
     <span className="flex flex-col items-start gap-1.5">
       <Header>{question.header}</Header>
-      <span className="font-semibold text-base text-fg">{question.question}</span>
+      <span className={TYPE.subsection}>{question.question}</span>
     </span>
   );
   return (
@@ -304,12 +305,17 @@ function Asked({
 }
 
 /** An option's row, which is its control: checked, it is edged and washed in the working colour. */
-const ROW =
-  "group flex w-full cursor-pointer items-start gap-3 rounded-(--question-option-radius) border border-line bg-surface px-(--question-option-pad-x) py-(--question-option-pad-y) text-start outline-offset-(--focus-offset) hover:border-edge focus-visible:outline-(length:--focus-width) focus-visible:outline-focus data-checked:border-accent data-checked:bg-wash data-disabled:cursor-not-allowed data-disabled:hover:border-line";
+const ROW = cn(
+  "group flex w-full cursor-pointer items-start gap-3 rounded-(--question-option-radius) border border-line bg-surface px-(--question-option-pad-x) py-(--question-option-pad-y) text-start hover:border-edge data-checked:border-accent data-checked:bg-wash data-disabled:cursor-not-allowed data-disabled:hover:border-line",
+  RING,
+  FEEDBACK,
+);
 
 /** The mark in an option's row: a ring, or a box, filled in the working colour once checked. */
-const MARK =
-  "mt-0.5 grid size-4 shrink-0 place-items-center border border-edge bg-surface group-data-checked:border-accent";
+const MARK = cn(
+  "mt-0.5 grid size-4 shrink-0 place-items-center border border-edge bg-surface group-data-checked:border-accent",
+  FEEDBACK,
+);
 
 /**
  * One option, as a row that is its radio or its checkbox, so the whole of it chooses it: named by

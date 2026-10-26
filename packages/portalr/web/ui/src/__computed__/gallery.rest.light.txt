@@ -278,7 +278,7 @@ div0
 div0>div0
 div0>div0>a0
 div0>div0>header1
-div0>div0>header1>button0
+div0>div0>header1>button0 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>header1>button0>svg0
 div0>div0>header1>button0>svg0>path0
 div0>div0>header1>button0>svg0>path1
@@ -300,7 +300,7 @@ div0>div0>header1>div1>a0>svg1>g0>polygon3
 div0>div0>header1>div1>a0>svg1>g0>polygon4
 div0>div0>header1>div1>a0>svg1>path1
 div0>div0>header1>div2
-div0>div0>header1>div2>button0
+div0>div0>header1>div2>button0 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>header1>div2>button0>span0
 div0>div0>header1>div2>button0>span1
 div0>div0>header1>div2>button0>span2
@@ -311,13 +311,13 @@ div0>div0>header1>div3>nav0
 div0>div0>header1>div3>nav0>ul0
 div0>div0>header1>div3>nav0>ul0>li0
 div0>div0>header1>div3>nav0>ul0>li0::marker
-div0>div0>header1>div3>nav0>ul0>li0>a0
+div0>div0>header1>div3>nav0>ul0>li0>a0 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>header1>div3>nav0>ul0>li0>a0>svg0
 div0>div0>header1>div3>nav0>ul0>li0>a0>svg0>path0
 div0>div0>header1>div3>nav0>ul0>li0>a0>span1
 div0>div0>header1>div3>nav0>ul0>li1
 div0>div0>header1>div3>nav0>ul0>li1::marker
-div0>div0>header1>div3>nav0>ul0>li1>a0
+div0>div0>header1>div3>nav0>ul0>li1>a0 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>header1>div3>nav0>ul0>li1>a0>svg0
 div0>div0>header1>div3>nav0>ul0>li1>a0>svg0>path0
 div0>div0>header1>div3>nav0>ul0>li1>a0>svg0>path1
@@ -325,16 +325,16 @@ div0>div0>header1>div3>nav0>ul0>li1>a0>svg0>path2
 div0>div0>header1>div3>nav0>ul0>li1>a0>svg0>path3
 div0>div0>header1>div3>nav0>ul0>li2
 div0>div0>header1>div3>nav0>ul0>li2::marker
-div0>div0>header1>div3>nav0>ul0>li2>a0
+div0>div0>header1>div3>nav0>ul0>li2>a0 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>header1>div3>nav0>ul0>li2>a0>svg0
 div0>div0>header1>div3>nav0>ul0>li2>a0>svg0>path0
 div0>div0>header1>div3>nav0>ul0>li3
 div0>div0>header1>div3>nav0>ul0>li3::marker
-div0>div0>header1>div3>nav0>ul0>li3>a0
+div0>div0>header1>div3>nav0>ul0>li3>a0 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>header1>div3>nav0>ul0>li3>a0>svg0
 div0>div0>header1>div3>nav0>ul0>li3>a0>svg0>path0
 div0>div0>header1>div4
-div0>div0>header1>div4>button0
+div0>div0>header1>div4>button0 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>header1>div4>button0>span0
 div0>div0>header1>div4>button0>span1
 div0>div0>main2
@@ -345,11 +345,11 @@ div0>div0>main2>div0>header0>div0>h10
 div0>div0>main2>div0>header0>div0>p1
 div0>div0>main2>div0>header0>div1
 div0>div0>main2>div0>header0>div1>div0
-div0>div0>main2>div0>header0>div1>div0>span0
+div0>div0>main2>div0>header0>div1>div0>span0 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>main2>div0>header0>div1>div0>span0>span0
 div0>div0>main2>div0>header0>div1>div0>input1
 div0>div0>main2>div0>header0>div1>div0>input1::placeholder
-div0>div0>main2>div0>header0>div1>div0>span2
+div0>div0>main2>div0>header0>div1>div0>span2 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>main2>div0>header0>div1>div0>span2>span0
 div0>div0>main2>div0>header0>div1>div0>input3
 div0>div0>main2>div0>header0>div1>div0>input3::placeholder
@@ -363,21 +363,21 @@ div0>div0>main2>div0>div1>section0>table0>thead1>tr0>th0
 div0>div0>main2>div0>div1>section0>table0>thead1>tr0>th1
 div0>div0>main2>div0>div1>section0>table0>thead1>tr0>th2
 div0>div0>main2>div0>div1>section0>table0>tbody2
-div0>div0>main2>div0>div1>section0>table0>tbody2>tr0
+div0>div0>main2>div0>div1>section0>table0>tbody2>tr0 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>main2>div0>div1>section0>table0>tbody2>tr0>td0
 div0>div0>main2>div0>div1>section0>table0>tbody2>tr0>td0>span0
 div0>div0>main2>div0>div1>section0>table0>tbody2>tr0>td0>span0>span0
 div0>div0>main2>div0>div1>section0>table0>tbody2>tr0>td1
 div0>div0>main2>div0>div1>section0>table0>tbody2>tr0>td2
 div0>div0>main2>div0>div1>section0>table0>tbody2>tr0>td2>button0 | transition-property: color, background-color, border-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
-div0>div0>main2>div0>div1>section0>table0>tbody2>tr1
+div0>div0>main2>div0>div1>section0>table0>tbody2>tr1 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>main2>div0>div1>section0>table0>tbody2>tr1>td0
 div0>div0>main2>div0>div1>section0>table0>tbody2>tr1>td0>span0
 div0>div0>main2>div0>div1>section0>table0>tbody2>tr1>td0>span0>span0
 div0>div0>main2>div0>div1>section0>table0>tbody2>tr1>td1
 div0>div0>main2>div0>div1>section0>table0>tbody2>tr1>td2
 div0>div0>main2>div0>div1>section0>table0>tbody2>tr1>td2>button0 | transition-property: color, background-color, border-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
-div0>div0>main2>div0>div1>section0>table0>tbody2>tr2
+div0>div0>main2>div0>div1>section0>table0>tbody2>tr2 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>main2>div0>div1>section0>table0>tbody2>tr2>td0
 div0>div0>main2>div0>div1>section0>table0>tbody2>tr2>td0>span0
 div0>div0>main2>div0>div1>section0>table0>tbody2>tr2>td0>span0>span0
@@ -388,7 +388,7 @@ div0>div0>main2>div0>div1>div1
 div0>div0>main2>div0>div1>div1>p0
 div0>div0>main2>div0>div1>div1>div1
 div0>div0>main2>div0>div1>div1>div1>label0
-div0>div0>main2>div0>div1>div1>div1>input1
+div0>div0>main2>div0>div1>div1>div1>input1 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>main2>div0>div1>div1>div1>input1::placeholder
 div0>div0>main2>div0>div1>div1>span2
 div0>div0>main2>div0>div1>div1>span2>button0 | transition-property: color, background-color, border-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)

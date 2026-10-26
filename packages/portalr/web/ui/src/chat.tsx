@@ -53,7 +53,7 @@ export function CommandButton({
   const { pending, unsent, send } = useSending();
   return (
     <span className="inline-flex flex-col gap-1">
-      <Button variant={variant} disabled={pending} onClick={() => send(onSend)}>
+      <Button variant={variant} pending={pending} onClick={() => send(onSend)}>
         {children}
       </Button>
       <Unsent reason={unsent} />
@@ -107,7 +107,7 @@ export function Thumbs({ given, onThumbs }: { given: Thumb | null; onThumbs: Giv
       {chosen !== null && (
         <form className="flex items-end gap-2" onSubmit={explain}>
           <TextField label="Why? (optional)" name="comment" className="flex-1" />
-          <Button type="submit" variant="secondary" disabled={pending}>
+          <Button type="submit" variant="secondary" pending={pending}>
             Add
           </Button>
         </form>
@@ -316,7 +316,8 @@ export function InlineArtifact({
 
 /**
  * Write a message: Enter sends it, Shift+Enter starts a new line, and composing text waits. It
- * clears as it sends, as the thread shows the message at once; one refused comes back.
+ * grows with its lines, to a height, then scrolls (portalr ADR-0079). It clears as it sends, as
+ * the thread shows the message at once; one refused comes back.
  */
 export function Composer({
   onSend,
@@ -379,14 +380,19 @@ export function Composer({
           placeholder="Write to the assistant"
           onValueChange={(value) => setText(String(value))}
           onKeyDown={key}
-          className="min-h-14 resize-none bg-transparent px-2.5 py-2 text-base text-fg outline-none placeholder:text-muted data-disabled:cursor-not-allowed data-disabled:text-muted"
+          className="max-h-64 min-h-14 field-sizing-content resize-none bg-transparent px-2.5 py-2 text-base text-fg outline-none placeholder:text-muted data-disabled:cursor-not-allowed data-disabled:text-muted"
         />
       </Field.Root>
       <div className="flex items-center justify-between gap-2 px-2.5 pb-1">
         <span className="text-muted text-xs max-sm:hidden">
           Enter sends, Shift+Enter starts a new line
         </span>
-        <Button type="submit" className="ml-auto" disabled={disabled || pending || !text.trim()}>
+        <Button
+          type="submit"
+          className="ml-auto"
+          disabled={disabled || !text.trim()}
+          pending={pending}
+        >
           Send
         </Button>
       </div>
@@ -543,12 +549,18 @@ function Question({
           </pre>
         )}
         <span className="flex gap-2">
-          <Button ref={first} disabled={closed} onClick={() => void answer({ approved: true })}>
+          <Button
+            ref={first}
+            disabled={answered}
+            pending={pending}
+            onClick={() => void answer({ approved: true })}
+          >
             Approve
           </Button>
           <Button
             variant="secondary"
-            disabled={closed}
+            disabled={answered}
+            pending={pending}
             onClick={() => void answer({ approved: false })}
           >
             Deny
@@ -567,7 +579,7 @@ function Question({
     <form className={card} aria-label="The agent asks" onSubmit={submit}>
       <p>{typeof asked === "string" ? asked : `The agent asks, through ${request.tool_name}.`}</p>
       <TextField label="Answer" name="answer" ref={first} disabled={closed} required />
-      <Button type="submit" disabled={closed}>
+      <Button type="submit" disabled={answered} pending={pending}>
         Answer
       </Button>
       <Unsent reason={unsent} />
@@ -712,8 +724,9 @@ export function ProposalCard({
         onRespond && (
           <span className="flex gap-2">
             <Button
-              disabled={pending || blocked !== null}
+              disabled={blocked !== null}
               focusableWhenDisabled={blocked !== null}
+              pending={pending}
               aria-describedby={blocked === null ? undefined : why}
               onClick={() => send(() => onRespond("accept"))}
             >
@@ -721,7 +734,7 @@ export function ProposalCard({
             </Button>
             <Button
               variant="secondary"
-              disabled={pending}
+              pending={pending}
               onClick={() => send(() => onRespond("reject"))}
             >
               Reject

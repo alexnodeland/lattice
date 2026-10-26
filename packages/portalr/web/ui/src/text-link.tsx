@@ -4,6 +4,7 @@ import { ExternalLink } from "lucide-react";
 import type { ComponentProps, ReactElement, ReactNode } from "react";
 import { cn } from "./cn";
 import { Icon } from "./icon";
+import { FEEDBACK, RING } from "./states";
 
 /**
  * A link's variants (portalr ADR-0059):
@@ -16,9 +17,6 @@ import { Icon } from "./icon";
  */
 export type LinkVariant = "inline" | "subtle" | "nav" | "external";
 
-const FOCUS =
-  "outline-offset-(--focus-offset) focus-visible:outline-(length:--focus-width) focus-visible:outline-focus";
-
 const UNDERLINE = "underline underline-offset-(--link-underline-offset)";
 
 const LOOK: Record<LinkVariant, string> = {
@@ -27,6 +25,11 @@ const LOOK: Record<LinkVariant, string> = {
   subtle: `text-fg ${UNDERLINE} decoration-edge hover:text-accent hover:decoration-accent`,
   nav: "font-medium text-accent text-sm underline-offset-(--link-underline-offset) hover:underline",
 };
+
+/** A link's look, with the ring and the feedback, for a link the kit doesn't render itself, such as Markdown's. */
+export function linkLook(variant: LinkVariant) {
+  return cn(LOOK[variant], RING, FEEDBACK);
+}
 
 type Props = Omit<ComponentProps<"a">, "className"> & {
   /**
@@ -72,7 +75,7 @@ export function TextLink({ render, variant = "inline", className, children, ...p
     defaultTagName: "a",
     render,
     props: mergeProps<"a">(props, {
-      className: cn(LOOK[variant], FOCUS, className),
+      className: cn(linkLook(variant), className),
       children: external ? withMark(children) : children,
       ...(external ? { target: "_blank", rel: "noopener noreferrer" } : {}),
     }),

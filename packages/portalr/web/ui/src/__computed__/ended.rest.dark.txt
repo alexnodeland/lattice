@@ -136,7 +136,7 @@ div0>div0>div0>ol0>li1>div0>div1>div0
 div0>div0>div0>ol0>li1>div0>div1>div0>p0
 div0>div0>div0>ol0>li1>div0>div1>div0>p0>span0
 div0>div0>div0>ol0>li1>div0>div1>div0>div1
-div0>div0>div0>ol0>li1>div0>div1>div0>div1>button0
+div0>div0>div0>ol0>li1>div0>div1>div0>div1>button0 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>div0>ol0>li1>div0>div1>div0>div1>button0>svg0 | transition-property: transform, translate, scale, rotate; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>div0>ol0>li1>div0>div1>div0>div1>button0>svg0>path0
 div0>div0>div0>ol0>li1>div0>div1>div0>div1>div1

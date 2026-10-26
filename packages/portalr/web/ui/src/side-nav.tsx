@@ -2,7 +2,9 @@ import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
 import type { LucideIcon } from "lucide-react";
 import type { ComponentProps, ReactElement, ReactNode } from "react";
+import { cn } from "./cn";
 import { Icon } from "./icon";
+import { FEEDBACK, RING } from "./states";
 
 /** The areas of a workspace, as a list of links, the current one marked. */
 export function SideNav({ label, children }: { label: string; children: ReactNode }) {
@@ -36,8 +38,11 @@ export function NavLink({ render, icon, count, children, ...props }: NavLinkProp
     props: mergeProps<"a">(
       {
         "aria-label": count ? `${children}, ${count} waiting for you` : undefined,
-        className:
-          "flex items-center gap-2.5 rounded-(--nav-radius) px-(--nav-pad-x) py-(--nav-pad-y) font-medium text-fg text-sm outline-offset-(--focus-offset) hover:bg-wash focus-visible:outline-(length:--focus-width) focus-visible:outline-focus aria-[current=page]:bg-wash aria-[current=page]:font-semibold aria-[current=page]:text-accent aria-[current=true]:bg-wash aria-[current=true]:font-semibold aria-[current=true]:text-accent forced-colors:aria-[current=page]:outline-solid forced-colors:aria-[current=page]:outline-(length:--focus-width) forced-colors:aria-[current=page]:-outline-offset-(--focus-width) forced-colors:aria-[current=page]:outline-system-highlight forced-colors:aria-[current=page]:focus-visible:outline-offset-(--focus-offset) forced-colors:aria-[current=page]:focus-visible:outline-focus forced-colors:aria-[current=true]:outline-solid forced-colors:aria-[current=true]:outline-(length:--focus-width) forced-colors:aria-[current=true]:-outline-offset-(--focus-width) forced-colors:aria-[current=true]:outline-system-highlight forced-colors:aria-[current=true]:focus-visible:outline-offset-(--focus-offset) forced-colors:aria-[current=true]:focus-visible:outline-focus",
+        className: cn(
+          RING,
+          FEEDBACK,
+          "flex items-center gap-2.5 rounded-(--nav-radius) px-(--nav-pad-x) py-(--nav-pad-y) font-medium text-fg text-sm hover:bg-wash aria-[current=page]:bg-wash aria-[current=page]:font-semibold aria-[current=page]:text-accent aria-[current=true]:bg-wash aria-[current=true]:font-semibold aria-[current=true]:text-accent forced-colors:aria-[current=page]:outline-solid forced-colors:aria-[current=page]:outline-(length:--focus-width) forced-colors:aria-[current=page]:-outline-offset-(--focus-width) forced-colors:aria-[current=page]:outline-system-highlight forced-colors:aria-[current=page]:focus-visible:outline-offset-(--focus-offset) forced-colors:aria-[current=page]:focus-visible:outline-focus forced-colors:aria-[current=true]:outline-solid forced-colors:aria-[current=true]:outline-(length:--focus-width) forced-colors:aria-[current=true]:-outline-offset-(--focus-width) forced-colors:aria-[current=true]:outline-system-highlight forced-colors:aria-[current=true]:focus-visible:outline-offset-(--focus-offset) forced-colors:aria-[current=true]:focus-visible:outline-focus",
+        ),
         children: (
           <>
             {icon && <Icon icon={icon} />}

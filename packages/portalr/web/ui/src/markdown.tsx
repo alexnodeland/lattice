@@ -25,6 +25,7 @@ import { useHighlighted } from "./highlighting";
 import { Icon } from "./icon";
 import { useOnDemand } from "./on-demand";
 import { ScrollRegion } from "./scroll-region";
+import { linkLook } from "./text-link";
 
 type Pluggable = NonNullable<ComponentProps<typeof Streamdown>["rehypePlugins"]>[number];
 
@@ -214,7 +215,8 @@ function InlineCode({
   );
 }
 
-const link = "text-accent underline underline-offset-2";
+/** A message's link: the kit's inline look, its ring and its feedback (portalr ADR-0059). */
+const link = linkLook("inline");
 
 const COMPONENTS: Components = {
   a: ({ href, children }) => {

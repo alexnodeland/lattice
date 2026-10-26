@@ -186,7 +186,7 @@ div0
 div0>div0
 div0>div0>a0
 div0>div0>header1
-div0>div0>header1>button0
+div0>div0>header1>button0 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>header1>button0>svg0
 div0>div0>header1>button0>svg0>path0
 div0>div0>header1>button0>svg0>path1
@@ -208,7 +208,7 @@ div0>div0>header1>div1>a0>svg1>g0>polygon3
 div0>div0>header1>div1>a0>svg1>g0>polygon4
 div0>div0>header1>div1>a0>svg1>path1
 div0>div0>header1>div2
-div0>div0>header1>div2>button0
+div0>div0>header1>div2>button0 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>header1>div2>button0>span0
 div0>div0>header1>div2>button0>svg1
 div0>div0>header1>div2>button0>svg1>path0
@@ -217,18 +217,18 @@ div0>div0>header1>div3>nav0
 div0>div0>header1>div3>nav0>ul0
 div0>div0>header1>div3>nav0>ul0>li0
 div0>div0>header1>div3>nav0>ul0>li0::marker
-div0>div0>header1>div3>nav0>ul0>li0>a0
+div0>div0>header1>div3>nav0>ul0>li0>a0 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>header1>div3>nav0>ul0>li0>a0>svg0
 div0>div0>header1>div3>nav0>ul0>li0>a0>svg0>path0
 div0>div0>header1>div3>nav0>ul0>li0>a0>svg0>path1
 div0>div0>header1>div3>nav0>ul0>li1
 div0>div0>header1>div3>nav0>ul0>li1::marker
-div0>div0>header1>div3>nav0>ul0>li1>a0
+div0>div0>header1>div3>nav0>ul0>li1>a0 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>header1>div3>nav0>ul0>li1>a0>svg0
 div0>div0>header1>div3>nav0>ul0>li1>a0>svg0>path0
 div0>div0>header1>div3>nav0>ul0>li1>a0>svg0>circle1
 div0>div0>header1>div4
-div0>div0>header1>div4>button0
+div0>div0>header1>div4>button0 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>header1>div4>button0>span0
 div0>div0>header1>div4>button0>span1
 div0>div0>main2

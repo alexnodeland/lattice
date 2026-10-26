@@ -63,7 +63,7 @@ export function SignIn({
             error={attempt.refused}
             required
           />
-          <Button type="submit" disabled={pending} className="mt-1 py-2">
+          <Button type="submit" pending={pending} className="mt-1">
             {pending ? "Signing in" : "Sign in"}
           </Button>
         </form>

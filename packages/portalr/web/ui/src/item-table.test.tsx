@@ -125,3 +125,31 @@ test("on a phone a card leaves out what its item has nothing for, label and all"
   await expect.element(list.getByRole("listitem", { name: "a1" }).getByText("Took")).toBeVisible();
   expect(list.getByRole("listitem", { name: "b2" }).getByText("Took").elements()).toHaveLength(0);
 });
+
+test("a card's heading sits one level under what names the table: the page's, or the heading named", async () => {
+  await page.viewport(390, 844);
+  const screen = await render(
+    <>
+      <Members />
+      <h2 id="notes">Workspace notes</h2>
+      <ItemTable
+        labelledBy="notes"
+        columns={[{ key: "to", label: "To", cell: (grant: { to: string }) => grant.to }]}
+        items={[{ to: "bob" }]}
+        keyOf={(grant) => grant.to}
+        empty={{ title: "No grants", body: "None yet." }}
+      />
+      <ItemTable
+        caption="Deep"
+        level={4}
+        columns={[{ key: "to", label: "To", cell: (grant: { to: string }) => grant.to }]}
+        items={[{ to: "dee" }]}
+        keyOf={(grant) => grant.to}
+        empty={{ title: "No grants", body: "None yet." }}
+      />
+    </>,
+  );
+  await expect.element(screen.getByRole("heading", { level: 2, name: "ci" })).toBeVisible();
+  await expect.element(screen.getByRole("heading", { level: 3, name: "bob" })).toBeVisible();
+  await expect.element(screen.getByRole("heading", { level: 4, name: "dee" })).toBeVisible();
+});

@@ -70,6 +70,11 @@ test("text and the focus ring read on the wash", () => {
   expect(contrast(token("focus"), token("wash"))).toBeGreaterThanOrEqual(3);
 });
 
+test("selected text reads on the selection, which is told from the paper", () => {
+  expect(contrast(token("fg"), token("selection"))).toBeGreaterThanOrEqual(7);
+  expect(contrast(token("selection"), token("paper"))).toBeGreaterThanOrEqual(1.5);
+});
+
 test("the danger colour reads on every surface, and its words read on it, hovered or not", () => {
   for (const surface of ["paper", "surface", "wash"]) {
     expect(contrast(token("danger"), token(surface))).toBeGreaterThanOrEqual(4.5);

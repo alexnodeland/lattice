@@ -3,6 +3,7 @@ import { ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "./cn";
 import { Icon } from "./icon";
+import { FEEDBACK, RING } from "./states";
 
 /**
  * How a disclosure's trigger looks (portalr ADR-0063):
@@ -62,7 +63,9 @@ export function Disclosure({
       <Collapsible.Trigger
         aria-label={name}
         className={cn(
-          "group flex min-h-(--disclosure-target) cursor-pointer gap-(--disclosure-gap) rounded-(--disclosure-radius) outline-offset-(--focus-offset) focus-visible:outline-(length:--focus-width) focus-visible:outline-focus",
+          "group flex min-h-(--disclosure-target) cursor-pointer gap-(--disclosure-gap) rounded-(--disclosure-radius)",
+          RING,
+          FEEDBACK,
           look !== "block" && "items-center",
           LOOK[look],
           triggerClassName,

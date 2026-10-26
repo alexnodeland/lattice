@@ -206,7 +206,8 @@ export function ConfirmDialog({
                 type="submit"
                 variant={calm ? "primary" : "danger"}
                 aria-busy={pending}
-                disabled={!ready}
+                disabled={typed !== undefined && entered !== typed}
+                pending={pending}
               >
                 {confirm}
               </Button>

@@ -184,3 +184,22 @@ test("colour-blind mode leaves the danger colour and its tint as they are", asyn
     before,
   );
 });
+
+test("a pending button can't be pressed again, looks disabled, and keeps the focus it was pressed with", async () => {
+  const press = vi.fn();
+  const screen = await render(
+    <Button pending onClick={press}>
+      Accept
+    </Button>,
+  );
+  const button = screen.getByRole("button", { name: "Accept" });
+  button.element().focus();
+  expect(document.activeElement).toBe(button.element());
+  await button.click({ force: true });
+  expect(press).not.toHaveBeenCalled();
+  await expect.element(button).toHaveAttribute("aria-disabled", "true");
+  const style = getComputedStyle(button.element());
+  expect(style.backgroundColor).toBe(token("line"));
+  expect(style.cursor).toBe("not-allowed");
+  expect(document.activeElement).toBe(button.element());
+});

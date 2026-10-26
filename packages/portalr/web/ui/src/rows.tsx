@@ -2,6 +2,7 @@ import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
 import type { ComponentProps, ReactElement, ReactNode } from "react";
 import { cn } from "./cn";
+import { FEEDBACK } from "./states";
 
 /** A list of rows, lined one under another, named for what they are. */
 export function Rows({ label, children }: { label: string; children: ReactNode }) {
@@ -32,7 +33,10 @@ export function Row({
 }) {
   return (
     <li
-      className="relative grid grid-cols-1 items-center gap-x-(--list-row-gap) gap-y-(--list-row-line-gap) px-(--list-row-pad-x) py-(--list-row-pad-y) text-sm has-[a:hover]:bg-wash has-[a:focus-visible]:bg-wash sm:grid-cols-[minmax(0,1fr)_fit-content(50%)]"
+      className={cn(
+        "relative grid grid-cols-1 items-center gap-x-(--list-row-gap) gap-y-(--list-row-line-gap) px-(--list-row-pad-x) py-(--list-row-pad-y) text-sm has-[a:hover]:bg-wash has-[a:focus-visible]:bg-wash sm:grid-cols-[minmax(0,1fr)_fit-content(50%)]",
+        FEEDBACK,
+      )}
       {...props}
     >
       <div className="flex min-w-0 flex-col gap-(--list-row-line-gap)">
@@ -67,6 +71,7 @@ export function RowLink({ render, className, ...props }: RowLinkProps) {
       {
         className: cn(
           "font-semibold text-fg underline decoration-edge underline-offset-(--link-underline-offset) outline-none after:absolute hover:text-accent hover:decoration-accent focus-visible:text-accent focus-visible:decoration-accent after:inset-0 after:content-[''] focus-visible:after:outline-(length:--focus-width) focus-visible:after:outline-focus focus-visible:after:-outline-offset-(--focus-offset)",
+          FEEDBACK,
           className,
         ),
       },

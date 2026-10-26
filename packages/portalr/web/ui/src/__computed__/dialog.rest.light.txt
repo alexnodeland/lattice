@@ -139,7 +139,7 @@ div1>div0 | border-top-color: rgb(28, 29, 38); border-top-style: solid; border-t
 div1>div1 | background-color: rgba(28, 29, 38, 0.45); border-top-color: rgb(28, 29, 38); border-top-style: solid; border-top-width: 0px; border-right-color: rgb(28, 29, 38); border-right-style: solid; border-right-width: 0px; border-bottom-color: rgb(28, 29, 38); border-bottom-style: solid; border-bottom-width: 0px; border-left-color: rgb(28, 29, 38); border-left-style: solid; border-left-width: 0px; border-top-left-radius: 0px; border-top-right-radius: 0px; border-bottom-right-radius: 0px; border-bottom-left-radius: 0px; backdrop-filter: blur(3px)
 div1>span2 | border-top-left-radius: 0px; border-top-right-radius: 0px; border-bottom-right-radius: 0px; border-bottom-left-radius: 0px
 div1>div3 | background-color: rgb(255, 255, 255); border-top-color: rgb(220, 213, 230); border-top-style: solid; border-top-width: 1px; padding-top: 20px; border-right-color: rgb(220, 213, 230); border-right-style: solid; border-right-width: 1px; padding-right: 20px; border-bottom-color: rgb(220, 213, 230); border-bottom-style: solid; border-bottom-width: 1px; padding-bottom: 20px; border-left-color: rgb(220, 213, 230); border-left-style: solid; border-left-width: 1px; padding-left: 20px; border-top-left-radius: 8px; border-top-right-radius: 8px; border-bottom-right-radius: 8px; border-bottom-left-radius: 8px; box-shadow: rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(40, 20, 70, 0.16) 0px 16px 40px -8px, rgba(40, 20, 70, 0.16) 0px 2px 6px 0px; row-gap: 16px; column-gap: 16px; translate: -50% -50%
-div1>div3>h20 | border-top-color: rgb(28, 29, 38); border-top-style: solid; border-top-width: 0px; border-right-color: rgb(28, 29, 38); border-right-style: solid; border-right-width: 0px; border-bottom-color: rgb(28, 29, 38); border-bottom-style: solid; border-bottom-width: 0px; border-left-color: rgb(28, 29, 38); border-left-style: solid; border-left-width: 0px; border-top-left-radius: 0px; border-top-right-radius: 0px; border-bottom-right-radius: 0px; border-bottom-left-radius: 0px; font-size: 18px; font-weight: 600; line-height: 28px
+div1>div3>h20 | border-top-color: rgb(28, 29, 38); border-top-style: solid; border-top-width: 0px; border-right-color: rgb(28, 29, 38); border-right-style: solid; border-right-width: 0px; border-bottom-color: rgb(28, 29, 38); border-bottom-style: solid; border-bottom-width: 0px; border-left-color: rgb(28, 29, 38); border-left-style: solid; border-left-width: 0px; border-top-left-radius: 0px; border-top-right-radius: 0px; border-bottom-right-radius: 0px; border-bottom-left-radius: 0px; font-size: 18px; font-weight: 600; line-height: 28px; letter-spacing: -0.45px
 div1>div3>p1 | color: rgb(94, 84, 112); border-top-color: rgb(94, 84, 112); border-top-style: solid; border-top-width: 0px; border-right-color: rgb(94, 84, 112); border-right-style: solid; border-right-width: 0px; border-bottom-color: rgb(94, 84, 112); border-bottom-style: solid; border-bottom-width: 0px; border-left-color: rgb(94, 84, 112); border-left-style: solid; border-left-width: 0px; border-top-left-radius: 0px; border-top-right-radius: 0px; border-bottom-right-radius: 0px; border-bottom-left-radius: 0px; font-size: 14px; line-height: 20px
 div1>div3>div2 | border-top-color: rgb(28, 29, 38); border-top-style: solid; border-top-width: 0px; border-right-color: rgb(28, 29, 38); border-right-style: solid; border-right-width: 0px; border-bottom-color: rgb(28, 29, 38); border-bottom-style: solid; border-bottom-width: 0px; border-left-color: rgb(28, 29, 38); border-left-style: solid; border-left-width: 0px; border-top-left-radius: 0px; border-top-right-radius: 0px; border-bottom-right-radius: 0px; border-bottom-left-radius: 0px; row-gap: 4px; column-gap: 4px; max-width: 448px
 div1>div3>div2>label0 | border-top-color: rgb(28, 29, 38); border-top-style: solid; border-top-width: 0px; border-right-color: rgb(28, 29, 38); border-right-style: solid; border-right-width: 0px; border-bottom-color: rgb(28, 29, 38); border-bottom-style: solid; border-bottom-width: 0px; border-left-color: rgb(28, 29, 38); border-left-style: solid; border-left-width: 0px; border-top-left-radius: 0px; border-top-right-radius: 0px; border-bottom-right-radius: 0px; border-bottom-left-radius: 0px; font-size: 14px; font-weight: 600; line-height: 20px; cursor: default
@@ -292,7 +292,7 @@ div1>div0 | background-color: rgba(255, 255, 255, 0); border-top-color: CanvasTe
 div1>div1 | background-color: rgba(255, 255, 255, 0.45); border-top-color: CanvasText; border-top-style: solid; border-top-width: 0px; border-right-color: CanvasText; border-right-style: solid; border-right-width: 0px; border-bottom-color: CanvasText; border-bottom-style: solid; border-bottom-width: 0px; border-left-color: CanvasText; border-left-style: solid; border-left-width: 0px; border-top-left-radius: 0px; border-top-right-radius: 0px; border-bottom-right-radius: 0px; border-bottom-left-radius: 0px; backdrop-filter: blur(3px)
 div1>span2 | background-color: rgba(255, 255, 255, 0); border-top-left-radius: 0px; border-top-right-radius: 0px; border-bottom-right-radius: 0px; border-bottom-left-radius: 0px
 div1>div3 | background-color: Canvas; border-top-color: CanvasText; border-top-style: solid; border-top-width: 1px; padding-top: 20px; border-right-color: CanvasText; border-right-style: solid; border-right-width: 1px; padding-right: 20px; border-bottom-color: CanvasText; border-bottom-style: solid; border-bottom-width: 1px; padding-bottom: 20px; border-left-color: CanvasText; border-left-style: solid; border-left-width: 1px; padding-left: 20px; border-top-left-radius: 8px; border-top-right-radius: 8px; border-bottom-right-radius: 8px; border-bottom-left-radius: 8px; row-gap: 16px; column-gap: 16px; translate: -50% -50%
-div1>div3>h20 | background-color: rgba(255, 255, 255, 0); border-top-color: CanvasText; border-top-style: solid; border-top-width: 0px; border-right-color: CanvasText; border-right-style: solid; border-right-width: 0px; border-bottom-color: CanvasText; border-bottom-style: solid; border-bottom-width: 0px; border-left-color: CanvasText; border-left-style: solid; border-left-width: 0px; border-top-left-radius: 0px; border-top-right-radius: 0px; border-bottom-right-radius: 0px; border-bottom-left-radius: 0px; font-size: 18px; font-weight: 600; line-height: 28px
+div1>div3>h20 | background-color: rgba(255, 255, 255, 0); border-top-color: CanvasText; border-top-style: solid; border-top-width: 0px; border-right-color: CanvasText; border-right-style: solid; border-right-width: 0px; border-bottom-color: CanvasText; border-bottom-style: solid; border-bottom-width: 0px; border-left-color: CanvasText; border-left-style: solid; border-left-width: 0px; border-top-left-radius: 0px; border-top-right-radius: 0px; border-bottom-right-radius: 0px; border-bottom-left-radius: 0px; font-size: 18px; font-weight: 600; line-height: 28px; letter-spacing: -0.45px
 div1>div3>p1 | background-color: rgba(255, 255, 255, 0); border-top-color: CanvasText; border-top-style: solid; border-top-width: 0px; border-right-color: CanvasText; border-right-style: solid; border-right-width: 0px; border-bottom-color: CanvasText; border-bottom-style: solid; border-bottom-width: 0px; border-left-color: CanvasText; border-left-style: solid; border-left-width: 0px; border-top-left-radius: 0px; border-top-right-radius: 0px; border-bottom-right-radius: 0px; border-bottom-left-radius: 0px; font-size: 14px; line-height: 20px
 div1>div3>div2 | background-color: rgba(255, 255, 255, 0); border-top-color: CanvasText; border-top-style: solid; border-top-width: 0px; border-right-color: CanvasText; border-right-style: solid; border-right-width: 0px; border-bottom-color: CanvasText; border-bottom-style: solid; border-bottom-width: 0px; border-left-color: CanvasText; border-left-style: solid; border-left-width: 0px; border-top-left-radius: 0px; border-top-right-radius: 0px; border-bottom-right-radius: 0px; border-bottom-left-radius: 0px; row-gap: 4px; column-gap: 4px; max-width: 448px
 div1>div3>div2>label0 | background-color: rgba(255, 255, 255, 0); border-top-color: CanvasText; border-top-style: solid; border-top-width: 0px; border-right-color: CanvasText; border-right-style: solid; border-right-width: 0px; border-bottom-color: CanvasText; border-bottom-style: solid; border-bottom-width: 0px; border-left-color: CanvasText; border-left-style: solid; border-left-width: 0px; border-top-left-radius: 0px; border-top-right-radius: 0px; border-bottom-right-radius: 0px; border-bottom-left-radius: 0px; font-size: 14px; font-weight: 600; line-height: 20px; cursor: default
@@ -306,7 +306,7 @@ div0
 div0>div0
 div0>div0>a0
 div0>div0>header1
-div0>div0>header1>button0
+div0>div0>header1>button0 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>header1>button0>svg0
 div0>div0>header1>button0>svg0>path0
 div0>div0>header1>button0>svg0>path1
@@ -328,7 +328,7 @@ div0>div0>header1>div1>a0>svg1>g0>polygon3
 div0>div0>header1>div1>a0>svg1>g0>polygon4
 div0>div0>header1>div1>a0>svg1>path1
 div0>div0>header1>div2
-div0>div0>header1>div2>button0
+div0>div0>header1>div2>button0 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>header1>div2>button0>span0
 div0>div0>header1>div2>button0>span1
 div0>div0>header1>div2>button0>span2
@@ -339,13 +339,13 @@ div0>div0>header1>div3>nav0
 div0>div0>header1>div3>nav0>ul0
 div0>div0>header1>div3>nav0>ul0>li0
 div0>div0>header1>div3>nav0>ul0>li0::marker
-div0>div0>header1>div3>nav0>ul0>li0>a0
+div0>div0>header1>div3>nav0>ul0>li0>a0 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>header1>div3>nav0>ul0>li0>a0>svg0
 div0>div0>header1>div3>nav0>ul0>li0>a0>svg0>path0
 div0>div0>header1>div3>nav0>ul0>li0>a0>span1
 div0>div0>header1>div3>nav0>ul0>li1
 div0>div0>header1>div3>nav0>ul0>li1::marker
-div0>div0>header1>div3>nav0>ul0>li1>a0
+div0>div0>header1>div3>nav0>ul0>li1>a0 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>header1>div3>nav0>ul0>li1>a0>svg0
 div0>div0>header1>div3>nav0>ul0>li1>a0>svg0>path0
 div0>div0>header1>div3>nav0>ul0>li1>a0>svg0>path1
@@ -353,16 +353,16 @@ div0>div0>header1>div3>nav0>ul0>li1>a0>svg0>path2
 div0>div0>header1>div3>nav0>ul0>li1>a0>svg0>path3
 div0>div0>header1>div3>nav0>ul0>li2
 div0>div0>header1>div3>nav0>ul0>li2::marker
-div0>div0>header1>div3>nav0>ul0>li2>a0
+div0>div0>header1>div3>nav0>ul0>li2>a0 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>header1>div3>nav0>ul0>li2>a0>svg0
 div0>div0>header1>div3>nav0>ul0>li2>a0>svg0>path0
 div0>div0>header1>div3>nav0>ul0>li3
 div0>div0>header1>div3>nav0>ul0>li3::marker
-div0>div0>header1>div3>nav0>ul0>li3>a0
+div0>div0>header1>div3>nav0>ul0>li3>a0 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>header1>div3>nav0>ul0>li3>a0>svg0
 div0>div0>header1>div3>nav0>ul0>li3>a0>svg0>path0
 div0>div0>header1>div4
-div0>div0>header1>div4>button0
+div0>div0>header1>div4>button0 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>header1>div4>button0>span0
 div0>div0>header1>div4>button0>span1
 div0>div0>main2
@@ -373,11 +373,11 @@ div0>div0>main2>div0>header0>div0>h10
 div0>div0>main2>div0>header0>div0>p1
 div0>div0>main2>div0>header0>div1
 div0>div0>main2>div0>header0>div1>div0
-div0>div0>main2>div0>header0>div1>div0>span0
+div0>div0>main2>div0>header0>div1>div0>span0 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>main2>div0>header0>div1>div0>span0>span0
 div0>div0>main2>div0>header0>div1>div0>input1
 div0>div0>main2>div0>header0>div1>div0>input1::placeholder
-div0>div0>main2>div0>header0>div1>div0>span2
+div0>div0>main2>div0>header0>div1>div0>span2 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>main2>div0>header0>div1>div0>span2>span0
 div0>div0>main2>div0>header0>div1>div0>input3
 div0>div0>main2>div0>header0>div1>div0>input3::placeholder
@@ -391,21 +391,21 @@ div0>div0>main2>div0>div1>section0>table0>thead1>tr0>th0
 div0>div0>main2>div0>div1>section0>table0>thead1>tr0>th1
 div0>div0>main2>div0>div1>section0>table0>thead1>tr0>th2
 div0>div0>main2>div0>div1>section0>table0>tbody2
-div0>div0>main2>div0>div1>section0>table0>tbody2>tr0
+div0>div0>main2>div0>div1>section0>table0>tbody2>tr0 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>main2>div0>div1>section0>table0>tbody2>tr0>td0
 div0>div0>main2>div0>div1>section0>table0>tbody2>tr0>td0>span0
 div0>div0>main2>div0>div1>section0>table0>tbody2>tr0>td0>span0>span0
 div0>div0>main2>div0>div1>section0>table0>tbody2>tr0>td1
 div0>div0>main2>div0>div1>section0>table0>tbody2>tr0>td2
 div0>div0>main2>div0>div1>section0>table0>tbody2>tr0>td2>button0 | transition-property: color, background-color, border-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
-div0>div0>main2>div0>div1>section0>table0>tbody2>tr1
+div0>div0>main2>div0>div1>section0>table0>tbody2>tr1 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>main2>div0>div1>section0>table0>tbody2>tr1>td0
 div0>div0>main2>div0>div1>section0>table0>tbody2>tr1>td0>span0
 div0>div0>main2>div0>div1>section0>table0>tbody2>tr1>td0>span0>span0
 div0>div0>main2>div0>div1>section0>table0>tbody2>tr1>td1
 div0>div0>main2>div0>div1>section0>table0>tbody2>tr1>td2
 div0>div0>main2>div0>div1>section0>table0>tbody2>tr1>td2>button0 | transition-property: color, background-color, border-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
-div0>div0>main2>div0>div1>section0>table0>tbody2>tr2
+div0>div0>main2>div0>div1>section0>table0>tbody2>tr2 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>main2>div0>div1>section0>table0>tbody2>tr2>td0
 div0>div0>main2>div0>div1>section0>table0>tbody2>tr2>td0>span0
 div0>div0>main2>div0>div1>section0>table0>tbody2>tr2>td0>span0>span0
@@ -416,7 +416,7 @@ div0>div0>main2>div0>div1>div1
 div0>div0>main2>div0>div1>div1>p0
 div0>div0>main2>div0>div1>div1>div1
 div0>div0>main2>div0>div1>div1>div1>label0
-div0>div0>main2>div0>div1>div1>div1>input1
+div0>div0>main2>div0>div1>div1>div1>input1 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>main2>div0>div1>div1>div1>input1::placeholder
 div0>div0>main2>div0>div1>div1>span2
 div0>div0>main2>div0>div1>div1>span2>button0 | transition-property: color, background-color, border-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
@@ -445,7 +445,7 @@ div1>div3>h20
 div1>div3>p1
 div1>div3>div2
 div1>div3>div2>label0
-div1>div3>div2>input1
+div1>div3>div2>input1 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div1>div3>div2>input1::placeholder
 div1>div3>div3
 div1>div3>div3>button0 | transition-property: color, background-color, border-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)

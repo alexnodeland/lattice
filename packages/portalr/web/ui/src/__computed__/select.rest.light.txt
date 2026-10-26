@@ -45,9 +45,14 @@ div0>div0>div0>div3>input1::placeholder | color: rgb(28, 29, 38); border-top-lef
 div0>div0>div0>div3>p2 | color: rgb(94, 84, 112); border-top-color: rgb(94, 84, 112); border-top-style: solid; border-top-width: 0px; border-right-color: rgb(94, 84, 112); border-right-style: solid; border-right-width: 0px; border-bottom-color: rgb(94, 84, 112); border-bottom-style: solid; border-bottom-width: 0px; border-left-color: rgb(94, 84, 112); border-left-style: solid; border-left-width: 0px; border-top-left-radius: 0px; border-top-right-radius: 0px; border-bottom-right-radius: 0px; border-bottom-left-radius: 0px; font-size: 12px; line-height: 16px
 div0>div0>div0>div4 | border-top-color: rgb(28, 29, 38); border-top-style: solid; border-top-width: 0px; border-right-color: rgb(28, 29, 38); border-right-style: solid; border-right-width: 0px; border-bottom-color: rgb(28, 29, 38); border-bottom-style: solid; border-bottom-width: 0px; border-left-color: rgb(28, 29, 38); border-left-style: solid; border-left-width: 0px; border-top-left-radius: 0px; border-top-right-radius: 0px; border-bottom-right-radius: 0px; border-bottom-left-radius: 0px; row-gap: 4px; column-gap: 4px; max-width: 448px
 div0>div0>div0>div4>label0 | border-top-color: rgb(28, 29, 38); border-top-style: solid; border-top-width: 0px; border-right-color: rgb(28, 29, 38); border-right-style: solid; border-right-width: 0px; border-bottom-color: rgb(28, 29, 38); border-bottom-style: solid; border-bottom-width: 0px; border-left-color: rgb(28, 29, 38); border-left-style: solid; border-left-width: 0px; border-top-left-radius: 0px; border-top-right-radius: 0px; border-bottom-right-radius: 0px; border-bottom-left-radius: 0px; font-size: 14px; font-weight: 600; line-height: 20px; cursor: default
-div0>div0>div0>div4>input1 | background-color: rgb(255, 255, 255); border-top-color: rgb(28, 29, 38); border-top-style: solid; border-top-width: 1px; padding-top: 6px; border-right-color: rgb(28, 29, 38); border-right-style: solid; border-right-width: 1px; padding-right: 12px; border-bottom-color: rgb(28, 29, 38); border-bottom-style: solid; border-bottom-width: 1px; padding-bottom: 6px; border-left-color: rgb(28, 29, 38); border-left-style: solid; border-left-width: 1px; padding-left: 12px; border-top-left-radius: 6px; border-top-right-radius: 6px; border-bottom-right-radius: 6px; border-bottom-left-radius: 6px; outline-offset: 2px; font-size: 14px; line-height: 20px; cursor: text
+div0>div0>div0>div4>input1 | background-color: rgb(255, 255, 255); border-top-color: rgb(138, 15, 44); border-top-style: solid; border-top-width: 1px; padding-top: 6px; border-right-color: rgb(138, 15, 44); border-right-style: solid; border-right-width: 1px; padding-right: 12px; border-bottom-color: rgb(138, 15, 44); border-bottom-style: solid; border-bottom-width: 1px; padding-bottom: 6px; border-left-color: rgb(138, 15, 44); border-left-style: solid; border-left-width: 1px; padding-left: 12px; border-top-left-radius: 6px; border-top-right-radius: 6px; border-bottom-right-radius: 6px; border-bottom-left-radius: 6px; outline-offset: 2px; font-size: 14px; line-height: 20px; cursor: text
 div0>div0>div0>div4>input1::placeholder | color: rgb(28, 29, 38); border-top-left-radius: 0px; border-top-right-radius: 0px; border-bottom-right-radius: 0px; border-bottom-left-radius: 0px; font-family: "Schibsted Grotesk", ui-sans-serif, system-ui, sans-serif; font-size: 14px; font-weight: 400; font-style: normal; line-height: 20px; letter-spacing: normal; cursor: text; accent-color: auto; fill: rgb(0, 0, 0); stroke: none; stroke-width: 1px
-div0>div0>div0>div4>div2 | border-top-color: rgb(28, 29, 38); border-top-style: solid; border-top-width: 0px; border-right-color: rgb(28, 29, 38); border-right-style: solid; border-right-width: 0px; border-bottom-color: rgb(28, 29, 38); border-bottom-style: solid; border-bottom-width: 0px; border-left-color: rgb(28, 29, 38); border-left-style: solid; border-left-width: 0px; border-top-left-radius: 0px; border-top-right-radius: 0px; border-bottom-right-radius: 0px; border-bottom-left-radius: 0px; font-size: 14px; line-height: 20px
+div0>div0>div0>div4>div2 | border-top-color: rgb(28, 29, 38); border-top-style: solid; border-top-width: 0px; border-right-color: rgb(28, 29, 38); border-right-style: solid; border-right-width: 0px; border-bottom-color: rgb(28, 29, 38); border-bottom-style: solid; border-bottom-width: 0px; border-left-color: rgb(28, 29, 38); border-left-style: solid; border-left-width: 0px; border-top-left-radius: 0px; border-top-right-radius: 0px; border-bottom-right-radius: 0px; border-bottom-left-radius: 0px; row-gap: 6px; column-gap: 6px; font-size: 14px; line-height: 20px
+div0>div0>div0>div4>div2>svg0 | color: rgb(138, 15, 44); border-top-color: rgb(138, 15, 44); border-top-style: solid; border-top-width: 0px; border-right-color: rgb(138, 15, 44); border-right-style: solid; border-right-width: 0px; border-bottom-color: rgb(138, 15, 44); border-bottom-style: solid; border-bottom-width: 0px; border-left-color: rgb(138, 15, 44); border-left-style: solid; border-left-width: 0px; border-top-left-radius: 0px; border-top-right-radius: 0px; border-bottom-right-radius: 0px; border-bottom-left-radius: 0px; fill: none; stroke: rgb(138, 15, 44); stroke-width: 2px
+div0>div0>div0>div4>div2>svg0>circle0 | border-top-color: rgb(138, 15, 44); border-top-style: solid; border-top-width: 0px; border-right-color: rgb(138, 15, 44); border-right-style: solid; border-right-width: 0px; border-bottom-color: rgb(138, 15, 44); border-bottom-style: solid; border-bottom-width: 0px; border-left-color: rgb(138, 15, 44); border-left-style: solid; border-left-width: 0px; border-top-left-radius: 0px; border-top-right-radius: 0px; border-bottom-right-radius: 0px; border-bottom-left-radius: 0px
+div0>div0>div0>div4>div2>svg0>line1 | border-top-color: rgb(138, 15, 44); border-top-style: solid; border-top-width: 0px; border-right-color: rgb(138, 15, 44); border-right-style: solid; border-right-width: 0px; border-bottom-color: rgb(138, 15, 44); border-bottom-style: solid; border-bottom-width: 0px; border-left-color: rgb(138, 15, 44); border-left-style: solid; border-left-width: 0px; border-top-left-radius: 0px; border-top-right-radius: 0px; border-bottom-right-radius: 0px; border-bottom-left-radius: 0px
+div0>div0>div0>div4>div2>svg0>line2 | border-top-color: rgb(138, 15, 44); border-top-style: solid; border-top-width: 0px; border-right-color: rgb(138, 15, 44); border-right-style: solid; border-right-width: 0px; border-bottom-color: rgb(138, 15, 44); border-bottom-style: solid; border-bottom-width: 0px; border-left-color: rgb(138, 15, 44); border-left-style: solid; border-left-width: 0px; border-top-left-radius: 0px; border-top-right-radius: 0px; border-bottom-right-radius: 0px; border-bottom-left-radius: 0px
+div0>div0>div0>div4>div2>span1 | border-top-color: rgb(28, 29, 38); border-top-style: solid; border-top-width: 0px; border-right-color: rgb(28, 29, 38); border-right-style: solid; border-right-width: 0px; border-bottom-color: rgb(28, 29, 38); border-bottom-style: solid; border-bottom-width: 0px; border-left-color: rgb(28, 29, 38); border-left-style: solid; border-left-width: 0px; border-top-left-radius: 0px; border-top-right-radius: 0px; border-bottom-right-radius: 0px; border-bottom-left-radius: 0px
 div0>div0>div1 | background-color: rgb(255, 255, 255); border-top-color: rgb(220, 213, 230); border-top-style: solid; border-top-width: 1px; padding-top: 16px; border-right-color: rgb(220, 213, 230); border-right-style: solid; border-right-width: 1px; padding-right: 16px; border-bottom-color: rgb(220, 213, 230); border-bottom-style: solid; border-bottom-width: 1px; padding-bottom: 16px; border-left-color: rgb(220, 213, 230); border-left-style: solid; border-left-width: 1px; padding-left: 16px; border-top-left-radius: 8px; border-top-right-radius: 8px; border-bottom-right-radius: 8px; border-bottom-left-radius: 8px; box-shadow: rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(40, 20, 70, 0.16) 0px 1px 2px 0px; row-gap: 12px; column-gap: 12px
 div0>div0>div1>div0 | border-top-color: rgb(28, 29, 38); border-top-style: solid; border-top-width: 0px; border-right-color: rgb(28, 29, 38); border-right-style: solid; border-right-width: 0px; border-bottom-color: rgb(28, 29, 38); border-bottom-style: solid; border-bottom-width: 0px; border-left-color: rgb(28, 29, 38); border-left-style: solid; border-left-width: 0px; border-top-left-radius: 0px; border-top-right-radius: 0px; border-bottom-right-radius: 0px; border-bottom-left-radius: 0px; row-gap: 8px; column-gap: 8px
 div0>div0>div1>div0>button0 | color: rgb(255, 255, 255); background-color: rgb(107, 47, 160); border-top-color: rgba(0, 0, 0, 0); border-top-style: solid; border-top-width: 1px; padding-top: 6px; border-right-color: rgba(0, 0, 0, 0); border-right-style: solid; border-right-width: 1px; padding-right: 12px; border-bottom-color: rgba(0, 0, 0, 0); border-bottom-style: solid; border-bottom-width: 1px; padding-bottom: 6px; border-left-color: rgba(0, 0, 0, 0); border-left-style: solid; border-left-width: 1px; padding-left: 12px; border-top-left-radius: 6px; border-top-right-radius: 6px; border-bottom-right-radius: 6px; border-bottom-left-radius: 6px; outline-offset: 2px; row-gap: 8px; column-gap: 8px; font-size: 14px; font-weight: 600; line-height: 20px; cursor: default
@@ -143,7 +148,8 @@ div0>div0>div0>div4 | background-color: rgba(255, 255, 255, 0); border-top-color
 div0>div0>div0>div4>label0 | background-color: rgba(255, 255, 255, 0); border-top-color: CanvasText; border-top-style: solid; border-top-width: 0px; border-right-color: CanvasText; border-right-style: solid; border-right-width: 0px; border-bottom-color: CanvasText; border-bottom-style: solid; border-bottom-width: 0px; border-left-color: CanvasText; border-left-style: solid; border-left-width: 0px; border-top-left-radius: 0px; border-top-right-radius: 0px; border-bottom-right-radius: 0px; border-bottom-left-radius: 0px; font-size: 14px; font-weight: 600; line-height: 20px; cursor: default
 div0>div0>div0>div4>input1 | background-color: Canvas; border-top-color: CanvasText; border-top-style: solid; border-top-width: 1px; padding-top: 6px; border-right-color: CanvasText; border-right-style: solid; border-right-width: 1px; padding-right: 12px; border-bottom-color: CanvasText; border-bottom-style: solid; border-bottom-width: 1px; padding-bottom: 6px; border-left-color: CanvasText; border-left-style: solid; border-left-width: 1px; padding-left: 12px; border-top-left-radius: 6px; border-top-right-radius: 6px; border-bottom-right-radius: 6px; border-bottom-left-radius: 6px; outline-offset: 2px; font-size: 14px; line-height: 20px; cursor: text
 div0>div0>div0>div4>input1::placeholder | color: CanvasText; background-color: rgba(255, 255, 255, 0); border-top-left-radius: 0px; border-top-right-radius: 0px; border-bottom-right-radius: 0px; border-bottom-left-radius: 0px; font-family: "Schibsted Grotesk", ui-sans-serif, system-ui, sans-serif; font-size: 14px; font-weight: 400; font-style: normal; line-height: 20px; letter-spacing: normal; cursor: text; accent-color: auto; fill: CanvasText; stroke: none; stroke-width: 1px
-div0>div0>div0>div4>div2 | background-color: rgba(255, 255, 255, 0); border-top-color: CanvasText; border-top-style: solid; border-top-width: 0px; border-right-color: CanvasText; border-right-style: solid; border-right-width: 0px; border-bottom-color: CanvasText; border-bottom-style: solid; border-bottom-width: 0px; border-left-color: CanvasText; border-left-style: solid; border-left-width: 0px; border-top-left-radius: 0px; border-top-right-radius: 0px; border-bottom-right-radius: 0px; border-bottom-left-radius: 0px; font-size: 14px; line-height: 20px
+div0>div0>div0>div4>div2 | background-color: rgba(255, 255, 255, 0); border-top-color: CanvasText; border-top-style: solid; border-top-width: 0px; border-right-color: CanvasText; border-right-style: solid; border-right-width: 0px; border-bottom-color: CanvasText; border-bottom-style: solid; border-bottom-width: 0px; border-left-color: CanvasText; border-left-style: solid; border-left-width: 0px; border-top-left-radius: 0px; border-top-right-radius: 0px; border-bottom-right-radius: 0px; border-bottom-left-radius: 0px; row-gap: 6px; column-gap: 6px; font-size: 14px; line-height: 20px
+div0>div0>div0>div4>div2>span1 | background-color: rgba(255, 255, 255, 0); border-top-color: CanvasText; border-top-style: solid; border-top-width: 0px; border-right-color: CanvasText; border-right-style: solid; border-right-width: 0px; border-bottom-color: CanvasText; border-bottom-style: solid; border-bottom-width: 0px; border-left-color: CanvasText; border-left-style: solid; border-left-width: 0px; border-top-left-radius: 0px; border-top-right-radius: 0px; border-bottom-right-radius: 0px; border-bottom-left-radius: 0px
 div0>div0>div1 | background-color: Canvas; border-top-color: CanvasText; border-top-style: solid; border-top-width: 1px; padding-top: 16px; border-right-color: CanvasText; border-right-style: solid; border-right-width: 1px; padding-right: 16px; border-bottom-color: CanvasText; border-bottom-style: solid; border-bottom-width: 1px; padding-bottom: 16px; border-left-color: CanvasText; border-left-style: solid; border-left-width: 1px; padding-left: 16px; border-top-left-radius: 8px; border-top-right-radius: 8px; border-bottom-right-radius: 8px; border-bottom-left-radius: 8px; row-gap: 12px; column-gap: 12px
 div0>div0>div1>div0 | background-color: rgba(255, 255, 255, 0); border-top-color: CanvasText; border-top-style: solid; border-top-width: 0px; border-right-color: CanvasText; border-right-style: solid; border-right-width: 0px; border-bottom-color: CanvasText; border-bottom-style: solid; border-bottom-width: 0px; border-left-color: CanvasText; border-left-style: solid; border-left-width: 0px; border-top-left-radius: 0px; border-top-right-radius: 0px; border-bottom-right-radius: 0px; border-bottom-left-radius: 0px; row-gap: 8px; column-gap: 8px
 div0>div0>div1>div0>button0 | background-color: Canvas; border-top-color: CanvasText; border-top-style: solid; border-top-width: 1px; padding-top: 6px; border-right-color: CanvasText; border-right-style: solid; border-right-width: 1px; padding-right: 12px; border-bottom-color: CanvasText; border-bottom-style: solid; border-bottom-width: 1px; padding-bottom: 6px; border-left-color: CanvasText; border-left-style: solid; border-left-width: 1px; padding-left: 12px; border-top-left-radius: 6px; border-top-right-radius: 6px; border-bottom-right-radius: 6px; border-bottom-left-radius: 6px; outline-offset: 2px; row-gap: 8px; column-gap: 8px; font-size: 14px; font-weight: 600; line-height: 20px; cursor: default
@@ -196,19 +202,19 @@ div0>div0>div0
 div0>div0>div0>div0
 div0>div0>div0>div0>span0
 div0>div0>div0>div0>div1
-div0>div0>div0>div0>div1>span0
+div0>div0>div0>div0>div1>span0 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>div0>div0>div1>input1
 div0>div0>div0>div0>div1>input1::placeholder
-div0>div0>div0>div0>div1>span2
+div0>div0>div0>div0>div1>span2 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>div0>div0>div1>input3
 div0>div0>div0>div0>div1>input3::placeholder
-div0>div0>div0>div0>div1>span4
+div0>div0>div0>div0>div1>span4 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>div0>div0>div1>input5
 div0>div0>div0>div0>div1>input5::placeholder
 div0>div0>div0>div0>p2
 div0>div0>div0>div1
 div0>div0>div0>div1>label0
-div0>div0>div0>div1>button1
+div0>div0>div0>div1>button1 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>div0>div1>button1>span0
 div0>div0>div0>div1>button1>span1
 div0>div0>div0>div1>button1>span1>svg0
@@ -221,7 +227,7 @@ div0>div0>div0>div1>input5::placeholder
 div0>div0>div0>div1>p6
 div0>div0>div0>div2
 div0>div0>div0>div2>label0
-div0>div0>div0>div2>button1
+div0>div0>div0>div2>button1 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>div0>div2>button1>span0
 div0>div0>div0>div2>button1>span1
 div0>div0>div0>div2>button1>span1>svg0
@@ -230,14 +236,19 @@ div0>div0>div0>div2>input2
 div0>div0>div0>div2>input2::placeholder
 div0>div0>div0>div3
 div0>div0>div0>div3>label0
-div0>div0>div0>div3>input1
+div0>div0>div0>div3>input1 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>div0>div3>input1::placeholder
 div0>div0>div0>div3>p2
 div0>div0>div0>div4
 div0>div0>div0>div4>label0
-div0>div0>div0>div4>input1
+div0>div0>div0>div4>input1 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div0>div0>div0>div4>input1::placeholder
 div0>div0>div0>div4>div2
+div0>div0>div0>div4>div2>svg0
+div0>div0>div0>div4>div2>svg0>circle0
+div0>div0>div0>div4>div2>svg0>line1
+div0>div0>div0>div4>div2>svg0>line2
+div0>div0>div0>div4>div2>span1
 div0>div0>div1
 div0>div0>div1>div0
 div0>div0>div1>div0>button0 | transition-property: color, background-color, border-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
@@ -271,15 +282,15 @@ div1>div1
 div1>div1>span0
 div1>div1>div1
 div1>div1>div1>div0
-div1>div1>div1>div0>div0
+div1>div1>div1>div0>div0 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div1>div1>div1>div0>div0>div0
-div1>div1>div1>div0>div1
+div1>div1>div1>div0>div1 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div1>div1>div1>div0>div1>div0
-div1>div1>div1>div0>div2
+div1>div1>div1>div0>div2 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div1>div1>div1>div0>div2>div0
 div1>div1>div1>div0>div2>span1
 div1>div1>div1>div0>div2>span1>svg0
 div1>div1>div1>div0>div2>span1>svg0>path0
-div1>div1>div1>div0>div3
+div1>div1>div1>div0>div3 | transition-property: color, background-color, border-color, text-decoration-color; transition-duration: 0.15s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
 div1>div1>div1>div0>div3>div0
 div1>div1>span2

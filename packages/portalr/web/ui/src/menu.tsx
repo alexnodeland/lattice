@@ -1,6 +1,7 @@
 import { Menu as BaseMenu } from "@base-ui/react/menu";
 import type { Ref } from "react";
 import { Button } from "./button";
+import { FEEDBACK } from "./states";
 
 /**
  * A menu of actions, and the look the kit's menus share: Base UI's Menu, on the surface. The item the keyboard or the
@@ -16,8 +17,7 @@ export const popup = `${popover} min-w-56 p-(--popover-pad) outline-none transit
 
 export const groupLabel = "px-(--popover-item-pad-x) pt-1.5 pb-1 font-semibold text-muted text-xs";
 
-export const item =
-  "flex cursor-default items-center justify-between gap-3 rounded-(--popover-item-radius) px-(--popover-item-pad-x) py-(--popover-item-pad-y) outline-none data-highlighted:bg-wash data-highlighted:text-accent data-highlighted:ring-(length:--focus-width) data-highlighted:ring-focus data-highlighted:ring-inset data-disabled:cursor-not-allowed data-disabled:text-muted";
+export const item = `flex cursor-default items-center justify-between gap-3 rounded-(--popover-item-radius) px-(--popover-item-pad-x) py-(--popover-item-pad-y) outline-none data-highlighted:bg-wash data-highlighted:text-accent data-highlighted:ring-(length:--focus-width) data-highlighted:ring-focus data-highlighted:ring-inset data-disabled:cursor-not-allowed data-disabled:text-muted ${FEEDBACK}`;
 
 export const separator = "my-1.5 h-px bg-line";
 

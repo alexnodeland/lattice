@@ -1,6 +1,7 @@
 import { Button as BaseButton } from "@base-ui/react/button";
 import type { ComponentProps } from "react";
 import { cn } from "./cn";
+import { RING } from "./states";
 
 const look = {
   primary: "border-transparent bg-accent text-on-accent hover:not-data-disabled:bg-accent-hover",
@@ -27,13 +28,20 @@ export type ButtonSize = keyof typeof size;
 type Props = Omit<ComponentProps<typeof BaseButton>, "className"> & {
   variant?: ButtonVariant;
   size?: ButtonSize;
+  /**
+   * Whether what it started is still going (portalr ADR-0079): it can't be pressed again, in the
+   * disabled look, but keeps the focus it was pressed with, so the keyboard isn't dropped at the
+   * document while the command is in flight.
+   */
+  pending?: boolean;
   className?: string;
 };
 
 /** A button's look, for what is drawn as a button but rendered as something else, such as a link. */
 export function buttonLook(variant: ButtonVariant = "primary", big: ButtonSize = "md") {
   return cn(
-    "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-(--button-radius) border font-(--button-weight) font-sans outline-offset-(--focus-offset) transition-[color,background-color,border-color] duration-(--button-duration) ease-(--button-ease) focus-visible:outline-(length:--focus-width) focus-visible:outline-focus active:not-data-disabled:translate-y-(--button-press-shift) motion-reduce:transition-none aria-pressed:border-accent aria-pressed:bg-wash aria-pressed:text-accent data-disabled:cursor-not-allowed data-disabled:border-line data-disabled:bg-line data-disabled:text-muted",
+    "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-(--button-radius) border font-(--button-weight) font-sans transition-[color,background-color,border-color] duration-(--button-duration) ease-(--button-ease) active:not-data-disabled:translate-y-(--button-press-shift) motion-reduce:transition-none aria-pressed:border-accent aria-pressed:bg-wash aria-pressed:text-accent data-disabled:cursor-not-allowed data-disabled:border-line data-disabled:bg-line data-disabled:text-muted",
+    RING,
     size[big],
     look[variant],
   );
@@ -43,8 +51,24 @@ export function buttonLook(variant: ButtonVariant = "primary", big: ButtonSize =
  * A button: Base UI's, in the working colour (`primary`), on the surface (`secondary`), bare until
  * hovered (`ghost`), or in the danger colour (`danger-soft` offers a destructive action, `danger`
  * confirms it), in two sizes. A pressed toggle takes the wash. A disabled one is on a muted fill, in
- * the quiet text, with the cursor that says it can't be used, rather than faded, so it still reads.
+ * the quiet text, with the cursor that says it can't be used, rather than faded, so it still reads;
+ * one that is `pending` looks the same and keeps the focus.
  */
-export function Button({ variant = "primary", size: big = "md", className, ...props }: Props) {
-  return <BaseButton className={cn(buttonLook(variant, big), className)} {...props} />;
+export function Button({
+  variant = "primary",
+  size: big = "md",
+  pending = false,
+  disabled = false,
+  focusableWhenDisabled = false,
+  className,
+  ...props
+}: Props) {
+  return (
+    <BaseButton
+      className={cn(buttonLook(variant, big), className)}
+      disabled={disabled || pending}
+      focusableWhenDisabled={focusableWhenDisabled || pending}
+      {...props}
+    />
+  );
 }

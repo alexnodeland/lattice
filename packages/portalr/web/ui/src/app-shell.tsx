@@ -9,6 +9,7 @@ import { keepTabWithin } from "./full-view";
 import { Icon } from "./icon";
 import { Lockup, Mark, type Ui } from "./marks";
 import { SkipLink } from "./skip-link";
+import { FEEDBACK, RING } from "./states";
 
 /** From this width the frame is a rail, and the drawer has no place. */
 const WIDE = "(min-width: 1024px)";
@@ -25,7 +26,8 @@ function Home({ ui, home, children }: { ui: Ui; home: ReactElement; children: Re
       "aria-label": name,
       title: kit ? name : undefined,
       className: cn(
-        "inline-flex rounded-(--header-trigger-radius) outline-offset-(--focus-offset) focus-visible:outline-(length:--focus-width) focus-visible:outline-focus",
+        "inline-flex rounded-(--header-trigger-radius)",
+        RING,
         kit ? "min-w-0 max-w-full" : "shrink-0",
       ),
       children,
@@ -33,8 +35,11 @@ function Home({ ui, home, children }: { ui: Ui; home: ReactElement; children: Re
   });
 }
 
-const button =
-  "inline-flex items-center gap-2 rounded-(--header-trigger-radius) px-2 py-(--header-trigger-pad-y) font-semibold text-fg text-sm outline-offset-(--focus-offset) hover:bg-wash focus-visible:outline-(length:--focus-width) focus-visible:outline-focus";
+const button = cn(
+  "inline-flex items-center gap-2 rounded-(--header-trigger-radius) px-2 py-(--header-trigger-pad-y) font-semibold text-fg text-sm hover:bg-wash",
+  RING,
+  FEEDBACK,
+);
 
 /**
  * The frame of every signed-in screen. One header holds the mark, the switcher, the navigation

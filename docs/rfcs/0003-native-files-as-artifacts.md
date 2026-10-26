@@ -218,7 +218,7 @@ The worker treats every file as hostile: a zip bomb, deeply nested XML, an enorm
 
 ### People: check-out and check-in
 
-People edit in WordCraft's browser build, unmodified and as released, served by the deployment. Today it is a standalone page with no host channel: it opens files through a picker, drag and drop or paste, and saves through `showSaveFilePicker` or a download.
+People edit in WordCraft's browser build, unmodified and as released, served by the deployment. At 0.7.0 it was a standalone page with no host channel: it opened files through a picker, drag and drop or paste, and saved through `showSaveFilePicker` or a download. That is level 1, below; WordCraft 0.11.0 has a bridge, and the apps with none are still checked out, downloaded, edited and uploaded this way.
 
 1. **Check-out.** portalr creates the check-out and its lease, downloads the head revision, and opens the hosted editor in a new tab, showing the expiry.
 2. **Editing.** The person opens the downloaded file in the editor, edits it, and saves it to disk.
@@ -233,18 +233,20 @@ The editor's origin:
 
 | Level | Meaning | Who has it |
 |---|---|---|
-| 1. Save only | Bytes when the person saves | WordCraft's browser build: its JavaScript exports only its initializer (verified) |
-| 2. Host to app | Commands, with replies | WordCraft headless, over MCP (verified); EffectCraft and LightCraft through same-page JavaScript APIs (FilmCraft's build has none: native files ADR-0016); GridCraft, PdfCraft and CADCraft through a `?host=parent` bridge offering open, save and dirty only, to a same-origin parent |
+| 1. Save only | Bytes when the person saves | The browser builds of the apps with no host surface; WordCraft's at 0.7.0, whose JavaScript exports only its initializer (verified) |
+| 2. Host to app | Commands, with replies | WordCraft headless, over MCP (verified); EffectCraft and LightCraft through same-page JavaScript APIs (FilmCraft 0.8.0, the pinned release, and VectorCraft 0.14.0, where `window.vectorcraft` was seen shipping, 0.12.0 being pinned, have one too: observed, not yet piloted through the shim); WordCraft 0.11.0, GridCraft, PdfCraft and CADCraft through a `?host=parent` bridge offering open, save and dirty, with ready and failed, to a same-origin parent |
 | 3. Polled | Changes found by asking | WordCraft's desktop app, through its undo history or a recorded macro (verified in code) |
-| 4. Pushed | Changes, selections or commands as they happen | No app: nothing pushes more than `dirty` |
+| 4. Pushed | Changes, selections or commands as they happen | No app: nothing pushes more than `dirty` of a document's changes, besides a bridge's lifecycle (`ready`, `failed`) and its `save` hand-off |
 
 Apart from WordCraft's, these rows come from research on 2026-10-16, unverified here.
 
+> **Amended (2026-10-26) by native files [ADR-0010](../artifactr/files/adr/0010-a-shim-beside-the-build-and-talk-level-one-plus.md):** WordCraft 0.11.0 has the `?host=parent` bridge (`storytold/wordcraft#3822`), so its talk level is 1+, `bridged`, through the shim, and its check-out opens in the portal's frame rather than a new tab; the picker's download and upload stay beneath it. FilmCraft's build has a JavaScript API, `window.filmcraft`, which native files [ADR-0016](../artifactr/files/adr/0016-a-project-that-holds-its-own-media-is-a-native-file.md) records as verified in FilmCraft 0.8.0. VectorCraft's `window.vectorcraft` was seen the same way, by loading the 0.14.0 build, not the pinned 0.12.0, and listing the global. Neither JavaScript API's level is claimed until a pilot runs it through the shim.
+
 > **Amended (2026-10-18) by native files [ADR-0010](../artifactr/files/adr/0010-a-shim-beside-the-build-and-talk-level-one-plus.md):** a `?host=parent` bridge (GridCraft, PdfCraft, CADCraft) gives open, save and dirty, not commands with replies: it is level 1+, `bridged`, reached through a shim of lattice's own on the editor's origin, run by hand with GridCraft 0.8.0, PdfCraft 0.8.0 and CADCraft 0.8.0. The JavaScript APIs' level is claimed per app once each has run through the shim.
 
-The pilot stays at level 1. A later phase may embed WordCraft through a host bridge, if one lands upstream and ships unmodified; we neither fork nor contribute. Until an app pushes events, events are polled or synthesized from revisions. A same-origin iframe is a stand-in only for the three apps with JavaScript APIs.
+The pilot began at level 1; a later phase embeds WordCraft through a host bridge, once one landed upstream and shipped unmodified, as it has in 0.11.0; we neither fork nor contribute. Until an app pushes events, events are polled or synthesized from revisions. A same-origin iframe is a stand-in only for the apps with JavaScript APIs.
 
-**Watching upstream.** Today there is no roadmap, spec or shared crate, and requests for pushed events (`photocraft#4939`, `vectorcraft#2188`) have no maintainer reply. What would change this: `gridcraft#1466` (a full control channel over `postMessage`), `photocraft#2263`, or WordCraft's `#405` and `#1655` (host bridges) merging; a shared `craft-embed` or `craft-control` crate; release notes mentioning `host=`, `window.` or `postMessage`.
+**Watching upstream.** Today there is no roadmap, spec or shared crate, and requests for pushed events (`photocraft#4939`, `vectorcraft#2188`) have no maintainer reply. What would change this: `gridcraft#1466` (a full control channel over `postMessage`) or `photocraft#2263` merging; a shared `craft-embed` or `craft-control` crate; release notes mentioning `host=`, `window.` or `postMessage`.
 
 **Next, a streamed session, evaluated in phase 5.** The unmodified desktop app runs under a virtual display, in a fixed pool of sandboxed containers, pre-started, one session at a time each (D7), streamed to the browser as noVNC or Kasm do. The agent reaches the live document through the app's control channel, which listens on 127.0.0.1 inside the container, with its key in a file there. The application sends the call to a runner in the session container over the internal network. The runner runs `wordcraft-cli mcp --connect` inside the container, so the channel and its key never leave it. Events come by polling.
 
@@ -378,7 +380,7 @@ Gathered on 2026-10-16. Everything downloaded was treated as untrusted data, in 
 | Commands | 617 in the v0.7.0 binary (389 change the document); the README says 422; parameters are free-text signatures. They act on positions and the selection; paragraphs and cells have no ids; comments have durable ids | Verified |
 | Comments and tracked changes | `inspect_document` gives counts only; `review.comments` and `review.changes` give author, date, anchor, text and id | Verified, live |
 | Saves and network | Saves are atomic (a temporary file and a rename); outside changes go unnoticed. No HTTP client in `Cargo.lock`, no telemetry | Verified in code |
-| Browser build | `wordcraft-web-0.7.0.zip`, checksum matched: 39.8 MB of WebAssembly (14.9 MB gzipped; its `HOSTING.md` says 13 and 5). No JavaScript API, no `postMessage`. No COOP or COEP, no workers, no remote URLs. It shares the CLI's engine crates | Verified from the files; not served or run |
+| Browser build | `wordcraft-web-0.7.0.zip`, checksum matched: 39.8 MB of WebAssembly (14.9 MB gzipped; its `HOSTING.md` says 13 and 5). No JavaScript API, no `postMessage` (true of 0.7.0 only: 0.11.0 has the `?host=parent` bridge, and its `wordcraft:*` messages are in its WebAssembly). No COOP or COEP, no workers, no remote URLs. It shares the CLI's engine crates | Verified from the files; not served or run |
 | CRDT | No CRDT or OT library in any of the thirteen apps' lock files | Verified |
 | The other apps | All thirteen have public repositories under `github.com/storytold`, with `LICENSE-MIT` and `LICENSE-APACHE`. Their control channels differ, and DeckCraft's and GridCraft's have no authentication. Their formats are their READMEs' claims | Licences verified; nothing else run |
 

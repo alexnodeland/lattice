@@ -409,6 +409,7 @@ def test_each_running_apps_editor_is_on_this_machine_by_default() -> None:
     environ = {"FILES_CRAFTS": ",".join(crafts)}
     environ |= {f"FILES_{craft.upper()}_TOKEN": TOKEN for craft in crafts}
     assert Settings.from_environ(environ).files.editors == {
+        "files:wordcraft": "http://127.0.0.1:{{ app_port + crafts.wordcraft.editor }}/",
         "files:gridcraft": "http://127.0.0.1:{{ app_port + crafts.gridcraft.editor }}/",
         "files:pdfcraft": "http://127.0.0.1:{{ app_port + crafts.pdfcraft.editor }}/",
     }
@@ -417,6 +418,7 @@ def test_each_running_apps_editor_is_on_this_machine_by_default() -> None:
     assert moved["files:pdfcraft"] == "http://127.0.0.1:9903/"
     environ["FILES_EDITOR_DOMAIN"] = "example.com"
     assert Settings.from_environ(environ).files.editors == {
+        "files:wordcraft": "https://wordcraft.example.com/",
         "files:gridcraft": "https://gridcraft.example.com/",
         "files:pdfcraft": "https://pdfcraft.example.com/",
     }, "a single host's edge"

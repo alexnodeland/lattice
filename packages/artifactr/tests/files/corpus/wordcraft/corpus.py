@@ -27,4 +27,4 @@ CORPUS = Corpus(
         "untyped": lambda: package.untyped(FEATURES["text"]()),
     },
 )
-"""WordCraft 0.7.0 keeps every feature."""
+"""WordCraft 0.11.0 keeps every feature."""

@@ -137,6 +137,7 @@ CRAFTS: Final = _registry(
         formats=frozenset({DOCX}),
         render=True,
         reach="file",
+        bridge="parent",
     ),
     Craft(
         name="gridcraft",
@@ -294,4 +295,5 @@ CRAFTS: Final = _registry(
 """The crafting apps, by name, read-only: what each pinned release offers, checked on
 2026-10-18 against its CLI's own MCP tools and options; and FreeCAD, a third party's, checked
 on 2026-10-20 against its console (native files ADR-0014); and Blender, checked on 2026-10-20
-against its background mode (native files ADR-0015)."""
+against its background mode (native files ADR-0015); WordCraft's host surface was rechecked
+on 2026-10-26 at 0.11.0 (native files ADR-0010)."""

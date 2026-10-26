@@ -42,6 +42,7 @@ COMMANDS = [
     {"id": "text.insert", "label": "Insert Text", "location": "Home", "params": '{"text": s}'},
     {"id": "para.heading1", "label": "Heading 1", "location": "Home > Styles", "params": "{}"},
     {"id": "review.newComment", "label": "New Comment", "location": "Review", "params": "{}"},
+    {"id": "file.saveAs", "label": "Save As", "location": "File", "params": '{"path": s}'},
 ]
 
 
@@ -61,7 +62,7 @@ def main() -> None:
 
 
 def serve(mode: str, read_root: Path, write_root: Path) -> None:
-    server = MCPServer("wordcraft", version="0.0.1" if mode == "version" else "0.7.0")
+    server = MCPServer("wordcraft", version="0.0.1" if mode == "version" else "0.11.0")
     document: dict[str, Any] = {"blocks": [], "comments": [], "saves": 0}
 
     async def misbehave() -> None:

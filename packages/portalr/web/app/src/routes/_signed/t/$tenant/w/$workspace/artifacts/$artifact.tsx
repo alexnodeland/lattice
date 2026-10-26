@@ -177,7 +177,7 @@ function Artifact() {
           .join(", ")}
         actions={feedback}
       />
-      <Connection snapshot={snapshot} waiting="the workspace" />
+      <Connection snapshot={snapshot} onReconnect={stream.reconnect} waiting="the workspace" />
       <Card>
         <FormHostContext value={host}>
           <AppHostContext value={apps}>

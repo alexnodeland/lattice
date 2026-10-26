@@ -28,3 +28,37 @@ test("a stream that closed says so, and its server's words go to the console alo
     warned.mockRestore();
   }
 });
+
+test("a stream that closed offers to connect now, where the page can, and one connecting again says what is sent waits", async () => {
+  const onReconnect = vi.fn();
+  const screen = await render(
+    <Connection
+      snapshot={{ state: null, seq: 3, status: "closed", error: null }}
+      waiting="the workspace"
+      onReconnect={onReconnect}
+    />,
+  );
+  await expect
+    .element(screen.getByRole("alert"))
+    .toHaveTextContent("The connection to this workspace ended.Connect now");
+  await screen.getByRole("button", { name: "Connect now" }).click();
+  expect(onReconnect).toHaveBeenCalledOnce();
+  await screen.rerender(
+    <Connection
+      snapshot={{ state: null, seq: 3, status: "connecting", error: null }}
+      waiting="the workspace"
+      onReconnect={onReconnect}
+    />,
+  );
+  await expect
+    .element(screen.getByRole("status"))
+    .toHaveTextContent("Connecting again… What you send goes once it is connected.");
+  // Before the log was ever read, connecting is reading.
+  await screen.rerender(
+    <Connection
+      snapshot={{ state: null, seq: 0, status: "connecting", error: null }}
+      waiting="the workspace"
+    />,
+  );
+  await expect.element(screen.getByRole("status")).toHaveTextContent("Reading the workspace…");
+});

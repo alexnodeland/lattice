@@ -196,7 +196,11 @@ function Runs() {
       />
       <div className="flex flex-col gap-3">
         <SectionTitle>The agent's turns</SectionTitle>
-        <Connection snapshot={turns} waiting="the workspace's turns" />
+        <Connection
+          snapshot={turns}
+          onReconnect={artifactr.reconnect}
+          waiting="the workspace's turns"
+        />
         <RunList
           caption="Turns"
           title="Thread"
@@ -213,7 +217,11 @@ function Runs() {
       </div>
       <div className="flex flex-col gap-3">
         <SectionTitle>Rules' runs</SectionTitle>
-        <Connection snapshot={automation} waiting="the workspace's rules" />
+        <Connection
+          snapshot={automation}
+          onReconnect={reflexr.reconnect}
+          waiting="the workspace's rules"
+        />
         <RunList
           caption="Rules' runs"
           title="Rule"

@@ -15,7 +15,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useActionState, useMemo, useState } from "react";
 import { read, SKELETON } from "../../../../../../../rules";
-import { Connection, useAutomation } from "../../../../../../../workspace";
+import { Connection, useAutomation, useAutomationStream } from "../../../../../../../workspace";
 
 const ACTIONS = ["reflexr:install_rule"] as const;
 
@@ -59,6 +59,7 @@ function Rules() {
   const { data: schedules } = useSuspenseQuery(queries.reflexr.schedules(tenant, workspace));
   // The list is read again as the log says a rule changed (`WorkspaceStreams`).
   const automation = useAutomation();
+  const automationStream = useAutomationStream();
 
   // The field is held here, not by the form, which a sent action resets.
   const [text, setText] = useState(SKELETON);
@@ -86,7 +87,11 @@ function Rules() {
         title="Rules"
         meta={`What reacts to events in ${workspace}, and the schedules that tick into it`}
       />
-      <Connection snapshot={automation} waiting="the latest changes to the rules" />
+      <Connection
+        snapshot={automation}
+        onReconnect={automationStream.reconnect}
+        waiting="the latest changes to the rules"
+      />
       <Rows label="Rules">
         {rules.map((rule) => (
           <Row

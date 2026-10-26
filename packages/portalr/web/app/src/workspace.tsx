@@ -24,7 +24,7 @@ import {
   streamUrl,
   useEnabled,
 } from "@portalr/client";
-import { Alert, failureLogged, IntegrationsContext, Reading } from "@portalr/ui";
+import { Alert, Button, failureLogged, IntegrationsContext, Reading } from "@portalr/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   createContext,
@@ -167,10 +167,13 @@ export function useAutomation(): Snapshot<Reflexr.Workspace> {
 export function Connection({
   snapshot,
   waiting,
+  onReconnect,
 }: {
   snapshot: Snapshot<unknown>;
   /** What is being read, such as "the workspace". */
   waiting: string;
+  /** Connect again now, offered once the connection has ended (portalr ADR-0080). */
+  onReconnect?: () => void;
 }) {
   // The server's own words of why, if it said, go to the console alone (portalr ADR-0070).
   useEffect(() => {
@@ -181,8 +184,27 @@ export function Connection({
   if (snapshot.status === "closed") {
     return (
       <Alert tone="error">
-        The connection to this workspace ended. Reload the page to connect again.
+        <span className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          {onReconnect ? (
+            <>
+              The connection to this workspace ended.
+              <Button variant="secondary" size="sm" onClick={onReconnect}>
+                Connect now
+              </Button>
+            </>
+          ) : (
+            "The connection to this workspace ended. Reload the page to connect again."
+          )}
+        </span>
       </Alert>
+    );
+  }
+  // Connecting again after the log was read: what is shown stays, and what is sent waits for it.
+  if (snapshot.status === "connecting" && snapshot.seq > 0) {
+    return (
+      <p role="status" className="text-muted text-sm">
+        Connecting again… What you send goes once it is connected.
+      </p>
     );
   }
   if (snapshot.status !== "live") {

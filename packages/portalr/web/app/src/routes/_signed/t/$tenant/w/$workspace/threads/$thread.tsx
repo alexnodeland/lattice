@@ -226,7 +226,7 @@ function Chat() {
         There's no thread here by that name, or it isn't one you can see.
       </NotFoundPage>
     ) : (
-      <Connection snapshot={snapshot} waiting="the thread" />
+      <Connection snapshot={snapshot} onReconnect={stream.reconnect} waiting="the thread" />
     );
   }
   if (!allowed.has("artifactr:read_threads")) {
@@ -319,7 +319,7 @@ function Chat() {
           </>
         }
       />
-      <Connection snapshot={snapshot} waiting="the thread" />
+      <Connection snapshot={snapshot} onReconnect={stream.reconnect} waiting="the thread" />
       <Messages>
         {log.map((entry) => {
           switch (entry.kind) {
@@ -462,7 +462,6 @@ function Chat() {
       {snapshot.status !== "closed" && allowed.has("artifactr:post_message") && (
         <ComposerDock>
           <Composer
-            disabled={snapshot.status !== "live"}
             onSend={send}
             onFiles={setDropped}
             attach={

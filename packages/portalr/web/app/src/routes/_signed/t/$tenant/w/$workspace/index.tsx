@@ -181,7 +181,7 @@ function Threads() {
         meta={`The threads in ${workspace}, the most recently active first`}
       />
       {starting}
-      <Connection snapshot={snapshot} waiting="the workspace" />
+      <Connection snapshot={snapshot} onReconnect={stream.reconnect} waiting="the workspace" />
       {needed.length > 0 && (
         <section aria-labelledby="needs-you" className="flex flex-col gap-3">
           <SectionTitle id="needs-you">Needs you</SectionTitle>

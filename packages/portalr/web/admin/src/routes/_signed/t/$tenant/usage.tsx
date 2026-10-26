@@ -185,8 +185,13 @@ function Workspaces({ usage, listed, more }: { usage: Usage; listed: boolean; mo
         caption="Each workspace's spend"
         columns={[
           { key: "workspace", label: "Workspace", cell: (place) => place.workspace },
-          { key: "spend", label: "Spend", cell: (place) => dollars(place.spend) },
-          { key: "tokens", label: "Tokens", cell: (place) => numbers.format(place.tokens) },
+          { key: "spend", label: "Spend", numeric: true, cell: (place) => dollars(place.spend) },
+          {
+            key: "tokens",
+            label: "Tokens",
+            numeric: true,
+            cell: (place) => numbers.format(place.tokens),
+          },
         ]}
         items={usage.workspaces}
         keyOf={(place) => place.workspace}

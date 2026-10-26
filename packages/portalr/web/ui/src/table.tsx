@@ -3,11 +3,13 @@ import { cn } from "./cn";
 import { ScrollRegion } from "./scroll-region";
 
 /**
- * A table of rows, named by its caption or by a heading beside it, on the surface, scrolling
- * sideways rather than squeezing on a narrow screen: the scroll is a region of the same name the
- * keyboard can reach. Its rows are the caller's `<thead>` and `<tbody>`, whose header cells say
- * what they head with `scope="col"` or `scope="row"`: a column's header is small and muted, and a
- * row's is in the row's own type, between its borders.
+ * A table of rows (portalr ADR-0080), named by its caption or by a heading beside it, on the
+ * surface, scrolling sideways rather than squeezing on a narrow screen: the scroll is a region of
+ * the same name the keyboard can reach. Its rows are the caller's `<thead>` and `<tbody>`, whose
+ * header cells say what they head with `scope="col"` or `scope="row"`: a column's header is a
+ * small quiet label in capitals on the paper, which stays at the top where the table scrolls, and
+ * a row's is in the row's own type, between its borders. A cell of figures takes `data-num`, so
+ * they line up on their digits and sit at the end.
  */
 export function Table({
   children,
@@ -38,7 +40,7 @@ export function Table({
       <table
         aria-labelledby={labelledBy}
         className={cn(
-          "w-full border-collapse text-(length:--table-text) text-fg [&_td]:border-line [&_td]:border-t [&_td]:h-(--row-height) [&_td]:px-(--table-cell-pad-x) [&_td]:py-(--row-pad) [&_td]:align-middle [&_th]:h-(--row-height) [&_th]:whitespace-nowrap [&_th]:px-(--table-cell-pad-x) [&_th]:py-(--row-pad) [&_th]:text-left [&_thead_th]:font-semibold [&_thead_th]:text-muted [&_thead_th]:text-xs [&_tbody_th]:border-line [&_tbody_th]:border-t [&_tbody_th]:align-middle [&_tbody_th]:font-semibold [&_tbody_th]:text-fg [&_tbody_th]:text-(length:--table-text) [&_tbody_tr:hover]:bg-wash",
+          "w-full border-collapse text-(length:--table-text) text-fg [&_td]:border-line [&_td]:border-t [&_td]:h-(--row-height) [&_td]:px-(--table-cell-pad-x) [&_td]:py-(--row-pad) [&_td]:align-middle [&_th]:h-(--row-height) [&_th]:whitespace-nowrap [&_th]:px-(--table-cell-pad-x) [&_th]:py-(--row-pad) [&_th]:text-left [&_thead_th]:sticky [&_thead_th]:top-0 [&_thead_th]:z-10 [&_thead_th]:bg-paper [&_thead_th]:font-semibold [&_thead_th]:text-muted [&_thead_th]:text-xs [&_thead_th]:uppercase [&_thead_th]:tracking-wider [&_tbody_th]:border-line [&_tbody_th]:border-t [&_tbody_th]:align-middle [&_tbody_th]:font-semibold [&_tbody_th]:text-fg [&_tbody_th]:text-(length:--table-text) [&_tbody_tr:hover]:bg-wash [&_[data-num]]:text-end [&_[data-num]]:tabular-nums",
           // A row's wash follows the pointer as a nav link's does: `FEEDBACK`, on each row.
           "[&_tbody_tr]:transition-[color,background-color,border-color,text-decoration-color] [&_tbody_tr]:duration-(--feedback-duration) [&_tbody_tr]:ease-(--feedback-ease) [&_tbody_tr]:motion-reduce:transition-none",
           className,

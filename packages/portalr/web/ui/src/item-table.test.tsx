@@ -153,3 +153,25 @@ test("a card's heading sits one level under what names the table: the page's, or
   await expect.element(screen.getByRole("heading", { level: 3, name: "bob" })).toBeVisible();
   await expect.element(screen.getByRole("heading", { level: 4, name: "dee" })).toBeVisible();
 });
+
+test("a column of figures sits at the end of its cells, on its digits", async () => {
+  await page.viewport(1024, 768);
+  onTestFinished(() => page.viewport(414, 896));
+  const screen = await render(
+    <ItemTable
+      caption="Spend"
+      columns={[
+        { key: "ws", label: "Workspace", cell: (row: { ws: string; spend: string }) => row.ws },
+        { key: "spend", label: "Spend", numeric: true, cell: (row) => row.spend },
+      ]}
+      items={[{ ws: "main", spend: "$12.40" }]}
+      keyOf={(row) => row.ws}
+      empty={{ title: "No spend", body: "None yet." }}
+    />,
+  );
+  const cell = screen.getByRole("cell", { name: "$12.40" }).element();
+  expect(getComputedStyle(cell).textAlign).toBe("end");
+  expect(getComputedStyle(cell).fontVariantNumeric).toContain("tabular-nums");
+  const header = screen.getByRole("columnheader", { name: "Spend" }).element();
+  expect(getComputedStyle(header).textAlign).toBe("end");
+});

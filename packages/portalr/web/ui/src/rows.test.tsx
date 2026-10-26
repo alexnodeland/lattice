@@ -55,15 +55,14 @@ test("a row's name is a quiet link, its meta quieter on the line beneath", async
   );
   const link = screen.getByRole("link", { name: "Launch plan" }).element();
   expect(getComputedStyle(link).color).toBe(token("fg"));
-  // A quiet underline at rest, so it reads as a link where nothing hovers.
-  expect(getComputedStyle(link).textDecorationLine).toBe("underline");
-  expect(getComputedStyle(link).textDecorationColor).toBe(token("edge"));
+  // No underline: the row's chevron says it opens (portalr ADR-0080).
+  expect(getComputedStyle(link).textDecorationLine).toBe("none");
+  expect(getComputedStyle(link).fontWeight).toBe("600");
   const meta = screen.getByText("art_1, note, version 2").element();
   expect(getComputedStyle(meta).color).toBe(token("muted"));
   expect(meta.getBoundingClientRect().top).toBeGreaterThan(link.getBoundingClientRect().bottom - 1);
   await userEvent.hover(link);
   expect(getComputedStyle(link).color).toBe(token("accent"));
-  expect(getComputedStyle(link).textDecorationColor).toBe(token("accent"));
 });
 
 test("a row's name takes the working colour when the keyboard reaches it", async () => {
@@ -76,7 +75,6 @@ test("a row's name takes the working colour when the keyboard reaches it", async
   const link = screen.getByRole("link", { name: "Launch plan" }).element();
   expect(link.matches(":focus-visible")).toBe(true);
   expect(getComputedStyle(link).color).toBe(token("accent"));
-  expect(getComputedStyle(link).textDecorationColor).toBe(token("accent"));
 });
 
 test("what is at a row's end is a target of its own, above the row's link", async () => {
@@ -241,4 +239,20 @@ test("an end of several controls sits against the row's end, and wraps within ha
   ).getBoundingClientRect();
   expect(end.width).toBeLessThanOrEqual(second.getBoundingClientRect().width / 2 + 1);
   expect(Math.abs(end.right - edge(second))).toBeLessThan(1);
+});
+
+test("a row whose name is a link and whose end is empty shows the kit's chevron; one with an end doesn't", async () => {
+  const screen = await render(
+    <Rows label="Threads">
+      <Row name={<RowLink href="#a">Launch plan</RowLink>} />
+      <Row name={<RowLink href="#b">Move the launch</RowLink>} end={<span>end</span>} />
+      <Row name="Plain words" />
+    </Rows>,
+  );
+  const rows = screen.getByRole("listitem").elements();
+  const chevron = (row: Element) => row.querySelector("svg[data-glyph]");
+  expect(chevron(rows[0] as Element)).not.toBeNull();
+  expect(getComputedStyle(chevron(rows[0] as Element) as Element).display).toBe("block");
+  expect(chevron(rows[1] as Element)).toBeNull();
+  expect(getComputedStyle(chevron(rows[2] as Element) as Element).display).toBe("none");
 });

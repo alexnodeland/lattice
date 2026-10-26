@@ -13,6 +13,8 @@ export interface Column<T> {
   readonly label: string;
   readonly cell: (item: T) => ReactNode;
   readonly width?: string;
+  /** Whether its cells are figures: they sit at the end, on their digits (portalr ADR-0080). */
+  readonly numeric?: boolean;
 }
 
 /**
@@ -67,7 +69,12 @@ export function ItemTable<T>({
           <thead>
             <tr>
               {columns.map((column) => (
-                <th key={column.key} scope="col" style={{ width: column.width }}>
+                <th
+                  key={column.key}
+                  scope="col"
+                  style={{ width: column.width }}
+                  {...(column.numeric && { "data-num": "" })}
+                >
                   {column.label}
                 </th>
               ))}
@@ -85,7 +92,9 @@ export function ItemTable<T>({
                   {first.cell(item)}
                 </th>
                 {rest.map((column) => (
-                  <td key={column.key}>{column.cell(item)}</td>
+                  <td key={column.key} {...(column.numeric && { "data-num": "" })}>
+                    {column.cell(item)}
+                  </td>
                 ))}
                 {actions && <td className="text-right">{actions(item)}</td>}
               </tr>

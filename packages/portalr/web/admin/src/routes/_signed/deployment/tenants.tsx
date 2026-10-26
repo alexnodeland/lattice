@@ -55,7 +55,7 @@ function Tenants() {
         caption="Tenants"
         columns={[
           { key: "tenant", label: "Tenant", cell: (row) => row.tenant },
-          { key: "spend", label: "Spend", cell: (row) => spendSaid(row) },
+          { key: "spend", label: "Spend", numeric: true, cell: (row) => spendSaid(row) },
           { key: "budget", label: "Budget", cell: (row) => budgetSaid(row, answered) },
         ]}
         items={rows.slice(0, shown)}

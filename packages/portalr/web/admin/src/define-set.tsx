@@ -160,7 +160,7 @@ export function DefineSet({
               <p>{lost.body}</p>
             </ConfirmDialog>
           ) : (
-            <Button type="submit" disabled={pending}>
+            <Button type="submit" pending={pending}>
               {changing ? words.saved : words.created}
             </Button>
           )}

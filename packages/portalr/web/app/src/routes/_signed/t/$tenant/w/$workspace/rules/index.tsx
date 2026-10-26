@@ -164,7 +164,7 @@ function Rules() {
             render={<textarea rows={14} wrap="off" className="font-mono" spellCheck={false} />}
             required
           />
-          <Button type="submit" disabled={pending} className="self-start">
+          <Button type="submit" pending={pending} className="self-start">
             Install
           </Button>
         </Card>

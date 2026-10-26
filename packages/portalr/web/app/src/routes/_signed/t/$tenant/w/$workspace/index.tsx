@@ -56,7 +56,7 @@ function Threads() {
     snapshot.status !== "closed" ? (
       <form className="flex items-end gap-2" action={start}>
         <TextField label="New thread" name="title" error={refused} required />
-        <Button type="submit" disabled={pending || !live}>
+        <Button type="submit" disabled={!live} pending={pending}>
           Start
         </Button>
       </form>

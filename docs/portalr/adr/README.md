@@ -42,7 +42,7 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0034](0034-tenants-and-the-deployments-audit.md) | Tenants in admin, created by email, and the deployment's audit log | Accepted, amended by 0038 |
 | [0035](0035-tools-and-the-record-of-opening-them.md) | Tools, links into Langfuse and Grafana, and the record of making them | Accepted |
 | [0036](0036-the-chart-theme-and-colour-blind-mode.md) | The chart theme: violet-led series, patterns only where marks touch, and a hook for colour-blind mode | Accepted, amended by 0047 |
-| [0037](0037-form-controls-and-row-actions.md) | Form controls and row actions: a Base UI select, form fields, segmented windows, button variants and sizes | Accepted |
+| [0037](0037-form-controls-and-row-actions.md) | Form controls and row actions: a Base UI select, form fields, segmented windows, button variants and sizes | Accepted, amended by 0079 |
 | [0038](0038-people-by-email.md) | People by email, not by id | Accepted |
 | [0039](0039-elevation-status-colour-states-and-density.md) | Elevation, status colours, alerts and placeholders, and admin's compact density | Accepted |
 | [0040](0040-scenarios-against-a-generated-application-and-size-budgets.md) | Scenarios against a generated application, and size budgets | Accepted, amended by 0044 |
@@ -58,7 +58,7 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0050](0050-a-native-files-proposals-and-the-pilots-scenarios.md) | A native file's proposals: outdated, never rebased, and compared page by page; and the check-out pilot's scenarios | Accepted |
 | [0051](0051-mini-apps-the-sandboxed-frame-and-its-bridge.md) | Mini apps: the sandboxed frame and its bridge | Accepted |
 | [0052](0052-artifacts-inline-in-their-thread.md) | Artifacts inline in their thread, a mini app first | Accepted |
-| [0053](0053-the-chats-questions-tool-calls-sides-failures-and-streaming.md) | The chat's questions, tool calls, sides, failures and streaming | Accepted |
+| [0053](0053-the-chats-questions-tool-calls-sides-failures-and-streaming.md) | The chat's questions, tool calls, sides, failures and streaming | Accepted, amended by 0079 |
 | [0054](0054-readable-revisions.md) | Readable revisions: per kind, in parts, one preview running | Accepted |
 | [0055](0055-every-kind-inline-and-a-native-file-read-and-edited-in-its-thread.md) | Every kind inline in its thread, and a native file read and edited there | Accepted |
 | [0056](0056-brand-kits-token-layers-loading-and-validation.md) | Brand kits: three token layers, a kit loaded per deployment, and validation in Python | Accepted |
@@ -73,7 +73,7 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0065](0065-empty-error-and-not-found-states.md) | Empty, error and not-found states | Accepted, amended by 0068 |
 | [0066](0066-the-style-census-enforced.md) | The style census, enforced | Accepted |
 | [0067](0067-settings-in-admin.md) | Settings in admin | Accepted, amended by 0069 |
-| [0068](0068-where-the-focus-goes-and-one-not-found.md) | Where the focus goes, and one not-found | Accepted |
+| [0068](0068-where-the-focus-goes-and-one-not-found.md) | Where the focus goes, and one not-found | Accepted, amended by 0079 |
 | [0069](0069-a-connected-apps-tools-chosen-in-admin-and-a-way-in-for-workspace-admins.md) | A connected app's tools chosen in admin, and a way in for a workspace's admins | Accepted |
 | [0070](0070-a-servers-words-never-reach-a-reader.md) | A server's words never reach a reader | Accepted |
 | [0071](0071-adoption-the-tenants-read-and-page.md) | Adoption, the tenant's read and page | Accepted |
@@ -84,5 +84,6 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0076](0076-the-relay-sends-umami-a-copy-and-deletes-there-too.md) | The relay sends Umami a copy, and deletes there too | Accepted |
 | [0077](0077-session-replay-its-own-yes-masked-in-the-browser-and-checked-at-the-relay.md) | Session replay, its own yes, masked in the browser and checked at the relay | Accepted |
 | [0078](0078-the-others-on-a-diagrams-canvas-and-their-revisions-as-they-arrive.md) | The others on a diagram's canvas, and their revisions as they arrive | Accepted |
+| [0079](0079-interaction-states-feedback-pending-and-a-refusals-mark.md) | Interaction states: feedback, pending, and a refusal's mark | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

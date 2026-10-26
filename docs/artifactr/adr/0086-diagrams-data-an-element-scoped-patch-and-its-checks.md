@@ -1,6 +1,6 @@
 # ADR-0086: Diagrams' data: an element-scoped patch and its checks
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-10-22
 **Deciders:** Alex Nodeland
 **Implements:** the data slice of [lattice RFC-0006](../../rfcs/0006-excalidraw-diagrams-drawn-live.md)'s phase 2 (O1, O6), as [lattice ADR-0026](../../adr/0026-a-distribution-needs-a-reason-integrations-are-extras.md) amends its packaging

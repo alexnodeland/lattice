@@ -14,7 +14,7 @@
 
 **stackr** is the infrastructure template for applications built on [artifactr](https://lattice.alexnodeland.com/artifactr/), [reflexr](https://lattice.alexnodeland.com/reflexr/) and [evalr](https://lattice.alexnodeland.com/evalr/): local Supabase, the LiteLLM gateway, OpenTelemetry, Grafana's LGTM stack with Pyroscope, and Langfuse, as one Docker Compose project with profiles, and a [Copier](https://copier.readthedocs.io) template that generates an application already wired to all of them.
 
-> **Status:** pre-release. v0.1 is built, as planned in [RFC-0001](https://lattice.alexnodeland.com/stackr/rfcs/0001-v0.1-implementation-plan/), and not yet released.
+> **Status:** alpha, and released. v0.1 is built, as planned in [RFC-0001](https://lattice.alexnodeland.com/stackr/rfcs/0001-v0.1-implementation-plan/): its images are on GHCR, and it ships no wheel.
 
 ## Why
 

@@ -1,6 +1,6 @@
 # ADR-0067: Settings in admin
 
-**Status:** Proposed, amended by [ADR-0069](0069-a-connected-apps-tools-chosen-in-admin-and-a-way-in-for-workspace-admins.md) (tools chosen by checkboxes, and a way in for a workspace's admins)
+**Status:** Accepted, amended by [ADR-0069](0069-a-connected-apps-tools-chosen-in-admin-and-a-way-in-for-workspace-admins.md) (tools chosen by checkboxes, and a way in for a workspace's admins)
 **Date:** 2026-10-22
 **Deciders:** Alex Nodeland
 **Beside:** [ADR-0045](0045-integrations-in-admin-and-the-apps-read-of-them.md), integrations in admin; implements the screen of lattice [ADR-0030](../../adr/0030-settings-typed-declared-in-lattice-core-and-only-narrowed-below.md)

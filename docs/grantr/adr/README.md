@@ -40,7 +40,7 @@ ADR-0001 to ADR-0009 record the decisions D1 to D9 of [lattice RFC-0001](../../r
 | [0032](0032-the-audit-log-read-newest-first.md) | The audit log, read from its end | Accepted |
 | [0033](0033-a-tenants-creation-in-the-deployments-log.md) | A tenant's creation, in the deployment's log | Accepted |
 | [0034](0034-integrations-switched-per-tenant-and-workspace-in-grantrs-table-audited.md) | Integrations switched per tenant and workspace, in grantr's table, audited | Accepted |
-| [0035](0035-settings-narrowed-per-tenant-and-workspace-in-grantrs-table-versioned-audited.md) | Settings narrowed per tenant and workspace, in grantr's table, versioned and audited | Proposed |
+| [0035](0035-settings-narrowed-per-tenant-and-workspace-in-grantrs-table-versioned-audited.md) | Settings narrowed per tenant and workspace, in grantr's table, versioned and audited | Accepted |
 | [0036](0036-a-hook-on-a-members-removal.md) | A hook on a member's removal | Superseded by 0037 |
 | [0037](0037-the-deployments-own-tools-read-a-tenants-audit-log.md) | The deployment's own tools read a tenant's audit log | Accepted |
 

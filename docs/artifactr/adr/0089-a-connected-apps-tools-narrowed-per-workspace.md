@@ -1,6 +1,6 @@
 # ADR-0089: A connected app's tools, narrowed per workspace
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-10-23
 **Deciders:** Alex Nodeland
 **Amends:** [ADR-0085](0085-connected-apps-an-operators-own-freecad-or-blender-through-a-vetted-mcp-server.md), whose tools were the operator's alone; beside [ADR-0087](0087-a-connected-apps-hourly-limit-read-from-settings.md)

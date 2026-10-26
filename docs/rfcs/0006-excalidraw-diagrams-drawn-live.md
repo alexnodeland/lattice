@@ -1,6 +1,6 @@
 # RFC-0006: Excalidraw diagrams, drawn live by people and agents
 
-**Status:** Draft, amended by [lattice ADR-0026](../adr/0026-a-distribution-needs-a-reason-integrations-are-extras.md)
+**Status:** Implemented, amended by [lattice ADR-0026](../adr/0026-a-distribution-needs-a-reason-integrations-are-extras.md)
 **Author:** Alex Nodeland
 **Created:** 2026-10-17
 **Discussion:** [#356](https://github.com/alexnodeland/lattice/pull/356)
@@ -403,14 +403,16 @@ Each is settled in phase 0's ADR or carried as an exit criterion.
 - [x] Sign-off on U1 to U6 (2026-10-22)
 - [x] lattice-core and grantr: `Integrations`, its adapter, audit and action ([lattice ADR-0027](../adr/0027-integrations-switched-per-workspace-through-one-port.md))
 - [ ] artifactr: `Workspaces(gate=...)` and `NotEnabled` (done, [artifactr ADR-0081](../artifactr/adr/0081-a-gate-before-access-integrations-switched-off-answer-not-enabled.md)); the watch commands, presence frames and `PresenceChannel` with its in-process adapter (done, [artifactr ADR-0093](../artifactr/adr/0093-presence-who-has-an-artifact-open-passed-on-and-never-stored.md)); its PostgreSQL adapter
-- [ ] artifactr-files: the collector's kinds
-- [ ] artifactr's `excalidraw` extra: its type, patches, checks and `render_for_agent` (done: artifactr ADR-0086, with phase 0's limits, and `excalidraw` off by default); its toolset and converter (done: [artifactr ADR-0090](../artifactr/adr/0090-diagrams-drawn-by-the-agent-through-a-converter.md)); its router
+- [x] artifactr-files: the collector's kinds (`NativeFiles(naming=(Diagram,))`, which stackr's template passes)
+- [x] artifactr's `excalidraw` extra: its type, patches, checks and `render_for_agent` (done: artifactr ADR-0086, with phase 0's limits, and `excalidraw` off by default); its toolset and converter (done: [artifactr ADR-0090](../artifactr/adr/0090-diagrams-drawn-by-the-agent-through-a-converter.md)); its router (done: `artifactr.excalidraw.fastapi`)
 - [x] stackr: the worker, its image and the `diagrams` question ([stackr ADR-0049](../stackr/adr/0049-the-diagrams-worker-excalidraw-in-headless-chromium-behind-a-relay.md)); Xiaolai in its image waits for its author's answer to lattice#679
 - [x] portalr, phase 3a: the renderer, its text alternative held to artifactr's by a shared fixture, and the canvas to look at, an add-on with its budget, under the policy unchanged ([portalr ADR-0072](../portalr/adr/0072-a-diagrams-card-and-its-canvas-to-look-at.md))
 - [x] portalr, phase 3b: editing on the canvas, the TypeScript patch builder, an upload route for a diagram's images with checks of size and type, and no SVG images; `img-src blob:` found not needed ([portalr ADR-0074](../portalr/adr/0074-editing-a-diagram-on-its-canvas-and-the-images-put-on-it.md), [artifactr ADR-0092](../artifactr/adr/0092-a-diagrams-images-uploaded-by-a-person-and-read-where-it-names-them.md))
-- [ ] portalr: presence, the list ("Here now"), the overlay, and revisions merged as they arrive (done, [portalr ADR-0078](../portalr/adr/0078-the-others-on-a-diagrams-canvas-and-their-revisions-as-they-arrive.md)); agents as peers; admin's Integrations page
+- [ ] portalr: presence, the list ("Here now"), the overlay, and revisions merged as they arrive (done, [portalr ADR-0078](../portalr/adr/0078-the-others-on-a-diagrams-canvas-and-their-revisions-as-they-arrive.md)); agents as peers; admin's Integrations page (done)
 - [x] The `[relayr]` projections and feedback anchors ([relayr ADR-0041](../relayr/adr/0041-a-diagrams-commits-bridged-as-its-elements-changed-and-comments-on-them.md)); commenting from the canvas is portalr's, still to do
 - [ ] Docs: the package's guide, its ADRs, and the architecture
+
+*Implemented 2026-10-25: diagrams shipped, behind the `excalidraw` integration, off by default: the type, its patches and checks, the agent's tools and converter, the worker, the canvas with its images, presence and revisions as they arrive, the revisions' thinning and the tombstone sweep, and the commits bridged to relayr with comments anchored to elements. Deferred: presence's PostgreSQL adapter, so presence reaches across processes; commenting from the canvas; agents as peers on the canvas; the package's guide and its place in the architecture; Xiaolai, until its author answers lattice#679; and viewers' cursors, still an open question.*
 
 ## Evidence
 

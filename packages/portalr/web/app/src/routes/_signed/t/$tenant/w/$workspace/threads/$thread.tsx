@@ -41,6 +41,7 @@ import { type ReactNode, Suspense, useEffect, useMemo, useRef, useState } from "
 import { author, unnamedPeople } from "../../../../../../../author";
 import { usePosting } from "../../../../../../../posting";
 import { RENDERERS } from "../../../../../../../renderers";
+import { markSeen } from "../../../../../../../seen";
 import { ShareDialog } from "../../../../../../../share-dialog";
 import { ThreadArtifact } from "../../../../../../../thread-artifact";
 import { RETRY_TAKEN, retryOf, threadLog } from "../../../../../../../thread-log";
@@ -196,6 +197,14 @@ function Chat() {
       });
     }
   }, [snapshot.status, runs, id, atLoad]);
+  // How far this browser has read the thread: where it is active at, once shown live (portalr
+  // ADR-0080), for the list's mark of what has moved since.
+  const readTo = thread?.active;
+  useEffect(() => {
+    if (snapshot.status === "live" && readTo !== undefined) {
+      markSeen(tenant, workspace, id, readTo);
+    }
+  }, [snapshot.status, tenant, workspace, id, readTo]);
   // Opened at a request, as from Needs you (portalr ADR-0080): once the thread is shown live, the
   // page goes to it, as Go to the question does.
   const hash = useRouterState({ select: (state) => state.location.hash });

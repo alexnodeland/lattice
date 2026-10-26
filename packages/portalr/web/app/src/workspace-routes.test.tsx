@@ -148,3 +148,55 @@ test("what waits on a person across the workspace is listed first, approvals bef
     .element(rows.nth(0).getByRole("link"))
     .toHaveAttribute("href", "/t/acme/w/notes/threads/thr_2#request-a1");
 });
+
+test("the threads are searched by title and filtered by state, the view kept in the URL, and one read here that has moved since is marked", async () => {
+  const at = (seq: number, actor: unknown, event: unknown) => ({
+    type: "event",
+    seq,
+    id: `evt_${seq}`,
+    ts: "2026-10-20T00:00:00Z",
+    workspace_id: "notes",
+    actor,
+    event,
+  });
+  const alice = { kind: "user", id: "alice" };
+  const agent = (run: string) => ({ kind: "agent", id: "agent", run_id: run });
+  const log = [
+    at(1, alice, { type: "thread_created", thread_id: "thr_1", title: "Launch" }),
+    at(2, alice, { type: "thread_created", thread_id: "thr_2", title: "Invoices" }),
+    at(3, alice, { type: "message_posted", thread_id: "thr_2", message_id: "m1", content: "Hi" }),
+    at(4, agent("run_1"), { type: "run_started", run_id: "run_1", thread_id: "thr_1" }),
+  ];
+  // Invoices was read here at its start; it has a message since. Launch was never opened here.
+  localStorage.setItem("portalr:seen:acme/notes", JSON.stringify({ thr_2: 2 }));
+  const { screen, router } = await open(
+    "/t/acme/w/notes",
+    async (_request, path) => (path === FLAGS ? Response.json({}) : undefined),
+    () => null,
+    { artifactrLog: log },
+  );
+  const threads = screen.getByRole("list", { name: "Threads" });
+  await expect.element(threads.getByRole("listitem")).toHaveLength(2);
+  const invoices = threads.getByRole("listitem").filter({ hasText: "Invoices" });
+  await expect
+    .element(invoices.getByRole("img", { name: "Moved since you read it" }))
+    .toBeVisible();
+  expect(
+    threads
+      .getByRole("listitem")
+      .filter({ hasText: "Launch" })
+      .getByRole("img", { name: "Moved since you read it" })
+      .elements(),
+  ).toHaveLength(0);
+  await screen.getByRole("searchbox", { name: "Search threads" }).fill("inv");
+  await expect.element(threads.getByRole("listitem")).toHaveLength(1);
+  await expect.poll(() => router.state.location.search).toEqual({ q: "inv" });
+  await screen.getByRole("searchbox", { name: "Search threads" }).fill("");
+  await screen.getByRole("radio", { name: /^Working/ }).click();
+  await expect.element(threads.getByRole("listitem")).toHaveLength(1);
+  await expect.element(threads.getByRole("listitem").filter({ hasText: "Launch" })).toBeVisible();
+  await expect.poll(() => router.state.location.search).toEqual({ show: "working" });
+  await screen.getByRole("radio", { name: /^Needs you/ }).click();
+  await expect.element(screen.getByText("No thread matches")).toBeVisible();
+  localStorage.removeItem("portalr:seen:acme/notes");
+});

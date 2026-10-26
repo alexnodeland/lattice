@@ -13,16 +13,29 @@ import {
   Rows,
   RunStatus,
   SectionTitle,
+  SegmentedFilter,
   StatusBadge,
   TextField,
 } from "@portalr/ui";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useActionState, useState } from "react";
 import { author } from "../../../../../../author";
+import { readSeen } from "../../../../../../seen";
 import { Connection, useStream, useWorkspace } from "../../../../../../workspace";
 
-/** The workspace's threads, the most recently active first, and a new one. */
-export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/")({ component: Threads });
+type Shown = "all" | "needs" | "working";
+
+/**
+ * The workspace's threads, the most recently active first, and a new one. The URL carries the
+ * search (`q`) and the filter (`show`), so a view is kept on reload and can be shared.
+ */
+export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/")({
+  component: Threads,
+  validateSearch: (search: Record<string, unknown>): { q?: string; show?: Shown } => ({
+    ...(typeof search.q === "string" && search.q !== "" && { q: search.q }),
+    ...((search.show === "needs" || search.show === "working") && { show: search.show }),
+  }),
+});
 
 function Threads() {
   const { tenant, workspace } = Route.useParams();
@@ -31,7 +44,19 @@ function Threads() {
   const stream = useStream();
   const snapshot = useWorkspace();
   const navigate = useNavigate();
-  const listed = Object.values(snapshot.state.threads).sort((a, b) => b.active - a.active);
+  const { q = "", show = "all" } = Route.useSearch();
+  const view = (change: { q?: string; show?: Shown }) =>
+    void navigate({
+      to: ".",
+      search: (was) => {
+        const next = { ...was, ...change };
+        return {
+          ...(next.q && { q: next.q }),
+          ...(next.show && next.show !== "all" && { show: next.show }),
+        };
+      },
+      replace: true,
+    });
   const toThread = (thread: string) =>
     navigate({
       to: "/t/$tenant/w/$workspace/threads/$thread",
@@ -95,6 +120,40 @@ function Threads() {
       .filter((run) => run.status === "running" || run.status === "paused")
       .map((run) => [run.threadId, run.status] as const),
   );
+  // Searched by title and filtered by state (portalr ADR-0080); a thread this browser has read
+  // that has moved since is marked. One never opened here is not: nothing is known of it.
+  const seen = readSeen(tenant, workspace);
+  const all = Object.values(snapshot.state.threads).sort((a, b) => b.active - a.active);
+  const needs = all.filter((thread) => going.get(thread.id) === "paused");
+  const working = all.filter((thread) => going.get(thread.id) === "running");
+  const shown = show === "needs" ? needs : show === "working" ? working : all;
+  const words = q.trim().toLocaleLowerCase();
+  const listed = words
+    ? shown.filter((thread) => (thread.title || "Untitled").toLocaleLowerCase().includes(words))
+    : shown;
+  const finding = all.length > 0 && (
+    <div className="flex flex-wrap items-end gap-3">
+      <TextField
+        type="search"
+        label="Search threads"
+        value={q}
+        onChange={(event) => view({ q: event.currentTarget.value })}
+        autoComplete="off"
+        enterKeyHint="search"
+        className="min-w-48 flex-1"
+      />
+      <SegmentedFilter<Shown>
+        label="Show"
+        value={show}
+        onValueChange={(chosen) => view({ show: chosen })}
+        segments={[
+          { value: "all", label: "All", count: all.length },
+          { value: "needs", label: "Needs you", count: needs.length },
+          { value: "working", label: "Working", count: working.length },
+        ]}
+      />
+    </div>
+  );
   const starting =
     snapshot.status !== "closed" ? (
       <div className="flex flex-col gap-2">
@@ -156,9 +215,15 @@ function Threads() {
           </Rows>
         </section>
       )}
-      {live && listed.length === 0 && (
+      {finding}
+      {live && all.length === 0 && (
         <EmptyState title="No threads yet">
           Write to the agent above to start one, or name one first.
+        </EmptyState>
+      )}
+      {live && all.length > 0 && listed.length === 0 && (
+        <EmptyState title="No thread matches">
+          None of the threads is {show === "all" ? "named so" : "in that state and named so"}.
         </EmptyState>
       )}
       {listed.length > 0 && (
@@ -195,7 +260,18 @@ function Threads() {
                     {thread.title || "Untitled"}
                   </RowLink>
                 }
-                end={status && <RunStatus status={status} />}
+                end={
+                  <>
+                    {seen[thread.id] !== undefined && thread.active > (seen[thread.id] ?? 0) && (
+                      <span
+                        role="img"
+                        aria-label="Moved since you read it"
+                        className="size-2 rounded-full bg-accent"
+                      />
+                    )}
+                    {status && <RunStatus status={status} />}
+                  </>
+                }
               />
             );
           })}

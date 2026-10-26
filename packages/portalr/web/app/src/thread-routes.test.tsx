@@ -427,3 +427,15 @@ test("the thread's mode is switched in its head, where the reader may", async ()
     mode: "suggest",
   });
 });
+
+test("a thread shown live is marked read here, as far as it is active", async () => {
+  localStorage.removeItem("portalr:seen:acme/notes");
+  const { screen } = await open("/t/acme/w/notes/threads/thr_1", serve, () => null, {
+    artifactrLog: LOG,
+  });
+  await expect.element(screen.getByRole("heading", { name: "Launch" })).toBeVisible();
+  await expect
+    .poll(() => JSON.parse(localStorage.getItem("portalr:seen:acme/notes") ?? "{}"))
+    .toEqual({ thr_1: LOG.findLast((entry) => entry.event.type === "message_posted")?.seq });
+  localStorage.removeItem("portalr:seen:acme/notes");
+});

@@ -20,6 +20,11 @@
  */
 @custom-variant fine (@media (hover: hover));
 @custom-variant coarse (@media (hover: none));
+/*
+ * A short window, as at a high zoom or a phone turned on its side: what is pinned to the bottom
+ * would cover most of the page, so the composer's dock stays in the flow (`short:static`).
+ */
+@custom-variant short (@media (max-height: 30rem));
 
 @layer base {
   html {
@@ -43,7 +48,7 @@
    * page without the frame has nothing pinned, so keeps none either.
    */
   html:has([data-frame-header]) {
-    scroll-padding-top: var(--header-clearance);
+    scroll-padding-top: calc(var(--header-clearance) + env(safe-area-inset-top));
     @variant lg {
       scroll-padding-top: 0;
     }
@@ -72,22 +77,13 @@
   }
 
   /*
-   * In a short window, as at a high zoom or a phone turned on its side, a composer pinned to the
-   * bottom would cover most of the page: it stays in the flow instead, at the thread's end.
-   */
-  @media (max-height: 30rem) {
-    [data-composer-dock] {
-      position: static;
-    }
-  }
-
-  /*
    * A phone's safe areas (portalr ADR-0080): the viewport reaches the screen's edges, so the page
-   * keeps the top and sides clear, a composer pinned to the bottom keeps the home indicator clear,
-   * and the drawer, which stands over the page, keeps the top and its own side clear itself.
+   * keeps the sides clear, the header pinned to the top keeps the notch clear itself (its own
+   * padding, in `app-shell.tsx`, and the room it takes below), a composer pinned to the bottom
+   * keeps the home indicator clear, and the drawer, which stands over the page, keeps the top,
+   * the bottom and its own side clear itself.
    */
   body {
-    padding-top: env(safe-area-inset-top);
     padding-right: env(safe-area-inset-right);
     padding-left: env(safe-area-inset-left);
   }
@@ -96,6 +92,7 @@
   }
   [data-frame-drawer] {
     padding-top: calc(var(--space-3) + env(safe-area-inset-top));
+    padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom));
     padding-left: calc(var(--space-3) + env(safe-area-inset-left));
   }
 }

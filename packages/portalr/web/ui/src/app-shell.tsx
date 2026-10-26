@@ -92,7 +92,7 @@ export function AppShell({
       <SkipLink />
       <header
         data-frame-header=""
-        className="sticky top-0 z-20 flex items-center gap-1 bg-paper px-3 py-2 lg:h-dvh lg:flex-col lg:items-stretch lg:gap-4 lg:p-3"
+        className="sticky top-0 z-20 flex items-center gap-1 bg-paper px-3 pt-[calc(var(--space-2)+env(safe-area-inset-top))] pb-2 lg:h-dvh lg:flex-col lg:items-stretch lg:gap-4 lg:p-3"
       >
         <Dialog.Root open={open} onOpenChange={setOpen}>
           <Dialog.Trigger className={`${button} lg:hidden`}>

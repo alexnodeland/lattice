@@ -2,7 +2,8 @@
  * A composer pinned to the bottom of the window as the page scrolls, and the room it takes there:
  * its height, as `--composer-clearance` on the page, which `scroll-padding-bottom` keeps clear, so
  * a control the keyboard reaches, or one scrolled to, is never left under it (the polish pass's
- * finding: the last message's Copy and thumbs under the composer).
+ * finding: the last message's Copy and thumbs under the composer). In a window under 30rem tall it
+ * stays in the flow instead (portalr ADR-0080), so it never covers most of the page.
  */
 
 import { type ReactNode, useEffect, useRef } from "react";
@@ -26,7 +27,11 @@ export function ComposerDock({ children }: { children: ReactNode }) {
     };
   }, []);
   return (
-    <div ref={dock} data-composer-dock="" className="sticky bottom-0 z-10 bg-paper pt-2">
+    <div
+      ref={dock}
+      data-composer-dock=""
+      className="sticky bottom-0 z-10 bg-paper pt-2 short:static"
+    >
       {children}
     </div>
   );

@@ -180,3 +180,26 @@ test("a folded group opens from the keyboard to its steps", async () => {
   await expect.element(group).toHaveAttribute("aria-expanded", "true");
   await expect.element(screen.getByRole("list", { name: "Steps" })).toBeVisible();
 });
+
+test("a group folds as its run ends, says Working between calls, and keeps its count as calls arrive", async () => {
+  const screen = await render(
+    <ToolCalls>
+      <RunSteps tools={steps(["ok"])} running />
+    </ToolCalls>,
+  );
+  await screen.rerender(
+    <ToolCalls>
+      <RunSteps tools={steps(["ok", "ok"])} running />
+    </ToolCalls>,
+  );
+  const group = screen.getByRole("button", { name: "2 steps" });
+  await expect.element(group).toHaveAttribute("aria-expanded", "true");
+  await expect.poll(() => group.element().textContent).toContain("Working");
+  await screen.rerender(
+    <ToolCalls>
+      <RunSteps tools={steps(["ok", "ok"])} running={false} />
+    </ToolCalls>,
+  );
+  await expect.element(group).toHaveAttribute("aria-expanded", "false");
+  await expect.poll(() => group.element().textContent).toContain("Done");
+});

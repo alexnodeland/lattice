@@ -10,3 +10,6 @@ export const RING =
 
 export const FEEDBACK =
   "transition-[color,background-color,border-color,text-decoration-color] duration-(--feedback-duration) ease-(--feedback-ease) motion-reduce:transition-none";
+
+/** What waits on the reader carries the rule at its start (portalr ADR-0080): an asking card, an approval. */
+export const ASKING = "border-l-4 border-l-accent";

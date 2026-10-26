@@ -18,9 +18,10 @@ import {
   TextField,
 } from "@portalr/ui";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { author } from "../../../../../../author";
-import { readSeen } from "../../../../../../seen";
+import { alreadyMade, messageId } from "../../../../../../posting";
+import { readSeen, subscribeToSeen } from "../../../../../../seen";
 import { Connection, useStream, useWorkspace } from "../../../../../../workspace";
 
 type Shown = "all" | "needs" | "working";
@@ -45,6 +46,12 @@ function Threads() {
   const snapshot = useWorkspace();
   const navigate = useNavigate();
   const { q = "", show = "all" } = Route.useSearch();
+  // What is typed is the page's own at once; the URL follows after a pause, trimmed, so each
+  // keystroke isn't a navigation; a URL that changes under it, as Back does, is taken up.
+  const [typed, setTyped] = useState(q);
+  useEffect(() => {
+    setTyped((now) => (now.trim() === q ? now : q));
+  }, [q]);
   const view = (change: { q?: string; show?: Shown }) =>
     void navigate({
       to: ".",
@@ -57,6 +64,16 @@ function Threads() {
       },
       replace: true,
     });
+  const viewNow = useRef(view);
+  viewNow.current = view;
+  useEffect(() => {
+    const want = typed.trim();
+    if (want === q) {
+      return;
+    }
+    const timer = setTimeout(() => viewNow.current({ q: want }), 200);
+    return () => clearTimeout(timer);
+  }, [typed, q]);
   const toThread = (thread: string) =>
     navigate({
       to: "/t/$tenant/w/$workspace/threads/$thread",
@@ -78,26 +95,36 @@ function Threads() {
     null,
   );
   // A thread started by writing to the agent (portalr ADR-0080): its title is the first line, its
-  // first message what was written. Refused, the words stay in the composer.
+  // first message what was written. The ids are fixed per draft, so the words, kept in the
+  // composer on any failure, sent again make nothing twice: a thread already made is gone on
+  // from, a message already posted is done. The page moves to the thread on success alone.
+  const attempt = useRef<{ content: string; thread: string; message: string } | null>(null);
   const write = async (content: string) => {
-    const thread = newThreadId();
+    const ids =
+      attempt.current?.content === content
+        ? attempt.current
+        : { content, thread: newThreadId(), message: messageId() };
+    attempt.current = ids;
     const created = await stream.send({
       type: "create_thread",
-      thread_id: thread,
+      thread_id: ids.thread,
       title: firstLine(content),
     });
-    if (created.outcome !== "done") {
+    if (created.outcome !== "done" && !alreadyMade(created, "thread", ids.thread)) {
       return created;
     }
     const posted = await stream.send({
       type: "post_message",
-      thread_id: thread,
-      message_id: `msg_${crypto.randomUUID().replaceAll("-", "")}`,
+      thread_id: ids.thread,
+      message_id: ids.message,
       content,
     });
-    // The thread is there either way: the page moves to it, where the message is sent again if need be.
-    await toThread(thread);
-    return posted;
+    if (posted.outcome !== "done" && !alreadyMade(posted, "message", ids.message)) {
+      return posted;
+    }
+    attempt.current = null;
+    await toThread(ids.thread);
+    return { outcome: "done" as const };
   };
   const [naming, setNaming] = useState(false);
   const live = snapshot.status === "live";
@@ -106,6 +133,8 @@ function Threads() {
   const needed = Object.values(snapshot.state.runs)
     .filter((run) => run.status === "paused")
     .flatMap((run) => run.requests.map((request) => ({ request, thread: run.threadId })))
+    // A thread the stream hasn't shown the reader is one they can't see: no way to a not-found.
+    .filter(({ thread }) => snapshot.state.threads[thread] !== undefined)
     .map(({ request, thread }) => {
       const question = request.tool_name === ASK_USER || request.tool_name === ASK_FORM;
       const risk = request.review?.risk;
@@ -122,7 +151,7 @@ function Threads() {
   );
   // Searched by title and filtered by state (portalr ADR-0080); a thread this browser has read
   // that has moved since is marked. One never opened here is not: nothing is known of it.
-  const seen = readSeen(tenant, workspace);
+  const seen = useSyncExternalStore(subscribeToSeen, () => readSeen(tenant, workspace));
   const all = Object.values(snapshot.state.threads).sort((a, b) => b.active - a.active);
   const needs = all.filter((thread) => going.get(thread.id) === "paused");
   const working = all.filter((thread) => going.get(thread.id) === "running");
@@ -136,8 +165,8 @@ function Threads() {
       <TextField
         type="search"
         label="Search threads"
-        value={q}
-        onChange={(event) => view({ q: event.currentTarget.value })}
+        value={typed}
+        onChange={(event) => setTyped(event.currentTarget.value)}
         autoComplete="off"
         enterKeyHint="search"
         className="min-w-48 flex-1"
@@ -154,26 +183,27 @@ function Threads() {
       />
     </div>
   );
-  const starting =
-    snapshot.status !== "closed" ? (
-      <div className="flex flex-col gap-2">
-        <Composer disabled={!live} onSend={write} />
-        <div className="flex flex-wrap items-end gap-2">
-          {naming ? (
-            <form className="flex flex-wrap items-end gap-2" action={start}>
-              <TextField label="New thread" name="title" error={refused} required autoFocus />
-              <Button type="submit" disabled={!live} pending={pending}>
-                Start
-              </Button>
-            </form>
-          ) : (
-            <Button variant="ghost" size="sm" disabled={!live} onClick={() => setNaming(true)}>
-              Name it first…
+  // Shown whatever the connection's state, so words kept through its closing stay in view, to
+  // send once it is connected again or to copy; disabled until it is live.
+  const starting = (
+    <div className="flex flex-col gap-2">
+      <Composer disabled={!live} onSend={write} keep />
+      <div className="flex flex-wrap items-end gap-2">
+        {naming ? (
+          <form className="flex flex-wrap items-end gap-2" action={start}>
+            <TextField label="New thread" name="title" error={refused} required autoFocus />
+            <Button type="submit" disabled={!live} pending={pending}>
+              Start
             </Button>
-          )}
-        </div>
+          </form>
+        ) : (
+          <Button variant="ghost" size="sm" disabled={!live} onClick={() => setNaming(true)}>
+            Name it first…
+          </Button>
+        )}
       </div>
-    ) : null;
+    </div>
+  );
   return (
     <>
       <PageHeader

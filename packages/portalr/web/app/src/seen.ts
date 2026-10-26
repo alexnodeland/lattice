@@ -7,13 +7,30 @@
 
 const key = (tenant: string, workspace: string) => `portalr:seen:${tenant}/${workspace}`;
 
+// What was read last, kept by its text, so a read that finds storage unchanged is the same object.
+let last: { readonly raw: string; readonly seen: Readonly<Record<string, number>> } | null = null;
+
 export function readSeen(tenant: string, workspace: string): Readonly<Record<string, number>> {
   try {
-    const stored: unknown = JSON.parse(localStorage.getItem(key(tenant, workspace)) ?? "{}");
-    return typeof stored === "object" && stored !== null ? (stored as Record<string, number>) : {};
+    const raw = localStorage.getItem(key(tenant, workspace)) ?? "{}";
+    if (last?.raw !== raw) {
+      const stored: unknown = JSON.parse(raw);
+      last = {
+        raw,
+        seen:
+          typeof stored === "object" && stored !== null ? (stored as Record<string, number>) : {},
+      };
+    }
+    return last.seen;
   } catch {
     return {};
   }
+}
+
+/** Hears another tab's marks, through the browser's storage event. */
+export function subscribeToSeen(onChange: () => void): () => void {
+  window.addEventListener("storage", onChange);
+  return () => window.removeEventListener("storage", onChange);
 }
 
 export function markSeen(tenant: string, workspace: string, thread: string, seq: number): void {

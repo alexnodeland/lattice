@@ -40,7 +40,7 @@ export type Serve = (request: Request, path: string) => Promise<Response | undef
 
 /**
  * What the stream says of a command: its rejection's type, or its type, message and fields, or
- * null to carry it out.
+ * null to carry it out; "close" closes the connection for good instead of answering.
  */
 export type Answer = (command: {
   type: string;
@@ -87,6 +87,11 @@ function socketAnswering(
         return;
       }
       const refused = answer(frame.command ?? { type: "" });
+      if (refused === "close") {
+        // The connection ends for good, as the server refusing the session would end it.
+        this.onclose?.({ code: 4403 });
+        return;
+      }
       const rejection = typeof refused === "string" ? { type: refused, message: refused } : refused;
       this.#emit({
         type: "command_result",

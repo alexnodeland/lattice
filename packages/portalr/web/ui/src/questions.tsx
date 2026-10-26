@@ -22,14 +22,13 @@ import {
 import { Alert } from "./alert";
 import { Badge } from "./badge";
 import { Button } from "./button";
-import { ASKING } from "./chat";
 import { cn } from "./cn";
 import { FieldGroup } from "./field-group";
 import { Icon } from "./icon";
 import { glyphs } from "./icons";
 import { isObject, isString, own } from "./json";
 import { type Sent, Unsent, useSending } from "./sending";
-import { FEEDBACK, RING } from "./states";
+import { ASKING, FEEDBACK, RING } from "./states";
 import { TextField } from "./text-field";
 import { TYPE } from "./type";
 
@@ -247,10 +246,13 @@ function Asking({
     if (at.closest("[role=radio], [role=checkbox], input, textarea, button")) {
       return;
     }
-    if (event.key === "ArrowRight" && !review) {
+    // On, and back, in the writing's direction: in a right-to-left page the arrows swap.
+    const rtl = getComputedStyle(event.currentTarget).direction === "rtl";
+    const [on, back] = rtl ? ["ArrowLeft", "ArrowRight"] : ["ArrowRight", "ArrowLeft"];
+    if (event.key === on && !review) {
       event.preventDefault();
       next();
-    } else if (event.key === "ArrowLeft" && step > 0) {
+    } else if (event.key === back && step > 0) {
       event.preventDefault();
       go(step - 1);
     }

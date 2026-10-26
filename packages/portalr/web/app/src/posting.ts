@@ -21,7 +21,12 @@ export interface Posting {
  * Whether the server refused a post as one it already has, which a message id is once: by the
  * refusal's typed fields, its reason and what it names, not by its words.
  */
-function alreadyPosted(sent: Awaited<Sent>, id: string): boolean {
+/** Whether a create was refused because an earlier try, from here or another tab, made `entity` `id`. */
+export function alreadyMade(
+  sent: Awaited<Sent>,
+  entity: "message" | "thread",
+  id: string,
+): boolean {
   const refused = sent.outcome === "refused" ? sent.result?.rejection : undefined;
   if (typeof refused !== "object" || refused === null) {
     return false;
@@ -30,13 +35,15 @@ function alreadyPosted(sent: Awaited<Sent>, id: string): boolean {
   return (
     rejection.type === "invalid_state" &&
     rejection.reason === "already_exists" &&
-    rejection.entity === "message" &&
+    rejection.entity === entity &&
     rejection.id === id
   );
 }
 
+const alreadyPosted = (sent: Awaited<Sent>, id: string) => alreadyMade(sent, "message", id);
+
 /** A new message's id, as artifactr's own are made. */
-const messageId = () => `msg_${crypto.randomUUID().replaceAll("-", "")}`;
+export const messageId = () => `msg_${crypto.randomUUID().replaceAll("-", "")}`;
 
 /**
  * The messages being posted to a thread that it doesn't have yet, and `post`, which shows one

@@ -131,6 +131,14 @@ test("what waits on a person across the workspace is listed first, approvals bef
         },
       ],
     }),
+    // A run in a thread the stream never showed the reader: not theirs to open.
+    at(7, agent("run_3"), { type: "run_started", run_id: "run_3", thread_id: "thr_hidden" }),
+    at(8, agent("run_3"), {
+      type: "run_paused",
+      run_id: "run_3",
+      thread_id: "thr_hidden",
+      requests: [{ kind: "question", tool_call_id: "q9", tool_name: "ask_user", args: {} }],
+    }),
   ];
   const { screen } = await open(
     "/t/acme/w/notes",
@@ -140,6 +148,7 @@ test("what waits on a person across the workspace is listed first, approvals bef
   );
   const needed = screen.getByRole("list", { name: "Needs you" });
   const rows = needed.getByRole("listitem");
+  await expect.element(rows).toHaveLength(2);
   await expect
     .element(rows.nth(0))
     .toHaveTextContent("Approve run_scriptin InvoicesDownloads from the internet");
@@ -199,4 +208,62 @@ test("the threads are searched by title and filtered by state, the view kept in 
   await screen.getByRole("radio", { name: /^Needs you/ }).click();
   await expect.element(screen.getByText("No thread matches")).toBeVisible();
   localStorage.removeItem("portalr:seen:acme/notes");
+});
+
+test("a thread whose start the connection closes on keeps the words in the composer", async () => {
+  const { screen } = await open(
+    "/t/acme/w/notes",
+    async (_request, path) => (path === FLAGS ? Response.json({}) : undefined),
+    (command) => (command.type === "create_thread" ? "close" : null),
+  );
+  const message = screen.getByRole("textbox", { name: "Message" });
+  await expect.element(message).toBeEnabled();
+  await message.fill("Plan the launch");
+  await screen.getByRole("button", { name: "Send" }).click();
+  await expect.element(screen.getByRole("alert").first()).toBeVisible();
+  await expect.element(message).toHaveValue("Plan the launch");
+});
+
+test("a first message refused after its thread was made keeps the words, and sent again goes to that thread under the same ids", async () => {
+  const sent: { type: string; thread_id?: string; message_id?: string }[] = [];
+  let posts = 0;
+  const { screen, router } = await open(
+    "/t/acme/w/notes",
+    async (_request, path) => (path === FLAGS ? Response.json({}) : undefined),
+    (command) => {
+      sent.push(command);
+      if (command.type === "post_message") {
+        posts += 1;
+        return posts === 1 ? "forbidden" : null;
+      }
+      if (
+        command.type === "create_thread" &&
+        sent.filter((c) => c.type === "create_thread").length > 1
+      ) {
+        const { thread_id } = command as unknown as { thread_id: string };
+        return {
+          type: "invalid_state",
+          message: "made",
+          reason: "already_exists",
+          entity: "thread",
+          id: thread_id,
+        };
+      }
+      return null;
+    },
+  );
+  const message = screen.getByRole("textbox", { name: "Message" });
+  await expect.element(message).toBeEnabled();
+  await message.fill("Plan the launch");
+  await screen.getByRole("button", { name: "Send" }).click();
+  await expect.element(screen.getByRole("alert")).toBeVisible();
+  await expect.element(message).toHaveValue("Plan the launch");
+  expect(router.state.location.pathname).toBe("/t/acme/w/notes");
+  await screen.getByRole("button", { name: "Send" }).click();
+  await expect.poll(() => sent.length).toBe(4);
+  expect(sent[2]?.thread_id).toBe(sent[0]?.thread_id);
+  expect(sent[3]?.message_id).toBe(sent[1]?.message_id);
+  await expect
+    .poll(() => router.state.location.pathname)
+    .toBe(`/t/acme/w/notes/threads/${sent[0]?.thread_id}`);
 });

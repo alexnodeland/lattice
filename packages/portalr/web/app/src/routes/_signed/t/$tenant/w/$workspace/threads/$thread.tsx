@@ -201,9 +201,18 @@ function Chat() {
   // ADR-0080), for the list's mark of what has moved since.
   const readTo = thread?.active;
   useEffect(() => {
-    if (snapshot.status === "live" && readTo !== undefined) {
-      markSeen(tenant, workspace, id, readTo);
+    if (snapshot.status !== "live" || readTo === undefined) {
+      return;
     }
+    // A tab out of sight hasn't been read: marked as it comes into view.
+    const mark = () => {
+      if (document.visibilityState === "visible") {
+        markSeen(tenant, workspace, id, readTo);
+      }
+    };
+    mark();
+    document.addEventListener("visibilitychange", mark);
+    return () => document.removeEventListener("visibilitychange", mark);
   }, [snapshot.status, tenant, workspace, id, readTo]);
   // Opened at a request, as from Needs you (portalr ADR-0080): once the thread is shown live, the
   // page goes to it, as Go to the question does.

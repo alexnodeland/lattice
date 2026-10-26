@@ -9,6 +9,7 @@ import {
   type DragEvent,
   type FormEvent,
   type KeyboardEvent,
+  type MouseEvent,
   type ReactElement,
   type ReactNode,
   useEffect,
@@ -36,7 +37,7 @@ import { SchemaForm } from "./schema-form";
 import { type Segment, SegmentedFilter } from "./segmented-filter";
 import { type Sent, Unsent, useSending } from "./sending";
 import { FOLDED_LINES, SourceView } from "./source-view";
-import { FEEDBACK } from "./states";
+import { ASKING, FEEDBACK } from "./states";
 import { StatusBadge, type Tone } from "./status-badge";
 import { TextField } from "./text-field";
 import { TYPE } from "./type";
@@ -45,7 +46,6 @@ const card =
   "flex flex-col gap-2 rounded-(--card-radius) border border-line bg-surface p-(--card-pad) text-sm";
 
 /** A card that waits on the reader: the working colour as a rule at its start, as an alert's edge is, not round it (portalr ADR-0080). */
-export const ASKING = "border-l-4 border-l-accent";
 
 /** A button that sends one command, waits while it is in flight, and says why one wasn't done. */
 export function CommandButton({
@@ -136,17 +136,18 @@ export function ActionsMenu({
           ...items,
           ...(onThumbs
             ? [
+                // The one already given is given: choosing it again sends nothing.
                 {
                   label: "Helpful",
                   checked: given?.up === true,
                   disabled: pending,
-                  onSelect: () => thumb(true),
+                  onSelect: () => given?.up !== true && thumb(true),
                 },
                 {
                   label: "Not helpful",
                   checked: given?.up === false,
                   disabled: pending,
-                  onSelect: () => thumb(false),
+                  onSelect: () => given?.up !== false && thumb(false),
                 },
               ]
             : []),
@@ -159,15 +160,29 @@ export function ActionsMenu({
 
 const NO_THUMBS: GiveThumbs = async () => ({ outcome: "done" });
 
-const COARSE = "(hover: none)";
-const subscribeToPointer = (onChange: () => void) => {
-  const media = matchMedia(COARSE);
-  media.addEventListener("change", onChange);
-  return () => media.removeEventListener("change", onChange);
+/**
+ * Whether the pointer can't hover, as a finger can't: one media query, heard once for every
+ * message that asks, rather than a listener each.
+ */
+const pointer = {
+  query: null as MediaQueryList | null,
+  listeners: new Set<() => void>(),
+  subscribe(onChange: () => void) {
+    if (pointer.query === null) {
+      pointer.query = matchMedia("(hover: none)");
+      pointer.query.addEventListener("change", () => {
+        for (const listener of pointer.listeners) {
+          listener();
+        }
+      });
+    }
+    pointer.listeners.add(onChange);
+    return () => pointer.listeners.delete(onChange);
+  },
+  coarse: () => (pointer.query ?? matchMedia("(hover: none)")).matches,
 };
-/** Whether the pointer can't hover, as a finger can't: then nothing waits on a hover. */
 function useCoarsePointer() {
-  return useSyncExternalStore(subscribeToPointer, () => matchMedia(COARSE).matches);
+  return useSyncExternalStore(pointer.subscribe, pointer.coarse);
 }
 
 /** How long a press is held before it opens a message's actions, where the pointer can't hover. */
@@ -304,6 +319,8 @@ export function Message({
             onPointerUp: release,
             onPointerCancel: release,
             onPointerMove: release,
+            // The browser's own menu on a long press would come over the message's.
+            onContextMenu: (event: MouseEvent<HTMLDivElement>) => event.preventDefault(),
           })}
       >
         <div
@@ -319,9 +336,16 @@ export function Message({
             />
           )}
         </div>
-        {long && !whole && (
-          <Button variant="secondary" size="sm" className="mt-2" onClick={() => setWhole(true)}>
-            Show the whole message
+        {long && (
+          // One button, kept, so the focus has somewhere to stay as it is pressed.
+          <Button
+            variant="secondary"
+            size="sm"
+            className="mt-2"
+            aria-expanded={whole}
+            onClick={() => setWhole((was) => !was)}
+          >
+            {whole ? "Show less" : "Show the whole message"}
           </Button>
         )}
       </div>
@@ -446,10 +470,12 @@ export function Messages({ children, className }: { children: ReactNode; classNa
     });
   };
   return (
-    <div role="log" aria-label="Messages" className="relative">
-      <ol ref={list} className={cn("flex flex-col gap-4", className)}>
-        {children}
-      </ol>
+    <div className="relative">
+      <div role="log" aria-label="Messages">
+        <ol ref={list} className={cn("flex flex-col gap-4", className)}>
+          {children}
+        </ol>
+      </div>
       <div ref={end} aria-hidden="true" className="h-px" />
       {away && arrived && (
         <div className="pointer-events-none sticky bottom-(--composer-clearance,0px) flex justify-center pb-2">
@@ -554,6 +580,7 @@ export function Composer({
   disabled = false,
   attach,
   onFiles,
+  keep = false,
 }: {
   /**
    * Post the message; the text is cleared as it is sent, and comes back if the server refused
@@ -565,6 +592,11 @@ export function Composer({
   attach?: ReactNode;
   /** Files dropped on the composer, where the page takes them. */
   onFiles?: (files: FileList) => void;
+  /**
+   * Keep the words on any failure, the connection closing included: for a page with no other way
+   * to send them again, as the Threads page, which starts a thread from them, has none.
+   */
+  keep?: boolean;
 }) {
   const [text, setText] = useState("");
   const box = useRef<HTMLTextAreaElement>(null);
@@ -591,7 +623,7 @@ export function Composer({
         refused = settled.outcome === "refused";
         return false; // the composer says why, whatever it was
       };
-      if (!(await sending(() => onSend(message), told)) && refused) {
+      if (!(await sending(() => onSend(message), told)) && (refused || keep)) {
         setText((written) => written || message); // back, unless something new was written
       }
     }
@@ -613,6 +645,10 @@ export function Composer({
       onSubmit={submit}
       {...(onFiles && {
         onDragOver: (event: DragEvent<HTMLFormElement>) => {
+          // Files alone: text dragged over the composer is the browser's to drop as text.
+          if (!event.dataTransfer.types.includes("Files")) {
+            return;
+          }
           event.preventDefault();
           event.currentTarget.dataset.over = "";
         },
@@ -620,8 +656,11 @@ export function Composer({
           delete event.currentTarget.dataset.over;
         },
         onDrop: (event: DragEvent<HTMLFormElement>) => {
-          event.preventDefault();
           delete event.currentTarget.dataset.over;
+          if (!event.dataTransfer.types.includes("Files")) {
+            return;
+          }
+          event.preventDefault();
           onFiles(event.dataTransfer.files);
         },
       })}

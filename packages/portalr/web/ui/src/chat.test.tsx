@@ -1074,3 +1074,78 @@ test("where the pointer can't hover, a message's actions are a menu, which a lon
   await expect.element(screen.getByRole("menu")).toBeVisible();
   bubble.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
 });
+
+test("text dragged over the composer is left to the browser: only files are taken", async () => {
+  const onFiles = vi.fn();
+  const screen = await render(<Composer onSend={sent()} onFiles={onFiles} />);
+  const form = screen
+    .getByRole("button", { name: "Send" })
+    .element()
+    .closest("form") as HTMLFormElement;
+  const text = new DataTransfer();
+  text.setData("text/plain", "words");
+  form.dispatchEvent(
+    new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: text }),
+  );
+  expect(form.dataset.over).toBeUndefined();
+  form.dispatchEvent(
+    new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: text }),
+  );
+  expect(onFiles).not.toHaveBeenCalled();
+});
+
+test("asked to keep them, the composer gives the words back when the connection closes too", async () => {
+  const screen = await render(<Composer onSend={sent("closed")} keep />);
+  const box = screen.getByRole("textbox", { name: "Message" });
+  await box.fill("Plan the launch");
+  await screen.getByRole("button", { name: "Send" }).click();
+  await expect.element(box).toHaveValue("Plan the launch");
+});
+
+test("in the actions menu, the thumb already given is given: choosing it again sends nothing", async () => {
+  const onThumbs = sent();
+  const screen = await render(
+    <ActionsMenu
+      label="Artifact actions"
+      given={{ up: true, comment: null }}
+      onThumbs={onThumbs}
+    />,
+  );
+  await screen.getByRole("button", { name: "Artifact actions" }).click();
+  await screen.getByRole("menuitemcheckbox", { name: "Helpful" }).click();
+  expect(onThumbs).not.toHaveBeenCalled();
+});
+
+test("the whole-message button stays as it is pressed, says its state, and shows less again", async () => {
+  const lines = Array.from({ length: 60 }, (_, at) => `Line ${at + 1}`).join("\n\n");
+  const screen = await render(
+    <Messages>
+      <Message message={message({ content: lines })} author="Assistant" />
+    </Messages>,
+  );
+  const button = screen.getByRole("button", { name: "Show the whole message" });
+  await expect.element(button).toHaveAttribute("aria-expanded", "false");
+  await button.click();
+  const less = screen.getByRole("button", { name: "Show less" });
+  await expect.element(less).toHaveAttribute("aria-expanded", "true");
+  await expect.element(less).toHaveFocus();
+  await less.click();
+  await expect
+    .element(screen.getByRole("button", { name: "Show the whole message" }))
+    .toBeVisible();
+});
+
+test("the log holds the messages alone: Jump to latest sits outside it", async () => {
+  const lines = (count: number) =>
+    Array.from({ length: count }, (_, at) => (
+      <li key={at} style={{ height: "40vh" }}>
+        Message {at + 1}
+      </li>
+    ));
+  const screen = await render(<Messages>{lines(6)}</Messages>);
+  window.scrollTo(0, 0);
+  await screen.rerender(<Messages>{lines(7)}</Messages>);
+  const jump = screen.getByRole("button", { name: "Jump to latest" });
+  await expect.element(jump).toBeVisible();
+  expect(jump.element().closest("[role=log]")).toBeNull();
+});

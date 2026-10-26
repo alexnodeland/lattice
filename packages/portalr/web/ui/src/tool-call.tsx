@@ -6,6 +6,7 @@
 
 import type { Artifactr } from "@portalr/client";
 import type { ReactNode } from "react";
+import { useState } from "react";
 import { CopyButton } from "./copy-button";
 import { Disclosure } from "./disclosure";
 import { Icon } from "./icon";
@@ -127,8 +128,11 @@ function stepsStatus(tools: readonly Artifactr.Tool[], running: boolean): readon
     return ["failed", "Failed"];
   }
   const called = tools.filter((tool) => tool.status === "called").length;
-  if (running && called > 0) {
-    return ["working", `Running step ${tools.length - called + 1} of ${tools.length}`];
+  if (running) {
+    // Between one call's answer and the next, the run is still at work.
+    const step =
+      called > 0 ? `Running step ${tools.length - called + 1} of ${tools.length}` : "Working";
+    return ["working", step];
   }
   return ["done", "Done"];
 }
@@ -146,6 +150,13 @@ export function RunSteps({
   tools: readonly (readonly [string, Artifactr.Tool])[];
   running: boolean;
 }) {
+  // Open while the run is, and folded as it ends; opened or closed by the reader meanwhile.
+  const [open, setOpen] = useState(running);
+  const [wasRunning, setWasRunning] = useState(running);
+  if (wasRunning !== running) {
+    setWasRunning(running);
+    setOpen(running);
+  }
   if (tools.length === 1) {
     return (
       <ToolCalls>
@@ -163,7 +174,8 @@ export function RunSteps({
       <Disclosure
         look="block"
         name={`${tools.length} steps`}
-        defaultOpen={running}
+        open={open}
+        onOpenChange={setOpen}
         className="rounded-(--tool-call-radius) border border-line bg-surface text-sm data-open:border-edge"
         triggerClassName="min-h-10 items-center rounded-(--tool-call-radius) px-(--tool-call-pad-x) py-(--tool-call-pad-y) hover:bg-transparent"
         panelClassName="data-open:pt-0"

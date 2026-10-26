@@ -113,6 +113,7 @@ export { Num } from "./num";
 export { retry, useLoaded } from "./on-demand";
 export { PageHeader } from "./page-header";
 export { Plain } from "./plain";
+export { Popover } from "./popover";
 export { Progress } from "./progress";
 export { Questions, type QuestionsAnswer } from "./questions";
 export { type Compare, type More, type RevisionShown, Revisions } from "./revisions";

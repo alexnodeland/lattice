@@ -12,11 +12,13 @@
 
 import { newArtifactId, type UploadAnswer, uploadFile } from "@portalr/client";
 import {
+  Alert,
   Button,
   FileChooser,
   fileSize,
   glyphs,
   Icon,
+  Popover,
   plainName,
   TextLink,
   type UploadItem,
@@ -260,14 +262,16 @@ export function Uploader({
       setOpen(true);
     }
   }, [files]);
-  useEffect(() => {
-    if (open && attach) {
-      chooser.current?.querySelector<HTMLElement>("input[type=file]")?.focus();
-    }
-  }, [open, attach]);
 
   if (offered === undefined || !offered.allowed) {
-    return null;
+    // Dropped on the composer all the same: said, rather than lost without a word.
+    return attach && files && files.length > 0 ? (
+      <Alert tone="error">
+        {offered === undefined
+          ? "Files can't be added until the thread's apps are read: try again in a moment."
+          : "You can't add files to this thread."}
+      </Alert>
+    ) : null;
   }
   const on = offered.kinds.filter((kind) => kind.enabled);
   const extensions = on.flatMap((kind) => kind.extensions);
@@ -336,26 +340,28 @@ export function Uploader({
   choosing.current = choose;
   if (attach) {
     return (
-      <div className="relative flex min-w-0 flex-col">
-        <Button
-          variant="ghost"
-          size="sm"
-          aria-expanded={open}
-          onClick={() => setOpen((was) => !was)}
+      <div className="flex min-w-0 flex-col">
+        <Popover
+          label="Attach files"
+          open={open}
+          onOpenChange={setOpen}
+          initialFocus={() =>
+            chooser.current?.querySelector<HTMLElement>("input[type=file]") ?? null
+          }
+          className="w-[min(var(--dialog-width),calc(100vw-var(--dialog-margin)))]"
+          trigger={
+            <Button variant="ghost" size="sm">
+              <Icon icon={glyphs.fileUp} className="size-3.5" />
+              Attach
+              {items.length > 0 && (
+                <span className="sr-only">
+                  , {items.length === 1 ? "1 file" : `${items.length} files`}
+                </span>
+              )}
+            </Button>
+          }
         >
-          <Icon icon={glyphs.fileUp} className="size-3.5" />
-          Attach
-          {items.length > 0 && (
-            <span className="sr-only">
-              , {items.length === 1 ? "1 file" : `${items.length} files`}
-            </span>
-          )}
-        </Button>
-        {open && (
-          <div
-            ref={chooser}
-            className="absolute bottom-full left-0 z-10 mb-2 flex w-[min(28rem,80vw)] flex-col gap-3 rounded-(--card-radius) border border-line bg-surface p-(--card-pad) shadow-(--popover-shadow)"
-          >
+          <div ref={chooser} className="flex flex-col gap-3">
             <FileChooser
               label="Add files to this thread"
               hint={
@@ -370,8 +376,11 @@ export function Uploader({
             />
             {list}
           </div>
-        )}
+        </Popover>
         {!open && items.length > 0 && <div className="mt-2">{list}</div>}
+        <p role="status" className="sr-only">
+          {announced}
+        </p>
       </div>
     );
   }

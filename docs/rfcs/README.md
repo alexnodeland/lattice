@@ -10,8 +10,8 @@ Outside this series, an RFC is named as "lattice RFC-0001".
 | [0002](0002-portalr-the-portal.md) | portalr, the portal | Accepted, amended by portalr ADR-0014, artifactr ADR-0068 and reflexr ADR-0065 |
 | [0003](0003-native-files-as-artifacts.md) | Native files as artifacts | Accepted, amended by portalr ADR-0041 and lattice ADR-0026 |
 | [0004](0004-relayr-and-task-trackers.md) | relayr and task trackers | Accepted |
-| [0005](0005-forms-dashboards-and-mini-apps.md) | Forms, dashboards and mini apps in the chat | Draft, amended by lattice ADR-0026 |
-| [0006](0006-excalidraw-diagrams-drawn-live.md) | Excalidraw diagrams, drawn live by people and agents | Draft, amended by lattice ADR-0026 |
+| [0005](0005-forms-dashboards-and-mini-apps.md) | Forms, dashboards and mini apps in the chat | Implemented, amended by lattice ADR-0026 |
+| [0006](0006-excalidraw-diagrams-drawn-live.md) | Excalidraw diagrams, drawn live by people and agents | Implemented, amended by lattice ADR-0026 |
 | [0007](0007-portalr-brand-kits.md) | portalr brand kits | Accepted |
 | [0008](0008-portalr-product-analytics.md) | portalr product analytics | Draft |
 

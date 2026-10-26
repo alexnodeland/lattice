@@ -1,6 +1,6 @@
 # RFC-0005: Forms, dashboards and mini apps in the chat
 
-**Status:** Draft, amended by [lattice ADR-0026](../adr/0026-a-distribution-needs-a-reason-integrations-are-extras.md), [lattice ADR-0027](../adr/0027-integrations-switched-per-workspace-through-one-port.md), on 2026-10-17 (see [Amendment](#amendment-2026-10-17-the-extra-the-module-and-relayrs-bridging)) and on 2026-10-20 (see [Amendment](#amendment-2026-10-20-ask_user-asks-questions-with-options))
+**Status:** Implemented, amended by [lattice ADR-0026](../adr/0026-a-distribution-needs-a-reason-integrations-are-extras.md), [lattice ADR-0027](../adr/0027-integrations-switched-per-workspace-through-one-port.md), on 2026-10-17 (see [Amendment](#amendment-2026-10-17-the-extra-the-module-and-relayrs-bridging)) and on 2026-10-20 (see [Amendment](#amendment-2026-10-20-ask_user-asks-questions-with-options))
 **Author:** Alex Nodeland
 **Created:** 2026-10-17
 **Discussion:** [#334](https://github.com/alexnodeland/lattice/pull/334)
@@ -305,11 +305,13 @@ Each is a phase 1 or phase 2 exit criterion, settled and recorded in an ADR.
 - [x] portalr: `SchemaForm`, `TextArea`, `DashboardView`, the renderers and `ask_form` in the chat; `generate.ts`
 - [x] stackr: the template's `ui` question
 - [x] Phase 1's unverified items settled, in an ADR
-- [ ] Mini apps: the proxy, `apps.<host>`, `AppFrame`, the bridge, the kill switch
+- [x] Mini apps: the proxy, `apps.<host>`, `AppFrame`, the bridge, the kill switch
 - [ ] The MCP export
 - [x] Docs: the package's guide and ADRs, and the architecture
 
 *Amended 2026-10-17 ([Amendment](#amendment-2026-10-17-the-extra-the-module-and-relayrs-bridging)): the items above that name the package are met in `artifactr.ui` and `relayr.ui`.*
+
+*Implemented 2026-10-25: forms, dashboards and mini apps shipped. Mini apps run in portalr's sandboxed frame on the apps' origin, with its bridge and kill switch ([artifactr ADR-0082](../artifactr/adr/0082-mini-apps-the-agents-tools-and-html-that-loads-nothing.md), [portalr ADR-0051](../portalr/adr/0051-mini-apps-the-sandboxed-frame-and-its-bridge.md), [portalr ADR-0052](../portalr/adr/0052-artifacts-inline-in-their-thread.md)), and `ask_user` asks questions with options ([artifactr ADR-0083](../artifactr/adr/0083-ask-user-asks-questions-with-options.md)). Deferred: phase 3, the MCP export, `artifactr.mcp`'s `extensions=` and the `ui://` resources.*
 
 ## Evidence
 

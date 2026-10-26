@@ -1,6 +1,6 @@
 # ADR-0035: Settings narrowed per tenant and workspace, in grantr's table, versioned and audited
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-10-22
 **Deciders:** Alex Nodeland
 **Implements:** lattice [ADR-0030](../../adr/0030-settings-typed-declared-in-lattice-core-and-only-narrowed-below.md); beside [ADR-0034](0034-integrations-switched-per-tenant-and-workspace-in-grantrs-table-audited.md)

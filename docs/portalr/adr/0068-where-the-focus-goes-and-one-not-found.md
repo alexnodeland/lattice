@@ -1,6 +1,6 @@
 # ADR-0068: Where the focus goes, and one not-found
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-10-23
 **Deciders:** Alex Nodeland
 

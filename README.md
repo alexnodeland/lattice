@@ -96,12 +96,12 @@ sequenceDiagram
 
 | Package | What it is | Status |
 |---|---|---|
-| **[artifactr](packages/artifactr)** | Chat applications where people and agents collaborate through shared, versioned artifacts | ✅ v0.1 · 📦 [PyPI](https://pypi.org/project/artifactr-ai/) |
-| **[reflexr](packages/reflexr)** | Rules over event streams that run LLM workflows: pydantic-ai agents, pydantic-graph graphs and functions | ✅ v0.1 · 📦 [PyPI](https://pypi.org/project/reflexr/) |
-| **[evalr](packages/evalr)** | Typed evaluation of agent systems: judges that give typed verdicts, trained on people's feedback and measured against it | ✅ v0.1 · 📦 [PyPI](https://pypi.org/project/evalr/) |
-| **[relayr](packages/relayr)** | The bridge between artifactr and reflexr: chat events become events for rules, and runs act back in the chat. Rules can be drafted in chat. | ✅ v0.1 · 📦 [PyPI](https://pypi.org/project/relayr-ai/) |
-| **[grantr](packages/grantr)** | Identity and access: tenants, members, groups, roles, service principals and restricted items, checked before every command and read, with row-level security | ✅ v0.1 · 📦 [PyPI](https://pypi.org/project/grantr/) |
-| **[portalr](packages/portalr)** | The portal: an app UI to chat with agents and see their artifacts, proposals and runs, and an admin UI for access, feedback, traces and spend | ✅ v0.1 · 📦 [PyPI](https://pypi.org/project/portalr/) |
+| **[artifactr](packages/artifactr)** | Chat applications where people and agents collaborate through shared, versioned artifacts | ✅ released · 📦 [PyPI](https://pypi.org/project/artifactr-ai/) |
+| **[reflexr](packages/reflexr)** | Rules over event streams that run LLM workflows: pydantic-ai agents, pydantic-graph graphs and functions | ✅ released · 📦 [PyPI](https://pypi.org/project/reflexr/) |
+| **[evalr](packages/evalr)** | Typed evaluation of agent systems: judges that give typed verdicts, trained on people's feedback and measured against it | ✅ released · 📦 [PyPI](https://pypi.org/project/evalr/) |
+| **[relayr](packages/relayr)** | The bridge between artifactr and reflexr: chat events become events for rules, and runs act back in the chat. Rules can be drafted in chat. | ✅ released · 📦 [PyPI](https://pypi.org/project/relayr-ai/) |
+| **[grantr](packages/grantr)** | Identity and access: tenants, members, groups, roles, service principals and restricted items, checked before every command and read, with row-level security | ✅ released · 📦 [PyPI](https://pypi.org/project/grantr/) |
+| **[portalr](packages/portalr)** | The portal: an app UI to chat with agents and see their artifacts, proposals and runs, and an admin UI for access, feedback, traces and spend | ✅ released · 📦 [PyPI](https://pypi.org/project/portalr/) |
 | **[lattice-core](packages/lattice-core)** | What the packages share and must keep identical: infrastructure each depends on and re-exports, never imported by an application | 📦 [PyPI](https://pypi.org/project/lattice-core-ai/) |
 | **[stackr](packages/stackr)** | The stack the libraries run on (Supabase or PostgreSQL, LiteLLM, OpenTelemetry, Grafana, Langfuse), an application template, and hosting recipes | ✅ template · 🐳 [images on GHCR](https://github.com/alexnodeland/lattice/releases/tag/stackr-v0.1.0) · 🚧 [hosting recipes](docs/stackr/rfcs/0004-hosting-recipes.md) |
 

@@ -1,0 +1,3 @@
+# Links lychee can't check: sites that refuse its requests, though they serve a browser.
+# Blender's Gitea answers bots with 403.
+^https://projects\.blender\.org/lab/blender_mcp$

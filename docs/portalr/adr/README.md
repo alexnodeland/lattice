@@ -72,9 +72,9 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0064](0064-the-frames-edges.md) | The frame's edges | Accepted |
 | [0065](0065-empty-error-and-not-found-states.md) | Empty, error and not-found states | Accepted, amended by 0068 |
 | [0066](0066-the-style-census-enforced.md) | The style census, enforced | Accepted |
-| [0067](0067-settings-in-admin.md) | Settings in admin | Proposed |
-| [0068](0068-where-the-focus-goes-and-one-not-found.md) | Where the focus goes, and one not-found | Proposed |
-| [0069](0069-a-connected-apps-tools-chosen-in-admin-and-a-way-in-for-workspace-admins.md) | A connected app's tools chosen in admin, and a way in for a workspace's admins | Proposed |
+| [0067](0067-settings-in-admin.md) | Settings in admin | Accepted, amended by 0069 |
+| [0068](0068-where-the-focus-goes-and-one-not-found.md) | Where the focus goes, and one not-found | Accepted |
+| [0069](0069-a-connected-apps-tools-chosen-in-admin-and-a-way-in-for-workspace-admins.md) | A connected app's tools chosen in admin, and a way in for a workspace's admins | Accepted |
 | [0070](0070-a-servers-words-never-reach-a-reader.md) | A server's words never reach a reader | Accepted |
 | [0071](0071-adoption-the-tenants-read-and-page.md) | Adoption, the tenant's read and page | Accepted |
 | [0072](0072-a-diagrams-card-and-its-canvas-to-look-at.md) | A diagram's card, and its canvas to look at | Accepted |

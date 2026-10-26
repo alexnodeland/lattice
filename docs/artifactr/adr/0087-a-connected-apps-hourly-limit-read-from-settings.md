@@ -1,6 +1,6 @@
 # ADR-0087: A connected app's hourly limit, read from settings
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-10-22
 **Deciders:** Alex Nodeland
 **Amends:** [ADR-0085](0085-connected-apps-an-operators-own-freecad-or-blender-through-a-vetted-mcp-server.md), whose limit was the operator's alone

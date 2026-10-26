@@ -1,6 +1,10 @@
 import { Menu as BaseMenu } from "@base-ui/react/menu";
 import type { Ref } from "react";
 import { Button } from "./button";
+import { Icon } from "./icon";
+import { IconButton } from "./icon-button";
+import type { Glyph } from "./icons";
+import { glyphs } from "./icons";
 import { FEEDBACK } from "./states";
 
 /**
@@ -27,36 +31,66 @@ export interface MenuItem {
   readonly onSelect: () => void;
   /** Whether it can't be chosen now, such as while it is being done. */
   readonly disabled?: boolean;
+  /**
+   * A state the item holds, shown as a check when it is on: choosing it asks for the other state.
+   * Without it, the item is a plain action.
+   */
+  readonly checked?: boolean;
 }
 
-/** A button that opens a menu of actions. `triggerRef` names the button, for focus to return to. */
+/**
+ * A button that opens a menu of actions. `triggerRef` names the button, for focus to return to.
+ * With `icon`, the button is an icon button named `label`: the overflow of a row of actions.
+ */
 export function Menu({
   label,
+  icon,
   items,
   triggerRef,
 }: {
   label: string;
+  icon?: Glyph;
   items: readonly MenuItem[];
   triggerRef?: Ref<HTMLButtonElement>;
 }) {
   return (
     <BaseMenu.Root>
-      <BaseMenu.Trigger ref={triggerRef} render={<Button variant="secondary" />}>
-        {label}
-      </BaseMenu.Trigger>
+      {icon ? (
+        <BaseMenu.Trigger ref={triggerRef} render={<IconButton label={label} icon={icon} />} />
+      ) : (
+        <BaseMenu.Trigger ref={triggerRef} render={<Button variant="secondary" />}>
+          {label}
+        </BaseMenu.Trigger>
+      )}
       <BaseMenu.Portal>
         <BaseMenu.Positioner sideOffset={4} align="end" className="z-30">
           <BaseMenu.Popup className={popup}>
-            {items.map((each) => (
-              <BaseMenu.Item
-                key={each.label}
-                className={item}
-                disabled={each.disabled ?? false}
-                onClick={each.onSelect}
-              >
-                {each.label}
-              </BaseMenu.Item>
-            ))}
+            {items.map((each) =>
+              each.checked === undefined ? (
+                <BaseMenu.Item
+                  key={each.label}
+                  className={item}
+                  disabled={each.disabled ?? false}
+                  onClick={each.onSelect}
+                >
+                  {each.label}
+                </BaseMenu.Item>
+              ) : (
+                <BaseMenu.CheckboxItem
+                  key={each.label}
+                  className={item}
+                  disabled={each.disabled ?? false}
+                  checked={each.checked}
+                  closeOnClick
+                  onCheckedChange={each.onSelect}
+                >
+                  {each.label}
+                  <BaseMenu.CheckboxItemIndicator keepMounted className="data-unchecked:invisible">
+                    <Icon icon={glyphs.check} className="size-3.5" />
+                  </BaseMenu.CheckboxItemIndicator>
+                </BaseMenu.CheckboxItem>
+              ),
+            )}
           </BaseMenu.Popup>
         </BaseMenu.Positioner>
       </BaseMenu.Portal>

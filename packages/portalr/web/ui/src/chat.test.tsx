@@ -3,6 +3,7 @@ import { describe, expect, onTestFinished, test, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import {
+  ActionsMenu,
   CommandButton,
   Composer,
   Message,
@@ -934,4 +935,25 @@ test("the composer holds a way to attach at the start of its row, and hands drop
   const given = onFiles.mock.calls[0]?.[0] as FileList;
   expect(given[0]?.name).toBe("notes.txt");
   expect(form.dataset.over).toBeUndefined();
+});
+
+test("a page's actions menu holds thumbs as checked items, then asks why", async () => {
+  const onThumbs = sent();
+  const screen = await render(
+    <ActionsMenu
+      label="Artifact actions"
+      given={{ up: true, comment: null }}
+      onThumbs={onThumbs}
+    />,
+  );
+  await screen.getByRole("button", { name: "Artifact actions" }).click();
+  const menu = screen.getByRole("menu");
+  await expect
+    .element(menu.getByRole("menuitemcheckbox", { name: "Helpful" }))
+    .toHaveAttribute("aria-checked", "true");
+  await menu.getByRole("menuitemcheckbox", { name: "Not helpful" }).click();
+  expect(onThumbs).toHaveBeenLastCalledWith(false, null);
+  await screen.getByRole("textbox", { name: "Why? (optional)" }).fill("It missed the date");
+  await screen.getByRole("button", { name: "Add" }).click();
+  expect(onThumbs).toHaveBeenLastCalledWith(false, "It missed the date");
 });

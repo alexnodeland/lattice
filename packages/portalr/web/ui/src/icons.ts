@@ -48,6 +48,7 @@ export const glyphs = {
   ),
   logOut: g("M6 2.5H3v11h3M10 11l3-3-3-3M13 8H6"),
   menu: g("M2 4h12M2 8h12M2 12h12"),
+  more: g("M3.5 8h.01M8 8h.01M12.5 8h.01"),
   maximize: g("M3 3h10v10H3zM6.5 9.5 10 6M7.5 6H10v2.5"),
   minimize: g("M6 2v4H2M14 6h-4V2M10 14v-4h4M2 10h4v4"),
   maximize2: g("M3 7V3h4M13 9v4H9M3 3l4 4M13 13 9 9"),

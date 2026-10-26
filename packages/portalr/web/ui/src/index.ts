@@ -53,6 +53,7 @@ export {
 export { formatDay, formatMoment, formatNumber } from "./chart-theme";
 export type { ChartTokens } from "./chart-tokens";
 export {
+  ActionsMenu,
   ASK_FORM,
   ASK_USER,
   CommandButton,

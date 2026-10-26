@@ -29,6 +29,7 @@ import { IconButton } from "./icon-button";
 import { glyphs } from "./icons";
 import { FeatureOff, useFormLock } from "./integrations";
 import { Markdown } from "./markdown";
+import { Menu, type MenuItem } from "./menu";
 import { Questions, type QuestionsAnswer } from "./questions";
 import { SchemaForm } from "./schema-form";
 import { type Sent, Unsent, useSending } from "./sending";
@@ -72,20 +73,7 @@ export type GiveThumbs = (up: boolean, comment: string | null) => Sent;
  * given, and the latest is what shows.
  */
 export function Thumbs({ given, onThumbs }: { given: Thumb | null; onThumbs: GiveThumbs }) {
-  const { pending, unsent, send } = useSending();
-  const [chosen, setChosen] = useState<boolean | null>(null);
-  async function thumb(up: boolean) {
-    if (await send(() => onThumbs(up, null))) {
-      setChosen(up);
-    }
-  }
-  async function explain(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const comment = String(new FormData(event.currentTarget).get("comment")).trim();
-    if (chosen !== null && (await send(() => onThumbs(chosen, comment || null)))) {
-      setChosen(null);
-    }
-  }
+  const { pending, thumb, why } = useThumbs(onThumbs);
   return (
     <fieldset aria-label="Feedback" className="m-0 flex min-w-0 flex-col gap-1 border-0 p-0">
       <span className="flex gap-1">
@@ -106,6 +94,73 @@ export function Thumbs({ given, onThumbs }: { given: Thumb | null; onThumbs: Giv
           onClick={() => thumb(false)}
         />
       </span>
+      {why(given)}
+    </fieldset>
+  );
+}
+
+/**
+ * A page's actions as a row: its own, then an overflow menu holding thumbs on it as items checked
+ * as they stand (portalr ADR-0080). A thumb given opens the "why" under the row, as `Thumbs` does.
+ */
+export function ActionsMenu({
+  label,
+  given,
+  onThumbs,
+  items = [],
+}: {
+  /** The menu's name, such as "Artifact actions". */
+  label: string;
+  given: Thumb | null;
+  onThumbs: GiveThumbs;
+  /** The actions before the thumbs, if any. */
+  items?: readonly MenuItem[];
+}) {
+  const { pending, thumb, why } = useThumbs(onThumbs);
+  return (
+    <div className="flex min-w-0 flex-col items-end gap-1">
+      <Menu
+        label={label}
+        icon={glyphs.more}
+        items={[
+          ...items,
+          {
+            label: "Helpful",
+            checked: given?.up === true,
+            disabled: pending,
+            onSelect: () => thumb(true),
+          },
+          {
+            label: "Not helpful",
+            checked: given?.up === false,
+            disabled: pending,
+            onSelect: () => thumb(false),
+          },
+        ]}
+      />
+      {why(given)}
+    </div>
+  );
+}
+
+/** Thumbs sent as given, then why, if the person wants to say: what `Thumbs` and `ActionsMenu` share. */
+function useThumbs(onThumbs: GiveThumbs) {
+  const { pending, unsent, send } = useSending();
+  const [chosen, setChosen] = useState<boolean | null>(null);
+  async function thumb(up: boolean) {
+    if (await send(() => onThumbs(up, null))) {
+      setChosen(up);
+    }
+  }
+  async function explain(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const comment = String(new FormData(event.currentTarget).get("comment")).trim();
+    if (chosen !== null && (await send(() => onThumbs(chosen, comment || null)))) {
+      setChosen(null);
+    }
+  }
+  const why = (given: Thumb | null) => (
+    <>
       {given?.comment && <p className="text-muted text-xs">You said: {given.comment}</p>}
       {chosen !== null && (
         <form className="flex items-end gap-2" onSubmit={explain}>
@@ -116,8 +171,9 @@ export function Thumbs({ given, onThumbs }: { given: Thumb | null; onThumbs: Giv
         </form>
       )}
       <Unsent reason={unsent} />
-    </fieldset>
+    </>
   );
+  return { pending, thumb, why } as const;
 }
 
 type MessageProps = {

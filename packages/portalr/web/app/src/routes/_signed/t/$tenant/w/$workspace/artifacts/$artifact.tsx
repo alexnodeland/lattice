@@ -1,6 +1,7 @@
 import { allowedIn, keys, Refused, thumbs, useMe, workspaceOf } from "@portalr/client";
 import { changes } from "@portalr/client/diff";
 import {
+  ActionsMenu,
   AppHostContext,
   ArtifactContent,
   ButtonLink,
@@ -13,7 +14,6 @@ import {
   proposedOn,
   Revisions,
   SectionTitle,
-  Thumbs,
 } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
@@ -127,7 +127,8 @@ function Artifact() {
     (proposal) => proposal.status === "open" && proposedOn(proposal) === id,
   );
   const feedback = allowed.has("artifactr:give_feedback") && (
-    <Thumbs
+    <ActionsMenu
+      label="Artifact actions"
       given={thumbs(
         (snapshot.state.artifacts[id]?.feedback ?? []).filter(
           (given) => given.version === latest.version,

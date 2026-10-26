@@ -28,26 +28,37 @@ Then("the agent asks {string}", async ({ page }, question: string) => {
   await expect(page.getByRole("form", { name: "The agent asks" })).toContainText(question);
 });
 
-/** An option of the agent's questions, by its label: a radio, which may be recommended, or a box. */
+/**
+ * An option of the agent's questions, by its label: a radio, which may be recommended, or a box.
+ * Several questions are stepped (portalr ADR-0080): an option of a later question is a step on,
+ * so Next is pressed first where the option isn't on this step.
+ */
 When("they choose {string}", async ({ page }, label: string) => {
   const asked = page.getByRole("form", { name: "The agent asks" });
   // One locator for either, so the click waits for the card: a count, which doesn't wait, read
   // before the card came found no radio and chose a checkbox that isn't there.
-  await asked
+  const option = asked
     .getByRole("radio", { name: new RegExp(`^${label}( Recommended)?$`) })
-    .or(asked.getByRole("checkbox", { name: label, exact: true }))
-    .click();
+    .or(asked.getByRole("checkbox", { name: label, exact: true }));
+  await asked.waitFor();
+  if ((await option.count()) === 0) {
+    await asked.getByRole("button", { name: "Next" }).click();
+  }
+  await option.click();
 });
 
 When("they write {string}", async ({ page }, words: string) => {
   await page.getByRole("textbox", { name: "Your answer" }).fill(words);
 });
 
+/** Answer: on to the review where the questions are stepped, then the one Answer. */
 When("they answer", async ({ page }) => {
-  await page
-    .getByRole("form", { name: "The agent asks" })
-    .getByRole("button", { name: "Answer" })
-    .click();
+  const asked = page.getByRole("form", { name: "The agent asks" });
+  const next = asked.getByRole("button", { name: "Next" });
+  while ((await next.count()) > 0) {
+    await next.click();
+  }
+  await asked.getByRole("button", { name: "Answer" }).click();
 });
 
 Then("the agent's questions say {string} was chosen", async ({ page }, label: string) => {

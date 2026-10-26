@@ -121,6 +121,7 @@
   --text-lg: var(--font-size-lg);
   --text-xl: var(--font-size-xl);
   --text-2xl: var(--font-size-2xl);
+  --text-3xl: var(--font-size-3xl);
   --font-weight-normal: var(--weight-normal);
   --font-weight-medium: var(--weight-medium);
   --font-weight-semibold: var(--weight-semibold);
@@ -131,13 +132,12 @@
 }
 
 /*
- * A native file's box turning from its preview to its editor and back (portalr ADR-0055): a
- * short turn into place, and none where motion is reduced.
+ * A native file's box going from its preview to its editor and back (portalr ADR-0055): a short
+ * fade in, no turn (portalr ADR-0080), and none where motion is reduced.
  */
 @keyframes flip-in {
   from {
     opacity: 0;
-    transform: perspective(1600px) rotateY(-8deg);
   }
 }
 

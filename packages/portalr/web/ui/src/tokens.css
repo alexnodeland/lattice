@@ -40,6 +40,7 @@
   --font-size-lg: 1.125rem;
   --font-size-xl: 1.25rem;
   --font-size-2xl: 1.5rem;
+  --font-size-3xl: 1.75rem;
   --weight-normal: 400;
   --weight-medium: 500;
   --weight-semibold: 600;
@@ -91,7 +92,7 @@
    * control's boundary: 3:1 or more on every surface, as WCAG asks of one.
    */
   --focus: light-dark(#6b2fa0, #a77bdf);
-  --edge: light-dark(#74747f, #75757f);
+  --edge: light-dark(#80808a, #75757f);
 
   /*
    * Status, as marks and never as text: a rose red for what failed, was dead-lettered or is an
@@ -149,7 +150,7 @@
    * How wide a page's content is, at most; a table row's least height, its padding and its words
    * (admin's compact density changes the last three, ADR-0039).
    */
-  --page-width: 75rem;
+  --page-width: 64rem;
   --row-height: 2.75rem;
   --row-pad: 0.5rem;
   --table-text: 0.875rem;
@@ -264,7 +265,7 @@
   --nav-radius: var(--radius-3);
   --nav-pad-x: var(--space-3);
   --nav-pad-y: var(--space-2);
-  --nav-count-radius: var(--radius-full);
+  --nav-count-radius: var(--radius-2);
   --header-clearance: 3.5rem;
   --header-trigger-radius: var(--radius-3);
   --header-trigger-pad-x: var(--space-3);
@@ -287,8 +288,8 @@
   --table-cell-pad-x: var(--space-3);
 
   /*
-   * A status badge: its pill's corners and padding. Its shapes are status marks, which tell each
-   * status apart for every reader, and are not a kit's to change (portalr ADR-0039).
+   * A status badge: its corners and padding. Its shapes are status marks, which tell each status
+   * apart for every reader, and are not a kit's to change (portalr ADR-0039).
    */
   --badge-radius: var(--radius-2);
   --badge-pad-y: var(--space-half);
@@ -327,7 +328,7 @@
   --question-option-radius: var(--radius-3);
   --question-option-pad-x: var(--space-3);
   --question-option-pad-y: 0.625rem;
-  --question-chip-radius: var(--radius-full);
+  --question-chip-radius: var(--radius-2);
 
   /*
    * A disclosure, a part that opens and closes: its trigger's least height, so a pointer has a

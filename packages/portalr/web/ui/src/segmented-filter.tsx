@@ -14,8 +14,8 @@ export type Segment<V extends string> = {
 
 /**
  * One filter of a few, side by side, such as a window of hours, days or weeks: Base UI's radio
- * group, whose arrow keys move the choice. The chosen one is pressed as every chosen control is, on
- * the wash, in the working colour, edged in it. A count is said after its word ("All, 7"). With
+ * group, whose arrow keys move the choice. The track is flat, on the line, and the chosen one is
+ * raised on the surface, in the text's weight, where the rest are quiet (portalr ADR-0080). A count is said after its word ("All, 7"). With
  * `showLabel` the group's name is written above it as a field's is, with its `hint` beneath and why
  * the choice was refused, if it was; with `name` it submits with its form.
  */
@@ -52,7 +52,7 @@ export function SegmentedFilter<V extends string>({
       value={value}
       disabled={disabled}
       onValueChange={(chosen) => onValueChange(chosen)}
-      className="inline-flex flex-wrap gap-0.5 self-start rounded-(--segmented-radius) border border-edge bg-surface p-(--segmented-pad) aria-invalid:border-status-failed"
+      className="inline-flex flex-wrap gap-0.5 self-start rounded-(--segmented-radius) border border-line bg-line p-(--segmented-pad) aria-invalid:border-status-failed"
     >
       {segments.map((segment) => (
         <Radio.Root
@@ -62,7 +62,7 @@ export function SegmentedFilter<V extends string>({
             segment.count === undefined ? undefined : `${segment.label}, ${segment.count}`
           }
           className={cn(
-            "inline-flex cursor-default items-center gap-1.5 rounded-(--segmented-item-radius) border border-transparent px-(--segmented-item-pad-x) py-(--segmented-item-pad-y) font-medium text-fg text-sm hover:not-data-disabled:bg-wash data-checked:border-accent data-checked:bg-wash data-checked:font-semibold data-checked:text-accent data-disabled:cursor-not-allowed data-disabled:text-muted data-checked:data-disabled:border-line data-checked:data-disabled:text-fg",
+            "inline-flex cursor-default items-center gap-1.5 rounded-(--segmented-item-radius) px-(--segmented-item-pad-x) py-(--segmented-item-pad-y) font-medium text-muted text-sm hover:not-data-disabled:text-fg data-checked:bg-surface data-checked:font-semibold data-checked:text-fg data-checked:shadow-(--card-shadow) data-disabled:cursor-not-allowed data-disabled:text-muted",
             RING,
             FEEDBACK,
           )}

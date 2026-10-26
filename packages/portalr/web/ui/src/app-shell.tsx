@@ -43,7 +43,7 @@ const button = cn(
 
 /**
  * The frame of every signed-in screen. One header holds the mark, the switcher, the navigation
- * and the account: from 1024 pixels it is a rail on the surface that stays as the page scrolls;
+ * and the account: from 1024 pixels it is a rail on the paper, set apart by space alone (portalr ADR-0080), that stays as the page scrolls;
  * narrower, it is a bar of the mark, the switcher and the account, and Menu opens a drawer that
  * holds the switcher, the navigation and the account too, whose name is shown. While the drawer
  * is open, then, each is there twice, behind it and in it. The drawer is a Base UI dialog that
@@ -92,7 +92,7 @@ export function AppShell({
       <SkipLink />
       <header
         data-frame-header=""
-        className="sticky top-0 z-20 flex items-center gap-1 border-line border-b bg-surface px-3 py-2 lg:h-dvh lg:flex-col lg:items-stretch lg:gap-4 lg:border-r lg:border-b-0 lg:p-3"
+        className="sticky top-0 z-20 flex items-center gap-1 bg-paper px-3 py-2 lg:h-dvh lg:flex-col lg:items-stretch lg:gap-4 lg:p-3"
       >
         <Dialog.Root open={open} onOpenChange={setOpen}>
           <Dialog.Trigger className={`${button} lg:hidden`}>
@@ -138,14 +138,14 @@ export function AppShell({
         ) : (
           <div className="hidden lg:block lg:flex-1" />
         )}
-        <div className="lg:border-line lg:border-t lg:pt-3">{account}</div>
+        <div className="lg:pt-3">{account}</div>
       </header>
       <main
         id="main"
         tabIndex={-1}
-        className="min-w-0 px-4 py-6 outline-none sm:px-6 lg:px-12 lg:py-9"
+        className="min-w-0 px-4 py-6 outline-none sm:px-6 lg:px-12 lg:py-10"
       >
-        <div className="mx-auto flex w-full max-w-(--page-width) flex-col gap-6">{children}</div>
+        <div className="mx-auto flex w-full max-w-(--page-width) flex-col gap-8">{children}</div>
       </main>
     </div>
   );

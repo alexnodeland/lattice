@@ -45,7 +45,9 @@ test("every tone's word reads on its pill, and only waiting for you takes the wo
   for (const tone of TONES) {
     const style = getComputedStyle(screen.getByText(tone).element());
     expect(contrast(style.color, style.backgroundColor)).toBeGreaterThanOrEqual(4.5);
-    expect(style.backgroundColor === token("accent")).toBe(tone === "waiting");
+    // Only waiting for you takes the working colour, as its wash; the rest are on the surface.
+    expect(style.backgroundColor === token("wash")).toBe(tone === "waiting");
+    expect(style.borderTopColor === token("line")).toBe(tone !== "waiting");
   }
 });
 
@@ -99,13 +101,18 @@ test("a budget's states are marks of the gold and the red, and their words stay 
   );
   const near = getComputedStyle(screen.getByText("Near budget").element());
   const over = getComputedStyle(screen.getByText("Over budget").element());
-  expect(near.borderTopColor).toBe(token("status-warn"));
-  expect(over.borderTopColor).toBe(token("status-failed"));
+  const mark = (word: string) =>
+    getComputedStyle(screen.getByText(word).element().firstElementChild as Element);
+  // The badge is quiet; the mark carries the colour (portalr ADR-0080).
+  expect(near.borderTopColor).toBe(token("line"));
+  expect(over.borderTopColor).toBe(token("line"));
+  expect(mark("Near budget").borderTopColor).toBe(token("status-warn"));
+  expect(mark("Over budget").backgroundColor).toBe(token("status-failed"));
   expect(near.color).toBe(token("fg"));
   expect(over.color).toBe(token("fg"));
 });
 
-test("failed is edged and marked in the red, retrying in the gold, and succeeded is neutral", async () => {
+test("failed is marked in the red, retrying in the gold, on quiet badges, and succeeded is neutral", async () => {
   const screen = await render(
     <div>
       <StatusBadge tone="failed">Dead-lettered</StatusBadge>
@@ -116,9 +123,9 @@ test("failed is edged and marked in the red, retrying in the gold, and succeeded
   const badge = (word: string) => getComputedStyle(screen.getByText(word).element());
   const glyph = (word: string) =>
     getComputedStyle(screen.getByText(word).element().firstElementChild as Element);
-  expect(badge("Dead-lettered").borderTopColor).toBe(token("status-failed"));
+  expect(badge("Dead-lettered").borderTopColor).toBe(token("line"));
   expect(glyph("Dead-lettered").backgroundColor).toBe(token("status-failed"));
-  expect(badge("Retrying").borderTopColor).toBe(token("status-warn"));
+  expect(badge("Retrying").borderTopColor).toBe(token("line"));
   expect(glyph("Retrying").borderTopColor).toBe(token("status-warn"));
   expect(badge("Succeeded").borderTopColor).toBe(token("line"));
   expect(badge("Succeeded").color).toBe(token("muted"));

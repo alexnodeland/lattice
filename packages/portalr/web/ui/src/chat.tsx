@@ -39,6 +39,9 @@ import { TYPE } from "./type";
 const card =
   "flex flex-col gap-2 rounded-(--card-radius) border border-line bg-surface p-(--card-pad) text-sm";
 
+/** A card that waits on the reader: the working colour as a rule at its start, as an alert's edge is, not round it (portalr ADR-0080). */
+export const ASKING = "border-l-4 border-l-accent";
+
 /** A button that sends one command, waits while it is in flight, and says why one wasn't done. */
 export function CommandButton({
   onSend,
@@ -137,7 +140,7 @@ const bubble = (mine: boolean) =>
   cn(
     "min-w-0 max-w-full rounded-(--bubble-radius) border px-(--bubble-pad-x) py-(--bubble-pad-y)",
     mine
-      ? "rounded-se-(--bubble-tail-radius) border-line bg-wash"
+      ? "rounded-se-(--bubble-tail-radius) border-transparent bg-line"
       : "rounded-ss-(--bubble-tail-radius) border-line bg-surface",
   );
 
@@ -458,7 +461,7 @@ function FormRequest({
       </Alert>
     ) : undefined;
   return (
-    <div className={cn(card, "gap-3", ended === undefined && off === null && "border-accent")}>
+    <div className={cn(card, "gap-3", ended === undefined && off === null && ASKING)}>
       <p className={cn(TYPE.note, "inline-flex items-center gap-1.5")}>
         <Icon icon={glyphs.bot} className="size-3.5" />
         The agent asks
@@ -544,7 +547,7 @@ function Question({
   if (request.kind === "approval") {
     const args = Object.keys(request.args ?? {}).length > 0;
     return (
-      <section className={cn(card, "border-accent")} aria-label={`Approve ${request.tool_name}?`}>
+      <section className={cn(card, ASKING)} aria-label={`Approve ${request.tool_name}?`}>
         <p>
           The agent wants to run <code className="font-mono">{request.tool_name}</code>.
         </p>

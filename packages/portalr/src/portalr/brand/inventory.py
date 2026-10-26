@@ -72,7 +72,10 @@ PRIMITIVES: tuple[Group, ...] = (
             Row("font.family.sans", "--font-family-sans", "fontFamily"),
             Row("font.family.mono", "--font-family-mono", "fontFamily"),
             *_scale(
-                "dimension", "font.size", "--font-size", ("xs", "sm", "base", "lg", "xl", "2xl")
+                "dimension",
+                "font.size",
+                "--font-size",
+                ("xs", "sm", "base", "lg", "xl", "2xl", "3xl"),
             ),
             *_scale("fontWeight", "font.weight", "--weight", ("normal", "medium", "semibold")),
             *_scale("number", "font.leading", "--leading", ("tight", "snug", "normal", "relaxed")),
@@ -334,7 +337,7 @@ COMPONENTS: tuple[Group, ...] = (
         ),
     ),
     Group(
-        "A status badge: its pill's corners and padding. Its shapes are status marks, which "
+        "A status badge: its corners and padding. Its shapes are status marks, which "
         "tell each status apart for every reader, and are not a kit's to change (portalr "
         "ADR-0039).",
         (

@@ -14,6 +14,7 @@ import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } fr
 import { Alert } from "./alert";
 import { Badge } from "./badge";
 import { Button } from "./button";
+import { ASKING } from "./chat";
 import { cn } from "./cn";
 import { FieldGroup } from "./field-group";
 import { Icon } from "./icon";
@@ -108,8 +109,8 @@ export function Questions({
     <section
       aria-label={given === null ? "The agent asks" : "The agent asked"}
       className={cn(
-        "flex flex-col gap-4 rounded-(--question-radius) border bg-surface p-(--question-pad) text-sm",
-        given === null ? "border-accent" : "border-line",
+        "flex flex-col gap-4 rounded-(--question-radius) border border-line bg-surface p-(--question-pad) text-sm",
+        given === null && ASKING,
       )}
     >
       <p className={cn(TYPE.note, "inline-flex items-center gap-1.5")}>
@@ -208,7 +209,7 @@ function Asking({
 /** A question's header, as a chip. */
 function Header({ children }: { children: ReactNode }) {
   return (
-    <span className="inline-flex max-w-full shrink-0 items-center truncate rounded-(--question-chip-radius) border border-line bg-wash px-2 py-0.5 font-semibold text-fg text-xs">
+    <span className="inline-flex max-w-full shrink-0 items-center truncate rounded-(--question-chip-radius) bg-line px-2 py-0.5 font-semibold text-fg text-xs">
       {children}
     </span>
   );

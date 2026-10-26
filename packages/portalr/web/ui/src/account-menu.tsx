@@ -167,7 +167,7 @@ export function AccountMenu({
       >
         <span
           aria-hidden="true"
-          className="grid size-7 shrink-0 place-items-center rounded-full bg-wash font-semibold text-accent text-xs"
+          className="grid size-7 shrink-0 place-items-center rounded-full bg-line font-semibold text-fg text-xs"
         >
           {initials(name)}
         </span>

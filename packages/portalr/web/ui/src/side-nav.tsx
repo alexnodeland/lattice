@@ -27,8 +27,9 @@ type NavLinkProps = Omit<ComponentProps<"a">, "className" | "children"> & {
 
 /**
  * One area: its icon, its word, and how many wait there. `aria-current="page"` marks the area
- * shown, and `aria-current="true"` the area a page inside it belongs to. Under forced colours,
- * where the wash and the working colour are the system's, the current one keeps an inset outline
+ * shown, and `aria-current="true"` the area a page inside it belongs to: in the text's colour and
+ * weight where the others are quiet, with a rule in the working colour at its start (portalr
+ * ADR-0080). Under forced colours, where the working colour is the system's, the current one keeps an inset outline
  * in the system's highlight, as a selected tab keeps its border; focused, the ring goes back outside.
  */
 export function NavLink({ render, icon, count, children, ...props }: NavLinkProps) {
@@ -41,7 +42,7 @@ export function NavLink({ render, icon, count, children, ...props }: NavLinkProp
         className: cn(
           RING,
           FEEDBACK,
-          "flex items-center gap-2.5 rounded-(--nav-radius) px-(--nav-pad-x) py-(--nav-pad-y) font-medium text-fg text-sm hover:bg-wash aria-[current=page]:bg-wash aria-[current=page]:font-semibold aria-[current=page]:text-accent aria-[current=true]:bg-wash aria-[current=true]:font-semibold aria-[current=true]:text-accent forced-colors:aria-[current=page]:outline-solid forced-colors:aria-[current=page]:outline-(length:--focus-width) forced-colors:aria-[current=page]:-outline-offset-(--focus-width) forced-colors:aria-[current=page]:outline-system-highlight forced-colors:aria-[current=page]:focus-visible:outline-offset-(--focus-offset) forced-colors:aria-[current=page]:focus-visible:outline-focus forced-colors:aria-[current=true]:outline-solid forced-colors:aria-[current=true]:outline-(length:--focus-width) forced-colors:aria-[current=true]:-outline-offset-(--focus-width) forced-colors:aria-[current=true]:outline-system-highlight forced-colors:aria-[current=true]:focus-visible:outline-offset-(--focus-offset) forced-colors:aria-[current=true]:focus-visible:outline-focus",
+          "relative flex items-center gap-2.5 rounded-(--nav-radius) px-(--nav-pad-x) py-(--nav-pad-y) font-medium text-muted text-sm before:absolute before:inset-y-(--nav-pad-y) before:left-0 before:w-0.5 before:rounded-full before:content-[''] hover:text-fg aria-[current=page]:font-semibold aria-[current=page]:text-fg aria-[current=page]:before:bg-accent aria-[current=true]:font-semibold aria-[current=true]:text-fg aria-[current=true]:before:bg-accent forced-colors:aria-[current=page]:outline-solid forced-colors:aria-[current=page]:outline-(length:--focus-width) forced-colors:aria-[current=page]:-outline-offset-(--focus-width) forced-colors:aria-[current=page]:outline-system-highlight forced-colors:aria-[current=page]:focus-visible:outline-offset-(--focus-offset) forced-colors:aria-[current=page]:focus-visible:outline-focus forced-colors:aria-[current=true]:outline-solid forced-colors:aria-[current=true]:outline-(length:--focus-width) forced-colors:aria-[current=true]:-outline-offset-(--focus-width) forced-colors:aria-[current=true]:outline-system-highlight forced-colors:aria-[current=true]:focus-visible:outline-offset-(--focus-offset) forced-colors:aria-[current=true]:focus-visible:outline-focus",
         ),
         children: (
           <>
@@ -50,7 +51,7 @@ export function NavLink({ render, icon, count, children, ...props }: NavLinkProp
             {count ? (
               <span
                 aria-hidden="true"
-                className="ml-auto grid h-5 min-w-5 place-items-center rounded-(--nav-count-radius) bg-accent px-1.5 font-semibold text-on-accent text-xs"
+                className="ml-auto grid h-5 min-w-5 place-items-center rounded-(--nav-count-radius) bg-wash px-1.5 font-semibold text-accent text-xs"
               >
                 {count}
               </span>

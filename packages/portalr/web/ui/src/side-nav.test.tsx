@@ -27,14 +27,21 @@ test("the navigation is named, and each area is a link named by its word and wha
   await expect.element(nav.getByRole("link", { name: "Runs", exact: true })).toBeVisible();
 });
 
-test("the current area is marked, on the wash, in the working colour", async () => {
+test("the current area is marked by its weight and a rule in the working colour at its start, where the rest are quiet", async () => {
   const screen = await render(<Nav />);
   const current = screen.getByRole("link", { name: /^Threads/ });
   await expect.element(current).toHaveAttribute("aria-current", "page");
   const style = getComputedStyle(current.element());
-  expect(style.backgroundColor).toBe(token("wash"));
-  expect(style.color).toBe(token("accent"));
-  expect(contrast(style.color, style.backgroundColor)).toBeGreaterThanOrEqual(4.5);
+  expect(style.color).toBe(token("fg"));
+  expect(style.fontWeight).toBe("600");
+  expect(getComputedStyle(current.element(), "::before").backgroundColor).toBe(token("accent"));
+  const other = getComputedStyle(screen.getByRole("link", { name: "Artifacts" }).element());
+  expect(other.color).toBe(token("muted"));
+  expect(
+    getComputedStyle(screen.getByRole("link", { name: "Artifacts" }).element(), "::before")
+      .backgroundColor,
+  ).toBe("rgba(0, 0, 0, 0)");
+  expect(contrast(style.color, token("paper"))).toBeGreaterThanOrEqual(4.5);
   expect(current.element().querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
 });
 

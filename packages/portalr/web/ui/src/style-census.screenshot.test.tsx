@@ -74,12 +74,10 @@ const LOOKS = {
   ],
   headings: ["the page's (h1)", "a section's", "a label's"],
   badges: [
-    "StatusBadge waiting: the accent's fill",
-    "StatusBadge failed and over: the failed edge",
+    "StatusBadge waiting: the working colour on its wash",
+    "StatusBadge working, failed, retrying, near and over: the text's colour on a quiet badge",
     "StatusBadge done, queued and stopped: quiet, on the line",
-    "StatusBadge retrying and near: the warning edge",
-    "StatusBadge working: the text's colour, on the line",
-    "Badge accent: the accent's fill, its padding even",
+    "Badge accent: the working colour on its wash, its padding even",
   ],
 } as const;
 

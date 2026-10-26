@@ -809,12 +809,14 @@ describe("a form the agent asks", () => {
     await expect.element(screen.getByRole("textbox", { name: "Answer" })).not.toHaveFocus();
   });
 
-  test("open, it is edged in the working colour; answered, it isn't", async () => {
+  test("open, it carries a rule in the working colour at its start; answered, it doesn't", async () => {
     const screen = await render(<Request request={asked} onAnswer={sent()} />);
     const card = screen.getByText("The agent asks").element().parentElement as Element;
-    expect(getComputedStyle(card).borderTopColor).toBe(token("accent"));
-    await screen.rerender(<Request request={asked} onAnswer={sent()} answeredBy="Alice" />);
+    expect(getComputedStyle(card).borderLeftColor).toBe(token("accent"));
+    expect(getComputedStyle(card).borderLeftWidth).toBe("4px");
     expect(getComputedStyle(card).borderTopColor).toBe(token("line"));
+    await screen.rerender(<Request request={asked} onAnswer={sent()} answeredBy="Alice" />);
+    expect(getComputedStyle(card).borderLeftColor).toBe(token("line"));
   });
 });
 

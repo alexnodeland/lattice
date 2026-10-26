@@ -53,7 +53,7 @@
       "$type": "color"
     },
     "edge": {
-      "$value": "#74747f",
+      "$value": "#80808a",
       "$type": "color"
     },
     "status": {
@@ -384,6 +384,13 @@
           "unit": "rem"
         },
         "$type": "dimension"
+      },
+      "3xl": {
+        "$value": {
+          "value": 1.75,
+          "unit": "rem"
+        },
+        "$type": "dimension"
       }
     },
     "weight": {
@@ -608,7 +615,7 @@
   "size": {
     "page-width": {
       "$value": {
-        "value": 75,
+        "value": 64,
         "unit": "rem"
       },
       "$type": "dimension"
@@ -871,7 +878,7 @@
         "$value": "{space.2}"
       },
       "count-radius": {
-        "$value": "{radius.full}"
+        "$value": "{radius.2}"
       }
     },
     "header": {
@@ -1033,7 +1040,7 @@
         }
       },
       "chip-radius": {
-        "$value": "{radius.full}"
+        "$value": "{radius.2}"
       }
     },
     "bubble": {

@@ -38,7 +38,7 @@ export {
 export { Badge } from "./badge";
 export { type Brand, BrandContext, brandName, pageTitle, useBrand, useUiName } from "./brand";
 export { Breadcrumbs, CRUMB, type Crumb } from "./breadcrumbs";
-export { Button, type ButtonSize, type ButtonVariant } from "./button";
+export { Button, ButtonLink, type ButtonSize, type ButtonVariant } from "./button";
 export { loadCapture } from "./capture";
 export { Card } from "./card";
 export {

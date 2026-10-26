@@ -1,5 +1,5 @@
 import { administered } from "@portalr/client";
-import { Account, glyphs, NavLink, Plain, SideNav, TextLink } from "@portalr/ui";
+import { Account, ButtonLink, glyphs, NavLink, Plain, SideNav } from "@portalr/ui";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, notFound, Outlet } from "@tanstack/react-router";
 import { allowedNow, anyPart, useAccess } from "../../../access";
@@ -52,7 +52,7 @@ function NotAdministered() {
       account={<Account signed={signed} />}
     >
       <p>admin shows a tenant to its owners and admins alone.</p>
-      <TextLink render={<Link to="/" />}>Choose another</TextLink>
+      <ButtonLink render={<Link to="/" />}>Choose another</ButtonLink>
     </Plain>
   );
 }

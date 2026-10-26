@@ -7,23 +7,25 @@ import { glyphs } from "./icons";
 import { FEEDBACK, RING } from "./states";
 
 /**
- * A link's variants (portalr ADR-0059):
- * - `inline`, in running text: the working colour, underlined.
- * - `subtle`, an id or a name standing alone, in a table's cell, a row or a breadcrumb: the text's
- *   colour, a quiet underline that takes the working colour when hovered. Never in running text,
- *   where only its underline would tell it from the words around it.
- * - `nav`, one of a few places to go: the working colour, underlined only when hovered.
+ * A link's variants (portalr ADR-0059, ADR-0080):
+ * - `inline`, in running text: the working colour, with a quiet rule under it that takes the
+ *   working colour when hovered, never the browser's own underline.
+ * - `subtle`, an id or a name standing alone, in a table's cell: the text's colour and weight,
+ *   the working colour when hovered or reached. Never in running text, where nothing would tell
+ *   it from the words around it.
  * - `external`, inline, opening another site in a new tab, which a mark and words say.
+ * A way on that is an action, "All threads", is a `ButtonLink`; a list's row is its own
+ * component; the places above a page are `Breadcrumbs`.
  */
-export type LinkVariant = "inline" | "subtle" | "nav" | "external";
+export type LinkVariant = "inline" | "subtle" | "external";
 
-const UNDERLINE = "underline underline-offset-(--link-underline-offset)";
+const UNDERLINE =
+  "underline decoration-edge underline-offset-(--link-underline-offset) hover:decoration-accent";
 
 const LOOK: Record<LinkVariant, string> = {
   inline: `text-accent ${UNDERLINE}`,
   external: `text-accent ${UNDERLINE}`,
-  subtle: `text-fg ${UNDERLINE} decoration-edge hover:text-accent hover:decoration-accent`,
-  nav: "font-medium text-accent text-sm underline-offset-(--link-underline-offset) hover:underline",
+  subtle: "font-semibold text-fg hover:text-accent focus-visible:text-accent",
 };
 
 /** A link's look, with the ring and the feedback, for a link the kit doesn't render itself, such as Markdown's. */

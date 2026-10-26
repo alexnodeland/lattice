@@ -1,5 +1,7 @@
 import { Button as BaseButton } from "@base-ui/react/button";
-import type { ComponentProps } from "react";
+import { mergeProps } from "@base-ui/react/merge-props";
+import { useRender } from "@base-ui/react/use-render";
+import type { ComponentProps, ReactElement } from "react";
 import { cn } from "./cn";
 import { RING } from "./states";
 
@@ -71,4 +73,37 @@ export function Button({
       {...props}
     />
   );
+}
+
+/**
+ * A link in a button's look (portalr ADR-0080): a way on that is an action, such as "All threads"
+ * under a not-found or "Start again" on a plain page. It stays a link, the router's through
+ * `render` or an `<a>`, so it opens in a new tab and a screen reader hears a link; the census
+ * counts it with the buttons (`data-button`).
+ */
+export function ButtonLink({
+  variant = "secondary",
+  size: big = "md",
+  render,
+  className,
+  ...props
+}: Omit<ComponentProps<"a">, "className"> & {
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  /** What to render as the link, such as the router's own: an `<a>` without one. */
+  render?: ReactElement;
+  className?: string;
+}) {
+  return useRender({
+    defaultTagName: "a",
+    render,
+    props: mergeProps<"a">(
+      // What the style census counts a button by, as a link (`data-*` is past the anchor's type).
+      {
+        "data-button": "",
+        className: cn(buttonLook(variant, big), className),
+      } as ComponentProps<"a">,
+      props,
+    ),
+  });
 }

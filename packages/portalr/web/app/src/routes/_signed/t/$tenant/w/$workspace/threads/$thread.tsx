@@ -14,6 +14,7 @@ import {
   ASK_FORM,
   ASK_USER,
   Button,
+  ButtonLink,
   Composer,
   ComposerDock,
   CRUMB,
@@ -28,7 +29,6 @@ import {
   RunStatus,
   rendererFor,
   Streaming,
-  TextLink,
   ToolCall,
   ToolCalls,
 } from "@portalr/ui";
@@ -198,9 +198,9 @@ function Chat() {
       <NotFoundPage
         title="Thread not found"
         action={
-          <TextLink render={<Link to="/t/$tenant/w/$workspace" params={{ tenant, workspace }} />}>
+          <ButtonLink render={<Link to="/t/$tenant/w/$workspace" params={{ tenant, workspace }} />}>
             All threads
-          </TextLink>
+          </ButtonLink>
         }
       >
         There's no thread here by that name, or it isn't one you can see.

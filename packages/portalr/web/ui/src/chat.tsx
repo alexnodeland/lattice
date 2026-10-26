@@ -18,7 +18,7 @@ import {
 } from "react";
 import { Alert } from "./alert";
 import type { Values } from "./artifactr-ui";
-import { Button } from "./button";
+import { Button, ButtonLink } from "./button";
 import { cn } from "./cn";
 import { CopyButton } from "./copy-button";
 import { endedBy, readAskForm } from "./form-schema";
@@ -34,7 +34,6 @@ import { type Sent, Unsent, useSending } from "./sending";
 import { FOLDED_LINES, SourceView } from "./source-view";
 import { StatusBadge, type Tone } from "./status-badge";
 import { TextField } from "./text-field";
-import { TextLink } from "./text-link";
 import { TYPE } from "./type";
 
 const card =
@@ -273,9 +272,9 @@ export function InlineArtifact({
       <li aria-label={name} className={card}>
         {children}
         {open && (
-          <span className="self-start text-xs">
-            <TextLink render={open}>Open its page</TextLink>
-          </span>
+          <ButtonLink size="sm" render={open} className="self-start">
+            Open its page
+          </ButtonLink>
         )}
       </li>
     );

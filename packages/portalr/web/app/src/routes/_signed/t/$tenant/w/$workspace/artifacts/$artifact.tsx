@@ -3,6 +3,7 @@ import { changes } from "@portalr/client/diff";
 import {
   AppHostContext,
   ArtifactContent,
+  ButtonLink,
   Card,
   CRUMB,
   FormHostContext,
@@ -12,7 +13,6 @@ import {
   proposedOn,
   Revisions,
   SectionTitle,
-  TextLink,
   Thumbs,
 } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
@@ -257,11 +257,11 @@ function NotFound() {
     <NotFoundPage
       title="Artifact not found"
       action={
-        <TextLink
+        <ButtonLink
           render={<Link to="/t/$tenant/w/$workspace/artifacts" params={{ tenant, workspace }} />}
         >
           All artifacts
-        </TextLink>
+        </ButtonLink>
       }
     >
       There's no artifact here by that name, or it isn't one you can see.

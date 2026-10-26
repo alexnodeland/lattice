@@ -1,5 +1,5 @@
 import { Refused } from "@portalr/client";
-import { Plain, TextLink } from "@portalr/ui";
+import { ButtonLink, Plain } from "@portalr/ui";
 import { createFileRoute, Link, notFound, Outlet } from "@tanstack/react-router";
 import { useGiven, usePageViews, useReplay } from "../../../analytics";
 
@@ -37,7 +37,7 @@ function NoSuchTenant() {
   return (
     <Plain home={<Link to="/" />} title="Tenant not found">
       <p>There's no tenant here by that name, or you aren't in it.</p>
-      <TextLink render={<Link to="/" />}>Choose a tenant</TextLink>
+      <ButtonLink render={<Link to="/" />}>Choose a tenant</ButtonLink>
     </Plain>
   );
 }

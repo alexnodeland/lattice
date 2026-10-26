@@ -8,7 +8,7 @@ import { AccountMenu } from "../account-menu";
 import { Alert } from "../alert";
 import { AppShell } from "../app-shell";
 import { Breadcrumbs } from "../breadcrumbs";
-import { Button, type ButtonVariant } from "../button";
+import { Button, ButtonLink, type ButtonVariant } from "../button";
 import { Card } from "../card";
 import { Message, Messages, Streaming } from "../chat";
 import { Checkbox, CheckboxGroup } from "../checkbox";
@@ -491,7 +491,11 @@ export function Sheet() {
           title="Spend"
           figure="$85.00"
           badge={<StatusBadge tone="near">Near budget</StatusBadge>}
-          action={<a href="#usage">Usage</a>}
+          action={
+            <ButtonLink size="sm" href="#usage">
+              Usage
+            </ButtonLink>
+          }
         >
           of $100.00, every 30 days
         </StatCard>
@@ -589,9 +593,9 @@ export function Kit() {
       <TextLink variant="subtle" href="#trace">
         trace_1
       </TextLink>
-      <TextLink variant="nav" href="#runs">
+      <ButtonLink variant="ghost" size="sm" href="#runs">
         Runs
-      </TextLink>
+      </ButtonLink>
       <Breadcrumbs
         trail={[
           { label: "Workspace", href: "#notes" },

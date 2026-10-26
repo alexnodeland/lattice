@@ -1,7 +1,7 @@
 import { expect, onTestFinished, test, vi } from "vitest";
 import { commands, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
-import { Button } from "./button";
+import { Button, ButtonLink } from "./button";
 import { contrast, token } from "./test/colours";
 
 test("a primary button is set in the working colour, readably", async () => {
@@ -202,4 +202,18 @@ test("a pending button can't be pressed again, looks disabled, and keeps the foc
   expect(style.backgroundColor).toBe(token("line"));
   expect(style.cursor).toBe("not-allowed");
   expect(document.activeElement).toBe(button.element());
+});
+
+test("a link in a button's look stays a link: an anchor with its href, no button role, the button's edge", async () => {
+  const screen = await render(
+    <ButtonLink href="#threads" variant="secondary">
+      All threads
+    </ButtonLink>,
+  );
+  const link = screen.getByRole("link", { name: "All threads" }).element();
+  expect(link.tagName).toBe("A");
+  expect(link.getAttribute("href")).toBe("#threads");
+  expect(link.getAttribute("role")).toBeNull();
+  expect(getComputedStyle(link).borderTopColor).toBe(token("edge"));
+  expect(getComputedStyle(link).textDecorationLine).toBe("none");
 });

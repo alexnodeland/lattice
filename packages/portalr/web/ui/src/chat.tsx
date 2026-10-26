@@ -16,6 +16,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import { Alert } from "./alert";
 import type { Values } from "./artifactr-ui";
@@ -35,6 +36,7 @@ import { SchemaForm } from "./schema-form";
 import { type Segment, SegmentedFilter } from "./segmented-filter";
 import { type Sent, Unsent, useSending } from "./sending";
 import { FOLDED_LINES, SourceView } from "./source-view";
+import { FEEDBACK } from "./states";
 import { StatusBadge, type Tone } from "./status-badge";
 import { TextField } from "./text-field";
 import { TYPE } from "./type";
@@ -109,40 +111,67 @@ export function ActionsMenu({
   given,
   onThumbs,
   items = [],
+  open,
+  onOpenChange,
 }: {
   /** The menu's name, such as "Artifact actions". */
   label: string;
   given: Thumb | null;
-  onThumbs: GiveThumbs;
+  /** Give thumbs; without it, the menu holds the actions alone. */
+  onThumbs?: GiveThumbs;
   /** The actions before the thumbs, if any. */
   items?: readonly MenuItem[];
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
-  const { pending, thumb, why } = useThumbs(onThumbs);
+  const { pending, thumb, why } = useThumbs(onThumbs ?? NO_THUMBS);
   return (
     <div className="flex min-w-0 flex-col items-end gap-1">
       <Menu
         label={label}
         icon={glyphs.more}
+        {...(open !== undefined && { open })}
+        {...(onOpenChange && { onOpenChange })}
         items={[
           ...items,
-          {
-            label: "Helpful",
-            checked: given?.up === true,
-            disabled: pending,
-            onSelect: () => thumb(true),
-          },
-          {
-            label: "Not helpful",
-            checked: given?.up === false,
-            disabled: pending,
-            onSelect: () => thumb(false),
-          },
+          ...(onThumbs
+            ? [
+                {
+                  label: "Helpful",
+                  checked: given?.up === true,
+                  disabled: pending,
+                  onSelect: () => thumb(true),
+                },
+                {
+                  label: "Not helpful",
+                  checked: given?.up === false,
+                  disabled: pending,
+                  onSelect: () => thumb(false),
+                },
+              ]
+            : []),
         ]}
       />
-      {why(given)}
+      {onThumbs && why(given)}
     </div>
   );
 }
+
+const NO_THUMBS: GiveThumbs = async () => ({ outcome: "done" });
+
+const COARSE = "(hover: none)";
+const subscribeToPointer = (onChange: () => void) => {
+  const media = matchMedia(COARSE);
+  media.addEventListener("change", onChange);
+  return () => media.removeEventListener("change", onChange);
+};
+/** Whether the pointer can't hover, as a finger can't: then nothing waits on a hover. */
+export function useCoarsePointer() {
+  return useSyncExternalStore(subscribeToPointer, () => matchMedia(COARSE).matches);
+}
+
+/** How long a press is held before it opens a message's actions, where the pointer can't hover. */
+const LONG_PRESS_MS = 500;
 
 /** Thumbs sent as given, then why, if the person wants to say: what `Thumbs` and `ActionsMenu` share. */
 function useThumbs(onThumbs: GiveThumbs) {
@@ -189,6 +218,11 @@ type MessageProps = {
   onSendAgain?: () => Sent;
   /** The reader's thumbs on it, as `client`'s `thumbs` reads them. */
   thumbs?: Thumb | null;
+  /**
+   * Whether the pointer can't hover, as a finger can't: then the actions are a menu, which a long
+   * press on the message opens too. Read from the pointer unless a test says.
+   */
+  coarse?: boolean;
   /** Give thumbs; without it, there are none. */
   onThumbs?: GiveThumbs;
 };
@@ -218,6 +252,7 @@ export function Message({
   sending = false,
   onSendAgain,
   thumbs = null,
+  coarse,
   onThumbs,
 }: MessageProps) {
   const name = useId();
@@ -225,12 +260,32 @@ export function Message({
   // A long message is folded past its first lines, with a way to the whole (portalr ADR-0080).
   const long = message.content.split("\n").length > FOLDED_AFTER;
   const [whole, setWhole] = useState(false);
+  // Where the pointer can't hover, the actions are a menu (portalr ADR-0080), opened by its button
+  // or by a long press on the message; what it copied is said for a screen reader.
+  const fingers = useCoarsePointer();
+  const menu = coarse ?? fingers;
+  const [opened, setOpened] = useState(false);
+  const [said, setSaid] = useState("");
+  const press = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const release = () => {
+    if (press.current !== null) {
+      clearTimeout(press.current);
+      press.current = null;
+    }
+  };
+  const copy = () =>
+    Promise.resolve()
+      .then(() => navigator.clipboard.writeText(message.content))
+      .then(
+        () => setSaid("Copied as Markdown"),
+        () => setSaid("Couldn't copy"),
+      );
   return (
     <li
       aria-labelledby={name}
       aria-busy={sending || undefined}
       className={cn(
-        "flex max-w-[min(100%,var(--bubble-max-width))] flex-col gap-1",
+        "group flex max-w-[min(100%,var(--bubble-max-width))] flex-col gap-1",
         mine ? "items-end self-end" : "items-start self-start",
         notice && "text-muted italic",
       )}
@@ -238,7 +293,19 @@ export function Message({
       <span id={name} className="font-semibold text-xs">
         {author}
       </span>
-      <div className={notice ? "min-w-0 max-w-full" : bubble(mine)}>
+      <div
+        className={notice ? "min-w-0 max-w-full" : bubble(mine)}
+        {...(menu &&
+          !sending && {
+            onPointerDown: () => {
+              release();
+              press.current = setTimeout(() => setOpened(true), LONG_PRESS_MS);
+            },
+            onPointerUp: release,
+            onPointerCancel: release,
+            onPointerMove: release,
+          })}
+      >
         <div
           className={cn(
             long && !whole && "relative max-h-(--code-block-max-height) overflow-hidden",
@@ -258,7 +325,17 @@ export function Message({
           </Button>
         )}
       </div>
-      <div className="flex min-h-7 flex-wrap items-start gap-1">
+      <div
+        className={cn(
+          "flex min-h-7 flex-wrap items-start gap-1",
+          // Where the pointer hovers, the actions show as it rests on the message, or the keyboard
+          // reaches them; the row keeps its height, so nothing moves. What was said stays shown.
+          !sending &&
+            !menu &&
+            !thumbs?.comment &&
+            `fine:opacity-0 fine:group-focus-within:opacity-100 fine:group-hover:opacity-100 ${FEEDBACK}`,
+        )}
+      >
         {sending && onSendAgain ? (
           <span className="flex items-center gap-2">
             <span className={TYPE.note}>It may not have been sent.</span>
@@ -266,6 +343,20 @@ export function Message({
           </span>
         ) : sending ? (
           <span className={TYPE.note}>Sending…</span>
+        ) : menu ? (
+          <>
+            <ActionsMenu
+              label="Message actions"
+              given={thumbs}
+              {...(onThumbs && { onThumbs })}
+              items={[{ label: "Copy as Markdown", onSelect: copy }]}
+              open={opened}
+              onOpenChange={setOpened}
+            />
+            <span role="status" className="sr-only">
+              {said}
+            </span>
+          </>
         ) : (
           <>
             <CopyButton text={message.content} what="as Markdown" />

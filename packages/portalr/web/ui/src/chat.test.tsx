@@ -1032,3 +1032,45 @@ test("the mode switch sends the mode chosen, and says when it is refused", async
   expect(onChange).toHaveBeenCalledWith("suggest");
   await expect.element(screen.getByRole("alert")).toBeVisible();
 });
+
+test("where the pointer hovers, a message's actions show as it rests on the message, or the keyboard reaches them", async () => {
+  const screen = await render(
+    <Messages>
+      <Message message={message()} author="Assistant" thumbs={null} onThumbs={sent()} />
+    </Messages>,
+  );
+  const item = screen.getByRole("listitem", { name: "Assistant" });
+  const copy = screen.getByRole("button", { name: "Copy as Markdown" });
+  const row = copy.element().parentElement as HTMLElement;
+  if (!matchMedia("(hover: hover)").matches) {
+    return; // a pointer that can't hover has the menu instead: the test below
+  }
+  await expect.poll(() => getComputedStyle(row).opacity).toBe("0");
+  await userEvent.hover(item);
+  await expect.poll(() => getComputedStyle(row).opacity).toBe("1");
+  await userEvent.unhover(item);
+  await expect.poll(() => getComputedStyle(row).opacity).toBe("0");
+  await userEvent.tab();
+  await expect.element(copy).toHaveFocus();
+  await expect.poll(() => getComputedStyle(row).opacity).toBe("1");
+});
+
+test("where the pointer can't hover, a message's actions are a menu, which a long press opens too", async () => {
+  const onThumbs = sent();
+  const screen = await render(
+    <Messages>
+      <Message message={message()} author="Assistant" thumbs={null} onThumbs={onThumbs} coarse />
+    </Messages>,
+  );
+  expect(screen.getByRole("button", { name: "Copy as Markdown" }).elements()).toHaveLength(0);
+  await screen.getByRole("button", { name: "Message actions" }).click();
+  const menu = screen.getByRole("menu");
+  await expect.element(menu.getByRole("menuitem", { name: "Copy as Markdown" })).toBeVisible();
+  await menu.getByRole("menuitemcheckbox", { name: "Helpful" }).click();
+  expect(onThumbs).toHaveBeenLastCalledWith(true, null);
+  await expect.element(screen.getByRole("menu")).not.toBeInTheDocument();
+  const bubble = screen.getByText("ready").element().closest("li > div") as HTMLElement;
+  bubble.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+  await expect.element(screen.getByRole("menu")).toBeVisible();
+  bubble.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
+});

@@ -14,6 +14,13 @@
 /* Streamdown renders with Tailwind classes of its own, which Tailwind finds here. */
 @source "../node_modules/streamdown/dist/*.js";
 
+/*
+ * A pointer that hovers, such as a mouse, and one that can't, such as a finger (portalr ADR-0080):
+ * what a hover reveals on the first is on the surface, or behind a long press, on the second.
+ */
+@custom-variant fine (@media (hover: hover));
+@custom-variant coarse (@media (hover: none));
+
 @layer base {
   html {
     background-color: var(--paper);

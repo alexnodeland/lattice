@@ -47,14 +47,19 @@ export function Menu({
   icon,
   items,
   triggerRef,
+  open,
+  onOpenChange,
 }: {
   label: string;
   icon?: Glyph;
   items: readonly MenuItem[];
   triggerRef?: Ref<HTMLButtonElement>;
+  /** Opened by the page, as by a long press, rather than by its button alone. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
   return (
-    <BaseMenu.Root>
+    <BaseMenu.Root {...(open !== undefined && { open })} {...(onOpenChange && { onOpenChange })}>
       {icon ? (
         <BaseMenu.Trigger ref={triggerRef} render={<IconButton label={label} icon={icon} />} />
       ) : (

@@ -166,7 +166,7 @@ const subscribeToPointer = (onChange: () => void) => {
   return () => media.removeEventListener("change", onChange);
 };
 /** Whether the pointer can't hover, as a finger can't: then nothing waits on a hover. */
-export function useCoarsePointer() {
+function useCoarsePointer() {
   return useSyncExternalStore(subscribeToPointer, () => matchMedia(COARSE).matches);
 }
 

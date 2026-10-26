@@ -9,6 +9,7 @@ export const posted = (page: Page, by: "You" | "Assistant") =>
     .last();
 
 When("they start the thread {string}", async ({ page }, title: string) => {
+  await page.getByRole("button", { name: "Name it first…" }).click();
   await page.getByLabel("New thread").fill(title);
   await page.getByRole("button", { name: "Start" }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(title);

@@ -36,10 +36,53 @@ test("a command refused as not_enabled reads the workspace's integrations again"
     (command) => (command.type === "create_thread" ? "not_enabled" : null),
   );
   await expect.poll(() => reads(fetched)).toBe(1);
+  await screen.getByRole("button", { name: "Name it first…" }).click();
   await screen.getByRole("textbox", { name: "New thread" }).fill("Sketch");
   await screen.getByRole("button", { name: "Start" }).click();
   await expect
     .element(screen.getByText("The thread wasn't started: the server refused it."))
     .toBeVisible();
   await expect.poll(() => reads(fetched)).toBe(2);
+});
+
+test("a thread starts from what is written to the agent: titled by its first line, the message posted, the page moved to it", async () => {
+  const sent: { type: string; thread_id?: string; title?: string; content?: string }[] = [];
+  const { screen, router } = await open(
+    "/t/acme/w/notes",
+    async (_request, path) => (path === FLAGS ? Response.json({}) : undefined),
+    (command) => {
+      sent.push(command);
+      return null;
+    },
+  );
+  const message = screen.getByRole("textbox", { name: "Message" });
+  await expect.element(message).toBeEnabled();
+  await message.fill("Plan the launch\nWe ship on Friday.");
+  await screen.getByRole("button", { name: "Send" }).click();
+  await expect.poll(() => sent.length).toBe(2);
+  const [created, posted] = sent;
+  expect(created).toMatchObject({ type: "create_thread", title: "Plan the launch" });
+  expect(posted).toMatchObject({
+    type: "post_message",
+    thread_id: created?.thread_id,
+    content: "Plan the launch\nWe ship on Friday.",
+  });
+  await expect
+    .poll(() => router.state.location.pathname)
+    .toBe(`/t/acme/w/notes/threads/${created?.thread_id}`);
+});
+
+test("a thread refused as it is written keeps the words in the composer", async () => {
+  const { screen, router } = await open(
+    "/t/acme/w/notes",
+    async (_request, path) => (path === FLAGS ? Response.json({}) : undefined),
+    (command) => (command.type === "create_thread" ? "forbidden" : null),
+  );
+  const message = screen.getByRole("textbox", { name: "Message" });
+  await expect.element(message).toBeEnabled();
+  await message.fill("Plan the launch");
+  await screen.getByRole("button", { name: "Send" }).click();
+  await expect.element(screen.getByRole("alert")).toBeVisible();
+  await expect.element(message).toHaveValue("Plan the launch");
+  expect(router.state.location.pathname).toBe("/t/acme/w/notes");
 });

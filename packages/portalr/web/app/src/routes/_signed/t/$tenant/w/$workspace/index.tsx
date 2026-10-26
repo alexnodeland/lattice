@@ -2,6 +2,7 @@ import { useMe } from "@portalr/client";
 import {
   Ago,
   Button,
+  Composer,
   EmptyState,
   PageHeader,
   plainTitle,
@@ -12,7 +13,7 @@ import {
   TextField,
 } from "@portalr/ui";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { author } from "../../../../../../author";
 import { Connection, useStream, useWorkspace } from "../../../../../../workspace";
 
@@ -27,9 +28,14 @@ function Threads() {
   const snapshot = useWorkspace();
   const navigate = useNavigate();
   const listed = Object.values(snapshot.state.threads).sort((a, b) => b.active - a.active);
+  const toThread = (thread: string) =>
+    navigate({
+      to: "/t/$tenant/w/$workspace/threads/$thread",
+      params: { tenant, workspace, thread },
+    });
   const [refused, start, pending] = useActionState(
     async (_last: string | null, form: FormData): Promise<string | null> => {
-      const thread = `thr_${crypto.randomUUID().replaceAll("-", "")}`;
+      const thread = newThreadId();
       const title = String(form.get("title"));
       const settled = await stream.send({ type: "create_thread", thread_id: thread, title });
       if (settled.outcome !== "done") {
@@ -37,14 +43,34 @@ function Threads() {
           ? "The thread wasn't started: the server refused it."
           : "The thread wasn't started: the connection closed.";
       }
-      await navigate({
-        to: "/t/$tenant/w/$workspace/threads/$thread",
-        params: { tenant, workspace, thread },
-      });
+      await toThread(thread);
       return null;
     },
     null,
   );
+  // A thread started by writing to the agent (portalr ADR-0080): its title is the first line, its
+  // first message what was written. Refused, the words stay in the composer.
+  const write = async (content: string) => {
+    const thread = newThreadId();
+    const created = await stream.send({
+      type: "create_thread",
+      thread_id: thread,
+      title: firstLine(content),
+    });
+    if (created.outcome !== "done") {
+      return created;
+    }
+    const posted = await stream.send({
+      type: "post_message",
+      thread_id: thread,
+      message_id: `msg_${crypto.randomUUID().replaceAll("-", "")}`,
+      content,
+    });
+    // The thread is there either way: the page moves to it, where the message is sent again if need be.
+    await toThread(thread);
+    return posted;
+  };
+  const [naming, setNaming] = useState(false);
   const live = snapshot.status === "live";
   // Each thread's run that is going, or waits on someone, said beside it.
   const going = new Map(
@@ -54,24 +80,35 @@ function Threads() {
   );
   const starting =
     snapshot.status !== "closed" ? (
-      <form className="flex items-end gap-2" action={start}>
-        <TextField label="New thread" name="title" error={refused} required />
-        <Button type="submit" disabled={!live} pending={pending}>
-          Start
-        </Button>
-      </form>
+      <div className="flex flex-col gap-2">
+        <Composer disabled={!live} onSend={write} />
+        <div className="flex flex-wrap items-end gap-2">
+          {naming ? (
+            <form className="flex flex-wrap items-end gap-2" action={start}>
+              <TextField label="New thread" name="title" error={refused} required autoFocus />
+              <Button type="submit" disabled={!live} pending={pending}>
+                Start
+              </Button>
+            </form>
+          ) : (
+            <Button variant="ghost" size="sm" disabled={!live} onClick={() => setNaming(true)}>
+              Name it first…
+            </Button>
+          )}
+        </div>
+      </div>
     ) : null;
   return (
     <>
       <PageHeader
         title="Threads"
         meta={`The threads in ${workspace}, the most recently active first`}
-        actions={starting}
       />
+      {starting}
       <Connection snapshot={snapshot} waiting="the workspace" />
       {live && listed.length === 0 && (
         <EmptyState title="No threads yet">
-          Name one in New thread, and talk with the agent in it.
+          Write to the agent above to start one, or name one first.
         </EmptyState>
       )}
       {listed.length > 0 && (
@@ -117,3 +154,15 @@ function Threads() {
     </>
   );
 }
+
+const newThreadId = () => `thr_${crypto.randomUUID().replaceAll("-", "")}`;
+
+/** A thread's title from what starts it: the first line, cut where a title would be too long. */
+const firstLine = (content: string) => {
+  const line =
+    content
+      .split("\n")
+      .find((each) => each.trim() !== "")
+      ?.trim() ?? "";
+  return line.length > 80 ? `${line.slice(0, 79).trimEnd()}…` : line;
+};

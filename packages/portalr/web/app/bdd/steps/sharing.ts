@@ -4,9 +4,9 @@ import { account } from "./app";
 import { started, Then, When } from "./fixtures";
 import { email, password, signIn } from "./people";
 
-/** The workspace's threads, once its log has been read: Start is enabled only then. */
+/** The workspace's threads, once its log has been read: naming one is enabled only then. */
 async function threads(page: Page) {
-  await expect(page.getByRole("button", { name: "Start" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Name it first…" })).toBeEnabled();
   return page.getByRole("list", { name: "Threads" });
 }
 
@@ -42,7 +42,7 @@ When("they open the thread they started by its address", async ({ page, scenario
 
 Then("the thread they started isn't listed", async ({ page, scenario }) => {
   const thread = started(scenario.thread);
-  await expect(page.getByRole("button", { name: "Start" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Name it first…" })).toBeEnabled();
   await expect(page.getByRole("link", { name: thread, exact: true })).toHaveCount(0);
 });
 

@@ -113,7 +113,7 @@ app = Subprocess("/opt/wordcraft/bin/wordcraft-cli", version="0.11.0")
 files = NativeFiles(blobs, checkouts, app)
 ```
 
-A CLI that isn't `version` is refused, so the version a revision's provenance records is the one that ran. An agent's commands are WordCraft's own, such as `{"name": "text.insert", "args": {"text": "Fees"}}` or `{"name": "para.heading1"}`; `app.commands("comment")` finds them, ten at most, from the 617 it has. A batch stops at the first command that fails, which refuses it whole, naming the command.
+A CLI that isn't `version` is refused, so the version a revision's provenance records is the one that ran. An agent's commands are WordCraft's own, such as `{"name": "text.insert", "args": {"text": "Fees"}}` or `{"name": "para.heading1"}`; `app.commands("comment")` finds them, ten at most, from the 643 it has at 0.11.0, less those that start with `file.` or `app.`, which reach past the open file: a batch that holds one is refused before any runs, and the search never finds one. A batch stops at the first command that fails, which refuses it whole, naming the command.
 
 The CLI runs as your application's user, with its network: `Subprocess` is for tests and trusted files; the worker, below, runs hostile ones. To fetch the pinned CLI, the one CI tests, run `scripts/craft wordcraft cli` in lattice: it downloads WordCraft's release once, checks its SHA-256 against `scripts/crafts/wordcraft.sha256`, and prints the CLI's path. `moon run artifactr:fidelity` runs the fidelity report with it.
 

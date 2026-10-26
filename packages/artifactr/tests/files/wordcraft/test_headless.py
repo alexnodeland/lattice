@@ -48,6 +48,14 @@ def test_it_is_an_app_that_people_check_out_and_in(spawn: Make) -> None:
     assert (app.talk, app.integration) == ("bridged", "files:wordcraft")
 
 
+async def test_a_command_past_the_open_file_is_refused_and_never_found(spawn: Make) -> None:
+    app = spawn()
+    with pytest.raises(AppFailed, match=r"file\.saveAs: WordCraft's adapter runs no such command"):
+        await app.apply(None, [command("file.saveAs", path="/etc/x")], deadline=20)
+    assert not [c for c in await app.commands("") if c.name.startswith("file.")]
+    assert not await app.commands("save as")
+
+
 async def test_a_batch_makes_a_file_and_says_what_is_in_it(spawn: Make) -> None:
     app = spawn()
     applied = await app.apply(

@@ -57,7 +57,7 @@ A spawn per call is cheap next to a call's seconds of deadline, and buys the con
 - Harder: the corpus is generated, so the report says nothing yet of real-world documents; documents whose licences allow it can join it. Nor does it measure large documents' round trips, which RFC-0003 asks of phase 2; that is deferred to the worker, phase 3, where the round trip includes its transport.
 - Revisit: the pin, with each WordCraft release, raised by hand after `moon run artifactr:fidelity` passes on it; `talk`, when a WordCraft host bridge ships in a release.
 
-> **Amended (2026-10-26) by [ADR-0010](0010-a-shim-beside-the-build-and-talk-level-one-plus.md):** the bridge shipped in WordCraft 0.11.0, which is pinned, so `talk` is `bridged`; the host bridges named above were superseded by `#3822`.
+> **Amended (2026-10-26) by [ADR-0010](0010-a-shim-beside-the-build-and-talk-level-one-plus.md):** the bridge shipped in WordCraft 0.11.0, which is pinned, so `talk` is `bridged`; the host bridges named above were superseded by `#3822`. WordCraft 0.11.0 has 26 more commands than 0.7.0, so its adapter now refuses `file.` and `app.` commands, as GridCraft's and DeckCraft's adapters do; an agent runs the rest, confined by the call's read and write roots and by the app's switch ([ADR-0006](0006-the-agents-tools-behind-each-apps-switch.md)).
 
 ## Action items
 

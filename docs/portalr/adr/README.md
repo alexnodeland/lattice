@@ -24,7 +24,7 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0016](0016-the-threads-area.md) | The Threads area: a workspace's stream, and a scripted agent to chat with | Accepted |
 | [0017](0017-the-artifacts-and-proposals-areas.md) | The Artifacts and Proposals areas: renderers by kind, and diffs by revision | Accepted |
 | [0018](0018-the-runs-area-and-feedback.md) | The Runs area, feedback on runs, and what a person may do | Accepted |
-| [0019](0019-the-kits-look.md) | The kit's look: a side rail, labelled icons, raised surfaces and quiet statuses | Accepted, amended by 0036, 0039 and 0080 |
+| [0019](0019-the-kits-look.md) | The kit's look: a side rail, labelled icons, raised surfaces and quiet statuses | Accepted, amended by 0036, 0037, 0039 and 0080 |
 | [0020](0020-the-rules-area.md) | The Rules area: stored rules as reflexr's JSON, sent over its REST | Accepted |
 | [0021](0021-the-areas-on-the-frame-and-what-admin-needs.md) | The areas on the frame, a danger colour, budget badges, and what admin's frame decides | Accepted |
 | [0022](0022-restricting-and-sharing-a-thread.md) | Restricting and sharing a thread, from its menu | Accepted, amended by 0038 |
@@ -64,7 +64,7 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0056](0056-brand-kits-token-layers-loading-and-validation.md) | Brand kits: three token layers, a kit loaded per deployment, and validation in Python | Accepted |
 | [0057](0057-brand-kits-motion-and-tokens-as-the-only-override.md) | Brand kits: a motion system with guard rails, and tokens as the only override | Accepted |
 | [0058](0058-a-new-version-offered-to-a-stale-tab.md) | A new version offered to a stale tab | Accepted |
-| [0059](0059-link-variants-breadcrumbs-and-the-skip-link.md) | Link variants, breadcrumbs, and the skip link | Accepted |
+| [0059](0059-link-variants-breadcrumbs-and-the-skip-link.md) | Link variants, breadcrumbs, and the skip link | Accepted, amended by 0080 |
 | [0060](0060-list-rows.md) | List rows: a name, a quieter line beneath it, and an end | Accepted |
 | [0061](0061-icon-buttons-and-the-inline-artifacts-header.md) | Icon buttons, and the inline artifact's header | Accepted |
 | [0062](0062-badges-and-headings.md) | Badges and headings | Accepted, amended by 0080 |

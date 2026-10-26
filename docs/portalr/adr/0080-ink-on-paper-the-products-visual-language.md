@@ -19,11 +19,22 @@ The owner read the first pass and said the UIs still looked like Windows Vista. 
 - **Pills.** Badges were full-radius pills with coloured edges; the nav's count and "Waiting for you" were solid violet pills; a message bubble had 16px corners and a tail.
 - **A bordered switcher.** The workspace switcher was a bordered, paper-filled combobox inside the surface rail.
 
-Gradients, bevels, gloss and inner highlights there were none; the type (Schibsted Grotesk, Fragment Mono) and the icons (Lucide, 2px) were already current.
+Gradients, bevels, gloss and inner highlights there were none; the type (Schibsted Grotesk, Fragment Mono) was current. The icons were Lucide's, a pack, which the owner then asked to be the kit's own.
 
 ## The direction: ink on paper
 
 A neutral paper with no violet in it, `#f6f6f8` and `#121216`; surfaces told apart by hairlines (`#e3e3e8`, `#2b2b33`) and spacing, a card's shadow a whisper (1px at 8% of a neutral) and elevation kept for what floats; a neutral control edge (`#74747f`, `#75757f`) that still holds 3:1 on every surface; the violet kept as the one accent, for the primary action, links, the focus ring and the current place, so a screen carries one tint where it carried four; crisp radii, 6px on controls and 8px on cards as before, 12px on a bubble (from 16) and 4px on a badge (from a pill); and a dark scheme designed on the same neutrals, with the accent a lighter violet (`#d9bff3`) that reads 4.5:1 on its surfaces. The switcher is a bare trigger, as the header's others are, and the upload zone is a 1px dashed card. The example kits, nightshade and calm, set their own colours and keep their character; the inventory, the schema and the validator are unchanged, and every pair in the manifest holds in both schemes.
+
+## Decisions the code cites
+
+- **The icons are the kit's own** (`icons.ts`): 53 glyphs, each one path on a 16-unit grid, drawn from scratch to that grid and the kit's metaphors (a message is a note with a folded corner, a file a leaf with a turned corner, a run a triangle, a rule a bolt), stroked by `Icon` at 1.5 units with round terminals and joins, in the text's colour; chevrons and arrowheads share one angle and a slight optical curve. The set was checked against Lucide 1.55.0, the pack the UIs used before, by sampled-point distance after scaling, and the glyphs that were nearest to it (the chevrons, the x, workflow, route, scroll, coins, terminal, list-checks, maximize and minimize, wrench) were redrawn with a construction of their own. `Glyph` is a branded string: only a path the kit drew reaches a `d`. The set ships whole, about a kilobyte compressed, as one object; `lucide-react` is gone from the three packages.
+- **A way on that is an action is a `ButtonLink`**: an anchor, the router's `Link` through `render`, in the button's look, so it opens in a new tab and reads as a link; it has no disabled state, as a link hasn't; `aria-current="page"` on one marks it as the current place by weight and a rule, as a nav link is; the census counts it with the buttons by `data-button`.
+- **An inline link keeps a rule under it**: the browser's underline, recoloured to the kit's edge at rest and the working colour when hovered, with the kit's offset; it is the one cue beside colour that it is a link in running text, so the edge holds 3:1 on the paper and the surface in both schemes.
+- **A subtle link is the text's weight with no underline**, for an id or a name standing alone in a cell; never in running text. A row's link is a row (its chevron says it opens); the places above a page are crumbs with the kit's chevron between them, not underlined words.
+
+## Built and planned
+
+Built in the pull request that adds this record: the neutral kit (paper, hairlines, edges, elevation, radii, dark), the icons, ButtonLink and the links, the crumb trail, rows as a bounded list with a chevron, the table's header and figures, the rail unboxed with the start rule, quiet badges, the flat segmented track, the cards' start rule, the 3xl title and the 64rem measure, the fade in place of the turn. Planned in the same pull request, as the owner approved, and recorded here only once built: the stepped question sets, tool calls grouped per run, the attach button in the composer, admin's forms behind New… and folding filter bars, revisions one open at a time, the artifact page's overflow menu, long messages folded, the run status strip, composer-first new threads, the needs-you queue, jump to latest, the thread's mode switch, message actions on hover, thread search and the unread dot, and reconnecting without a reload.
 
 ## The language, part by part
 

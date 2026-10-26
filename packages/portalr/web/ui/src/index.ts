@@ -136,7 +136,7 @@ export { Table } from "./table";
 export { TextArea } from "./text-area";
 export { TextField } from "./text-field";
 export { type LinkVariant, TextLink } from "./text-link";
-export { ToolCall, ToolCalls } from "./tool-call";
+export { RunSteps, ToolCall, ToolCalls } from "./tool-call";
 export { duration, type Reveal, type Standing, TraceView } from "./trace-view";
 export { type Block, type Level, Tracker } from "./tracker";
 export { type TrackerItem, TrackerItems, trackerName } from "./tracker-items";

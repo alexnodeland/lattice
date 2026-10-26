@@ -27,10 +27,9 @@ import {
   Request,
   RunFailed,
   RunStatus,
+  RunSteps,
   rendererFor,
   Streaming,
-  ToolCall,
-  ToolCalls,
 } from "@portalr/ui";
 import {
   type UseSuspenseQueryOptions,
@@ -322,11 +321,11 @@ function Chat() {
               );
             case "tools":
               return (
-                <ToolCalls key={entry.tools[0]?.[0]}>
-                  {entry.tools.map(([call, tool]) => (
-                    <ToolCall key={call} tool={tool} />
-                  ))}
-                </ToolCalls>
+                <RunSteps
+                  key={entry.tools[0]?.[0]}
+                  tools={entry.tools}
+                  running={entry.run.status === "running"}
+                />
               );
             case "question": {
               const { request, answer: given } = entry.question;

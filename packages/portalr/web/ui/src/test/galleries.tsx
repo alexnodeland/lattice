@@ -40,7 +40,7 @@ import { Table } from "../table";
 import { TextArea } from "../text-area";
 import { TextField } from "../text-field";
 import { TextLink } from "../text-link";
-import { ToolCall, ToolCalls } from "../tool-call";
+import { RunSteps, ToolCall, ToolCalls } from "../tool-call";
 
 export function Gallery() {
   return (
@@ -415,9 +415,15 @@ export function Thread() {
         <li>
           <Questions request={ASKED} onAnswer={sent} focus={false} />
         </li>
+        <RunSteps
+          running={false}
+          tools={[
+            ["c1", tool("create_artifact", "ok", "Done: note_1 is now at version 1.")],
+            ["c2", tool("draft_rule", "retry", "rule\n  Input should be an object")],
+          ]}
+        />
         <ToolCalls>
-          <ToolCall tool={tool("create_artifact", "ok", "Done: note_1 is now at version 1.")} />
-          <ToolCall tool={tool("draft_rule", "retry", "rule\n  Input should be an object")} />
+          <ToolCall tool={tool("list_artifacts", "ok", "[]")} />
         </ToolCalls>
         <Message
           message={message("m2", "The launch note is **drafted**.", false)}

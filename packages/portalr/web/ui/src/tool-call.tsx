@@ -65,8 +65,8 @@ function Part({
   );
 }
 
-/** One call: a summary line that opens to its arguments and what it returned. */
-export function ToolCall({ tool }: { tool: Artifactr.Tool }) {
+/** One call: a summary line that opens to its arguments and what it returned; `open` to start so. */
+export function ToolCall({ tool, open = false }: { tool: Artifactr.Tool; open?: boolean }) {
   const [tone, word, returned] = STATUS[tool.status] ?? ["done", tool.status, "Result"];
   const failed = tool.status === "error" || tool.status === "retry";
   const line = failed ? tool.result : tool.args;
@@ -74,6 +74,7 @@ export function ToolCall({ tool }: { tool: Artifactr.Tool }) {
     <li>
       <Disclosure
         look="block"
+        defaultOpen={open}
         className="rounded-(--tool-call-radius) border border-line bg-surface text-sm data-open:border-edge"
         triggerClassName="min-h-10 items-center rounded-(--tool-call-radius) px-(--tool-call-pad-x) py-(--tool-call-pad-y) hover:bg-transparent"
         panelClassName="data-open:pt-0"
@@ -116,6 +117,77 @@ export function ToolCalls({ children }: { children: ReactNode }) {
       <ul aria-label="Tools" className="flex flex-col gap-1">
         {children}
       </ul>
+    </li>
+  );
+}
+
+/** How a run's steps are going together: failed if any did, running while one is, else done. */
+function stepsStatus(tools: readonly Artifactr.Tool[], running: boolean): readonly [Tone, string] {
+  if (tools.some((tool) => tool.status === "error" || tool.status === "retry")) {
+    return ["failed", "Failed"];
+  }
+  const called = tools.filter((tool) => tool.status === "called").length;
+  if (running && called > 0) {
+    return ["working", `Running step ${tools.length - called + 1} of ${tools.length}`];
+  }
+  return ["done", "Done"];
+}
+
+/**
+ * A run's calls as one group (portalr ADR-0080): a summary that says how many steps and how
+ * they are going, open while the run is, with the newest step open too, and folded once it is
+ * done, so a run of eight calls is one line of the thread until it is wanted. One call is its
+ * own row, as before.
+ */
+export function RunSteps({
+  tools,
+  running,
+}: {
+  tools: readonly (readonly [string, Artifactr.Tool])[];
+  running: boolean;
+}) {
+  if (tools.length === 1) {
+    return (
+      <ToolCalls>
+        <ToolCall tool={(tools[0] as [string, Artifactr.Tool])[1]} />
+      </ToolCalls>
+    );
+  }
+  const [tone, word] = stepsStatus(
+    tools.map(([, tool]) => tool),
+    running,
+  );
+  const latest = tools.at(-1)?.[1];
+  return (
+    <li>
+      <Disclosure
+        look="block"
+        name={`${tools.length} steps`}
+        defaultOpen={running}
+        className="rounded-(--tool-call-radius) border border-line bg-surface text-sm data-open:border-edge"
+        triggerClassName="min-h-10 items-center rounded-(--tool-call-radius) px-(--tool-call-pad-x) py-(--tool-call-pad-y) hover:bg-transparent"
+        panelClassName="data-open:pt-0"
+        summary={
+          <>
+            <Icon icon={glyphs.listChecks} className="size-3.5 shrink-0 text-muted" />
+            <span className="shrink-0 font-semibold">{tools.length} steps</span>
+            {latest && (
+              <code className="min-w-0 flex-1 truncate font-mono text-muted text-xs">
+                {latest.name}
+              </code>
+            )}
+            <StatusBadge tone={tone} live={running} className="shrink-0">
+              {word}
+            </StatusBadge>
+          </>
+        }
+      >
+        <ul aria-label="Steps" className="flex flex-col gap-1 border-line border-t p-2">
+          {tools.map(([call, tool], at) => (
+            <ToolCall key={call} tool={tool} open={running && at === tools.length - 1} />
+          ))}
+        </ul>
+      </Disclosure>
     </li>
   );
 }

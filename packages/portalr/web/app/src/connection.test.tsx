@@ -62,3 +62,26 @@ test("a stream that closed offers to connect now, where the page can, and one co
   );
   await expect.element(screen.getByRole("status")).toHaveTextContent("Reading the workspace…");
 });
+
+test("offline, the notice says so rather than blaming the connection", async () => {
+  const was = Object.getOwnPropertyDescriptor(Navigator.prototype, "onLine");
+  Object.defineProperty(navigator, "onLine", { configurable: true, get: () => false });
+  try {
+    const screen = await render(
+      <Connection
+        snapshot={{ state: null, seq: 3, status: "closed", error: null }}
+        waiting="the workspace"
+        onReconnect={() => undefined}
+      />,
+    );
+    const said = screen.getByRole("alert");
+    await expect.poll(() => said.element().textContent).toContain("You're offline.");
+    expect(said.element().textContent).not.toContain("connection to this workspace");
+  } finally {
+    // The instance's own getter goes, and the prototype's shows through again.
+    Reflect.deleteProperty(navigator, "onLine");
+    if (was) {
+      Object.defineProperty(Navigator.prototype, "onLine", was);
+    }
+  }
+});

@@ -181,13 +181,14 @@ export function Connection({
       failureLogged(snapshot.error);
     }
   }, [snapshot.status, snapshot.error]);
+  const offline = useSyncExternalStore(subscribeToOnline, () => !navigator.onLine);
   if (snapshot.status === "closed") {
     return (
       <Alert tone="error">
         <span className="flex flex-wrap items-center gap-x-3 gap-y-2">
           {onReconnect ? (
             <>
-              The connection to this workspace ended.
+              {offline ? "You're offline." : "The connection to this workspace ended."}
               <Button variant="secondary" size="sm" onClick={onReconnect}>
                 Connect now
               </Button>
@@ -203,7 +204,8 @@ export function Connection({
   if (snapshot.status === "connecting" && snapshot.seq > 0) {
     return (
       <p role="status" className="text-muted text-sm">
-        Connecting again… What you send goes once it is connected.
+        {offline ? "You're offline. " : "Connecting again… "}What you send goes once it is
+        connected.
       </p>
     );
   }
@@ -211,4 +213,14 @@ export function Connection({
     return <Reading>Reading {waiting}…</Reading>;
   }
   return null;
+}
+
+/** The browser's word on whether it is online, heard as it changes. */
+function subscribeToOnline(onChange: () => void) {
+  window.addEventListener("online", onChange);
+  window.addEventListener("offline", onChange);
+  return () => {
+    window.removeEventListener("online", onChange);
+    window.removeEventListener("offline", onChange);
+  };
 }

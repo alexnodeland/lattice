@@ -886,3 +886,28 @@ test("Enter twice while a send is in flight sends once", async () => {
   held.settle?.();
   await expect.element(screen.getByRole("button", { name: "Send" })).not.toBeDisabled();
 });
+
+test("a long message is folded past its first lines, and opens whole; Copy copies all of it; a streaming one never folds", async () => {
+  // Paragraphs, a blank line between: Markdown joins single lines into one.
+  const lines = Array.from({ length: 60 }, (_, at) => `line ${at + 1}`).join("\n\n");
+  const written = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
+  const screen = await render(
+    <Messages>
+      <Message message={message({ content: lines })} author="Assistant" />
+      <Streaming text={lines} author="Assistant" />
+    </Messages>,
+  );
+  const whole = screen.getByRole("button", { name: "Show the whole message" });
+  await expect.element(whole).toBeVisible();
+  expect(screen.getByRole("button", { name: "Show the whole message" }).elements()).toHaveLength(1);
+  const body = screen
+    .getByRole("listitem", { name: "Assistant", exact: true })
+    .element()
+    .querySelector("[class*='max-h']") as Element;
+  expect(getComputedStyle(body).overflow).toBe("hidden");
+  await screen.getByRole("button", { name: "Copy as Markdown" }).click();
+  expect(written).toHaveBeenLastCalledWith(lines);
+  await whole.click();
+  await expect.element(whole).not.toBeInTheDocument();
+  expect(getComputedStyle(body).overflow).not.toBe("hidden");
+});

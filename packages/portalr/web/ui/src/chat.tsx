@@ -135,6 +135,9 @@ type MessageProps = {
   onThumbs?: GiveThumbs;
 };
 
+/** The lines of a message past which it is folded, with a way to the whole. */
+const FOLDED_AFTER = 40;
+
 /** A message's bubble: the reader's at the end of the line, everyone else's at its start. */
 const bubble = (mine: boolean) =>
   cn(
@@ -161,6 +164,9 @@ export function Message({
 }: MessageProps) {
   const name = useId();
   const notice = message.kind === "notice";
+  // A long message is folded past its first lines, with a way to the whole (portalr ADR-0080).
+  const long = message.content.split("\n").length > FOLDED_AFTER;
+  const [whole, setWhole] = useState(false);
   return (
     <li
       aria-labelledby={name}
@@ -175,7 +181,24 @@ export function Message({
         {author}
       </span>
       <div className={notice ? "min-w-0 max-w-full" : bubble(mine)}>
-        <Markdown>{message.content}</Markdown>
+        <div
+          className={cn(
+            long && !whole && "relative max-h-(--code-block-max-height) overflow-hidden",
+          )}
+        >
+          <Markdown>{message.content}</Markdown>
+          {long && !whole && (
+            <div
+              aria-hidden="true"
+              className="absolute inset-x-0 bottom-0 h-16 bg-linear-to-t from-surface to-transparent"
+            />
+          )}
+        </div>
+        {long && !whole && (
+          <Button variant="secondary" size="sm" className="mt-2" onClick={() => setWhole(true)}>
+            Show the whole message
+          </Button>
+        )}
       </div>
       <div className="flex min-h-7 flex-wrap items-start gap-1">
         {sending && onSendAgain ? (

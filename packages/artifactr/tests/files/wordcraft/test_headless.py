@@ -33,7 +33,7 @@ def spawn(tmp_path: Path) -> Make:
             f'exec "{sys.executable}" -I "{FAKE}" --mode "{mode}" "$@"\n'
         )
         cli.chmod(cli.stat().st_mode | stat.S_IXUSR)
-        return Subprocess(cli, version="0.7.0", limit=limit)
+        return Subprocess(cli, version="0.11.0", limit=limit)
 
     return spawn
 
@@ -44,8 +44,16 @@ def command(name: str, **args: str) -> AppCommand:
 
 def test_it_is_an_app_that_people_check_out_and_in(spawn: Make) -> None:
     app: App = spawn()
-    assert (app.name, app.version, app.build) == ("wordcraft", "0.7.0", None)
-    assert (app.talk, app.integration) == ("save", "files:wordcraft")
+    assert (app.name, app.version, app.build) == ("wordcraft", "0.11.0", None)
+    assert (app.talk, app.integration) == ("bridged", "files:wordcraft")
+
+
+async def test_a_command_past_the_open_file_is_refused_and_never_found(spawn: Make) -> None:
+    app = spawn()
+    with pytest.raises(AppFailed, match=r"file\.saveAs: WordCraft's adapter runs no such command"):
+        await app.apply(None, [command("file.saveAs", path="/etc/x")], deadline=20)
+    assert not [c for c in await app.commands("") if c.name.startswith("file.")]
+    assert not await app.commands("save as")
 
 
 async def test_a_batch_makes_a_file_and_says_what_is_in_it(spawn: Make) -> None:
@@ -125,7 +133,7 @@ async def test_it_finds_ten_commands_at_most(spawn: Make) -> None:
 
 
 async def test_a_cli_of_another_version_is_refused(spawn: Make) -> None:
-    with pytest.raises(AppFailed, match=r"wordcraft-cli is 0\.0\.1, not 0\.7\.0") as refused:
+    with pytest.raises(AppFailed, match=r"wordcraft-cli is 0\.0\.1, not 0\.11\.0") as refused:
         await spawn("version").apply(None, [], deadline=20)
     assert refused.value.failure == "refused"
 
@@ -149,7 +157,7 @@ async def test_a_cli_that_exits_mid_call_crashed_and_says_what_it_printed(spawn:
 
 async def test_a_cli_that_cant_start_crashed(tmp_path: Path) -> None:
     with pytest.raises(AppFailed) as crashed:
-        await Subprocess(tmp_path / "absent", version="0.7.0").inspect(b"", deadline=20)
+        await Subprocess(tmp_path / "absent", version="0.11.0").inspect(b"", deadline=20)
     assert crashed.value.failure == "crashed"
 
 

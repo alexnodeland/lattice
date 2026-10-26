@@ -37,6 +37,13 @@ def test_the_shim_names_the_app_its_surface_and_the_portal() -> None:
     assert "<title>GridCraft</title>" in page
 
 
+def test_wordcrafts_shim_relays_its_parent_bridge() -> None:
+    page = shim_page(CRAFTS["wordcraft"], PORTAL)
+    assert 'data-app="wordcraft"' in page
+    assert 'data-surface="parent"' in page
+    assert "<title>WordCraft</title>" in page
+
+
 def test_a_javascript_apis_shim_calls_only_the_methods_allowed() -> None:
     page = shim_page(CRAFTS["effectcraft"], PORTAL, ["info", "request"])
     assert 'data-surface="global" data-methods="info request"' in page
@@ -58,7 +65,7 @@ def test_the_shims_policy_runs_its_own_code_frames_its_origin_and_is_framed_by_t
 @pytest.mark.parametrize(
     ("app", "portal", "methods", "refused"),
     [
-        ("wordcraft", PORTAL, [], "WordCraft's build has no host surface"),
+        ("photocraft", PORTAL, [], "PhotoCraft's build has no host surface"),
         ("gridcraft", "https://portal.example/app", [], "the portal is an origin"),
         ("gridcraft", "javascript:alert(1)", [], "the portal is an origin"),
         ("gridcraft", PORTAL, ["open"], "GridCraft's build has no JavaScript API"),

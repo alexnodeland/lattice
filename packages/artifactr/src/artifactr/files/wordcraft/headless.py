@@ -55,6 +55,7 @@ class Subprocess(ToolsDialect):
     new_arguments: ClassVar[Mapping[str, JsonValue]] = {"template": "blank"}
     open_tool: ClassVar[str] = "open_document"
     save_tool: ClassVar[str] = "save_document"
+    denied: ClassVar[tuple[str, ...]] = ("file.", "app.")
 
     def __init__(
         self,

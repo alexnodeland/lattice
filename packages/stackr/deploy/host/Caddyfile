@@ -95,7 +95,7 @@ auth.{$STACKR_DOMAIN} {
 {$STACKR_EDITOR_HOSTS:editors.localhost} {
 	{$CADDY_TLS}
 	import headers
-	@editor header_regexp editor Host ^(gridcraft|pdfcraft|cadcraft)\.
+	@editor header_regexp editor Host ^(gridcraft|pdfcraft|cadcraft|wordcraft)\.
 	handle @editor {
 		reverse_proxy files-{re.editor.1}-editor:8000
 	}

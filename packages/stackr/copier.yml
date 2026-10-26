@@ -141,12 +141,12 @@ python_version:
 
 app_port:
   type: int
-  help: The port it is published on, on this machine; the next four are its mini apps' and editors'
+  help: The port it is published on, on this machine; the next five are its mini apps' and editors'
   default: 8800
   validator: >-
-    {% if app_port < 1024 or app_port > 65531 %}Choose a port from 1024 to 65531: the next four are the
+    {% if app_port < 1024 or app_port > 65530 %}Choose a port from 1024 to 65530: the next five are the
     mini apps' (APPS_PORT) and native files' editors' (GRIDCRAFT_EDITOR_PORT, PDFCRAFT_EDITOR_PORT,
-    CADCRAFT_EDITOR_PORT){% endif %}
+    CADCRAFT_EDITOR_PORT, WORDCRAFT_EDITOR_PORT){% endif %}
 
 # Never asked, and not recorded in the answers. The application installs the libraries from
 # lattice at the commit the template is rendered from (ADR-0018), so `copier update` moves them
@@ -215,7 +215,7 @@ use_integrations:
 crafts:
   type: yaml
   default:
-    wordcraft: {version: "0.11.0", type: WordDocument}
+    wordcraft: {version: "0.11.0", type: WordDocument, editor: 5}
     gridcraft: {version: "0.8.0", type: Workbook, editor: 2}
     deckcraft: {version: "0.7.0", type: Presentation}
     pdfcraft: {version: "0.8.0", type: PdfDocument, editor: 3}

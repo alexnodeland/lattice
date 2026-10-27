@@ -143,19 +143,28 @@ dotenv = $(shell sed -n 's/^$(1)=//p' .env 2>/dev/null | tail -n 1)
 APP_URL = http://127.0.0.1:$(or $(call dotenv,APP_PORT),{{ app_port }})
 {%- if hosting != 'host' %}
 TAILNET_BESIDE = $(if $(call dotenv,PORTAL_APPS_URL),$(or $(call dotenv,APPS_PORT),{{ app_port + 1 }}))
-{%- else %}
-TAILNET_BESIDE =
-{%- endif %}
 {%- if use_files %}
 {%- for name, craft in crafts.items() if craft.editor %}
 TAILNET_BESIDE += $(if $(filter {{ name }},$(FILES)),$(or $(call dotenv,{{ name | upper }}_EDITOR_PORT),{{ app_port + craft.editor }}))
 {%- endfor %}
 {%- endif %}
+# What the next `make up` would refuse beside the tailnet name: an apps' origin or an editor that
+# isn't a port of this machine's loopback, so has no port to be beside it.
+TAILNET_REFUSED = $(strip \
+	$(if $(filter-out http://127.0.0.1:%,$(call dotenv,PORTAL_APPS_URL)),PORTAL_APPS_URL isn't http://127.0.0.1:<port>) \
+	$(if $(call dotenv,FILES_EDITORS),FILES_EDITORS names the editors elsewhere) \
+	$(if $(call dotenv,FILES_EDITOR_DOMAIN),FILES_EDITOR_DOMAIN puts the editors at an edge))
+{%- else %}
+# A single host has one origin for the portal, its edge: no tailnet name beside it.
+TAILNET_BESIDE =
+TAILNET_REFUSED = this application is on a single host, whose edge is its one origin
+{%- endif %}
 
-tailnet: ## Serve the application, its mini apps and editors on your tailnet only, over HTTPS (TAILNET_PORT, 443)
+tailnet: ## Serve the application, its mini apps and editors (FILES, or FILES_CRAFTS in .env) on your tailnet only, over HTTPS (TAILNET_PORT, 443)
+	@$(if $(TAILNET_REFUSED),echo "make tailnet: nothing changed: $(TAILNET_REFUSED); see https://lattice.alexnodeland.com/stackr/guides/single-host/" >&2; exit 1,true)
 	$(TAILNET) on $(TAILNET_PORT) $(APP_URL) $(strip $(TAILNET_BESIDE))
 
-tailnet-off: ## Stop serving them on your tailnet: what `make tailnet` set up, alone
+tailnet-off: ## Stop serving them on your tailnet: with the same TAILNET_PORT and FILES as `make tailnet`
 	$(TAILNET) off $(TAILNET_PORT) $(APP_URL) $(strip $(TAILNET_BESIDE))
 {%- endif %}
 

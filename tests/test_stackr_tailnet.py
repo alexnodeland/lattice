@@ -7,6 +7,7 @@ up (portalr ADR-0084).
 
 import json
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -44,17 +45,18 @@ OURS = served(PLAN)
 COMFY = {"TCP": {"8443": {"HTTPS": True}}, "AllowFunnel": {f"{NAME}:8443": True}}
 """ComfyUI on 8443, with Funnel: never this script's."""
 
-# The CLI's stub: it records each call, answers the two it is asked for JSON, and fails a serve
-# on the port FAIL names.
+# The CLI's stub: it records each call, answers the two it is asked for JSON, and fails a serve,
+# or its removal, on the port FAIL names.
 STUB = """#!/usr/bin/env bash
 echo "$*" >>"$CALLS"
 case "$*" in
   "serve status --json") cat "$SERVED" ;;
-  "status --json") printf '{"Self": {"DNSName": "%s."}}' "$NAME" ;;
+  "status --json --peers=false") cat "$STATUS" ;;
   *"--https=$FAIL "*) exit 1 ;;
 esac
 """
-LOOK = ["status --json", "serve status --json"]
+RUNNING: dict[str, Any] = {"BackendState": "Running", "Self": {"DNSName": f"{NAME}."}}
+LOOK = ["status --json --peers=false", "serve status --json"]
 """The two reads before anything changes."""
 
 
@@ -65,12 +67,14 @@ def run(
     served: dict[str, Any],
     env: str | None = "APP_PORT=8800\n",
     fail: str = "none",
+    status: dict[str, Any] | None = None,
 ) -> tuple[int, str, list[str]]:
     """The script's exit status, what it printed, and the CLI's calls, with .env holding `env`."""
     stub = tmp_path / "tailscale"
     stub.write_text(STUB)
     stub.chmod(0o755)
     (tmp_path / "served.json").write_text(json.dumps(served))
+    (tmp_path / "status.json").write_text(json.dumps(RUNNING if status is None else status))
     dotenv = tmp_path / ".env"
     if env is not None and not dotenv.exists():
         dotenv.write_text(env)
@@ -81,7 +85,7 @@ def run(
         "UV": shutil.which("uv") or "uv",
         "CALLS": str(tmp_path / "calls"),
         "SERVED": str(tmp_path / "served.json"),
-        "NAME": NAME,
+        "STATUS": str(tmp_path / "status.json"),
         "FAIL": fail,
         "DOTENV": str(dotenv),
     }
@@ -94,7 +98,7 @@ def run(
     calls = tmp_path / "calls"
     called = calls.read_text().splitlines() if calls.exists() else []
     assert not any("funnel" in call for call in called), "never Funnel"
-    assert not any("8443" in call for call in called), "never ComfyUI's port"
+    assert not any(re.search(r"--https=8443\b", call) for call in called), "never ComfyUI's port"
     return done.returncode, done.stdout + done.stderr, called
 
 
@@ -256,3 +260,93 @@ def test_without_the_cli_it_says_where_to_get_it(tmp_path: Path) -> None:
     )
     assert done.returncode == 1
     assert "set TAILSCALE to the CLI's path" in done.stderr
+
+
+def test_another_port_with_8443_in_it_is_a_port_like_any(tmp_path: Path) -> None:
+    status, printed, called = run(tmp_path, "on", "18443", APP, served=COMFY)
+    assert status == 0, printed
+    assert called == [*LOOK, f"serve --bg --yes --https=18443 {APP}"]
+
+
+@pytest.mark.parametrize(
+    "state",
+    [
+        {"BackendState": "Running"},
+        {"BackendState": "Running", "Self": {"DNSName": ""}},
+        {"BackendState": "NeedsLogin", "Self": {"DNSName": f"{NAME}."}},
+        {},
+    ],
+    ids=["no Self", "no name", "logged out", "nothing"],
+)
+def test_without_a_signed_in_name_nothing_changes(tmp_path: Path, state: dict[str, Any]) -> None:
+    status, printed, called = run(tmp_path, "on", served={}, status=state)
+    assert status == 1
+    assert "Tailscale is not signed in / MagicDNS is off" in printed
+    assert called == LOOK[:1]
+    assert dotenv(tmp_path) == "APP_PORT=8800\n"
+
+
+def test_a_name_that_is_no_host_name_is_refused(tmp_path: Path) -> None:
+    odd = {"BackendState": "Running", "Self": {"DNSName": "lap top;rm.ts.net."}}
+    status, printed, called = run(tmp_path, "on", served={}, status=odd)
+    assert status == 1
+    assert "is not a host name" in printed
+    assert called == LOOK[:1]
+
+
+def test_a_large_status_is_read_from_a_pipe(tmp_path: Path) -> None:
+    large = {**RUNNING, "Peer": {f"peer{i}": {"HostName": "x" * 200} for i in range(2000)}}
+    status, printed, _ = run(tmp_path, "on", served={}, status=large)
+    assert status == 0, printed
+
+
+def test_a_failed_removal_stops_off_and_leaves_the_key(tmp_path: Path) -> None:
+    env = f"PORTAL_EXTRA_URLS={ORIGIN}\n"
+    status, printed, called = run(tmp_path, "off", served=OURS, env=env, fail="8802")
+    assert status == 1
+    assert "port 8802 wasn't removed (removed so far: 443 8801)" in printed
+    assert called == LOOK + off("443", "8801", "8802")
+    assert dotenv(tmp_path) == env
+
+
+def test_crlf_lines_keep_their_endings(tmp_path: Path) -> None:
+    env = "A=1\r\nPORTAL_EXTRA_URLS=\r\nB=2\r\n"
+    status, printed, _ = run(tmp_path, "on", served={}, env=env)
+    assert status == 0, printed
+    written = (tmp_path / ".env").read_bytes().decode()
+    assert written == f"A=1\r\nPORTAL_EXTRA_URLS={ORIGIN}\r\nB=2\r\n"
+    status, printed, _ = run(tmp_path, "off", served=OURS)
+    assert status == 0, printed
+    assert (tmp_path / ".env").read_bytes().decode() == "A=1\r\nB=2\r\n"
+
+
+def test_a_repeated_key_is_left_once(tmp_path: Path) -> None:
+    env = f"PORTAL_EXTRA_URLS={ORIGIN}\nA=1\nPORTAL_EXTRA_URLS=\n"
+    status, printed, _ = run(tmp_path, "on", served={}, env=env)
+    assert status == 0, printed
+    assert dotenv(tmp_path) == f"PORTAL_EXTRA_URLS={ORIGIN}\nA=1\n"
+
+
+def test_a_quoted_value_counts_as_set_by_hand(tmp_path: Path) -> None:
+    env = f'PORTAL_EXTRA_URLS="{ORIGIN}"\n'
+    status, printed, called = run(tmp_path, "on", served={}, env=env)
+    assert status == 1
+    assert "counts as set by hand, quoted or not" in printed
+    assert called == LOOK
+
+
+def test_on_refuses_an_env_file_it_cannot_write(tmp_path: Path) -> None:
+    (tmp_path / ".env").write_text("A=1\n")
+    (tmp_path / ".env").chmod(0o400)
+    if os.access(tmp_path / ".env", os.W_OK):
+        pytest.skip("this user writes any file")
+    status, printed, called = run(tmp_path, "on", served={})
+    assert status == 1
+    assert "cannot be written" in printed
+    assert called == LOOK
+
+
+def test_on_without_siblings_says_what_is_missing(tmp_path: Path) -> None:
+    status, printed, _ = run(tmp_path, "on", "443", APP, served={})
+    assert status == 0, printed
+    assert "pass FILES to make tailnet unless .env sets FILES_CRAFTS" in printed

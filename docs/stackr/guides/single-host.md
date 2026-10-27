@@ -72,7 +72,7 @@ The portal's UIs reach Supabase Auth at `<url>/auth/v1`. The overlay sets that U
 
 The edge's routing is tested with the shipped `Caddyfile` in Caddy, in front of two stand-in backends (`tests/test_stackr_edge.py`), and `make smoke` signs the smoke user in through it.
 
-**One origin for the portal.** Leave `PORTAL_EXTRA_URLS` empty on a single host. It names the portal's other origins, such as a laptop's tailnet name, each with mini apps and the editors beside it on the ports they have on that machine ([portalr ADR-0084](../../portalr/adr/0084-several-portal-origins-an-allow-list-aliases-and-a-union-policy.md)). At the edge each editor is `https://<app>.<domain>/`, on the default port, with no port of its own to carry over, so the application refuses to start with both, and says why. A custom domain beside a tailnet needs its places named explicitly, which the template doesn't do yet.
+**One origin for the portal.** Leave `PORTAL_EXTRA_URLS` empty on a single host. It names the portal's other origins, such as a laptop's tailnet name, each with mini apps and the editors beside it on the ports they have on that machine ([portalr ADR-0084](../../portalr/adr/0084-several-portal-origins-an-allow-list-aliases-and-a-union-policy.md)). At the edge each editor is `https://<app>.<domain>/`, on the default port, with no port of its own to carry over, so the application refuses to start with both, and says why. `make tailnet` refuses on a single host before it changes anything, and anywhere `PORTAL_APPS_URL` isn't `http://127.0.0.1:<port>`, `FILES_EDITORS` names the editors, or `FILES_EDITOR_DOMAIN` is set. A custom domain beside a tailnet needs its places named explicitly, which the template doesn't do yet.
 
 ## Reach the admin UIs
 

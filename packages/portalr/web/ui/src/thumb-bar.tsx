@@ -35,7 +35,7 @@ export function ThumbBar({ target }: { target: string }) {
     return null;
   }
   return (
-    <div aria-hidden="true" className="flex justify-end pb-2 short:hidden">
+    <div data-thumb-bar="" aria-hidden="true" className="flex justify-end pb-2 short:hidden">
       <Button
         tabIndex={-1}
         onClick={() => {

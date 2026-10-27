@@ -1,7 +1,7 @@
 /**
  * What a turn under way says beyond its words (portalr ADR-0083), loaded as the first run
  * streams: what the model is doing, the one status that says so, the turn's token count,
- * estimated, and how long it thought. It imports nothing the chat doesn't hold already, so the
+ * estimated until the provider's arrives, and how long it thought. It imports nothing the chat doesn't hold already, so the
  * bundle shares no chunk between them.
  */
 
@@ -79,27 +79,44 @@ export function Phase({ run, now }: { run: Artifactr.Run; now: Date }) {
   );
 }
 
-/** One count, as a chip: "in ~1,060", named in full for a screen reader. */
-function Chip({ short, name, n }: { short: string; name: string; n: number }) {
+/**
+ * One count, as a chip: "in ~1,060" while estimated, "in 1,060" once the provider's, named in
+ * full for a screen reader.
+ */
+function Chip({
+  short,
+  name,
+  n,
+  exact = false,
+}: {
+  short: string;
+  name: string;
+  n: number;
+  exact?: boolean;
+}) {
   return (
     <span
       data-chip=""
       className="inline-flex items-center whitespace-nowrap rounded-(--badge-radius) bg-subtle px-(--badge-pad-end) py-(--badge-pad-y) font-medium text-muted text-xs tabular-nums"
     >
       <span aria-hidden="true">
-        {short} ~{count(n)}
+        {short} {exact ? "" : "~"}
+        {count(n)}
       </span>
       <span className="sr-only">
-        {name}, estimated: {count(n)}
+        {name}
+        {exact ? "" : ", estimated"}: {count(n)}
       </span>
     </span>
   );
 }
 
 /**
- * The turn's tokens, as chips in the strip, estimated from the characters sent and streamed
- * (exact counts are a later phase's), "~" and their names saying so; never announced, as they
- * change with every frame. What was sent counts the thread's messages alone, so it is a floor.
+ * The turn's tokens, as chips in the strip: the provider's counts once a model request has
+ * ended (artifactr ADR-0096), with what was read from and written to its prompt cache, and spent
+ * reasoning, where any was, and the model that answered; until then estimated from the
+ * characters sent and streamed, "~" and their names saying so, where what was sent counts the
+ * thread's messages alone, so it is a floor. Never announced, as they change with every frame.
  */
 export function Tokens({
   run,
@@ -109,6 +126,24 @@ export function Tokens({
   /** The characters of the thread's history the turn was sent, or null where that isn't known. */
   history: number | null;
 }) {
+  const usage = run.live.usage;
+  if (usage) {
+    const extra = [
+      ["cached", "Cached input tokens", usage.cache_read_tokens],
+      ["cache write", "Input tokens written to the cache", usage.cache_write_tokens],
+      ["reasoning", "Reasoning tokens", usage.reasoning_tokens],
+    ] as const;
+    return (
+      <span className="flex flex-wrap items-center gap-1">
+        <Chip short="in" name="Input tokens" n={usage.input_tokens ?? 0} exact />
+        <Chip short="out" name="Output tokens" n={usage.output_tokens ?? 0} exact />
+        {extra.map(
+          ([short, name, n]) => !!n && <Chip key={short} short={short} name={name} n={n} exact />,
+        )}
+        {usage.model && <span className="text-muted text-xs">{usage.model}</span>}
+      </span>
+    );
+  }
   return (
     <span className="flex flex-wrap gap-1">
       {history !== null && <Chip short="in" name="Input tokens" n={Math.ceil(history / 4)} />}

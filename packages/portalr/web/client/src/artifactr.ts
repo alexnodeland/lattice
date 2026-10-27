@@ -148,6 +148,11 @@ export interface Live {
   readonly truncated: boolean;
   /** Whether a frame has come since the connection was welcomed. */
   readonly framed: boolean;
+  /**
+   * What the run used, as its provider counted: the latest `usage` frame's total, then its
+   * `run_ended`'s; null until the first request ends, while a client can only estimate.
+   */
+  readonly usage: v1.RunUsage | null;
 }
 
 /** The most characters of text or thinking kept, from the end; the start goes, as `truncated`. */
@@ -277,6 +282,7 @@ const fresh = (now: number, change: Partial<Live> = {}): Live => ({
   reply: "pending",
   truncated: false,
   framed: false,
+  usage: null,
   ...change,
 });
 
@@ -504,7 +510,14 @@ const handlers: Handlers = {
     return withRun(state, event.run_id, {
       status: event.status,
       text: kept ? (run?.text ?? "") : "",
-      ...(run && { live: { ...run.live, thinking: kept ? run.live.thinking : "", at: now } }),
+      ...(run && {
+        live: {
+          ...run.live,
+          thinking: kept ? run.live.thinking : "",
+          at: now,
+          usage: event.usage ?? run.live.usage,
+        },
+      }),
       requests: [],
       answered: [],
       ended: envelope.seq,
@@ -614,6 +627,13 @@ export function applyLive(state: Workspace, frame: v1.Server, now: number): Work
     return state;
   }
   const { event } = frame;
+  if (event.type === "usage") {
+    // A total, not an increment: one sent again, or late, counts nothing twice.
+    const had = run.live.usage;
+    return (had?.requests ?? 0) > (event.total.requests ?? 0)
+      ? state
+      : withLive(state, run.id, (live) => ({ ...live, usage: event.total }));
+  }
   // The first frame after a welcome that isn't a part's start: the start of what streamed was
   // lost before the replay.
   const live: Live = run.live.framed

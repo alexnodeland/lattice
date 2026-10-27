@@ -1074,7 +1074,10 @@ export interface components {
         };
         /**
          * RunUsage
-         * @description Token and request counts for a run.
+         * @description Token and request counts for a run (ADR-0096).
+         *
+         *     Every field has a default, so an event recorded before a field was counted reads as 0,
+         *     ``None``, or no steps.
          */
         RunUsage: {
             /**
@@ -1092,16 +1095,28 @@ export interface components {
              * @default 0
              */
             input_tokens: number;
+            /** Model */
+            model?: string | null;
             /**
              * Output Tokens
              * @default 0
              */
             output_tokens: number;
             /**
+             * Reasoning Tokens
+             * @default 0
+             */
+            reasoning_tokens: number;
+            /**
              * Requests
              * @default 0
              */
             requests: number;
+            /**
+             * Steps
+             * @default []
+             */
+            steps: components["schemas"]["StepUsage"][];
         };
         /**
          * SetFocus
@@ -1133,6 +1148,41 @@ export interface components {
              * @enum {string}
              */
             type: "set_thread_mode";
+        };
+        /**
+         * StepUsage
+         * @description Token counts of one model request, a step of a run, as the provider reported them.
+         */
+        StepUsage: {
+            /**
+             * Cache Read Tokens
+             * @default 0
+             */
+            cache_read_tokens: number;
+            /**
+             * Cache Write Tokens
+             * @default 0
+             */
+            cache_write_tokens: number;
+            /** Duration Ms */
+            duration_ms?: number | null;
+            /**
+             * Input Tokens
+             * @default 0
+             */
+            input_tokens: number;
+            /** Model */
+            model?: string | null;
+            /**
+             * Output Tokens
+             * @default 0
+             */
+            output_tokens: number;
+            /**
+             * Reasoning Tokens
+             * @default 0
+             */
+            reasoning_tokens: number;
         };
         /**
          * StopRun

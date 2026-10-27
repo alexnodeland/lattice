@@ -18,6 +18,7 @@ from artifactr.agent.live import (
     FanoutChannel,
     LiveChannel,
     NullChannel,
+    StepUsed,
     forward_live,
     to_live,
 )
@@ -60,6 +61,7 @@ __all__ = [
     "Runner",
     "Sent",
     "Session",
+    "StepUsed",
     "ToolStalled",
     "Trigger",
     "TurnContext",

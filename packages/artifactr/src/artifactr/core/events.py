@@ -158,8 +158,32 @@ class DeferredRequest(BaseModel):
     app's code, the app, what running it means, and what a scan found in it (ADR-0085)."""
 
 
+class StepUsage(BaseModel):
+    """Token counts of one model request, a step of a run, as the provider reported them."""
+
+    model_config = ConfigDict(frozen=True)
+
+    model: str | None = None
+    """The model that answered, as its response names it: what a gateway routed to, which may
+    not be the name asked for; ``None`` where the response doesn't say."""
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cache_read_tokens: int = 0
+    """Of the input tokens, those read from the provider's prompt cache."""
+    cache_write_tokens: int = 0
+    """Of the input tokens, those written to the provider's prompt cache."""
+    reasoning_tokens: int = 0
+    """Of the output tokens, those the model spent reasoning, where the provider says."""
+    duration_ms: int | None = None
+    """How long the request took, from the moment it was sent to its response's end."""
+
+
 class RunUsage(BaseModel):
-    """Token and request counts for a run."""
+    """Token and request counts for a run (ADR-0096).
+
+    Every field has a default, so an event recorded before a field was counted reads as 0,
+    ``None``, or no steps.
+    """
 
     model_config = ConfigDict(frozen=True)
 
@@ -172,6 +196,13 @@ class RunUsage(BaseModel):
     cache_write_tokens: int = 0
     """Of the input tokens, those written to the provider's prompt cache; 0 where it doesn't
     say."""
+    reasoning_tokens: int = 0
+    """Of the output tokens, those the model spent reasoning; 0 where the provider doesn't say."""
+    model: str | None = None
+    """The model that answered the run's last request, as its response names it."""
+    steps: tuple[StepUsage, ...] = ()
+    """Each model request of the run, oldest first; empty in events from earlier versions, and
+    in a live ``usage`` frame's total, whose step comes beside it."""
 
 
 class RunStarted(_Event):

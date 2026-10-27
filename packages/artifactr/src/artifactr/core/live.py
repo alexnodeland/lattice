@@ -9,6 +9,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
+from artifactr.core.events import RunUsage, StepUsage
 from artifactr.core.ids import ArtifactId, RunId
 from artifactr.core.tagged import tag_required
 
@@ -82,8 +83,33 @@ class AppLive(_LiveEvent):
     data: JsonValue = None
 
 
+class UsageUpdate(_LiveEvent):
+    """What a model request used, as the provider counted it, and what the run has so far.
+
+    Sent as each request's response ends (ADR-0096). ``total`` is the run's whole count so far,
+    not an increment, so a client that is sent the frame again, as a run's frames are replayed
+    on reconnect, counts nothing twice: it takes the total with the most requests.
+    """
+
+    type: Literal["usage"] = "usage"
+    step: int
+    """The request's index among the run's requests, from 0."""
+    usage: StepUsage
+    total: RunUsage
+    """The run's usage so far, this request's included; its ``steps`` are left out."""
+    exact: bool = True
+    """Whether the counts are the provider's own rather than an estimate."""
+
+
 LiveEvent = Annotated[
-    PartStarted | TextDelta | ThinkingDelta | ToolArgsDelta | PartEnded | Draft | AppLive,
+    PartStarted
+    | TextDelta
+    | ThinkingDelta
+    | ToolArgsDelta
+    | PartEnded
+    | Draft
+    | AppLive
+    | UsageUpdate,
     Field(discriminator="type"),
 ]
 """Any live event, discriminated by ``type``."""

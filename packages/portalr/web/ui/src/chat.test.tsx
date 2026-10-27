@@ -1011,6 +1011,7 @@ const live = (change: Partial<Artifactr.Live> = {}): Artifactr.Live => ({
   reply: "pending",
   truncated: false,
   framed: false,
+  usage: null,
   ...change,
 });
 
@@ -1065,6 +1066,39 @@ test("the strip counts the turn's tokens as chips, each estimated and named in f
   await screen.rerender(strip({ outputChars: 401 }, now, { history: null }));
   await expect.element(group.getByText("out ~101")).toBeVisible();
   expect(group.getByText(/^in ~/).elements()).toHaveLength(0);
+});
+
+test("once the provider has counted, the chips are exact, with the cache and reasoning where any, and the model", async () => {
+  const now = new Date();
+  const usage = {
+    requests: 1,
+    input_tokens: 1030,
+    output_tokens: 40,
+    cache_read_tokens: 0,
+    cache_write_tokens: 0,
+    reasoning_tokens: 0,
+    model: "glm-4.7",
+  };
+  const screen = await render(strip({ outputChars: 401, usage }, now, { history: 4000 }));
+  const group = screen.getByRole("group", { name: "This turn" });
+  await expect.element(group.getByText("in 1,030")).toBeVisible();
+  await expect.element(group.getByText("out 40")).toBeVisible();
+  await expect.element(group.getByText("Input tokens: 1,030")).toBeInTheDocument();
+  await expect.element(group.getByText("Output tokens: 40")).toBeInTheDocument();
+  await expect.element(group.getByText("glm-4.7")).toBeVisible();
+  // None read from the cache, written to it, or spent reasoning: no chip says 0.
+  expect(group.getByText(/^(cached|cache write|reasoning) /).elements()).toHaveLength(0);
+  expect(group.getByText(/~/).elements()).toHaveLength(0);
+  const more = { cache_read_tokens: 800, cache_write_tokens: 200, reasoning_tokens: 12 };
+  await screen.rerender(strip({ usage: { ...usage, ...more, model: null } }, now));
+  await expect.element(group.getByText("cached 800")).toBeVisible();
+  await expect.element(group.getByText("cache write 200")).toBeVisible();
+  await expect.element(group.getByText("reasoning 12")).toBeVisible();
+  await expect.element(group.getByText("Cached input tokens: 800")).toBeInTheDocument();
+  await expect.element(group.getByText("Reasoning tokens: 12")).toBeInTheDocument();
+  expect(group.getByText("glm-4.7").elements()).toHaveLength(0);
+  const chip = group.getByText("cached 800").element().closest("[data-chip]") as HTMLElement;
+  expect(getComputedStyle(chip).fontVariantNumeric).toBe("tabular-nums");
 });
 
 test("what streams is never announced as it grows: only the posted message is", async () => {

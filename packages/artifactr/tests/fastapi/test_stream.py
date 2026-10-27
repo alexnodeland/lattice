@@ -20,9 +20,12 @@ from artifactr.core import (
     ErrorFrame,
     LiveFrame,
     RunStarted,
+    RunUsage,
+    StepUsage,
     TenantId,
     TextDelta,
     ThinkingDelta,
+    UsageUpdate,
     UserActor,
     Visibility,
     WorkspaceId,
@@ -477,7 +480,10 @@ def _delta(n: int = 0) -> LiveFrame:
 async def test_thinking_is_shed_first_when_the_client_falls_behind() -> None:
     connection = _bare_stream(10)
     thought = LiveFrame(run_id="r", event=ThinkingDelta(part=1, delta="hm"))
-    frames = [_delta(0), thought, _delta(1), _delta(2), _delta(3), _delta(4), thought, _delta(5)]
+    total = RunUsage(requests=1)
+    used = LiveFrame(run_id="r", event=UsageUpdate(step=0, usage=StepUsage(), total=total))
+    frames = [_delta(0), thought, _delta(1), _delta(2), _delta(3), _delta(4), thought, used]
+    frames.append(_delta(5))
 
     async def watch(run_id: str) -> AsyncIterator[LiveFrame]:
         for frame in frames:
@@ -494,8 +500,9 @@ async def test_thinking_is_shed_first_when_the_client_falls_behind() -> None:
         "text_delta",
         "thinking_delta",
         *["text_delta"] * 4,
+        "usage",
         "text_delta",
-    ], "the second thought found the outbox more than half full, and was dropped; text never is"
+    ], "the second thought found the outbox over half full: dropped; text and counts never are"
 
 
 async def test_live_frames_leave_the_outbox_room_for_events_and_results() -> None:

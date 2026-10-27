@@ -79,6 +79,7 @@ from artifactr.core.events import (
     RunPaused,
     RunStarted,
     RunUsage,
+    StepUsage,
     ThreadCreated,
     ThreadModeChanged,
     ToolCalled,
@@ -126,6 +127,7 @@ from artifactr.core.live import (
     TextDelta,
     ThinkingDelta,
     ToolArgsDelta,
+    UsageUpdate,
 )
 from artifactr.core.notes import (
     ChangeNote,
@@ -309,6 +311,7 @@ __all__ = [
     "SetFocus",
     "SetThreadMode",
     "State",
+    "StepUsage",
     "StopRun",
     "SystemActor",
     "TargetKind",
@@ -331,6 +334,7 @@ __all__ = [
     "UnknownEvent",
     "UnsupportedProtocol",
     "UnwatchArtifact",
+    "UsageUpdate",
     "UserActor",
     "ValidationFailed",
     "VersionConflict",

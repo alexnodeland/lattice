@@ -268,8 +268,18 @@ export type Type31 = "run_paused";
 export type CacheReadTokens = number;
 export type CacheWriteTokens = number;
 export type InputTokens = number;
+export type Model = string | null;
 export type OutputTokens = number;
+export type ReasoningTokens = number;
 export type Requests1 = number;
+export type CacheReadTokens1 = number;
+export type CacheWriteTokens1 = number;
+export type DurationMs = number | null;
+export type InputTokens1 = number;
+export type Model1 = string | null;
+export type OutputTokens1 = number;
+export type ReasoningTokens1 = number;
+export type Steps = StepUsage[];
 export type Approved1 = boolean | null;
 export type ToolCallId4 = string;
 export type ToolName3 = string | null;
@@ -291,7 +301,14 @@ export type Type37 = "event";
 export type Type38 = "replay_complete";
 export type UpToSeq = number;
 export type Event1 =
-  PartStarted | TextDelta | ThinkingDelta | ToolArgsDelta | PartEnded | Draft | AppLive;
+  | PartStarted
+  | TextDelta
+  | ThinkingDelta
+  | ToolArgsDelta
+  | PartEnded
+  | Draft
+  | AppLive
+  | UsageUpdate;
 export type Part = number;
 export type PartKind = "text" | "thinking" | "tool_call";
 export type ToolName4 = string | null;
@@ -313,30 +330,33 @@ export type Kind18 = string;
 export type Type44 = "draft";
 export type Name6 = string;
 export type Type45 = "app_live";
-export type Type46 = "live";
+export type Exact = boolean;
+export type Step = number;
+export type Type46 = "usage";
+export type Type47 = "live";
 export type CommandId1 = string;
 export type Ok = boolean;
 export type Outcome = (Applied | Proposed | Resolved | Recorded | Watching) | null;
 export type Seq2 = number | null;
-export type Type47 = "applied";
+export type Type48 = "applied";
 export type Version6 = number;
 export type Seq3 = number | null;
-export type Type48 = "proposed";
+export type Type49 = "proposed";
 export type Decision2 = "accept" | "reject";
 export type Seq4 = number | null;
-export type Type49 = "resolved";
+export type Type50 = "resolved";
 export type Version7 = number | null;
 export type Seq5 = number | null;
-export type Type50 = "recorded";
+export type Type51 = "recorded";
 export type Peer = string;
 export type Rights = "view" | "edit";
-export type Type51 = "watching";
+export type Type52 = "watching";
 export type Rejection = {
   [k: string]: JsonValue;
 } | null;
-export type Type52 = "command_result";
+export type Type53 = "command_result";
 export type Message = string;
-export type Type53 = "error";
+export type Type54 = "error";
 export type Actor1 = UserActor | AgentActor | ExternalAgentActor | SystemActor | EvaluatorActor;
 export type BaseVersion3 = number;
 export type Editing1 = {
@@ -345,9 +365,9 @@ export type Editing1 = {
 export type Peer1 = string;
 export type Selection1 = string[];
 export type Seq6 = number;
-export type Type54 = "peer_presence";
+export type Type55 = "peer_presence";
 export type Peer2 = string;
-export type Type55 = "peer_left";
+export type Type56 = "peer_left";
 
 /**
  * Frames of the artifactr.v1 thread protocol: `client` is any frame a client sends, `server` any frame a server sends. `ask_user` is the `args` of a paused request whose `tool_name` is `ask_user`, and `ask_user_answer` the `answer` it takes.
@@ -1073,7 +1093,10 @@ export interface Review {
   [k: string]: JsonValue;
 }
 /**
- * Token and request counts for a run.
+ * Token and request counts for a run (ADR-0096).
+ *
+ * Every field has a default, so an event recorded before a field was counted reads as 0,
+ * ``None``, or no steps.
  *
  * This interface was referenced by `ArtifactrV1`'s JSON-Schema
  * via the `definition` "RunUsage".
@@ -1082,8 +1105,26 @@ export interface RunUsage {
   cache_read_tokens?: CacheReadTokens;
   cache_write_tokens?: CacheWriteTokens;
   input_tokens?: InputTokens;
+  model?: Model;
   output_tokens?: OutputTokens;
+  reasoning_tokens?: ReasoningTokens;
   requests?: Requests1;
+  steps?: Steps;
+}
+/**
+ * Token counts of one model request, a step of a run, as the provider reported them.
+ *
+ * This interface was referenced by `ArtifactrV1`'s JSON-Schema
+ * via the `definition` "StepUsage".
+ */
+export interface StepUsage {
+  cache_read_tokens?: CacheReadTokens1;
+  cache_write_tokens?: CacheWriteTokens1;
+  duration_ms?: DurationMs;
+  input_tokens?: InputTokens1;
+  model?: Model1;
+  output_tokens?: OutputTokens1;
+  reasoning_tokens?: ReasoningTokens1;
 }
 /**
  * A paused run's request was answered.
@@ -1177,7 +1218,7 @@ export interface ReplayComplete {
 export interface LiveFrame {
   event: Event1;
   run_id: RunId;
-  type: Type46;
+  type: Type47;
 }
 /**
  * The model started a response part: text, thinking, or a tool call.
@@ -1263,6 +1304,23 @@ export interface AppLive {
   type: Type45;
 }
 /**
+ * What a model request used, as the provider counted it, and what the run has so far.
+ *
+ * Sent as each request's response ends (ADR-0096). ``total`` is the run's whole count so far,
+ * not an increment, so a client that is sent the frame again, as a run's frames are replayed
+ * on reconnect, counts nothing twice: it takes the total with the most requests.
+ *
+ * This interface was referenced by `ArtifactrV1`'s JSON-Schema
+ * via the `definition` "UsageUpdate".
+ */
+export interface UsageUpdate {
+  exact?: Exact;
+  step: Step;
+  total: RunUsage;
+  type: Type46;
+  usage: StepUsage;
+}
+/**
  * The result of one command frame.
  *
  * This interface was referenced by `ArtifactrV1`'s JSON-Schema
@@ -1273,7 +1331,7 @@ export interface CommandResult {
   ok: Ok;
   outcome?: Outcome;
   rejection?: Rejection;
-  type: Type52;
+  type: Type53;
 }
 /**
  * The change was applied: the artifact is now at ``version``.
@@ -1284,7 +1342,7 @@ export interface CommandResult {
 export interface Applied {
   artifact_id: ArtifactId;
   seq?: Seq2;
-  type: Type47;
+  type: Type48;
   version: Version6;
 }
 /**
@@ -1296,7 +1354,7 @@ export interface Applied {
 export interface Proposed {
   proposal_id: ProposalId;
   seq?: Seq3;
-  type: Type48;
+  type: Type49;
 }
 /**
  * A proposal was accepted (the artifact is now at ``version``) or rejected.
@@ -1308,7 +1366,7 @@ export interface Resolved {
   decision: Decision2;
   proposal_id: ProposalId;
   seq?: Seq4;
-  type: Type49;
+  type: Type50;
   version?: Version7;
 }
 /**
@@ -1320,7 +1378,7 @@ export interface Resolved {
 export interface Recorded {
   run_id?: RunId | null;
   seq?: Seq5;
-  type: Type50;
+  type: Type51;
 }
 /**
  * A watch accepted: what the watcher may do on the artifact, ``view`` or ``edit``.
@@ -1332,7 +1390,7 @@ export interface Watching {
   artifact_id: ArtifactId;
   peer: Peer;
   rights: Rights;
-  type: Type51;
+  type: Type52;
 }
 /**
  * A frame the server could not understand, or a failure it could not attribute.
@@ -1342,7 +1400,7 @@ export interface Watching {
  */
 export interface ErrorFrame {
   message: Message;
-  type: Type53;
+  type: Type54;
 }
 /**
  * Another connection's presence on an artifact this one watches.
@@ -1362,7 +1420,7 @@ export interface PeerPresence {
   pointer?: Pointer | null;
   selection?: Selection1;
   seq: Seq6;
-  type: Type54;
+  type: Type55;
 }
 /**
  * A peer closed an artifact, left, lost its access, or fell silent.
@@ -1373,5 +1431,5 @@ export interface PeerPresence {
 export interface PeerLeft {
   artifact_id: ArtifactId;
   peer: Peer2;
-  type: Type55;
+  type: Type56;
 }

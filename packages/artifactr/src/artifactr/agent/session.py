@@ -10,6 +10,7 @@ from artifactr.core import (
     ExternalAgentActor,
     MessageId,
     RunId,
+    StepUsage,
     ThreadId,
     UserActor,
     acting_for,
@@ -73,6 +74,12 @@ class Session[AppDepsT]:
     delivered: Delivered = field(default_factory=Delivered, init=False, repr=False, compare=False)
     """How far the run has taken the log: to ``watch_after`` once it has started, then as far as
     its watcher delivers. The capability records it with the run's start and its end."""
+
+    steps: list[StepUsage] = field(
+        default_factory=list[StepUsage], init=False, repr=False, compare=False
+    )
+    """What each of the run segment's model requests used, oldest first, as the capability
+    counts them: recorded with the segment's end, however it ends (ADR-0096)."""
 
     @property
     def on_behalf_of(self) -> UserActor | ExternalAgentActor | None:

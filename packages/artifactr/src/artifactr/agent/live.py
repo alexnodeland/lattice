@@ -14,6 +14,7 @@ from typing import Any, Final, Protocol
 
 from pydantic_ai import (
     AgentStreamEvent,
+    CapabilityEvent,
     CustomEvent,
     PartDeltaEvent,
     PartEndEvent,
@@ -36,9 +37,12 @@ from artifactr.core import (
     PartEnded,
     PartStarted,
     RunId,
+    RunUsage,
+    StepUsage,
     TextDelta,
     ThinkingDelta,
     ToolArgsDelta,
+    UsageUpdate,
 )
 
 
@@ -53,6 +57,18 @@ class ArtifactDraft(CustomEvent):
     kind: str
     snapshot: dict[str, Any]
     artifact_id: ArtifactId | None = None
+
+
+@dataclasses.dataclass(kw_only=True, repr=False)
+class StepUsed(CapabilityEvent, namespace="artifactr"):
+    """What a model request used, which :class:`ArtifactWorkspace` emits as its response ends.
+
+    It reaches live channels as a ``usage`` frame (ADR-0096) and is never stored.
+    """
+
+    step: int
+    usage: StepUsage
+    total: RunUsage
 
 
 class LiveChannel(Protocol):
@@ -75,7 +91,8 @@ class FanoutChannel:
 
     It keeps the frames of runs in progress, so a watcher that attaches mid-run first receives
     what the run has produced so far. Watchers that fall behind lose their oldest frames rather
-    than slowing the run.
+    than slowing the run. A run's latest ``usage`` frame is kept apart as well, so a watcher
+    that attaches after it left the buffer still learns the run's count.
 
     Args:
         buffer: How many frames each run keeps, and each watcher may fall behind.
@@ -85,6 +102,7 @@ class FanoutChannel:
     def __init__(self, *, buffer: int = 1024, remember_closed: int = 10_000) -> None:
         self._buffer = buffer
         self._frames: dict[RunId, deque[LiveFrame]] = {}
+        self._usage: dict[RunId, LiveFrame] = {}
         self._watchers: dict[RunId, set[asyncio.Queue[LiveFrame | None]]] = {}
         self._closed: OrderedDict[RunId, None] = OrderedDict()
         self._remember_closed = remember_closed
@@ -94,6 +112,8 @@ class FanoutChannel:
         if frame.run_id in self._closed:
             return
         self._frames.setdefault(frame.run_id, deque(maxlen=self._buffer)).append(frame)
+        if isinstance(frame.event, UsageUpdate):
+            self._usage[frame.run_id] = frame
         for queue in self._watchers.get(frame.run_id, ()):
             _offer(queue, frame)
 
@@ -105,8 +125,12 @@ class FanoutChannel:
         if run_id in self._closed:
             return
         queue: asyncio.Queue[LiveFrame | None] = asyncio.Queue(maxsize=self._buffer)
-        for frame in self._frames.get(run_id, ()):
+        frames = self._frames.get(run_id, ())
+        for frame in frames:
             _offer(queue, frame)
+        usage = self._usage.get(run_id)
+        if usage is not None and usage not in frames:
+            _offer(queue, usage)  # a total: it says the same whenever it comes
         watchers = self._watchers.setdefault(run_id, set())
         watchers.add(queue)
         try:
@@ -125,6 +149,7 @@ class FanoutChannel:
         if len(self._closed) > self._remember_closed:
             self._closed.popitem(last=False)
         self._frames.pop(run_id, None)
+        self._usage.pop(run_id, None)
         for queue in self._watchers.pop(run_id, ()):
             _offer(queue, None)
 
@@ -242,6 +267,8 @@ def to_live(event: AgentStreamEvent) -> list[LiveEvent]:
             return _args(index, delta)
         case PartEndEvent(index=index):
             return [PartEnded(part=index)]
+        case StepUsed(step=step, usage=usage, total=total):
+            return [UsageUpdate(step=step, usage=usage, total=total)]
         case ArtifactDraft(kind=kind, snapshot=snapshot, artifact_id=artifact_id):
             return [Draft(kind=kind, data=snapshot, artifact_id=artifact_id)]
         case CustomEvent(name=name):

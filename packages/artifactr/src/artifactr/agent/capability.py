@@ -16,6 +16,7 @@ import itertools
 import json
 import logging
 import re
+import time
 from collections.abc import Sequence
 from dataclasses import KW_ONLY, dataclass, field
 from typing import Any, override
@@ -25,6 +26,7 @@ from pydantic_ai import (
     AgentRunResult,
     DeferredToolRequests,
     FunctionToolset,
+    ModelResponse,
     ModelRetry,
     RunContext,
     ToolCallPart,
@@ -34,6 +36,7 @@ from pydantic_ai.capabilities import AbstractCapability
 from pydantic_ai.capabilities.abstract import (
     RawToolArgs,
     ValidatedToolArgs,
+    WrapModelRequestHandler,
     WrapRunHandler,
     WrapToolExecuteHandler,
 )
@@ -43,8 +46,11 @@ from pydantic_ai.exceptions import (
     UnexpectedModelBehavior,
     UserError,
 )
+from pydantic_ai.models import ModelRequestContext
+from pydantic_ai.usage import RequestUsage
 from pydantic_ai.usage import RunUsage as PydanticUsage
 
+from artifactr.agent.live import StepUsed
 from artifactr.agent.session import Session, last_seen
 from artifactr.agent.tools import artifact_tools
 from artifactr.core import (
@@ -61,6 +67,7 @@ from artifactr.core import (
     RunPaused,
     RunStarted,
     RunUsage,
+    StepUsage,
     ToolCalled,
     ToolReturned,
     VersionConflict,
@@ -210,7 +217,7 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
                 watcher.cancel()
                 await asyncio.gather(watcher, return_exceptions=True)
         except asyncio.CancelledError:
-            stopped = self._ended(session, "stopped", usage=_usage(ctx.usage))
+            stopped = self._ended(session, "stopped", usage=_usage(ctx.usage, session.steps))
             await _record(workspace, stopped, cursor=delivered.at(delivered.seq))
             raise
         except Exception as error:
@@ -218,7 +225,7 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
             failed = self._ended(
                 session,
                 "failed",
-                usage=_usage(ctx.usage),
+                usage=_usage(ctx.usage, session.steps),
                 error=redacted(str(error)),
                 reason=reason,
             )
@@ -265,7 +272,7 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
         taken = session.delivered.at(session.delivered.seq)
         history = result.new_messages_json()
         output = result.output
-        usage = _usage(result.usage)
+        usage = _usage(result.usage, session.steps)
         if isinstance(output, DeferredToolRequests):
             requests = (
                 *_requests(output.calls, "question", output.metadata),
@@ -301,6 +308,31 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
             error=error,
             reason=reason,
         )
+
+    # ─── model requests ───────────────────────────────────────────────────────
+
+    @override
+    async def wrap_model_request(
+        self,
+        ctx: Context,
+        *,
+        request_context: ModelRequestContext,
+        handler: WrapModelRequestHandler,
+    ) -> ModelResponse:
+        """Count what the request used, as its provider says, and tell the run's live channel.
+
+        The total sent is the run segment's requests summed: pydantic-ai's own count takes a
+        streamed response in parts, its tokens before its request, so mid-step it is neither
+        (ADR-0096). The run's end records pydantic-ai's count, which agrees once the step is done.
+        """
+        sent = time.monotonic()
+        response = await handler(request_context)
+        step = _step(response, duration_ms=round((time.monotonic() - sent) * 1000))
+        steps = ctx.deps.steps
+        steps.append(step)
+        total = _summed(steps)
+        await ctx.emit(StepUsed(step=len(steps) - 1, usage=step, total=total))
+        return response
 
     # ─── tool calls ───────────────────────────────────────────────────────────
 
@@ -563,14 +595,54 @@ def _reason(error: Exception) -> str | None:
     return "tool_retries_exhausted" if exhausted else "unexpected_model_behavior"
 
 
-def _usage(usage: PydanticUsage) -> RunUsage:
+def _usage(usage: PydanticUsage, steps: Sequence[StepUsage]) -> RunUsage:
     """What a run used, as its events record it: so far, for a run that ends early."""
     return RunUsage(
         requests=usage.requests,
         input_tokens=usage.input_tokens,
         output_tokens=usage.output_tokens,
         cache_read_tokens=usage.cache_read_tokens,
-        cache_write_tokens=usage.cache_write_tokens,
+        cache_write_tokens=_cache_write(usage),
+        reasoning_tokens=usage.details.get("reasoning_tokens", 0),
+        model=steps[-1].model if steps else None,
+        steps=tuple(steps),
+    )
+
+
+def _step(response: ModelResponse, *, duration_ms: int) -> StepUsage:
+    """What one model request used, as its response says."""
+    usage = response.usage
+    return StepUsage(
+        model=response.model_name,
+        input_tokens=usage.input_tokens,
+        output_tokens=usage.output_tokens,
+        cache_read_tokens=usage.cache_read_tokens,
+        cache_write_tokens=_cache_write(usage),
+        reasoning_tokens=usage.details.get("reasoning_tokens", 0),
+        duration_ms=duration_ms,
+    )
+
+
+def _cache_write(usage: PydanticUsage | RequestUsage) -> int:
+    """The tokens written to the prompt cache.
+
+    An OpenAI-compatible gateway in front of Anthropic, as LiteLLM is, says so in a top-level
+    ``cache_creation_input_tokens``, which pydantic-ai keeps among the usage's details rather
+    than as ``cache_write_tokens``.
+    """
+    return usage.cache_write_tokens or usage.details.get("cache_creation_input_tokens", 0)
+
+
+def _summed(steps: Sequence[StepUsage]) -> RunUsage:
+    """The usage of a run's requests so far, summed; its steps left out."""
+    return RunUsage(
+        requests=len(steps),
+        input_tokens=sum(step.input_tokens for step in steps),
+        output_tokens=sum(step.output_tokens for step in steps),
+        cache_read_tokens=sum(step.cache_read_tokens for step in steps),
+        cache_write_tokens=sum(step.cache_write_tokens for step in steps),
+        reasoning_tokens=sum(step.reasoning_tokens for step in steps),
+        model=steps[-1].model,
     )
 
 

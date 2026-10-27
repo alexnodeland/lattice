@@ -63,6 +63,22 @@ export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/rules/$rul
 const line = (value: unknown) => JSON.stringify(value);
 
 /**
+ * When a rule fires, in words where it is the common shape, the events it is on and how it
+ * matches them ("portal:ticket.opened, each"); its JSON otherwise.
+ */
+function when(condition: unknown): string {
+  const { filter, pattern } = (condition ?? {}) as {
+    filter?: { kind?: string; types?: unknown[] };
+    pattern?: { kind?: string };
+  };
+  const types = filter?.kind === "on" ? filter.types : undefined;
+  if (!types?.every((type) => typeof type === "string")) {
+    return line(condition);
+  }
+  return [types.join(" or "), pattern?.kind].filter(Boolean).join(", ");
+}
+
+/**
  * What a rule says, as a person reads it (portalr ADR-0085): when, then, over what, and how it
  * retries, ahead of its JSON. Each is one line; a value with no words of its own is its JSON.
  */
@@ -74,7 +90,7 @@ function Summary({ rule }: { rule: Record<string, unknown> }) {
     [
       "When",
       <code key="when" className="break-all font-mono text-xs">
-        {line(rule.when)}
+        {when(rule.when)}
       </code>,
     ],
     [

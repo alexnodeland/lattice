@@ -101,9 +101,10 @@ When("they open their rule", async ({ page, scenario }) => {
 });
 
 Then("they can't edit or archive it", async ({ page }) => {
-  await expect(page.getByRole("region", { name: "The rule, as reflexr's JSON" })).toContainText(
-    '"description"',
-  );
+  // It reads as When and Then; its JSON is folded under them (portalr ADR-0085).
+  await expect(page.getByText("When", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "The rule, as reflexr's JSON" }).click();
+  await expect(page.getByText(/"description"/)).toBeVisible();
   await expect(field(page)).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Archive" })).toHaveCount(0);
 });

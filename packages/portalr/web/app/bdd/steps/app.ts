@@ -59,12 +59,12 @@ Then(
   "they see the workspaces {string} and {string}",
   async ({ page }, one: string, other: string) => {
     // Each workspace is a row named by a link with its name; the links to its areas are at the
-    // row's end, in a list named for the workspace.
+    // row's end, a track named for the workspace (portalr ADR-0085).
     const workspaces = page.getByRole("list", { name: "Workspaces" });
     for (const name of [one, other]) {
       await expect(workspaces.getByRole("link", { name, exact: true })).toBeVisible();
     }
-    await expect(workspaces.getByRole("list")).toHaveCount(2);
+    await expect(workspaces.getByRole("navigation")).toHaveCount(2);
   },
 );
 
@@ -78,7 +78,7 @@ Then("they see the workspace {string}", async ({ page }, workspace: string) => {
 
 Then("each links to its areas", async ({ page }) => {
   for (const workspace of ["notes", "plans"]) {
-    const areas = page.getByRole("list", { name: `${workspace}'s areas` }).getByRole("link");
+    const areas = page.getByRole("navigation", { name: `${workspace}'s areas` }).getByRole("link");
     await expect(areas).toHaveText(["Threads", "Artifacts", "Proposals", "Runs", "Rules"]);
   }
 });
@@ -87,7 +87,7 @@ When(
   "they open the {string} of the workspace {string}",
   async ({ page }, area: string, workspace: string) => {
     await page
-      .getByRole("list", { name: `${workspace}'s areas` })
+      .getByRole("navigation", { name: `${workspace}'s areas` })
       .getByRole("link", { name: area })
       .click();
   },

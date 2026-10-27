@@ -34,7 +34,7 @@ def policy(site: Site) -> str:
     Where the deployment runs mini apps, ``frame-src`` names their origin, and where it hosts
     native files' editors, each editor's origin, whose shim frames the app's build there (portalr
     ADR-0055); and, where the portal is reached at several origins, the apps' and editors'
-    origins beside each of them (portalr ADR-0083), each once, in order, and no wildcard: the
+    origins beside each of them (portalr ADR-0084), each once, in order, and no wildcard: the
     UIs frame nothing else, and their own pages are still framed by no one (lattice RFC-0005).
     """
     supabase = urlsplit(site.supabase_url)

@@ -6,7 +6,7 @@ the portal frames the shim, the shim frames the build on the shim's own origin, 
 relays between them by `postMessage`, checking every message's window and origin (native files
 ADR-0010). The build is served unchanged; the shim is ours.
 
-A deployment reached at several addresses has several portal origins (portalr ADR-0083): the
+A deployment reached at several addresses has several portal origins (portalr ADR-0084): the
 shim is told them all, and learns which one frames it from `?host=`, the framing page's own
 origin, which the portal's frame adds. Told one portal, it needs no `?host=`; told several, it
 answers only a `?host=` among them, and does nothing without one, so no message goes to an

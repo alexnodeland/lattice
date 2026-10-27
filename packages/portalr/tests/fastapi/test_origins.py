@@ -1,4 +1,4 @@
-"""Several portal origins (portalr ADR-0083): aliases, the places beside them, and a union policy.
+"""Several portal origins (portalr ADR-0084): aliases, the places beside them, and a union policy.
 
 A deployment reached at its loopback address and at its tailnet name is two portal origins; mini
 apps and the editors are framed from each, so each has an apps origin and editors beside it, the
@@ -113,12 +113,13 @@ def test_aliases_are_kept_by_the_portal_origin_as_a_browser_compares_it() -> Non
         ),
         (
             {
+                "origin": LOOPBACK,
                 "aliases": {
                     TAILNET: {
                         "editors": {"files:gridcraft": "https://apps.example.com/x"},
                         "apps": "https://apps.example.com",
                     }
-                }
+                },
             },
             "give it an origin of its own",
         ),
@@ -137,7 +138,10 @@ def test_an_alias_is_held_to_what_the_canonical_place_is(given: dict[str, Any], 
     "given",
     [
         {"origin": LOOPBACK, "editors": {"files:gridcraft": f"{LOOPBACK}/editor/"}},
-        {"aliases": {TAILNET: {"editors": {"files:gridcraft": f"{TAILNET}/editor/"}}}},
+        {
+            "origin": LOOPBACK,
+            "aliases": {TAILNET: {"editors": {"files:gridcraft": f"{TAILNET}/editor/"}}},
+        },
     ],
 )
 def test_an_editor_on_a_portals_own_origin_is_refused_where_that_origin_is_known(
@@ -145,6 +149,16 @@ def test_an_editor_on_a_portals_own_origin_is_refused_where_that_origin_is_known
 ) -> None:
     with pytest.raises(ValidationError, match="give it an origin of its own"):
         site(**given)
+
+
+def test_aliases_without_the_portals_own_origin_are_refused() -> None:
+    with pytest.raises(ValidationError, match="name its own origin too"):
+        site(aliases={TAILNET: {}})
+
+
+def test_an_editor_is_kept_on_its_origin_as_a_browser_compares_it_its_path_kept() -> None:
+    made = site(editors={"files:gridcraft": "HTTPS://Editor.Example:443/grid/"})
+    assert made.editors == {"files:gridcraft": "https://editor.example/grid/"}
 
 
 def test_without_aliases_or_an_origin_a_site_is_as_it_was() -> None:
@@ -157,6 +171,7 @@ def test_without_aliases_or_an_origin_a_site_is_as_it_was() -> None:
 
 def test_the_portals_policy_frames_every_place_once_in_order_and_names_no_wildcard() -> None:
     made = site(
+        origin=LOOPBACK,
         apps=APPS,
         editors=EDITORS,
         aliases={

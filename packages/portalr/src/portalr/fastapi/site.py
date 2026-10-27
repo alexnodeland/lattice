@@ -31,7 +31,7 @@ class Place(BaseModel):
     """Where mini apps and the editors are for a portal reached at one of its other origins.
 
     A deployment reached at several addresses, such as this machine's loopback and its tailnet
-    name, is several portal origins (portalr ADR-0083). The sandbox and each editor are framed
+    name, is several portal origins (portalr ADR-0084). The sandbox and each editor are framed
     from the portal, so each portal origin needs its own, reachable from the same place: the
     sandbox's and the editors' origins beside that portal origin, which ``beside`` derives.
     """
@@ -89,7 +89,7 @@ class Site(BaseModel):
     apps or editors at from one it does. None leaves them trusting the address they are at."""
     aliases: dict[str, Place] = {}
     """Each other origin the portal is reached at, such as its tailnet name beside its loopback
-    address, and where mini apps and the editors are for a portal there (portalr ADR-0083): at
+    address, and where mini apps and the editors are for a portal there (portalr ADR-0084): at
     the same host as that portal origin, on the apps' and the editors' own ports, as
     :func:`beside` derives them. The UIs at an origin named here use its place; at the portal's
     own, the canonical ``apps`` and ``editors``; and the portal's policy frames them all."""
@@ -138,6 +138,13 @@ class Site(BaseModel):
                 raise ValueError(f"the portal at {origin} is aliased twice")
             named[origin] = place
         return named
+
+    @model_validator(mode="after")
+    def _aliased_origin(self) -> "Site":
+        """Refuse aliases without the portal's own origin, which the UIs tell them apart from."""
+        if self.aliases and self.origin is None:
+            raise ValueError("aliases are other origins of the portal: name its own origin too")
+        return self
 
     @model_validator(mode="after")
     def _editors_apart(self) -> "Site":
@@ -214,14 +221,23 @@ def _apps_origin(apps: str | None) -> str | None:
 
 
 def _editor_urls(editors: dict[str, str]) -> dict[str, str]:
-    """The editors as given, each for a native file's app and on a web origin of its own."""
+    """Each editor's URL on its web origin as a browser compares it, its path kept.
+
+    Raises:
+        ValueError: If a key is no native file's app, or a URL has no web origin, or a query or
+            fragment.
+    """
+    kept: dict[str, str] = {}
     for key, url in editors.items():
         if not (key.startswith("files:") and KEY.fullmatch(key)):
             raise ValueError(f"{key} is no native file's app: its key is files:<app>")
         parts = urlsplit(url)
+        if parts.query or parts.fragment:
+            raise ValueError(f"{key}'s editor is at {url}: no query or fragment")
         # An editor is a URL, which may have a path; its origin is what must be a web origin.
-        web_origin(urlunsplit((parts.scheme, parts.netloc, "", "", "")), what=f"{key}'s editor")
-    return editors
+        origin = urlunsplit((parts.scheme, parts.netloc, "", "", ""))
+        kept[key] = web_origin(origin, what=f"{key}'s editor") + parts.path
+    return kept
 
 
 def _origin_of(url: str) -> str | None:

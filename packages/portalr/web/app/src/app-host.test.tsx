@@ -318,7 +318,7 @@ test("the artifact's actions are a menu at its head, thumbs on it checked as giv
   });
 });
 
-test("at an alias of the portal, the app runs on the apps' origin beside it (portalr ADR-0083)", async () => {
+test("at an alias of the portal, the app runs on the apps' origin beside it (portalr ADR-0084)", async () => {
   const { screen } = await open("/t/acme/w/notes/artifacts/app_1", serving(on), () => null, {
     apps: "http://127.0.0.1:8",
     origin: "https://elsewhere.example",

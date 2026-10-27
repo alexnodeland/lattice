@@ -169,7 +169,7 @@ class Config(BaseModel):
     address they are at."""
     aliases: dict[str, Place] = {}
     """Where mini apps and the editors are for the portal at each of its other origins (portalr
-    ADR-0083): a UI at an origin named here uses its place, and at any other address the
+    ADR-0084): a UI at an origin named here uses its place, and at any other address the
     deployment doesn't name, none."""
     brand: Brand | None = None
     """The deployment's brand kit, or None for portalr's own look."""

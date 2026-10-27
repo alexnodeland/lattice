@@ -1,6 +1,6 @@
 /**
  * Where mini apps and the editors are for the portal at the address this page is at (portalr
- * ADR-0083). A deployment reached at several addresses is several portal origins: `config.json`
+ * ADR-0084). A deployment reached at several addresses is several portal origins: `config.json`
  * names the canonical one, `origin`, and by each other, `aliases`, the apps' origin and the
  * editors beside it, which that address reaches. At an alias, its place; at the canonical origin,
  * or where the deployment names none, the canonical apps and editors; anywhere else, nothing runs

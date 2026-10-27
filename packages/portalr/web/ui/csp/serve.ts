@@ -7,7 +7,7 @@
  * a third port, under the shim's policy (native files ADR-0010).
  *
  * The page is reached at two origins, `127.0.0.1` and `localhost`, which Chromium keeps apart, as
- * a portal at its loopback address and its tailnet name is two origins (portalr ADR-0083): the
+ * a portal at its loopback address and its tailnet name is two origins (portalr ADR-0084): the
  * sandbox and the shim are framed by both, the sandbox is reached beside each on its own port, and
  * the page's `frame-src` is the union of what each origin frames.
  */
@@ -110,7 +110,7 @@ export default async function serve(project: TestProject) {
       port: 0,
       headers: {
         // As `Site(apps=..., editors=..., aliases=...)` adds it: the apps' and the editor's origins
-        // beside each portal origin, the union, each once (portalr ADR-0083).
+        // beside each portal origin, the union, each once (portalr ADR-0084).
         "Content-Security-Policy": `${policy}; frame-src ${apps.origin} ${editor.origin} ${apps.alias} ${editor.alias}`,
         "X-Content-Type-Options": "nosniff",
       },

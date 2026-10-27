@@ -1,6 +1,6 @@
 # ADR-0010: Pausing with pydantic-ai deferred tools
 
-**Status:** Accepted; its answers amended by [ADR-0073](0073-checks-that-refuse-a-command-before-it-commits.md), the amendment below, and [ADR-0083](0083-ask-user-asks-questions-with-options.md), `ask_user`'s questions and answers
+**Status:** Accepted; its answers amended by [ADR-0073](0073-checks-that-refuse-a-command-before-it-commits.md), the amendment below, and [ADR-0084](0083-ask-user-asks-questions-with-options.md), `ask_user`'s questions and answers
 **Date:** 2026-09-28
 **Deciders:** Alex Nodeland
 

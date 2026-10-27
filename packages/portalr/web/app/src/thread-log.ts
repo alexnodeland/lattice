@@ -1,6 +1,6 @@
 /**
  * A thread as its chat shows it, oldest first: its messages, the artifacts it shows, its runs' tool
- * calls, the questions its runs asked through `ask_user` (artifactr ADR-0083), and the turns that
+ * calls, the questions its runs asked through `ask_user` (artifactr ADR-0084), and the turns that
  * failed, each where the log has it. A run's calls in a row are one group.
  */
 

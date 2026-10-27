@@ -58,7 +58,7 @@ The RFC left the browser's behaviour unverified. A spike in Chromium, with the p
 - Harder: an app whose state two people change at once keeps each person's patches, written again on the other's, never merged.
 - Harder: a running app is stopped within half a minute of being switched off, not at once, unless it writes.
 
-> **Amended (2026-10-27) by [ADR-0083](0083-several-portal-origins-an-allow-list-aliases-and-a-union-policy.md):** a portal reached at several origins has an apps' origin beside each, `Site.aliases`; `SandboxOrigin(app, apps=, portal=)` and `sandbox_policy` take one origin or several, answer every apps' origin alike and are framed by every portal origin, and the UIs' `frame-src` is the union; `config.json` carries `origin` and `aliases`, and at an address the deployment names no place for, the app says where to open the portal. A string is served as before.
+> **Amended (2026-10-27) by [ADR-0084](0084-several-portal-origins-an-allow-list-aliases-and-a-union-policy.md):** a portal reached at several origins has an apps' origin beside each, `Site.aliases`; `SandboxOrigin(app, apps=, portal=)` and `sandbox_policy` take one origin or several, answer every apps' origin alike and are framed by every portal origin, and the UIs' `frame-src` is the union; `config.json` carries `origin` and `aliases`, and at an address the deployment names no place for, the app says where to open the portal. A string is served as before.
 
 ## Action items
 

@@ -11,6 +11,7 @@ test or a developer runs.
 """
 
 import ipaddress
+import re
 from collections.abc import Sequence
 from typing import Final
 from urllib.parse import urlsplit
@@ -23,6 +24,14 @@ LOOPBACK: Final = frozenset({"localhost", "127.0.0.1", "::1"})
 DEFAULT_PORTS: Final = {"http": 80, "https": 443}
 
 EXAMPLE: Final = "https://portal.example"
+
+HOST: Final = re.compile(r"[A-Za-z0-9:.\-\[\]]+")
+"""The characters an origin's host and port are written in: none a policy or a header separates
+on, no space, quote, comma or semicolon, and ASCII alone, so an internationalised name comes as
+its punycode."""
+
+LABEL: Final = re.compile(r"(?!-)[a-z0-9-]{1,63}(?<!-)")
+"""One label of a host name, as DNS spells it."""
 
 
 def web_origin(url: str, *, what: str = "the origin") -> str:
@@ -40,8 +49,10 @@ def web_origin(url: str, *, what: str = "the origin") -> str:
 
     Raises:
         ValueError: If `url` is no web origin: no https, or http off loopback; a user or a
-            password, or no host; a path, query or fragment; a ``*`` or a ``%`` anywhere; or an
-            IP address that isn't loopback, which no certificate names.
+            password, or no host; a character in the host or port outside ASCII letters, digits
+            and ``.-:[]``, or a host name that isn't DNS labels; a path, query or fragment; a
+            ``*`` or a ``%`` anywhere; or an IP address that isn't loopback, which no
+            certificate names.
     """
     said = f"{what} is an origin, such as {EXAMPLE}, not {url!r}"
     if "*" in url or "%" in url:
@@ -51,6 +62,8 @@ def web_origin(url: str, *, what: str = "the origin") -> str:
     host = (parts.hostname or "").lower()
     if parts.username is not None or parts.password is not None or not host:
         raise ValueError(f"{said}: a host, with no user or password")
+    if not HOST.fullmatch(parts.netloc):
+        raise ValueError(f"{said}: ASCII letters, digits and . - : [ ] alone, a name in punycode")
     if parts.path not in ("", "/") or parts.query or parts.fragment:
         raise ValueError(f"{said}: no path, query or fragment")
     try:
@@ -58,6 +71,8 @@ def web_origin(url: str, *, what: str = "the origin") -> str:
     except ValueError as error:
         raise ValueError(f"{said}: {error}") from error
     address = _address(host)
+    if address is None and not all(LABEL.fullmatch(each) for each in host.split(".")):
+        raise ValueError(f"{said}: a host name of DNS labels")
     loopback = host in LOOPBACK
     if address is not None and not loopback:
         raise ValueError(f"{said}: an IP address that isn't loopback names no certificate")
@@ -72,7 +87,7 @@ def web_origin(url: str, *, what: str = "the origin") -> str:
 def web_origins(named: str | Sequence[str], *, what: str = "the origin") -> tuple[str, ...]:
     """One origin or several, each as :func:`web_origin` keeps it, once, in the order named.
 
-    For a setting that took one origin and now takes several (portalr ADR-0083): a string is
+    For a setting that took one origin and now takes several (portalr ADR-0084): a string is
     that one origin, and a sequence each of them.
 
     Raises:

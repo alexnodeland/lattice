@@ -80,7 +80,7 @@ def test_an_editor_on_loopback_may_be_http_and_an_apps_own() -> None:
     [
         ("https://apps.example.com", "https://apps.example.com"),
         # As a browser compares it, and as `location.origin` spells it: in lower case, the default
-        # port left out, so an alias is found by the origin the UI is at (portalr ADR-0083).
+        # port left out, so an alias is found by the origin the UI is at (portalr ADR-0084).
         ("https://Apps.Example.com/", "https://apps.example.com"),
         ("https://apps.example.com:443", "https://apps.example.com"),
         ("http://127.0.0.1:8001", "http://127.0.0.1:8001"),

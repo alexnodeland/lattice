@@ -9,7 +9,7 @@
 
 The owner used the chat against a generated application and asked for five things:
 
-- **Questions as options.** `ask_user` now asks one to four questions with options ([artifactr ADR-0083](../../artifactr/adr/0083-ask-user-asks-questions-with-options.md)); the chat drew a question as one text field.
+- **Questions as options.** `ask_user` now asks one to four questions with options ([artifactr ADR-0084](../../artifactr/adr/0083-ask-user-asks-questions-with-options.md)); the chat drew a question as one text field.
 - **Tool calls that can be read.** A call was a row with a name and a status; what it was asked, what it returned, and why it failed weren't shown, and the rows went once the run ended.
 - **Sides.** Every message sat at the start of the line, the reader's as the agent's.
 - **Failures that say why.** A run that ended `failed` left the thread: no status, no reason, nothing to retry. In the owner's case the model had filled `draft_rule`'s arguments wrongly until it ran out of retries, and the thread said nothing.

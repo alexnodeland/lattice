@@ -1,4 +1,4 @@
-# ADR-0083: Several portal origins: an allow-list, aliases, and a union policy
+# ADR-0084: Several portal origins: an allow-list, aliases, and a union policy
 
 **Status:** Accepted
 **Date:** 2026-10-27

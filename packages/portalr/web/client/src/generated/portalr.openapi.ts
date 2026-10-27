@@ -991,7 +991,7 @@ export interface components {
          * @description Where mini apps and the editors are for a portal reached at one of its other origins.
          *
          *     A deployment reached at several addresses, such as this machine's loopback and its tailnet
-         *     name, is several portal origins (portalr ADR-0083). The sandbox and each editor are framed
+         *     name, is several portal origins (portalr ADR-0084). The sandbox and each editor are framed
          *     from the portal, so each portal origin needs its own, reachable from the same place: the
          *     sandbox's and the editors' origins beside that portal origin, which ``beside`` derives.
          */

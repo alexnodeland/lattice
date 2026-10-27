@@ -9,7 +9,7 @@ the app's own document, so neither can be loosened.
 
 Add :class:`SandboxOrigin` to the application, and name the origin in :class:`Site`'s ``apps``,
 so the portal frames it and nothing else. A portal reached at several origins, each with an
-apps origin beside it (portalr ADR-0083, :class:`Site`'s ``aliases``), gives it every apps
+apps origin beside it (portalr ADR-0084, :class:`Site`'s ``aliases``), gives it every apps
 origin, which it answers alike, and every portal origin, which alone may frame it.
 """
 

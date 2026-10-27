@@ -81,7 +81,7 @@ The thread shows what each kind's page shows, as far as a message can hold it: i
 - Harder: the portal's policy frames each hosted editor's origin, which a deployment names in `Site.editors`; an editor hosted without its shim isn't ready, and says so.
 - Revisit: a JavaScript API's apps (FilmCraft, EffectCraft, LightCraft) in place, once a pilot runs one through the shim; FreeCAD's `cad_model` and Blender's files, by their own talk levels, once they are native files; a version's pages compared in the thread, which its page does.
 
-> **Amended (2026-10-27) by [ADR-0083](0083-several-portal-origins-an-allow-list-aliases-and-a-union-policy.md):** the editors the page frames are those beside the address it is at, `deploymentAt(config, location.origin)`, the canonical ones at the portal's own origin or where none is named; `frame-src` names the editors' origins of every alias too; and `EditorFrame` adds `?host=<location.origin>` to the shim's URL, so a shim told several portals knows which one frames it. At an address the deployment names no place for, a file is read and downloaded, and not edited in place.
+> **Amended (2026-10-27) by [ADR-0084](0084-several-portal-origins-an-allow-list-aliases-and-a-union-policy.md):** the editors the page frames are those beside the address it is at, `deploymentAt(config, location.origin)`, the canonical ones at the portal's own origin or where none is named; `frame-src` names the editors' origins of every alias too; and `EditorFrame` adds `?host=<location.origin>` to the shim's URL, so a shim told several portals knows which one frames it. At an address the deployment names no place for, a file is read and downloaded, and not edited in place.
 
 ## Action items
 

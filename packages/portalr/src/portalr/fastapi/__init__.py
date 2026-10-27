@@ -2,7 +2,7 @@
 
 With mini apps, :class:`SandboxOrigin` serves their sandbox on an origin of its own. A portal
 reached at several origins names a :class:`Place` beside each, which :func:`beside` derives
-(portalr ADR-0083).
+(portalr ADR-0084).
 """
 
 from portalr.fastapi.router import UI, Config, Invited, Links, NewInvite, portalr_router

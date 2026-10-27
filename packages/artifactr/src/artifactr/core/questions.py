@@ -1,4 +1,4 @@
-"""The questions the agent asks through ``ask_user``, and how they are answered (ADR-0083).
+"""The questions the agent asks through ``ask_user``, and how they are answered (ADR-0084).
 
 ``ask_user`` asks one to four questions at once. Each has a short header, two to four options,
 each a label and what it means, and says whether several may be chosen and whether the person may

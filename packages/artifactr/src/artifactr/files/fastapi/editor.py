@@ -87,7 +87,7 @@ def editor_app(
             `scripts/craft wordcraft web` prints.
         craft: The app whose build it is, if its build has a host surface for the shim to reach.
         portal: The portal's origin, or its origins where it is reached at several addresses
-            (portalr ADR-0083): the only ones that may frame the shim, and that it answers.
+            (portalr ADR-0084): the only ones that may frame the shim, and that it answers.
         methods: For a build with a JavaScript API, the methods of it the portal may call.
 
     Raises:

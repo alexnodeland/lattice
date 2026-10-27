@@ -450,7 +450,7 @@ test("a workbook whose build hands it over is edited in its editor, framed here,
   const editor = book.getByTitle("GridCraft, editing figures.xlsx");
   await expect.element(editor).toBeInTheDocument();
   const frame = editor.element() as HTMLIFrameElement;
-  // The shim is told which portal origin frames it: this page's own (portalr ADR-0083).
+  // The shim is told which portal origin frames it: this page's own (portalr ADR-0084).
   expect(frame.getAttribute("src")).toBe(
     `http://127.0.0.1:9/.lattice/shim.html?host=${encodeURIComponent(location.origin)}`,
   );

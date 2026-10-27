@@ -1,5 +1,5 @@
 /**
- * Several portal origins in Chromium (portalr ADR-0083): the page reached at `127.0.0.1` and at
+ * Several portal origins in Chromium (portalr ADR-0084): the page reached at `127.0.0.1` and at
  * `localhost`, two origins, frames the sandbox and the editor's shim from each, and both answer;
  * a third origin that frames them is refused by their `frame-ancestors`; and the sandbox's and the
  * shim's `event.origin` checks answer only the portal origin their frame was told, `?host=`, which

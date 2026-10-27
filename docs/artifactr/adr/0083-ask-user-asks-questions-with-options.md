@@ -1,4 +1,4 @@
-# ADR-0083: `ask_user` asks questions with options, and takes answers per question
+# ADR-0084: `ask_user` asks questions with options, and takes answers per question
 
 **Status:** Accepted
 **Date:** 2026-10-20

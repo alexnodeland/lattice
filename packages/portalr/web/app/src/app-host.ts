@@ -16,7 +16,7 @@ export function useAppHost(context: Context, tenant: string, workspace: string):
   const { config, signed } = context;
   const stream = useStream();
   return useMemo(() => {
-    // The apps' origin beside the address the page is at (portalr ADR-0083): at an address the
+    // The apps' origin beside the address the page is at (portalr ADR-0084): at an address the
     // deployment names none for, no origin, and where the portal is to be opened instead.
     const here = deploymentAt(config, location.origin);
     return {

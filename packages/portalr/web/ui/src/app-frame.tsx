@@ -4,7 +4,7 @@
  * is the agent's and runs sandboxed, apart from the person's session, and keeps its summary beside
  * it as its text equivalent. Nothing runs where the app is archived, where mini apps are off in the
  * workspace, where the deployment names no apps' origin, or none for the address the portal is at
- * (portalr ADR-0083), or where that origin is the portal's own; the label and the summary are
+ * (portalr ADR-0084), or where that origin is the portal's own; the label and the summary are
  * shown instead. The bridge answers the frame as the person viewing
  * it: its state, coalesced to one version every five seconds, and a submission, or a link, only
  * once they confirm it in a dialog of the host's, outside the frame.
@@ -31,7 +31,7 @@ export interface AppHost {
   /** The origin apps run on, as `config.json` names it; null where the deployment runs none. */
   readonly origin: string | null;
   /**
-   * The portal's addresses apps run at, where the page is at none of them (portalr ADR-0083):
+   * The portal's addresses apps run at, where the page is at none of them (portalr ADR-0084):
    * the deployment names no apps' origin for this address, so none runs here, and the reader is
    * told where to open the portal instead of being shown a frame nothing answers.
    */

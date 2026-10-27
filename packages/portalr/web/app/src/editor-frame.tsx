@@ -23,7 +23,7 @@ const STARTS_WITHIN = 60_000;
 
 /**
  * The shim, on the editor's origin, told which portal origin frames it, this page's own, for a
- * shim that serves several (portalr ADR-0083); or null where the editor is at no web address.
+ * shim that serves several (portalr ADR-0084); or null where the editor is at no web address.
  */
 function shimAt(editor: string): string | null {
   try {

@@ -58,6 +58,8 @@ function keyboard(covered: number) {
 
 test("the question's Answer sits in the composer's row, presses the card's own, and is one tab stop", async () => {
   await page.viewport(390, 844);
+  // A visual viewport of the test's own: the real one's scrolls would measure the keyboard down.
+  const viewport = keyboard(0);
   const { screen } = await open("/t/acme/w/notes/threads/thr_1", serve, () => null, WORLD);
   await expect.element(screen.getByText("Which week should the note cover?")).toBeVisible();
   // The card's Answer is below the fold: the bar shows it.
@@ -74,7 +76,8 @@ test("the question's Answer sits in the composer's row, presses the card's own, 
   window.scrollTo(0, 0);
   await expect.poll(() => bar()?.textContent).toContain("Answer");
   // The keyboard up: the bar gives way too.
-  document.documentElement.style.setProperty("--keyboard-inset", "300px");
+  viewport.height = window.innerHeight - 300;
+  viewport.dispatchEvent(new Event("resize"));
   await expect.poll(() => bar()).toBeNull();
 });
 

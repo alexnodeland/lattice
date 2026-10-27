@@ -1159,9 +1159,10 @@ export function RunStrip({
   // An add-on that failed to load, as offline, is tried again as the next run starts.
   const addon = useRetrying(loadStreaming, working, run.id);
   return (
+    // `min-w-0`: a fieldset is otherwise never narrower than its content, as at 200% text.
     <fieldset
       aria-label="This turn"
-      className="m-0 flex flex-wrap items-center gap-3 rounded-(--card-radius) border border-line bg-surface px-3 py-2"
+      className="m-0 flex min-w-0 flex-wrap items-center gap-3 rounded-(--card-radius) border border-line bg-surface px-3 py-2"
     >
       {/* Its status, then what it does and for how long, then its counts: one left edge. */}
       <span className="flex min-w-40 flex-1 flex-col items-start gap-1">

@@ -30,6 +30,7 @@ _DERIVED = {
     "danger-wash": ("danger", 0.12, "transparent"),
     "wash": ("accent", 0.10, "paper"),
     "subtle": ("fg", 0.05, "paper"),
+    "outline": ("edge", 0.55, "surface"),
     "selection": ("accent", 0.30, "paper"),
     "accent-hover": ("accent", 0.88, "on-accent"),
     "danger-hover": ("danger", 0.88, "on-danger"),

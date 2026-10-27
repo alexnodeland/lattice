@@ -249,7 +249,7 @@ export function SheetTable({ sheet }: { sheet: Sheet }) {
               <tr key={number}>
                 <th
                   scope="row"
-                  className="border-line border-e border-b bg-wash px-2 py-1 text-end font-normal text-muted text-xs tabular-nums"
+                  className="border-line border-e border-b bg-subtle px-2 py-1 text-end font-normal text-muted text-xs tabular-nums"
                 >
                   {number}
                 </th>

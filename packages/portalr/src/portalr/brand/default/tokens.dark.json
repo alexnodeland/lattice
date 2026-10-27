@@ -67,7 +67,7 @@
       }
     },
     "on-danger": {
-      "$value": "#121216",
+      "$value": "#16181d",
       "$type": "color"
     },
     "chart": {

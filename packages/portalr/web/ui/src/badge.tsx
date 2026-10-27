@@ -4,8 +4,9 @@ import { cn } from "./cn";
 /**
  * A word in a badge that says what something is, not how it is going (that is `StatusBadge`'s):
  * "Latest", "Recommended". Its corners and padding are the badge's tokens, its words always in a
- * colour that reads on its fill (portalr ADR-0062). `neutral` is quiet, on the surface; `accent`
- * is the working colour on its wash, for the one thing the reader is pointed to (ADR-0080).
+ * colour that reads on its fill (portalr ADR-0062). `neutral` is quiet, on the quiet wash; `accent`
+ * is the working colour on its wash, for the one thing the reader is pointed to: the one tinted
+ * thing (ADR-0081).
  */
 const TONE = {
   neutral: "bg-subtle text-muted",

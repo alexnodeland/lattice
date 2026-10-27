@@ -48,11 +48,13 @@ test("a button is pressed, unless it is disabled", async () => {
   expect(press).toHaveBeenCalledOnce();
 });
 
-test("a secondary button's edge stands out from the surface it sits on", async () => {
+test("a secondary button's outline is lighter than a field's edge: its words are its cue", async () => {
   const screen = await render(<Button variant="secondary">Deny</Button>);
   const style = getComputedStyle(screen.getByRole("button", { name: "Deny" }).element());
-  expect(style.borderTopColor).toBe(token("edge"));
-  expect(contrast(style.borderTopColor, token("paper"))).toBeGreaterThanOrEqual(3);
+  // The outline is the edge at a little over half its strength (portalr ADR-0081), still seen.
+  expect(style.borderTopColor).toBe(token("outline"));
+  expect(contrast(style.borderTopColor, token("paper"))).toBeGreaterThanOrEqual(1.5);
+  expect(contrast(token("edge"), token("paper"))).toBeGreaterThanOrEqual(3); // a field keeps it
 });
 
 test("a danger button is in the danger colour, readably", async () => {
@@ -214,7 +216,7 @@ test("a link in a button's look stays a link: an anchor with its href, no button
   expect(link.tagName).toBe("A");
   expect(link.getAttribute("href")).toBe("#threads");
   expect(link.getAttribute("role")).toBeNull();
-  expect(getComputedStyle(link).borderTopColor).toBe(token("edge"));
+  expect(getComputedStyle(link).borderTopColor).toBe(token("outline"));
   expect(getComputedStyle(link).textDecorationLine).toBe("none");
 });
 

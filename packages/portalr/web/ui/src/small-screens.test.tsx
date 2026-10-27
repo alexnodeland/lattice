@@ -159,12 +159,7 @@ test("to a finger, every control is 44px or taller, admin's density included, an
     selector.includes('[data-density="compact"]'),
   );
   expect(roots?.[0]).toContain(":root");
-  for (const token of [
-    "--icon-button-size",
-    "--disclosure-target",
-    "--breadcrumb-target",
-    "--row-height",
-  ]) {
+  for (const token of ["--icon-button-size", "--disclosure-target", "--breadcrumb-target"]) {
     expect(Number.parseFloat(roots?.[1].getPropertyValue(token) ?? "0")).toBeGreaterThanOrEqual(
       2.75,
     );

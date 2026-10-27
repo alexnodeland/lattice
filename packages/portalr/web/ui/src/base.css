@@ -64,6 +64,12 @@
    */
   --subtle: color-mix(in srgb, var(--fg) 5%, var(--paper));
   /*
+   * A labelled button's outline (portalr ADR-0081): the edge at a little over half its strength
+   * over the surface, lighter than a field's boundary, which keeps the edge at 3:1 because it
+   * may be the one cue that it is a field; a button's words are its cue.
+   */
+  --outline: color-mix(in srgb, var(--edge) 55%, var(--surface));
+  /*
    * What a reader has selected: a deeper tint than the wash, so it reads over a washed row too,
    * and is told from the paper at a glance (the audit's N8); the text keeps 7:1 on it.
    */
@@ -149,7 +155,6 @@
     --icon-button-size: 2.75rem;
     --disclosure-target: 2.75rem;
     --breadcrumb-target: 2.75rem;
-    --row-height: 2.75rem;
     --header-trigger-pad-y: var(--space-3);
   }
   :where(

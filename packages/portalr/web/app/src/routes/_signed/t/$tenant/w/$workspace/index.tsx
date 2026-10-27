@@ -197,7 +197,7 @@ function Threads() {
             </Button>
           </form>
         ) : (
-          <Button variant="ghost" size="sm" disabled={!live} onClick={() => setNaming(true)}>
+          <Button variant="secondary" size="sm" disabled={!live} onClick={() => setNaming(true)}>
             Name it first…
           </Button>
         )}
@@ -239,10 +239,12 @@ function Threads() {
                 }
                 meta={`in ${title}`}
                 end={
-                  risk !== undefined && (
+                  risk !== undefined ? (
                     <StatusBadge tone="retrying">
                       {risk === "network" ? "Downloads from the internet" : "Runs code"}
                     </StatusBadge>
+                  ) : (
+                    <StatusBadge tone="waiting">Waiting for you</StatusBadge>
                   )
                 }
               />
@@ -282,13 +284,14 @@ function Threads() {
                   )
                 }
                 name={
-                  <span className="flex items-center gap-2">
-                    {/* Unread: a mark in the working colour at the row's start (portalr ADR-0081). */}
+                  <span className="relative block ps-4">
+                    {/* Unread: a mark in the working colour in a slot at the row's start, kept so
+                        read and unread titles line up (portalr ADR-0081). */}
                     {seen[thread.id] !== undefined && thread.active > (seen[thread.id] ?? 0) && (
                       <span
                         role="img"
                         aria-label="Moved since you read it"
-                        className="size-2 shrink-0 rounded-full bg-accent"
+                        className="absolute start-0 top-1/2 size-2 -translate-y-1/2 rounded-full bg-accent forced-color-adjust-none forced-colors:bg-system-text"
                       />
                     )}
                     <RowLink

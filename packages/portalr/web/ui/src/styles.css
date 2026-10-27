@@ -101,6 +101,7 @@
   --color-*: initial;
   --color-paper: var(--paper);
   --color-subtle: var(--subtle);
+  --color-outline: var(--outline);
   --color-surface: var(--surface);
   --color-fg: var(--fg);
   --color-muted: var(--muted);

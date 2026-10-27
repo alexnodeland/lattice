@@ -42,7 +42,12 @@ export function Row({
   return (
     <li
       className={cn(
-        "group relative grid grid-cols-1 items-center gap-x-(--list-row-gap) gap-y-(--list-row-line-gap) px-(--list-row-pad-x) py-(--list-row-pad-y) text-sm has-[a:hover]:bg-subtle has-[a:focus-visible]:bg-subtle sm:grid-cols-[minmax(0,1fr)_fit-content(50%)]",
+        "group relative grid items-center gap-x-(--list-row-gap) gap-y-(--list-row-line-gap) px-(--list-row-pad-x) py-(--list-row-pad-y) text-sm has-[a:hover]:bg-subtle has-[a:focus-visible]:bg-subtle",
+        // With something at its end, a narrow row stacks it under the meta; the chevron alone
+        // keeps its column at every width, so it never wraps under the name.
+        end
+          ? "grid-cols-1 sm:grid-cols-[minmax(0,1fr)_fit-content(50%)]"
+          : "grid-cols-[minmax(0,1fr)_auto]",
         FEEDBACK,
       )}
       {...props}

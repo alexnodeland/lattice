@@ -45,8 +45,6 @@ import { TYPE } from "./type";
 const card =
   "flex flex-col gap-2 rounded-(--card-radius) border border-line bg-surface p-(--card-pad) text-sm";
 
-/** A card that waits on the reader: the working colour as a rule at its start, as an alert's edge is, not round it (portalr ADR-0080). */
-
 /** A button that sends one command, waits while it is in flight, and says why one wasn't done. */
 export function CommandButton({
   onSend,
@@ -245,7 +243,6 @@ type MessageProps = {
 /** The lines of a message past which it is folded, with a way to the whole. */
 const FOLDED_AFTER = 40;
 
-/** A message's bubble: the reader's at the end of the line, everyone else's at its start. */
 /**
  * The message grammar (portalr ADR-0081): the reader's words sit on the quiet wash, the agent's
  * are unboxed on the page; that one difference tells them apart, with the name above each.
@@ -1060,13 +1057,24 @@ const RUN_STATUS: Record<Artifactr.Run["status"], readonly [Tone, string]> = {
   stopped: ["stopped", "Stopped"],
 };
 
-/** Minutes and seconds since `from`, as "1:05", once the run has said when it started. */
+/**
+ * How long since `from`, once the run has said when it started: "1:05" under an hour, "2:03:40"
+ * under a day, "3 d 2 h" past it; nothing for a moment that can't be read.
+ */
 function elapsed(from: string | undefined, now: Date): string | null {
-  if (from === undefined) {
+  const started = from === undefined ? Number.NaN : new Date(from).getTime();
+  if (Number.isNaN(started)) {
     return null;
   }
-  const seconds = Math.max(0, Math.floor((now.getTime() - new Date(from).getTime()) / 1000));
-  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+  const seconds = Math.max(0, Math.floor((now.getTime() - started) / 1000));
+  const two = (n: number) => String(n).padStart(2, "0");
+  if (seconds >= 86_400) {
+    return `${Math.floor(seconds / 86_400)} d ${Math.floor((seconds % 86_400) / 3600)} h`;
+  }
+  if (seconds >= 3600) {
+    return `${Math.floor(seconds / 3600)}:${two(Math.floor((seconds % 3600) / 60))}:${two(seconds % 60)}`;
+  }
+  return `${Math.floor(seconds / 60)}:${two(seconds % 60)}`;
 }
 
 /**
@@ -1106,7 +1114,7 @@ export function RunStrip({
       <RunStatus status={run.status} />
       {since !== null && active && (
         <span className={cn(TYPE.note, "tabular-nums")}>
-          <span className="sr-only">for </span>
+          {run.status === "paused" ? "waiting " : <span className="sr-only">for </span>}
           {since}
         </span>
       )}

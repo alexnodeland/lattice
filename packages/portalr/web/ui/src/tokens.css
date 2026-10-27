@@ -19,6 +19,7 @@
   --space-2: 0.5rem;
   --space-3: 0.75rem;
   --space-4: 1rem;
+  --space-5: 1.25rem;
   --space-6: 1.5rem;
 
   /* Corners, from square to round: each a component's radius defaults to one of these. */
@@ -104,7 +105,7 @@
   --status-failed: light-dark(#8a0f2c, #f391b1);
   --status-warn: light-dark(#9c821c, #f9e890);
   --danger: var(--status-failed);
-  --on-danger: light-dark(#ffffff, #121216);
+  --on-danger: light-dark(#ffffff, #16181d);
 
   /*
    * A chart's series, in this order and no more: tints of the brand violet, then one accent, a
@@ -213,7 +214,7 @@
 
   /* A card, and an empty state, which is one: corners, padding and what it casts. */
   --card-radius: var(--radius-4);
-  --card-pad: 1.25rem;
+  --card-pad: var(--space-5);
   --card-shadow: var(--shadow-1);
   --empty-state-pad: var(--space-6);
 
@@ -223,7 +224,7 @@
    * (portalr ADR-0039).
    */
   --dialog-radius: var(--radius-4);
-  --dialog-pad: 1.25rem;
+  --dialog-pad: var(--space-5);
   --dialog-width: 32rem;
   --dialog-margin: 2rem;
   --dialog-shadow: var(--shadow-3);
@@ -257,15 +258,13 @@
   --notice-shadow: var(--shadow-3);
 
   /*
-   * The frame's navigation: a nav link's corners and padding, its count's corners, the header's
-   * triggers (the switcher, the account menu, the home link), the room a narrow window's pinned
-   * header takes, which a scroll stops below, the rail's width, and the drawer's width, shadow and
-   * slide.
+   * The frame's navigation: a nav link's corners and padding, the header's triggers (the switcher,
+   * the account menu, the home link), the room a narrow window's pinned header takes, which a
+   * scroll stops below, the rail's width, and the drawer's width, shadow and slide.
    */
   --nav-radius: var(--radius-3);
   --nav-pad-x: var(--space-3);
   --nav-pad-y: var(--space-2);
-  --nav-count-radius: var(--radius-2);
   --header-clearance: 3.5rem;
   --header-trigger-radius: var(--radius-3);
   --header-trigger-pad-x: var(--space-3);
@@ -293,7 +292,6 @@
    */
   --badge-radius: var(--radius-3);
   --badge-pad-y: var(--space-half);
-  --badge-pad-start: var(--space-1-5);
   --badge-pad-end: var(--space-2);
 
   /*
@@ -324,7 +322,7 @@
   --tool-call-pad-y: var(--space-2);
   --tool-call-result-radius: var(--radius-3);
   --question-radius: var(--radius-4);
-  --question-pad: 1.25rem;
+  --question-pad: var(--space-5);
   --question-option-radius: var(--radius-3);
   --question-option-pad-x: var(--space-3);
   --question-option-pad-y: 0.75rem;
@@ -347,7 +345,6 @@
    */
   --bubble-radius: var(--radius-4);
   --bubble-max-width: 42rem;
-  --bubble-tail-radius: var(--radius-1);
   --bubble-pad-x: var(--space-4);
   --bubble-pad-y: var(--space-3);
   --composer-radius: var(--radius-4);
@@ -385,7 +382,7 @@
    * line and its meta's (portalr ADR-0060).
    */
   --list-row-pad-x: var(--space-4);
-  --list-row-pad-y: var(--space-4);
+  --list-row-pad-y: var(--space-3);
   --list-row-gap: var(--space-3);
   --list-row-line-gap: var(--space-half);
 

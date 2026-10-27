@@ -12,6 +12,11 @@ test("text is readable on every surface, and on the working colour", () => {
     expect(contrast(token("muted"), token(surface))).toBeGreaterThanOrEqual(4.5);
     expect(contrast(token("accent"), token(surface))).toBeGreaterThanOrEqual(4.5);
   }
+  // The quiet wash too (portalr ADR-0081): the reader's words and a table's head sit on it.
+  expect(contrast(token("fg"), token("subtle"))).toBeGreaterThanOrEqual(4.5);
+  expect(contrast(token("muted"), token("subtle"))).toBeGreaterThanOrEqual(4.5);
+  expect(contrast(token("accent"), token("subtle"))).toBeGreaterThanOrEqual(4.5);
+  expect(contrast(token("edge"), token("subtle"))).toBeGreaterThanOrEqual(3);
   expect(contrast(token("on-accent"), token("accent"))).toBeGreaterThanOrEqual(4.5);
 });
 

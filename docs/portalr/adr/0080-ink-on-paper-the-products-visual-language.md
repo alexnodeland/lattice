@@ -38,6 +38,8 @@ Built in the pull request that adds this record: the neutral kit (paper, hairlin
 
 ## The language, part by part
 
+*Superseded in part by [ADR-0081](0081-plain-a-bright-page-one-colour-and-a-mark-for-what-waits.md): the rule, the shape, the badges, the rail's current area, the message grammar and the rhythm below are as this record decided them; Plain moved each, and says where.*
+
 The owner then asked for more than a restyle: components of the product's own all the way down, no navigation as underlined text, real buttons and tables, icons that are ours, one aesthetic across the app and admin. These are the rules the kit's components follow; a kit of its own re-skins them through the same tokens.
 
 - **Paper and ink.** One neutral paper, one surface, hairlines between things. The violet is ink: the primary action, links, the focus ring and the current place take it, and nothing else is filled with it. A tint of it, the wash, is a hover or a chosen state, never a surface at rest.

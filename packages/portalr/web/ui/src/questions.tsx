@@ -352,6 +352,7 @@ function Review({
 }) {
   return (
     <dl className="flex flex-col gap-2">
+      <dt className="sr-only">Your answers</dt>
       {questions.map((question, at) => {
         const chosen = choosing[at] as Choosing;
         const said = [...chosen.selected, ...(chosen.other ? [chosen.other.trim()] : [])];
@@ -369,7 +370,7 @@ function Review({
                 <span
                   data-step-heading={at === 0 ? "" : undefined}
                   tabIndex={at === 0 ? -1 : undefined}
-                  className="sr-only outline-none"
+                  className="text-muted outline-none"
                 >
                   {question.question}
                 </span>

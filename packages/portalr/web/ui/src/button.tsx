@@ -7,7 +7,7 @@ import { RING } from "./states";
 
 const look = {
   primary: "border-transparent bg-accent text-on-accent hover:not-data-disabled:bg-accent-hover",
-  secondary: "border-edge bg-surface text-fg hover:not-data-disabled:bg-wash",
+  secondary: "border-outline bg-surface text-fg hover:not-data-disabled:bg-wash",
   ghost: "border-transparent bg-transparent text-fg hover:not-data-disabled:bg-wash",
   /** A destructive action's confirmation: the danger colour, solid. */
   danger: "border-transparent bg-danger text-on-danger hover:not-data-disabled:bg-danger-hover",

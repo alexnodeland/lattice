@@ -43,6 +43,7 @@ function Tenants() {
           {unread("LiteLLM", every.spend).line} Spend and budgets are not shown.
         </Alert>
       )}
+      <Create />
       <ItemTable
         caption="Tenants"
         columns={[
@@ -52,7 +53,7 @@ function Tenants() {
         ]}
         items={rows.slice(0, shown)}
         keyOf={(row) => row.tenant}
-        empty={{ title: "No tenants yet", body: "Create the first one below." }}
+        empty={{ title: "No tenants yet", body: "Create the first one above." }}
       />
       <p role="status" className="sr-only">
         {Math.min(shown, rows.length)} of {rows.length} tenants shown
@@ -62,7 +63,6 @@ function Tenants() {
           Show more
         </Button>
       )}
-      <Create />
     </div>
   );
 }

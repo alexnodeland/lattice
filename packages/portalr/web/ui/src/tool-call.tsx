@@ -217,7 +217,7 @@ export function RunSteps({
           </>
         }
       >
-        <ul aria-label="Steps" className="flex flex-col border-line border-t py-1">
+        <ol aria-label="Steps" className="flex flex-col border-line border-t py-1">
           {tools.map(([call, tool], at) => (
             <ToolCall
               key={call}
@@ -226,7 +226,7 @@ export function RunSteps({
               open={running && at === tools.length - 1}
             />
           ))}
-        </ul>
+        </ol>
       </Disclosure>
     </li>
   );

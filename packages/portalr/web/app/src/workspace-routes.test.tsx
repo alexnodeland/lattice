@@ -152,7 +152,7 @@ test("what waits on a person across the workspace is listed first, approvals bef
   await expect
     .element(rows.nth(0))
     .toHaveTextContent("Approve run_scriptin InvoicesDownloads from the internet");
-  await expect.element(rows.nth(1)).toHaveTextContent("A questionin Launch");
+  await expect.element(rows.nth(1)).toHaveTextContent("A questionin LaunchWaiting for you");
   await expect
     .element(rows.nth(0).getByRole("link"))
     .toHaveAttribute("href", "/t/acme/w/notes/threads/thr_2#request-a1");

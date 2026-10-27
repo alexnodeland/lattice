@@ -256,6 +256,13 @@
       },
       "$type": "dimension"
     },
+    "5": {
+      "$value": {
+        "value": 1.25,
+        "unit": "rem"
+      },
+      "$type": "dimension"
+    },
     "6": {
       "$value": {
         "value": 1.5,
@@ -763,10 +770,7 @@
         "$value": "{radius.4}"
       },
       "pad": {
-        "$value": {
-          "value": 1.25,
-          "unit": "rem"
-        }
+        "$value": "{space.5}"
       },
       "shadow": {
         "$value": "{shadow.1}"
@@ -782,10 +786,7 @@
         "$value": "{radius.4}"
       },
       "pad": {
-        "$value": {
-          "value": 1.25,
-          "unit": "rem"
-        }
+        "$value": "{space.5}"
       },
       "width": {
         "$value": {
@@ -879,9 +880,6 @@
       },
       "pad-y": {
         "$value": "{space.2}"
-      },
-      "count-radius": {
-        "$value": "{radius.2}"
       }
     },
     "header": {
@@ -948,9 +946,6 @@
       },
       "pad-y": {
         "$value": "{space.half}"
-      },
-      "pad-start": {
-        "$value": "{space.1-5}"
       },
       "pad-end": {
         "$value": "{space.2}"
@@ -1028,10 +1023,7 @@
         "$value": "{radius.4}"
       },
       "pad": {
-        "$value": {
-          "value": 1.25,
-          "unit": "rem"
-        }
+        "$value": "{space.5}"
       },
       "option-radius": {
         "$value": "{radius.3}"
@@ -1058,9 +1050,6 @@
           "value": 42,
           "unit": "rem"
         }
-      },
-      "tail-radius": {
-        "$value": "{radius.1}"
       },
       "pad-x": {
         "$value": "{space.4}"
@@ -1148,7 +1137,7 @@
         "$value": "{space.4}"
       },
       "pad-y": {
-        "$value": "{space.4}"
+        "$value": "{space.3}"
       },
       "gap": {
         "$value": "{space.3}"

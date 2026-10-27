@@ -2,9 +2,9 @@ import type { ReactNode } from "react";
 import { cn } from "./cn";
 
 /**
- * How a thing is going, as a shape and a word, never colour alone. The word is always in the
- * ink, which reads on the badge; the colour is the shape's alone, as a mark, on a quiet hairline
- * badge (portalr ADR-0039, ADR-0080). Only waiting for you takes the working colour, as its wash.
+ * How a thing is going, as a shape and a word, never colour alone, with no box (portalr ADR-0039,
+ * ADR-0081). The word is in the ink, or the muted for what is over; the colour is the shape's
+ * alone, as a mark. Only waiting for you takes the working colour, for its word too.
  * What failed, and a budget overspent, carry the rose red; what is retrying, and a budget nearly
  * spent, the gold; the rest are neutral. Under forced colours the shapes keep their own colours.
  * A budget nearly spent is a half-filled ring, and one overspent a triangle.

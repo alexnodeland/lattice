@@ -57,7 +57,9 @@ PRIMITIVES: tuple[Group, ...] = (
     ),
     Group(
         "Space: steps of a quarter rem, and a hairline and a half step below them.",
-        _scale("dimension", "space", "--space", ("px", "half", "1", "1-5", "2", "3", "4", "6")),
+        _scale(
+            "dimension", "space", "--space", ("px", "half", "1", "1-5", "2", "3", "4", "5", "6")
+        ),
     ),
     Group(
         "Corners, from square to round: each a component's radius defaults to one of these.",
@@ -301,7 +303,7 @@ COMPONENTS: tuple[Group, ...] = (
         ),
     ),
     Group(
-        "The frame's navigation: a nav link's corners and padding, its count's corners, the "
+        "The frame's navigation: a nav link's corners and padding, the "
         "header's triggers (the switcher, the account menu, the home link), the room a narrow "
         "window's pinned header takes, which a scroll stops below, the rail's width, and the "
         "drawer's width, shadow and slide.",
@@ -309,7 +311,6 @@ COMPONENTS: tuple[Group, ...] = (
             Row("component.nav.radius", "--nav-radius", "dimension"),
             Row("component.nav.pad-x", "--nav-pad-x", "dimension"),
             Row("component.nav.pad-y", "--nav-pad-y", "dimension"),
-            Row("component.nav.count-radius", "--nav-count-radius", "dimension"),
             Row("component.header.clearance", "--header-clearance", "dimension"),
             Row("component.header.trigger-radius", "--header-trigger-radius", "dimension"),
             Row("component.header.trigger-pad-x", "--header-trigger-pad-x", "dimension"),
@@ -343,7 +344,6 @@ COMPONENTS: tuple[Group, ...] = (
         (
             Row("component.badge.radius", "--badge-radius", "dimension"),
             Row("component.badge.pad-y", "--badge-pad-y", "dimension"),
-            Row("component.badge.pad-start", "--badge-pad-start", "dimension"),
             Row("component.badge.pad-end", "--badge-pad-end", "dimension"),
         ),
     ),
@@ -402,7 +402,6 @@ COMPONENTS: tuple[Group, ...] = (
         (
             Row("component.bubble.radius", "--bubble-radius", "dimension"),
             Row("component.bubble.max-width", "--bubble-max-width", "dimension"),
-            Row("component.bubble.tail-radius", "--bubble-tail-radius", "dimension"),
             Row("component.bubble.pad-x", "--bubble-pad-x", "dimension"),
             Row("component.bubble.pad-y", "--bubble-pad-y", "dimension"),
             Row("component.composer.radius", "--composer-radius", "dimension"),

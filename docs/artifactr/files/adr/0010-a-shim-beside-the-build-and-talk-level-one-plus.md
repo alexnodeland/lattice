@@ -59,6 +59,8 @@ The shim is the only route above level 1 that changes no build and puts none on 
 > - Framed directly by the stand-in portal, the build sent nothing and opened nothing.
 > - File, Open, Browse still opens the build's picker, whose inline stylesheet a policy without `'unsafe-inline'` blocks, so [ADR-0007](0007-check-out-over-http-and-the-editor-on-its-own-origin.md)'s allowance of inline styles stays.
 
+> **Amended (2026-10-27) by [portalr ADR-0083](../../../portalr/adr/0083-several-portal-origins-an-allow-list-aliases-and-a-union-policy.md):** `shim_page` and `shim_policy` take the portal's origin or each of its origins; the page names them all in `data-portals`, the policy's `frame-ancestors` too, and the script learns which one frames it from `?host=`, which the portal's frame adds: with one portal it needs none, with several it takes only a `?host=` among them, and without one does nothing, the build not even loaded. The chosen portal is still the only origin it posts to and hears from. The lax origin check is `lattice_core.origins.web_origin`'s, so plain http is refused off loopback.
+
 ## Action items
 
 1. [x] `shim_page`, `shim_policy`, and `editor_app(build, craft=, portal=, methods=)`.

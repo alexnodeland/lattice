@@ -21,10 +21,13 @@ const SHIM = "/.lattice/shim.html";
 /** How long the build has to say it is ready before the page says it didn't start. */
 const STARTS_WITHIN = 60_000;
 
-/** The shim, on the editor's origin, or null where the editor is at no web address. */
+/**
+ * The shim, on the editor's origin, told which portal origin frames it, this page's own, for a
+ * shim that serves several (portalr ADR-0083); or null where the editor is at no web address.
+ */
 function shimAt(editor: string): string | null {
   try {
-    return new URL(SHIM, new URL(editor).origin).href;
+    return `${new URL(SHIM, new URL(editor).origin).href}?host=${encodeURIComponent(location.origin)}`;
   } catch {
     return null;
   }

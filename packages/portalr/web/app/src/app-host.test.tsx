@@ -317,3 +317,31 @@ test("the artifact's actions are a menu at its head, thumbs on it checked as giv
     value: { up: true },
   });
 });
+
+test("at an alias of the portal, the app runs on the apps' origin beside it (portalr ADR-0083)", async () => {
+  const { screen } = await open("/t/acme/w/notes/artifacts/app_1", serving(on), () => null, {
+    apps: "http://127.0.0.1:8",
+    origin: "https://elsewhere.example",
+    aliases: { [location.origin]: { apps: APPS, editors: {} } },
+  });
+  const frame = screen.getByTitle(TITLE);
+  await expect
+    .element(frame)
+    .toHaveAttribute("src", `${APPS}/?host=${encodeURIComponent(location.origin)}`);
+});
+
+test("at an address the deployment names no apps for, the app says where to open the portal", async () => {
+  const { screen } = await open("/t/acme/w/notes/artifacts/app_1", serving(on), () => null, {
+    apps: APPS,
+    origin: "https://elsewhere.example",
+    aliases: {
+      "https://m.my-tailnet.ts.net": { apps: "https://m.my-tailnet.ts.net:8801", editors: {} },
+    },
+  });
+  await expect
+    .element(screen.getByText(/Apps don't run at this address/))
+    .toHaveTextContent(
+      "Apps don't run at this address: open the portal at https://elsewhere.example or https://m.my-tailnet.ts.net.",
+    );
+  expect(screen.container.querySelector("iframe")).toBeNull();
+});

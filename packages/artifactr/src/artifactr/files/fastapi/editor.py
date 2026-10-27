@@ -24,6 +24,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from artifactr.files.craft import Craft
 from artifactr.files.fastapi.shim import PATH, shim_page, shim_policy
+from lattice_core.origins import web_origins
 
 INLINE: Final = re.compile(r"<script\b[^>]*>(.*?)</script\b[^>]*>", re.DOTALL | re.IGNORECASE)
 """An inline script in the page, which the policy allows by the hash of its text."""
@@ -33,15 +34,18 @@ IMMUTABLE: Final = (".wasm", ".js")
 the page, and anything not found, is revalidated every time."""
 
 
-def editor_policy(index: str, *, portal: str | None = None) -> str:
+def editor_policy(index: str, *, portal: str | Sequence[str] | None = None) -> str:
     """The Content-Security-Policy for a build whose page is `index`.
 
     Its own files, and `blob:` for what the page makes itself, such as a saved file; its inline
     scripts by their SHA-256, and WebAssembly compiled from its own bytes, and no other code;
     styles; and no form, base or plugin. Nothing frames it; or, given the `portal` that frames
-    the shim, only the shim, of its own origin, inside the portal: a frame's ancestors are each
-    checked, the top one too.
+    the shim, one origin or several, only the shim, of its own origin, inside the portal: a
+    frame's ancestors are each checked, the top one too.
     """
+    framed = (
+        "'none'" if portal is None else f"'self' {' '.join(web_origins(portal, what='the portal'))}"
+    )
     hashes = [
         f"'sha256-{base64.b64encode(hashlib.sha256(text.encode()).digest()).decode()}'"
         for text in INLINE.findall(index)
@@ -61,7 +65,7 @@ def editor_policy(index: str, *, portal: str | None = None) -> str:
             "object-src 'none'",
             "base-uri 'none'",
             "form-action 'none'",
-            f"frame-ancestors {"'none'" if portal is None else f"'self' {portal}"}",
+            f"frame-ancestors {framed}",
         ]
     )
 
@@ -70,7 +74,7 @@ def editor_app(
     build: Path,
     *,
     craft: Craft | None = None,
-    portal: str | None = None,
+    portal: str | Sequence[str] | None = None,
     methods: Sequence[str] = (),
 ) -> ASGIApp:
     """Serve a browser build's directory, as released, under its policy; and its shim, if asked.
@@ -82,7 +86,8 @@ def editor_app(
         build: The directory holding the build's `index.html`, such as what
             `scripts/craft wordcraft web` prints.
         craft: The app whose build it is, if its build has a host surface for the shim to reach.
-        portal: The portal's origin, the only one that may frame the shim, and that it answers.
+        portal: The portal's origin, or its origins where it is reached at several addresses
+            (portalr ADR-0083): the only ones that may frame the shim, and that it answers.
         methods: For a build with a JavaScript API, the methods of it the portal may call.
 
     Raises:

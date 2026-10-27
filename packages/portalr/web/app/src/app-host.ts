@@ -8,15 +8,20 @@
 import type { AppHost } from "@portalr/ui";
 import { useMemo } from "react";
 import type { Context } from "./context";
+import { deploymentAt, portalsOf } from "./deployment";
 import { useStream } from "./workspace";
 
 /** The app host of a page in a workspace, for the deployment and the person `context` holds. */
 export function useAppHost(context: Context, tenant: string, workspace: string): AppHost {
   const { config, signed } = context;
   const stream = useStream();
-  return useMemo(
-    () => ({
-      origin: config.apps ?? null,
+  return useMemo(() => {
+    // The apps' origin beside the address the page is at (portalr ADR-0083): at an address the
+    // deployment names none for, no origin, and where the portal is to be opened instead.
+    const here = deploymentAt(config, location.origin);
+    return {
+      origin: here.apps,
+      ...(here.known ? {} : { elsewhere: portalsOf(config) }),
       place: {
         surfaces: config.surfaces,
         signed,
@@ -38,7 +43,6 @@ export function useAppHost(context: Context, tenant: string, workspace: string):
           kind: "submission",
           data: { ...submission },
         }),
-    }),
-    [config, signed, tenant, workspace, stream],
-  );
+    };
+  }, [config, signed, tenant, workspace, stream]);
 }

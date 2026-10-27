@@ -23,6 +23,7 @@ import { useQuery } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { editorAt, type Place } from "./check-out";
+import { deploymentAt } from "./deployment";
 import { useEditing } from "./editing";
 import type { Native } from "./native";
 import { downloadingSaid, FileControls, useDownload } from "./native-file";
@@ -232,7 +233,8 @@ function FileView({
   const view = chosen !== null && views.includes(chosen) ? chosen : (views[0] ?? "outline");
   // Its build hands the file over and its editor is hosted: the box flips between the two.
   const editable =
-    status.talk === "bridged" && editorAt(context.config.editors, native.integration) !== null;
+    status.talk === "bridged" &&
+    editorAt(deploymentAt(context.config, location.origin).editors, native.integration) !== null;
   const about = [
     fileSize(status.size),
     pages > 0 ? `${pages} ${pages === 1 ? "page" : "pages"}` : null,

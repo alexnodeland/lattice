@@ -36,8 +36,8 @@ def test_a_native_files_editor_is_served_by_its_apps_key() -> None:
     [
         ("markdown:math", "https://editor.example.net", "no native file's app"),
         ("files:Not An App", "https://editor.example.net", "no native file's app"),
-        ("files:wordcraft", "/editor", "give it https"),
-        ("files:wordcraft", "javascript:alert(1)", "give it https"),
+        ("files:wordcraft", "/editor", "a host, with no user or password"),
+        ("files:wordcraft", "javascript:alert(1)", "a host, with no user or password"),
         ("files:wordcraft", "http://editor.example.net", "give it https"),
         ("files:wordcraft", "https://me:secret@editor.example.net", "no user or password"),
         ("files:wordcraft", "https://", "no user or password"),
@@ -79,7 +79,10 @@ def test_an_editor_on_loopback_may_be_http_and_an_apps_own() -> None:
     ("apps", "kept"),
     [
         ("https://apps.example.com", "https://apps.example.com"),
-        ("https://Apps.Example.com/", "https://Apps.Example.com"),
+        # As a browser compares it, and as `location.origin` spells it: in lower case, the default
+        # port left out, so an alias is found by the origin the UI is at (portalr ADR-0083).
+        ("https://Apps.Example.com/", "https://apps.example.com"),
+        ("https://apps.example.com:443", "https://apps.example.com"),
         ("http://127.0.0.1:8001", "http://127.0.0.1:8001"),
         (None, None),
     ],
@@ -91,8 +94,9 @@ def test_mini_apps_origin_is_kept_as_an_origin(apps: str | None, kept: str | Non
 @pytest.mark.parametrize(
     ("apps", "said"),
     [
-        ("http://apps.example.com", "give them https"),
-        ("/apps", "give them https"),
+        ("http://apps.example.com", "give it https, or http on loopback"),
+        ("/apps", "a host, with no user or password"),
+        ("http://10.0.0.5:8801", "an IP address that isn't loopback"),
         ("https://user@apps.example.com", "no user or password"),
         ("https://", "no user or password"),
         ("https://apps.example.com/sandbox", "no path, query or fragment"),

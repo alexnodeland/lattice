@@ -16,7 +16,8 @@ const TONE = {
   working: {
     badge: QUIET,
     glyph:
-      "rounded-full border-2 border-current border-r-transparent animate-spin [animation-play-state:var(--motion-loop)] motion-reduce:animate-none",
+      // Turning; where motion is reduced, a whole ring, never a still arc that reads as a "c".
+      "rounded-full border-2 border-current border-r-transparent animate-spin [animation-play-state:var(--motion-loop)] motion-reduce:animate-none motion-reduce:border-r-current",
   },
   waiting: {
     badge: "text-accent",

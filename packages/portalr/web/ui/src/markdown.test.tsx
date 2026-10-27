@@ -218,13 +218,15 @@ test.each([
   },
 );
 
-test("a callout's tone is its edge: a warning gold, a caution red", async () => {
+test("a callout's tone is its mark: a warning gold, a caution red", async () => {
   const screen = await render(
     <Markdown>{"> [!WARNING]\n> Careful.\n\n> [!CAUTION]\n> Stop."}</Markdown>,
   );
   const [warning, caution] = screen.getByRole("note").elements();
-  expect(warning && getComputedStyle(warning).borderLeftColor).toBe(token("status-warn"));
-  expect(caution && getComputedStyle(caution).borderLeftColor).toBe(token("status-failed"));
+  const mark = (note: Element | undefined) =>
+    note && getComputedStyle(note.querySelector("svg") as Element).color;
+  expect(mark(warning)).toBe(token("status-warn"));
+  expect(mark(caution)).toBe(token("status-failed"));
 });
 
 test("a quote that isn't a callout stays a quote: an unknown kind, or a marker not on its first line", async () => {

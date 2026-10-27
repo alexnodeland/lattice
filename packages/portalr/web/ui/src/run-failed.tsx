@@ -20,6 +20,9 @@ const REASONS: Readonly<Record<string, string>> = {
   tool_stalled: "A tool didn't return, so the turn was ended. Your message is safe; send it again.",
 };
 
+/** An error short enough to say in the alert itself: one line, a sentence long. */
+const short = (error: string) => error.length <= 120 && !error.includes("\n");
+
 /**
  * A failed turn: what went wrong, the run's own words under "Details" where `error` is given,
  * which the thread gives the person the turn acted for, and "Try again" where `onRetry` is,
@@ -49,7 +52,9 @@ export function RunFailed({
             <span className="font-semibold">The assistant couldn't finish. </span>
             {(reason !== null && REASONS[reason]) || "Something went wrong before it answered."}
           </p>
-          {error && (
+          {/* A short error is said as it is; a long one waits under Details (portalr ADR-0085). */}
+          {error && short(error) && <p className="break-words font-mono text-xs">{error}</p>}
+          {error && !short(error) && (
             <Disclosure summary="Details" className="text-muted">
               <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words font-mono text-xs">
                 {error}

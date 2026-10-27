@@ -182,7 +182,8 @@ test("a thread shows its messages, the reader's on the wash, its calls and quest
   const failed = log.getByRole("alert");
   await expect.element(failed.getByText(/The model kept calling a tool/)).toBeVisible();
   await failed.getByRole("button", { name: "Try again" }).click();
-  await expect.element(failed.getByText("Details")).toBeVisible(); // the turn acted for alice
+  // The turn acted for alice: its short error is said in the alert (portalr ADR-0085).
+  await expect.element(failed.getByText(/exceeded max retries/)).toBeVisible();
   expect(sent.at(-1)).toMatchObject({
     type: "post_message",
     content: "Draft a rule",
@@ -423,9 +424,9 @@ test("the thread's mode is switched in its head, where the reader may", async ()
     },
     { artifactrLog: LOG },
   );
-  const mode = screen.getByRole("radiogroup", { name: "Mode" });
-  await expect.element(mode.getByRole("radio", { name: "Agent edits" })).toBeChecked();
-  await mode.getByRole("radio", { name: "Agent proposes" }).click();
+  const mode = screen.getByRole("radiogroup", { name: "Agent mode" });
+  await expect.element(mode.getByRole("radio", { name: "Edits" })).toBeChecked();
+  await mode.getByRole("radio", { name: "Proposes" }).click();
   expect(sent.at(-1)).toMatchObject({
     type: "set_thread_mode",
     thread_id: "thr_1",

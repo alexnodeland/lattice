@@ -713,9 +713,12 @@ export function Composer({
       </Field.Root>
       <div className="flex items-center justify-between gap-2 px-2.5 pb-1">
         {attach}
-        <span className="text-muted text-xs max-sm:hidden">
-          Enter sends, Shift+Enter starts a new line
-        </span>
+        {/* The keys' hint where the row has room: not beside a thread's Attach and mode. */}
+        {!attach && (
+          <span className="text-muted text-xs max-sm:hidden">
+            Enter sends, Shift+Enter starts a new line
+          </span>
+        )}
         <Button
           type="submit"
           className="ml-auto"
@@ -871,9 +874,10 @@ function Question({
     // review: a reviewed approval is read before it is given, never a press away on the bar.
     const plain = !request.review;
     return (
-      <section className={cn(card, ASKING)} aria-label={`Approve ${request.tool_name}?`}>
-        <p>
-          The agent wants to run <code className="font-mono">{request.tool_name}</code>.
+      <section className={cn(card, "gap-3", ASKING)} aria-label={`Approve ${request.tool_name}?`}>
+        {/* A head line, as a question's (portalr ADR-0085): what is asked, then what it does. */}
+        <p className={TYPE.subsection}>
+          Approve <code className="font-mono">{request.tool_name}</code>?
         </p>
         <Review review={request.review ?? {}} />
         {args && (
@@ -881,7 +885,7 @@ function Question({
             {unhidden(JSON.stringify(request.args, null, 2))}
           </pre>
         )}
-        <span className="flex gap-2">
+        <span className="flex gap-2 sm:justify-end">
           <Button
             ref={first}
             disabled={answered}
@@ -1174,6 +1178,7 @@ export function RunStrip({
         {active && (since !== null || (working && addon)) && (
           <span className={`${TYPE.note} flex flex-wrap gap-x-2 tabular-nums`}>
             {working && addon && <addon.Phase run={run} now={at} />}
+            {working && addon && since !== null && <span aria-hidden="true">·</span>}
             {since !== null && (
               <span>
                 {run.status === "paused" ? "waiting " : <span className="sr-only">for </span>}
@@ -1198,8 +1203,9 @@ export function RunStrip({
 }
 
 /**
- * The thread's mode in its head (portalr ADR-0080): whether the agent edits artifacts itself or
- * proposes changes for someone to accept, switched where the reader may.
+ * The thread's mode (portalr ADR-0080), a small toggle in the composer's row beside Attach and
+ * Send (ADR-0085): whether the agent edits artifacts itself or proposes changes for someone to
+ * accept, a radio group named "Agent mode", switched where the reader may.
  */
 export function ModeSwitch({
   mode,
@@ -1212,9 +1218,10 @@ export function ModeSwitch({
 }) {
   const { pending, unsent, send } = useSending();
   return (
-    <div className="flex flex-col items-end gap-1">
+    <div className="flex flex-col gap-1">
       <SegmentedFilter
-        label="Mode"
+        label="Agent mode"
+        size="sm"
         value={mode}
         disabled={disabled || pending}
         segments={MODES}
@@ -1226,8 +1233,8 @@ export function ModeSwitch({
 }
 
 const MODES: readonly Segment<Artifactr.Thread["mode"]>[] = [
-  { value: "edit", label: "Agent edits" },
-  { value: "suggest", label: "Agent proposes" },
+  { value: "edit", label: "Edits" },
+  { value: "suggest", label: "Proposes" },
 ];
 
 /** How a run is going, announced as it changes. */

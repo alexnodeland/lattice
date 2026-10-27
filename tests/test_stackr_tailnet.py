@@ -67,7 +67,7 @@ def run(
     served: dict[str, Any],
     env: str | None = "APP_PORT=8800\n",
     fail: str = "none",
-    status: dict[str, Any] | None = None,
+    status: Any = None,
 ) -> tuple[int, str, list[str]]:
     """The script's exit status, what it printed, and the CLI's calls, with .env holding `env`."""
     stub = tmp_path / "tailscale"
@@ -275,10 +275,13 @@ def test_another_port_with_8443_in_it_is_a_port_like_any(tmp_path: Path) -> None
         {"BackendState": "Running", "Self": {"DNSName": ""}},
         {"BackendState": "NeedsLogin", "Self": {"DNSName": f"{NAME}."}},
         {},
+        [],
+        "Running",
+        {"BackendState": "Running", "Self": "laptop"},
     ],
-    ids=["no Self", "no name", "logged out", "nothing"],
+    ids=["no Self", "no name", "logged out", "nothing", "a list", "a string", "Self a string"],
 )
-def test_without_a_signed_in_name_nothing_changes(tmp_path: Path, state: dict[str, Any]) -> None:
+def test_without_a_signed_in_name_nothing_changes(tmp_path: Path, state: Any) -> None:
     status, printed, called = run(tmp_path, "on", served={}, status=state)
     assert status == 1
     assert "Tailscale is not signed in / MagicDNS is off" in printed
@@ -346,7 +349,17 @@ def test_on_refuses_an_env_file_it_cannot_write(tmp_path: Path) -> None:
     assert called == LOOK
 
 
-def test_on_without_siblings_says_what_is_missing(tmp_path: Path) -> None:
+def test_on_without_siblings_says_what_is_missing_once(tmp_path: Path) -> None:
     status, printed, _ = run(tmp_path, "on", "443", APP, served={})
     assert status == 0, printed
-    assert "pass FILES to make tailnet unless .env sets FILES_CRAFTS" in printed
+    assert "editors only for the apps FILES (or FILES_CRAFTS in .env) runs" in printed
+    status, printed, _ = run(tmp_path, "on", "443", APP, served=served({"443": APP}))
+    assert status == 0, printed
+    assert "no port beside it" not in printed
+
+
+def test_a_key_appended_to_a_crlf_file_ends_as_its_lines_do(tmp_path: Path) -> None:
+    status, printed, _ = run(tmp_path, "on", served={}, env="A=1\r\nB=2\r\n")
+    assert status == 0, printed
+    written = (tmp_path / ".env").read_bytes().decode()
+    assert written == f"A=1\r\nB=2\r\nPORTAL_EXTRA_URLS={ORIGIN}\r\n"

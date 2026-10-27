@@ -161,7 +161,7 @@ TAILNET_REFUSED = this application is on a single host, whose edge is its one or
 {%- endif %}
 
 tailnet: ## Serve the application, its mini apps and editors (FILES, or FILES_CRAFTS in .env) on your tailnet only, over HTTPS (TAILNET_PORT, 443)
-	@$(if $(TAILNET_REFUSED),echo "make tailnet: nothing changed: $(TAILNET_REFUSED); see https://lattice.alexnodeland.com/stackr/guides/single-host/" >&2; exit 1,true)
+	@$(if $(TAILNET_REFUSED),echo "make tailnet: nothing changed: $(TAILNET_REFUSED); see https://lattice.alexnodeland.com/stackr/guides/single-host/#signing-in-to-the-portal" >&2; exit 1,true)
 	$(TAILNET) on $(TAILNET_PORT) $(APP_URL) $(strip $(TAILNET_BESIDE))
 
 tailnet-off: ## Stop serving them on your tailnet: with the same TAILNET_PORT and FILES as `make tailnet`

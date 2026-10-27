@@ -60,10 +60,12 @@ python() { "${UV:-uv}" run --no-project python -c "$@"; }
 NAME='
 import json, re, sys
 try:
-    me = json.loads(sys.stdin.read() or "{}") or {}
+    me = json.loads(sys.stdin.read() or "{}")
 except ValueError:
     me = {}
-name = str((me.get("Self") or {}).get("DNSName") or "").rstrip(".").lower()
+me = me if isinstance(me, dict) else {}
+own = me.get("Self") if isinstance(me.get("Self"), dict) else {}
+name = str(own.get("DNSName") or "").rstrip(".").lower()
 if me.get("BackendState") != "Running" or not name:
     sys.exit("tailnet: Tailscale is not signed in / MagicDNS is off; sign in, turn MagicDNS on, and run this again")
 if not re.fullmatch(r"[a-z0-9.-]+", name):
@@ -141,16 +143,17 @@ try:
 except FileNotFoundError:
     sys.exit()
 ours = [i for i, line in enumerate(lines) if line.startswith(key)]
+newline = "\r\n" if lines and lines[0].endswith("\r\n") else "\n"
 if action == "on":
     if [lines[i].strip() for i in ours] == [key + origin]:
         sys.exit()
     kept = [line for i, line in enumerate(lines) if i not in ours[1:]]
     if ours:
         line = kept[ours[0]]
-        ending = line[len(line.rstrip("\r\n")):] or "\n"
+        ending = line[len(line.rstrip("\r\n")):] or newline
         kept[ours[0]] = key + origin + ending
     else:
-        kept.append(("" if not kept or kept[-1].endswith("\n") else "\n") + f"{key}{origin}\n")
+        kept.append(("" if not kept or kept[-1].endswith("\n") else newline) + key + origin + newline)
 else:
     kept = [line for line in lines if line.strip() != key + origin]
     if len(kept) == len(lines):
@@ -202,9 +205,9 @@ if [[ $action == on ]]; then
   if ((${#siblings[@]})); then
     beside="${siblings[*]}"
     echo "  with mini apps and the editors beside it, on ports ${beside// /, }"
-  else
-    echo "tailnet: no mini apps' or editors' port beside it: set PORTAL_APPS_URL, and pass FILES" \
-      "to make tailnet unless .env sets FILES_CRAFTS" >&2
+  elif [[ -n $changed ]]; then
+    echo "tailnet: no port beside it: mini apps are served only where PORTAL_APPS_URL is set," \
+      "and editors only for the apps FILES (or FILES_CRAFTS in .env) runs" >&2
   fi
   [[ -z $changed ]] || echo "$env_file now sets PORTAL_EXTRA_URLS=$origin: run \`make up\` to apply"
 else

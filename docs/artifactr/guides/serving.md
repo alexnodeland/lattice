@@ -161,7 +161,7 @@ The [thread protocol](../protocol.md) specifies every frame and close code, and 
 | `hello_timeout` | 10 seconds | How long a new connection has to send `hello` before it is closed (4408) |
 | `outbox_size` | 1,000 frames | How far a connection may fall behind before it is closed (4429); it reconnects and resumes by `seq` |
 
-Each connection reads frames in one task and runs each command as its own task, so a `stop_run` is never stuck behind a slow command. All outgoing frames go through one bounded outbox. A client too slow to keep up is disconnected rather than allowed to hold events back or grow the server's memory, and nothing is lost, because it resumes from the log.
+Each connection reads frames in one task and runs each command as its own task, so a `stop_run` is never stuck behind a slow command. All outgoing frames go through one bounded outbox. A client too slow to keep up is disconnected rather than allowed to hold events back or grow the server's memory, and nothing is lost, because it resumes from the log. A run's live frames (text, thinking and tool-argument deltas) are different: they are not in the log, and when a client watches a run in progress its buffered frames may outnumber the outbox. They wait for room, stopping short of the last tenth of the outbox, which stays free for events, results and errors; the run's channel sheds the oldest frames a watcher falls behind on. A client that leaves no room for 30 seconds is closed (4429) like any other slow one.
 
 ## More than one process
 

@@ -77,7 +77,7 @@ export interface Snapshot<State> {
 /** Close codes after which reconnecting by itself can't help (both protocols' 4400, 4401, 4403). */
 const FINAL = new Set([4400, 4401, 4403]);
 
-/** The most to wait before each reconnect, in milliseconds; the last repeats. Full jitter. */
+/** The most to wait before each reconnect, in milliseconds; the last repeats. Equal jitter. */
 const BACKOFF = [100, 500, 1000, 2000, 5000];
 
 /**
@@ -176,6 +176,7 @@ export class Stream<State, Frame, Command, R extends Result, Hello> {
    */
   readonly reconnect = (): void => {
     this.#stopped = false;
+    this.#attempt = 0; // a fresh start: a refreshed token, or a person asking
     this.#detach();
     this.#connect();
   };
@@ -261,10 +262,13 @@ export class Stream<State, Frame, Command, R extends Result, Hello> {
       const ceiling = BACKOFF[Math.min(this.#attempt, BACKOFF.length - 1)] ?? 0;
       this.#attempt += 1;
       this.#update({ status: "connecting" });
-      this.#timer = setTimeout(() => {
-        this.#timer = null;
-        this.#connect();
-      }, Math.random() * ceiling);
+      this.#timer = setTimeout(
+        () => {
+          this.#timer = null;
+          this.#connect();
+        },
+        ceiling / 2 + (Math.random() * ceiling) / 2,
+      );
     };
   }
 

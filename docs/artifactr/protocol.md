@@ -246,7 +246,7 @@ A connection that watches an artifact sends where its person is on it, and is se
 | `4401` | Unauthenticated | re-authenticate |
 | `4403` | The actor may not open this workspace, or read its log or runs; or `resolve_actor` refused it with `Forbidden` | stop |
 | `4408` | `hello` not received in time | reconnect |
-| `4429` | The client did not read frames fast enough and its outbox overflowed | reconnect and resume |
+| `4429` | The client did not read frames fast enough: its outbox overflowed with events, results or errors, or left a run's live frames no room for 30 seconds | reconnect and resume |
 
 ## REST
 

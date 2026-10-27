@@ -1,20 +1,7 @@
 import { administered } from "@portalr/client";
-import { Account, NavLink, Plain, SideNav, TextLink } from "@portalr/ui";
+import { Account, ButtonLink, glyphs, NavLink, Plain, SideNav } from "@portalr/ui";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, notFound, Outlet } from "@tanstack/react-router";
-import {
-  Coins,
-  House,
-  KeyRound,
-  ListChecks,
-  Puzzle,
-  ScrollText,
-  SlidersHorizontal,
-  Terminal,
-  ThumbsUp,
-  Route as TracesIcon,
-  UsersRound,
-} from "lucide-react";
 import { allowedNow, anyPart, useAccess } from "../../../access";
 import { Frame } from "../../../frame";
 import { remember } from "../../../last";
@@ -65,7 +52,7 @@ function NotAdministered() {
       account={<Account signed={signed} />}
     >
       <p>admin shows a tenant to its owners and admins alone.</p>
-      <TextLink render={<Link to="/" />}>Choose another</TextLink>
+      <ButtonLink render={<Link to="/" />}>Choose another</ButtonLink>
     </Plain>
   );
 }
@@ -96,19 +83,22 @@ function Tenant() {
       nav={
         <SideNav label="Tenant">
           <NavLink
-            icon={House}
+            icon={glyphs.house}
             render={<Link to="/t/$tenant" params={{ tenant }} activeOptions={{ exact: true }} />}
           >
             Home
           </NavLink>
           {anyPart(allowed) && (
-            <NavLink icon={KeyRound} render={<Link to="/t/$tenant/access" params={{ tenant }} />}>
+            <NavLink
+              icon={glyphs.keyRound}
+              render={<Link to="/t/$tenant/access" params={{ tenant }} />}
+            >
               Access
             </NavLink>
           )}
           {allowed.has("grantr:manage_integrations") && (
             <NavLink
-              icon={Puzzle}
+              icon={glyphs.puzzle}
               render={<Link to="/t/$tenant/integrations" params={{ tenant }} />}
             >
               Integrations
@@ -116,47 +106,65 @@ function Tenant() {
           )}
           {(allowed.has("grantr:manage_settings") || (places && anywhere(places))) && (
             <NavLink
-              icon={SlidersHorizontal}
+              icon={glyphs.slidersHorizontal}
               render={<Link to="/t/$tenant/settings" params={{ tenant }} />}
             >
               Settings
             </NavLink>
           )}
           {allowed.has("grantr:read_audit") && (
-            <NavLink icon={ScrollText} render={<Link to="/t/$tenant/audit" params={{ tenant }} />}>
+            <NavLink
+              icon={glyphs.scrollText}
+              render={<Link to="/t/$tenant/audit" params={{ tenant }} />}
+            >
               Audit
             </NavLink>
           )}
           {allowed.has("portalr:read_telemetry") && (
-            <NavLink icon={ThumbsUp} render={<Link to="/t/$tenant/feedback" params={{ tenant }} />}>
+            <NavLink
+              icon={glyphs.thumbsUp}
+              render={<Link to="/t/$tenant/feedback" params={{ tenant }} />}
+            >
               Feedback
             </NavLink>
           )}
           {allowed.has("portalr:read_telemetry") && (
-            <NavLink icon={TracesIcon} render={<Link to="/t/$tenant/traces" params={{ tenant }} />}>
+            <NavLink
+              icon={glyphs.route}
+              render={<Link to="/t/$tenant/traces" params={{ tenant }} />}
+            >
               Traces
             </NavLink>
           )}
           {allowed.has("portalr:read_telemetry") && (
-            <NavLink icon={Terminal} render={<Link to="/t/$tenant/logs" params={{ tenant }} />}>
+            <NavLink
+              icon={glyphs.terminal}
+              render={<Link to="/t/$tenant/logs" params={{ tenant }} />}
+            >
               Logs
             </NavLink>
           )}
           {allowed.has("reflexr:read_runs") && (
-            <NavLink icon={ListChecks} render={<Link to="/t/$tenant/runs" params={{ tenant }} />}>
+            <NavLink
+              icon={glyphs.listChecks}
+              render={<Link to="/t/$tenant/runs" params={{ tenant }} />}
+            >
               Runs
             </NavLink>
           )}
           {allowed.has("portalr:read_telemetry") && (
             <NavLink
-              icon={UsersRound}
+              icon={glyphs.usersRound}
               render={<Link to="/t/$tenant/adoption" params={{ tenant }} />}
             >
               Adoption
             </NavLink>
           )}
           {allowed.has("portalr:read_spend") && (
-            <NavLink icon={Coins} render={<Link to="/t/$tenant/usage" params={{ tenant }} />}>
+            <NavLink
+              icon={glyphs.coins}
+              render={<Link to="/t/$tenant/usage" params={{ tenant }} />}
+            >
               Usage
             </NavLink>
           )}

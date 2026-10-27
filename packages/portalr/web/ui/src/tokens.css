@@ -19,6 +19,7 @@
   --space-2: 0.5rem;
   --space-3: 0.75rem;
   --space-4: 1rem;
+  --space-5: 1.25rem;
   --space-6: 1.5rem;
 
   /* Corners, from square to round: each a component's radius defaults to one of these. */
@@ -26,7 +27,7 @@
   --radius-1: 0.125rem;
   --radius-2: 0.25rem;
   --radius-3: 0.375rem;
-  --radius-4: 0.5rem;
+  --radius-4: 0.625rem;
   --radius-5: 0.75rem;
   --radius-6: 1rem;
   --radius-full: 2147483647px;
@@ -40,6 +41,7 @@
   --font-size-lg: 1.125rem;
   --font-size-xl: 1.25rem;
   --font-size-2xl: 1.5rem;
+  --font-size-3xl: 1.75rem;
   --weight-normal: 400;
   --weight-medium: 500;
   --weight-semibold: 600;
@@ -56,7 +58,7 @@
    * Elevation: a card's, a menu's or a tooltip's, and a dialog's or a drawer's (ADR-0039), each
    * cast in --shadow-color.
    */
-  --shadow-1: 0 1px 2px var(--shadow-color);
+  --shadow-1: 0 1px 1px var(--shadow-color);
   --shadow-2: 0 4px 12px -2px var(--shadow-color), 0 1px 3px var(--shadow-color);
   --shadow-3: 0 16px 40px -8px var(--shadow-color), 0 2px 6px var(--shadow-color);
 
@@ -78,20 +80,20 @@
    * The roles the components use: the paper, a surface on it, the text, the quiet text, a line,
    * and the working colour and what is written on it.
    */
-  --paper: light-dark(#f7f4fb, #17111f);
-  --surface: light-dark(#ffffff, #1f1829);
-  --fg: light-dark(#1c1d26, #f1eef6);
-  --muted: light-dark(#5e5470, #bdb2cc);
-  --line: light-dark(#dcd5e6, #3a3247);
-  --accent: var(--portalr-violet);
-  --on-accent: light-dark(#ffffff, #17111f);
+  --paper: light-dark(#fafafb, #121317);
+  --surface: light-dark(#ffffff, #191a1f);
+  --fg: light-dark(#16181d, #ebecef);
+  --muted: light-dark(#5b6271, #a3a8b3);
+  --line: light-dark(#e5e7eb, #2a2c34);
+  --accent: light-dark(var(--portalr-violet), #b798ec);
+  --on-accent: light-dark(#ffffff, #16181d);
 
   /*
    * The focus ring: the brand's violet in both schemes, lighter in the dark, never another ink. A
    * control's boundary: 3:1 or more on every surface, as WCAG asks of one.
    */
-  --focus: light-dark(#6b2fa0, #a77bdf);
-  --edge: light-dark(#857a97, #7d7091);
+  --focus: light-dark(#6b2fa0, #b798ec);
+  --edge: light-dark(#80808a, #75757f);
 
   /*
    * Status, as marks and never as text: a rose red for what failed, was dead-lettered or is an
@@ -103,7 +105,7 @@
   --status-failed: light-dark(#8a0f2c, #f391b1);
   --status-warn: light-dark(#9c821c, #f9e890);
   --danger: var(--status-failed);
-  --on-danger: light-dark(#ffffff, #17111f);
+  --on-danger: light-dark(#ffffff, #16181d);
 
   /*
    * A chart's series, in this order and no more: tints of the brand violet, then one accent, a
@@ -149,8 +151,8 @@
    * How wide a page's content is, at most; a table row's least height, its padding and its words
    * (admin's compact density changes the last three, ADR-0039).
    */
-  --page-width: 75rem;
-  --row-height: 2.75rem;
+  --page-width: 64rem;
+  --row-height: 3rem;
   --row-pad: 0.5rem;
   --table-text: 0.875rem;
 
@@ -158,8 +160,8 @@
    * Behind a drawer or a dialog; and what a raised thing casts, faint in light and, to be seen on
    * the dark paper, black and heavier in dark.
    */
-  --scrim: light-dark(rgb(28 29 38 / 45%), rgb(0 0 0 / 60%));
-  --shadow-color: light-dark(rgb(40 20 70 / 16%), rgb(0 0 0 / 65%));
+  --scrim: light-dark(rgb(16 16 24 / 40%), rgb(0 0 0 / 60%));
+  --shadow-color: light-dark(rgb(16 16 24 / 6%), rgb(0 0 0 / 55%));
 
   /*
    * The focus ring: how wide it is, and how far from what it rings (inside a row, the same
@@ -169,12 +171,19 @@
   --focus-offset: 2px;
 
   /*
+   * A control's feedback: how long its colours take to follow the pointer and the keyboard when it
+   * is hovered, pressed or chosen, and how they ease; a button's are its own (portalr ADR-0079).
+   */
+  --feedback-duration: var(--duration-fast);
+  --feedback-ease: var(--ease-in-out);
+
+  /*
    * A button: its corners, its padding at each size, its words' weight, how far it moves down when
    * pressed, and how its colours change (portalr ADR-0037).
    */
   --button-radius: var(--radius-3);
   --button-pad-x: var(--space-3);
-  --button-pad-y: var(--space-1-5);
+  --button-pad-y: var(--space-2);
   --button-sm-pad-x: var(--space-2);
   --button-sm-pad-y: var(--space-1);
   --button-weight: var(--weight-semibold);
@@ -188,7 +197,7 @@
    */
   --input-radius: var(--radius-3);
   --input-pad-x: var(--space-3);
-  --input-pad-y: var(--space-1-5);
+  --input-pad-y: var(--space-2);
   --checkbox-radius: var(--radius-2);
   --checkbox-size: var(--space-4);
   --switch-width: 2.25rem;
@@ -205,7 +214,7 @@
 
   /* A card, and an empty state, which is one: corners, padding and what it casts. */
   --card-radius: var(--radius-4);
-  --card-pad: var(--space-4);
+  --card-pad: var(--space-5);
   --card-shadow: var(--shadow-1);
   --empty-state-pad: var(--space-6);
 
@@ -215,7 +224,7 @@
    * (portalr ADR-0039).
    */
   --dialog-radius: var(--radius-4);
-  --dialog-pad: 1.25rem;
+  --dialog-pad: var(--space-5);
   --dialog-width: 32rem;
   --dialog-margin: 2rem;
   --dialog-shadow: var(--shadow-3);
@@ -249,15 +258,13 @@
   --notice-shadow: var(--shadow-3);
 
   /*
-   * The frame's navigation: a nav link's corners and padding, its count's pill, the header's
-   * triggers (the switcher, the account menu, the home link), the room a narrow window's pinned
-   * header takes, which a scroll stops below, the rail's width, and the drawer's width, shadow and
-   * slide.
+   * The frame's navigation: a nav link's corners and padding, the header's triggers (the switcher,
+   * the account menu, the home link), the room a narrow window's pinned header takes, which a
+   * scroll stops below, the rail's width, and the drawer's width, shadow and slide.
    */
   --nav-radius: var(--radius-3);
   --nav-pad-x: var(--space-3);
   --nav-pad-y: var(--space-2);
-  --nav-count-radius: var(--radius-full);
   --header-clearance: 3.5rem;
   --header-trigger-radius: var(--radius-3);
   --header-trigger-pad-x: var(--space-3);
@@ -277,15 +284,14 @@
    * are the roles above, which admin's compact density sets.
    */
   --table-radius: var(--radius-4);
-  --table-cell-pad-x: var(--space-3);
+  --table-cell-pad-x: var(--space-4);
 
   /*
-   * A status badge: its pill's corners and padding. Its shapes are status marks, which tell each
-   * status apart for every reader, and are not a kit's to change (portalr ADR-0039).
+   * A status badge: its corners and padding. Its shapes are status marks, which tell each status
+   * apart for every reader, and are not a kit's to change (portalr ADR-0039).
    */
-  --badge-radius: var(--radius-full);
+  --badge-radius: var(--radius-3);
   --badge-pad-y: var(--space-half);
-  --badge-pad-start: var(--space-1-5);
   --badge-pad-end: var(--space-2);
 
   /*
@@ -316,11 +322,11 @@
   --tool-call-pad-y: var(--space-2);
   --tool-call-result-radius: var(--radius-3);
   --question-radius: var(--radius-4);
-  --question-pad: var(--space-4);
+  --question-pad: var(--space-5);
   --question-option-radius: var(--radius-3);
   --question-option-pad-x: var(--space-3);
-  --question-option-pad-y: 0.625rem;
-  --question-chip-radius: var(--radius-full);
+  --question-option-pad-y: 0.75rem;
+  --question-chip-radius: var(--radius-2);
 
   /*
    * A disclosure, a part that opens and closes: its trigger's least height, so a pointer has a
@@ -337,13 +343,12 @@
    * The chat: a message's bubble, its corners and the smaller corner it points from, its padding
    * and its widest; and the composer's corners and padding (portalr ADR-0053).
    */
-  --bubble-radius: var(--radius-6);
+  --bubble-radius: var(--radius-4);
   --bubble-max-width: 42rem;
-  --bubble-tail-radius: var(--radius-2);
-  --bubble-pad-x: 0.875rem;
-  --bubble-pad-y: var(--space-2);
+  --bubble-pad-x: var(--space-4);
+  --bubble-pad-y: var(--space-3);
   --composer-radius: var(--radius-4);
-  --composer-pad: var(--space-1);
+  --composer-pad: var(--space-2);
 
   /*
    * An alert's corners and padding; inline code's corners and padding; and the sign-in card's
@@ -355,7 +360,7 @@
   --code-inline-radius: var(--radius-2);
   --code-inline-pad-x: var(--space-1-5);
   --code-inline-pad-y: var(--space-half);
-  --sign-in-radius: var(--radius-5);
+  --sign-in-radius: var(--radius-4);
   --sign-in-pad: 2rem;
 
   /* A panel of preformatted text, a tool's result or a span's input: its padding on every side. */
@@ -376,7 +381,7 @@
    * A list's row: its padding, the gap between what it is and its end, and between its title's
    * line and its meta's (portalr ADR-0060).
    */
-  --list-row-pad-x: var(--space-2);
+  --list-row-pad-x: var(--space-4);
   --list-row-pad-y: var(--space-3);
   --list-row-gap: var(--space-3);
   --list-row-line-gap: var(--space-half);

@@ -169,6 +169,7 @@ test("a line is asked for by its record, once, and shown in its colours; another
 
 test("other filters are another page: nothing asked carries over", async () => {
   const { screen, router } = await open("/t/acme/logs");
+  await screen.getByRole("button", { name: /^Find…/ }).click();
   await screen.getByRole("button", { name: "Show this line" }).click();
   await expect.element(screen.getByText(/launch on Tuesday/)).toBeVisible();
   expect(lines()).toHaveLength(1);
@@ -185,6 +186,7 @@ test("other filters are another page: nothing asked carries over", async () => {
 
 test("a window and a run go to portalr and into the address, and clearing puts them back", async () => {
   const { screen, router } = await open("/t/acme/logs");
+  await screen.getByRole("button", { name: /^Find…/ }).click();
   await screen
     .getByRole("radiogroup", { name: "Window" })
     .getByRole("radio", { name: "6 hours" })

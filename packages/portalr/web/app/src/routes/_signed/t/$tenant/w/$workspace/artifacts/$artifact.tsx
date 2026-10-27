@@ -1,8 +1,10 @@
 import { allowedIn, keys, Refused, thumbs, useMe, workspaceOf } from "@portalr/client";
 import { changes } from "@portalr/client/diff";
 import {
+  ActionsMenu,
   AppHostContext,
   ArtifactContent,
+  ButtonLink,
   Card,
   CRUMB,
   FormHostContext,
@@ -12,8 +14,6 @@ import {
   proposedOn,
   Revisions,
   SectionTitle,
-  TextLink,
-  Thumbs,
 } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
@@ -127,7 +127,8 @@ function Artifact() {
     (proposal) => proposal.status === "open" && proposedOn(proposal) === id,
   );
   const feedback = allowed.has("artifactr:give_feedback") && (
-    <Thumbs
+    <ActionsMenu
+      label="Artifact actions"
       given={thumbs(
         (snapshot.state.artifacts[id]?.feedback ?? []).filter(
           (given) => given.version === latest.version,
@@ -176,7 +177,7 @@ function Artifact() {
           .join(", ")}
         actions={feedback}
       />
-      <Connection snapshot={snapshot} waiting="the workspace" />
+      <Connection snapshot={snapshot} onReconnect={stream.reconnect} waiting="the workspace" />
       <Card>
         <FormHostContext value={host}>
           <AppHostContext value={apps}>
@@ -257,11 +258,11 @@ function NotFound() {
     <NotFoundPage
       title="Artifact not found"
       action={
-        <TextLink
+        <ButtonLink
           render={<Link to="/t/$tenant/w/$workspace/artifacts" params={{ tenant, workspace }} />}
         >
           All artifacts
-        </TextLink>
+        </ButtonLink>
       }
     >
       There's no artifact here by that name, or it isn't one you can see.

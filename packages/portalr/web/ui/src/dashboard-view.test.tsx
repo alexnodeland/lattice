@@ -382,6 +382,13 @@ describe("a table panel, once the dashboards add-on is in", () => {
     expect(button.matches(":focus-visible")).toBe(true);
     expect(getComputedStyle(button).outlineColor).toBe(token("focus"));
   });
+
+  test("a column's heading is a target 24px tall or more, the kit's small ghost button", async () => {
+    const screen = await table();
+    const button = screen.getByRole("columnheader", { name: /Ticket/ }).getByRole("button");
+    expect(button.element().getBoundingClientRect().height).toBeGreaterThanOrEqual(24);
+    expect(getComputedStyle(button.element()).backgroundColor).toBe("rgba(0, 0, 0, 0)");
+  });
 });
 
 test("with dashboards off, a chart isn't drawn, its figures from the panel are open, and a table is plain", async () => {

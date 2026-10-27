@@ -13,35 +13,35 @@ import {
   Alert,
   ASK_FORM,
   ASK_USER,
-  Button,
+  ButtonLink,
   Composer,
   ComposerDock,
   CRUMB,
   Message,
   Messages,
+  ModeSwitch,
   NotFound as NotFoundPage,
   PageHeader,
   ProposalCard,
   Questions,
   Request,
   RunFailed,
-  RunStatus,
+  RunSteps,
+  RunStrip,
   rendererFor,
   Streaming,
-  TextLink,
-  ToolCall,
-  ToolCalls,
 } from "@portalr/ui";
 import {
   type UseSuspenseQueryOptions,
   useSuspenseQueries,
   useSuspenseQuery,
 } from "@tanstack/react-query";
-import { CatchBoundary, createFileRoute, Link } from "@tanstack/react-router";
+import { CatchBoundary, createFileRoute, Link, useRouterState } from "@tanstack/react-router";
 import { type ReactNode, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { author, unnamedPeople } from "../../../../../../../author";
 import { usePosting } from "../../../../../../../posting";
 import { RENDERERS } from "../../../../../../../renderers";
+import { markSeen } from "../../../../../../../seen";
 import { ShareDialog } from "../../../../../../../share-dialog";
 import { ThreadArtifact } from "../../../../../../../thread-artifact";
 import { RETRY_TAKEN, retryOf, threadLog } from "../../../../../../../thread-log";
@@ -56,6 +56,8 @@ import { Connection, useStream, useWorkspace } from "../../../../../../../worksp
 const ACTIONS = [
   "artifactr:read_threads",
   "artifactr:post_message",
+  "artifactr:stop_run",
+  "artifactr:set_thread_mode",
   "grantr:grant",
   "grantr:revoke",
   "grantr:restrict",
@@ -159,6 +161,8 @@ function Chat() {
   const { threads, runs, proposals, artifacts } = snapshot.state;
   const thread = threads[id];
   const { posting, post } = usePosting(thread?.messages);
+  // Files dropped on the composer, for the uploader it holds (portalr ADR-0080).
+  const [dropped, setDropped] = useState<FileList | null>(null);
   // The people who posted without a name of their own, named when drawn: the stream's state
   // holds the actors as the server sent them, never an email.
   const names = usePeople(
@@ -193,20 +197,45 @@ function Chat() {
       });
     }
   }, [snapshot.status, runs, id, atLoad]);
+  // How far this browser has read the thread: where it is active at, once shown live (portalr
+  // ADR-0080), for the list's mark of what has moved since.
+  const readTo = thread?.active;
+  useEffect(() => {
+    if (snapshot.status !== "live" || readTo === undefined) {
+      return;
+    }
+    // A tab out of sight hasn't been read: marked as it comes into view.
+    const mark = () => {
+      if (document.visibilityState === "visible") {
+        markSeen(tenant, workspace, id, readTo);
+      }
+    };
+    mark();
+    document.addEventListener("visibilitychange", mark);
+    return () => document.removeEventListener("visibilitychange", mark);
+  }, [snapshot.status, tenant, workspace, id, readTo]);
+  // Opened at a request, as from Needs you (portalr ADR-0080): once the thread is shown live, the
+  // page goes to it, as Go to the question does.
+  const hash = useRouterState({ select: (state) => state.location.hash });
+  useEffect(() => {
+    if (atLoad?.id === id && hash.startsWith("request-")) {
+      toRequest(hash.slice("request-".length));
+    }
+  }, [atLoad, id, hash]);
   if (thread === undefined) {
     return snapshot.status === "live" ? (
       <NotFoundPage
         title="Thread not found"
         action={
-          <TextLink render={<Link to="/t/$tenant/w/$workspace" params={{ tenant, workspace }} />}>
+          <ButtonLink render={<Link to="/t/$tenant/w/$workspace" params={{ tenant, workspace }} />}>
             All threads
-          </TextLink>
+          </ButtonLink>
         }
       >
         There's no thread here by that name, or it isn't one you can see.
       </NotFoundPage>
     ) : (
-      <Connection snapshot={snapshot} waiting="the thread" />
+      <Connection snapshot={snapshot} onReconnect={stream.reconnect} waiting="the thread" />
     );
   }
   if (!allowed.has("artifactr:read_threads")) {
@@ -263,15 +292,7 @@ function Chat() {
     latestRequest !== undefined &&
     atLoad?.id === id &&
     !atLoad.waiting.has(latestRequest.tool_call_id);
-  // To the question's own named part, such as "The agent asks", or else to where it is.
-  const toQuestion = () => {
-    const at = document.getElementById(`request-${latestRequest?.tool_call_id}`);
-    const named = at?.querySelector<HTMLElement>("[aria-label], [aria-labelledby]") ?? at;
-    if (named && !named.hasAttribute("tabindex")) {
-      named.tabIndex = -1;
-    }
-    named?.focus();
-  };
+  const toQuestion = () => toRequest(latestRequest?.tool_call_id);
 
   return (
     <section
@@ -285,10 +306,12 @@ function Chat() {
         id="thread"
         actions={
           <>
-            {latestRequest !== undefined && (
-              <Button variant="secondary" size="sm" onClick={toQuestion}>
-                Go to the question
-              </Button>
+            {snapshot.status !== "closed" && allowed.has("artifactr:set_thread_mode") && (
+              <ModeSwitch
+                mode={thread.mode}
+                disabled={snapshot.status !== "live"}
+                onChange={(mode) => stream.send({ type: "set_thread_mode", thread_id: id, mode })}
+              />
             )}
             {(allowed.has("grantr:grant") || allowed.has("grantr:restrict")) && (
               <CatchBoundary
@@ -305,7 +328,7 @@ function Chat() {
           </>
         }
       />
-      <Connection snapshot={snapshot} waiting="the thread" />
+      <Connection snapshot={snapshot} onReconnect={stream.reconnect} waiting="the thread" />
       <Messages>
         {log.map((entry) => {
           switch (entry.kind) {
@@ -322,11 +345,11 @@ function Chat() {
               );
             case "tools":
               return (
-                <ToolCalls key={entry.tools[0]?.[0]}>
-                  {entry.tools.map(([call, tool]) => (
-                    <ToolCall key={call} tool={tool} />
-                  ))}
-                </ToolCalls>
+                <RunSteps
+                  key={entry.tools[0]?.[0]}
+                  tools={entry.tools}
+                  running={entry.run.status === "running"}
+                />
               );
             case "question": {
               const { request, answer: given } = entry.question;
@@ -401,7 +424,14 @@ function Chat() {
       </Messages>
       {active.map((run) => (
         <div key={run.id} className="flex flex-col gap-2">
-          <RunStatus status={run.status} />
+          <RunStrip
+            run={run}
+            {...(run.status === "running" &&
+              allowed.has("artifactr:stop_run") && {
+                onStop: () => stream.send({ type: "stop_run", run_id: run.id }),
+              })}
+            {...(run.requests.length > 0 && { onQuestion: toQuestion })}
+          />
           {[
             ...run.requests
               .filter((request) => request.tool_name !== ASK_USER)
@@ -440,10 +470,23 @@ function Chat() {
       ))}
       {snapshot.status !== "closed" && allowed.has("artifactr:post_message") && (
         <ComposerDock>
-          <Composer disabled={snapshot.status !== "live"} onSend={send} />
+          <Composer
+            onSend={send}
+            onFiles={setDropped}
+            attach={
+              <Uploader
+                context={context}
+                tenant={tenant}
+                workspace={workspace}
+                thread={id}
+                attach
+                files={dropped}
+              />
+            }
+          />
         </ComposerDock>
       )}
-      {snapshot.status !== "closed" && (
+      {snapshot.status !== "closed" && !allowed.has("artifactr:post_message") && (
         <Uploader context={context} tenant={tenant} workspace={workspace} thread={id} />
       )}
     </section>
@@ -614,4 +657,14 @@ function Sharing({
       )}
     </div>
   );
+}
+
+/** To a request's own named part, such as "The agent asks", or else to where it is. */
+function toRequest(toolCallId: string | undefined) {
+  const at = document.getElementById(`request-${toolCallId}`);
+  const named = at?.querySelector<HTMLElement>("[aria-label], [aria-labelledby]") ?? at;
+  if (named && !named.hasAttribute("tabindex")) {
+    named.tabIndex = -1;
+  }
+  named?.focus();
 }

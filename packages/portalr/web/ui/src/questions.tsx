@@ -10,16 +10,25 @@ import { CheckboxGroup } from "@base-ui/react/checkbox-group";
 import { Radio } from "@base-ui/react/radio";
 import { RadioGroup } from "@base-ui/react/radio-group";
 import type { ArtifactrV1 } from "@portalr/client";
-import { Bot, Check } from "lucide-react";
-import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from "react";
+import {
+  type FormEvent,
+  type KeyboardEvent,
+  type ReactNode,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
 import { Alert } from "./alert";
 import { Badge } from "./badge";
 import { Button } from "./button";
 import { cn } from "./cn";
 import { FieldGroup } from "./field-group";
 import { Icon } from "./icon";
+import { glyphs } from "./icons";
 import { isObject, isString, own } from "./json";
 import { type Sent, Unsent, useSending } from "./sending";
+import { ASKING, FEEDBACK, RING } from "./states";
 import { TextField } from "./text-field";
 import { TYPE } from "./type";
 
@@ -107,12 +116,12 @@ export function Questions({
     <section
       aria-label={given === null ? "The agent asks" : "The agent asked"}
       className={cn(
-        "flex flex-col gap-4 rounded-(--question-radius) border bg-surface p-(--question-pad) text-sm",
-        given === null ? "border-accent" : "border-line",
+        "flex flex-col gap-4 rounded-(--question-radius) border border-line bg-surface p-(--question-pad) text-sm",
+        given === null && ASKING,
       )}
     >
-      <p className={cn(TYPE.note, "inline-flex items-center gap-1.5")}>
-        <Icon icon={Bot} className="size-3.5" />
+      <p className={cn(TYPE.meta, "inline-flex items-center gap-2")}>
+        <Icon icon={glyphs.bot} className={cn("size-4", given === null && "text-accent")} />
         {given === null ? "The agent asks" : "The agent asked"}
       </p>
       {questions === null ? (
@@ -128,7 +137,19 @@ export function Questions({
   );
 }
 
-/** The questions as a form, sent once every one is answered. */
+/** A step of a stepped ask: one of the questions, or, past them, the review. */
+function unansweredAt(questions: readonly Question[], choosing: readonly Choosing[]) {
+  return questions.map((question, at) => unanswered(question, choosing[at] as Choosing));
+}
+
+/**
+ * The questions as a form, sent once every one is answered. More than one is stepped (portalr
+ * ADR-0080): one question a view, Back and Next between them, "2 of 3" said as it moves and a
+ * dot per question that fills as it is answered, then a review of every answer with a way back
+ * to change each, and one Answer that sends them all as one reply, as a single question is sent.
+ * Each step lands the focus on the question's words; Enter goes on to the next step, and the
+ * arrow keys do where the focus isn't in an option or a field. Nothing slides: a step is a cut.
+ */
 function Asking({
   questions,
   focus,
@@ -145,6 +166,13 @@ function Asking({
   const [sent, setSent] = useState(false);
   const { pending, unsent, send } = useSending();
   const form = useRef<HTMLFormElement>(null);
+  const stepped = questions.length > 1;
+  // The step: a question's index, or, past the last, the review.
+  const [step, setStep] = useState(0);
+  const review = stepped && step === questions.length;
+  // Whether the step was moved to by the reader, whose focus then lands on its words.
+  const moved = useRef(false);
+  const progress = useId();
   useEffect(() => {
     if (!focus) {
       return;
@@ -156,22 +184,52 @@ function Asking({
     );
     return () => cancelAnimationFrame(first);
   }, [focus]);
+  useEffect(() => {
+    if (moved.current) {
+      moved.current = false;
+      form.current?.querySelector<HTMLElement>("[data-step-heading]")?.focus();
+    }
+  }, [step]);
   function choose(at: number, change: Choosing) {
     setChoosing((all) => all.map((each, index) => (index === at ? change : each)));
     setErrors((all) => all.map((each, index) => (index === at ? null : each)));
   }
+  /** To the words, if they are what's missing, or else to the question's first option. */
+  function attend() {
+    const asked = form.current?.querySelector<HTMLElement>("[data-question]");
+    (
+      asked?.querySelector<HTMLElement>("[data-words]") ??
+      asked?.querySelector<HTMLElement>("[role=radio], [role=checkbox]")
+    )?.focus();
+  }
+  function go(to: number) {
+    moved.current = true;
+    setStep(to);
+  }
+  /** On to the next step, once this question is answered. */
+  function next() {
+    const found = unanswered(questions[step] as Question, choosing[step] as Choosing);
+    if (found !== null) {
+      setErrors((all) => all.map((each, at) => (at === step ? found : each)));
+      attend();
+      return;
+    }
+    go(step + 1);
+  }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const found = questions.map((question, at) => unanswered(question, choosing[at] as Choosing));
+    if (stepped && !review) {
+      next();
+      return;
+    }
+    const found = unansweredAt(questions, choosing);
     setErrors(found);
     const first = found.findIndex((error) => error !== null);
     if (first !== -1) {
-      // To the words, if they are what's missing, or else to the question's first option.
-      const asked = form.current?.querySelectorAll<HTMLElement>("[data-question]")[first];
-      (
-        asked?.querySelector<HTMLElement>("[data-words]") ??
-        asked?.querySelector<HTMLElement>("[role=radio], [role=checkbox]")
-      )?.focus();
+      if (stepped) {
+        go(first);
+      }
+      requestAnimationFrame(attend);
       return;
     }
     const answers = choosing.map(({ selected, other }) => ({
@@ -180,23 +238,101 @@ function Asking({
     }));
     setSent(await send(() => onAnswer({ answers })));
   }
+  function keys(event: KeyboardEvent<HTMLFormElement>) {
+    if (!stepped || closed) {
+      return;
+    }
+    const at = event.target as HTMLElement;
+    if (at.closest("[role=radio], [role=checkbox], input, textarea, button")) {
+      return;
+    }
+    // On, and back, in the writing's direction: in a right-to-left page the arrows swap.
+    const rtl = getComputedStyle(event.currentTarget).direction === "rtl";
+    const [on, back] = rtl ? ["ArrowLeft", "ArrowRight"] : ["ArrowRight", "ArrowLeft"];
+    if (event.key === on && !review) {
+      event.preventDefault();
+      next();
+    } else if (event.key === back && step > 0) {
+      event.preventDefault();
+      go(step - 1);
+    }
+  }
   const closed = sent || pending;
+  const answered = unansweredAt(questions, choosing).map((error) => error === null);
   return (
-    <form ref={form} aria-label="The agent asks" className="flex flex-col gap-5" onSubmit={submit}>
-      {questions.map((question, at) => (
-        <Asked
-          key={question.question}
-          question={question}
-          choosing={choosing[at] as Choosing}
-          error={errors[at] ?? null}
-          disabled={closed}
-          onChange={(change) => choose(at, change)}
-        />
-      ))}
+    <form
+      ref={form}
+      aria-label="The agent asks"
+      aria-describedby={stepped ? progress : undefined}
+      className="flex flex-col gap-5"
+      onSubmit={submit}
+      onKeyDown={keys}
+    >
+      {stepped && (
+        <div className="flex items-center justify-end gap-3">
+          <p id={progress} aria-live="polite" className={cn(TYPE.note, "tabular-nums")}>
+            {review ? "Review your answers" : `Step ${step + 1} of ${questions.length}`}
+          </p>
+          {/* Three bars: what is done, where we are, and what is next (portalr ADR-0081). */}
+          <span aria-hidden="true" className="flex items-center gap-1">
+            {questions.map((question, at) => (
+              <span
+                key={question.question}
+                className={cn(
+                  "h-1 w-3 rounded-full",
+                  at === step && !review
+                    ? "bg-accent"
+                    : answered[at] || review
+                      ? "bg-accent opacity-45"
+                      : "bg-edge",
+                )}
+              />
+            ))}
+          </span>
+        </div>
+      )}
+      {review ? (
+        <Review questions={questions} choosing={choosing} onChange={go} />
+      ) : (
+        questions.map(
+          (question, at) =>
+            (!stepped || at === step) && (
+              <Asked
+                key={question.question}
+                question={question}
+                choosing={choosing[at] as Choosing}
+                error={errors[at] ?? null}
+                disabled={closed}
+                stepped={stepped}
+                onChange={(change) => choose(at, change)}
+              />
+            ),
+        )
+      )}
       <div className="flex flex-col gap-1">
-        <Button type="submit" className="self-start" disabled={closed}>
-          Answer
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          {stepped && step > 0 && (
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={closed}
+              onClick={() => go(step - 1)}
+            >
+              Back
+            </Button>
+          )}
+          {/* Keyed apart: React reusing one button for both would make the click that reached
+              the review submit it, as the node turned into the submit button under the pointer. */}
+          {stepped && !review ? (
+            <Button key="next" type="button" onClick={next} disabled={closed}>
+              Next
+            </Button>
+          ) : (
+            <Button key="answer" type="submit" disabled={sent} pending={pending}>
+              Answer
+            </Button>
+          )}
+        </div>
         <p className={TYPE.note}>Or reply in a message, in your own words.</p>
       </div>
       <Unsent reason={unsent} />
@@ -204,10 +340,57 @@ function Asking({
   );
 }
 
+/** The review before the answers go: each question's answer, and a way back to change it. */
+function Review({
+  questions,
+  choosing,
+  onChange,
+}: {
+  questions: readonly Question[];
+  choosing: readonly Choosing[];
+  onChange: (at: number) => void;
+}) {
+  return (
+    <dl className="flex flex-col gap-2">
+      <dt className="sr-only">Your answers</dt>
+      {questions.map((question, at) => {
+        const chosen = choosing[at] as Choosing;
+        const said = [...chosen.selected, ...(chosen.other ? [chosen.other.trim()] : [])];
+        return (
+          <div
+            key={question.question}
+            className="flex items-center justify-between gap-3 rounded-(--button-radius) bg-subtle px-3 py-2"
+          >
+            <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
+              <span aria-hidden="true" className="font-mono text-muted text-xs tabular-nums">
+                {at + 1}
+              </span>
+              <dt className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+                <Header>{question.header}</Header>
+                <span
+                  data-step-heading={at === 0 ? "" : undefined}
+                  tabIndex={at === 0 ? -1 : undefined}
+                  className="text-muted outline-none"
+                >
+                  {question.question}
+                </span>
+              </dt>
+              <dd className="font-medium text-fg">{said.join(", ") || "Not answered"}</dd>
+            </div>
+            <Button type="button" variant="ghost" size="sm" onClick={() => onChange(at)}>
+              Change<span className="sr-only"> {question.header}</span>
+            </Button>
+          </div>
+        );
+      })}
+    </dl>
+  );
+}
+
 /** A question's header, as a chip. */
 function Header({ children }: { children: ReactNode }) {
   return (
-    <span className="inline-flex max-w-full shrink-0 items-center truncate rounded-(--question-chip-radius) border border-line bg-wash px-2 py-0.5 font-semibold text-fg text-xs">
+    <span className="inline-flex max-w-full shrink-0 items-center truncate rounded-(--question-chip-radius) bg-subtle px-2 py-0.5 font-medium text-muted text-xs">
       {children}
     </span>
   );
@@ -219,12 +402,15 @@ function Asked({
   choosing,
   error,
   disabled,
+  stepped = false,
   onChange,
 }: {
   question: Question;
   choosing: Choosing;
   error: string | null;
   disabled: boolean;
+  /** Whether it is one step of several, whose words take the focus as the step is shown. */
+  stepped?: boolean;
   onChange: (change: Choosing) => void;
 }) {
   const words = useRef<HTMLInputElement>(null);
@@ -255,7 +441,13 @@ function Asked({
   const label = (
     <span className="flex flex-col items-start gap-1.5">
       <Header>{question.header}</Header>
-      <span className="font-semibold text-base text-fg">{question.question}</span>
+      <span
+        data-step-heading={stepped ? "" : undefined}
+        tabIndex={stepped ? -1 : undefined}
+        className={cn(TYPE.subsection, "outline-none")}
+      >
+        {question.question}
+      </span>
     </span>
   );
   return (
@@ -304,12 +496,17 @@ function Asked({
 }
 
 /** An option's row, which is its control: checked, it is edged and washed in the working colour. */
-const ROW =
-  "group flex w-full cursor-pointer items-start gap-3 rounded-(--question-option-radius) border border-line bg-surface px-(--question-option-pad-x) py-(--question-option-pad-y) text-start outline-offset-(--focus-offset) hover:border-edge focus-visible:outline-(length:--focus-width) focus-visible:outline-focus data-checked:border-accent data-checked:bg-wash data-disabled:cursor-not-allowed data-disabled:hover:border-line";
+const ROW = cn(
+  "group flex w-full cursor-pointer items-start gap-3 rounded-(--question-option-radius) border border-line bg-surface px-(--question-option-pad-x) py-(--question-option-pad-y) text-start hover:border-edge data-checked:border-accent data-checked:bg-wash data-disabled:cursor-not-allowed data-disabled:hover:border-line",
+  RING,
+  FEEDBACK,
+);
 
 /** The mark in an option's row: a ring, or a box, filled in the working colour once checked. */
-const MARK =
-  "mt-0.5 grid size-4 shrink-0 place-items-center border border-edge bg-surface group-data-checked:border-accent";
+const MARK = cn(
+  "mt-0.5 grid size-4 shrink-0 place-items-center border border-edge bg-surface group-data-checked:border-accent",
+  FEEDBACK,
+);
 
 /**
  * One option, as a row that is its radio or its checkbox, so the whole of it chooses it: named by
@@ -350,7 +547,7 @@ function OptionRow({
     <Checkbox.Root {...named} value={option.value} className={ROW}>
       <span className={cn(MARK, "rounded group-data-checked:bg-accent")}>
         <Checkbox.Indicator className="text-on-accent">
-          <Icon icon={Check} className="size-3" />
+          <Icon icon={glyphs.check} className="size-3" />
         </Checkbox.Indicator>
       </span>
       {words}

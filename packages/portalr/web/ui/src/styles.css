@@ -14,6 +14,18 @@
 /* Streamdown renders with Tailwind classes of its own, which Tailwind finds here. */
 @source "../node_modules/streamdown/dist/*.js";
 
+/*
+ * A pointer that hovers, such as a mouse, and one that can't, such as a finger (portalr ADR-0080):
+ * what a hover reveals on the first is on the surface, or behind a long press, on the second.
+ */
+@custom-variant fine (@media (hover: hover));
+@custom-variant coarse (@media (hover: none));
+/*
+ * A short window, as at a high zoom or a phone turned on its side: what is pinned to the bottom
+ * would cover most of the page, so the composer's dock stays in the flow (`short:static`).
+ */
+@custom-variant short (@media (max-height: 30rem));
+
 @layer base {
   html {
     background-color: var(--paper);
@@ -36,7 +48,7 @@
    * page without the frame has nothing pinned, so keeps none either.
    */
   html:has([data-frame-header]) {
-    scroll-padding-top: var(--header-clearance);
+    scroll-padding-top: calc(var(--header-clearance) + env(safe-area-inset-top));
     @variant lg {
       scroll-padding-top: 0;
     }
@@ -63,11 +75,33 @@
   html:has([data-composer-dock]:focus-within) {
     scroll-padding-bottom: 0;
   }
+
+  /*
+   * A phone's safe areas (portalr ADR-0080): the viewport reaches the screen's edges, so the page
+   * keeps the sides clear, the header pinned to the top keeps the notch clear itself (its own
+   * padding, in `app-shell.tsx`, and the room it takes below), a composer pinned to the bottom
+   * keeps the home indicator clear, and the drawer, which stands over the page, keeps the top,
+   * the bottom and its own side clear itself.
+   */
+  body {
+    padding-right: env(safe-area-inset-right);
+    padding-left: env(safe-area-inset-left);
+  }
+  [data-composer-dock] {
+    padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+  }
+  [data-frame-drawer] {
+    padding-top: calc(var(--space-3) + env(safe-area-inset-top));
+    padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom));
+    padding-left: calc(var(--space-3) + env(safe-area-inset-left));
+  }
 }
 
 @theme inline {
   --color-*: initial;
   --color-paper: var(--paper);
+  --color-subtle: var(--subtle);
+  --color-outline: var(--outline);
   --color-surface: var(--surface);
   --color-fg: var(--fg);
   --color-muted: var(--muted);
@@ -121,6 +155,7 @@
   --text-lg: var(--font-size-lg);
   --text-xl: var(--font-size-xl);
   --text-2xl: var(--font-size-2xl);
+  --text-3xl: var(--font-size-3xl);
   --font-weight-normal: var(--weight-normal);
   --font-weight-medium: var(--weight-medium);
   --font-weight-semibold: var(--weight-semibold);
@@ -131,13 +166,12 @@
 }
 
 /*
- * A native file's box turning from its preview to its editor and back (portalr ADR-0055): a
- * short turn into place, and none where motion is reduced.
+ * A native file's box going from its preview to its editor and back (portalr ADR-0055): a short
+ * fade in, no turn (portalr ADR-0080), and none where motion is reduced.
  */
 @keyframes flip-in {
   from {
     opacity: 0;
-    transform: perspective(1600px) rotateY(-8deg);
   }
 }
 

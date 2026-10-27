@@ -333,3 +333,32 @@ test("revisions read again, with the same data, are not compared again", async (
   await expect.element(screen.getByRole("tab", { name: "Changes" })).toBeVisible();
   expect(counted.mock.calls.length).toBe(calls);
 });
+
+test("one revision is open at a time: opening another closes it, and a newer one opens as it arrives", async () => {
+  const screen = await shown(APP_REVISIONS);
+  const summary = (name: string) =>
+    screen
+      .getByRole("listitem", { name })
+      .element()
+      .querySelector("[aria-expanded]") as HTMLElement;
+  expect(summary("Version 2").getAttribute("aria-expanded")).toBe("true");
+  expect(summary("Version 1").getAttribute("aria-expanded")).toBe("false");
+  await userEvent.click(summary("Version 1"));
+  await expect.poll(() => summary("Version 1").getAttribute("aria-expanded")).toBe("true");
+  expect(summary("Version 2").getAttribute("aria-expanded")).toBe("false");
+  await screen.rerender(
+    <IntegrationsContext value={() => true}>
+      <AppHostContext value={host()}>
+        <Revisions
+          id="art_1"
+          revisions={[...APP_REVISIONS, app(3, "Dice game", "<p>Rolled</p>")]}
+          renderers={RENDERERS}
+          compare={compare}
+        />
+      </AppHostContext>
+    </IntegrationsContext>,
+  );
+  await expect.poll(() => summary("Version 3").getAttribute("aria-expanded")).toBe("true");
+  expect(summary("Version 1").getAttribute("aria-expanded")).toBe("false");
+  expect(summary("Version 2").getAttribute("aria-expanded")).toBe("false");
+});

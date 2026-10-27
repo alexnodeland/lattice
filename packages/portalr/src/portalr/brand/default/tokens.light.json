@@ -21,7 +21,7 @@
       }
     },
     "paper": {
-      "$value": "#f7f4fb",
+      "$value": "#fafafb",
       "$type": "color"
     },
     "surface": {
@@ -29,15 +29,15 @@
       "$type": "color"
     },
     "fg": {
-      "$value": "#1c1d26",
+      "$value": "#16181d",
       "$type": "color"
     },
     "muted": {
-      "$value": "#5e5470",
+      "$value": "#5b6271",
       "$type": "color"
     },
     "line": {
-      "$value": "#dcd5e6",
+      "$value": "#e5e7eb",
       "$type": "color"
     },
     "accent": {
@@ -53,7 +53,7 @@
       "$type": "color"
     },
     "edge": {
-      "$value": "#857a97",
+      "$value": "#80808a",
       "$type": "color"
     },
     "status": {
@@ -182,12 +182,12 @@
     "scrim": {
       "$value": {
         "colorSpace": "srgb",
-        "hex": "#1c1d26",
-        "alpha": 0.45,
+        "hex": "#101018",
+        "alpha": 0.4,
         "components": [
-          0.1098,
-          0.1137,
-          0.149
+          0.0627,
+          0.0627,
+          0.0941
         ]
       },
       "$type": "color"
@@ -195,12 +195,12 @@
     "shadow": {
       "$value": {
         "colorSpace": "srgb",
-        "hex": "#281446",
-        "alpha": 0.16,
+        "hex": "#101018",
+        "alpha": 0.06,
         "components": [
-          0.1569,
-          0.0784,
-          0.2745
+          0.0627,
+          0.0627,
+          0.0941
         ]
       },
       "$type": "color"
@@ -256,6 +256,13 @@
       },
       "$type": "dimension"
     },
+    "5": {
+      "$value": {
+        "value": 1.25,
+        "unit": "rem"
+      },
+      "$type": "dimension"
+    },
     "6": {
       "$value": {
         "value": 1.5,
@@ -295,7 +302,7 @@
     },
     "4": {
       "$value": {
-        "value": 0.5,
+        "value": 0.625,
         "unit": "rem"
       },
       "$type": "dimension"
@@ -384,6 +391,13 @@
           "unit": "rem"
         },
         "$type": "dimension"
+      },
+      "3xl": {
+        "$value": {
+          "value": 1.75,
+          "unit": "rem"
+        },
+        "$type": "dimension"
       }
     },
     "weight": {
@@ -450,7 +464,7 @@
           "unit": "px"
         },
         "blur": {
-          "value": 2,
+          "value": 1,
           "unit": "px"
         }
       },
@@ -608,14 +622,14 @@
   "size": {
     "page-width": {
       "$value": {
-        "value": 75,
+        "value": 64,
         "unit": "rem"
       },
       "$type": "dimension"
     },
     "row-height": {
       "$value": {
-        "value": 2.75,
+        "value": 3,
         "unit": "rem"
       },
       "$type": "dimension"
@@ -647,6 +661,14 @@
         }
       }
     },
+    "feedback": {
+      "duration": {
+        "$value": "{motion.duration.fast}"
+      },
+      "ease": {
+        "$value": "{motion.ease.in-out}"
+      }
+    },
     "button": {
       "radius": {
         "$value": "{radius.3}"
@@ -655,7 +677,7 @@
         "$value": "{space.3}"
       },
       "pad-y": {
-        "$value": "{space.1-5}"
+        "$value": "{space.2}"
       },
       "sm": {
         "pad-x": {
@@ -686,7 +708,7 @@
         "$value": "{space.3}"
       },
       "pad-y": {
-        "$value": "{space.1-5}"
+        "$value": "{space.2}"
       }
     },
     "checkbox": {
@@ -748,7 +770,7 @@
         "$value": "{radius.4}"
       },
       "pad": {
-        "$value": "{space.4}"
+        "$value": "{space.5}"
       },
       "shadow": {
         "$value": "{shadow.1}"
@@ -764,10 +786,7 @@
         "$value": "{radius.4}"
       },
       "pad": {
-        "$value": {
-          "value": 1.25,
-          "unit": "rem"
-        }
+        "$value": "{space.5}"
       },
       "width": {
         "$value": {
@@ -861,9 +880,6 @@
       },
       "pad-y": {
         "$value": "{space.2}"
-      },
-      "count-radius": {
-        "$value": "{radius.full}"
       }
     },
     "header": {
@@ -921,18 +937,15 @@
         "$value": "{radius.4}"
       },
       "cell-pad-x": {
-        "$value": "{space.3}"
+        "$value": "{space.4}"
       }
     },
     "badge": {
       "radius": {
-        "$value": "{radius.full}"
+        "$value": "{radius.3}"
       },
       "pad-y": {
         "$value": "{space.half}"
-      },
-      "pad-start": {
-        "$value": "{space.1-5}"
       },
       "pad-end": {
         "$value": "{space.2}"
@@ -1010,7 +1023,7 @@
         "$value": "{radius.4}"
       },
       "pad": {
-        "$value": "{space.4}"
+        "$value": "{space.5}"
       },
       "option-radius": {
         "$value": "{radius.3}"
@@ -1020,17 +1033,17 @@
       },
       "option-pad-y": {
         "$value": {
-          "value": 0.625,
+          "value": 0.75,
           "unit": "rem"
         }
       },
       "chip-radius": {
-        "$value": "{radius.full}"
+        "$value": "{radius.2}"
       }
     },
     "bubble": {
       "radius": {
-        "$value": "{radius.6}"
+        "$value": "{radius.4}"
       },
       "max-width": {
         "$value": {
@@ -1038,17 +1051,11 @@
           "unit": "rem"
         }
       },
-      "tail-radius": {
-        "$value": "{radius.2}"
-      },
       "pad-x": {
-        "$value": {
-          "value": 0.875,
-          "unit": "rem"
-        }
+        "$value": "{space.4}"
       },
       "pad-y": {
-        "$value": "{space.2}"
+        "$value": "{space.3}"
       }
     },
     "composer": {
@@ -1056,7 +1063,7 @@
         "$value": "{radius.4}"
       },
       "pad": {
-        "$value": "{space.1}"
+        "$value": "{space.2}"
       }
     },
     "alert": {
@@ -1083,7 +1090,7 @@
     },
     "sign-in": {
       "radius": {
-        "$value": "{radius.5}"
+        "$value": "{radius.4}"
       },
       "pad": {
         "$value": {
@@ -1127,7 +1134,7 @@
     },
     "list-row": {
       "pad-x": {
-        "$value": "{space.2}"
+        "$value": "{space.4}"
       },
       "pad-y": {
         "$value": "{space.3}"

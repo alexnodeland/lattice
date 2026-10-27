@@ -1,8 +1,8 @@
 import {
+  ButtonLink,
   FailureAlert,
   NewVersionOffer,
   Plain,
-  TextLink,
   useHeadingAfterNavigation,
 } from "@portalr/ui";
 import {
@@ -43,7 +43,7 @@ function Failed({ error }: ErrorComponentProps) {
   return (
     <Plain home={<Link to="/" />} title="Something went wrong">
       <FailureAlert error={error} />
-      <TextLink render={<Link to="/" />}>Start again</TextLink>
+      <ButtonLink render={<Link to="/" />}>Start again</ButtonLink>
     </Plain>
   );
 }
@@ -52,7 +52,7 @@ function NotFound() {
   return (
     <Plain home={<Link to="/" />} title="Not found">
       <p>There's nothing at this address.</p>
-      <TextLink render={<Link to="/" />}>Start again</TextLink>
+      <ButtonLink render={<Link to="/" />}>Start again</ButtonLink>
     </Plain>
   );
 }

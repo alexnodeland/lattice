@@ -8,7 +8,7 @@ Answers [#185](https://github.com/alexnodeland/lattice/issues/185), raised in th
 
 ## Context
 
-The app and admin UIs are built by Vite into `src/portalr/static/`, and the wheel and the test application's image carry that directory. Their bundles hold React, TanStack Router and Query, Base UI, Recharts and its d3 modules, lucide, Streamdown, Tailwind's styles and the packages those need: 113 packages in the app's, 138 in admin's at the time of writing. MIT, ISC, BSD, 0BSD and Apache-2.0 all ask that their text, and their NOTICE where they have one, travels with the code. The wheel carried none of it. The Tremor charts' notice (`web/ui/NOTICE`) is hand-written, since it describes a change lattice made; the bundled packages' are not ours to write, nor to keep up by hand.
+The app and admin UIs are built by Vite into `src/portalr/static/`, and the wheel and the test application's image carry that directory. Their bundles hold React, TanStack Router and Query, Base UI, Recharts and its d3 modules, lucide (until ADR-0080, which draws the kit's own icons), Streamdown, Tailwind's styles and the packages those need: 113 packages in the app's, 138 in admin's at the time of writing. MIT, ISC, BSD, 0BSD and Apache-2.0 all ask that their text, and their NOTICE where they have one, travels with the code. The wheel carried none of it. The Tremor charts' notice (`web/ui/NOTICE`) is hand-written, since it describes a change lattice made; the bundled packages' are not ours to write, nor to keep up by hand.
 
 The user decided the policy: a strict allowlist, JavaScript only, Unlicense on the list.
 

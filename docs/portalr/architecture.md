@@ -189,7 +189,7 @@ Forms, dashboards and mini apps are switched on and off per workspace by an inte
 | `Menu` | A button and the actions it opens, each of which may be disabled while it's being done |
 | `SelectField` | A labelled choice among several, Base UI's Select on the menus' surface with the keyboard of a native select, which submits with its form |
 | `FormField` | A control's label, hint and refusal, and the 28rem its width is capped at, which `TextField` and `SelectField` share |
-| `Icon`, `Mark`, `Lockup` | A Lucide icon beside its word; portalr's marks |
+| `Icon`, `Mark`, `Lockup` | One of the kit's own icons beside its word (ADR-0080); portalr's marks |
 
 `gallery.screenshot.test.tsx` pins how they sit together, wide and narrow, in each scheme. It runs in CI alone, against Linux baselines.
 

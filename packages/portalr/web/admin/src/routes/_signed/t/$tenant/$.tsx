@@ -1,4 +1,4 @@
-import { NotFound, TextLink } from "@portalr/ui";
+import { ButtonLink, NotFound } from "@portalr/ui";
 import { createFileRoute, Link } from "@tanstack/react-router";
 
 /** A page that isn't there, in a tenant the reader administers: in the frame (portalr ADR-0068). */
@@ -12,7 +12,7 @@ function PageNotFound() {
   return (
     <NotFound
       title="Page not found"
-      action={<TextLink render={<Link to="/t/$tenant" params={{ tenant }} />}>Home</TextLink>}
+      action={<ButtonLink render={<Link to="/t/$tenant" params={{ tenant }} />}>Home</ButtonLink>}
     >
       There's nothing at this address in {tenant}.
     </NotFound>

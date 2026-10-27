@@ -1,16 +1,8 @@
 import { type GrantrApi, type Names, orThrow, refusal } from "@portalr/client";
-import {
-  Alert,
-  Button,
-  Card,
-  ConfirmDialog,
-  ItemTable,
-  SectionTitle,
-  TextField,
-} from "@portalr/ui";
+import { Alert, Button, ConfirmDialog, ItemTable, TextField } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { useActionState, useId, useState } from "react";
+import { useActionState, useState } from "react";
 import {
   byKindThenName,
   KIND,
@@ -20,6 +12,7 @@ import {
   useAccess,
   useNames,
 } from "../../../../../access";
+import { Folded, Toolbar } from "../../../../../folded";
 
 type Member = GrantrApi.components["schemas"]["Member"];
 
@@ -46,8 +39,6 @@ function Members() {
   const yourself = (member: Member) => member.kind === "user" && member.id === user;
   const names = useNames(tenant, peopleIn(members));
   const removes = allowed.has("grantr:remove_member");
-  const inviteId = useId();
-  const principalId = useId();
 
   const [email, setEmail] = useState("");
   const [invited, invite, inviting] = useActionState(async (_last: Said) => {
@@ -69,7 +60,35 @@ function Members() {
   }, null);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
+      <Toolbar>
+        <Folded title="Invite someone" action="Invite…">
+          <form className="flex flex-col gap-3" action={invite}>
+            <TextField
+              label="Email"
+              name="email"
+              type="email"
+              autoComplete="off"
+              required
+              value={email}
+              onValueChange={(value) => setEmail(String(value))}
+            />
+            {invited && <Alert tone={invited.refused ? "error" : "info"}>{invited.said}</Alert>}
+            <Button type="submit" disabled={inviting} className="self-start">
+              Invite
+            </Button>
+          </form>
+        </Folded>
+        <Folded title="Add a service principal" action="Add…">
+          <form className="flex flex-col gap-3" action={make}>
+            <TextField label="Name" name="principal" autoComplete="off" required />
+            {made && <Alert tone={made.refused ? "error" : "info"}>{made.said}</Alert>}
+            <Button type="submit" disabled={making} className="self-start">
+              Add
+            </Button>
+          </form>
+        </Folded>
+      </Toolbar>
       <ItemTable
         caption="Members"
         columns={[
@@ -99,36 +118,6 @@ function Members() {
         }
         empty={{ title: "No members yet", body: "Invite someone, or add a service principal." }}
       />
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card render={<section aria-labelledby={inviteId} />} className="flex flex-col gap-3">
-          <SectionTitle id={inviteId}>Invite someone</SectionTitle>
-          <form className="flex flex-col gap-3" action={invite}>
-            <TextField
-              label="Email"
-              name="email"
-              type="email"
-              autoComplete="off"
-              required
-              value={email}
-              onValueChange={(value) => setEmail(String(value))}
-            />
-            {invited && <Alert tone={invited.refused ? "error" : "info"}>{invited.said}</Alert>}
-            <Button type="submit" disabled={inviting} className="self-start">
-              Invite
-            </Button>
-          </form>
-        </Card>
-        <Card render={<section aria-labelledby={principalId} />} className="flex flex-col gap-3">
-          <SectionTitle id={principalId}>Add a service principal</SectionTitle>
-          <form className="flex flex-col gap-3" action={make}>
-            <TextField label="Name" name="principal" autoComplete="off" required />
-            {made && <Alert tone={made.refused ? "error" : "info"}>{made.said}</Alert>}
-            <Button type="submit" disabled={making} className="self-start">
-              Add
-            </Button>
-          </form>
-        </Card>
-      </div>
     </div>
   );
 }

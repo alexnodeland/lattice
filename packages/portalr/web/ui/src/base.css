@@ -58,8 +58,22 @@
 :root,
 [data-brand] {
   --wash: color-mix(in srgb, var(--accent) 10%, var(--paper));
-  /* What a reader has selected: a deeper tint than the wash, so it reads over a washed row too. */
-  --selection: color-mix(in srgb, var(--accent) 22%, var(--paper));
+  /*
+   * The quiet wash (portalr ADR-0081): the reader's words, a table's head row, a disabled field,
+   * a review strip: the text's colour at a twentieth over the paper, so it is the page's own grey.
+   */
+  --subtle: color-mix(in srgb, var(--fg) 5%, var(--paper));
+  /*
+   * A labelled button's outline (portalr ADR-0081): the edge at a little over half its strength
+   * over the surface, lighter than a field's boundary, which keeps the edge at 3:1 because it
+   * may be the one cue that it is a field; a button's words are its cue.
+   */
+  --outline: color-mix(in srgb, var(--edge) 55%, var(--surface));
+  /*
+   * What a reader has selected: a deeper tint than the wash, so it reads over a washed row too,
+   * and is told from the paper at a glance (the audit's N8); the text keeps 7:1 on it.
+   */
+  --selection: color-mix(in srgb, var(--accent) 30%, var(--paper));
   /* A destructive action offered, hovered: a tint of the danger colour. */
   --danger-wash: color-mix(in srgb, var(--danger) 12%, transparent);
   --accent-hover: color-mix(in srgb, var(--accent) 88%, var(--on-accent));
@@ -127,6 +141,45 @@
  * colours replace it. So every pattern, dash and marker shape is on as in colour-blind mode, whether
  * or not it was chosen; the inks themselves are the system's.
  */
+/*
+ * Small screens and fingers (portalr ADR-0080). A pointer that can't hover is a finger: every
+ * control is 44px or taller to it, admin's compact density included, which holds for a mouse; a
+ * field's text is 16px, so iOS doesn't zoom to it; a control answers at once, with no tap flash of
+ * the browser's (the kit's feedback is the answer) and no double-tap zoom. Whatever the pointer,
+ * a part that scrolls inside the page keeps its scroll to itself, so reaching its end never
+ * pulls the page or refreshes it.
+ */
+@media (pointer: coarse) {
+  :root,
+  [data-density="compact"] {
+    --icon-button-size: 2.75rem;
+    --disclosure-target: 2.75rem;
+    --breadcrumb-target: 2.75rem;
+    --header-trigger-pad-y: var(--space-3);
+  }
+  :where(
+    button,
+    [role="button"],
+    [data-button],
+    select,
+    input:not([type="checkbox"], [type="radio"])
+  ) {
+    min-height: 2.75rem;
+  }
+  :where(input, select, textarea) {
+    font-size: max(1rem, 1em);
+  }
+}
+:root {
+  -webkit-tap-highlight-color: transparent;
+}
+:where(a, button, [role="button"], input, select, textarea, label, summary) {
+  touch-action: manipulation;
+}
+:where(.overflow-auto, .overflow-x-auto, .overflow-y-auto) {
+  overscroll-behavior: contain;
+}
+
 @media (forced-colors: active) {
   :root {
     --chart-hatch: var(--chart-hatched);

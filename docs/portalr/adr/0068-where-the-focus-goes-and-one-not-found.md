@@ -1,6 +1,6 @@
 # ADR-0068: Where the focus goes, and one not-found
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0079](0079-interaction-states-feedback-pending-and-a-refusals-mark.md)
 **Date:** 2026-10-23
 **Deciders:** Alex Nodeland
 

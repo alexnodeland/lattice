@@ -21,5 +21,5 @@ export const TYPE = {
   /** A hint, a count, a time: the smallest. */
   note: "text-muted text-xs",
   /** A figure read on its own, such as a card's. */
-  figure: "font-semibold text-2xl text-fg tracking-tight",
+  figure: "font-semibold text-3xl text-fg tracking-tight",
 } as const;

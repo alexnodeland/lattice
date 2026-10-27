@@ -302,3 +302,13 @@ test("a reconnect during the backoff connects at once, and only once", async () 
   await new Promise((resolve) => setTimeout(resolve, 200)); // past any backoff left behind
   expect(server.hellos.map((hello) => hello.resume_after_seq)).toEqual([0, 1]);
 });
+
+test("reconnect works handed on detached, as a page gives it to a button, and connects anew", async () => {
+  const store = open();
+  await until(store, (snapshot) => snapshot.status === "live");
+  server.drop(4403); // a close the store never reconnects from by itself
+  await until(store, (snapshot) => snapshot.status === "closed");
+  const { reconnect } = store;
+  reconnect();
+  await until(store, (snapshot) => snapshot.status === "live");
+});

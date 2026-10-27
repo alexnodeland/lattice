@@ -57,7 +57,9 @@ PRIMITIVES: tuple[Group, ...] = (
     ),
     Group(
         "Space: steps of a quarter rem, and a hairline and a half step below them.",
-        _scale("dimension", "space", "--space", ("px", "half", "1", "1-5", "2", "3", "4", "6")),
+        _scale(
+            "dimension", "space", "--space", ("px", "half", "1", "1-5", "2", "3", "4", "5", "6")
+        ),
     ),
     Group(
         "Corners, from square to round: each a component's radius defaults to one of these.",
@@ -72,7 +74,10 @@ PRIMITIVES: tuple[Group, ...] = (
             Row("font.family.sans", "--font-family-sans", "fontFamily"),
             Row("font.family.mono", "--font-family-mono", "fontFamily"),
             *_scale(
-                "dimension", "font.size", "--font-size", ("xs", "sm", "base", "lg", "xl", "2xl")
+                "dimension",
+                "font.size",
+                "--font-size",
+                ("xs", "sm", "base", "lg", "xl", "2xl", "3xl"),
             ),
             *_scale("fontWeight", "font.weight", "--weight", ("normal", "medium", "semibold")),
             *_scale("number", "font.leading", "--leading", ("tight", "snug", "normal", "relaxed")),
@@ -200,6 +205,15 @@ COMPONENTS: tuple[Group, ...] = (
         ),
     ),
     Group(
+        "A control's feedback: how long its colours take to follow the pointer and the keyboard"
+        " when it is hovered, pressed or chosen, and how they ease; a button's are its own"
+        " (portalr ADR-0079).",
+        (
+            Row("component.feedback.duration", "--feedback-duration", "duration"),
+            Row("component.feedback.ease", "--feedback-ease", "cubicBezier"),
+        ),
+    ),
+    Group(
         "A button: its corners, its padding at each size, its words' weight, how far it moves"
         " down when pressed, and how its colours change (portalr ADR-0037).",
         (
@@ -289,7 +303,7 @@ COMPONENTS: tuple[Group, ...] = (
         ),
     ),
     Group(
-        "The frame's navigation: a nav link's corners and padding, its count's pill, the "
+        "The frame's navigation: a nav link's corners and padding, the "
         "header's triggers (the switcher, the account menu, the home link), the room a narrow "
         "window's pinned header takes, which a scroll stops below, the rail's width, and the "
         "drawer's width, shadow and slide.",
@@ -297,7 +311,6 @@ COMPONENTS: tuple[Group, ...] = (
             Row("component.nav.radius", "--nav-radius", "dimension"),
             Row("component.nav.pad-x", "--nav-pad-x", "dimension"),
             Row("component.nav.pad-y", "--nav-pad-y", "dimension"),
-            Row("component.nav.count-radius", "--nav-count-radius", "dimension"),
             Row("component.header.clearance", "--header-clearance", "dimension"),
             Row("component.header.trigger-radius", "--header-trigger-radius", "dimension"),
             Row("component.header.trigger-pad-x", "--header-trigger-pad-x", "dimension"),
@@ -325,13 +338,12 @@ COMPONENTS: tuple[Group, ...] = (
         ),
     ),
     Group(
-        "A status badge: its pill's corners and padding. Its shapes are status marks, which "
+        "A status badge: its corners and padding. Its shapes are status marks, which "
         "tell each status apart for every reader, and are not a kit's to change (portalr "
         "ADR-0039).",
         (
             Row("component.badge.radius", "--badge-radius", "dimension"),
             Row("component.badge.pad-y", "--badge-pad-y", "dimension"),
-            Row("component.badge.pad-start", "--badge-pad-start", "dimension"),
             Row("component.badge.pad-end", "--badge-pad-end", "dimension"),
         ),
     ),
@@ -390,7 +402,6 @@ COMPONENTS: tuple[Group, ...] = (
         (
             Row("component.bubble.radius", "--bubble-radius", "dimension"),
             Row("component.bubble.max-width", "--bubble-max-width", "dimension"),
-            Row("component.bubble.tail-radius", "--bubble-tail-radius", "dimension"),
             Row("component.bubble.pad-x", "--bubble-pad-x", "dimension"),
             Row("component.bubble.pad-y", "--bubble-pad-y", "dimension"),
             Row("component.composer.radius", "--composer-radius", "dimension"),

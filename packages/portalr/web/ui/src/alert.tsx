@@ -1,7 +1,7 @@
-import { CircleAlert, Info, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "./cn";
 import { Icon } from "./icon";
+import { glyphs } from "./icons";
 
 /**
  * What an alert is: how it is announced, its shape, and the mark that edges it. The shape and the
@@ -10,9 +10,9 @@ import { Icon } from "./icon";
  * (`status`).
  */
 const TONE = {
-  info: { role: "status", icon: Info, edge: "border-l-edge" },
-  warn: { role: "status", icon: TriangleAlert, edge: "border-l-status-warn" },
-  error: { role: "alert", icon: CircleAlert, edge: "border-l-status-failed" },
+  info: { role: "status", icon: glyphs.info, edge: "border-l-edge" },
+  warn: { role: "status", icon: glyphs.triangleAlert, edge: "border-l-status-warn" },
+  error: { role: "alert", icon: glyphs.circleAlert, edge: "border-l-status-failed" },
 } as const;
 
 export type AlertTone = keyof typeof TONE;

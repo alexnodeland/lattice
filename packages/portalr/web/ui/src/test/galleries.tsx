@@ -4,22 +4,11 @@
  */
 
 import type { Artifactr, ArtifactrV1 } from "@portalr/client";
-import {
-  House,
-  KeyRound,
-  Maximize2,
-  MessageSquare,
-  Play,
-  Plus,
-  ScrollText,
-  ThumbsUp,
-  Zap,
-} from "lucide-react";
 import { AccountMenu } from "../account-menu";
 import { Alert } from "../alert";
 import { AppShell } from "../app-shell";
 import { Breadcrumbs } from "../breadcrumbs";
-import { Button, type ButtonVariant } from "../button";
+import { Button, ButtonLink, type ButtonVariant } from "../button";
 import { Card } from "../card";
 import { Message, Messages, Streaming } from "../chat";
 import { Checkbox, CheckboxGroup } from "../checkbox";
@@ -30,6 +19,7 @@ import { Dialog } from "../dialog";
 import { EmptyState } from "../empty-state";
 import { Icon } from "../icon";
 import { IconButton } from "../icon-button";
+import { glyphs } from "../icons";
 import { Menu } from "../menu";
 import { PageHeader } from "../page-header";
 import { Progress } from "../progress";
@@ -50,7 +40,7 @@ import { Table } from "../table";
 import { TextArea } from "../text-area";
 import { TextField } from "../text-field";
 import { TextLink } from "../text-link";
-import { ToolCall, ToolCalls } from "../tool-call";
+import { RunSteps, ToolCall, ToolCalls } from "../tool-call";
 
 export function Gallery() {
   return (
@@ -81,16 +71,16 @@ export function Gallery() {
       }
       nav={
         <SideNav label="Workspace">
-          <NavLink href="#threads" icon={MessageSquare} count={1}>
+          <NavLink href="#threads" icon={glyphs.messageSquare} count={1}>
             Threads
           </NavLink>
-          <NavLink href="#artifacts" icon={ScrollText}>
+          <NavLink href="#artifacts" icon={glyphs.scrollText}>
             Artifacts
           </NavLink>
-          <NavLink href="#runs" icon={Play} aria-current="page">
+          <NavLink href="#runs" icon={glyphs.play} aria-current="page">
             Runs
           </NavLink>
-          <NavLink href="#rules" icon={Zap}>
+          <NavLink href="#rules" icon={glyphs.zap}>
             Rules
           </NavLink>
         </SideNav>
@@ -157,7 +147,7 @@ export function Gallery() {
           <TextField label="Why? (optional)" defaultValue="The ticket had no subject" />
           <span className="flex gap-2">
             <Button>
-              <Icon icon={Plus} />
+              <Icon icon={glyphs.plus} />
               Approve
             </Button>
             <Button variant="secondary">Deny</Button>
@@ -225,10 +215,10 @@ export function AdminGallery() {
       }
       nav={
         <SideNav label="Tenant">
-          <NavLink href="#home" icon={House} aria-current="page">
+          <NavLink href="#home" icon={glyphs.house} aria-current="page">
             Home
           </NavLink>
-          <NavLink href="#access" icon={KeyRound}>
+          <NavLink href="#access" icon={glyphs.keyRound}>
             Access
           </NavLink>
         </SideNav>
@@ -425,9 +415,15 @@ export function Thread() {
         <li>
           <Questions request={ASKED} onAnswer={sent} focus={false} />
         </li>
+        <RunSteps
+          running={false}
+          tools={[
+            ["c1", tool("create_artifact", "ok", "Done: note_1 is now at version 1.")],
+            ["c2", tool("draft_rule", "retry", "rule\n  Input should be an object")],
+          ]}
+        />
         <ToolCalls>
-          <ToolCall tool={tool("create_artifact", "ok", "Done: note_1 is now at version 1.")} />
-          <ToolCall tool={tool("draft_rule", "retry", "rule\n  Input should be an object")} />
+          <ToolCall tool={tool("list_artifacts", "ok", "[]")} />
         </ToolCalls>
         <Message
           message={message("m2", "The launch note is **drafted**.", false)}
@@ -501,7 +497,11 @@ export function Sheet() {
           title="Spend"
           figure="$85.00"
           badge={<StatusBadge tone="near">Near budget</StatusBadge>}
-          action={<a href="#usage">Usage</a>}
+          action={
+            <ButtonLink size="sm" href="#usage">
+              Usage
+            </ButtonLink>
+          }
         >
           of $100.00, every 30 days
         </StatCard>
@@ -599,9 +599,9 @@ export function Kit() {
       <TextLink variant="subtle" href="#trace">
         trace_1
       </TextLink>
-      <TextLink variant="nav" href="#runs">
+      <ButtonLink variant="ghost" size="sm" href="#runs">
         Runs
-      </TextLink>
+      </ButtonLink>
       <Breadcrumbs
         trail={[
           { label: "Workspace", href: "#notes" },
@@ -621,8 +621,8 @@ export function Kit() {
       <Menu label="Actions" items={[{ label: "Open", onSelect: () => undefined }]} />
       <CopyButton text="portalr" what="the name" />
       <span className="flex gap-1">
-        <IconButton label="Helpful" icon={ThumbsUp} aria-pressed />
-        <IconButton label="Full view" icon={Maximize2} />
+        <IconButton label="Helpful" icon={glyphs.thumbsUp} aria-pressed />
+        <IconButton label="Full view" icon={glyphs.maximize2} />
       </span>
       <CodeBlock code={'const a = "b";'} language="text" />
     </div>

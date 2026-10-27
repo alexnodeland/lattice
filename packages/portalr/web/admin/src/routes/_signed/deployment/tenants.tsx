@@ -1,17 +1,9 @@
 import { keys, orThrow } from "@portalr/client";
-import {
-  Alert,
-  Button,
-  Card,
-  ConfirmDialog,
-  ItemTable,
-  PageHeader,
-  SectionTitle,
-  TextField,
-} from "@portalr/ui";
+import { Alert, Button, ConfirmDialog, ItemTable, PageHeader, TextField } from "@portalr/ui";
 import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-router";
-import { useId, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { Folded, Toolbar } from "../../../folded";
 import { unread } from "../../../home";
 import { ReadFailed } from "../../../read-failed";
 import { budgetSaid, isEmail, isTenantId, PAGE, rowsFor, spendSaid } from "../../../tenants";
@@ -51,16 +43,17 @@ function Tenants() {
           {unread("LiteLLM", every.spend).line} Spend and budgets are not shown.
         </Alert>
       )}
+      <Create />
       <ItemTable
         caption="Tenants"
         columns={[
           { key: "tenant", label: "Tenant", cell: (row) => row.tenant },
-          { key: "spend", label: "Spend", cell: (row) => spendSaid(row) },
+          { key: "spend", label: "Spend", numeric: true, cell: (row) => spendSaid(row) },
           { key: "budget", label: "Budget", cell: (row) => budgetSaid(row, answered) },
         ]}
         items={rows.slice(0, shown)}
         keyOf={(row) => row.tenant}
-        empty={{ title: "No tenants yet", body: "Create the first one below." }}
+        empty={{ title: "No tenants yet", body: "Create the first one above." }}
       />
       <p role="status" className="sr-only">
         {Math.min(shown, rows.length)} of {rows.length} tenants shown
@@ -70,7 +63,6 @@ function Tenants() {
           Show more
         </Button>
       )}
-      <Create />
     </div>
   );
 }
@@ -84,67 +76,64 @@ function Tenants() {
 function Create() {
   const { commands, user } = Route.useRouteContext();
   const queryClient = useQueryClient();
-  const heading = useId();
   const [tenant, setTenant] = useState("");
   const [email, setEmail] = useState("");
   const [made, setMade] = useState<string | null>(null);
   const field = useRef<HTMLInputElement>(null);
   const ready = isTenantId(tenant) && isEmail(email.trim());
   return (
-    <Card
-      render={<section aria-labelledby={heading} />}
-      className="flex flex-col gap-3 sm:max-w-xl"
-    >
-      <SectionTitle id={heading}>Create a tenant</SectionTitle>
-      <TextField
-        ref={field}
-        label="Tenant"
-        name="tenant"
-        autoComplete="off"
-        spellCheck={false}
-        value={tenant}
-        onValueChange={(value) => {
-          setMade(null);
-          setTenant(String(value));
-        }}
-      />
-      <TextField
-        label="Owner's email"
-        name="owner"
-        type="email"
-        autoComplete="off"
-        value={email}
-        onValueChange={(value) => {
-          setMade(null);
-          setEmail(String(value));
-        }}
-      />
-      <ConfirmDialog
-        label="Create tenant"
-        className="self-start"
-        title={`Create ${tenant.trim()}?`}
-        confirm="Create the tenant"
-        calm
-        disabled={!ready}
-        finalFocus={field}
-        onConfirm={async () => {
-          const created = orThrow(
-            "Not created",
-            await commands.portalr.createTenant(tenant.trim(), email.trim()),
-          );
-          setMade(`${created.tenant} is created, owned by ${created.owner}.`);
-          setTenant("");
-          setEmail("");
-          await queryClient.invalidateQueries({ queryKey: keys.portalr.tenants(user) });
-        }}
-      >
-        <p>
-          Creates the tenant {tenant.trim()} and makes {email.trim()} its first owner. If they have
-          no account, Supabase Auth sends them an invitation; if they have, they are found, and
-          nothing is sent. A tenant can't be deleted from here.
-        </p>
-      </ConfirmDialog>
-      {made && <Alert tone="info">{made}</Alert>}
-    </Card>
+    <Toolbar>
+      <Folded title="Create a tenant" action="Create…" className="sm:max-w-xl">
+        <TextField
+          ref={field}
+          label="Tenant"
+          name="tenant"
+          autoComplete="off"
+          spellCheck={false}
+          value={tenant}
+          onValueChange={(value) => {
+            setMade(null);
+            setTenant(String(value));
+          }}
+        />
+        <TextField
+          label="Owner's email"
+          name="owner"
+          type="email"
+          autoComplete="off"
+          value={email}
+          onValueChange={(value) => {
+            setMade(null);
+            setEmail(String(value));
+          }}
+        />
+        <ConfirmDialog
+          label="Create tenant"
+          className="self-start"
+          title={`Create ${tenant.trim()}?`}
+          confirm="Create the tenant"
+          calm
+          disabled={!ready}
+          finalFocus={field}
+          onConfirm={async () => {
+            const created = orThrow(
+              "Not created",
+              await commands.portalr.createTenant(tenant.trim(), email.trim()),
+            );
+            setMade(`${created.tenant} is created, owned by ${created.owner}.`);
+            setTenant("");
+            setEmail("");
+            await queryClient.invalidateQueries({ queryKey: keys.portalr.tenants(user) });
+          }}
+        >
+          <p>
+            Creates the tenant {tenant.trim()} and makes {email.trim()} its first owner. If they
+            have no account, Supabase Auth sends them an invitation; if they have, they are found,
+            and nothing is sent. A tenant can't be deleted from here.
+          </p>
+        </ConfirmDialog>
+        {made && <Alert tone="info">{made}</Alert>}
+      </Folded>
+    </Toolbar>
   );
 }

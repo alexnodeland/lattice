@@ -1,6 +1,6 @@
 # ADR-0059: Link variants, breadcrumbs, and the skip link
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0080](0080-ink-on-paper-the-products-visual-language.md) (the nav variant gone, a way on as a button, the crumbs' chevron, no underline on a subtle link)
 **Date:** 2026-10-21
 **Deciders:** Alex Nodeland
 

@@ -118,7 +118,17 @@ function Groups() {
   };
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
+      {said && <Alert tone={said.refused ? "error" : "info"}>{said.said}</Alert>}
+      {allowed.has("grantr:add_member") ? (
+        <FromMembers key={changing?.name ?? "new"} tenant={tenant} define={define} />
+      ) : (
+        <DefineSet
+          key={changing?.name ?? "new"}
+          {...define}
+          picking={{ typed: "Members, as user:id or service_principal:id, separated by commas" }}
+        />
+      )}
       <ItemTable
         caption="Groups"
         columns={[
@@ -159,16 +169,6 @@ function Groups() {
         )}
         empty={{ title: "No groups yet", body: "A group's grants reach each of its members." }}
       />
-      {said && <Alert tone={said.refused ? "error" : "info"}>{said.said}</Alert>}
-      {allowed.has("grantr:add_member") ? (
-        <FromMembers key={changing?.name ?? "new"} tenant={tenant} define={define} />
-      ) : (
-        <DefineSet
-          key={changing?.name ?? "new"}
-          {...define}
-          picking={{ typed: "Members, as user:id or service_principal:id, separated by commas" }}
-        />
-      )}
     </div>
   );
 }

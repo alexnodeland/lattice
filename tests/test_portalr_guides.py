@@ -201,11 +201,11 @@ def test_the_look_the_guides_describe_is_the_kits() -> None:
     base = (WEB / "ui" / "src" / "base.css").read_text()
     shell = (WEB / "ui" / "src" / "app-shell.tsx").read_text()
     admin = text("guides/admin.md")
-    # Admin is compact, and the app is not: 2.25rem and 2.75rem rows, at 16px to the rem.
+    # Admin is compact, and the app is not: 2.25rem and 3rem rows, at 16px to the rem.
     assert 'data-density={ui === "admin" ? "compact" : undefined}' in shell
     assert re.search(r"\[data-density=\"compact\"\] \{\n  --row-height: 2\.25rem;", base)
-    assert "  --row-height: 2.75rem;" in tokens
-    assert "rows are 36px high, where the app's are 44px" in admin
+    assert "  --row-height: 3rem;" in tokens
+    assert "rows are 36px high, where the app's are 48px" in admin
     # Status colours: a red and a gold, with a shape and a word.
     assert "--status-failed:" in tokens
     assert "--status-warn:" in tokens

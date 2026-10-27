@@ -19,11 +19,14 @@ test("the way back is a navigation named Breadcrumb, outermost first", async () 
   expect(links.map((link) => link.textContent)).toEqual(["Workspace", "Threads"]);
 });
 
-test("a crumb is a target 24px tall or more, in the quiet link's look", async () => {
+test("a crumb is a target 24px tall or more, quiet, with no underline, the text's colour when hovered", async () => {
   const screen = await render(<Breadcrumbs trail={[{ label: "Rules", href: "#rules" }]} />);
-  const link = screen.getByRole("link", { name: "Rules" }).element();
-  expect(link.getBoundingClientRect().height).toBeGreaterThanOrEqual(24);
-  expect(getComputedStyle(link).color).toBe(token("fg"));
+  const link = screen.getByRole("link", { name: "Rules" });
+  expect(link.element().getBoundingClientRect().height).toBeGreaterThanOrEqual(24);
+  expect(getComputedStyle(link.element()).color).toBe(token("muted"));
+  expect(getComputedStyle(link.element()).textDecorationLine).toBe("none");
+  await link.hover();
+  await expect.poll(() => getComputedStyle(link.element()).color).toBe(token("fg"));
 });
 
 test("a router's link renders a crumb", async () => {
@@ -59,7 +62,10 @@ test("the separators between crumbs are hidden from assistive technology", async
       ]}
     />,
   );
-  expect(screen.getByText("/").element().getAttribute("aria-hidden")).toBe("true");
+  // The kit's chevron between them, hidden as every icon is.
+  const separator = screen.container.querySelector("li svg") as Element;
+  expect(separator.getAttribute("aria-hidden")).toBe("true");
+  expect(screen.container.querySelectorAll("li svg")).toHaveLength(1);
 });
 
 test("an empty trail shows nothing", async () => {

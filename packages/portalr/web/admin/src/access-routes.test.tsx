@@ -163,6 +163,7 @@ test("with no part allowed, Access is not on the rail", async () => {
 
 test("a key's secret is gone once Keys is left and opened again", async () => {
   const { screen, router } = await open("/t/acme/access/keys", TENANT_ACTIONS);
+  await screen.getByRole("button", { name: "Issue…" }).click();
   await screen.getByRole("button", { name: "Issue" }).click();
   const secret = screen.getByRole("textbox", { name: "The key" });
   await expect.element(secret).toHaveValue("k_2.s3cr3t");
@@ -175,6 +176,7 @@ test("a key's secret is gone once Keys is left and opened again", async () => {
 
 test("Done clears a key's secret", async () => {
   const { screen } = await open("/t/acme/access/keys", TENANT_ACTIONS);
+  await screen.getByRole("button", { name: "Issue…" }).click();
   await screen.getByRole("button", { name: "Issue" }).click();
   await expect.element(screen.getByRole("textbox", { name: "The key" })).toBeVisible();
   await screen.getByRole("button", { name: "Done" }).click();
@@ -183,6 +185,7 @@ test("Done clears a key's secret", async () => {
 
 test("Create refuses a group's name that is taken, rather than replace its members", async () => {
   const { screen } = await open("/t/acme/access/groups", TENANT_ACTIONS);
+  await screen.getByRole("button", { name: "Create…" }).click();
   await screen.getByRole("textbox", { name: "Group" }).fill("ops");
   await screen.getByRole("button", { name: "Create the group" }).click();
   await expect
@@ -193,6 +196,7 @@ test("Create refuses a group's name that is taken, rather than replace its membe
 
 test("Change members starts from the group's members, and confirms whom it takes out", async () => {
   const { screen } = await open("/t/acme/access/groups", TENANT_ACTIONS);
+  await screen.getByRole("button", { name: "Create…" }).click();
   await expect.element(screen.getByRole("cell", { name: "bob (person)" })).toBeVisible();
   await screen.getByRole("button", { name: "Change ops' members" }).click();
   const bob = screen.getByRole("checkbox", { name: "bob (person)" });
@@ -220,6 +224,7 @@ test("Change members starts from the group's members, and confirms whom it takes
 
 test("without reading members, a group's members are typed, and checked before sending", async () => {
   const { screen } = await open("/t/acme/access/groups", ["grantr:manage_groups"]);
+  await screen.getByRole("button", { name: "Create…" }).click();
   await screen.getByRole("textbox", { name: "Group" }).fill("eng");
   const typed = screen.getByRole("textbox", { name: /^Members/ });
   await typed.fill("user:bob, ci");
@@ -234,6 +239,7 @@ test("without reading members, a group's members are typed, and checked before s
 
 test("revoking the key just issued clears its secret", async () => {
   const { screen } = await open("/t/acme/access/keys", TENANT_ACTIONS);
+  await screen.getByRole("button", { name: "Issue…" }).click();
   await screen.getByRole("button", { name: "Issue" }).click();
   await expect.element(screen.getByRole("textbox", { name: "The key" })).toBeVisible();
   await screen.getByRole("button", { name: "Revoke k_2" }).click();
@@ -251,14 +257,17 @@ test("without defining roles or granting, Roles and Grants aren't parts", async 
 
 test("with defining roles and granting, Roles and Grants are parts", async () => {
   const { screen } = await open("/t/acme/access/roles", TENANT_ACTIONS);
+  await screen.getByRole("button", { name: "Create…" }).click();
   const parts = screen.getByRole("navigation", { name: "Access" });
   await expect.element(parts.getByRole("link", { name: "Roles" })).toBeVisible();
   await parts.getByRole("link", { name: "Grants" }).click();
+  await screen.getByRole("button", { name: "Grant…" }).click();
   await expect.element(screen.getByRole("heading", { name: "Grant a role" })).toBeVisible();
 });
 
 test("Roles lists the catalog's roles and the custom ones, and refuses a name taken", async () => {
   const { screen } = await open("/t/acme/access/roles", TENANT_ACTIONS);
+  await screen.getByRole("button", { name: "Create…" }).click();
   const builtIn = screen.getByRole("table", { name: "Built-in roles" });
   await expect.element(builtIn.getByRole("rowheader", { name: "viewer" })).toBeVisible();
   await expect
@@ -279,6 +288,7 @@ test("Roles lists the catalog's roles and the custom ones, and refuses a name ta
 
 test("Change actions starts from the role's, and confirms the actions it takes away", async () => {
   const { screen } = await open("/t/acme/access/roles", TENANT_ACTIONS);
+  await screen.getByRole("button", { name: "Create…" }).click();
   await screen.getByRole("button", { name: "Change triager's actions" }).click();
   const heading = screen.getByRole("heading", { name: "Change triager's actions" });
   await expect.element(heading).toHaveFocus();
@@ -307,6 +317,7 @@ test("Change actions starts from the role's, and confirms the actions it takes a
 
 test("deleting a custom role says its grants go with it", async () => {
   const { screen } = await open("/t/acme/access/roles", TENANT_ACTIONS);
+  await screen.getByRole("button", { name: "Create…" }).click();
   await screen.getByRole("button", { name: "Delete triager" }).click();
   const dialog = screen.getByRole("alertdialog", { name: "Delete the role triager?" });
   await expect.element(dialog.getByText("Every grant of triager goes with it.")).toBeVisible();
@@ -317,6 +328,7 @@ test("deleting a custom role says its grants go with it", async () => {
 
 test("Grants groups the tenant's grants and each workspace's, each named by whom and what", async () => {
   const { screen } = await open("/t/acme/access/grants", TENANT_ACTIONS);
+  await screen.getByRole("button", { name: "Grant…" }).click();
   // Each place is headed, visibly, and its table named by its heading.
   await expect.element(screen.getByRole("heading", { name: "The tenant" })).toBeVisible();
   await expect.element(screen.getByRole("heading", { name: "Workspace ws_1" })).toBeVisible();
@@ -345,6 +357,7 @@ test("Grants groups the tenant's grants and each workspace's, each named by whom
 test("on a phone, each place's grants are a list named by its heading", async () => {
   await page.viewport(390, 844);
   const { screen } = await open("/t/acme/access/grants", TENANT_ACTIONS);
+  await screen.getByRole("button", { name: "Grant…" }).click();
   await expect.element(screen.getByRole("list", { name: "Workspace ws_1" })).toBeVisible();
   await expect
     .element(screen.getByRole("table", { name: "Workspace ws_1" }))
@@ -353,6 +366,7 @@ test("on a phone, each place's grants are a list named by its heading", async ()
 
 test("a form left on its empty choices sends nothing", async () => {
   const { screen } = await open("/t/acme/access/grants", TENANT_ACTIONS);
+  await screen.getByRole("button", { name: "Grant…" }).click();
   await expect
     .element(screen.getByRole("combobox", { name: "Role" }))
     .toHaveTextContent("Choose a role…");
@@ -362,6 +376,7 @@ test("a form left on its empty choices sends nothing", async () => {
 
 test("a group made the tenant's admin is named so in the question", async () => {
   const { screen } = await open("/t/acme/access/grants", TENANT_ACTIONS);
+  await screen.getByRole("button", { name: "Grant…" }).click();
   await choose(screen, "Role", "owner");
   await choose(screen, "On", "tenant");
   await choose(screen, "To", "ops (group)");
@@ -373,6 +388,7 @@ test("a group made the tenant's admin is named so in the question", async () => 
 
 test("the form starts on no role and no one, and a role chooses where again", async () => {
   const { screen } = await open("/t/acme/access/grants", TENANT_ACTIONS);
+  await screen.getByRole("button", { name: "Grant…" }).click();
   await expect
     .element(screen.getByRole("combobox", { name: "Role" }))
     .toHaveTextContent("Choose a role…");
@@ -395,6 +411,7 @@ test("the form starts on no role and no one, and a role chooses where again", as
 
 test("a custom role is granted where custom roles may be, and the ids are trimmed", async () => {
   const { screen } = await open("/t/acme/access/grants", TENANT_ACTIONS);
+  await screen.getByRole("button", { name: "Grant…" }).click();
   await choose(screen, "Role", "triager");
   expect(await optionsOf(screen, "On")).toEqual([
     "Choose where…",
@@ -424,6 +441,7 @@ test("a custom role is granted where custom roles may be, and the ids are trimme
 
 test("granting a role that runs the tenant is confirmed first", async () => {
   const { screen } = await open("/t/acme/access/grants", TENANT_ACTIONS);
+  await screen.getByRole("button", { name: "Grant…" }).click();
   await choose(screen, "Role", "owner");
   await choose(screen, "On", "tenant");
   await choose(screen, "To", "bob (person)");
@@ -448,6 +466,7 @@ test("granting a role that runs the tenant is confirmed first", async () => {
 
 test("a refused grant says why, and keeps what was entered", async () => {
   const { screen } = await open("/t/acme/access/grants", TENANT_ACTIONS);
+  await screen.getByRole("button", { name: "Grant…" }).click();
   await choose(screen, "Role", "editor");
   await choose(screen, "On", "workspace");
   await screen.getByRole("combobox", { name: "Workspace" }).fill("ws_1");
@@ -466,6 +485,7 @@ test("a refused grant says why, and keeps what was entered", async () => {
 
 test("without groups to read, whom is typed as kind:id", async () => {
   const { screen } = await open("/t/acme/access/grants", ["grantr:grant", "grantr:add_member"]);
+  await screen.getByRole("button", { name: "Grant…" }).click();
   await choose(screen, "Role", "viewer");
   await choose(screen, "On", "workspace");
   await screen.getByRole("combobox", { name: "Workspace" }).fill("ws_1");
@@ -492,6 +512,7 @@ test("without deleting the tenant, owner isn't offered, nor its grants' Revoke",
     "grantr:add_member",
     "grantr:manage_groups",
   ]);
+  await screen.getByRole("button", { name: "Grant…" }).click();
   await expect.element(screen.getByRole("combobox", { name: "Role" })).toBeVisible();
   expect(await optionsOf(screen, "Role")).toEqual(["Choose a role…", "editor", "viewer"]);
   await expect
@@ -510,6 +531,7 @@ test("without revoking, Grants has no Revoke", async () => {
 
 test("revoking a grant is confirmed, and sends the grant", async () => {
   const { screen } = await open("/t/acme/access/grants", TENANT_ACTIONS);
+  await screen.getByRole("button", { name: "Grant…" }).click();
   const revoke = screen.getByRole("button", {
     name: "Revoke ops (group) as viewer on thread t_1 in ws_1",
   });
@@ -534,6 +556,7 @@ test("revoking a grant is confirmed, and sends the grant", async () => {
 
 test("a refused revocation keeps the dialog open, and says why", async () => {
   const { screen } = await open("/t/acme/access/grants", TENANT_ACTIONS);
+  await screen.getByRole("button", { name: "Grant…" }).click();
   await screen
     .getByRole("button", { name: "Revoke bob (person) as editor on workspace ws_1" })
     .click();

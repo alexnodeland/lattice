@@ -26,7 +26,7 @@ test("a heading sits at the outline's level and weighs what its look says", asyn
   expect(size(part)).toBeGreaterThan(size(card));
 });
 
-test("a badge's words read on its fill, and it has an edge in either tone", async () => {
+test("a badge's words read on its fill, with no edge, in either tone", async () => {
   const screen = await render(
     <>
       <Badge>Latest</Badge>
@@ -35,7 +35,7 @@ test("a badge's words read on its fill, and it has an edge in either tone", asyn
   );
   for (const word of ["Latest", "Recommended"]) {
     const style = getComputedStyle(screen.getByText(word).element());
-    expect(style.borderTopWidth).toBe("1px");
+    expect(style.borderTopWidth).toBe("0px");
     expect(contrast(style.color, style.backgroundColor)).toBeGreaterThanOrEqual(4.5);
   }
 });

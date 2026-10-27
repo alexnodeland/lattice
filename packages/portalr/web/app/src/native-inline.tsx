@@ -10,6 +10,7 @@ import { Refused } from "@portalr/client";
 import {
   Alert,
   fileSize,
+  glyphs,
   IconButton,
   PageViewer,
   Reading,
@@ -19,7 +20,6 @@ import {
   sheetsOf,
 } from "@portalr/ui";
 import { useQuery } from "@tanstack/react-query";
-import { Download } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { editorAt, type Place } from "./check-out";
@@ -246,7 +246,7 @@ function FileView({
     <>
       <IconButton
         label="Download"
-        icon={Download}
+        icon={glyphs.download}
         aria-busy={downloading || undefined}
         disabled={downloading}
         focusableWhenDisabled

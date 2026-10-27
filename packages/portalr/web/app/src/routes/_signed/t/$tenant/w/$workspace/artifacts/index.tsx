@@ -5,7 +5,7 @@ import { newestFirst } from "../../../../../../../order";
 import { kindWords } from "../../../../../../../thread-artifact";
 import { titlesOf } from "../../../../../../../titles";
 import { Uploader } from "../../../../../../../upload";
-import { Connection, useWorkspace } from "../../../../../../../workspace";
+import { Connection, useStream, useWorkspace } from "../../../../../../../workspace";
 
 /** The workspace's artifacts, as its log holds them: each by kind, and its latest version. */
 export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/artifacts/")({
@@ -29,6 +29,7 @@ function Artifacts() {
   const context = Route.useRouteContext();
   const { queries } = context;
   const snapshot = useWorkspace();
+  const stream = useStream();
   // Titles are read from the artifacts' data, which the log doesn't carry; the loader has them.
   const { data: read } = useQuery(queries.artifactr.artifacts(tenant, workspace));
   const titles = titlesOf(read);
@@ -39,7 +40,7 @@ function Artifacts() {
   return (
     <>
       <PageHeader title="Artifacts" meta={`What the agent and people make in ${workspace}`} />
-      <Connection snapshot={snapshot} waiting="the workspace" />
+      <Connection snapshot={snapshot} onReconnect={stream.reconnect} waiting="the workspace" />
       <Uploader context={context} tenant={tenant} workspace={workspace} />
       {snapshot.status === "live" && listed.length === 0 && (
         <EmptyState title="No artifacts yet">

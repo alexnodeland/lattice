@@ -24,8 +24,8 @@ const SIGNATURE = [
 ] as const;
 
 const KINDS = {
-  links: "a[href]",
-  buttons: "button, [role='button']",
+  links: "a[href]:not([data-button])",
+  buttons: "button, [role='button'], [data-button]",
   headings: "h1, h2, h3, h4, h5, h6",
   badges: "[data-badge]",
 } as const;
@@ -44,12 +44,10 @@ const LOOKS = {
     "the current nav link",
     "a tab",
     "the current tab",
-    "TextLink default, in body text",
+    "TextLink inline, in body text",
     "TextLink subtle, in body text",
-    "TextLink subtle, in small text (a breadcrumb)",
-    "TextLink nav",
-    "a row's link (subtle, semibold)",
-    "a test gallery's raw link (the Sheet's Usage), not a product look",
+    "a crumb (quiet, in the meta size)",
+    "a row's link (semibold)",
   ],
   buttons: [
     "the header's Menu",
@@ -76,12 +74,10 @@ const LOOKS = {
   ],
   headings: ["the page's (h1)", "a section's", "a label's"],
   badges: [
-    "StatusBadge waiting: the accent's fill",
-    "StatusBadge failed and over: the failed edge",
+    "StatusBadge waiting: the working colour on its wash",
+    "StatusBadge working, failed, retrying, near and over: the text's colour on a quiet badge",
     "StatusBadge done, queued and stopped: quiet, on the line",
-    "StatusBadge retrying and near: the warning edge",
-    "StatusBadge working: the text's colour, on the line",
-    "Badge accent: the accent's fill, its padding even",
+    "Badge accent: the working colour on its wash, its padding even",
   ],
 } as const;
 

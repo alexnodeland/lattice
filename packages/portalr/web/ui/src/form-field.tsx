@@ -1,6 +1,20 @@
 import { Field } from "@base-ui/react/field";
 import type { ReactNode } from "react";
 import { cn } from "./cn";
+import { Icon } from "./icon";
+import { glyphs } from "./icons";
+import { TYPE } from "./type";
+
+/**
+ * Why a field or a group was refused: its words, in the ink, after the failed mark, as an alert's
+ * are (portalr ADR-0079). The mark says it to a reader who doesn't follow the control's edge.
+ */
+export const refusal = "flex items-start gap-1.5 text-fg text-sm";
+
+/** The failed mark before a refusal's words, on their first line. */
+export function RefusalMark() {
+  return <Icon icon={glyphs.circleAlert} className="mt-0.5 text-status-failed" />;
+}
 
 /**
  * A form control's frame: its label, the control, a hint under it, and why it was refused. Base
@@ -35,21 +49,20 @@ export function FormField({
       invalid={error !== null}
     >
       {beside ? (
-        <Field.Label className="flex items-center gap-2 font-semibold text-fg text-sm">
+        <Field.Label className={cn(TYPE.label, "flex items-center gap-2")}>
           {children}
           <span>{label}</span>
         </Field.Label>
       ) : (
         <>
-          <Field.Label className="font-semibold text-fg text-sm">{label}</Field.Label>
+          <Field.Label className={TYPE.label}>{label}</Field.Label>
           {children}
         </>
       )}
-      {hint !== undefined && (
-        <Field.Description className="text-muted text-xs">{hint}</Field.Description>
-      )}
-      <Field.Error className="text-fg text-sm" match={error !== null}>
-        {error}
+      {hint !== undefined && <Field.Description className={TYPE.note}>{hint}</Field.Description>}
+      <Field.Error className={refusal} match={error !== null}>
+        <RefusalMark />
+        <span>{error}</span>
       </Field.Error>
     </Field.Root>
   );

@@ -158,6 +158,7 @@ When("they find that trace by its thread", async ({ page, made }) => {
     .getByRole("navigation", { name: "Tenant" })
     .getByRole("link", { name: "Traces" })
     .click();
+  await page.getByRole("button", { name: /^Find…/ }).click();
   await page.getByRole("textbox", { name: "Thread" }).fill(made.get("thread") ?? "");
   await page.getByRole("button", { name: "Apply" }).click();
   await eventuallyListed(page);

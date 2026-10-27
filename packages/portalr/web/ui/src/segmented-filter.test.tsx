@@ -22,14 +22,20 @@ test("a filter is a named radio group, each choice said with its count", async (
   await expect.element(group.getByRole("radio", { name: "Turns" })).not.toBeChecked();
 });
 
-test("the choice is pressed as every chosen control is: on the wash, in the working colour", async () => {
+test("the choice is raised on the surface in the text's weight, where the rest are quiet on the wash", async () => {
   const screen = await render(
     <SegmentedFilter<Shown> label="Show" segments={SEGMENTS} value="all" onValueChange={vi.fn()} />,
   );
   const style = getComputedStyle(screen.getByRole("radio", { name: "All, 7" }).element());
-  expect(style.backgroundColor).toBe(token("wash"));
-  expect(style.color).toBe(token("accent"));
-  expect(style.borderTopColor).toBe(token("accent"));
+  expect(style.backgroundColor).toBe(token("surface"));
+  expect(style.color).toBe(token("fg"));
+  expect(style.fontWeight).toBe("600");
+  const other = getComputedStyle(screen.getByRole("radio", { name: "Needs you, 2" }).element());
+  expect(other.backgroundColor).toBe("rgba(0, 0, 0, 0)");
+  expect(other.color).toBe(token("muted"));
+  const track = getComputedStyle(screen.getByRole("radiogroup", { name: "Show" }).element());
+  expect(track.backgroundColor).toBe(token("subtle")); // the quiet wash (portalr ADR-0081)
+  expect(contrast(other.color, track.backgroundColor)).toBeGreaterThanOrEqual(3);
   expect(contrast(style.color, style.backgroundColor)).toBeGreaterThanOrEqual(4.5);
 });
 
@@ -139,5 +145,6 @@ test("a shown filter's refusal is said under it, describes it, and marks it inva
   const group = screen.getByRole("radiogroup", { name: "Show" });
   await expect.element(group).toHaveAttribute("aria-invalid", "true");
   await expect.element(group).toHaveAccessibleDescription("What to list. Choose one.");
-  expect(getComputedStyle(group.element()).borderTopColor).toBe(token("fg"));
+  // Its edge is the failed mark's colour, as a refused field's is (portalr ADR-0079).
+  expect(getComputedStyle(group.element()).borderTopColor).toBe(token("status-failed"));
 });

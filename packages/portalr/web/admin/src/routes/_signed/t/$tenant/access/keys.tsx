@@ -1,18 +1,10 @@
 import { orThrow, refusal } from "@portalr/client";
-import {
-  Alert,
-  Button,
-  Card,
-  ConfirmDialog,
-  ItemTable,
-  SectionTitle,
-  SelectField,
-  TextField,
-} from "@portalr/ui";
+import { Alert, Button, ConfirmDialog, ItemTable, SelectField, TextField } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { useActionState, useId, useState } from "react";
+import { useActionState, useState } from "react";
 import { allowedNow, opening, useAccess } from "../../../../../access";
+import { Folded, Toolbar } from "../../../../../folded";
 
 /** A key just issued: its public id, its principal, and its secret, held by this screen alone. */
 interface Issued {
@@ -50,7 +42,14 @@ function Keys() {
   const { data: keys } = useSuspenseQuery(queries.grantr.keyring(tenant));
   const [issued, setIssued] = useState<Issued | null>(null);
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
+      <Toolbar>
+        {allowed.has("grantr:add_member") ? (
+          <IssueToListed tenant={tenant} issued={issued} onIssued={setIssued} />
+        ) : (
+          <Issue tenant={tenant} principals={null} issued={issued} onIssued={setIssued} />
+        )}
+      </Toolbar>
       <ItemTable
         caption="Keys"
         columns={[
@@ -84,11 +83,6 @@ function Keys() {
         }
         empty={{ title: "No keys yet", body: "A service principal signs in with a key." }}
       />
-      {allowed.has("grantr:add_member") ? (
-        <IssueToListed tenant={tenant} issued={issued} onIssued={setIssued} />
-      ) : (
-        <Issue tenant={tenant} principals={null} issued={issued} onIssued={setIssued} />
-      )}
     </div>
   );
 }
@@ -130,7 +124,6 @@ function Issue({
 }) {
   const { commands } = Route.useRouteContext();
   const { changed } = useAccess(tenant);
-  const heading = useId();
   const [copied, setCopied] = useState<boolean | null>(null);
   const [refused, issue, issuing] = useActionState(async (_last: string | null, form: FormData) => {
     setCopied(null);
@@ -152,8 +145,7 @@ function Issue({
     return null;
   }, null);
   return (
-    <Card render={<section aria-labelledby={heading} />} className="flex flex-col gap-3">
-      <SectionTitle id={heading}>Issue a key</SectionTitle>
+    <Folded title="Issue a key" action="Issue…">
       <form className="flex flex-col gap-3" action={issue}>
         {principals === null ? (
           <TextField label="Service principal" name="principal" autoComplete="off" required />
@@ -210,6 +202,6 @@ function Issue({
           </div>
         </div>
       )}
-    </Card>
+    </Folded>
   );
 }

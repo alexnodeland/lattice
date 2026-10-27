@@ -294,3 +294,26 @@ test("an app whose first read fails says so", async () => {
     .element(screen.getByText("This app couldn't be read. Reload the page to try again."))
     .toBeVisible();
 });
+
+test("the artifact's actions are a menu at its head, thumbs on it checked as given", async () => {
+  const sent: { type: string }[] = [];
+  const { screen } = await open(
+    "/t/acme/w/notes/artifacts/app_1",
+    async (request, path) =>
+      path === "/grantr/v1/checks"
+        ? Response.json(((await request.json()) as unknown[]).map(() => true))
+        : serving(on)(request, path),
+    (command) => {
+      sent.push(command);
+      return null;
+    },
+  );
+  await screen.getByRole("button", { name: "Artifact actions" }).click();
+  await screen.getByRole("menuitemcheckbox", { name: "Helpful" }).click();
+  expect(sent.at(-1)).toMatchObject({
+    type: "give_feedback",
+    feedback_type: "thumbs",
+    target: { kind: "artifact", artifact_id: "app_1" },
+    value: { up: true },
+  });
+});

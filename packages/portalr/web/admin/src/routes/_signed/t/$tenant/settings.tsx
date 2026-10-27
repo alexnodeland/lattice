@@ -397,16 +397,11 @@ function Setting({
             {done}
           </p>
           <div className="flex flex-wrap gap-2">
-            <Button type="submit" disabled={saving} focusableWhenDisabled>
+            <Button type="submit" pending={saving}>
               Save<span className="sr-only"> {row.name}</span>
             </Button>
             {row.here && (
-              <Button
-                variant="secondary"
-                disabled={saving}
-                focusableWhenDisabled
-                onClick={() => void send(null)}
-              >
+              <Button variant="secondary" pending={saving} onClick={() => void send(null)}>
                 {`Use ${row.inherits}`}
                 <span className="sr-only"> for {row.name}</span>
               </Button>

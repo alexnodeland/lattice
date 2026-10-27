@@ -59,50 +59,7 @@ function Roles() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <ItemTable
-        caption="Built-in roles"
-        columns={[
-          { key: "role", label: "Role", cell: (role) => role.name },
-          { key: "kinds", label: "Granted on", cell: (role) => role.kinds.join(", ") },
-        ]}
-        items={catalog.roles}
-        keyOf={(role) => role.name}
-        empty={{ title: "No built-in roles", body: "The deployment grants none in a tenant." }}
-      />
-      <ItemTable
-        caption="Custom roles"
-        columns={[
-          { key: "role", label: "Role", cell: (role) => role.name },
-          { key: "actions", label: "Actions", cell: (role) => [...role.actions].sort().join(", ") },
-        ]}
-        items={custom}
-        keyOf={(role) => role.name}
-        actions={(role) => (
-          <>
-            <Button variant="ghost" size="sm" onClick={() => void change(role.name)}>
-              Change<span className="sr-only"> {possessive(role.name)}</span> actions
-            </Button>
-            <ConfirmDialog
-              label="Delete"
-              about={role.name}
-              look="danger-soft"
-              size="sm"
-              title={`Delete the role ${role.name}?`}
-              confirm="Delete"
-              onConfirm={async () =>
-                orThrow("Not deleted", await changed(commands.grantr.deleteRole(tenant, role.name)))
-              }
-            >
-              <p>Every grant of {role.name} goes with it.</p>
-            </ConfirmDialog>
-          </>
-        )}
-        empty={{
-          title: "No custom roles yet",
-          body: `A custom role holds some of a workspace admin's actions, granted on ${catalog.custom_kinds.join(", ")}.`,
-        }}
-      />
+    <div className="flex flex-col gap-4">
       {said && <Alert tone={said.refused ? "error" : "info"}>{said.said}</Alert>}
       <DefineSet
         key={changing?.name ?? "new"}
@@ -145,6 +102,49 @@ function Roles() {
           setSaid({ said: message, refused: false });
         }}
         onCancel={() => setChanging(null)}
+      />
+      <ItemTable
+        caption="Built-in roles"
+        columns={[
+          { key: "role", label: "Role", cell: (role) => role.name },
+          { key: "kinds", label: "Granted on", cell: (role) => role.kinds.join(", ") },
+        ]}
+        items={catalog.roles}
+        keyOf={(role) => role.name}
+        empty={{ title: "No built-in roles", body: "The deployment grants none in a tenant." }}
+      />
+      <ItemTable
+        caption="Custom roles"
+        columns={[
+          { key: "role", label: "Role", cell: (role) => role.name },
+          { key: "actions", label: "Actions", cell: (role) => [...role.actions].sort().join(", ") },
+        ]}
+        items={custom}
+        keyOf={(role) => role.name}
+        actions={(role) => (
+          <>
+            <Button variant="ghost" size="sm" onClick={() => void change(role.name)}>
+              Change<span className="sr-only"> {possessive(role.name)}</span> actions
+            </Button>
+            <ConfirmDialog
+              label="Delete"
+              about={role.name}
+              look="danger-soft"
+              size="sm"
+              title={`Delete the role ${role.name}?`}
+              confirm="Delete"
+              onConfirm={async () =>
+                orThrow("Not deleted", await changed(commands.grantr.deleteRole(tenant, role.name)))
+              }
+            >
+              <p>Every grant of {role.name} goes with it.</p>
+            </ConfirmDialog>
+          </>
+        )}
+        empty={{
+          title: "No custom roles yet",
+          body: `A custom role holds some of a workspace admin's actions, granted on ${catalog.custom_kinds.join(", ")}.`,
+        }}
       />
     </div>
   );

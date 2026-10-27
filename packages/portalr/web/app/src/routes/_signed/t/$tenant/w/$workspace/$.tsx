@@ -1,4 +1,4 @@
-import { NotFound, TextLink } from "@portalr/ui";
+import { ButtonLink, NotFound } from "@portalr/ui";
 import { createFileRoute, Link } from "@tanstack/react-router";
 
 /** A page that isn't there, in a workspace: in its frame (portalr ADR-0068). */
@@ -15,9 +15,9 @@ function PageNotFound() {
     <NotFound
       title="Page not found"
       action={
-        <TextLink render={<Link to="/t/$tenant/w/$workspace" params={{ tenant, workspace }} />}>
+        <ButtonLink render={<Link to="/t/$tenant/w/$workspace" params={{ tenant, workspace }} />}>
           The workspace's threads
-        </TextLink>
+        </ButtonLink>
       }
     >
       There's nothing at this address in {workspace}.

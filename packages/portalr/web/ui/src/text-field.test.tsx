@@ -44,3 +44,17 @@ test("a field that wasn't refused says nothing more", async () => {
   const screen = await render(<TextField label="Email" />);
   await expect.element(screen.getByLabelText("Email")).not.toHaveAttribute("aria-invalid");
 });
+
+test("a refused field's edge is the failed colour, and the failed mark stands before its words", async () => {
+  const screen = await render(<TextField label="Password" error="Invalid login credentials" />);
+  const input = screen.getByLabelText("Password").element();
+  expect(getComputedStyle(input).borderTopColor).toBe(token("status-failed"));
+  for (const ground of ["paper", "surface"]) {
+    expect(contrast(token("status-failed"), token(ground))).toBeGreaterThanOrEqual(3);
+  }
+  const words = screen.getByText("Invalid login credentials").element();
+  const mark = words.previousElementSibling as Element;
+  expect(mark.tagName.toLowerCase()).toBe("svg");
+  expect(mark.getAttribute("aria-hidden")).toBe("true");
+  expect(getComputedStyle(mark).color).toBe(token("status-failed"));
+});

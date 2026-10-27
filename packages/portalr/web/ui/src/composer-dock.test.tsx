@@ -3,6 +3,7 @@ import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { Button } from "./button";
 import { ComposerDock } from "./composer-dock";
+import { viewport } from "./test/viewport";
 
 function Thread({ rows = 3, after = true }: { rows?: number; after?: boolean }) {
   return (
@@ -144,4 +145,17 @@ test("the page forgets the composer once it goes", async () => {
     .not.toBe("");
   screen.unmount();
   expect(document.documentElement.style.getPropertyValue("--composer-clearance")).toBe("");
+});
+
+test("in a window under 30rem tall the dock stays in the flow, and is pinned otherwise", async () => {
+  await viewport(800, 400);
+  const screen = await render(
+    <ComposerDock>
+      <div>composer</div>
+    </ComposerDock>,
+  );
+  const dock = screen.container.querySelector("[data-composer-dock]") as HTMLElement;
+  expect(getComputedStyle(dock).position).toBe("static");
+  await page.viewport(800, 800);
+  await expect.poll(() => getComputedStyle(dock).position).toBe("sticky");
 });

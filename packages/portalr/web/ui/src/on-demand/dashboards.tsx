@@ -20,7 +20,6 @@ import {
   tableFeatures,
   useTable,
 } from "@tanstack/react-table";
-import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { useEffect, useId, useMemo, useState } from "react";
 import type { Keyed, Panel, TablePanel, TableRow } from "../artifactr-ui";
 import { Button } from "../button";
@@ -29,6 +28,7 @@ import { formatNumber } from "../chart-theme";
 import { cellText } from "../dashboard-figures";
 import { EmptyState } from "../empty-state";
 import { Icon } from "../icon";
+import { glyphs } from "../icons";
 import { isNumber, own } from "../json";
 import { Table } from "../table";
 import { TextField } from "../text-field";
@@ -181,19 +181,25 @@ export function DataTable({ panel, labelledBy }: { panel: TablePanel; labelledBy
                 const sorted = header.column.getIsSorted();
                 return (
                   <th key={header.id} scope="col" aria-sort={sortOf(header.column)}>
-                    <button
-                      type="button"
+                    {/* A small ghost button, 24px tall, its words set back to the column's edge. */}
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={header.column.getToggleSortingHandler()}
-                      className="-mx-1 inline-flex items-center gap-1 rounded px-1 outline-offset-(--focus-offset) hover:bg-wash focus-visible:outline-(length:--focus-width) focus-visible:outline-focus"
+                      className="-mx-(--button-sm-pad-x) gap-1 text-muted"
                     >
                       {String(header.column.columnDef.header)}
                       <Icon
                         icon={
-                          sorted === "asc" ? ArrowUp : sorted === "desc" ? ArrowDown : ArrowUpDown
+                          sorted === "asc"
+                            ? glyphs.arrowUp
+                            : sorted === "desc"
+                              ? glyphs.arrowDown
+                              : glyphs.arrowUpDown
                         }
                         className="size-3.5"
                       />
-                    </button>
+                    </Button>
                   </th>
                 );
               })}

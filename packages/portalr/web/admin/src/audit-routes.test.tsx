@@ -130,6 +130,7 @@ test("a log of exactly one page offers Show more once, and then says it has all"
 
 test("a filter goes to grantr and into the address, trimmed, and Clear takes it away", async () => {
   const { screen, router } = await open("/t/acme/audit");
+  await screen.getByRole("button", { name: "Filter…" }).click();
   await choose(screen, "Change", "Members added");
   await choose(screen, "Made by", "A person");
   await screen.getByRole("textbox", { name: "Their id" }).fill(" bob ");
@@ -157,7 +158,8 @@ test("an address naming a maker grantr can't take reads the whole log", async ()
   await expect.element(screen.getByRole("table", { name: "Audit log" })).toBeVisible();
   // The read uses only what grantr takes: here, nothing of the maker.
   expect(audits.every((query) => !query.has("actor") && !query.has("actor_kind"))).toBe(true);
-  // The form shows the filter read, not the address.
+  // The form shows the filter read, not the address: nothing, so it is folded.
+  await screen.getByRole("button", { name: "Filter…" }).click();
   await expect
     .element(screen.getByRole("combobox", { name: "Made by" }))
     .toHaveTextContent("Anyone");

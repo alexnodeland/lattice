@@ -50,13 +50,14 @@ test("a dialog casts the most shadow, over a scrim that blurs what is behind it"
   expect(getComputedStyle(backdrop as Element).backdropFilter).toMatch(/blur\(/);
 });
 
-test("the shadow is black and heavier in dark, where a faint violet one would not be seen", async () => {
+test("the shadow is a whisper of a neutral in light, and black and heavier in dark, where a faint one would not be seen (portalr ADR-0079)", async () => {
   const screen = await render(<Card>A card</Card>);
   const card = screen.getByText("A card").element();
   const dark = matchMedia("(prefers-color-scheme: dark)").matches;
   const { alpha, black } = shadowOf(card);
   expect(black).toBe(dark);
-  expect(alpha).toBeGreaterThan(dark ? 0.5 : 0.1);
+  expect(alpha).toBeGreaterThan(dark ? 0.5 : 0.05);
+  expect(alpha).toBeLessThan(dark ? 0.7 : 0.1);
 });
 
 test("a drawer casts its shadow too", async () => {

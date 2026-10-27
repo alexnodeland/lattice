@@ -308,7 +308,7 @@ export function CheckOut({
       return (
         <>
           {createPortal(
-            <Button size="sm" disabled={pending} onClick={checkOut}>
+            <Button size="sm" pending={pending} onClick={checkOut}>
               Edit in {app}
             </Button>,
             slots.toggle,
@@ -323,7 +323,7 @@ export function CheckOut({
     }
     return lease === null ? (
       <div className="flex flex-col items-start gap-2">
-        <Button disabled={pending} onClick={checkOut}>
+        <Button pending={pending} onClick={checkOut}>
           {here
             ? `Edit here in ${app}`
             : editor === null
@@ -406,7 +406,7 @@ export function CheckOut({
           <Button
             variant="secondary"
             size="sm"
-            disabled={pending}
+            pending={pending}
             onClick={() => void extend(leased)}
           >
             Extend

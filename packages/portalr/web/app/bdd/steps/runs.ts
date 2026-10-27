@@ -85,6 +85,7 @@ Given("bob has published a ticket that fails", async ({ request, scenario }) => 
 
 When("they start a thread of their own", async ({ page, scenario }) => {
   scenario.thread = `Thread ${crypto.randomUUID().slice(0, 8)}`;
+  await page.getByRole("button", { name: "Name it first…" }).click();
   await page.getByLabel("New thread").fill(scenario.thread);
   await page.getByRole("button", { name: "Start" }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(scenario.thread);

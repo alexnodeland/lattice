@@ -38,7 +38,7 @@ function Proposals() {
         title="Proposals"
         meta={`Every proposal in ${workspace}, the open ones first`}
       />
-      <Connection snapshot={snapshot} waiting="the workspace" />
+      <Connection snapshot={snapshot} onReconnect={stream.reconnect} waiting="the workspace" />
       {snapshot.status === "live" && listed.length === 0 && (
         <EmptyState title="No proposals yet">
           The agent proposes a change to an artifact here when it may not make the change itself.

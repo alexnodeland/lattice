@@ -22,7 +22,6 @@
     "clsx": "2.1.1",
     "hast-util-from-html-isomorphic": "2.0.0",
     "katex": "0.19.0",
-    "lucide-react": "1.55.0",
     "react": "19.3.0",
     "react-is": "19.3.0",
     "recharts": "3.10.1",

@@ -390,7 +390,7 @@ export function SchemaForm({
         })}
       {open && (
         <div className="flex flex-col items-start gap-2">
-          <Button type="submit" disabled={pending}>
+          <Button type="submit" pending={pending}>
             {layout.submitLabel}
           </Button>
           <Unsent reason={unsent} />

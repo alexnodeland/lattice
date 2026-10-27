@@ -201,7 +201,12 @@ function Charts({ summary, everywhere }: { summary: Summary; everywhere: boolean
           caption="Every evaluation"
           columns={[
             { key: "name", label: "Evaluation", cell: named },
-            { key: "count", label: "Scores", cell: (evaluation) => figure(evaluation.count) },
+            {
+              key: "count",
+              label: "Scores",
+              numeric: true,
+              cell: (evaluation) => figure(evaluation.count),
+            },
           ]}
           items={summary.evaluations}
           keyOf={named}
@@ -228,8 +233,13 @@ function Charts({ summary, everywhere }: { summary: Summary; everywhere: boolean
               label: "Workspace",
               cell: (place) => place.workspace ?? NOWHERE.name,
             },
-            { key: "up", label: "Thumbs up", cell: (place) => figure(place.up) },
-            { key: "down", label: "Thumbs down", cell: (place) => figure(place.down) },
+            { key: "up", label: "Thumbs up", numeric: true, cell: (place) => figure(place.up) },
+            {
+              key: "down",
+              label: "Thumbs down",
+              numeric: true,
+              cell: (place) => figure(place.down),
+            },
             { key: "evaluated", label: "Evaluations", cell: (place) => figure(place.evaluated) },
           ]}
           items={summary.workspaces}

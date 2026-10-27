@@ -1,8 +1,17 @@
 import { Menu } from "@base-ui/react/menu";
-import { Check, ChevronDown } from "lucide-react";
 import type { ReactElement } from "react";
+import { cn } from "./cn";
 import { Icon } from "./icon";
+import { glyphs } from "./icons";
 import { groupLabel, item, popup, separator } from "./menu";
+import { FEEDBACK, RING } from "./states";
+
+/** The switchers' trigger: where the person is, bare until hovered, as the header's other triggers are. */
+const trigger = cn(
+  "inline-flex min-w-0 items-center gap-1.5 rounded-(--header-trigger-radius) px-(--header-trigger-pad-x) py-(--header-trigger-pad-y) font-semibold text-fg text-sm hover:bg-wash",
+  RING,
+  FEEDBACK,
+);
 
 /** A tenant or a workspace to choose, by its id, with a word about it. */
 export type Choice = { readonly id: string; readonly detail?: string };
@@ -29,7 +38,7 @@ function Choices({
             <span className="flex items-center gap-2 text-muted text-xs">
               {detail}
               <Menu.RadioItemIndicator className="text-accent">
-                <Icon icon={Check} />
+                <Icon icon={glyphs.check} />
               </Menu.RadioItemIndicator>
             </span>
           </Menu.RadioItem>
@@ -69,7 +78,7 @@ export function Switcher({
     <Menu.Root>
       <Menu.Trigger
         aria-label={where ? `Workspace: ${tenant}, ${where.workspace}` : `Tenant: ${tenant}`}
-        className="inline-flex min-w-0 items-center gap-1.5 rounded-(--header-trigger-radius) border border-edge bg-paper px-(--header-trigger-pad-x) py-(--header-trigger-pad-y) font-semibold text-fg text-sm outline-offset-(--focus-offset) hover:bg-wash focus-visible:outline-(length:--focus-width) focus-visible:outline-focus"
+        className={trigger}
       >
         {where ? (
           <>
@@ -88,7 +97,7 @@ export function Switcher({
             {tenant}
           </span>
         )}
-        <Icon icon={ChevronDown} className="ml-auto text-muted" />
+        <Icon icon={glyphs.chevronDown} className="ml-auto text-muted" />
       </Menu.Trigger>
       <Menu.Portal>
         <Menu.Positioner sideOffset={6} align="start" className="z-30">
@@ -134,14 +143,11 @@ export function TenantSwitcher({
   const named = tenant ?? "All tenants";
   return (
     <Menu.Root>
-      <Menu.Trigger
-        aria-label={`Tenant: ${named}`}
-        className="inline-flex min-w-0 items-center gap-1.5 rounded-(--header-trigger-radius) border border-edge bg-paper px-(--header-trigger-pad-x) py-(--header-trigger-pad-y) font-semibold text-fg text-sm outline-offset-(--focus-offset) hover:bg-wash focus-visible:outline-(length:--focus-width) focus-visible:outline-focus"
-      >
+      <Menu.Trigger aria-label={`Tenant: ${named}`} className={trigger}>
         <span aria-hidden="true" className="truncate">
           {named}
         </span>
-        <Icon icon={ChevronDown} className="ml-auto text-muted" />
+        <Icon icon={glyphs.chevronDown} className="ml-auto text-muted" />
       </Menu.Trigger>
       <Menu.Portal>
         <Menu.Positioner sideOffset={6} align="start" className="z-30">

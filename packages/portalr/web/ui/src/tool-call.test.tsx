@@ -2,7 +2,7 @@ import type { Artifactr } from "@portalr/client";
 import { expect, onTestFinished, test, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
-import { ToolCall, ToolCalls } from "./tool-call";
+import { RunSteps, ToolCall, ToolCalls } from "./tool-call";
 
 const tool = (change: Partial<Artifactr.Tool> = {}): Artifactr.Tool => ({
   name: "create_artifact",
@@ -126,4 +126,80 @@ test("a status the run didn't name is said as it was", async () => {
   await expect.element(screen.getByText("skipped")).toBeVisible();
   await screen.getByText("create_artifact").click();
   await expect.element(screen.getByText("{}", { exact: true })).toBeVisible();
+});
+
+const steps = (statuses: readonly string[]): (readonly [string, Artifactr.Tool])[] =>
+  statuses.map((status, at) => [`call_${at}`, tool({ name: `step_${at}`, status, seq: at })]);
+
+test("a run's several calls are one group: its count and how it goes, open while it runs with the newest step open", async () => {
+  const screen = await render(
+    <ul>
+      <RunSteps tools={steps(["ok", "ok", "called"])} running />
+    </ul>,
+  );
+  const group = screen.getByRole("button", { name: "3 steps" });
+  await expect.element(group).toHaveAttribute("aria-expanded", "true");
+  await expect.element(screen.getByText("Running step 3 of 3")).toBeVisible();
+  const list = screen.getByRole("list", { name: "Steps" });
+  // A step's row is its disclosure's button; Copy's name holds the step's name too.
+  const rows = list.getByRole("button", { name: /^step_/, expanded: true }).elements();
+  expect(rows.map((row) => row.textContent?.includes("step_2"))).toEqual([true]);
+  expect(list.getByRole("button", { name: /^step_/, expanded: false }).elements()).toHaveLength(2);
+});
+
+test("done, the group is folded and says so; failed, it says that; one call is a row of its own", async () => {
+  const screen = await render(
+    <ul>
+      <RunSteps tools={steps(["ok", "ok"])} running={false} />
+      <RunSteps tools={steps(["ok", "error"])} running={false} />
+      <RunSteps tools={steps(["ok"])} running={false} />
+    </ul>,
+  );
+  const groups = screen.getByRole("button", { name: "2 steps" }).elements();
+  expect(groups).toHaveLength(2);
+  for (const group of groups) {
+    expect(group.getAttribute("aria-expanded")).toBe("false");
+  }
+  expect(groups.map((group) => group.textContent?.endsWith("Done"))).toEqual([true, false]);
+  expect(groups.map((group) => group.textContent?.endsWith("Failed"))).toEqual([false, true]);
+  expect(screen.getByRole("button", { name: "1 steps" }).elements()).toHaveLength(0);
+  expect(screen.getByRole("button", { name: /^step_0/, expanded: false }).elements()).toHaveLength(
+    1,
+  );
+});
+
+test("a folded group opens from the keyboard to its steps", async () => {
+  const screen = await render(
+    <ul>
+      <RunSteps tools={steps(["ok", "ok"])} running={false} />
+    </ul>,
+  );
+  const group = screen.getByRole("button", { name: "2 steps" });
+  group.element().focus();
+  await userEvent.keyboard("{Enter}");
+  await expect.element(group).toHaveAttribute("aria-expanded", "true");
+  await expect.element(screen.getByRole("list", { name: "Steps" })).toBeVisible();
+});
+
+test("a group folds as its run ends, says Working between calls, and keeps its count as calls arrive", async () => {
+  const screen = await render(
+    <ToolCalls>
+      <RunSteps tools={steps(["ok"])} running />
+    </ToolCalls>,
+  );
+  await screen.rerender(
+    <ToolCalls>
+      <RunSteps tools={steps(["ok", "ok"])} running />
+    </ToolCalls>,
+  );
+  const group = screen.getByRole("button", { name: "2 steps" });
+  await expect.element(group).toHaveAttribute("aria-expanded", "true");
+  await expect.poll(() => group.element().textContent).toContain("Working");
+  await screen.rerender(
+    <ToolCalls>
+      <RunSteps tools={steps(["ok", "ok"])} running={false} />
+    </ToolCalls>,
+  );
+  await expect.element(group).toHaveAttribute("aria-expanded", "false");
+  await expect.poll(() => group.element().textContent).toContain("Done");
 });

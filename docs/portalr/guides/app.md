@@ -20,7 +20,7 @@ A workspace's threads, and a new one. A **thread** is a conversation, and its pa
 - a **tool call** the run made, and how it returned;
 - what a **paused run waits on**: a call to approve or deny, a question to answer, or a **form** an agent asks through artifactr.ui's `ask_form` ([lattice RFC-0005](../../rfcs/0005-forms-dashboards-and-mini-apps.md)), whose fields say what they take, and say under a field what was refused; once answered, it says by whom, until the turn ends;
 - the thread's **proposals**, each with its rationale and how it was resolved, to accept or reject;
-- a composer, only where grantr allows the person to post.
+- a composer, only where grantr allows the person to post, which grows with what is written, to a height.
 
 Markdown renders through Streamdown, with no raw HTML; links go to the web, mail, the page and the application only, and images only from the app's own origin. GitHub's callouts (`> [!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`, `[!CAUTION]`) show as notes with their word, and a block of code names its language, is highlighted in the common languages, and has **Wrap** and **Copy**. Math between `$$` shows as math, within a line or on lines of its own; a single `$` is a price. **Copy** under a message copies it as the Markdown it was written in. A Mermaid diagram shows as its source: diagrams aren't drawn yet, and where Mermaid is off in the workspace, the line under it says so.
 

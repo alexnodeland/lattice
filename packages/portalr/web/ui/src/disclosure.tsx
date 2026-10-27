@@ -1,13 +1,15 @@
 import { Collapsible } from "@base-ui/react/collapsible";
-import { ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "./cn";
 import { Icon } from "./icon";
+import { glyphs } from "./icons";
+import { FEEDBACK, RING } from "./states";
 
 /**
  * How a disclosure's trigger looks (portalr ADR-0063):
  * - `quiet`, a muted line such as "Show the figures";
- * - `link`, in the working colour, underlined on hover, for a part that reads as a way on;
+ * - `link`, in the working colour, underlined on hover, for a part that reads as a way on, as a
+ *   proposal's Compare does (`native-proposal.tsx`): the one text-link look a disclosure may take;
  * - `block`, the whole width of what it opens, laid out by its summary, as a card's header is.
  */
 const LOOK = {
@@ -62,14 +64,16 @@ export function Disclosure({
       <Collapsible.Trigger
         aria-label={name}
         className={cn(
-          "group flex min-h-(--disclosure-target) cursor-pointer gap-(--disclosure-gap) rounded-(--disclosure-radius) outline-offset-(--focus-offset) focus-visible:outline-(length:--focus-width) focus-visible:outline-focus",
+          "group flex min-h-(--disclosure-target) cursor-pointer gap-(--disclosure-gap) rounded-(--disclosure-radius)",
+          RING,
+          FEEDBACK,
           look !== "block" && "items-center",
           LOOK[look],
           triggerClassName,
         )}
       >
         <Icon
-          icon={ChevronRight}
+          icon={glyphs.chevronRight}
           className={cn(
             "size-3.5 shrink-0 text-muted transition-transform duration-(--disclosure-duration) group-data-panel-open:rotate-90 motion-reduce:transition-none rtl:-scale-x-100 rtl:group-data-panel-open:rotate-90",
             look === "block" && "mt-0.5 size-4",

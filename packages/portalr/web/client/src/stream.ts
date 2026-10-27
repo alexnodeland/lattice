@@ -123,7 +123,7 @@ export class Stream<State, Frame, Command, R extends Result, Hello> {
   #timer: ReturnType<typeof setTimeout> | null = null;
   #stable: ReturnType<typeof setTimeout> | null = null;
   /** A telling put off until the next frame, while one is. */
-  #later: unknown = null;
+  #later: (() => void) | null = null;
   readonly #listeners = new Set<() => void>();
   readonly #live = new Set<(envelope: Extract<Frame, Envelope>) => void>();
   readonly #refused = new Set<(result: R) => void>();
@@ -228,10 +228,8 @@ export class Stream<State, Frame, Command, R extends Result, Hello> {
     }
     this.#timer = null;
     this.#stable = null;
-    if (this.#later !== null) {
-      cancel(this.#later);
-      this.#later = null;
-    }
+    this.#later?.();
+    this.#later = null;
     const socket = this.#socket;
     this.#socket = null;
     socket?.close(1000);
@@ -288,15 +286,14 @@ export class Stream<State, Frame, Command, R extends Result, Hello> {
     const classified = this.protocol.classify(frame);
     switch (classified.kind) {
       case "welcome": {
-        const state = this.protocol.welcome?.(this.#current.state, frame) ?? this.#current.state;
-        if (this.#fromHead) {
-          this.#fromHead = false;
-          this.#update({ state, seq: classified.headSeq, status: "replaying" });
-        } else if (classified.reset) {
-          this.#update({ state: this.protocol.initial(), seq: 0, status: "replaying" });
-        } else {
-          this.#update({ state, status: "replaying" });
-        }
+        // Told to reset, the store starts over, and still holds what the welcome says, such as
+        // the runs under way; joined at the head, it goes on from there.
+        const reset = classified.reset && !this.#fromHead;
+        const base = reset ? this.protocol.initial() : this.#current.state;
+        const state = this.protocol.welcome?.(base, frame) ?? base;
+        const seq = this.#fromHead ? classified.headSeq : reset ? 0 : this.#current.seq;
+        this.#fromHead = false;
+        this.#update({ state, seq, status: "replaying" });
         // Commands sent before the drop and still unanswered go again, with their ids.
         for (const id of this.#pending.keys()) {
           this.#transmit(id);
@@ -376,10 +373,8 @@ export class Stream<State, Frame, Command, R extends Result, Hello> {
 
   /** Tells every listener, now; a telling put off until the next frame is done with it. */
   #tell(): void {
-    if (this.#later !== null) {
-      cancel(this.#later);
-      this.#later = null;
-    }
+    this.#later?.();
+    this.#later = null;
     for (const listener of this.#listeners) {
       listener();
     }
@@ -400,7 +395,7 @@ export class Stream<State, Frame, Command, R extends Result, Hello> {
     if (!later) {
       this.#tell();
     } else if (this.#later === null) {
-      this.#later = frame(() => {
+      this.#later = nextFrame(() => {
         this.#later = null;
         this.#tell();
       });
@@ -409,13 +404,24 @@ export class Stream<State, Frame, Command, R extends Result, Hello> {
 }
 
 /**
- * The browser's next frame, or a moment's wait where there are none, as in a test: read as each
- * is asked for, so a test may give the browser's. A hidden tab draws no frames, so what it holds
- * waits until it is shown, or until the next event, which tells at once.
+ * Calls `fn` on the browser's next frame, or after a tenth of a second where there are none, as
+ * in a test, or where the tab is hidden and draws none: whichever comes first. Returns how to
+ * cancel it.
+ * Read as each is asked for, so a test may give the browser's frames.
  */
-const frame = (fn: () => void): unknown =>
-  typeof requestAnimationFrame === "function" ? requestAnimationFrame(fn) : setTimeout(fn, 16);
-const cancel = (handle: unknown): void =>
-  typeof cancelAnimationFrame === "function"
-    ? cancelAnimationFrame(handle as number)
-    : clearTimeout(handle as number);
+const nextFrame = (fn: () => void): (() => void) => {
+  const drawn = typeof requestAnimationFrame === "function";
+  const cancel = () => {
+    clearTimeout(timer);
+    if (drawn) {
+      cancelAnimationFrame(frame);
+    }
+  };
+  const go = () => {
+    cancel();
+    fn();
+  };
+  const timer = setTimeout(go, drawn ? 100 : 16);
+  const frame = drawn ? requestAnimationFrame(go) : 0;
+  return cancel;
+};

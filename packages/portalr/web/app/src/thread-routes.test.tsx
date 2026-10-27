@@ -406,7 +406,8 @@ test("a turn under way has a strip with Stop, which asks the run to stop", async
     { artifactrLog: working },
   );
   const strip = screen.getByRole("group", { name: "This turn" });
-  await expect.element(strip.getByRole("status")).toHaveTextContent("Working");
+  // "Working", and what it is doing once the prefetched add-on has loaded.
+  await expect.poll(() => strip.getByRole("status").element().textContent).toMatch(/^Working/);
   await strip.getByRole("button", { name: "Stop" }).click();
   expect(sent.at(-1)).toMatchObject({ type: "stop_run", run_id: "run_2" });
 });

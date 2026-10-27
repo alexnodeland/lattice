@@ -1026,11 +1026,11 @@ test("the strip says what the turn is doing, in one status, and how long since i
     strip({ phase: "tool", tool: "create_app", argsChars: 12_300, at }, now),
   );
   const group = screen.getByRole("group", { name: "This turn" });
-  await expect.element(group.getByText("Preparing create_app call, 12 KB")).toBeVisible();
+  await expect.element(group.getByText("Preparing a create_app call, 12 KB")).toBeVisible();
   expect(group.getByRole("status").elements()).toHaveLength(1);
   await expect
     .element(group.getByRole("status"))
-    .toHaveTextContent("Working: Preparing create_app call, 12 KB");
+    .toHaveTextContent("Working: Preparing a create_app call, 12 KB");
   await expect.element(group.getByRole("button", { name: "Stop" })).toBeVisible();
   // The clock ticks outside the status.
   expect(group.getByRole("status").element().textContent).not.toContain("1:05");
@@ -1059,12 +1059,8 @@ test("the strip counts the turn's tokens, as an estimate until something says th
     .toBeVisible();
   await screen.rerender(strip({ outputChars: 401 }, now, { history: null }));
   await expect.element(group.getByText("Tokens: about 101 out, estimated")).toBeVisible();
-  await screen.rerender(
-    strip({ outputChars: 401 }, now, { usage: { input: 1234, output: 56, cacheRead: 1000 } }),
-  );
-  const exact = group.getByText("Tokens: 1,234 in, 56 out, 1,000 from cache");
-  await expect.element(exact).toBeVisible();
-  expect(exact.element().closest("[role=status], [aria-live]")).toBeNull();
+  const line = group.getByText("Tokens: about 101 out, estimated");
+  expect(line.element().closest("[role=status], [aria-live]")).toBeNull();
 });
 
 test("what streams is never announced as it grows: only the posted message is", async () => {
@@ -1317,7 +1313,7 @@ test("the log holds the messages alone: Jump to latest sits outside it", async (
   expect(jump.element().closest("[role=log]")).toBeNull();
 });
 
-test("what streamed says where its start is missing, fades before a tool call, and a thought of unknown length is a moment", async () => {
+test("what streamed says where its start is missing, fades before a tool call, and a thought of unknown length has none", async () => {
   const screen = await render(
     <Messages>
       <Streaming
@@ -1336,7 +1332,7 @@ test("what streamed says where its start is missing, fades before a tool call, a
   );
   const item = screen.getByRole("listitem", { name: "Assistant is writing" });
   await expect.element(item.getByText("…and so on.")).toBeVisible(); // its start is missing
-  await expect.element(item.getByRole("button", { name: "Thought for a moment" })).toBeVisible();
+  await expect.element(item.getByRole("button", { name: "Thought", exact: true })).toBeVisible();
   const bubble = item.getByText("…and so on.").element().closest(".opacity-45");
   expect(bubble).not.toBeNull();
   await screen.rerender(

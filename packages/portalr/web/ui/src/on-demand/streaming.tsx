@@ -1,13 +1,12 @@
 /**
  * What a turn under way says beyond its words (portalr ADR-0083), loaded as the first run
- * streams: what the model is doing, the one status that says so, and the turn's token count,
- * estimated until exact. It imports nothing the chat doesn't hold already, so the bundle shares
- * no chunk between them.
+ * streams: what the model is doing, the one status that says so, the turn's token count,
+ * estimated, and how long it thought. It imports nothing the chat doesn't hold already, so the
+ * bundle shares no chunk between them.
  */
 
 import type { Artifactr } from "@portalr/client";
 import { useEffect, useState } from "react";
-import type { Usage } from "../chat";
 import { TYPE } from "../type";
 
 /** How long without a frame before the strip says the model is being waited on. */
@@ -31,7 +30,7 @@ function doing({ phase, tool, calls, argsChars }: Artifactr.Live): string {
       if (calls > 0) {
         return `Running ${tool ?? "a tool"}${calls > 1 ? ` and ${calls - 1} more` : ""}`;
       }
-      return `Preparing ${tool ?? "a"} call${argsChars > 0 ? `, ${kb(argsChars)}` : ""}`;
+      return `Preparing a ${tool ? `${tool} ` : ""}call${argsChars > 0 ? `, ${kb(argsChars)}` : ""}`;
     default:
       return "Waiting on the model";
   }
@@ -82,28 +81,42 @@ export function Phase({ run, now }: { run: Artifactr.Run; now: Date }) {
 }
 
 /**
- * The turn's tokens, for the strip's quiet line: estimated from the characters sent and streamed
- * until `usage` says exactly; never announced, as it changes with every frame. The estimate of
- * what was sent counts the thread's messages alone, so it is a floor.
+ * The turn's tokens, for the strip's quiet line, estimated from the characters sent and streamed
+ * (exact counts are a later phase's); never announced, as it changes with every frame. The
+ * estimate of what was sent counts the thread's messages alone, so it is a floor.
  */
 export function Tokens({
   run,
   history,
-  usage,
 }: {
   run: Artifactr.Run;
   /** The characters of the thread's history the turn was sent, or null where that isn't known. */
   history: number | null;
-  usage: Usage | null;
 }) {
-  if (usage) {
-    return `Tokens: ${[
-      `${count(usage.input)} in`,
-      `${count(usage.output)} out`,
-      ...(usage.cacheRead ? [`${count(usage.cacheRead)} from cache`] : []),
-      ...(usage.reasoning ? [`${count(usage.reasoning)} thinking`] : []),
-    ].join(", ")}`;
-  }
   const sent = history === null ? "" : `at least about ${count(Math.ceil(history / 4))} in, `;
   return `Tokens: ${sent}about ${count(Math.ceil(run.live.outputChars / 4))} out, estimated`;
+}
+
+/**
+ * What the thinking's disclosure says: "Thinking…" while it thinks; once it has, for how long, "a
+ * moment" under a second, counting a part still open as the turn ended up to its last frame;
+ * or "Thought" alone, where a reconnect lost its length.
+ */
+export function Thought({
+  live,
+  ended,
+}: {
+  live: Artifactr.Live;
+  /** How the turn ended, if it has. */
+  ended: "failed" | "stopped" | undefined;
+}) {
+  const thinking = live.phase === "thinking";
+  if (thinking && !ended) {
+    return "Thinking…";
+  }
+  if (live.thoughtMs === null) {
+    return "Thought";
+  }
+  const ms = live.thoughtMs + (thinking ? live.at - live.since : 0);
+  return `Thought for ${ms < 1000 ? "a moment" : `${Math.round(ms / 1000)} s`}`;
 }

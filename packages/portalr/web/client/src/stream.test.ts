@@ -160,6 +160,18 @@ test("a store told to reset discards what it holds and rebuilds from the replay"
   expect(stream.snapshot().seq).toBe(1);
 });
 
+test("a store told to reset still holds the runs the welcome says are under way", async () => {
+  server.append(message(1));
+  server.append(message(2));
+  open();
+  await until(stream, (s) => s.status === "live" && s.seq === 2);
+  server.reset([message(7)]);
+  server.activeRuns = [{ run_id: "run_9", thread_id: "thr_1" }];
+  server.drop();
+  await until(stream, (s) => s.status === "live" && ids(stream).length === 1);
+  expect(stream.snapshot().state.runs.run_9?.status).toBe("running");
+});
+
 test("a reset whose replay is cut short goes on from where the replay got to", async () => {
   for (const n of [1, 2, 3]) {
     server.append(message(n));
@@ -485,10 +497,25 @@ test("with the browser's frames, a run's frames are heard as the next is drawn, 
   });
   server.send(delta("He"));
   server.send(delta("llo"));
-  await new Promise((resolve) => setTimeout(resolve, 100));
+  await new Promise((resolve) => setTimeout(resolve, 40));
   expect(stream.snapshot().state.runs.run_1?.text).toBe("Hello"); // taken at once
   expect(heard).toBe(0); // told once a frame is drawn
   expect(drawn).toHaveLength(1);
   drawn[0]?.(0);
+  expect(heard).toBe(1);
+});
+
+test("a hidden tab, which draws no frames, still hears a run's frames a moment later", async () => {
+  vi.stubGlobal("requestAnimationFrame", () => 1); // never drawn
+  vi.stubGlobal("cancelAnimationFrame", () => {});
+  server.append({ type: "run_started", run_id: "run_1", thread_id: "thr_1" });
+  open();
+  await until(stream, (s) => s.status === "live");
+  let heard = 0;
+  stream.subscribe(() => {
+    heard += 1;
+  });
+  server.send(delta("Hi"));
+  await new Promise((resolve) => setTimeout(resolve, 250));
   expect(heard).toBe(1);
 });

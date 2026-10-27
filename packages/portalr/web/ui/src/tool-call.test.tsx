@@ -40,11 +40,15 @@ test("open, it shows its arguments indented and what it returned, each to copy",
     </ToolCalls>,
   );
   await screen.getByText("create_artifact").click();
-  // Formatted once the view has loaded: keys and values apart; Raw is the JSON indented.
+  // Formatted once the view has loaded: keys and values apart; Raw is the value as recorded.
   await expect.element(screen.getByText('"Ship Friday"')).toBeVisible();
   await screen.getByRole("button", { name: "Raw" }).click();
   await expect
-    .element(screen.getByText(/^\{\n {2}"kind": "note",\n {2}"data": \{\n {4}"text"/))
+    .element(
+      screen
+        .getByRole("region", { name: "The arguments of create_artifact" })
+        .getByText('{"kind": "note", "data": {"text": "Ship Friday"}}'),
+    )
     .toBeVisible();
   await expect.element(screen.getByText("Done: note_1 is now at version 1.")).toBeVisible();
   await screen.getByRole("button", { name: "Copy the result of create_artifact" }).click();
@@ -260,9 +264,9 @@ test("the formatted view lays out JSON, shows a string's lines as a block, and c
   await expect.element(region.getByText("{}")).toBeVisible();
   // Nothing is wider than its box.
   expect(region.element().scrollWidth).toBeLessThanOrEqual(region.element().clientWidth);
-  // Raw is the JSON as it was shown before, and the choice is remembered for every call.
+  // Raw is the value as the run recorded it, and the choice is remembered for every call.
   await toggle.getByRole("button", { name: "Raw" }).click();
-  await expect.element(region.getByText(/^\{\n {2}"title": "Hello"/)).toBeVisible();
+  await expect.element(region.getByText(/^\{"title":"Hello"/)).toBeVisible();
   expect(localStorage.getItem("portalr:tool-call-view")).toBe("raw");
   await screen.rerender(
     <ToolCalls>
@@ -350,4 +354,24 @@ test("a value too heavy to lay out is shown as recorded, with a note", async () 
   await screen.getByText("create_artifact").click();
   await expect.element(screen.getByText("Too much to format: shown as recorded.")).toBeVisible();
   expect(screen.getByRole("group").elements()).toHaveLength(0);
+});
+
+test("Raw shows, and copies, a long number exactly as recorded", async () => {
+  onTestFinished(() => localStorage.removeItem("portalr:tool-call-view"));
+  const written = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
+  onTestFinished(() => written.mockRestore());
+  const args = '{"id": 12345678901234567}';
+  const screen = await render(
+    <ToolCalls>
+      <ToolCall tool={tool({ args })} />
+    </ToolCalls>,
+  );
+  await screen.getByText("create_artifact").click();
+  const view = screen.getByRole("group", { name: "View of the arguments of create_artifact" });
+  await view.getByRole("button", { name: "Raw" }).click();
+  const region = screen.getByRole("region", { name: "The arguments of create_artifact" });
+  await expect.element(region.getByText(args)).toBeVisible();
+  await screen.getByRole("button", { name: "Copy the arguments of create_artifact" }).click();
+  expect(written).toHaveBeenLastCalledWith(region.element().textContent);
+  expect(written).toHaveBeenLastCalledWith(args);
 });

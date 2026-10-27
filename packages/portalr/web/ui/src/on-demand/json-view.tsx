@@ -13,8 +13,11 @@ import { type ReactNode, useState } from "react";
 import { Button } from "../button";
 import { TYPE } from "../type";
 
-/** The most characters formatted: past it, a value is shown raw, with a note. */
+/** The most characters formatted, or indented: past it, a value is shown as recorded, with a note. */
 export const LONGEST = 200_000;
+
+/** A number of sixteen digits or more, or in exponent form, which parsing may round. */
+const LONG_NUMBER = /(?:^|[^\w."])-?\d{16,}|\d[eE][+-]?\d/;
 
 /** The deepest nesting, and the most values, laid out: past either, a value is shown raw. */
 export const DEEPEST = 50;
@@ -136,33 +139,32 @@ export function tooHeavy(value: unknown): boolean {
   return false;
 }
 
-/** A number of sixteen digits or more, or in exponent form, which the browser may round. */
-const LONG_NUMBER = /(?:^|[^\w."])-?\d{16,}|\d[eE][+-]?\d/;
-
 /** The words a key is made of: `source_html` is `source` and `html`. */
 const wordsOf = (key: string) => new Set(key.toLowerCase().split(/[^a-z0-9]+/));
 
 /** The languages a key's words name, by the word. */
-const NAMED: Readonly<Record<string, string>> = {
-  html: "html",
-  css: "css",
-  style: "css",
-  styles: "css",
-  stylesheet: "css",
-  js: "javascript",
-  javascript: "javascript",
-  ts: "typescript",
-  typescript: "typescript",
-  py: "python",
-  python: "python",
-  sql: "sql",
-  md: "markdown",
-  markdown: "markdown",
-  code: "",
-  source: "",
-  src: "",
-  script: "",
-};
+const NAMED: ReadonlyMap<string, string> = new Map(
+  Object.entries({
+    html: "html",
+    css: "css",
+    style: "css",
+    styles: "css",
+    stylesheet: "css",
+    js: "javascript",
+    javascript: "javascript",
+    ts: "typescript",
+    typescript: "typescript",
+    py: "python",
+    python: "python",
+    sql: "sql",
+    md: "markdown",
+    markdown: "markdown",
+    code: "",
+    source: "",
+    src: "",
+    script: "",
+  }),
+);
 
 /**
  * The language a string value is written in: by its key's words first (`source_ts` names
@@ -171,7 +173,7 @@ const NAMED: Readonly<Record<string, string>> = {
  */
 export function languageOf(key: string, value: string): string | null {
   // A language the key names wins; a word that says code alone, as `source`, comes after.
-  const named = [...wordsOf(key)].map((word) => NAMED[word]).filter((it) => it !== undefined);
+  const named = [...wordsOf(key)].map((word) => NAMED.get(word)).filter((it) => it !== undefined);
   const language = named.find((it) => it !== "") ?? named[0];
   if (language) {
     return language;
@@ -198,7 +200,10 @@ const LONG = 80;
  * shown as its escape, so a value reads as it is.
  */
 const plain = (text: string) =>
-  text.replace(/[‎‏‪-‮⁦-⁩]/g, (c) => `\\u${(c.codePointAt(0) ?? 0).toString(16).padStart(4, "0")}`);
+  text.replace(
+    /[\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/g,
+    (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`,
+  );
 
 /** What a part's caller gives it of the kit: the region a value scrolls in, and a Copy of it. */
 export interface Shell {
@@ -206,16 +211,30 @@ export interface Shell {
   readonly copy: (text: string, what?: string) => ReactNode;
 }
 
-/** A block of code, labelled by its language, wrapped to the box, with Copy; never highlighted. */
-function Code({ code, language, copy }: { code: string; language: string; copy: Shell["copy"] }) {
+/**
+ * A string of lines as a block of its own, wrapped to the box: where it is code, labelled by its
+ * language, with Copy; never highlighted.
+ */
+function Block({
+  text,
+  language,
+  copy,
+}: {
+  text: string;
+  language: string | null;
+  copy: Shell["copy"];
+}) {
+  const label = language || "code";
   return (
-    <div className="flex min-w-0 flex-col rounded-(--code-block-radius) border border-line bg-surface">
-      <div className="flex items-center justify-between gap-2 border-line border-b py-1 pr-1 pl-3">
-        <span className="font-mono text-muted text-xs">{language || "code"}</span>
-        {copy(code, `this ${language || "code"} value`)}
-      </div>
+    <div className="mt-1 flex min-w-0 flex-col rounded-(--code-block-radius) border border-line bg-surface">
+      {language !== null && (
+        <div className="flex items-center justify-between gap-2 border-line border-b py-1 pr-1 pl-3">
+          <span className="font-mono text-muted text-xs">{label}</span>
+          {copy(text, `this ${label} value`)}
+        </div>
+      )}
       <pre className="m-0 whitespace-pre-wrap break-words px-(--code-block-pad-x) py-(--code-block-pad-y) text-fg [font-variant-ligatures:none]">
-        {plain(code)}
+        {plain(text)}
       </pre>
     </div>
   );
@@ -238,18 +257,7 @@ function Scalar({ value }: { value: unknown }) {
  */
 function Value({ value, name, copy }: { value: unknown; name: string; copy: Shell["copy"] }) {
   if (typeof value === "string" && (value.includes("\n") || value.length > LONG)) {
-    const language = languageOf(name, value);
-    return (
-      <div className="mt-1 min-w-0">
-        {language === null ? (
-          <pre className="whitespace-pre-wrap break-words rounded-(--code-block-radius) border border-line bg-surface px-(--code-block-pad-x) py-(--code-block-pad-y)">
-            {plain(value)}
-          </pre>
-        ) : (
-          <Code code={value} language={language} copy={copy} />
-        )}
-      </div>
-    );
+    return <Block text={value} language={languageOf(name, value)} copy={copy} />;
   }
   if (Array.isArray(value)) {
     return value.length === 0 ? (
@@ -329,7 +337,7 @@ function keep(view: View): void {
 }
 
 /** What a text is, once read: its value, laid out, or why it is shown as recorded. */
-function read(text: string, cut: boolean): { parsed?: Parsed; note?: string } {
+function read(text: string, cut: boolean): { parsed?: Parsed; note?: string; indented?: string } {
   const parsed = parseJson(text, cut);
   if (parsed === undefined) {
     return text.length > LONGEST ? { note: "Too long to format: shown as recorded." } : {};
@@ -337,20 +345,22 @@ function read(text: string, cut: boolean): { parsed?: Parsed; note?: string } {
   if (tooHeavy(parsed.value)) {
     return { note: "Too much to format: shown as recorded." };
   }
-  return { parsed };
+  // Indented to copy, unless it was cut, or parsing it may have rounded a number.
+  return parsed.repaired || LONG_NUMBER.test(text)
+    ? { parsed }
+    : { parsed, indented: JSON.stringify(parsed.value, null, 2) };
 }
 
 /**
  * A part of a call, as the add-on draws it: its name, a Formatted and Raw toggle where the value
  * is an object or an array, Copy of what is shown, a note where the value was cut short or
  * holds numbers the browser may have rounded, and the value in its region. Formatted lays the
- * JSON out; Raw is the JSON indented, or the text as recorded.
+ * JSON out; Raw is the value exactly as the run recorded it.
  */
 export function Formatted({
   name,
   what,
   text,
-  shown,
   cut,
   shell,
 }: {
@@ -360,8 +370,6 @@ export function Formatted({
   what: string;
   /** The value, as the run recorded it. */
   text: string;
-  /** The raw view: the JSON indented, or the text as recorded. */
-  shown: string;
   /** Whether the run cut it short. */
   cut: boolean;
   shell: Shell;
@@ -375,6 +383,8 @@ export function Formatted({
   const { parsed, note } = was;
   const toggles = parsed !== undefined && parsed.value !== null && typeof parsed.value === "object";
   const formatted = toggles && view === "formatted";
+  // Formatted copies the JSON indented; Raw, and a value with no toggle, as recorded.
+  const copied = formatted ? (was.indented ?? text) : text;
   const choose = (chosen: View) => {
     setView(chosen);
     keep(chosen);
@@ -399,8 +409,8 @@ export function Formatted({
               ))}
             </fieldset>
           )}
-          {/* Copy copies what is shown: the JSON laid out, as indented; Raw, as recorded. */}
-          {shell.copy(toggles && view === "raw" ? text : shown)}
+          {/* Copy copies what is shown: the JSON laid out, as indented; otherwise as recorded. */}
+          {shell.copy(copied)}
         </span>
       </div>
       {parsed?.repaired && (
@@ -416,7 +426,7 @@ export function Formatted({
             <Value value={parsed.value} name="" copy={shell.copy} />
           </div>
         ) : (
-          <pre className="whitespace-pre-wrap break-words p-3 font-mono text-xs">{shown}</pre>
+          <pre className="whitespace-pre-wrap break-words p-3 font-mono text-xs">{plain(text)}</pre>
         ),
       )}
       {cut && <p className={TYPE.note}>Cut short: the run keeps the first part of each value.</p>}

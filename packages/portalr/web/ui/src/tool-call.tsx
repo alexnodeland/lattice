@@ -25,15 +25,6 @@ const STATUS: Record<string, readonly [Tone, string, string]> = {
   retry: ["retrying", "Refused", "Why it was refused"],
 };
 
-/** A value as it reads best: JSON indented, anything else as it was recorded. */
-function pretty(text: string): string {
-  try {
-    return JSON.stringify(JSON.parse(text), null, 2);
-  } catch {
-    return text;
-  }
-}
-
 /** The formatted view of a call's parts (portalr ADR-0083), loaded as a call is first opened. */
 const loadJsonView = () => import("./on-demand/json-view");
 
@@ -59,7 +50,8 @@ function Part({
   view: JsonView | null;
 }) {
   const what = `the ${name.toLowerCase()} of ${tool}`;
-  const shown = pretty(text) || (name === "Arguments" ? "{}" : "");
+  // As recorded until the formatted view loads, which indents it; no arguments are `{}`.
+  const shown = text || (name === "Arguments" ? "{}" : "");
   const region = (children: ReactNode) => (
     <ScrollRegion
       aria-label={what.charAt(0).toUpperCase() + what.slice(1)}
@@ -71,14 +63,7 @@ function Part({
   if (view) {
     const copy = (copied: string, of = what) => <CopyButton text={copied} what={of} />;
     return (
-      <view.Formatted
-        name={name}
-        what={what}
-        text={text}
-        shown={shown}
-        cut={cut}
-        shell={{ region, copy }}
-      />
+      <view.Formatted name={name} what={what} text={shown} cut={cut} shell={{ region, copy }} />
     );
   }
   return (
@@ -138,7 +123,7 @@ export function ToolCall({
               <Icon icon={glyphs.wrench} className="size-3.5 shrink-0 text-muted" />
             )}
             <code className="shrink-0 font-mono">{tool.name}</code>
-            <span className="min-w-0 flex-1 truncate font-mono text-muted text-xs">{line}</span>
+            <bdi className="min-w-0 flex-1 truncate font-mono text-muted text-xs">{line}</bdi>
             <StatusBadge tone={tone} className="shrink-0">
               {word}
             </StatusBadge>

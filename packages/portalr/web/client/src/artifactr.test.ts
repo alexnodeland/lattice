@@ -232,6 +232,21 @@ test("the text of a new response replaces what the model wrote before its tool c
   expect(state.runs.run_1?.live.outputChars).toBe("I'll draft it.Here it is. Done.".length);
 });
 
+test("a part of a kind this client doesn't know still counts as the last part", () => {
+  let state = streamed(started(), [
+    { type: "part_started", part: 0, part_kind: "text" },
+    { type: "text_delta", part: 0, delta: "Before." },
+    { type: "part_started", part: 1, part_kind: "image" },
+  ]);
+  expect(state.runs.run_1?.live.part).toBe(1);
+  // A text part numbered after it goes on in the same response.
+  state = streamed(state, [
+    { type: "part_started", part: 2, part_kind: "text" },
+    { type: "text_delta", part: 2, delta: " After." },
+  ]);
+  expect(state.runs.run_1?.text).toBe("Before. After.");
+});
+
 test("a welcome starts every running run's live output over, so a replay shows nothing twice", () => {
   const frames = [
     { type: "part_started", part: 0, part_kind: "thinking" },

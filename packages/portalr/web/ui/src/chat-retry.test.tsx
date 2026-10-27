@@ -1,5 +1,5 @@
 import type { Artifactr } from "@portalr/client";
-import { expect, test, vi } from "vitest";
+import { expect, onTestFinished, test, vi } from "vitest";
 import { render } from "vitest-browser-react";
 import { RunStrip } from "./chat";
 import { useRetrying } from "./on-demand";
@@ -76,4 +76,33 @@ test("a call keys its add-on by being open, so a failed load is tried again as i
   expect(keys().at(-1)).toEqual([false, false]);
   await screen.getByText("a").click();
   expect(keys().at(-1)).toEqual([true, true]);
+});
+
+test("before the formatted view loads, a call's Copy copies what it shows", async () => {
+  const retrying = vi.mocked(useRetrying);
+  const real = retrying.getMockImplementation();
+  retrying.mockImplementation(() => null);
+  onTestFinished(() => {
+    retrying.mockImplementation(real ?? (() => null));
+  });
+  const written = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
+  onTestFinished(() => written.mockRestore());
+  const tool: Artifactr.Tool = {
+    name: "create_artifact",
+    status: "called",
+    args: '{"kind": "note"}',
+    result: "",
+    argsCut: false,
+    resultCut: false,
+    seq: 1,
+  };
+  const screen = await render(
+    <ToolCalls>
+      <ToolCall tool={tool} open />
+    </ToolCalls>,
+  );
+  const region = screen.getByRole("region", { name: "The arguments of create_artifact" });
+  await expect.element(region).toBeVisible();
+  await screen.getByRole("button", { name: "Copy the arguments of create_artifact" }).click();
+  expect(written).toHaveBeenLastCalledWith(region.element().textContent);
 });

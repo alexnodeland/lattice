@@ -105,6 +105,9 @@ export class ScriptedServer {
     }
   }
 
+  /** The runs under way, as each welcome says them. */
+  activeRuns: { run_id: string; thread_id: string }[] = [];
+
   /** Replaces the log, as a server whose data was reset; its head may be behind a client's. */
   reset(events: Record<string, unknown>[]): void {
     this.#log = events.map((event, index) => ({ seq: index + 1, event }));
@@ -191,7 +194,13 @@ export class ScriptedServer {
     const reset = position > this.head;
     const after = reset ? 0 : position;
     socket.send(
-      JSON.stringify({ type: "welcome", workspace_id: "ws_1", head_seq: this.head, reset }),
+      JSON.stringify({
+        type: "welcome",
+        workspace_id: "ws_1",
+        head_seq: this.head,
+        reset,
+        active_runs: this.activeRuns,
+      }),
     );
     const replay = this.#log.filter((entry) => entry.seq > after);
     const cut = this.#cutReplayAfter;

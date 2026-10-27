@@ -86,6 +86,9 @@ test("a string's language is read from its key, then from its first characters",
   expect(languageOf("transcript", "Alice: hi\nBob: hello")).toBeNull();
   expect(languageOf("subscription", "monthly")).toBeNull();
   expect(languageOf("lifestyle", "quiet")).toBeNull();
+  // A key named as an object's own members is a word like any other.
+  expect(languageOf("constructor", "Dear Alex,\nThanks.")).toBeNull();
+  expect(languageOf("to_string", "Dear Alex,\nThanks.")).toBeNull();
   expect(languageOf("body", "import { a } from './b';\nconst c = a;")).toBe("javascript");
   expect(languageOf("body", "import os\nprint(os.name)")).toBe("python");
 });

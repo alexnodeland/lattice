@@ -423,7 +423,8 @@ export function Streaming({
   ended?: "failed" | "stopped";
 }) {
   const thinking = live?.thinking ?? "";
-  const thought = !ended && live?.phase === "thinking" ? null : (live?.thoughtMs ?? 0);
+  // How long it thought, in the add-on's words, loaded ahead as the thread opens.
+  const addon = useRetrying(loadStreaming, thinking !== "", live?.phase);
   const state = ended ? "didn't finish" : text ? "is writing" : "is thinking";
   // The start of what streamed may be missing: cut to its cap, or lost to a reconnect.
   const words = live?.truncated ? `…${text}` : text;
@@ -442,24 +443,21 @@ export function Streaming({
         // The thinking, folded under a line that says it is thinking, or for how long it
         // thought: live only, never kept, which the panel says. Nothing of it is announced.
         <Disclosure
-          summary={
-            thought === null
-              ? "Thinking…"
-              : // "a moment" under a second, or for longer where a reconnect lost the count
-                `Thought for ${thought < 1000 ? "a moment" : `${Math.round(thought / 1000)} s`}`
-          }
+          summary={live && addon ? <addon.Thought live={live} ended={ended} /> : "Thinking…"}
           className={TYPE.note}
         >
           <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words font-mono text-xs">
-            {thinking}
+            <bdi>{thinking}</bdi>
           </pre>
           <p className="mt-1">Thinking isn't kept: it goes when the page does.</p>
         </Disclosure>
       )}
       {/* Words the model wrote before calling a tool aren't the reply: they fade as it calls. */}
-      <div className={cn(bubble(false), !ended && live?.reply === "stale" && "opacity-45")}>
-        {text ? <Markdown streaming={!ended}>{words}</Markdown> : ended ? null : <Thinking />}
-      </div>
+      {(text || !ended) && (
+        <div className={cn(bubble(false), !ended && live?.reply === "stale" && "opacity-45")}>
+          {text ? <Markdown streaming={!ended}>{words}</Markdown> : <Thinking />}
+        </div>
+      )}
       <div aria-hidden="true" className="min-h-7" />
     </li>
   );
@@ -1134,18 +1132,6 @@ function elapsed(from: string | undefined, now: Date): string | null {
 }
 
 /**
- * A turn's tokens, exactly, as a future usage frame says them (streaming design, phases C and E);
- * until one does, the strip estimates.
- */
-export interface Usage {
-  readonly input: number;
-  readonly output: number;
-  readonly cacheRead?: number;
-  readonly cacheWrite?: number;
-  readonly reasoning?: number;
-}
-
-/**
  * The strip over a turn under way (portalr ADR-0080): how it is going, what it is doing and for
  * how long (portalr ADR-0083), its tokens, and what can be done about it: Stop while it works,
  * where the reader may; and the way to its question while it waits. One status announces how it
@@ -1158,8 +1144,7 @@ export function RunStrip({
   onStop,
   onQuestion,
   now,
-  history = null,
-  usage = null,
+  history,
 }: {
   run: Artifactr.Run;
   /** Stop it, where the reader may; none hides Stop. */
@@ -1170,8 +1155,6 @@ export function RunStrip({
   now?: Date;
   /** The characters of the thread's history the turn was sent, for the estimate; null if unknown. */
   history?: number | null;
-  /** The turn's tokens, exactly, once something says them; the strip estimates until then. */
-  usage?: Usage | null;
 }) {
   const active = run.status === "running" || run.status === "paused";
   const [tick, setTick] = useState(() => new Date());
@@ -1218,7 +1201,7 @@ export function RunStrip({
       {/* The tokens' row is kept from the start, so the strip doesn't grow as the add-on loads. */}
       {working && (
         <span className={cn(TYPE.note, "w-full tabular-nums")}>
-          {addon ? <addon.Tokens run={run} history={history} usage={usage} /> : "\u00a0"}
+          {addon ? <addon.Tokens run={run} history={history ?? null} /> : "\u00a0"}
         </span>
       )}
     </fieldset>

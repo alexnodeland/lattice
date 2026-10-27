@@ -630,34 +630,32 @@ export function applyLive(state: Workspace, frame: v1.Server, now: number): Work
       // part's start was lost, as what response that was isn't known.
       const again = live.part === null ? live.reply === "writing" : event.part <= live.part;
       const reply = again || live.reply === "posted" ? "pending" : live.reply;
+      // Whatever its kind, it is now the last part, which the next is numbered after.
+      const next: Live = { ...live, part: event.part, reply };
       switch (event.part_kind) {
         case "text": {
           const replaces = reply !== "writing";
           return withRun(state, run.id, {
             text: replaces ? "" : run.text,
-            live: phased(live, "writing", now, {
-              part: event.part,
+            live: phased(next, "writing", now, {
               reply: "writing",
               truncated: replaces ? false : live.truncated,
             }),
           });
         }
         case "thinking":
-          return withLive(state, run.id, (was) =>
-            phased(was, "thinking", now, { part: event.part, reply }),
-          );
+          return withRun(state, run.id, { live: phased(next, "thinking", now) });
         case "tool_call":
-          return withLive(state, run.id, (was) =>
-            phased(was, "tool", now, {
-              part: event.part,
+          return withRun(state, run.id, {
+            live: phased(next, "tool", now, {
               // Text before a tool call is what the model said it would do, not the reply.
               reply: reply === "writing" && run.text !== "" ? "stale" : reply,
               tool: event.tool_name ?? null,
               argsChars: 0,
             }),
-          );
+          });
         default:
-          return state;
+          return withRun(state, run.id, { live: { ...next, at: now } });
       }
     }
     case "text_delta": {

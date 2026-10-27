@@ -552,6 +552,7 @@ def test_a_run_in_a_thread_the_client_does_not_follow_has_no_start_read() -> Non
             [active] = ws.receive_json()["active_runs"]
             assert active["started_at"] is None, "listed, but its thread's log isn't read"
         latch.released.set()
+        wait_for(lambda: _runs_ended(client) == 1)  # the run ends before the app stops
 
 
 def _runs_ended(client: TestClient) -> int:

@@ -7,7 +7,7 @@
  * button. A filter's action says what is in effect beside it while it is closed.
  */
 
-import { Button, Card, SectionTitle } from "@portalr/ui";
+import { Button, Card, Dialog, SectionTitle, usePhone } from "@portalr/ui";
 import {
   createContext,
   type KeyboardEvent,
@@ -64,7 +64,7 @@ export function Folded({
   children,
 }: {
   /** The form's heading, once open; the region's name. */
-  title: ReactNode;
+  title: string;
   /** The button that opens it: a verb, such as "Invite…" or "Find…". */
   action: string;
   /** What is in effect while it is closed, beside the button: a filter's window, say. */
@@ -104,20 +104,36 @@ export function Folded({
       trigger.current?.focus();
     }
   };
-  const panel = shown && (
-    <Card
-      ref={card}
-      id={id}
-      render={<section aria-labelledby={`${id}-title`} />}
-      className={className ? `flex flex-col gap-3 ${className}` : "flex flex-col gap-3"}
-      onKeyDown={closeOnEscape}
-    >
-      <SectionTitle id={`${id}-title`} {...heading}>
-        {title}
-      </SectionTitle>
-      {children}
-    </Card>
-  );
+  // On a phone the form is a sheet over the page rather than a card beneath the row (portalr
+  // ADR-0082): a dialog, with its focus kept in and its own way to close.
+  const asSheet = usePhone();
+  const panel =
+    shown && asSheet ? (
+      <Dialog open onOpenChange={show} title={title} close="Done">
+        {/* The dialog itself closes on Escape and brings the focus back. */}
+        <div
+          ref={card}
+          className={className ? `flex flex-col gap-3 ${className}` : "flex flex-col gap-3"}
+        >
+          {children}
+        </div>
+      </Dialog>
+    ) : (
+      shown && (
+        <Card
+          ref={card}
+          id={id}
+          render={<section aria-labelledby={`${id}-title`} />}
+          className={className ? `flex flex-col gap-3 ${className}` : "flex flex-col gap-3"}
+          onKeyDown={closeOnEscape}
+        >
+          <SectionTitle id={`${id}-title`} {...heading}>
+            {title}
+          </SectionTitle>
+          {children}
+        </Card>
+      )
+    );
   return (
     <>
       {said && !shown && <span className="text-muted text-xs">{said}</span>}

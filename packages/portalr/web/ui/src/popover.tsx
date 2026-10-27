@@ -1,7 +1,8 @@
 import { Popover as BasePopover } from "@base-ui/react/popover";
-import type { ReactElement, ReactNode } from "react";
+import { type ReactElement, type ReactNode, useRef } from "react";
 import { cn } from "./cn";
 import { popover } from "./menu";
+import { SheetHandle, sheetPopup, sheetPositioner, useSheet } from "./sheet";
 
 /**
  * A panel that opens from a button, over the page, with a dialog's manners (portalr ADR-0080):
@@ -27,21 +28,31 @@ export function Popover({
   className?: string;
   children: ReactNode;
 }) {
+  const box = useRef<HTMLDivElement>(null);
+  useSheet(box, open, () => onOpenChange(false));
   return (
     <BasePopover.Root open={open} onOpenChange={onOpenChange}>
       <BasePopover.Trigger render={trigger} />
       <BasePopover.Portal>
-        <BasePopover.Positioner side="top" align="start" sideOffset={8} className="z-30">
+        <BasePopover.Positioner
+          side="top"
+          align="start"
+          sideOffset={8}
+          className={`z-30 ${sheetPositioner}`}
+        >
           <BasePopover.Popup
+            ref={box}
             role="dialog"
             aria-label={label}
             {...(initialFocus && { initialFocus })}
             className={cn(
               popover,
               "flex flex-col gap-3 p-(--card-pad) outline-none transition-[opacity,scale] duration-(--popover-duration) data-ending-style:scale-(--popover-enter-scale) data-starting-style:scale-(--popover-enter-scale) data-ending-style:opacity-0 data-starting-style:opacity-0 motion-reduce:transition-none",
+              sheetPopup,
               className,
             )}
           >
+            <SheetHandle />
             {children}
           </BasePopover.Popup>
         </BasePopover.Positioner>

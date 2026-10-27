@@ -151,40 +151,6 @@ for (const width of [320, 360]) {
   });
 }
 
-/** The declarations of every rule under a media condition, by selector. */
-function rulesUnder(condition: string): Map<string, CSSStyleDeclaration> {
-  const found = new Map<string, CSSStyleDeclaration>();
-  for (const sheet of Array.from(document.styleSheets)) {
-    for (const rule of Array.from(sheet.cssRules)) {
-      if (rule instanceof CSSMediaRule && rule.conditionText.includes(condition)) {
-        for (const inner of Array.from(rule.cssRules)) {
-          if (inner instanceof CSSStyleRule) {
-            found.set(inner.selectorText, inner.style);
-          }
-        }
-      }
-    }
-  }
-  return found;
-}
-
-test("to a finger, every control is 44px or taller, admin's density included, and a field's text is 16px", () => {
-  const coarse = rulesUnder("pointer: coarse");
-  const roots = Array.from(coarse.entries()).find(([selector]) =>
-    selector.includes('[data-density="compact"]'),
-  );
-  expect(roots?.[0]).toContain(":root");
-  for (const token of ["--icon-button-size", "--disclosure-target", "--breadcrumb-target"]) {
-    expect(Number.parseFloat(roots?.[1].getPropertyValue(token) ?? "0")).toBeGreaterThanOrEqual(
-      2.75,
-    );
-  }
-  const controls = Array.from(coarse.entries()).find(([selector]) => selector.includes("button"));
-  expect(controls?.[1].minHeight).toBe("2.75rem");
-  const fields = Array.from(coarse.entries()).find(([selector]) => selector.includes("textarea"));
-  expect(fields?.[1].fontSize).toBe("max(1rem, 1em)");
-});
-
 test("the composer's dock and the drawer keep a phone's safe areas clear, and the page its top and sides", () => {
   const text = Array.from(document.styleSheets)
     .flatMap((sheet) => Array.from(sheet.cssRules))

@@ -1,10 +1,11 @@
 import { Menu as BaseMenu } from "@base-ui/react/menu";
-import type { Ref } from "react";
+import { type Ref, useRef, useState } from "react";
 import { Button } from "./button";
 import { Icon } from "./icon";
 import { IconButton } from "./icon-button";
 import type { Glyph } from "./icons";
 import { glyphs } from "./icons";
+import { SheetHandle, sheetPopup, sheetPositioner, useSheet } from "./sheet";
 import { FEEDBACK } from "./states";
 
 /**
@@ -58,8 +59,17 @@ export function Menu({
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 }) {
+  // Open or not, known here as well, so the sheet's drag can close it (portalr ADR-0082).
+  const [opened, setOpened] = useState(false);
+  const shown = open ?? opened;
+  const change = (next: boolean) => {
+    setOpened(next);
+    onOpenChange?.(next);
+  };
+  const box = useRef<HTMLDivElement>(null);
+  useSheet(box, shown, () => change(false));
   return (
-    <BaseMenu.Root {...(open !== undefined && { open })} {...(onOpenChange && { onOpenChange })}>
+    <BaseMenu.Root open={shown} onOpenChange={change}>
       {icon ? (
         <BaseMenu.Trigger ref={triggerRef} render={<IconButton label={label} icon={icon} />} />
       ) : (
@@ -68,8 +78,9 @@ export function Menu({
         </BaseMenu.Trigger>
       )}
       <BaseMenu.Portal>
-        <BaseMenu.Positioner sideOffset={4} align="end" className="z-30">
-          <BaseMenu.Popup className={popup}>
+        <BaseMenu.Positioner sideOffset={4} align="end" className={`z-30 ${sheetPositioner}`}>
+          <BaseMenu.Popup ref={box} className={`${popup} ${sheetPopup}`}>
+            <SheetHandle />
             {items.map((each) =>
               each.checked === undefined ? (
                 <BaseMenu.Item

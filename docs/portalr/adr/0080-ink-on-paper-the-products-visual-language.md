@@ -64,6 +64,8 @@ The style census counts 10 link looks (from 12) and 4 badge looks (from 6); Biom
 
 ## Small screens
 
+*Amended by [ADR-0082](0082-sheets-the-thumb-bar-and-a-phone-s-tables.md): what floats becomes a sheet on a phone, the thumb bar, a phone's tables, the keyboard, and a finger measured in the tests.*
+
 A phone is a first target, not a narrowing of the desktop. The fundamentals are in the kit's base styles and the shell, so every page has them:
 
 - **A finger's targets.** Two media questions, each for its own concern: `pointer: coarse` says the pointer is imprecise, so every control is 44px or taller to it; `hover: none` says nothing can rest on a control, so nothing waits on a hover (the message's actions). A phone answers both; a touch laptop answers the first with a mouse plugged in and keeps its hover. Where the pointer is coarse, every control is 44px or taller: the icon button, a disclosure's line, a crumb, a table row, the header's trigger, and every button, select and text input by a floor on their height. Admin's compact density holds for a mouse and gives way to the same floor for a finger.

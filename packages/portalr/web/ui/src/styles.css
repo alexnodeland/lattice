@@ -20,11 +20,89 @@
  */
 @custom-variant fine (@media (hover: hover));
 @custom-variant coarse (@media (hover: none));
+/* A phone: a narrow window where a finger is a pointer (portalr ADR-0082): what floats becomes a sheet. */
+@custom-variant phone (@media (max-width: 48rem) and (any-pointer: coarse));
 /*
  * A short window, as at a high zoom or a phone turned on its side: what is pinned to the bottom
  * would cover most of the page, so the composer's dock stays in the flow (`short:static`).
  */
 @custom-variant short (@media (max-height: 30rem));
+
+/*
+ * A sheet (portalr ADR-0082): what floats, sitting along the bottom of the window on a phone, the
+ * full width, rounded at its top alone, scrolling inside itself past most of the window, keeping
+ * the home indicator clear, and sliding up and down rather than fading or scaling (not where
+ * motion is reduced). A popup that places itself (a dialog's) is `as-sheet`; a positioned popup's
+ * positioner is `as-sheet-positioner` (beating the place Base UI writes inline), and its popup
+ * `as-sheet-popup`, filling it. (The names are no word of the prose: Tailwind writes a rule for
+ * each word of the sources it finds a utility in.)
+ */
+@utility as-sheet {
+  @apply as-sheet-placed as-sheet-popup;
+}
+@utility as-sheet-placed {
+  position: fixed;
+  inset: auto 0 0 0;
+  width: auto;
+  max-width: none;
+  translate: none;
+  transform: none;
+  z-index: 50;
+}
+@utility as-sheet-positioner {
+  @apply as-sheet-placed;
+}
+@utility as-sheet-popup {
+  width: 100%;
+  min-width: 0;
+  max-height: 85dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-width: 1px 0 0;
+  border-radius: var(--dialog-radius) var(--dialog-radius) 0 0;
+  padding-bottom: calc(var(--dialog-pad) + env(safe-area-inset-bottom));
+  transition-property: translate;
+  &[data-starting-style],
+  &[data-ending-style] {
+    translate: 0 100%;
+    scale: 1;
+    opacity: 1;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
+/*
+ * What scrolls sideways on a phone shows it: a shadow at each edge that is scrolled past, drawn by
+ * the stylesheet alone (the covers scroll with the content, the shadows don't). A table pins its
+ * first column as the rest scrolls.
+ */
+@utility as-scroll-shadows {
+  overscroll-behavior-x: contain;
+  background:
+    linear-gradient(to right, var(--surface) 30%, transparent),
+    linear-gradient(to left, var(--surface) 30%, transparent) 100% 0,
+    radial-gradient(farthest-side at 0 50%, var(--scrim), transparent),
+    radial-gradient(farthest-side at 100% 50%, var(--scrim), transparent) 100% 0;
+  background-attachment: local, local, scroll, scroll;
+  background-repeat: no-repeat;
+  background-size:
+    2.5rem 100%,
+    2.5rem 100%,
+    0.75rem 100%,
+    0.75rem 100%;
+}
+@utility as-pinned-column {
+  & th:first-child {
+    position: sticky;
+    inset-inline-start: 0;
+    z-index: 10;
+  }
+  & tbody th:first-child {
+    background-color: var(--surface);
+  }
+}
 
 @layer base {
   html {

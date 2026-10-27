@@ -17,7 +17,6 @@ import {
   useMemo,
   useRef,
   useState,
-  useSyncExternalStore,
 } from "react";
 import { Alert } from "./alert";
 import type { Values } from "./artifactr-ui";
@@ -42,6 +41,7 @@ import { FOLDED_LINES, SourceView } from "./source-view";
 import { ASKING, FEEDBACK } from "./states";
 import { StatusBadge, type Tone } from "./status-badge";
 import { TextField } from "./text-field";
+import { useCoarsePointer } from "./touch";
 import { TYPE } from "./type";
 
 const card =
@@ -159,31 +159,6 @@ export function ActionsMenu({
 }
 
 const NO_THUMBS: GiveThumbs = async () => ({ outcome: "done" });
-
-/**
- * Whether the pointer can't hover, as a finger can't: one media query, heard once for every
- * message that asks, rather than a listener each.
- */
-const pointer = {
-  query: null as MediaQueryList | null,
-  listeners: new Set<() => void>(),
-  subscribe(onChange: () => void) {
-    if (pointer.query === null) {
-      pointer.query = matchMedia("(hover: none)");
-      pointer.query.addEventListener("change", () => {
-        for (const listener of pointer.listeners) {
-          listener();
-        }
-      });
-    }
-    pointer.listeners.add(onChange);
-    return () => pointer.listeners.delete(onChange);
-  },
-  coarse: () => (pointer.query ?? matchMedia("(hover: none)")).matches,
-};
-function useCoarsePointer() {
-  return useSyncExternalStore(pointer.subscribe, pointer.coarse);
-}
 
 /** How long a press is held before it opens a message's actions, where the pointer can't hover. */
 const LONG_PRESS_MS = 500;

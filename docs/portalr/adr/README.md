@@ -44,7 +44,7 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0036](0036-the-chart-theme-and-colour-blind-mode.md) | The chart theme: violet-led series, patterns only where marks touch, and a hook for colour-blind mode | Accepted, amended by 0047 |
 | [0037](0037-form-controls-and-row-actions.md) | Form controls and row actions: a Base UI select, form fields, segmented windows, button variants and sizes | Accepted, amended by 0079 |
 | [0038](0038-people-by-email.md) | People by email, not by id | Accepted |
-| [0039](0039-elevation-status-colour-states-and-density.md) | Elevation, status colours, alerts and placeholders, and admin's compact density | Accepted, amended by 0080 |
+| [0039](0039-elevation-status-colour-states-and-density.md) | Elevation, status colours, alerts and placeholders, and admin's compact density | Accepted, amended by 0080 and 0081 |
 | [0040](0040-scenarios-against-a-generated-application-and-size-budgets.md) | Scenarios against a generated application, and size budgets | Accepted, amended by 0044 |
 | [0041](0041-first-party-webassembly-in-the-apps-policy.md) | First-party WebAssembly in the UIs' policy | Accepted, amended 2026-10-17 and 2026-10-22 |
 | [0042](0042-mermaid-cant-draw-under-the-policy.md) | Mermaid can't draw in the page under the policy, so it is parked | Accepted |
@@ -58,7 +58,7 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0050](0050-a-native-files-proposals-and-the-pilots-scenarios.md) | A native file's proposals: outdated, never rebased, and compared page by page; and the check-out pilot's scenarios | Accepted |
 | [0051](0051-mini-apps-the-sandboxed-frame-and-its-bridge.md) | Mini apps: the sandboxed frame and its bridge | Accepted |
 | [0052](0052-artifacts-inline-in-their-thread.md) | Artifacts inline in their thread, a mini app first | Accepted |
-| [0053](0053-the-chats-questions-tool-calls-sides-failures-and-streaming.md) | The chat's questions, tool calls, sides, failures and streaming | Accepted, amended by 0079 and 0080 |
+| [0053](0053-the-chats-questions-tool-calls-sides-failures-and-streaming.md) | The chat's questions, tool calls, sides, failures and streaming | Accepted, amended by 0079, 0080 and 0081 |
 | [0054](0054-readable-revisions.md) | Readable revisions: per kind, in parts, one preview running | Accepted |
 | [0055](0055-every-kind-inline-and-a-native-file-read-and-edited-in-its-thread.md) | Every kind inline in its thread, and a native file read and edited there | Accepted |
 | [0056](0056-brand-kits-token-layers-loading-and-validation.md) | Brand kits: three token layers, a kit loaded per deployment, and validation in Python | Accepted |
@@ -85,6 +85,7 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0077](0077-session-replay-its-own-yes-masked-in-the-browser-and-checked-at-the-relay.md) | Session replay, its own yes, masked in the browser and checked at the relay | Accepted |
 | [0078](0078-the-others-on-a-diagrams-canvas-and-their-revisions-as-they-arrive.md) | The others on a diagram's canvas, and their revisions as they arrive | Accepted |
 | [0079](0079-interaction-states-feedback-pending-and-a-refusals-mark.md) | Interaction states: feedback, pending, and a refusal's mark | Accepted |
-| [0080](0080-ink-on-paper-the-products-visual-language.md) | Ink on paper, the product's visual language | Accepted |
+| [0080](0080-ink-on-paper-the-products-visual-language.md) | Ink on paper, the product's visual language | Accepted, amended by 0081 |
+| [0081](0081-plain-a-bright-page-one-colour-and-a-mark-for-what-waits.md) | Plain: a bright page, one colour, and a mark for what waits | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

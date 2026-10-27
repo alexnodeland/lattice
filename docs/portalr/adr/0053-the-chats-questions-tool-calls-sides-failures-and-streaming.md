@@ -1,6 +1,6 @@
 # ADR-0053: The chat's questions, tool calls, sides, failures and streaming
 
-**Status:** Accepted, amended by [ADR-0079](0079-interaction-states-feedback-pending-and-a-refusals-mark.md) and [ADR-0080](0080-ink-on-paper-the-products-visual-language.md)
+**Status:** Accepted, amended by [ADR-0079](0079-interaction-states-feedback-pending-and-a-refusals-mark.md) and [ADR-0080](0080-ink-on-paper-the-products-visual-language.md), and by [ADR-0081](0081-plain-a-bright-page-one-colour-and-a-mark-for-what-waits.md)
 **Date:** 2026-10-20
 **Deciders:** Alex Nodeland
 **Amends:** [ADR-0015](0015-the-chat-components-and-streamdown.md)'s tool-call row and question card, and [ADR-0016](0016-the-threads-area.md)'s composer, which kept its text until the post was done

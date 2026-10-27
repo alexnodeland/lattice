@@ -1,0 +1,45 @@
+# ADR-0081: Plain: a bright page, one colour, and a mark for what waits
+
+**Status:** Accepted
+**Date:** 2026-10-27
+**Deciders:** Alex Nodeland
+**Amends:** [ADR-0080](0080-ink-on-paper-the-products-visual-language.md) (the rule, the shape, the badges, the rail's current area, the message grammar, the rhythm), [ADR-0053](0053-the-chats-questions-tool-calls-sides-failures-and-streaming.md) (the sides), [ADR-0039](0039-elevation-status-colour-states-and-density.md) (a status as a mark and a word)
+
+## Context
+
+Four reviews of the design pass ([ADR-0080](0080-ink-on-paper-the-products-visual-language.md)) found it clean and consistent, and generic: a neutral SaaS with a violet accent, every surface a rounded rectangle with a hairline, one grotesque in four sizes, stock controls. The owner asked for a signature, saw three subdued directions as mockups built on the same markup (Plain, Dense, Signal) beside a louder round, and chose Plain, with four borrows: a mark inside the asking surface for what waits on the reader, a numbered ledger for a run's steps with a three-bar step indicator, status marks whose shape repeats their colour, and one strong rule above a table or a block of figures. Plain's character is in proportion and restraint: it is the current anatomy, rows, tables, button links, stepped questions, ledgers, re-proportioned, not re-architected.
+
+## Decision
+
+Plain, in the default kit's tokens and the kit's components, so every page inherits it and a kit of its own re-skins the same anatomy.
+
+- **A bright page.** The paper is a step off white (`#fafafb`) with white surfaces, told apart by hairlines (`#e5e7eb`) and space, never by shadow: a card casts a 1px whisper (`shadow.1` at 6%), and only what floats (a menu, a popover, a dialog) casts the kit's shadow. The text is `#16181d`, the muted `#5b6271` (5.6:1 on white), the control's edge stays `#80808a` (3:1 everywhere, the kit's rule). Dark is designed, not inverted: a slate-neutral page (`#121317`, surfaces `#191a1f`, hairlines `#2a2c34`) with the direction's lighter violet (`#b798ec`) as the one colour.
+- **One colour, five jobs.** The violet (`#6b2fa0`, kept) is a link, the primary button, the focus ring, the rail's current area (on its wash, in the working colour) and anything for you: waiting for you, the unread mark, the selected option's edge. Nothing else takes it, and no wash larger than a selected row is ever in it.
+- **Two radii, in the tokens alone.** `radius.3` (6px) on controls: buttons, fields, chips, segments, options, code; `radius.4`, now 10px, on containers: cards, dialogs, popovers, tables, the ledger, the composer, the asking surface, the reader's words. The example kits keep their own radii, as they set them.
+- **Proportion.** Controls 36px tall (44 to a finger, ADR-0080), small buttons 26px; table rows 48px, list rows a rem padded; cards and asking surfaces padded 20px; the page's title at 2xl, a section at lg, labels at sm, notes at xs; figures at 3xl on their digits.
+- **Mono as a role.** Fragment Mono for a call's name and arguments, an id, a count, a duration and a date in a list: the rail's counts, a segment's count, a row's time, a table's figures, the ledger's numbers. Never for prose or a control.
+- **The message grammar.** The reader's words sit on the quiet wash (`--subtle`, the text's colour at a twentieth over the paper, derived in base.css and mixed the same way by the validator) at 10px; the agent's are unboxed on the page; both at the start of the line, each named above, the reader's name in the ink and the agent's quieter. That one difference tells them apart; the sides of ADR-0053 go.
+- **A status is a mark and a word.** No box, no pill: the shape of ADR-0039 carries the colour (a dot done, a ring at work, a diamond waiting, a square failed, a dotted ring queued), the word beside it in the text's colour, or the working colour for waiting for you. A chip (Recommended, a question's header) is the one tinted thing, on the quiet wash or the working colour's.
+- **What waits on the reader carries a mark inside its surface.** An asking card and an approval have a short rule in the working colour at their edge, at the height of the head line, inside the card: no margin column, no rule down the side. The agent's glyph in the head takes the working colour while the question is open.
+- **The ledger of steps.** A run's calls are one container with a summary row (the terminal glyph, "3 steps", the latest call in mono, the status) and numbered rows beneath, `n name {args}` in mono with the status mark, no hairlines between them. Stepped questions say "Step 2 of 3" with three bars: what is done at less than half the working colour's strength, where we are in it whole, what is next in the edge's colour.
+- **Tables and figures.** A table is a 10px container with one strong 1px rule along its top in the edge's colour, a head row on the quiet wash in sentence case, hairlines between rows, figures in mono on their digits at the end, the wash on rows that open. Admin's actions, Invite, Add, Issue, Grant, Create, Find, Filter, are buttons in a toolbar row above the table, each opening its form in a card under the row; the folded card is gone.
+- **Lists.** A thread's row: an unread mark in the working colour at its start, the title in the ink, the last words and the time in mono beneath, its status at the end. Needs you says its count in mono beside its title.
+- **Empty states.** A dashed box on the page, centred, with no fill: a heading, a line, and the one thing to do.
+
+## Fonts
+
+Plain's mockup set Inter and JetBrains Mono; the product ships Schibsted Grotesk and Fragment Mono, both OFL, cut to Latin, under `font-src 'self'`. Rendered side by side, the shipped pair reads as Plain does: a humanist grotesque at 16px with the same hierarchy by weight and size, and a mono that is quieter than JetBrains at 13px. Inter would cost two faces of woff2 (about 110 to 160 KB) for a texture the reader would not name, so the shipped pair stays: zero new bytes, no new notices. The governance that would apply if that changes: the size budget counts only script and stylesheets, a new face needs its OFL text beside it and the wheel's `OFL-*.txt` include, `notices/expression.ts` already carries OFL-1.1, mini apps never get the kit's fonts, and a display face should ship with a metric-matched fallback (`size-adjust`, `ascent-override`) so nothing shifts as it loads.
+
+## Built and planned
+
+Built in the pull request that adds this record: the tokens (both schemes), the derived quiet wash, the type roles, the message grammar, the asking surface's mark and the three bars, the ledger of steps, the status as a mark and a word, the chips, tables and rows, the segments on the quiet wash, the rail's current area, the empty state, admin's toolbars, the threads list's unread mark and counts, and the composer's Send with its arrow. Planned, and recorded here only once built: the small screens' sheets and thumb bar (the stacked pull request), a density toggle for admin's tables, a time beside each message's name once the log carries one.
+
+## What still feels generic
+
+Plain is distinct by quality, not by look: from across the room it is a well-made neutral tool with a violet accent. The icons are a thin quiet line like any set's; the primary button is a solid fill like any product's; the dialog and the menu are the floating surface everyone uses. What is the product's own is the asking surface's mark, the ledger, the message grammar and the figures in mono, and those are small. The owner chose that over a louder device.
+
+## Consequences
+
+- Every screenshot baseline moves, and the computed-style snapshots with the tokens.
+- The style census keeps its counts within the ratchet: a status badge is still one look, a chip two.
+- A deployment on the default kit changes colour and proportion; a kit of its own is untouched but for what the inventory already held.

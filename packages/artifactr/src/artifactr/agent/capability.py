@@ -194,6 +194,7 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
                 trigger=session.trigger,
                 trace_id=current_trace_id(),
                 message_ids=session.message_ids,
+                model=session.model,
             ),
             cursor=delivered.at(taken),
             claim=delivered.claim,

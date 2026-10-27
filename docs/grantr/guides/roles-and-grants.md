@@ -18,6 +18,8 @@ grantr builds its roles over the catalogs it is given, so a library's new action
 | `application` | the deployment | the application's own work in every tenant ([ADR-0019](../adr/0019-runtime-actions-and-the-application-role.md)) |
 | `rule` | a workspace, held without a grant since ADR-0029 | a stored rule's runs, in its own workspace ([ADR-0020](../adr/0020-the-rule-role.md), [ADR-0029](../adr/0029-a-stored-rule-acts-as-itself-in-its-own-workspace.md)) |
 
+An `editor` holds `artifactr:use_model`, which a turn their message starts asks as them to answer with the model the message names: any model the application offers. It is asked with the model's name in `Access.model`, which grantr does not scope by, since a model is not an item of a workspace; which models a tenant is offered is narrowed where the application lists them ([artifactr ADR-0097](../../artifactr/adr/0097-a-message-chooses-the-model-of-the-turn-it-starts.md)). A custom role without it still posts: the turn answers with the default model, and a notice says why.
+
 The [architecture](../architecture.md#built-in-roles) lists each role's actions, and the [permission matrix](matrix.md) shows every role against every action of artifactr, reflexr and grantr.
 
 ### The application and its rules

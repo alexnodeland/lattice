@@ -1,10 +1,11 @@
 """Exact usage: what each model request used, live as it ends and with the run's end (ADR-0096)."""
 
 import asyncio
+from collections.abc import AsyncIterator
 
 import pytest
 from pydantic_ai import FunctionToolset, ModelMessage, ModelResponse, RunContext, TextPart
-from pydantic_ai.models.function import AgentInfo
+from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai.usage import RunUsage as PydanticUsage
 
 from artifactr.agent import FanoutChannel, Runner, Session, StepUsed, function_model, to_live
@@ -106,6 +107,29 @@ async def test_a_run_stopped_mid_request_records_no_step_for_it(
     assert ended.usage == RunUsage(), (
         "a request stopped before its response ended is no step, and pydantic-ai counted none of it"
     )
+
+
+async def test_a_run_stopped_after_some_streamed_text_counts_it_in_a_last_step(
+    ws: Workspace, thread: Thread, gate: Gate, runners: MakeRunner
+) -> None:
+    async def stream(messages: list[ModelMessage], info: AgentInfo) -> AsyncIterator[str]:
+        yield "Half an answer, "
+        await gate.wait()
+        yield "never sent"
+
+    agent = make_agent(Script())
+    runner = runners(agent)
+    with agent.override(model=FunctionModel(stream_function=stream)):
+        handle = started(await runner.send(ws, thread.id, "Go"))
+        await asyncio.wait_for(gate.entered.wait(), timeout=2)
+        assert await runner.stop(handle.run_id)
+    ended = event_as((await ws.read())[-1], RunEnded)
+    assert ended.status == "stopped"
+    assert ended.usage is not None
+    [step] = ended.usage.steps
+    assert step.output_tokens > 0, "the tokens streamed before the stop are counted"
+    assert (step.model, step.duration_ms) == (None, None), "in a step no response ended"
+    assert (ended.usage.requests, ended.usage.output_tokens) == (1, step.output_tokens)
 
 
 def test_a_run_ended_early_counts_what_no_step_saw_and_its_sums_are_the_steps() -> None:

@@ -13,6 +13,7 @@ ARTIFACTR = frozenset(
         "artifactr:propose_change",
         "artifactr:stop_run",
         "artifactr:record",
+        "artifactr:use_model",
         "artifactr:claim_thread",
         "artifactr:save_cursor",
         "artifactr:read_cursors",

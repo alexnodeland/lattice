@@ -60,6 +60,9 @@ class Run(BaseModel):
     trace_ids: tuple[TraceId, ...] = ()
     """The OpenTelemetry trace of each traced attempt, oldest first: a run that pauses and
     resumes runs once per attempt, each in its own trace."""
+    model: str | None = None
+    """The model its latest attempt asked for, as its ``run_started`` says: what a resume
+    answered by no message, or by one that names none, asks for again (ADR-0097)."""
 
     @property
     def all_answered(self) -> bool:

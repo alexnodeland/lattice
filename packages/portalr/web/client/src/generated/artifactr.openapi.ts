@@ -716,6 +716,8 @@ export interface components {
              */
             kind: "message" | "notice";
             message_id: components["schemas"]["MessageId"];
+            /** Model */
+            model?: string | null;
             run_id?: components["schemas"]["RunId"] | null;
             thread_id: components["schemas"]["ThreadId"];
             /**
@@ -757,6 +759,8 @@ export interface components {
              */
             kind: "message" | "notice";
             message_id?: components["schemas"]["MessageId"];
+            /** Model */
+            model?: string | null;
             thread_id: components["schemas"]["ThreadId"];
             /**
              * @description discriminator enum property added by openapi-typescript
@@ -986,6 +990,8 @@ export interface components {
                 [key: string]: components["schemas"]["DeferredAnswer"];
             };
             id: components["schemas"]["RunId"];
+            /** Model */
+            model?: string | null;
             /**
              * Pending
              * @default []
@@ -1056,6 +1062,8 @@ export interface components {
              * @default []
              */
             message_ids: components["schemas"]["MessageId"][];
+            /** Model */
+            model?: string | null;
             run_id: components["schemas"]["RunId"];
             thread_id: components["schemas"]["ThreadId"];
             trace_id?: components["schemas"]["TraceId"] | null;

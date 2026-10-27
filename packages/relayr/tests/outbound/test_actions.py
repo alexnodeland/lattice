@@ -539,9 +539,12 @@ class StopsAfterPosting(artifactr.agent.Runner[None]):
         content: str,
         *,
         message_id: a.MessageId | None = None,
+        model: str | None = None,
     ) -> artifactr.agent.Sent:
         if self.stopped:
-            return await super().send(workspace, thread_id, content, message_id=message_id)
+            return await super().send(
+                workspace, thread_id, content, message_id=message_id, model=model
+            )
         self.stopped = True
         await workspace.post_message(thread_id, content, message_id=message_id)
         raise RuntimeError("the process stopped before it asked for the turn")

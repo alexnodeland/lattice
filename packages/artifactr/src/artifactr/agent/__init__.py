@@ -26,7 +26,9 @@ from artifactr.agent.liveness import Liveness, ModelStalled, ToolStalled, is_loc
 from artifactr.agent.models import Respond, function_model
 from artifactr.agent.results import CommandKey, CommandResults, InMemoryCommandResults
 from artifactr.agent.runner import (
+    USE_MODEL,
     EndedTurn,
+    ModelFor,
     RunHandle,
     Runner,
     Sent,
@@ -44,6 +46,7 @@ from artifactr.agent.tools import (
 )
 
 __all__ = [
+    "USE_MODEL",
     "ArtifactDraft",
     "ArtifactWorkspace",
     "CommandKey",
@@ -53,6 +56,7 @@ __all__ = [
     "InMemoryCommandResults",
     "LiveChannel",
     "Liveness",
+    "ModelFor",
     "ModelStalled",
     "NullChannel",
     "Respond",

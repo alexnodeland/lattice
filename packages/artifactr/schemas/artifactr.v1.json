@@ -1588,6 +1588,18 @@
         "message_id": {
           "$ref": "#/$defs/MessageId"
         },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
         "run_id": {
           "anyOf": [
             {
@@ -1924,6 +1936,19 @@
         },
         "message_id": {
           "$ref": "#/$defs/MessageId"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
         },
         "thread_id": {
           "$ref": "#/$defs/ThreadId"
@@ -2698,6 +2723,18 @@
           },
           "title": "Message Ids",
           "type": "array"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
         },
         "run_id": {
           "$ref": "#/$defs/RunId"

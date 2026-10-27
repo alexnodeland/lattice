@@ -61,7 +61,7 @@ import logging
 import time
 from collections.abc import AsyncIterator, Callable, Sequence
 from contextlib import AbstractAsyncContextManager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import timedelta
 from typing import Any, Final, Literal, Protocol
 
@@ -79,6 +79,7 @@ from opentelemetry.trace import (
 from pydantic import JsonValue
 from pydantic_ai import Agent, AgentRunResult, DeferredToolRequests, DeferredToolResults, ToolDenied
 from pydantic_ai.messages import repair_messages
+from pydantic_ai.models import Model
 
 from artifactr.agent.live import FanoutChannel, forward_live
 from artifactr.agent.liveness import Liveness, watched
@@ -148,6 +149,10 @@ propagated trace attributes, implements it, and the Runner stays free of the bac
 type TurnOutcome = Literal["completed", "paused", "failed", "stopped"]
 """How a turn ended: the agent finished, paused on questions, raised, or was stopped."""
 
+USE_MODEL: Final = "artifactr:use_model"
+"""What a turn asks, as its agent acting for its author, to answer with the model a message
+named (ADR-0097): an ``Access`` with that ``model``."""
+
 _RUNNER: Final = SystemActor(name="runner")
 """Who the Runner's own work acts as: holding threads, keeping its cursors, planning turns."""
 
@@ -171,6 +176,39 @@ NOT_TAKEN: Final = (
     "this thread. Ask someone who can start the assistant to send it again."
 )
 """The notice posted in a thread when a message's turn was refused (ADR-0095)."""
+
+type ModelFor = Callable[[str], Model]
+"""The host's models by name (ADR-0097): the model a message asked for, by the name it gave.
+
+It raises :class:`LookupError`, as a dict's ``__getitem__`` does, for a name it doesn't know.
+The Runner calls it as each turn starts, so a host caches its models, one per name.
+"""
+
+
+def model_not_allowed(name: str) -> str:
+    """The notice when a message asks for a model its sender may not use (ADR-0097)."""
+    return (
+        f"The last message asked for the model {name}, which its sender isn't allowed to use "
+        "here, so the default model is answering it instead. To use that model, ask an admin "
+        "of this workspace for access, or pick another one."
+    )
+
+
+def model_unknown(name: str) -> str:
+    """The notice when a message asks for a model the app doesn't offer (ADR-0097)."""
+    return (
+        f"The last message asked for the model {name}, which this app doesn't offer, so the "
+        "default model is answering it instead. Pick one of the models offered, or send it "
+        "without choosing one."
+    )
+
+
+def model_not_chosen(name: str) -> str:
+    """The notice when a message asks for a model in an app that answers with one (ADR-0097)."""
+    return (
+        f"The last message asked for the model {name}, but this app answers with one model "
+        "only, so that model is answering it instead. Send messages without choosing a model."
+    )
 
 
 @dataclass(frozen=True)
@@ -273,6 +311,11 @@ class Runner[AppDepsT]:
             fails the run, ``model_stalled`` or ``tool_stalled``. Defaults to
             :class:`~artifactr.agent.Liveness`'s: two minutes for a hosted model, five for a
             local one, ten for a tool.
+        model_for: The host's models by name, for messages that name one (ADR-0097). A turn
+            answers with the model its first message names, if its author may use it
+            (``artifactr:use_model``) and the host knows it; otherwise with the agent's own,
+            and a notice says why. Without it, every turn answers with the agent's own model,
+            and a message that names one is told so.
     """
 
     def __init__(
@@ -290,8 +333,10 @@ class Runner[AppDepsT]:
         evaluators: Sequence[TurnEvaluator] = (),
         results: CommandResults | None = None,
         liveness: Liveness | None = None,
+        model_for: ModelFor | None = None,
     ) -> None:
         self._agent = agent
+        self._model_for = model_for
         self._results = results or InMemoryCommandResults()
         self._liveness = liveness or Liveness()
         self._turn_context = turn_context
@@ -350,8 +395,14 @@ class Runner[AppDepsT]:
         content: str,
         *,
         message_id: MessageId | None = None,
+        model: str | None = None,
     ) -> Sent:
         """Post a message as the workspace handle's actor, and ask for the thread's next turn.
+
+        A ``model`` is the one to answer with, if this message starts a turn (ADR-0097): one
+        that joins a running turn is answered by the turn's model. A model the sender may not
+        use, or the host doesn't know, is not refused here: the turn answers with the agent's
+        own, and a notice says so.
 
         Raises:
             InvalidState: If ``message_id`` is already used in the workspace; nothing is done.
@@ -359,7 +410,10 @@ class Runner[AppDepsT]:
                 the agent acting for the sender (ADR-0057); nothing is done.
         """
         message = PostMessage(
-            thread_id=thread_id, content=content, message_id=message_id or new_message_id()
+            thread_id=thread_id,
+            content=content,
+            message_id=message_id or new_message_id(),
+            model=model,
         )
         await _check_starting(workspace, thread_id)
         posted = await workspace.commit(message)
@@ -499,7 +553,11 @@ class Runner[AppDepsT]:
         match command:
             case PostMessage(kind="message"):
                 sent = await self.send(
-                    workspace, command.thread_id, command.content, message_id=command.message_id
+                    workspace,
+                    command.thread_id,
+                    command.content,
+                    message_id=command.message_id,
+                    model=command.model,
                 )
                 return sent.outcome
             case AnswerDeferred():
@@ -610,6 +668,7 @@ class Runner[AppDepsT]:
                 watch_after=turn.watch_after,
                 on_behalf_of=turn.on_behalf_of,
                 message_ids=turn.message_ids,
+                model=turn.model,
             )
             session.delivered.seq, session.delivered.cursor = turn.taken, _taken(thread_id)
             session.delivered.claim = claim
@@ -692,6 +751,7 @@ class Runner[AppDepsT]:
                 on_behalf_of=acting_for(first.actor),
                 traceparent=first.traceparent,
                 message_ids=(first.event.message_id,),
+                model=first.event.model,
             )
             return await self._allowed(workspace, claim, turn)
         await workspace.save_cursor(_taken(thread_id), through)  # no message in it to carry out
@@ -728,7 +788,32 @@ class Runner[AppDepsT]:
                 await workspace.record(ended)
             await self._refused(workspace, thread_id, turn.watch_after, refused)
             return await self._plan(workspace, claim)
-        return turn
+        return await self._with_model(workspace, agent, turn)
+
+    async def _with_model(self, runner: Workspace, agent: AgentActor, turn: "_Turn") -> "_Turn":
+        """The turn with the model it asked for, or with the agent's own and a notice why.
+
+        ``agent`` is the turn's agent, acting for its author, who must hold
+        ``artifactr:use_model`` for the model; ``runner`` posts the notice. A model asked for
+        and not used is never a silence (ADR-0097): the notice says what was asked, what
+        answers instead, and what to do.
+        """
+        name = turn.model
+        if name is None:
+            return turn
+        if self._model_for is None:
+            notice = model_not_chosen(name)
+        else:
+            use = Access(action=USE_MODEL, thread_id=agent.thread_id, model=name)
+            try:
+                await runner.as_actor(agent).check(use)
+                return replace(turn, resolved=self._model_for(name))
+            except Forbidden:
+                notice = model_not_allowed(name)
+            except LookupError:
+                notice = model_unknown(name)
+        await _notify(runner, agent.thread_id, notice)
+        return replace(turn, model=None)
 
     @staticmethod
     async def _refused(
@@ -742,14 +827,7 @@ class Runner[AppDepsT]:
         """
         logger.warning("thread %s skips a turn through %d: %s", thread_id, through, refused.message)
         await workspace.save_cursor(_taken(thread_id), through)
-        try:
-            await workspace.post_message(thread_id, NOT_TAKEN, kind="notice")
-        except Rejection as rejection:
-            logger.warning(
-                "thread %s: the notice of a skipped turn was refused: %s",
-                thread_id,
-                rejection.message,
-            )
+        await _notify(workspace, thread_id, NOT_TAKEN)
 
     async def _run(
         self,
@@ -766,7 +844,7 @@ class Runner[AppDepsT]:
                 stopping = asyncio.create_task(_cancel_when_lost(lost, run))
                 self.live.open(session.run_id)  # a resumed run's turn streams again
                 try:
-                    return await self._turn(session, turn.prompt, turn.deferred, caller)
+                    return await self._turn(session, turn, caller)
                 finally:
                     self.live.close(session.run_id)
                     stopping.cancel()
@@ -868,8 +946,7 @@ class Runner[AppDepsT]:
     async def _turn(
         self,
         session: Session[AppDepsT],
-        prompt: str | list[str] | None,
-        deferred: DeferredToolResults | None,
+        turn: "_Turn",
         caller: SpanContext,
     ) -> AgentRunResult[Any]:
         """Run the agent once, as a turn: its own trace, linked to what started it."""
@@ -912,13 +989,14 @@ class Runner[AppDepsT]:
                         if self._turn_context is not None:
                             await scope.enter_async_context(self._turn_context(session))
                         history = await load_history(workspace, session.thread_id)
-                        if deferred is None:  # a new run: close the calls an ended run left open
+                        if turn.deferred is None:  # a new run: close the calls left open
                             history = repair_messages(history)
                         result = await self._agent.run(
-                            prompt,
+                            turn.prompt,
+                            model=turn.resolved,
                             deps=session,
                             message_history=history,
-                            deferred_tool_results=deferred,
+                            deferred_tool_results=turn.deferred,
                             event_stream_handler=watched(forward_live(self.live), self._liveness),
                             conversation_id=session.thread_id,
                         )
@@ -984,6 +1062,14 @@ async def _cancel_when_lost(lost: asyncio.Event, run: "asyncio.Task[Any]") -> No
     run.cancel()
 
 
+async def _notify(workspace: Workspace, thread_id: ThreadId, notice: str) -> None:
+    """Post a notice in a thread as the Runner; one it may not post is logged, not raised."""
+    try:
+        await workspace.post_message(thread_id, notice, kind="notice")
+    except Rejection as rejection:
+        logger.warning("thread %s: a notice was refused: %s", thread_id, rejection.message)
+
+
 def _starting(thread_id: ThreadId) -> Access:
     """What starting a turn asks, as its agent acting for its author: to record ``run_started``."""
     return Access(action="artifactr:record", thread_id=thread_id)
@@ -1030,6 +1116,11 @@ class _Turn:
     """Where the message or answer it carries out was committed."""
     message_ids: tuple[MessageId, ...]
     """The messages it carries out as it starts."""
+    model: str | None = None
+    """The model it asks for, by the host's name for it: its first message's, or, resumed, the
+    reply's or else the run's. ``None`` for the agent's own (ADR-0097)."""
+    resolved: Model | None = None
+    """``model``, as the host's ``model_for`` gave it, once its author may use it."""
 
 
 def _resume(
@@ -1068,6 +1159,7 @@ def _resume(
     )
     messages = [e.event for e in ours if isinstance(e.event, MessagePosted)]
     carried = [by.event] if not ours and by is not None else messages
+    chosen = by.event.model if by is not None and isinstance(by.event, MessagePosted) else None
     return _Turn(
         run_id=run.id,
         trigger="resume",
@@ -1079,6 +1171,7 @@ def _resume(
         on_behalf_of=None if by is None else acting_for(by.actor),
         traceparent=None if by is None else by.traceparent,
         message_ids=tuple(e.message_id for e in carried if isinstance(e, MessagePosted)),
+        model=chosen or run.model,
     )
 
 

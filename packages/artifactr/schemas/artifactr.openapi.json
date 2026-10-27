@@ -1327,6 +1327,17 @@
           "message_id": {
             "$ref": "#/components/schemas/MessageId"
           },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
           "run_id": {
             "anyOf": [
               {
@@ -1411,6 +1422,18 @@
           },
           "message_id": {
             "$ref": "#/components/schemas/MessageId"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
           },
           "thread_id": {
             "$ref": "#/components/schemas/ThreadId"
@@ -2160,6 +2183,17 @@
           "id": {
             "$ref": "#/components/schemas/RunId"
           },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
           "pending": {
             "default": [],
             "items": {
@@ -2321,6 +2355,17 @@
             },
             "title": "Message Ids",
             "type": "array"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
           },
           "run_id": {
             "$ref": "#/components/schemas/RunId"

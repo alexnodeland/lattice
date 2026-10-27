@@ -273,7 +273,7 @@ class Portal:
             return {}
         if not portal.url:
             raise ValueError(UNNAMED)
-        editors = {% if use_files %}dict(self._settings.files.editors){% else %}{}{% endif %}
+        editors: dict[str, str] = {% if use_files %}dict(self._settings.files.editors){% else %}{}{% endif %}
         return {
             extra: beside(portal.url, extra, apps=portal.apps_url or None, editors=editors)
             for extra in portal.extra_urls

@@ -4,12 +4,12 @@
 #
 # The Anthropic groups get prompt-cache breakpoints from the gateway (ADR-0054):
 # the OpenAI-compatible clients that call it never send Anthropic's
-# cache_control, so without these every request pays full input. The system
-# prompt, and the last two messages, so a multi-turn agent loop reads the
-# conversation so far from the cache and writes only the newest turn. Three of
-# Anthropic's four breakpoints; LiteLLM skips a point past the fourth, counting
-# any the client set. Only on Anthropic deployments: other providers, and the
-# upstream groups, cache their own way or reject the field.
+# cache_control, so without these every request pays full input. One on the
+# system prompt, and one on the last message: Anthropic reads the longest
+# cached prefix it finds looking back from a breakpoint (up to 20 blocks), so
+# the next turn's -1 reads what this turn's -1 wrote. LiteLLM's own default.
+# Only on Anthropic deployments: other providers, and the upstream groups,
+# cache their own way or reject the field.
 model_list:
   - model_name: default
     litellm_params:
@@ -19,8 +19,6 @@ model_list:
         - location: message
           role: system
         - location: message
-          index: -2
-        - location: message
           index: -1
   - model_name: fast
     litellm_params:
@@ -29,7 +27,5 @@ model_list:
       cache_control_injection_points:
         - location: message
           role: system
-        - location: message
-          index: -2
         - location: message
           index: -1

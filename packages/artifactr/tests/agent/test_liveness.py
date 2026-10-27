@@ -169,17 +169,18 @@ async def test_the_stalled_tool_is_named_among_the_calls_still_running() -> None
         )
         await asyncio.Event().wait()
 
-    seen: list[Any] = []
+    seen = 0
 
     async def handler(ctx: Any, stream: AsyncIterable[Any]) -> None:
-        async for event in stream:  # each kept as it comes, before the stream fails
-            seen.append(event)  # noqa: PERF401
+        nonlocal seen
+        async for _ in stream:  # each counted as it comes, before the stream fails
+            seen += 1
 
     ctx: Any = SimpleNamespace(model=SimpleNamespace(model_name="default"))
     timed = watched(handler, Liveness(first_output=WAIT, no_output=WAIT, tool=WAIT))
     with pytest.raises(ToolStalled, match=r"the tool hold didn't return within 0.25 seconds"):
         await timed(ctx, events())
-    assert len(seen) == 3, "every event reached the handler first"
+    assert seen == 3, "every event reached the handler first"
 
 
 async def test_a_slow_tool_is_not_a_stalled_model(

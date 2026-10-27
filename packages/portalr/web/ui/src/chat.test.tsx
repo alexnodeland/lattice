@@ -1050,17 +1050,21 @@ test("the strip says what the turn is doing, in one status, and how long since i
   expect(group.getByRole("status").element().textContent).not.toContain("21 s");
 });
 
-test("the strip counts the turn's tokens, as an estimate until something says them exactly", async () => {
+test("the strip counts the turn's tokens as chips, each estimated and named in full", async () => {
   const now = new Date();
   const screen = await render(strip({ outputChars: 401 }, now, { history: 4000 }));
   const group = screen.getByRole("group", { name: "This turn" });
-  await expect
-    .element(group.getByText("Tokens: at least about 1,000 in, about 101 out, estimated"))
-    .toBeVisible();
+  await expect.element(group.getByText("in ~1,000")).toBeVisible();
+  await expect.element(group.getByText("out ~101")).toBeVisible();
+  await expect.element(group.getByText("Input tokens, estimated: 1,000")).toBeInTheDocument();
+  await expect.element(group.getByText("Output tokens, estimated: 101")).toBeInTheDocument();
+  // A chip never breaks across lines, and the counts are never announced.
+  const chip = group.getByText("out ~101").element().parentElement as HTMLElement;
+  expect(getComputedStyle(chip).whiteSpace).toBe("nowrap");
+  expect(chip.closest("[role=status], [aria-live]")).toBeNull();
   await screen.rerender(strip({ outputChars: 401 }, now, { history: null }));
-  await expect.element(group.getByText("Tokens: about 101 out, estimated")).toBeVisible();
-  const line = group.getByText("Tokens: about 101 out, estimated");
-  expect(line.element().closest("[role=status], [aria-live]")).toBeNull();
+  await expect.element(group.getByText("out ~101")).toBeVisible();
+  expect(group.getByText(/^in ~/).elements()).toHaveLength(0);
 });
 
 test("what streams is never announced as it grows: only the posted message is", async () => {
@@ -1349,15 +1353,13 @@ test("what streamed says where its start is missing, fades before a tool call, a
   expect(item.getByText("The reply.").element().closest(".opacity-45")).toBeNull();
 });
 
-test("the strip keeps its tokens' row from the start, and says how a turn ended in the same status", async () => {
+test("the strip shows its token chips, and says how a turn ended in the same status", async () => {
   const now = new Date();
   const screen = await render(
     strip({ phase: "writing", at: now.getTime() }, now, { history: 400 }),
   );
   const group = screen.getByRole("group", { name: "This turn" });
-  // The row is there before the add-on has loaded, so nothing moves as it does.
-  expect(group.element().querySelector(".w-full")).not.toBeNull();
-  await expect.element(group.getByText(/^Tokens: /)).toBeVisible();
+  await expect.element(group.getByText("in ~100")).toBeVisible();
   const status = group.getByRole("status").element();
   await screen.rerender(
     <RunStrip run={{ ...run("completed"), live: live() }} onStop={sent()} now={now} />,

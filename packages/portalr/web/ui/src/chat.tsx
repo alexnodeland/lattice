@@ -1182,23 +1182,30 @@ export function RunStrip({
   return (
     <fieldset
       aria-label="This turn"
-      className="m-0 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-(--card-radius) border border-line bg-surface px-3 py-2"
+      className="m-0 flex items-center gap-3 rounded-(--card-radius) border border-line bg-surface px-3 py-2"
     >
-      <StatusBadge tone={tone} className="self-start">
-        {status}
-      </StatusBadge>
-      {/* One status, kept through the add-on's loading, so what it says changes in place. */}
-      <span role="status" className="sr-only">
-        {working && addon ? <addon.Said run={run} status={status} now={at} /> : status}
-      </span>
-      {working && addon && <addon.Phase run={run} now={at} />}
-      {since !== null && active && (
-        <span className={cn(TYPE.note, "tabular-nums")}>
-          {run.status === "paused" ? "waiting " : <span className="sr-only">for </span>}
-          {since}
+      {/* Its status, then what it does and for how long, then its counts: one left edge. */}
+      <span className="flex min-w-0 flex-1 flex-col items-start gap-1">
+        <StatusBadge tone={tone}>{status}</StatusBadge>
+        {/* One status, kept through the add-on's loading, so what it says changes in place. */}
+        <span role="status" className="sr-only">
+          {working && addon ? <addon.Said run={run} status={status} now={at} /> : status}
         </span>
-      )}
-      <span className="ml-auto flex items-center gap-2">
+        {active && (
+          <span className={`${TYPE.note} flex flex-wrap gap-x-2 tabular-nums`}>
+            {working && addon && <addon.Phase run={run} now={at} />}
+            {since !== null && (
+              <span>
+                {run.status === "paused" ? "waiting " : <span className="sr-only">for </span>}
+                {since}
+              </span>
+            )}
+          </span>
+        )}
+        {/* The counts, once the add-on has loaded: the thread loads it as it opens. */}
+        {working && addon && <addon.Tokens run={run} history={history ?? null} />}
+      </span>
+      <span className="flex shrink-0 items-center gap-2">
         {run.status === "paused" && onQuestion && (
           <Button variant="secondary" size="sm" onClick={onQuestion}>
             Go to the question
@@ -1206,12 +1213,6 @@ export function RunStrip({
         )}
         {working && onStop && <CommandButton onSend={onStop}>Stop</CommandButton>}
       </span>
-      {/* The tokens' row is kept from the start, so the strip doesn't grow as the add-on loads. */}
-      {working && (
-        <span className={cn(TYPE.note, "w-full tabular-nums")}>
-          {addon ? <addon.Tokens run={run} history={history ?? null} /> : "\u00a0"}
-        </span>
-      )}
     </fieldset>
   );
 }

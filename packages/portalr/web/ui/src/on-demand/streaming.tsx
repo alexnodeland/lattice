@@ -7,7 +7,6 @@
 
 import type { Artifactr } from "@portalr/client";
 import { useEffect, useState } from "react";
-import { TYPE } from "../type";
 
 /** How long without a frame before the strip says the model is being waited on. */
 const IDLE_MS = 20_000;
@@ -73,17 +72,31 @@ export function Said({ run, status, now }: { run: Artifactr.Run; status: string;
 export function Phase({ run, now }: { run: Artifactr.Run; now: Date }) {
   const since = idle(run.live, now);
   return (
-    <span className={TYPE.note}>
+    <span>
       {doing(run.live)}
       {since * 1000 >= IDLE_MS && `, ${since} s since the last output`}
     </span>
   );
 }
 
+/** One count, as a chip: "in ~1,060", named in full for a screen reader. */
+function Chip({ short, name, n }: { short: string; name: string; n: number }) {
+  return (
+    <span className="inline-flex items-center whitespace-nowrap rounded-(--badge-radius) bg-subtle px-(--badge-pad-end) py-(--badge-pad-y) font-medium text-muted text-xs tabular-nums">
+      <span aria-hidden="true">
+        {short} ~{count(n)}
+      </span>
+      <span className="sr-only">
+        {name}, estimated: {count(n)}
+      </span>
+    </span>
+  );
+}
+
 /**
- * The turn's tokens, for the strip's quiet line, estimated from the characters sent and streamed
- * (exact counts are a later phase's); never announced, as it changes with every frame. The
- * estimate of what was sent counts the thread's messages alone, so it is a floor.
+ * The turn's tokens, as chips in the strip, estimated from the characters sent and streamed
+ * (exact counts are a later phase's), "~" and their names saying so; never announced, as they
+ * change with every frame. What was sent counts the thread's messages alone, so it is a floor.
  */
 export function Tokens({
   run,
@@ -93,8 +106,12 @@ export function Tokens({
   /** The characters of the thread's history the turn was sent, or null where that isn't known. */
   history: number | null;
 }) {
-  const sent = history === null ? "" : `at least about ${count(Math.ceil(history / 4))} in, `;
-  return `Tokens: ${sent}about ${count(Math.ceil(run.live.outputChars / 4))} out, estimated`;
+  return (
+    <span className="flex flex-wrap gap-1">
+      {history !== null && <Chip short="in" name="Input tokens" n={Math.ceil(history / 4)} />}
+      <Chip short="out" name="Output tokens" n={Math.ceil(run.live.outputChars / 4)} />
+    </span>
+  );
 }
 
 /**

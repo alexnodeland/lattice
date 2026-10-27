@@ -15,7 +15,8 @@ export function SaidCard({ title, said }: { title: string; said: Said }) {
   return (
     <StatCard
       title={title}
-      figure={said.figure}
+      // A card with no figure keeps the figure's line, a dash, so a row's cards line up (portalr ADR-0085).
+      figure={said.figure ?? "—"}
       badge={said.badge && <StatusBadge tone={said.badge.tone}>{said.badge.word}</StatusBadge>}
     >
       {said.line}

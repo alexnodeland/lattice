@@ -62,7 +62,7 @@ function Members() {
   return (
     <div className="flex flex-col gap-4">
       <Toolbar>
-        <Folded title="Invite someone" action="Invite…">
+        <Folded title="Invite someone" action="Invite…" primary>
           <form className="flex flex-col gap-3" action={invite}>
             <TextField
               label="Email"
@@ -97,7 +97,9 @@ function Members() {
             label: "Member",
             cell: (member) =>
               member.kind === "user" ? (
-                <span title={member.id}>{names(member.id)}</span>
+                // The reader is "You"; anyone else their email where the deployment names
+                // people, their id cut short where it doesn't, whole on hover.
+                <span title={member.id}>{yourself(member) ? "You" : names(member.id)}</span>
               ) : (
                 member.id
               ),

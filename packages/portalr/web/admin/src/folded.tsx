@@ -58,6 +58,7 @@ export function Folded({
   title,
   action,
   kind = "form",
+  primary = false,
   said,
   defaultOpen = false,
   open,
@@ -72,6 +73,8 @@ export function Folded({
   action: string;
   /** What it is: a `form` that makes something, a sheet on a phone, or a `filter`, a card there too. */
   kind?: "form" | "filter";
+  /** The view's one primary action, such as Members' Invite; the rest are secondary (portalr ADR-0085). */
+  primary?: boolean;
   /** What is in effect while it is closed, beside the button: a filter's window, say. */
   said?: string | null;
   defaultOpen?: boolean;
@@ -154,8 +157,7 @@ export function Folded({
       {said && !shown && <span className="text-muted text-xs">{said}</span>}
       <Button
         ref={trigger}
-        variant="secondary"
-        size="sm"
+        variant={primary ? "primary" : "secondary"}
         aria-expanded={shown}
         aria-controls={id}
         onClick={() => {

@@ -10,7 +10,9 @@
 On its own origin, the portal signs in wherever the application is reached: on this machine, on
 a tailnet (``make tailnet``), or behind a proxy, with GoTrue alone or Supabase's gateway behind
 it. The calls go where the deployment's commands find people, ``AUTH_ADMIN_URL`` or
-``AUTH_ISSUER``; only those three, and nothing of the admin API.
+``AUTH_ISSUER``; only those three, and nothing of the admin API. Reached at more than one origin,
+``PORTAL_URL`` and ``PORTAL_EXTRA_URLS``, it runs mini apps and opens the editors at each, beside
+it on their own ports (portalr ADR-0084).
 
 It is mounted only where the Supabase project the UIs sign in to is named (``PORTAL_SUPABASE_URL``
 and ``PORTAL_SUPABASE_KEY``); a tool is read only where its address is. The Supabase secret key
@@ -33,7 +35,7 @@ from grantr import Grants
 from portalr.analytics import InMemoryRateLimiter, Relay, SessionStamp, Umami
 from portalr.analytics.sql import SqlConsent, SqlReplayConsent
 from portalr.analytics.sql import migrate as migrate_consent
-from portalr.fastapi import UI, SandboxOrigin, Site, {% if use_tracker %}Surfaces, {% endif %}portalr_router
+from portalr.fastapi import UI, Place, SandboxOrigin, Site, {% if use_tracker %}Surfaces, {% endif %}beside, portalr_router
 from portalr.invites import Invite, InviteFailed, SupabaseInvite
 from portalr.people import People, SupabasePeople
 from portalr.readers import (
@@ -64,6 +66,7 @@ LOGGER = logging.getLogger(__name__)
 
 OFF = "the portal is off: PORTAL_SUPABASE_URL and PORTAL_SUPABASE_KEY are unset"
 UNFRAMED = "PORTAL_APPS_URL needs PORTAL_URL, the portal's own origin, which alone frames the apps"
+UNNAMED = "PORTAL_EXTRA_URLS needs PORTAL_URL, the portal's own origin, which they stand beside"
 PLAIN = "PORTAL_SUPABASE_URL is not an https address"
 NOWHERE = "PORTAL_SUPABASE_URL is this origin, which passes sign-in on: set AUTH_ISSUER"
 
@@ -255,6 +258,28 @@ class Portal:
         return self._access.grants
 
     @property
+    def aliases(self) -> dict[str, Place]:
+        """Where mini apps and the editors are for each of the portal's other origins.
+
+        Each of ``PORTAL_EXTRA_URLS`` has them beside it, on the ports they have here (portalr
+        ADR-0084).
+
+        Raises:
+            ValueError: If they are named without ``PORTAL_URL``, or one of the apps' origin or
+                an editor has no port of its own, as one at a single host's edge hasn't.
+        """
+        portal = self._settings.portal
+        if not portal.extra_urls:
+            return {}
+        if not portal.url:
+            raise ValueError(UNNAMED)
+        editors = {% if use_files %}dict(self._settings.files.editors){% else %}{}{% endif %}
+        return {
+            extra: beside(portal.url, extra, apps=portal.apps_url or None, editors=editors)
+            for extra in portal.extra_urls
+        }
+
+    @property
     def site(self) -> Site | None:
         """The Supabase project the UIs sign in to, or None where it isn't named.{% if use_tracker %}
 
@@ -269,6 +294,8 @@ class Portal:
                 surfaces=Surfaces(relayr=""),
 {%- endif %}
                 apps=portal.apps_url,
+                origin=portal.url or None,
+                aliases=self.aliases,
 {%- if use_files %}
                 editors=dict(self._settings.files.editors),
 {%- endif %}
@@ -338,7 +365,8 @@ class Portal:
         Raises:
             ValueError: If none is, or it is not at an https address, and the settings say the
                 application must have the portal; or it is this origin, and Supabase Auth's
-                address isn't set; or the apps' origin is named without the portal's.
+                address isn't set; or the apps' origin, or the portal's other origins, are named
+                without the portal's.
         """
         portal = self._settings.portal
         if portal.apps_url and not portal.url:
@@ -396,9 +424,10 @@ class Portal:
         )
         app.include_router(router, prefix=PREFIX)
         if portal.apps_url and portal.url:
+            beside_each = [place.apps for place in site.aliases.values() if place.apps]
             app.add_middleware(
                 SandboxOrigin,
-                apps=portal.apps_url,
-                portal=portal.url,
+                apps=[portal.apps_url, *beside_each],
+                portal=[portal.url, *site.aliases],
                 root=Path(portal.ui_dir) if portal.ui_dir else UI,
             )

@@ -4,7 +4,8 @@ Lattice's shim is served beside the build, and the portal frames it, to open a c
 the app and hear its saves (lattice RFC-0003).
 
 compose.yaml's ``files-<app>-editor`` runs it, as this module: the app is ``EDITOR_APP``, its
-build ``EDITOR_BUILD``, and the portal that alone may frame it ``PORTAL_URL``. It listens on
+build ``EDITOR_BUILD``, and the portal that may frame it ``PORTAL_URL``, with its other origins,
+``PORTAL_EXTRA_URLS``, such as this machine's tailnet name (portalr ADR-0084). It listens on
 ``EDITOR_HOST``:``EDITOR_PORT``, 0.0.0.0:8000 in its container, which compose.yaml publishes on
 this machine's loopback alone. It sets no cookie and reads none, so it never sees a token.
 """
@@ -18,6 +19,7 @@ from starlette.types import ASGIApp
 
 from artifactr.files.craft import CRAFTS
 from artifactr.files.fastapi import editor_app
+from lattice_core.origins import origins
 
 
 def editor_from_environment(environ: Mapping[str, str]) -> ASGIApp:
@@ -25,11 +27,16 @@ def editor_from_environment(environ: Mapping[str, str]) -> ASGIApp:
 
     Raises:
         KeyError: If it names no app, build or portal.
+        ValueError: If a portal origin isn't one.
     """
+    portal = environ["PORTAL_URL"]
+    extra = origins(
+        environ.get("PORTAL_EXTRA_URLS", ""), what="PORTAL_EXTRA_URLS", canonical=portal
+    )
     return editor_app(
         Path(environ["EDITOR_BUILD"]),
         craft=CRAFTS[environ["EDITOR_APP"]],
-        portal=environ["PORTAL_URL"],
+        portal=[portal, *extra] if extra else portal,
     )
 
 

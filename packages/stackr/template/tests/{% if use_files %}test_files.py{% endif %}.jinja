@@ -441,6 +441,34 @@ def test_the_portal_tells_the_app_where_each_editor_is(script: Script) -> None:
         assert client.get("/portalr/config.json").json()["editors"] == editors
 
 
+def test_each_editor_is_beside_each_of_the_portals_origins(script: Script) -> None:
+    editors = {"files:gridcraft": "http://127.0.0.1:{{ app_port + crafts.gridcraft.editor }}/"}
+    portal = PortalSettings(
+        supabase_url="http://127.0.0.1:54321",
+        supabase_key="sb_publishable_x",
+        url="http://127.0.0.1:{{ app_port }}",
+        extra_urls=("https://laptop.tail1234.ts.net",),
+    )
+    config = replace(settings(), files=replace(WORDCRAFT, editors=editors), portal=portal)
+    with TestClient(app(script, config, workers=workers())) as client:
+        aliases = client.get("/portalr/config.json").json()["aliases"]
+    beside = "https://laptop.tail1234.ts.net:{{ app_port + crafts.gridcraft.editor }}/"
+    assert aliases["https://laptop.tail1234.ts.net"]["editors"] == {"files:gridcraft": beside}
+
+
+def test_an_editor_at_an_edge_has_no_port_to_be_beside(script: Script) -> None:
+    portal = PortalSettings(
+        supabase_url="http://127.0.0.1:54321",
+        supabase_key="sb_publishable_x",
+        url="https://app.example.com",
+        extra_urls=("https://laptop.tail1234.ts.net",),
+    )
+    editors = {"files:gridcraft": "https://gridcraft.example.com/"}
+    config = replace(settings(), files=replace(WORDCRAFT, editors=editors), portal=portal)
+    with pytest.raises(ValueError, match="no port of its own"):
+        app(script, config, workers=workers())
+
+
 def build(tmp_path: Path) -> Path:
     """A browser build's directory, as small as one can be."""
     (tmp_path / "index.html").write_text("<!doctype html><title>GridCraft</title>")
@@ -460,6 +488,23 @@ def test_an_editor_serves_the_build_and_lattices_shim(tmp_path: Path) -> None:
         shim = client.get("/.lattice/shim.html")
     assert page.status_code == shim.status_code == 200
     assert "frame-ancestors" in page.headers["content-security-policy"]
+
+
+def test_an_editor_is_framed_by_each_of_the_portals_origins(tmp_path: Path) -> None:
+    from {{ package_name }}.editor import editor_from_environment
+
+    environ = {
+        "EDITOR_APP": "gridcraft",
+        "EDITOR_BUILD": str(build(tmp_path)),
+        "PORTAL_URL": "http://127.0.0.1:{{ app_port }}",
+        "PORTAL_EXTRA_URLS": "https://laptop.tail1234.ts.net",
+    }
+    with TestClient(editor_from_environment(environ)) as client:
+        page = client.get("/")
+    portals = "http://127.0.0.1:{{ app_port }} https://laptop.tail1234.ts.net"
+    assert f"frame-ancestors 'self' {portals}" in page.headers["content-security-policy"]
+    # Cookies are host-scoped, not port-scoped: none on an editor beside the portal.
+    assert "set-cookie" not in page.headers
 
 
 def test_the_editors_module_serves_it(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

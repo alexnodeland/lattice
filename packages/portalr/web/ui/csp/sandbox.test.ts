@@ -443,6 +443,7 @@ test("an app that throws, or loads what its policy refuses, is said under it and
   await expect.poll(() => said.join("\n"), SETTLED).toContain("boom");
   await expect.poll(() => said.join("\n"), SETTLED).toContain("rejection: no level");
   await expect.poll(() => said.join("\n"), SETTLED).toContain("policy: img-src refused");
+  expect(said.join("\n")).toContain("(https://example.com/x.png)");
   await page.getByText("The app reported a problem").click();
   await expect.poll(() => page.getByText(/error: .*boom/).count(), SETTLED).toBe(1);
   await page.close();
@@ -468,4 +469,17 @@ test("an app that draws nothing on its canvas is said to, and one that draws is 
   expect(await drawing.page.getByText("The app reported a problem").count()).toBe(0);
   expect(await drawing.page.getByText("drew nothing", { exact: false }).count()).toBe(0);
   await drawing.page.close();
+});
+
+test("an app's document says the first five errors that differ, and no more", async () => {
+  const { page, said } = await watched(
+    `<body><p>Board</p><script>for(let i=0;i<20;i++)setTimeout(()=>{throw new Error("again")});for(let i=0;i<7;i++)setTimeout(()=>{throw new Error("boom "+i)});</script>`,
+  );
+  await expect.poll(() => said.length, SETTLED).toBe(5);
+  await page.waitForTimeout(2000);
+  expect(said).toHaveLength(5);
+  expect(said.filter((line) => line.includes("again"))).toHaveLength(1);
+  await page.getByText("The app reported a problem").click();
+  expect(await page.locator("details li").count()).toBe(5);
+  await page.close();
 });

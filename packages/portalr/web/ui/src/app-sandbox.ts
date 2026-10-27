@@ -172,19 +172,21 @@ const STARTED = `parent.postMessage({ jsonrpc: "2.0", method: "${APP_STARTED}" }
 /**
  * What went wrong in the app's document, said to the host, which shows it as plain text: an error
  * (a resource that didn't load among them), a refused promise, or a refusal of its policy, the
- * first five that differ by their message, each cut short; and once, 1.5 s after the document
- * loaded, what it drew: its children and canvases, the largest canvas's size and whether an 8 by 8
- * copy of it is blank, the window, and which of the APIs a game leans on it has. The canvas is
- * copied, never asked for a context of its own, so an app's WebGL or 2D context is left as it is.
- * Nothing here is sent anywhere but the host's page, which keeps none of it.
+ * first five that differ by their message and what was refused, each cut short (WebKit says the
+ * app's own errors only as "Script error."); and once, 1.5 s after the document loaded, what it
+ * drew: its children (text counting as one) and canvases, the largest canvas's size and whether
+ * 8 by 8 pixels at its centre are blank, the window, and which of the APIs a game leans on it
+ * has. A canvas holding WebGL has no 2D context to read, and is said to be unread. Nothing here
+ * is sent anywhere but the host's page, which keeps none of it.
  */
 const DIAGNOSED = [
   "(() => {",
   "  const said = new Set();",
   '  const cut = (text, most) => String(text == null ? "" : text).slice(0, most);',
   "  const report = (params) => {",
-  "    if (said.size >= 5 || said.has(params.message)) return;",
-  "    said.add(params.message);",
+  '    const key = params.message + " " + (params.blocked || "");',
+  "    if (said.size >= 5 || said.has(key)) return;",
+  "    said.add(key);",
   `    parent.postMessage({ jsonrpc: "2.0", method: "${APP_ERROR}", params }, "*");`,
   "  };",
   '  addEventListener("error", (event) => {',
@@ -201,7 +203,7 @@ const DIAGNOSED = [
   '    report({ kind: "rejection", message: cut(reason && reason.message ? reason.message : reason, 300) });',
   "  });",
   '  document.addEventListener("securitypolicyviolation", (event) => {',
-  '    report({ kind: "policy", message: cut(event.effectiveDirective + " refused " + (event.blockedURI || "inline"), 300), directive: cut(event.effectiveDirective || event.violatedDirective, 60), blocked: cut(event.blockedURI, 200), source: cut(event.sourceFile, 120), line: event.lineNumber | 0 });',
+  '    report({ kind: "policy", message: cut((event.effectiveDirective || event.violatedDirective) + " refused", 300), directive: cut(event.effectiveDirective || event.violatedDirective, 60), blocked: cut(event.blockedURI, 200), source: cut(event.sourceFile, 120), line: event.lineNumber | 0 });',
   "  });",
   '  addEventListener("DOMContentLoaded", () => setTimeout(() => {',
   "    let largest = null;",
@@ -210,20 +212,20 @@ const DIAGNOSED = [
   '    let canvasPixels = "none";',
   "    if (largest) {",
   "      try {",
-  '        const copy = document.createElement("canvas");',
-  "        copy.width = copy.height = 8;",
-  '        const context = copy.getContext("2d");',
-  "        context.drawImage(largest, 0, 0, 8, 8);",
-  "        const data = context.getImageData(0, 0, 8, 8).data;",
-  "        let blank = true;",
-  "        for (let i = 0; i < data.length; i += 4) if (data[i + 3] !== 0 && !(data[i] > 249 && data[i + 1] > 249 && data[i + 2] > 249)) blank = false;",
-  '        canvasPixels = blank ? "blank" : "drawn";',
+  '        const context = largest.getContext("2d");',
+  "        if (context) {",
+  "          const x = Math.max(0, (largest.width >> 1) - 4), y = Math.max(0, (largest.height >> 1) - 4);",
+  "          const data = context.getImageData(x, y, Math.min(8, largest.width), Math.min(8, largest.height)).data;",
+  "          let blank = true;",
+  "          for (let i = 0; i < data.length; i += 4) if (data[i + 3] !== 0 && !(data[i] > 249 && data[i + 1] > 249 && data[i + 2] > 249)) blank = false;",
+  '          canvasPixels = blank ? "blank" : "drawn";',
+  '        } else canvasPixels = "unread";',
   '      } catch { canvasPixels = "unread"; }',
   "    }",
   '    const has = ["AudioContext", "webkitAudioContext", "ResizeObserver", "requestAnimationFrame"].filter((name) => name in window).join(" ");',
   `    parent.postMessage({ jsonrpc: "2.0", method: "${APP_BOOT}", params: {`,
   "      readyState: document.readyState,",
-  "      children: document.body ? document.body.childElementCount : 0,",
+  "      children: document.body ? document.body.childElementCount + (document.body.innerText.trim() ? 1 : 0) : 0,",
   "      canvases: canvases.length,",
   "      canvasWidth: largest ? largest.clientWidth : 0,",
   "      canvasHeight: largest ? largest.clientHeight : 0,",

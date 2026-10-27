@@ -50,6 +50,15 @@ class Rating(Feedback, name="rating", targets={"turn"}):
 
     stars: Annotated[int, Field(ge=1, le=5, description="From 1 (useless) to 5 (just right)")]
     comment: str | None = None
+{%- if use_portal %}
+
+
+class Thumbs(Feedback, name="thumbs", targets={"turn", "message", "artifact"}):
+    """Whether a turn, a message or a note helped, and why: what the portal's thumbs give."""
+
+    up: bool
+    comment: str | None = None
+{%- endif %}
 
 
 def build_note_agent(

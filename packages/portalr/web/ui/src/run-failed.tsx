@@ -15,6 +15,8 @@ const REASONS: Readonly<Record<string, string>> = {
   unexpected_model_behavior: "The model answered in a way the turn couldn't use.",
   abandoned: "The turn stopped answering, and was given up.",
   guardrail_blocked: "A guardrail stopped the turn.",
+  model_stalled: "The model stopped answering, so the turn was ended.",
+  tool_stalled: "A tool didn't return, so the turn was ended.",
 };
 
 /**

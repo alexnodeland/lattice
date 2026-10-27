@@ -10,7 +10,7 @@ import dataclasses
 import json
 from collections import OrderedDict, deque
 from collections.abc import AsyncIterable, AsyncIterator, Awaitable, Callable
-from typing import Any, Protocol
+from typing import Any, Final, Protocol
 
 from pydantic_ai import (
     AgentStreamEvent,
@@ -137,20 +137,79 @@ def _offer(queue: asyncio.Queue[LiveFrame | None], item: LiveFrame | None) -> No
 
 EventStreamHandler = Callable[[RunContext[Any], AsyncIterable[AgentStreamEvent]], Awaitable[None]]
 
+COALESCE: Final = 0.05
+"""Seconds a run's text and thinking deltas are gathered for before they are sent as one."""
 
-def forward_live(channel: LiveChannel) -> EventStreamHandler:
+
+def forward_live(channel: LiveChannel, *, coalesce: float = COALESCE) -> EventStreamHandler:
     """Return a pydantic-ai ``event_stream_handler`` that sends live frames to ``channel``.
 
-    The run id comes from the run's ``Session``.
+    The run id comes from the run's ``Session``. Text and thinking deltas of a part are
+    gathered for ``coalesce`` seconds and sent as one, with the ``offset`` of the first, so a
+    model that streams a token at a time doesn't send a frame a token; 0 sends each as it
+    comes. Any other event sends what is gathered first, so frames keep the stream's order,
+    and the stream's end sends the rest. Each delta carries its offset in its part, counted
+    per run across the turn's requests, so a client told a delta twice places it once.
     """
 
     async def handle(ctx: RunContext[Any], events: AsyncIterable[AgentStreamEvent]) -> None:
         run_id: RunId = ctx.deps.run_id
-        async for event in events:
-            for live in to_live(event):
-                await channel.send(LiveFrame(run_id=run_id, event=live))
+        gathered = _Gathered(run_id, channel, coalesce)
+        try:
+            async for event in events:
+                for live in to_live(event):
+                    await gathered.add(live)
+        finally:
+            await gathered.flush()
 
     return handle
+
+
+class _Gathered:
+    """A run's deltas gathered for a moment, and the offset each part has reached."""
+
+    def __init__(self, run_id: RunId, channel: LiveChannel, coalesce: float) -> None:
+        self._run_id = run_id
+        self._channel = channel
+        self._coalesce = coalesce
+        self._offsets: dict[int, int] = {}
+        self._pending: TextDelta | ThinkingDelta | None = None
+        self._flush: asyncio.TimerHandle | None = None
+        self._flushing: asyncio.Task[None] | None = None
+
+    async def add(self, live: LiveEvent) -> None:
+        if not isinstance(live, TextDelta | ThinkingDelta):
+            await self.flush()
+            await self._channel.send(LiveFrame(run_id=self._run_id, event=live))
+            return
+        pending = self._pending
+        offset = self._offsets.get(live.part, 0)
+        self._offsets[live.part] = offset + len(live.delta)
+        if pending is not None and type(pending) is type(live) and pending.part == live.part:
+            self._pending = pending.model_copy(update={"delta": pending.delta + live.delta})
+            return
+        await self.flush()
+        self._pending = live.model_copy(update={"offset": offset})
+        if self._coalesce <= 0:
+            await self.flush()
+        else:
+            loop = asyncio.get_running_loop()
+            self._flush = loop.call_later(self._coalesce, self._flush_later)
+
+    def _flush_later(self) -> None:
+        self._flushing = asyncio.create_task(self.flush())
+
+    async def flush(self) -> None:
+        """Send what is gathered, if anything."""
+        if self._flush is not None:
+            self._flush.cancel()
+            self._flush = None
+        if self._flushing is not None and self._flushing is not asyncio.current_task():
+            flushing, self._flushing = self._flushing, None
+            await flushing
+        pending, self._pending = self._pending, None
+        if pending is not None:
+            await self._channel.send(LiveFrame(run_id=self._run_id, event=pending))
 
 
 def to_live(event: AgentStreamEvent) -> list[LiveEvent]:

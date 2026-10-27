@@ -5,6 +5,7 @@ import logging
 import time
 import uuid
 from collections.abc import Awaitable, Callable, Collection, Coroutine
+from datetime import datetime
 from typing import Annotated, Any, Final, Literal
 
 from fastapi import HTTPException, WebSocket, WebSocketDisconnect
@@ -32,6 +33,7 @@ from artifactr.core import (
     ReplayComplete,
     RunId,
     RunStarted,
+    ThinkingDelta,
     ThreadId,
     UnsupportedProtocol,
     UnwatchArtifact,
@@ -205,12 +207,17 @@ class Stream:
         except (UnsupportedProtocol, ValidationFailed) as refused:
             await self._close(4400, refused.message)
             return
+        # Each running run's latest turn: where its run_started is, and when it was.
+        starts = {run.id: await _started(workspace, run.id, run.thread_id) for run in running}
         self._put(
             Welcome(
                 workspace_id=workspace.workspace_id,
                 head_seq=head,
                 reset=plan.reset,
-                active_runs=tuple(ActiveRun(run_id=r.id, thread_id=r.thread_id) for r in running),
+                active_runs=tuple(
+                    ActiveRun(run_id=r.id, thread_id=r.thread_id, started_at=starts[r.id][1])
+                    for r in running
+                ),
             )
         )
         self._connected = True
@@ -223,8 +230,7 @@ class Stream:
             # head_seq, is the same turn and not watched twice; later turns as they start.
             for run in running:
                 if hello.threads is None or run.thread_id in hello.threads:
-                    turn = await _started(workspace, run.id, run.thread_id)
-                    self._watch(workspace, run.id, run.thread_id, turn=turn)
+                    self._watch(workspace, run.id, run.thread_id, turn=starts[run.id][0])
         else:
             self._put(ReplayComplete(up_to_seq=head))  # for presence alone: no events
         await self._read(workspace)
@@ -346,6 +352,8 @@ class Stream:
             async for frame in self._runner.watch(run_id):
                 if thread_id in (await workspace.hidden()).threads:
                     return
+                if isinstance(frame.event, ThinkingDelta) and self._crowded():
+                    continue  # thinking goes first: it is never kept, and the reply matters more
                 await self._put_waiting(frame)
 
         self._spawn(forward())
@@ -436,6 +444,11 @@ class Stream:
             self._overflowed = True
         self._wake.set()
 
+    def _crowded(self) -> bool:
+        """Whether the outbox is more than half full: the client is falling behind."""
+        size = self._outbox.maxsize
+        return size > 0 and self._outbox.qsize() > size // 2
+
     async def _put_waiting(self, frame: BaseModel) -> None:
         """Queue a run's live frame, waiting for room rather than overflowing the outbox.
 
@@ -486,12 +499,17 @@ _PAGE = 100
 """How many envelopes of a thread a look for a run's latest start reads at a time."""
 
 
-async def _started(workspace: Workspace, run_id: RunId, thread_id: ThreadId) -> int:
-    """The ``seq`` of a running run's latest ``run_started``, read back from its thread's end."""
+async def _started(
+    workspace: Workspace, run_id: RunId, thread_id: ThreadId
+) -> tuple[int, datetime | None]:
+    """A running run's latest ``run_started``: its ``seq``, and when it was.
+
+    It is read back from the thread's end; ``(0, None)`` where the thread's log doesn't hold it.
+    """
     before: int | None = None
     while page := await workspace.read(threads={thread_id}, before_seq=before, last=_PAGE):
         for envelope in reversed(page):
             if isinstance(envelope.event, RunStarted) and envelope.event.run_id == run_id:
-                return envelope.seq
+                return envelope.seq, envelope.ts
         before = page[0].seq
-    return 0
+    return 0, None

@@ -32,14 +32,20 @@ Each frame is a `LiveFrame` with the `run_id` and one event:
 | Event | Fields | From |
 |---|---|---|
 | `PartStarted` | `part`, `part_kind` (`text`, `thinking` or `tool_call`), `tool_name` | The model starting a response part |
-| `TextDelta` | `part`, `delta` | More text |
-| `ThinkingDelta` | `part`, `delta` | More thinking |
+| `TextDelta` | `part`, `delta`, `offset` | More text; `offset` is where it starts in the part |
+| `ThinkingDelta` | `part`, `delta`, `offset` | More thinking, with its offset |
 | `ToolArgsDelta` | `part`, `delta` | More of a tool call's JSON arguments |
 | `PartEnded` | `part` | The part is complete |
 | `Draft` | `kind`, `data`, `artifact_id` | An application tool's `ArtifactDraft` |
 | `AppLive` | `name`, `data` | Any other pydantic-ai `CustomEvent` a tool emits |
 
 `part` is the index of the response part, so a client can keep several parts apart. The [thread protocol](../protocol.md#live-ephemeral) gives the wire format.
+
+A model that streams a token at a time would send a frame a token. `forward_live` gathers a part's text and thinking deltas for 50 milliseconds (`forward_live(channel, coalesce=...)`; `0` sends each as it comes) and sends them as one delta, so a watcher sees the reply grow a few words at a time at most twenty times a second; any other event, such as the part's end, sends what is gathered first, so frames keep the stream's order. Each delta carries `offset`, where it starts in its part, counted per run across the turn's requests. A watcher that attaches mid-run is sent the run's buffered frames first, so it may be sent a delta it already has: writing each delta at its offset, rather than appending it, makes the second sending harmless ([the protocol](../protocol.md#live-ephemeral) spells the rule out).
+
+## A model that sends nothing
+
+A request that never answers, or a stream that stops mid-reply, would otherwise hold its thread for as long as the client library waits, ten minutes through a gateway, with no sign of progress. The runner times each turn's stream (`Runner(liveness=Liveness(...))`): a model request must send its first event within `first_output` seconds and each later one within `no_output` (two minutes each by default), and a tool call must return within `tool` (ten minutes; `None` waits as long as the tool needs). A wait that runs out tears the request down and fails the run with the reason `model_stalled`, or `tool_stalled`, its usage so far recorded, and the thread is released for the next message. A model served locally is slower to its first token, so `local_first_output` and `local_no_output` (five minutes each) apply to one; `is_local_model(name)` tells them apart by name, LiteLLM's local providers' prefixes (`ollama/`, `lm_studio/`, `omlx/`, `llamacpp/`, `vllm/`) and the `local` aliases, with `Liveness(local_models=..., hosted_models=...)` as the application's last word, and an unknown name counts as hosted ([ADR-0095](../adr/0095-a-run-that-waits-on-nothing-is-failed-and-a-message-that-starts-nothing-is-told.md)).
 
 ## Drafts and progress from your tools
 

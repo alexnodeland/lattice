@@ -1,9 +1,11 @@
 """artifactr's surfaces: people and the agent write notes together, signed in with Supabase."""
 
+import asyncio
 from typing import Any
 
 import httpx
 import httpx2
+import pytest
 from fastapi.testclient import TestClient
 from mcp import Client
 from mcp.client.streamable_http import streamable_http_client
@@ -12,7 +14,7 @@ from mcp.types import TextContent
 from pydantic_ai import ToolReturnPart
 {%- endif %}
 
-from artifactr import new_id
+from artifactr import SystemActor, new_id
 {%- if use_ui or use_files %}
 from lattice_core.integrations import Defaults
 {%- endif %}
@@ -125,6 +127,73 @@ async def test_mcp_clients_in_process_are_refused(script: Script) -> None:
     assert refused.is_error
     assert isinstance(content, TextContent)
     assert "connect over HTTP" in content.text
+
+
+async def test_a_workspace_is_recovered_once_as_it_first_opens(
+    script: Script, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """What a process that died left in a workspace is taken as the workspace first opens here:
+    a run left running is abandoned, and a turn asked for is started (artifactr ADR-0095)."""
+    config = settings()
+    collaboration = Collaboration(
+        name="{{ project_slug }}",
+        authenticate=nobody,
+        identify=nobody,
+{%- if use_ui or use_files %}
+        integrations=Defaults(),
+{%- endif %}
+{%- if use_files %}
+        files=Files(FilesSettings(), integrations=Defaults()),
+{%- endif %}
+        model=script.model,
+        gateway=config.gateway,
+    )
+    recovered: list[tuple[str, str, object]] = []
+
+    async def recover(workspace: Any) -> list[Any]:
+        recovered.append((workspace.tenant_id, workspace.workspace_id, workspace.actor))
+        return []
+
+    monkeypatch.setattr(collaboration.runner, "recover", recover)
+    for _ in range(2):
+        await collaboration.workspaces.open(TENANT, "main", actor=SystemActor())
+    await collaboration.workspaces.open(TENANT, "other", actor=SystemActor())
+    await asyncio.gather(*collaboration._recovering)
+    assert recovered == [
+        (TENANT, "main", SystemActor()),
+        (TENANT, "other", SystemActor()),
+    ], "once a workspace, as the system"
+
+
+async def test_a_recovery_that_fails_is_logged_and_the_open_still_succeeds(
+    script: Script, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    config = settings()
+    collaboration = Collaboration(
+        name="{{ project_slug }}",
+        authenticate=nobody,
+        identify=nobody,
+{%- if use_ui or use_files %}
+        integrations=Defaults(),
+{%- endif %}
+{%- if use_files %}
+        files=Files(FilesSettings(), integrations=Defaults()),
+{%- endif %}
+        model=script.model,
+        gateway=config.gateway,
+    )
+
+    async def broken(workspace: Any) -> list[Any]:
+        raise RuntimeError("storage blinked")
+
+    monkeypatch.setattr(collaboration.runner, "recover", broken)
+    with caplog.at_level("ERROR", logger="{{ package_name }}.collaboration"):
+        workspace = await collaboration.workspaces.open(TENANT, "main", actor=SystemActor())
+        await asyncio.gather(*collaboration._recovering)
+    assert workspace.workspace_id == "main"
+    assert [r.getMessage() for r in caplog.records] == [
+        f"recovering workspace main of {TENANT} failed"
+    ]
 {%- if use_ui %}
 
 

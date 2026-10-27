@@ -72,6 +72,8 @@ def test_every_setting_comes_from_its_variable() -> None:
             "LITELLM_TENANT_KEYS": '{"acme": "sk-acme"}',
             "LITELLM_GUARDRAILS": "pii-mask, ",
             "LITELLM_MOCK_RESPONSE": "ok",
+            "LITELLM_NO_OUTPUT_SECONDS": "45",
+            "LITELLM_LOCAL_MODELS": "default, slow",
             "LANGFUSE_PUBLIC_KEY": "pk-lf-1",
 {%- if use_tracker %}
             "TRACKER_CREDENTIALS": json.dumps({"acme": CREDENTIALS}),
@@ -107,6 +109,8 @@ def test_every_setting_comes_from_its_variable() -> None:
             tenant_keys={"acme": "sk-acme"},
             guardrails=("pii-mask",),
             mock_response="ok",
+            no_output_seconds=45.0,
+            local_models=("default", "slow"),
         ),
 {%- if use_tracker %}
         tracker=TrackerSettings(
@@ -130,6 +134,12 @@ def test_empty_variables_count_as_unset() -> None:
 
 def test_guardrails_can_be_turned_off() -> None:
     assert Settings.from_environ({"LITELLM_GUARDRAILS": "none"}).gateway.guardrails == ()
+
+
+@pytest.mark.parametrize("seconds", ["soon", "0", "-5"])
+def test_a_wait_must_be_a_positive_number_of_seconds(seconds: str) -> None:
+    with pytest.raises(ValueError, match="LITELLM_NO_OUTPUT_SECONDS must be a number of seconds"):
+        Settings.from_environ({"LITELLM_NO_OUTPUT_SECONDS": seconds})
 
 
 @pytest.mark.parametrize("keys", ["not json", '["sk-acme"]'])

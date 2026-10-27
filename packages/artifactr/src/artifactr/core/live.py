@@ -32,6 +32,11 @@ class TextDelta(_LiveEvent):
     type: Literal["text_delta"] = "text_delta"
     part: int
     delta: str
+    offset: int | None = None
+    """Where ``delta`` starts in the part, in characters from its beginning, when the sender
+    counts: a client that is sent a delta again, as a run's frames are replayed on reconnect,
+    puts it where it belongs rather than appending it twice. ``None`` from a sender that
+    doesn't count, as earlier versions didn't."""
 
 
 class ThinkingDelta(_LiveEvent):
@@ -40,6 +45,8 @@ class ThinkingDelta(_LiveEvent):
     type: Literal["thinking_delta"] = "thinking_delta"
     part: int
     delta: str
+    offset: int | None = None
+    """Where ``delta`` starts in the part, as for a text delta."""
 
 
 class ToolArgsDelta(_LiveEvent):

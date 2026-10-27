@@ -2366,6 +2366,16 @@
       "RunUsage": {
         "description": "Token and request counts for a run.",
         "properties": {
+          "cache_read_tokens": {
+            "default": 0,
+            "title": "Cache Read Tokens",
+            "type": "integer"
+          },
+          "cache_write_tokens": {
+            "default": 0,
+            "title": "Cache Write Tokens",
+            "type": "integer"
+          },
           "input_tokens": {
             "default": 0,
             "title": "Input Tokens",

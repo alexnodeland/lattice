@@ -10,6 +10,7 @@ import { Dialog as BaseDialog } from "@base-ui/react/dialog";
 import type { ReactNode, RefObject } from "react";
 import { Button } from "./button";
 import { keepTabWithin } from "./full-view";
+import { SheetHandle, sheet, useSheet } from "./sheet";
 import { TYPE } from "./type";
 
 export const backdrop =
@@ -42,7 +43,7 @@ export function Dialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  title: string;
+  title: ReactNode;
   description?: ReactNode;
   /** The words on the button that closes it. */
   close?: string;
@@ -50,20 +51,24 @@ export function Dialog({
   finalFocus?: RefObject<HTMLElement | null>;
   children: ReactNode;
 }) {
+  // On a phone it is a sheet, dragged down to close (portalr ADR-0082).
+  const asSheet = useSheet(open, () => onOpenChange(false));
   return (
     <BaseDialog.Root open={open} onOpenChange={onOpenChange}>
       <BaseDialog.Portal>
         <BaseDialog.Backdrop className={backdrop} />
         <BaseDialog.Popup
+          ref={asSheet}
           // Base UI traps the focus but doesn't say so: assistive technology learns the page
           // behind is out of reach from aria-modal, as the drawer says it.
           aria-modal="true"
           // Tab kept in it at once, never on Base UI's guards outside it (portalr ADR-0068).
           onKeyDown={(event) => keepTabWithin(event.currentTarget, event.nativeEvent)}
-          className={popup}
+          className={`${popup} ${sheet}`}
           {...(initialFocus && { initialFocus })}
           {...(finalFocus && { finalFocus })}
         >
+          <SheetHandle />
           <BaseDialog.Title className={title}>{named}</BaseDialog.Title>
           {about && (
             <BaseDialog.Description className={description}>{about}</BaseDialog.Description>

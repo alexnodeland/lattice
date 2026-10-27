@@ -35,6 +35,11 @@ class Alice extends Signed {
   override signedIn = async () => "alice";
 }
 
+/** Nobody signed in: the sign-in page's world. */
+class Nobody extends Signed {
+  override signedIn = async () => null;
+}
+
 /** A test's answers, past who alice is: undefined for none. */
 export type Serve = (request: Request, path: string) => Promise<Response | undefined>;
 
@@ -141,6 +146,8 @@ export interface World {
   readonly readers?: Config["readers"];
   /** Whether the deployment records session replays, which it doesn't unless told. */
   readonly replay?: boolean;
+  /** Whether nobody is signed in, which alice is unless told. */
+  readonly signedOut?: boolean;
 }
 
 /** The app, opened at `path`, over `serve` and streams that answer as `answer` does. */
@@ -175,7 +182,9 @@ export async function open(
     history: createMemoryHistory({ initialEntries: [path] }),
     context: {
       config,
-      signed: new Alice(config, () => undefined),
+      signed: world.signedOut
+        ? new Nobody(config, () => undefined)
+        : new Alice(config, () => undefined),
       api,
       queries: createQueries(api),
       commands: createCommands(api, () => undefined),

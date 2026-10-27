@@ -10,7 +10,10 @@ import { FEEDBACK } from "./states";
  */
 export function TabNav({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <nav aria-label={label} className="mb-4 flex gap-1 overflow-x-auto border-line border-b">
+    <nav
+      aria-label={label}
+      className="mb-4 flex gap-1 overflow-x-auto border-line border-b [--scroll-cover:var(--paper)] phone:as-scroll-shadows"
+    >
       {children}
     </nav>
   );

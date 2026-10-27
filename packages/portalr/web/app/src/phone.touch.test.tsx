@@ -115,9 +115,17 @@ test("a plain approval's bar mirrors Approve", async () => {
 });
 
 for (const [what, review] of [
-  ["code and a risk", { app: "FreeCAD", risk: "network", code: "import os\nos.system('curl x')" }],
-  ["what it holds", { app: "FreeCAD", holds: ["a document"] }],
-  ["findings", { app: "FreeCAD", findings: ["reads a file"] }],
+  ["what it runs", { app: "Blender", runs: "It runs a script." }],
+  [
+    "what it runs, code and a risk",
+    {
+      app: "Blender",
+      runs: "It runs a script.",
+      risk: "network",
+      code: "import os\nos.system('curl x')",
+    },
+  ],
+  ["findings", { app: "Blender", runs: "It runs a script.", findings: ["reads a file"] }],
 ] as const) {
   test(`an approval with ${what} to review first is never mirrored: it is read before it is given`, async () => {
     await page.viewport(390, 844);
@@ -133,19 +141,6 @@ for (const [what, review] of [
     expect(bar()).toBeNull();
   });
 }
-
-test("an approval that names its app alone is plain: mirrored", async () => {
-  await page.viewport(390, 844);
-  const { screen } = await open(
-    "/t/acme/w/notes/threads/thr_1",
-    serve,
-    () => null,
-    APPROVAL({ app: "FreeCAD" }),
-  );
-  await expect.element(screen.getByRole("button", { name: "Approve" })).toBeInTheDocument();
-  window.scrollTo(0, 0);
-  await expect.poll(() => bar()?.textContent).toContain("Approve");
-});
 
 test("on a small phone the composer's row, bar and all, takes at most a quarter of the window", async () => {
   await page.viewport(375, 667);

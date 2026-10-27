@@ -18,7 +18,6 @@ const FLICK_AT = 24;
  */
 export function sheetDrag(sheet: HTMLElement, close: () => void): () => void {
   let from: { y: number; at: number; id: number; handle: HTMLElement } | null = null;
-  sheet.style.setProperty("--sheet-drag", "0px");
   const settle = (dy: number) => {
     sheet.style.transition = "";
     sheet.style.setProperty("--sheet-drag", `${dy}px`);
@@ -100,7 +99,8 @@ export function keyboardInset(root: HTMLElement = document.documentElement): () 
       ? 0
       : Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop);
     root.style.setProperty("--keyboard-inset", `${Math.round(covered)}px`);
-    root.toggleAttribute("data-keyboard", covered > 0);
+    // Past a browser toolbar's height: a toolbar coming and going is no keyboard.
+    root.toggleAttribute("data-keyboard", covered > 80);
   };
   // Resize and scroll come together, and often: one measure a frame.
   const soon = () => {

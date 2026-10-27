@@ -1188,7 +1188,13 @@ export function RunStrip({
           </span>
         )}
         {/* The counts, once the add-on has loaded: the thread loads it as it opens. */}
-        {working && addon && <addon.Tokens run={run} history={history ?? null} />}
+        {/* Folded for everyone (portalr ADR-0085): the strip says how the turn goes; its counts,
+            and the model that answered, are a press away. */}
+        {working && addon && (
+          <Disclosure summary="Tokens" className={TYPE.note}>
+            <addon.Tokens run={run} history={history ?? null} />
+          </Disclosure>
+        )}
       </span>
       <span className="flex shrink-0 items-center gap-2">
         {run.status === "paused" && onQuestion && (

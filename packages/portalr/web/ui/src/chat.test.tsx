@@ -1055,6 +1055,11 @@ test("the strip counts the turn's tokens as chips, each estimated and named in f
   const now = new Date();
   const screen = await render(strip({ outputChars: 401 }, now, { history: 4000 }));
   const group = screen.getByRole("group", { name: "This turn" });
+  // Folded for everyone (portalr ADR-0085): the strip stays quiet until Tokens is opened.
+  const tokens = group.getByRole("button", { name: "Tokens" });
+  await expect.element(tokens).toHaveAttribute("aria-expanded", "false");
+  await expect.element(group.getByText("in ~1,000")).not.toBeVisible();
+  await tokens.click();
   await expect.element(group.getByText("in ~1,000")).toBeVisible();
   await expect.element(group.getByText("out ~101")).toBeVisible();
   await expect.element(group.getByText("Input tokens, estimated: 1,000")).toBeInTheDocument();
@@ -1081,6 +1086,7 @@ test("once the provider has counted, the chips are exact, with the cache and rea
   };
   const screen = await render(strip({ outputChars: 401, usage }, now, { history: 4000 }));
   const group = screen.getByRole("group", { name: "This turn" });
+  await group.getByRole("button", { name: "Tokens" }).click();
   await expect.element(group.getByText("in 1,030")).toBeVisible();
   await expect.element(group.getByText("out 40")).toBeVisible();
   await expect.element(group.getByText("Input tokens: 1,030")).toBeInTheDocument();
@@ -1393,6 +1399,7 @@ test("the strip shows its token chips, and says how a turn ended in the same sta
     strip({ phase: "writing", at: now.getTime() }, now, { history: 400 }),
   );
   const group = screen.getByRole("group", { name: "This turn" });
+  await group.getByRole("button", { name: "Tokens" }).click();
   await expect.element(group.getByText("in ~100")).toBeVisible();
   const status = group.getByRole("status").element();
   await screen.rerender(

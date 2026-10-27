@@ -20,24 +20,27 @@ const REASONS: Readonly<Record<string, string>> = {
 /**
  * A failed turn: what went wrong, the run's own words under "Details" where `error` is given,
  * which the thread gives the person the turn acted for, and "Try again" where `onRetry` is,
- * which it gives its latest turn, or `retryRefused`, why it can't. Only that one is announced,
- * as it fails; one further up is a note.
+ * which it gives its latest turn, or `retryRefused`, why it can't. That one is announced, as it
+ * fails, and any the thread says is (`live`); one further up is a note.
  */
 export function RunFailed({
   reason,
   error,
   onRetry,
   retryRefused,
+  live,
 }: {
   reason: string | null;
   error: string | null;
   onRetry?: () => Sent;
   /** Why the latest turn can't be tried again, in place of "Try again". */
   retryRefused?: string;
+  /** Announce it, as a thread does for a turn that fails while the page is open. */
+  live?: boolean | undefined;
 }) {
   return (
     <li className="self-stretch">
-      <Alert tone="error" live={onRetry !== undefined || retryRefused !== undefined}>
+      <Alert tone="error" live={live ?? (onRetry !== undefined || retryRefused !== undefined)}>
         <div className="flex flex-col gap-2">
           <p>
             <span className="font-semibold">The assistant couldn't finish. </span>

@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { renderHook } from "vitest-browser-react";
-import { retry, useLoaded } from "./on-demand";
+import { retry, useLoaded, useRetrying } from "./on-demand";
 
 test("an add-on is nothing until it loads, then its module", async () => {
   const load = async () => ({ drawn: true });
@@ -51,4 +51,28 @@ test("an add-on that failed loads again when retried, and one loaded isn't loade
   expect(result.current.failed).toBe(false);
   retry(load);
   expect(asked).toBe(2);
+});
+
+test("an add-on that failed is tried again when what wants it changes, and not otherwise", async () => {
+  let tries = 0;
+  const load = async () => {
+    tries += 1;
+    throw new TypeError("Failed to fetch dynamically imported module");
+  };
+  const { result, rerender } = await renderHook(
+    (props?: { wanted: boolean; key: string }) =>
+      useRetrying(load, props?.wanted ?? true, props?.key ?? "run_1"),
+    { initialProps: { wanted: true, key: "run_1" } },
+  );
+  await expect.poll(() => tries).toBe(1);
+  expect(result.current).toBeNull();
+  await rerender({ wanted: true, key: "run_1" });
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  expect(tries).toBe(1);
+  await rerender({ wanted: true, key: "run_2" });
+  await expect.poll(() => tries).toBe(2);
+  // Not wanted, it isn't tried, whatever changes.
+  await rerender({ wanted: false, key: "run_3" });
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  expect(tries).toBe(2);
 });

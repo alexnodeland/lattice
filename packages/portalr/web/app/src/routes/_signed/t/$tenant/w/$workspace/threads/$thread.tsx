@@ -23,6 +23,7 @@ import {
   NotFound as NotFoundPage,
   PageHeader,
   ProposalCard,
+  prefetchStreaming,
   Questions,
   Request,
   RunFailed,
@@ -184,11 +185,17 @@ function Chat() {
   // The requests already waiting when this thread is first shown live: they don't take the focus,
   // which starts at the page's heading; one that arrives while the page is open does (portalr
   // ADR-0068). Kept with the thread's id, so another thread's page starts afresh.
-  const [atLoad, setAtLoad] = useState<{ id: string; waiting: ReadonlySet<string> } | null>(null);
+  const [atLoad, setAtLoad] = useState<{
+    id: string;
+    waiting: ReadonlySet<string>;
+    /** The log's position as the thread was shown live: what ends after it happened here. */
+    seq: number;
+  } | null>(null);
   useEffect(() => {
     if (snapshot.status === "live" && atLoad?.id !== id) {
       setAtLoad({
         id,
+        seq: snapshot.seq,
         waiting: new Set(
           Object.values(runs)
             .filter((run) => run.threadId === id)
@@ -197,6 +204,15 @@ function Chat() {
       });
     }
   }, [snapshot.status, runs, id, atLoad]);
+  // What a turn shows as it streams is loaded ahead of the first (portalr ADR-0083).
+  useEffect(() => prefetchStreaming(), []);
+  // The thread before a turn, as sent to the model, for its token estimate (portalr ADR-0083):
+  // the characters of the messages before the turn's start, summed as the strip is drawn.
+  const sentBefore = (started: number) =>
+    (thread?.messages ?? []).reduce(
+      (chars, message) => (message.seq < started ? chars + message.content.length : chars),
+      0,
+    );
   // How far this browser has read the thread: where it is active at, once shown live (portalr
   // ADR-0080), for the list's mark of what has moved since.
   const readTo = thread?.active;
@@ -381,6 +397,24 @@ function Chat() {
                   artifact={entry.artifact}
                 />
               );
+            case "partial":
+              return [
+                (entry.run.text !== "" || entry.run.live.thinking !== "") && (
+                  <Streaming
+                    key={`${entry.run.id}-partial`}
+                    text={entry.run.text}
+                    live={entry.run.live}
+                    ended={entry.run.status}
+                    author="Assistant"
+                  />
+                ),
+                // A line of the log, which announces it: the one end nothing else says.
+                entry.run.status === "stopped" && (
+                  <li key={`${entry.run.id}-stopped`} className="self-start text-muted text-xs">
+                    Stopped here.
+                  </li>
+                ),
+              ];
             case "failed":
               return (
                 <RunFailed
@@ -388,6 +422,8 @@ function Chat() {
                   reason={entry.run.reason}
                   // What it failed with, which may name the reader's own words, is its author's.
                   error={entry.run.actsFor === me ? entry.run.error : null}
+                  // One that failed while the page was open is announced, whoever started it.
+                  live={(atLoad?.id === id && (entry.run.ended ?? 0) > atLoad.seq) || undefined}
                   {...(retry?.run === entry.run.id &&
                     (retry.id === null
                       ? { retryRefused: RETRY_TAKEN }
@@ -419,13 +455,14 @@ function Chat() {
         {active
           .filter((run) => run.status === "running")
           .map((run) => (
-            <Streaming key={run.id} text={run.text} author="Assistant" />
+            <Streaming key={run.id} text={run.text} live={run.live} author="Assistant" />
           ))}
       </Messages>
       {active.map((run) => (
         <div key={run.id} className="flex flex-col gap-2">
           <RunStrip
             run={run}
+            history={sentBefore(run.started)}
             {...(run.status === "running" &&
               allowed.has("artifactr:stop_run") && {
                 onStop: () => stream.send({ type: "stop_run", run_id: run.id }),

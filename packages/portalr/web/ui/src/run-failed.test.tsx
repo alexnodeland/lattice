@@ -54,3 +54,17 @@ test("a latest turn that can't be tried again says why, in place of the button",
     .toContain("It can't be tried again here.");
   expect(screen.getByRole("button", { name: "Try again" }).elements()).toHaveLength(0);
 });
+
+test("a failure the thread says is live is announced, whoever may try again", async () => {
+  const screen = await render(
+    <Messages>
+      <RunFailed reason="abandoned" error={null} live />
+      <RunFailed reason="abandoned" error={null} live={false} retryRefused="Not here." />
+    </Messages>,
+  );
+  await expect
+    .poll(() => screen.getByRole("alert").element().textContent)
+    .toContain("The turn stopped answering, and was given up.");
+  expect(screen.getByRole("alert").elements()).toHaveLength(1);
+  expect(screen.getByRole("note").elements()).toHaveLength(1);
+});

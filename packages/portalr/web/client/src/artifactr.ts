@@ -107,14 +107,64 @@ export interface Answered {
   readonly actor: v1.Actor;
 }
 
+/** What a run is doing: waiting on the model, thinking, on a tool call, or writing its reply. */
+export type Phase = "starting" | "thinking" | "tool" | "writing";
+
+/**
+ * What a run is doing right now, as its live frames say (portalr ADR-0083). Live output is never
+ * stored: a reconnect starts it afresh from what the server replays, and the posted message is
+ * the reply.
+ */
+export interface Live {
+  readonly phase: Phase;
+  /** The tool whose call is being prepared, or the latest running, in the `tool` phase. */
+  readonly tool: string | null;
+  /** How many of its calls run: their arguments complete, and each call on the log. */
+  readonly calls: number;
+  /** The characters of the call's arguments streamed so far. */
+  readonly argsChars: number;
+  /** The model's thinking, as streamed; empty where the model shows none; its last part past `CAP`. */
+  readonly thinking: string;
+  /** The milliseconds spent in thinking parts that have ended; null where a reconnect lost some. */
+  readonly thoughtMs: number | null;
+  /** Every character the model produced this turn: text, thinking and arguments, for an estimate. */
+  readonly outputChars: number;
+  /** When the phase began, and when the last frame came, by the browser's clock; 0 before any. */
+  readonly since: number;
+  readonly at: number;
+  /**
+   * The index of the last part the model started, of any kind: a response numbers its parts
+   * from 0, so one at or below it begins a new response, whose first text part replaces the text.
+   */
+  readonly part: number | null;
+  /**
+   * What the text is: `pending`, until the response under way begins its text, which replaces
+   * what is there; `writing`, this response's reply; `stale`, what the model wrote before calling
+   * a tool, which isn't the reply; `posted`, the reply once posted, so text that still arrives
+   * is late and isn't kept.
+   */
+  readonly reply: "pending" | "writing" | "stale" | "posted";
+  /** Whether the start of the text or thinking is missing: cut to its cap, or lost to a reconnect. */
+  readonly truncated: boolean;
+  /** Whether a frame has come since the connection was welcomed. */
+  readonly framed: boolean;
+}
+
+/** The most characters of text or thinking kept, from the end; the start goes, as `truncated`. */
+export const CAP = 65_536;
+
 export interface Run {
   readonly id: v1.RunId;
   readonly threadId: v1.ThreadId;
   /** `running`, `paused`, or how it ended. */
   readonly status: "running" | "paused" | v1.RunEnded["status"];
   readonly tools: Readonly<Record<string, Tool>>;
-  /** The text the run is streaming, until its message is posted or it ends. */
+  /**
+   * The text the run is streaming, until its message is posted; a run that failed or was stopped
+   * keeps what it had streamed, so what it was writing isn't lost with it.
+   */
   readonly text: string;
+  readonly live: Live;
   /** What a paused run waits on: questions to answer and calls to approve, until each is. */
   readonly requests: readonly v1.DeferredRequest[];
   /**
@@ -153,6 +203,8 @@ type Handlers = {
     state: Workspace,
     event: Extract<Known, { type: T }>,
     envelope: v1.EventFrame,
+    /** The browser's clock, for a run's phase; `apply` reads it, a test gives it. */
+    now: number,
   ) => Workspace;
 };
 
@@ -210,6 +262,41 @@ function withArtifact(
   };
 }
 
+/** A run's live state before any frame, or again after a reconnect's replay starts it over. */
+const fresh = (now: number, change: Partial<Live> = {}): Live => ({
+  phase: "starting",
+  tool: null,
+  calls: 0,
+  argsChars: 0,
+  thinking: "",
+  thoughtMs: 0,
+  outputChars: 0,
+  since: now,
+  at: now,
+  part: null,
+  reply: "pending",
+  truncated: false,
+  framed: false,
+  ...change,
+});
+
+/** A run's live state in `phase` from `now`, with what the phase changes. */
+function phased(live: Live, phase: Phase, now: number, change: Partial<Live> = {}): Live {
+  return { ...live, ...change, phase, since: live.phase === phase ? live.since : now, at: now };
+}
+
+/** A running run's live state changed; a run that has ended, or paused, is left as it is. */
+function withLive(state: Workspace, id: v1.RunId, change: (live: Live) => Live): Workspace {
+  const run = state.runs[id];
+  return run?.status === "running" ? withRun(state, id, { live: change(run.live) }) : state;
+}
+
+/** `text` with `more` on its end, kept to `CAP` from the end: whether it was cut, and the rest. */
+function appended(text: string, more: string): readonly [boolean, string] {
+  const whole = text + more;
+  return whole.length > CAP ? [true, whole.slice(whole.length - CAP)] : [false, whole];
+}
+
 function withRun(state: Workspace, id: v1.RunId, change: Partial<Run>): Workspace {
   const run = state.runs[id];
   if (!(run || change.threadId)) {
@@ -221,6 +308,7 @@ function withRun(state: Workspace, id: v1.RunId, change: Partial<Run>): Workspac
     status: "running",
     tools: {},
     text: "",
+    live: fresh(0),
     requests: [],
     answered: [],
     started: 0,
@@ -264,8 +352,15 @@ const handlers: Handlers = {
       active: envelope.seq,
       activeAt: envelope.ts,
     });
-    // The posted message is the authoritative text of what the run streamed.
-    return event.run_id ? withRun(next, event.run_id, { text: "" }) : next;
+    // The posted message is the authoritative text of what the run streamed, and its thinking
+    // went into it: neither is kept.
+    const run = event.run_id && next.runs[event.run_id];
+    return run
+      ? withRun(next, run.id, {
+          text: "",
+          live: { ...run.live, thinking: "", reply: "posted" },
+        })
+      : next;
   },
   artifact_created: (state, event, envelope) =>
     withArtifact(
@@ -316,14 +411,19 @@ const handlers: Handlers = {
       },
     };
   },
-  run_started: (state, event, envelope) => {
-    const first = state.runs[event.run_id]?.prompt.length ? undefined : event.message_ids;
+  run_started: (state, event, envelope, now) => {
+    const run = state.runs[event.run_id];
+    const first = run?.prompt.length ? undefined : event.message_ids;
     const { actor } = envelope;
+    // A new turn's start, or a run's first, starts its live output over; one the welcome seeded
+    // from the server's list of running runs may have taken frames already, which it keeps.
+    const seeded = run !== undefined && run.started === 0 && run.status === "running";
     return withRun(state, event.run_id, {
       threadId: event.thread_id,
       status: "running",
       started: envelope.seq,
       startedAt: envelope.ts,
+      ...(!seeded && { text: "", live: fresh(now) }),
       ...(first && { prompt: first }),
       ...(actor.kind === "agent" &&
         actor.on_behalf_of?.kind === "user" && {
@@ -331,8 +431,8 @@ const handlers: Handlers = {
         }),
     });
   },
-  tool_called: (state, event, envelope) =>
-    withRun(state, event.run_id, {
+  tool_called: (state, event, envelope, now) =>
+    withRun(withLive(state, event.run_id, running(event.tool_name, now)), event.run_id, {
       tools: {
         ...state.runs[event.run_id]?.tools,
         [event.tool_call_id]: {
@@ -346,9 +446,9 @@ const handlers: Handlers = {
         },
       },
     }),
-  tool_returned: (state, event, envelope) => {
+  tool_returned: (state, event, envelope, now) => {
     const called = state.runs[event.run_id]?.tools[event.tool_call_id];
-    return withRun(state, event.run_id, {
+    return withRun(withLive(state, event.run_id, returned(now)), event.run_id, {
       tools: {
         ...state.runs[event.run_id]?.tools,
         [event.tool_call_id]: {
@@ -363,18 +463,18 @@ const handlers: Handlers = {
       },
     });
   },
-  run_paused: (state, event, envelope) => {
+  run_paused: (state, event, envelope, now) => {
     const asked = event.requests
       .filter((request) => request.tool_name === ASK_USER)
       .map((request) => ({ request, seq: envelope.seq, answer: null }));
-    return withRun(state, event.run_id, {
+    return withRun(withLive(state, event.run_id, returned(now, true)), event.run_id, {
       status: "paused",
       requests: event.requests,
       answered: [],
       questions: [...(state.runs[event.run_id]?.questions ?? []), ...asked],
     });
   },
-  deferred_answered: (state, event, envelope) => {
+  deferred_answered: (state, event, envelope, now) => {
     const run = state.runs[event.run_id];
     const asked = run?.requests ?? [];
     const requests = asked.filter((request) => request.tool_call_id !== event.tool_call_id);
@@ -392,19 +492,26 @@ const handlers: Handlers = {
           ? { ...question, answer }
           : question,
       ),
-      ...(resumes && { status: "running" }),
+      // The reply comes from the turn that resumes, not from the words before the question.
+      ...(resumes && { status: "running", text: "", live: fresh(now) }),
     });
   },
-  run_ended: (state, event, envelope) =>
-    withRun(state, event.run_id, {
+  run_ended: (state, event, envelope, now) => {
+    const run = state.runs[event.run_id];
+    // A run that completed posted its reply; one that failed, or was stopped, keeps what it
+    // had streamed, and its thinking, until the page is left: neither is kept anywhere else.
+    const kept = event.status !== "completed";
+    return withRun(state, event.run_id, {
       status: event.status,
-      text: "",
+      text: kept ? (run?.text ?? "") : "",
+      ...(run && { live: { ...run.live, thinking: kept ? run.live.thinking : "", at: now } }),
       requests: [],
       answered: [],
       ended: envelope.seq,
       error: event.error ?? null,
       reason: event.reason ?? null,
-    }),
+    });
+  },
   feedback_given: (state, event, envelope) => {
     const feedback: Feedback = {
       actor: envelope.actor,
@@ -456,7 +563,7 @@ export function isKnown(event: v1.Event): event is Known {
 }
 
 /** The state after one event. */
-export function apply(state: Workspace, envelope: v1.EventFrame): Workspace {
+export function apply(state: Workspace, envelope: v1.EventFrame, now = Date.now()): Workspace {
   const { event } = envelope;
   if (!isKnown(event)) {
     return state;
@@ -467,17 +574,155 @@ export function apply(state: Workspace, envelope: v1.EventFrame): Workspace {
     state: Workspace,
     event: Known,
     envelope: v1.EventFrame,
+    now: number,
   ) => Workspace;
-  return handler(state, event, envelope);
+  return handler(state, event, envelope, now);
 }
 
-/** The state after a live frame: a run's text grows with each text delta. */
-function live(state: Workspace, frame: v1.Server): Workspace {
-  if (frame.type !== "live" || frame.event.type !== "text_delta") {
+/** A tool's call is on the log, its arguments complete: the tool runs, beside any already. */
+const running = (tool: string, now: number) => (live: Live) =>
+  phased(live, "tool", now, { tool, calls: live.calls + 1 });
+
+/**
+ * A tool returned: the model is waited on again once none runs; or the run paused, which ends
+ * its calls.
+ */
+const returned =
+  (now: number, all = false) =>
+  (live: Live) => {
+    const calls = all ? 0 : Math.max(0, live.calls - 1);
+    return calls > 0
+      ? { ...live, calls, at: now }
+      : phased(live, "starting", now, { tool: null, calls: 0, argsChars: 0 });
+  };
+
+/**
+ * The state after a live frame, at `now`: a running run's text grows with each text delta, its
+ * thinking with each thinking delta, and its phase follows the parts the model starts, or the
+ * deltas where their part's start was lost. A part whose index is at or below the last part's
+ * begins a new response, whose first text part replaces the text: what the model wrote before a
+ * tool call isn't the reply. Text after the reply was posted is late, and isn't kept. Frames for
+ * a run the store doesn't hold, or one not running, change nothing. The server keeps a run's
+ * last 1,024 frames: a replay of a longer run is short its start, which the first frame shows.
+ */
+export function applyLive(state: Workspace, frame: v1.Server, now: number): Workspace {
+  if (frame.type !== "live") {
     return state;
   }
   const run = state.runs[frame.run_id];
-  return run ? withRun(state, frame.run_id, { text: run.text + frame.event.delta }) : state;
+  if (run?.status !== "running") {
+    return state;
+  }
+  const { event } = frame;
+  // The first frame after a welcome that isn't a part's start: the start of what streamed was
+  // lost before the replay.
+  const live: Live = run.live.framed
+    ? run.live
+    : {
+        ...run.live,
+        framed: true,
+        truncated: run.live.truncated || event.type !== "part_started",
+      };
+  const more = (chars: number): Partial<Live> => ({ outputChars: live.outputChars + chars });
+  switch (event.type) {
+    case "part_started": {
+      // A part at or below the last begins a new response; so does one after text whose own
+      // part's start was lost, as what response that was isn't known.
+      const again = live.part === null ? live.reply === "writing" : event.part <= live.part;
+      const reply = again || live.reply === "posted" ? "pending" : live.reply;
+      // Whatever its kind, it is now the last part, which the next is numbered after.
+      const next: Live = { ...live, part: event.part, reply };
+      switch (event.part_kind) {
+        case "text": {
+          const replaces = reply !== "writing";
+          return withRun(state, run.id, {
+            text: replaces ? "" : run.text,
+            live: phased(next, "writing", now, {
+              reply: "writing",
+              truncated: replaces ? false : live.truncated,
+            }),
+          });
+        }
+        case "thinking":
+          return withRun(state, run.id, { live: phased(next, "thinking", now) });
+        case "tool_call":
+          return withRun(state, run.id, {
+            live: phased(next, "tool", now, {
+              // Text before a tool call is what the model said it would do, not the reply.
+              reply: reply === "writing" && run.text !== "" ? "stale" : reply,
+              tool: event.tool_name ?? null,
+              argsChars: 0,
+            }),
+          });
+        default:
+          return withRun(state, run.id, { live: { ...next, at: now } });
+      }
+    }
+    case "text_delta": {
+      if (live.reply === "posted") {
+        return withLive(state, run.id, () => ({ ...live, at: now }));
+      }
+      const [cut, text] = appended(run.text, event.delta);
+      return withRun(state, run.id, {
+        text,
+        live: phased(live, "writing", now, {
+          ...more(event.delta.length),
+          reply: "writing",
+          truncated: live.truncated || cut,
+        }),
+      });
+    }
+    case "thinking_delta": {
+      const [cut, thinking] = appended(live.thinking, event.delta);
+      return withLive(state, run.id, () =>
+        phased(live, "thinking", now, {
+          ...more(event.delta.length),
+          thinking,
+          truncated: live.truncated || cut,
+        }),
+      );
+    }
+    case "tool_args_delta":
+      return withLive(state, run.id, () =>
+        phased(live, "tool", now, {
+          ...more(event.delta.length),
+          argsChars: live.argsChars + event.delta.length,
+        }),
+      );
+    case "part_ended":
+      // A thinking part's time is counted as it ends; the next part says what comes next.
+      return withLive(state, run.id, () =>
+        live.phase === "thinking"
+          ? phased(live, "starting", now, {
+              thoughtMs: live.thoughtMs === null ? null : live.thoughtMs + (now - live.since),
+            })
+          : { ...live, at: now },
+      );
+    default:
+      return state;
+  }
+}
+
+/**
+ * The state as a connection is welcomed again: every running run's live output starts over, as
+ * the server replays what it has of each, so nothing streamed shows twice; and a run the server
+ * says is running that the store doesn't hold yet, as before the replay reaches its start or
+ * when the store joins at the head, is held from here, so its frames aren't dropped. What a
+ * thinking part took before the welcome isn't known any more.
+ */
+export function applyWelcome(state: Workspace, frame: v1.Server, now = Date.now()): Workspace {
+  const active = frame.type === "welcome" ? (frame.active_runs ?? []) : [];
+  const seeded = active.reduce(
+    (next, run) => withRun(next, run.run_id, { threadId: run.thread_id, status: "running" }),
+    state,
+  );
+  return Object.values(seeded.runs).reduce(
+    (next, run) =>
+      run.status === "running"
+        ? withRun(next, run.id, { text: "", live: fresh(now, { thoughtMs: null }) })
+        : next,
+    seeded,
+  );
 }
 
 function classify(frame: v1.Server): Classified<v1.Server, v1.CommandResult> {
@@ -521,7 +766,8 @@ export const artifactr: Protocol<Workspace, v1.Server, v1.Command, v1.CommandRes
   initial: () => ({ threads: {}, artifacts: {}, proposals: {}, runs: {} }),
   classify,
   apply,
-  other: live,
+  other: (state, frame) => applyLive(state, frame, Date.now()),
+  welcome: (state, frame) => applyWelcome(state, frame),
   creates: (command) => createdId(command) != null,
 };
 

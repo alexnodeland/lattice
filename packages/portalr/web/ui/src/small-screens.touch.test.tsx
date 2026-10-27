@@ -8,6 +8,7 @@ import { useState } from "react";
 import { expect, test, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
+import { AccountMenu } from "./account-menu";
 import { Button } from "./button";
 import { ComposerDock } from "./composer-dock";
 import { Dialog } from "./dialog";
@@ -284,3 +285,53 @@ test("a flick down closes the sheet though it went a short way", async () => {
   el.dispatchEvent(pe("pointerup", 540));
   await expect.poll(() => onChange.mock.calls.at(-1)?.[0]).toBe(false);
 });
+
+function Floating() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="p-4">
+      <Menu label="Thread actions" items={[{ label: "Share…", onSelect: vi.fn() }]} />
+      <AccountMenu
+        name="alice"
+        appearance="system"
+        colourBlind={false}
+        onColourBlind={vi.fn()}
+        onAppearance={vi.fn()}
+        onSignOut={vi.fn()}
+      />
+      <Popover
+        label="Attach files"
+        open={open}
+        onOpenChange={setOpen}
+        trigger={<Button variant="ghost">Attach</Button>}
+      >
+        <TextField label="File" />
+      </Popover>
+    </div>
+  );
+}
+
+for (const [what, trigger, role] of [
+  ["a menu", "Thread actions", "menu"],
+  ["the account menu", /^Account/, "menu"],
+  ["a popover", "Attach", "dialog"],
+] as const) {
+  test(`${what} as a sheet follows the finger, and springs back when let go short`, async () => {
+    const screen = await render(<Floating />);
+    await screen.getByRole("button", { name: trigger }).click();
+    const popup = screen.getByRole(role);
+    await expect.element(popup).toBeVisible();
+    const el = popup.element() as HTMLElement;
+    await armed(el);
+    await expect.poll(() => Math.round(el.getBoundingClientRect().bottom)).toBe(window.innerHeight);
+    const rest = el.getBoundingClientRect().top;
+    (el.querySelector("[data-sheet-handle]") as HTMLElement).dispatchEvent(pe("pointerdown", 600));
+    el.dispatchEvent(pe("pointermove", 620));
+    expect(Math.round(el.getBoundingClientRect().top - rest)).toBe(20);
+    // Let go slowly, well short of a third of even a short menu: no flick, no close.
+    await settle(150);
+    el.dispatchEvent(pe("pointerup", 620));
+    await expect.poll(() => Math.round(el.getBoundingClientRect().top)).toBe(Math.round(rest));
+    await expect.element(screen.getByRole(role)).toBeVisible();
+  });
+}

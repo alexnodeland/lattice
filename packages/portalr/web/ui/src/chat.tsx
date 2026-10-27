@@ -868,8 +868,12 @@ function Question({
   if (request.kind === "approval") {
     const args = Object.keys(request.args ?? {}).length > 0;
     // A phone's thumb bar mirrors Approve (portalr ADR-0082) only where there is nothing to
-    // review first: an approval with code or a risk is read before it is given.
-    const plain = !request.review?.code && !request.review?.risk;
+    // review first: an approval with anything to read beyond the app's name is read before it is
+    // given, never a press away on the bar.
+    const plain = Object.entries(request.review ?? {}).every(
+      ([key, value]) =>
+        key === "app" || value == null || (Array.isArray(value) && value.length === 0),
+    );
     return (
       <section className={cn(card, ASKING)} aria-label={`Approve ${request.tool_name}?`}>
         <p>

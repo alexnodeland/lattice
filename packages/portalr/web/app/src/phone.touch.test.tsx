@@ -114,18 +114,37 @@ test("a plain approval's bar mirrors Approve", async () => {
   await expect.poll(() => bar()?.textContent).toContain("Approve");
 });
 
-test("an approval with something to review first is never mirrored: it is read before it is given", async () => {
+for (const [what, review] of [
+  ["code and a risk", { app: "FreeCAD", risk: "network", code: "import os\nos.system('curl x')" }],
+  ["what it holds", { app: "FreeCAD", holds: ["a document"] }],
+  ["findings", { app: "FreeCAD", findings: ["reads a file"] }],
+] as const) {
+  test(`an approval with ${what} to review first is never mirrored: it is read before it is given`, async () => {
+    await page.viewport(390, 844);
+    const { screen } = await open(
+      "/t/acme/w/notes/threads/thr_1",
+      serve,
+      () => null,
+      APPROVAL(review),
+    );
+    await expect.element(screen.getByRole("button", { name: "Approve" })).toBeInTheDocument();
+    window.scrollTo(0, 0);
+    await new Promise((settled) => setTimeout(settled, 300));
+    expect(bar()).toBeNull();
+  });
+}
+
+test("an approval that names its app alone is plain: mirrored", async () => {
   await page.viewport(390, 844);
   const { screen } = await open(
     "/t/acme/w/notes/threads/thr_1",
     serve,
     () => null,
-    APPROVAL({ app: "FreeCAD", risk: "network", code: "import os\nos.system('curl x')" }),
+    APPROVAL({ app: "FreeCAD" }),
   );
   await expect.element(screen.getByRole("button", { name: "Approve" })).toBeInTheDocument();
   window.scrollTo(0, 0);
-  await new Promise((settled) => setTimeout(settled, 300));
-  expect(bar()).toBeNull();
+  await expect.poll(() => bar()?.textContent).toContain("Approve");
 });
 
 test("on a small phone the composer's row, bar and all, takes at most a quarter of the window", async () => {
@@ -179,9 +198,13 @@ test("the composer's dock rises by what the on-screen keyboard covers, and the p
   await expect
     .poll(() => document.documentElement.style.getPropertyValue("--keyboard-inset"))
     .toBe("0px");
+  const clear = Number.parseFloat(getComputedStyle(dock()).paddingBottom);
   viewport.height = window.innerHeight - 300;
   viewport.dispatchEvent(new Event("resize"));
   await expect.poll(() => getComputedStyle(dock()).bottom).toBe("300px");
+  // The home indicator's room goes with the keyboard: the dock keeps only its own padding.
+  expect(Number.parseFloat(getComputedStyle(dock()).paddingBottom)).toBeLessThanOrEqual(clear);
+  expect(getComputedStyle(dock()).paddingBottom).toBe("16px");
   expect(bottom(dock())).toBeLessThanOrEqual(window.innerHeight - 300);
   await expect.element(screen.getByRole("button", { name: "Send" })).toBeVisible();
   noneWider();

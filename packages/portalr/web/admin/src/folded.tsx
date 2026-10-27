@@ -99,16 +99,20 @@ export function Folded({
     held.className = "contents";
     return held;
   });
+  // Opened by its button, the form's first field takes the focus; the page's own focus wins.
+  const [byButton, setByButton] = useState(false);
+  const focusFirst = () =>
+    body.querySelector<HTMLElement>("input, select, textarea, [role=combobox], button")?.focus();
   const hold = (node: HTMLElement | null) => {
     if (node && body.parentNode !== node) {
       node.append(body);
     }
   };
-  // Opened by its button, the form's first field takes the focus; the page's own focus wins.
-  const [byButton, setByButton] = useState(false);
+  // In the card, which mounts with the form; in the sheet, which mounts a render later, the
+  // dialog itself focuses its first field, and remembers the button to come back to.
   useEffect(() => {
-    if (shown && byButton && !heading) {
-      body.querySelector<HTMLElement>("input, select, textarea, [role=combobox], button")?.focus();
+    if (shown && byButton && !heading && body.isConnected) {
+      focusFirst();
     }
   }, [shown, byButton, heading, body]);
   const closeOnEscape = (event: KeyboardEvent<HTMLDivElement>) => {

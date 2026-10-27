@@ -46,8 +46,7 @@
   width: auto;
   max-width: 36rem;
   margin-inline: auto;
-  /* The drag's offset, which the touch module sets, so its place is never fought. */
-  translate: 0 var(--sheet-drag, 0px);
+  translate: none;
   transform: none;
   z-index: 50;
 }
@@ -68,6 +67,8 @@
   padding-inline: max(var(--dialog-pad), env(safe-area-inset-left))
     max(var(--dialog-pad), env(safe-area-inset-right));
   padding-bottom: calc(var(--dialog-pad) + env(safe-area-inset-bottom));
+  /* The drag's offset, which the touch module sets on the popup, so its place is never fought. */
+  translate: 0 var(--sheet-drag, 0px);
   transition-property: translate;
   &[data-starting-style],
   &[data-ending-style] {
@@ -188,6 +189,10 @@
   }
   [data-composer-dock] {
     padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+  }
+  /* The keyboard up (`keyboardInset`) covers the home indicator: nothing to keep clear. */
+  :root[data-keyboard] [data-composer-dock] {
+    padding-bottom: var(--space-4);
   }
   [data-frame-drawer] {
     padding-top: calc(var(--space-3) + env(safe-area-inset-top));

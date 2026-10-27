@@ -2,6 +2,7 @@ import { allowedIn, keys, Refused, thumbs, useMe, workspaceOf } from "@portalr/c
 import { changes } from "@portalr/client/diff";
 import {
   ActionsMenu,
+  Ago,
   AppHostContext,
   ArtifactContent,
   ButtonLink,
@@ -126,30 +127,34 @@ function Artifact() {
   const open = Object.values(snapshot.state.proposals).filter(
     (proposal) => proposal.status === "open" && proposedOn(proposal) === id,
   );
-  const feedback = allowed.has("artifactr:give_feedback") && (
+  const feedback = allowed.has("artifactr:give_feedback");
+  // Its id is in the overflow, to copy, not in the line under its title (portalr ADR-0085).
+  const actions = (
     <ActionsMenu
       label="Artifact actions"
+      items={[{ label: "Copy id", onSelect: () => void navigator.clipboard.writeText(id) }]}
       given={thumbs(
         (snapshot.state.artifacts[id]?.feedback ?? []).filter(
           (given) => given.version === latest.version,
         ),
         me,
       )}
-      onThumbs={(up, comment) =>
-        stream.send({
-          type: "give_feedback",
-          feedback_type: "thumbs",
-          target: { kind: "artifact", artifact_id: id, version: latest.version },
-          value: comment === null ? { up } : { up, comment },
-        })
-      }
+      {...(feedback && {
+        onThumbs: (up: boolean, comment: string | null) =>
+          stream.send({
+            type: "give_feedback",
+            feedback_type: "thumbs",
+            target: { kind: "artifact", artifact_id: id, version: latest.version },
+            value: comment === null ? { up } : { up, comment },
+          }),
+      })}
     />
   );
   return (
     <section
       aria-labelledby="artifact"
       data-portalr-replay="block"
-      className="flex max-w-190 flex-col gap-6"
+      className="mx-auto flex w-full max-w-190 flex-col gap-6"
     >
       <PageHeader
         id="artifact"
@@ -167,15 +172,20 @@ function Artifact() {
             ),
           },
         ]}
-        meta={[
-          title === null ? null : id,
-          latest.kind,
-          `version ${latest.version}`,
-          latest.archived ? "archived" : null,
-        ]
-          .filter(Boolean)
-          .join(", ")}
-        actions={feedback}
+        meta={
+          <>
+            <span className="first-letter:uppercase inline-block">{latest.kind}</span>
+            {` · v${latest.version}`}
+            {latest.at && (
+              <>
+                {" · "}
+                <Ago at={latest.at} />
+              </>
+            )}
+            {latest.archived && " · archived"}
+          </>
+        }
+        actions={actions}
       />
       <Connection snapshot={snapshot} onReconnect={stream.reconnect} waiting="the workspace" />
       <Card>

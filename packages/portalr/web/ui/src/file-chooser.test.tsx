@@ -31,7 +31,7 @@ test("a file is chosen through its labelled input, described with how else to gi
   await expect.element(input).toHaveAttribute("accept", ".docx");
   await expect
     .element(input)
-    .toHaveAccessibleDescription("The file you saved, up to 25 MB. Or drop it here.");
+    .toHaveAccessibleDescription("Or drop it here · The file you saved, up to 25 MB.");
   await input.upload(new File(["x"], "brief.docx"));
   expect(chosen).toEqual(["brief.docx"]);
   expect(await axeViolations(screen.container)).toEqual([]);
@@ -59,7 +59,7 @@ test("with several allowed, each file chosen or dropped is given in turn", async
   );
   const input = screen.getByLabelText("Upload files");
   await expect.element(input).toHaveAttribute("multiple");
-  await expect.element(input).toHaveAccessibleDescription("Or drop them here.");
+  await expect.element(input).toHaveAccessibleDescription("Or drop them here");
   await input.upload([new File(["a"], "one.docx"), new File(["b"], "two.pdf")]);
   drop(screen.container.firstElementChild as Element, new File(["c"], "three.docx"));
   expect(chosen).toEqual(["one.docx", "two.pdf", "three.docx"]);
@@ -102,10 +102,10 @@ test("the browser's own control isn't drawn: a kit button stands for it, shows i
     <FileChooser label="Upload files" multiple onFile={() => undefined} />,
   );
   const input = screen.getByLabelText("Upload files");
-  // Named by its label, and by the button's words, which are its second label.
-  await expect.element(input).toHaveAccessibleName("Upload files Choose files");
+  // Named by its label, which is the kit button that stands for it (portalr ADR-0085).
+  await expect.element(input).toHaveAccessibleName("Upload files");
   expect(input.element().getBoundingClientRect().width).toBeLessThanOrEqual(1);
-  const button = screen.getByText("Choose files");
+  const button = screen.getByText("Upload files");
   await expect.element(button).toBeVisible();
   expect(button.element().getAttribute("for")).toBe(input.element().id);
   await userEvent.tab();
@@ -123,7 +123,7 @@ test("the kit button opens the input, and says a file where one is chosen", asyn
     opened += 1;
     event.preventDefault();
   });
-  await screen.getByText("Choose a file").click();
+  await screen.getByText("The edited file").click();
   expect(opened).toBe(1);
 });
 
@@ -131,7 +131,7 @@ test("a disabled chooser's button keeps its disabled look under the pointer", as
   const screen = await render(
     <FileChooser label="The edited file" disabled onFile={() => undefined} />,
   );
-  const button = screen.getByText("Choose a file");
+  const button = screen.getByText("The edited file");
   await button.hover();
   expect(getComputedStyle(button.element()).backgroundColor).toBe(token("line"));
 });
@@ -143,7 +143,22 @@ test("under forced colours the button still shows the input's focus", async () =
     <FileChooser label="Upload files" multiple onFile={() => undefined} />,
   );
   await userEvent.tab();
-  expect(getComputedStyle(screen.getByText("Choose files").element()).outlineStyle).not.toBe(
+  expect(getComputedStyle(screen.getByText("Upload files").element()).outlineStyle).not.toBe(
     "none",
   );
+});
+
+test("which files are taken is folded under Supported files, out of the way of the zone", async () => {
+  const screen = await render(
+    <FileChooser
+      label="Upload files"
+      multiple
+      hint="up to 26 MB"
+      types=".docx, .pdf, up to 26 MB each."
+      onFile={() => undefined}
+    />,
+  );
+  await expect.element(screen.getByText(/\.docx, \.pdf/)).not.toBeVisible();
+  await screen.getByRole("button", { name: "Supported files" }).click();
+  await expect.element(screen.getByText(/\.docx, \.pdf/)).toBeVisible();
 });

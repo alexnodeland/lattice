@@ -101,6 +101,12 @@ test("a revision's words are compared when asked", async () => {
     fetched.mock.calls.filter(([input]) =>
       new URL((input as Request).url).pathname.endsWith("/text"),
     ).length;
+  // The revisions are closed until one is opened (portalr ADR-0085).
+  await screen
+    .getByRole("list", { name: "Revisions" })
+    .getByRole("button", { name: /^Version/ })
+    .first()
+    .click();
   const disclosure = screen.getByText("Changes to its words");
   await expect.element(disclosure).toBeVisible();
   expect(asked()).toBe(0);

@@ -5,13 +5,15 @@ import {
   ButtonLink,
   ConfirmDialog,
   CRUMB,
+  Disclosure,
   NotFound as NotFoundPage,
   PageHeader,
+  StatusBadge,
   TextField,
 } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
-import { useActionState, useMemo, useState } from "react";
+import { Fragment, type ReactNode, useActionState, useMemo, useState } from "react";
 import { read } from "../../../../../../../rules";
 
 const ACTIONS = ["reflexr:update_rule", "reflexr:archive_rule"] as const;
@@ -56,6 +58,53 @@ export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/rules/$rul
   notFoundComponent: NotFound,
   component: RulePage,
 });
+
+/** A value of a rule's, as one line of its JSON. */
+const line = (value: unknown) => JSON.stringify(value);
+
+/**
+ * What a rule says, as a person reads it (portalr ADR-0085): when, then, over what, and how it
+ * retries, ahead of its JSON. Each is one line; a value with no words of its own is its JSON.
+ */
+function Summary({ rule }: { rule: Record<string, unknown> }) {
+  const then = rule.then as { action?: string; params?: Record<string, unknown> } | undefined;
+  const scope = (rule.scope as { fields?: string[] } | undefined)?.fields ?? [];
+  const retry = rule.retry as { max_attempts?: number } | undefined;
+  const parts: [string, ReactNode][] = [
+    [
+      "When",
+      <code key="when" className="break-all font-mono text-xs">
+        {line(rule.when)}
+      </code>,
+    ],
+    [
+      "Then",
+      <code key="then" className="font-mono text-xs">
+        {then?.action}
+        {then?.params && Object.keys(then.params).length > 0 && ` ${line(then.params)}`}
+      </code>,
+    ],
+    ["For each", scope.length > 0 ? scope.join(", ") : "the whole workspace"],
+    ["Retries", `up to ${retry?.max_attempts ?? 5} attempts`],
+    ["Starts", rule.start === "beginning" ? "from the log's beginning" : "from now on"],
+  ];
+  return (
+    <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 rounded-(--card-radius) border border-line bg-surface p-(--card-pad) text-sm">
+      {parts.map(([term, said]) => (
+        <Fragment key={term}>
+          <dt className="text-muted">{term}</dt>
+          <dd className="min-w-0 break-words">{said}</dd>
+        </Fragment>
+      ))}
+      <dt className="text-muted">State</dt>
+      <dd>
+        <StatusBadge tone={rule.enabled === false ? "stopped" : "done"}>
+          {rule.enabled === false ? "Disabled" : "Enabled"}
+        </StatusBadge>
+      </dd>
+    </dl>
+  );
+}
 
 /** A rule as its editor starts: indented JSON. */
 const shown = (rule: unknown) => `${JSON.stringify(rule, null, 2)}\n`;
@@ -117,11 +166,10 @@ function RulePage() {
 
   const stored = held.origin === "stored";
   return (
-    <section aria-labelledby="rule" className="flex max-w-190 flex-col gap-6">
+    <section aria-labelledby="rule" className="mx-auto flex w-full max-w-190 flex-col gap-6">
       <PageHeader
         id="rule"
         title={name}
-        mono
         breadcrumbs={[
           {
             label: "Rules",
@@ -157,6 +205,7 @@ function RulePage() {
       />
       {unarchived && <Alert tone="error">{unarchived}</Alert>}
       <p>{held.rule.description || "No description."}</p>
+      <Summary rule={held.rule as Record<string, unknown>} />
       {stored && allowed.has("reflexr:update_rule") ? (
         <form aria-label="Edit the rule" className="flex flex-col gap-2" action={save}>
           {current > base && (
@@ -189,11 +238,12 @@ function RulePage() {
           </Button>
         </form>
       ) : (
-        <section aria-label="The rule, as reflexr's JSON">
-          <pre className="whitespace-pre-wrap break-words rounded-(--card-radius) border border-line bg-surface p-4 font-mono text-sm">
+        // Its JSON, folded until asked (portalr ADR-0085).
+        <Disclosure summary="The rule, as reflexr's JSON">
+          <pre className="whitespace-pre-wrap break-words rounded-(--card-radius) border border-line bg-surface p-4 font-mono text-xs">
             {shown(held.rule)}
           </pre>
-        </section>
+        </Disclosure>
       )}
     </section>
   );

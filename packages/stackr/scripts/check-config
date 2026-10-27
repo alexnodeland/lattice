@@ -190,6 +190,13 @@ OPEN_GUARDRAILS = {
 }
 GUARDRAIL_MODES = {"pre_call", "post_call", "during_call", "logging_only"}
 ENV_REF = re.compile(r"^os\.environ/(\w+)$")
+# The prompt-cache breakpoints the Anthropic groups carry (ADR-0054), in LiteLLM's order: earlier
+# points win when Anthropic's four are scarce.
+CACHE_POINTS = [
+    {"location": "message", "role": "system"},
+    {"location": "message", "index": -2},
+    {"location": "message", "index": -1},
+]
 
 
 def check_litellm() -> list[str]:
@@ -212,6 +219,23 @@ def check_litellm() -> list[str]:
             problems.append(f"groups/{name}.yaml holds more than a model_list")
         if not {"default", "fast"} <= {entry["model_name"] for entry in chosen["model_list"]}:
             problems.append(f"groups/{name}.yaml doesn't define both default and fast")
+    # Prompt-cache breakpoints (ADR-0054) on the Anthropic groups, the system prompt and the last
+    # two messages, and on no other deployment, which may reject the field.
+    for name, chosen in groups.items():
+        for entry in chosen["model_list"]:
+            params = entry.get("litellm_params") or {}
+            points = params.get("cache_control_injection_points")
+            if str(params.get("model", "")).startswith("anthropic/"):
+                if points != CACHE_POINTS:
+                    problems.append(
+                        f"groups/{name}.yaml's {entry['model_name']!r} needs the prompt-cache "
+                        "breakpoints: the system prompt and the last two messages"
+                    )
+            elif points is not None:
+                problems.append(
+                    f"groups/{name}.yaml's {entry['model_name']!r} isn't Anthropic, so it gets "
+                    "no cache_control_injection_points"
+                )
     entries = config.get("model_list", []) + [
         entry for chosen in groups.values() for entry in chosen.get("model_list", [])
     ]

@@ -1,12 +1,35 @@
 # The model groups, on the providers' models in config.yaml: what applications
 # ask for. A group can hold several deployments, which the router balances; on
 # errors it falls back to the groups in config.yaml's router_settings.fallbacks.
+#
+# The Anthropic groups get prompt-cache breakpoints from the gateway (ADR-0054):
+# the OpenAI-compatible clients that call it never send Anthropic's
+# cache_control, so without these every request pays full input. The system
+# prompt, and the last two messages, so a multi-turn agent loop reads the
+# conversation so far from the cache and writes only the newest turn. Three of
+# Anthropic's four breakpoints; LiteLLM skips a point past the fourth, counting
+# any the client set. Only on Anthropic deployments: other providers, and the
+# upstream groups, cache their own way or reject the field.
 model_list:
   - model_name: default
     litellm_params:
       model: anthropic/claude-sonnet-4-6
       api_key: os.environ/ANTHROPIC_API_KEY
+      cache_control_injection_points:
+        - location: message
+          role: system
+        - location: message
+          index: -2
+        - location: message
+          index: -1
   - model_name: fast
     litellm_params:
       model: anthropic/claude-haiku-4-5-20251001
       api_key: os.environ/ANTHROPIC_API_KEY
+      cache_control_injection_points:
+        - location: message
+          role: system
+        - location: message
+          index: -2
+        - location: message
+          index: -1

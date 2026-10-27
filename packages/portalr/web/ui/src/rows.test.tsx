@@ -2,7 +2,8 @@ import { expect, onTestFinished, test } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { RunStatus } from "./chat";
-import { Row, RowLink, Rows } from "./rows";
+import { glyphs } from "./icons";
+import { Row, RowLink, Rows, TrackLink, Tracks } from "./rows";
 import { contrast, token } from "./test/colours";
 
 test("rows are a named list, each row's link named by its words alone", async () => {
@@ -272,4 +273,25 @@ test("a row whose name is a link and whose end is empty shows the kit's chevron;
   expect(getComputedStyle(chevron(rows[0] as Element) as Element).display).toBe("block");
   expect(chevron(rows[1] as Element)).toBeNull();
   expect(getComputedStyle(chevron(rows[2] as Element) as Element).display).toBe("none");
+});
+
+test("a track of ways on: each link named by its word, which a phone's width leaves to its glyph", async () => {
+  onTestFinished(() => page.viewport(414, 896));
+  await page.viewport(1280, 800);
+  const screen = await render(
+    <Tracks label="main's areas">
+      <TrackLink icon={glyphs.play} render={<a href="#runs" />}>
+        Runs
+      </TrackLink>
+      <TrackLink icon={glyphs.zap} render={<a href="#rules" />}>
+        Rules
+      </TrackLink>
+    </Tracks>,
+  );
+  const nav = screen.getByRole("navigation", { name: "main's areas" });
+  await expect.element(nav.getByRole("link", { name: "Runs" })).toBeVisible();
+  await expect.element(nav.getByText("Rules")).toBeVisible();
+  await page.viewport(390, 800);
+  await expect.element(nav.getByText("Rules")).not.toBeVisible();
+  await expect.element(nav.getByRole("link", { name: "Rules" })).toBeVisible();
 });

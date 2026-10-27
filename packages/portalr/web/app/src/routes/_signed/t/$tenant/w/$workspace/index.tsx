@@ -12,6 +12,7 @@ import {
   RowLink,
   Rows,
   RunStatus,
+  SearchField,
   SectionTitle,
   SegmentedFilter,
   StatusBadge,
@@ -161,14 +162,11 @@ function Threads() {
     ? shown.filter((thread) => (thread.title || "Untitled").toLocaleLowerCase().includes(words))
     : shown;
   const finding = all.length > 0 && (
-    <div className="flex flex-wrap items-end gap-3">
-      <TextField
-        type="search"
+    <div className="flex flex-wrap items-center gap-3">
+      <SearchField
         label="Search threads"
         value={typed}
         onChange={(event) => setTyped(event.currentTarget.value)}
-        autoComplete="off"
-        enterKeyHint="search"
         className="min-w-48 flex-1"
       />
       <SegmentedFilter<Shown>
@@ -186,22 +184,28 @@ function Threads() {
   // Shown whatever the connection's state, so words kept through its closing stay in view, to
   // send once it is connected again or to copy; disabled until it is live.
   const starting = (
-    <div className="flex flex-col gap-2">
-      <Composer disabled={!live} onSend={write} keep />
-      <div className="flex flex-wrap items-end gap-2">
-        {naming ? (
-          <form className="flex flex-wrap items-end gap-2" action={start}>
-            <TextField label="New thread" name="title" error={refused} required autoFocus />
-            <Button type="submit" disabled={!live} pending={pending}>
-              Start
+    <div className="flex flex-col gap-3">
+      <Composer
+        disabled={!live}
+        onSend={write}
+        keep
+        attach={
+          // A quieter way in, inside the composer's row (portalr ADR-0085): name it, then start it.
+          !naming && (
+            <Button variant="ghost" size="sm" disabled={!live} onClick={() => setNaming(true)}>
+              Name it first…
             </Button>
-          </form>
-        ) : (
-          <Button variant="secondary" size="sm" disabled={!live} onClick={() => setNaming(true)}>
-            Name it first…
+          )
+        }
+      />
+      {naming && (
+        <form className="flex flex-wrap items-end gap-2" action={start}>
+          <TextField label="New thread" name="title" error={refused} required autoFocus />
+          <Button type="submit" disabled={!live} pending={pending}>
+            Start
           </Button>
-        )}
-      </div>
+        </form>
+      )}
     </div>
   );
   return (
@@ -216,9 +220,7 @@ function Threads() {
         <section aria-labelledby="needs-you" className="flex flex-col gap-3">
           <SectionTitle id="needs-you">
             Needs you{" "}
-            <span className="font-mono font-normal text-muted text-sm tabular-nums">
-              {needed.length}
-            </span>
+            <span className="font-normal text-muted text-sm tabular-nums">{needed.length}</span>
           </SectionTitle>
           <Rows label="Needs you">
             {needed.map(({ request, thread, title, question, risk }) => (
@@ -284,14 +286,15 @@ function Threads() {
                   )
                 }
                 name={
-                  <span className="relative block ps-4">
-                    {/* Unread: a mark in the working colour in a slot at the row's start, kept so
-                        read and unread titles line up (portalr ADR-0081). */}
+                  <span className="block">
+                    {/* Unread: a mark in the working colour in the row's own start padding, at the
+                        row's middle, so the title and the line under it share one left edge
+                        (portalr ADR-0085). */}
                     {seen[thread.id] !== undefined && thread.active > (seen[thread.id] ?? 0) && (
                       <span
                         role="img"
                         aria-label="Moved since you read it"
-                        className="absolute start-0 top-1/2 size-2 -translate-y-1/2 rounded-full bg-accent forced-color-adjust-none forced-colors:bg-system-text"
+                        className="absolute left-2 top-1/2 size-2 -translate-y-1/2 rounded-full bg-accent forced-color-adjust-none forced-colors:bg-system-text"
                       />
                     )}
                     <RowLink

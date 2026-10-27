@@ -114,6 +114,12 @@ def test_feedback_becomes_scores_on_the_traces_it_is_about(
         rated = command(type="give_feedback", **rating)
         assert rated["ok"], rated
         expected["rating.stars"] = (4, "NUMERIC", "rating")
+{%- if use_portal %}
+        # The portal's thumbs on the same turn: a yes or no, as the UI sends it.
+        thumbs = {"feedback_type": "thumbs", "target": target, "value": {"up": True}}
+        assert command(type="give_feedback", **thumbs)["ok"]
+        expected["thumbs.up"] = (1, "BOOLEAN", "thumbs")
+{%- endif %}
         wait_for(lambda: scored(len(expected)))
 {%- endif %}
 {%- if use_reflexr %}
@@ -127,6 +133,9 @@ def test_feedback_becomes_scores_on_the_traces_it_is_about(
             return [r for r in runs if r["rule"] == TRIAGE and r["status"] == "succeeded"]
 
         wait_for(triaged)
+{%- if use_portal %}
+        sent = len(langfuse.scores)
+{%- endif %}
         [triage] = triaged()
         review = {
             "type": "give_feedback",
@@ -138,7 +147,23 @@ def test_feedback_becomes_scores_on_the_traces_it_is_about(
         assert client.post(f"{events}/commands", json=frame).json()["ok"]
         # A yes or no reaches Langfuse as 1 or 0.
         expected["triage-review.correct"] = (1, "BOOLEAN", "triage-review")
+{%- if use_portal %}
+        run_thumbs = {
+            "type": "give_feedback",
+            "feedback_type": "thumbs",
+            "target": {"kind": "run", "run_id": triage["id"]},
+            "value": {"up": True},
+        }
+        frame = {"type": "command", "command_id": str(uuid.uuid4()), "command": run_thumbs}
+        assert client.post(f"{events}/commands", json=frame).json()["ok"]
+        # The same score as the turn's, from a run: counted as one more, named once.
+        expected["thumbs.up"] = (1, "BOOLEAN", "thumbs")
+{%- endif %}
+{%- if use_portal %}
+        wait_for(lambda: scored(sent + 2))
+{%- else %}
         wait_for(lambda: scored(len(expected)))
+{%- endif %}
 {%- endif %}
 
     configs = {
@@ -149,6 +174,10 @@ def test_feedback_becomes_scores_on_the_traces_it_is_about(
 {%- if use_reflexr %}
         "triage-review.correct",
         "triage-review.comment",
+{%- endif %}
+{%- if use_portal %}
+        "thumbs.up",
+        "thumbs.comment",
 {%- endif %}
     }
     assert set(langfuse.configs) == configs

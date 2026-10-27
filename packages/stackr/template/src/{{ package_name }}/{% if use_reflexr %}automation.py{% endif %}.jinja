@@ -75,6 +75,9 @@ from {{ package_name }}.telemetry import TelemetryHandle
 from {{ package_name }}.tickets import (
     EVENTS,
     RULES,
+{%- if use_portal %}
+    Thumbs,
+{%- endif %}
     TriageReview,
     build_triage_agent,
     triage_action,
@@ -226,7 +229,7 @@ class Automation:
         """
         if self._langfuse is not None:
             configs = LangfuseScoreConfigStore(self._langfuse)
-            await sync_configs(sync_score_configs(configs, [TriageReview]))
+            await sync_configs(sync_score_configs(configs, [TriageReview{% if use_portal %}, Thumbs{% endif %}]))
         stop = asyncio.Event()
         serving = asyncio.create_task(
             self.reactor.serve(poll_interval=self._poll_interval, stop=stop, grace=self._grace)

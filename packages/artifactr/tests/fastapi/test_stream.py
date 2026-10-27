@@ -1,10 +1,12 @@
 """The thread protocol over WebSocket."""
 
 import asyncio
+import json
 from collections.abc import AsyncIterator
 from datetime import timedelta
+from types import SimpleNamespace
 from typing import Any
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -20,6 +22,7 @@ from artifactr.core import (
     RunStarted,
     TenantId,
     TextDelta,
+    ThinkingDelta,
     UserActor,
     Visibility,
     WorkspaceId,
@@ -249,7 +252,7 @@ def test_live_frames_of_runs_in_followed_threads() -> None:
             ws.send_json(command("c2", type="post_message", thread_id="t1", content="Hi"))
             frames = _until_event(ws, "run_ended")
             live = [f["event"] for f in frames if f["type"] == "live"]
-            assert {"type": "text_delta", "part": 0, "delta": "Hello there."} in live
+            assert {"type": "text_delta", "part": 0, "delta": "Hello there.", "offset": 0} in live
             types = [f["event"]["type"] for f in frames if f["type"] == "event"]
             assert "run_ended" in types
 
@@ -270,7 +273,7 @@ def test_a_run_resumed_by_an_answer_streams_again() -> None:
             )
             frames = _until_event(ws, "run_ended")
             live = [f["event"] for f in frames if f["type"] == "live"]
-            assert {"type": "text_delta", "part": 0, "delta": "Tuesday it is."} in live
+            assert {"type": "text_delta", "part": 0, "delta": "Tuesday it is.", "offset": 0} in live
 
 
 def test_every_turn_of_a_run_that_pauses_again_and_again_streams_once() -> None:
@@ -327,12 +330,13 @@ def test_runs_in_progress_are_listed_and_watched() -> None:
             welcome = ws.receive_json()
             [active] = welcome["active_runs"]
             assert active["thread_id"] == "t1"
+            assert active["started_at"] is not None, "when its turn started, for a client's clock"
             ws.send_json(command("c3", type="watch_run", run_id=active["run_id"]))
             latch.released.set()
             frames = _until_event(ws, "run_ended")
             assert [f["ok"] for f in frames if f["type"] == "command_result"] == [True]
             deltas = [f["event"] for f in frames if f["type"] == "live"]
-            assert {"type": "text_delta", "part": 0, "delta": "Released."} in deltas
+            assert {"type": "text_delta", "part": 0, "delta": "Released.", "offset": 0} in deltas
 
 
 def test_a_run_running_as_a_client_joins_is_streamed_once_though_its_start_follows(
@@ -383,7 +387,7 @@ def test_a_client_from_the_head_still_watches_runs_in_progress() -> None:
             head = welcome["head_seq"]
             assert frames[0] == {"type": "replay_complete", "up_to_seq": head}, "nothing replayed"
             deltas = [f["event"] for f in frames if f["type"] == "live"]
-            assert {"type": "text_delta", "part": 0, "delta": "Released."} in deltas
+            assert {"type": "text_delta", "part": 0, "delta": "Released.", "offset": 0} in deltas
 
 
 def test_only_runs_in_followed_threads_are_watched() -> None:
@@ -470,6 +474,30 @@ def _delta(n: int = 0) -> LiveFrame:
     return LiveFrame(run_id="r", event=TextDelta(part=0, delta=str(n)))
 
 
+async def test_thinking_is_shed_first_when_the_client_falls_behind() -> None:
+    connection = _bare_stream(10)
+    thought = LiveFrame(run_id="r", event=ThinkingDelta(part=1, delta="hm"))
+    frames = [_delta(0), thought, _delta(1), _delta(2), _delta(3), _delta(4), thought, _delta(5)]
+
+    async def watch(run_id: str) -> AsyncIterator[LiveFrame]:
+        for frame in frames:
+            yield frame
+
+    connection._runner.watch = watch
+    workspace = Mock()
+    workspace.hidden = AsyncMock(return_value=SimpleNamespace(threads=set()))
+    connection._watch(workspace, "r", "t1")
+    for _ in range(20):
+        await asyncio.sleep(0)
+    sent = [connection._outbox.get_nowait() for _ in range(connection._outbox.qsize())]
+    assert [f["event"]["type"] for f in map(json.loads, sent)] == [
+        "text_delta",
+        "thinking_delta",
+        *["text_delta"] * 4,
+        "text_delta",
+    ], "the second thought found the outbox more than half full, and was dropped; text never is"
+
+
 async def test_live_frames_leave_the_outbox_room_for_events_and_results() -> None:
     connection = _bare_stream(10)
     forwarders = [asyncio.create_task(connection._put_waiting(_delta(n))) for n in range(30)]
@@ -510,6 +538,32 @@ async def test_a_forwarder_waiting_for_room_is_cancelled_cleanly() -> None:
     connection._room.set()
     await asyncio.wait_for(connection._put_waiting(_delta(10)), 1)
     assert connection._outbox.qsize() == 9
+
+
+def test_a_run_in_a_thread_the_client_does_not_follow_has_no_start_read(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    reads: list[str] = []
+    started = stream._started
+
+    async def counted(workspace: Workspace, run_id: Any, thread_id: Any) -> Any:
+        reads.append(thread_id)
+        return await started(workspace, run_id, thread_id)
+
+    monkeypatch.setattr(stream, "_started", counted)
+    latch = Latch()
+    app, _ = build(Script(call("hold"), say("Released.")), latch=latch)
+    with TestClient(app) as client:
+        _post(client, "c1", type="create_thread", thread_id="t1")
+        _post(client, "c2", type="post_message", thread_id="t1", content="Go")
+        wait_for(latch.entered.is_set)
+        with client.websocket_connect(STREAM) as ws:
+            ws.send_json(hello(threads=["t2"]))
+            [active] = ws.receive_json()["active_runs"]
+            assert active["started_at"] is None, "listed, but its thread's log isn't read"
+            assert reads == [], "a hello that follows none of the running threads reads nothing"
+        latch.released.set()
+        wait_for(lambda: _runs_ended(client) == 1)  # the run ends before the app stops
 
 
 def _runs_ended(client: TestClient) -> int:
@@ -606,5 +660,6 @@ async def test_a_runs_latest_start_is_read_back_a_page_at_a_time(
     for text in ("after", "the", "start"):
         await ws.post_message(thread.id, text)
     monkeypatch.setattr(stream, "_PAGE", 1)
-    assert await stream._started(ws, "run_1", thread.id) == started.seq
-    assert await stream._started(ws, "run_none", thread.id) == 0
+    seq, at = await stream._started(ws, "run_1", thread.id)
+    assert (seq, at) == (started.seq, (await ws.read())[seq - 1].ts)
+    assert await stream._started(ws, "run_none", thread.id) == (0, None)

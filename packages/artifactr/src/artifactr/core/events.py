@@ -166,6 +166,12 @@ class RunUsage(BaseModel):
     requests: int = 0
     input_tokens: int = 0
     output_tokens: int = 0
+    cache_read_tokens: int = 0
+    """Of the input tokens, those read from the provider's prompt cache; 0 where the provider
+    doesn't say, as in events recorded before it was counted."""
+    cache_write_tokens: int = 0
+    """Of the input tokens, those written to the provider's prompt cache; 0 where it doesn't
+    say."""
 
 
 class RunStarted(_Event):
@@ -250,10 +256,14 @@ class RunEnded(_Event):
     thread_id: ThreadId
     status: Literal["completed", "stopped", "failed"]
     usage: RunUsage | None = None
+    """What the run used: whole for a completed run, and so far for one stopped or failed; left
+    out by earlier versions for those, and for a run abandoned by a process that died, whose
+    usage went with it."""
     error: str | None = None
     reason: str | None = None
     """Why a failed run failed, when a capability or the runner said, such as
-    ``guardrail_blocked``, or ``abandoned`` for a run whose claim lapsed."""
+    ``guardrail_blocked``, ``model_stalled`` for a model that sent nothing for too long, or
+    ``abandoned`` for a run whose claim lapsed."""
 
 
 # ─── feedback ─────────────────────────────────────────────────────────────────

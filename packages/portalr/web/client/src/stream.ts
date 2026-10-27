@@ -80,6 +80,12 @@ const FINAL = new Set([4400, 4401, 4403]);
 /** The most to wait before each reconnect, in milliseconds; the last repeats. Full jitter. */
 const BACKOFF = [100, 500, 1000, 2000, 5000];
 
+/**
+ * How long a connection must stay live before the next drop is a fresh start. One that is dropped
+ * the moment it is caught up, as a server does for a client it finds too slow, is still failing.
+ */
+const STABLE = 10_000;
+
 /** The fields a hello frame carries that the store sets itself. */
 type Handshake = "type" | "protocol" | "resume_after_seq" | "from_head";
 
@@ -109,6 +115,7 @@ export class Stream<State, Frame, Command, R extends Result, Hello> {
   #stopped = true;
   #fromHead: boolean;
   #timer: ReturnType<typeof setTimeout> | null = null;
+  #stable: ReturnType<typeof setTimeout> | null = null;
   readonly #listeners = new Set<() => void>();
   readonly #live = new Set<(envelope: Extract<Frame, Envelope>) => void>();
   readonly #refused = new Set<(result: R) => void>();
@@ -207,10 +214,11 @@ export class Stream<State, Frame, Command, R extends Result, Hello> {
 
   /** Forgets the current socket and any pending reconnect, so nothing from them reaches the store. */
   #detach(): void {
-    if (this.#timer) {
-      clearTimeout(this.#timer);
-      this.#timer = null;
+    for (const timer of [this.#timer, this.#stable]) {
+      clearTimeout(timer ?? undefined);
     }
+    this.#timer = null;
+    this.#stable = null;
     const socket = this.#socket;
     this.#socket = null;
     socket?.close(1000);
@@ -243,6 +251,7 @@ export class Stream<State, Frame, Command, R extends Result, Hello> {
         return; // a socket the store already let go of
       }
       this.#socket = null;
+      clearTimeout(this.#stable ?? undefined);
       if (this.#stopped || FINAL.has(closed.code)) {
         // Nothing will answer what is still unanswered: no one waits for it for ever.
         this.#settleAll();
@@ -278,7 +287,10 @@ export class Stream<State, Frame, Command, R extends Result, Hello> {
         return;
       }
       case "replay_complete":
-        this.#attempt = 0;
+        clearTimeout(this.#stable ?? undefined);
+        this.#stable = setTimeout(() => {
+          this.#attempt = 0;
+        }, STABLE);
         this.#update({ status: "live" });
         return;
       case "event": {

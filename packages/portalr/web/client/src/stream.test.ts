@@ -312,3 +312,68 @@ test("reconnect works handed on detached, as a page gives it to a button, and co
   reconnect();
   await until(store, (snapshot) => snapshot.status === "live");
 });
+
+/** A WebSocket that does what the test says, on the timers the test controls. */
+class FakeSocket {
+  static all: FakeSocket[] = [];
+  onopen: (() => void) | null = null;
+  onmessage: ((message: { data: string }) => void) | null = null;
+  onclose: ((closed: { code: number }) => void) | null = null;
+  constructor() {
+    FakeSocket.all.push(this);
+  }
+  send() {}
+  close() {}
+  /** Connected and caught up, as a server that then drops it does. */
+  caughtUp() {
+    this.onopen?.();
+    const say = (frame: object) => this.onmessage?.({ data: JSON.stringify(frame) });
+    say({
+      type: "welcome",
+      protocol: "artifactr.v1",
+      workspace_id: "w",
+      head_seq: 0,
+      reset: false,
+    });
+    say({ type: "replay_complete", up_to_seq: 0 });
+  }
+}
+
+/** Milliseconds from a drop until the next connection, found by stepping the clock. */
+function waitForNext(): number {
+  const before = FakeSocket.all.length;
+  let waited = 0;
+  while (FakeSocket.all.length === before && waited < 60_000) {
+    vi.advanceTimersByTime(50);
+    waited += 50;
+  }
+  return waited;
+}
+
+test("a connection dropped the moment it is caught up backs off, rather than reconnecting in a loop", () => {
+  vi.useFakeTimers();
+  vi.spyOn(Math, "random").mockReturnValue(1);
+  vi.stubGlobal("WebSocket", FakeSocket);
+  FakeSocket.all = [];
+  try {
+    stream = new Stream(artifactr, { url: () => "ws://x" });
+    stream.open();
+    const waits: number[] = [];
+    for (let n = 0; n < 6; n++) {
+      FakeSocket.all.at(-1)?.caughtUp();
+      FakeSocket.all.at(-1)?.onclose?.({ code: 4429 });
+      waits.push(waitForNext());
+    }
+    expect(waits).toEqual([100, 500, 1000, 2000, 5000, 5000]);
+    // One that stays live for a while is a fresh start.
+    FakeSocket.all.at(-1)?.caughtUp();
+    vi.advanceTimersByTime(10_000);
+    FakeSocket.all.at(-1)?.onclose?.({ code: 1006 });
+    expect(waitForNext()).toBe(100);
+  } finally {
+    stream?.close();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  }
+});

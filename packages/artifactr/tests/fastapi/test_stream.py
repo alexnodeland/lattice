@@ -1,5 +1,6 @@
 """The thread protocol over WebSocket."""
 
+from collections.abc import AsyncIterator
 from datetime import timedelta
 from typing import Any
 
@@ -12,8 +13,10 @@ from starlette.websockets import WebSocketDisconnect
 from artifactr.core import (
     Actor,
     AgentActor,
+    LiveFrame,
     RunStarted,
     TenantId,
+    TextDelta,
     UserActor,
     Visibility,
     WorkspaceId,
@@ -416,6 +419,33 @@ def test_replayed_runs_are_not_watched(monkeypatch: pytest.MonkeyPatch) -> None:
             ws.send_json(command("c3", type="set_thread_mode", thread_id="t1", mode="suggest"))
             _until_event(ws, "thread_mode_changed")
     assert watched == [], "an ended run in the replay is not watched"
+
+
+def test_a_runs_buffered_frames_beyond_the_outbox_do_not_disconnect_the_client(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A run watched mid-turn replays its buffer at once, which may exceed the outbox."""
+    latch = Latch()
+    app, runner = build(Script(call("hold"), say("Done.")), latch=latch, outbox_size=10)
+    buffered = [LiveFrame(run_id="r", event=TextDelta(part=0, delta=str(n))) for n in range(50)]
+
+    async def watch(run_id: str) -> AsyncIterator[LiveFrame]:
+        for frame in buffered:
+            yield frame.model_copy(update={"run_id": run_id})
+
+    monkeypatch.setattr(runner, "watch", watch)
+    with TestClient(app) as client:
+        _post(client, "c1", type="create_thread", thread_id="t1")
+        _post(client, "c2", type="post_message", thread_id="t1", content="Go")
+        wait_for(latch.entered.is_set)
+        with client.websocket_connect(STREAM) as ws:
+            ws.send_json(hello(threads=["t1"]))
+            frames = []
+            while sum(f["type"] == "live" for f in frames) < len(buffered):
+                frames.append(ws.receive_json())
+            latch.released.set()
+    deltas = [f["event"]["delta"] for f in frames if f["type"] == "live"]
+    assert deltas == [str(n) for n in range(50)]
 
 
 def _runs_ended(client: TestClient) -> int:

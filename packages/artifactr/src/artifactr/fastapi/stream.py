@@ -338,7 +338,7 @@ class Stream:
             async for frame in self._runner.watch(run_id):
                 if thread_id in (await workspace.hidden()).threads:
                     return
-                self._put(frame)
+                await self._put_waiting(frame)
 
         self._spawn(forward())
 
@@ -426,6 +426,16 @@ class Stream:
             self._outbox.put_nowait(frame.model_dump_json())
         except asyncio.QueueFull:
             self._overflowed = True
+        self._wake.set()
+
+    async def _put_waiting(self, frame: BaseModel) -> None:
+        """Queue a live frame, waiting for room rather than overflowing the outbox.
+
+        A run's buffered frames arrive all at once when it is watched, as many as the channel
+        keeps, which may be more than the outbox holds: the client is not slow for being sent
+        them. The channel sheds a watcher's oldest frames if this one falls behind.
+        """
+        await self._outbox.put(frame.model_dump_json())
         self._wake.set()
 
     async def _write(self) -> None:

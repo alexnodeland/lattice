@@ -381,6 +381,16 @@ function Chat() {
                   artifact={entry.artifact}
                 />
               );
+            case "partial":
+              return (
+                <Streaming
+                  key={`${entry.run.id}-partial`}
+                  text={entry.run.text}
+                  live={entry.run.live}
+                  ended={entry.run.status}
+                  author="Assistant"
+                />
+              );
             case "failed":
               return (
                 <RunFailed
@@ -419,13 +429,20 @@ function Chat() {
         {active
           .filter((run) => run.status === "running")
           .map((run) => (
-            <Streaming key={run.id} text={run.text} author="Assistant" />
+            <Streaming key={run.id} text={run.text} live={run.live} author="Assistant" />
           ))}
       </Messages>
       {active.map((run) => (
         <div key={run.id} className="flex flex-col gap-2">
           <RunStrip
             run={run}
+            // The thread before the turn, as sent to the model, for its token estimate (portalr
+            // ADR-0083); the exact count, once a run says it, goes in `usage`.
+            history={thread.messages.reduce(
+              (chars, message) =>
+                message.seq < run.started ? chars + message.content.length : chars,
+              0,
+            )}
             {...(run.status === "running" &&
               allowed.has("artifactr:stop_run") && {
                 onStop: () => stream.send({ type: "stop_run", run_id: run.id }),

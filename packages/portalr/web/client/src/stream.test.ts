@@ -437,4 +437,36 @@ test("reconnect() mid-backoff connects once, starts the backoff over, and leaves
   last().drop(1006);
   expect(waitForNext()).toBe(100);
   expect(FakeSocket.all).toHaveLength(before + 2);
+
+const delta = (text: string) => ({
+  type: "live",
+  run_id: "run_1",
+  event: { type: "text_delta", part: 0, delta: text },
+});
+
+test("a run's frames are taken at once and heard once a frame later, and a welcome starts its live output over", async () => {
+  server.append({ type: "run_started", run_id: "run_1", thread_id: "thr_1" });
+  open();
+  await until(stream, (s) => s.status === "live");
+  let heard = 0;
+  stream.subscribe(() => {
+    heard += 1;
+  });
+  server.send({
+    type: "live",
+    run_id: "run_1",
+    event: { type: "part_started", part: 0, part_kind: "text" },
+  });
+  server.send(delta("Hel"));
+  server.send(delta("lo"));
+  await until(stream, (s) => s.state.runs.run_1?.text === "Hello");
+  expect(heard).toBe(1);
+  // The connection drops: the server welcomes it again and replays the run's frames.
+  server.drop();
+  await server.hello(2); // welcomed again: the frames come after the welcome
+  server.send(delta("Hel"));
+  server.send(delta("lo"));
+  await until(stream, (s) => s.status === "live" && s.state.runs.run_1?.text === "Hello");
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  expect(stream.snapshot().state.runs.run_1?.text).toBe("Hello");
 });

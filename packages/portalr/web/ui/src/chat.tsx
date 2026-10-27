@@ -24,6 +24,7 @@ import type { Values } from "./artifactr-ui";
 import { Button, ButtonLink } from "./button";
 import { cn } from "./cn";
 import { CopyButton } from "./copy-button";
+import { Disclosure } from "./disclosure";
 import { endedBy, readAskForm } from "./form-schema";
 import { useFullView } from "./full-view";
 import { Icon } from "./icon";
@@ -32,6 +33,7 @@ import { glyphs } from "./icons";
 import { FeatureOff, useFormLock } from "./integrations";
 import { Markdown } from "./markdown";
 import { Menu, type MenuItem } from "./menu";
+import { useOnDemand } from "./on-demand";
 import { Questions, type QuestionsAnswer } from "./questions";
 import { SchemaForm } from "./schema-form";
 import { type Segment, SegmentedFilter } from "./segmented-filter";
@@ -389,21 +391,59 @@ export function Message({
   );
 }
 
+/** What a turn shows beyond its words, loaded as the first run streams (portalr ADR-0083). */
+const loadStreaming = () => import("./on-demand/streaming");
+
 /**
  * What a run is streaming, as it arrives, in the bubble its message will have, so nothing moves
- * when the message replaces it. Before its first words, it says the agent is thinking.
+ * when the message replaces it: its thinking, folded, then its words; before either, three dots.
+ * Nothing of it is announced as it grows (`aria-live="off"` in the log): the posted message is.
+ * A run that failed, or was stopped, keeps what it had streamed, quietly, as `ended` says.
  */
-export function Streaming({ text, author }: { text: string; author: string }) {
+export function Streaming({
+  text,
+  author,
+  live,
+  ended,
+}: {
+  text: string;
+  author: string;
+  /** The run's live state, for its thinking; without it, the words alone. */
+  live?: Artifactr.Live;
+  /** How the run ended, where it did before its reply: what it streamed is left as it was. */
+  ended?: "failed" | "stopped";
+}) {
+  const thinking = live?.thinking ?? "";
+  const thought = !ended && live?.phase === "thinking" ? null : (live?.thoughtMs ?? 0);
+  const state = ended ? "didn't finish" : text ? "is writing" : "is thinking";
   return (
     <li
-      className="flex max-w-[min(100%,var(--bubble-max-width))] flex-col items-start gap-1 self-start"
-      aria-busy="true"
-      aria-label={text ? `${author} is writing` : `${author} is thinking`}
+      className={cn(
+        "flex max-w-[min(100%,var(--bubble-max-width))] flex-col items-start gap-1 self-start",
+        ended && "text-muted",
+      )}
+      aria-live="off"
+      aria-busy={ended ? undefined : "true"}
+      aria-label={`${author} ${state}`}
     >
       <span className="font-semibold text-muted text-xs">{author}</span>
+      {thinking !== "" && (
+        // The thinking, folded under a line that says it is thinking, or for how long it
+        // thought: live only, never kept, which the panel says. Nothing of it is announced.
+        <Disclosure
+          summary={thought === null ? "Thinking…" : `Thought for ${Math.round(thought / 1000)} s`}
+          className={TYPE.note}
+        >
+          <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words font-mono text-xs">
+            {thinking}
+          </pre>
+          <p className="mt-1">Thinking isn't kept: it goes when the page does.</p>
+        </Disclosure>
+      )}
       <div className={bubble(false)}>
-        {text ? <Markdown streaming>{text}</Markdown> : <Thinking />}
+        {text ? <Markdown streaming={!ended}>{text}</Markdown> : ended ? null : <Thinking />}
       </div>
+      {ended === "stopped" && <span className={TYPE.note}>Stopped here.</span>}
       <div aria-hidden="true" className="min-h-7" />
     </li>
   );
@@ -1078,15 +1118,31 @@ function elapsed(from: string | undefined, now: Date): string | null {
 }
 
 /**
- * The strip over a turn under way (portalr ADR-0080): how it is going, for how long, and what
- * can be done about it: Stop while it works, where the reader may; and the way to its question
- * while it waits.
+ * A turn's tokens, exactly, as a future usage frame says them (streaming design, phases C and E);
+ * until one does, the strip estimates.
+ */
+export interface Usage {
+  readonly input: number;
+  readonly output: number;
+  readonly cacheRead?: number;
+  readonly cacheWrite?: number;
+  readonly reasoning?: number;
+}
+
+/**
+ * The strip over a turn under way (portalr ADR-0080): how it is going, what it is doing and for
+ * how long (portalr ADR-0083), its tokens, and what can be done about it: Stop while it works,
+ * where the reader may; and the way to its question while it waits. One status announces how it
+ * goes and, once the add-on that words it has loaded, what it does, as that changes; the clock,
+ * the idle count and the tokens are never announced.
  */
 export function RunStrip({
   run,
   onStop,
   onQuestion,
   now,
+  history = null,
+  usage = null,
 }: {
   run: Artifactr.Run;
   /** Stop it, where the reader may; none hides Stop. */
@@ -1095,6 +1151,10 @@ export function RunStrip({
   onQuestion?: () => void;
   /** The moment the elapsed time is counted to, pinned by a test; the strip's own clock otherwise. */
   now?: Date;
+  /** The characters of the thread's history the turn was sent, for the estimate; null if unknown. */
+  history?: number | null;
+  /** The turn's tokens, exactly, once something says them; the strip estimates until then. */
+  usage?: Usage | null;
 }) {
   const active = run.status === "running" || run.status === "paused";
   const [tick, setTick] = useState(() => new Date());
@@ -1105,13 +1165,24 @@ export function RunStrip({
     const timer = setInterval(() => setTick(new Date()), 1000);
     return () => clearInterval(timer);
   }, [active, now]);
-  const since = elapsed(run.startedAt, now ?? tick);
+  const at = now ?? tick;
+  const since = elapsed(run.startedAt, at);
+  const [tone, status] = RUN_STATUS[run.status];
+  const working = run.status === "running";
+  const addon = useOnDemand(loadStreaming, working);
   return (
     <fieldset
       aria-label="This turn"
       className="m-0 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-(--card-radius) border border-line bg-surface px-3 py-2"
     >
-      <RunStatus status={run.status} />
+      <StatusBadge tone={tone} className="self-start">
+        {status}
+      </StatusBadge>
+      {/* One status, kept through the add-on's loading, so what it says changes in place. */}
+      <span role="status" className="sr-only">
+        {working && addon ? <addon.Said run={run} status={status} now={at} /> : status}
+      </span>
+      {working && addon && <addon.Doing run={run} now={at} history={history} usage={usage} />}
       {since !== null && active && (
         <span className={cn(TYPE.note, "tabular-nums")}>
           {run.status === "paused" ? "waiting " : <span className="sr-only">for </span>}
@@ -1124,7 +1195,7 @@ export function RunStrip({
             Go to the question
           </Button>
         )}
-        {run.status === "running" && onStop && <CommandButton onSend={onStop}>Stop</CommandButton>}
+        {working && onStop && <CommandButton onSend={onStop}>Stop</CommandButton>}
       </span>
     </fieldset>
   );

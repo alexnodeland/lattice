@@ -988,6 +988,7 @@ const run = (status: Artifactr.Run["status"], requests: ArtifactrV1.DeferredRequ
     status,
     tools: {},
     text: "",
+    live: live(),
     requests,
     answered: [],
     started: 1,
@@ -996,12 +997,154 @@ const run = (status: Artifactr.Run["status"], requests: ArtifactrV1.DeferredRequ
     error: null,
   }) as unknown as Artifactr.Run;
 
+const live = (change: Partial<Artifactr.Live> = {}): Artifactr.Live => ({
+  phase: "starting",
+  tool: null,
+  running: false,
+  argsChars: 0,
+  thinking: "",
+  thoughtMs: 0,
+  outputChars: 0,
+  since: 0,
+  at: 0,
+  part: null,
+  ...change,
+});
+
+/** The strip over a running turn whose live state is `change`, at `now`. */
+const strip = (change: Partial<Artifactr.Live>, now: Date, more = {}) => (
+  <RunStrip run={{ ...run("running"), live: live(change) }} onStop={sent()} now={now} {...more} />
+);
+
+test("the strip says what the turn is doing, in one status, and how long since its last frame once that is a while", async () => {
+  const now = new Date("2026-10-20T00:01:05Z");
+  const at = now.getTime() - 5000;
+  const screen = await render(
+    strip({ phase: "tool", tool: "create_app", argsChars: 12_300, at }, now),
+  );
+  const group = screen.getByRole("group", { name: "This turn" });
+  await expect.element(group.getByText("Preparing create_app call, 12 KB")).toBeVisible();
+  expect(group.getByRole("status").elements()).toHaveLength(1);
+  await expect
+    .element(group.getByRole("status"))
+    .toHaveTextContent("Working: Preparing create_app call, 12 KB");
+  await expect.element(group.getByRole("button", { name: "Stop" })).toBeVisible();
+  // The clock ticks outside the status.
+  expect(group.getByRole("status").element().textContent).not.toContain("1:05");
+  await screen.rerender(strip({ phase: "tool", tool: "create_app", running: true, at }, now));
+  await expect.element(group.getByText("Running create_app")).toBeVisible();
+  await screen.rerender(strip({ phase: "writing", at: now.getTime() - 40_000 }, now));
+  await expect
+    .element(group.getByText("Writing the reply, 40 s since the last output"))
+    .toBeVisible();
+  await screen.rerender(strip({ phase: "thinking", at }, now));
+  await expect.element(group.getByText("Thinking")).toBeVisible();
+  await screen.rerender(strip({ at: now.getTime() - 21_000 }, now));
+  await expect
+    .element(group.getByText("Waiting on the model, 21 s since the last output"))
+    .toBeVisible();
+  // Phases that go by in a blink are announced at most every few seconds: the last is pending.
+  expect(group.getByRole("status").element().textContent).not.toContain("21 s");
+});
+
+test("the strip counts the turn's tokens, as an estimate until something says them exactly", async () => {
+  const now = new Date();
+  const screen = await render(strip({ outputChars: 401 }, now, { history: 4000 }));
+  const group = screen.getByRole("group", { name: "This turn" });
+  await expect
+    .element(group.getByText("Tokens: about 1,000 in, about 101 out, estimated"))
+    .toBeVisible();
+  await screen.rerender(strip({ outputChars: 401 }, now, { history: null }));
+  await expect.element(group.getByText("Tokens: about 101 out, estimated")).toBeVisible();
+  await screen.rerender(
+    strip({ outputChars: 401 }, now, { usage: { input: 1234, output: 56, cacheRead: 1000 } }),
+  );
+  const exact = group.getByText("Tokens: 1,234 in, 56 out, 1,000 from cache");
+  await expect.element(exact).toBeVisible();
+  expect(exact.element().closest("[role=status], [aria-live]")).toBeNull();
+});
+
+test("what streams is never announced as it grows: only the posted message is", async () => {
+  const screen = await render(
+    <Messages>
+      <Streaming text="Hel" live={live({ phase: "writing" })} author="Assistant" />
+    </Messages>,
+  );
+  const writing = screen.getByRole("listitem", { name: "Assistant is writing" });
+  await expect.element(writing).toHaveAttribute("aria-live", "off");
+  const word = writing.getByText("Hel").element();
+  expect(word.closest("[aria-live]")).toBe(writing.element());
+  await screen.rerender(
+    <Messages>
+      <Streaming text="Hello there" live={live({ phase: "writing" })} author="Assistant" />
+    </Messages>,
+  );
+  await expect.element(writing.getByText("Hello there")).toBeVisible();
+  expect(
+    writing
+      .element()
+      .querySelectorAll("[role=status], [role=alert], [aria-live=polite], [aria-live=assertive]"),
+  ).toHaveLength(0);
+  expect(screen.getByRole("log").element().getAttribute("aria-live")).toBeNull();
+});
+
+test("the model's thinking is folded under how long it has thought, and says it isn't kept", async () => {
+  const screen = await render(
+    <Messages>
+      <Streaming
+        text=""
+        live={live({ phase: "thinking", thinking: "Let me see." })}
+        author="Assistant"
+      />
+    </Messages>,
+  );
+  const button = screen.getByRole("button", { name: "Thinking…" });
+  await expect.element(button).toHaveAttribute("aria-expanded", "false");
+  await expect.element(screen.getByText("Let me see.")).not.toBeVisible();
+  await button.click();
+  await expect.element(button).toHaveAttribute("aria-expanded", "true");
+  await expect.element(screen.getByText("Let me see.")).toBeVisible();
+  await expect
+    .element(screen.getByText("Thinking isn't kept: it goes when the page does."))
+    .toBeVisible();
+  await screen.rerender(
+    <Messages>
+      <Streaming
+        text="So,"
+        live={live({ phase: "writing", thinking: "Let me see.", thoughtMs: 12_400 })}
+        author="Assistant"
+      />
+    </Messages>,
+  );
+  await expect.element(screen.getByRole("button", { name: "Thought for 12 s" })).toBeVisible();
+});
+
+test("a turn that was stopped, or failed, keeps what it streamed, quietly, and says so", async () => {
+  const screen = await render(
+    <Messages>
+      <Streaming
+        text="Half a rep"
+        live={live({ thinking: "Hmm", thoughtMs: 2000 })}
+        ended="stopped"
+        author="Assistant"
+      />
+    </Messages>,
+  );
+  const left = screen.getByRole("listitem", { name: "Assistant didn't finish" });
+  await expect.element(left).not.toHaveAttribute("aria-busy");
+  await expect.element(left.getByText("Half a rep")).toBeVisible();
+  await expect.element(left.getByText("Stopped here.")).toBeVisible();
+  await expect.element(left.getByRole("button", { name: "Thought for 2 s" })).toBeVisible();
+  expect(left.element().classList).toContain("text-muted");
+});
+
 test("the strip over a turn says how it goes, for how long, and offers Stop while it works", async () => {
   const onStop = sent();
   const now = new Date("2026-10-20T00:01:05Z");
   const screen = await render(<RunStrip run={run("running")} onStop={onStop} now={now} />);
   const strip = screen.getByRole("group", { name: "This turn" });
-  await expect.element(strip.getByRole("status")).toHaveTextContent("Working");
+  // "Working" at once; what it is doing joins it once the add-on that words it has loaded.
+  await expect.poll(() => strip.getByRole("status").element().textContent).toMatch(/^Working/);
   await expect.element(strip.getByText("for 1:05")).toBeVisible();
   await strip.getByRole("button", { name: "Stop" }).click();
   expect(onStop).toHaveBeenCalledOnce();

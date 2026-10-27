@@ -58,7 +58,7 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0050](0050-a-native-files-proposals-and-the-pilots-scenarios.md) | A native file's proposals: outdated, never rebased, and compared page by page; and the check-out pilot's scenarios | Accepted |
 | [0051](0051-mini-apps-the-sandboxed-frame-and-its-bridge.md) | Mini apps: the sandboxed frame and its bridge | Accepted, amended by 0084 |
 | [0052](0052-artifacts-inline-in-their-thread.md) | Artifacts inline in their thread, a mini app first | Accepted |
-| [0053](0053-the-chats-questions-tool-calls-sides-failures-and-streaming.md) | The chat's questions, tool calls, sides, failures and streaming | Accepted, amended by 0079, 0080 and 0081 |
+| [0053](0053-the-chats-questions-tool-calls-sides-failures-and-streaming.md) | The chat's questions, tool calls, sides, failures and streaming | Accepted, amended by 0079, 0080, 0081 and 0083 |
 | [0054](0054-readable-revisions.md) | Readable revisions: per kind, in parts, one preview running | Accepted |
 | [0055](0055-every-kind-inline-and-a-native-file-read-and-edited-in-its-thread.md) | Every kind inline in its thread, and a native file read and edited there | Accepted, amended by 0084 |
 | [0056](0056-brand-kits-token-layers-loading-and-validation.md) | Brand kits: three token layers, a kit loaded per deployment, and validation in Python | Accepted |
@@ -87,6 +87,7 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0079](0079-interaction-states-feedback-pending-and-a-refusals-mark.md) | Interaction states: feedback, pending, and a refusal's mark | Accepted |
 | [0080](0080-ink-on-paper-the-products-visual-language.md) | Ink on paper, the product's visual language | Accepted, amended by 0081 |
 | [0081](0081-plain-a-bright-page-one-colour-and-a-mark-for-what-waits.md) | Plain: a bright page, one colour, and a mark for what waits | Accepted |
+| [0083](0083-a-turn-shows-its-progress-phase-thinking-and-an-estimated-count.md) | A turn shows its progress: phase, thinking, and an estimated count | Accepted |
 | [0084](0084-several-portal-origins-an-allow-list-aliases-and-a-union-policy.md) | Several portal origins: an allow-list, aliases, and a union policy | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

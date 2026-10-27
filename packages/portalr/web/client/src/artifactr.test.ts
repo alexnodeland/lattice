@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { apply, artifactr, type Workspace } from "./artifactr";
+import { apply, applyLive, artifactr, type Workspace } from "./artifactr";
 import type * as v1 from "./generated/artifactr.v1";
 
 function envelope(event: Record<string, unknown>, seq: number): v1.EventFrame {
@@ -117,6 +117,18 @@ test("a run streams its text until its message is posted, and keeps its status",
       },
     },
     text: "",
+    live: {
+      phase: "starting",
+      tool: null,
+      running: false,
+      argsChars: 0,
+      thinking: "",
+      thoughtMs: 0,
+      outputChars: 8,
+      since: expect.any(Number),
+      at: expect.any(Number),
+      part: null,
+    },
     requests: [],
     answered: [],
     started: 1,
@@ -129,6 +141,174 @@ test("a run streams its text until its message is posted, and keeps its status",
     questions: [],
     feedback: [],
   });
+});
+
+/** A live frame of `run`, as the server sends it. */
+const frame = (run: string, event: Record<string, unknown>): v1.Server =>
+  ({ type: "live", run_id: run, event }) as unknown as v1.Server;
+
+const started = () => replay({ type: "run_started", run_id: "run_1", thread_id: "thr_1" });
+
+/** The state after each frame, at a second apart, from `at`. */
+function streamed(state: Workspace, frames: Record<string, unknown>[], at = 1000): Workspace {
+  return frames.reduce(
+    (next, event, index) => applyLive(next, frame("run_1", event), at + index * 1000),
+    state,
+  );
+}
+
+test("a run's thinking streams, its phase follows it, and its time is counted as it ends", () => {
+  let state = started();
+  expect(state.runs.run_1?.live.phase).toBe("starting");
+  state = streamed(state, [
+    { type: "part_started", part: 0, part_kind: "thinking" },
+    { type: "thinking_delta", part: 0, delta: "Let me " },
+    { type: "thinking_delta", part: 0, delta: "see." },
+  ]);
+  expect(state.runs.run_1?.live).toMatchObject({
+    phase: "thinking",
+    thinking: "Let me see.",
+    since: 1000,
+    at: 3000,
+    outputChars: 11,
+  });
+  state = streamed(state, [{ type: "part_ended", part: 0 }], 13_000);
+  expect(state.runs.run_1?.live).toMatchObject({ phase: "starting", thoughtMs: 12_000 });
+  expect(state.runs.run_1?.text).toBe("");
+});
+
+test("a tool call is prepared as its arguments stream, runs once its call is on the log, and returns", () => {
+  let state = streamed(started(), [
+    { type: "part_started", part: 0, part_kind: "tool_call", tool_name: "create_app" },
+    { type: "tool_args_delta", part: 0, delta: '{"html": "<!doctype' },
+    { type: "tool_args_delta", part: 0, delta: ' html>"}' },
+    { type: "part_ended", part: 0 },
+  ]);
+  expect(state.runs.run_1?.live).toMatchObject({
+    phase: "tool",
+    tool: "create_app",
+    running: false,
+    argsChars: 27,
+    outputChars: 27,
+    since: 1000,
+    at: 4000,
+  });
+  const call = { run_id: "run_1", thread_id: "thr_1", tool_call_id: "t1", tool_name: "create_app" };
+  state = apply(state, envelope({ type: "tool_called", ...call }, 2));
+  expect(state.runs.run_1?.live).toMatchObject({
+    phase: "tool",
+    tool: "create_app",
+    running: true,
+  });
+  state = apply(state, envelope({ type: "tool_returned", ...call, status: "ok" }, 3));
+  expect(state.runs.run_1?.live).toMatchObject({ phase: "starting", tool: null, argsChars: 0 });
+});
+
+test("the text of a new response replaces what the model wrote before its tool call", () => {
+  let state = streamed(started(), [
+    { type: "part_started", part: 0, part_kind: "text" },
+    { type: "text_delta", part: 0, delta: "I'll draft it." },
+    { type: "part_ended", part: 0 },
+    { type: "part_started", part: 1, part_kind: "tool_call", tool_name: "draft" },
+    { type: "part_ended", part: 1 },
+  ]);
+  expect(state.runs.run_1?.text).toBe("I'll draft it.");
+  // The next response's parts start over at 0: its text is the reply.
+  state = streamed(state, [
+    { type: "part_started", part: 0, part_kind: "text" },
+    { type: "text_delta", part: 0, delta: "Here it is." },
+  ]);
+  expect(state.runs.run_1).toMatchObject({ text: "Here it is.", live: { phase: "writing" } });
+  // Within one response, a second text part goes on from the first.
+  state = streamed(state, [
+    { type: "part_ended", part: 0 },
+    { type: "part_started", part: 1, part_kind: "text" },
+    { type: "text_delta", part: 1, delta: " Done." },
+  ]);
+  expect(state.runs.run_1?.text).toBe("Here it is. Done.");
+  expect(state.runs.run_1?.live.outputChars).toBe("I'll draft it.Here it is. Done.".length);
+});
+
+test("a welcome starts every running run's live output over, so a replay shows nothing twice", () => {
+  const frames = [
+    { type: "part_started", part: 0, part_kind: "thinking" },
+    { type: "thinking_delta", part: 0, delta: "Hmm." },
+    { type: "part_started", part: 1, part_kind: "text" },
+    { type: "text_delta", part: 1, delta: "Hi" },
+  ];
+  const state = streamed(started(), frames);
+  const again = artifactr.welcome?.(state) ?? state;
+  expect(again.runs.run_1).toMatchObject({
+    text: "",
+    live: { thinking: "", phase: "starting", outputChars: 0, part: null },
+  });
+  expect(streamed(again, frames).runs.run_1).toMatchObject({
+    text: "Hi",
+    live: { thinking: "Hmm." },
+  });
+  // A run that has ended isn't replayed, and keeps what it had.
+  const ended = apply(
+    state,
+    envelope({ type: "run_ended", run_id: "run_1", thread_id: "thr_1", status: "stopped" }, 2),
+  );
+  expect(artifactr.welcome?.(ended)).toBe(ended);
+});
+
+test("a run that fails, or is stopped, keeps what it streamed; one that completes has posted it", () => {
+  const streaming = streamed(started(), [
+    { type: "part_started", part: 0, part_kind: "thinking" },
+    { type: "thinking_delta", part: 0, delta: "First," },
+    { type: "part_started", part: 1, part_kind: "text" },
+    { type: "text_delta", part: 1, delta: "Half a rep" },
+  ]);
+  const end = (status: string) =>
+    envelope({ type: "run_ended", run_id: "run_1", thread_id: "thr_1", status }, 2);
+  for (const status of ["failed", "stopped"]) {
+    const ended = apply(streaming, end(status));
+    expect(ended.runs.run_1).toMatchObject({
+      status,
+      text: "Half a rep",
+      live: { thinking: "First," },
+    });
+    // Ended, it takes no more frames.
+    const late = frame("run_1", { type: "text_delta", part: 1, delta: "ly" });
+    expect(applyLive(ended, late, 9)).toBe(ended);
+  }
+  const posted = apply(
+    streaming,
+    envelope(
+      {
+        type: "message_posted",
+        thread_id: "thr_1",
+        message_id: "m9",
+        content: "Reply",
+        run_id: "run_1",
+      },
+      2,
+    ),
+  );
+  expect(posted.runs.run_1).toMatchObject({ text: "", live: { thinking: "" } });
+  expect(apply(posted, end("completed")).runs.run_1?.status).toBe("completed");
+});
+
+test("a paused run waits on the model again as it resumes, with its live output afresh", () => {
+  const ask = { kind: "question", tool_call_id: "t1", tool_name: "ask_user", args: {} };
+  const paused = apply(
+    streamed(started(), [
+      { type: "part_started", part: 0, part_kind: "tool_call", tool_name: "ask_user" },
+      { type: "tool_args_delta", part: 0, delta: "{}" },
+    ]),
+    envelope({ type: "run_paused", run_id: "run_1", thread_id: "thr_1", requests: [ask] }, 2),
+  );
+  expect(paused.runs.run_1?.live).toMatchObject({ phase: "starting", tool: null });
+  const resumed = apply(
+    paused,
+    envelope(
+      { type: "deferred_answered", run_id: "run_1", thread_id: "thr_1", tool_call_id: "t1" },
+      3,
+    ),
+  );
+  expect(resumed.runs.run_1).toMatchObject({ status: "running", live: { phase: "starting" } });
 });
 
 test("a tool call keeps its arguments, what it returned and where it was called", () => {

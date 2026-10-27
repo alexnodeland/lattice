@@ -70,6 +70,7 @@ export {
   RunStrip,
   Streaming,
   Thumbs,
+  type Usage,
 } from "./chat";
 export { Checkbox, type CheckboxChoice, CheckboxGroup } from "./checkbox";
 export { useColourBlind } from "./colour-blind";

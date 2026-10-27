@@ -12,6 +12,9 @@ package (lattice ADR-0018).
   workspace.
 - :mod:`lattice_core.text`: checks on text before it is stored, such as
   :func:`~lattice_core.text.holds_nul`.
+- :mod:`lattice_core.origins`: web origins as a browser compares them, such as
+  :func:`~lattice_core.origins.web_origin`, for the settings that name a portal, its mini apps'
+  sandbox and its editors.
 - :mod:`lattice_core.sql`: SQL helpers for storage on SQLAlchemy's asyncio API, behind the
   ``sql`` extra.
 - :mod:`lattice_core.otel`: OpenTelemetry in one call, behind the ``otel`` extra, and the

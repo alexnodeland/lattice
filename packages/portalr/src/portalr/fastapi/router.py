@@ -53,7 +53,7 @@ from portalr.analytics.relay import (
     Session,
 )
 from portalr.analytics.replay import MOST_REPLAY_BYTES, ReplayBatch, expansion
-from portalr.fastapi.site import Site, Surfaces
+from portalr.fastapi.site import Place, Site, Surfaces
 from portalr.fastapi.ui import ui_router
 from portalr.invites import Invite, InviteFailed
 from portalr.people import People
@@ -164,6 +164,13 @@ class Config(BaseModel):
     """Each native file's hosted editor, by its app's integration."""
     apps: str | None
     """The origin mini apps run on, or None where the deployment runs none."""
+    origin: str | None = None
+    """The portal's own origin, where the application names it; None leaves the UIs trusting the
+    address they are at."""
+    aliases: dict[str, Place] = {}
+    """Where mini apps and the editors are for the portal at each of its other origins (portalr
+    ADR-0084): a UI at an origin named here uses its place, and at any other address the
+    deployment doesn't name, none."""
     brand: Brand | None = None
     """The deployment's brand kit, or None for portalr's own look."""
     replay: bool = False
@@ -343,6 +350,8 @@ def portalr_router(
             people=people is not None,
             editors=site.editors,
             apps=site.apps,
+            origin=site.origin,
+            aliases=site.aliases,
             brand=Brand.model_validate(site.kit.config()) if site.kit else None,
             replay=relay is not None
             and relay.replay is not None

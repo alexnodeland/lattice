@@ -3,8 +3,9 @@
  * apps' origin, inside chrome of the host's own that the app can't draw over. The chrome says it
  * is the agent's and runs sandboxed, apart from the person's session, and keeps its summary beside
  * it as its text equivalent. Nothing runs where the app is archived, where mini apps are off in the
- * workspace, where the deployment names no apps' origin, or where that origin is the portal's own;
- * the label and the summary are shown instead. The bridge answers the frame as the person viewing
+ * workspace, where the deployment names no apps' origin, or none for the address the portal is at
+ * (portalr ADR-0084), or where that origin is the portal's own; the label and the summary are
+ * shown instead. The bridge answers the frame as the person viewing
  * it: its state, coalesced to one version every five seconds, and a submission, or a link, only
  * once they confirm it in a dialog of the host's, outside the frame.
  */
@@ -29,6 +30,12 @@ import { TYPE } from "./type";
 export interface AppHost {
   /** The origin apps run on, as `config.json` names it; null where the deployment runs none. */
   readonly origin: string | null;
+  /**
+   * The portal's addresses apps run at, where the page is at none of them (portalr ADR-0084):
+   * the deployment names no apps' origin for this address, so none runs here, and the reader is
+   * told where to open the portal instead of being shown a frame nothing answers.
+   */
+  readonly elsewhere?: readonly string[];
   /** Write an app's state as the viewer: its `/state` replaced, on the version it was read at. */
   readonly setState: (id: string, version: number, state: JsonObject) => Sent;
   /** Create a submission to an app, with its derived id, as the viewer. */
@@ -71,8 +78,8 @@ const PREVIEW_SENDS_NOTHING = "This is a preview of a version: nothing is sent f
 const loadApps = () => import("./on-demand/apps");
 
 /**
- * Why the app doesn't run here, or null where it does: archived, mini apps off, or no apps'
- * origin of its own.
+ * Why the app doesn't run here, or null where it does: archived, mini apps off, the portal at an
+ * address apps aren't served for, or no apps' origin of its own.
  */
 export function stillWhy(shown: Shown, off: boolean, host: AppHost | null): string | null {
   if (shown.archived) {
@@ -80,6 +87,9 @@ export function stillWhy(shown: Shown, off: boolean, host: AppHost | null): stri
   }
   if (off) {
     return offSaid(MINI_APPS);
+  }
+  if (host?.elsewhere?.length) {
+    return `Apps don't run at this address: open the portal at ${host.elsewhere.join(" or ")}.`;
   }
   if (!host?.origin || new URL(host.origin).origin === location.origin) {
     return "Apps don't run here: this deployment has no origin for them.";

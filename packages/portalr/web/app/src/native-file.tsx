@@ -28,6 +28,7 @@ import {
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { CheckOut, editorAt, type Place, type Said } from "./check-out";
+import { deploymentAt } from "./deployment";
 import { useEditing } from "./editing";
 import type { Native } from "./native";
 
@@ -187,7 +188,7 @@ export function FileControls({
             place={place}
             status={status}
             app={native.app}
-            editor={editorAt(config.editors, native.integration)}
+            editor={editorAt(deploymentAt(config, location.origin).editors, native.integration)}
             onSaid={setSaid}
             onDownload={onDownload}
           />

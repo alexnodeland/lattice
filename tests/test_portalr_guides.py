@@ -103,6 +103,8 @@ def test_config_json_is_what_the_page_says() -> None:
         "people",
         "editors",
         "apps",
+        "origin",
+        "aliases",
         "brand",
     ]
     for field, default in Surfaces().model_dump().items():

@@ -320,6 +320,14 @@
       "Config": {
         "description": "``config.json``: what the UIs need of the deployment they run in.",
         "properties": {
+          "aliases": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Place"
+            },
+            "default": {},
+            "title": "Aliases",
+            "type": "object"
+          },
           "apps": {
             "anyOf": [
               {
@@ -347,6 +355,17 @@
             },
             "title": "Editors",
             "type": "object"
+          },
+          "origin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin"
           },
           "people": {
             "title": "People",
@@ -1222,6 +1241,32 @@
           "data"
         ],
         "title": "Ok[list[TraceSummary]]",
+        "type": "object"
+      },
+      "Place": {
+        "description": "Where mini apps and the editors are for a portal reached at one of its other origins.\n\nA deployment reached at several addresses, such as this machine's loopback and its tailnet\nname, is several portal origins (portalr ADR-0084). The sandbox and each editor are framed\nfrom the portal, so each portal origin needs its own, reachable from the same place: the\nsandbox's and the editors' origins beside that portal origin, which ``beside`` derives.",
+        "properties": {
+          "apps": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apps"
+          },
+          "editors": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": {},
+            "title": "Editors",
+            "type": "object"
+          }
+        },
+        "title": "Place",
         "type": "object"
       },
       "Point": {

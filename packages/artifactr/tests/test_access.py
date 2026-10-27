@@ -17,7 +17,7 @@ from datetime import timedelta
 from typing import Any
 
 import pytest
-from fastapi import APIRouter, FastAPI
+from fastapi import APIRouter
 from fastapi.routing import APIRoute, APIWebSocketRoute
 from fastapi.testclient import TestClient
 from mcp import Client
@@ -46,6 +46,7 @@ from artifactr.files.native import CREATE_NATIVE_FILE
 from artifactr.mcp import ArtifactrMcp, artifact_uri
 from artifactr.workspace import ACTIONS, Access, InMemoryStorage, Workspace, Workspaces
 from tests.artifact_types import Note
+from tests.fastapi.conftest import closing
 
 TENANT, WORKSPACE = "tenant", "w1"
 TENANT_WIDE = "artifactr:read_workspaces"
@@ -342,8 +343,10 @@ def router(workspaces: Workspaces, runner: Runner[None]) -> APIRouter:
 
 
 @pytest.fixture
-def client(workspaces: Workspaces, recorder: Recorder, router: APIRouter) -> Iterator[TestClient]:
-    app = FastAPI()
+def client(
+    workspaces: Workspaces, recorder: Recorder, runner: Runner[None], router: APIRouter
+) -> Iterator[TestClient]:
+    app = closing(runner)
     app.include_router(router)
     with TestClient(app) as client:
         assert client.portal is not None

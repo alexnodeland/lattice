@@ -420,6 +420,8 @@ export interface BridgeHost {
   readonly resize: (height: number) => void;
   /** The frame sent past its calls a minute, and isn't answered for now. */
   readonly quieted: () => void;
+  /** The app's document said something: it ran, whether or not it uses the bridge. */
+  readonly started?: () => void;
 }
 
 /**
@@ -439,6 +441,8 @@ export class Bridge {
   #measuredAt = Number.NEGATIVE_INFINITY;
   /** The latest measure heard too soon after the last, applied when its time comes. */
   #held: { height: number; timer: ReturnType<typeof setTimeout> } | null = null;
+  /** Whether the app's HTML was given to the sandbox, which runs the first it is given alone. */
+  #given = false;
   readonly #now: () => number;
 
   constructor(options: {
@@ -502,6 +506,19 @@ export class Bridge {
     this.#sizeChanged(height, true);
   }
 
+  /**
+   * Give the sandbox the app, once however often it is asked: when it says it is ready, and when
+   * its page has loaded, by which time it listens, so a ready said before the host listened, as
+   * on a slow phone, isn't the end of it. The sandbox runs the first it is given and passes any
+   * later one to the app, so a second is never sent.
+   */
+  give(): void {
+    if (!this.#given) {
+      this.#given = true;
+      this.#notify(RESOURCE_READY, { ...this.#host.app() });
+    }
+  }
+
   /** Hear a message: answered if it is the sandbox's, within its calls a minute; else dropped. */
   heard(event: { readonly source: unknown; readonly origin: string; readonly data: unknown }) {
     if (event.source !== this.#source || event.origin !== this.#origin) {
@@ -512,6 +529,7 @@ export class Bridge {
     const measured = isString(event.data) && event.data.includes('"measured"');
     const read = measured ? readMessage(event.data) : null;
     if (read !== null && isMeasured(read)) {
+      this.#host.started?.();
       this.#measure(read.params.height as number);
       return;
     }
@@ -524,10 +542,12 @@ export class Bridge {
       return;
     }
     const { method, params } = message;
+    if (method === PROXY_READY) {
+      return this.give();
+    }
+    this.#host.started?.(); // anything else is the app's, so the app ran
     if (message.kind === "notification") {
-      if (method === PROXY_READY) {
-        this.#notify(RESOURCE_READY, { ...this.#host.app() });
-      } else if (method === SIZE_CHANGED && isNumber(params.height)) {
+      if (method === SIZE_CHANGED && isNumber(params.height)) {
         this.#sizeChanged(params.height, params.measured === true);
       }
       return;

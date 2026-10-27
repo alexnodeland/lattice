@@ -206,6 +206,7 @@ function bridged(
   const opened: string[] = [];
   const sized: number[] = [];
   let quieted = 0;
+  let started = 0;
   const host: BridgeHost = {
     app: () => ({ title: "Dice", html: "<p>1</p>" }),
     context: () => ({ theme: "dark" }),
@@ -220,6 +221,9 @@ function bridged(
     quieted: () => {
       quieted += 1;
     },
+    started: () => {
+      started += 1;
+    },
   };
   const { kept, writes } = keeper();
   const bridge = new Bridge({
@@ -233,7 +237,17 @@ function bridged(
     bridge.heard({ source: from, origin, data });
     await vi.advanceTimersByTimeAsync(0);
   };
-  return { bridge, hear, posted, asked, opened, sized, writes, quiet: () => quieted };
+  return {
+    bridge,
+    hear,
+    posted,
+    asked,
+    opened,
+    sized,
+    writes,
+    quiet: () => quieted,
+    started: () => started,
+  };
 }
 
 test("a message from anything but the sandbox, at its origin, is dropped unanswered", async () => {
@@ -269,6 +283,36 @@ test("the sandbox is given the app once it is ready, and the app the host's cont
     },
     { jsonrpc: "2.0", method: "ui/notifications/host-context-changed", params: { theme: "dark" } },
   ]);
+});
+
+test("the sandbox is given the app once, however often it is ready or its page loads", async () => {
+  const { hear, posted, bridge, started } = bridged();
+  bridge.give();
+  await hear(text({ jsonrpc: "2.0", method: PROXY_READY }));
+  bridge.give();
+  expect(posted).toEqual([
+    {
+      jsonrpc: "2.0",
+      method: "ui/notifications/sandbox-resource-ready",
+      params: { title: "Dice", html: "<p>1</p>" },
+    },
+  ]);
+  expect(started()).toBe(0);
+});
+
+test("the app has started once its document says anything: its measure, or the app's own", async () => {
+  const measured = bridged();
+  await measured.hear(
+    text({
+      jsonrpc: "2.0",
+      method: "ui/notifications/size-changed",
+      params: { height: 300, measured: true },
+    }),
+  );
+  expect(measured.started()).toBe(1);
+  const asking = bridged();
+  await asking.hear(request(1, "ui/initialize"));
+  expect(asking.started()).toBe(1);
 });
 
 test("an app reaches its own state, and no other tool or method", async () => {

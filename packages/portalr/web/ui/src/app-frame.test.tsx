@@ -1,9 +1,12 @@
-import { expect, test, vi } from "vitest";
+import { expect, onTestFinished, test, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
+import { PROXY_READY, RESOURCE_READY } from "./app-bridge";
 import { AppFrame, type AppHost, AppHostContext, type ReadApp } from "./app-frame";
 import type { Shown } from "./artifacts";
 import { IntegrationsContext, type IsEnabled } from "./integrations";
+import { isObject } from "./json";
+import { START_WITHIN } from "./on-demand/apps";
 import { submissionId } from "./submission-id";
 import { axeViolations } from "./test/axe";
 
@@ -269,4 +272,71 @@ test("an app is shown whole, as tall as it asks, up to twice the window", async 
   fromFrame(frame, { method: "ui/notifications/size-changed", params: { height: 2000 } });
   await vi.waitFor(() => expect(frame.style.height).toBe("2000px"));
   expect(frame.getBoundingClientRect().height).toBe(Math.min(2000, innerHeight * 2));
+});
+
+/** The frame's window as the bridge sees it, standing in for it: what it was sent, kept. */
+function stoodIn() {
+  const sent: unknown[] = [];
+  // A window of this page's origin, so a message can come from it and its `postMessage` be kept.
+  const blank = document.body.appendChild(document.createElement("iframe"));
+  const window = blank.contentWindow as Window;
+  window.postMessage = (message: unknown) => sent.push(message);
+  onTestFinished(() => blank.remove());
+  const spy = vi.spyOn(HTMLIFrameElement.prototype, "contentWindow", "get");
+  spy.mockReturnValue(window);
+  onTestFinished(() => spy.mockRestore());
+  const given = () => sent.filter((each) => isObject(each) && each.method === RESOURCE_READY);
+  return { given };
+}
+
+test("a ready never heard: the app is given once its sandbox's page loads, and once only", async () => {
+  const { given } = stoodIn();
+  const frame = await frameIn(await shown());
+  frame.dispatchEvent(new Event("load"));
+  await vi.waitFor(() => expect(given()).toHaveLength(1));
+  fromFrame(frame, { method: PROXY_READY });
+  frame.dispatchEvent(new Event("load"));
+  await new Promise((settled) => setTimeout(settled, 50));
+  expect(given()).toHaveLength(1);
+});
+
+test("an app that never reports back is said not to have started, and can be tried again", async () => {
+  stoodIn();
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+  onTestFinished(() => {
+    vi.useRealTimers();
+  });
+  const screen = await shown();
+  const frame = await frameIn(screen);
+  frame.dispatchEvent(new Event("load"));
+  const said = screen.getByText(
+    `This app didn't start. Its sandbox at ${APPS} loaded, but the app in it never reported back.`,
+  );
+  // The frame's own load, of a page that isn't there, may come later and time it afresh.
+  await vi.waitFor(() => {
+    vi.advanceTimersByTime(START_WITHIN);
+    expect(said.query()).not.toBeNull();
+  });
+  await expect.element(said).toBeVisible();
+  await screen.getByRole("button", { name: "Try again" }).click();
+  await expect.element(said).not.toBeInTheDocument();
+  expect(await frameIn(screen)).not.toBe(frame);
+});
+
+test("an app that reports back in time is not said to have stalled", async () => {
+  stoodIn();
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+  onTestFinished(() => {
+    vi.useRealTimers();
+  });
+  const screen = await shown();
+  const frame = await frameIn(screen);
+  frame.dispatchEvent(new Event("load"));
+  fromFrame(frame, {
+    method: "ui/notifications/size-changed",
+    params: { height: 400, measured: true },
+  });
+  vi.advanceTimersByTime(START_WITHIN);
+  await new Promise((settled) => queueMicrotask(() => settled(null)));
+  expect(screen.container.textContent).not.toContain("didn't start");
 });

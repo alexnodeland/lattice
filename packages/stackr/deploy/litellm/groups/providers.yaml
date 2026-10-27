@@ -7,7 +7,8 @@
 # cache_control, so without these every request pays full input. One on the
 # system prompt, and one on the last message: Anthropic reads the longest
 # cached prefix it finds looking back from a breakpoint (up to 20 blocks), so
-# the next turn's -1 reads what this turn's -1 wrote. LiteLLM's own default.
+# the next turn's -1 reads what this turn's -1 wrote; a step that adds more
+# than 20 blocks between breakpoints misses, and writes the prefix again.
 # Only on Anthropic deployments: other providers, and the upstream groups,
 # cache their own way or reject the field.
 model_list:

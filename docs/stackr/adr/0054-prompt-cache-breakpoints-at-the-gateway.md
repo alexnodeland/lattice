@@ -16,7 +16,7 @@ LiteLLM adds breakpoints itself with `cache_control_injection_points` in a deplo
 
 ## Decision
 
-- **`default` and `fast` in `groups/providers.yaml` carry two points:** the system prompt and the last message, LiteLLM's own default. On the next turn Anthropic looks back up to 20 blocks from the new last breakpoint for the longest prefix it cached, so it reads the conversation so far and writes only what is new. A point on the message before the last would write a strict prefix of what the last one writes, spend a slot, and with two messages land on the system prompt again.
+- **`default` and `fast` in `groups/providers.yaml` carry two points:** the system prompt and the last message, the same two LiteLLM's own `enable_anthropic_prompt_caching` adds (`get_default_injection_points` in v1.103.0's hook). On the next turn Anthropic looks back up to 20 blocks from the new last breakpoint for the longest prefix it cached, so it reads the conversation so far and writes only what is new; a step that adds more than 20 content blocks between breakpoints misses, and writes the prefix again. A point on the message before the last would write a strict prefix of what the last one writes, and spend a slot; with two messages, -2 is the system prompt again.
 - **Nothing else gets them:** not the aliases in `config.yaml`, not the other providers, which cache their own way, and not `groups/upstream.yaml`, whose models are behind an OpenAI-compatible API that may reject the field.
 - **`scripts/check-config litellm` holds the groups to it:** an `anthropic/` deployment in `groups/` without at least these two points (a `control`, such as a TTL, and more points are allowed), or any other deployment with points at all, fails `make validate`.
 
@@ -58,9 +58,9 @@ The groups are what applications ask for, so they are where the savings are; the
 
 ## Consequences
 
-- Easier: a long conversation on `default` or `fast` reads its history from Anthropic's cache, at about 0.1 times the input price, for 5 minutes after its last use (Anthropic's documentation, verified on 2026-10-27).
+- Easier: a long conversation on `default` or `fast` reads its history from Anthropic's cache, at about 0.1 times the input price, for 5 minutes after its last use ([Anthropic's documentation](https://platform.claude.com/docs/en/docs/build-with-claude/prompt-caching), read on 2026-10-27 when this was written).
 - Harder: each new prefix is written at about 1.25 times the input price, so a one-off request costs a little more. Prompts below Anthropic's minimum (1,024 tokens on Sonnet 4.6, 4,096 on Haiku 4.5) aren't cached.
-- Limits: an assistant message that only calls tools, with no text, takes no breakpoint (the last message of a request is a user turn or a tool result, so the two points aren't affected). The check recognises only `anthropic/` models: a Claude group on Bedrock or Vertex would need adding to it. The four-breakpoint cap with a client that marks its own, such as Claude Code, is from LiteLLM's source, not tested here.
+- Limits: an assistant message that only calls tools, with no text, takes no breakpoint (the last message of a request is a user turn or a tool result, so the two points aren't affected). The check recognises only `anthropic/` models: a Claude group on Bedrock or Vertex would need adding to it. The hook never pushes a request past Anthropic's four (from LiteLLM's source, not tested here): a 400 about `cache_control` means the client's own marks, such as Claude Code's, exceed it.
 - To revisit: Anthropic's 1-hour TTL for long idle threads; points on the `claude-*` aliases; that the cache tokens reach pydantic-ai's usage (client LiteLLM 1.83.0, proxy 1.103.0) and Langfuse, which is unverified.
 
 ## Action items

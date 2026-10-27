@@ -214,7 +214,12 @@ function Threads() {
       <Connection snapshot={snapshot} onReconnect={stream.reconnect} waiting="the workspace" />
       {needed.length > 0 && (
         <section aria-labelledby="needs-you" className="flex flex-col gap-3">
-          <SectionTitle id="needs-you">Needs you</SectionTitle>
+          <SectionTitle id="needs-you">
+            Needs you{" "}
+            <span className="font-mono font-normal text-muted text-sm tabular-nums">
+              {needed.length}
+            </span>
+          </SectionTitle>
           <Rows label="Needs you">
             {needed.map(({ request, thread, title, question, risk }) => (
               <Row
@@ -277,31 +282,30 @@ function Threads() {
                   )
                 }
                 name={
-                  <RowLink
-                    // Described by what was said last, not by a time that moves.
-                    {...(said && { "aria-describedby": `${thread.id}-said` })}
-                    render={
-                      <Link
-                        to="/t/$tenant/w/$workspace/threads/$thread"
-                        params={{ tenant, workspace, thread: thread.id }}
-                      />
-                    }
-                  >
-                    {thread.title || "Untitled"}
-                  </RowLink>
-                }
-                end={
-                  <>
+                  <span className="flex items-center gap-2">
+                    {/* Unread: a mark in the working colour at the row's start (portalr ADR-0081). */}
                     {seen[thread.id] !== undefined && thread.active > (seen[thread.id] ?? 0) && (
                       <span
                         role="img"
                         aria-label="Moved since you read it"
-                        className="size-2 rounded-full bg-accent"
+                        className="size-2 shrink-0 rounded-full bg-accent"
                       />
                     )}
-                    {status && <RunStatus status={status} />}
-                  </>
+                    <RowLink
+                      // Described by what was said last, not by a time that moves.
+                      {...(said && { "aria-describedby": `${thread.id}-said` })}
+                      render={
+                        <Link
+                          to="/t/$tenant/w/$workspace/threads/$thread"
+                          params={{ tenant, workspace, thread: thread.id }}
+                        />
+                      }
+                    >
+                      {thread.title || "Untitled"}
+                    </RowLink>
+                  </span>
                 }
+                end={status && <RunStatus status={status} />}
               />
             );
           })}

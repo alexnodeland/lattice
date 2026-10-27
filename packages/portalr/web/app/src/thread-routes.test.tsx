@@ -145,7 +145,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-test("a thread shows its messages by side, its calls and questions in place, and why a turn failed", async () => {
+test("a thread shows its messages, the reader's on the wash, its calls and questions in place, and why a turn failed", async () => {
   const sent: { type: string; content?: string; message_id?: string }[] = [];
   const { screen } = await open(
     "/t/acme/w/notes/threads/thr_1",
@@ -162,8 +162,12 @@ test("a thread shows its messages by side, its calls and questions in place, and
     log.getByRole("listitem", { name: "You" }).first().element(),
     log.getByRole("listitem", { name: "Assistant" }).element(),
   ];
-  expect(getComputedStyle(mine).alignSelf).toBe("flex-end");
+  // Both at the start of the line: the reader's words on the quiet wash, the agent's unboxed.
+  expect(getComputedStyle(mine).alignSelf).toBe("flex-start");
   expect(getComputedStyle(theirs).alignSelf).toBe("flex-start");
+  const words = (item: Element) => getComputedStyle(item.querySelector(":scope > div") as Element);
+  expect(words(mine).backgroundColor).not.toBe("rgba(0, 0, 0, 0)");
+  expect(words(theirs).backgroundColor).toBe("rgba(0, 0, 0, 0)");
   const [created, drafted] = log.getByRole("list", { name: "Tools" }).elements();
   expect(created?.textContent).toContain("create_artifact");
   expect(drafted?.textContent).toContain("Refused");

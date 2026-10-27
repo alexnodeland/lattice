@@ -95,7 +95,10 @@ Then("they are told it isn't found", async ({ page }) => {
 /** The artifact's thumbs are items of its actions menu, checked as given (portalr ADR-0080). */
 When("they find the note helpful", async ({ page }) => {
   await artifactPage(page).getByRole("button", { name: "Artifact actions" }).click();
-  await page.getByRole("menuitemcheckbox", { name: "Helpful", exact: true }).click();
+  await page
+    .getByRole("menu")
+    .getByRole("menuitemcheckbox", { name: "Helpful", exact: true })
+    .click();
 });
 
 Then("the note shows them finding it helpful", async ({ page }) => {

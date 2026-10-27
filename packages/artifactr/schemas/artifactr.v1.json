@@ -6,6 +6,19 @@
         "run_id": {
           "$ref": "#/$defs/RunId"
         },
+        "started_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Started At"
+        },
         "thread_id": {
           "$ref": "#/$defs/ThreadId"
         }
@@ -2727,6 +2740,16 @@
     "RunUsage": {
       "description": "Token and request counts for a run.",
       "properties": {
+        "cache_read_tokens": {
+          "default": 0,
+          "title": "Cache Read Tokens",
+          "type": "integer"
+        },
+        "cache_write_tokens": {
+          "default": 0,
+          "title": "Cache Write Tokens",
+          "type": "integer"
+        },
         "input_tokens": {
           "default": 0,
           "title": "Input Tokens",
@@ -2854,6 +2877,18 @@
           "title": "Delta",
           "type": "string"
         },
+        "offset": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Offset"
+        },
         "part": {
           "title": "Part",
           "type": "integer"
@@ -2928,6 +2963,18 @@
         "delta": {
           "title": "Delta",
           "type": "string"
+        },
+        "offset": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Offset"
         },
         "part": {
           "title": "Part",

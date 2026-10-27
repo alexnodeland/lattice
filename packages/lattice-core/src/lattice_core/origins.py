@@ -30,6 +30,9 @@ HOST: Final = re.compile(r"[A-Za-z0-9:.\-\[\]]+")
 on, no space, quote, comma or semicolon, and ASCII alone, so an internationalised name comes as
 its punycode."""
 
+NUMBER: Final = re.compile(r"[0-9]+|0[xX][0-9a-fA-F]*")
+"""A label a browser reads as a number, which as a host's last makes it an IPv4 address."""
+
 LABEL: Final = re.compile(r"(?!-)[a-z0-9-]{1,63}(?<!-)")
 """One label of a host name, as DNS spells it."""
 
@@ -75,7 +78,7 @@ def web_origin(url: str, *, what: str = "the origin") -> str:
     address = _address(host)
     labels = host.split(".")
     if address is None and not (
-        all(LABEL.fullmatch(each) for each in labels) and not labels[-1].isdigit()
+        all(LABEL.fullmatch(each) for each in labels) and not NUMBER.fullmatch(labels[-1])
     ):
         raise ValueError(f"{said}: a host name of DNS labels, the last not a number")
     loopback = host in LOOPBACK

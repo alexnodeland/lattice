@@ -16,8 +16,9 @@ ALIASES = 8
 """The most other origins a portal may be reached at: a policy naming many is a mistake."""
 
 
-EDITOR_PATH = re.compile(r"(/[A-Za-z0-9._~\-/]*)?")
-"""An editor's path: nothing a policy or a header separates on, nor an escape."""
+EDITOR_PATH = re.compile(r"(/(?!\.\.?(?:/|$))[A-Za-z0-9._~\-]+)*/?")
+"""An editor's path: nothing a policy or a header separates on, nor an escape, nor an empty,
+``.`` or ``..`` segment."""
 
 
 class Surfaces(BaseModel):
@@ -251,7 +252,10 @@ def _editor_urls(editors: dict[str, str]) -> dict[str, str]:
         origin = urlunsplit((parts.scheme, parts.netloc, "", "", ""))
         at = web_origin(origin, what=f"{key}'s editor")
         if not EDITOR_PATH.fullmatch(parts.path):
-            raise ValueError(f"{key}'s editor is at {url}: a path of letters, digits and ._~-/")
+            raise ValueError(
+                f"{key}'s editor is at {url}: a path of letters, digits and ._~-/, "
+                "no empty, . or .. segment"
+            )
         kept[key] = at + parts.path
     return kept
 

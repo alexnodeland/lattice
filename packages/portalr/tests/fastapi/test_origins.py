@@ -195,6 +195,16 @@ def test_an_editors_path_is_plain(path: str) -> None:
         site(editors={"files:gridcraft": f"https://editor.example{path}"})
 
 
+def test_exactly_eight_aliases_are_named() -> None:
+    eight = {f"https://alias{n}.example": {} for n in range(8)}
+    assert len(site(origin=LOOPBACK, aliases=eight).aliases) == 8
+
+
+def test_an_editors_plain_path_is_kept() -> None:
+    made = site(editors={"files:gridcraft": "https://editor.example/a.b/c-d_e~f/"})
+    assert made.editors == {"files:gridcraft": "https://editor.example/a.b/c-d_e~f/"}
+
+
 def test_without_aliases_or_an_origin_a_site_is_as_it_was() -> None:
     made = site(apps=APPS, editors=EDITORS)
     assert (made.origin, made.aliases) == (None, {})

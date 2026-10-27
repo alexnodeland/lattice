@@ -27,6 +27,7 @@ const live: Artifactr.Live = {
   reply: "writing",
   truncated: false,
   framed: false,
+  usage: null,
 };
 const run = (id: string): Artifactr.Run =>
   ({

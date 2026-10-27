@@ -102,6 +102,7 @@ function Page() {
               reply: "writing",
               truncated: false,
               framed: false,
+              usage: null,
             },
             requests: [],
             answered: [],

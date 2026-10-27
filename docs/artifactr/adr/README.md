@@ -99,5 +99,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0093](0093-presence-who-has-an-artifact-open-passed-on-and-never-stored.md) | Presence: who has an artifact open, passed on and never stored | Accepted |
 | [0094](0094-diagrams-revisions-thinned-to-one-an-actor-every-ten-minutes.md) | Diagrams' revisions thinned to one an actor every ten minutes | Accepted |
 | [0095](0095-a-run-that-waits-on-nothing-is-failed-and-a-message-that-starts-nothing-is-told.md) | A run that waits on nothing is failed, and a message that starts nothing is told | Accepted |
+| [0096](0096-a-run-counts-each-model-request-exactly-live-and-at-its-end.md) | A run counts each model request exactly, live and at its end | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

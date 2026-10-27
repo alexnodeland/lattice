@@ -2364,7 +2364,7 @@
         "type": "object"
       },
       "RunUsage": {
-        "description": "Token and request counts for a run.",
+        "description": "Token and request counts for a run (ADR-0096).\n\nEvery field has a default, so an event recorded before a field was counted reads as 0,\n``None``, or no steps.",
         "properties": {
           "cache_read_tokens": {
             "default": 0,
@@ -2381,15 +2381,39 @@
             "title": "Input Tokens",
             "type": "integer"
           },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
           "output_tokens": {
             "default": 0,
             "title": "Output Tokens",
+            "type": "integer"
+          },
+          "reasoning_tokens": {
+            "default": 0,
+            "title": "Reasoning Tokens",
             "type": "integer"
           },
           "requests": {
             "default": 0,
             "title": "Requests",
             "type": "integer"
+          },
+          "steps": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/StepUsage"
+            },
+            "title": "Steps",
+            "type": "array"
           }
         },
         "title": "RunUsage",
@@ -2452,6 +2476,60 @@
           "type"
         ],
         "title": "SetThreadMode",
+        "type": "object"
+      },
+      "StepUsage": {
+        "description": "Token counts of one model request, a step of a run, as the provider reported them.",
+        "properties": {
+          "cache_read_tokens": {
+            "default": 0,
+            "title": "Cache Read Tokens",
+            "type": "integer"
+          },
+          "cache_write_tokens": {
+            "default": 0,
+            "title": "Cache Write Tokens",
+            "type": "integer"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "input_tokens": {
+            "default": 0,
+            "title": "Input Tokens",
+            "type": "integer"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "output_tokens": {
+            "default": 0,
+            "title": "Output Tokens",
+            "type": "integer"
+          },
+          "reasoning_tokens": {
+            "default": 0,
+            "title": "Reasoning Tokens",
+            "type": "integer"
+          }
+        },
+        "title": "StepUsage",
         "type": "object"
       },
       "StopRun": {

@@ -14,7 +14,7 @@
       "canvas": { "total": 350000, "largest": 165000 },
       "replay-account": { "total": 1400, "largest": 1400 },
       "replay": { "total": 61000, "largest": 61000 },
-      "streaming": { "total": 1100, "largest": 1100 },
+      "streaming": { "total": 1300, "largest": 1300 },
       "json-view": { "total": 2800, "largest": 2800 },
       "touch": { "total": 2500, "largest": 2500 }
     }

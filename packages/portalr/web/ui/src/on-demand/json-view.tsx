@@ -9,8 +9,7 @@
  * caller, so the bundle shares no chunk between them.
  */
 
-import { type ReactNode, useState } from "react";
-import { Button } from "../button";
+import { Fragment, type ReactNode, useState } from "react";
 import { TYPE } from "../type";
 
 /** The most characters formatted, or indented: past it, a value is shown as recorded, with a note. */
@@ -213,6 +212,8 @@ const plain = (text: string) =>
 export interface Shell {
   readonly region: (children: ReactNode) => ReactNode;
   readonly copy: (text: string, what?: string) => ReactNode;
+  /** A toggle's button, pressed as chosen: the kit's, from the caller, so no chunk is shared. */
+  readonly choice: (label: string, pressed: boolean, onClick: () => void) => ReactNode;
 }
 
 /**
@@ -401,15 +402,11 @@ export function Formatted({
           {toggles && (
             <fieldset aria-label={`View of ${what}`} className="m-0 flex gap-1 border-0 p-0">
               {(["formatted", "raw"] as const).map((choice) => (
-                <Button
-                  key={choice}
-                  variant="ghost"
-                  size="sm"
-                  aria-pressed={view === choice}
-                  onClick={() => choose(choice)}
-                >
-                  {choice === "raw" ? "Raw" : "Formatted"}
-                </Button>
+                <Fragment key={choice}>
+                  {shell.choice(choice === "raw" ? "Raw" : "Formatted", view === choice, () =>
+                    choose(choice),
+                  )}
+                </Fragment>
               ))}
             </fieldset>
           )}

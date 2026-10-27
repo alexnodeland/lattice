@@ -7,6 +7,7 @@
 import type { Artifactr } from "@portalr/client";
 import type { ReactNode } from "react";
 import { useState } from "react";
+import { Button } from "./button";
 import { CopyButton } from "./copy-button";
 import { Disclosure } from "./disclosure";
 import { Icon } from "./icon";
@@ -62,8 +63,19 @@ function Part({
   );
   if (view) {
     const copy = (copied: string, of = what) => <CopyButton text={copied} what={of} />;
+    const choice = (label: string, pressed: boolean, onClick: () => void) => (
+      <Button variant="ghost" size="sm" aria-pressed={pressed} onClick={onClick}>
+        {label}
+      </Button>
+    );
     return (
-      <view.Formatted name={name} what={what} text={shown} cut={cut} shell={{ region, copy }} />
+      <view.Formatted
+        name={name}
+        what={what}
+        text={shown}
+        cut={cut}
+        shell={{ region, copy, choice }}
+      />
     );
   }
   return (

@@ -1,6 +1,6 @@
 import type { Artifactr, ArtifactrV1 } from "@portalr/client";
 import { describe, expect, onTestFinished, test, vi } from "vitest";
-import { userEvent } from "vitest/browser";
+import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import {
   ActionsMenu,
@@ -1059,7 +1059,7 @@ test("the strip counts the turn's tokens as chips, each estimated and named in f
   await expect.element(group.getByText("Input tokens, estimated: 1,000")).toBeInTheDocument();
   await expect.element(group.getByText("Output tokens, estimated: 101")).toBeInTheDocument();
   // A chip never breaks across lines, and the counts are never announced.
-  const chip = group.getByText("out ~101").element().parentElement as HTMLElement;
+  const chip = group.getByText("out ~101").element().closest("[data-chip]") as HTMLElement;
   expect(getComputedStyle(chip).whiteSpace).toBe("nowrap");
   expect(chip.closest("[role=status], [aria-live]")).toBeNull();
   await screen.rerender(strip({ outputChars: 401 }, now, { history: null }));
@@ -1413,4 +1413,19 @@ test("thinking is isolated, so a direction mark in it can't reorder what follows
   const shown = screen.getByText("a\u202eb");
   await expect.element(shown).toBeVisible();
   expect(shown.element().tagName).toBe("BDI");
+});
+
+test("on a narrow phone, the strip's buttons wrap under it rather than squeeze it", async () => {
+  await page.viewport(320, 700);
+  const now = new Date();
+  const paused = { ...run("paused"), live: live() };
+  const screen = await render(
+    <RunStrip run={paused} onStop={sent()} onQuestion={() => {}} now={now} />,
+  );
+  const group = screen.getByRole("group", { name: "This turn" });
+  await expect.element(group.getByRole("button", { name: "Go to the question" })).toBeVisible();
+  const strip = group.element();
+  expect(strip.scrollWidth).toBeLessThanOrEqual(strip.clientWidth);
+  const column = strip.firstElementChild as HTMLElement;
+  expect(column.getBoundingClientRect().width).toBeGreaterThanOrEqual(160);
 });

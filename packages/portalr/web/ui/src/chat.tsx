@@ -1182,16 +1182,16 @@ export function RunStrip({
   return (
     <fieldset
       aria-label="This turn"
-      className="m-0 flex items-center gap-3 rounded-(--card-radius) border border-line bg-surface px-3 py-2"
+      className="m-0 flex flex-wrap items-center gap-3 rounded-(--card-radius) border border-line bg-surface px-3 py-2"
     >
       {/* Its status, then what it does and for how long, then its counts: one left edge. */}
-      <span className="flex min-w-0 flex-1 flex-col items-start gap-1">
+      <span className="flex min-w-40 flex-1 flex-col items-start gap-1">
         <StatusBadge tone={tone}>{status}</StatusBadge>
         {/* One status, kept through the add-on's loading, so what it says changes in place. */}
         <span role="status" className="sr-only">
           {working && addon ? <addon.Said run={run} status={status} now={at} /> : status}
         </span>
-        {active && (
+        {active && (since !== null || (working && addon)) && (
           <span className={`${TYPE.note} flex flex-wrap gap-x-2 tabular-nums`}>
             {working && addon && <addon.Phase run={run} now={at} />}
             {since !== null && (

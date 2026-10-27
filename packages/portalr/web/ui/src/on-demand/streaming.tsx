@@ -82,7 +82,10 @@ export function Phase({ run, now }: { run: Artifactr.Run; now: Date }) {
 /** One count, as a chip: "in ~1,060", named in full for a screen reader. */
 function Chip({ short, name, n }: { short: string; name: string; n: number }) {
   return (
-    <span className="inline-flex items-center whitespace-nowrap rounded-(--badge-radius) bg-subtle px-(--badge-pad-end) py-(--badge-pad-y) font-medium text-muted text-xs tabular-nums">
+    <span
+      data-chip=""
+      className="inline-flex items-center whitespace-nowrap rounded-(--badge-radius) bg-subtle px-(--badge-pad-end) py-(--badge-pad-y) font-medium text-muted text-xs tabular-nums"
+    >
       <span aria-hidden="true">
         {short} ~{count(n)}
       </span>

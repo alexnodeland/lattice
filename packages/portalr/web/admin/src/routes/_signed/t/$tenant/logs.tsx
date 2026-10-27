@@ -206,6 +206,7 @@ function Filter({ shown }: { shown: Required<Shown> }) {
       <Folded
         title="Find"
         action="Find…"
+        kind="filter"
         said={[
           LOG_RANGES.find((range) => range.hours === shown.hours)?.label,
           shown.thread && `thread ${shown.thread}`,

@@ -51,6 +51,23 @@ const pointAt: BrowserCommand<[selector: string, hold?: boolean]> = async (
 // The screenshots' baselines are Linux's, made in CI (portalr ADR-0019): they run where CI is.
 const screenshots = "src/**/*.screenshot.test.tsx";
 
+// A phone: a finger as the pointer, a narrow window, and the device's scale (portalr ADR-0082).
+// Its tests are `*.touch.test.tsx`, run in this instance alone; the rest see a mouse.
+const touch = {
+  browser: "chromium" as const,
+  name: "touch",
+  provider: playwright({
+    contextOptions: {
+      hasTouch: true,
+      isMobile: true,
+      deviceScaleFactor: 2,
+      viewport: { width: 390, height: 844 },
+      colorScheme: "light",
+      reducedMotion: "reduce",
+    },
+  }),
+};
+
 /** Ask for forced colours, as a high-contrast mode does, or stop asking. */
 const forcedColors: BrowserCommand<[active: boolean]> = async ({ page }, active) => {
   await page.emulateMedia({ forcedColors: active ? "active" : "none" });
@@ -79,12 +96,31 @@ export default defineConfig({
           name: "components",
           include: ["src/**/*.test.{ts,tsx}"],
           setupFiles: ["./src/test/setup.ts"],
-          exclude: [...configDefaults.exclude, ...(process.env.CI ? [] : [screenshots])],
+          exclude: [
+            ...configDefaults.exclude,
+            "src/**/*.touch.test.tsx",
+            ...(process.env.CI ? [] : [screenshots]),
+          ],
           browser: {
             enabled: true,
             headless: true,
             provider: playwright(),
             instances: [scheme("light"), scheme("dark")],
+            commands: { forcedColors, pointAt, pointerAway, reduceMotion },
+          },
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: "touch",
+          include: ["src/**/*.touch.test.tsx"],
+          setupFiles: ["./src/test/setup.ts"],
+          browser: {
+            enabled: true,
+            headless: true,
+            provider: playwright(),
+            instances: [touch],
             commands: { forcedColors, pointAt, pointerAway, reduceMotion },
           },
         },

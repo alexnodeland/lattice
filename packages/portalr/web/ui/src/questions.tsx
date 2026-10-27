@@ -323,12 +323,19 @@ function Asking({
           )}
           {/* Keyed apart: React reusing one button for both would make the click that reached
               the review submit it, as the node turned into the submit button under the pointer. */}
+          {/* The step's own next move, which a phone's thumb bar mirrors (portalr ADR-0082). */}
           {stepped && !review ? (
-            <Button key="next" type="button" onClick={next} disabled={closed}>
+            <Button key="next" type="button" onClick={next} disabled={closed} data-thumb-action="">
               Next
             </Button>
           ) : (
-            <Button key="answer" type="submit" disabled={sent} pending={pending}>
+            <Button
+              key="answer"
+              type="submit"
+              disabled={sent}
+              pending={pending}
+              data-thumb-action=""
+            >
               Answer
             </Button>
           )}

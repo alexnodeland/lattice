@@ -3,7 +3,7 @@ import { cn } from "./cn";
 
 /** A scrolling region's look: a tab stop, with the focus ring the kit's controls have. */
 export const SCROLLS =
-  "overflow-x-auto outline-offset-(--focus-offset) focus-visible:outline-(length:--focus-width) focus-visible:outline-focus";
+  "overflow-x-auto outline-offset-(--focus-offset) focus-visible:outline-(length:--focus-width) focus-visible:outline-focus phone:as-scroll-shadows";
 
 /**
  * What scrolls sideways when it is wider than the page, such as a table or a block of code: a tab

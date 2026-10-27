@@ -11,10 +11,13 @@ import { FEEDBACK, RING } from "./states";
 export type Appearance = "system" | "light" | "dark";
 
 const APPEARANCES: readonly (readonly [Appearance, string])[] = [
-  ["system", "Follow the system"],
+  ["system", "System"],
   ["light", "Light"],
   ["dark", "Dark"],
 ];
+
+/** An appearance as a segment of a three-way track (portalr ADR-0085), chosen on the surface. */
+const SEGMENT = `flex-1 cursor-default rounded-(--segmented-item-radius) px-(--segmented-item-pad-x) py-(--segmented-item-pad-y) text-center font-medium text-muted outline-none data-checked:bg-surface data-checked:text-fg data-checked:shadow-(--card-shadow) data-highlighted:ring-(length:--focus-width) data-highlighted:ring-focus data-highlighted:ring-inset ${FEEDBACK}`;
 
 /** Two letters for a name: its first and last words' initials. */
 function initials(name: string): string {
@@ -122,6 +125,7 @@ function PrivacySwitch({
       {pending && <Note>{pending}</Note>}
       <Menu.LinkItem href={guide} target="_blank" rel="noopener noreferrer" className={item}>
         {words.link}
+        <Icon icon={glyphs.externalLink} className="shrink-0 text-muted" />
       </Menu.LinkItem>
     </>
   );
@@ -199,13 +203,11 @@ export function AccountMenu({
               <Menu.RadioGroup
                 value={appearance}
                 onValueChange={(chosen: Appearance) => onAppearance(chosen)}
+                className="mx-4 mb-2 flex gap-0.5 rounded-(--segmented-radius) border border-line bg-subtle p-(--segmented-pad)"
               >
                 {APPEARANCES.map(([value, label]) => (
-                  <Menu.RadioItem key={value} value={value} className={item}>
+                  <Menu.RadioItem key={value} value={value} className={SEGMENT}>
                     {label}
-                    <Menu.RadioItemIndicator className="text-accent">
-                      <Icon icon={glyphs.check} />
-                    </Menu.RadioItemIndicator>
                   </Menu.RadioItem>
                 ))}
               </Menu.RadioGroup>

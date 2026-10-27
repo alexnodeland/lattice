@@ -40,7 +40,7 @@ test("it holds the scheme, chosen among three, and signing out", async () => {
   const signedIn = menu.getByRole("group", { name: "Alex Nodeland alex@acme.test" });
   await expect.element(signedIn.getByRole("menuitem", { name: "Sign out" })).toBeVisible();
   await expect
-    .element(menu.getByRole("menuitemradio", { name: "Follow the system" }))
+    .element(menu.getByRole("menuitemradio", { name: "System" }))
     .toHaveAttribute("aria-checked", "true");
   await menu.getByRole("menuitemradio", { name: "Dark" }).click();
   expect(onAppearance).toHaveBeenCalledExactlyOnceWith("dark");

@@ -219,7 +219,10 @@ async def test_the_proxys_counts_reach_the_runs_end_as_they_were_reported() -> N
     ws = await workspace("acme", "launch")
     thread = await ws.create_thread()
     runner = Runner(agent(proxy.model(), LiteLLMGateway()), app=None)
-    await started(await runner.send(ws, thread.id, "hi")).wait()
+    try:
+        await started(await runner.send(ws, thread.id, "hi")).wait()
+    finally:
+        await runner.aclose()
     ended = (await ws.read())[-1].event
     assert isinstance(ended, RunEnded)
     assert ended.usage is not None

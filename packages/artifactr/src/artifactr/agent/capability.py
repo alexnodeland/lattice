@@ -217,7 +217,9 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
                 watcher.cancel()
                 await asyncio.gather(watcher, return_exceptions=True)
         except asyncio.CancelledError:
-            stopped = self._ended(session, "stopped", usage=_usage(ctx.usage, session.steps))
+            stopped = self._ended(
+                session, "stopped", usage=_usage(ctx.usage, session.steps, partial=True)
+            )
             await _record(workspace, stopped, cursor=delivered.at(delivered.seq))
             raise
         except Exception as error:
@@ -225,7 +227,7 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
             failed = self._ended(
                 session,
                 "failed",
-                usage=_usage(ctx.usage, session.steps),
+                usage=_usage(ctx.usage, session.steps, partial=True),
                 error=redacted(str(error)),
                 reason=reason,
             )
@@ -323,7 +325,7 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
 
         The total sent is the run segment's requests summed: pydantic-ai's own count takes a
         streamed response in parts, its tokens before its request, so mid-step it is neither
-        (ADR-0096). The run's end records pydantic-ai's count, which agrees once the step is done.
+        (ADR-0096). The run's end sums the same steps.
         """
         sent = time.monotonic()
         response = await handler(request_context)
@@ -595,18 +597,39 @@ def _reason(error: Exception) -> str | None:
     return "tool_retries_exhausted" if exhausted else "unexpected_model_behavior"
 
 
-def _usage(usage: PydanticUsage, steps: Sequence[StepUsage]) -> RunUsage:
-    """What a run used, as its events record it: so far, for a run that ends early."""
-    return RunUsage(
-        requests=usage.requests,
-        input_tokens=usage.input_tokens,
-        output_tokens=usage.output_tokens,
-        cache_read_tokens=usage.cache_read_tokens,
-        cache_write_tokens=_cache_write(usage),
-        reasoning_tokens=usage.details.get("reasoning_tokens", 0),
-        model=steps[-1].model if steps else None,
-        steps=tuple(steps),
+def _usage(usage: PydanticUsage, steps: Sequence[StepUsage], *, partial: bool = False) -> RunUsage:
+    """What a run used, as its events record it: so far, for a run that ends early.
+
+    The tokens are the steps', summed, so the sums and the steps never disagree; ``requests`` is
+    pydantic-ai's. A run that ends early, ``partial``, adds a last step without a model for what
+    pydantic-ai counted that no step did: a request stopped or failed mid-stream (ADR-0096).
+    """
+    taken = list(steps)
+    if partial and (rest := _rest(usage, taken)) is not None:
+        taken.append(rest)
+    if not taken:
+        return RunUsage(
+            requests=usage.requests,
+            input_tokens=usage.input_tokens,
+            output_tokens=usage.output_tokens,
+            cache_read_tokens=usage.cache_read_tokens,
+            cache_write_tokens=_cache_write(usage),
+            reasoning_tokens=usage.details.get("reasoning_tokens", 0),
+        )
+    return _summed(taken).model_copy(update={"requests": usage.requests, "steps": tuple(taken)})
+
+
+def _rest(usage: PydanticUsage, steps: Sequence[StepUsage]) -> StepUsage | None:
+    """What pydantic-ai counted beyond the steps, as a step of its own; ``None`` for nothing."""
+    summed = _summed(steps)
+    rest = StepUsage(
+        input_tokens=max(0, usage.input_tokens - summed.input_tokens),
+        output_tokens=max(0, usage.output_tokens - summed.output_tokens),
+        cache_read_tokens=max(0, usage.cache_read_tokens - summed.cache_read_tokens),
+        cache_write_tokens=max(0, _cache_write(usage) - summed.cache_write_tokens),
+        reasoning_tokens=max(0, usage.details.get("reasoning_tokens", 0) - summed.reasoning_tokens),
     )
+    return rest if rest != StepUsage() else None
 
 
 def _step(response: ModelResponse, *, duration_ms: int) -> StepUsage:
@@ -634,7 +657,10 @@ def _cache_write(usage: PydanticUsage | RequestUsage) -> int:
 
 
 def _summed(steps: Sequence[StepUsage]) -> RunUsage:
-    """The usage of a run's requests so far, summed; its steps left out."""
+    """The usage of a run's requests so far, summed; its steps left out.
+
+    Its model is that of the last request that names one.
+    """
     return RunUsage(
         requests=len(steps),
         input_tokens=sum(step.input_tokens for step in steps),
@@ -642,7 +668,7 @@ def _summed(steps: Sequence[StepUsage]) -> RunUsage:
         cache_read_tokens=sum(step.cache_read_tokens for step in steps),
         cache_write_tokens=sum(step.cache_write_tokens for step in steps),
         reasoning_tokens=sum(step.reasoning_tokens for step in steps),
-        model=steps[-1].model,
+        model=next((step.model for step in reversed(steps) if step.model), None),
     )
 
 

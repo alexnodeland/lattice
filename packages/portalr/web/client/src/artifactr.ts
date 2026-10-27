@@ -628,11 +628,12 @@ export function applyLive(state: Workspace, frame: v1.Server, now: number): Work
   }
   const { event } = frame;
   if (event.type === "usage") {
-    // A total, not an increment: one sent again, or late, counts nothing twice.
+    // A total, not an increment: one sent again, or late, counts nothing twice. It is no output:
+    // the run's last output stays when it was, and a replay it starts isn't missing its start.
     const had = run.live.usage;
     return (had?.requests ?? 0) > (event.total.requests ?? 0)
       ? state
-      : withLive(state, run.id, (live) => ({ ...live, usage: event.total }));
+      : withLive(state, run.id, (live) => ({ ...live, framed: true, usage: event.total }));
   }
   // The first frame after a welcome that isn't a part's start: the start of what streamed was
   // lost before the replay.

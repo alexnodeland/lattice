@@ -1,8 +1,8 @@
 /**
  * What a turn under way says beyond its words (portalr ADR-0083), loaded as the first run
  * streams: what the model is doing, the one status that says so, the turn's token count,
- * estimated until the provider's arrives, and how long it thought. It imports nothing the chat doesn't hold already, so the
- * bundle shares no chunk between them.
+ * estimated until the provider's arrives, and how long it thought. It imports nothing the chat
+ * doesn't hold already, so the bundle shares no chunk between them.
  */
 
 import type { Artifactr } from "@portalr/client";
@@ -140,7 +140,12 @@ export function Tokens({
         {extra.map(
           ([short, name, n]) => !!n && <Chip key={short} short={short} name={name} n={n} exact />,
         )}
-        {usage.model && <span className="text-muted text-xs">{usage.model}</span>}
+        {usage.model && (
+          <span className="text-muted text-xs">
+            <span className="sr-only">Model: </span>
+            {usage.model}
+          </span>
+        )}
       </span>
     );
   }

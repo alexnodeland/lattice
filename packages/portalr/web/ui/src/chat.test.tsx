@@ -1085,7 +1085,7 @@ test("once the provider has counted, the chips are exact, with the cache and rea
   await expect.element(group.getByText("out 40")).toBeVisible();
   await expect.element(group.getByText("Input tokens: 1,030")).toBeInTheDocument();
   await expect.element(group.getByText("Output tokens: 40")).toBeInTheDocument();
-  await expect.element(group.getByText("glm-4.7")).toBeVisible();
+  await expect.element(group.getByText("Model: glm-4.7")).toBeVisible();
   // None read from the cache, written to it, or spent reasoning: no chip says 0.
   expect(group.getByText(/^(cached|cache write|reasoning) /).elements()).toHaveLength(0);
   expect(group.getByText(/~/).elements()).toHaveLength(0);
@@ -1096,7 +1096,7 @@ test("once the provider has counted, the chips are exact, with the cache and rea
   await expect.element(group.getByText("reasoning 12")).toBeVisible();
   await expect.element(group.getByText("Cached input tokens: 800")).toBeInTheDocument();
   await expect.element(group.getByText("Reasoning tokens: 12")).toBeInTheDocument();
-  expect(group.getByText("glm-4.7").elements()).toHaveLength(0);
+  expect(group.getByText(/glm-4\.7/).elements()).toHaveLength(0);
   const chip = group.getByText("cached 800").element().closest("[data-chip]") as HTMLElement;
   expect(getComputedStyle(chip).fontVariantNumeric).toBe("tabular-nums");
 });

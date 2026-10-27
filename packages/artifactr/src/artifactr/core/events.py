@@ -175,7 +175,8 @@ class StepUsage(BaseModel):
     reasoning_tokens: int = 0
     """Of the output tokens, those the model spent reasoning, where the provider says."""
     duration_ms: int | None = None
-    """How long the request took, from the moment it was sent to its response's end."""
+    """How long the request took, from when it was sent to its response's end; ``None`` for the
+    part of a request stopped or failed mid-stream."""
 
 
 class RunUsage(BaseModel):
@@ -201,7 +202,10 @@ class RunUsage(BaseModel):
     model: str | None = None
     """The model that answered the run's last request, as its response names it."""
     steps: tuple[StepUsage, ...] = ()
-    """Each model request of the run, oldest first; empty in events from earlier versions, and
+    """Each model request of the run segment whose response ended, oldest first, the token sums
+    being theirs; for a run stopped or failed mid-request, then a last step without a model or a
+    duration for what that request had used. A resumed run is a new segment: its steps, and its
+    ``run_ended``'s usage, count from its resumption. Empty in events from earlier versions, and
     in a live ``usage`` frame's total, whose step comes beside it."""
 
 

@@ -93,12 +93,14 @@ class UsageUpdate(_LiveEvent):
 
     type: Literal["usage"] = "usage"
     step: int
-    """The request's index among the run's requests, from 0."""
+    """The request's index among the run segment's requests, from 0: a resumed run counts
+    from 0 again, and its ``total`` with it."""
     usage: StepUsage
     total: RunUsage
     """The run's usage so far, this request's included; its ``steps`` are left out."""
     exact: bool = True
-    """Whether the counts are the provider's own rather than an estimate."""
+    """Whether the counts are the provider's own rather than an estimate; always true from this
+    version, which sends no estimate."""
 
 
 LiveEvent = Annotated[

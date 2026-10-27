@@ -195,6 +195,16 @@ async def test_a_recovery_that_fails_is_logged_and_the_open_still_succeeds(
     assert [r.getMessage() for r in caplog.records] == [
         f"recovering workspace main of {TENANT} failed"
     ]
+    recovered: list[str] = []
+
+    async def recover(workspace: Any) -> list[Any]:
+        recovered.append(workspace.workspace_id)
+        return []
+
+    monkeypatch.setattr(collaboration.runner, "recover", recover)
+    await collaboration.workspaces.open(TENANT, "main", actor=SystemActor())
+    await asyncio.gather(*collaboration._recovering)
+    assert recovered == ["main"], "tried again as the workspace next opened"
 
 
 async def test_a_recovery_still_going_at_shutdown_is_cancelled(

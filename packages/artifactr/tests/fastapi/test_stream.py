@@ -540,7 +540,17 @@ async def test_a_forwarder_waiting_for_room_is_cancelled_cleanly() -> None:
     assert connection._outbox.qsize() == 9
 
 
-def test_a_run_in_a_thread_the_client_does_not_follow_has_no_start_read() -> None:
+def test_a_run_in_a_thread_the_client_does_not_follow_has_no_start_read(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    reads: list[str] = []
+    started = stream._started
+
+    async def counted(workspace: Workspace, run_id: Any, thread_id: Any) -> Any:
+        reads.append(thread_id)
+        return await started(workspace, run_id, thread_id)
+
+    monkeypatch.setattr(stream, "_started", counted)
     latch = Latch()
     app, _ = build(Script(call("hold"), say("Released.")), latch=latch)
     with TestClient(app) as client:
@@ -551,6 +561,7 @@ def test_a_run_in_a_thread_the_client_does_not_follow_has_no_start_read() -> Non
             ws.send_json(hello(threads=["t2"]))
             [active] = ws.receive_json()["active_runs"]
             assert active["started_at"] is None, "listed, but its thread's log isn't read"
+            assert reads == [], "a hello that follows none of the running threads reads nothing"
         latch.released.set()
         wait_for(lambda: _runs_ended(client) == 1)  # the run ends before the app stops
 

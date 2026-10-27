@@ -26,14 +26,14 @@ from artifactr.agent import (
     ToolStalled,
     is_local_model,
 )
-from artifactr.agent.liveness import watched
+from artifactr.agent.liveness import QUEUED, watched
 from artifactr.core import RunEnded, RunUsage, TextDelta, Thread
 from artifactr.workspace import Workspace
 from tests.agent.conftest import Gate, Script, call, event_as, make_agent, say, started
 from tests.artifact_types import Checklist, Note
 
-WAIT = 0.25
-"""A wait short enough for a test, and five times what a test sleeps against it."""
+WAIT = 0.5
+"""A wait short enough for a test, and ten times what a test sleeps against it."""
 
 QUICK = Liveness(first_output=WAIT, no_output=WAIT, tool=WAIT)
 
@@ -77,12 +77,12 @@ async def test_a_model_that_never_starts_answering_fails_the_run_as_stalled(
     stalling = Stalling()
     runner = Runner(_agent(stalling.model), app=gate, liveness=QUICK)
     handle = started(await runner.send(ws, thread.id, "Hello?"))
-    with pytest.raises(Exception, match=r"didn't start answering within 0.25 seconds"):
+    with pytest.raises(Exception, match=r"didn't start answering within 0.5 seconds"):
         await asyncio.wait_for(handle.wait(), timeout=2)
     ended = event_as((await ws.read())[-1], RunEnded)
     assert (ended.status, ended.reason) == ("failed", "model_stalled")
     assert ended.error == (
-        "the model (function:respond:stream) didn't start answering within 0.25 seconds"
+        "the model (function:respond:stream) didn't start answering within 0.5 seconds"
     )
     assert ended.usage == RunUsage(), "what it used so far: nothing"
     assert stalling.closed.is_set(), "the request was torn down"
@@ -100,7 +100,7 @@ async def test_a_model_that_stops_mid_reply_fails_the_run_and_keeps_what_it_sent
     runner = Runner(_agent(stalling.model), app=gate, liveness=QUICK)
     handle = started(await runner.send(ws, thread.id, "Plan it"))
     frames = [frame async for frame in runner.watch(handle.run_id)]
-    with pytest.raises(Exception, match=r"stopped answering within 0.25 seconds"):
+    with pytest.raises(Exception, match=r"stopped answering within 0.5 seconds"):
         await handle.wait()
     ended = event_as((await ws.read())[-1], RunEnded)
     assert (ended.status, ended.reason) == ("failed", "model_stalled")
@@ -148,7 +148,9 @@ async def test_a_tool_that_never_returns_fails_the_run_as_stalled(
     script = Script(call("hold"), say("Done."))
     runner = Runner(make_agent(script, tools=[_slow_tools()]), app=gate, liveness=QUICK)
     handle = started(await runner.send(ws, thread.id, "Go"))
-    with pytest.raises(Exception, match=r"the tool hold didn't return within 0.25 seconds"):
+    with pytest.raises(
+        Exception, match=r"the tool hold, still running, didn't return within 0.5 seconds"
+    ):
         await asyncio.wait_for(handle.wait(), timeout=2)
     ended = event_as((await ws.read())[-1], RunEnded)
     assert (ended.status, ended.reason) == ("failed", "tool_stalled")
@@ -178,9 +180,36 @@ async def test_the_stalled_tool_is_named_among_the_calls_still_running() -> None
 
     ctx: Any = SimpleNamespace(model=SimpleNamespace(model_name="default"))
     timed = watched(handler, Liveness(first_output=WAIT, no_output=WAIT, tool=WAIT))
-    with pytest.raises(ToolStalled, match=r"the tool hold didn't return within 0.25 seconds"):
+    with pytest.raises(
+        ToolStalled, match=r"the tool hold, still running, didn't return within 0.5 seconds"
+    ):
         await timed(ctx, events())
     assert seen == 3, "every event reached the handler first"
+
+
+def test_every_call_still_running_is_named_once() -> None:
+    message = str(ToolStalled(["hold", "fetch", "hold"], 600))
+    assert message == "the tools hold and fetch, still running, didn't return within 600 seconds"
+
+
+async def test_a_handler_that_stops_with_the_queue_full_is_not_waited_on_forever() -> None:
+    """The model's events fill the queue; the handler stops reading and fails."""
+
+    async def events() -> AsyncIterator[Any]:
+        for n in range(QUEUED * 2):
+            yield FunctionToolResultEvent(
+                part=ToolReturnPart(tool_name="t", content="", tool_call_id=str(n))
+            )
+
+    async def handler(ctx: Any, stream: AsyncIterable[Any]) -> None:
+        async for _ in stream:
+            await asyncio.sleep(0.01)  # the model's events fill the queue meanwhile
+            raise RuntimeError("the handler broke")
+
+    ctx: Any = SimpleNamespace(model=SimpleNamespace(model_name="default"))
+    timed = watched(handler, Liveness(first_output=WAIT, no_output=WAIT, tool=WAIT))
+    with pytest.raises(RuntimeError, match="the handler broke"):
+        await asyncio.wait_for(timed(ctx, events()), timeout=5)
 
 
 async def test_a_slow_tool_is_not_a_stalled_model(
@@ -205,7 +234,7 @@ async def test_a_reply_that_keeps_coming_slowly_is_waited_for(
         messages: list[ModelMessage], info: AgentInfo
     ) -> AsyncIterator[str | DeltaToolCalls]:
         for word in ("one ", "two ", "three ", "four "):
-            await asyncio.sleep(WAIT / 5)
+            await asyncio.sleep(WAIT / 10)
             yield word
 
     model = FunctionModel(lambda messages, info: say("unused"), stream_function=stream)

@@ -415,3 +415,57 @@ host.connect().then(say);
   await expect.poll(() => said(page), SETTLED).toMatch(/^dark dark coloured [1-9]\d*$/);
   await page.close();
 });
+
+/** What the host's page says of the app in its console, `[app-frame]` first, as it is said. */
+function warnings(page: Page): string[] {
+  const said: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "warning" && message.text().startsWith("[app-frame]")) {
+      said.push(message.text());
+    }
+  });
+  return said;
+}
+
+/** The harness's page, with what it warns of the app kept from before the app runs. */
+async function watched(html: string): Promise<{ page: Page; said: string[] }> {
+  const page = await browser.newPage();
+  const said = warnings(page);
+  const search = new URLSearchParams({ app: html, apps: inject("apps") });
+  await page.goto(`${inject("harness")}?${search}`);
+  return { page, said };
+}
+
+test("an app that throws, or loads what its policy refuses, is said under it and in the console", async () => {
+  const { page, said } = await watched(
+    `<body><p>Board</p><img src="https://example.com/x.png"><script>Promise.reject(new Error("no level"));throw new Error("boom");</script>`,
+  );
+  await expect.poll(() => said.join("\n"), SETTLED).toContain("boom");
+  await expect.poll(() => said.join("\n"), SETTLED).toContain("rejection: no level");
+  await expect.poll(() => said.join("\n"), SETTLED).toContain("policy: img-src refused");
+  await page.getByText("The app reported a problem").click();
+  await expect.poll(() => page.getByText(/error: .*boom/).count(), SETTLED).toBe(1);
+  await page.close();
+});
+
+test("an app that draws nothing on its canvas is said to, and one that draws is not", async () => {
+  const blank = await watched(`<body><canvas width="200" height="100"></canvas>`);
+  await expect
+    .poll(
+      () => blank.page.getByText("The app started but drew nothing.", { exact: false }).count(),
+      SETTLED,
+    )
+    .toBe(1);
+  expect(blank.said.join("\n")).toContain("drew nothing");
+  await blank.page.close();
+  const drawing = await watched(
+    `<body style="margin:0"><canvas width="200" height="100"></canvas><script>requestAnimationFrame(()=>{const c=document.querySelector("canvas").getContext("2d");c.fillStyle="#000";c.fillRect(0,0,200,100)})</script>`,
+  );
+  await expect.poll(() => drawn(drawing.page), SETTLED).toBeGreaterThan(0);
+  // Past the document's report of what it drew, 1.5 s after it loaded.
+  await drawing.page.waitForTimeout(3000);
+  expect(drawing.said).toEqual([]);
+  expect(await drawing.page.getByText("The app reported a problem").count()).toBe(0);
+  expect(await drawing.page.getByText("drew nothing", { exact: false }).count()).toBe(0);
+  await drawing.page.close();
+});

@@ -10,10 +10,12 @@ import { AlertDialog } from "@base-ui/react/alert-dialog";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Alert } from "../alert";
 import {
+  APP_BOOT,
   Bridge,
   CALLS_A_MINUTE,
   type JsonObject,
   type Question,
+  type Report,
   StateKeeper,
   type Written,
 } from "../app-bridge";
@@ -114,6 +116,22 @@ function hostContext(within: Element, displayMode: DisplayMode): JsonObject {
   };
 }
 
+/**
+ * Whether what the app's document said it drew is nothing: no element in its body, or canvases
+ * the largest of which has no size or a blank copy, all of it transparent or white.
+ */
+export const drewNothing = ({ params }: Report): boolean =>
+  params.children === 0 ||
+  (Number(params.canvases) > 0 &&
+    (params.canvasWidth === 0 || params.canvasHeight === 0 || params.canvasPixels === "blank"));
+
+/** A report as one line of plain text: what it says, where, and what its policy refused. */
+export function reportLine({ params }: Report): string {
+  const where = params.source ? ` at ${params.source}:${params.line ?? 0}` : "";
+  const refused = params.blocked ? ` (${params.blocked})` : "";
+  return `${params.kind ?? "error"}: ${params.message ?? ""}${where}${refused}`;
+}
+
 /** A question open, and how its answer, yes or no, reaches the bridge. */
 type Asking = Question & { readonly settle: (yes: boolean) => void };
 
@@ -169,6 +187,9 @@ export function Running({
   const open = useRef<Asking | null>(null);
   const [quieted, setQuieted] = useState(false);
   const [stalled, setStalled] = useState<Stalled | null>(null);
+  // What the app's document reported went wrong, and whether it drew nothing: shown, never kept.
+  const [problems, setProblems] = useState<readonly string[]>([]);
+  const [blank, setBlank] = useState(false);
   const [run, setRun] = useState({ html: app.html, count: 0 });
   // A new version's HTML runs afresh; its state alone changing does not.
   if (run.html !== app.html) {
@@ -227,6 +248,8 @@ export function Running({
       timer = setTimeout(() => ran || setStalled(ready ? "silent" : "unanswered"), START_WITHIN);
     };
     setStalled(null);
+    setProblems([]);
+    setBlank(false);
     time(); // a frame that never loads is timed too
     const { id } = head.current.shown;
     const kept = new StateKeeper(
@@ -271,6 +294,19 @@ export function Running({
           ran = true;
           setStalled(null);
         },
+        reported: (report) => {
+          // For the browser's own console, where a person debugging the app looks; nothing else.
+          if (report.method === APP_BOOT) {
+            if (drewNothing(report)) {
+              console.warn("[app-frame]", "drew nothing", report.params);
+              setBlank(true);
+            }
+            return;
+          }
+          console.warn("[app-frame]", reportLine(report));
+          const line = reportLine(report);
+          setProblems((now) => (now.includes(line) ? now : [...now, line]));
+        },
       },
     });
     bridged.current = bridge;
@@ -311,6 +347,7 @@ export function Running({
     };
   }, [element, host, origin]);
 
+  const again = () => setRun({ ...run, count: run.count + 1 });
   const settle = (yes: boolean) => {
     open.current?.settle(yes);
     open.current = null;
@@ -381,15 +418,33 @@ export function Running({
                 ? `Its sandbox at ${origin} answered, but the app in it never said it runs.`
                 : `Its sandbox at ${origin} didn't answer.`}
             </details>
-            <Button
-              variant="secondary"
-              className="px-2 py-1 text-xs"
-              onClick={() => setRun({ ...run, count: run.count + 1 })}
-            >
+            <Button variant="secondary" className="px-2 py-1 text-xs" onClick={again}>
               Try again
             </Button>
           </span>
         </Alert>
+      )}
+      {blank && !stalled && (
+        <Alert tone="warn">
+          <span className="flex flex-col items-start gap-2">
+            <span>
+              The app started but drew nothing. Try again, or ask the agent to rebuild it.
+            </span>
+            <Button variant="secondary" className="px-2 py-1 text-xs" onClick={again}>
+              Try again
+            </Button>
+          </span>
+        </Alert>
+      )}
+      {problems.length > 0 && (
+        <details className="text-muted text-xs">
+          <summary>The app reported a problem</summary>
+          <ul className="mt-1 flex flex-col gap-1 break-all font-mono">
+            {problems.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </details>
       )}
       {quieted && (
         <Alert tone="warn">

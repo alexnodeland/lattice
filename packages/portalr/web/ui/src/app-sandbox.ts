@@ -11,7 +11,14 @@
  * what the portal sends is relayed to the app.
  */
 
-import { APP_STARTED, MOST_MESSAGE, PROXY_READY, RESOURCE_READY } from "./app-bridge";
+import {
+  APP_BOOT,
+  APP_ERROR,
+  APP_STARTED,
+  MOST_MESSAGE,
+  PROXY_READY,
+  RESOURCE_READY,
+} from "./app-bridge";
 import { isObject, isString } from "./json";
 
 /** An app's policy, which the server sends for the sandbox too: `web/ui/csp/app-policy.txt`. */
@@ -162,9 +169,74 @@ const HOST = [
 /** Said first, before the app's HTML: its document runs, whatever the app then does or draws. */
 const STARTED = `parent.postMessage({ jsonrpc: "2.0", method: "${APP_STARTED}" }, "*");`;
 
+/**
+ * What went wrong in the app's document, said to the host, which shows it as plain text: an error
+ * (a resource that didn't load among them), a refused promise, or a refusal of its policy, the
+ * first five that differ by their message, each cut short; and once, 1.5 s after the document
+ * loaded, what it drew: its children and canvases, the largest canvas's size and whether an 8 by 8
+ * copy of it is blank, the window, and which of the APIs a game leans on it has. The canvas is
+ * copied, never asked for a context of its own, so an app's WebGL or 2D context is left as it is.
+ * Nothing here is sent anywhere but the host's page, which keeps none of it.
+ */
+const DIAGNOSED = [
+  "(() => {",
+  "  const said = new Set();",
+  '  const cut = (text, most) => String(text == null ? "" : text).slice(0, most);',
+  "  const report = (params) => {",
+  "    if (said.size >= 5 || said.has(params.message)) return;",
+  "    said.add(params.message);",
+  `    parent.postMessage({ jsonrpc: "2.0", method: "${APP_ERROR}", params }, "*");`,
+  "  };",
+  '  addEventListener("error", (event) => {',
+  "    const target = event.target;",
+  "    if (target && target !== window && target.tagName) {",
+  '      const blocked = target.currentSrc || target.src || target.href || "";',
+  '      report({ kind: "load", message: cut("<" + target.tagName.toLowerCase() + "> didn\'t load", 300), blocked: cut(blocked, 200) });',
+  "      return;",
+  "    }",
+  '    report({ kind: "error", message: cut(event.message || "an error", 300), source: cut(event.filename, 120), line: event.lineno | 0 });',
+  "  }, true);",
+  '  addEventListener("unhandledrejection", (event) => {',
+  "    const reason = event.reason;",
+  '    report({ kind: "rejection", message: cut(reason && reason.message ? reason.message : reason, 300) });',
+  "  });",
+  '  document.addEventListener("securitypolicyviolation", (event) => {',
+  '    report({ kind: "policy", message: cut(event.effectiveDirective + " refused " + (event.blockedURI || "inline"), 300), directive: cut(event.effectiveDirective || event.violatedDirective, 60), blocked: cut(event.blockedURI, 200), source: cut(event.sourceFile, 120), line: event.lineNumber | 0 });',
+  "  });",
+  '  addEventListener("DOMContentLoaded", () => setTimeout(() => {',
+  "    let largest = null;",
+  '    const canvases = document.querySelectorAll("canvas");',
+  "    for (const each of canvases) if (!largest || each.clientWidth * each.clientHeight > largest.clientWidth * largest.clientHeight) largest = each;",
+  '    let canvasPixels = "none";',
+  "    if (largest) {",
+  "      try {",
+  '        const copy = document.createElement("canvas");',
+  "        copy.width = copy.height = 8;",
+  '        const context = copy.getContext("2d");',
+  "        context.drawImage(largest, 0, 0, 8, 8);",
+  "        const data = context.getImageData(0, 0, 8, 8).data;",
+  "        let blank = true;",
+  "        for (let i = 0; i < data.length; i += 4) if (data[i + 3] !== 0 && !(data[i] > 249 && data[i + 1] > 249 && data[i + 2] > 249)) blank = false;",
+  '        canvasPixels = blank ? "blank" : "drawn";',
+  '      } catch { canvasPixels = "unread"; }',
+  "    }",
+  '    const has = ["AudioContext", "webkitAudioContext", "ResizeObserver", "requestAnimationFrame"].filter((name) => name in window).join(" ");',
+  `    parent.postMessage({ jsonrpc: "2.0", method: "${APP_BOOT}", params: {`,
+  "      readyState: document.readyState,",
+  "      children: document.body ? document.body.childElementCount : 0,",
+  "      canvases: canvases.length,",
+  "      canvasWidth: largest ? largest.clientWidth : 0,",
+  "      canvasHeight: largest ? largest.clientHeight : 0,",
+  "      canvasPixels, width: innerWidth, height: innerHeight, pixelRatio: devicePixelRatio,",
+  "      userAgent: cut(navigator.userAgent, 120), has,",
+  '    } }, "*");',
+  "  }, 1500));",
+  "})();",
+].join("\n");
+
 /** The app's document: its own policy, no DNS prefetching, no WebRTC, its size and `host` first. */
 export const appDocument = (html: string): string =>
-  `<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${APP_POLICY}"><meta http-equiv="x-dns-prefetch-control" content="off"><script>${STARTED}\n${NO_WEBRTC}\n${SIZED}\n${HOST}</script>${html}`;
+  `<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${APP_POLICY}"><meta http-equiv="x-dns-prefetch-control" content="off"><script>${STARTED}\n${DIAGNOSED}\n${NO_WEBRTC}\n${SIZED}\n${HOST}</script>${html}`;
 
 /** What the app's frame may do: run its scripts, and nothing else. */
 export const APP_SANDBOX = "allow-scripts";

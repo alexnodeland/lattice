@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import {
+  APP_BOOT,
+  APP_ERROR,
   APP_STARTED,
   applyPatch,
   Bridge,
@@ -9,10 +11,13 @@ import {
   Limiter,
   MOST_HEIGHT,
   MOST_MESSAGE,
+  MOST_REPORTS,
   MOST_STATE,
   PatchRefused,
   PROXY_READY,
+  type Report,
   readMessage,
+  readReport,
   STATE_EVERY,
   StateKeeper,
   type Written,
@@ -209,6 +214,7 @@ function bridged(
   let quieted = 0;
   let started = 0;
   let ready = 0;
+  const reports: Report[] = [];
   const host: BridgeHost = {
     app: () => ({ title: "Dice", html: "<p>1</p>" }),
     context: () => ({ theme: "dark" }),
@@ -229,6 +235,7 @@ function bridged(
     ready: () => {
       ready += 1;
     },
+    reported: (report) => reports.push(report),
   };
   const { kept, writes } = keeper();
   const bridge = new Bridge({
@@ -250,6 +257,7 @@ function bridged(
     opened,
     sized,
     writes,
+    reports,
     quiet: () => quieted,
     started: () => started,
     ready: () => ready,
@@ -475,4 +483,53 @@ test("past sixty messages in a minute, the frame isn't answered, and the page is
   await vi.advanceTimersByTimeAsync(60_000);
   await hear(request(99, "tools/call", { name: "get_state" }));
   expect(posted.at(-1)).toMatchObject({ id: 99 });
+});
+
+// ─── what the app's document reports ─────────────────────────────────────────
+
+const reported = (method: string, params: unknown) => text({ jsonrpc: "2.0", method, params });
+
+test("an app's report keeps the fields it knows, text cut short and on one line, and no other", () => {
+  expect(
+    readReport(APP_ERROR, {
+      kind: "error",
+      message: `a\u202eb\nc${"x".repeat(400)}`,
+      line: 3,
+      source: 7,
+      blocked: { evil: true },
+      markup: "<img>",
+    }),
+  ).toEqual({
+    method: APP_ERROR,
+    params: { kind: "error", message: `a b c${"x".repeat(295)}`, line: 3 },
+  });
+  expect(readReport(APP_BOOT, { children: 0, canvases: Number.NaN, userAgent: "x" })).toEqual({
+    method: APP_BOOT,
+    params: { children: 0, userAgent: "x" },
+  });
+  expect(readReport(APP_ERROR, { message: ["not text"], line: "3" })).toBeNull();
+  expect(readReport("portalr/app-evil", { message: "x" })).toBeNull();
+  expect(readMessage(reported("portalr/app-evil", { message: "x" }))).toBeNull();
+});
+
+test("an app's reports reach the page, at most six a frame, and count against its messages", async () => {
+  const { hear, reports, posted, started } = bridged();
+  for (let each = 0; each < 10; each += 1) {
+    await hear(reported(APP_ERROR, { kind: "error", message: `boom ${each}` }));
+  }
+  await hear(reported(APP_ERROR, { message: 1 }));
+  await hear(reported(APP_ERROR, { pad: "x".repeat(MOST_MESSAGE) }));
+  expect(reports).toHaveLength(MOST_REPORTS);
+  expect(reports[0]).toEqual({ method: APP_ERROR, params: { kind: "error", message: "boom 0" } });
+  expect(posted).toEqual([]);
+  expect(started()).toBe(11);
+});
+
+test("an app flooding its reports is quieted like any other message", async () => {
+  const { hear, reports, quiet } = bridged();
+  for (let each = 0; each <= CALLS_A_MINUTE; each += 1) {
+    await hear(reported(APP_BOOT, { children: each }));
+  }
+  expect(reports).toHaveLength(MOST_REPORTS);
+  expect(quiet()).toBe(1);
 });

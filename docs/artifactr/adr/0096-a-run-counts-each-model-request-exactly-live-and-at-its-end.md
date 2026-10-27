@@ -45,14 +45,17 @@ Rejected: mid-step it counts a streamed response's tokens but not its request, a
 ## Consequences
 
 **Positive:**
+
 - A client shows the provider's numbers within a request of a run's start, and the model that answered.
 - A stopped or failed run's end says what each request cost, and which model answered it.
 
 **Negative:**
+
 - `run_ended` grows by a step per model request; a run of a hundred requests carries a hundred small objects.
 - The live total and the recorded one can differ where pydantic-ai counts what no step saw, such as a `FallbackModel`'s rejected attempts, which artifactr doesn't use.
 
 **Risks:**
+
 - A gateway that reports a cache write some other way counts it as 0 until artifactr reads it; Anthropic's through LiteLLM is read from the detail above, verified against pydantic-ai's source and a fake proxy, not a real call.
 
 ## Action items

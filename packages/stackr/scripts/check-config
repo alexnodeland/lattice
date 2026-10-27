@@ -190,6 +190,12 @@ OPEN_GUARDRAILS = {
 }
 GUARDRAIL_MODES = {"pre_call", "post_call", "during_call", "logging_only"}
 ENV_REF = re.compile(r"^os\.environ/(\w+)$")
+# The prompt-cache breakpoints every Anthropic group carries at least (ADR-0054): the system prompt
+# and the last message. A point may add a `control`, such as a TTL.
+CACHE_POINTS = [
+    {"location": "message", "role": "system"},
+    {"location": "message", "index": -1},
+]
 
 
 def check_litellm() -> list[str]:
@@ -212,6 +218,28 @@ def check_litellm() -> list[str]:
             problems.append(f"groups/{name}.yaml holds more than a model_list")
         if not {"default", "fast"} <= {entry["model_name"] for entry in chosen["model_list"]}:
             problems.append(f"groups/{name}.yaml doesn't define both default and fast")
+    # Prompt-cache breakpoints (ADR-0054) on the Anthropic groups, at least the system prompt and
+    # the last message, and on no other deployment, which may reject the field. Only `anthropic/`
+    # models are recognised: a Claude group on Bedrock or Vertex would need adding here.
+    for name, chosen in groups.items():
+        for entry in chosen["model_list"]:
+            params = entry.get("litellm_params") or {}
+            points = params.get("cache_control_injection_points")
+            if str(params.get("model", "")).startswith("anthropic/"):
+                where = [
+                    {key: value for key, value in given.items() if key != "control"}
+                    for given in points or []
+                ]
+                if not all(point in where for point in CACHE_POINTS):
+                    problems.append(
+                        f"groups/{name}.yaml's {entry['model_name']!r} needs the prompt-cache "
+                        "breakpoints: the system prompt and the last message"
+                    )
+            elif points is not None:
+                problems.append(
+                    f"groups/{name}.yaml's {entry['model_name']!r} isn't Anthropic, so it gets "
+                    "no cache_control_injection_points"
+                )
     entries = config.get("model_list", []) + [
         entry for chosen in groups.values() for entry in chosen.get("model_list", [])
     ]

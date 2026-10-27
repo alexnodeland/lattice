@@ -112,6 +112,25 @@ The libraries' `[litellm]` extras do the same through pydantic-ai, with `litellm
 
 Responses are cached for 10 minutes, so an identical request inside that time is answered from the cache.
 
+## Prompt caching
+
+That response cache is not a prompt cache. It answers a request that is identical, word for word, to one in the last 10 minutes, from the gateway's Valkey, without calling the provider. A prompt cache is the provider's: it keeps the processed prefix of a prompt, so a request that starts the same way, such as the next turn of a conversation, pays less for that prefix and is answered sooner.
+
+Anthropic caches only up to a `cache_control` breakpoint in the request, and the OpenAI-compatible clients that call the gateway, pydantic-ai's included, never send one. So the gateway adds two to the Anthropic groups, `default` and `fast`, in `deploy/litellm/groups/providers.yaml` ([ADR-0054](../adr/0054-prompt-cache-breakpoints-at-the-gateway.md)): on the system prompt, and on the last message. On the next turn, Anthropic looks back from the new last message's breakpoint (up to 20 blocks) for the longest prefix it has cached, so it reads the conversation so far and writes only what is new. A step that adds more than 20 content blocks between breakpoints misses, and writes the prefix again. Nothing else gets them: the aliases in `config.yaml`, the other providers and the upstream groups are as they were.
+
+Two limits:
+
+- **An assistant message that only calls tools,** with no text, takes no breakpoint. The last message of a request is a user turn or a tool result, so the groups' points aren't affected; a point by index on such a message would be lost.
+- **Anthropic allows four breakpoints a request.** The proxy's LiteLLM (v1.103.0) skips a message the client already marked and stops at four, counting the client's own, so the gateway never pushes a request past four (from its source, not tested here). A 400 about `cache_control` means the client's own marks exceed it: look at the client, not the gateway.
+
+What it costs, from [Anthropic's prompt caching documentation](https://platform.claude.com/docs/en/docs/build-with-claude/prompt-caching) (read on 2026-10-27, when this was written):
+
+- **A cache entry lives 5 minutes,** refreshed each time it is read. A conversation idle longer starts again from a write.
+- **Writing costs about 1.25 times the input price, reading about 0.1 times.** A prefix read once more within the 5 minutes has paid for its write.
+- **Short prompts aren't cached:** below 1,024 tokens on Sonnet 4.6 (`default`) and 4,096 on Haiku 4.5 (`fast`), the request goes through uncached, with no error.
+
+To see it working, look at a request's usage. LiteLLM reads Anthropic's `cache_read_input_tokens` and `cache_creation_input_tokens` into its usage, and pydantic-ai has `cache_read_tokens` and `cache_write_tokens` on a run's usage; whether the numbers reach the application through the gateway (whose LiteLLM is newer than the libraries' client), and Langfuse's generation view, hasn't been checked yet. To check by hand: send a request above the minimum, then within 5 minutes the same messages with one more user turn (so the response cache can't answer it), and compare the two responses' `usage`.
+
 ## Guardrails
 
 Two guardrails are defined once, in the proxy, and chosen per request with `"guardrails": [...]` in the request body. Both are off unless a request asks for them.

@@ -1,7 +1,10 @@
 """The thread protocol over WebSocket."""
 
+import asyncio
+from collections.abc import AsyncIterator
 from datetime import timedelta
 from typing import Any
+from unittest.mock import Mock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -12,8 +15,11 @@ from starlette.websockets import WebSocketDisconnect
 from artifactr.core import (
     Actor,
     AgentActor,
+    ErrorFrame,
+    LiveFrame,
     RunStarted,
     TenantId,
+    TextDelta,
     UserActor,
     Visibility,
     WorkspaceId,
@@ -416,6 +422,94 @@ def test_replayed_runs_are_not_watched(monkeypatch: pytest.MonkeyPatch) -> None:
             ws.send_json(command("c3", type="set_thread_mode", thread_id="t1", mode="suggest"))
             _until_event(ws, "thread_mode_changed")
     assert watched == [], "an ended run in the replay is not watched"
+
+
+def test_a_runs_buffered_frames_beyond_the_outbox_do_not_disconnect_the_client(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A run watched mid-turn replays its buffer at once, which may exceed the outbox."""
+    latch = Latch()
+    app, runner = build(Script(call("hold"), say("Done.")), latch=latch, outbox_size=10)
+    buffered = [LiveFrame(run_id="r", event=TextDelta(part=0, delta=str(n))) for n in range(50)]
+
+    async def watch(run_id: str) -> AsyncIterator[LiveFrame]:
+        for frame in buffered:
+            yield frame.model_copy(update={"run_id": run_id})
+
+    monkeypatch.setattr(runner, "watch", watch)
+    with TestClient(app) as client:
+        _post(client, "c1", type="create_thread", thread_id="t1")
+        _post(client, "c2", type="post_message", thread_id="t1", content="Go")
+        wait_for(latch.entered.is_set)
+        with client.websocket_connect(STREAM) as ws:
+            ws.send_json(hello(threads=["t1"]))
+            frames: list[dict[str, Any]] = []
+            for _ in range(200):  # a regression fails here, rather than hanging
+                if sum(f["type"] == "live" for f in frames) == len(buffered):
+                    break
+                frames.append(ws.receive_json())
+            latch.released.set()
+    deltas = [f["event"]["delta"] for f in frames if f["type"] == "live"]
+    assert deltas == [str(n) for n in range(50)]
+
+
+def _bare_stream(outbox_size: int) -> stream.Stream:
+    """A connection with nothing behind it, to drive its outbox by hand."""
+    return stream.Stream(
+        Mock(),
+        "w1",
+        open_workspace=Mock(),
+        runner=Mock(),
+        hello_timeout=1.0,
+        outbox_size=outbox_size,
+        telemetry=Mock(),
+    )
+
+
+def _delta(n: int = 0) -> LiveFrame:
+    return LiveFrame(run_id="r", event=TextDelta(part=0, delta=str(n)))
+
+
+async def test_live_frames_leave_the_outbox_room_for_events_and_results() -> None:
+    connection = _bare_stream(10)
+    forwarders = [asyncio.create_task(connection._put_waiting(_delta(n))) for n in range(30)]
+    await asyncio.sleep(0)
+    assert connection._outbox.qsize() == 9, "live frames stop short of the reserve"
+    connection._put(ErrorFrame(message="an event or a result"))
+    assert connection._outbox.qsize() == 10
+    assert not connection._overflowed, "the burst took no room from them"
+    for forwarder in forwarders:
+        forwarder.cancel()
+
+
+async def test_a_live_frame_that_finds_no_room_for_long_closes_the_client(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(stream, "LIVE_WAIT", 0.01)
+    connection = _bare_stream(10)
+    for n in range(9):
+        await connection._put_waiting(_delta(n))
+    assert not connection._overflowed
+    await connection._put_waiting(_delta(9))  # nothing is taking frames
+    assert connection._overflowed, "a client that never makes room is closed (4429)"
+    assert connection._outbox.qsize() == 9
+
+
+async def test_a_forwarder_waiting_for_room_is_cancelled_cleanly() -> None:
+    connection = _bare_stream(10)
+    for n in range(9):
+        await connection._put_waiting(_delta(n))
+    waiting = asyncio.create_task(connection._put_waiting(_delta(9)))
+    await asyncio.sleep(0)
+    waiting.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await waiting
+    assert connection._outbox.qsize() == 9
+    assert not connection._overflowed
+    connection._outbox.get_nowait()
+    connection._room.set()
+    await asyncio.wait_for(connection._put_waiting(_delta(10)), 1)
+    assert connection._outbox.qsize() == 9
 
 
 def _runs_ended(client: TestClient) -> int:

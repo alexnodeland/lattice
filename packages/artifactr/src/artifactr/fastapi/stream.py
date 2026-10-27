@@ -67,6 +67,12 @@ MOST_WATCHED: Final = 20
 RECHECK: Final = 30.0
 """Seconds between reads of a watcher's rights, which live outside the log (lattice RFC-0006)."""
 
+LIVE_WAIT: Final = 30.0
+"""Seconds a run's live frame waits for room in the outbox before the client is closed (4429)."""
+
+OUTBOX_RESERVE: Final = 10
+"""The outbox's share, as ``1/OUTBOX_RESERVE``, kept free of live frames for events and results."""
+
 _INBOUND: Final = TypeAdapter[CommandFrame | Presence](
     Annotated[CommandFrame | Presence, Field(discriminator="type")]
 )
@@ -140,6 +146,8 @@ class Stream:
         self._peers: dict[tuple[str, ArtifactId], str] = {}
         """Presence to send: each peer's latest frame for each artifact, sent after events."""
         self._wake = asyncio.Event()
+        self._room = asyncio.Event()
+        """Set by the writer each time it takes a frame from the outbox: room for a live frame."""
         self._heard: list[float] = []
         """When this connection's last presence frames arrived, for its pace."""
         self._paced = 0.0
@@ -338,7 +346,7 @@ class Stream:
             async for frame in self._runner.watch(run_id):
                 if thread_id in (await workspace.hidden()).threads:
                     return
-                self._put(frame)
+                await self._put_waiting(frame)
 
         self._spawn(forward())
 
@@ -428,6 +436,30 @@ class Stream:
             self._overflowed = True
         self._wake.set()
 
+    async def _put_waiting(self, frame: BaseModel) -> None:
+        """Queue a run's live frame, waiting for room rather than overflowing the outbox.
+
+        A run's buffered frames arrive all at once when it is watched, more than the outbox may
+        hold: the client is not slow for being sent them. Live frames stop short of the last
+        ``1/OUTBOX_RESERVE`` of the outbox, which stays free for events, results and errors
+        (``_put``), so a replay burst never makes those overflow. A client that leaves no room for
+        :data:`LIVE_WAIT` seconds is slow after all, and is closed (4429). The channel sheds a
+        watcher's oldest frames meanwhile.
+        """
+        text = frame.model_dump_json()
+        size = self._outbox.maxsize
+        limit = size - size // OUTBOX_RESERVE if size > 0 else float("inf")  # 0: unbounded
+        try:
+            async with asyncio.timeout(LIVE_WAIT):
+                while self._outbox.qsize() >= limit:
+                    self._room.clear()
+                    await self._room.wait()
+        except TimeoutError:
+            self._overflowed = True
+        else:
+            self._outbox.put_nowait(text)
+        self._wake.set()
+
     async def _write(self) -> None:
         """Send events first, then presence; presence never fills the outbox, nor closes it."""
         while True:
@@ -436,6 +468,7 @@ class Stream:
                 return
             if not self._outbox.empty():
                 await self._ws.send_text(self._outbox.get_nowait())
+                self._room.set()
             elif self._peers:
                 key = next(iter(self._peers))
                 await self._ws.send_text(self._peers.pop(key))

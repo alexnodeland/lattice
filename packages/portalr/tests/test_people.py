@@ -195,9 +195,10 @@ async def test_one_big_call_leaves_the_rest_of_the_reads_to_others() -> None:
     big = asyncio.create_task(people([f"u{i}" for i in range(30)]))
     await auth.held_at(4)
     # The big call's reads are held, so the small call is answered only from a free share.
-    assert await people(["small"]) == {"small": "small@x.io"}, (
-        "and the next call is not kept waiting"
-    )
+    # A bound on a call that should not wait at all, so a regression fails here, not by hanging.
+    async with asyncio.timeout(10):
+        small = await people(["small"])
+    assert small == {"small": "small@x.io"}, "and the next call is not kept waiting"
     assert auth.running == 4, "a call uses its share of the reads, not all"
     assert not big.done()
     auth.release.set()

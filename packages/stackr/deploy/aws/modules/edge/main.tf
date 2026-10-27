@@ -171,6 +171,7 @@ resource "aws_lb_listener_rule" "app" {
   depends_on = [aws_lb_listener_rule.auth]
 }
 
+# Keep these until every deployment has applied once since the rules were split.
 moved {
   from = aws_lb_listener_rule.host["auth"]
   to   = aws_lb_listener_rule.auth

@@ -34,7 +34,15 @@ async function bare(viewModeEnabled: boolean) {
       />
     </div>,
   );
-  await ready;
+  // Mounted in the same commit as its canvas; a mount that never comes fails here, by name.
+  let never: ReturnType<typeof setTimeout> | undefined;
+  await Promise.race([
+    ready,
+    new Promise<never>((_, reject) => {
+      never = setTimeout(() => reject(new Error("Excalidraw never mounted")), 10_000);
+    }),
+  ]);
+  clearTimeout(never);
   return screen;
 }
 
@@ -164,7 +172,7 @@ test("a diagram the canvas can't read says so, in the dialog, with its text vers
 test("the guard bites: a key that opens Excalidraw's help bare opens nothing on the canvas", async () => {
   const excalidraw = await bare(true);
   const help = () => document.querySelector(".HelpDialog");
-  await expect.poll(() => document.querySelector(".excalidraw canvas")).not.toBeNull();
+  expect(document.querySelector(".excalidraw canvas")).not.toBeNull();
   (document.querySelector(".excalidraw") as HTMLElement).focus();
   await userEvent.keyboard("?");
   await expect.poll(help).not.toBeNull();
@@ -281,7 +289,7 @@ const editing: CanvasHost = {
 test("the guard bites while editing: help and the palette open bare, and nothing on the canvas", async () => {
   const excalidraw = await bare(false);
   const opened = () => document.querySelector(".HelpDialog, .command-palette-dialog");
-  await expect.poll(() => document.querySelector(".excalidraw canvas")).not.toBeNull();
+  expect(document.querySelector(".excalidraw canvas")).not.toBeNull();
   const focus = () => (document.querySelector(".excalidraw") as HTMLElement).focus();
   focus();
   await userEvent.keyboard("?");

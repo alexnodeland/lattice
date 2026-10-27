@@ -207,10 +207,10 @@ class RunUsage(BaseModel):
     steps: tuple[StepUsage, ...] = ()
     """Each model request of the run segment whose response ended, oldest first, the token sums
     being theirs; for a run stopped or failed mid-request, then a last step without a model or a
-    duration for what that request had used, so there may be one more step than ``requests``
-    counts. A resumed run is a new segment: its steps, and its
-    ``run_ended``'s usage, count from its resumption. Empty in events from earlier versions, and
-    in a live ``usage`` frame's total, whose step comes beside it."""
+    duration for what pydantic-ai counted that no ended response did, which is no request of
+    its own, so there may be one more step than ``requests``. A resumed run is a new segment:
+    its steps, and its ``run_ended``'s usage, count from its resumption. Empty in events from
+    earlier versions, and in a live ``usage`` frame's total, whose step comes beside it."""
 
 
 class RunStarted(_Event):

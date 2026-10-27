@@ -49,7 +49,7 @@ The application hands `Grants` each library's catalog, its `ACTIONS`, and grantr
 | `admin` | a tenant | the owner's, but `grantr:delete_tenant` |
 | `member` | a tenant | `artifactr:read_workspaces`: listing the tenant's workspaces, which artifactr filters by what the caller may open; it makes a user or service principal a member |
 | `admin` | a workspace | every library action but the bookkeeping, and `grantr:grant`, `revoke`, `restrict`, `manage_integrations` ([ADR-0034](adr/0034-integrations-switched-per-tenant-and-workspace-in-grantrs-table-audited.md)) and `manage_settings` ([ADR-0035](adr/0035-settings-narrowed-per-tenant-and-workspace-in-grantrs-table-versioned-audited.md)) |
-| `editor` | a workspace, thread, artifact or rule | a viewer's, and the commands that post, create, edit, propose, archive, resolve proposals, record a turn, and stop and operate runs |
+| `editor` | a workspace, thread, artifact or rule | a viewer's, and the commands that post, create, edit, propose, archive, resolve proposals, record a turn, choose the model it answers with (`artifactr:use_model`, [artifactr ADR-0097](../artifactr/adr/0097-a-message-chooses-the-model-of-the-turn-it-starts.md)), and stop and operate runs |
 | `viewer` | a workspace, thread, artifact or rule | every `read_` action but the cursors, every `open`, and giving feedback |
 | `rule` | a workspace | `reflexr:open`, `reflexr:publish`, `reflexr:checkpoint_run`, `reflexr:read_events` and `reflexr:read_runs`: a stored rule's runs; and `artifactr:open` and `artifactr:post_message`, for their notices through relayr. A stored rule's principal holds it in its own workspace with no grant ([ADR-0029](adr/0029-a-stored-rule-acts-as-itself-in-its-own-workspace.md)) |
 

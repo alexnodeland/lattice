@@ -48,6 +48,7 @@ Rejected: pydantic-ai runs a turn with one model; switching would stop and resta
 **Negative:**
 
 - A turn checks one more action when its message names a model; a message that names none checks nothing more.
+- The notice of a model not used is posted as the turn starts, so an agent whose capability asks for notices ([ADR-0051](0051-notices.md)) is told it too.
 - grantr grants every model or none: narrowing to some models is the host's listing and settings, not a role.
 
 **Risks:**

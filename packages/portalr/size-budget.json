@@ -13,8 +13,14 @@
       "files": { "total": 14000, "largest": 14000 },
       "canvas": { "total": 350000, "largest": 165000 },
       "replay-account": { "total": 1400, "largest": 1400 },
-      "replay": { "total": 61000, "largest": 61000 }
+      "replay": { "total": 61000, "largest": 61000 },
+      "touch": { "total": 2500, "largest": 2500 }
     }
   },
-  "admin": { "initial": 225000, "total": 600000, "largest": 140000 }
+  "admin": {
+    "initial": 225000,
+    "total": 600000,
+    "largest": 140000,
+    "addons": { "touch": { "total": 2500, "largest": 2500 } }
+  }
 }

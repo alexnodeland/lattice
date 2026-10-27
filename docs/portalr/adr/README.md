@@ -85,7 +85,8 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0077](0077-session-replay-its-own-yes-masked-in-the-browser-and-checked-at-the-relay.md) | Session replay, its own yes, masked in the browser and checked at the relay | Accepted |
 | [0078](0078-the-others-on-a-diagrams-canvas-and-their-revisions-as-they-arrive.md) | The others on a diagram's canvas, and their revisions as they arrive | Accepted |
 | [0079](0079-interaction-states-feedback-pending-and-a-refusals-mark.md) | Interaction states: feedback, pending, and a refusal's mark | Accepted |
-| [0080](0080-ink-on-paper-the-products-visual-language.md) | Ink on paper, the product's visual language | Accepted, amended by 0081 |
+| [0080](0080-ink-on-paper-the-products-visual-language.md) | Ink on paper, the product's visual language | Accepted, amended by 0081 and 0082 |
 | [0081](0081-plain-a-bright-page-one-colour-and-a-mark-for-what-waits.md) | Plain: a bright page, one colour, and a mark for what waits | Accepted |
+| [0082](0082-sheets-the-thumb-bar-and-a-phone-s-tables.md) | Sheets, the thumb bar, and a phone's tables | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

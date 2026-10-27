@@ -30,6 +30,7 @@ import {
   RunStrip,
   rendererFor,
   Streaming,
+  ThumbBar,
 } from "@portalr/ui";
 import {
   type UseSuspenseQueryOptions,
@@ -470,6 +471,9 @@ function Chat() {
       ))}
       {snapshot.status !== "closed" && allowed.has("artifactr:post_message") && (
         <ComposerDock>
+          {latestRequest !== undefined && (
+            <ThumbBar target={`request-${latestRequest.tool_call_id}`} />
+          )}
           <Composer
             onSend={send}
             onFiles={setDropped}

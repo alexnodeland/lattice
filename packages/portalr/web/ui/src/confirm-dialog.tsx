@@ -13,6 +13,7 @@ import { Button, type ButtonSize, type ButtonVariant } from "./button";
 import { actions, backdrop, description, title as heading, popup } from "./dialog";
 import { failureLogged, failureSaid } from "./failure";
 import { keepTabWithin } from "./full-view";
+import { SheetHandle, sheet, useSheet } from "./sheet";
 import { TextField } from "./text-field";
 
 /** The most a reason may be, in characters. */
@@ -92,11 +93,18 @@ export function ConfirmDialog({
   onConfirm: (reason: string) => Promise<unknown>;
 }) {
   const [open, setOpen] = useState(false);
+  // Whether the action is under way: read at once, where a state would be a render behind.
+  const busy = useRef(false);
+  // On a phone the dialog is a sheet, dragged down to close, unless its action is under way.
+  const box = useRef<HTMLDivElement>(null);
+  useSheet(box, open, () => {
+    if (!busy.current) {
+      setOpen(false);
+    }
+  });
   const [entered, setEntered] = useState("");
   const [reason, setReason] = useState("");
   const [pending, setPending] = useState(false);
-  // Whether the action is under way: read at once, where a state would be a render behind.
-  const busy = useRef(false);
   // Whether the dialog closes because the action was done: only then does focus go elsewhere.
   const done = useRef(false);
   const counter = useId();
@@ -163,12 +171,14 @@ export function ConfirmDialog({
       <AlertDialog.Portal>
         <AlertDialog.Backdrop className={backdrop} />
         <AlertDialog.Popup
-          className={popup}
+          ref={box}
+          className={`${popup} ${sheet}`}
           // Tab kept in it at once, never on Base UI's guards outside it (portalr ADR-0068).
           onKeyDown={(event) => keepTabWithin(event.currentTarget, event.nativeEvent)}
           initialFocus={typed === undefined ? cancel : true}
           {...(finalFocus && { finalFocus: () => (done.current ? finalFocus.current : true) })}
         >
+          <SheetHandle />
           <AlertDialog.Title className={heading}>{title}</AlertDialog.Title>
           <AlertDialog.Description render={<div />} className={description}>
             {children}

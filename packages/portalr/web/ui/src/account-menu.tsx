@@ -1,9 +1,10 @@
 import { Menu } from "@base-ui/react/menu";
-import { type ReactNode, useId } from "react";
+import { type ReactNode, useId, useRef, useState } from "react";
 import { cn } from "./cn";
 import { Icon } from "./icon";
 import { glyphs } from "./icons";
 import { groupLabel, item, popup, separator } from "./menu";
+import { SheetHandle, sheetPopup, sheetPositioner, useSheet } from "./sheet";
 import { FEEDBACK, RING } from "./states";
 
 /** The scheme a person chose: the system's, or one of the two. */
@@ -155,8 +156,12 @@ export function AccountMenu({
   const replay = analytics?.replay;
   // A deletion of recordings still owed, which is said whether or not the switch is on offer.
   const owed = replay !== undefined && !replay.given && replay.deleting === true;
+  // Open or not, known here too, so the sheet's drag can close it on a phone (portalr ADR-0082).
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  useSheet(box, open, () => setOpen(false));
   return (
-    <Menu.Root>
+    <Menu.Root open={open} onOpenChange={setOpen}>
       <Menu.Trigger
         aria-label={`Account: ${name}`}
         className={cn(
@@ -176,8 +181,9 @@ export function AccountMenu({
         </span>
       </Menu.Trigger>
       <Menu.Portal>
-        <Menu.Positioner sideOffset={6} align="end" className="z-30">
-          <Menu.Popup className={popup}>
+        <Menu.Positioner sideOffset={6} align="end" className={`z-30 ${sheetPositioner}`}>
+          <Menu.Popup ref={box} className={`${popup} ${sheetPopup}`}>
+            <SheetHandle />
             <Menu.Group>
               <Menu.GroupLabel className="px-2.5 pt-1.5 pb-1">
                 <span className="block font-semibold">{name}</span>

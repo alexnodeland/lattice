@@ -57,6 +57,12 @@ export interface Protocol<State, Frame, Command, R extends Result> {
   apply(state: State, envelope: Extract<Frame, Envelope>): State;
   /** The state after a frame that isn't an event, welcome, result or error, such as a live frame. */
   other(state: State, frame: Frame): State;
+  /**
+   * The state as a connection is welcomed without a reset, which keeps what the events built:
+   * what the server sends again on every connection, such as a run's live frames, starts over,
+   * from what the welcome says, such as the runs under way.
+   */
+  welcome?(state: State, frame: Frame): State;
   /** Whether the command creates something under an id the client chose. */
   creates(command: Command): boolean;
 }
@@ -116,6 +122,8 @@ export class Stream<State, Frame, Command, R extends Result, Hello> {
   #fromHead: boolean;
   #timer: ReturnType<typeof setTimeout> | null = null;
   #stable: ReturnType<typeof setTimeout> | null = null;
+  /** A telling put off until the next frame, while one is. */
+  #later: (() => void) | null = null;
   readonly #listeners = new Set<() => void>();
   readonly #live = new Set<(envelope: Extract<Frame, Envelope>) => void>();
   readonly #refused = new Set<(result: R) => void>();
@@ -220,6 +228,8 @@ export class Stream<State, Frame, Command, R extends Result, Hello> {
     }
     this.#timer = null;
     this.#stable = null;
+    this.#later?.();
+    this.#later = null;
     const socket = this.#socket;
     this.#socket = null;
     socket?.close(1000);
@@ -276,14 +286,14 @@ export class Stream<State, Frame, Command, R extends Result, Hello> {
     const classified = this.protocol.classify(frame);
     switch (classified.kind) {
       case "welcome": {
-        if (this.#fromHead) {
-          this.#fromHead = false;
-          this.#update({ seq: classified.headSeq, status: "replaying" });
-        } else if (classified.reset) {
-          this.#update({ state: this.protocol.initial(), seq: 0, status: "replaying" });
-        } else {
-          this.#update({ status: "replaying" });
-        }
+        // Told to reset, the store starts over, and still holds what the welcome says, such as
+        // the runs under way; joined at the head, it goes on from there.
+        const reset = classified.reset && !this.#fromHead;
+        const base = reset ? this.protocol.initial() : this.#current.state;
+        const state = this.protocol.welcome?.(base, frame) ?? base;
+        const seq = this.#fromHead ? classified.headSeq : reset ? 0 : this.#current.seq;
+        this.#fromHead = false;
+        this.#update({ state, seq, status: "replaying" });
         // Commands sent before the drop and still unanswered go again, with their ids.
         for (const id of this.#pending.keys()) {
           this.#transmit(id);
@@ -320,7 +330,9 @@ export class Stream<State, Frame, Command, R extends Result, Hello> {
         this.#update({ error: classified.message });
         return;
       case "other":
-        this.#update({ state: this.protocol.other(this.#current.state, classified.frame) });
+        // A run's frames come many a second: the state takes each at once, and what reads it
+        // hears once a frame is drawn, so a stream of deltas is drawn once per frame.
+        this.#update({ state: this.protocol.other(this.#current.state, classified.frame) }, true);
         return;
       default:
         classified satisfies never;
@@ -359,7 +371,17 @@ export class Stream<State, Frame, Command, R extends Result, Hello> {
     }
   }
 
-  #update(change: Partial<Snapshot<State>>): void {
+  /** Tells every listener, now; a telling put off until the next frame is done with it. */
+  #tell(): void {
+    this.#later?.();
+    this.#later = null;
+    for (const listener of this.#listeners) {
+      listener();
+    }
+  }
+
+  /** The snapshot changed; the listeners hear now, or, with `later`, once the next frame is drawn. */
+  #update(change: Partial<Snapshot<State>>, later = false): void {
     const next = { ...this.#current, ...change };
     if (
       next.state === this.#current.state &&
@@ -370,8 +392,36 @@ export class Stream<State, Frame, Command, R extends Result, Hello> {
       return;
     }
     this.#current = next;
-    for (const listener of this.#listeners) {
-      listener();
+    if (!later) {
+      this.#tell();
+    } else if (this.#later === null) {
+      this.#later = nextFrame(() => {
+        this.#later = null;
+        this.#tell();
+      });
     }
   }
 }
+
+/**
+ * Calls `fn` on the browser's next frame, or after a tenth of a second where there are none, as
+ * in a test, or where the tab is hidden and draws none: whichever comes first. Returns how to
+ * cancel it.
+ * Read as each is asked for, so a test may give the browser's frames.
+ */
+const nextFrame = (fn: () => void): (() => void) => {
+  const drawn = typeof requestAnimationFrame === "function";
+  const cancel = () => {
+    clearTimeout(timer);
+    if (drawn) {
+      cancelAnimationFrame(frame);
+    }
+  };
+  const go = () => {
+    cancel();
+    fn();
+  };
+  const timer = setTimeout(go, drawn ? 100 : 16);
+  const frame = drawn ? requestAnimationFrame(go) : 0;
+  return cancel;
+};

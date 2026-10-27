@@ -7,10 +7,12 @@
 import type { Artifactr } from "@portalr/client";
 import type { ReactNode } from "react";
 import { useState } from "react";
+import { Button } from "./button";
 import { CopyButton } from "./copy-button";
 import { Disclosure } from "./disclosure";
 import { Icon } from "./icon";
 import { glyphs } from "./icons";
+import { useRetrying } from "./on-demand";
 import { ScrollRegion } from "./scroll-region";
 import { StatusBadge, type Tone } from "./status-badge";
 import { TYPE } from "./type";
@@ -24,43 +26,66 @@ const STATUS: Record<string, readonly [Tone, string, string]> = {
   retry: ["retrying", "Refused", "Why it was refused"],
 };
 
-/** A value as it reads best: JSON indented, anything else as it was recorded. */
-function pretty(text: string): string {
-  try {
-    return JSON.stringify(JSON.parse(text), null, 2);
-  } catch {
-    return text;
-  }
-}
+/** The formatted view of a call's parts (portalr ADR-0083), loaded as a call is first opened. */
+const loadJsonView = () => import("./on-demand/json-view");
+
+type JsonView = Awaited<ReturnType<typeof loadJsonView>>;
 
 /**
- * A part of a call: its name, a way to copy it, and its value, scrolled where it is long, which
- * the keyboard reaches and scrolls too. A value the run cut short, at its limit, says so.
+ * A part of a call: its name, a way to copy what is shown, and its value, scrolled where it is
+ * long, which the keyboard reaches and scrolls too: JSON indented, or, once `view` has loaded,
+ * formatted, with a toggle to the raw view. A value the run cut short, at its limit, says so.
  */
 function Part({
   name,
   tool,
   text,
   cut,
+  view,
 }: {
   name: string;
   tool: string;
+  /** The value, as the run recorded it. */
   text: string;
   cut: boolean;
+  view: JsonView | null;
 }) {
   const what = `the ${name.toLowerCase()} of ${tool}`;
+  // As recorded until the formatted view loads, which indents it; no arguments are `{}`.
+  const shown = text || (name === "Arguments" ? "{}" : "");
+  const region = (children: ReactNode) => (
+    <ScrollRegion
+      aria-label={what.charAt(0).toUpperCase() + what.slice(1)}
+      className="max-h-64 overflow-y-auto rounded-(--tool-call-result-radius) border border-line bg-paper"
+    >
+      {children}
+    </ScrollRegion>
+  );
+  if (view) {
+    const copy = (copied: string, of = what) => <CopyButton text={copied} what={of} />;
+    const choice = (label: string, pressed: boolean, onClick: () => void) => (
+      <Button variant="ghost" size="sm" aria-pressed={pressed} onClick={onClick}>
+        {label}
+      </Button>
+    );
+    return (
+      <view.Formatted
+        name={name}
+        what={what}
+        text={shown}
+        cut={cut}
+        shell={{ region, copy, choice }}
+      />
+    );
+  }
   return (
     <div className="flex flex-col gap-1">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex min-h-7 items-center justify-between gap-2">
         <span className={TYPE.note}>{name}</span>
-        <CopyButton text={text} what={what} />
+        <CopyButton text={shown} what={what} />
       </div>
-      <ScrollRegion
-        aria-label={what.charAt(0).toUpperCase() + what.slice(1)}
-        className="max-h-64 overflow-y-auto rounded-(--tool-call-result-radius) border border-line bg-paper"
-      >
-        <pre className="whitespace-pre-wrap break-words p-3 font-mono text-xs">{text}</pre>
-      </ScrollRegion>
+      {/* As recorded, unescaped: the add-on's escapes would cost the first load bytes it hasn't. */}
+      {region(<pre className="whitespace-pre-wrap break-words p-3 font-mono text-xs">{shown}</pre>)}
       {cut && <p className={TYPE.note}>Cut short: the run keeps the first part of each value.</p>}
     </div>
   );
@@ -81,11 +106,16 @@ export function ToolCall({
   const failed = tool.status === "error" || tool.status === "retry";
   const line = failed ? tool.result : tool.args;
   const step = index !== undefined;
+  // The formatted view loads once the call is opened, by the reader or by a find in the page; one
+  // that failed to load, as offline, is tried again as the call is opened again.
+  const [opened, setOpened] = useState(open);
+  const view = useRetrying(loadJsonView, opened, opened);
   return (
     <li>
       <Disclosure
         look="block"
-        defaultOpen={open}
+        open={opened}
+        onOpenChange={setOpened}
         className={
           step
             ? "text-sm"
@@ -106,7 +136,7 @@ export function ToolCall({
               <Icon icon={glyphs.wrench} className="size-3.5 shrink-0 text-muted" />
             )}
             <code className="shrink-0 font-mono">{tool.name}</code>
-            <span className="min-w-0 flex-1 truncate font-mono text-muted text-xs">{line}</span>
+            <bdi className="min-w-0 flex-1 truncate font-mono text-muted text-xs">{line}</bdi>
             <StatusBadge tone={tone} className="shrink-0">
               {word}
             </StatusBadge>
@@ -114,18 +144,14 @@ export function ToolCall({
         }
       >
         <div className="flex flex-col gap-3 border-line border-t p-3">
-          <Part
-            name="Arguments"
-            tool={tool.name}
-            text={pretty(tool.args) || "{}"}
-            cut={tool.argsCut}
-          />
+          <Part name="Arguments" tool={tool.name} text={tool.args} cut={tool.argsCut} view={view} />
           {tool.status !== "called" && (
             <Part
               name={returned}
               tool={tool.name}
-              text={pretty(tool.result)}
+              text={tool.result}
               cut={tool.resultCut}
+              view={view}
             />
           )}
         </div>

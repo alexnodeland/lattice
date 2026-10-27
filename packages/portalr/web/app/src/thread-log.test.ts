@@ -1,6 +1,6 @@
 import type { Artifactr } from "@portalr/client";
 import { expect, test } from "vitest";
-import { retryOf } from "./thread-log";
+import { retryOf, threadLog } from "./thread-log";
 
 const message = (id: string, by: string): Artifactr.Message => ({
   id,
@@ -18,6 +18,21 @@ const run = (change: Partial<Artifactr.Run>): Artifactr.Run => ({
   status: "failed",
   tools: {},
   text: "",
+  live: {
+    phase: "starting",
+    tool: null,
+    calls: 0,
+    argsChars: 0,
+    thinking: "",
+    thoughtMs: 0,
+    outputChars: 0,
+    since: 0,
+    at: 0,
+    part: null,
+    reply: "pending",
+    truncated: false,
+    framed: false,
+  },
   requests: [],
   answered: [],
   started: 2,
@@ -85,4 +100,26 @@ test("a thread whose every try id is someone else's says it can't try, rather th
   expect(
     retryOf(thread(message("m1", "alice"), ...taken.slice(0, 99)), { run_1: run({}) }, "alice")?.id,
   ).toBe("msg_again_run_1_100");
+});
+
+test("a turn that failed, or was stopped, shows what it had streamed before why, where it ended", () => {
+  const failed = run({ text: "Half a rep", ended: 3 });
+  const stopped = run({
+    id: "run_2",
+    status: "stopped",
+    started: 4,
+    ended: 5,
+    text: "",
+    live: { ...failed.live, thinking: "Hmm" },
+  });
+  const quiet = run({ id: "run_3", status: "completed", started: 6, ended: 7 });
+  const bare = run({ id: "run_4", status: "stopped", started: 8, ended: 9 });
+  const kinds = threadLog(thread(message("m1", "alice")), {
+    run_1: failed,
+    run_2: stopped,
+    run_3: quiet,
+    run_4: bare,
+  }).map((entry) => `${entry.kind}@${entry.seq}`);
+  // A stop is shown even where nothing had streamed; a failure with nothing streamed isn't.
+  expect(kinds).toEqual(["message@1", "partial@3", "failed@3", "partial@5", "partial@9"]);
 });

@@ -1,7 +1,8 @@
 /**
  * A thread as its chat shows it, oldest first: its messages, the artifacts it shows, its runs' tool
  * calls, the questions its runs asked through `ask_user` (artifactr ADR-0083), and the turns that
- * failed, each where the log has it. A run's calls in a row are one group.
+ * failed, or were stopped, with what they had streamed, each where the log has it. A run's calls
+ * in a row are one group.
  */
 
 import type { Artifactr } from "@portalr/client";
@@ -21,7 +22,26 @@ export type Entry =
       readonly question: Artifactr.Question;
     }
   | { readonly kind: "failed"; readonly seq: number; readonly run: Artifactr.Run }
+  /** What a run that failed, or was stopped, had streamed before it ended; a stop itself (portalr ADR-0083). */
+  | {
+      readonly kind: "partial";
+      readonly seq: number;
+      readonly run: Artifactr.Run & { readonly status: "failed" | "stopped" };
+    }
   | { readonly kind: "artifact"; readonly seq: number; readonly artifact: Artifactr.Artifact };
+
+/**
+ * A run that ended before its reply, with what it had streamed, its words or its thinking; a
+ * stopped one is shown even with none, as the thread says it stopped there.
+ */
+function unfinished(
+  run: Artifactr.Run,
+): run is Artifactr.Run & { readonly status: "failed" | "stopped" } {
+  return (
+    run.status === "stopped" ||
+    (run.status === "failed" && (run.text !== "" || run.live.thinking !== ""))
+  );
+}
 
 /**
  * Whether a run's call is shown as a call: one that asked questions is shown as its questions, and
@@ -56,6 +76,10 @@ export function threadLog(
         ...run.questions.map(
           (question) => ({ kind: "question", seq: question.seq, run, question }) as const,
         ),
+        // What it streamed comes before why it failed, at the same place.
+        ...(unfinished(run) && run.ended !== null
+          ? [{ kind: "partial", seq: run.ended, run } as const]
+          : []),
         ...(run.status === "failed" && run.ended !== null
           ? [{ kind: "failed", seq: run.ended, run } as const]
           : []),

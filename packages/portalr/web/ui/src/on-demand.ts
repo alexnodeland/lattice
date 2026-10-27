@@ -6,7 +6,7 @@
  * it would draw another way, as it does where the add-on is off.
  */
 
-import { useCallback, useEffect, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 
 /**
  * An add-on as a caller has it: its module once loaded, or null, and whether it failed to load,
@@ -100,3 +100,20 @@ export function useLoaded<T>(load: (() => Promise<T>) | undefined, wanted = true
 /** The loaded module `load` gives, once it has, or null; `load` starts only when `wanted`. */
 export const useOnDemand = <T>(load: (() => Promise<T>) | undefined, wanted = true): T | null =>
   useLoaded(load, wanted).module;
+
+/**
+ * The loaded module `load` gives, or null, as `useOnDemand`; and one that failed to load, as
+ * offline, is tried again when `key` changes while it is wanted, such as a new run starting or
+ * a call being opened again, rather than failing for the page's life.
+ */
+export function useRetrying<T>(load: () => Promise<T>, wanted: boolean, key: unknown): T | null {
+  const { module, failed } = useLoaded(load, wanted);
+  const broken = useRef(failed);
+  broken.current = failed;
+  useEffect(() => {
+    if (wanted && broken.current) {
+      retry(load);
+    }
+  }, [load, wanted, key]);
+  return module;
+}

@@ -57,22 +57,27 @@ def web_origin(url: str, *, what: str = "the origin") -> str:
     said = f"{what} is an origin, such as {EXAMPLE}, not {url!r}"
     if "*" in url or "%" in url:
         raise ValueError(f"{said}: no wildcard or escape")
-    parts = urlsplit(url)
+    try:
+        parts = urlsplit(url)
+        host = (parts.hostname or "").lower()
+        port = parts.port
+    except ValueError as error:
+        raise ValueError(f"{said}: {error}") from error
     scheme = parts.scheme.lower()
-    host = (parts.hostname or "").lower()
     if parts.username is not None or parts.password is not None or not host:
         raise ValueError(f"{said}: a host, with no user or password")
     if not HOST.fullmatch(parts.netloc):
         raise ValueError(f"{said}: ASCII letters, digits and . - : [ ] alone, a name in punycode")
     if parts.path not in ("", "/") or parts.query or parts.fragment:
         raise ValueError(f"{said}: no path, query or fragment")
-    try:
-        port = parts.port
-    except ValueError as error:
-        raise ValueError(f"{said}: {error}") from error
+    if port == 0:
+        raise ValueError(f"{said}: a port from 1 to 65535")
     address = _address(host)
-    if address is None and not all(LABEL.fullmatch(each) for each in host.split(".")):
-        raise ValueError(f"{said}: a host name of DNS labels")
+    labels = host.split(".")
+    if address is None and not (
+        all(LABEL.fullmatch(each) for each in labels) and not labels[-1].isdigit()
+    ):
+        raise ValueError(f"{said}: a host name of DNS labels, the last not a number")
     loopback = host in LOOPBACK
     if address is not None and not loopback:
         raise ValueError(f"{said}: an IP address that isn't loopback names no certificate")

@@ -6,7 +6,7 @@ comes from:
 - In an idle thread, a message starts a run.
 - In a busy thread, it steers the running agent: the run's watcher delivers it.
 - In a thread whose run is paused on questions, it is the reply: questions are answered with
-  it, ``ask_user``'s as a reply in place of choices (ADR-0084), approvals are declined with it
+  it, ``ask_user``'s as a reply in place of choices (ADR-0083), approvals are declined with it
   as the reason, and the run resumes. A form is answered only by its own answer, so a message
   posted while one is open waits, not taken, and reaches the run as it resumes, beside the
   form's values (lattice RFC-0005).

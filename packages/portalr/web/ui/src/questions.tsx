@@ -1,5 +1,5 @@
 /**
- * What the agent asks through `ask_user` (artifactr ADR-0084): one to four questions, each a
+ * What the agent asks through `ask_user` (artifactr ADR-0083): one to four questions, each a
  * group of options to choose one or several of, the agent's recommendation first, and, where it
  * offers it, an answer in the reader's own words. Answered, it stays in the thread and says what
  * was chosen, and by whom.

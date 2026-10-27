@@ -697,7 +697,7 @@ export function Composer({
 /** The deferred tool that asks a form, whose answer is the form's values (lattice RFC-0005). */
 export const ASK_FORM = "ask_form";
 
-/** The deferred tool that asks questions with options, answered per question (artifactr ADR-0084). */
+/** The deferred tool that asks questions with options, answered per question (artifactr ADR-0083). */
 export const ASK_USER = "ask_user";
 
 type Answer =

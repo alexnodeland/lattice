@@ -246,7 +246,7 @@ Proposals do not block the run ([ADR-0009](../adr/0009-write-policies-and-non-bl
 
 Some points need a person before the agent can continue: a question only they can answer, or an action that needs approval. These use pydantic-ai's deferred tools ([ADR-0010](../adr/0010-pausing-with-deferred-tools.md)):
 
-- `ask_user`, added by `ArtifactWorkspace(..., ask=True)`, asks one to four questions, each with a short `header` and two to four options (a `label`, a `description`, and `recommended` on the one the agent would choose), one choice or `multiple`, and, where it sets `other`, an answer in the person's own words ([ADR-0084](../adr/0083-ask-user-asks-questions-with-options.md)). Any tool that raises `CallDeferred` pauses the same way.
+- `ask_user`, added by `ArtifactWorkspace(..., ask=True)`, asks one to four questions, each with a short `header` and two to four options (a `label`, a `description`, and `recommended` on the one the agent would choose), one choice or `multiple`, and, where it sets `other`, an answer in the person's own words ([ADR-0083](../adr/0083-ask-user-asks-questions-with-options.md)). Any tool that raises `CallDeferred` pauses the same way.
 - A tool declared with `requires_approval=True` needs approval before it runs.
 
 The agent's `output_type` must include `DeferredToolRequests`:

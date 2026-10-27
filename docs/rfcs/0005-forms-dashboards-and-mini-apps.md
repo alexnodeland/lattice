@@ -311,7 +311,7 @@ Each is a phase 1 or phase 2 exit criterion, settled and recorded in an ADR.
 
 *Amended 2026-10-17 ([Amendment](#amendment-2026-10-17-the-extra-the-module-and-relayrs-bridging)): the items above that name the package are met in `artifactr.ui` and `relayr.ui`.*
 
-*Implemented 2026-10-25: forms, dashboards and mini apps shipped. Mini apps run in portalr's sandboxed frame on the apps' origin, with its bridge and kill switch ([artifactr ADR-0082](../artifactr/adr/0082-mini-apps-the-agents-tools-and-html-that-loads-nothing.md), [portalr ADR-0051](../portalr/adr/0051-mini-apps-the-sandboxed-frame-and-its-bridge.md), [portalr ADR-0052](../portalr/adr/0052-artifacts-inline-in-their-thread.md)), and `ask_user` asks questions with options ([artifactr ADR-0084](../artifactr/adr/0083-ask-user-asks-questions-with-options.md)). Deferred: phase 3, the MCP export, `artifactr.mcp`'s `extensions=` and the `ui://` resources.*
+*Implemented 2026-10-25: forms, dashboards and mini apps shipped. Mini apps run in portalr's sandboxed frame on the apps' origin, with its bridge and kill switch ([artifactr ADR-0082](../artifactr/adr/0082-mini-apps-the-agents-tools-and-html-that-loads-nothing.md), [portalr ADR-0051](../portalr/adr/0051-mini-apps-the-sandboxed-frame-and-its-bridge.md), [portalr ADR-0052](../portalr/adr/0052-artifacts-inline-in-their-thread.md)), and `ask_user` asks questions with options ([artifactr ADR-0083](../artifactr/adr/0083-ask-user-asks-questions-with-options.md)). Deferred: phase 3, the MCP export, `artifactr.mcp`'s `extensions=` and the `ui://` resources.*
 
 ## Evidence
 
@@ -350,7 +350,7 @@ Gathered on 2026-10-16 and 2026-10-17. lattice was read at `origin/main`; the we
 
 ## Amendment (2026-10-20): `ask_user` asks questions with options
 
-Beside phase 3, the owner asked for `ask_user` to ask as Claude Code's AskUserQuestion does, which closes the first item of [Motivation](#motivation) for the questions that need no form. It is decided in [artifactr ADR-0084](../artifactr/adr/0083-ask-user-asks-questions-with-options.md):
+Beside phase 3, the owner asked for `ask_user` to ask as Claude Code's AskUserQuestion does, which closes the first item of [Motivation](#motivation) for the questions that need no form. It is decided in [artifactr ADR-0083](../artifactr/adr/0083-ask-user-asks-questions-with-options.md):
 
 - **`ask_user(questions)`** takes one to four questions, each with a short `header`, two to four options (a `label`, a `description`, `recommended`), `multiple` for several choices, and `other` where a person may answer in their own words. Recommended options come first.
 - **An answer is per question,** `{"answers": [{"selected": [...], "other": ...}]}`, or a reply in words, `{"reply": ...}`, which a message posted in the paused thread is. artifactr's core holds an answer to its questions as it is committed, on every surface, as `validation_failed`.

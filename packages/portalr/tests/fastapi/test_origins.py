@@ -167,6 +167,34 @@ def test_an_editor_with_a_query_or_fragment_is_refused(url: str) -> None:
         site(editors={"files:gridcraft": url})
 
 
+def test_at_most_eight_aliases_are_named() -> None:
+    nine = {f"https://alias{n}.example": {} for n in range(9)}
+    with pytest.raises(ValidationError, match="9 aliases: at most 8"):
+        site(origin=LOOPBACK, aliases=nine)
+
+
+@pytest.mark.parametrize(
+    ("given", "said"),
+    [
+        ({"aliases": {f"{LOOPBACK}/": {}}}, "the portal's own origin, not an alias"),
+        ({"apps": LOOPBACK}, "share a portal's origin"),
+        ({"apps": TAILNET, "aliases": {TAILNET: {}}}, "share a portal's origin"),
+        ({"aliases": {TAILNET: {"apps": LOOPBACK}}}, "share a portal's origin"),
+        ({"editors": {"files:gridcraft": f"{TAILNET}/e/"}, "aliases": {TAILNET: {}}}, "own"),
+        ({"aliases": {TAILNET: {"editors": {"files:gridcraft": f"{LOOPBACK}/e/"}}}}, "own"),
+    ],
+)
+def test_no_place_is_on_any_portal_origin(given: dict[str, Any], said: str) -> None:
+    with pytest.raises(ValidationError, match=said):
+        site(origin=LOOPBACK, **given)
+
+
+@pytest.mark.parametrize("path", ["/a;b", "/a,b", "/a b", "/a'b", "/a%20b", "/a@b"])
+def test_an_editors_path_is_plain(path: str) -> None:
+    with pytest.raises(ValidationError, match="a path of letters"):
+        site(editors={"files:gridcraft": f"https://editor.example{path}"})
+
+
 def test_without_aliases_or_an_origin_a_site_is_as_it_was() -> None:
     made = site(apps=APPS, editors=EDITORS)
     assert (made.origin, made.aliases) == (None, {})
@@ -197,8 +225,11 @@ def test_the_portals_policy_frames_every_place_once_in_order_and_names_no_wildca
     frames = policy(made).split("; frame-src ")[1].split(";")[0].split(" ")
     assert len(frames) == len(set(frames))
     assert "*" not in policy(made)
-    assert policy(made) == policy(site(apps=APPS, editors=EDITORS)).replace(
-        f"{APPS} http://127.0.0.1:8802 http://127.0.0.1:8803;", expected[len("; frame-src ") :]
+    assert policy(made) == (
+        "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
+        "font-src 'self'; connect-src 'self'"
+        f"{expected} object-src 'none'; base-uri 'self'; form-action 'self'; "
+        "frame-ancestors 'none'"
     )
 
 
@@ -316,7 +347,7 @@ async def test_a_websocket_to_any_apps_origin_is_closed(built: Path) -> None:
     ],
 )
 def test_no_apps_origin_may_be_any_portals(apps: list[str], portals: list[str]) -> None:
-    with pytest.raises(ValueError, match="share the portal's origin"):
+    with pytest.raises(ValueError, match="share a portal's origin"):
         SandboxOrigin(FastAPI(), apps=apps, portal=portals)
 
 
@@ -337,7 +368,7 @@ def test_the_sandbox_takes_only_web_origins(
 
 
 def test_the_csp_tests_run_the_shim_as_artifactr_writes_it() -> None:
-    # ui's CSP tests (web/ui/csp/shim.test.ts) frame the editor's shim from two portal origins,
+    # ui's CSP tests (web/ui/csp/origins.test.ts) frame the editor's shim from two portal origins,
     # in Chromium, with its script as artifactr serves it: the copy is held to the source.
     harness = Path(__file__).parents[2] / "web" / "ui" / "csp" / "shim-script.js"
     assert harness.read_text() == SCRIPT.strip() + "\n"

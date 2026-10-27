@@ -1,6 +1,7 @@
 """What the UIs need to know about the application they run in, as ``config.json`` serves it."""
 
 import base64
+import re
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
 
@@ -10,6 +11,13 @@ from lattice_core.integrations import KEY
 from lattice_core.origins import web_origin
 from portalr.brand.kit import Kit, load
 from portalr.brand.tokens import BrandError
+
+ALIASES = 8
+"""The most other origins a portal may be reached at: a policy naming many is a mistake."""
+
+
+EDITOR_PATH = re.compile(r"(/[A-Za-z0-9._~\-/]*)?")
+"""An editor's path: nothing a policy or a header separates on, nor an escape."""
 
 
 class Surfaces(BaseModel):
@@ -131,6 +139,8 @@ class Site(BaseModel):
     @classmethod
     def _aliases(cls, aliases: dict[str, Place]) -> dict[str, Place]:
         """Each alias by its portal origin as a browser compares it, which is how the UIs look."""
+        if len(aliases) > ALIASES:
+            raise ValueError(f"{len(aliases)} aliases: at most {ALIASES}")
         named: dict[str, Place] = {}
         for portal, place in aliases.items():
             origin = web_origin(portal, what="the portal")
@@ -144,23 +154,26 @@ class Site(BaseModel):
         """Refuse aliases without the portal's own origin, which the UIs tell them apart from."""
         if self.aliases and self.origin is None:
             raise ValueError("aliases are other origins of the portal: name its own origin too")
+        if self.origin in self.aliases:
+            raise ValueError(f"{self.origin} is the portal's own origin, not an alias of it")
         return self
 
     @model_validator(mode="after")
     def _editors_apart(self) -> "Site":
-        """Refuse an editor on the apps' origin, Supabase's or the portal's, for each place.
+        """Refuse mini apps or an editor on a portal origin, or an editor on apps' or Supabase's.
 
-        The portal frames an editor with its origin's scripts allowed, so it must be an origin of
-        its own. The portal's own origin is known here only where ``origin`` says it, and an
-        alias's by its key; the UIs refuse an editor on their own origin in any case.
+        The portal frames them with their origin's scripts allowed, so each must be an origin of
+        its own. The portal's origins are known here only where ``origin`` and the aliases name
+        them; the UIs refuse an editor on their own origin in any case.
         """
-        places = [
-            (self.origin, self.apps, self.editors),
-            *((portal, place.apps, place.editors) for portal, place in self.aliases.items()),
-        ]
-        for portal, apps, editors in places:
-            named = (portal, apps, self.supabase_url)
-            others = {_origin_of(url) for url in named if url} - {None}
+        portals = {self.origin, *self.aliases} - {None}
+        places = [(self.apps, self.editors)]
+        places += [(place.apps, place.editors) for place in self.aliases.values()]
+        for apps, editors in places:
+            if apps in portals:
+                raise ValueError(f"mini apps at {apps} would share a portal's origin")
+            named = (apps, self.supabase_url)
+            others = portals | ({_origin_of(url) for url in named if url} - {None})
             for key, url in editors.items():
                 if _origin_of(url) in others:
                     raise ValueError(f"{key}'s editor is at {url}: give it an origin of its own")
@@ -236,7 +249,10 @@ def _editor_urls(editors: dict[str, str]) -> dict[str, str]:
             raise ValueError(f"{key}'s editor is at {url}: no query or fragment")
         # An editor is a URL, which may have a path; its origin is what must be a web origin.
         origin = urlunsplit((parts.scheme, parts.netloc, "", "", ""))
-        kept[key] = web_origin(origin, what=f"{key}'s editor") + parts.path
+        at = web_origin(origin, what=f"{key}'s editor")
+        if not EDITOR_PATH.fullmatch(parts.path):
+            raise ValueError(f"{key}'s editor is at {url}: a path of letters, digits and ._~-/")
+        kept[key] = at + parts.path
     return kept
 
 

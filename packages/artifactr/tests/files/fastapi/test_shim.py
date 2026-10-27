@@ -128,14 +128,6 @@ def test_told_several_portals_the_shim_names_them_all_once_as_a_browser_compares
     assert shim_page(CRAFTS["gridcraft"], [LOOPBACK]) == shim_page(CRAFTS["gridcraft"], LOOPBACK)
 
 
-def test_the_shim_learns_its_portal_from_the_frames_host_and_is_inert_without_one() -> None:
-    # The script itself, which the CSP tests run in Chromium (web/ui/csp/shim.test.ts): told one
-    # portal it needs no `?host=`; told several, it takes only a `?host=` among them.
-    assert 'new URLSearchParams(location.search).get("host")' in SCRIPT
-    assert "portals.includes(asked) ? asked : portals.length === 1 ? portals[0] : null" in SCRIPT
-    assert "if (!portal) return;" in SCRIPT
-
-
 def test_every_policy_is_framed_by_each_portal_and_the_editor_serves_them(build: Path) -> None:
     both = [LOOPBACK, TAILNET]
     shim = dict(d.split(" ", 1) for d in shim_policy(both).split("; "))

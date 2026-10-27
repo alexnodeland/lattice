@@ -55,7 +55,7 @@ An allow-list costs one setting and keeps every policy static and explicit, whic
 - Harder: an origin is served in lower case with its default port left out; a deployment that spelled one otherwise sees the policy change, with the same meaning to a browser.
 - Harder: the shim's script changed, so its hash in its policy did; its page is no longer byte for byte what it was.
 - Deferred: the template and `make tailnet`; a `Host` allow-list on the application against DNS rebinding on loopback; a custom domain beside a tailnet, which needs the places named explicitly, since `beside` derives none for an edge on the default port.
-- Budget: the resolver and the reason added 54 bytes gzipped to the app's initial load and 384 to its total, measured locally; no ceiling moved.
+- Budget: no size budget's ceiling moved for the resolver and the reason.
 
 ## Action items
 

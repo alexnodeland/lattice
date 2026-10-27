@@ -104,7 +104,7 @@ class SandboxOrigin:
         self._hosts = {_host(urlsplit(each).netloc) for each in origins}
         for each in origins:
             if each in portals:
-                raise ValueError(f"mini apps at {each} would share the portal's origin, {each}")
+                raise ValueError(f"mini apps at {each} would share a portal's origin")
         self._page = root / "sandbox" / "index.html"
         self._headers = {
             "Content-Security-Policy": sandbox_policy(portal),

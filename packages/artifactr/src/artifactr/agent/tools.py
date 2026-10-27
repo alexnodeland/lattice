@@ -49,7 +49,7 @@ def artifact_tools(
         types: The artifact types the agent may create; their JSON Schemas are described to
             the model once, so tool definitions never change between requests.
         ask: Whether to include ``ask_user``, which asks questions and pauses the run until
-            someone answers them (ADR-0084).
+            someone answers them (ADR-0083).
             The agent's ``output_type`` must then include ``DeferredToolRequests``.
     """
     toolset = FunctionToolset[Session[Any]]()

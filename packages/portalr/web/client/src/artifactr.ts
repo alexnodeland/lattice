@@ -86,7 +86,7 @@ export interface Tool {
   readonly seq: number;
 }
 
-/** The deferred tool that asks questions with options (artifactr ADR-0084). */
+/** The deferred tool that asks questions with options (artifactr ADR-0083). */
 const ASK_USER = "ask_user";
 
 /**

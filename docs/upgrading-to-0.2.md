@@ -6,7 +6,7 @@ Three changes break what a client or an application of its own may rely on: `ask
 
 ## On the wire: `ask_user`'s questions and answers
 
-`ask_user` asks one to four questions with options now ([#423](https://github.com/alexnodeland/lattice/pull/423)), and an answer to it is one of two shapes ([artifactr ADR-0084](artifactr/adr/0083-ask-user-asks-questions-with-options.md)):
+`ask_user` asks one to four questions with options now ([#423](https://github.com/alexnodeland/lattice/pull/423)), and an answer to it is one of two shapes ([artifactr ADR-0083](artifactr/adr/0083-ask-user-asks-questions-with-options.md)):
 
 ```json
 {"answers": [{"selected": ["Weekly"]}, {"selected": [], "other": "Every other Tuesday"}]}

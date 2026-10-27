@@ -1,6 +1,7 @@
 """artifactr's surfaces: people and the agent write notes together, signed in with Supabase."""
 
 import asyncio
+import contextlib
 from typing import Any
 
 import httpx
@@ -219,6 +220,8 @@ async def test_a_recovery_still_going_at_shutdown_is_cancelled(
         return []
 
     monkeypatch.setattr(collaboration.runner, "recover", slow)
+    # The MCP server's lifespan needs the app it is mounted in; this test has none.
+    monkeypatch.setattr(collaboration.mcp, "lifespan", contextlib.nullcontext)
     async with collaboration.lifespan():
         await collaboration.workspaces.open(TENANT, "main", actor=SystemActor())
         await asyncio.sleep(0)

@@ -11,6 +11,7 @@ import { CopyButton } from "./copy-button";
 import { Disclosure } from "./disclosure";
 import { Icon } from "./icon";
 import { glyphs } from "./icons";
+import { useOnDemand } from "./on-demand";
 import { ScrollRegion } from "./scroll-region";
 import { StatusBadge, type Tone } from "./status-badge";
 import { TYPE } from "./type";
@@ -33,22 +34,35 @@ function pretty(text: string): string {
   }
 }
 
+/** The formatted view of a call's parts (portalr ADR-0083), loaded as a call is first opened. */
+const loadJsonView = () => import("./on-demand/json-view");
+
 /**
- * A part of a call: its name, a way to copy it, and its value, scrolled where it is long, which
- * the keyboard reaches and scrolls too. A value the run cut short, at its limit, says so.
+ * A part of a call: its name, a way to copy it, as the run recorded it, and its value, scrolled
+ * where it is long, which the keyboard reaches and scrolls too: JSON indented, or, once `view`
+ * has loaded, formatted, with a toggle to the raw view. A value the run cut short, at its limit,
+ * says so.
  */
 function Part({
   name,
   tool,
   text,
   cut,
+  view,
 }: {
   name: string;
   tool: string;
+  /** The value, as the run recorded it: what Copy copies. */
   text: string;
   cut: boolean;
+  view: Awaited<ReturnType<typeof loadJsonView>> | null;
 }) {
   const what = `the ${name.toLowerCase()} of ${tool}`;
+  const raw = (
+    <pre className="whitespace-pre-wrap break-words p-3 font-mono text-xs">
+      {pretty(text) || (name === "Arguments" ? "{}" : "")}
+    </pre>
+  );
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-center justify-between gap-2">
@@ -59,7 +73,7 @@ function Part({
         aria-label={what.charAt(0).toUpperCase() + what.slice(1)}
         className="max-h-64 overflow-y-auto rounded-(--tool-call-result-radius) border border-line bg-paper"
       >
-        <pre className="whitespace-pre-wrap break-words p-3 font-mono text-xs">{text}</pre>
+        {view ? <view.Formatted text={text} cut={cut} what={what} raw={raw} /> : raw}
       </ScrollRegion>
       {cut && <p className={TYPE.note}>Cut short: the run keeps the first part of each value.</p>}
     </div>
@@ -81,11 +95,15 @@ export function ToolCall({
   const failed = tool.status === "error" || tool.status === "retry";
   const line = failed ? tool.result : tool.args;
   const step = index !== undefined;
+  // The formatted view loads once the call is opened, by the reader or by a find in the page.
+  const [opened, setOpened] = useState(open);
+  const view = useOnDemand(loadJsonView, opened);
   return (
     <li>
       <Disclosure
         look="block"
-        defaultOpen={open}
+        open={opened}
+        onOpenChange={setOpened}
         className={
           step
             ? "text-sm"
@@ -114,18 +132,14 @@ export function ToolCall({
         }
       >
         <div className="flex flex-col gap-3 border-line border-t p-3">
-          <Part
-            name="Arguments"
-            tool={tool.name}
-            text={pretty(tool.args) || "{}"}
-            cut={tool.argsCut}
-          />
+          <Part name="Arguments" tool={tool.name} text={tool.args} cut={tool.argsCut} view={view} />
           {tool.status !== "called" && (
             <Part
               name={returned}
               tool={tool.name}
-              text={pretty(tool.result)}
+              text={tool.result}
               cut={tool.resultCut}
+              view={view}
             />
           )}
         </div>

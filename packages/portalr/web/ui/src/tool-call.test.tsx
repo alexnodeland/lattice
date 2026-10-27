@@ -40,16 +40,21 @@ test("open, it shows its arguments indented and what it returned, each to copy",
     </ToolCalls>,
   );
   await screen.getByText("create_artifact").click();
+  // Formatted once the view has loaded: keys and values apart; Raw is the JSON indented.
+  await expect.element(screen.getByText('"Ship Friday"')).toBeVisible();
+  await screen.getByRole("button", { name: "Raw" }).click();
   await expect
     .element(screen.getByText(/^\{\n {2}"kind": "note",\n {2}"data": \{\n {4}"text"/))
     .toBeVisible();
   await expect.element(screen.getByText("Done: note_1 is now at version 1.")).toBeVisible();
   await screen.getByRole("button", { name: "Copy the result of create_artifact" }).click();
   expect(written).toHaveBeenCalledWith("Done: note_1 is now at version 1.");
+  // Copy copies the value as the run recorded it, whichever view is shown.
   await screen.getByRole("button", { name: "Copy the arguments of create_artifact" }).click();
-  expect(written).toHaveBeenLastCalledWith(
-    JSON.stringify({ kind: "note", data: { text: "Ship Friday" } }, null, 2),
-  );
+  expect(written).toHaveBeenLastCalledWith('{"kind": "note", "data": {"text": "Ship Friday"}}');
+  await screen.getByRole("button", { name: "Formatted" }).click();
+  await screen.getByRole("button", { name: "Copy the arguments of create_artifact" }).click();
+  expect(written).toHaveBeenLastCalledWith('{"kind": "note", "data": {"text": "Ship Friday"}}');
 });
 
 test("the keyboard opens and closes a call", async () => {
@@ -202,4 +207,86 @@ test("a group folds as its run ends, says Working between calls, and keeps its c
   );
   await expect.element(group).toHaveAttribute("aria-expanded", "false");
   await expect.poll(() => group.element().textContent).toContain("Done");
+});
+
+test("the formatted view lays out JSON, shows a string's lines as a block, and code as code", async () => {
+  const html = "<!doctype html>\n<html>\n<body>Hi</body>\n</html>";
+  const args = JSON.stringify({
+    title: "Hello",
+    html,
+    lines: "one\ntwo",
+    n: 3,
+    ok: true,
+    none: null,
+    tags: ["a", "b"],
+    empty: {},
+  });
+  onTestFinished(() => localStorage.removeItem("portalr:tool-call-view"));
+  const screen = await render(
+    <ToolCalls>
+      <ToolCall key="app" tool={tool({ name: "create_app", args })} />
+    </ToolCalls>,
+  );
+  await screen.getByText("create_app").click();
+  const toggle = screen.getByRole("group", { name: "View of the arguments of create_app" });
+  await expect
+    .element(toggle.getByRole("button", { name: "Formatted" }))
+    .toHaveAttribute("aria-pressed", "true");
+  await expect
+    .element(toggle.getByRole("button", { name: "Raw" }))
+    .toHaveAttribute("aria-pressed", "false");
+  // The HTML is a code block, its lines real, labelled by its language, and never run.
+  const region = screen.getByRole("region", { name: "The arguments of create_app" });
+  await expect.element(region.getByRole("region", { name: "html code" })).toBeVisible();
+  expect(region.element().querySelector("body")).toBeNull();
+  expect(region.getByRole("region", { name: "html code" }).element().textContent).toBe(html);
+  // A string with lines, not code, is a block of its own, wrapped; scalars sit in their lines.
+  const lines = region.getByText("one two").element();
+  expect(lines.tagName).toBe("PRE");
+  expect(getComputedStyle(lines).whiteSpace).toBe("pre-wrap");
+  await expect.element(region.getByText('"Hello"')).toBeVisible();
+  await expect.element(region.getByText("true")).toBeVisible();
+  await expect.element(region.getByText("null")).toBeVisible();
+  await expect.element(region.getByText("{}")).toBeVisible();
+  // Nothing is wider than its box.
+  expect(region.element().scrollWidth).toBeLessThanOrEqual(region.element().clientWidth);
+  // Raw is the JSON as it was shown before, and the choice is remembered for every call.
+  await toggle.getByRole("button", { name: "Raw" }).click();
+  await expect.element(region.getByText(/^\{\n {2}"title": "Hello"/)).toBeVisible();
+  expect(localStorage.getItem("portalr:tool-call-view")).toBe("raw");
+  await screen.rerender(
+    <ToolCalls>
+      <ToolCall key="other" tool={tool({ name: "other", args: '{"a": 1}' })} />
+    </ToolCalls>,
+  );
+  await screen.getByText("other").click();
+  await expect
+    .element(screen.getByRole("button", { name: "Raw" }))
+    .toHaveAttribute("aria-pressed", "true");
+  await screen.getByRole("button", { name: "Formatted" }).click();
+  expect(localStorage.getItem("portalr:tool-call-view")).toBeNull();
+});
+
+test("a value cut short is formatted from what parses, and one that isn't JSON has no toggle", async () => {
+  const screen = await render(
+    <ToolCalls>
+      <ToolCall
+        tool={tool({
+          args: '{"kind": "note", "data": {"text": "Ship Fri',
+          argsCut: true,
+          result: "Done.",
+        })}
+      />
+    </ToolCalls>,
+  );
+  await screen.getByText("create_artifact").click();
+  await expect.element(screen.getByText('"Ship Fri"')).toBeVisible();
+  await expect.element(screen.getByText("Formatted from what parses of it.")).toBeVisible();
+  await expect
+    .element(screen.getByText("Cut short: the run keeps the first part of each value."))
+    .toBeVisible();
+  expect(
+    screen.getByRole("group", { name: "View of the result of create_artifact" }).elements(),
+  ).toHaveLength(0);
+  await expect.element(screen.getByText("Done.")).toBeVisible();
 });

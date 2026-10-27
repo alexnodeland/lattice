@@ -21,7 +21,7 @@
       }
     },
     "paper": {
-      "$value": "#f6f6f8",
+      "$value": "#fafafb",
       "$type": "color"
     },
     "surface": {
@@ -29,15 +29,15 @@
       "$type": "color"
     },
     "fg": {
-      "$value": "#16161d",
+      "$value": "#16181d",
       "$type": "color"
     },
     "muted": {
-      "$value": "#5d5d68",
+      "$value": "#5b6271",
       "$type": "color"
     },
     "line": {
-      "$value": "#e3e3e8",
+      "$value": "#e5e7eb",
       "$type": "color"
     },
     "accent": {
@@ -196,7 +196,7 @@
       "$value": {
         "colorSpace": "srgb",
         "hex": "#101018",
-        "alpha": 0.08,
+        "alpha": 0.06,
         "components": [
           0.0627,
           0.0627,
@@ -295,7 +295,7 @@
     },
     "4": {
       "$value": {
-        "value": 0.5,
+        "value": 0.625,
         "unit": "rem"
       },
       "$type": "dimension"
@@ -622,7 +622,7 @@
     },
     "row-height": {
       "$value": {
-        "value": 2.75,
+        "value": 3,
         "unit": "rem"
       },
       "$type": "dimension"
@@ -670,14 +670,14 @@
         "$value": "{space.3}"
       },
       "pad-y": {
-        "$value": "{space.1-5}"
+        "$value": "{space.2}"
       },
       "sm": {
         "pad-x": {
           "$value": "{space.2}"
         },
         "pad-y": {
-          "$value": "{space.1}"
+          "$value": "{space.1-5}"
         }
       },
       "weight": {
@@ -701,7 +701,7 @@
         "$value": "{space.3}"
       },
       "pad-y": {
-        "$value": "{space.1-5}"
+        "$value": "{space.2}"
       }
     },
     "checkbox": {
@@ -763,7 +763,10 @@
         "$value": "{radius.4}"
       },
       "pad": {
-        "$value": "{space.4}"
+        "$value": {
+          "value": 1.25,
+          "unit": "rem"
+        }
       },
       "shadow": {
         "$value": "{shadow.1}"
@@ -936,12 +939,12 @@
         "$value": "{radius.4}"
       },
       "cell-pad-x": {
-        "$value": "{space.3}"
+        "$value": "{space.4}"
       }
     },
     "badge": {
       "radius": {
-        "$value": "{radius.2}"
+        "$value": "{radius.3}"
       },
       "pad-y": {
         "$value": "{space.half}"
@@ -1025,7 +1028,10 @@
         "$value": "{radius.4}"
       },
       "pad": {
-        "$value": "{space.4}"
+        "$value": {
+          "value": 1.25,
+          "unit": "rem"
+        }
       },
       "option-radius": {
         "$value": "{radius.3}"
@@ -1035,7 +1041,7 @@
       },
       "option-pad-y": {
         "$value": {
-          "value": 0.625,
+          "value": 0.75,
           "unit": "rem"
         }
       },
@@ -1045,7 +1051,7 @@
     },
     "bubble": {
       "radius": {
-        "$value": "{radius.5}"
+        "$value": "{radius.4}"
       },
       "max-width": {
         "$value": {
@@ -1057,13 +1063,10 @@
         "$value": "{radius.1}"
       },
       "pad-x": {
-        "$value": {
-          "value": 0.875,
-          "unit": "rem"
-        }
+        "$value": "{space.4}"
       },
       "pad-y": {
-        "$value": "{space.2}"
+        "$value": "{space.3}"
       }
     },
     "composer": {
@@ -1071,7 +1074,7 @@
         "$value": "{radius.4}"
       },
       "pad": {
-        "$value": "{space.1}"
+        "$value": "{space.2}"
       }
     },
     "alert": {
@@ -1142,10 +1145,10 @@
     },
     "list-row": {
       "pad-x": {
-        "$value": "{space.2}"
+        "$value": "{space.4}"
       },
       "pad-y": {
-        "$value": "{space.3}"
+        "$value": "{space.4}"
       },
       "gap": {
         "$value": "{space.3}"

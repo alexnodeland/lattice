@@ -21,35 +21,35 @@
       }
     },
     "paper": {
-      "$value": "#121216",
+      "$value": "#121317",
       "$type": "color"
     },
     "surface": {
-      "$value": "#1a1a20",
+      "$value": "#191a1f",
       "$type": "color"
     },
     "fg": {
-      "$value": "#ececf1",
+      "$value": "#ebecef",
       "$type": "color"
     },
     "muted": {
-      "$value": "#a6a6b0",
+      "$value": "#a3a8b3",
       "$type": "color"
     },
     "line": {
-      "$value": "#2b2b33",
+      "$value": "#2a2c34",
       "$type": "color"
     },
     "accent": {
-      "$value": "#d9bff3",
+      "$value": "#b798ec",
       "$type": "color"
     },
     "on-accent": {
-      "$value": "#121216",
+      "$value": "#16181d",
       "$type": "color"
     },
     "focus": {
-      "$value": "#a77bdf",
+      "$value": "#b798ec",
       "$type": "color"
     },
     "edge": {

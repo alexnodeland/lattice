@@ -26,7 +26,7 @@
   --radius-1: 0.125rem;
   --radius-2: 0.25rem;
   --radius-3: 0.375rem;
-  --radius-4: 0.5rem;
+  --radius-4: 0.625rem;
   --radius-5: 0.75rem;
   --radius-6: 1rem;
   --radius-full: 2147483647px;
@@ -79,19 +79,19 @@
    * The roles the components use: the paper, a surface on it, the text, the quiet text, a line,
    * and the working colour and what is written on it.
    */
-  --paper: light-dark(#f6f6f8, #121216);
-  --surface: light-dark(#ffffff, #1a1a20);
-  --fg: light-dark(#16161d, #ececf1);
-  --muted: light-dark(#5d5d68, #a6a6b0);
-  --line: light-dark(#e3e3e8, #2b2b33);
-  --accent: light-dark(var(--portalr-violet), #d9bff3);
-  --on-accent: light-dark(#ffffff, #121216);
+  --paper: light-dark(#fafafb, #121317);
+  --surface: light-dark(#ffffff, #191a1f);
+  --fg: light-dark(#16181d, #ebecef);
+  --muted: light-dark(#5b6271, #a3a8b3);
+  --line: light-dark(#e5e7eb, #2a2c34);
+  --accent: light-dark(var(--portalr-violet), #b798ec);
+  --on-accent: light-dark(#ffffff, #16181d);
 
   /*
    * The focus ring: the brand's violet in both schemes, lighter in the dark, never another ink. A
    * control's boundary: 3:1 or more on every surface, as WCAG asks of one.
    */
-  --focus: light-dark(#6b2fa0, #a77bdf);
+  --focus: light-dark(#6b2fa0, #b798ec);
   --edge: light-dark(#80808a, #75757f);
 
   /*
@@ -151,7 +151,7 @@
    * (admin's compact density changes the last three, ADR-0039).
    */
   --page-width: 64rem;
-  --row-height: 2.75rem;
+  --row-height: 3rem;
   --row-pad: 0.5rem;
   --table-text: 0.875rem;
 
@@ -160,7 +160,7 @@
    * the dark paper, black and heavier in dark.
    */
   --scrim: light-dark(rgb(16 16 24 / 40%), rgb(0 0 0 / 60%));
-  --shadow-color: light-dark(rgb(16 16 24 / 8%), rgb(0 0 0 / 55%));
+  --shadow-color: light-dark(rgb(16 16 24 / 6%), rgb(0 0 0 / 55%));
 
   /*
    * The focus ring: how wide it is, and how far from what it rings (inside a row, the same
@@ -182,9 +182,9 @@
    */
   --button-radius: var(--radius-3);
   --button-pad-x: var(--space-3);
-  --button-pad-y: var(--space-1-5);
+  --button-pad-y: var(--space-2);
   --button-sm-pad-x: var(--space-2);
-  --button-sm-pad-y: var(--space-1);
+  --button-sm-pad-y: var(--space-1-5);
   --button-weight: var(--weight-semibold);
   --button-press-shift: var(--space-px);
   --button-duration: var(--duration-fast);
@@ -196,7 +196,7 @@
    */
   --input-radius: var(--radius-3);
   --input-pad-x: var(--space-3);
-  --input-pad-y: var(--space-1-5);
+  --input-pad-y: var(--space-2);
   --checkbox-radius: var(--radius-2);
   --checkbox-size: var(--space-4);
   --switch-width: 2.25rem;
@@ -213,7 +213,7 @@
 
   /* A card, and an empty state, which is one: corners, padding and what it casts. */
   --card-radius: var(--radius-4);
-  --card-pad: var(--space-4);
+  --card-pad: 1.25rem;
   --card-shadow: var(--shadow-1);
   --empty-state-pad: var(--space-6);
 
@@ -285,13 +285,13 @@
    * are the roles above, which admin's compact density sets.
    */
   --table-radius: var(--radius-4);
-  --table-cell-pad-x: var(--space-3);
+  --table-cell-pad-x: var(--space-4);
 
   /*
    * A status badge: its corners and padding. Its shapes are status marks, which tell each status
    * apart for every reader, and are not a kit's to change (portalr ADR-0039).
    */
-  --badge-radius: var(--radius-2);
+  --badge-radius: var(--radius-3);
   --badge-pad-y: var(--space-half);
   --badge-pad-start: var(--space-1-5);
   --badge-pad-end: var(--space-2);
@@ -324,10 +324,10 @@
   --tool-call-pad-y: var(--space-2);
   --tool-call-result-radius: var(--radius-3);
   --question-radius: var(--radius-4);
-  --question-pad: var(--space-4);
+  --question-pad: 1.25rem;
   --question-option-radius: var(--radius-3);
   --question-option-pad-x: var(--space-3);
-  --question-option-pad-y: 0.625rem;
+  --question-option-pad-y: 0.75rem;
   --question-chip-radius: var(--radius-2);
 
   /*
@@ -345,13 +345,13 @@
    * The chat: a message's bubble, its corners and the smaller corner it points from, its padding
    * and its widest; and the composer's corners and padding (portalr ADR-0053).
    */
-  --bubble-radius: var(--radius-5);
+  --bubble-radius: var(--radius-4);
   --bubble-max-width: 42rem;
   --bubble-tail-radius: var(--radius-1);
-  --bubble-pad-x: 0.875rem;
-  --bubble-pad-y: var(--space-2);
+  --bubble-pad-x: var(--space-4);
+  --bubble-pad-y: var(--space-3);
   --composer-radius: var(--radius-4);
-  --composer-pad: var(--space-1);
+  --composer-pad: var(--space-2);
 
   /*
    * An alert's corners and padding; inline code's corners and padding; and the sign-in card's
@@ -384,8 +384,8 @@
    * A list's row: its padding, the gap between what it is and its end, and between its title's
    * line and its meta's (portalr ADR-0060).
    */
-  --list-row-pad-x: var(--space-2);
-  --list-row-pad-y: var(--space-3);
+  --list-row-pad-x: var(--space-4);
+  --list-row-pad-y: var(--space-4);
   --list-row-gap: var(--space-3);
   --list-row-line-gap: var(--space-half);
 

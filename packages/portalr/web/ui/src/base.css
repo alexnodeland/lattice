@@ -59,6 +59,11 @@
 [data-brand] {
   --wash: color-mix(in srgb, var(--accent) 10%, var(--paper));
   /*
+   * The quiet wash (portalr ADR-0081): the reader's words, a table's head row, a disabled field,
+   * a review strip: the text's colour at a twentieth over the paper, so it is the page's own grey.
+   */
+  --subtle: color-mix(in srgb, var(--fg) 5%, var(--paper));
+  /*
    * What a reader has selected: a deeper tint than the wash, so it reads over a washed row too,
    * and is told from the paper at a glance (the audit's N8); the text keeps 7:1 on it.
    */

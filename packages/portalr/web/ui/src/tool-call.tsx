@@ -67,23 +67,46 @@ function Part({
 }
 
 /** One call: a summary line that opens to its arguments and what it returned; `open` to start so. */
-export function ToolCall({ tool, open = false }: { tool: Artifactr.Tool; open?: boolean }) {
+export function ToolCall({
+  tool,
+  open = false,
+  index,
+}: {
+  tool: Artifactr.Tool;
+  open?: boolean;
+  /** Its number in a run's ledger of steps (portalr ADR-0081): then a row of the ledger, unboxed. */
+  index?: number;
+}) {
   const [tone, word, returned] = STATUS[tool.status] ?? ["done", tool.status, "Result"];
   const failed = tool.status === "error" || tool.status === "retry";
   const line = failed ? tool.result : tool.args;
+  const step = index !== undefined;
   return (
     <li>
       <Disclosure
         look="block"
         defaultOpen={open}
-        className="rounded-(--tool-call-radius) border border-line bg-surface text-sm data-open:border-edge"
+        className={
+          step
+            ? "text-sm"
+            : "rounded-(--tool-call-radius) border border-line bg-surface text-sm data-open:border-edge"
+        }
         triggerClassName="min-h-10 items-center rounded-(--tool-call-radius) px-(--tool-call-pad-x) py-(--tool-call-pad-y) hover:bg-transparent"
         panelClassName="data-open:pt-0"
         summary={
           <>
-            <Icon icon={glyphs.wrench} className="size-3.5 shrink-0 text-muted" />
+            {step ? (
+              <span
+                aria-hidden="true"
+                className="w-4 shrink-0 text-end font-mono text-muted text-xs tabular-nums"
+              >
+                {index}
+              </span>
+            ) : (
+              <Icon icon={glyphs.wrench} className="size-3.5 shrink-0 text-muted" />
+            )}
             <code className="shrink-0 font-mono">{tool.name}</code>
-            <span className="min-w-0 flex-1 truncate text-muted text-xs">{line}</span>
+            <span className="min-w-0 flex-1 truncate font-mono text-muted text-xs">{line}</span>
             <StatusBadge tone={tone} className="shrink-0">
               {word}
             </StatusBadge>
@@ -181,7 +204,7 @@ export function RunSteps({
         panelClassName="data-open:pt-0"
         summary={
           <>
-            <Icon icon={glyphs.listChecks} className="size-3.5 shrink-0 text-muted" />
+            <Icon icon={glyphs.terminal} className="size-3.5 shrink-0 text-muted" />
             <span className="shrink-0 font-semibold">{tools.length} steps</span>
             {latest && (
               <code className="min-w-0 flex-1 truncate font-mono text-muted text-xs">
@@ -194,9 +217,14 @@ export function RunSteps({
           </>
         }
       >
-        <ul aria-label="Steps" className="flex flex-col gap-1 border-line border-t p-2">
+        <ul aria-label="Steps" className="flex flex-col border-line border-t py-1">
           {tools.map(([call, tool], at) => (
-            <ToolCall key={call} tool={tool} open={running && at === tools.length - 1} />
+            <ToolCall
+              key={call}
+              tool={tool}
+              index={at + 1}
+              open={running && at === tools.length - 1}
+            />
           ))}
         </ul>
       </Disclosure>

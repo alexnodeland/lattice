@@ -108,7 +108,7 @@ test("a notice is set apart from messages", async () => {
   expect(getComputedStyle(notice).color).toBe(token("muted"));
 });
 
-test("the reader's messages are at the end of the line, everyone else's at its start", async () => {
+test("the reader's words sit on the quiet wash and the agent's are unboxed, both at the start of the line", async () => {
   const screen = await render(
     <Messages>
       <Message message={message()} author="You" mine />
@@ -117,14 +117,15 @@ test("the reader's messages are at the end of the line, everyone else's at its s
   );
   const mine = screen.getByRole("listitem", { name: "You" }).element();
   const theirs = screen.getByRole("listitem", { name: "Assistant" }).element();
-  expect(getComputedStyle(mine).alignSelf).toBe("flex-end");
+  expect(getComputedStyle(mine).alignSelf).toBe("flex-start");
   expect(getComputedStyle(theirs).alignSelf).toBe("flex-start");
-  const list = mine.parentElement as HTMLElement;
-  const [start, end] = [list.getBoundingClientRect(), mine.getBoundingClientRect()];
-  expect(Math.round(end.right)).toBe(Math.round(start.right));
-  // Right to left, the reader's go to the left: the line's end.
-  list.dir = "rtl";
-  expect(Math.round(mine.getBoundingClientRect().left)).toBe(Math.round(start.left));
+  const body = (item: Element) => getComputedStyle(item.querySelector(":scope > div") as Element);
+  expect(body(mine).backgroundColor).toBe(token("subtle"));
+  expect(body(theirs).backgroundColor).toBe("rgba(0, 0, 0, 0)");
+  expect(body(theirs).borderTopWidth).toBe("0px");
+  // The name above each: the reader's in the ink, the agent's quieter.
+  expect(getComputedStyle(screen.getByText("You").element()).color).toBe(token("fg"));
+  expect(getComputedStyle(screen.getByText("Assistant").element()).color).toBe(token("muted"));
 });
 
 test("a message on its way says so, and can't be copied or judged yet", async () => {
@@ -812,14 +813,15 @@ describe("a form the agent asks", () => {
     await expect.element(screen.getByRole("textbox", { name: "Answer" })).not.toHaveFocus();
   });
 
-  test("open, it carries a rule in the working colour at its start; answered, it doesn't", async () => {
+  test("open, it carries a tick in the working colour inside its edge; answered, it doesn't", async () => {
     const screen = await render(<Request request={asked} onAnswer={sent()} />);
     const card = screen.getByText("The agent asks").element().parentElement as Element;
-    expect(getComputedStyle(card).borderLeftColor).toBe(token("accent"));
-    expect(getComputedStyle(card).borderLeftWidth).toBe("4px");
-    expect(getComputedStyle(card).borderTopColor).toBe(token("line"));
-    await screen.rerender(<Request request={asked} onAnswer={sent()} answeredBy="Alice" />);
+    const tick = () => getComputedStyle(card, "::before");
+    expect(tick().backgroundColor).toBe(token("accent"));
+    expect(tick().height).toBe("20px");
     expect(getComputedStyle(card).borderLeftColor).toBe(token("line"));
+    await screen.rerender(<Request request={asked} onAnswer={sent()} answeredBy="Alice" />);
+    expect(tick().content).toBe("none");
   });
 });
 

@@ -120,8 +120,8 @@ export function Questions({
         given === null && ASKING,
       )}
     >
-      <p className={cn(TYPE.note, "inline-flex items-center gap-1.5")}>
-        <Icon icon={glyphs.bot} className="size-3.5" />
+      <p className={cn(TYPE.meta, "inline-flex items-center gap-2")}>
+        <Icon icon={glyphs.bot} className={cn("size-4", given === null && "text-accent")} />
         {given === null ? "The agent asks" : "The agent asked"}
       </p>
       {questions === null ? (
@@ -269,18 +269,22 @@ function Asking({
       onKeyDown={keys}
     >
       {stepped && (
-        <div className="flex items-center gap-3">
+        <div className="flex items-center justify-end gap-3">
           <p id={progress} aria-live="polite" className={cn(TYPE.note, "tabular-nums")}>
-            {review ? "Review your answers" : `${step + 1} of ${questions.length}`}
+            {review ? "Review your answers" : `Step ${step + 1} of ${questions.length}`}
           </p>
+          {/* Three bars: what is done, where we are, and what is next (portalr ADR-0081). */}
           <span aria-hidden="true" className="flex items-center gap-1">
             {questions.map((question, at) => (
               <span
                 key={question.question}
                 className={cn(
-                  "size-1.5 rounded-full",
-                  answered[at] ? "bg-accent" : "bg-line",
-                  at === step && "outline outline-(length:--focus-width) outline-accent",
+                  "h-1 w-3 rounded-full",
+                  at === step && !review
+                    ? "bg-accent"
+                    : answered[at] || review
+                      ? "bg-accent opacity-45"
+                      : "bg-edge",
                 )}
               />
             ))}
@@ -347,24 +351,30 @@ function Review({
   onChange: (at: number) => void;
 }) {
   return (
-    <dl className="flex flex-col gap-3">
+    <dl className="flex flex-col gap-2">
       {questions.map((question, at) => {
         const chosen = choosing[at] as Choosing;
         const said = [...chosen.selected, ...(chosen.other ? [chosen.other.trim()] : [])];
         return (
-          <div key={question.question} className="flex items-start justify-between gap-3">
-            <div className="flex min-w-0 flex-col items-start gap-1">
-              <dt className="flex flex-col items-start gap-1.5">
+          <div
+            key={question.question}
+            className="flex items-center justify-between gap-3 rounded-(--button-radius) bg-subtle px-3 py-2"
+          >
+            <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
+              <span aria-hidden="true" className="font-mono text-muted text-xs tabular-nums">
+                {at + 1}
+              </span>
+              <dt className="flex min-w-0 flex-wrap items-baseline gap-x-2">
                 <Header>{question.header}</Header>
                 <span
                   data-step-heading={at === 0 ? "" : undefined}
                   tabIndex={at === 0 ? -1 : undefined}
-                  className="text-muted outline-none"
+                  className="sr-only outline-none"
                 >
                   {question.question}
                 </span>
               </dt>
-              <dd className="font-semibold text-fg">{said.join(", ") || "Not answered"}</dd>
+              <dd className="font-medium text-fg">{said.join(", ") || "Not answered"}</dd>
             </div>
             <Button type="button" variant="ghost" size="sm" onClick={() => onChange(at)}>
               Change<span className="sr-only"> {question.header}</span>
@@ -379,7 +389,7 @@ function Review({
 /** A question's header, as a chip. */
 function Header({ children }: { children: ReactNode }) {
   return (
-    <span className="inline-flex max-w-full shrink-0 items-center truncate rounded-(--question-chip-radius) bg-line px-2 py-0.5 font-semibold text-fg text-xs">
+    <span className="inline-flex max-w-full shrink-0 items-center truncate rounded-(--question-chip-radius) bg-subtle px-2 py-0.5 font-medium text-muted text-xs">
       {children}
     </span>
   );

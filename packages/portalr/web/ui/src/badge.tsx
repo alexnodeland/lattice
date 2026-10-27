@@ -8,8 +8,8 @@ import { cn } from "./cn";
  * is the working colour on its wash, for the one thing the reader is pointed to (ADR-0080).
  */
 const TONE = {
-  neutral: "border-line bg-surface text-muted",
-  accent: "border-wash bg-wash text-accent",
+  neutral: "bg-subtle text-muted",
+  accent: "bg-wash text-accent",
 } as const;
 
 export function Badge({
@@ -28,7 +28,7 @@ export function Badge({
       // What the style census counts a badge by (portalr ADR-0066).
       data-badge=""
       className={cn(
-        "inline-flex items-center whitespace-nowrap rounded-(--badge-radius) border px-(--badge-pad-end) py-(--badge-pad-y) font-semibold text-xs",
+        "inline-flex items-center whitespace-nowrap rounded-(--badge-radius) px-(--badge-pad-end) py-(--badge-pad-y) font-medium text-xs",
         TONE[tone],
       )}
     >

@@ -7,7 +7,7 @@
  */
 export const TYPE = {
   /** A page's one heading. */
-  page: "font-semibold text-3xl text-fg tracking-tight",
+  page: "font-semibold text-2xl text-fg tracking-tight",
   /** A section's heading, under the page's. */
   section: "font-semibold text-fg text-lg tracking-tight",
   /** A part of a section, or a pane beside the main one: between the section's and a label. */
@@ -21,5 +21,5 @@ export const TYPE = {
   /** A hint, a count, a time: the smallest. */
   note: "text-muted text-xs",
   /** A figure read on its own, such as a card's. */
-  figure: "font-semibold text-2xl text-fg tracking-tight",
+  figure: "font-semibold text-3xl text-fg tracking-tight",
 } as const;

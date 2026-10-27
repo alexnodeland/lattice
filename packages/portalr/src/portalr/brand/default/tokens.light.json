@@ -677,7 +677,7 @@
           "$value": "{space.2}"
         },
         "pad-y": {
-          "$value": "{space.1-5}"
+          "$value": "{space.1}"
         }
       },
       "weight": {

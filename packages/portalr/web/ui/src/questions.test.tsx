@@ -70,7 +70,7 @@ test("each question is a group named by its header and words, its options named 
   await expect.element(next).toHaveFocus(); // the first, which the agent recommends
   await expect.element(week.getByRole("radio", { name: "Other" })).toBeVisible();
   // Two questions are stepped: the second is a step on, after the first is answered.
-  await expect.element(card.getByText("1 of 2")).toBeVisible();
+  await expect.element(card.getByText("Step 1 of 2")).toBeVisible();
   expect(
     card.getByRole("group", { name: "Topics What should the notes cover?" }).elements(),
   ).toHaveLength(0);
@@ -79,7 +79,7 @@ test("each question is a group named by its header and words, its options named 
   const topics = card.getByRole("group", { name: "Topics What should the notes cover?" });
   expect(topics.getByRole("checkbox").elements()).toHaveLength(3);
   await expect.element(card.getByText("Choose any that apply.")).toBeVisible();
-  await expect.element(card.getByText("2 of 2")).toBeVisible();
+  await expect.element(card.getByText("Step 2 of 2")).toBeVisible();
 });
 
 test("one choice, several, and words of the reader's own are sent as each question's answer", async () => {
@@ -212,19 +212,28 @@ test("a single question is compact: no steps, no Next, and Answer sends it", asy
   await expect.element(screen.getByRole("button", { name: "Answer" })).toBeVisible();
 });
 
-test("stepped, Back keeps the answers, the dots fill as questions are answered, and the focus lands on each step's words", async () => {
+test("stepped, Back keeps the answers, the bars say done, now and next, and the focus lands on each step's words", async () => {
   const screen = await render(<Questions request={asking(WEEK, TOPICS)} onAnswer={sent()} />);
-  const dots = () =>
-    [
-      ...(screen.container.querySelectorAll("[aria-hidden] > .size-1\\.5") as NodeListOf<Element>),
-    ].map((dot) => getComputedStyle(dot).backgroundColor === token("accent"));
-  expect(dots()).toEqual([false, false]);
+  // Three bars (portalr ADR-0081): the step we are on in the working colour, one answered at
+  // less than half its strength, one to come in the edge's colour.
+  const bars = () =>
+    [...(screen.container.querySelectorAll("[aria-hidden] > .h-1") as NodeListOf<Element>)].map(
+      (bar) => {
+        const style = getComputedStyle(bar);
+        return style.backgroundColor === token("accent")
+          ? style.opacity === "1"
+            ? "now"
+            : "done"
+          : "next";
+      },
+    );
+  expect(bars()).toEqual(["now", "next"]);
   await screen.getByRole("radio", { name: "This week" }).click();
-  expect(dots()).toEqual([true, false]);
+  expect(bars()).toEqual(["now", "next"]);
   await screen.getByRole("button", { name: "Next" }).click();
   await expect.element(screen.getByText("What should the notes cover?")).toHaveFocus();
   await screen.getByRole("checkbox", { name: "Agenda" }).click();
-  expect(dots()).toEqual([true, true]);
+  expect(bars()).toEqual(["done", "now"]);
   await screen.getByRole("button", { name: "Back" }).click();
   await expect.element(screen.getByText("Which week?")).toHaveFocus();
   await expect.element(screen.getByRole("radio", { name: "This week" })).toBeChecked();
@@ -241,7 +250,7 @@ test("the review's Change goes back to that question, and a failed send keeps ev
   await screen.getByRole("checkbox", { name: "Agenda" }).click();
   await screen.getByRole("button", { name: "Next" }).click();
   await screen.getByRole("button", { name: "Change Week" }).click();
-  await expect.element(screen.getByText("1 of 2")).toBeVisible();
+  await expect.element(screen.getByText("Step 1 of 2")).toBeVisible();
   await expect.element(screen.getByRole("radio", { name: "This week" })).toBeChecked();
   await screen.getByRole("button", { name: "Next" }).click();
   await screen.getByRole("button", { name: "Next" }).click();
@@ -260,16 +269,16 @@ test("the arrow keys step where the focus isn't in an option, and Enter goes on"
   await screen.getByRole("radio", { name: "This week" }).click();
   (screen.getByText("Which week?").element() as HTMLElement).focus();
   await userEvent.keyboard("{ArrowRight}");
-  await expect.element(screen.getByText("2 of 2")).toBeVisible();
+  await expect.element(screen.getByText("Step 2 of 2")).toBeVisible();
   await userEvent.keyboard("{ArrowLeft}");
-  await expect.element(screen.getByText("1 of 2")).toBeVisible();
+  await expect.element(screen.getByText("Step 1 of 2")).toBeVisible();
   // In a radio group the arrows are the group's own: the step stays.
   await screen.getByRole("radio", { name: "This week" }).click();
   await userEvent.keyboard("{ArrowRight}");
-  await expect.element(screen.getByText("1 of 2")).toBeVisible();
+  await expect.element(screen.getByText("Step 1 of 2")).toBeVisible();
   // Enter in a field goes on, as a form's Enter does.
   await screen.getByRole("radio", { name: "Other" }).click();
   await screen.getByRole("textbox", { name: "Your answer" }).fill("Later");
   await userEvent.keyboard("{Enter}");
-  await expect.element(screen.getByText("2 of 2")).toBeVisible();
+  await expect.element(screen.getByText("Step 2 of 2")).toBeVisible();
 });

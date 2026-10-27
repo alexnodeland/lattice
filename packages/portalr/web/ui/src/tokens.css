@@ -184,7 +184,7 @@
   --button-pad-x: var(--space-3);
   --button-pad-y: var(--space-2);
   --button-sm-pad-x: var(--space-2);
-  --button-sm-pad-y: var(--space-1-5);
+  --button-sm-pad-y: var(--space-1);
   --button-weight: var(--weight-semibold);
   --button-press-shift: var(--space-px);
   --button-duration: var(--duration-fast);

@@ -53,7 +53,7 @@ export function ago(at: Date, now: Date): string {
 export function Ago({ at, now = new Date() }: { at: string; now?: Date }) {
   const when = new Date(at);
   return (
-    <time dateTime={at} title={when.toLocaleString()}>
+    <time dateTime={at} title={when.toLocaleString()} className="font-mono text-xs tabular-nums">
       {ago(when.getTime() > now.getTime() ? now : when, now)}
     </time>
   );

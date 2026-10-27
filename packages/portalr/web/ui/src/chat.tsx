@@ -246,13 +246,14 @@ type MessageProps = {
 const FOLDED_AFTER = 40;
 
 /** A message's bubble: the reader's at the end of the line, everyone else's at its start. */
+/**
+ * The message grammar (portalr ADR-0081): the reader's words sit on the quiet wash, the agent's
+ * are unboxed on the page; that one difference tells them apart, with the name above each.
+ */
 const bubble = (mine: boolean) =>
-  cn(
-    "min-w-0 max-w-full break-words rounded-(--bubble-radius) border px-(--bubble-pad-x) py-(--bubble-pad-y)",
-    mine
-      ? "rounded-se-(--bubble-tail-radius) border-transparent bg-line"
-      : "rounded-ss-(--bubble-tail-radius) border-line bg-surface",
-  );
+  mine
+    ? "min-w-0 max-w-full break-words rounded-(--bubble-radius) bg-subtle px-(--bubble-pad-x) py-(--bubble-pad-y)"
+    : "min-w-0 max-w-full break-words";
 
 /**
  * One message, named for who posted it: their name, its Markdown in a bubble, a way to copy it as
@@ -300,12 +301,11 @@ export function Message({
       aria-labelledby={name}
       aria-busy={sending || undefined}
       className={cn(
-        "group flex max-w-[min(100%,var(--bubble-max-width))] flex-col gap-1",
-        mine ? "items-end self-end" : "items-start self-start",
+        "group flex max-w-[min(100%,var(--bubble-max-width))] flex-col items-start gap-1 self-start",
         notice && "text-muted italic",
       )}
     >
-      <span id={name} className="font-semibold text-xs">
+      <span id={name} className={cn("font-semibold text-xs", mine ? "text-fg" : "text-muted")}>
         {author}
       </span>
       <div
@@ -403,7 +403,7 @@ export function Streaming({ text, author }: { text: string; author: string }) {
       aria-busy="true"
       aria-label={text ? `${author} is writing` : `${author} is thinking`}
     >
-      <span className="font-semibold text-xs">{author}</span>
+      <span className="font-semibold text-muted text-xs">{author}</span>
       <div className={bubble(false)}>
         {text ? <Markdown streaming>{text}</Markdown> : <Thinking />}
       </div>
@@ -689,6 +689,7 @@ export function Composer({
           pending={pending}
         >
           Send
+          <Icon icon={glyphs.arrowRight} className="size-3.5" />
         </Button>
       </div>
       <Unsent reason={unsent} />

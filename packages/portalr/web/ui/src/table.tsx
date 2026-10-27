@@ -35,12 +35,13 @@ export function Table({
       {...("caption" in naming
         ? { "aria-label": naming.caption }
         : { "aria-labelledby": naming.labelledBy })}
-      className="rounded-(--table-radius) border border-line bg-surface"
+      // One strong rule above a table (portalr ADR-0081): its top edge in the control's edge colour.
+      className="rounded-(--table-radius) border border-line border-t-edge bg-surface"
     >
       <table
         aria-labelledby={labelledBy}
         className={cn(
-          "w-full border-collapse text-(length:--table-text) text-fg [&_td]:border-line [&_td]:border-t [&_td]:h-(--row-height) [&_td]:px-(--table-cell-pad-x) [&_td]:py-(--row-pad) [&_td]:align-middle [&_th]:h-(--row-height) [&_th]:whitespace-nowrap [&_th]:px-(--table-cell-pad-x) [&_th]:py-(--row-pad) [&_th]:text-left [&_thead_th]:bg-paper [&_thead_th]:font-semibold [&_thead_th]:text-muted [&_thead_th]:text-xs [&_thead_th]:uppercase [&_thead_th]:tracking-wider [&_tbody_th]:border-line [&_tbody_th]:border-t [&_tbody_th]:align-middle [&_tbody_th]:font-semibold [&_tbody_th]:text-fg [&_tbody_th]:text-(length:--table-text) [&_tbody_tr:has(a):hover]:bg-wash [&_[data-num]]:text-end [&_[data-num]]:tabular-nums",
+          "w-full border-collapse text-(length:--table-text) text-fg [&_td]:border-line [&_td]:border-t [&_td]:h-(--row-height) [&_td]:px-(--table-cell-pad-x) [&_td]:py-(--row-pad) [&_td]:align-middle [&_th]:h-(--row-height) [&_th]:whitespace-nowrap [&_th]:px-(--table-cell-pad-x) [&_th]:py-(--row-pad) [&_th]:text-left [&_thead_th]:bg-subtle [&_thead_th]:font-medium [&_thead_th]:text-muted [&_thead_th]:text-xs [&_tbody_th]:border-line [&_tbody_th]:border-t [&_tbody_th]:align-middle [&_tbody_th]:font-semibold [&_tbody_th]:text-fg [&_tbody_th]:text-(length:--table-text) [&_tbody_tr:has(a):hover]:bg-subtle [&_[data-num]]:text-end [&_[data-num]]:font-mono [&_[data-num]]:tabular-nums",
           // A row's wash follows the pointer as a nav link's does: `FEEDBACK`, on each row.
           "[&_tbody_tr]:transition-[color,background-color,border-color,text-decoration-color] [&_tbody_tr]:duration-(--feedback-duration) [&_tbody_tr]:ease-(--feedback-ease) [&_tbody_tr]:motion-reduce:transition-none",
           className,

@@ -31,7 +31,7 @@ export function EmptyState({
   return (
     <section
       aria-labelledby={heading}
-      className="flex max-w-xl flex-col items-start gap-2 rounded-(--card-radius) border border-line bg-surface p-(--empty-state-pad) shadow-(--card-shadow)"
+      className="flex max-w-xl flex-col items-center gap-2 rounded-(--card-radius) border border-line border-dashed p-(--empty-state-pad) text-center"
     >
       <SectionTitle id={heading} ref={ref} tabIndex={focus ? -1 : undefined}>
         {title}

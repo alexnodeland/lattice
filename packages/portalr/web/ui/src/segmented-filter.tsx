@@ -52,7 +52,7 @@ export function SegmentedFilter<V extends string>({
       value={value}
       disabled={disabled}
       onValueChange={(chosen) => onValueChange(chosen)}
-      className="inline-flex flex-wrap gap-0.5 self-start rounded-(--segmented-radius) border border-line bg-line p-(--segmented-pad) aria-invalid:border-status-failed"
+      className="inline-flex flex-wrap gap-0.5 self-start rounded-(--segmented-radius) border border-line bg-subtle p-(--segmented-pad) aria-invalid:border-status-failed"
     >
       {segments.map((segment) => (
         <Radio.Root
@@ -69,7 +69,7 @@ export function SegmentedFilter<V extends string>({
         >
           {segment.label}
           {segment.count !== undefined && (
-            <span aria-hidden="true" className="font-normal text-xs">
+            <span aria-hidden="true" className="font-mono font-normal text-xs tabular-nums">
               {segment.count}
             </span>
           )}

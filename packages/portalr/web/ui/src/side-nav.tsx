@@ -42,7 +42,7 @@ export function NavLink({ render, icon, count, children, ...props }: NavLinkProp
         className: cn(
           RING,
           FEEDBACK,
-          "relative flex items-center gap-2.5 rounded-(--nav-radius) px-(--nav-pad-x) py-(--nav-pad-y) font-medium text-muted text-sm before:absolute before:inset-y-(--nav-pad-y) before:start-0 before:w-0.5 before:rounded-full before:content-[''] hover:text-fg aria-[current=page]:font-semibold aria-[current=page]:text-fg aria-[current=page]:before:bg-accent aria-[current=true]:font-semibold aria-[current=true]:text-fg aria-[current=true]:before:bg-accent forced-colors:aria-[current=page]:outline-solid forced-colors:aria-[current=page]:outline-(length:--focus-width) forced-colors:aria-[current=page]:-outline-offset-(--focus-width) forced-colors:aria-[current=page]:outline-system-highlight forced-colors:aria-[current=page]:focus-visible:outline-offset-(--focus-offset) forced-colors:aria-[current=page]:focus-visible:outline-focus forced-colors:aria-[current=true]:outline-solid forced-colors:aria-[current=true]:outline-(length:--focus-width) forced-colors:aria-[current=true]:-outline-offset-(--focus-width) forced-colors:aria-[current=true]:outline-system-highlight forced-colors:aria-[current=true]:focus-visible:outline-offset-(--focus-offset) forced-colors:aria-[current=true]:focus-visible:outline-focus",
+          "flex items-center gap-2.5 rounded-(--nav-radius) px-(--nav-pad-x) py-(--nav-pad-y) font-medium text-fg text-sm hover:bg-subtle aria-[current=page]:bg-wash aria-[current=page]:text-accent aria-[current=true]:bg-wash aria-[current=true]:text-accent forced-colors:aria-[current=page]:outline-solid forced-colors:aria-[current=page]:outline-(length:--focus-width) forced-colors:aria-[current=page]:-outline-offset-(--focus-width) forced-colors:aria-[current=page]:outline-system-highlight forced-colors:aria-[current=page]:focus-visible:outline-offset-(--focus-offset) forced-colors:aria-[current=page]:focus-visible:outline-focus forced-colors:aria-[current=true]:outline-solid forced-colors:aria-[current=true]:outline-(length:--focus-width) forced-colors:aria-[current=true]:-outline-offset-(--focus-width) forced-colors:aria-[current=true]:outline-system-highlight forced-colors:aria-[current=true]:focus-visible:outline-offset-(--focus-offset) forced-colors:aria-[current=true]:focus-visible:outline-focus",
         ),
         children: (
           <>
@@ -51,7 +51,7 @@ export function NavLink({ render, icon, count, children, ...props }: NavLinkProp
             {count ? (
               <span
                 aria-hidden="true"
-                className="ml-auto grid h-5 min-w-5 place-items-center rounded-(--nav-count-radius) bg-wash px-1.5 font-semibold text-accent text-xs"
+                className="ml-auto font-mono text-accent text-xs tabular-nums"
               >
                 {count}
               </span>

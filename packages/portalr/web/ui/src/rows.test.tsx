@@ -123,7 +123,7 @@ test("on a phone, a row's end goes under its meta, and its name keeps the width"
   const end = screen.getByText("12 behind, 3 dead letters").element().getBoundingClientRect();
   const meta = screen.getByText("stored, version 3").element().getBoundingClientRect();
   expect(end.top).toBeGreaterThanOrEqual(meta.bottom - 1);
-  expect(name.width).toBeGreaterThanOrEqual(row.width - 16);
+  expect(name.width).toBeGreaterThanOrEqual(row.width - 32); // less its padding, a rem each side
 });
 
 test("on a phone, a row's name of several blocks is all there: none of it is clipped", async () => {

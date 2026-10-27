@@ -101,5 +101,5 @@ test("a table's row is the row's height", async () => {
       </tbody>
     </Table>,
   );
-  expect(box(screen.getByRole("row").element()).height).toBe(44);
+  expect(box(screen.getByRole("row").element()).height).toBe(48);
 });

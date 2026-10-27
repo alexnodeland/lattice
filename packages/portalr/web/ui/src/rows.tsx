@@ -42,7 +42,7 @@ export function Row({
   return (
     <li
       className={cn(
-        "group relative grid grid-cols-1 items-center gap-x-(--list-row-gap) gap-y-(--list-row-line-gap) px-(--list-row-pad-x) py-(--list-row-pad-y) text-sm has-[a:hover]:bg-wash has-[a:focus-visible]:bg-wash sm:grid-cols-[minmax(0,1fr)_fit-content(50%)]",
+        "group relative grid grid-cols-1 items-center gap-x-(--list-row-gap) gap-y-(--list-row-line-gap) px-(--list-row-pad-x) py-(--list-row-pad-y) text-sm has-[a:hover]:bg-subtle has-[a:focus-visible]:bg-subtle sm:grid-cols-[minmax(0,1fr)_fit-content(50%)]",
         FEEDBACK,
       )}
       {...props}

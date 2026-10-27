@@ -143,7 +143,7 @@ test("a run's several calls are one group: its count and how it goes, open while
   const list = screen.getByRole("list", { name: "Steps" });
   // A step's row is its disclosure's button; Copy's name holds the step's name too.
   const rows = list.getByRole("button", { name: /^step_/, expanded: true }).elements();
-  expect(rows.map((row) => row.textContent?.startsWith("step_2"))).toEqual([true]);
+  expect(rows.map((row) => row.textContent?.includes("step_2"))).toEqual([true]);
   expect(list.getByRole("button", { name: /^step_/, expanded: false }).elements()).toHaveLength(2);
 });
 

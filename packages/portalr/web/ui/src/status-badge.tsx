@@ -9,8 +9,8 @@ import { cn } from "./cn";
  * spent, the gold; the rest are neutral. Under forced colours the shapes keep their own colours.
  * A budget nearly spent is a half-filled ring, and one overspent a triangle.
  */
-const QUIET = "border-line bg-surface text-fg";
-const STILL = "border-line bg-surface text-muted";
+const QUIET = "text-fg";
+const STILL = "text-muted";
 
 const TONE = {
   working: {
@@ -19,7 +19,7 @@ const TONE = {
       "rounded-full border-2 border-current border-r-transparent animate-spin [animation-play-state:var(--motion-loop)] motion-reduce:animate-none",
   },
   waiting: {
-    badge: "border-wash bg-wash text-accent",
+    badge: "text-accent",
     // The working colour; under forced colours, where the wash goes, the text's.
     glyph: "rotate-45 scale-75 bg-current forced-colors:bg-system-text",
   },
@@ -55,7 +55,7 @@ export function StatusBadge({ tone, children, live = false, className }: Props) 
       // What the style census counts a badge by (portalr ADR-0066).
       data-badge=""
       className={cn(
-        "inline-flex items-center gap-1.5 whitespace-nowrap rounded-(--badge-radius) border py-(--badge-pad-y) pr-(--badge-pad-end) pl-(--badge-pad-start) font-semibold text-xs",
+        "inline-flex items-center gap-1.5 whitespace-nowrap font-medium text-xs",
         TONE[tone].badge,
         className,
       )}

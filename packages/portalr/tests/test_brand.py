@@ -46,7 +46,7 @@ def kit(tmp_path: Path, light: dict, dark: dict | None = None) -> Path:
 def test_a_kit_sets_only_what_it_changes(tmp_path: Path) -> None:
     css = compile_kit(kit(tmp_path, {"radius": {"3": {"$value": {"value": 0, "unit": "rem"}}}}))
     assert "  --radius-3: 0;" in css
-    assert "  --paper: light-dark(#f6f6f8, #121216);" in css
+    assert "  --paper: light-dark(#fafafb, #121317);" in css
 
 
 def test_light_holds_in_dark_unless_dark_says_otherwise(tmp_path: Path) -> None:

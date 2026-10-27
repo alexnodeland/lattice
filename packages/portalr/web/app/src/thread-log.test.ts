@@ -32,6 +32,7 @@ const run = (change: Partial<Artifactr.Run>): Artifactr.Run => ({
     reply: "pending",
     truncated: false,
     framed: false,
+    usage: null,
   },
   requests: [],
   answered: [],

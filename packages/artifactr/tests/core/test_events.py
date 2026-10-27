@@ -15,6 +15,8 @@ from artifactr.core import (
     KnownEvent,
     MessagePosted,
     RunEnded,
+    RunUsage,
+    StepUsage,
     TextEdit,
     TextEdits,
     ThreadCreated,
@@ -49,6 +51,36 @@ def test_an_answer_recorded_before_it_named_its_tool_reads_without_one() -> None
     event = EVENTS.validate_python(raw)
     assert isinstance(event, DeferredAnswered)
     assert event.tool_name is None
+
+
+def test_usage_recorded_before_steps_were_counted_reads_as_none() -> None:
+    raw = {
+        "type": "run_ended",
+        "run_id": "r1",
+        "thread_id": "t1",
+        "status": "completed",
+        "usage": {"requests": 2, "input_tokens": 30, "output_tokens": 4},
+    }
+    event = EVENTS.validate_python(raw)
+    assert isinstance(event, RunEnded)
+    assert event.usage is not None
+    assert event.usage == RunUsage(requests=2, input_tokens=30, output_tokens=4)
+    assert (event.usage.steps, event.usage.model) == ((), None)
+
+
+def test_usage_with_its_steps_round_trips() -> None:
+    step = StepUsage(
+        model="glm-4.7",
+        input_tokens=30,
+        output_tokens=4,
+        cache_read_tokens=20,
+        cache_write_tokens=5,
+        reasoning_tokens=2,
+        duration_ms=812,
+    )
+    usage = RunUsage(requests=1, input_tokens=30, output_tokens=4, model="glm-4.7", steps=(step,))
+    event = RunEnded(run_id="r1", thread_id="t1", status="stopped", usage=usage)
+    assert EVENTS.validate_json(EVENTS.dump_json(event)) == event
 
 
 def test_values_without_a_string_type_are_unknown() -> None:

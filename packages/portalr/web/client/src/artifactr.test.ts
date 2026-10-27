@@ -131,6 +131,7 @@ test("a run streams its text until its message is posted, and keeps its status",
       reply: "posted",
       truncated: true, // its first frame wasn't a part's start
       framed: true,
+      usage: null,
     },
     requests: [],
     answered: [],
@@ -1013,4 +1014,70 @@ test("text keeps its real newlines through deltas, a replay after a reconnect, a
     envelope({ type: "run_ended", run_id: "run_1", thread_id: "thr_1", status: "stopped" }, 2),
   );
   expect(stopped.runs.run_1).toMatchObject({ status: "stopped", text: reply });
+});
+
+/** A `usage` frame: what request `step` used, and the run's total over `requests` requests. */
+const used = (step: number, requests: number, input: number) => ({
+  type: "usage",
+  step,
+  usage: { input_tokens: input, output_tokens: 5, model: "glm-4.7" },
+  total: {
+    requests,
+    input_tokens: requests * input,
+    output_tokens: requests * 5,
+    model: "glm-4.7",
+  },
+  exact: true,
+});
+
+test("a run's usage is exact once a request ends, its total replacing the last, and its end's replacing that", () => {
+  expect(started().runs.run_1?.live.usage).toBeNull();
+  const first = streamed(started(), [used(0, 1, 100)]);
+  expect(first.runs.run_1?.live).toMatchObject({
+    usage: { requests: 1, input_tokens: 100 },
+    framed: true,
+    truncated: false, // a count isn't output: a replay that sends it first isn't missing its start
+    at: 0,
+  });
+  const second = streamed(first, [
+    { type: "part_started", part: 0, part_kind: "text" },
+    used(1, 2, 100),
+  ]);
+  expect(second.runs.run_1?.live.usage).toMatchObject({ requests: 2, input_tokens: 200 });
+  // Sent again, or late, as a replay may: an older total doesn't take a newer one's place.
+  expect(streamed(second, [used(0, 1, 100)])).toBe(second);
+  expect(streamed(second, [used(1, 2, 100)]).runs.run_1?.live.usage).toMatchObject({ requests: 2 });
+  const usage = { requests: 2, input_tokens: 210, output_tokens: 10, steps: [] };
+  const end = (extra: Record<string, unknown>) =>
+    apply(
+      second,
+      envelope(
+        { type: "run_ended", run_id: "run_1", thread_id: "thr_1", status: "stopped", ...extra },
+        2,
+      ),
+    );
+  expect(end({ usage }).runs.run_1?.live.usage).toEqual(usage);
+  expect(end({}).runs.run_1?.live.usage).toMatchObject({ requests: 2, input_tokens: 200 });
+  // A welcome starts the count over with the rest of the live output: the server sends it again.
+  expect(applyWelcome(second, welcomed(), 9).runs.run_1?.live.usage).toBeNull();
+});
+
+test("a resumed run counts afresh: its first request's total takes the place of the paused segment's", () => {
+  const asked = { tool_call_id: "c1", tool_name: "ask_user", kind: "question", args: {} };
+  const paused = apply(
+    streamed(started(), [used(2, 3, 100)]),
+    envelope({ type: "run_paused", run_id: "run_1", thread_id: "thr_1", requests: [asked] }, 2),
+  );
+  const resumed = apply(
+    paused,
+    envelope(
+      { type: "deferred_answered", run_id: "run_1", thread_id: "thr_1", tool_call_id: "c1" },
+      3,
+    ),
+  );
+  expect(resumed.runs.run_1).toMatchObject({ status: "running", live: { usage: null } });
+  expect(streamed(resumed, [used(0, 1, 40)]).runs.run_1?.live.usage).toMatchObject({
+    requests: 1,
+    input_tokens: 40,
+  });
 });

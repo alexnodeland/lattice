@@ -46,10 +46,19 @@ BLOCKED = {
 class FakeProxy:
     """A LiteLLM proxy's chat completions endpoint: records requests, answers as told."""
 
-    def __init__(self, status: int = 200, error: dict[str, Any] | None = None) -> None:
+    def __init__(
+        self,
+        status: int = 200,
+        error: dict[str, Any] | None = None,
+        usage: dict[str, Any] | None = None,
+        model: str = "claude-sonnet",
+    ) -> None:
         self.requests: list[tuple[dict[str, Any], httpx2.Headers]] = []
         self.status = status
         self.error = error
+        self.answers = model
+        """The model the proxy says answered, which a gateway's routing may make another."""
+        self.usage = usage or {"prompt_tokens": 5, "completion_tokens": 2, "total_tokens": 7}
 
     def handle(self, request: httpx2.Request) -> httpx2.Response:
         body = json.loads(request.content)
@@ -58,10 +67,10 @@ class FakeProxy:
             return httpx2.Response(self.status, json=self.error)
         assert body["stream"], "the Runner streams"
         chunk = {"id": "chatcmpl-1", "object": "chat.completion.chunk", "created": 0}
-        chunk["model"] = "claude-sonnet"
+        chunk["model"] = self.answers
         text = {"index": 0, "delta": {"role": "assistant", "content": "Done."}}
         stop = {"index": 0, "delta": {}, "finish_reason": "stop"}
-        usage = {"prompt_tokens": 5, "completion_tokens": 2, "total_tokens": 7}
+        usage = self.usage
         events = [chunk | {"choices": [text]}, chunk | {"choices": [stop], "usage": usage}]
         stream = "".join(f"data: {json.dumps(event)}\n\n" for event in events) + "data: [DONE]\n\n"
         return httpx2.Response(200, text=stream, headers={"content-type": "text/event-stream"})
@@ -193,6 +202,47 @@ async def test_without_a_person_tenant_key_guardrails_or_trace() -> None:
     assert "guardrails" not in body
     assert "existing_trace_id" not in body["metadata"]
     assert "traceparent" not in headers
+
+
+async def test_the_proxys_counts_reach_the_runs_end_as_they_were_reported() -> None:
+    # As LiteLLM reports a reply from Anthropic: the cache read in the prompt's details, the
+    # cache write at the top, and reasoning in the completion's details.
+    usage = {
+        "prompt_tokens": 1030,
+        "completion_tokens": 40,
+        "total_tokens": 1070,
+        "prompt_tokens_details": {"cached_tokens": 800},
+        "cache_creation_input_tokens": 200,
+        "completion_tokens_details": {"reasoning_tokens": 12},
+    }
+    proxy = FakeProxy(usage=usage, model="claude-sonnet-4-5-20250929")
+    ws = await workspace("acme", "launch")
+    thread = await ws.create_thread()
+    runner = Runner(agent(proxy.model(), LiteLLMGateway()), app=None)
+    try:
+        await started(await runner.send(ws, thread.id, "hi")).wait()
+    finally:
+        await runner.aclose()
+    ended = (await ws.read())[-1].event
+    assert isinstance(ended, RunEnded)
+    assert ended.usage is not None
+    [step] = ended.usage.steps
+    counts = (1030, 40, 800, 200, 12)
+    assert (
+        step.input_tokens,
+        step.output_tokens,
+        step.cache_read_tokens,
+        step.cache_write_tokens,
+        step.reasoning_tokens,
+    ) == counts
+    assert (
+        ended.usage.input_tokens,
+        ended.usage.output_tokens,
+        ended.usage.cache_read_tokens,
+        ended.usage.cache_write_tokens,
+        ended.usage.reasoning_tokens,
+    ) == counts
+    assert ended.usage.model == step.model == "claude-sonnet-4-5-20250929", "not the alias asked"
 
 
 async def test_a_guardrail_block_fails_the_run_with_a_reason_and_is_not_retried() -> None:

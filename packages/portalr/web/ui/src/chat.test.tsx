@@ -593,6 +593,25 @@ test("a command refused as an integration off here says it isn't available", asy
     .toHaveTextContent("Not available in this workspace.");
 });
 
+test("thumbs the application doesn't define say so, rather than that the server refused", async () => {
+  const none = vi.fn(async () => ({
+    outcome: "refused" as const,
+    result: {
+      rejection: {
+        type: "not_found",
+        message: "feedback type thumbs does not exist",
+        entity: "feedback type",
+        id: "thumbs",
+      },
+    },
+  }));
+  const screen = await render(<Thumbs given={null} onThumbs={none} />);
+  await screen.getByRole("button", { name: "Helpful" }).click();
+  await expect
+    .element(screen.getByRole("alert"))
+    .toHaveTextContent("Thumbs aren't available in this workspace.");
+});
+
 test("a refused response to a proposal says so, and can be given again", async () => {
   const screen = await render(<ProposalCard proposal={proposal()} onRespond={sent("refused")} />);
   await screen.getByRole("button", { name: "Accept" }).click();

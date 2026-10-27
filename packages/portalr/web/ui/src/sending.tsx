@@ -21,13 +21,22 @@ const UNSENT = {
   closed: "That wasn't sent: the connection closed.",
   // An integration it needs is off here: said of the workspace, never of the reader's grants.
   not_enabled: "Not available in this workspace.",
+  // The application defines no such feedback: said of the workspace, with the type left out.
+  no_feedback: "Thumbs aren't available in this workspace.",
 } as const;
 
 /** Why a command wasn't done, in words, by how it ended and the server's rejection. */
-const unsentSaid = (outcome: "refused" | "closed", rejection: unknown) =>
-  outcome === "refused" && isObject(rejection) && rejection.type === "not_enabled"
-    ? UNSENT.not_enabled
-    : UNSENT[outcome];
+const unsentSaid = (outcome: "refused" | "closed", rejection: unknown) => {
+  if (outcome === "refused" && isObject(rejection)) {
+    if (rejection.type === "not_enabled") {
+      return UNSENT.not_enabled;
+    }
+    if (rejection.type === "not_found" && rejection.entity === "feedback type") {
+      return UNSENT.no_feedback;
+    }
+  }
+  return UNSENT[outcome];
+};
 
 /** How a command ended, as a `Sent` settles. */
 type Settled = Awaited<Sent>;

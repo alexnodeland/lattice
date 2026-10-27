@@ -22,7 +22,7 @@ Other questions were new: how the two libraries share one application, how feedb
 - **Questions:** the name, slug and description; the libraries (`artifactr`, `reflexr` or `both`); whether to include evals; the Python version (3.12 to 3.14); the published port (8800 by default, since 8000 is commonly taken); and a revision for each library.
 - **The libraries are pinned by git revision** in the application's `[tool.uv.sources]`, since none is on PyPI. The defaults are each repository's `main` when the template was last updated. The application declares evalr's source itself when it uses reflexr's `[evals]` extra: a dependency's own `[tool.uv.sources]` doesn't apply to its dependents.
 - **One application, one database, one telemetry setup.** Each library's surfaces are mounted under its name in every variant: `/artifactr/v1` and `/artifactr/mcp/`, `/reflexr/v1` and `/reflexr/mcp/`. A variant, or a later `copier update`, never moves a URL, and both libraries mount side by side without clashing.
-- **The examples are small and complete:** a `note` artifact type, its agent and a `rating` of turns (artifactr); `ticket.opened` and `ticket.triaged` events, a `triage` rule and its agent, and a `triage-review` of runs (reflexr). The triage agent answers in text, so a mocked model reply completes its run.
+- **The examples are small and complete:** a `note` artifact type, its agent and a `rating` of turns (artifactr); with the portal, both also define the `thumbs` its UIs give, without which the portal's thumbs are refused; `ticket.opened` and `ticket.triaged` events, a `triage` rule and its agent, and a `triage-review` of runs (reflexr). The triage agent answers in text, so a mocked model reply completes its run.
 
 ### The ports
 

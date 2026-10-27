@@ -28,10 +28,13 @@
       frame.contentWindow.postMessage({ type: `${app}:open`, name: data.name, bytes }, own, [
         bytes,
       ]);
-    } else if (data.type === "lattice:call" && methods.includes(data.method)) {
+    } else if (data.type === "lattice:call") {
+      // The method called is the allowed name itself, found in the list, never the message's.
+      const method = methods.find((name) => name === data.method);
+      if (method === undefined) return;
       const args = Array.isArray(data.args) ? data.args : [];
       Promise.resolve()
-        .then(() => frame.contentWindow[app][data.method](...args))
+        .then(() => frame.contentWindow[app][method](...args))
         .then(
           (result) => reply(data.id, { result }),
           (error) => reply(data.id, { error: String(error) }),

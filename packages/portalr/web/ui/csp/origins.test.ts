@@ -13,13 +13,13 @@ import { afterAll, beforeAll, expect, inject, test } from "vitest";
 
 let browser: Browser;
 
-/** A third origin: a page there that frames `src`, and keeps every message it hears. */
-const third = createServer((request, response) => {
-  const src = new URL(request.url ?? "/", "http://third").searchParams.get("frame") ?? "";
+/** What the third origin's page frames: set by a test, never read from a request. */
+let framedByThird = "";
+
+/** A third origin: a page there that frames `framedByThird`. */
+const third = createServer((_request, response) => {
   response.writeHead(200, { "Content-Type": "text/html" });
-  response.end(
-    `<!doctype html><title>Third</title><iframe src="${src.replaceAll('"', "&quot;")}"></iframe>`,
-  );
+  response.end(`<!doctype html><title>Third</title><iframe src="${framedByThird}"></iframe>`);
 });
 let thirdOrigin: string;
 
@@ -102,8 +102,8 @@ test("the page at 127.0.0.1 and the page at localhost each run an app in the san
 });
 
 test("a third origin that frames the sandbox is refused: it hears nothing from it", async () => {
-  const framed = `${inject("apps")}/?host=${encodeURIComponent(thirdOrigin)}`;
-  const { page } = await listening(`${thirdOrigin}/?frame=${encodeURIComponent(framed)}`);
+  framedByThird = `${inject("apps")}/?host=${encodeURIComponent(thirdOrigin)}`;
+  const { page } = await listening(`${thirdOrigin}/`);
   await page.waitForTimeout(SILENCE);
   expect(await heard(page)).toEqual([]);
   await page.close();
@@ -176,10 +176,10 @@ test("the shim is inert without a host it was told; with the other portal's, it 
 });
 
 test("a third origin that frames the shim is refused by its frame-ancestors", async () => {
-  const framed = shim(inject("editor"), thirdOrigin);
-  const { page, loaded } = await listening(`${thirdOrigin}/?frame=${encodeURIComponent(framed)}`);
+  framedByThird = shim(inject("editor"), thirdOrigin);
+  const { page, loaded } = await listening(`${thirdOrigin}/`);
   await page.waitForTimeout(SILENCE);
   expect(await heard(page)).toEqual([]);
-  expect(loaded.filter((url) => url.startsWith(`${inject("editor")}/`))).toEqual([framed]);
+  expect(loaded.filter((url) => url.startsWith(`${inject("editor")}/`))).toEqual([framedByThird]);
   await page.close();
 });

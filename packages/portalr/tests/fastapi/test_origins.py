@@ -35,7 +35,7 @@ PAGE = "<!doctype html><title>Sandbox</title><script>relay()</script>"
 
 
 def site(supabase_url: str = "/", **given: Any) -> Site:
-    return Site(supabase_url=supabase_url, supabase_key=KEY, **given)  # type: ignore[arg-type]
+    return Site(supabase_url=supabase_url, supabase_key=KEY, **given)
 
 
 # beside: the port-sibling rule

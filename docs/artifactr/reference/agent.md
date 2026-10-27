@@ -46,6 +46,18 @@ See [Running the agent](../guides/agent.md#running-the-agent).
 
 ::: artifactr.agent.TurnOutcome
 
+## A model, or a tool, that sends nothing
+
+See [A model that sends nothing](../guides/live-output.md#a-model-that-sends-nothing).
+
+::: artifactr.agent.Liveness
+
+::: artifactr.agent.is_local_model
+
+::: artifactr.agent.ModelStalled
+
+::: artifactr.agent.ToolStalled
+
 ## Scripted models
 
 See [Testing your application](../guides/testing.md#scripting-the-model).

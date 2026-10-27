@@ -3,7 +3,8 @@
 import asyncio
 import threading
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator
+from contextlib import asynccontextmanager
 from datetime import timedelta
 from typing import Any
 
@@ -94,10 +95,27 @@ def build(
         hidden_refresh=hidden_refresh,
         gate=gate,
     )
-    app = FastAPI()
+    app = closing(runner)
     router = artifactr_router(workspaces, runner, resolve_actor=resolve_actor, **options)
     app.include_router(router, prefix="/v1")
     return app, runner
+
+
+def closing(runner: Runner[Any]) -> FastAPI:
+    """An application that closes ``runner`` as it stops, as a deployment's would.
+
+    Without it a run still going as a test's client exits is destroyed with the client's
+    event loop, its coroutines never awaited, and reported under a later test.
+    """
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        try:
+            yield
+        finally:
+            await runner.aclose()
+
+    return FastAPI(lifespan=lifespan)
 
 
 @pytest.fixture

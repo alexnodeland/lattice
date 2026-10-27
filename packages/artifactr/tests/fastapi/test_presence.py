@@ -29,7 +29,7 @@ from artifactr.fastapi.presence import LocalPresence, Room
 from artifactr.workspace import Access, InMemoryStorage, Workspaces, integration_gate
 from tests.agent.conftest import Script
 from tests.artifact_types import Note
-from tests.fastapi.conftest import Latch, command, hello, resolve_actor
+from tests.fastapi.conftest import Latch, closing, command, hello, resolve_actor
 from tests.workspace.gating import NOTES, Switch, key_of
 
 STREAM = "/v1/workspaces/w1/stream"
@@ -83,10 +83,9 @@ def _app(grants: Grants, switch: Switch, **options: Any) -> FastAPI:
         hidden=grants.hidden,
         gate=integration_gate(switch, key_of),
     )
-    app = FastAPI()
-    router = artifactr_router(
-        workspaces, Runner(agent, app=Latch()), resolve_actor=resolve_actor, **options
-    )
+    runner = Runner(agent, app=Latch())
+    app = closing(runner)
+    router = artifactr_router(workspaces, runner, resolve_actor=resolve_actor, **options)
     app.include_router(router, prefix="/v1")
     return app
 

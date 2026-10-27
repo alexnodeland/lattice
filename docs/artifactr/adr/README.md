@@ -45,7 +45,7 @@ Each record captures one decision: the context that forced it, the options consi
 | [0039](0039-the-langfuse-adapter.md) | The Langfuse adapter | Accepted; its score adapters superseded by 0049 |
 | [0040](0040-joining-stackrs-network.md) | Joining stackr's network when it runs | Accepted; its override superseded by lattice ADR-0009 |
 | [0041](0041-dashboards-generated-tested-and-released.md) | Dashboards generated, tested and released | Accepted; its release assets superseded by 0054 |
-| [0042](0042-typed-run-failures.md) | Typed run failures | Accepted |
+| [0042](0042-typed-run-failures.md) | Typed run failures | Accepted, amended by [0095](0095-a-run-that-waits-on-nothing-is-failed-and-a-message-that-starts-nothing-is-told.md) |
 | [0043](0043-the-litellm-adapter.md) | The LiteLLM adapter | Accepted |
 | [0044](0044-the-evalr-adapter.md) | The evalr adapter | Accepted; its amendment superseded by 0049, and its pin of evalr by 0052 |
 | [0045](0045-a-message-id-is-used-once.md) | A message id is used once in a workspace | Accepted |
@@ -98,5 +98,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0092](0092-a-diagrams-images-uploaded-by-a-person-and-read-where-it-names-them.md) | A diagram's images, uploaded by a person and read where it names them | Accepted |
 | [0093](0093-presence-who-has-an-artifact-open-passed-on-and-never-stored.md) | Presence: who has an artifact open, passed on and never stored | Accepted |
 | [0094](0094-diagrams-revisions-thinned-to-one-an-actor-every-ten-minutes.md) | Diagrams' revisions thinned to one an actor every ten minutes | Accepted |
+| [0095](0095-a-run-that-waits-on-nothing-is-failed-and-a-message-that-starts-nothing-is-told.md) | A run that waits on nothing is failed, and a message that starts nothing is told | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

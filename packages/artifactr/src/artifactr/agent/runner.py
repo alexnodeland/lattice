@@ -81,6 +81,7 @@ from pydantic_ai import Agent, AgentRunResult, DeferredToolRequests, DeferredToo
 from pydantic_ai.messages import repair_messages
 
 from artifactr.agent.live import FanoutChannel, forward_live
+from artifactr.agent.liveness import Liveness, watched
 from artifactr.agent.results import CommandKey, CommandResults, InMemoryCommandResults
 from artifactr.agent.session import Session, Trigger, last_seen, load_history
 from artifactr.core import (
@@ -164,6 +165,12 @@ so free text from the chat never answers one: the run waits for the form's own a
 _ABANDONED = "the run was abandoned: its claim lapsed"
 """The error recorded for a run whose claim lapsed before it ended, whether its process stopped
 or lived on."""
+
+NOT_TAKEN: Final = (
+    "The last message got no reply: whoever sent it isn't allowed to start the assistant in "
+    "this thread. Ask someone who can start the assistant to send it again."
+)
+"""The notice posted in a thread when a message's turn was refused (ADR-0095)."""
 
 
 @dataclass(frozen=True)
@@ -262,6 +269,10 @@ class Runner[AppDepsT]:
             ``artifactr.evals.OnlineEvaluator``s.
         results: Where :meth:`execute` remembers commands' results. Defaults to the 10,000
             most recent, in this process.
+        liveness: How long a turn waits for a model, or a tool, that sends nothing before it
+            fails the run, ``model_stalled`` or ``tool_stalled``. Defaults to
+            :class:`~artifactr.agent.Liveness`'s: two minutes for a hosted model, five for a
+            local one, ten for a tool.
     """
 
     def __init__(
@@ -278,9 +289,11 @@ class Runner[AppDepsT]:
         turn_context: TurnContext | None = None,
         evaluators: Sequence[TurnEvaluator] = (),
         results: CommandResults | None = None,
+        liveness: Liveness | None = None,
     ) -> None:
         self._agent = agent
         self._results = results or InMemoryCommandResults()
+        self._liveness = liveness or Liveness()
         self._turn_context = turn_context
         self._evaluators = tuple(evaluators)
         self._app = app
@@ -385,7 +398,7 @@ class Runner[AppDepsT]:
         return await self._ask(runner, run.thread_id, await runner.head_seq())
 
     async def recover(self, workspace: Workspace) -> list[RunHandle]:
-        """Take each turn the workspace's threads were asked for and no run has taken.
+        """Take the turns the workspace was asked for, and end the runs a dead process left.
 
         Call it for each workspace as the application starts. A process that died holding a
         thread, or between an ask and its claim, left what was asked for no one to take
@@ -394,10 +407,46 @@ class Runner[AppDepsT]:
         handle's actor; a thread hidden from the Runner is not swept. A thread whose turn fails
         to start is logged, and the others are still taken. A closed runner takes none. Returns
         the runs it started.
+
+        A run left ``running`` by a process that died is recorded as failed, ``abandoned``,
+        once its thread can be claimed, as the thread's next turn would record it (ADR-0095):
+        until then every client is told the run is active. Its usage went with its process, so
+        it has none. A thread claimed by another, as a dead process's thread still is until its
+        claim lapses, is swept again once, ``look_again_after`` later; a live holder's is left
+        to it, as it records its own run's end.
         """
         runner = _runner(workspace)
         taken = [await self._take_or_log(runner, thread.id) for thread in await runner.threads()]
+        for run in await runner.runs(status="running"):
+            await self._sweep(runner, run.id, run.thread_id, again=True)
         return [handle for handle in taken if handle is not None]
+
+    async def _sweep(
+        self, runner: Workspace, run_id: RunId, thread_id: ThreadId, *, again: bool
+    ) -> None:
+        """Record a thread's run a dead process left as abandoned, once the thread can be claimed.
+
+        With ``again``, a thread another claim holds is swept once more ``look_again_after``
+        later, by when a dead holder's claim has lapsed; :meth:`aclose` cancels the wait.
+        """
+        if self._closed or run_id in self._runs:
+            return  # a closed runner, or this process's own run, which records its end
+        try:
+            claim = runner.claim_thread(thread_id, holder=new_id("claim"), ttl=self._claim_ttl)
+            async with claim:
+                await _abandon(runner, thread_id)
+        except ThreadBusy:
+            if again:
+                look = asyncio.create_task(self._sweep_again(runner, run_id, thread_id))
+                self._looks.add(look)
+                look.add_done_callback(self._looks.discard)
+
+    async def _sweep_again(self, runner: Workspace, run_id: RunId, thread_id: ThreadId) -> None:
+        await asyncio.sleep(self._look_again_after.total_seconds())
+        try:
+            await self._sweep(runner, run_id, thread_id, again=False)
+        except Exception:
+            logger.exception("sweeping thread %s for run %s failed", thread_id, run_id)
 
     async def stop(self, run_id: RunId) -> bool:
         """Cancel a run of this process. Returns whether there was one to stop.
@@ -685,9 +734,22 @@ class Runner[AppDepsT]:
     async def _refused(
         workspace: Workspace, thread_id: ThreadId, through: int, refused: Forbidden
     ) -> None:
-        """Take a thread's log through a message whose turn its author may not start."""
-        logger.info("thread %s skips a turn through %d: %s", thread_id, through, refused.message)
+        """Take a thread's log through a message whose turn its author may not start.
+
+        People are told: a notice says the message got no turn, and why, in their words, so a
+        message that starts nothing is never a silence (ADR-0095). The log says the rest. A
+        notice the runner may not post is logged, and the turn is still skipped.
+        """
+        logger.warning("thread %s skips a turn through %d: %s", thread_id, through, refused.message)
         await workspace.save_cursor(_taken(thread_id), through)
+        try:
+            await workspace.post_message(thread_id, NOT_TAKEN, kind="notice")
+        except Rejection as rejection:
+            logger.warning(
+                "thread %s: the notice of a skipped turn was refused: %s",
+                thread_id,
+                rejection.message,
+            )
 
     async def _run(
         self,
@@ -857,7 +919,7 @@ class Runner[AppDepsT]:
                             deps=session,
                             message_history=history,
                             deferred_tool_results=deferred,
-                            event_stream_handler=forward_live(self.live),
+                            event_stream_handler=watched(forward_live(self.live), self._liveness),
                             conversation_id=session.thread_id,
                         )
                 except asyncio.CancelledError:

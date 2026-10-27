@@ -164,6 +164,7 @@ export type Server =
   | ErrorFrame
   | PeerPresence
   | PeerLeft;
+export type StartedAt = string | null;
 export type ActiveRuns = ActiveRun[];
 export type HeadSeq = number;
 export type Protocol1 = string;
@@ -264,6 +265,8 @@ export type Kind17 = "question" | "approval";
 export type ToolCallId3 = string;
 export type ToolName2 = string;
 export type Type31 = "run_paused";
+export type CacheReadTokens = number;
+export type CacheWriteTokens = number;
 export type InputTokens = number;
 export type OutputTokens = number;
 export type Requests1 = number;
@@ -294,9 +297,11 @@ export type PartKind = "text" | "thinking" | "tool_call";
 export type ToolName4 = string | null;
 export type Type39 = "part_started";
 export type Delta = string;
+export type Offset = number | null;
 export type Part1 = number;
 export type Type40 = "text_delta";
 export type Delta1 = string;
+export type Offset1 = number | null;
 export type Part2 = number;
 export type Type41 = "thinking_delta";
 export type Delta2 = string;
@@ -771,6 +776,7 @@ export interface Welcome {
  */
 export interface ActiveRun {
   run_id: RunId;
+  started_at?: StartedAt;
   thread_id: ThreadId;
 }
 /**
@@ -1073,6 +1079,8 @@ export interface Review {
  * via the `definition` "RunUsage".
  */
 export interface RunUsage {
+  cache_read_tokens?: CacheReadTokens;
+  cache_write_tokens?: CacheWriteTokens;
   input_tokens?: InputTokens;
   output_tokens?: OutputTokens;
   requests?: Requests1;
@@ -1191,6 +1199,7 @@ export interface PartStarted {
  */
 export interface TextDelta {
   delta: Delta;
+  offset?: Offset;
   part: Part1;
   type: Type40;
 }
@@ -1202,6 +1211,7 @@ export interface TextDelta {
  */
 export interface ThinkingDelta {
   delta: Delta1;
+  offset?: Offset1;
   part: Part2;
   type: Type41;
 }

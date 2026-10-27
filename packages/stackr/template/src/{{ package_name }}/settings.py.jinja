@@ -82,6 +82,18 @@ class GatewaySettings:
         guardrails: The gateway's guardrails every request asks for.
         mock_response: A reply the gateway sends instead of calling a model, for smoke tests;
             the gateway honours it only for keys whose team allows mocked responses.
+        first_output_seconds: The most a hosted model's request may take to start answering
+            before the turn fails as ``model_stalled`` (artifactr ADR-0095).
+        no_output_seconds: The most a hosted model may go quiet mid-answer before the same.
+        local_first_output_seconds: The same two, for a model served on the operator's own
+            hardware, which is slower to its first token.
+        local_no_output_seconds: See above.
+        local_models: Model names to count as local whatever their shape; artifactr knows
+            LiteLLM's local providers' prefixes (``ollama/``, ``lm_studio/``, ...) and the
+            ``local`` aliases by itself, and counts an unknown name as hosted.
+        hosted_models: Model names to count as hosted whatever their shape.
+        tool_seconds: The most a tool call may take to return before the turn fails as
+            ``tool_stalled``; ``None`` waits as long as a tool needs.
     """
 
     base_url: str = "http://localhost:4400"
@@ -90,6 +102,13 @@ class GatewaySettings:
     tenant_keys: Mapping[str, str] = field(default_factory=dict[str, str])
     guardrails: tuple[str, ...] = ("pii-mask", "prompt-injection")
     mock_response: str | None = None
+    first_output_seconds: float = 120.0
+    no_output_seconds: float = 120.0
+    local_first_output_seconds: float = 300.0
+    local_no_output_seconds: float = 300.0
+    local_models: tuple[str, ...] = ()
+    hosted_models: tuple[str, ...] = ()
+    tool_seconds: float | None = 600.0
 
 
 {% if use_tracker -%}
@@ -506,6 +525,13 @@ class Settings:
             tenant_keys=_tenant_keys(env.get("LITELLM_TENANT_KEYS", "{}")),
             guardrails=_names(guardrails),
             mock_response=env.get("LITELLM_MOCK_RESPONSE"),
+            first_output_seconds=_wait(env, "LITELLM_FIRST_OUTPUT_SECONDS", 120.0),
+            no_output_seconds=_wait(env, "LITELLM_NO_OUTPUT_SECONDS", 120.0),
+            local_first_output_seconds=_wait(env, "LITELLM_LOCAL_FIRST_OUTPUT_SECONDS", 300.0),
+            local_no_output_seconds=_wait(env, "LITELLM_LOCAL_NO_OUTPUT_SECONDS", 300.0),
+            local_models=_names(env.get("LITELLM_LOCAL_MODELS", "")),
+            hosted_models=_names(env.get("LITELLM_HOSTED_MODELS", "")),
+            tool_seconds=_seconds(env, "AGENT_TOOL_SECONDS", 600.0, none=True),
         )
         return cls(
             service_name=env.get("OTEL_SERVICE_NAME", cls.service_name),
@@ -678,6 +704,31 @@ def _extra_urls(env: Mapping[str, str]) -> tuple[str, ...]:
 
 
 {% endif -%}
+def _seconds(
+    env: Mapping[str, str], name: str, default: float, *, none: bool = False
+) -> float | None:
+    """Parse a wait in seconds, which must be positive; with ``none``, ``none`` is no wait."""
+    text = env.get(name)
+    if not text:
+        return default
+    if none and text.strip().lower() == "none":
+        return None
+    try:
+        seconds = float(text)
+    except ValueError:
+        raise ValueError(f"{name} must be a number of seconds") from None
+    if seconds <= 0:
+        raise ValueError(f"{name} must be a number of seconds")
+    return seconds
+
+
+def _wait(env: Mapping[str, str], name: str, default: float) -> float:
+    """Parse a wait that is always some seconds."""
+    seconds = _seconds(env, name, default)
+    assert seconds is not None, "without `none`, a wait is seconds"
+    return seconds
+
+
 def _names(text: str) -> tuple[str, ...]:
     """Parse a comma-separated list of names, where ``none`` is the empty list."""
     names = tuple(name.strip() for name in text.split(",") if name.strip())

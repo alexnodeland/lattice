@@ -12,6 +12,7 @@ import { render } from "vitest-browser-react";
 import { AppShell } from "./app-shell";
 import { Checkbox } from "./checkbox";
 import { Dialog } from "./dialog";
+import { glyphs } from "./icons";
 import { Menu } from "./menu";
 import { Progress } from "./progress";
 import { Switch } from "./switch";
@@ -49,7 +50,11 @@ test("a dialog keeps its margin from a narrow window's edges", async () => {
 
 test("a menu enters and leaves at the popover's scale", async () => {
   const screen = await render(
-    <Menu label="Actions" items={[{ label: "Open", onSelect: () => undefined }]} />,
+    <Menu
+      label="Actions"
+      icon={glyphs.more}
+      items={[{ label: "Open", onSelect: () => undefined }]}
+    />,
   );
   await screen.getByRole("button", { name: "Actions" }).click();
   await expect.element(page.getByRole("menu")).toBeVisible();

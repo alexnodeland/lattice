@@ -1,6 +1,5 @@
 import { Menu as BaseMenu } from "@base-ui/react/menu";
 import { type Ref, useState } from "react";
-import { Button } from "./button";
 import { Icon } from "./icon";
 import { IconButton } from "./icon-button";
 import type { Glyph } from "./icons";
@@ -40,8 +39,8 @@ export interface MenuItem {
 }
 
 /**
- * A button that opens a menu of actions. `triggerRef` names the button, for focus to return to.
- * With `icon`, the button is an icon button named `label`: the overflow of a row of actions.
+ * An icon button named `label` that opens a menu of actions: the overflow of a row of actions or
+ * of a page's title (portalr ADR-0085). `triggerRef` names the button, for focus to return to.
  */
 export function Menu({
   label,
@@ -52,7 +51,7 @@ export function Menu({
   onOpenChange,
 }: {
   label: string;
-  icon?: Glyph;
+  icon: Glyph;
   items: readonly MenuItem[];
   triggerRef?: Ref<HTMLButtonElement>;
   /** Opened by the page, as by a long press, rather than by its button alone. */
@@ -69,13 +68,7 @@ export function Menu({
   const asSheet = useSheet(shown, () => change(false));
   return (
     <BaseMenu.Root open={shown} onOpenChange={change}>
-      {icon ? (
-        <BaseMenu.Trigger ref={triggerRef} render={<IconButton label={label} icon={icon} />} />
-      ) : (
-        <BaseMenu.Trigger ref={triggerRef} render={<Button variant="secondary" />}>
-          {label}
-        </BaseMenu.Trigger>
-      )}
+      <BaseMenu.Trigger ref={triggerRef} render={<IconButton label={label} icon={icon} />} />
       <BaseMenu.Portal>
         <BaseMenu.Positioner sideOffset={4} align="end" className={`z-30 ${sheetPositioner}`}>
           <BaseMenu.Popup ref={asSheet} className={`${popup} ${sheetPopup}`}>

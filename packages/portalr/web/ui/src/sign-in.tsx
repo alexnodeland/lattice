@@ -32,8 +32,10 @@ export function SignIn({
     { email: "", refused: null },
   );
   return (
+    // A card from the small breakpoint; on a phone the form is the page, on its 16px gutter
+    // (portalr ADR-0085). The lockup keeps its inks here alone.
     <main id="main" className="grid min-h-dvh place-items-center bg-paper px-4 py-10 text-fg">
-      <div className="flex w-full max-w-sm flex-col gap-2 rounded-(--sign-in-radius) border border-line bg-surface p-(--sign-in-pad)">
+      <div className="flex w-full min-w-0 max-w-sm flex-col gap-2 rounded-(--sign-in-radius) border border-line bg-surface p-(--sign-in-pad) max-sm:border-0 max-sm:bg-transparent max-sm:p-0">
         <div className="mb-6 flex flex-col gap-1">
           <Lockup ui={ui} className="h-9" />
           {brand?.copy?.tagline && (

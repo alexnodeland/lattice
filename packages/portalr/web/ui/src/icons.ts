@@ -36,6 +36,7 @@ export const glyphs = {
   plus: g("M8 3v10M3 8h10"),
   check: g("M2.5 9 6 12.5 13.5 3.5"),
   x: g("M3 3l10 10M13 3 3 13"),
+  search: g("M7 12.5a5.5 5.5 0 1 0 0-11 5.5 5.5 0 0 0 0 11M11 11l3.5 3.5"),
   circle: g(circle),
   square: g("M3 3h10v10H3z"),
   squareCheck: g("M3 3h10v10H3zM5.5 8l2 2 3.5-4"),

@@ -3,8 +3,8 @@ import { useRender } from "@base-ui/react/use-render";
 import type { ComponentProps, ReactElement, ReactNode } from "react";
 import { cn } from "./cn";
 import { Icon } from "./icon";
-import { glyphs } from "./icons";
-import { FEEDBACK } from "./states";
+import { type Glyph, glyphs } from "./icons";
+import { FEEDBACK, RING } from "./states";
 
 /**
  * A list of rows (portalr ADR-0080): on the surface, bounded by a hairline with the table's
@@ -95,5 +95,53 @@ export function RowLink({ render, className, ...props }: RowLinkProps) {
       },
       props,
     ),
+  });
+}
+
+/**
+ * A compact track of ways on, such as a workspace's areas (portalr ADR-0085): a segment's look,
+ * flat on the quiet wash, each a link with its glyph and its word, the word shown from the small
+ * breakpoint, so five fit a phone's row; below it each is named by its word alone.
+ */
+export function Tracks({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <nav
+      aria-label={label}
+      className="inline-flex gap-0.5 self-start rounded-(--segmented-radius) border border-line bg-subtle p-(--segmented-pad)"
+    >
+      {children}
+    </nav>
+  );
+}
+
+/** One of a track's links, the router's through `render`. */
+export function TrackLink({
+  render,
+  icon,
+  children,
+}: {
+  render: ReactElement;
+  icon: Glyph;
+  children: string;
+}) {
+  return useRender({
+    defaultTagName: "a",
+    render,
+    props: {
+      "aria-label": children,
+      className: cn(
+        "inline-flex items-center gap-1.5 rounded-(--segmented-item-radius) px-(--segmented-item-pad-x) py-(--segmented-item-pad-y) font-medium text-muted text-sm hover:text-fg",
+        RING,
+        FEEDBACK,
+      ),
+      children: (
+        <>
+          <Icon icon={icon} />
+          <span aria-hidden="true" className="max-sm:hidden">
+            {children}
+          </span>
+        </>
+      ),
+    },
   });
 }

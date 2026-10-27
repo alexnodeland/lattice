@@ -143,8 +143,19 @@ test("on a phone, a row's name of several blocks is all there: none of it is cli
       />
     </Rows>,
   );
-  // Measured in the faces it is drawn in: a fallback face wraps the lines elsewhere.
-  await document.fonts.ready;
+  // Measured in the faces it is drawn in, loaded now rather than when first drawn: a fallback
+  // face wraps the lines elsewhere.
+  await Promise.all([
+    document.fonts.load('1em "Schibsted Grotesk"'),
+    document.fonts.load('1em "Fragment Mono"'),
+  ]);
+  // What the test is about: the failure's words wrap over lines.
+  expect(
+    screen
+      .getByText(/last failure/)
+      .element()
+      .getClientRects().length,
+  ).toBeGreaterThan(1);
   const row = screen.getByRole("listitem").element().getBoundingClientRect();
   for (const part of [
     screen.getByText(/last failure/).element(),
@@ -154,8 +165,8 @@ test("on a phone, a row's name of several blocks is all there: none of it is cli
     expect(box.top).toBeGreaterThanOrEqual(row.top);
     expect(box.bottom).toBeLessThanOrEqual(row.bottom);
     // And drawn there: what is at the middle of its first line is it, not what a clip would
-    // leave. The first line, not the whole box: an inline part wrapped over lines starts partway
-    // along its first, so its box's left edge, on a middle line, may be another part's words.
+    // leave. Only the first line is hit-tested: the box's own middle, on a part wrapped over two
+    // lines, is the gap between them. A later line clipped is caught by the top and bottom above.
     const [line] = part.getClientRects();
     if (line === undefined) throw new Error("the part isn't drawn");
     const hit = document.elementFromPoint(line.left + line.width / 2, line.top + line.height / 2);

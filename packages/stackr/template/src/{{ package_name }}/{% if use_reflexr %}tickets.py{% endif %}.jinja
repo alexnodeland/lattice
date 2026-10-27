@@ -68,6 +68,15 @@ class TriageReview(Feedback, name="triage-review", targets={"run"}):
 
     correct: bool = Field(description="The priority and summary were right")
     comment: str | None = None
+{%- if use_portal %}
+
+
+class Thumbs(Feedback, name="thumbs", targets={"run"}):
+    """Whether a run helped, and why: what the portal's thumbs give."""
+
+    up: bool
+    comment: str | None = None
+{%- endif %}
 
 
 def build_triage_agent(

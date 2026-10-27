@@ -23,12 +23,14 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from grantr.core import User
+{% if use_artifactr %}from artifactr.core import feedback_types as artifactr_types
+{% endif %}from grantr.core import User
 from portalr.analytics import Relay, SessionStamp
 from portalr.invites import InviteFailed, SupabaseInvite
 from portalr.people import SupabasePeople
 from portalr.readers import Analytics
-
+{% if use_reflexr %}from reflexr.core import feedback_types as reflexr_types
+{% endif %}
 from {{ package_name }}.portal import (
     LARGEST,
     analytics,
@@ -792,3 +794,13 @@ def test_a_pass_that_fails_is_logged_and_the_application_still_stops(
             client.get("/healthz")
             time.sleep(0.01)
     assert "the removals and deletions owed weren't read" in caplog.text
+
+
+def test_the_portals_thumbs_are_feedback_the_libraries_take() -> None:
+    """The portal's Runs, threads and notes send `thumbs`; a type not registered refuses them."""
+{%- if use_artifactr %}
+    assert artifactr_types()["thumbs"].targets == {"turn", "message", "artifact"}
+{%- endif %}
+{%- if use_reflexr %}
+    assert reflexr_types()["thumbs"].targets == {"run"}
+{%- endif %}

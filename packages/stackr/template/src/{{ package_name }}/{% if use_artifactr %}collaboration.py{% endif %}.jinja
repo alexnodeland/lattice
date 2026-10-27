@@ -56,7 +56,7 @@ from {{ package_name }}.gateway import Guardrails, TenantKeys
 {%- if use_relayr %}
 from {{ package_name }}.incidents import Postmortem, Timeline
 {%- endif %}
-from {{ package_name }}.notes import Note, Rating, build_note_agent
+from {{ package_name }}.notes import Note, Rating, {% if use_portal %}Thumbs, {% endif %}build_note_agent
 from {{ package_name }}.scores import Mirrors, {% if use_relayr %}OnOpen, {% endif %}opened, sync_configs
 from {{ package_name }}.settings import GatewaySettings
 from {{ package_name }}.telemetry import TelemetryHandle
@@ -264,7 +264,7 @@ class Collaboration:
         """
         if self._langfuse is not None:
             configs = LangfuseScoreConfigStore(self._langfuse)
-            await sync_configs(sync_score_configs(configs, [Rating]))
+            await sync_configs(sync_score_configs(configs, [Rating{% if use_portal %}, Thumbs{% endif %}]))
         try:
             async with {% if use_files %}self._files.lifespan(), {% endif %}self.mcp.lifespan():
                 yield

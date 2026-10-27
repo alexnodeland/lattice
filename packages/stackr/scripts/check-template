@@ -346,9 +346,36 @@ def check_fetches() -> list[str]:
     return problems
 
 
+FEEDBACK_SENT = re.compile(r"""feedback_type:\s*["']([\w-]+)["']""")
+
+
+def check_feedback(app: Path) -> list[str]:
+    """Check that the feedback types portalr's UIs send are defined by the rendered application.
+
+    A type the application doesn't define is refused by the server, and the person is told only
+    that a thumb wasn't given; so every `feedback_type: "..."` the UIs send is looked for among
+    the names the example modules register.
+    """
+    if not (list(app.glob("src/*/portal.py"))):
+        return []
+    sent: set[str] = set()
+    for folder in ("app", "client"):
+        for path in (LATTICE / "packages" / "portalr" / "web" / folder / "src").rglob("*.ts*"):
+            if ".test." not in path.name and "test" not in path.parts:
+                sent |= set(FEEDBACK_SENT.findall(path.read_text()))
+    defined = set()
+    for module in ("notes.py", "tickets.py"):
+        for path in app.glob(f"src/*/{module}"):
+            defined |= set(re.findall(r'name="([\w-]+)", targets', path.read_text()))
+    return [
+        f"portalr's UIs send {name!r} feedback, which the application doesn't define"
+        for name in sorted(sent - defined)
+    ]
+
+
 def check(app: Path, sources: dict[str, dict[str, str]]) -> list[str]:
     """Check one rendered application, which needs these sources; return the problems found."""
-    problems = check_sources(app, sources)
+    problems = check_sources(app, sources) + check_feedback(app)
     if (app / "scripts" / "build-portal-ui.sh").exists():
         problems += check_bun(app)
     files = [p for p in app.rglob("*") if p.is_file() and ".git" not in p.parts]

@@ -8,7 +8,6 @@
 
 import { type ReactNode, useEffect, useState } from "react";
 import { Button } from "../button";
-import { cn } from "../cn";
 import { CodeBlock } from "../code-block";
 
 /** The most characters formatted: past it, a value is shown raw, with a note. */
@@ -280,18 +279,19 @@ export function Formatted({
           ))}
         </fieldset>
       )}
+      {/* A note comes first, where it is seen: the value below may scroll past the box. */}
+      {found?.repaired && (
+        <p className="px-3 pt-2 text-muted text-xs">Formatted from what parses of it.</p>
+      )}
+      {found === undefined && text.length > LONGEST && (
+        <p className="px-3 pt-2 text-muted text-xs">Too long to format: shown as recorded.</p>
+      )}
       {found !== undefined && view === "formatted" ? (
-        <div className={cn("min-w-0 break-words p-3 font-mono text-xs", found.repaired && "")}>
+        <div className="min-w-0 break-words p-3 font-mono text-xs">
           <Value value={found.value} name="" />
         </div>
       ) : (
         raw
-      )}
-      {found?.repaired && (
-        <p className="px-3 pb-2 text-muted text-xs">Formatted from what parses of it.</p>
-      )}
-      {found === undefined && text.length > LONGEST && (
-        <p className="px-3 pb-2 text-muted text-xs">Too long to format: shown as recorded.</p>
       )}
     </>
   );

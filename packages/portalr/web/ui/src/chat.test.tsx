@@ -1135,7 +1135,7 @@ test("a turn that was stopped, or failed, keeps what it streamed, quietly, and s
   await expect.element(left.getByText("Half a rep")).toBeVisible();
   await expect.element(left.getByText("Stopped here.")).toBeVisible();
   await expect.element(left.getByRole("button", { name: "Thought for 2 s" })).toBeVisible();
-  expect(left.element().classList).toContain("text-muted");
+  expect(left.element().classList).toContain("opacity-70");
 });
 
 test("the strip over a turn says how it goes, for how long, and offers Stop while it works", async () => {

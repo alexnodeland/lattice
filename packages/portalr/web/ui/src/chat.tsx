@@ -420,7 +420,7 @@ export function Streaming({
     <li
       className={cn(
         "flex max-w-[min(100%,var(--bubble-max-width))] flex-col items-start gap-1 self-start",
-        ended && "text-muted",
+        ended && "opacity-70",
       )}
       aria-live="off"
       aria-busy={ended ? undefined : "true"}

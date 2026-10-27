@@ -207,15 +207,21 @@ class Stream:
         except (UnsupportedProtocol, ValidationFailed) as refused:
             await self._close(4400, refused.message)
             return
-        # Each running run's latest turn: where its run_started is, and when it was.
-        starts = {run.id: await _started(workspace, run.id, run.thread_id) for run in running}
+        # Each followed run's latest turn: where its run_started is, and when it was. It is
+        # read back from the run's thread, so a run the client doesn't follow isn't read.
+        followed = [r for r in running if hello.threads is None or r.thread_id in hello.threads]
+        starts = {run.id: await _started(workspace, run.id, run.thread_id) for run in followed}
         self._put(
             Welcome(
                 workspace_id=workspace.workspace_id,
                 head_seq=head,
                 reset=plan.reset,
                 active_runs=tuple(
-                    ActiveRun(run_id=r.id, thread_id=r.thread_id, started_at=starts[r.id][1])
+                    ActiveRun(
+                        run_id=r.id,
+                        thread_id=r.thread_id,
+                        started_at=starts[r.id][1] if r.id in starts else None,
+                    )
                     for r in running
                 ),
             )
@@ -228,9 +234,8 @@ class Stream:
             # Runs running as the client joined are watched from this list, each as the turn
             # its latest run_started began, so that run_started, if the log has it after
             # head_seq, is the same turn and not watched twice; later turns as they start.
-            for run in running:
-                if hello.threads is None or run.thread_id in hello.threads:
-                    self._watch(workspace, run.id, run.thread_id, turn=starts[run.id][0])
+            for run in followed:
+                self._watch(workspace, run.id, run.thread_id, turn=starts[run.id][0])
         else:
             self._put(ReplayComplete(up_to_seq=head))  # for presence alone: no events
         await self._read(workspace)

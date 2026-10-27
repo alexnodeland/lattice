@@ -194,6 +194,36 @@ async def test_a_recovery_that_fails_is_logged_and_the_open_still_succeeds(
     assert [r.getMessage() for r in caplog.records] == [
         f"recovering workspace main of {TENANT} failed"
     ]
+
+
+async def test_a_recovery_still_going_at_shutdown_is_cancelled(
+    script: Script, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config = settings()
+    collaboration = Collaboration(
+        name="{{ project_slug }}",
+        authenticate=nobody,
+        identify=nobody,
+{%- if use_ui or use_files %}
+        integrations=Defaults(),
+{%- endif %}
+{%- if use_files %}
+        files=Files(FilesSettings(), integrations=Defaults()),
+{%- endif %}
+        model=script.model,
+        gateway=config.gateway,
+    )
+
+    async def slow(workspace: Any) -> list[Any]:
+        await asyncio.Event().wait()
+        return []
+
+    monkeypatch.setattr(collaboration.runner, "recover", slow)
+    async with collaboration.lifespan():
+        await collaboration.workspaces.open(TENANT, "main", actor=SystemActor())
+        await asyncio.sleep(0)
+        [recovering] = collaboration._recovering
+    assert recovering.cancelled(), "it is not left running as the application stops"
 {%- if use_ui %}
 
 

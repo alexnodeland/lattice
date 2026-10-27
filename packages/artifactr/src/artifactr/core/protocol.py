@@ -194,7 +194,8 @@ class ActiveRun(BaseModel):
     thread_id: ThreadId
     started_at: datetime | None = None
     """When the run's latest turn started, from its ``run_started``, so a client can say how
-    long it has been going; ``None`` from earlier servers."""
+    long it has been going; ``None`` for a run in a thread the client doesn't follow, and from
+    earlier servers."""
 
 
 class Welcome(BaseModel):

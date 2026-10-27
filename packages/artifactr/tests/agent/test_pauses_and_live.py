@@ -459,17 +459,20 @@ async def test_deltas_are_gathered_for_a_moment_and_sent_with_their_offsets() ->
 
 async def test_deltas_gathered_past_the_moment_are_sent_as_they_stand() -> None:
     frames: list[LiveFrame] = []
+    sent = asyncio.Event()
 
     class Channel:
         async def send(self, frame: LiveFrame) -> None:
             frames.append(frame)
+            sent.set()
 
     async def slowly() -> AsyncIterator[Any]:
         yield _text(0, "Hel")
         yield _text(0, "lo")
-        await asyncio.sleep(0.1)
+        await sent.wait()  # the moment passed, and what was gathered went
+        sent.clear()
         yield _text(0, " there")
-        await asyncio.sleep(0.1)
+        await sent.wait()
 
     await forward_live(Channel(), coalesce=0.02)(_ctx(), slowly())
     assert [f.event for f in frames] == [
@@ -488,6 +491,48 @@ async def test_without_a_moment_each_delta_is_sent_as_it_comes() -> None:
     ]
 
 
+async def test_offsets_count_from_zero_at_each_parts_start() -> None:
+    """A model response's parts are numbered from 0 again: so are their offsets."""
+    sent = await _forwarded(
+        0,
+        PartStartEvent(index=0, part=TextPart("")),
+        _text(0, "first"),
+        PartEndEvent(index=0, part=TextPart("first")),
+        PartStartEvent(index=0, part=TextPart("")),  # the next response's part 0
+        _text(0, "second"),
+    )
+    assert [e for e in sent if isinstance(e, TextDelta)] == [
+        TextDelta(part=0, delta="first", offset=0),
+        TextDelta(part=0, delta="second", offset=0),
+    ]
+
+
+async def test_a_handler_cancelled_with_a_flush_pending_sends_what_it_gathered() -> None:
+    frames: list[LiveFrame] = []
+
+    class Channel:
+        async def send(self, frame: LiveFrame) -> None:
+            frames.append(frame)
+
+    async def stalling() -> AsyncIterator[Any]:
+        yield _text(0, "Hel")
+        yield _text(0, "lo")
+        await asyncio.Event().wait()
+
+    async def handle() -> None:
+        await forward_live(Channel(), coalesce=5.0)(_ctx(), stalling())
+
+    handling = asyncio.create_task(handle())
+    await asyncio.sleep(0.01)
+    assert frames == [], "gathered, not sent yet"
+    handling.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await handling
+    assert [f.event for f in frames] == [TextDelta(part=0, delta="Hello", offset=0)]
+    await asyncio.sleep(0.01)
+    assert not [t for t in asyncio.all_tasks() if t is not asyncio.current_task()], "no flush left"
+
+
 async def test_a_delta_sent_twice_places_itself_by_its_offset() -> None:
     """What a client does with offsets: a replayed delta lands where it belongs, once."""
     parts: dict[int, str] = {}
@@ -497,11 +542,13 @@ async def test_a_delta_sent_twice_places_itself_by_its_offset() -> None:
         TextDelta(part=0, delta=" there", offset=5),  # replayed on reconnect
         TextDelta(part=0, delta="Hello there", offset=0),  # gathered differently, replayed
         TextDelta(part=0, delta="!", offset=11),
+        TextDelta(part=0, delta=" Bye", offset=20),  # past the end: a frame it was never sent
+        TextDelta(part=0, delta="."),  # from an earlier server: no offset
     ]:
         text = parts.get(delta.part, "")
-        assert delta.offset is not None
-        parts[delta.part] = text[: delta.offset] + delta.delta
-    assert parts == {0: "Hello there!"}
+        at = len(text) if delta.offset is None or delta.offset > len(text) else delta.offset
+        parts[delta.part] = text[:at] + delta.delta
+    assert parts == {0: "Hello there! Bye."}
 
 
 async def test_execute_routes_answers_and_stops(

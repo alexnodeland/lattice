@@ -85,6 +85,7 @@ A generated application reads these from its `.env`. `copier update` never touch
 | `PORTAL_BRAND_DIR` | lattice's own look | The deployment's brand kit ([white-labelling](portalr/guides/white-labelling.md)) |
 | `PORTAL_SUPABASE_URL` | `/` | `/` signs the portal in on the application's own origin; an application from before 0.2 names Supabase's address here, and should set `/` ([stackr ADR-0042](stackr/adr/0042-a-generated-application-as-a-local-product.md)) |
 | `PORTAL_URL`, `PORTAL_APPS_URL` | this machine | The portal's origin, and the mini apps' origin, which only the portal may frame |
+| `PORTAL_EXTRA_URLS` | none | The portal's other origins, such as the tailnet name `make tailnet` writes, each with mini apps and the editors beside it ([portalr ADR-0084](portalr/adr/0084-several-portal-origins-an-allow-list-aliases-and-a-union-policy.md)) |
 
 In stackr's own `.env`: `STACKR_GATEWAY_MODELS` and `STACKR_UPSTREAM_*` point the gateway's `default` and `fast` at a gateway of your own ([the gateway](stackr/guides/gateway.md)); leave them unset for the providers, as before.
 

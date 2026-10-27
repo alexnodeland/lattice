@@ -133,17 +133,39 @@ brand: ## Start a brand kit in brand/kit (BRAND_FROM: template, nightshade or ca
 	fi
 
 # The tailnet: `tailscale serve` puts the application on this machine's tailnet name, over HTTPS,
-# for your tailnet only; its port stays on 127.0.0.1. The portal signs in on that origin as on
-# this one, with PORTAL_SUPABASE_URL=/ (the default).
+# for your tailnet only; its ports stay on 127.0.0.1. The portal signs in on that origin as on
+# this one, with PORTAL_SUPABASE_URL=/ (the default). Mini apps' port, where PORTAL_APPS_URL names
+# their origin, and each running editor's are served beside it, each on the same port there, and
+# PORTAL_EXTRA_URLS in .env names the tailnet origin, for `make up` to apply (portalr ADR-0084).
 TAILNET_PORT ?= 443
 TAILNET = UV="$(UV)" scripts/tailnet.sh
-APP_URL = http://127.0.0.1:$(or $(shell sed -n 's/^APP_PORT=//p' .env 2>/dev/null | tail -n 1),{{ app_port }})
+dotenv = $(shell sed -n 's/^$(1)=//p' .env 2>/dev/null | tail -n 1)
+APP_URL = http://127.0.0.1:$(or $(call dotenv,APP_PORT),{{ app_port }})
+{%- if hosting != 'host' %}
+TAILNET_BESIDE = $(if $(call dotenv,PORTAL_APPS_URL),$(or $(call dotenv,APPS_PORT),{{ app_port + 1 }}))
+{%- if use_files %}
+{%- for name, craft in crafts.items() if craft.editor %}
+TAILNET_BESIDE += $(if $(filter {{ name }},$(FILES)),$(or $(call dotenv,{{ name | upper }}_EDITOR_PORT),{{ app_port + craft.editor }}))
+{%- endfor %}
+{%- endif %}
+# What the next `make up` would refuse beside the tailnet name: an apps' origin or an editor that
+# isn't a port of this machine's loopback, so has no port to be beside it.
+TAILNET_REFUSED = $(strip \
+	$(if $(filter-out http://127.0.0.1:%,$(call dotenv,PORTAL_APPS_URL)),PORTAL_APPS_URL isn't http://127.0.0.1:<port>) \
+	$(if $(call dotenv,FILES_EDITORS),FILES_EDITORS names the editors elsewhere) \
+	$(if $(call dotenv,FILES_EDITOR_DOMAIN),FILES_EDITOR_DOMAIN puts the editors at an edge))
+{%- else %}
+# A single host has one origin for the portal, its edge: no tailnet name beside it.
+TAILNET_BESIDE =
+TAILNET_REFUSED = this application is on a single host, whose edge is its one origin
+{%- endif %}
 
-tailnet: ## Serve the application on your tailnet only, over HTTPS (TAILNET_PORT, 443), and print its address
-	$(TAILNET) on $(TAILNET_PORT) $(APP_URL)
+tailnet: ## Serve the application, its mini apps and editors (FILES, or FILES_CRAFTS in .env) on your tailnet only, over HTTPS (TAILNET_PORT, 443)
+	@$(if $(TAILNET_REFUSED),echo "make tailnet: nothing changed: $(TAILNET_REFUSED); see https://lattice.alexnodeland.com/stackr/guides/single-host/#signing-in-to-the-portal" >&2; exit 1,true)
+	$(TAILNET) on $(TAILNET_PORT) $(APP_URL) $(strip $(TAILNET_BESIDE))
 
-tailnet-off: ## Stop serving it on your tailnet: what `make tailnet` set up on TAILNET_PORT, alone
-	$(TAILNET) off $(TAILNET_PORT) $(APP_URL)
+tailnet-off: ## Stop serving them on your tailnet: with the same TAILNET_PORT and FILES as `make tailnet`
+	$(TAILNET) off $(TAILNET_PORT) $(APP_URL) $(strip $(TAILNET_BESIDE))
 {%- endif %}
 
 up: ## Build and start the application in the app profile, beside stackr's stack{% if use_files %}, with FILES' workers{% endif %}

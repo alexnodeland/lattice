@@ -165,6 +165,47 @@ def test_an_apps_origin_without_the_portals_stops_the_application(script: Script
         app(script, off)
 
 
+TAILNET = "https://laptop.tail1234.ts.net"
+
+
+def test_mini_apps_run_beside_each_of_the_portals_origins(script: Script, ui: Path) -> None:
+    (ui / "sandbox").mkdir()
+    (ui / "sandbox" / "index.html").write_text("<title>sandbox</title>")
+    named = with_portal(ui_dir=str(ui), url=PORTAL, apps_url=APPS, extra_urls=(TAILNET,))
+    with TestClient(app(script, named)) as client:
+        config = client.get("/portalr/config.json").json()
+        assert config["origin"] == PORTAL
+        assert config["aliases"][TAILNET]["apps"] == f"{TAILNET}:8801"
+        policy = client.get("/portalr/app/").headers["content-security-policy"]
+        assert APPS in policy
+        assert f"{TAILNET}:8801" in policy
+        for host in ("127.0.0.1:8801", "laptop.tail1234.ts.net:8801"):
+            sandbox = client.get("/", headers={"Host": host})
+            assert sandbox.text == "<title>sandbox</title>"
+            ancestors = sandbox.headers["content-security-policy"]
+            assert f"frame-ancestors {PORTAL} {TAILNET}" in ancestors
+            # Cookies are host-scoped, not port-scoped: none on any origin beside the portal.
+            assert "set-cookie" not in sandbox.headers
+
+
+def test_the_portals_other_origins_need_its_own(script: Script, ui: Path) -> None:
+    with pytest.raises(ValueError, match="PORTAL_EXTRA_URLS needs PORTAL_URL"):
+        app(script, with_portal(ui_dir=str(ui), extra_urls=(TAILNET,)))
+
+
+def test_the_portals_other_origins_are_read_from_the_environment() -> None:
+    def read(extra: str, url: str = PORTAL) -> tuple[str, ...]:
+        environ = {"PORTAL_URL": url, "PORTAL_EXTRA_URLS": extra}
+        return Settings.from_environ(environ).portal.extra_urls
+
+    assert read("") == ()
+    assert read(f" {TAILNET}/ , https://Laptop.tail1234.ts.net, {PORTAL}") == (TAILNET,)
+    with pytest.raises(ValueError, match="PORTAL_EXTRA_URLS"):
+        read("http://laptop.tail1234.ts.net")
+    with pytest.raises(ValueError, match="PORTAL_EXTRA_URLS"):
+        read("https://*.ts.net")
+
+
 def test_without_the_portal_no_app_runs(script: Script) -> None:
     off = replace(settings(), portal=PortalSettings(url=PORTAL, apps_url=APPS))
     with TestClient(app(script, off)) as client:

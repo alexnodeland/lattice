@@ -232,7 +232,7 @@ class RunStarted(_Event):
     """The model this attempt asked for, by the name the host's ``model_for`` knows (ADR-0097),
     or ``None`` for the agent's own. A model its sender asked for and may not use is not named:
     the run asks for the default, and a notice says so. Which model answered each request, as
-    when a gateway falls back to another, is each step's :attr:`StepUsage.model`."""
+    when a gateway falls back to another, is each step's ``StepUsage.model``."""
 
 
 class ToolCalled(_Event):

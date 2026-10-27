@@ -18,6 +18,7 @@ const FLICK_AT = 24;
  */
 export function sheetDrag(sheet: HTMLElement, close: () => void): () => void {
   let from: { y: number; at: number; id: number; handle: HTMLElement } | null = null;
+  sheet.style.setProperty("--sheet-drag", "0px");
   const settle = (dy: number) => {
     sheet.style.transition = "";
     sheet.style.setProperty("--sheet-drag", `${dy}px`);
@@ -74,7 +75,7 @@ export function sheetDrag(sheet: HTMLElement, close: () => void): () => void {
     sheet.removeEventListener("pointercancel", cancel);
     delete sheet.dataset.sheetDrag;
     sheet.style.transition = "";
-    sheet.style.removeProperty("--sheet-drag");
+    // The offset stays: a sheet closing from where it was let go slides on from there.
   };
 }
 
@@ -82,8 +83,9 @@ export function sheetDrag(sheet: HTMLElement, close: () => void): () => void {
  * Keeps `--keyboard-inset` on the root at the height the on-screen keyboard covers, as the
  * visual viewport says, so a composer pinned to the bottom sits above it where the page itself
  * doesn't shrink (`interactive-widget=resizes-content` is honoured by some browsers, not all). A
- * pinch zoom shrinks the visual viewport too, and is no keyboard: nothing is kept then. Returns
- * what stops it.
+ * pinch zoom shrinks the visual viewport too, and is no keyboard: nothing is kept then. While
+ * the keyboard is up the root is marked `data-keyboard`, as the home indicator is under it then.
+ * Returns what stops it.
  */
 export function keyboardInset(root: HTMLElement = document.documentElement): () => void {
   const viewport = window.visualViewport;
@@ -98,6 +100,7 @@ export function keyboardInset(root: HTMLElement = document.documentElement): () 
       ? 0
       : Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop);
     root.style.setProperty("--keyboard-inset", `${Math.round(covered)}px`);
+    root.toggleAttribute("data-keyboard", covered > 0);
   };
   // Resize and scroll come together, and often: one measure a frame.
   const soon = () => {
@@ -111,5 +114,6 @@ export function keyboardInset(root: HTMLElement = document.documentElement): () 
     viewport.removeEventListener("scroll", soon);
     cancelAnimationFrame(frame);
     root.style.removeProperty("--keyboard-inset");
+    root.removeAttribute("data-keyboard");
   };
 }

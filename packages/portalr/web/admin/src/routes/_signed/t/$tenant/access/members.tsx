@@ -12,7 +12,7 @@ import {
   useAccess,
   useNames,
 } from "../../../../../access";
-import { Folded } from "../../../../../folded";
+import { Folded, Toolbar } from "../../../../../folded";
 
 type Member = GrantrApi.components["schemas"]["Member"];
 
@@ -60,7 +60,35 @@ function Members() {
   }, null);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
+      <Toolbar>
+        <Folded title="Invite someone" action="Invite…">
+          <form className="flex flex-col gap-3" action={invite}>
+            <TextField
+              label="Email"
+              name="email"
+              type="email"
+              autoComplete="off"
+              required
+              value={email}
+              onValueChange={(value) => setEmail(String(value))}
+            />
+            {invited && <Alert tone={invited.refused ? "error" : "info"}>{invited.said}</Alert>}
+            <Button type="submit" disabled={inviting} className="self-start">
+              Invite
+            </Button>
+          </form>
+        </Folded>
+        <Folded title="Add a service principal" action="Add…">
+          <form className="flex flex-col gap-3" action={make}>
+            <TextField label="Name" name="principal" autoComplete="off" required />
+            {made && <Alert tone={made.refused ? "error" : "info"}>{made.said}</Alert>}
+            <Button type="submit" disabled={making} className="self-start">
+              Add
+            </Button>
+          </form>
+        </Folded>
+      </Toolbar>
       <ItemTable
         caption="Members"
         columns={[
@@ -90,34 +118,6 @@ function Members() {
         }
         empty={{ title: "No members yet", body: "Invite someone, or add a service principal." }}
       />
-      <div className="grid gap-4 md:grid-cols-2">
-        <Folded title="Invite someone" action="Invite…">
-          <form className="flex flex-col gap-3" action={invite}>
-            <TextField
-              label="Email"
-              name="email"
-              type="email"
-              autoComplete="off"
-              required
-              value={email}
-              onValueChange={(value) => setEmail(String(value))}
-            />
-            {invited && <Alert tone={invited.refused ? "error" : "info"}>{invited.said}</Alert>}
-            <Button type="submit" disabled={inviting} className="self-start">
-              Invite
-            </Button>
-          </form>
-        </Folded>
-        <Folded title="Add a service principal" action="Add…">
-          <form className="flex flex-col gap-3" action={make}>
-            <TextField label="Name" name="principal" autoComplete="off" required />
-            {made && <Alert tone={made.refused ? "error" : "info"}>{made.said}</Alert>}
-            <Button type="submit" disabled={making} className="self-start">
-              Add
-            </Button>
-          </form>
-        </Folded>
-      </div>
     </div>
   );
 }

@@ -261,6 +261,7 @@ test("with defining roles and granting, Roles and Grants are parts", async () =>
   const parts = screen.getByRole("navigation", { name: "Access" });
   await expect.element(parts.getByRole("link", { name: "Roles" })).toBeVisible();
   await parts.getByRole("link", { name: "Grants" }).click();
+  await screen.getByRole("button", { name: "Grant…" }).click();
   await expect.element(screen.getByRole("heading", { name: "Grant a role" })).toBeVisible();
 });
 

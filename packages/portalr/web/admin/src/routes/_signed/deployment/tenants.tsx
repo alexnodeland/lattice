@@ -3,7 +3,7 @@ import { Alert, Button, ConfirmDialog, ItemTable, PageHeader, TextField } from "
 import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-router";
 import { useMemo, useRef, useState } from "react";
-import { Folded } from "../../../folded";
+import { Folded, Toolbar } from "../../../folded";
 import { unread } from "../../../home";
 import { ReadFailed } from "../../../read-failed";
 import { budgetSaid, isEmail, isTenantId, PAGE, rowsFor, spendSaid } from "../../../tenants";
@@ -82,56 +82,58 @@ function Create() {
   const field = useRef<HTMLInputElement>(null);
   const ready = isTenantId(tenant) && isEmail(email.trim());
   return (
-    <Folded title="Create a tenant" action="Create…" className="sm:max-w-xl">
-      <TextField
-        ref={field}
-        label="Tenant"
-        name="tenant"
-        autoComplete="off"
-        spellCheck={false}
-        value={tenant}
-        onValueChange={(value) => {
-          setMade(null);
-          setTenant(String(value));
-        }}
-      />
-      <TextField
-        label="Owner's email"
-        name="owner"
-        type="email"
-        autoComplete="off"
-        value={email}
-        onValueChange={(value) => {
-          setMade(null);
-          setEmail(String(value));
-        }}
-      />
-      <ConfirmDialog
-        label="Create tenant"
-        className="self-start"
-        title={`Create ${tenant.trim()}?`}
-        confirm="Create the tenant"
-        calm
-        disabled={!ready}
-        finalFocus={field}
-        onConfirm={async () => {
-          const created = orThrow(
-            "Not created",
-            await commands.portalr.createTenant(tenant.trim(), email.trim()),
-          );
-          setMade(`${created.tenant} is created, owned by ${created.owner}.`);
-          setTenant("");
-          setEmail("");
-          await queryClient.invalidateQueries({ queryKey: keys.portalr.tenants(user) });
-        }}
-      >
-        <p>
-          Creates the tenant {tenant.trim()} and makes {email.trim()} its first owner. If they have
-          no account, Supabase Auth sends them an invitation; if they have, they are found, and
-          nothing is sent. A tenant can't be deleted from here.
-        </p>
-      </ConfirmDialog>
-      {made && <Alert tone="info">{made}</Alert>}
-    </Folded>
+    <Toolbar>
+      <Folded title="Create a tenant" action="Create…" className="sm:max-w-xl">
+        <TextField
+          ref={field}
+          label="Tenant"
+          name="tenant"
+          autoComplete="off"
+          spellCheck={false}
+          value={tenant}
+          onValueChange={(value) => {
+            setMade(null);
+            setTenant(String(value));
+          }}
+        />
+        <TextField
+          label="Owner's email"
+          name="owner"
+          type="email"
+          autoComplete="off"
+          value={email}
+          onValueChange={(value) => {
+            setMade(null);
+            setEmail(String(value));
+          }}
+        />
+        <ConfirmDialog
+          label="Create tenant"
+          className="self-start"
+          title={`Create ${tenant.trim()}?`}
+          confirm="Create the tenant"
+          calm
+          disabled={!ready}
+          finalFocus={field}
+          onConfirm={async () => {
+            const created = orThrow(
+              "Not created",
+              await commands.portalr.createTenant(tenant.trim(), email.trim()),
+            );
+            setMade(`${created.tenant} is created, owned by ${created.owner}.`);
+            setTenant("");
+            setEmail("");
+            await queryClient.invalidateQueries({ queryKey: keys.portalr.tenants(user) });
+          }}
+        >
+          <p>
+            Creates the tenant {tenant.trim()} and makes {email.trim()} its first owner. If they
+            have no account, Supabase Auth sends them an invitation; if they have, they are found,
+            and nothing is sent. A tenant can't be deleted from here.
+          </p>
+        </ConfirmDialog>
+        {made && <Alert tone="info">{made}</Alert>}
+      </Folded>
+    </Toolbar>
   );
 }

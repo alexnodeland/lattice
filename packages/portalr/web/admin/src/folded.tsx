@@ -1,11 +1,17 @@
 /**
- * A card whose contents fold behind a line (portalr ADR-0080): a form that makes something, closed
- * until it is wanted, so a page opens on what is there, not on blank fields; or a filter bar, open
- * while something is set, and otherwise closed with what is in effect said on the line.
+ * A toolbar action (portalr ADR-0081): a button in the row above a table, Invite… or Find…, which
+ * opens its form in a card beneath the row, so a page opens on what is there, not on blank
+ * fields. In a `Toolbar`, the buttons sit together at the row's end and an open form takes the
+ * full line under them. A filter's action says what is in effect beside it while it is closed.
  */
 
-import { Card, Disclosure, SectionTitle } from "@portalr/ui";
-import { type ReactNode, useId } from "react";
+import { Button, Card, SectionTitle } from "@portalr/ui";
+import { type ReactNode, useId, useState } from "react";
+
+/** The row above a table that holds its actions: filters at the start, what makes things at the end. */
+export function Toolbar({ children }: { children: ReactNode }) {
+  return <div className="flex flex-wrap items-center justify-end gap-2">{children}</div>;
+}
 
 export function Folded({
   title,
@@ -18,11 +24,11 @@ export function Folded({
   className,
   children,
 }: {
-  /** The section's heading. */
+  /** The form's heading, once open; the region's name. */
   title: ReactNode;
-  /** The line that opens it: a verb, such as "Invite…" or "Find…". */
+  /** The button that opens it: a verb, such as "Invite…" or "Find…". */
   action: string;
-  /** What is in effect while it is closed, beside the line: a filter's window, say. */
+  /** What is in effect while it is closed, beside the button: a filter's window, say. */
   said?: string | null;
   defaultOpen?: boolean;
   /** Open or not, where the page holds it. */
@@ -34,28 +40,40 @@ export function Folded({
   children: ReactNode;
 }) {
   const id = useId();
+  const [opened, setOpened] = useState(defaultOpen);
+  const shown = open ?? opened;
+  const toggle = () => {
+    setOpened(!shown);
+    onOpenChange?.(!shown);
+  };
   return (
-    <Card
-      render={<section aria-labelledby={id} />}
-      className={className ? `flex flex-col gap-3 ${className}` : "flex flex-col gap-3"}
-    >
-      <SectionTitle id={id} {...heading}>
-        {title}
-      </SectionTitle>
-      <Disclosure
-        summary={
-          <span className="flex flex-wrap items-baseline gap-x-2">
-            {action}
-            {said && <span className="text-muted text-xs">{said}</span>}
-          </span>
-        }
-        defaultOpen={defaultOpen}
-        {...(open !== undefined && { open })}
-        {...(onOpenChange && { onOpenChange })}
-        panelClassName="flex flex-col gap-3 pt-3"
+    <>
+      {said && !shown && <span className="text-muted text-xs">{said}</span>}
+      <Button
+        variant="secondary"
+        size="sm"
+        aria-expanded={shown}
+        aria-controls={id}
+        onClick={toggle}
       >
-        {children}
-      </Disclosure>
-    </Card>
+        {action}
+      </Button>
+      {shown && (
+        <Card
+          id={id}
+          render={<section aria-labelledby={`${id}-title`} />}
+          className={
+            className
+              ? `order-last basis-full flex flex-col gap-3 ${className}`
+              : "order-last basis-full flex flex-col gap-3"
+          }
+        >
+          <SectionTitle id={`${id}-title`} {...heading}>
+            {title}
+          </SectionTitle>
+          {children}
+        </Card>
+      )}
+    </>
   );
 }

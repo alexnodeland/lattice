@@ -23,7 +23,7 @@ import {
   searchOf,
   TYPES,
 } from "../../../../audit";
-import { Folded } from "../../../../folded";
+import { Folded, Toolbar } from "../../../../folded";
 import { ReadFailed } from "../../../../read-failed";
 
 const HEADER = <PageHeader title="Audit" meta="Every change to who may see and do what" />;
@@ -119,55 +119,57 @@ function Filter({ filter }: { filter: AuditFilter }) {
     void navigate({ search: filterOf(Object.fromEntries(new FormData(event.currentTarget))) });
   }
   return (
-    <Folded
-      title="Filter"
-      action="Filter…"
-      said={Object.values(filter).some(Boolean) ? "filtered" : null}
-      defaultOpen={Object.values(filter).some(Boolean)}
-    >
-      <form className="grid gap-3 sm:grid-cols-2" onSubmit={apply}>
-        <SelectField
-          label="Change"
-          name="type"
-          defaultValue={filter.type ?? ""}
-          options={[{ value: "", label: "Any change" }, ...TYPES]}
-        />
-        <SelectField
-          label="Made by"
-          name="actor_kind"
-          value={kind}
-          onValueChange={setKind}
-          options={MAKERS}
-        />
-        {(kind === "user" || kind === "service_principal" || kind === "rule") && (
-          <TextField
-            label={kind === "rule" ? "The rule's name" : "Their id"}
-            name="actor"
-            defaultValue={filter.actor ?? ""}
-            autoComplete="off"
-            spellCheck={false}
-            required
-            // A person's or a service principal's id, as grantr takes one.
-            {...(kind !== "rule" && { pattern: ID_FIELD })}
+    <Toolbar>
+      <Folded
+        title="Filter"
+        action="Filter…"
+        said={Object.values(filter).some(Boolean) ? "filtered" : null}
+        defaultOpen={Object.values(filter).some(Boolean)}
+      >
+        <form className="grid gap-3 sm:grid-cols-2" onSubmit={apply}>
+          <SelectField
+            label="Change"
+            name="type"
+            defaultValue={filter.type ?? ""}
+            options={[{ value: "", label: "Any change" }, ...TYPES]}
           />
-        )}
-        {kind === "rule" && (
-          <TextField
-            label="The rule's workspace"
-            name="workspace"
-            defaultValue={filter.workspace ?? ""}
-            autoComplete="off"
-            required
+          <SelectField
+            label="Made by"
+            name="actor_kind"
+            value={kind}
+            onValueChange={setKind}
+            options={MAKERS}
           />
-        )}
-        <div className="flex flex-wrap gap-2 sm:col-span-2">
-          <Button type="submit">Apply</Button>
-          <Button variant="secondary" onClick={() => void navigate({ search: {} })}>
-            Clear
-          </Button>
-        </div>
-      </form>
-    </Folded>
+          {(kind === "user" || kind === "service_principal" || kind === "rule") && (
+            <TextField
+              label={kind === "rule" ? "The rule's name" : "Their id"}
+              name="actor"
+              defaultValue={filter.actor ?? ""}
+              autoComplete="off"
+              spellCheck={false}
+              required
+              // A person's or a service principal's id, as grantr takes one.
+              {...(kind !== "rule" && { pattern: ID_FIELD })}
+            />
+          )}
+          {kind === "rule" && (
+            <TextField
+              label="The rule's workspace"
+              name="workspace"
+              defaultValue={filter.workspace ?? ""}
+              autoComplete="off"
+              required
+            />
+          )}
+          <div className="flex flex-wrap gap-2 sm:col-span-2">
+            <Button type="submit">Apply</Button>
+            <Button variant="secondary" onClick={() => void navigate({ search: {} })}>
+              Clear
+            </Button>
+          </div>
+        </form>
+      </Folded>
+    </Toolbar>
   );
 }
 

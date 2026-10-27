@@ -28,7 +28,7 @@ import {
   whom,
   whomIn,
 } from "../../../../../access";
-import { Folded } from "../../../../../folded";
+import { Folded, Toolbar } from "../../../../../folded";
 
 type Grant = GrantrApi.components["schemas"]["Grant"];
 type AuditEntry = GrantrApi.components["schemas"]["AuditEntry"];
@@ -142,9 +142,19 @@ function Grants() {
       .map((id) => ({ kind: "group", id })),
   ];
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
+      <Toolbar>
+        <Granting
+          tenant={tenant}
+          roles={roles}
+          listed={listed}
+          names={names}
+          // Both lists read: choose from them. Either not: type, with what was read suggested.
+          typed={members === null || groups === null}
+        />
+      </Toolbar>
       {places.length === 0 && (
-        <EmptyState title="No grants yet">Grant a role to a member or a group below.</EmptyState>
+        <EmptyState title="No grants yet">Grant a role to a member or a group above.</EmptyState>
       )}
       {places.map((place) => (
         <Granted
@@ -156,14 +166,6 @@ function Grants() {
           names={names}
         />
       ))}
-      <Granting
-        tenant={tenant}
-        roles={roles}
-        listed={listed}
-        names={names}
-        // Both lists read: choose from them. Either not: type, with what was read suggested.
-        typed={members === null || groups === null}
-      />
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useActionState, useState } from "react";
 import { allowedNow, opening, useAccess } from "../../../../../access";
-import { Folded } from "../../../../../folded";
+import { Folded, Toolbar } from "../../../../../folded";
 
 /** A key just issued: its public id, its principal, and its secret, held by this screen alone. */
 interface Issued {
@@ -42,7 +42,14 @@ function Keys() {
   const { data: keys } = useSuspenseQuery(queries.grantr.keyring(tenant));
   const [issued, setIssued] = useState<Issued | null>(null);
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
+      <Toolbar>
+        {allowed.has("grantr:add_member") ? (
+          <IssueToListed tenant={tenant} issued={issued} onIssued={setIssued} />
+        ) : (
+          <Issue tenant={tenant} principals={null} issued={issued} onIssued={setIssued} />
+        )}
+      </Toolbar>
       <ItemTable
         caption="Keys"
         columns={[
@@ -76,11 +83,6 @@ function Keys() {
         }
         empty={{ title: "No keys yet", body: "A service principal signs in with a key." }}
       />
-      {allowed.has("grantr:add_member") ? (
-        <IssueToListed tenant={tenant} issued={issued} onIssued={setIssued} />
-      ) : (
-        <Issue tenant={tenant} principals={null} issued={issued} onIssued={setIssued} />
-      )}
     </div>
   );
 }

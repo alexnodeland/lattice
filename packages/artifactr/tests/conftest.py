@@ -1,7 +1,9 @@
+import asyncio
 import functools
 import importlib
+import inspect
 import os
-from collections.abc import Callable, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator
 from typing import Concatenate
 
 import pytest
@@ -29,10 +31,29 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
             or (craft and (craft.args or (None,))[0] != running)
         )
 
+    for item in items:
+        if isinstance(item, pytest.Function) and inspect.iscoroutinefunction(item.obj):
+            item.fixturenames.append("_no_task_left")
     left_out = [item for item in items if unready(item)]
     if left_out:
         config.hook.pytest_deselected(items=left_out)
         items[:] = [item for item in items if item not in left_out]
+
+
+@pytest.fixture
+async def _no_task_left() -> AsyncIterator[None]:
+    """Cancel and await what an async test left running, before its event loop closes.
+
+    A run a test leaves going, a model request it cut short or a runner it didn't close,
+    would otherwise be destroyed with the loop, its coroutines never awaited, and reported
+    under whichever test the garbage collector happens to run in.
+    """
+    yield
+    current = asyncio.current_task()
+    left = [task for task in asyncio.all_tasks() if task is not current and not task.done()]
+    for task in left:
+        task.cancel()
+    await asyncio.gather(*left, return_exceptions=True)
 
 
 @pytest.fixture(autouse=True)

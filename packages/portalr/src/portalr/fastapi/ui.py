@@ -33,14 +33,18 @@ def policy(site: Site) -> str:
     ``scripts/check_wasm.py`` holds each build to no module, as ``web/wasm-allowlist.json`` lists.
     Where the deployment runs mini apps, ``frame-src`` names their origin, and where it hosts
     native files' editors, each editor's origin, whose shim frames the app's build there (portalr
-    ADR-0055): the UIs frame nothing else, and their own pages are still framed by no one
-    (lattice RFC-0005).
+    ADR-0055); and, where the portal is reached at several origins, the apps' and editors'
+    origins beside each of them (portalr ADR-0084), each once, in order, and no wildcard: the
+    UIs frame nothing else, and their own pages are still framed by no one (lattice RFC-0005).
     """
     supabase = urlsplit(site.supabase_url)
     connect = " ".join(
         ["'self'", *([site.supabase_url] if supabase.scheme in ("http", "https") else [])]
     )
-    named: list[str] = [*([site.apps] if site.apps else []), *_origins(site.editors)]
+    places = [(site.apps, site.editors), *((a.apps, a.editors) for a in site.aliases.values())]
+    named = [
+        each for apps, editors in places for each in (*([apps] if apps else []), *_origins(editors))
+    ]
     frames = list(dict.fromkeys(named))
     return "; ".join(
         (

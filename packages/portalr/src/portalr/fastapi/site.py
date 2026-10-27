@@ -1,15 +1,24 @@
 """What the UIs need to know about the application they run in, as ``config.json`` serves it."""
 
 import base64
+import re
 from pathlib import Path
-from typing import Final
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, urlunsplit
 
 from pydantic import BaseModel, ConfigDict, PrivateAttr, field_validator, model_validator
 
 from lattice_core.integrations import KEY
+from lattice_core.origins import web_origin
 from portalr.brand.kit import Kit, load
 from portalr.brand.tokens import BrandError
+
+ALIASES = 8
+"""The most other origins a portal may be reached at: a policy naming many is a mistake."""
+
+
+EDITOR_PATH = re.compile(r"(/(?!\.\.?(?:/|$))[A-Za-z0-9._~\-]+)*/?")
+"""An editor's path: nothing a policy or a header separates on, nor an escape, nor an empty,
+``.`` or ``..`` segment."""
 
 
 class Surfaces(BaseModel):
@@ -25,6 +34,33 @@ class Surfaces(BaseModel):
     relayr: str | None = None
     """The origin relayr's tracker reads are mounted at, whose paths carry ``/relayr/v1``
     themselves; None where the application has no tracker, so the UIs never ask."""
+
+
+class Place(BaseModel):
+    """Where mini apps and the editors are for a portal reached at one of its other origins.
+
+    A deployment reached at several addresses, such as this machine's loopback and its tailnet
+    name, is several portal origins (portalr ADR-0084). The sandbox and each editor are framed
+    from the portal, so each portal origin needs its own, reachable from the same place: the
+    sandbox's and the editors' origins beside that portal origin, which ``beside`` derives.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    apps: str | None = None
+    """The origin mini apps run on, for a portal at this origin; None where it runs none."""
+    editors: dict[str, str] = {}
+    """Each native file's hosted editor, by its app's integration, for a portal at this origin."""
+
+    @field_validator("apps")
+    @classmethod
+    def _apps(cls, apps: str | None) -> str | None:
+        return _apps_origin(apps)
+
+    @field_validator("editors")
+    @classmethod
+    def _editors(cls, editors: dict[str, str]) -> dict[str, str]:
+        return _editor_urls(editors)
 
 
 class Site(BaseModel):
@@ -56,6 +92,16 @@ class Site(BaseModel):
     serving the sandbox and nothing else (:class:`~portalr.fastapi.SandboxOrigin`); http only on
     loopback, for development and tests. The portal frames it alone. None where the deployment
     runs no apps: each is shown as its label and summary."""
+    origin: str | None = None
+    """The portal's own origin, such as ``https://app.example.com``, where the application knows
+    it: ``config.json`` carries it, so the UIs can tell an address the deployment doesn't serve
+    apps or editors at from one it does. None leaves them trusting the address they are at."""
+    aliases: dict[str, Place] = {}
+    """Each other origin the portal is reached at, such as its tailnet name beside its loopback
+    address, and where mini apps and the editors are for a portal there (portalr ADR-0084): at
+    the same host as that portal origin, on the apps' and the editors' own ports, as
+    :func:`beside` derives them. The UIs at an origin named here use its place; at the portal's
+    own, the canonical ``apps`` and ``editors``; and the portal's policy frames them all."""
 
     @model_validator(mode="after")
     def _read_kit(self) -> "Site":
@@ -77,42 +123,61 @@ class Site(BaseModel):
     @classmethod
     def _apps(cls, apps: str | None) -> str | None:
         """Refuse an apps origin that is no web origin of its own; keep it as its origin."""
-        if apps is None:
-            return None
-        parts = urlsplit(apps)
-        if not _web(apps):
-            raise ValueError(f"mini apps are at {apps}: give them https, or http on loopback")
-        if parts.username is not None or parts.password is not None or not parts.hostname:
-            raise ValueError(f"mini apps are at {apps}: a host, with no user or password")
-        if parts.path not in ("", "/") or parts.query or parts.fragment:
-            raise ValueError(f"mini apps are at {apps}: an origin, with no path, query or fragment")
-        return f"{parts.scheme}://{parts.netloc}"
+        return _apps_origin(apps)
 
     @field_validator("editors")
     @classmethod
     def _editors(cls, editors: dict[str, str]) -> dict[str, str]:
         """Refuse an editor for no native file's app, or one at no web address of its own."""
-        for key, url in editors.items():
-            if not (key.startswith("files:") and KEY.fullmatch(key)):
-                raise ValueError(f"{key} is no native file's app: its key is files:<app>")
-            parts = urlsplit(url)
-            if not _web(url):
-                raise ValueError(f"{key}'s editor is at {url}: give it https, or http on loopback")
-            if parts.username is not None or parts.password is not None or not parts.hostname:
-                raise ValueError(f"{key}'s editor is at {url}: a host, with no user or password")
-        return editors
+        return _editor_urls(editors)
+
+    @field_validator("origin")
+    @classmethod
+    def _origin(cls, origin: str | None) -> str | None:
+        return None if origin is None else web_origin(origin, what="the portal")
+
+    @field_validator("aliases")
+    @classmethod
+    def _aliases(cls, aliases: dict[str, Place]) -> dict[str, Place]:
+        """Each alias by its portal origin as a browser compares it, which is how the UIs look."""
+        if len(aliases) > ALIASES:
+            raise ValueError(f"{len(aliases)} aliases: at most {ALIASES}")
+        named: dict[str, Place] = {}
+        for portal, place in aliases.items():
+            origin = web_origin(portal, what="the portal")
+            if origin in named:
+                raise ValueError(f"the portal at {origin} is aliased twice")
+            named[origin] = place
+        return named
+
+    @model_validator(mode="after")
+    def _aliased_origin(self) -> "Site":
+        """Refuse aliases without the portal's own origin, which the UIs tell them apart from."""
+        if self.aliases and self.origin is None:
+            raise ValueError("aliases are other origins of the portal: name its own origin too")
+        if self.origin in self.aliases:
+            raise ValueError(f"{self.origin} is the portal's own origin, not an alias of it")
+        return self
 
     @model_validator(mode="after")
     def _editors_apart(self) -> "Site":
-        """Refuse an editor on the apps' origin or Supabase's.
+        """Refuse mini apps or an editor on a portal origin, or an editor on apps' or Supabase's.
 
-        The portal frames an editor with its origin's scripts allowed, so it must be an origin of
-        its own. The portal's own origin isn't known here; the UIs refuse an editor on it.
+        The portal frames them with their origin's scripts allowed, so each must be an origin of
+        its own. The portal's origins are known here only where ``origin`` and the aliases name
+        them; the UIs refuse an editor on their own origin in any case.
         """
-        others = {_origin(url) for url in (self.apps, self.supabase_url) if url and _web(url)}
-        for key, url in self.editors.items():
-            if _origin(url) in others:
-                raise ValueError(f"{key}'s editor is at {url}: give it an origin of its own")
+        portals = {self.origin, *self.aliases} - {None}
+        places = [(self.apps, self.editors)]
+        places += [(place.apps, place.editors) for place in self.aliases.values()]
+        for apps, editors in places:
+            if apps in portals:
+                raise ValueError(f"mini apps at {apps} would share a portal's origin")
+            named = (apps, self.supabase_url)
+            others = portals | ({_origin_of(url) for url in named if url} - {None})
+            for key, url in editors.items():
+                if _origin_of(url) in others:
+                    raise ValueError(f"{key}'s editor is at {url}: give it an origin of its own")
         return self
 
     @field_validator("supabase_key")
@@ -124,21 +189,84 @@ class Site(BaseModel):
         return key
 
 
-DEFAULT_PORTS: Final = {"http": 80, "https": 443}
+def beside(portal: str, extra: str, *, apps: str | None, editors: dict[str, str]) -> Place:
+    """Where mini apps and the editors are for the portal reached at `extra`, beside `portal`.
+
+    The rule is the port's: an application on one machine serves the portal, the sandbox and
+    each editor on ports of its own, and an address that reaches the machine under another
+    name, such as its tailnet name forwarding each port, reaches each on the same port. So the
+    apps' origin beside `extra` is `extra`'s scheme and host on the canonical apps origin's port,
+    and each editor's address likewise, its path kept.
+
+    Args:
+        portal: The portal's own origin, which `extra` is another address of.
+        extra: The portal's other origin, such as ``https://my-machine.my-tailnet.ts.net``.
+        apps: The canonical apps origin, with its port, such as ``http://127.0.0.1:8801``; None
+            where the deployment runs no apps.
+        editors: The canonical editors, each with its port, such as ``http://127.0.0.1:8802/``.
+
+    Raises:
+        ValueError: If `extra` is `portal` itself, or the apps origin or an editor has no port
+            of its own to carry over, as one at an edge on the default port hasn't: name that
+            deployment's places yourself.
+    """
+    own, other = web_origin(portal, what="the portal"), web_origin(extra, what="the portal")
+    if own == other:
+        raise ValueError(f"{other} is the portal's own origin, not another address of it")
+    at = urlsplit(other)
+
+    def moved(url: str, what: str) -> str:
+        parts = urlsplit(url)
+        if parts.port is None:
+            raise ValueError(f"{what} is at {url}, with no port of its own to reach beside {other}")
+        host = f"[{at.hostname}]" if ":" in (at.hostname or "") else at.hostname
+        return urlunsplit((at.scheme, f"{host}:{parts.port}", parts.path, "", ""))
+
+    origin = _apps_origin(apps)
+    return Place(
+        apps=None if origin is None else moved(origin, "mini apps"),
+        editors={key: moved(url, f"{key}'s editor") for key, url in _editor_urls(editors).items()},
+    )
 
 
-def _origin(url: str) -> tuple[str, str, int | None]:
-    """A URL's origin as a browser compares it: scheme, host and port, the default filled in."""
+def _apps_origin(apps: str | None) -> str | None:
+    """Mini apps' origin as a browser compares it, or a refusal naming them."""
+    return None if apps is None else web_origin(apps, what="mini apps")
+
+
+def _editor_urls(editors: dict[str, str]) -> dict[str, str]:
+    """Each editor's URL on its web origin as a browser compares it, its path kept.
+
+    Raises:
+        ValueError: If a key is no native file's app, or a URL has no web origin, or a query or
+            fragment.
+    """
+    kept: dict[str, str] = {}
+    for key, url in editors.items():
+        if not (key.startswith("files:") and KEY.fullmatch(key)):
+            raise ValueError(f"{key} is no native file's app: its key is files:<app>")
+        parts = urlsplit(url)
+        if parts.query or parts.fragment:
+            raise ValueError(f"{key}'s editor is at {url}: no query or fragment")
+        # An editor is a URL, which may have a path; its origin is what must be a web origin.
+        origin = urlunsplit((parts.scheme, parts.netloc, "", "", ""))
+        at = web_origin(origin, what=f"{key}'s editor")
+        if not EDITOR_PATH.fullmatch(parts.path):
+            raise ValueError(
+                f"{key}'s editor is at {url}: a path of letters, digits and ._~-/, "
+                "no empty, . or .. segment"
+            )
+        kept[key] = at + parts.path
+    return kept
+
+
+def _origin_of(url: str) -> str | None:
+    """A URL's web origin as a browser compares it, or None where it has none, as a path hasn't."""
     parts = urlsplit(url)
-    scheme = parts.scheme.lower()
-    return scheme, (parts.hostname or "").lower(), parts.port or DEFAULT_PORTS.get(scheme)
-
-
-def _web(url: str) -> bool:
-    """Whether a URL is https, or http on loopback, as a test's or a developer's is."""
-    parts = urlsplit(url)
-    loopback = parts.hostname in ("localhost", "127.0.0.1", "::1")
-    return parts.scheme == "https" or (parts.scheme == "http" and loopback)
+    try:
+        return web_origin(urlunsplit((parts.scheme, parts.netloc, "", "", "")))
+    except ValueError:
+        return None
 
 
 def _role(key: str) -> str | None:

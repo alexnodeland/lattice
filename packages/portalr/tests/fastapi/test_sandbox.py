@@ -116,7 +116,7 @@ async def test_the_lifespan_reaches_the_application(built: Path) -> None:
 
 @pytest.mark.parametrize("apps", [PORTAL, f"{PORTAL}:443"])
 def test_apps_never_share_the_portals_origin(apps: str) -> None:
-    with pytest.raises(ValueError, match="share the portal's origin"):
+    with pytest.raises(ValueError, match="share a portal's origin"):
         SandboxOrigin(FastAPI(), apps=apps, portal=PORTAL)
 
 

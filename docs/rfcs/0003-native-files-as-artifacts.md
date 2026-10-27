@@ -226,7 +226,7 @@ People edit in WordCraft's browser build, unmodified and as released, served by 
 
 The editor's origin:
 
-- **An origin of its own:** its own registrable domain, or a host name for which portalr sets no cookies, so the editor never sees a token. Its CSP is `default-src 'self'`, plus the inline script's hash, `'wasm-unsafe-eval'` and `blob:`, with `frame-ancestors 'none'`. Nothing calls out.
+- **An origin of its own:** its own registrable domain, or a host name for which portalr sets no cookies, so the editor never sees a token. Its CSP is `default-src 'self'`, plus the inline script's hash, `'wasm-unsafe-eval'` and `blob:`, with `frame-ancestors 'none'`. Nothing calls out. *Amended 2026-10-27 ([portalr ADR-0084](../portalr/adr/0084-several-portal-origins-an-allow-list-aliases-and-a-union-policy.md)): with the shim, `frame-ancestors` names the portal's origin, or each of its origins where it is reached at several addresses; on loopback or a tailnet the editor shares the portal's host on a port of its own, so no cookie is ever set there.*
 - **Shared browsers:** the editor stores preferences and fonts, not documents, and the check-in page reminds the person that their downloaded copy stays on disk. Hostile files now also open in the browser's sandbox; the server still reads every revision in the worker.
 
 **How much an app can talk** is a capability of each `App` adapter, as merge strategy is:

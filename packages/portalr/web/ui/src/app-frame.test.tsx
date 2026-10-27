@@ -99,6 +99,11 @@ test.each([
     { host: hosted(location.origin) },
     "Apps don't run here: this deployment has no origin for them.",
   ],
+  [
+    "at an address the deployment serves no apps for",
+    { host: { ...hosted(null), elsewhere: ["http://127.0.0.1:8800", "https://m.ts.net"] } },
+    "Apps don't run at this address: open the portal at http://127.0.0.1:8800 or https://m.ts.net.",
+  ],
 ] as const)(
   "%s, nothing runs, and its label and summary say what it is",
   async (_, given, said) => {

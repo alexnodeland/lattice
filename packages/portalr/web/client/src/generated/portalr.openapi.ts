@@ -611,6 +611,13 @@ export interface components {
          * @description ``config.json``: what the UIs need of the deployment they run in.
          */
         Config: {
+            /**
+             * Aliases
+             * @default {}
+             */
+            aliases: {
+                [key: string]: components["schemas"]["Place"];
+            };
             /** Apps */
             apps: string | null;
             brand?: components["schemas"]["Brand"] | null;
@@ -618,6 +625,8 @@ export interface components {
             editors: {
                 [key: string]: string;
             };
+            /** Origin */
+            origin?: string | null;
             /** People */
             people: boolean;
             /** Readers */
@@ -976,6 +985,26 @@ export interface components {
              * @enum {string}
              */
             status: "ok";
+        };
+        /**
+         * Place
+         * @description Where mini apps and the editors are for a portal reached at one of its other origins.
+         *
+         *     A deployment reached at several addresses, such as this machine's loopback and its tailnet
+         *     name, is several portal origins (portalr ADR-0084). The sandbox and each editor are framed
+         *     from the portal, so each portal origin needs its own, reachable from the same place: the
+         *     sandbox's and the editors' origins beside that portal origin, which ``beside`` derives.
+         */
+        Place: {
+            /** Apps */
+            apps?: string | null;
+            /**
+             * Editors
+             * @default {}
+             */
+            editors: {
+                [key: string]: string;
+            };
         };
         /**
          * Point

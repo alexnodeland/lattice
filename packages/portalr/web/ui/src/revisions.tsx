@@ -152,6 +152,7 @@ const RunningRevision = createContext<{
 function previewHost(host: AppHost): AppHost {
   return {
     origin: host.origin,
+    ...(host.elsewhere && { elsewhere: host.elsewhere }),
     setState: () => Promise.resolve({ outcome: "done" }),
     submit: () => Promise.resolve({ outcome: "refused" }),
   };

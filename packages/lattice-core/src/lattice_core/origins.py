@@ -51,7 +51,7 @@ def web_origin(url: str, *, what: str = "the origin") -> str:
         ValueError: If `url` is no web origin: no https, or http off loopback; a user or a
             password, or no host; a character in the host or port outside ASCII letters, digits
             and ``.-:[]``, or a host name that isn't DNS labels; a path, query or fragment; a
-            ``*`` or a ``%`` anywhere; or an IP address that isn't loopback, which no
+            wildcard or a percent sign anywhere; or an IP address that isn't loopback, which no
             certificate names.
     """
     said = f"{what} is an origin, such as {EXAMPLE}, not {url!r}"

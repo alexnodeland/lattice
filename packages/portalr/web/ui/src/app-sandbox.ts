@@ -11,7 +11,7 @@
  * what the portal sends is relayed to the app.
  */
 
-import { MOST_MESSAGE, PROXY_READY, RESOURCE_READY } from "./app-bridge";
+import { APP_STARTED, MOST_MESSAGE, PROXY_READY, RESOURCE_READY } from "./app-bridge";
 import { isObject, isString } from "./json";
 
 /** An app's policy, which the server sends for the sandbox too: `web/ui/csp/app-policy.txt`. */
@@ -159,9 +159,12 @@ const HOST = [
   "})();",
 ].join("\n");
 
+/** Said first, before the app's HTML: its document runs, whatever the app then does or draws. */
+const STARTED = `parent.postMessage({ jsonrpc: "2.0", method: "${APP_STARTED}" }, "*");`;
+
 /** The app's document: its own policy, no DNS prefetching, no WebRTC, its size and `host` first. */
 export const appDocument = (html: string): string =>
-  `<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${APP_POLICY}"><meta http-equiv="x-dns-prefetch-control" content="off"><script>${NO_WEBRTC}\n${SIZED}\n${HOST}</script>${html}`;
+  `<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${APP_POLICY}"><meta http-equiv="x-dns-prefetch-control" content="off"><script>${STARTED}\n${NO_WEBRTC}\n${SIZED}\n${HOST}</script>${html}`;
 
 /** What the app's frame may do: run its scripts, and nothing else. */
 export const APP_SANDBOX = "allow-scripts";
@@ -189,6 +192,9 @@ export function startSandbox(scope: Window): void {
     if (app === null) {
       app = framed(scope.document, event.data);
       return;
+    }
+    if (isObject(event.data) && event.data.method === RESOURCE_READY) {
+      return; // the host gives the app on every ready and load: the first one runs, alone
     }
     app.contentWindow?.postMessage(event.data, "*");
   });

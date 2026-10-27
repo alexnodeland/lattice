@@ -37,7 +37,15 @@ const SIZE_CHANGED = "ui/notifications/size-changed";
 const CONTEXT_CHANGED = "ui/notifications/host-context-changed";
 
 /** The notifications an app may send; any other is dropped, and any other request refused. */
-const NOTIFICATIONS = new Set([PROXY_READY, "ui/notifications/initialized", SIZE_CHANGED]);
+/** portalr's own, said by the app's document before the app's HTML: it runs. */
+export const APP_STARTED = "portalr/app-started";
+
+const NOTIFICATIONS = new Set([
+  PROXY_READY,
+  APP_STARTED,
+  "ui/notifications/initialized",
+  SIZE_CHANGED,
+]);
 
 type Json = null | boolean | number | string | readonly Json[] | { readonly [key: string]: Json };
 export type JsonObject = { readonly [key: string]: Json };
@@ -420,8 +428,10 @@ export interface BridgeHost {
   readonly resize: (height: number) => void;
   /** The frame sent past its calls a minute, and isn't answered for now. */
   readonly quieted: () => void;
-  /** The app's document said something: it ran, whether or not it uses the bridge. */
-  readonly started?: () => void;
+  /** The sandbox said it is ready: its page runs. */
+  readonly ready: () => void;
+  /** The app's document said something: it runs, whether or not it uses the bridge. */
+  readonly started: () => void;
 }
 
 /**
@@ -441,8 +451,6 @@ export class Bridge {
   #measuredAt = Number.NEGATIVE_INFINITY;
   /** The latest measure heard too soon after the last, applied when its time comes. */
   #held: { height: number; timer: ReturnType<typeof setTimeout> } | null = null;
-  /** Whether the app's HTML was given to the sandbox, which runs the first it is given alone. */
-  #given = false;
   readonly #now: () => number;
 
   constructor(options: {
@@ -507,16 +515,12 @@ export class Bridge {
   }
 
   /**
-   * Give the sandbox the app, once however often it is asked: when it says it is ready, and when
-   * its page has loaded, by which time it listens, so a ready said before the host listened, as
-   * on a slow phone, isn't the end of it. The sandbox runs the first it is given and passes any
-   * later one to the app, so a second is never sent.
+   * Give the sandbox the app: when it says it is ready, and when its frame loads, by which time a
+   * sandbox listens, so a ready the host didn't hear, or a post to a page that wasn't yet the
+   * sandbox's, isn't the end of it. The sandbox runs the first it is given and drops the rest.
    */
   give(): void {
-    if (!this.#given) {
-      this.#given = true;
-      this.#notify(RESOURCE_READY, { ...this.#host.app() });
-    }
+    this.#notify(RESOURCE_READY, { ...this.#host.app() });
   }
 
   /** Hear a message: answered if it is the sandbox's, within its calls a minute; else dropped. */
@@ -529,7 +533,7 @@ export class Bridge {
     const measured = isString(event.data) && event.data.includes('"measured"');
     const read = measured ? readMessage(event.data) : null;
     if (read !== null && isMeasured(read)) {
-      this.#host.started?.();
+      this.#host.started();
       this.#measure(read.params.height as number);
       return;
     }
@@ -543,9 +547,10 @@ export class Bridge {
     }
     const { method, params } = message;
     if (method === PROXY_READY) {
+      this.#host.ready();
       return this.give();
     }
-    this.#host.started?.(); // anything else is the app's, so the app ran
+    this.#host.started(); // anything else is the app's document's, so it runs
     if (message.kind === "notification") {
       if (method === SIZE_CHANGED && isNumber(params.height)) {
         this.#sizeChanged(params.height, params.measured === true);

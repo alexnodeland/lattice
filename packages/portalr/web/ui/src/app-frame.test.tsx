@@ -1,7 +1,7 @@
 import { expect, onTestFinished, test, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
-import { PROXY_READY, RESOURCE_READY } from "./app-bridge";
+import { APP_STARTED, PROXY_READY, RESOURCE_READY } from "./app-bridge";
 import { AppFrame, type AppHost, AppHostContext, type ReadApp } from "./app-frame";
 import type { Shown } from "./artifacts";
 import { IntegrationsContext, type IsEnabled } from "./integrations";
@@ -289,54 +289,93 @@ function stoodIn() {
   return { given };
 }
 
-test("a ready never heard: the app is given once its sandbox's page loads, and once only", async () => {
+test("the sandbox is given the app on its ready and on its frame's load, in either order", async () => {
+  // Counted as each is said: the frame's own load, of a page that isn't there, gives it too.
   const { given } = stoodIn();
-  const frame = await frameIn(await shown());
-  frame.dispatchEvent(new Event("load"));
-  await vi.waitFor(() => expect(given()).toHaveLength(1));
-  fromFrame(frame, { method: PROXY_READY });
-  frame.dispatchEvent(new Event("load"));
-  await new Promise((settled) => setTimeout(settled, 50));
-  expect(given()).toHaveLength(1);
+  const gives = (say: () => void) => {
+    const before = given().length;
+    say();
+    return given().length - before;
+  };
+  const once = await shown();
+  const first = await frameIn(once);
+  expect(gives(() => fromFrame(first, { method: PROXY_READY }))).toBe(1);
+  expect(gives(() => first.dispatchEvent(new Event("load")))).toBe(1);
+  await once.unmount();
+  // A ready never heard: the load gives it; and a load whose post the frame's page dropped
+  // doesn't stop a later ready giving it again.
+  const second = await frameIn(await shown());
+  expect(gives(() => second.dispatchEvent(new Event("load")))).toBe(1);
+  expect(gives(() => fromFrame(second, { method: PROXY_READY }))).toBe(1);
+  expect(given().at(-1)).toEqual({
+    jsonrpc: "2.0",
+    method: RESOURCE_READY,
+    params: { title: "Dice", html: DICE.html },
+  });
 });
 
-test("an app that never reports back is said not to have started, and can be tried again", async () => {
-  stoodIn();
-  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-  onTestFinished(() => {
-    vi.useRealTimers();
-  });
-  const screen = await shown();
-  const frame = await frameIn(screen);
-  frame.dispatchEvent(new Event("load"));
-  const said = screen.getByText(
-    `This app didn't start. Its sandbox at ${APPS} loaded, but the app in it never reported back.`,
-  );
-  // The frame's own load, of a page that isn't there, may come later and time it afresh.
+const DIDNT_START =
+  "This app didn't start. Nothing it held is lost. Try again, or ask the agent to rebuild it.";
+
+/** Fake time, then run it on until `shown` holds: the frame's own load may time it afresh. */
+async function waited(shown: () => void) {
   await vi.waitFor(() => {
     vi.advanceTimersByTime(START_WITHIN);
-    expect(said.query()).not.toBeNull();
+    shown();
   });
-  await expect.element(said).toBeVisible();
-  await screen.getByRole("button", { name: "Try again" }).click();
-  await expect.element(said).not.toBeInTheDocument();
-  expect(await frameIn(screen)).not.toBe(frame);
-});
+}
 
-test("an app that reports back in time is not said to have stalled", async () => {
-  stoodIn();
+function faked() {
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
   onTestFinished(() => {
     vi.useRealTimers();
   });
+}
+
+test("a sandbox that never answers is said, as is an app that never says it runs", async () => {
+  stoodIn();
+  faked();
+  const screen = await shown();
+  const said = screen.getByRole("alert");
+  await waited(() => expect(said.query()?.textContent).toContain(DIDNT_START));
+  expect(said.element().textContent).toContain(`Its sandbox at ${APPS} didn't answer.`);
+  fromFrame(await frameIn(screen), { method: PROXY_READY });
+  await waited(() =>
+    expect(said.query()?.textContent).toContain(
+      `Its sandbox at ${APPS} answered, but the app in it never said it runs.`,
+    ),
+  );
+});
+
+test("Try again makes the frame afresh, and an app that says it runs is not said to have stalled", async () => {
+  stoodIn();
+  faked();
   const screen = await shown();
   const frame = await frameIn(screen);
-  frame.dispatchEvent(new Event("load"));
-  fromFrame(frame, {
-    method: "ui/notifications/size-changed",
-    params: { height: 400, measured: true },
-  });
-  vi.advanceTimersByTime(START_WITHIN);
-  await new Promise((settled) => queueMicrotask(() => settled(null)));
-  expect(screen.container.textContent).not.toContain("didn't start");
+  const said = screen.getByText(DIDNT_START);
+  await waited(() => expect(said.query()).not.toBeNull());
+  await screen.getByRole("button", { name: "Try again" }).click();
+  await expect.element(said).not.toBeInTheDocument();
+  const fresh = await frameIn(screen);
+  expect(fresh).not.toBe(frame);
+  fromFrame(fresh, { method: APP_STARTED });
+  vi.advanceTimersByTime(START_WITHIN * 3);
+  await new Promise((settled) => requestAnimationFrame(settled));
+  expect(said.query()).toBeNull();
+});
+
+test("a new version's HTML clears a stalled frame's card", async () => {
+  stoodIn();
+  faked();
+  const screen = await shown();
+  const said = screen.getByText(DIDNT_START);
+  await waited(() => expect(said.query()).not.toBeNull());
+  await screen.rerender(
+    <IntegrationsContext value={allOn}>
+      <AppHostContext value={hosted()}>
+        <AppFrame app={{ ...DICE, html: "<button>Roll two</button>" }} shown={SHOWN} />
+      </AppHostContext>
+    </IntegrationsContext>,
+  );
+  await expect.element(said).not.toBeInTheDocument();
 });

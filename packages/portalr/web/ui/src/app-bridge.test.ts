@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import {
+  APP_STARTED,
   applyPatch,
   Bridge,
   type BridgeHost,
@@ -207,6 +208,7 @@ function bridged(
   const sized: number[] = [];
   let quieted = 0;
   let started = 0;
+  let ready = 0;
   const host: BridgeHost = {
     app: () => ({ title: "Dice", html: "<p>1</p>" }),
     context: () => ({ theme: "dark" }),
@@ -223,6 +225,9 @@ function bridged(
     },
     started: () => {
       started += 1;
+    },
+    ready: () => {
+      ready += 1;
     },
   };
   const { kept, writes } = keeper();
@@ -247,6 +252,7 @@ function bridged(
     writes,
     quiet: () => quieted,
     started: () => started,
+    ready: () => ready,
   };
 }
 
@@ -285,22 +291,24 @@ test("the sandbox is given the app once it is ready, and the app the host's cont
   ]);
 });
 
-test("the sandbox is given the app once, however often it is ready or its page loads", async () => {
-  const { hear, posted, bridge, started } = bridged();
+test("the sandbox is given the app whenever it is ready or its frame loads", async () => {
+  const { hear, posted, bridge, started, ready } = bridged();
   bridge.give();
   await hear(text({ jsonrpc: "2.0", method: PROXY_READY }));
-  bridge.give();
-  expect(posted).toEqual([
-    {
-      jsonrpc: "2.0",
-      method: "ui/notifications/sandbox-resource-ready",
-      params: { title: "Dice", html: "<p>1</p>" },
-    },
-  ]);
+  const given = {
+    jsonrpc: "2.0",
+    method: "ui/notifications/sandbox-resource-ready",
+    params: { title: "Dice", html: "<p>1</p>" },
+  };
+  expect(posted).toEqual([given, given]);
+  expect(ready()).toBe(1);
   expect(started()).toBe(0);
 });
 
-test("the app has started once its document says anything: its measure, or the app's own", async () => {
+test("the app runs once its document says anything: that it runs, its measure, or the app's own", async () => {
+  const said = bridged();
+  await said.hear(text({ jsonrpc: "2.0", method: APP_STARTED }));
+  expect(said.started()).toBe(1);
   const measured = bridged();
   await measured.hear(
     text({

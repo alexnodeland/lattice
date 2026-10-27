@@ -13,6 +13,12 @@
 @source "./";
 /* Streamdown renders with Tailwind classes of its own, which Tailwind finds here. */
 @source "../node_modules/streamdown/dist/*.js";
+/*
+ * Less the classes of its parts portalr turns off (`controls={false}`, `linkSafety` off, the
+ * download menu): its code and diagram toolbars, the link modal and the diagram's full screen,
+ * which no page draws (portalr ADR-0085, the bytes the polish pass spends elsewhere).
+ */
+@source not inline("supports-[backdrop-filter]:bg-sidebar/70 supports-[backdrop-filter]:backdrop-blur supports-[backdrop-filter]:bg-background/70 supports-[backdrop-filter]:backdrop-blur-sm bg-sidebar/80 border-sidebar bg-background/95 bg-background/80 bg-background/50 bg-primary text-primary-foreground hover:bg-primary/90 min-w-[120px] top-full");
 
 /*
  * A pointer that hovers, such as a mouse, and one that can't, such as a finger (portalr ADR-0080):

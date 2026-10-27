@@ -28,7 +28,7 @@ runner = Runner(agent, app=AppDeps(search=SearchClient()))
 
 - **`deps_type=Session[AppDeps]`.** The run's dependencies are a `Session`: `workspace` (a handle acting as this thread's agent), `thread_id`, `run_id`, and `app`, your own dependencies. Use `Session[None]` if you have none.
 - **`ArtifactWorkspace(types=...)`** lists the artifact types the agent may create. `ask=True` adds the `ask_user` tool (see [Pausing](#pausing-for-people)); `max_render_chars` (4,000) limits how much of each followed artifact goes into the instructions; `max_summary_chars` (2,000) limits how much of each tool call's arguments and result is recorded, which is what everyone who may read the thread sees of the call (`0` records none: a tool that reads what some readers may not see names it by `artifact_id`, so the call is hidden with it, and keeps secrets out of what it returns and raises, [ADR-0084](../adr/0084-what-a-run-records-of-its-calls-and-who-reads-it.md)); `notices=True` tells the agent about notices (see [Notices](#notices)).
-- **`Runner(agent, app=...)`** passes `app` to every run as `ctx.deps.app`. Its other options are `agent_name` (how the agent is named in the workspace, `"assistant"` by default), `claim_ttl` (how long a thread claim survives a dead process, 30 seconds), `live` (where live output goes; see [Live output](live-output.md)), `liveness` (how long a turn waits for a model, or a tool, that sends nothing before it fails the run; see [A model that sends nothing](live-output.md#a-model-that-sends-nothing)) and `results` (where commands' results are remembered, so a retried command is carried out once; see [Serving](serving.md#rest)).
+- **`Runner(agent, app=...)`** passes `app` to every run as `ctx.deps.app`. Its other options are `agent_name` (how the agent is named in the workspace, `"assistant"` by default), `claim_ttl` (how long a thread claim survives a dead process, 30 seconds), `live` (where live output goes; see [Live output](live-output.md)), `liveness` (how long a turn waits for a model, or a tool, that sends nothing before it fails the run; see [A model that sends nothing](live-output.md#a-model-that-sends-nothing)), `results` (where commands' results are remembered, so a retried command is carried out once; see [Serving](serving.md#rest)) and `model_for` (the models a message may choose; see [A model per message](#a-model-per-message)).
 
 The capability composes with any other capabilities, toolsets, output types and model settings the agent has. A turn is an ordinary pydantic-ai run.
 
@@ -199,6 +199,25 @@ So a turn takes messages only up to the first from another author, whose message
 The runner's own work, claiming the thread and keeping its place in the log, acts as `SystemActor(name="runner")`, so `authorize` hears it apart from the person.
 
 Starting a turn asks `artifactr:record` as the agent acting for its author. `send` asks it before posting, and raises `Forbidden` if the sender may not start a turn. A message that reached the thread otherwise, or a reply its author may not give, is passed over: the runner takes the log past it, records nothing for it, and runs the next turn, so it never wedges the thread; a paused run whose resume is refused ends as failed, with the reason `forbidden`.
+
+### A model per message
+
+A message may name the model that answers it: `PostMessage.model`, or `runner.send(..., model="fast")`. The runner asks the application for it by name, through `model_for`, a function from a name to a pydantic-ai `Model` that raises `LookupError` for a name it doesn't know ([ADR-0097](../adr/0097-a-message-chooses-the-model-of-the-turn-it-starts.md)):
+
+```python
+from pydantic_ai.models.openai import OpenAIChatModel
+
+models = {name: OpenAIChatModel(name, provider=gateway) for name in ("default", "fast", "local")}
+runner = Runner(agent, app=deps, model_for=models.__getitem__)
+```
+
+The runner calls `model_for` as each turn starts, so build each model once and keep it, as the dict does. Keep it a closed list of the models you offer: a function that builds a model from whatever name it is given lets anyone who may choose use any model your gateway serves. A name is up to 128 letters, digits and `._:/@+-`, starting with a letter or digit. Without `model_for`, every turn answers with the agent's own model, as before.
+
+- **A turn answers with the model its first message names**, or with the agent's own when it names none. A message that joins a running turn, through its watcher, is answered by the turn's model, with no notice: the model applies when the message starts a new turn. A client shows this beside its picker, or disables the picker while a run is active.
+- **A resumed run** answers with the model its reply names, or else the one the run last asked for (`Run.model`).
+- **Who may choose.** The turn asks `artifactr:use_model` as its agent acting for its author, with the model's name in `Access.model`. grantr's `editor` holds it for every model.
+- **Never silent.** A model its author may not use, one `model_for` doesn't know or fails to set up (the failure is logged), or any model where there is no `model_for`, is not refused: the turn answers with the agent's own, and the runner posts a notice that says which model was asked for, that the default is answering instead, and what to do.
+- **Which model answered.** `run_started.model` is the model the turn asked for, `None` for the agent's own; each step of the run's usage names the model that answered, which a gateway that falls back to another reports ([Token counts](live-output.md#token-counts)).
 
 ### Running without a runner
 

@@ -50,6 +50,7 @@ def test_an_editor_adds_the_commands_it_names_that_the_catalogs_have() -> None:
         "artifactr:propose_change",
         "artifactr:stop_run",
         "artifactr:record",
+        "artifactr:use_model",
         "reflexr:publish",
         "reflexr:cancel_run",
     }

@@ -15,6 +15,7 @@ from artifactr.core import (
     KnownEvent,
     MessagePosted,
     RunEnded,
+    RunStarted,
     RunUsage,
     StepUsage,
     TextEdit,
@@ -51,6 +52,18 @@ def test_an_answer_recorded_before_it_named_its_tool_reads_without_one() -> None
     event = EVENTS.validate_python(raw)
     assert isinstance(event, DeferredAnswered)
     assert event.tool_name is None
+
+
+def test_messages_and_starts_recorded_before_models_were_chosen_read_without_one() -> None:
+    posted = EVENTS.validate_json(
+        '{"type": "message_posted", "thread_id": "t1", "message_id": "m1", "content": "hi"}'
+    )
+    started = EVENTS.validate_json('{"type": "run_started", "run_id": "r1", "thread_id": "t1"}')
+    assert isinstance(posted, MessagePosted)
+    assert isinstance(started, RunStarted)
+    assert (posted.model, started.model) == (None, None)
+    chosen = started.model_copy(update={"model": "fast"})
+    assert EVENTS.validate_json(EVENTS.dump_json(chosen)) == chosen
 
 
 def test_usage_recorded_before_steps_were_counted_reads_as_none() -> None:

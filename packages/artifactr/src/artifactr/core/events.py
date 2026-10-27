@@ -71,6 +71,9 @@ class MessagePosted(_Event):
     content: str
     run_id: RunId | None = None
     kind: MessageKind = "message"
+    model: str | None = None
+    """The model its sender asked to answer with, if any (ADR-0097). It applies when the message
+    starts a turn; the run's ``run_started`` says which model the turn asked for."""
 
 
 # ─── artifacts and proposals ──────────────────────────────────────────────────
@@ -204,9 +207,10 @@ class RunUsage(BaseModel):
     steps: tuple[StepUsage, ...] = ()
     """Each model request of the run segment whose response ended, oldest first, the token sums
     being theirs; for a run stopped or failed mid-request, then a last step without a model or a
-    duration for what that request had used. A resumed run is a new segment: its steps, and its
-    ``run_ended``'s usage, count from its resumption. Empty in events from earlier versions, and
-    in a live ``usage`` frame's total, whose step comes beside it."""
+    duration for what pydantic-ai counted that no ended response did, which is no request of
+    its own, so there may be one more step than ``requests``. A resumed run is a new segment:
+    its steps, and its ``run_ended``'s usage, count from its resumption. Empty in events from
+    earlier versions, and in a live ``usage`` frame's total, whose step comes beside it."""
 
 
 class RunStarted(_Event):
@@ -223,6 +227,12 @@ class RunStarted(_Event):
     """The messages this start carries out, oldest first (ADR-0065): the one that starts the
     run, or the reply and the messages a resumed run takes as its prompt. Messages that reach
     the run later, through its watcher, are not named."""
+
+    model: str | None = None
+    """The model this attempt asked for, by the name the host's ``model_for`` knows (ADR-0097),
+    or ``None`` for the agent's own. A model its sender asked for and may not use is not named:
+    the run asks for the default, and a notice says so. Which model answered each request, as
+    when a gateway falls back to another, is each step's ``StepUsage.model``."""
 
 
 class ToolCalled(_Event):

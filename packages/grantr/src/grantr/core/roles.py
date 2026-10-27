@@ -80,6 +80,7 @@ EDITOR_COMMANDS: Final = frozenset(
         "artifactr:respond_to_proposal",
         "artifactr:stop_run",
         "artifactr:record",
+        "artifactr:use_model",
         "reflexr:publish",
         "reflexr:retry_run",
         "reflexr:skip_run",
@@ -87,8 +88,10 @@ EDITOR_COMMANDS: Final = frozenset(
     }
 )
 """The commands an editor may send beyond a viewer's: post, create, upload a native file, edit,
-propose, archive, resolve proposals, and operate runs, and ``artifactr:record``, which a turn
-that an editor's message starts asks as them. Rule management is the workspace admin's alone."""
+propose, archive, resolve proposals, and operate runs, and ``artifactr:record`` and
+``artifactr:use_model``, which a turn that an editor's message starts asks as them: to start, and
+to answer with the model the message names, whichever it is. Which models a tenant offers is
+narrowed where they are listed, not by role. Rule management is the workspace admin's alone."""
 
 BOOKKEEPING: Final = frozenset(
     {

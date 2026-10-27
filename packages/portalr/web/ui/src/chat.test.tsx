@@ -1429,3 +1429,23 @@ test("on a narrow phone, the strip's buttons wrap under it rather than squeeze i
   const column = strip.firstElementChild as HTMLElement;
   expect(column.getBoundingClientRect().width).toBeGreaterThanOrEqual(160);
 });
+
+test("a stopped turn's kept words render as Markdown, its list cut mid-item and all", async () => {
+  const screen = await render(
+    <Messages>
+      <Streaming
+        text={"I've drafted it:\n\n1. A hero with the tagline\n2. Pricing, three"}
+        live={live({ phase: "writing" })}
+        ended="stopped"
+        author="Assistant"
+      />
+    </Messages>,
+  );
+  const item = screen.getByRole("listitem", { name: "Assistant didn't finish" });
+  const list = item.getByRole("list");
+  await expect.element(list).toBeVisible();
+  expect(list.element().tagName).toBe("OL");
+  await expect.element(list.getByText("A hero with the tagline")).toBeVisible();
+  await expect.element(list.getByText("Pricing, three")).toBeVisible();
+  expect(item.element().textContent).not.toContain("\\n");
+});

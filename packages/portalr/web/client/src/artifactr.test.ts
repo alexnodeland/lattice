@@ -991,3 +991,26 @@ test("parallel tool calls keep the tool phase until the last returns, naming the
   state = apply(state, envelope({ type: "tool_returned", ...call("t2", "b"), status: "ok" }, 5), 4);
   expect(state.runs.run_1?.live).toMatchObject({ phase: "starting", calls: 0, tool: null });
 });
+
+test("text keeps its real newlines through deltas, a replay after a reconnect, and a stop", () => {
+  const reply = "I've drafted it:\n\n1. A hero\n2. Pricing, three";
+  const frames = [
+    { type: "part_started", part: 0, part_kind: "text" },
+    // Split mid-line, as a model's deltas are.
+    { type: "text_delta", part: 0, delta: reply.slice(0, 20) },
+    { type: "text_delta", part: 0, delta: reply.slice(20) },
+  ];
+  // As the socket delivers them: JSON on the wire, parsed back.
+  const wire = frames.map((event) => JSON.parse(JSON.stringify(event)));
+  const live = streamed(started(), wire);
+  expect(live.runs.run_1?.text).toBe(reply);
+  expect(live.runs.run_1?.text).not.toContain("\\n");
+  // A reconnect starts its live output over, and the replay brings it back the same.
+  const replayed = streamed(applyWelcome(live, welcomed("run_1"), 5000), wire, 6000);
+  expect(replayed.runs.run_1?.text).toBe(reply);
+  const stopped = apply(
+    replayed,
+    envelope({ type: "run_ended", run_id: "run_1", thread_id: "thr_1", status: "stopped" }, 2),
+  );
+  expect(stopped.runs.run_1).toMatchObject({ status: "stopped", text: reply });
+});

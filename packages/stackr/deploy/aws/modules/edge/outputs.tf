@@ -2,7 +2,7 @@ output "target_groups" {
   description = "The target groups, app and auth, that the application's and GoTrue's services register with."
   value       = { for key, group in aws_lb_target_group.this : key => group.arn }
   # ECS refuses a service whose target group no listener forwards to yet.
-  depends_on = [aws_lb_listener_rule.host]
+  depends_on = [aws_lb_listener_rule.app, aws_lb_listener_rule.auth]
 }
 
 output "hosts" {

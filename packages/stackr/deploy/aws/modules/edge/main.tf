@@ -135,20 +135,51 @@ resource "aws_lb_listener_rule" "auth_admin" {
   }
 }
 
-resource "aws_lb_listener_rule" "host" {
-  for_each     = local.hosts
+# Each host's rule, one after another: Floci, the AWS emulator tier 2 applies against, keeps a
+# listener's rules in a list that concurrent CreateRule calls corrupt, losing a rule (the listener
+# then answers 404) or refusing one with PriorityInUse. AWS doesn't need the order, and doesn't mind
+# it.
+resource "aws_lb_listener_rule" "auth" {
   listener_arn = aws_lb_listener.https.arn
-  priority     = each.value.priority
+  priority     = local.hosts.auth.priority
 
   action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.this[each.key].arn
+    target_group_arn = aws_lb_target_group.this["auth"].arn
   }
   condition {
     host_header {
-      values = [each.value.name]
+      values = [local.hosts.auth.name]
     }
   }
+  depends_on = [aws_lb_listener_rule.auth_admin]
+}
+
+resource "aws_lb_listener_rule" "app" {
+  listener_arn = aws_lb_listener.https.arn
+  priority     = local.hosts.app.priority
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.this["app"].arn
+  }
+  condition {
+    host_header {
+      values = [local.hosts.app.name]
+    }
+  }
+  depends_on = [aws_lb_listener_rule.auth]
+}
+
+# Keep these until every deployment has applied once since the rules were split.
+moved {
+  from = aws_lb_listener_rule.host["auth"]
+  to   = aws_lb_listener_rule.auth
+}
+
+moved {
+  from = aws_lb_listener_rule.host["app"]
+  to   = aws_lb_listener_rule.app
 }
 
 resource "aws_route53_record" "host" {

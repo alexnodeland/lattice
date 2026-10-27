@@ -30,6 +30,9 @@ class Auth:
         self.running = 0
         self.most = 0
         self.pause = 0.0
+        self.hold: set[str] = set()
+        self.release = asyncio.Event()
+        self._held = asyncio.Condition()
 
     async def handle(self, request: httpx.Request) -> httpx.Response:
         self.requests.append(request)
@@ -39,6 +42,10 @@ class Auth:
         try:
             if self.pause:
                 await asyncio.sleep(self.pause)
+            if id in self.hold:
+                async with self._held:
+                    self._held.notify_all()
+                await self.release.wait()
         finally:
             self.running -= 1
         scripted = self.script.get(id)
@@ -49,6 +56,11 @@ class Auth:
         if id not in self.emails:
             return httpx.Response(404, json={"msg": "User not found"})
         return httpx.Response(200, json={"id": id, "email": self.emails[id]})
+
+    async def held_at(self, running: int) -> None:
+        """Wait until ``running`` reads are under way and held."""
+        async with self._held:
+            await self._held.wait_for(lambda: self.running >= running)
 
     def people(self, clock: Clock | None = None, **options: Any) -> SupabasePeople:
         client = httpx.AsyncClient(transport=httpx.MockTransport(self.handle))
@@ -178,16 +190,18 @@ async def test_calls_for_the_same_id_at_once_share_one_read() -> None:
 
 async def test_one_big_call_leaves_the_rest_of_the_reads_to_others() -> None:
     auth = Auth({f"u{i}": f"u{i}@x.io" for i in range(30)} | {"small": "small@x.io"})
-    auth.pause = 0.05
+    auth.hold = {f"u{i}" for i in range(30)}
     people = auth.people(concurrency=8, per_call=4)
     big = asyncio.create_task(people([f"u{i}" for i in range(30)]))
-    await asyncio.sleep(0.02)
+    await auth.held_at(4)
+    # The big call's reads are held, so the small call is answered only from a free share.
+    # A bound on a call that should not wait at all, so a regression fails here, not by hanging.
+    async with asyncio.timeout(10):
+        small = await people(["small"])
+    assert small == {"small": "small@x.io"}, "and the next call is not kept waiting"
     assert auth.running == 4, "a call uses its share of the reads, not all"
-    started = asyncio.get_running_loop().time()
-    assert await people(["small"]) == {"small": "small@x.io"}
-    assert asyncio.get_running_loop().time() - started < 0.2, (
-        "and the next call is not kept waiting"
-    )
+    assert not big.done()
+    auth.release.set()
     assert len(await big) == 30
     assert auth.most <= 8
 
@@ -228,13 +242,24 @@ async def test_a_slow_read_is_cut_off_and_the_rest_are_answered() -> None:
     assert await people(["slow", "fast"]) == {"fast": "fast@x.io"}
 
 
-async def test_all_the_reads_together_are_cut_off_at_the_deadline() -> None:
+async def test_all_the_reads_together_are_cut_off_at_the_deadline(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The loop's clock, which the deadline is timed by, moves only when the test moves it: u0 is
+    # read, u1 is held, and then the deadline passes, however busy the machine is (#801).
+    loop = asyncio.get_running_loop()
+    clock = Clock()
+    monkeypatch.setattr(loop, "time", clock)
     auth = Auth({f"u{i}": f"u{i}@x.io" for i in range(6)})
-    auth.pause = 0.2
-    people = auth.people(concurrency=1, each=5, deadline=0.35)
-    found = await people([f"u{i}" for i in range(6)])
-    assert 1 <= len(found) < 6, "what was read in time is answered, the rest left out"
-    assert set(found) <= set(auth.emails)
+    auth.hold = {f"u{i}" for i in range(1, 6)}
+    people = auth.people(concurrency=1, each=5, deadline=1)
+    call = asyncio.create_task(people([f"u{i}" for i in range(6)]))
+    await auth.held_at(1)
+    clock.now += 2
+    found = await call
+    auth.release.set()
+    await asyncio.gather(*people._reading.values())
+    assert found == {"u0": "u0@x.io"}, "what was read in time is answered, the rest left out"
 
 
 async def test_a_failed_read_is_an_absence_not_an_exception() -> None:

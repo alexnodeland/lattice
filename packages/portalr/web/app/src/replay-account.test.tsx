@@ -309,16 +309,23 @@ test("a withdrawal made in another tab is seen when this one is focused again, a
 test("a replay yes read before an analytics no is not believed after an analytics yes, even if replay can't be read", async () => {
   const relay = relayOf(true, true);
   const { screen } = await open("/t/acme/w/notes", serving(relay), undefined, world);
-  await expect.poll(() => relay.replayed.length, { timeout: 15_000 }).toBeGreaterThan(0);
   await openMenu(screen);
+  // The yes, read: what the switch and the recorder both start from. Not a first batch, which
+  // waits the recorder's five seconds and spent a third of the test's time (#812).
+  await expect
+    .element(screen.getByRole("status").filter({ hasText: "Recording your sessions is on." }))
+    .toBeInTheDocument();
   const sharing = screen.getByRole("menuitemcheckbox", { name: "Share how I use the app" });
   relay.replayReadable = false;
   await sharing.click();
   await expect.poll(() => relay.analytics).toBe(false);
-  await new Promise((resolve) => setTimeout(resolve, 500));
+  await expect
+    .element(screen.getByRole("status").filter({ hasText: "Recording your sessions is off." }))
+    .toBeInTheDocument();
   const sent = relay.replayed.length;
   await sharing.click();
   await expect.poll(() => relay.analytics).toBe(true);
+  // Longer than a recorder waits before its first batch: one started on the old yes would send.
   await new Promise((resolve) => setTimeout(resolve, 7_000));
   expect(relay.replayed.length, "no recorder starts on a yes that was read before").toBe(sent);
   expect(

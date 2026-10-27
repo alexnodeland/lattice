@@ -307,6 +307,9 @@ step "Apply"
 task_logs() { docker logs "$network-floci" 2>&1 | grep -F '[ecs:' | tail -n "${1:-60}" >&2 || true; }
 
 if ! tofu_floci apply -state="$state" "$work/tier2.tfplan" >"$work/apply.log" 2>&1; then
+  # The edge's listener rules are created one at a time for Floci (modules/edge/main.tf): a
+  # PriorityInUse here after that change disproves the theory that concurrent CreateRule calls
+  # caused it (#810).
   grep -E -A10 'Error|run-task' "$work/apply.log" >&2 || true
   task_logs
   echo "tier2: the apply failed" >&2
@@ -369,7 +372,8 @@ ask() {
 }
 bearer() { printf 'header = "Authorization: Bearer %s"\n' "$1"; }
 # Asks, with nothing on curl's standard input, until the answer's status is the one expected, 30
-# times at most.
+# times at most, 5 seconds apart: a service still starting is waited for, and one that never
+# answers so is said to have been, with the last answer.
 answers() {
   local what=$1 expected=$2 got
   shift 2
@@ -381,7 +385,8 @@ answers() {
   if [[ $got == "$expected" ]]; then
     echo "ok: $what"
   else
-    fail "$what: $got, not $expected"
+    [[ $got == 000 ]] && got="000 (could not connect)"
+    fail "$what: last answer $got after 30 tries over 150 s, expected $expected"
   fi
 }
 answers "the application, through the load balancer" 200 --header "Host: app.stackr.test" http://floci:443/healthz

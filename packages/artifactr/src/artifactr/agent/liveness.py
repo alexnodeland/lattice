@@ -97,15 +97,18 @@ class ToolStalled(RunFailure):
     """A tool call didn't return within the turn's wait: the run fails, ``tool_stalled``.
 
     ``tools`` names the calls still running as the wait ran out: the wait starts again at each
-    event, so which of them stalled isn't known. A name called twice is named once.
+    event, so which of them stalled isn't known. A name called twice is named once. A call
+    deferred to a person (``CallDeferred``, ``ApprovalRequired``) sends no result either, so
+    beside a call that really hung it is named as still running too.
     """
 
     def __init__(self, tools: Collection[str], seconds: float) -> None:
         names = list(dict.fromkeys(tools))
         named = names[0] if len(names) == 1 else f"{', '.join(names[:-1])} and {names[-1]}"
-        which = "tool" if len(names) == 1 else "tools"
+        which, verb = ("tool", "is") if len(names) == 1 else ("tools", "are")
         super().__init__(
-            f"the {which} {named}, still running, didn't return within {seconds:g} seconds",
+            f"the {which} {named} {verb} still running "
+            f"and didn't return within {seconds:g} seconds",
             reason="tool_stalled",
         )
 

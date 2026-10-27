@@ -500,6 +500,15 @@ async def test_offsets_count_utf16_code_units_as_a_browser_does() -> None:
     ]
 
 
+async def test_a_lone_surrogate_is_counted_not_refused() -> None:
+    """A provider can split an escape; the count goes on rather than raising."""
+    sent = await _forwarded(0, _text(0, "a\ud83d"), _text(0, "b"))
+    assert sent == [
+        TextDelta(part=0, delta="a\ud83d", offset=0),
+        TextDelta(part=0, delta="b", offset=2),
+    ]
+
+
 async def test_offsets_count_from_zero_at_each_parts_start() -> None:
     """A model response's parts are numbered from 0 again: so are their offsets."""
     sent = await _forwarded(

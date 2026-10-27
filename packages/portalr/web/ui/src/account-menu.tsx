@@ -1,5 +1,5 @@
 import { Menu } from "@base-ui/react/menu";
-import { type ReactNode, useId, useRef, useState } from "react";
+import { type ReactNode, useId, useState } from "react";
 import { cn } from "./cn";
 import { Icon } from "./icon";
 import { glyphs } from "./icons";
@@ -158,8 +158,7 @@ export function AccountMenu({
   const owed = replay !== undefined && !replay.given && replay.deleting === true;
   // Open or not, known here too, so the sheet's drag can close it on a phone (portalr ADR-0082).
   const [open, setOpen] = useState(false);
-  const box = useRef<HTMLDivElement>(null);
-  useSheet(box, open, () => setOpen(false));
+  const asSheet = useSheet(open, () => setOpen(false));
   return (
     <Menu.Root open={open} onOpenChange={setOpen}>
       <Menu.Trigger
@@ -182,7 +181,7 @@ export function AccountMenu({
       </Menu.Trigger>
       <Menu.Portal>
         <Menu.Positioner sideOffset={6} align="end" className={`z-30 ${sheetPositioner}`}>
-          <Menu.Popup ref={box} className={`${popup} ${sheetPopup}`}>
+          <Menu.Popup ref={asSheet} className={`${popup} ${sheetPopup}`}>
             <SheetHandle />
             <Menu.Group>
               <Menu.GroupLabel className="px-2.5 pt-1.5 pb-1">

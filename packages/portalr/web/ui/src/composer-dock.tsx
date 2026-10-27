@@ -7,12 +7,12 @@
  */
 
 import { type ReactNode, useEffect, useRef } from "react";
-import { useTouch } from "./touch";
+import { useCoarsePointer, useTouch } from "./touch";
 
 export function ComposerDock({ children }: { children: ReactNode }) {
   const dock = useRef<HTMLDivElement>(null);
   // On a phone the on-screen keyboard's height is kept on the root, and the dock sits above it.
-  const touch = useTouch();
+  const touch = useTouch(useCoarsePointer());
   useEffect(() => touch?.keyboardInset(), [touch]);
   useEffect(() => {
     const element = dock.current;

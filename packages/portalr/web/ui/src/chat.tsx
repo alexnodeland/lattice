@@ -867,6 +867,9 @@ function Question({
   const closed = answered || pending;
   if (request.kind === "approval") {
     const args = Object.keys(request.args ?? {}).length > 0;
+    // A phone's thumb bar mirrors Approve (portalr ADR-0082) only where there is nothing to
+    // review first: an approval with code or a risk is read before it is given.
+    const plain = !request.review?.code && !request.review?.risk;
     return (
       <section className={cn(card, ASKING)} aria-label={`Approve ${request.tool_name}?`}>
         <p>
@@ -884,6 +887,7 @@ function Question({
             disabled={answered}
             pending={pending}
             onClick={() => void answer({ approved: true })}
+            {...(plain && { "data-thumb-action": "" })}
           >
             Approve
           </Button>

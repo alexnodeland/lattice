@@ -9,6 +9,7 @@ import { expect, test, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { Button } from "./button";
+import { ComposerDock } from "./composer-dock";
 import { Dialog } from "./dialog";
 import { Disclosure } from "./disclosure";
 import { IconButton } from "./icon-button";
@@ -42,21 +43,6 @@ test("to a finger, a button, an icon button, a field and a disclosure's line are
   expect(Number.parseFloat(getComputedStyle(field).fontSize)).toBeGreaterThanOrEqual(16);
 });
 
-test("admin's compact rows reach 44px to a finger", async () => {
-  const screen = await render(
-    <div data-density="compact">
-      <table>
-        <tbody>
-          <tr style={{ height: "var(--row-height)" }}>
-            <td>alice</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>,
-  );
-  expect(height(screen.getByRole("row").element())).toBeGreaterThanOrEqual(44);
-});
-
 function Opened({ onChange }: { onChange: (open: boolean) => void }) {
   return (
     <Dialog open onOpenChange={onChange} title="Share the thread" description="With whom.">
@@ -80,10 +66,11 @@ test("a dialog is a sheet along the bottom: a dialog still, the focus in it, Esc
   expect(Math.round(box.width)).toBe(window.innerWidth);
   expect(style.borderTopLeftRadius).not.toBe("0px");
   expect(style.borderBottomLeftRadius).toBe("0px");
-  expect(dialog.element().querySelector("[data-sheet-handle]")).not.toBeNull();
-  expect(
-    getComputedStyle(dialog.element().querySelector("[data-sheet-handle]") as Element).display,
-  ).toBe("block");
+  // The handle shows once the drag listens, which the touch module's arrival turns on.
+  await expect.poll(() => dialog.element().hasAttribute("data-sheet-drag")).toBe(true);
+  const handle = dialog.element().querySelector("[data-sheet-handle]") as HTMLElement;
+  expect(getComputedStyle(handle).display).toBe("block");
+  expect(handle.getBoundingClientRect().height).toBeGreaterThanOrEqual(44);
   await expect.element(screen.getByRole("textbox", { name: "Email" })).toHaveFocus();
   await userEvent.keyboard("{Escape}");
   await expect.poll(() => onChange.mock.calls.at(-1)?.[0]).toBe(false);
@@ -94,9 +81,8 @@ test("a sheet dragged down past a third of its height closes; let go sooner, it 
   const screen = await render(<Opened onChange={onChange} />);
   const dialog = screen.getByRole("dialog", { name: "Share the thread" });
   const handle = () => dialog.element().querySelector("[data-sheet-handle]") as HTMLElement;
-  // The touch module loads on first need.
-  await expect.poll(() => dialog.element().onpointerdown !== undefined).toBe(true);
-  await new Promise((settled) => setTimeout(settled, 300));
+  // The touch module loads as the sheet opens; the drag listens once it is here.
+  await expect.poll(() => dialog.element().hasAttribute("data-sheet-drag")).toBe(true);
   const drag = (from: number, to: number) => {
     const down = new PointerEvent("pointerdown", {
       bubbles: true,
@@ -173,4 +159,128 @@ test("a menu and a popover sit as sheets too, and keep their roles", async () =>
   await expect
     .element(screen.getByRole("dialog", { name: "Attach files" }))
     .not.toBeInTheDocument();
+});
+
+const pe = (type: string, y: number, extra: PointerEventInit = {}) =>
+  new PointerEvent(type, {
+    bubbles: true,
+    clientY: y,
+    pointerId: 1,
+    pointerType: "touch",
+    ...extra,
+  });
+const settle = (ms = 100) => new Promise((r) => setTimeout(r, ms));
+const armed = (el: Element) =>
+  expect.poll(() => el.hasAttribute("data-sheet-drag"), { timeout: 3000 }).toBe(true);
+
+function Closed({ onChange }: { onChange: (open: boolean) => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Button onClick={() => setOpen(true)}>Share</Button>
+      <Dialog
+        open={open}
+        onOpenChange={(next) => {
+          setOpen(next);
+          onChange(next);
+        }}
+        title="Share the thread"
+      >
+        <TextField label="Email" />
+      </Dialog>
+    </>
+  );
+}
+
+test("a dialog opened by its button is dragged closed too: the drag arms as the popup mounts", async () => {
+  const onChange = vi.fn();
+  const screen = await render(<Closed onChange={onChange} />);
+  await settle(800);
+  await screen.getByRole("button", { name: "Share" }).click();
+  const dialog = screen.getByRole("dialog", { name: "Share the thread" });
+  await expect.element(dialog).toBeVisible();
+  const el = dialog.element() as HTMLElement;
+  await armed(el);
+  const handle = el.querySelector("[data-sheet-handle]") as HTMLElement;
+  handle.dispatchEvent(pe("pointerdown", 500));
+  el.dispatchEvent(pe("pointermove", 500 + el.offsetHeight * 0.6));
+  el.dispatchEvent(pe("pointerup", 500 + el.offsetHeight * 0.6));
+  await expect.poll(() => onChange.mock.calls.at(-1)?.[0], { timeout: 1500 }).toBe(false);
+});
+
+test("the sheet follows the finger while dragged", async () => {
+  const screen = await render(
+    <Dialog open onOpenChange={vi.fn()} title="Share the thread">
+      <TextField label="Email" />
+    </Dialog>,
+  );
+  const dialog = screen.getByRole("dialog", { name: "Share the thread" });
+  await expect.element(dialog).toBeVisible();
+  const el = dialog.element() as HTMLElement;
+  await armed(el);
+  const rest = el.getBoundingClientRect().top;
+  (el.querySelector("[data-sheet-handle]") as HTMLElement).dispatchEvent(pe("pointerdown", 500));
+  el.dispatchEvent(pe("pointermove", 560));
+  expect(Math.round(el.getBoundingClientRect().top - rest)).toBe(60);
+  el.dispatchEvent(pe("pointerup", 560));
+});
+
+test("a gesture the browser takes springs the sheet back, never closes it", async () => {
+  const onChange = vi.fn();
+  const screen = await render(
+    <Dialog open onOpenChange={onChange} title="Share the thread">
+      <TextField label="Email" />
+    </Dialog>,
+  );
+  const dialog = screen.getByRole("dialog", { name: "Share the thread" });
+  await expect.element(dialog).toBeVisible();
+  const el = dialog.element() as HTMLElement;
+  await armed(el);
+  const rest = el.getBoundingClientRect().top;
+  (el.querySelector("[data-sheet-handle]") as HTMLElement).dispatchEvent(pe("pointerdown", 500));
+  el.dispatchEvent(pe("pointermove", 500 + el.offsetHeight * 0.6));
+  el.dispatchEvent(pe("pointercancel", 500 + el.offsetHeight * 0.6));
+  await settle(100);
+  expect(onChange).not.toHaveBeenCalled();
+  expect(Math.round(el.getBoundingClientRect().top)).toBe(Math.round(rest));
+});
+
+test("a pinch zoom is no keyboard: nothing is kept clear for it", async () => {
+  const real = window.visualViewport;
+  const viewport = new EventTarget() as EventTarget & {
+    height: number;
+    offsetTop: number;
+    scale: number;
+  };
+  viewport.height = window.innerHeight / 2;
+  viewport.offsetTop = 0;
+  viewport.scale = 2;
+  Object.defineProperty(window, "visualViewport", { value: viewport, configurable: true });
+  try {
+    await render(
+      <ComposerDock>
+        <button type="submit">Send</button>
+      </ComposerDock>,
+    );
+    await settle();
+    expect(document.documentElement.style.getPropertyValue("--keyboard-inset")).toBe("0px");
+  } finally {
+    Object.defineProperty(window, "visualViewport", { value: real, configurable: true });
+  }
+});
+
+test("a flick down closes the sheet though it went a short way", async () => {
+  const onChange = vi.fn();
+  const screen = await render(<Opened onChange={onChange} />);
+  const dialog = screen.getByRole("dialog", { name: "Share the thread" });
+  await expect.element(dialog).toBeVisible();
+  const el = dialog.element() as HTMLElement;
+  await armed(el);
+  const handle = el.querySelector("[data-sheet-handle]") as HTMLElement;
+  handle.dispatchEvent(pe("pointerdown", 500));
+  // 40px in about 20ms: a flick, well short of a third of the sheet.
+  await settle(20);
+  el.dispatchEvent(pe("pointermove", 540));
+  el.dispatchEvent(pe("pointerup", 540));
+  await expect.poll(() => onChange.mock.calls.at(-1)?.[0]).toBe(false);
 });

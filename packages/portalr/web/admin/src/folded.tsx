@@ -4,7 +4,9 @@
  * fields. A `Toolbar` holds the buttons together at the row's end, and the open forms in a row
  * of their own beneath, in the order of their buttons, so what is read follows what is seen. As a
  * form opens its first field takes the focus; Escape closes it and the focus comes back to its
- * button. A filter's action says what is in effect beside it while it is closed.
+ * button. A filter's action says what is in effect beside it while it is closed. On a phone a
+ * form that makes something opens as a sheet over the page instead (portalr ADR-0082); a filter
+ * stays a card beneath the row, so what it finds is seen as it is typed.
  */
 
 import { Button, Card, Dialog, SectionTitle, usePhone } from "@portalr/ui";
@@ -55,6 +57,7 @@ export function Toolbar({ children }: { children: ReactNode }) {
 export function Folded({
   title,
   action,
+  kind = "form",
   said,
   defaultOpen = false,
   open,
@@ -64,9 +67,11 @@ export function Folded({
   children,
 }: {
   /** The form's heading, once open; the region's name. */
-  title: string;
+  title: ReactNode;
   /** The button that opens it: a verb, such as "Invite…" or "Find…". */
   action: string;
+  /** What it is: a `form` that makes something, a sheet on a phone, or a `filter`, a card there too. */
+  kind?: "form" | "filter";
   /** What is in effect while it is closed, beside the button: a filter's window, say. */
   said?: string | null;
   defaultOpen?: boolean;
@@ -81,22 +86,31 @@ export function Folded({
   const id = useId();
   const beneath = useContext(Beneath);
   const trigger = useRef<HTMLButtonElement>(null);
-  const card = useRef<HTMLDivElement>(null);
   const [opened, setOpened] = useState(defaultOpen);
   const shown = open ?? opened;
   const show = (next: boolean) => {
     setOpened(next);
     onOpenChange?.(next);
   };
+  // What the form holds lives in one element, whether it is shown in the card or the sheet, so
+  // turning a phone through the width where one becomes the other keeps what was typed.
+  const [body] = useState(() => {
+    const held = document.createElement("div");
+    held.className = "contents";
+    return held;
+  });
+  const hold = (node: HTMLElement | null) => {
+    if (node && body.parentNode !== node) {
+      node.append(body);
+    }
+  };
   // Opened by its button, the form's first field takes the focus; the page's own focus wins.
   const [byButton, setByButton] = useState(false);
   useEffect(() => {
     if (shown && byButton && !heading) {
-      card.current
-        ?.querySelector<HTMLElement>("input, select, textarea, [role=combobox], button")
-        ?.focus();
+      body.querySelector<HTMLElement>("input, select, textarea, [role=combobox], button")?.focus();
     }
-  }, [shown, byButton, heading]);
+  }, [shown, byButton, heading, body]);
   const closeOnEscape = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Escape" && !event.defaultPrevented) {
       event.preventDefault();
@@ -104,24 +118,21 @@ export function Folded({
       trigger.current?.focus();
     }
   };
-  // On a phone the form is a sheet over the page rather than a card beneath the row (portalr
-  // ADR-0082): a dialog, with its focus kept in and its own way to close.
-  const asSheet = usePhone();
-  const panel =
-    shown && asSheet ? (
-      <Dialog open onOpenChange={show} title={title} close="Done">
-        {/* The dialog itself closes on Escape and brings the focus back. */}
-        <div
-          ref={card}
-          className={className ? `flex flex-col gap-3 ${className}` : "flex flex-col gap-3"}
-        >
-          {children}
-        </div>
-      </Dialog>
-    ) : (
-      shown && (
+  const asSheet = usePhone() && kind === "form";
+  const panel = shown && (
+    <>
+      {asSheet ? (
+        // The dialog closes on Escape and brings the focus back to the button itself.
+        <Dialog open onOpenChange={show} title={title} close="Done">
+          {heading && (
+            <div className="sr-only">
+              <SectionTitle {...heading}>{title}</SectionTitle>
+            </div>
+          )}
+          <div ref={hold} className="flex flex-col gap-3" />
+        </Dialog>
+      ) : (
         <Card
-          ref={card}
           id={id}
           render={<section aria-labelledby={`${id}-title`} />}
           className={className ? `flex flex-col gap-3 ${className}` : "flex flex-col gap-3"}
@@ -130,10 +141,12 @@ export function Folded({
           <SectionTitle id={`${id}-title`} {...heading}>
             {title}
           </SectionTitle>
-          {children}
+          <div ref={hold} className="contents" />
         </Card>
-      )
-    );
+      )}
+      {createPortal(<div className="flex flex-col gap-3">{children}</div>, body)}
+    </>
+  );
   return (
     <>
       {said && !shown && <span className="text-muted text-xs">{said}</span>}

@@ -7,25 +7,9 @@ import { afterEach, expect, test, vi } from "vitest";
 import { page } from "vitest/browser";
 import { open } from "./test/app";
 import { serve, WORLD } from "./test/notes";
+import { wider } from "./test/overflow";
 
 afterEach(() => vi.unstubAllGlobals());
-
-/** What scrolls inside its own box may be wider than the page; the page itself never is. */
-function wider(): string[] {
-  const scrolls = (element: Element | null): boolean =>
-    element !== null &&
-    element !== document.body &&
-    (/auto|scroll/.test(getComputedStyle(element).overflowX) || scrolls(element.parentElement));
-  return Array.from(document.body.querySelectorAll<HTMLElement>("*"))
-    .filter(
-      (element) =>
-        element.getBoundingClientRect().right > window.innerWidth + 1 &&
-        !scrolls(element.parentElement),
-    )
-    .map(
-      (element) => `${element.tagName.toLowerCase()}.${element.className.toString().slice(0, 60)}`,
-    );
-}
 
 const WIDTHS = [320, 360, 390, 430, 768];
 const ROUTES: [string, string, string[], boolean?][] = [

@@ -10,31 +10,35 @@ const FLICK = 0.6;
 const FLICK_AT = 24;
 
 /**
- * Lets a sheet be dragged down by its handle, or from anywhere in it that isn't scrolled, and
- * closes it when let go far enough down or flicked; otherwise it springs back. Returns what
- * undoes it.
+ * Lets a sheet be dragged down by its handle, and closes it when let go far enough down or
+ * flicked; otherwise, or when the browser takes the gesture, it springs back. The sheet follows
+ * the finger through `--sheet-drag`, which its place reads (styles.css), so the place's own
+ * transform is never fought. It marks the sheet `data-sheet-drag` while it listens, which shows
+ * the handle. Returns what undoes it.
  */
 export function sheetDrag(sheet: HTMLElement, close: () => void): () => void {
-  let from: { y: number; at: number; id: number } | null = null;
-  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let from: { y: number; at: number; id: number; handle: HTMLElement } | null = null;
+  const settle = (dy: number) => {
+    sheet.style.transition = "";
+    sheet.style.setProperty("--sheet-drag", `${dy}px`);
+  };
   const start = (event: PointerEvent) => {
-    if (event.pointerType === "mouse") {
+    if (event.pointerType === "mouse" || from !== null) {
       return;
     }
-    const handle = (event.target as Element).closest("[data-sheet-handle]");
-    // From the body, only when its scroll is at the top: otherwise the finger scrolls it.
-    if (handle === null && sheet.scrollTop > 0) {
+    const handle = (event.target as Element).closest<HTMLElement>("[data-sheet-handle]");
+    if (handle === null) {
       return;
     }
-    from = { y: event.clientY, at: event.timeStamp, id: event.pointerId };
+    from = { y: event.clientY, at: event.timeStamp, id: event.pointerId, handle };
+    handle.setPointerCapture?.(event.pointerId);
     sheet.style.transition = "none";
   };
   const move = (event: PointerEvent) => {
     if (from === null || event.pointerId !== from.id) {
       return;
     }
-    const dy = Math.max(0, event.clientY - from.y);
-    sheet.style.transform = `translateY(${dy}px)`;
+    sheet.style.setProperty("--sheet-drag", `${Math.max(0, event.clientY - from.y)}px`);
   };
   const end = (event: PointerEvent) => {
     if (from === null || event.pointerId !== from.id) {
@@ -43,49 +47,69 @@ export function sheetDrag(sheet: HTMLElement, close: () => void): () => void {
     const dy = Math.max(0, event.clientY - from.y);
     const speed = dy / Math.max(1, event.timeStamp - from.at);
     from = null;
-    sheet.style.transition = "";
-    sheet.style.transform = "";
     if (dy > sheet.offsetHeight * CLOSE_AT || (dy > FLICK_AT && speed > FLICK)) {
+      // Closed from where it was let go: its closing slide carries on from there.
+      settle(dy);
       close();
-    } else if (reduced) {
-      sheet.style.transform = "";
+    } else {
+      settle(0);
+    }
+  };
+  // The browser took the gesture, to scroll say: never a close.
+  const cancel = (event: PointerEvent) => {
+    if (from !== null && event.pointerId === from.id) {
+      from = null;
+      settle(0);
     }
   };
   sheet.addEventListener("pointerdown", start);
   sheet.addEventListener("pointermove", move);
   sheet.addEventListener("pointerup", end);
-  sheet.addEventListener("pointercancel", end);
+  sheet.addEventListener("pointercancel", cancel);
+  sheet.dataset.sheetDrag = "";
   return () => {
     sheet.removeEventListener("pointerdown", start);
     sheet.removeEventListener("pointermove", move);
     sheet.removeEventListener("pointerup", end);
-    sheet.removeEventListener("pointercancel", end);
+    sheet.removeEventListener("pointercancel", cancel);
+    delete sheet.dataset.sheetDrag;
     sheet.style.transition = "";
-    sheet.style.transform = "";
+    sheet.style.removeProperty("--sheet-drag");
   };
 }
 
 /**
  * Keeps `--keyboard-inset` on the root at the height the on-screen keyboard covers, as the
  * visual viewport says, so a composer pinned to the bottom sits above it where the page itself
- * doesn't shrink (`interactive-widget=resizes-content` is honoured by some browsers, not all).
- * Returns what stops it.
+ * doesn't shrink (`interactive-widget=resizes-content` is honoured by some browsers, not all). A
+ * pinch zoom shrinks the visual viewport too, and is no keyboard: nothing is kept then. Returns
+ * what stops it.
  */
 export function keyboardInset(root: HTMLElement = document.documentElement): () => void {
   const viewport = window.visualViewport;
   if (!viewport) {
     return () => undefined;
   }
+  let frame = 0;
   const measure = () => {
-    const covered = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop);
+    frame = 0;
+    const zoomed = viewport.scale > 1.01;
+    const covered = zoomed
+      ? 0
+      : Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop);
     root.style.setProperty("--keyboard-inset", `${Math.round(covered)}px`);
   };
+  // Resize and scroll come together, and often: one measure a frame.
+  const soon = () => {
+    frame ||= requestAnimationFrame(measure);
+  };
   measure();
-  viewport.addEventListener("resize", measure);
-  viewport.addEventListener("scroll", measure);
+  viewport.addEventListener("resize", soon);
+  viewport.addEventListener("scroll", soon);
   return () => {
-    viewport.removeEventListener("resize", measure);
-    viewport.removeEventListener("scroll", measure);
+    viewport.removeEventListener("resize", soon);
+    viewport.removeEventListener("scroll", soon);
+    cancelAnimationFrame(frame);
     root.style.removeProperty("--keyboard-inset");
   };
 }

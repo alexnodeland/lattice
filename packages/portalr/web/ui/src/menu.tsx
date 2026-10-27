@@ -1,5 +1,5 @@
 import { Menu as BaseMenu } from "@base-ui/react/menu";
-import { type Ref, useRef, useState } from "react";
+import { type Ref, useState } from "react";
 import { Button } from "./button";
 import { Icon } from "./icon";
 import { IconButton } from "./icon-button";
@@ -66,8 +66,7 @@ export function Menu({
     setOpened(next);
     onOpenChange?.(next);
   };
-  const box = useRef<HTMLDivElement>(null);
-  useSheet(box, shown, () => change(false));
+  const asSheet = useSheet(shown, () => change(false));
   return (
     <BaseMenu.Root open={shown} onOpenChange={change}>
       {icon ? (
@@ -79,7 +78,7 @@ export function Menu({
       )}
       <BaseMenu.Portal>
         <BaseMenu.Positioner sideOffset={4} align="end" className={`z-30 ${sheetPositioner}`}>
-          <BaseMenu.Popup ref={box} className={`${popup} ${sheetPopup}`}>
+          <BaseMenu.Popup ref={asSheet} className={`${popup} ${sheetPopup}`}>
             <SheetHandle />
             {items.map((each) =>
               each.checked === undefined ? (

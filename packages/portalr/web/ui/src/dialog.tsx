@@ -8,7 +8,6 @@
 
 import { Dialog as BaseDialog } from "@base-ui/react/dialog";
 import type { ReactNode, RefObject } from "react";
-import { useRef } from "react";
 import { Button } from "./button";
 import { keepTabWithin } from "./full-view";
 import { SheetHandle, sheet, useSheet } from "./sheet";
@@ -44,7 +43,7 @@ export function Dialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  title: string;
+  title: ReactNode;
   description?: ReactNode;
   /** The words on the button that closes it. */
   close?: string;
@@ -52,14 +51,14 @@ export function Dialog({
   finalFocus?: RefObject<HTMLElement | null>;
   children: ReactNode;
 }) {
-  const box = useRef<HTMLDivElement>(null);
-  useSheet(box, open, () => onOpenChange(false));
+  // On a phone it is a sheet, dragged down to close (portalr ADR-0082).
+  const asSheet = useSheet(open, () => onOpenChange(false));
   return (
     <BaseDialog.Root open={open} onOpenChange={onOpenChange}>
       <BaseDialog.Portal>
         <BaseDialog.Backdrop className={backdrop} />
         <BaseDialog.Popup
-          ref={box}
+          ref={asSheet}
           // Base UI traps the focus but doesn't say so: assistive technology learns the page
           // behind is out of reach from aria-modal, as the drawer says it.
           aria-modal="true"

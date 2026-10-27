@@ -322,6 +322,36 @@ async def test_recover_abandons_a_run_a_dead_process_left_running(
     assert types(await ws.read()).count("run_ended") == 1, "ended once"
 
 
+async def test_recover_sweeps_again_once_a_dead_claim_could_have_lapsed(
+    storage: InMemoryStorage, ws: Workspace, thread: Thread, gate: Gate
+) -> None:
+    """A restart finds the dead process's claim still there, for up to claim_ttl."""
+    left = ws.as_actor(AgentActor(thread_id=thread.id, run_id="run_left"))
+    await left.record(RunStarted(run_id="run_left", thread_id=thread.id))
+    scope = Scope(tenant_id=ws.tenant_id, workspace_id=ws.workspace_id)
+    dead = timedelta(milliseconds=150)
+    assert await storage.acquire_lease(scope, f"thread:{thread.id}", "dead-process", dead)
+    runner = Runner(make_agent(Script()), app=gate, look_again_after=timedelta(milliseconds=200))
+    assert await runner.recover(ws) == []
+    assert (await ws.run("run_left")).status == "running", "its claim hasn't lapsed yet"
+    await asyncio.gather(*runner._looks)  # the look again, once the dead claim could lapse
+    assert (await ws.run("run_left")).status == "failed", "swept again once it could have"
+    await runner.aclose()
+
+
+async def test_a_sweep_waiting_to_look_again_is_cancelled_as_the_runner_closes(
+    storage: InMemoryStorage, ws: Workspace, thread: Thread, gate: Gate
+) -> None:
+    left = ws.as_actor(AgentActor(thread_id=thread.id, run_id="run_left"))
+    await left.record(RunStarted(run_id="run_left", thread_id=thread.id))
+    scope = Scope(tenant_id=ws.tenant_id, workspace_id=ws.workspace_id)
+    assert await storage.acquire_lease(scope, f"thread:{thread.id}", "dead", timedelta(seconds=5))
+    runner = Runner(make_agent(Script()), app=gate, look_again_after=timedelta(seconds=5))
+    await runner.recover(ws)
+    await runner.aclose()
+    assert (await ws.run("run_left")).status == "running", "left to the next process"
+
+
 async def test_recover_leaves_a_run_another_process_holds(
     ws: Workspace, thread: Thread, gate: Gate
 ) -> None:

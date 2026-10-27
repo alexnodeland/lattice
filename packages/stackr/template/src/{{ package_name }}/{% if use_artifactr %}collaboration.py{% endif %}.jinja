@@ -248,6 +248,7 @@ class Collaboration:
                 local_no_output=gateway.local_no_output_seconds,
                 local_models=frozenset(gateway.local_models),
                 hosted_models=frozenset(gateway.hosted_models),
+                tool=gateway.tool_seconds,
             ),
         )
 {%- if use_files %}

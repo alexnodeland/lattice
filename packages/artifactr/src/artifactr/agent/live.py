@@ -148,8 +148,15 @@ def forward_live(channel: LiveChannel, *, coalesce: float = COALESCE) -> EventSt
     gathered for ``coalesce`` seconds and sent as one, with the ``offset`` of the first, so a
     model that streams a token at a time doesn't send a frame a token; 0 sends each as it
     comes. Any other event sends what is gathered first, so frames keep the stream's order,
-    and the stream's end sends the rest. Each delta carries its offset in its part, counted
-    per run across the turn's requests, so a client told a delta twice places it once.
+    and the stream's end sends the rest.
+
+    A delta's ``offset`` is where it starts in its part, in characters: it counts from 0 at
+    each ``part_started``, and a model response's parts are numbered from 0 again, so the
+    offsets of one response's part 0 say nothing of another's. A client keeps each part's text
+    and writes a delta at its offset, ``text[:offset] + delta``, so one it is sent twice, as a
+    run's buffered frames are on reconnect, lands once; a delta past the end of what it has,
+    after a frame it was never sent, is appended; one without an offset, from an earlier
+    server, is appended too.
     """
 
     async def handle(ctx: RunContext[Any], events: AsyncIterable[AgentStreamEvent]) -> None:
@@ -180,6 +187,8 @@ class _Gathered:
     async def add(self, live: LiveEvent) -> None:
         if not isinstance(live, TextDelta | ThinkingDelta):
             await self.flush()
+            if isinstance(live, PartStarted):
+                self._offsets[live.part] = 0  # a response's parts are numbered from 0 again
             await self._channel.send(LiveFrame(run_id=self._run_id, event=live))
             return
         pending = self._pending

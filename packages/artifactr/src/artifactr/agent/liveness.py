@@ -32,6 +32,9 @@ LOCAL_PREFIXES: Final = ("lm_studio/", "lmstudio/", "ollama/", "omlx/", "llamacp
 LOCAL_ALIASES: Final = ("local", "local-", "local/", "local:")
 """Gateway aliases that name a local model: ``local`` itself, or one that starts with it."""
 
+QUEUED: Final = 256
+"""How many of a model's events wait for the handler before the model's stream is held back."""
+
 
 def is_local_model(name: str, *, local: Collection[str] = (), hosted: Collection[str] = ()) -> bool:
     """Whether a model, by name, is served locally: slower to its first token than a host's.
@@ -91,11 +94,15 @@ class ModelStalled(RunFailure):
 
 
 class ToolStalled(RunFailure):
-    """A tool call didn't return within the turn's wait: the run fails, ``tool_stalled``."""
+    """A tool call didn't return within the turn's wait: the run fails, ``tool_stalled``.
 
-    def __init__(self, tool: str, seconds: float) -> None:
+    ``tools`` names the calls still running as the wait ran out, the stalled one among them.
+    """
+
+    def __init__(self, tools: Collection[str], seconds: float) -> None:
+        named = ", ".join(tools)
         super().__init__(
-            f"the tool {tool} didn't return within {seconds:g} seconds", reason="tool_stalled"
+            f"the tool {named} didn't return within {seconds:g} seconds", reason="tool_stalled"
         )
 
 
@@ -117,7 +124,10 @@ def watched(handler: EventStreamHandler, liveness: Liveness) -> EventStreamHandl
     async def handle(ctx: RunContext[Any], events: AsyncIterable[AgentStreamEvent]) -> None:
         model = ctx.model.model_name
         first, between = liveness.limits(model)
-        queue: asyncio.Queue[AgentStreamEvent | None] = asyncio.Queue()
+        # Bounded, so a handler slower than the model holds the model's stream back a little
+        # rather than the queue growing without end; the watchdog times the model, not the
+        # handler, since a full queue is one that has events.
+        queue: asyncio.Queue[AgentStreamEvent | None] = asyncio.Queue(maxsize=QUEUED)
         failed: list[BaseException] = []
 
         async def pull() -> None:
@@ -140,8 +150,7 @@ def watched(handler: EventStreamHandler, liveness: Liveness) -> EventStreamHandl
                         event = await queue.get()
                 except TimeoutError:
                     if calling:
-                        tool = next(iter(calling.values()))
-                        raise ToolStalled(tool, liveness.tool or 0) from None
+                        raise ToolStalled(list(calling.values()), liveness.tool or 0) from None
                     raise ModelStalled(model, limit or 0, first=not started) from None
                 started = True
                 if event is None:

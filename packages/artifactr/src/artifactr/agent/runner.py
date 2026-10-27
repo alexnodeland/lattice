@@ -167,7 +167,7 @@ _ABANDONED = "the run was abandoned: its claim lapsed"
 or lived on."""
 
 NOT_TAKEN: Final = (
-    "The last message got no reply: its author isn't allowed to start the assistant in this "
+    "The last message got no reply: whoever sent it isn't allowed to run the assistant in this "
     "thread. Messages from someone who is will be answered."
 )
 """The notice posted in a thread when a message's turn was refused (ADR-0095)."""
@@ -411,20 +411,42 @@ class Runner[AppDepsT]:
         A run left ``running`` by a process that died is recorded as failed, ``abandoned``,
         once its thread can be claimed, as the thread's next turn would record it (ADR-0095):
         until then every client is told the run is active. Its usage went with its process, so
-        it has none. A thread another process holds is left to it.
+        it has none. A thread claimed by another, as a dead process's thread still is until its
+        claim lapses, is swept again once, ``look_again_after`` later; a live holder's is left
+        to it, as it records its own run's end.
         """
         runner = _runner(workspace)
         taken = [await self._take_or_log(runner, thread.id) for thread in await runner.threads()]
         for run in await runner.runs(status="running"):
-            if self._closed or any(handle.run_id == run.id for handle in self._runs.values()):
-                continue
-            with contextlib.suppress(ThreadBusy):  # a live holder, or a dead one's claim yet
-                claim = runner.claim_thread(
-                    run.thread_id, holder=new_id("claim"), ttl=self._claim_ttl
-                )
-                async with claim:
-                    await _abandon(runner, run.thread_id)
+            await self._sweep(runner, run.id, run.thread_id, again=True)
         return [handle for handle in taken if handle is not None]
+
+    async def _sweep(
+        self, runner: Workspace, run_id: RunId, thread_id: ThreadId, *, again: bool
+    ) -> None:
+        """Record a thread's run a dead process left as abandoned, once the thread can be claimed.
+
+        With ``again``, a thread another claim holds is swept once more ``look_again_after``
+        later, by when a dead holder's claim has lapsed; :meth:`aclose` cancels the wait.
+        """
+        if self._closed or run_id in self._runs:
+            return  # a closed runner, or this process's own run, which records its end
+        try:
+            claim = runner.claim_thread(thread_id, holder=new_id("claim"), ttl=self._claim_ttl)
+            async with claim:
+                await _abandon(runner, thread_id)
+        except ThreadBusy:
+            if again:
+                look = asyncio.create_task(self._sweep_again(runner, run_id, thread_id))
+                self._looks.add(look)
+                look.add_done_callback(self._looks.discard)
+
+    async def _sweep_again(self, runner: Workspace, run_id: RunId, thread_id: ThreadId) -> None:
+        await asyncio.sleep(self._look_again_after.total_seconds())
+        try:
+            await self._sweep(runner, run_id, thread_id, again=False)
+        except Exception:
+            logger.exception("sweeping thread %s for run %s failed", thread_id, run_id)
 
     async def stop(self, run_id: RunId) -> bool:
         """Cancel a run of this process. Returns whether there was one to stop.

@@ -121,7 +121,7 @@ export function ToolCall({
             ? "text-sm"
             : "rounded-(--tool-call-radius) border border-line bg-surface text-sm data-open:border-edge"
         }
-        triggerClassName="min-h-10 items-center rounded-(--tool-call-radius) px-(--tool-call-pad-x) py-(--tool-call-pad-y) hover:bg-transparent"
+        triggerClassName="min-h-10 flex-wrap items-center rounded-(--tool-call-radius) px-(--tool-call-pad-x) py-(--tool-call-pad-y) hover:bg-transparent"
         panelClassName="data-open:pt-0"
         summary={
           <>
@@ -226,7 +226,7 @@ export function RunSteps({
         open={open}
         onOpenChange={setOpen}
         className="rounded-(--tool-call-radius) border border-line bg-surface text-sm data-open:border-edge"
-        triggerClassName="min-h-10 items-center rounded-(--tool-call-radius) px-(--tool-call-pad-x) py-(--tool-call-pad-y) hover:bg-transparent"
+        triggerClassName="min-h-10 flex-wrap items-center rounded-(--tool-call-radius) px-(--tool-call-pad-x) py-(--tool-call-pad-y) hover:bg-transparent"
         panelClassName="data-open:pt-0"
         summary={
           <>

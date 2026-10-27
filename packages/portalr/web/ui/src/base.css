@@ -142,20 +142,24 @@
  * or not it was chosen; the inks themselves are the system's.
  */
 /*
- * Small screens and fingers (portalr ADR-0080). A pointer that can't hover is a finger: every
- * control is 44px or taller to it, admin's compact density included, which holds for a mouse; a
+ * Small screens and fingers (portalr ADR-0080, ADR-0082). Where any pointer is coarse, a finger
+ * (a touch laptop with a mouse plugged in too), every control is 44px or taller, admin's compact
+ * density included, whose rows reach 44px there and hold at 36px for a mouse alone; a
  * field's text is 16px, so iOS doesn't zoom to it; a control answers at once, with no tap flash of
  * the browser's (the kit's feedback is the answer) and no double-tap zoom. Whatever the pointer,
  * a part that scrolls inside the page keeps its scroll to itself, so reaching its end never
  * pulls the page or refreshes it.
  */
-@media (pointer: coarse) {
+@media (any-pointer: coarse) {
   :root,
   [data-density="compact"] {
     --icon-button-size: 2.75rem;
     --disclosure-target: 2.75rem;
     --breadcrumb-target: 2.75rem;
     --header-trigger-pad-y: var(--space-3);
+  }
+  [data-density="compact"] {
+    --row-height: 2.75rem;
   }
   :where(
     button,

@@ -471,21 +471,24 @@ function Chat() {
       ))}
       {snapshot.status !== "closed" && allowed.has("artifactr:post_message") && (
         <ComposerDock>
-          {latestRequest !== undefined && (
-            <ThumbBar target={`request-${latestRequest.tool_call_id}`} />
-          )}
           <Composer
             onSend={send}
             onFiles={setDropped}
             attach={
-              <Uploader
-                context={context}
-                tenant={tenant}
-                workspace={workspace}
-                thread={id}
-                attach
-                files={dropped}
-              />
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                <Uploader
+                  context={context}
+                  tenant={tenant}
+                  workspace={workspace}
+                  thread={id}
+                  attach
+                  files={dropped}
+                />
+                {/* A phone's thumb bar: the request's next step, at the row's end (portalr ADR-0082). */}
+                {latestRequest !== undefined && (
+                  <ThumbBar target={`request-${latestRequest.tool_call_id}`} />
+                )}
+              </div>
             }
           />
         </ComposerDock>

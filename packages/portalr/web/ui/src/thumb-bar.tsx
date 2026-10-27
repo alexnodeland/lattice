@@ -1,51 +1,90 @@
 /**
- * The thumb bar (portalr ADR-0082): on a phone, the active request's primary action, Answer or
- * Approve, within the thumb's reach above the composer, so a question far up the thread is
- * answered without scrolling back to it. The bar's button presses the request's own submit
- * button, so the handlers are the request's; it is hidden from assistive technology, which
- * reaches the one in the request, so there is one tab stop. Its words follow that button's. In a
- * short window it gives way, so what is pinned never covers most of the page.
+ * The thumb bar (portalr ADR-0082): on a phone, the active request's next step, Next or Answer
+ * on a question, Approve on a plain approval, within the thumb's reach in the composer's row, so
+ * a question far up the thread is answered without scrolling back to it. The bar's button presses
+ * the request's own, marked `data-thumb-action` by its card, so the handlers are the card's; it
+ * is hidden from assistive technology, which reaches the one in the card, so there is one tab
+ * stop. Its words and its disabled state follow that button's. It gives way while the card's own
+ * button is on screen, while the on-screen keyboard is up, and in a short window.
  */
 
 import { useEffect, useState } from "react";
 import { Button } from "./button";
-import { usePhone } from "./sheet";
+import { usePhone } from "./touch";
+
+/** The card's button the bar mirrors, if it is one to mirror. */
+const ACTION = "[data-thumb-action]";
+
+/** What the bar shows: the words and whether the action can be taken, or nothing. */
+type Mirror = { word: string; disabled: boolean } | null;
 
 export function ThumbBar({ target }: { target: string }) {
   const phone = usePhone();
-  const [word, setWord] = useState("");
+  const [mirror, setMirror] = useState<Mirror>(null);
   useEffect(() => {
     if (!phone) {
       return;
     }
-    const form = document.getElementById(target);
-    if (form === null) {
+    const card = document.getElementById(target);
+    if (card === null) {
       return;
     }
-    const read = () =>
-      setWord(
-        form.querySelector<HTMLButtonElement>("button[type=submit]")?.textContent?.trim() ?? "",
+    const root = document.documentElement;
+    let frame = 0;
+    // Read once a frame, however many scrolls, mutations and resizes asked.
+    const read = () => {
+      frame = 0;
+      const action = card.querySelector<HTMLButtonElement>(ACTION);
+      if (action === null) {
+        setMirror(null);
+        return;
+      }
+      const box = action.getBoundingClientRect();
+      const seen = box.width > 0 && box.bottom > 0 && box.top < window.innerHeight;
+      // The keyboard's inset is kept on the root (`keyboardInset`): up, the bar would crowd it.
+      const keyboard = Number.parseFloat(root.style.getPropertyValue("--keyboard-inset")) > 0;
+      setMirror(
+        seen || keyboard
+          ? null
+          : { word: action.textContent?.trim() ?? "", disabled: action.disabled },
       );
+    };
+    const soon = () => {
+      frame ||= requestAnimationFrame(read);
+    };
     read();
-    const heard = new MutationObserver(read);
-    heard.observe(form, { subtree: true, childList: true, characterData: true });
-    return () => heard.disconnect();
+    const heard = new MutationObserver(soon);
+    heard.observe(card, { subtree: true, childList: true, characterData: true, attributes: true });
+    const keyboarded = new MutationObserver(soon);
+    keyboarded.observe(root, { attributes: true, attributeFilter: ["style"] });
+    // Scrolls anywhere, as the card may sit in a box that scrolls on its own.
+    document.addEventListener("scroll", soon, { capture: true, passive: true });
+    window.addEventListener("resize", soon);
+    return () => {
+      heard.disconnect();
+      keyboarded.disconnect();
+      document.removeEventListener("scroll", soon, { capture: true });
+      window.removeEventListener("resize", soon);
+      cancelAnimationFrame(frame);
+    };
   }, [phone, target]);
-  if (!phone || word === "") {
+  if (!phone || mirror === null || mirror.word === "") {
     return null;
   }
   return (
-    <div data-thumb-bar="" aria-hidden="true" className="flex justify-end pb-2 short:hidden">
+    <span data-thumb-bar="" aria-hidden="true" className="ml-auto short:hidden">
       <Button
+        size="sm"
         tabIndex={-1}
+        disabled={mirror.disabled}
         onClick={() => {
-          const form = document.getElementById(target);
-          form?.querySelector<HTMLButtonElement>("button[type=submit]")?.click();
-          form?.scrollIntoView({ block: "nearest" });
+          const card = document.getElementById(target);
+          card?.querySelector<HTMLButtonElement>(ACTION)?.click();
+          card?.scrollIntoView({ block: "nearest" });
         }}
       >
-        {word}
+        {mirror.word}
       </Button>
-    </div>
+    </span>
   );
 }

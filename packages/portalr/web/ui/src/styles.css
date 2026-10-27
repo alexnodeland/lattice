@@ -44,8 +44,10 @@
   position: fixed;
   inset: auto 0 0 0;
   width: auto;
-  max-width: none;
-  translate: none;
+  max-width: 36rem;
+  margin-inline: auto;
+  /* The drag's offset, which the touch module sets, so its place is never fought. */
+  translate: 0 var(--sheet-drag, 0px);
   transform: none;
   z-index: 50;
 }
@@ -55,11 +57,16 @@
 @utility as-sheet-popup {
   width: 100%;
   min-width: 0;
+  max-width: 36rem;
+  margin-inline: auto;
   max-height: 85dvh;
   overflow-y: auto;
   overscroll-behavior: contain;
   border-width: 1px 0 0;
   border-radius: var(--dialog-radius) var(--dialog-radius) 0 0;
+  /* Turned on its side, the notch's side kept clear. */
+  padding-inline: max(var(--dialog-pad), env(safe-area-inset-left))
+    max(var(--dialog-pad), env(safe-area-inset-right));
   padding-bottom: calc(var(--dialog-pad) + env(safe-area-inset-bottom));
   transition-property: translate;
   &[data-starting-style],
@@ -74,17 +81,23 @@
 }
 
 /*
- * What scrolls sideways on a phone shows it: a shadow at each edge that is scrolled past, drawn by
- * the stylesheet alone (the covers scroll with the content, the shadows don't). A table pins its
- * first column as the rest scrolls.
+ * What scrolls sideways on a phone shows it: a shadow at each edge that is scrolled past, drawn
+ * by the stylesheet alone (the covers scroll with the content, the shadows don't). The covers are
+ * the box's own colour, `--scroll-cover`, the surface unless the box says otherwise; the shadow
+ * is the text's colour thinned, seen on a dark surface as on a light one. Under forced colours
+ * there are none: the edge is the scrollbar's. A table pins its first column as the rest scrolls,
+ * no wider than a third of the window, with an edge of its own, as the rows' lines are scrolled
+ * under it.
  */
 @utility as-scroll-shadows {
+  --scroll-shadow: color-mix(in srgb, var(--fg) 28%, transparent);
   overscroll-behavior-x: contain;
   background:
-    linear-gradient(to right, var(--surface) 30%, transparent),
-    linear-gradient(to left, var(--surface) 30%, transparent) 100% 0,
-    radial-gradient(farthest-side at 0 50%, var(--scrim), transparent),
-    radial-gradient(farthest-side at 100% 50%, var(--scrim), transparent) 100% 0;
+    linear-gradient(to right, var(--scroll-cover, var(--surface)) 30%, transparent),
+    linear-gradient(to left, var(--scroll-cover, var(--surface)) 30%, transparent) 100% 0,
+    radial-gradient(farthest-side at 0 50%, var(--scroll-shadow), transparent),
+    radial-gradient(farthest-side at 100% 50%, var(--scroll-shadow), transparent) 100% 0;
+  background-color: var(--scroll-cover, var(--surface));
   background-attachment: local, local, scroll, scroll;
   background-repeat: no-repeat;
   background-size:
@@ -92,15 +105,23 @@
     2.5rem 100%,
     0.75rem 100%,
     0.75rem 100%;
+  @media (forced-colors: active) {
+    background-image: none;
+  }
 }
 @utility as-pinned-column {
   & th:first-child {
     position: sticky;
     inset-inline-start: 0;
-    z-index: 10;
+    z-index: 1;
+    max-width: 33vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   & tbody th:first-child {
-    background-color: var(--surface);
+    background-color: var(--scroll-cover, var(--surface));
+    box-shadow: inset -1px 0 var(--line);
   }
 }
 

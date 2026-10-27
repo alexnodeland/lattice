@@ -1,8 +1,11 @@
 import { Popover as BasePopover } from "@base-ui/react/popover";
-import { type ReactElement, type ReactNode, useRef } from "react";
+import type { ReactElement, ReactNode } from "react";
+import { Button } from "./button";
 import { cn } from "./cn";
+import { backdrop } from "./dialog";
 import { popover } from "./menu";
 import { SheetHandle, sheetPopup, sheetPositioner, useSheet } from "./sheet";
+import { usePhone } from "./touch";
 
 /**
  * A panel that opens from a button, over the page, with a dialog's manners (portalr ADR-0080):
@@ -28,12 +31,15 @@ export function Popover({
   className?: string;
   children: ReactNode;
 }) {
-  const box = useRef<HTMLDivElement>(null);
-  useSheet(box, open, () => onOpenChange(false));
+  // On a phone it is a sheet (portalr ADR-0082), and modal as a dialog is: the page behind it
+  // neither scrolls nor takes the focus, under a scrim, with a Done to leave by.
+  const phone = usePhone();
+  const asSheet = useSheet(open, () => onOpenChange(false));
   return (
-    <BasePopover.Root open={open} onOpenChange={onOpenChange}>
+    <BasePopover.Root open={open} onOpenChange={onOpenChange} modal={phone}>
       <BasePopover.Trigger render={trigger} />
       <BasePopover.Portal>
+        {phone && <BasePopover.Backdrop className={backdrop} />}
         <BasePopover.Positioner
           side="top"
           align="start"
@@ -41,9 +47,10 @@ export function Popover({
           className={`z-30 ${sheetPositioner}`}
         >
           <BasePopover.Popup
-            ref={box}
+            ref={asSheet}
             role="dialog"
             aria-label={label}
+            aria-modal={phone || undefined}
             {...(initialFocus && { initialFocus })}
             className={cn(
               popover,
@@ -54,6 +61,11 @@ export function Popover({
           >
             <SheetHandle />
             {children}
+            {phone && (
+              <BasePopover.Close render={<Button variant="secondary" className="self-end" />}>
+                Done
+              </BasePopover.Close>
+            )}
           </BasePopover.Popup>
         </BasePopover.Positioner>
       </BasePopover.Portal>

@@ -1,5 +1,5 @@
 /**
- * admin on a phone (portalr ADR-0082): a toolbar's form opens as a dialog along the bottom, a
+ * admin on a phone (portalr ADR-0082): Invite… opens its form as a dialog along the bottom, a
  * sheet, with the form's first field focused, closed by Escape with the focus back on its button.
  */
 

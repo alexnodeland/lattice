@@ -123,6 +123,7 @@ function Filter({ filter }: { filter: AuditFilter }) {
       <Folded
         title="Filter"
         action="Filter…"
+        kind="filter"
         said={Object.values(filter).some(Boolean) ? "filtered" : null}
         defaultOpen={Object.values(filter).some(Boolean)}
       >

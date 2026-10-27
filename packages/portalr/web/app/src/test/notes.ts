@@ -129,3 +129,47 @@ export const WORLD = {
     }),
   ],
 };
+
+/** The same thread, its run asking two questions, stepped, and then an approval of each kind. */
+const asked = (requests: unknown[]) =>
+  at(9, agent("run_1"), { type: "run_paused", run_id: "run_1", thread_id: "thr_1", requests });
+const question = (header: string, text: string) => ({
+  header,
+  question: text,
+  options: [
+    { label: "Yes", description: "Go ahead" },
+    { label: "No", description: "Hold" },
+  ],
+});
+export const STEPPED = {
+  artifactrLog: [
+    ...LOG.slice(0, 8),
+    asked([
+      {
+        kind: "question",
+        tool_call_id: "q2",
+        tool_name: "ask_user",
+        args: {
+          questions: [
+            question("Week", "Which week should the note cover?"),
+            question("Tone", "Formal, or plain?"),
+          ],
+        },
+      },
+    ]),
+  ],
+};
+export const APPROVAL = (review: Record<string, unknown> | undefined) => ({
+  artifactrLog: [
+    ...LOG.slice(0, 8),
+    asked([
+      {
+        kind: "approval",
+        tool_call_id: "a1",
+        tool_name: "send_note",
+        args: { to: "launch@acme.test" },
+        ...(review && { review }),
+      },
+    ]),
+  ],
+});

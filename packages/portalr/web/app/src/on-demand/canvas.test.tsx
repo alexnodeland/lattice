@@ -14,6 +14,30 @@ import {
 } from "./canvas";
 import { type CanvasHost, CanvasHostContext } from "./canvas-host";
 
+/**
+ * Excalidraw itself, bare, rendered and mounted. It draws nothing until it has loaded its words,
+ * by an import the first mount in a file fetches from Vite: a busy runner took longer than a
+ * poll's second (#816). Its API, handed over as it mounts, is the cue.
+ */
+async function bare(viewModeEnabled: boolean) {
+  const { Excalidraw } = await import("@excalidraw/excalidraw");
+  let mounted = () => {};
+  const ready = new Promise<void>((resolve) => {
+    mounted = resolve;
+  });
+  const screen = await render(
+    <div style={{ height: 500, width: 800 }}>
+      <Excalidraw
+        viewModeEnabled={viewModeEnabled}
+        handleKeyboardGlobally={false}
+        excalidrawAPI={() => mounted()}
+      />
+    </div>,
+  );
+  await ready;
+  return screen;
+}
+
 test("the canvas takes no link, no embedded page and no image it has no bytes for, and restores what it takes", () => {
   const { elements, left } = elementsOf({
     elements: {
@@ -138,18 +162,13 @@ test("a diagram the canvas can't read says so, in the dialog, with its text vers
 });
 
 test("the guard bites: a key that opens Excalidraw's help bare opens nothing on the canvas", async () => {
-  const { Excalidraw } = await import("@excalidraw/excalidraw");
-  const bare = await render(
-    <div style={{ height: 500, width: 800 }}>
-      <Excalidraw viewModeEnabled handleKeyboardGlobally={false} />
-    </div>,
-  );
+  const excalidraw = await bare(true);
   const help = () => document.querySelector(".HelpDialog");
   await expect.poll(() => document.querySelector(".excalidraw canvas")).not.toBeNull();
   (document.querySelector(".excalidraw") as HTMLElement).focus();
   await userEvent.keyboard("?");
   await expect.poll(help).not.toBeNull();
-  await bare.unmount();
+  await excalidraw.unmount();
   await render(
     <CanvasDialog
       data={{ name: "Guarded", elements: {} }}
@@ -260,12 +279,7 @@ const editing: CanvasHost = {
 };
 
 test("the guard bites while editing: help and the palette open bare, and nothing on the canvas", async () => {
-  const { Excalidraw } = await import("@excalidraw/excalidraw");
-  const bare = await render(
-    <div style={{ height: 500, width: 800 }}>
-      <Excalidraw handleKeyboardGlobally={false} />
-    </div>,
-  );
+  const excalidraw = await bare(false);
   const opened = () => document.querySelector(".HelpDialog, .command-palette-dialog");
   await expect.poll(() => document.querySelector(".excalidraw canvas")).not.toBeNull();
   const focus = () => (document.querySelector(".excalidraw") as HTMLElement).focus();
@@ -288,7 +302,7 @@ test("the guard bites while editing: help and the palette open bare, and nothing
   await userEvent.keyboard("0");
   await new Promise((settled) => setTimeout(settled, 300));
   expect(document.querySelector(".sidebar")).toBeNull();
-  await bare.unmount();
+  await excalidraw.unmount();
   const screen = await render(
     <CanvasHostContext value={editing}>
       <CanvasDialog

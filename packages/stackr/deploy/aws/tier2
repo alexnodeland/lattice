@@ -369,7 +369,8 @@ ask() {
 }
 bearer() { printf 'header = "Authorization: Bearer %s"\n' "$1"; }
 # Asks, with nothing on curl's standard input, until the answer's status is the one expected, 30
-# times at most.
+# times at most, 5 seconds apart: a service still starting is waited for, and one that never
+# answers so is said to have been, with the last answer.
 answers() {
   local what=$1 expected=$2 got
   shift 2
@@ -381,7 +382,7 @@ answers() {
   if [[ $got == "$expected" ]]; then
     echo "ok: $what"
   else
-    fail "$what: $got, not $expected"
+    fail "$what: $got, not $expected, still after 30 tries over 150 seconds"
   fi
 }
 answers "the application, through the load balancer" 200 --header "Host: app.stackr.test" http://floci:443/healthz

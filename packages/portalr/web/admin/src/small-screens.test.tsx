@@ -54,8 +54,27 @@ async function serve(_request: Request, path: string): Promise<Response | undefi
       { status: 403 },
     );
   if (path === "/artifactr/v1/workspaces") return Response.json(["notes", "launch"]);
-  if (path === "/portalr/v1/settings" || path.startsWith("/portalr/v1/tenants/acme/settings"))
-    return Response.json([]);
+  if (path === "/portalr/v1/people") return Response.json({ people: {} });
+  if (/^\/grantr\/v1\/tenants\/acme(\/workspaces\/[^/]+)?\/settings$/.test(path))
+    return Response.json({
+      settings: [
+        {
+          key: "connect-per-hour:freecad",
+          description: "How many connections an hour.",
+          kind: { type: "int_range", low: 0, high: 1000, universe: null },
+          default: 30,
+          lowest: "workspace",
+          operator: 60,
+          tenant: null,
+          workspace: null,
+          version: 0,
+          ceiling: 60,
+          ceiling_set_by: "operator",
+          effective: 60,
+        },
+      ],
+      unknown: [],
+    });
   return undefined;
 }
 afterEach(() => vi.unstubAllGlobals());
@@ -80,6 +99,7 @@ const WIDTHS = [320, 360, 390, 430, 768];
 const ROUTES: [string, string, readonly string[], string][] = [
   ["members", "/t/acme/access/members", TENANT_ACTIONS, "Access"],
   ["usage", "/t/acme/usage", ["portalr:read_spend"], "Usage"],
+  ["settings", "/t/acme/settings", ["grantr:manage_settings"], "Settings"],
 ];
 for (const [what, path, allowed, heading] of ROUTES) {
   for (const width of WIDTHS) {
@@ -91,7 +111,11 @@ for (const [what, path, allowed, heading] of ROUTES) {
         .element(
           screen
             .getByText(
-              what === "members" ? "a-service-principal-with-a-very-long-name-indeed" : "notes",
+              {
+                members: "a-service-principal-with-a-very-long-name-indeed",
+                usage: "notes",
+                settings: "How many connections an hour.",
+              }[what] ?? what,
               { exact: false },
             )
             .first(),

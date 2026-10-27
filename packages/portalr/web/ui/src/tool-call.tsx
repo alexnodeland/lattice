@@ -72,6 +72,7 @@ function Part({
         <span className={TYPE.note}>{name}</span>
         <CopyButton text={shown} what={what} />
       </div>
+      {/* As recorded, unescaped: the add-on's escapes would cost the first load bytes it hasn't. */}
       {region(<pre className="whitespace-pre-wrap break-words p-3 font-mono text-xs">{shown}</pre>)}
       {cut && <p className={TYPE.note}>Cut short: the run keeps the first part of each value.</p>}
     </div>

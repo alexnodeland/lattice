@@ -16,7 +16,11 @@ import { TYPE } from "../type";
 /** The most characters formatted, or indented: past it, a value is shown as recorded, with a note. */
 export const LONGEST = 200_000;
 
-/** A number of sixteen digits or more, or in exponent form, which parsing may round. */
+/**
+ * A number of sixteen digits or more, or in exponent form, which parsing may round: a partial
+ * guard, as a shorter number can round too. Where it matches, Formatted's Copy gives the value as
+ * recorded rather than the parsed value it shows.
+ */
 const LONG_NUMBER = /(?:^|[^\w."])-?\d{16,}|\d[eE][+-]?\d/;
 
 /** The deepest nesting, and the most values, laid out: past either, a value is shown raw. */

@@ -443,7 +443,15 @@ export function Streaming({
         // The thinking, folded under a line that says it is thinking, or for how long it
         // thought: live only, never kept, which the panel says. Nothing of it is announced.
         <Disclosure
-          summary={live && addon ? <addon.Thought live={live} ended={ended} /> : "Thinking…"}
+          summary={
+            live && addon ? (
+              <addon.Thought live={live} ended={ended} />
+            ) : live?.phase === "thinking" && !ended ? (
+              "Thinking…"
+            ) : (
+              "Thought" // how long, once the add-on has loaded
+            )
+          }
           className={TYPE.note}
         >
           <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words font-mono text-xs">

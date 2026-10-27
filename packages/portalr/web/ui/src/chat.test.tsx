@@ -1369,3 +1369,46 @@ test("the strip keeps its tokens' row from the start, and says how a turn ended 
   await screen.rerender(<RunStrip run={{ ...run("stopped"), live: live() }} now={now} />);
   await expect.poll(() => status.textContent).toBe("Stopped");
 });
+
+test("a turn that ended with no words draws no bubble, and says it didn't finish", async () => {
+  const screen = await render(
+    <Messages>
+      <Streaming text="" live={live({ thinking: "mm" })} ended="failed" author="Assistant" />
+    </Messages>,
+  );
+  const item = screen.getByRole("listitem", { name: "Assistant didn't finish" });
+  await expect.element(item).toBeVisible();
+  // No bubble under the author, and no dots in one.
+  expect(item.element().querySelector(":scope > div.max-w-full")).toBeNull();
+  expect(item.element().querySelector(".animate-pulse, .h-6")).toBeNull();
+});
+
+test("a thinking part still open as the turn ended counts to its last frame", async () => {
+  const screen = await render(
+    <Messages>
+      <Streaming
+        text=""
+        live={live({ phase: "thinking", thinking: "mm", thoughtMs: 1000, since: 1000, at: 3000 })}
+        ended="failed"
+        author="Assistant"
+      />
+    </Messages>,
+  );
+  await expect.element(screen.getByRole("button", { name: "Thought for 3 s" })).toBeVisible();
+});
+
+test("thinking is isolated, so a direction mark in it can't reorder what follows", async () => {
+  const screen = await render(
+    <Messages>
+      <Streaming
+        text=""
+        live={live({ phase: "thinking", thinking: "a\u202eb" })}
+        author="Assistant"
+      />
+    </Messages>,
+  );
+  await screen.getByRole("button", { name: "Thinking…" }).click();
+  const shown = screen.getByText("a\u202eb");
+  await expect.element(shown).toBeVisible();
+  expect(shown.element().tagName).toBe("BDI");
+});

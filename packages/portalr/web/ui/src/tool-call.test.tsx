@@ -314,7 +314,7 @@ test("each part has its own view, a scalar has none, and a string's direction ma
     <ToolCalls>
       <ToolCall
         tool={tool({
-          args: '{"note": "right\u202eleft", "n": 12345678901234567890}',
+          args: '{"note": "right\u202eleft\u061cend", "n": 12345678901234567890}',
           result: '{"ok": true}',
         })}
       />
@@ -327,11 +327,14 @@ test("each part has its own view, a scalar has none, and a string's direction ma
   await expect
     .element(args.getByRole("button", { name: "Raw" }))
     .toHaveAttribute("aria-pressed", "true");
+  // Raw is as recorded, with direction marks shown as their escapes.
+  const raw = screen.getByRole("region", { name: "The arguments of create_artifact" });
+  await expect.element(raw.getByText(/right\\u202eleft\\u061cend/)).toBeVisible();
   await expect
     .element(result.getByRole("button", { name: "Formatted" }))
     .toHaveAttribute("aria-pressed", "true");
   await args.getByRole("button", { name: "Formatted" }).click();
-  await expect.element(screen.getByText('"right\\u202eleft"')).toBeVisible();
+  await expect.element(screen.getByText('"right\\u202eleft\\u061cend"')).toBeVisible();
   await expect.element(screen.getByText(/Long numbers may be rounded here/)).toBeVisible();
   await screen.rerender(
     <ToolCalls>

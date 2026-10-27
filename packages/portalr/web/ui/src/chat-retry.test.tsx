@@ -1,7 +1,7 @@
 import type { Artifactr } from "@portalr/client";
 import { expect, onTestFinished, test, vi } from "vitest";
 import { render } from "vitest-browser-react";
-import { RunStrip } from "./chat";
+import { Messages, RunStrip, Streaming } from "./chat";
 import { useRetrying } from "./on-demand";
 import { ToolCall, ToolCalls } from "./tool-call";
 
@@ -105,4 +105,26 @@ test("before the formatted view loads, a call's Copy copies what it shows", asyn
   await expect.element(region).toBeVisible();
   await screen.getByRole("button", { name: "Copy the arguments of create_artifact" }).click();
   expect(written).toHaveBeenLastCalledWith(region.element().textContent);
+});
+
+test("before the streaming add-on loads, an ended turn's thinking says it thought", async () => {
+  const retrying = vi.mocked(useRetrying);
+  const real = retrying.getMockImplementation();
+  retrying.mockImplementation(() => null);
+  onTestFinished(() => {
+    retrying.mockImplementation(real ?? (() => null));
+  });
+  const thinking = { ...live, phase: "thinking" as const, thinking: "mm" };
+  const screen = await render(
+    <Messages>
+      <Streaming text="" live={thinking} ended="failed" author="Assistant" />
+    </Messages>,
+  );
+  await expect.element(screen.getByRole("button", { name: "Thought", exact: true })).toBeVisible();
+  await screen.rerender(
+    <Messages>
+      <Streaming text="" live={thinking} author="Assistant" />
+    </Messages>,
+  );
+  await expect.element(screen.getByRole("button", { name: "Thinking…" })).toBeVisible();
 });

@@ -312,3 +312,129 @@ test("reconnect works handed on detached, as a page gives it to a button, and co
   reconnect();
   await until(store, (snapshot) => snapshot.status === "live");
 });
+
+/** A WebSocket that does what the test says, on the timers the test controls. */
+class FakeSocket {
+  static all: FakeSocket[] = [];
+  onopen: (() => void) | null = null;
+  onmessage: ((message: { data: string }) => void) | null = null;
+  onclose: ((closed: { code: number }) => void) | null = null;
+  constructor() {
+    FakeSocket.all.push(this);
+  }
+  send() {}
+  close() {}
+  /** Connected and caught up, as a server that then drops it does. */
+  caughtUp() {
+    this.onopen?.();
+    const say = (frame: object) => this.onmessage?.({ data: JSON.stringify(frame) });
+    say({
+      type: "welcome",
+      protocol: "artifactr.v1",
+      workspace_id: "w",
+      head_seq: 0,
+      reset: false,
+    });
+    say({ type: "replay_complete", up_to_seq: 0 });
+  }
+  /** Dropped by the server with `code`. */
+  drop(code: number) {
+    this.onclose?.({ code });
+  }
+}
+
+const last = () => {
+  const socket = FakeSocket.all.at(-1);
+  if (!socket) {
+    throw new Error("no socket");
+  }
+  return socket;
+};
+
+/** Milliseconds from a drop until the next connection, found by stepping the clock. */
+function waitForNext(): number {
+  const before = FakeSocket.all.length;
+  let waited = 0;
+  while (FakeSocket.all.length === before && waited < 60_000) {
+    vi.advanceTimersByTime(50);
+    waited += 50;
+  }
+  return waited;
+}
+
+/** A store on a fake clock and fake sockets, with `Math.random` fixed at `random`. */
+function onFakes(random: number) {
+  vi.useFakeTimers();
+  vi.spyOn(Math, "random").mockReturnValue(random);
+  vi.stubGlobal("WebSocket", FakeSocket);
+  FakeSocket.all = [];
+  stream = new Stream(artifactr, { url: () => "ws://x" });
+  stream.open();
+}
+
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
+test.each([
+  [1, [100, 500, 1000, 2000, 5000, 5000]],
+  [0, [50, 250, 500, 1000, 2500, 2500]],
+])(
+  "a connection dropped the moment it is caught up backs off, not in a loop (random %d)",
+  (random, expected) => {
+    onFakes(random);
+    const waits: number[] = [];
+    for (let n = 0; n < 6; n++) {
+      last().caughtUp();
+      last().drop(4429);
+      waits.push(waitForNext());
+    }
+    expect(waits).toEqual(expected);
+    // One that stays live for a while is a fresh start.
+    last().caughtUp();
+    vi.advanceTimersByTime(10_000);
+    last().drop(1006);
+    expect(waitForNext()).toBe(random === 1 ? 100 : 50);
+  },
+);
+
+test.each([4400, 4401, 4403])("a drop with %d is not retried, and leaves no timer", (code) => {
+  onFakes(1);
+  last().caughtUp();
+  last().drop(code);
+  expect(stream.snapshot().status).toBe("closed");
+  expect(vi.getTimerCount()).toBe(0);
+  vi.advanceTimersByTime(60_000);
+  expect(FakeSocket.all).toHaveLength(1);
+});
+
+test("close() leaves no timer behind, mid-backoff or live", () => {
+  onFakes(1);
+  last().caughtUp();
+  stream.close();
+  expect(vi.getTimerCount()).toBe(0);
+  onFakes(1);
+  last().drop(1006); // waiting to reconnect
+  stream.close();
+  expect(vi.getTimerCount()).toBe(0);
+  vi.advanceTimersByTime(60_000);
+  expect(FakeSocket.all).toHaveLength(1);
+});
+
+test("reconnect() mid-backoff connects once, starts the backoff over, and leaves one timer", () => {
+  onFakes(1);
+  for (let n = 0; n < 3; n++) {
+    last().drop(1006);
+    waitForNext();
+  }
+  last().drop(1006); // the fourth wait would be 2000
+  const before = FakeSocket.all.length;
+  stream.reconnect();
+  expect(FakeSocket.all).toHaveLength(before + 1);
+  expect(vi.getTimerCount()).toBe(0);
+  last().drop(1006);
+  expect(waitForNext()).toBe(100);
+  expect(FakeSocket.all).toHaveLength(before + 2);
+});

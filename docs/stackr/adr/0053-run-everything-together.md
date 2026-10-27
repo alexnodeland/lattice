@@ -39,6 +39,8 @@ Only the smoke test's `make smoke-app` did all of this, and only for itself.
 - **Running it again is safe.** It generates the application and makes the keys once.
 - **`make dev-down` runs each project's own `make down`, the application's first, which keeps their data.** `make dev-reset` deletes the containers and volumes of exactly the two projects, the application's (as its `compose.yaml` names it, which must be a project name and not `stackr`) and then `stackr`, with `docker compose -p <name> down --volumes`, once you type `yes` in a terminal. It shows the Docker context first, and says that `stackr` is the one stack every clone and worktree on the machine shares. `COMPOSE_PROJECT_NAME` and the other `COMPOSE_*` settings are unset, so neither project is renamed. `down -p <name>` needs no compose file: Compose v2, which `make dev` checks for, finds a project's containers and volumes by its labels. Nothing else of Docker's is removed. The gateway's keys went with the stack's data, so reset takes them out of the application's `.env`, and the next `make dev` makes new ones.
 
+> **Amended (2026-10-27) by [portalr ADR-0084](../../portalr/adr/0084-several-portal-origins-an-allow-list-aliases-and-a-union-policy.md):** the application in `.local/run/portal` gets `PORTAL_EXTRA_URLS` and the new `make tailnet` by `copier update`. `make tailnet` in its directory is the one other writer of its `.env`: one key, `PORTAL_EXTRA_URLS`, in place and mode 0600 kept, which `make tailnet-off` removes; `scripts/wire-app` and `make dev` leave it as it is, and `make up` (or `make dev`) applies it.
+
 ## Consequences
 
 - One command runs the system as a person would use it, at the clone's committed and pushed code.

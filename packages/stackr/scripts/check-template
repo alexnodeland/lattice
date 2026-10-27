@@ -158,7 +158,9 @@ def expected_sources(variant: Variant, commit: str) -> dict[str, dict[str, str]]
         "relayr-ai": variant.bridge,
         "portalr": variant.access == "grantr" and variant.portal,
         "lattice-core-ai": (variant.libraries != "reflexr" and (variant.ui or variant.native_files))
-        or (variant.bridge and variant.tracker != "none"),
+        or (variant.bridge and variant.tracker != "none")
+        # The portal reads its other origins with lattice_core.origins (portalr ADR-0084).
+        or (variant.access == "grantr" and variant.portal),
     }
     return {
         name: {"git": REPOSITORY, "subdirectory": f"packages/{DIRECTORIES[name]}", "rev": commit}

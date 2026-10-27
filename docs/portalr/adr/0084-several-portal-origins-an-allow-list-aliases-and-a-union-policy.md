@@ -28,7 +28,7 @@ The owner decided (2026-10-27): proper support for several origins, not a hack; 
 - **Each extra origin is trusted as the portal is:** it may frame the sandbox and the editors and drive their bridges. Only origins the operator controls go in the list, which is why the rule is strict and the list short.
 - **Held in Chromium** by `ui`'s CSP tests (`csp/origins.test.ts`): the harness page reached at `127.0.0.1` and at `localhost`, two origins, each runs a mini app in the sandbox beside it (`http://localhost:<apps port>` beside `http://localhost:<page port>`) and hears the shim's `ready` from the editor beside it; a third origin that frames the sandbox or the shim is refused by their `frame-ancestors`, and hears nothing; the sandbox and the shim answer only the portal origin their frame names, which must be the page's own, so a page at one portal origin can't speak as another; and a shim framed with no `?host=`, or one it wasn't told, loads nothing.
 
-Built here (lattice-core, artifactr, portalr). Planned, in the next change: stackr's template reads `PORTAL_EXTRA_URLS` (a comma-separated list, through `origins(..., canonical=PORTAL_URL)`), passes `origin=`, `aliases={extra: beside(...)}` to `Site`, every apps' and portal origin to `SandboxOrigin`, and every portal origin to each editor's `editor_app`; and `make tailnet` forwards the apps' and editors' ports beside 443 and writes that one key.
+Built in two changes: first lattice-core, artifactr and portalr; then stackr's template, which reads `PORTAL_EXTRA_URLS` (a comma-separated list, through `origins(..., canonical=PORTAL_URL)`), passes `origin=`, `aliases={extra: beside(...)}` to `Site`, every apps' and portal origin to `SandboxOrigin`, and every portal origin to each editor's `editor_app`; and `make tailnet` forwards the apps' and running editors' ports beside 443, tailnet only and all or nothing, and writes that one key ([stackr ADR-0042](../../stackr/adr/0042-a-generated-application-as-a-local-product.md), amended).
 
 ## Options considered
 
@@ -49,16 +49,16 @@ An allow-list costs one setting and keeps every policy static and explicit, whic
 
 ## Consequences
 
-- Easier: a deployment reached at two addresses runs mini apps and opens editors in place from both, once the template names them (planned).
+- Easier: a deployment reached at two addresses runs mini apps and opens editors in place from both: on a tailnet, after `make tailnet` and `make up`.
 - Easier: every origin the portal is told is checked the same way, in one place, and a mistake fails the start with its reason.
 - Harder: plain http is refused off loopback, where the shim's regular expression took it; a deployment that named a LAN address over plain http must use https or a loopback address. The owner's local stacks bind loopback by default.
 - Harder: an origin is served in lower case with its default port left out; a deployment that spelled one otherwise sees the policy change, with the same meaning to a browser.
 - Harder: the shim's script changed, so its hash in its policy did; its page is no longer byte for byte what it was.
-- Deferred: the template and `make tailnet`; a `Host` allow-list on the application against DNS rebinding on loopback; a custom domain beside a tailnet, which needs the places named explicitly, since `beside` derives none for an edge on the default port.
+- Deferred: a `Host` allow-list on the application against DNS rebinding on loopback; a custom domain beside a tailnet, which needs the places named explicitly, since `beside` derives none for an edge on the default port.
 - Budget: no size budget's ceiling moved for the resolver and the reason.
 
 ## Action items
 
 1. [x] `lattice_core.origins`; the shim, the editor and the sandbox on one origin or several; `Site.origin`, `Site.aliases`, `Place`, `beside`; `config.json`; the union policy.
 2. [x] `deploymentAt`, `?host=` on the shim's URL, the reason at an unknown address; the CSP harness at two origins.
-3. [ ] stackr's template and `make tailnet` ([stackr ADR-0042](../../stackr/adr/0042-a-generated-application-as-a-local-product.md), [ADR-0043](../../stackr/adr/0043-native-files-in-the-template.md) and [ADR-0053](../../stackr/adr/0053-run-everything-together.md) to amend).
+3. [x] stackr's template and `make tailnet` ([stackr ADR-0042](../../stackr/adr/0042-a-generated-application-as-a-local-product.md), [ADR-0043](../../stackr/adr/0043-native-files-in-the-template.md) and [ADR-0053](../../stackr/adr/0053-run-everything-together.md), amended).

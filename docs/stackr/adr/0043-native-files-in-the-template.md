@@ -74,6 +74,8 @@ Three things settled the shape:
 
 > **Amended (2026-10-26):** WordCraft 0.11.0 has the `?host=parent` bridge ([files ADR-0010](../../artifactr/files/adr/0010-a-shim-beside-the-build-and-talk-level-one-plus.md)), so it has an editor too, `WORDCRAFT_EDITOR_PORT`, at `app_port` and five: four editors, and the next five ports after the application's are the mini apps' and the editors', so `app_port` is at most 65530. The editors at the edge are four, and `wordcraft.<domain>` is served by the same rule.
 
+> **Amended (2026-10-27) by [portalr ADR-0084](../../portalr/adr/0084-several-portal-origins-an-allow-list-aliases-and-a-union-policy.md):** on a tailnet, `make tailnet` serves each running editor's port itself, and writes `PORTAL_EXTRA_URLS`, the portal's other origin, so `PORTAL_URL` stays `http://127.0.0.1:<app_port>` and `FILES_EDITORS` stays empty. Each editor's shim and `frame-ancestors` name every portal origin (`PORTAL_URL` and `PORTAL_EXTRA_URLS`, which compose.yaml passes to each editor), and `config.json` names the editors beside each other origin, on the ports they have here. An editor with no port of its own, at the edge, can't be beside another origin: the application refuses to start with both, and says why.
+
 ### The proof
 
 `scripts/check-files [APP...]`, `moon run stackr:files`, generates an application at `HEAD`, builds the workers of every app a worker runs, and the editors of the four bridged ones, starts them with the application's own `compose.yaml`, and checks, for each:

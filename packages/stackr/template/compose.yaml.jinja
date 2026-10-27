@@ -89,8 +89,10 @@ x-files-editor: &files-editor
   memswap_limit: 256m
   pids_limit: 64
   environment:
-    # The portal's origin, the only one that may frame the editor.
+    # The portal's origin, and its other origins, such as the tailnet name `make tailnet` writes:
+    # the only pages that may frame the editor.
     PORTAL_URL: ${PORTAL_URL:-http://127.0.0.1:${APP_PORT:-{{ app_port }}}}
+    PORTAL_EXTRA_URLS: ${PORTAL_EXTRA_URLS:-}
   networks: [editors]
   healthcheck:
     test:

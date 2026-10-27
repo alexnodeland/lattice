@@ -1,6 +1,6 @@
 # ADR-0080: Ink on paper, the product's visual language
 
-**Status:** Accepted, amended by [ADR-0081](0081-plain-a-bright-page-one-colour-and-a-mark-for-what-waits.md) (the rule, the shape, the badges, the rail's current area, the message grammar, the rhythm)
+**Status:** Accepted, amended by [ADR-0081](0081-plain-a-bright-page-one-colour-and-a-mark-for-what-waits.md) (the rule, the shape, the badges, the rail's current area, the message grammar, the rhythm), amended by [ADR-0085](0085-polish-one-shape-per-part-and-what-is-folded.md) (the rhythm, the mark in the frame)
 **Date:** 2026-10-26
 **Deciders:** Alex Nodeland
 **Amends:** [ADR-0019](0019-the-kits-look.md) (the paper, the edges, the raised surfaces), [ADR-0039](0039-elevation-status-colour-states-and-density.md) (elevation and the badge's pill), [ADR-0053](0053-the-chats-questions-tool-calls-sides-failures-and-streaming.md) (the bubble) and [ADR-0062](0062-badges-and-headings.md) (the badge's shape)

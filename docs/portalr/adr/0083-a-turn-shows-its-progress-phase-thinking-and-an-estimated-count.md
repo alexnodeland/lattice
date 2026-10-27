@@ -1,6 +1,6 @@
 # ADR-0083: A turn shows its progress: phase, thinking, and an estimated count
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0085](0085-polish-one-shape-per-part-and-what-is-folded.md) (the tokens folded under the strip)
 **Date:** 2026-10-27
 **Deciders:** Alex Nodeland
 **Amends:** [ADR-0053](0053-the-chats-questions-tool-calls-sides-failures-and-streaming.md) (what streams, and the three dots before it; a call's arguments and result, and what Copy copies), [ADR-0080](0080-ink-on-paper-the-products-visual-language.md) (the strip over a turn)

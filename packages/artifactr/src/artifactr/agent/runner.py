@@ -167,8 +167,8 @@ _ABANDONED = "the run was abandoned: its claim lapsed"
 or lived on."""
 
 NOT_TAKEN: Final = (
-    "The last message got no reply: whoever sent it isn't allowed to run the assistant in this "
-    "thread. Messages from someone who is will be answered."
+    "The last message got no reply: whoever sent it isn't allowed to start the assistant in "
+    "this thread. Ask someone who can start the assistant to send it again."
 )
 """The notice posted in a thread when a message's turn was refused (ADR-0095)."""
 

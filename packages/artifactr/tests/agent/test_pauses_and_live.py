@@ -491,6 +491,15 @@ async def test_without_a_moment_each_delta_is_sent_as_it_comes() -> None:
     ]
 
 
+async def test_offsets_count_utf16_code_units_as_a_browser_does() -> None:
+    """An emoji outside the Basic Multilingual Plane is one code point but two units."""
+    sent = await _forwarded(0, _text(0, "hi \U0001f600"), _text(0, "!"))
+    assert sent == [
+        TextDelta(part=0, delta="hi \U0001f600", offset=0),
+        TextDelta(part=0, delta="!", offset=5),
+    ]
+
+
 async def test_offsets_count_from_zero_at_each_parts_start() -> None:
     """A model response's parts are numbered from 0 again: so are their offsets."""
     sent = await _forwarded(

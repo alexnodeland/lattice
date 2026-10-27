@@ -207,10 +207,11 @@ class Stream:
         except (UnsupportedProtocol, ValidationFailed) as refused:
             await self._close(4400, refused.message)
             return
-        # Each followed run's latest turn: where its run_started is, and when it was. It is
-        # read back from the run's thread, so a run the client doesn't follow isn't read.
+        # Each followed run's latest turn: where its run_started is, and when it was. Each is
+        # read back from its run's thread, all at once; a run the client doesn't follow isn't.
         followed = [r for r in running if hello.threads is None or r.thread_id in hello.threads]
-        starts = {run.id: await _started(workspace, run.id, run.thread_id) for run in followed}
+        read = await asyncio.gather(*(_started(workspace, r.id, r.thread_id) for r in followed))
+        starts = {run.id: start for run, start in zip(followed, read, strict=True)}
         self._put(
             Welcome(
                 workspace_id=workspace.workspace_id,

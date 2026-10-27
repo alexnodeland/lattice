@@ -268,7 +268,8 @@ class Collaboration:
 
         A run it left ``running`` is recorded as abandoned, and a turn it was asked for and
         never took is started (artifactr ADR-0070, ADR-0095). It runs in the background, so
-        the open that found the workspace isn't slowed; the runner acts as the system.
+        the open that found the workspace isn't slowed; the runner acts as the system. A
+        recovery that fails is logged, and tried again as the workspace next opens.
         """
         key = (tenant_id, workspace_id)
         if key in self._recovered:
@@ -281,6 +282,7 @@ class Collaboration:
                 await self.runner.recover(workspace)
             except Exception:
                 LOGGER.exception("recovering workspace %s of %s failed", workspace_id, tenant_id)
+                self._recovered.discard(key)  # so the workspace's next open tries again
 
         task = asyncio.create_task(recover())
         self._recovering.add(task)

@@ -33,10 +33,11 @@ class TextDelta(_LiveEvent):
     part: int
     delta: str
     offset: int | None = None
-    """Where ``delta`` starts in the part, in characters from the part's start, when the sender
-    counts: a client that is sent a delta again, as a run's frames are replayed on reconnect,
-    writes it where it belongs rather than appending it twice; one past the end of what it
-    has is appended. ``None`` from a sender that doesn't count, as earlier versions didn't."""
+    """Where ``delta`` starts in the part, in UTF-16 code units from the part's start, as
+    JavaScript indexes a string, when the sender counts: a client that is sent a delta again,
+    as a run's frames are replayed on reconnect, writes it where it belongs rather than
+    appending it twice; one past the end of what it has is appended. ``None`` from a sender
+    that doesn't count, as earlier versions didn't."""
 
 
 class ThinkingDelta(_LiveEvent):

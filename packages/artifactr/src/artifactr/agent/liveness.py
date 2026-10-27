@@ -96,13 +96,17 @@ class ModelStalled(RunFailure):
 class ToolStalled(RunFailure):
     """A tool call didn't return within the turn's wait: the run fails, ``tool_stalled``.
 
-    ``tools`` names the calls still running as the wait ran out, the stalled one among them.
+    ``tools`` names the calls still running as the wait ran out: the wait starts again at each
+    event, so which of them stalled isn't known. A name called twice is named once.
     """
 
     def __init__(self, tools: Collection[str], seconds: float) -> None:
-        named = ", ".join(tools)
+        names = list(dict.fromkeys(tools))
+        named = names[0] if len(names) == 1 else f"{', '.join(names[:-1])} and {names[-1]}"
+        which = "tool" if len(names) == 1 else "tools"
         super().__init__(
-            f"the tool {named} didn't return within {seconds:g} seconds", reason="tool_stalled"
+            f"the {which} {named}, still running, didn't return within {seconds:g} seconds",
+            reason="tool_stalled",
         )
 
 
@@ -131,14 +135,15 @@ def watched(handler: EventStreamHandler, liveness: Liveness) -> EventStreamHandl
         failed: list[BaseException] = []
 
         async def pull() -> None:
+            # The stream's end is queued after its events, but not in a ``finally``: once the
+            # handler has stopped, the puller is cancelled, and a put on a full queue then would
+            # wait for a reader that is gone.
             try:
                 async for event in events:
                     await queue.put(event)
-            except BaseException as error:
+            except Exception as error:
                 failed.append(error)
-                raise
-            finally:
-                await queue.put(None)
+            await queue.put(None)
 
         async def timed() -> AsyncIterable[AgentStreamEvent]:
             limit: float | None = first

@@ -150,13 +150,13 @@ def forward_live(channel: LiveChannel, *, coalesce: float = COALESCE) -> EventSt
     comes. Any other event sends what is gathered first, so frames keep the stream's order,
     and the stream's end sends the rest.
 
-    A delta's ``offset`` is where it starts in its part, in characters: it counts from 0 at
-    each ``part_started``, and a model response's parts are numbered from 0 again, so the
-    offsets of one response's part 0 say nothing of another's. A client keeps each part's text
-    and writes a delta at its offset, ``text[:offset] + delta``, so one it is sent twice, as a
-    run's buffered frames are on reconnect, lands once; a delta past the end of what it has,
-    after a frame it was never sent, is appended; one without an offset, from an earlier
-    server, is appended too.
+    A delta's ``offset`` is where it starts in its part, in UTF-16 code units, as JavaScript
+    indexes a string: it counts from 0 at each ``part_started``, and a model response's parts
+    are numbered from 0 again, so the offsets of one response's part 0 say nothing of
+    another's. A client keeps each part's text and writes a delta at its offset,
+    ``text[:offset] + delta``, so one it is sent twice, as a run's buffered frames are on
+    reconnect, lands once; a delta past the end of what it has, after a frame it was never
+    sent, is appended; one without an offset, from an earlier server, is appended too.
     """
 
     async def handle(ctx: RunContext[Any], events: AsyncIterable[AgentStreamEvent]) -> None:
@@ -193,7 +193,7 @@ class _Gathered:
             return
         pending = self._pending
         offset = self._offsets.get(live.part, 0)
-        self._offsets[live.part] = offset + len(live.delta)
+        self._offsets[live.part] = offset + _utf16(live.delta)
         if pending is not None and type(pending) is type(live) and pending.part == live.part:
             self._pending = pending.model_copy(update={"delta": pending.delta + live.delta})
             return
@@ -206,6 +206,8 @@ class _Gathered:
             self._flush = loop.call_later(self._coalesce, self._flush_later)
 
     def _flush_later(self) -> None:
+        # No older flush is still going: a timer is set only after ``flush`` has awaited the
+        # last one, so ``_flushing`` never drops a task that is sending.
         self._flushing = asyncio.create_task(self.flush())
 
     async def flush(self) -> None:
@@ -260,3 +262,8 @@ def _args(index: int, args: str | dict[str, Any] | None) -> list[LiveEvent]:
         return []
     delta = args if isinstance(args, str) else json.dumps(args)
     return [ToolArgsDelta(part=index, delta=delta)]
+
+
+def _utf16(text: str) -> int:
+    """The length of ``text`` in UTF-16 code units, as a JavaScript client counts it."""
+    return len(text.encode("utf-16-le")) // 2

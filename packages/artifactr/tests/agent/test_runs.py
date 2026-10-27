@@ -339,6 +339,46 @@ async def test_recover_sweeps_again_once_a_dead_claim_could_have_lapsed(
     await runner.aclose()
 
 
+async def test_a_sweep_that_finds_the_thread_still_held_looks_no_more(
+    storage: InMemoryStorage, ws: Workspace, thread: Thread, gate: Gate
+) -> None:
+    """A live holder's run is left to it: it records its own run's end."""
+    left = ws.as_actor(AgentActor(thread_id=thread.id, run_id="run_left"))
+    await left.record(RunStarted(run_id="run_left", thread_id=thread.id))
+    scope = Scope(tenant_id=ws.tenant_id, workspace_id=ws.workspace_id)
+    assert await storage.acquire_lease(scope, f"thread:{thread.id}", "live", timedelta(seconds=5))
+    runner = Runner(make_agent(Script()), app=gate, look_again_after=timedelta(0))
+    await runner.recover(ws)
+    await asyncio.gather(*runner._looks)
+    assert not runner._looks, "it looked once more, and no more"
+    assert (await ws.run("run_left")).status == "running"
+    await runner.aclose()
+
+
+async def test_a_sweep_again_that_fails_is_logged(
+    storage: InMemoryStorage,
+    ws: Workspace,
+    thread: Thread,
+    gate: Gate,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    left = ws.as_actor(AgentActor(thread_id=thread.id, run_id="run_left"))
+    await left.record(RunStarted(run_id="run_left", thread_id=thread.id))
+    scope = Scope(tenant_id=ws.tenant_id, workspace_id=ws.workspace_id)
+    assert await storage.acquire_lease(scope, f"thread:{thread.id}", "dead", timedelta(seconds=5))
+    runner = Runner(make_agent(Script()), app=gate, look_again_after=timedelta(0))
+    await runner.recover(ws)
+
+    async def broken(*args: object) -> None:
+        raise RuntimeError("storage blinked")
+
+    monkeypatch.setattr(storage, "acquire_lease", broken)
+    await asyncio.gather(*runner._looks)
+    assert f"sweeping thread {thread.id} for run run_left failed" in caplog.text
+    await runner.aclose()
+
+
 async def test_a_sweep_waiting_to_look_again_is_cancelled_as_the_runner_closes(
     storage: InMemoryStorage, ws: Workspace, thread: Thread, gate: Gate
 ) -> None:

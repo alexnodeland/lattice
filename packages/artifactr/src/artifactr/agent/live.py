@@ -265,5 +265,9 @@ def _args(index: int, args: str | dict[str, Any] | None) -> list[LiveEvent]:
 
 
 def _utf16(text: str) -> int:
-    """The length of ``text`` in UTF-16 code units, as a JavaScript client counts it."""
-    return len(text.encode("utf-16-le")) // 2
+    """The length of ``text`` in UTF-16 code units, as a JavaScript client counts it.
+
+    Counted, not encoded: a provider can split an escape and send a lone surrogate, which
+    an encoding would refuse.
+    """
+    return len(text) + sum(ord(c) > 0xFFFF for c in text)

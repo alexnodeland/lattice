@@ -149,7 +149,7 @@ async def test_a_tool_that_never_returns_fails_the_run_as_stalled(
     runner = Runner(make_agent(script, tools=[_slow_tools()]), app=gate, liveness=QUICK)
     handle = started(await runner.send(ws, thread.id, "Go"))
     with pytest.raises(
-        Exception, match=r"the tool hold, still running, didn't return within 0.5 seconds"
+        Exception, match=r"the tool hold is still running and didn't return within 0.5 seconds"
     ):
         await asyncio.wait_for(handle.wait(), timeout=2)
     ended = event_as((await ws.read())[-1], RunEnded)
@@ -181,7 +181,7 @@ async def test_the_stalled_tool_is_named_among_the_calls_still_running() -> None
     ctx: Any = SimpleNamespace(model=SimpleNamespace(model_name="default"))
     timed = watched(handler, Liveness(first_output=WAIT, no_output=WAIT, tool=WAIT))
     with pytest.raises(
-        ToolStalled, match=r"the tool hold, still running, didn't return within 0.5 seconds"
+        ToolStalled, match=r"the tool hold is still running and didn't return within 0.5 seconds"
     ):
         await timed(ctx, events())
     assert seen == 3, "every event reached the handler first"
@@ -189,7 +189,9 @@ async def test_the_stalled_tool_is_named_among_the_calls_still_running() -> None
 
 def test_every_call_still_running_is_named_once() -> None:
     message = str(ToolStalled(["hold", "fetch", "hold"], 600))
-    assert message == "the tools hold and fetch, still running, didn't return within 600 seconds"
+    assert message == (
+        "the tools hold and fetch are still running and didn't return within 600 seconds"
+    )
 
 
 async def test_a_handler_that_stops_with_the_queue_full_is_not_waited_on_forever() -> None:

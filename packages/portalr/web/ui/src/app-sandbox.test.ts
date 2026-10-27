@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 import POLICY from "../csp/app-policy.txt?raw";
 import { MOST_MESSAGE, PROXY_READY, RESOURCE_READY } from "./app-bridge";
 import { APP_POLICY, APP_SANDBOX, appDocument, startSandbox } from "./app-sandbox";
@@ -61,6 +61,24 @@ test("a framed sandbox says it is ready, to its host alone, and runs the app it 
   expect(frame?.title).toBe("Dice");
   expect(frame?.srcdoc).toBe(appDocument("<b>"));
   frame?.remove();
+});
+
+test("a sandbox runs the first app it is given, and passes no later one to it", () => {
+  const { parent, body, hear } = scope();
+  const source = parent as unknown as Window;
+  const given = { jsonrpc: "2.0", method: RESOURCE_READY, params: { html: "<b>" } };
+  const sent = vi.fn();
+  const app = vi.spyOn(HTMLIFrameElement.prototype, "contentWindow", "get");
+  app.mockReturnValue({ postMessage: sent } as unknown as Window);
+  hear({ source, origin: PORTAL, data: given });
+  const frame = body.querySelector("iframe") as HTMLIFrameElement;
+  hear({ source, origin: PORTAL, data: { ...given, params: { html: "<i>" } } });
+  const context = { jsonrpc: "2.0", method: "ui/notifications/host-context-changed", params: {} };
+  hear({ source, origin: PORTAL, data: context });
+  expect(body.querySelectorAll("iframe")).toHaveLength(1);
+  expect(sent.mock.calls).toEqual([[context, "*"]]);
+  app.mockRestore();
+  frame.remove();
 });
 
 test("the app's messages reach the host as JSON text within the limit; others are dropped", () => {

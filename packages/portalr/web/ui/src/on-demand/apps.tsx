@@ -7,7 +7,7 @@
  */
 
 import { AlertDialog } from "@base-ui/react/alert-dialog";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Alert } from "../alert";
 import {
   Bridge,
@@ -38,6 +38,15 @@ import { TYPE } from "../type";
  * full view.
  */
 const FITS = "200dvh";
+
+/**
+ * How long an app's document has to say it runs, in milliseconds, from its frame going into the
+ * page or loading, before the card says it didn't start, rather than leave a blank frame.
+ */
+export const START_WITHIN = 10_000;
+
+/** Why an app isn't running: its sandbox never said it was ready, or the app never said a word. */
+type Stalled = "unanswered" | "silent";
 
 /** The height a frame starts at, in pixels, until its app asks for another. */
 const FIRST_HEIGHT = 360;
@@ -159,6 +168,7 @@ export function Running({
   // The question open, read at once by the bridge, which a state would give a render late.
   const open = useRef<Asking | null>(null);
   const [quieted, setQuieted] = useState(false);
+  const [stalled, setStalled] = useState<Stalled | null>(null);
   const [run, setRun] = useState({ html: app.html, count: 0 });
   // A new version's HTML runs afresh; its state alone changing does not.
   if (run.html !== app.html) {
@@ -201,10 +211,23 @@ export function Running({
     keeper.current?.rebase({ state: app.state, version: shown.version });
   }, [app.state, shown.version]);
 
-  useEffect(() => {
+  // A layout effect, in the same task as the frame went into the page, so the bridge listens
+  // before anything the sandbox says can arrive, and hears its page load.
+  useLayoutEffect(() => {
     if (element === null) {
       return;
     }
+    // Whether the sandbox said it was ready, and the app's document that it runs. `ran` isn't
+    // cleared on a later load: the app's frame can say it runs before its sandbox's load fires.
+    let ready = false;
+    let ran = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const time = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => ran || setStalled(ready ? "silent" : "unanswered"), START_WITHIN);
+    };
+    setStalled(null);
+    time(); // a frame that never loads is timed too
     const { id } = head.current.shown;
     const kept = new StateKeeper(
       { state: head.current.app.state, version: head.current.shown.version },
@@ -240,11 +263,25 @@ export function Running({
         open: (url) => window.open(url, "_blank", "noopener,noreferrer"),
         resize: setHeight,
         quieted: () => setQuieted(true),
+        ready: () => {
+          ready = true;
+          time(); // a sandbox that answers late is given its time from then
+        },
+        started: () => {
+          ran = true;
+          setStalled(null);
+        },
       },
     });
     bridged.current = bridge;
     const heard = (event: MessageEvent) => bridge.heard(event);
     addEventListener("message", heard);
+    // Its page loaded, so a sandbox listens: given the app, if its ready was missed, and timed.
+    const loaded = () => {
+      bridge.give();
+      time();
+    };
+    element.addEventListener("load", loaded);
 
     // The host's colours and modes, sent again whenever they change.
     const changed = () => bridge.contextChanged();
@@ -260,6 +297,8 @@ export function Running({
     }
     return () => {
       removeEventListener("message", heard);
+      element.removeEventListener("load", loaded);
+      clearTimeout(timer);
       observer.disconnect();
       for (const each of media) {
         each.removeEventListener("change", changed);
@@ -329,6 +368,29 @@ export function Running({
       <p id={after} tabIndex={-1} className="sr-only">
         End of {app.title}.
       </p>
+      {stalled && (
+        <Alert tone="error">
+          <span className="flex flex-col items-start gap-2">
+            <span>
+              This app didn't start. Nothing it held is lost. Try again, or ask the agent to rebuild
+              it.
+            </span>
+            <details className="text-muted text-xs">
+              <summary>Details</summary>
+              {stalled === "silent"
+                ? `Its sandbox at ${origin} answered, but the app in it never said it runs.`
+                : `Its sandbox at ${origin} didn't answer.`}
+            </details>
+            <Button
+              variant="secondary"
+              className="px-2 py-1 text-xs"
+              onClick={() => setRun({ ...run, count: run.count + 1 })}
+            >
+              Try again
+            </Button>
+          </span>
+        </Alert>
+      )}
       {quieted && (
         <Alert tone="warn">
           This app sent more than {CALLS_A_MINUTE} messages in a minute, so it isn't answered for

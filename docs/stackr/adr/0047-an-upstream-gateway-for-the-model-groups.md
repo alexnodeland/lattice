@@ -1,6 +1,6 @@
 # ADR-0047: An upstream gateway for the model groups
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0054](0054-prompt-cache-breakpoints-at-the-gateway.md)
 **Date:** 2026-10-22
 **Deciders:** Alex Nodeland
 

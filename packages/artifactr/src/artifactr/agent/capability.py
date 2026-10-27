@@ -43,6 +43,7 @@ from pydantic_ai.exceptions import (
     UnexpectedModelBehavior,
     UserError,
 )
+from pydantic_ai.usage import RunUsage as PydanticUsage
 
 from artifactr.agent.session import Session, last_seen
 from artifactr.agent.tools import artifact_tools
@@ -209,12 +210,18 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
                 watcher.cancel()
                 await asyncio.gather(watcher, return_exceptions=True)
         except asyncio.CancelledError:
-            stopped = self._ended(session, "stopped")
+            stopped = self._ended(session, "stopped", usage=_usage(ctx.usage))
             await _record(workspace, stopped, cursor=delivered.at(delivered.seq))
             raise
         except Exception as error:
             reason = _reason(error)
-            failed = self._ended(session, "failed", error=redacted(str(error)), reason=reason)
+            failed = self._ended(
+                session,
+                "failed",
+                usage=_usage(ctx.usage),
+                error=redacted(str(error)),
+                reason=reason,
+            )
             await _record(workspace, failed, cursor=delivered.at(delivered.seq))
             raise
         await self._finish(session, result)
@@ -258,11 +265,7 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
         taken = session.delivered.at(session.delivered.seq)
         history = result.new_messages_json()
         output = result.output
-        usage = RunUsage(
-            requests=result.usage.requests,
-            input_tokens=result.usage.input_tokens,
-            output_tokens=result.usage.output_tokens,
-        )
+        usage = _usage(result.usage)
         if isinstance(output, DeferredToolRequests):
             requests = (
                 *_requests(output.calls, "question", output.metadata),
@@ -558,6 +561,17 @@ def _reason(error: Exception) -> str | None:
         return None
     exhausted = error.message.startswith("Tool ") and "exceeded max retries" in error.message
     return "tool_retries_exhausted" if exhausted else "unexpected_model_behavior"
+
+
+def _usage(usage: PydanticUsage) -> RunUsage:
+    """What a run used, as its events record it: so far, for a run that ends early."""
+    return RunUsage(
+        requests=usage.requests,
+        input_tokens=usage.input_tokens,
+        output_tokens=usage.output_tokens,
+        cache_read_tokens=usage.cache_read_tokens,
+        cache_write_tokens=usage.cache_write_tokens,
+    )
 
 
 def _wrap(notes: list[Note]) -> str:

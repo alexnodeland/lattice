@@ -1,16 +1,19 @@
 """One author per turn: a turn acts for whoever started it, and takes only their messages."""
 
 import asyncio
+import logging
 
 import pytest
 from pydantic_ai import DeferredToolRequests, FunctionToolset
 
 from artifactr.agent import Session
+from artifactr.agent.runner import NOT_TAKEN
 from artifactr.core import (
     Actor,
     AgentActor,
     AnswerDeferred,
     Forbidden,
+    MessagePosted,
     RunEnded,
     RunStarted,
     SystemActor,
@@ -25,6 +28,7 @@ from tests.agent.conftest import (
     Script,
     ask,
     call,
+    event_as,
     in_words,
     make_agent,
     make_runner,
@@ -105,7 +109,7 @@ async def test_a_resumed_run_acts_for_whoever_answered_it(
     assert script.prompt_texts(2)[-1] == "Any news?"
 
 
-def _refusing(*refused: tuple[str, str]) -> Authorize:
+def _refusing(*refused: tuple[str | None, str]) -> Authorize:
     """A hook that refuses each ``(participant acted for, action)`` pair, and allows the rest."""
 
     async def authorize(
@@ -118,7 +122,7 @@ def _refusing(*refused: tuple[str, str]) -> Authorize:
 
 
 async def test_a_message_whose_author_may_not_start_a_turn_does_not_wedge_its_thread(
-    storage: InMemoryStorage, gate: Gate
+    storage: InMemoryStorage, gate: Gate, caplog: pytest.LogCaptureFixture
 ) -> None:
     workspaces = Workspaces(storage, authorize=_refusing(("user:bob", "artifactr:record")))
     ws = await workspaces.open("tenant", "ws", actor=ALICE)
@@ -130,10 +134,39 @@ async def test_a_message_whose_author_may_not_start_a_turn_does_not_wedge_its_th
         await runner.send(bob, thread.id, "Ship it")
     assert [e.event.type for e in await ws.read()] == ["thread_created"], "the sender is refused"
     await bob.post_message(thread.id, "Ship it")  # committed without the runner
-    await started(await runner.send(ws, thread.id, "Hello")).wait()
-    await settled(thread.id, runner)
+    with caplog.at_level(logging.WARNING, logger="artifactr.agent"):
+        await started(await runner.send(ws, thread.id, "Hello")).wait()
+        await settled(thread.id, runner)
     assert await _for_whom(ws) == ["user:alice"], "Bob's message is passed over"
     assert script.prompt_texts(0)[-1] == "Hello"
+    log = await ws.read()
+    [notice] = [e for e in log if isinstance(e.event, MessagePosted) and e.event.kind == "notice"]
+    assert notice.actor == SystemActor(name="runner"), "and people are told, by the runner"
+    assert event_as(notice, MessagePosted).content == NOT_TAKEN
+    assert "artifactr:record" not in event_as(notice, MessagePosted).content, "in their words"
+    assert script.conversation() == ["Hello"], "the agent is not told the notice"
+    [skipped] = [r for r in caplog.records if "skips a turn" in r.getMessage()]
+    assert skipped.levelno == logging.WARNING
+    assert "artifactr:record is refused" in skipped.getMessage(), "the log says why"
+
+
+async def test_a_notice_the_runner_may_not_post_is_logged_and_the_turn_still_skipped(
+    storage: InMemoryStorage, gate: Gate, caplog: pytest.LogCaptureFixture
+) -> None:
+    refused = _refusing(("user:bob", "artifactr:record"), (None, "artifactr:post_message"))
+    ws = await Workspaces(storage, authorize=refused).open("tenant", "ws", actor=ALICE)
+    thread = await ws.create_thread()
+    script = Script(say("Hi Alice."))
+    runner = make_runner(make_agent(script), gate)
+    await ws.as_actor(BOB).post_message(thread.id, "Ship it")  # committed without the runner
+    with caplog.at_level(logging.WARNING, logger="artifactr.agent"):
+        await started(await runner.send(ws, thread.id, "Hello")).wait()
+        await settled(thread.id, runner)
+    assert await _for_whom(ws) == ["user:alice"], "Bob's message is still passed over"
+    log = await ws.read()
+    assert not [e for e in log if isinstance(e.event, MessagePosted) and e.event.kind == "notice"]
+    [refusal] = [r.getMessage() for r in caplog.records if "notice" in r.getMessage()]
+    assert refusal.endswith("artifactr:post_message is refused in this workspace")
 
 
 async def test_a_reply_its_author_may_not_give_is_passed_over(

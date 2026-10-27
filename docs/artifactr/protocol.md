@@ -37,7 +37,7 @@ sequenceDiagram
   "workspace_id": "ws_1",
   "head_seq": 1057,
   "reset": false,
-  "active_runs": [{"run_id": "run_42", "thread_id": "thr_9"}]
+  "active_runs": [{"run_id": "run_42", "thread_id": "thr_9", "started_at": "2026-10-27T06:36:13Z"}]
 }
 ```
 
@@ -99,7 +99,7 @@ Every durable event arrives in the same envelope. The stored envelope and the wi
 | `tool_returned` | run | `run_id`, `thread_id`, `tool_call_id`, `tool_name`, `status` (`ok`, `error`, `retry`), `summary` |
 | `run_paused` | run | `run_id`, `thread_id`, `requests`: list of `{tool_call_id, tool_name, kind: question \| approval, args}`, `usage?` |
 | `deferred_answered` | run | `run_id`, `thread_id`, `tool_call_id`, `tool_name?`: the tool whose call was answered, copied from its request, and null only on answers recorded before it was; `answer?`, `approved?` |
-| `run_ended` | run | `run_id`, `thread_id`, `status` (`completed`, `stopped`, `failed`), `usage?`, `error?`, `reason?`: a failure's typed reason, such as `guardrail_blocked`, or `abandoned` for a run whose claim lapsed, recorded by the system when its thread is next claimed |
+| `run_ended` | run | `run_id`, `thread_id`, `status` (`completed`, `stopped`, `failed`), `usage?`: what the run used, whole for a completed run and so far for one stopped or failed (`requests`, `input_tokens`, `output_tokens`, and of the input `cache_read_tokens` and `cache_write_tokens` where the provider says), `error?`, `reason?`: a failure's typed reason, such as `guardrail_blocked`; `model_stalled` for a model that sent nothing for the turn's wait, or `tool_stalled` for a tool call that didn't return in it (the error names the calls still running) ([ADR-0095](adr/0095-a-run-that-waits-on-nothing-is-failed-and-a-message-that-starts-nothing-is-told.md)); or `abandoned` for a run whose claim lapsed, recorded by the system when its thread is next claimed, or as a replacement process starts |
 | `feedback_given` | thread, or workspace for an artifact | `feedback_type`, `target` (`{kind: artifact, artifact_id, version}`, `{kind: thread, thread_id}`, `{kind: turn, run_id}` or `{kind: message, message_id, thread_id, run_id?}`), `value` (the feedback type's fields, validated), `thread_id?`, `run_id?`. The judge is the envelope's actor. |
 | `app_event` | any | `name`, `data`, `thread_id?`, `run_id?` |
 
@@ -121,14 +121,16 @@ Live frames carry a run's token-level output. They have no `seq`, are not stored
 | `event.type` | Fields | Source |
 |---|---|---|
 | `part_started` | `part`, `part_kind` (`text`, `thinking`, `tool_call`), `tool_name?` | pydantic-ai `PartStartEvent` |
-| `text_delta` | `part`, `delta` | `PartDeltaEvent` |
-| `thinking_delta` | `part`, `delta` | `PartDeltaEvent` |
+| `text_delta` | `part`, `delta`, `offset?` | `PartDeltaEvent`; the server gathers a part's deltas for about 50 ms and sends them as one, and `offset` is where the delta starts in its part, in UTF-16 code units from the part's `part_started` |
+| `thinking_delta` | `part`, `delta`, `offset?` | `PartDeltaEvent`, gathered and offset the same way; dropped first when a connection's outbox is more than half full |
 | `tool_args_delta` | `part`, `delta` | `PartDeltaEvent` |
 | `part_ended` | `part` | `PartEndEvent` |
 | `draft` | `artifact_id?`, `kind`, `data` | an application tool's `ctx.emit(ArtifactDraft(...))`: a full snapshot of an artifact being generated, not yet committed |
 | `app_live` | `name`, `data` | other application `CustomEvent`s; `data` holds the event's own fields |
 
 Durable events supersede live frames. When the agent's `message_posted` arrives, it is the authoritative text for that message. When `artifact_changed` arrives, it replaces any `draft` for that artifact.
+
+A connection that watches a run in progress is first sent the run's buffered frames, the most recent 1,024 by default, so a client that reconnects mid-reply is sent deltas it already has. A delta's `offset` makes that harmless. The rule: `offset` is where the delta starts in its part, in UTF-16 code units, as a browser's string indexes count them (an emoji outside the Basic Multilingual Plane is two), counting from 0 at the part's `part_started`; a model response's parts are numbered from 0 again, so a part is the pair of its response and its `part`, and a `part_started` whose `part` is not above the last one seen begins a new response. A client keeps each part's text and writes the delta at its offset, `text[:offset] + delta`, so a delta sent twice lands once, and one gathered differently on the second sending (`"Hello there"` at 0 where it had `"Hello"` at 0 and `" there"` at 5) lands the same. A delta past the end of what the client has, after a frame it was never sent (a `thinking_delta` the connection shed, or a frame the run's buffer no longer held), is appended; so is a delta without an offset, from an earlier server. A part whose first buffered delta starts past 0 began before the buffer: the text before it is lost until the durable `message_posted` arrives.
 
 Clients receive live frames for runs in the threads they subscribed to. `watch_run` attaches to a specific run.
 

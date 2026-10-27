@@ -307,6 +307,113 @@ async def test_a_run_left_running_is_abandoned_when_its_thread_is_next_claimed(
     assert (await ws.run(handle.run_id)).status == "completed"
 
 
+async def test_recover_abandons_a_run_a_dead_process_left_running(
+    ws: Workspace, thread: Thread, gate: Gate
+) -> None:
+    left = ws.as_actor(AgentActor(thread_id=thread.id, run_id="run_left"))
+    await left.record(RunStarted(run_id="run_left", thread_id=thread.id))  # then its process died
+    runner = make_runner(make_agent(Script()), gate)
+    assert await runner.recover(ws) == [], "nothing was asked for: no turn starts"
+    ended = event_as((await ws.read())[-1], RunEnded)
+    assert (ended.run_id, ended.status, ended.reason) == ("run_left", "failed", "abandoned")
+    assert ended.usage is None, "its usage went with its process"
+    assert await ws.runs(status="running") == [], "so no client is told it is active"
+    await runner.recover(ws)
+    assert types(await ws.read()).count("run_ended") == 1, "ended once"
+
+
+async def test_recover_sweeps_again_once_a_dead_claim_could_have_lapsed(
+    storage: InMemoryStorage, ws: Workspace, thread: Thread, gate: Gate
+) -> None:
+    """A restart finds the dead process's claim still there, for up to claim_ttl."""
+    left = ws.as_actor(AgentActor(thread_id=thread.id, run_id="run_left"))
+    await left.record(RunStarted(run_id="run_left", thread_id=thread.id))
+    scope = Scope(tenant_id=ws.tenant_id, workspace_id=ws.workspace_id)
+    dead = timedelta(milliseconds=150)
+    assert await storage.acquire_lease(scope, f"thread:{thread.id}", "dead-process", dead)
+    runner = Runner(make_agent(Script()), app=gate, look_again_after=timedelta(milliseconds=200))
+    assert await runner.recover(ws) == []
+    assert (await ws.run("run_left")).status == "running", "its claim hasn't lapsed yet"
+    await asyncio.gather(*runner._looks)  # the look again, once the dead claim could lapse
+    assert (await ws.run("run_left")).status == "failed", "swept again once it could have"
+    await runner.aclose()
+
+
+async def test_a_sweep_that_finds_the_thread_still_held_looks_no_more(
+    storage: InMemoryStorage, ws: Workspace, thread: Thread, gate: Gate
+) -> None:
+    """A live holder's run is left to it: it records its own run's end."""
+    left = ws.as_actor(AgentActor(thread_id=thread.id, run_id="run_left"))
+    await left.record(RunStarted(run_id="run_left", thread_id=thread.id))
+    scope = Scope(tenant_id=ws.tenant_id, workspace_id=ws.workspace_id)
+    assert await storage.acquire_lease(scope, f"thread:{thread.id}", "live", timedelta(seconds=5))
+    runner = Runner(make_agent(Script()), app=gate, look_again_after=timedelta(0))
+    await runner.recover(ws)
+    await asyncio.gather(*runner._looks)
+    assert not runner._looks, "it looked once more, and no more"
+    assert (await ws.run("run_left")).status == "running"
+    await runner.aclose()
+
+
+async def test_a_sweep_again_that_fails_is_logged(
+    storage: InMemoryStorage,
+    ws: Workspace,
+    thread: Thread,
+    gate: Gate,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    left = ws.as_actor(AgentActor(thread_id=thread.id, run_id="run_left"))
+    await left.record(RunStarted(run_id="run_left", thread_id=thread.id))
+    scope = Scope(tenant_id=ws.tenant_id, workspace_id=ws.workspace_id)
+    assert await storage.acquire_lease(scope, f"thread:{thread.id}", "dead", timedelta(seconds=5))
+    runner = Runner(make_agent(Script()), app=gate, look_again_after=timedelta(0))
+    await runner.recover(ws)
+
+    async def broken(*args: object) -> None:
+        raise RuntimeError("storage blinked")
+
+    monkeypatch.setattr(storage, "acquire_lease", broken)
+    await asyncio.gather(*runner._looks)
+    assert f"sweeping thread {thread.id} for run run_left failed" in caplog.text
+    await runner.aclose()
+
+
+async def test_a_sweep_waiting_to_look_again_is_cancelled_as_the_runner_closes(
+    storage: InMemoryStorage, ws: Workspace, thread: Thread, gate: Gate
+) -> None:
+    left = ws.as_actor(AgentActor(thread_id=thread.id, run_id="run_left"))
+    await left.record(RunStarted(run_id="run_left", thread_id=thread.id))
+    scope = Scope(tenant_id=ws.tenant_id, workspace_id=ws.workspace_id)
+    assert await storage.acquire_lease(scope, f"thread:{thread.id}", "dead", timedelta(seconds=5))
+    runner = Runner(make_agent(Script()), app=gate, look_again_after=timedelta(seconds=5))
+    await runner.recover(ws)
+    await runner.aclose()
+    assert (await ws.run("run_left")).status == "running", "left to the next process"
+
+
+async def test_recover_leaves_a_run_another_process_holds(
+    ws: Workspace, thread: Thread, gate: Gate
+) -> None:
+    running = ws.as_actor(AgentActor(thread_id=thread.id, run_id="run_live"))
+    runner = make_runner(make_agent(Script()), gate)
+    async with ws.claim_thread(thread.id, holder="run_live"):
+        await running.record(RunStarted(run_id="run_live", thread_id=thread.id))
+        assert await runner.recover(ws) == []
+    assert (await ws.run("run_live")).status == "running"
+
+
+async def test_recover_leaves_this_processs_own_runs(
+    ws: Workspace, thread: Thread, gate: Gate, app_tools: FunctionToolset[Session[Gate]]
+) -> None:
+    runner = make_runner(make_agent(Script(call("hold"), say("Done.")), tools=[app_tools]), gate)
+    handle = started(await runner.send(ws, thread.id, "Go"))
+    await asyncio.wait_for(gate.entered.wait(), timeout=2)
+    assert await runner.recover(ws) == []
+    gate.release.set()
+    assert (await handle.wait()).output == "Done."
+
+
 async def test_a_run_whose_claim_is_held_is_not_abandoned(
     ws: Workspace, thread: Thread, gate: Gate
 ) -> None:

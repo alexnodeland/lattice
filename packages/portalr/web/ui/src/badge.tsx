@@ -2,14 +2,15 @@ import type { ReactNode } from "react";
 import { cn } from "./cn";
 
 /**
- * A word in a pill that says what something is, not how it is going (that is `StatusBadge`'s):
+ * A word in a badge that says what something is, not how it is going (that is `StatusBadge`'s):
  * "Latest", "Recommended". Its corners and padding are the badge's tokens, its words always in a
- * colour that reads on its fill (portalr ADR-0062). `neutral` is quiet, on the surface; `accent`
- * is the working colour, for the one thing the reader is pointed to.
+ * colour that reads on its fill (portalr ADR-0062). `neutral` is quiet, on the quiet wash; `accent`
+ * is the working colour on its wash, for the one thing the reader is pointed to: the one tinted
+ * thing (ADR-0081).
  */
 const TONE = {
-  neutral: "border-line bg-surface text-muted",
-  accent: "border-accent bg-accent text-on-accent",
+  neutral: "bg-subtle text-muted",
+  accent: "bg-wash text-accent",
 } as const;
 
 export function Badge({
@@ -28,7 +29,7 @@ export function Badge({
       // What the style census counts a badge by (portalr ADR-0066).
       data-badge=""
       className={cn(
-        "inline-flex items-center whitespace-nowrap rounded-(--badge-radius) border px-(--badge-pad-end) py-(--badge-pad-y) font-semibold text-xs",
+        "inline-flex items-center whitespace-nowrap rounded-(--badge-radius) px-(--badge-pad-end) py-(--badge-pad-y) font-medium text-xs",
         TONE[tone],
       )}
     >

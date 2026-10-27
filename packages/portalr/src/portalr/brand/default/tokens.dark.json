@@ -21,35 +21,39 @@
       }
     },
     "paper": {
-      "$value": "#17111f",
+      "$value": "#121317",
       "$type": "color"
     },
     "surface": {
-      "$value": "#1f1829",
+      "$value": "#191a1f",
       "$type": "color"
     },
     "fg": {
-      "$value": "#f1eef6",
+      "$value": "#ebecef",
       "$type": "color"
     },
     "muted": {
-      "$value": "#bdb2cc",
+      "$value": "#a3a8b3",
       "$type": "color"
     },
     "line": {
-      "$value": "#3a3247",
+      "$value": "#2a2c34",
+      "$type": "color"
+    },
+    "accent": {
+      "$value": "#b798ec",
       "$type": "color"
     },
     "on-accent": {
-      "$value": "#17111f",
+      "$value": "#16181d",
       "$type": "color"
     },
     "focus": {
-      "$value": "#a77bdf",
+      "$value": "#b798ec",
       "$type": "color"
     },
     "edge": {
-      "$value": "#7d7091",
+      "$value": "#75757f",
       "$type": "color"
     },
     "status": {
@@ -63,7 +67,7 @@
       }
     },
     "on-danger": {
-      "$value": "#17111f",
+      "$value": "#16181d",
       "$type": "color"
     },
     "chart": {
@@ -131,7 +135,7 @@
       "$value": {
         "colorSpace": "srgb",
         "hex": "#000000",
-        "alpha": 0.65,
+        "alpha": 0.55,
         "components": [
           0.0,
           0.0,

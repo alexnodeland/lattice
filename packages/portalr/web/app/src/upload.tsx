@@ -12,8 +12,13 @@
 
 import { newArtifactId, type UploadAnswer, uploadFile } from "@portalr/client";
 import {
+  Alert,
+  Button,
   FileChooser,
   fileSize,
+  glyphs,
+  Icon,
+  Popover,
   plainName,
   TextLink,
   type UploadItem,
@@ -152,12 +157,21 @@ export function Uploader({
   tenant,
   workspace,
   thread,
+  attach = false,
+  files = null,
 }: {
   context: Context;
   tenant: string;
   workspace: string;
   /** The thread the files are made in, if any. */
   thread?: string;
+  /**
+   * In a thread's composer: an Attach button that opens the chooser above the composer, and the
+   * list of what is going there, rather than a zone at the page's end (portalr ADR-0080).
+   */
+  attach?: boolean;
+  /** Files dropped on the composer, taken as chosen ones. */
+  files?: FileList | null;
 }) {
   const { data: offered } = useQuery(context.queries.files.uploads(tenant, workspace));
   const [items, setItems] = useState<readonly Queued[]>([]);
@@ -235,8 +249,29 @@ export function Uploader({
     }
   }, [items, offered, send]);
 
+  const [open, setOpen] = useState(false);
+  const chooser = useRef<HTMLDivElement>(null);
+  // This render's `choose`, for files dropped on the composer: each is chosen, and the list
+  // opens to show it going. Each drop is a new FileList, and the files it holds are taken once.
+  const choosing = useRef<(file: File) => void>(() => {});
+  useEffect(() => {
+    if (files && files.length > 0) {
+      for (const file of Array.from(files)) {
+        choosing.current(file);
+      }
+      setOpen(true);
+    }
+  }, [files]);
+
   if (offered === undefined || !offered.allowed) {
-    return null;
+    // Dropped on the composer all the same: said, rather than lost without a word.
+    return attach && files && files.length > 0 ? (
+      <Alert tone="error">
+        {offered === undefined
+          ? "Files can't be added until the thread's apps are read: try again in a moment."
+          : "You can't add files to this thread."}
+      </Alert>
+    ) : null;
   }
   const on = offered.kinds.filter((kind) => kind.enabled);
   const extensions = on.flatMap((kind) => kind.extensions);
@@ -286,6 +321,69 @@ export function Uploader({
     .sort(([a], [b]) => b - a)
     .map(([most, shown]) => `${shown.join(", ")}, up to ${fileSize(most)} each`)
     .join("; ");
+  const list = (
+    <UploadList
+      items={items}
+      onStop={() => stop.current?.abort()}
+      onRemove={(id) => setItems((now) => now.filter((item) => item.id !== id))}
+      onRetry={(id) =>
+        setItems((now) =>
+          now.map((item) =>
+            item.id === id
+              ? { ...item, state: "waiting", said: undefined, tries: item.tries + 1 }
+              : item,
+          ),
+        )
+      }
+    />
+  );
+  choosing.current = choose;
+  if (attach) {
+    return (
+      <div className="flex min-w-0 flex-col">
+        <Popover
+          label="Attach files"
+          open={open}
+          onOpenChange={setOpen}
+          initialFocus={() =>
+            chooser.current?.querySelector<HTMLElement>("input[type=file]") ?? null
+          }
+          className="w-[min(var(--dialog-width),calc(100vw-var(--dialog-margin)))]"
+          trigger={
+            <Button variant="ghost" size="sm">
+              <Icon icon={glyphs.fileUp} className="size-3.5" />
+              Attach
+              {items.length > 0 && (
+                <span className="sr-only">
+                  , {items.length === 1 ? "1 file" : `${items.length} files`}
+                </span>
+              )}
+            </Button>
+          }
+        >
+          <div ref={chooser} className="flex flex-col gap-3">
+            <FileChooser
+              label="Add files to this thread"
+              hint={
+                on.length === 0
+                  ? "No app for files is on in this workspace: an admin can switch one on in its integrations."
+                  : `${sizes}.`
+              }
+              accept={extensions.join(",")}
+              multiple
+              disabled={on.length === 0}
+              onFile={choose}
+            />
+            {list}
+          </div>
+        </Popover>
+        {!open && items.length > 0 && <div className="mt-2">{list}</div>}
+        <p role="status" className="sr-only">
+          {announced}
+        </p>
+      </div>
+    );
+  }
   return (
     <div className="flex min-w-0 flex-col gap-3">
       <FileChooser
@@ -300,20 +398,7 @@ export function Uploader({
         disabled={on.length === 0}
         onFile={choose}
       />
-      <UploadList
-        items={items}
-        onStop={() => stop.current?.abort()}
-        onRemove={(id) => setItems((now) => now.filter((item) => item.id !== id))}
-        onRetry={(id) =>
-          setItems((now) =>
-            now.map((item) =>
-              item.id === id
-                ? { ...item, state: "waiting", said: undefined, tries: item.tries + 1 }
-                : item,
-            ),
-          )
-        }
-      />
+      {list}
       <p role="status" className="sr-only">
         {announced}
       </p>

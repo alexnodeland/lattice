@@ -60,8 +60,7 @@
     {
       "includes": [
         "packages/portalr/web/ui/src/artifacts.tsx",
-        "packages/portalr/web/ui/src/file-preview.tsx",
-        "packages/portalr/web/ui/src/on-demand/dashboards.tsx"
+        "packages/portalr/web/ui/src/file-preview.tsx"
       ],
       "linter": {
         "rules": {

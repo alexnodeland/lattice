@@ -1,32 +1,40 @@
 import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
-import { ExternalLink } from "lucide-react";
 import type { ComponentProps, ReactElement, ReactNode } from "react";
 import { cn } from "./cn";
 import { Icon } from "./icon";
+import { glyphs } from "./icons";
+import { FEEDBACK, RING } from "./states";
 
 /**
- * A link's variants (portalr ADR-0059):
- * - `inline`, in running text: the working colour, underlined.
- * - `subtle`, an id or a name standing alone, in a table's cell, a row or a breadcrumb: the text's
- *   colour, a quiet underline that takes the working colour when hovered. Never in running text,
- *   where only its underline would tell it from the words around it.
- * - `nav`, one of a few places to go: the working colour, underlined only when hovered.
+ * A link's variants (portalr ADR-0059, ADR-0080):
+ * - `inline`, in running text: the working colour, with a rule under it (the browser's underline,
+ *   recoloured to the kit's edge at rest and the working colour when hovered, at the kit's
+ *   offset). The rule is the one cue beside colour that it is a link, so the edge holds 3:1 on
+ *   the paper and the surface, which a test keeps.
+ * - `subtle`, an id or a name standing alone in a table's cell or a row's end: the text's colour
+ *   and weight, the working colour when hovered or reached, and no underline. Never in running
+ *   text, where nothing would tell it from the words around it; a row's name is a `RowLink`,
+ *   whose row carries the chevron.
  * - `external`, inline, opening another site in a new tab, which a mark and words say.
+ * A way on that is an action, "All threads", is a `ButtonLink`; a list's row is its own
+ * component; the places above a page are `Breadcrumbs`.
  */
-export type LinkVariant = "inline" | "subtle" | "nav" | "external";
+export type LinkVariant = "inline" | "subtle" | "external";
 
-const FOCUS =
-  "outline-offset-(--focus-offset) focus-visible:outline-(length:--focus-width) focus-visible:outline-focus";
-
-const UNDERLINE = "underline underline-offset-(--link-underline-offset)";
+const UNDERLINE =
+  "underline decoration-edge underline-offset-(--link-underline-offset) hover:decoration-accent";
 
 const LOOK: Record<LinkVariant, string> = {
   inline: `text-accent ${UNDERLINE}`,
   external: `text-accent ${UNDERLINE}`,
-  subtle: `text-fg ${UNDERLINE} decoration-edge hover:text-accent hover:decoration-accent`,
-  nav: "font-medium text-accent text-sm underline-offset-(--link-underline-offset) hover:underline",
+  subtle: "font-semibold text-fg hover:text-accent focus-visible:text-accent",
 };
+
+/** A link's look, with the ring and the feedback, for a link the kit doesn't render itself, such as Markdown's. */
+export function linkLook(variant: LinkVariant) {
+  return cn(LOOK[variant], RING, FEEDBACK);
+}
 
 type Props = Omit<ComponentProps<"a">, "className"> & {
   /**
@@ -53,7 +61,7 @@ function withMark(children: ReactNode) {
       <span className="whitespace-nowrap">
         {tail}
         <Icon
-          icon={ExternalLink}
+          icon={glyphs.externalLink}
           className="ms-(--link-mark-gap) inline size-(--link-mark-size) align-baseline"
         />
       </span>
@@ -72,7 +80,7 @@ export function TextLink({ render, variant = "inline", className, children, ...p
     defaultTagName: "a",
     render,
     props: mergeProps<"a">(props, {
-      className: cn(LOOK[variant], FOCUS, className),
+      className: cn(linkLook(variant), className),
       children: external ? withMark(children) : children,
       ...(external ? { target: "_blank", rel: "noopener noreferrer" } : {}),
     }),

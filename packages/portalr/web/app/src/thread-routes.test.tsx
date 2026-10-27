@@ -145,7 +145,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-test("a thread shows its messages by side, its calls and questions in place, and why a turn failed", async () => {
+test("a thread shows its messages, the reader's on the wash, its calls and questions in place, and why a turn failed", async () => {
   const sent: { type: string; content?: string; message_id?: string }[] = [];
   const { screen } = await open(
     "/t/acme/w/notes/threads/thr_1",
@@ -162,8 +162,12 @@ test("a thread shows its messages by side, its calls and questions in place, and
     log.getByRole("listitem", { name: "You" }).first().element(),
     log.getByRole("listitem", { name: "Assistant" }).element(),
   ];
-  expect(getComputedStyle(mine).alignSelf).toBe("flex-end");
+  // Both at the start of the line: the reader's words on the quiet wash, the agent's unboxed.
+  expect(getComputedStyle(mine).alignSelf).toBe("flex-start");
   expect(getComputedStyle(theirs).alignSelf).toBe("flex-start");
+  const words = (item: Element) => getComputedStyle(item.querySelector(":scope > div") as Element);
+  expect(words(mine).backgroundColor).not.toBe("rgba(0, 0, 0, 0)");
+  expect(words(theirs).backgroundColor).toBe("rgba(0, 0, 0, 0)");
   const [created, drafted] = log.getByRole("list", { name: "Tools" }).elements();
   expect(created?.textContent).toContain("create_artifact");
   expect(drafted?.textContent).toContain("Refused");
@@ -295,6 +299,19 @@ test("a question waiting when the thread is opened leaves the focus be, and is r
   expect(document.activeElement?.closest("#request-q1")).not.toBeNull();
 });
 
+test("opened at a request, as from Needs you, the page goes to it once the thread is shown", async () => {
+  const waiting = LOG.slice(
+    0,
+    LOG.findIndex((entry) => entry.event.type === "deferred_answered"),
+  );
+  const { screen } = await open("/t/acme/w/notes/threads/thr_1#request-q1", serve, () => null, {
+    artifactrLog: waiting,
+  });
+  await expect.element(screen.getByRole("radio", { name: "This week" })).toBeVisible();
+  await expect.poll(() => document.activeElement?.closest("#request-q1")).not.toBeNull();
+  expect(document.activeElement?.getAttribute("aria-label")).toBe("The agent asks");
+});
+
 test("another thread's question waiting when its page opens leaves the focus be too", async () => {
   const waiting = LOG.slice(
     0,
@@ -371,4 +388,58 @@ test("a thread marks itself, with its chat and its sharing, to be blocked whole 
   const log = screen.getByRole("log", { name: "Messages" });
   await expect.element(log.getByText("Planned for next week.")).toBeVisible();
   expect(log.element().closest('[data-portalr-replay="block"]')).not.toBeNull();
+});
+
+test("a turn under way has a strip with Stop, which asks the run to stop", async () => {
+  const sent: { type: string; run_id?: string }[] = [];
+  const working = LOG.slice(
+    0,
+    LOG.findIndex((entry) => entry.event.type === "run_ended" && entry.event.run_id === "run_2"),
+  );
+  const { screen } = await open(
+    "/t/acme/w/notes/threads/thr_1",
+    serve,
+    (command) => {
+      sent.push(command);
+      return null;
+    },
+    { artifactrLog: working },
+  );
+  const strip = screen.getByRole("group", { name: "This turn" });
+  await expect.element(strip.getByRole("status")).toHaveTextContent("Working");
+  await strip.getByRole("button", { name: "Stop" }).click();
+  expect(sent.at(-1)).toMatchObject({ type: "stop_run", run_id: "run_2" });
+});
+
+test("the thread's mode is switched in its head, where the reader may", async () => {
+  const sent: { type: string; thread_id?: string; mode?: string }[] = [];
+  const { screen } = await open(
+    "/t/acme/w/notes/threads/thr_1",
+    serve,
+    (command) => {
+      sent.push(command);
+      return null;
+    },
+    { artifactrLog: LOG },
+  );
+  const mode = screen.getByRole("radiogroup", { name: "Mode" });
+  await expect.element(mode.getByRole("radio", { name: "Agent edits" })).toBeChecked();
+  await mode.getByRole("radio", { name: "Agent proposes" }).click();
+  expect(sent.at(-1)).toMatchObject({
+    type: "set_thread_mode",
+    thread_id: "thr_1",
+    mode: "suggest",
+  });
+});
+
+test("a thread shown live is marked read here, as far as it is active", async () => {
+  localStorage.removeItem("portalr:seen:acme/notes");
+  const { screen } = await open("/t/acme/w/notes/threads/thr_1", serve, () => null, {
+    artifactrLog: LOG,
+  });
+  await expect.element(screen.getByRole("heading", { name: "Launch" })).toBeVisible();
+  await expect
+    .poll(() => JSON.parse(localStorage.getItem("portalr:seen:acme/notes") ?? "{}"))
+    .toEqual({ thr_1: LOG.findLast((entry) => entry.event.type === "message_posted")?.seq });
+  localStorage.removeItem("portalr:seen:acme/notes");
 });

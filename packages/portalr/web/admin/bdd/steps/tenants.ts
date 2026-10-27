@@ -22,6 +22,7 @@ Then(
 When("they fill in a new tenant, owned by {string}", async ({ page, made }, email: string) => {
   const tenant = `bdd-${crypto.randomUUID().slice(0, 8)}`;
   made.set("tenant", tenant);
+  await page.getByRole("button", { name: "Create…" }).click();
   await page.getByRole("textbox", { name: "Tenant" }).fill(tenant);
   await page.getByRole("textbox", { name: "Owner's email" }).fill(email);
 });
@@ -29,6 +30,10 @@ When("they fill in a new tenant, owned by {string}", async ({ page, made }, emai
 When(
   "they fill in the same tenant again, owned by {string}",
   async ({ page, made }, email: string) => {
+    const create = page.getByRole("button", { name: "Create…" });
+    if ((await create.getAttribute("aria-expanded")) !== "true") {
+      await create.click();
+    }
     await page.getByRole("textbox", { name: "Tenant" }).fill(made.get("tenant") ?? "");
     await page.getByRole("textbox", { name: "Owner's email" }).fill(email);
   },

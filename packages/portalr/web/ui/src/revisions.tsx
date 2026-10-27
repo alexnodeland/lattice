@@ -12,7 +12,6 @@
 
 import { Tabs } from "@base-ui/react/tabs";
 import type { Change, Granularity } from "@portalr/client/diff";
-import { Play, Square } from "lucide-react";
 import { createContext, type ReactNode, use, useEffect, useId, useMemo, useState } from "react";
 import { type AppHost, AppHostContext, MINI_APPS, stillWhy } from "./app-frame";
 import {
@@ -31,6 +30,7 @@ import { cn } from "./cn";
 import { Disclosure } from "./disclosure";
 import { Heading } from "./heading";
 import { Icon } from "./icon";
+import { glyphs } from "./icons";
 import { IntegrationsContext } from "./integrations";
 import { LineDiff, lineCounts } from "./line-diff";
 import { ago } from "./moment";
@@ -197,7 +197,7 @@ function RunPreview({ id, revision, renderer, runs }: Previewed & { runs: boolea
           size="sm"
           onClick={() => running.run(() => (live ? null : revision.version))}
         >
-          <Icon icon={live ? Square : Play} className="size-3.5" />
+          <Icon icon={live ? glyphs.square : glyphs.play} className="size-3.5" />
           {live ? `Stop version ${revision.version}` : `Run version ${revision.version}`}
         </Button>
         <p className={TYPE.note}>
@@ -368,6 +368,8 @@ function Revision({
   compare,
   archived,
   latest,
+  open,
+  onOpenChange,
   more,
   now,
 }: Previewed & {
@@ -375,12 +377,11 @@ function Revision({
   compare: Compare;
   archived: boolean;
   latest: boolean;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   more: () => ReactNode;
   now: Date;
 }) {
-  // Open as it is first shown if it is the latest; a version that arrives later leaves it as the
-  // reader left it.
-  const [open, setOpen] = useState(latest);
   // Closed, a revision says which parts changed; their counts are worked out once it is open.
   const names = useMemo(() => changedNames(pair), [pair]);
   const counted = useMemo(() => (open ? changedParts(pair, compare) : null), [open, pair, compare]);
@@ -392,7 +393,7 @@ function Revision({
       <Disclosure
         look="block"
         open={open}
-        onOpenChange={setOpen}
+        onOpenChange={onOpenChange}
         triggerClassName="rounded-(--card-radius) px-4 py-3"
         panelClassName="data-open:pt-0"
         summary={
@@ -459,6 +460,13 @@ export function Revisions({
 }): ReactNode {
   const [version, run] = useState<number | null>(null);
   const running = useMemo(() => ({ version, run }), [version]);
+  // One revision open at a time (portalr ADR-0080): the latest as the list is first shown, and
+  // a newer one as it arrives; opening another closes it.
+  const latest = revisions.reduce((most, revision) => Math.max(most, revision.version), 0);
+  const [opened, setOpened] = useState({ latest, version: latest as number | null });
+  if (opened.latest !== latest) {
+    setOpened({ latest, version: latest });
+  }
   // Each revision beside the one before; what changed is worked out as each is shown or opened.
   const shown = useMemo(() => {
     const ordered = [...revisions].sort((a, b) => a.version - b.version);
@@ -478,7 +486,7 @@ export function Revisions({
   return (
     <RunningRevision value={running}>
       <ol aria-label="Revisions" className="flex flex-col gap-3">
-        {shown.map(({ revision, before, renderer, pair }, at) => (
+        {shown.map(({ revision, before, renderer, pair }) => (
           <Revision
             key={revision.version}
             id={id}
@@ -487,7 +495,9 @@ export function Revisions({
             pair={pair}
             compare={compare}
             archived={archived}
-            latest={at === 0}
+            latest={revision.version === latest}
+            open={revision.version === opened.version}
+            onOpenChange={(open) => setOpened({ latest, version: open ? revision.version : null })}
             more={() => more?.(revision, before)}
             now={now}
           />

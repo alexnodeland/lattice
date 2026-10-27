@@ -79,6 +79,7 @@ const fill = async (
 
 test("every tenant is listed by name, with its spend and its budget", async () => {
   const { screen } = await open("/deployment/tenants");
+  await screen.getByRole("button", { name: "Create…" }).click();
   const table = screen.getByRole("table", { name: "Tenants" });
   await expect.element(table.getByRole("row", { name: /acme/ })).toBeVisible();
   const acme = table.getByRole("row", { name: /^acme/ });
@@ -99,6 +100,7 @@ test("a tenant LiteLLM has no team for says it has no budget", async () => {
   tenants = ["acme", "initech"];
   spend = { status: "ok", data: [team("acme", 1)] };
   const { screen } = await open("/deployment/tenants");
+  await screen.getByRole("button", { name: "Create…" }).click();
   await expect
     .element(screen.getByRole("table", { name: "Tenants" }).getByRole("row", { name: /^initech/ }))
     .toHaveTextContent("initech–No budget");
@@ -107,6 +109,7 @@ test("a tenant LiteLLM has no team for says it has no budget", async () => {
 test("LiteLLM not answering leaves the tenants, and says that spend isn't shown", async () => {
   spend = { status: "unavailable", reason: "litellm answered 502" };
   const { screen } = await open("/deployment/tenants");
+  await screen.getByRole("button", { name: "Create…" }).click();
   await expect.element(screen.getByRole("table", { name: "Tenants" })).toBeVisible();
   await expect
     .element(screen.getByRole("status").first())
@@ -117,6 +120,7 @@ test("LiteLLM not configured is said, and no tenants is said", async () => {
   spend = { status: "unconfigured" };
   tenants = [];
   const { screen } = await open("/deployment/tenants");
+  await screen.getByRole("button", { name: "Create…" }).click();
   await expect.element(screen.getByText("No tenants yet")).toBeVisible();
   await expect
     .element(screen.getByText(/LiteLLM isn't configured\. Spend and budgets are not shown\./))
@@ -127,6 +131,7 @@ test("a few hundred tenants are shown fifty at a time", async () => {
   tenants = Array.from({ length: 120 }, (_, at) => `t${String(at).padStart(3, "0")}`);
   spend = { status: "ok", data: [] };
   const { screen } = await open("/deployment/tenants");
+  await screen.getByRole("button", { name: "Create…" }).click();
   const rows = () =>
     screen.getByRole("table", { name: "Tenants" }).getByRole("row").elements().length - 1;
   await expect.poll(rows).toBe(50);
@@ -158,6 +163,7 @@ test("the rail offers Tenants and Audit to an operator", async () => {
 
 test("creating is not possible until the tenant and the owner's email are filled in", async () => {
   const { screen } = await open("/deployment/tenants");
+  await screen.getByRole("button", { name: "Create…" }).click();
   const create = screen.getByRole("button", { name: "Create tenant" });
   await expect.element(create).toBeDisabled();
   await fill(screen, "initech", "dan");
@@ -170,6 +176,7 @@ test("creating is not possible until the tenant and the owner's email are filled
 
 test("a tenant is confirmed, created once, and shown, and its owner's email is kept nowhere", async () => {
   const { screen } = await open("/deployment/tenants");
+  await screen.getByRole("button", { name: "Create…" }).click();
   await fill(screen, " initech ", " dan@initech.com ");
   await screen.getByRole("button", { name: "Create tenant" }).click();
   const dialog = screen.getByRole("alertdialog", { name: "Create initech?" });
@@ -211,6 +218,7 @@ test("a submit while the creation is under way is sent once", async () => {
       finish = () => resolve(Response.json({ tenant: "initech", owner: "dan" }, { status: 201 }));
     });
   const { screen } = await open("/deployment/tenants");
+  await screen.getByRole("button", { name: "Create…" }).click();
   await fill(screen, "initech", "dan@initech.com");
   await screen.getByRole("button", { name: "Create tenant" }).click();
   const dialog = screen.getByRole("alertdialog", { name: "Create initech?" });
@@ -228,6 +236,7 @@ test("a tenant that exists is refused in the dialog, which stays, and nothing el
   creation = () =>
     Response.json({ detail: { type: "invalid", message: "initech exists" } }, { status: 422 });
   const { screen } = await open("/deployment/tenants");
+  await screen.getByRole("button", { name: "Create…" }).click();
   await fill(screen, "initech", "dan@initech.com");
   await screen.getByRole("button", { name: "Create tenant" }).click();
   const dialog = screen.getByRole("alertdialog", { name: "Create initech?" });
@@ -246,6 +255,7 @@ test("an owner Supabase couldn't invite is said, without the email", async () =>
       { status: 502 },
     );
   const { screen } = await open("/deployment/tenants");
+  await screen.getByRole("button", { name: "Create…" }).click();
   await fill(screen, "initech", "dan@initech.com");
   await screen.getByRole("button", { name: "Create tenant" }).click();
   const dialog = screen.getByRole("alertdialog", { name: "Create initech?" });
@@ -263,6 +273,7 @@ test("a caller who may not create is refused in the dialog", async () => {
       { status: 403 },
     );
   const { screen } = await open("/deployment/tenants");
+  await screen.getByRole("button", { name: "Create…" }).click();
   await fill(screen, "initech", "dan@initech.com");
   await screen.getByRole("button", { name: "Create tenant" }).click();
   const dialog = screen.getByRole("alertdialog", { name: "Create initech?" });

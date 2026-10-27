@@ -32,7 +32,7 @@ test("a live status is announced as one", async () => {
   await expect.element(screen.getByRole("status")).toHaveTextContent("Working");
 });
 
-test("every tone's word reads on its pill, and only waiting for you takes the working colour", async () => {
+test("every tone is a mark and a word with no box, and only waiting for you takes the working colour", async () => {
   const screen = await render(
     <div>
       {TONES.map((tone) => (
@@ -44,8 +44,11 @@ test("every tone's word reads on its pill, and only waiting for you takes the wo
   );
   for (const tone of TONES) {
     const style = getComputedStyle(screen.getByText(tone).element());
-    expect(contrast(style.color, style.backgroundColor)).toBeGreaterThanOrEqual(4.5);
-    expect(style.backgroundColor === token("accent")).toBe(tone === "waiting");
+    // No box of its own: the word reads on whatever it sits on, the paper here.
+    expect(style.backgroundColor).toBe("rgba(0, 0, 0, 0)");
+    expect(style.borderTopWidth).toBe("0px");
+    expect(contrast(style.color, token("paper"))).toBeGreaterThanOrEqual(4.5);
+    expect(style.color === token("accent")).toBe(tone === "waiting");
   }
 });
 
@@ -99,13 +102,18 @@ test("a budget's states are marks of the gold and the red, and their words stay 
   );
   const near = getComputedStyle(screen.getByText("Near budget").element());
   const over = getComputedStyle(screen.getByText("Over budget").element());
-  expect(near.borderTopColor).toBe(token("status-warn"));
-  expect(over.borderTopColor).toBe(token("status-failed"));
+  const mark = (word: string) =>
+    getComputedStyle(screen.getByText(word).element().firstElementChild as Element);
+  // The mark carries the colour (portalr ADR-0080); the word has no box (ADR-0081).
+  expect(near.backgroundColor).toBe("rgba(0, 0, 0, 0)");
+  expect(over.backgroundColor).toBe("rgba(0, 0, 0, 0)");
+  expect(mark("Near budget").borderTopColor).toBe(token("status-warn"));
+  expect(mark("Over budget").backgroundColor).toBe(token("status-failed"));
   expect(near.color).toBe(token("fg"));
   expect(over.color).toBe(token("fg"));
 });
 
-test("failed is edged and marked in the red, retrying in the gold, and succeeded is neutral", async () => {
+test("failed is marked in the red, retrying in the gold, with no box, and succeeded is neutral", async () => {
   const screen = await render(
     <div>
       <StatusBadge tone="failed">Dead-lettered</StatusBadge>
@@ -116,11 +124,11 @@ test("failed is edged and marked in the red, retrying in the gold, and succeeded
   const badge = (word: string) => getComputedStyle(screen.getByText(word).element());
   const glyph = (word: string) =>
     getComputedStyle(screen.getByText(word).element().firstElementChild as Element);
-  expect(badge("Dead-lettered").borderTopColor).toBe(token("status-failed"));
+  expect(badge("Dead-lettered").backgroundColor).toBe("rgba(0, 0, 0, 0)");
   expect(glyph("Dead-lettered").backgroundColor).toBe(token("status-failed"));
-  expect(badge("Retrying").borderTopColor).toBe(token("status-warn"));
+  expect(badge("Retrying").backgroundColor).toBe("rgba(0, 0, 0, 0)");
   expect(glyph("Retrying").borderTopColor).toBe(token("status-warn"));
-  expect(badge("Succeeded").borderTopColor).toBe(token("line"));
+  expect(badge("Succeeded").backgroundColor).toBe("rgba(0, 0, 0, 0)");
   expect(badge("Succeeded").color).toBe(token("muted"));
 });
 

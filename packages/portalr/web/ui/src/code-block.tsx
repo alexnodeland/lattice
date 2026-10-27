@@ -1,9 +1,9 @@
-import { WrapText } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { Button } from "./button";
 import { cn } from "./cn";
 import { CopyButton } from "./copy-button";
 import { Icon } from "./icon";
+import { glyphs } from "./icons";
 import { ScrollRegion } from "./scroll-region";
 
 type Props = {
@@ -38,7 +38,7 @@ export function CodeBlock({ code, language, note, children }: Props) {
             aria-pressed={wrapped}
             onClick={() => setWrapped(!wrapped)}
           >
-            <Icon icon={WrapText} className="size-3.5" />
+            <Icon icon={glyphs.wrapText} className="size-3.5" />
             Wrap
           </Button>
           <CopyButton text={code} what={what} />

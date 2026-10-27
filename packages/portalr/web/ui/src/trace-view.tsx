@@ -10,37 +10,26 @@
 
 import type { Kind, Outline, Row, Said } from "@portalr/client";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import {
-  Bot,
-  ChevronDown,
-  ChevronRight,
-  Circle,
-  Database,
-  Globe,
-  type LucideIcon,
-  Sparkles,
-  Workflow,
-  Wrench,
-} from "lucide-react";
 import { type KeyboardEvent, type ReactNode, useId, useMemo, useRef, useState } from "react";
 import { Alert } from "./alert";
 import { Button } from "./button";
 import { cn } from "./cn";
 import { Heading } from "./heading";
 import { Icon } from "./icon";
+import { type Glyph, glyphs } from "./icons";
 import { Num } from "./num";
 import { Reading } from "./skeleton";
 import { StatusBadge } from "./status-badge";
 
 /** What each kind of span is called, and the mark beside it. */
-const KINDS: Record<Kind, { word: string; mark: LucideIcon }> = {
-  workflow: { word: "Workflow", mark: Workflow },
-  agent: { word: "Agent", mark: Bot },
-  llm: { word: "Model call", mark: Sparkles },
-  tool: { word: "Tool", mark: Wrench },
-  http: { word: "HTTP request", mark: Globe },
-  database: { word: "Database", mark: Database },
-  other: { word: "Span", mark: Circle },
+const KINDS: Record<Kind, { word: string; mark: Glyph }> = {
+  workflow: { word: "Workflow", mark: glyphs.workflow },
+  agent: { word: "Agent", mark: glyphs.bot },
+  llm: { word: "Model call", mark: glyphs.sparkles },
+  tool: { word: "Tool", mark: glyphs.wrench },
+  http: { word: "HTTP request", mark: glyphs.globe },
+  database: { word: "Database", mark: glyphs.database },
+  other: { word: "Span", mark: glyphs.circle },
 };
 
 /** The height of a row of the tree, in pixels. */
@@ -286,7 +275,7 @@ export function TraceView({ outline, reveal }: { outline: Outline; reveal: Revea
                         }}
                         className="size-5 shrink-0 border-0 p-0 text-muted hover:text-fg"
                       >
-                        <Icon icon={open ? ChevronDown : ChevronRight} />
+                        <Icon icon={open ? glyphs.chevronDown : glyphs.chevronRight} />
                       </Button>
                     ) : (
                       <span aria-hidden="true" className="size-5 shrink-0" />

@@ -1,4 +1,5 @@
 import { expect, onTestFinished, test, vi } from "vitest";
+import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { IntegrationsContext } from "./integrations";
 import { linkTo, Markdown, showable } from "./markdown";
@@ -95,7 +96,12 @@ test("its links, code, quotes and tables take portalr's colours", async () => {
     <Markdown>{"[docs](https://example.com) `code`\n\n> quoted\n\n| a |\n|---|\n| b |"}</Markdown>,
   );
   const style = (element: Element) => getComputedStyle(element);
-  expect(style(screen.getByRole("link", { name: "docs" }).element()).color).toBe(token("accent"));
+  const link = screen.getByRole("link", { name: "docs" }).element();
+  expect(style(link).color).toBe(token("accent"));
+  // A message's link is the kit's inline link: reached by the keyboard, it has the kit's ring.
+  link.focus();
+  await userEvent.keyboard("{Shift}");
+  expect(style(link).outlineColor).toBe(token("focus"));
   const code = screen.getByText("code").element();
   expect(style(code).backgroundColor).toBe(token("paper"));
   expect(style(code).color).toBe(token("fg"));
@@ -246,7 +252,7 @@ test.each(HOSTILE)("hostile Markdown runs, loads and links nothing: %s", async (
     "iframe",
     "style",
     "img",
-    "svg:not(.lucide)",
+    "svg:not([data-glyph])",
     "[style], [onerror]",
   ]) {
     expect(screen.container.querySelector(element)).toBeNull();
@@ -398,4 +404,12 @@ test("TeX that expands without end is refused, and shown as its source", async (
     .element(screen.getByText("This formula couldn't be drawn: this is its source."))
     .toBeVisible();
   expect(screen.container.querySelector("math")).toBeNull();
+});
+
+test("an svg a message writes with the kit's own mark on it is still no drawing", async () => {
+  const screen = await render(
+    <Markdown>{'<svg data-glyph=""><path d="M0 0h16v16z"/></svg> words'}</Markdown>,
+  );
+  expect(screen.container.querySelector("svg")).toBeNull();
+  await expect.element(screen.getByText(/words/)).toBeVisible();
 });

@@ -1,5 +1,5 @@
 {
-  "$comment": "Each pair a kit's colours must hold in both schemes, by WCAG's contrast ratio: a foreground custom property, the background it is read on, the least ratio, and, where either is clear, the backdrop it is drawn over (the paper unless named) (lattice RFC-0007). The validator reads it, with --wash, --accent-hover, --danger-hover and --danger-wash mixed as base.css mixes them.",
+  "$comment": "Each pair a kit's colours must hold in both schemes, by WCAG's contrast ratio: a foreground custom property, the background it is read on, the least ratio, and, where either is clear, the backdrop it is drawn over (the paper unless named) (lattice RFC-0007). The validator reads it, with --wash, --subtle, --outline, --accent-hover, --danger-hover and --danger-wash mixed as base.css mixes them.",
   "pairs": [
     {
       "fg": "fg",
@@ -428,6 +428,36 @@
       "bg": "selection",
       "min": 4.5,
       "why": "selected text"
+    },
+    {
+      "fg": "fg",
+      "bg": "subtle",
+      "min": 4.5,
+      "why": "the quiet wash: the reader's words, a table's head row, a review strip"
+    },
+    {
+      "fg": "muted",
+      "bg": "subtle",
+      "min": 4.5,
+      "why": "the quiet wash: the reader's words, a table's head row, a review strip"
+    },
+    {
+      "fg": "accent",
+      "bg": "subtle",
+      "min": 4.5,
+      "why": "the quiet wash: the reader's words, a table's head row, a review strip"
+    },
+    {
+      "fg": "edge",
+      "bg": "subtle",
+      "min": 3,
+      "why": "a control on the quiet wash"
+    },
+    {
+      "fg": "focus",
+      "bg": "subtle",
+      "min": 3,
+      "why": "the quiet wash: the reader's words, a table's head row, a review strip"
     }
   ]
 }

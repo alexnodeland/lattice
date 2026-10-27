@@ -1,7 +1,6 @@
-import { AppShell, NavLink, SideNav, Switcher } from "@portalr/ui";
+import { AppShell, glyphs, NavLink, SideNav, Switcher } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, Outlet, useMatchRoute, useNavigate } from "@tanstack/react-router";
-import { FileText, MessageSquare, Play, Workflow, Zap } from "lucide-react";
 import { AppAccount } from "../../../../../analytics";
 import { useWorkspace, WorkspaceAddons, WorkspaceStreams } from "../../../../../workspace";
 
@@ -89,7 +88,7 @@ function Areas({ tenant, workspace }: { tenant: string; workspace: string }) {
   return (
     <SideNav label="Workspace">
       <NavLink
-        icon={MessageSquare}
+        icon={glyphs.messageSquare}
         count={paused}
         render={
           <Link
@@ -103,22 +102,28 @@ function Areas({ tenant, workspace }: { tenant: string; workspace: string }) {
         Threads
       </NavLink>
       <NavLink
-        icon={FileText}
+        icon={glyphs.fileText}
         render={<Link to="/t/$tenant/w/$workspace/artifacts" params={params} />}
       >
         Artifacts
       </NavLink>
       <NavLink
-        icon={Workflow}
+        icon={glyphs.workflow}
         count={open.length}
         render={<Link to="/t/$tenant/w/$workspace/proposals" params={params} />}
       >
         Proposals
       </NavLink>
-      <NavLink icon={Play} render={<Link to="/t/$tenant/w/$workspace/runs" params={params} />}>
+      <NavLink
+        icon={glyphs.play}
+        render={<Link to="/t/$tenant/w/$workspace/runs" params={params} />}
+      >
         Runs
       </NavLink>
-      <NavLink icon={Zap} render={<Link to="/t/$tenant/w/$workspace/rules" params={params} />}>
+      <NavLink
+        icon={glyphs.zap}
+        render={<Link to="/t/$tenant/w/$workspace/rules" params={params} />}
+      >
         Rules
       </NavLink>
     </SideNav>

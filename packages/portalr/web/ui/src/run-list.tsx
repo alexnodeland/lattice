@@ -8,7 +8,6 @@
 import type { Reflexr } from "@portalr/client";
 import type { ReactNode } from "react";
 import { EmptyState } from "./empty-state";
-import { Num } from "./num";
 import { Row, Rows } from "./rows";
 import { StatusBadge, type Tone } from "./status-badge";
 import { Table } from "./table";
@@ -84,7 +83,11 @@ export function RunList({
               <th scope="col">Status</th>
               <th scope="col">{title}</th>
               {started && <th scope="col">Started</th>}
-              {attempts && <th scope="col">Attempts</th>}
+              {attempts && (
+                <th scope="col" data-num="">
+                  Attempts
+                </th>
+              )}
               {feedback && <th scope="col">Feedback</th>}
               <th scope="col">
                 <span className="sr-only">Actions</span>
@@ -98,8 +101,8 @@ export function RunList({
                 <td>{run.title}</td>
                 {started && <td className="text-muted">{run.started}</td>}
                 {attempts && (
-                  <td className="text-muted">
-                    <Num>{String(run.attempts ?? "")}</Num>
+                  <td className="text-muted" data-num="">
+                    {run.attempts}
                   </td>
                 )}
                 {feedback && <td>{run.feedback}</td>}

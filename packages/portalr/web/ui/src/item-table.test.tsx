@@ -125,3 +125,53 @@ test("on a phone a card leaves out what its item has nothing for, label and all"
   await expect.element(list.getByRole("listitem", { name: "a1" }).getByText("Took")).toBeVisible();
   expect(list.getByRole("listitem", { name: "b2" }).getByText("Took").elements()).toHaveLength(0);
 });
+
+test("a card's heading sits one level under what names the table: the page's, or the heading named", async () => {
+  await page.viewport(390, 844);
+  const screen = await render(
+    <>
+      <Members />
+      <h2 id="notes">Workspace notes</h2>
+      <ItemTable
+        labelledBy="notes"
+        columns={[{ key: "to", label: "To", cell: (grant: { to: string }) => grant.to }]}
+        items={[{ to: "bob" }]}
+        keyOf={(grant) => grant.to}
+        empty={{ title: "No grants", body: "None yet." }}
+      />
+      <ItemTable
+        caption="Deep"
+        level={4}
+        columns={[{ key: "to", label: "To", cell: (grant: { to: string }) => grant.to }]}
+        items={[{ to: "dee" }]}
+        keyOf={(grant) => grant.to}
+        empty={{ title: "No grants", body: "None yet." }}
+      />
+    </>,
+  );
+  await expect.element(screen.getByRole("heading", { level: 2, name: "ci" })).toBeVisible();
+  await expect.element(screen.getByRole("heading", { level: 3, name: "bob" })).toBeVisible();
+  await expect.element(screen.getByRole("heading", { level: 4, name: "dee" })).toBeVisible();
+});
+
+test("a column of figures sits at the end of its cells, on its digits", async () => {
+  await page.viewport(1024, 768);
+  onTestFinished(() => page.viewport(414, 896));
+  const screen = await render(
+    <ItemTable
+      caption="Spend"
+      columns={[
+        { key: "ws", label: "Workspace", cell: (row: { ws: string; spend: string }) => row.ws },
+        { key: "spend", label: "Spend", numeric: true, cell: (row) => row.spend },
+      ]}
+      items={[{ ws: "main", spend: "$12.40" }]}
+      keyOf={(row) => row.ws}
+      empty={{ title: "No spend", body: "None yet." }}
+    />,
+  );
+  const cell = screen.getByRole("cell", { name: "$12.40" }).element();
+  expect(getComputedStyle(cell).textAlign).toBe("end");
+  expect(getComputedStyle(cell).fontVariantNumeric).toContain("tabular-nums");
+  const header = screen.getByRole("columnheader", { name: "Spend" }).element();
+  expect(getComputedStyle(header).textAlign).toBe("end");
+});

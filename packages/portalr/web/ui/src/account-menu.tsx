@@ -1,9 +1,10 @@
 import { Menu } from "@base-ui/react/menu";
-import { Check, LogOut } from "lucide-react";
 import { type ReactNode, useId } from "react";
 import { cn } from "./cn";
 import { Icon } from "./icon";
+import { glyphs } from "./icons";
 import { groupLabel, item, popup, separator } from "./menu";
+import { FEEDBACK, RING } from "./states";
 
 /** The scheme a person chose: the system's, or one of the two. */
 export type Appearance = "system" | "light" | "dark";
@@ -114,7 +115,7 @@ function PrivacySwitch({
           </span>
         </span>
         <Menu.CheckboxItemIndicator className="text-accent">
-          <Icon icon={Check} />
+          <Icon icon={glyphs.check} />
         </Menu.CheckboxItemIndicator>
       </Menu.CheckboxItem>
       {pending && <Note>{pending}</Note>}
@@ -158,11 +159,15 @@ export function AccountMenu({
     <Menu.Root>
       <Menu.Trigger
         aria-label={`Account: ${name}`}
-        className="inline-flex min-w-0 items-center gap-2 rounded-(--header-trigger-radius) p-1 pr-2 font-medium text-fg text-sm outline-offset-(--focus-offset) hover:bg-wash focus-visible:outline-(length:--focus-width) focus-visible:outline-focus"
+        className={cn(
+          "inline-flex min-w-0 items-center gap-2 rounded-(--header-trigger-radius) p-1 pr-2 font-medium text-fg text-sm hover:bg-wash",
+          RING,
+          FEEDBACK,
+        )}
       >
         <span
           aria-hidden="true"
-          className="grid size-7 shrink-0 place-items-center rounded-full bg-wash font-semibold text-accent text-xs"
+          className="grid size-7 shrink-0 place-items-center rounded-full bg-line font-semibold text-fg text-xs"
         >
           {initials(name)}
         </span>
@@ -180,7 +185,7 @@ export function AccountMenu({
               </Menu.GroupLabel>
               <Menu.Item className={item} onClick={onSignOut}>
                 Sign out
-                <Icon icon={LogOut} />
+                <Icon icon={glyphs.logOut} />
               </Menu.Item>
             </Menu.Group>
             <Menu.Separator className={separator} />
@@ -194,7 +199,7 @@ export function AccountMenu({
                   <Menu.RadioItem key={value} value={value} className={item}>
                     {label}
                     <Menu.RadioItemIndicator className="text-accent">
-                      <Icon icon={Check} />
+                      <Icon icon={glyphs.check} />
                     </Menu.RadioItemIndicator>
                   </Menu.RadioItem>
                 ))}
@@ -216,7 +221,7 @@ export function AccountMenu({
                   </span>
                 </span>
                 <Menu.CheckboxItemIndicator className="text-accent">
-                  <Icon icon={Check} />
+                  <Icon icon={glyphs.check} />
                 </Menu.CheckboxItemIndicator>
               </Menu.CheckboxItem>
             </Menu.Group>

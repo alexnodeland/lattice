@@ -33,7 +33,7 @@ async function matches(name: string) {
 
 test("a thread: sides, questions, tool calls with one open, and thinking, wide", async () => {
   const screen = await shown(900, <Thread />);
-  await screen.getByText("draft_rule").click();
+  await screen.getByText("draft_rule").first().click(); // the ledger's summary names its latest call
   await matches("chat-wide");
 });
 

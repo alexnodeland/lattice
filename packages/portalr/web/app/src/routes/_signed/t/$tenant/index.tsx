@@ -1,4 +1,4 @@
-import { AppShell, PageHeader, Row, RowLink, Rows, Switcher, TextLink } from "@portalr/ui";
+import { AppShell, ButtonLink, PageHeader, Row, RowLink, Rows, Switcher } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { AppAccount } from "../../../../analytics";
@@ -69,12 +69,13 @@ function Workspaces() {
                 <ul aria-label={`${workspace}'s areas`} className="flex flex-wrap gap-x-4 gap-y-1">
                   {AREAS.map(({ to, label }) => (
                     <li key={label}>
-                      <TextLink
-                        variant="nav"
+                      <ButtonLink
+                        variant="ghost"
+                        size="sm"
                         render={<Link to={to} params={{ tenant, workspace }} />}
                       >
                         {label}
-                      </TextLink>
+                      </ButtonLink>
                     </li>
                   ))}
                 </ul>

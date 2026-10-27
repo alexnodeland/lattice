@@ -1,15 +1,15 @@
 import { mergeProps } from "@base-ui/react/merge-props";
 import { Tooltip } from "@base-ui/react/tooltip";
-import type { LucideIcon } from "lucide-react";
 import { type ComponentProps, cloneElement, type ReactElement } from "react";
 import { Button, buttonLook } from "./button";
 import { cn } from "./cn";
 import { Icon } from "./icon";
+import type { Glyph } from "./icons";
 
 type Named = {
   /** What it does, in words: its name, and the tooltip a pointer or the keyboard shows. */
   label: string;
-  icon: LucideIcon;
+  icon: Glyph;
   className?: string;
   /**
    * Whether Escape, after it closes the tooltip, goes on to what holds the button: for a full

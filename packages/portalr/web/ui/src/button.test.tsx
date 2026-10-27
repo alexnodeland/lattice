@@ -1,7 +1,7 @@
 import { expect, onTestFinished, test, vi } from "vitest";
 import { commands, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
-import { Button } from "./button";
+import { Button, ButtonLink } from "./button";
 import { contrast, token } from "./test/colours";
 
 test("a primary button is set in the working colour, readably", async () => {
@@ -48,11 +48,13 @@ test("a button is pressed, unless it is disabled", async () => {
   expect(press).toHaveBeenCalledOnce();
 });
 
-test("a secondary button's edge stands out from the surface it sits on", async () => {
+test("a secondary button's outline is lighter than a field's edge: its words are its cue", async () => {
   const screen = await render(<Button variant="secondary">Deny</Button>);
   const style = getComputedStyle(screen.getByRole("button", { name: "Deny" }).element());
-  expect(style.borderTopColor).toBe(token("edge"));
-  expect(contrast(style.borderTopColor, token("paper"))).toBeGreaterThanOrEqual(3);
+  // The outline is the edge at a little over half its strength (portalr ADR-0081), still seen.
+  expect(style.borderTopColor).toBe(token("outline"));
+  expect(contrast(style.borderTopColor, token("paper"))).toBeGreaterThanOrEqual(1.5);
+  expect(contrast(token("edge"), token("paper"))).toBeGreaterThanOrEqual(3); // a field keeps it
 });
 
 test("a danger button is in the danger colour, readably", async () => {
@@ -183,4 +185,68 @@ test("colour-blind mode leaves the danger colour and its tint as they are", asyn
   expect(getComputedStyle(screen.getByRole("button", { name: "Remove" }).element()).color).toBe(
     before,
   );
+});
+
+test("a pending button can't be pressed again, looks disabled, and keeps the focus it was pressed with", async () => {
+  const press = vi.fn();
+  const screen = await render(
+    <Button pending onClick={press}>
+      Accept
+    </Button>,
+  );
+  const button = screen.getByRole("button", { name: "Accept" });
+  button.element().focus();
+  expect(document.activeElement).toBe(button.element());
+  await button.click({ force: true });
+  expect(press).not.toHaveBeenCalled();
+  await expect.element(button).toHaveAttribute("aria-disabled", "true");
+  const style = getComputedStyle(button.element());
+  expect(style.backgroundColor).toBe(token("line"));
+  expect(style.cursor).toBe("not-allowed");
+  expect(document.activeElement).toBe(button.element());
+});
+
+test("a link in a button's look stays a link: an anchor with its href, no button role, the button's edge", async () => {
+  const screen = await render(
+    <ButtonLink href="#threads" variant="secondary">
+      All threads
+    </ButtonLink>,
+  );
+  const link = screen.getByRole("link", { name: "All threads" }).element();
+  expect(link.tagName).toBe("A");
+  expect(link.getAttribute("href")).toBe("#threads");
+  expect(link.getAttribute("role")).toBeNull();
+  expect(getComputedStyle(link).borderTopColor).toBe(token("outline"));
+  expect(getComputedStyle(link).textDecorationLine).toBe("none");
+});
+
+test("a link in a button's look follows on Enter and not on Space, and shows the ring from the keyboard", async () => {
+  onTestFinished(() => history.replaceState(null, "", location.pathname + location.search));
+  const screen = await render(<ButtonLink href="#threads">All threads</ButtonLink>);
+  await userEvent.tab();
+  const link = screen.getByRole("link", { name: "All threads" }).element();
+  expect(link).toBe(document.activeElement);
+  expect(getComputedStyle(link).outlineColor).toBe(token("focus"));
+  await userEvent.keyboard(" ");
+  expect(location.hash).toBe("");
+  await userEvent.keyboard("{Enter}");
+  expect(location.hash).toBe("#threads");
+});
+
+test("a link in a button's look that is the current page is told by its weight and a rule, not colour alone", async () => {
+  const screen = await render(
+    <>
+      <ButtonLink variant="ghost" size="sm" href="#runs" aria-current="page">
+        Runs
+      </ButtonLink>
+      <ButtonLink variant="ghost" size="sm" href="#rules">
+        Rules
+      </ButtonLink>
+    </>,
+  );
+  const current = screen.getByRole("link", { name: "Runs" }).element();
+  const other = screen.getByRole("link", { name: "Rules" }).element();
+  expect(getComputedStyle(current).fontWeight).toBe("600");
+  expect(getComputedStyle(current, "::before").backgroundColor).toBe(token("accent"));
+  expect(getComputedStyle(other, "::before").backgroundColor).toBe("rgba(0, 0, 0, 0)");
 });

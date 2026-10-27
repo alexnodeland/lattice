@@ -1,6 +1,7 @@
 import { Switch as BaseSwitch } from "@base-ui/react/switch";
 import type { ComponentProps } from "react";
 import { cn } from "./cn";
+import { FEEDBACK, RING } from "./states";
 
 type Props = Omit<ComponentProps<typeof BaseSwitch.Root>, "className"> & { className?: string };
 
@@ -15,7 +16,9 @@ export function Switch({ className, ...props }: Props) {
   return (
     <BaseSwitch.Root
       className={cn(
-        "inline-flex h-(--switch-height) w-(--switch-width) items-center rounded-full border border-edge bg-paper p-(--switch-pad) outline-offset-(--focus-offset) focus-visible:outline-(length:--focus-width) focus-visible:outline-focus data-checked:border-accent data-checked:bg-accent data-disabled:cursor-not-allowed data-disabled:border-line data-disabled:bg-wash forced-color-adjust-none forced-colors:border-system-text forced-colors:bg-system-canvas forced-colors:outline-system-text forced-colors:data-checked:border-system-highlight forced-colors:data-checked:bg-system-highlight forced-colors:data-disabled:border-system-disabled forced-colors:data-checked:data-disabled:bg-system-disabled",
+        RING,
+        FEEDBACK,
+        "inline-flex h-(--switch-height) w-(--switch-width) items-center rounded-full border border-edge bg-paper p-(--switch-pad) data-checked:border-accent data-checked:bg-accent data-disabled:cursor-not-allowed data-disabled:border-line data-disabled:bg-wash forced-color-adjust-none forced-colors:border-system-text forced-colors:bg-system-canvas forced-colors:outline-system-text forced-colors:data-checked:border-system-highlight forced-colors:data-checked:bg-system-highlight forced-colors:data-disabled:border-system-disabled forced-colors:data-checked:data-disabled:bg-system-disabled",
         className,
       )}
       {...props}

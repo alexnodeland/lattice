@@ -1,6 +1,8 @@
 import { Field } from "@base-ui/react/field";
 import type { ComponentProps, ReactNode } from "react";
+import { cn } from "./cn";
 import { FormField } from "./form-field";
+import { control } from "./text-field";
 
 type Props = Omit<ComponentProps<typeof Field.Control>, "className" | "render"> & {
   label: ReactNode;
@@ -22,7 +24,7 @@ export function TextArea({ label, hint, error = null, rows = 4, className, ...pr
     <FormField label={label} hint={hint} error={error} className={className}>
       <Field.Control
         render={<textarea rows={rows} />}
-        className="min-h-16 resize-y rounded-(--input-radius) border border-edge bg-surface px-(--input-pad-x) py-(--input-pad-y) text-fg text-sm leading-normal outline-offset-(--focus-offset) placeholder:text-muted focus-visible:outline-(length:--focus-width) focus-visible:outline-focus data-disabled:cursor-not-allowed data-disabled:resize-none data-disabled:border-line data-disabled:bg-line data-disabled:text-muted data-invalid:border-fg"
+        className={cn(control, "min-h-16 resize-y leading-normal data-disabled:resize-none")}
         {...props}
       />
     </FormField>

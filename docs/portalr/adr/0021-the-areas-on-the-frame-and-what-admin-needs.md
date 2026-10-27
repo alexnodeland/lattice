@@ -21,7 +21,7 @@ The maintainer decided each of them.
 
 - **A workspace's routes render `AppShell`.**
   - The `Switcher` lists the person's tenants, from their memberships, and the workspaces grantr lets them open. Its menu also links to every workspace in the tenant.
-  - A `SideNav` holds Threads, Artifacts, Proposals, Runs and Rules, each with its Lucide icon beside its word. Threads counts the turns paused for an answer, and Proposals the open proposals.
+  - A `SideNav` holds Threads, Artifacts, Proposals, Runs and Rules, each with its Lucide (the kit's own since ADR-0080) icon beside its word. Threads counts the turns paused for an answer, and Proposals the open proposals.
   - The `AccountMenu` holds sign-out and the person's scheme. The scheme is kept in localStorage and set as `data-theme` before the app renders.
   - The workspace's streams wrap the frame, so the counts follow the log.
 - **Outside a workspace, ui's `Plain` page frames the screen:** the lockup as a link home, and one column. Choosing a tenant or a workspace also shows the account; what went wrong, with no one known, shows none. Signing in is a card. `Page` retires, and the page's background and text colour are the `html` element's.

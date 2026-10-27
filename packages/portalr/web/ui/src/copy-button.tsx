@@ -1,7 +1,7 @@
-import { Check, Copy } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "./button";
 import { Icon } from "./icon";
+import { glyphs } from "./icons";
 
 /** How long "Copied" shows before the button offers to copy again. */
 const SHOWN_MS = 2000;
@@ -52,7 +52,7 @@ export function CopyButton({
             });
         }}
       >
-        <Icon icon={copy?.said === "Copied" ? Check : Copy} className="size-3.5" />
+        <Icon icon={copy?.said === "Copied" ? glyphs.check : glyphs.copy} className="size-3.5" />
         {said}
       </Button>
       {onSaid === undefined && (

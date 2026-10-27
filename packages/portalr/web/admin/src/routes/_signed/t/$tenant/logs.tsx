@@ -1,7 +1,6 @@
 import { type createQueries, LOGS_LIMIT, type PortalrApi, type TimeSpan } from "@portalr/client";
 import {
   Button,
-  Card,
   EmptyState,
   type LineReveal,
   LogList,
@@ -16,8 +15,9 @@ import {
   type ErrorComponentProps,
   type SearchSchemaInput,
 } from "@tanstack/react-router";
-import { type FormEvent, useId, useState } from "react";
+import { type FormEvent, useState } from "react";
 import { opening } from "../../../../access";
+import { Folded, Toolbar } from "../../../../folded";
 import { Health } from "../../../../health";
 import { healthWindow, LOG_RANGES, logWindow, type Shown, shownOf } from "../../../../logs";
 import { ReadFailed } from "../../../../read-failed";
@@ -195,7 +195,6 @@ function Records({
 /** The logs' window, and a thread's or a run's id: applying them puts them in the address. */
 function Filter({ shown }: { shown: Required<Shown> }) {
   const navigate = Route.useNavigate();
-  const heading = useId();
   const [hours, setHours] = useState(String(shown.hours));
   function apply(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -203,55 +202,70 @@ function Filter({ shown }: { shown: Required<Shown> }) {
     void navigate({ search: shownOf({ ...form, health: shown.health }) });
   }
   return (
-    <Card render={<section aria-labelledby={heading} />} className="flex flex-col gap-3">
-      <SectionTitle id={heading}>Find</SectionTitle>
-      <form className="grid gap-3 sm:grid-cols-3" onSubmit={apply}>
-        <SegmentedFilter
-          label="Window"
-          showLabel
-          name="hours"
-          segments={LOG_RANGES.map((range) => ({ value: String(range.hours), label: range.label }))}
-          value={hours}
-          onValueChange={setHours}
-        />
-        <TextField
-          label="Thread"
-          name="thread"
-          defaultValue={shown.thread ?? ""}
-          autoComplete="off"
-          spellCheck={false}
-          pattern={`\\s*${ID_PATTERN}\\s*|`}
-        />
-        <TextField
-          label="Run"
-          name="run"
-          defaultValue={shown.run ?? ""}
-          autoComplete="off"
-          spellCheck={false}
-          pattern={`\\s*${ID_PATTERN}\\s*|`}
-        />
-        <div className="flex flex-wrap gap-2 sm:col-span-3">
-          <Button type="submit">Apply</Button>
-          <Button
-            variant="secondary"
-            onClick={() =>
-              void navigate({
-                search: {
-                  hours: shown.hours,
-                  health: shown.health,
-                  thread: undefined,
-                  run: undefined,
-                },
-              })
-            }
-          >
-            Clear
-          </Button>
-        </div>
-      </form>
-      <p className="text-muted text-xs">
-        The newest {LOGS_LIMIT} records of a window of a day at most are read.
-      </p>
-    </Card>
+    <Toolbar>
+      <Folded
+        title="Find"
+        action="Find…"
+        said={[
+          LOG_RANGES.find((range) => range.hours === shown.hours)?.label,
+          shown.thread && `thread ${shown.thread}`,
+          shown.run && `run ${shown.run}`,
+        ]
+          .filter(Boolean)
+          .join(", ")}
+        defaultOpen={Boolean(shown.thread || shown.run)}
+      >
+        <form className="grid gap-3 sm:grid-cols-3" onSubmit={apply}>
+          <SegmentedFilter
+            label="Window"
+            showLabel
+            name="hours"
+            segments={LOG_RANGES.map((range) => ({
+              value: String(range.hours),
+              label: range.label,
+            }))}
+            value={hours}
+            onValueChange={setHours}
+          />
+          <TextField
+            label="Thread"
+            name="thread"
+            defaultValue={shown.thread ?? ""}
+            autoComplete="off"
+            spellCheck={false}
+            pattern={`\\s*${ID_PATTERN}\\s*|`}
+          />
+          <TextField
+            label="Run"
+            name="run"
+            defaultValue={shown.run ?? ""}
+            autoComplete="off"
+            spellCheck={false}
+            pattern={`\\s*${ID_PATTERN}\\s*|`}
+          />
+          <div className="flex flex-wrap gap-2 sm:col-span-3">
+            <Button type="submit">Apply</Button>
+            <Button
+              variant="secondary"
+              onClick={() =>
+                void navigate({
+                  search: {
+                    hours: shown.hours,
+                    health: shown.health,
+                    thread: undefined,
+                    run: undefined,
+                  },
+                })
+              }
+            >
+              Clear
+            </Button>
+          </div>
+        </form>
+        <p className="text-muted text-xs">
+          The newest {LOGS_LIMIT} records of a window of a day at most are read.
+        </p>
+      </Folded>
+    </Toolbar>
   );
 }

@@ -1,19 +1,17 @@
 import type { AuditFilter } from "@portalr/client";
 import {
   Button,
-  Card,
   EmptyState,
   FailureAlert,
   ItemTable,
   Moment,
   PageHeader,
-  SectionTitle,
   SelectField,
   TextField,
 } from "@portalr/ui";
 import { useSuspenseInfiniteQuery } from "@tanstack/react-query";
 import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-router";
-import { type FormEvent, useId, useState } from "react";
+import { type FormEvent, useState } from "react";
 import { opening, useNames } from "../../../../access";
 import {
   actor,
@@ -25,6 +23,7 @@ import {
   searchOf,
   TYPES,
 } from "../../../../audit";
+import { Folded, Toolbar } from "../../../../folded";
 import { ReadFailed } from "../../../../read-failed";
 
 const HEADER = <PageHeader title="Audit" meta="Every change to who may see and do what" />;
@@ -114,58 +113,63 @@ function Audit() {
  */
 function Filter({ filter }: { filter: AuditFilter }) {
   const navigate = Route.useNavigate();
-  const heading = useId();
   const [kind, setKind] = useState<string>(filter.actor_kind ?? "");
   function apply(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     void navigate({ search: filterOf(Object.fromEntries(new FormData(event.currentTarget))) });
   }
   return (
-    <Card render={<section aria-labelledby={heading} />} className="flex flex-col gap-3">
-      <SectionTitle id={heading}>Filter</SectionTitle>
-      <form className="grid gap-3 sm:grid-cols-2" onSubmit={apply}>
-        <SelectField
-          label="Change"
-          name="type"
-          defaultValue={filter.type ?? ""}
-          options={[{ value: "", label: "Any change" }, ...TYPES]}
-        />
-        <SelectField
-          label="Made by"
-          name="actor_kind"
-          value={kind}
-          onValueChange={setKind}
-          options={MAKERS}
-        />
-        {(kind === "user" || kind === "service_principal" || kind === "rule") && (
-          <TextField
-            label={kind === "rule" ? "The rule's name" : "Their id"}
-            name="actor"
-            defaultValue={filter.actor ?? ""}
-            autoComplete="off"
-            spellCheck={false}
-            required
-            // A person's or a service principal's id, as grantr takes one.
-            {...(kind !== "rule" && { pattern: ID_FIELD })}
+    <Toolbar>
+      <Folded
+        title="Filter"
+        action="Filter…"
+        said={Object.values(filter).some(Boolean) ? "filtered" : null}
+        defaultOpen={Object.values(filter).some(Boolean)}
+      >
+        <form className="grid gap-3 sm:grid-cols-2" onSubmit={apply}>
+          <SelectField
+            label="Change"
+            name="type"
+            defaultValue={filter.type ?? ""}
+            options={[{ value: "", label: "Any change" }, ...TYPES]}
           />
-        )}
-        {kind === "rule" && (
-          <TextField
-            label="The rule's workspace"
-            name="workspace"
-            defaultValue={filter.workspace ?? ""}
-            autoComplete="off"
-            required
+          <SelectField
+            label="Made by"
+            name="actor_kind"
+            value={kind}
+            onValueChange={setKind}
+            options={MAKERS}
           />
-        )}
-        <div className="flex flex-wrap gap-2 sm:col-span-2">
-          <Button type="submit">Apply</Button>
-          <Button variant="secondary" onClick={() => void navigate({ search: {} })}>
-            Clear
-          </Button>
-        </div>
-      </form>
-    </Card>
+          {(kind === "user" || kind === "service_principal" || kind === "rule") && (
+            <TextField
+              label={kind === "rule" ? "The rule's name" : "Their id"}
+              name="actor"
+              defaultValue={filter.actor ?? ""}
+              autoComplete="off"
+              spellCheck={false}
+              required
+              // A person's or a service principal's id, as grantr takes one.
+              {...(kind !== "rule" && { pattern: ID_FIELD })}
+            />
+          )}
+          {kind === "rule" && (
+            <TextField
+              label="The rule's workspace"
+              name="workspace"
+              defaultValue={filter.workspace ?? ""}
+              autoComplete="off"
+              required
+            />
+          )}
+          <div className="flex flex-wrap gap-2 sm:col-span-2">
+            <Button type="submit">Apply</Button>
+            <Button variant="secondary" onClick={() => void navigate({ search: {} })}>
+              Clear
+            </Button>
+          </div>
+        </form>
+      </Folded>
+    </Toolbar>
   );
 }
 

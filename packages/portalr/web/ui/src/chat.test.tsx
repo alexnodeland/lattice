@@ -3,14 +3,17 @@ import { describe, expect, onTestFinished, test, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import {
+  ActionsMenu,
   CommandButton,
   Composer,
   Message,
   Messages,
+  ModeSwitch,
   ProposalCard,
   proposedOn,
   Request,
   RunStatus,
+  RunStrip,
   Streaming,
   Thumbs,
   unhidden,
@@ -105,7 +108,7 @@ test("a notice is set apart from messages", async () => {
   expect(getComputedStyle(notice).color).toBe(token("muted"));
 });
 
-test("the reader's messages are at the end of the line, everyone else's at its start", async () => {
+test("the reader's words sit on the quiet wash and the agent's are unboxed, both at the start of the line", async () => {
   const screen = await render(
     <Messages>
       <Message message={message()} author="You" mine />
@@ -114,14 +117,15 @@ test("the reader's messages are at the end of the line, everyone else's at its s
   );
   const mine = screen.getByRole("listitem", { name: "You" }).element();
   const theirs = screen.getByRole("listitem", { name: "Assistant" }).element();
-  expect(getComputedStyle(mine).alignSelf).toBe("flex-end");
+  expect(getComputedStyle(mine).alignSelf).toBe("flex-start");
   expect(getComputedStyle(theirs).alignSelf).toBe("flex-start");
-  const list = mine.parentElement as HTMLElement;
-  const [start, end] = [list.getBoundingClientRect(), mine.getBoundingClientRect()];
-  expect(Math.round(end.right)).toBe(Math.round(start.right));
-  // Right to left, the reader's go to the left: the line's end.
-  list.dir = "rtl";
-  expect(Math.round(mine.getBoundingClientRect().left)).toBe(Math.round(start.left));
+  const body = (item: Element) => getComputedStyle(item.querySelector(":scope > div") as Element);
+  expect(body(mine).backgroundColor).toBe(token("subtle"));
+  expect(body(theirs).backgroundColor).toBe("rgba(0, 0, 0, 0)");
+  expect(body(theirs).borderTopWidth).toBe("0px");
+  // The name above each: the reader's in the ink, the agent's quieter.
+  expect(getComputedStyle(screen.getByText("You").element()).color).toBe(token("fg"));
+  expect(getComputedStyle(screen.getByText("Assistant").element()).color).toBe(token("muted"));
 });
 
 test("a message on its way says so, and can't be copied or judged yet", async () => {
@@ -809,11 +813,341 @@ describe("a form the agent asks", () => {
     await expect.element(screen.getByRole("textbox", { name: "Answer" })).not.toHaveFocus();
   });
 
-  test("open, it is edged in the working colour; answered, it isn't", async () => {
+  test("open, it carries a tick in the working colour inside its edge; answered, it doesn't", async () => {
     const screen = await render(<Request request={asked} onAnswer={sent()} />);
     const card = screen.getByText("The agent asks").element().parentElement as Element;
-    expect(getComputedStyle(card).borderTopColor).toBe(token("accent"));
+    const tick = () => getComputedStyle(card, "::before");
+    expect(tick().backgroundColor).toBe(token("accent"));
+    expect(tick().height).toBe("20px");
+    expect(getComputedStyle(card).borderLeftColor).toBe(token("line"));
     await screen.rerender(<Request request={asked} onAnswer={sent()} answeredBy="Alice" />);
-    expect(getComputedStyle(card).borderTopColor).toBe(token("line"));
+    expect(tick().content).toBe("none");
   });
+});
+
+test("the composer grows with its lines, up to a height, and scrolls past it", async () => {
+  const screen = await render(<Composer onSend={sent()} />);
+  const box = screen.getByRole("textbox", { name: "Message" });
+  const two = box.element().getBoundingClientRect().height;
+  await box.fill("one\ntwo\nthree\nfour\nfive");
+  const five = box.element().getBoundingClientRect().height;
+  expect(five).toBeGreaterThan(two);
+  await box.fill(Array.from({ length: 40 }, (_, at) => `line ${at}`).join("\n"));
+  const forty = box.element().getBoundingClientRect().height;
+  expect(forty).toBeGreaterThan(five);
+  expect(forty).toBeLessThanOrEqual(256);
+  expect(box.element().scrollHeight).toBeGreaterThan(forty);
+});
+
+test("sent with the button, the composer keeps the focus in its words", async () => {
+  const screen = await render(<Composer onSend={sent()} />);
+  const box = screen.getByRole("textbox", { name: "Message" });
+  await box.fill("Draft the plan");
+  await screen.getByRole("button", { name: "Send" }).click();
+  await expect.element(box).toHaveValue("");
+  expect(document.activeElement).toBe(box.element());
+});
+
+test("a question's answer field is read-only once sent, so the focus stays in it", async () => {
+  const request: ArtifactrV1.DeferredRequest = {
+    kind: "question",
+    tool_call_id: "q9",
+    tool_name: "ask",
+    args: { question: "Which?" } as ArtifactrV1.Args,
+  };
+  const screen = await render(<Request request={request} onAnswer={sent()} />);
+  const field = screen.getByRole("textbox", { name: "Answer" });
+  await field.fill("That one");
+  await userEvent.keyboard("{Enter}");
+  await expect.element(field).toHaveAttribute("readonly");
+  expect(document.activeElement).toBe(field.element());
+});
+
+test("a message refused comes back to the composer with the focus still in it", async () => {
+  const screen = await render(<Composer onSend={sent("refused")} />);
+  const box = screen.getByRole("textbox", { name: "Message" });
+  await box.fill("Draft the plan");
+  await screen.getByRole("button", { name: "Send" }).click();
+  await expect.element(box).toHaveValue("Draft the plan");
+  await expect.element(screen.getByRole("alert")).toBeVisible();
+  expect(document.activeElement).toBe(box.element());
+});
+
+test("Enter twice while a send is in flight sends once", async () => {
+  const held: { settle?: () => void } = {};
+  const onSend = vi.fn(
+    () =>
+      new Promise<{ outcome: "done" }>((resolve) => {
+        held.settle = () => resolve({ outcome: "done" });
+      }),
+  );
+  const screen = await render(<Composer onSend={onSend} />);
+  const box = screen.getByRole("textbox", { name: "Message" });
+  await box.fill("Draft the plan");
+  await userEvent.keyboard("{Enter}");
+  await box.fill("Another");
+  await userEvent.keyboard("{Enter}");
+  expect(onSend).toHaveBeenCalledTimes(1);
+  held.settle?.();
+  await expect.element(screen.getByRole("button", { name: "Send" })).not.toBeDisabled();
+});
+
+test("a long message is folded past its first lines, and opens whole; Copy copies all of it; a streaming one never folds", async () => {
+  // Paragraphs, a blank line between: Markdown joins single lines into one.
+  const lines = Array.from({ length: 60 }, (_, at) => `line ${at + 1}`).join("\n\n");
+  const written = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
+  const screen = await render(
+    <Messages>
+      <Message message={message({ content: lines })} author="Assistant" />
+      <Streaming text={lines} author="Assistant" />
+    </Messages>,
+  );
+  const whole = screen.getByRole("button", { name: "Show the whole message" });
+  await expect.element(whole).toBeVisible();
+  expect(screen.getByRole("button", { name: "Show the whole message" }).elements()).toHaveLength(1);
+  const body = screen
+    .getByRole("listitem", { name: "Assistant", exact: true })
+    .element()
+    .querySelector("[class*='max-h']") as Element;
+  expect(getComputedStyle(body).overflow).toBe("hidden");
+  await screen.getByRole("button", { name: "Copy as Markdown" }).click();
+  expect(written).toHaveBeenLastCalledWith(lines);
+  await whole.click();
+  await expect.element(whole).not.toBeInTheDocument();
+  expect(getComputedStyle(body).overflow).not.toBe("hidden");
+});
+
+test("the composer holds a way to attach at the start of its row, and hands dropped files to the page", async () => {
+  const onFiles = vi.fn();
+  const screen = await render(
+    <Composer onSend={sent()} onFiles={onFiles} attach={<button type="button">Attach</button>} />,
+  );
+  const attach = screen.getByRole("button", { name: "Attach" }).element();
+  const send = screen.getByRole("button", { name: "Send" }).element();
+  expect(attach.compareDocumentPosition(send) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  const form = attach.closest("form") as HTMLFormElement;
+  const files = new DataTransfer();
+  files.items.add(new File(["hello"], "notes.txt", { type: "text/plain" }));
+  form.dispatchEvent(
+    new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: files }),
+  );
+  expect(form.dataset.over).toBe("");
+  form.dispatchEvent(
+    new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: files }),
+  );
+  expect(onFiles).toHaveBeenCalledTimes(1);
+  const given = onFiles.mock.calls[0]?.[0] as FileList;
+  expect(given[0]?.name).toBe("notes.txt");
+  expect(form.dataset.over).toBeUndefined();
+});
+
+test("a page's actions menu holds thumbs as checked items, then asks why", async () => {
+  const onThumbs = sent();
+  const screen = await render(
+    <ActionsMenu
+      label="Artifact actions"
+      given={{ up: true, comment: null }}
+      onThumbs={onThumbs}
+    />,
+  );
+  await screen.getByRole("button", { name: "Artifact actions" }).click();
+  const menu = screen.getByRole("menu");
+  await expect
+    .element(menu.getByRole("menuitemcheckbox", { name: "Helpful" }))
+    .toHaveAttribute("aria-checked", "true");
+  await menu.getByRole("menuitemcheckbox", { name: "Not helpful" }).click();
+  expect(onThumbs).toHaveBeenLastCalledWith(false, null);
+  await screen.getByRole("textbox", { name: "Why? (optional)" }).fill("It missed the date");
+  await screen.getByRole("button", { name: "Add" }).click();
+  expect(onThumbs).toHaveBeenLastCalledWith(false, "It missed the date");
+});
+
+const run = (status: Artifactr.Run["status"], requests: ArtifactrV1.DeferredRequest[] = []) =>
+  ({
+    id: "run_1",
+    threadId: "t_1",
+    status,
+    tools: {},
+    text: "",
+    requests,
+    answered: [],
+    started: 1,
+    startedAt: "2026-10-20T00:00:00Z",
+    ended: null,
+    error: null,
+  }) as unknown as Artifactr.Run;
+
+test("the strip over a turn says how it goes, for how long, and offers Stop while it works", async () => {
+  const onStop = sent();
+  const now = new Date("2026-10-20T00:01:05Z");
+  const screen = await render(<RunStrip run={run("running")} onStop={onStop} now={now} />);
+  const strip = screen.getByRole("group", { name: "This turn" });
+  await expect.element(strip.getByRole("status")).toHaveTextContent("Working");
+  await expect.element(strip.getByText("for 1:05")).toBeVisible();
+  await strip.getByRole("button", { name: "Stop" }).click();
+  expect(onStop).toHaveBeenCalledOnce();
+  expect(strip.getByRole("button", { name: "Go to the question" }).elements()).toHaveLength(0);
+});
+
+test("the strip over a paused turn offers the way to its question, and no Stop", async () => {
+  const onQuestion = vi.fn();
+  const screen = await render(
+    <RunStrip run={run("paused")} onStop={sent()} onQuestion={onQuestion} now={new Date()} />,
+  );
+  const strip = screen.getByRole("group", { name: "This turn" });
+  await expect.element(strip.getByRole("status")).toHaveTextContent("Waiting for you");
+  expect(strip.getByRole("button", { name: "Stop" }).elements()).toHaveLength(0);
+  await strip.getByRole("button", { name: "Go to the question" }).click();
+  expect(onQuestion).toHaveBeenCalledOnce();
+});
+
+test("away from the end, the way back to the latest is offered once more arrives, and not before", async () => {
+  const lines = (count: number, from = 0) =>
+    Array.from({ length: count }, (_, at) => (
+      <li key={from + at} style={{ height: "40vh" }}>
+        Message {from + at + 1}
+      </li>
+    ));
+  const screen = await render(<Messages>{lines(6)}</Messages>);
+  window.scrollTo(0, document.documentElement.scrollHeight);
+  await expect.poll(() => window.scrollY).toBeGreaterThan(0);
+  window.scrollTo(0, 0);
+  await expect.poll(() => window.scrollY).toBe(0);
+  // Away, but nothing new: nothing is offered.
+  await new Promise((settled) => setTimeout(settled, 100));
+  expect(screen.getByRole("button", { name: "Jump to latest" }).elements()).toHaveLength(0);
+  await screen.rerender(<Messages>{lines(7)}</Messages>);
+  const jump = screen.getByRole("button", { name: "Jump to latest" });
+  await expect.element(jump).toBeVisible();
+  await jump.click();
+  await expect.element(jump).not.toBeInTheDocument();
+  expect(document.activeElement?.textContent).toBe("Message 7");
+  expect(window.scrollY).toBeGreaterThan(0);
+});
+
+test("the mode switch sends the mode chosen, and says when it is refused", async () => {
+  const onChange = sent("refused");
+  const screen = await render(<ModeSwitch mode="edit" onChange={onChange} />);
+  const group = screen.getByRole("radiogroup", { name: "Mode" });
+  await expect.element(group.getByRole("radio", { name: "Agent edits" })).toBeChecked();
+  await group.getByRole("radio", { name: "Agent proposes" }).click();
+  expect(onChange).toHaveBeenCalledWith("suggest");
+  await expect.element(screen.getByRole("alert")).toBeVisible();
+});
+
+test("where the pointer hovers, a message's actions show as it rests on the message, or the keyboard reaches them", async () => {
+  const screen = await render(
+    <Messages>
+      <Message message={message()} author="Assistant" thumbs={null} onThumbs={sent()} />
+    </Messages>,
+  );
+  const item = screen.getByRole("listitem", { name: "Assistant" });
+  const copy = screen.getByRole("button", { name: "Copy as Markdown" });
+  const row = copy.element().parentElement as HTMLElement;
+  if (!matchMedia("(hover: hover)").matches) {
+    return; // a pointer that can't hover has the menu instead: the test below
+  }
+  await expect.poll(() => getComputedStyle(row).opacity).toBe("0");
+  await userEvent.hover(item);
+  await expect.poll(() => getComputedStyle(row).opacity).toBe("1");
+  await userEvent.unhover(item);
+  await expect.poll(() => getComputedStyle(row).opacity).toBe("0");
+  await userEvent.tab();
+  await expect.element(copy).toHaveFocus();
+  await expect.poll(() => getComputedStyle(row).opacity).toBe("1");
+});
+
+test("where the pointer can't hover, a message's actions are a menu, which a long press opens too", async () => {
+  const onThumbs = sent();
+  const screen = await render(
+    <Messages>
+      <Message message={message()} author="Assistant" thumbs={null} onThumbs={onThumbs} coarse />
+    </Messages>,
+  );
+  expect(screen.getByRole("button", { name: "Copy as Markdown" }).elements()).toHaveLength(0);
+  await screen.getByRole("button", { name: "Message actions" }).click();
+  const menu = screen.getByRole("menu");
+  await expect.element(menu.getByRole("menuitem", { name: "Copy as Markdown" })).toBeVisible();
+  await menu.getByRole("menuitemcheckbox", { name: "Helpful" }).click();
+  expect(onThumbs).toHaveBeenLastCalledWith(true, null);
+  await expect.element(screen.getByRole("menu")).not.toBeInTheDocument();
+  const bubble = screen.getByText("ready").element().closest("li > div") as HTMLElement;
+  bubble.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+  await expect.element(screen.getByRole("menu")).toBeVisible();
+  bubble.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
+});
+
+test("text dragged over the composer is left to the browser: only files are taken", async () => {
+  const onFiles = vi.fn();
+  const screen = await render(<Composer onSend={sent()} onFiles={onFiles} />);
+  const form = screen
+    .getByRole("button", { name: "Send" })
+    .element()
+    .closest("form") as HTMLFormElement;
+  const text = new DataTransfer();
+  text.setData("text/plain", "words");
+  form.dispatchEvent(
+    new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: text }),
+  );
+  expect(form.dataset.over).toBeUndefined();
+  form.dispatchEvent(
+    new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: text }),
+  );
+  expect(onFiles).not.toHaveBeenCalled();
+});
+
+test("asked to keep them, the composer gives the words back when the connection closes too", async () => {
+  const screen = await render(<Composer onSend={sent("closed")} keep />);
+  const box = screen.getByRole("textbox", { name: "Message" });
+  await box.fill("Plan the launch");
+  await screen.getByRole("button", { name: "Send" }).click();
+  await expect.element(box).toHaveValue("Plan the launch");
+});
+
+test("in the actions menu, the thumb already given is given: choosing it again sends nothing", async () => {
+  const onThumbs = sent();
+  const screen = await render(
+    <ActionsMenu
+      label="Artifact actions"
+      given={{ up: true, comment: null }}
+      onThumbs={onThumbs}
+    />,
+  );
+  await screen.getByRole("button", { name: "Artifact actions" }).click();
+  await screen.getByRole("menuitemcheckbox", { name: "Helpful" }).click();
+  expect(onThumbs).not.toHaveBeenCalled();
+});
+
+test("the whole-message button stays as it is pressed, says its state, and shows less again", async () => {
+  const lines = Array.from({ length: 60 }, (_, at) => `Line ${at + 1}`).join("\n\n");
+  const screen = await render(
+    <Messages>
+      <Message message={message({ content: lines })} author="Assistant" />
+    </Messages>,
+  );
+  const button = screen.getByRole("button", { name: "Show the whole message" });
+  await expect.element(button).toHaveAttribute("aria-expanded", "false");
+  await button.click();
+  const less = screen.getByRole("button", { name: "Show less" });
+  await expect.element(less).toHaveAttribute("aria-expanded", "true");
+  await expect.element(less).toHaveFocus();
+  await less.click();
+  await expect
+    .element(screen.getByRole("button", { name: "Show the whole message" }))
+    .toBeVisible();
+});
+
+test("the log holds the messages alone: Jump to latest sits outside it", async () => {
+  const lines = (count: number) =>
+    Array.from({ length: count }, (_, at) => (
+      <li key={at} style={{ height: "40vh" }}>
+        Message {at + 1}
+      </li>
+    ));
+  const screen = await render(<Messages>{lines(6)}</Messages>);
+  window.scrollTo(0, 0);
+  await screen.rerender(<Messages>{lines(7)}</Messages>);
+  const jump = screen.getByRole("button", { name: "Jump to latest" });
+  await expect.element(jump).toBeVisible();
+  expect(jump.element().closest("[role=log]")).toBeNull();
 });

@@ -6,12 +6,12 @@
  * finds them. And every icon button, the thumbs as well, names itself on hover and on focus.
  */
 
-import { Download, FileText } from "lucide-react";
 import { expect, onTestFinished, test } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { InlineArtifact, Messages, Thumbs } from "./chat";
 import { IconButton } from "./icon-button";
+import { glyphs } from "./icons";
 
 /** The tooltip open now, named `name`: its popup, the innermost element that says it is open. */
 function tooltip(name: string): Element | null {
@@ -57,7 +57,7 @@ function Entry({ above }: { above: number }) {
           name="atlas-brief.docx"
           kind="Word document"
           open={<a href="#page">page</a>}
-          actions={<IconButton label="Download" icon={Download} />}
+          actions={<IconButton label="Download" icon={glyphs.download} />}
         >
           <p>37 kB · 2 pages · version 1</p>
         </InlineArtifact>
@@ -114,7 +114,7 @@ test("the thumbs name themselves on hover and on focus, as every icon button doe
   const screen = await render(
     <div className="flex gap-2 p-16">
       <Thumbs given={null} onThumbs={async () => ({ outcome: "done" })} />
-      <IconButton label="Open its page" icon={FileText} />
+      <IconButton label="Open its page" icon={glyphs.fileText} />
     </div>,
   );
   const down = screen.getByRole("button", { name: "Not helpful" });
@@ -143,7 +143,7 @@ test("a tooltip below the header lies over the body for as long as it shows, and
         name="atlas-brief.docx"
         kind="Word document"
         open={<a href="#page">page</a>}
-        actions={<IconButton label="Download" icon={Download} />}
+        actions={<IconButton label="Download" icon={glyphs.download} />}
       >
         <div className="flex justify-end">
           <button type="button">Edit in GridCraft</button>

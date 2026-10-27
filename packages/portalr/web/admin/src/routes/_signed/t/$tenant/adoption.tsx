@@ -174,7 +174,12 @@ function Integrations({ adoption }: { adoption: Adoption }) {
           caption="Each integration's people and uses"
           columns={[
             { key: "integration", label: "Integration", cell: (use) => use.integration },
-            { key: "people", label: "People", cell: (use) => numbers.format(use.people) },
+            {
+              key: "people",
+              label: "People",
+              numeric: true,
+              cell: (use) => numbers.format(use.people),
+            },
             {
               key: "share",
               label: "Of everyone active",
@@ -210,7 +215,12 @@ function Funnel({ adoption }: { adoption: Adoption }) {
           caption="People at each step, within 24 hours of the first"
           columns={[
             { key: "step", label: "Step", cell: (step) => step.name },
-            { key: "people", label: "People", cell: (step) => numbers.format(step.people) },
+            {
+              key: "people",
+              label: "People",
+              numeric: true,
+              cell: (step) => numbers.format(step.people),
+            },
             {
               key: "share",
               label: "Of the first step",
@@ -242,7 +252,12 @@ function Retention({ adoption }: { adoption: Adoption }) {
           caption="Of the people active in the window's first week, those active in each whole week of it"
           columns={[
             { key: "week", label: "Week", cell: (week) => weekSaid(week.week) },
-            { key: "people", label: "People", cell: (week) => numbers.format(week.people) },
+            {
+              key: "people",
+              label: "People",
+              numeric: true,
+              cell: (week) => numbers.format(week.people),
+            },
             { key: "share", label: "Of week 1", cell: (week) => shareOf(week.people, first) },
           ]}
           items={weeks}

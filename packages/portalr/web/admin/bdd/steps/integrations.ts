@@ -32,6 +32,7 @@ When("they open the audit log, filtered to integrations switched", async ({ page
     .getByRole("navigation", { name: "Tenant" })
     .getByRole("link", { name: "Audit" })
     .click();
+  await page.getByRole("button", { name: "Filter…" }).click();
   await choose(page, page.getByRole("combobox", { name: "Change" }), "Integrations switched");
   await page.getByRole("button", { name: "Apply" }).click();
   await expect(page).toHaveURL(/type=integration_set/);

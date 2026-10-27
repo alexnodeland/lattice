@@ -43,10 +43,10 @@ test("admin's tables are compact: 36px rows, 13px words, and a small action stil
   expect(getComputedStyle(cell).fontSize).toBe("13px");
 });
 
-test("the app's are comfortable: 44px rows and 14px words, though the same table", async () => {
+test("the app's are comfortable: 48px rows and 14px words, though the same table", async () => {
   await page.viewport(1280, 800);
   const screen = await render(<Members ui="app" />);
-  expect(rows(screen)).toEqual([44, 44]);
+  expect(rows(screen)).toEqual([48, 48]);
   const cell = screen.getByRole("cell", { name: "owner" }).element();
   expect(getComputedStyle(cell).fontSize).toBe("14px");
 });

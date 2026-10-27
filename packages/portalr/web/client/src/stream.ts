@@ -164,13 +164,14 @@ export class Stream<State, Frame, Command, R extends Result, Hello> {
 
   /**
    * Connects again now, on a new connection, whatever the store's state: after the session's token
-   * is refreshed, say, or after the server refused the old one (4401).
+   * is refreshed, say, or after the server refused the old one (4401). A field, as `snapshot` and
+   * `subscribe` are, so a page can hand it on detached, as a button's handler.
    */
-  reconnect(): void {
+  readonly reconnect = (): void => {
     this.#stopped = false;
     this.#detach();
     this.#connect();
-  }
+  };
 
   /** Closes the connection for good, and settles every unanswered command as `closed`. */
   close(): void {

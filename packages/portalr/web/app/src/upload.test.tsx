@@ -7,6 +7,7 @@
  */
 
 import { afterEach, expect, test, vi } from "vitest";
+import { userEvent } from "vitest/browser";
 import { open } from "./test/app";
 import { AT, Upload } from "./test/files";
 import { appOf, kindsOf, uploadRefused } from "./upload";
@@ -153,8 +154,34 @@ test("a thread's files are made in it, beneath its composer", async () => {
   const { screen } = await open("/t/acme/w/notes/threads/t_1", thread, undefined, {
     artifactrLog: log,
   });
+  // The uploader is the composer's Attach (portalr ADR-0080): it opens the chooser above it.
+  expect(screen.getByLabelText("Add files to this thread").elements()).toHaveLength(0);
+  // Its name counts what is going, once something is.
+  const attach = screen.getByRole("button", { name: /^Attach/ });
+  await attach.click();
+  await expect.element(attach).toHaveAttribute("aria-expanded", "true");
+  await expect.element(screen.getByLabelText("Add files to this thread")).toHaveFocus();
   await screen.getByLabelText("Add files to this thread").upload(new File(["x"], "brief.docx"));
-  expect(query(await sent(1)).get("thread_id")).toBe("t_1");
+  const first = await sent(1);
+  expect(query(first).get("thread_id")).toBe("t_1");
+  first.answer(200, { outcome: "applied", version: 1, proposal_id: null });
+  // The panel is a dialog with a dialog's manners: Escape closes it and the focus comes back.
+  await expect.element(screen.getByRole("dialog", { name: "Attach files" })).toBeVisible();
+  await userEvent.keyboard("{Escape}");
+  await expect.element(attach).toHaveAttribute("aria-expanded", "false");
+  await expect.element(attach).toHaveFocus();
+  // Dropped on the composer, a file goes the same way, and the list opens to show it.
+  const composer = screen
+    .getByRole("textbox", { name: "Message" })
+    .element()
+    .closest("form") as HTMLFormElement;
+  const files = new DataTransfer();
+  files.items.add(new File(["y"], "plan.docx"));
+  composer.dispatchEvent(
+    new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: files }),
+  );
+  expect(query(await sent(2)).get("thread_id")).toBe("t_1");
+  await expect.element(attach).toHaveAttribute("aria-expanded", "true");
 });
 
 test("with every app off the chooser says why and takes nothing", async () => {

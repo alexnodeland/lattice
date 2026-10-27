@@ -10,6 +10,7 @@ import { Dialog as BaseDialog } from "@base-ui/react/dialog";
 import type { ReactNode, RefObject } from "react";
 import { Button } from "./button";
 import { keepTabWithin } from "./full-view";
+import { TYPE } from "./type";
 
 export const backdrop =
   "fixed inset-0 z-40 bg-scrim backdrop-blur-(--dialog-scrim-blur) transition-[opacity,backdrop-filter] duration-(--dialog-duration) data-ending-style:opacity-0 data-ending-style:backdrop-blur-none data-starting-style:opacity-0 data-starting-style:backdrop-blur-none motion-reduce:transition-none";
@@ -17,9 +18,10 @@ export const backdrop =
 export const popup =
   "fixed top-1/2 left-1/2 z-50 flex max-h-[85dvh] w-[min(var(--dialog-width),calc(100vw-var(--dialog-margin)))] -translate-x-1/2 -translate-y-1/2 flex-col gap-4 overflow-y-auto rounded-(--dialog-radius) border border-line bg-surface p-(--dialog-pad) text-fg shadow-(--dialog-shadow) outline-none transition-[opacity,scale] duration-(--dialog-duration) data-ending-style:scale-(--dialog-enter-scale) data-starting-style:scale-(--dialog-enter-scale) data-ending-style:opacity-0 data-starting-style:opacity-0 motion-reduce:transition-none";
 
-export const title = "font-semibold text-fg text-lg";
+/** A dialog's title is a section's heading, and what it's about a line under it, on the type scale. */
+export const title = TYPE.section;
 
-export const description = "text-muted text-sm";
+export const description = TYPE.meta;
 
 export const actions = "flex flex-wrap justify-end gap-2";
 
@@ -115,7 +117,7 @@ export function WholeDialog({
           {...(finalFocus && { finalFocus })}
         >
           <div className="flex items-center justify-between gap-3 border-line border-b px-4 py-2">
-            <BaseDialog.Title className="truncate font-semibold text-fg">{named}</BaseDialog.Title>
+            <BaseDialog.Title className={`${TYPE.subsection} truncate`}>{named}</BaseDialog.Title>
             <BaseDialog.Close render={<Button variant="secondary" size="sm" />}>
               {close}
             </BaseDialog.Close>

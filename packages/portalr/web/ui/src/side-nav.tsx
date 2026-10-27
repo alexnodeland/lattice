@@ -1,8 +1,10 @@
 import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
-import type { LucideIcon } from "lucide-react";
 import type { ComponentProps, ReactElement, ReactNode } from "react";
+import { cn } from "./cn";
 import { Icon } from "./icon";
+import type { Glyph } from "./icons";
+import { FEEDBACK, RING } from "./states";
 
 /** The areas of a workspace, as a list of links, the current one marked. */
 export function SideNav({ label, children }: { label: string; children: ReactNode }) {
@@ -17,7 +19,7 @@ type NavLinkProps = Omit<ComponentProps<"a">, "className" | "children"> & {
   /** What to render as the link, such as the router's own, which marks the current page. */
   render?: ReactElement;
   /** The area's icon, beside its word. */
-  icon?: LucideIcon;
+  icon?: Glyph;
   /** How many wait for the reader there, said as such. */
   count?: number;
   children: string;
@@ -25,8 +27,9 @@ type NavLinkProps = Omit<ComponentProps<"a">, "className" | "children"> & {
 
 /**
  * One area: its icon, its word, and how many wait there. `aria-current="page"` marks the area
- * shown, and `aria-current="true"` the area a page inside it belongs to. Under forced colours,
- * where the wash and the working colour are the system's, the current one keeps an inset outline
+ * shown, and `aria-current="true"` the area a page inside it belongs to: on the wash in the
+ * working colour and the heavier weight, where the others are plain (portalr ADR-0081); its count
+ * in mono. Under forced colours, where the working colour is the system's, the current one keeps an inset outline
  * in the system's highlight, as a selected tab keeps its border; focused, the ring goes back outside.
  */
 export function NavLink({ render, icon, count, children, ...props }: NavLinkProps) {
@@ -36,8 +39,11 @@ export function NavLink({ render, icon, count, children, ...props }: NavLinkProp
     props: mergeProps<"a">(
       {
         "aria-label": count ? `${children}, ${count} waiting for you` : undefined,
-        className:
-          "flex items-center gap-2.5 rounded-(--nav-radius) px-(--nav-pad-x) py-(--nav-pad-y) font-medium text-fg text-sm outline-offset-(--focus-offset) hover:bg-wash focus-visible:outline-(length:--focus-width) focus-visible:outline-focus aria-[current=page]:bg-wash aria-[current=page]:font-semibold aria-[current=page]:text-accent aria-[current=true]:bg-wash aria-[current=true]:font-semibold aria-[current=true]:text-accent forced-colors:aria-[current=page]:outline-solid forced-colors:aria-[current=page]:outline-(length:--focus-width) forced-colors:aria-[current=page]:-outline-offset-(--focus-width) forced-colors:aria-[current=page]:outline-system-highlight forced-colors:aria-[current=page]:focus-visible:outline-offset-(--focus-offset) forced-colors:aria-[current=page]:focus-visible:outline-focus forced-colors:aria-[current=true]:outline-solid forced-colors:aria-[current=true]:outline-(length:--focus-width) forced-colors:aria-[current=true]:-outline-offset-(--focus-width) forced-colors:aria-[current=true]:outline-system-highlight forced-colors:aria-[current=true]:focus-visible:outline-offset-(--focus-offset) forced-colors:aria-[current=true]:focus-visible:outline-focus",
+        className: cn(
+          RING,
+          FEEDBACK,
+          "flex items-center gap-2.5 rounded-(--nav-radius) px-(--nav-pad-x) py-(--nav-pad-y) font-medium text-fg text-sm hover:bg-subtle aria-[current=page]:bg-wash aria-[current=page]:font-semibold aria-[current=page]:text-accent aria-[current=true]:bg-wash aria-[current=true]:font-semibold aria-[current=true]:text-accent forced-colors:aria-[current=page]:outline-solid forced-colors:aria-[current=page]:outline-(length:--focus-width) forced-colors:aria-[current=page]:-outline-offset-(--focus-width) forced-colors:aria-[current=page]:outline-system-highlight forced-colors:aria-[current=page]:focus-visible:outline-offset-(--focus-offset) forced-colors:aria-[current=page]:focus-visible:outline-focus forced-colors:aria-[current=true]:outline-solid forced-colors:aria-[current=true]:outline-(length:--focus-width) forced-colors:aria-[current=true]:-outline-offset-(--focus-width) forced-colors:aria-[current=true]:outline-system-highlight forced-colors:aria-[current=true]:focus-visible:outline-offset-(--focus-offset) forced-colors:aria-[current=true]:focus-visible:outline-focus",
+        ),
         children: (
           <>
             {icon && <Icon icon={icon} />}
@@ -45,7 +51,7 @@ export function NavLink({ render, icon, count, children, ...props }: NavLinkProp
             {count ? (
               <span
                 aria-hidden="true"
-                className="ml-auto grid h-5 min-w-5 place-items-center rounded-(--nav-count-radius) bg-accent px-1.5 font-semibold text-on-accent text-xs"
+                className="ml-auto font-mono text-accent text-xs tabular-nums"
               >
                 {count}
               </span>

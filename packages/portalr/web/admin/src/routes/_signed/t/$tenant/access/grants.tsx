@@ -2,7 +2,6 @@ import { type Answer, type GrantrApi, type Names, orThrow, refusal } from "@port
 import {
   Alert,
   Button,
-  Card,
   type Column,
   ConfirmDialog,
   EmptyState,
@@ -29,6 +28,7 @@ import {
   whom,
   whomIn,
 } from "../../../../../access";
+import { Folded, Toolbar } from "../../../../../folded";
 
 type Grant = GrantrApi.components["schemas"]["Grant"];
 type AuditEntry = GrantrApi.components["schemas"]["AuditEntry"];
@@ -142,9 +142,19 @@ function Grants() {
       .map((id) => ({ kind: "group", id })),
   ];
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
+      <Toolbar>
+        <Granting
+          tenant={tenant}
+          roles={roles}
+          listed={listed}
+          names={names}
+          // Both lists read: choose from them. Either not: type, with what was read suggested.
+          typed={members === null || groups === null}
+        />
+      </Toolbar>
       {places.length === 0 && (
-        <EmptyState title="No grants yet">Grant a role to a member or a group below.</EmptyState>
+        <EmptyState title="No grants yet">Grant a role to a member or a group above.</EmptyState>
       )}
       {places.map((place) => (
         <Granted
@@ -156,14 +166,6 @@ function Grants() {
           names={names}
         />
       ))}
-      <Granting
-        tenant={tenant}
-        roles={roles}
-        listed={listed}
-        names={names}
-        // Both lists read: choose from them. Either not: type, with what was read suggested.
-        typed={members === null || groups === null}
-      />
     </div>
   );
 }
@@ -289,7 +291,6 @@ function Granting({
 }) {
   const { queries, commands } = Route.useRouteContext();
   const { changed } = useAccess(tenant);
-  const heading = useId();
   const suggestedWorkspaces = useId();
   const suggestedGrantees = useId();
   // Suggestions alone, so the form works without them.
@@ -352,8 +353,7 @@ function Granting({
   }
 
   return (
-    <Card render={<section aria-labelledby={heading} />} className="flex flex-col gap-3">
-      <SectionTitle id={heading}>Grant a role</SectionTitle>
+    <Folded title="Grant a role" action="Grant…">
       <form className="flex flex-col gap-3" onSubmit={(event) => void submit(event)}>
         <SelectField
           label="Role"
@@ -464,11 +464,11 @@ function Granting({
             </p>
           </ConfirmDialog>
         ) : (
-          <Button type="submit" disabled={pending} className="self-start">
+          <Button type="submit" pending={pending} className="self-start">
             Grant
           </Button>
         )}
       </form>
-    </Card>
+    </Folded>
   );
 }

@@ -1,6 +1,8 @@
 import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
 import type { ComponentProps, ReactElement, ReactNode } from "react";
+import { cn } from "./cn";
+import { FEEDBACK } from "./states";
 
 /**
  * A row of links to an area's parts, named by `label`; the current part is marked. The row stays
@@ -30,8 +32,10 @@ export function TabLink({
     render,
     props: mergeProps<"a">(
       {
-        className:
+        className: cn(
           "-mb-px shrink-0 whitespace-nowrap border-transparent border-b-(length:--tabs-indicator) px-(--tabs-pad-x) py-(--tabs-pad-y) font-medium text-muted text-sm -outline-offset-(--focus-offset) hover:text-fg focus-visible:outline-(length:--focus-width) focus-visible:outline-focus aria-[current=page]:border-accent aria-[current=page]:text-fg",
+          FEEDBACK,
+        ),
         children,
       },
       props,

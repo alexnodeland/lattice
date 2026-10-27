@@ -1,6 +1,6 @@
 # ADR-0019: The kit's look: a side rail, labelled icons, raised surfaces and quiet statuses
 
-**Status:** Accepted, amended by [ADR-0036](0036-the-chart-theme-and-colour-blind-mode.md) (the chart series' tokens), [ADR-0037](0037-form-controls-and-row-actions.md) (controls and buttons) and [ADR-0039](0039-elevation-status-colour-states-and-density.md) (status colours, elevation and density)
+**Status:** Accepted, amended by [ADR-0036](0036-the-chart-theme-and-colour-blind-mode.md) (the chart series' tokens), [ADR-0037](0037-form-controls-and-row-actions.md) (controls and buttons), [ADR-0039](0039-elevation-status-colour-states-and-density.md) (status colours, elevation and density) and [ADR-0080](0080-ink-on-paper-the-products-visual-language.md) (the paper, the edges, elevation, the icons)
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 
@@ -40,7 +40,7 @@ The pass also found five faults in `ui` as it was:
 ## Decision
 
 - **The frame is a side rail (direction A).** `AppShell` holds the lockup, the `Switcher`, a `SideNav` and the `AccountMenu` in a rail on the surface from 1024 pixels. The rail stays put as the page scrolls. Narrower, a bar holds the mark, the switcher and the account, and Menu opens the navigation in a drawer: a Base UI Dialog that keeps the focus, closes on Escape, on Close or on following a link, and gives the focus back to Menu. `ui` (`app | admin`) chooses the mark, so `admin` is told apart by the side its mark opens to. A skip link comes first. The header renders the switcher, the navigation and the account once, and CSS moves them between rail and bar; the drawer is modal, and widening past 1024 pixels closes it. Cards hold what asks something of the reader, and `Table` is for rows; the list pattern, lined rows, comes with the areas' restyle.
-- **Icons are Lucide's** (`lucide-react`, pinned at 1.55.0, ISC), the set the docs site's scheme toggle already uses. `Icon` hides each one from assistive technology, and every icon sits beside the word that names its control: never icon-only.
+- **Icons are Lucide's** (until [ADR-0080](0080-ink-on-paper-the-products-visual-language.md), which draws the kit's own set and drops the package) (`lucide-react`, pinned at 1.55.0, ISC), the set the docs site's scheme toggle already uses. `Icon` hides each one from assistive technology, and every icon sits beside the word that names its control: never icon-only.
 - **The dark surface is raised and violet, `#1f1829`,** lighter than the paper. A test holds it lighter in both schemes.
 - **A status is neutral: a shape and a word** (`StatusBadge`). Only waiting for you takes the working colour, and the inks stay in the marks. Each shape stays its own when motion is reduced: working is an open ring, still, where queued is dotted. A paused run says "Waiting for you" wherever it is shown, through `RunStatus`.
 - **Four tokens join the roles,** each asserted in both schemes and listed below. `--wash` and `--accent-hover` are declared on `:root` and again on `[data-brand]`, since a custom property is resolved where it is declared.
@@ -64,7 +64,7 @@ The pass also found five faults in `ui` as it was:
 | Frame | **A, side rail (chosen)** | Holds `admin`'s seven areas; the switcher and the lockup always in reach | Phones open the navigation with a tap |
 | | B, header and tabs | Closest to the docs site | Tabs can't hold `admin`'s areas; the switcher scrolls away; "Rules" falls off a phone |
 | | C, icon rail and panes | Densest | Icons as the only labels; tiny type; three panes fix every area's layout |
-| Icons | **Lucide, labelled (chosen)** | lattice's set already; faster scanning | More to draw than words alone |
+| Icons | **Lucide, labelled (chosen then; the kit's own since ADR-0080)** | lattice's set already; faster scanning | More to draw than words alone |
 | | Words only | The least decoration | The rail reads slower |
 | Dark surface | **Re-tint to `#1f1829` (chosen)** | Raised cards in portalr's own hue | One more number that differs from the site |
 | | Keep `#0d1920` | lattice's site background | Sunken, cyan cards on violet paper |

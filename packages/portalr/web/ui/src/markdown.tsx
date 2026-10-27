@@ -1,4 +1,3 @@
-import { Square, SquareCheck } from "lucide-react";
 import {
   type ComponentProps,
   createContext,
@@ -23,8 +22,10 @@ import { cn } from "./cn";
 import { CodeBlock } from "./code-block";
 import { useHighlighted } from "./highlighting";
 import { Icon } from "./icon";
+import { glyphs } from "./icons";
 import { useOnDemand } from "./on-demand";
 import { ScrollRegion } from "./scroll-region";
+import { linkLook } from "./text-link";
 
 type Pluggable = NonNullable<ComponentProps<typeof Streamdown>["rehypePlugins"]>[number];
 
@@ -214,7 +215,8 @@ function InlineCode({
   );
 }
 
-const link = "text-accent underline underline-offset-2";
+/** A message's link: the kit's inline look, its ring and its feedback (portalr ADR-0059). */
+const link = linkLook("inline");
 
 const COMPONENTS: Components = {
   a: ({ href, children }) => {
@@ -244,7 +246,7 @@ const COMPONENTS: Components = {
   input: ({ checked }) => (
     <>
       <Icon
-        icon={checked ? SquareCheck : Square}
+        icon={checked ? glyphs.squareCheck : glyphs.square}
         className="mr-1.5 inline size-4 align-text-bottom"
       />
       <span className="sr-only">{checked ? "Done:" : "To do:"}</span>

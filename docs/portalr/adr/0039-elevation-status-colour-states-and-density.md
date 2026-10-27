@@ -1,6 +1,6 @@
 # ADR-0039: Elevation, status colours, alerts and placeholders, and admin's compact density
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0080](0080-ink-on-paper-the-products-visual-language.md) (elevation and the badge's pill), and by [ADR-0081](0081-plain-a-bright-page-one-colour-and-a-mark-for-what-waits.md)
 **Date:** 2026-10-16
 **Deciders:** Alex Nodeland
 **Amends:** the look and statuses of [ADR-0019](0019-the-kits-look.md), and the budget badges of [ADR-0021](0021-the-areas-on-the-frame-and-what-admin-needs.md)

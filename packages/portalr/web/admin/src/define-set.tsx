@@ -6,17 +6,10 @@
  */
 
 import { type Answer, orThrow, refusal } from "@portalr/client";
-import {
-  Alert,
-  Button,
-  Card,
-  CheckboxGroup,
-  ConfirmDialog,
-  SectionTitle,
-  TextField,
-} from "@portalr/ui";
-import { type ReactNode, useActionState, useEffect, useId, useRef, useState } from "react";
+import { Alert, Button, CheckboxGroup, ConfirmDialog, TextField } from "@portalr/ui";
+import { type ReactNode, useActionState, useEffect, useRef, useState } from "react";
 import { refused } from "./access";
+import { Folded, Toolbar } from "./folded";
 
 /** A set being changed: its name, and what is in it, as grantr last said, read afresh. */
 export interface Changing {
@@ -81,7 +74,6 @@ export function DefineSet({
   onSaved,
   onCancel,
 }: DefineSetProps) {
-  const headingId = useId();
   const heading = useRef<HTMLHeadingElement>(null);
   const choices = "choices" in picking ? picking.choices : null;
   const offered = (key: string) => choices === null || choices.some((one) => one.value === key);
@@ -104,6 +96,7 @@ export function DefineSet({
     return reason === null ? save(named, keys) : refused(reason);
   }
 
+  const [opened, setOpened] = useState(false);
   const [said, submit, pending] = useActionState(async (_last: string | null) => {
     const saved = await saving();
     if (saved.outcome === "refused") {
@@ -115,63 +108,68 @@ export function DefineSet({
 
   const lost = removed.length > 0 ? losing(removed, named) : null;
   return (
-    <Card render={<section aria-labelledby={headingId} />} className="flex flex-col gap-3">
-      <SectionTitle id={headingId} ref={heading} tabIndex={-1}>
-        {changing ? words.change(changing.name) : words.create}
-      </SectionTitle>
-      {changing && note}
-      <form className="flex flex-col gap-3" action={submit}>
-        {changing === null && (
-          <TextField
-            label={words.name}
-            name="name"
-            autoComplete="off"
-            required
-            value={name}
-            onValueChange={(value) => setName(String(value))}
-          />
-        )}
-        {"choices" in picking ? (
-          <Choices
-            legend={words.of}
-            choices={picking.choices}
-            value={chosen}
-            onValueChange={setChosen}
-          />
-        ) : (
-          <TextField
-            label={picking.typed}
-            name="chosen"
-            autoComplete="off"
-            spellCheck={false}
-            value={typed}
-            onValueChange={(value) => setTyped(String(value))}
-          />
-        )}
-        {said && <Alert tone="error">{said}</Alert>}
-        <div className="flex flex-wrap gap-2">
-          {lost ? (
-            <ConfirmDialog
-              label={words.saved}
-              title={lost.title}
-              confirm={words.saved}
-              onConfirm={async () => onSaved(orThrow("Not saved", await saving()))}
-            >
-              <p>{lost.body}</p>
-            </ConfirmDialog>
+    <Toolbar>
+      <Folded
+        title={changing ? words.change(changing.name) : words.create}
+        action={changing ? "Change…" : "Create…"}
+        open={changing !== null || opened}
+        onOpenChange={setOpened}
+        heading={{ ref: heading, tabIndex: -1 }}
+      >
+        {changing && note}
+        <form className="flex flex-col gap-3" action={submit}>
+          {changing === null && (
+            <TextField
+              label={words.name}
+              name="name"
+              autoComplete="off"
+              required
+              value={name}
+              onValueChange={(value) => setName(String(value))}
+            />
+          )}
+          {"choices" in picking ? (
+            <Choices
+              legend={words.of}
+              choices={picking.choices}
+              value={chosen}
+              onValueChange={setChosen}
+            />
           ) : (
-            <Button type="submit" disabled={pending}>
-              {changing ? words.saved : words.created}
-            </Button>
+            <TextField
+              label={picking.typed}
+              name="chosen"
+              autoComplete="off"
+              spellCheck={false}
+              value={typed}
+              onValueChange={(value) => setTyped(String(value))}
+            />
           )}
-          {changing && (
-            <Button variant="secondary" onClick={onCancel}>
-              Cancel
-            </Button>
-          )}
-        </div>
-      </form>
-    </Card>
+          {said && <Alert tone="error">{said}</Alert>}
+          <div className="flex flex-wrap gap-2">
+            {lost ? (
+              <ConfirmDialog
+                label={words.saved}
+                title={lost.title}
+                confirm={words.saved}
+                onConfirm={async () => onSaved(orThrow("Not saved", await saving()))}
+              >
+                <p>{lost.body}</p>
+              </ConfirmDialog>
+            ) : (
+              <Button type="submit" pending={pending}>
+                {changing ? words.saved : words.created}
+              </Button>
+            )}
+            {changing && (
+              <Button variant="secondary" onClick={onCancel}>
+                Cancel
+              </Button>
+            )}
+          </div>
+        </form>
+      </Folded>
+    </Toolbar>
   );
 }
 

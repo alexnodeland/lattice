@@ -3,7 +3,7 @@ import { commands } from "vitest/browser";
 import { contrast, dark, deltaE2000, distance, luminance, token } from "./test/colours";
 
 test("the working colour is the scheme's violet", () => {
-  expect(token("accent")).toBe(dark ? "rgb(226, 204, 245)" : "rgb(107, 47, 160)");
+  expect(token("accent")).toBe(dark ? "rgb(183, 152, 236)" : "rgb(107, 47, 160)");
 });
 
 test("text is readable on every surface, and on the working colour", () => {
@@ -12,6 +12,11 @@ test("text is readable on every surface, and on the working colour", () => {
     expect(contrast(token("muted"), token(surface))).toBeGreaterThanOrEqual(4.5);
     expect(contrast(token("accent"), token(surface))).toBeGreaterThanOrEqual(4.5);
   }
+  // The quiet wash too (portalr ADR-0081): the reader's words and a table's head sit on it.
+  expect(contrast(token("fg"), token("subtle"))).toBeGreaterThanOrEqual(4.5);
+  expect(contrast(token("muted"), token("subtle"))).toBeGreaterThanOrEqual(4.5);
+  expect(contrast(token("accent"), token("subtle"))).toBeGreaterThanOrEqual(4.5);
+  expect(contrast(token("edge"), token("subtle"))).toBeGreaterThanOrEqual(3);
   expect(contrast(token("on-accent"), token("accent"))).toBeGreaterThanOrEqual(4.5);
 });
 
@@ -70,6 +75,11 @@ test("text and the focus ring read on the wash", () => {
   expect(contrast(token("focus"), token("wash"))).toBeGreaterThanOrEqual(3);
 });
 
+test("selected text reads on the selection, which is told from the paper", () => {
+  expect(contrast(token("fg"), token("selection"))).toBeGreaterThanOrEqual(7);
+  expect(contrast(token("selection"), token("paper"))).toBeGreaterThanOrEqual(1.5);
+});
+
 test("the danger colour reads on every surface, and its words read on it, hovered or not", () => {
   for (const surface of ["paper", "surface", "wash"]) {
     expect(contrast(token("danger"), token(surface))).toBeGreaterThanOrEqual(4.5);
@@ -105,7 +115,7 @@ test("a page asks for a scheme with data-theme", () => {
     delete html.dataset.theme;
   });
   html.dataset.theme = dark ? "light" : "dark";
-  expect(token("accent")).toBe(dark ? "rgb(107, 47, 160)" : "rgb(226, 204, 245)");
+  expect(token("accent")).toBe(dark ? "rgb(107, 47, 160)" : "rgb(183, 152, 236)");
 });
 
 const SERIES = ["chart-1", "chart-2", "chart-3"];

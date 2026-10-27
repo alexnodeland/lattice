@@ -40,8 +40,9 @@ Then("the members include {string}", async ({ page }, who: string) => {
 
 When("they invite someone new", async ({ page, made }) => {
   const person = fresh(made, "invitee");
+  await page.getByRole("button", { name: "Invite…" }).click();
   await page.getByRole("textbox", { name: "Email" }).fill(`${person}@portalr.test`);
-  await page.getByRole("button", { name: "Invite" }).click();
+  await page.getByRole("button", { name: "Invite", exact: true }).click();
   await expect(page.getByRole("status")).toContainText(`${person}@portalr.test is invited`);
 });
 
@@ -59,18 +60,20 @@ Then("the one they invited isn't a member", async ({ page, made }) => {
 });
 
 When("they add a service principal", async ({ page, made }) => {
+  await page.getByRole("button", { name: "Add…" }).click();
   await page.getByRole("textbox", { name: "Name" }).fill(fresh(made, "principal"));
   await page.getByRole("button", { name: "Add", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("is a service principal");
 });
 
 When("they issue it a key", async ({ page, made }) => {
+  await page.getByRole("button", { name: "Issue…" }).click();
   await choose(
     page,
     page.getByRole("combobox", { name: "Service principal" }),
     madeAs(made, "principal"),
   );
-  await page.getByRole("button", { name: "Issue" }).click();
+  await page.getByRole("button", { name: "Issue", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("Copy it now");
   await expect(page.getByLabel("The key")).not.toHaveValue("");
 });
@@ -93,6 +96,7 @@ Then("it has no key", async ({ page, made }) => {
 });
 
 When("they make a group of {string}", async ({ page, made }, member: string) => {
+  await page.getByRole("button", { name: "Create…" }).click();
   await page.getByRole("textbox", { name: "Group" }).fill(fresh(made, "group"));
   // Each person is named by their email, with their kind beside them: "bob@portalr.test (person)".
   await page.getByRole("checkbox", { name: `${email(member)} (person)` }).check();
@@ -113,6 +117,7 @@ Then("the group isn't listed", async ({ page, made }) => {
 });
 
 When("they create a role holding the first action the catalog lists", async ({ page, made }) => {
+  await page.getByRole("button", { name: "Create…" }).click();
   await page.getByRole("textbox", { name: "Role" }).fill(fresh(made, "role"));
   await page.getByRole("region", { name: "Create a role" }).getByRole("checkbox").first().check();
   await page.getByRole("button", { name: "Create the role" }).click();
@@ -135,6 +140,7 @@ When(
   "they grant it {string} on the workspace {string}",
   async ({ page, made }, role: string, workspace: string) => {
     const principal = madeAs(made, "principal");
+    await page.getByRole("button", { name: "Grant…" }).click();
     await choose(page, page.getByRole("combobox", { name: "Role" }), role);
     await choose(page, page.getByRole("combobox", { name: "On" }), "workspace");
     await page.getByRole("combobox", { name: "Workspace" }).fill(workspace);

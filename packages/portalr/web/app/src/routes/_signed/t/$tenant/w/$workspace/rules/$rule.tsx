@@ -2,12 +2,12 @@ import { allowedIn, keys, Refused, refusal } from "@portalr/client";
 import {
   Alert,
   Button,
+  ButtonLink,
   ConfirmDialog,
   CRUMB,
   NotFound as NotFoundPage,
   PageHeader,
   TextField,
-  TextLink,
 } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
@@ -205,11 +205,11 @@ function NotFound() {
     <NotFoundPage
       title="Rule not found"
       action={
-        <TextLink
+        <ButtonLink
           render={<Link to="/t/$tenant/w/$workspace/rules" params={{ tenant, workspace }} />}
         >
           All rules
-        </TextLink>
+        </ButtonLink>
       }
     >
       There's no rule here by that name: it may have been archived.

@@ -1,6 +1,6 @@
 # ADR-0037: Form controls and row actions: a Base UI select, form fields, segmented windows, button variants and sizes
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0079](0079-interaction-states-feedback-pending-and-a-refusals-mark.md)
 **Date:** 2026-10-16
 **Deciders:** Alex Nodeland
 **Amends:** the controls and buttons of [ADR-0019](0019-the-kits-look.md)

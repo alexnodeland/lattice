@@ -2,7 +2,7 @@
 
 Admin, at `/portalr/admin/`, is the UI for a tenant's **owners and admins**: who has access, what changed, what people thought of the agent, what it costs, and what it did. An editor or a viewer who opens it is told there is no access. Operators have areas of their own, in [the runbook](operators.md).
 
-Every area shows only where grantr allows its read, and every read names its tenant. Each area's page opens with its own state: a tool that is down or isn't configured fails that area's cards alone, and says so in a notice, a shape beside its words ([ADR-0023](../adr/0023-admins-shell-and-home.md), [ADR-0039](../adr/0039-elevation-status-colour-states-and-density.md)). Admin is compact: a table's rows are 36px high, where the app's are 44px. A chart's figures are also a table, under **Show the figures**, for a keyboard or a screen reader.
+Every area shows only where grantr allows its read, and every read names its tenant. Each area's page opens with its own state: a tool that is down or isn't configured fails that area's cards alone, and says so in a notice, a shape beside its words ([ADR-0023](../adr/0023-admins-shell-and-home.md), [ADR-0039](../adr/0039-elevation-status-colour-states-and-density.md)). Admin is compact: a table's rows are 36px high, where the app's are 48px. A chart's figures are also a table, under **Show the figures**, for a keyboard or a screen reader.
 
 !!! info "What each area needs"
 

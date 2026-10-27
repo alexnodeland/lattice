@@ -1,13 +1,13 @@
-import { Plus } from "lucide-react";
 import { expect, test } from "vitest";
 import { render } from "vitest-browser-react";
 import { Button } from "./button";
 import { Icon } from "./icon";
+import { glyphs } from "./icons";
 
 test("an icon is hidden, so the word beside it names the control", async () => {
   const screen = await render(
     <Button>
-      <Icon icon={Plus} />
+      <Icon icon={glyphs.plus} />
       New thread
     </Button>,
   );

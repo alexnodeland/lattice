@@ -5,10 +5,11 @@
 
 import { Field } from "@base-ui/react/field";
 import type { Artifactr, ArtifactrV1, Thumb } from "@portalr/client";
-import { Bot, FileText, Maximize2, Minimize2, ThumbsDown, ThumbsUp } from "lucide-react";
 import {
+  type DragEvent,
   type FormEvent,
   type KeyboardEvent,
+  type MouseEvent,
   type ReactElement,
   type ReactNode,
   useEffect,
@@ -16,25 +17,29 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import { Alert } from "./alert";
 import type { Values } from "./artifactr-ui";
-import { Button } from "./button";
+import { Button, ButtonLink } from "./button";
 import { cn } from "./cn";
 import { CopyButton } from "./copy-button";
 import { endedBy, readAskForm } from "./form-schema";
 import { useFullView } from "./full-view";
 import { Icon } from "./icon";
 import { IconButton } from "./icon-button";
+import { glyphs } from "./icons";
 import { FeatureOff, useFormLock } from "./integrations";
 import { Markdown } from "./markdown";
+import { Menu, type MenuItem } from "./menu";
 import { Questions, type QuestionsAnswer } from "./questions";
 import { SchemaForm } from "./schema-form";
+import { type Segment, SegmentedFilter } from "./segmented-filter";
 import { type Sent, Unsent, useSending } from "./sending";
 import { FOLDED_LINES, SourceView } from "./source-view";
+import { ASKING, FEEDBACK } from "./states";
 import { StatusBadge, type Tone } from "./status-badge";
 import { TextField } from "./text-field";
-import { TextLink } from "./text-link";
 import { TYPE } from "./type";
 
 const card =
@@ -53,7 +58,7 @@ export function CommandButton({
   const { pending, unsent, send } = useSending();
   return (
     <span className="inline-flex flex-col gap-1">
-      <Button variant={variant} disabled={pending} onClick={() => send(onSend)}>
+      <Button variant={variant} pending={pending} onClick={() => send(onSend)}>
         {children}
       </Button>
       <Unsent reason={unsent} />
@@ -69,6 +74,120 @@ export type GiveThumbs = (up: boolean, comment: string | null) => Sent;
  * given, and the latest is what shows.
  */
 export function Thumbs({ given, onThumbs }: { given: Thumb | null; onThumbs: GiveThumbs }) {
+  const { pending, thumb, why } = useThumbs(onThumbs);
+  return (
+    <fieldset aria-label="Feedback" className="m-0 flex min-w-0 flex-col gap-1 border-0 p-0">
+      <span className="flex gap-1">
+        <IconButton
+          label="Helpful"
+          icon={glyphs.thumbsUp}
+          aria-pressed={given?.up === true}
+          disabled={pending}
+          focusableWhenDisabled
+          onClick={() => thumb(true)}
+        />
+        <IconButton
+          label="Not helpful"
+          icon={glyphs.thumbsDown}
+          aria-pressed={given?.up === false}
+          disabled={pending}
+          focusableWhenDisabled
+          onClick={() => thumb(false)}
+        />
+      </span>
+      {why(given)}
+    </fieldset>
+  );
+}
+
+/**
+ * A page's actions as a row: its own, then an overflow menu holding thumbs on it as items checked
+ * as they stand (portalr ADR-0080). A thumb given opens the "why" under the row, as `Thumbs` does.
+ */
+export function ActionsMenu({
+  label,
+  given,
+  onThumbs,
+  items = [],
+  open,
+  onOpenChange,
+}: {
+  /** The menu's name, such as "Artifact actions". */
+  label: string;
+  given: Thumb | null;
+  /** Give thumbs; without it, the menu holds the actions alone. */
+  onThumbs?: GiveThumbs;
+  /** The actions before the thumbs, if any. */
+  items?: readonly MenuItem[];
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
+  const { pending, thumb, why } = useThumbs(onThumbs ?? NO_THUMBS);
+  return (
+    <div className="flex min-w-0 flex-col items-end gap-1">
+      <Menu
+        label={label}
+        icon={glyphs.more}
+        {...(open !== undefined && { open })}
+        {...(onOpenChange && { onOpenChange })}
+        items={[
+          ...items,
+          ...(onThumbs
+            ? [
+                // The one already given is given: choosing it again sends nothing.
+                {
+                  label: "Helpful",
+                  checked: given?.up === true,
+                  disabled: pending,
+                  onSelect: () => given?.up !== true && thumb(true),
+                },
+                {
+                  label: "Not helpful",
+                  checked: given?.up === false,
+                  disabled: pending,
+                  onSelect: () => given?.up !== false && thumb(false),
+                },
+              ]
+            : []),
+        ]}
+      />
+      {onThumbs && why(given)}
+    </div>
+  );
+}
+
+const NO_THUMBS: GiveThumbs = async () => ({ outcome: "done" });
+
+/**
+ * Whether the pointer can't hover, as a finger can't: one media query, heard once for every
+ * message that asks, rather than a listener each.
+ */
+const pointer = {
+  query: null as MediaQueryList | null,
+  listeners: new Set<() => void>(),
+  subscribe(onChange: () => void) {
+    if (pointer.query === null) {
+      pointer.query = matchMedia("(hover: none)");
+      pointer.query.addEventListener("change", () => {
+        for (const listener of pointer.listeners) {
+          listener();
+        }
+      });
+    }
+    pointer.listeners.add(onChange);
+    return () => pointer.listeners.delete(onChange);
+  },
+  coarse: () => (pointer.query ?? matchMedia("(hover: none)")).matches,
+};
+function useCoarsePointer() {
+  return useSyncExternalStore(pointer.subscribe, pointer.coarse);
+}
+
+/** How long a press is held before it opens a message's actions, where the pointer can't hover. */
+const LONG_PRESS_MS = 500;
+
+/** Thumbs sent as given, then why, if the person wants to say: what `Thumbs` and `ActionsMenu` share. */
+function useThumbs(onThumbs: GiveThumbs) {
   const { pending, unsent, send } = useSending();
   const [chosen, setChosen] = useState<boolean | null>(null);
   async function thumb(up: boolean) {
@@ -83,38 +202,21 @@ export function Thumbs({ given, onThumbs }: { given: Thumb | null; onThumbs: Giv
       setChosen(null);
     }
   }
-  return (
-    <fieldset aria-label="Feedback" className="m-0 flex min-w-0 flex-col gap-1 border-0 p-0">
-      <span className="flex gap-1">
-        <IconButton
-          label="Helpful"
-          icon={ThumbsUp}
-          aria-pressed={given?.up === true}
-          disabled={pending}
-          focusableWhenDisabled
-          onClick={() => thumb(true)}
-        />
-        <IconButton
-          label="Not helpful"
-          icon={ThumbsDown}
-          aria-pressed={given?.up === false}
-          disabled={pending}
-          focusableWhenDisabled
-          onClick={() => thumb(false)}
-        />
-      </span>
+  const why = (given: Thumb | null) => (
+    <>
       {given?.comment && <p className="text-muted text-xs">You said: {given.comment}</p>}
       {chosen !== null && (
         <form className="flex items-end gap-2" onSubmit={explain}>
           <TextField label="Why? (optional)" name="comment" className="flex-1" />
-          <Button type="submit" variant="secondary" disabled={pending}>
+          <Button type="submit" variant="secondary" pending={pending}>
             Add
           </Button>
         </form>
       )}
       <Unsent reason={unsent} />
-    </fieldset>
+    </>
   );
+  return { pending, thumb, why } as const;
 }
 
 type MessageProps = {
@@ -129,18 +231,26 @@ type MessageProps = {
   onSendAgain?: () => Sent;
   /** The reader's thumbs on it, as `client`'s `thumbs` reads them. */
   thumbs?: Thumb | null;
+  /**
+   * Whether the pointer can't hover, as a finger can't: then the actions are a menu, which a long
+   * press on the message opens too. Read from the pointer unless a test says.
+   */
+  coarse?: boolean;
   /** Give thumbs; without it, there are none. */
   onThumbs?: GiveThumbs;
 };
 
-/** A message's bubble: the reader's at the end of the line, everyone else's at its start. */
+/** The lines of a message past which it is folded, with a way to the whole. */
+const FOLDED_AFTER = 40;
+
+/**
+ * The message grammar (portalr ADR-0081): the reader's words sit on the quiet wash, the agent's
+ * are unboxed on the page; that one difference tells them apart, with the name above each.
+ */
 const bubble = (mine: boolean) =>
-  cn(
-    "min-w-0 max-w-full rounded-(--bubble-radius) border px-(--bubble-pad-x) py-(--bubble-pad-y)",
-    mine
-      ? "rounded-se-(--bubble-tail-radius) border-line bg-wash"
-      : "rounded-ss-(--bubble-tail-radius) border-line bg-surface",
-  );
+  mine
+    ? "min-w-0 max-w-full break-words rounded-(--bubble-radius) bg-subtle px-(--bubble-pad-x) py-(--bubble-pad-y)"
+    : "min-w-0 max-w-full break-words";
 
 /**
  * One message, named for who posted it: their name, its Markdown in a bubble, a way to copy it as
@@ -155,27 +265,98 @@ export function Message({
   sending = false,
   onSendAgain,
   thumbs = null,
+  coarse,
   onThumbs,
 }: MessageProps) {
   const name = useId();
   const notice = message.kind === "notice";
+  // A long message is folded past its first lines, with a way to the whole (portalr ADR-0080).
+  const long = message.content.split("\n").length > FOLDED_AFTER;
+  const [whole, setWhole] = useState(false);
+  // Where the pointer can't hover, the actions are a menu (portalr ADR-0080), opened by its button
+  // or by a long press on the message; what it copied is said for a screen reader.
+  const fingers = useCoarsePointer();
+  const menu = coarse ?? fingers;
+  const [opened, setOpened] = useState(false);
+  const [said, setSaid] = useState("");
+  const press = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const release = () => {
+    if (press.current !== null) {
+      clearTimeout(press.current);
+      press.current = null;
+    }
+  };
+  const copy = () =>
+    Promise.resolve()
+      .then(() => navigator.clipboard.writeText(message.content))
+      .then(
+        () => setSaid("Copied as Markdown"),
+        () => setSaid("Couldn't copy"),
+      );
   return (
     <li
       aria-labelledby={name}
       aria-busy={sending || undefined}
       className={cn(
-        "flex max-w-[min(100%,var(--bubble-max-width))] flex-col gap-1",
-        mine ? "items-end self-end" : "items-start self-start",
+        "group flex max-w-[min(100%,var(--bubble-max-width))] flex-col items-start gap-1 self-start",
         notice && "text-muted italic",
       )}
     >
-      <span id={name} className="font-semibold text-xs">
+      <span id={name} className={cn("font-semibold text-xs", mine ? "text-fg" : "text-muted")}>
         {author}
       </span>
-      <div className={notice ? "min-w-0 max-w-full" : bubble(mine)}>
-        <Markdown>{message.content}</Markdown>
+      <div
+        className={notice ? "min-w-0 max-w-full" : bubble(mine)}
+        {...(menu &&
+          !sending && {
+            onPointerDown: () => {
+              release();
+              press.current = setTimeout(() => setOpened(true), LONG_PRESS_MS);
+            },
+            onPointerUp: release,
+            onPointerCancel: release,
+            onPointerMove: release,
+            // The browser's own menu on a long press would come over the message's.
+            onContextMenu: (event: MouseEvent<HTMLDivElement>) => event.preventDefault(),
+          })}
+      >
+        <div
+          className={cn(
+            long && !whole && "relative max-h-(--code-block-max-height) overflow-hidden",
+          )}
+        >
+          <Markdown>{message.content}</Markdown>
+          {long && !whole && (
+            <div
+              aria-hidden="true"
+              className="absolute inset-x-0 bottom-0 h-16 bg-linear-to-t from-surface to-transparent"
+            />
+          )}
+        </div>
+        {long && (
+          // One button, kept, so the focus has somewhere to stay as it is pressed.
+          <Button
+            variant="secondary"
+            size="sm"
+            className="mt-2"
+            aria-expanded={whole}
+            onClick={() => setWhole((was) => !was)}
+          >
+            {whole ? "Show less" : "Show the whole message"}
+          </Button>
+        )}
       </div>
-      <div className="flex min-h-7 flex-wrap items-start gap-1">
+      <div
+        className={cn(
+          "flex min-h-7 flex-wrap items-start gap-1",
+          // Where the pointer hovers, the actions show as it rests on the message, or the keyboard
+          // reaches them; the row keeps its height, so nothing moves. What was said stays shown.
+          !sending &&
+            !menu &&
+            !thumbs?.comment &&
+            `fine:opacity-0 fine:group-focus-within:opacity-100 fine:group-hover:opacity-100 ${FEEDBACK}`,
+        )}
+      >
         {sending && onSendAgain ? (
           <span className="flex items-center gap-2">
             <span className={TYPE.note}>It may not have been sent.</span>
@@ -183,6 +364,20 @@ export function Message({
           </span>
         ) : sending ? (
           <span className={TYPE.note}>Sending…</span>
+        ) : menu ? (
+          <>
+            <ActionsMenu
+              label="Message actions"
+              given={thumbs}
+              {...(onThumbs && { onThumbs })}
+              items={[{ label: "Copy as Markdown", onSelect: copy }]}
+              open={opened}
+              onOpenChange={setOpened}
+            />
+            <span role="status" className="sr-only">
+              {said}
+            </span>
+          </>
         ) : (
           <>
             <CopyButton text={message.content} what="as Markdown" />
@@ -205,7 +400,7 @@ export function Streaming({ text, author }: { text: string; author: string }) {
       aria-busy="true"
       aria-label={text ? `${author} is writing` : `${author} is thinking`}
     >
-      <span className="font-semibold text-xs">{author}</span>
+      <span className="font-semibold text-muted text-xs">{author}</span>
       <div className={bubble(false)}>
         {text ? <Markdown streaming>{text}</Markdown> : <Thinking />}
       </div>
@@ -233,9 +428,65 @@ function Thinking() {
 
 /** A thread's messages, oldest first, and what is streaming after them, announced as they come. */
 export function Messages({ children, className }: { children: ReactNode; className?: string }) {
+  const list = useRef<HTMLOListElement>(null);
+  const end = useRef<HTMLDivElement>(null);
+  // Away from the end, and more arrived since (portalr ADR-0080): the way back to the latest is
+  // offered, and never while the end is in view, where the page follows what arrives on its own.
+  const [away, setAway] = useState(false);
+  const [arrived, setArrived] = useState(false);
+  useEffect(() => {
+    if (end.current === null || list.current === null) {
+      return;
+    }
+    const seeing = new IntersectionObserver(([entry]) => {
+      const visible = entry?.isIntersecting ?? true;
+      setAway(!visible);
+      if (visible) {
+        setArrived(false);
+      }
+    });
+    seeing.observe(end.current);
+    const growing = new MutationObserver(() => setArrived(true));
+    growing.observe(list.current, { childList: true });
+    return () => {
+      seeing.disconnect();
+      growing.disconnect();
+    };
+  }, []);
+  const toLatest = () => {
+    const last = list.current?.lastElementChild;
+    if (last instanceof HTMLElement) {
+      if (!last.hasAttribute("tabindex")) {
+        last.tabIndex = -1;
+      }
+      last.focus({ preventScroll: true });
+    }
+    end.current?.scrollIntoView({
+      block: "end",
+      behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+    });
+  };
   return (
-    <div role="log" aria-label="Messages">
-      <ol className={cn("flex flex-col gap-4", className)}>{children}</ol>
+    <div className="relative">
+      <div role="log" aria-label="Messages">
+        <ol ref={list} className={cn("flex flex-col gap-4", className)}>
+          {children}
+        </ol>
+      </div>
+      <div ref={end} aria-hidden="true" className="h-px" />
+      {away && arrived && (
+        <div className="pointer-events-none sticky bottom-(--composer-clearance,0px) flex justify-center pb-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            className="pointer-events-auto shadow-(--popover-shadow)"
+            onClick={toLatest}
+          >
+            <Icon icon={glyphs.arrowDown} className="size-3.5" />
+            Jump to latest
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
@@ -273,9 +524,9 @@ export function InlineArtifact({
       <li aria-label={name} className={card}>
         {children}
         {open && (
-          <span className="self-start text-xs">
-            <TextLink render={open}>Open its page</TextLink>
-          </span>
+          <ButtonLink size="sm" render={open} className="self-start">
+            Open its page
+          </ButtonLink>
         )}
       </li>
     );
@@ -298,12 +549,14 @@ export function InlineArtifact({
           <span className="flex shrink-0 items-center gap-1">
             {/* In the full view, the way back alone (portalr ADR-0061). */}
             {!full && actions}
-            {open && !full && <IconButton label="Open its page" icon={FileText} render={open} />}
+            {open && !full && (
+              <IconButton label="Open its page" icon={glyphs.fileText} render={open} />
+            )}
             <IconButton
               ref={back}
               escapeThrough={full}
               label={full ? "Back to the page" : "Full view"}
-              icon={full ? Minimize2 : Maximize2}
+              icon={full ? glyphs.minimize2 : glyphs.maximize2}
               onClick={() => setFull(!full)}
             />
           </span>
@@ -316,11 +569,15 @@ export function InlineArtifact({
 
 /**
  * Write a message: Enter sends it, Shift+Enter starts a new line, and composing text waits. It
- * clears as it sends, as the thread shows the message at once; one refused comes back.
+ * grows with its lines, to a height, then scrolls (portalr ADR-0079). It clears as it sends, as
+ * the thread shows the message at once; one refused comes back.
  */
 export function Composer({
   onSend,
   disabled = false,
+  attach,
+  onFiles,
+  keep = false,
 }: {
   /**
    * Post the message; the text is cleared as it is sent, and comes back if the server refused
@@ -328,8 +585,18 @@ export function Composer({
    */
   onSend: (text: string) => Sent;
   disabled?: boolean;
+  /** A way to attach files, such as the page's uploader, at the start of the composer's row (portalr ADR-0080). */
+  attach?: ReactNode;
+  /** Files dropped on the composer, where the page takes them. */
+  onFiles?: (files: FileList) => void;
+  /**
+   * Keep the words on any failure, the connection closing included: for a page with no other way
+   * to send them again, as the Threads page, which starts a thread from them, has none.
+   */
+  keep?: boolean;
 }) {
   const [text, setText] = useState("");
+  const box = useRef<HTMLTextAreaElement>(null);
   const { pending, unsent, send: sending } = useSending();
   // A draft not yet sent: leaving the page, or reloading it, asks first.
   const drafted = text.trim() !== "";
@@ -345,12 +612,15 @@ export function Composer({
     const message = text.trim();
     if (message && !pending) {
       setText("");
+      // Sent with the button, the focus comes back to the words: with nothing left to send the
+      // button is disabled, and a disabled button would drop it (portalr ADR-0079).
+      box.current?.focus();
       let refused = false;
       const told = (settled: { outcome: string }) => {
         refused = settled.outcome === "refused";
         return false; // the composer says why, whatever it was
       };
-      if (!(await sending(() => onSend(message), told)) && refused) {
+      if (!(await sending(() => onSend(message), told)) && (refused || keep)) {
         setText((written) => written || message); // back, unless something new was written
       }
     }
@@ -368,26 +638,55 @@ export function Composer({
   }
   return (
     <form
-      className="flex flex-col gap-1 rounded-(--composer-radius) border border-edge bg-surface p-(--composer-pad) outline-offset-(--focus-offset) has-[textarea:focus-visible]:outline-(length:--focus-width) has-[textarea:focus-visible]:outline-focus"
+      className="flex flex-col gap-1 rounded-(--composer-radius) border border-edge bg-surface p-(--composer-pad) outline-offset-(--focus-offset) has-[textarea:focus-visible]:outline-(length:--focus-width) has-[textarea:focus-visible]:outline-focus data-over:border-accent"
       onSubmit={submit}
+      {...(onFiles && {
+        onDragOver: (event: DragEvent<HTMLFormElement>) => {
+          // Files alone: text dragged over the composer is the browser's to drop as text.
+          if (!event.dataTransfer.types.includes("Files")) {
+            return;
+          }
+          event.preventDefault();
+          event.currentTarget.dataset.over = "";
+        },
+        onDragLeave: (event: DragEvent<HTMLFormElement>) => {
+          delete event.currentTarget.dataset.over;
+        },
+        onDrop: (event: DragEvent<HTMLFormElement>) => {
+          delete event.currentTarget.dataset.over;
+          if (!event.dataTransfer.types.includes("Files")) {
+            return;
+          }
+          event.preventDefault();
+          onFiles(event.dataTransfer.files);
+        },
+      })}
     >
       <Field.Root className="flex flex-col" disabled={disabled}>
         <Field.Label className="sr-only">Message</Field.Label>
         <Field.Control
-          render={<textarea rows={2} />}
+          ref={box}
+          render={<textarea rows={2} enterKeyHint="send" />}
           value={text}
           placeholder="Write to the assistant"
           onValueChange={(value) => setText(String(value))}
           onKeyDown={key}
-          className="min-h-14 resize-none bg-transparent px-2.5 py-2 text-base text-fg outline-none placeholder:text-muted data-disabled:cursor-not-allowed data-disabled:text-muted"
+          className="max-h-64 min-h-14 field-sizing-content resize-none bg-transparent px-2.5 py-2 text-base text-fg outline-none placeholder:text-muted data-disabled:cursor-not-allowed data-disabled:text-muted"
         />
       </Field.Root>
       <div className="flex items-center justify-between gap-2 px-2.5 pb-1">
+        {attach}
         <span className="text-muted text-xs max-sm:hidden">
           Enter sends, Shift+Enter starts a new line
         </span>
-        <Button type="submit" className="ml-auto" disabled={disabled || pending || !text.trim()}>
+        <Button
+          type="submit"
+          className="ml-auto"
+          disabled={disabled || !text.trim()}
+          pending={pending}
+        >
           Send
+          <Icon icon={glyphs.arrowRight} className="size-3.5" />
         </Button>
       </div>
       <Unsent reason={unsent} />
@@ -446,9 +745,9 @@ function FormRequest({
       </Alert>
     ) : undefined;
   return (
-    <div className={cn(card, "gap-3", ended === undefined && off === null && "border-accent")}>
+    <div className={cn(card, "gap-3", ended === undefined && off === null && ASKING)}>
       <p className={cn(TYPE.note, "inline-flex items-center gap-1.5")}>
-        <Icon icon={Bot} className="size-3.5" />
+        <Icon icon={glyphs.bot} className="size-3.5" />
         The agent asks
       </p>
       {asked === null ? (
@@ -532,7 +831,7 @@ function Question({
   if (request.kind === "approval") {
     const args = Object.keys(request.args ?? {}).length > 0;
     return (
-      <section className={cn(card, "border-accent")} aria-label={`Approve ${request.tool_name}?`}>
+      <section className={cn(card, ASKING)} aria-label={`Approve ${request.tool_name}?`}>
         <p>
           The agent wants to run <code className="font-mono">{request.tool_name}</code>.
         </p>
@@ -543,12 +842,18 @@ function Question({
           </pre>
         )}
         <span className="flex gap-2">
-          <Button ref={first} disabled={closed} onClick={() => void answer({ approved: true })}>
+          <Button
+            ref={first}
+            disabled={answered}
+            pending={pending}
+            onClick={() => void answer({ approved: true })}
+          >
             Approve
           </Button>
           <Button
             variant="secondary"
-            disabled={closed}
+            disabled={answered}
+            pending={pending}
             onClick={() => void answer({ approved: false })}
           >
             Deny
@@ -566,8 +871,9 @@ function Question({
   return (
     <form className={card} aria-label="The agent asks" onSubmit={submit}>
       <p>{typeof asked === "string" ? asked : `The agent asks, through ${request.tool_name}.`}</p>
-      <TextField label="Answer" name="answer" ref={first} disabled={closed} required />
-      <Button type="submit" disabled={closed}>
+      {/* Read-only once sent, not disabled: Enter in it doesn't drop the focus (portalr ADR-0079). */}
+      <TextField label="Answer" name="answer" ref={first} readOnly={closed} required />
+      <Button type="submit" disabled={answered} pending={pending}>
         Answer
       </Button>
       <Unsent reason={unsent} />
@@ -712,8 +1018,9 @@ export function ProposalCard({
         onRespond && (
           <span className="flex gap-2">
             <Button
-              disabled={pending || blocked !== null}
+              disabled={blocked !== null}
               focusableWhenDisabled={blocked !== null}
+              pending={pending}
               aria-describedby={blocked === null ? undefined : why}
               onClick={() => send(() => onRespond("accept"))}
             >
@@ -721,7 +1028,7 @@ export function ProposalCard({
             </Button>
             <Button
               variant="secondary"
-              disabled={pending}
+              pending={pending}
               onClick={() => send(() => onRespond("reject"))}
             >
               Reject
@@ -749,6 +1056,112 @@ const RUN_STATUS: Record<Artifactr.Run["status"], readonly [Tone, string]> = {
   failed: ["failed", "Failed"],
   stopped: ["stopped", "Stopped"],
 };
+
+/**
+ * How long since `from`, once the run has said when it started: "1:05" under an hour, "2:03:40"
+ * under a day, "3 d 2 h" past it; nothing for a moment that can't be read.
+ */
+function elapsed(from: string | undefined, now: Date): string | null {
+  const started = from === undefined ? Number.NaN : new Date(from).getTime();
+  if (Number.isNaN(started)) {
+    return null;
+  }
+  const seconds = Math.max(0, Math.floor((now.getTime() - started) / 1000));
+  const two = (n: number) => String(n).padStart(2, "0");
+  if (seconds >= 86_400) {
+    return `${Math.floor(seconds / 86_400)} d ${Math.floor((seconds % 86_400) / 3600)} h`;
+  }
+  if (seconds >= 3600) {
+    return `${Math.floor(seconds / 3600)}:${two(Math.floor((seconds % 3600) / 60))}:${two(seconds % 60)}`;
+  }
+  return `${Math.floor(seconds / 60)}:${two(seconds % 60)}`;
+}
+
+/**
+ * The strip over a turn under way (portalr ADR-0080): how it is going, for how long, and what
+ * can be done about it: Stop while it works, where the reader may; and the way to its question
+ * while it waits.
+ */
+export function RunStrip({
+  run,
+  onStop,
+  onQuestion,
+  now,
+}: {
+  run: Artifactr.Run;
+  /** Stop it, where the reader may; none hides Stop. */
+  onStop?: () => Sent;
+  /** Go to the question it waits on; none hides the way. */
+  onQuestion?: () => void;
+  /** The moment the elapsed time is counted to, pinned by a test; the strip's own clock otherwise. */
+  now?: Date;
+}) {
+  const active = run.status === "running" || run.status === "paused";
+  const [tick, setTick] = useState(() => new Date());
+  useEffect(() => {
+    if (!active || now !== undefined) {
+      return;
+    }
+    const timer = setInterval(() => setTick(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, [active, now]);
+  const since = elapsed(run.startedAt, now ?? tick);
+  return (
+    <fieldset
+      aria-label="This turn"
+      className="m-0 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-(--card-radius) border border-line bg-surface px-3 py-2"
+    >
+      <RunStatus status={run.status} />
+      {since !== null && active && (
+        <span className={cn(TYPE.note, "tabular-nums")}>
+          {run.status === "paused" ? "waiting " : <span className="sr-only">for </span>}
+          {since}
+        </span>
+      )}
+      <span className="ml-auto flex items-center gap-2">
+        {run.status === "paused" && onQuestion && (
+          <Button variant="secondary" size="sm" onClick={onQuestion}>
+            Go to the question
+          </Button>
+        )}
+        {run.status === "running" && onStop && <CommandButton onSend={onStop}>Stop</CommandButton>}
+      </span>
+    </fieldset>
+  );
+}
+
+/**
+ * The thread's mode in its head (portalr ADR-0080): whether the agent edits artifacts itself or
+ * proposes changes for someone to accept, switched where the reader may.
+ */
+export function ModeSwitch({
+  mode,
+  onChange,
+  disabled = false,
+}: {
+  mode: Artifactr.Thread["mode"];
+  onChange: (mode: Artifactr.Thread["mode"]) => Sent;
+  disabled?: boolean;
+}) {
+  const { pending, unsent, send } = useSending();
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <SegmentedFilter
+        label="Mode"
+        value={mode}
+        disabled={disabled || pending}
+        segments={MODES}
+        onValueChange={(chosen) => void send(() => onChange(chosen))}
+      />
+      <Unsent reason={unsent} />
+    </div>
+  );
+}
+
+const MODES: readonly Segment<Artifactr.Thread["mode"]>[] = [
+  { value: "edit", label: "Agent edits" },
+  { value: "suggest", label: "Agent proposes" },
+];
 
 /** How a run is going, announced as it changes. */
 export function RunStatus({ status }: { status: Artifactr.Run["status"] }) {

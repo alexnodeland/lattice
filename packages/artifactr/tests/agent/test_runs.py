@@ -307,6 +307,43 @@ async def test_a_run_left_running_is_abandoned_when_its_thread_is_next_claimed(
     assert (await ws.run(handle.run_id)).status == "completed"
 
 
+async def test_recover_abandons_a_run_a_dead_process_left_running(
+    ws: Workspace, thread: Thread, gate: Gate
+) -> None:
+    left = ws.as_actor(AgentActor(thread_id=thread.id, run_id="run_left"))
+    await left.record(RunStarted(run_id="run_left", thread_id=thread.id))  # then its process died
+    runner = make_runner(make_agent(Script()), gate)
+    assert await runner.recover(ws) == [], "nothing was asked for: no turn starts"
+    ended = event_as((await ws.read())[-1], RunEnded)
+    assert (ended.run_id, ended.status, ended.reason) == ("run_left", "failed", "abandoned")
+    assert ended.usage is None, "its usage went with its process"
+    assert await ws.runs(status="running") == [], "so no client is told it is active"
+    await runner.recover(ws)
+    assert types(await ws.read()).count("run_ended") == 1, "ended once"
+
+
+async def test_recover_leaves_a_run_another_process_holds(
+    ws: Workspace, thread: Thread, gate: Gate
+) -> None:
+    running = ws.as_actor(AgentActor(thread_id=thread.id, run_id="run_live"))
+    runner = make_runner(make_agent(Script()), gate)
+    async with ws.claim_thread(thread.id, holder="run_live"):
+        await running.record(RunStarted(run_id="run_live", thread_id=thread.id))
+        assert await runner.recover(ws) == []
+    assert (await ws.run("run_live")).status == "running"
+
+
+async def test_recover_leaves_this_processs_own_runs(
+    ws: Workspace, thread: Thread, gate: Gate, app_tools: FunctionToolset[Session[Gate]]
+) -> None:
+    runner = make_runner(make_agent(Script(call("hold"), say("Done.")), tools=[app_tools]), gate)
+    handle = started(await runner.send(ws, thread.id, "Go"))
+    await asyncio.wait_for(gate.entered.wait(), timeout=2)
+    assert await runner.recover(ws) == []
+    gate.release.set()
+    assert (await handle.wait()).output == "Done."
+
+
 async def test_a_run_whose_claim_is_held_is_not_abandoned(
     ws: Workspace, thread: Thread, gate: Gate
 ) -> None:

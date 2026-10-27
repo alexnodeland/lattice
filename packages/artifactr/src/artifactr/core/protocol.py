@@ -6,6 +6,7 @@ timestamp (ADR-0005). The frame models here are the protocol's source of truth;
 ``schemas/artifactr.v1.json`` is generated from them.
 """
 
+from datetime import datetime
 from typing import Annotated, Final, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue
@@ -191,6 +192,9 @@ class ActiveRun(BaseModel):
 
     run_id: RunId
     thread_id: ThreadId
+    started_at: datetime | None = None
+    """When the run's latest turn started, from its ``run_started``, so a client can say how
+    long it has been going; ``None`` from earlier servers."""
 
 
 class Welcome(BaseModel):

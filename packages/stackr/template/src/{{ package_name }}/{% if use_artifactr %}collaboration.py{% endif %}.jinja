@@ -7,7 +7,9 @@ token they carry, or for no one with a key{% else %}each request's tenant and us
 clients are external agents acting for the user whose token they carry{% endif %}.
 """
 
+import asyncio
 import contextlib
+import logging
 from collections.abc import AsyncGenerator, Awaitable, Callable{% if use_ui and use_diagrams %}, Mapping{% endif %}
 
 from fastapi import FastAPI{% if access == 'grantr' %}, HTTPException{% endif %}
@@ -17,9 +19,7 @@ from pydantic_ai.models import Model
 from starlette.requests import HTTPConnection
 
 from artifactr import InMemoryStorage, Runner, Session, SystemActor, UserActor, Workspaces
-{%- if use_relayr %}
-from artifactr.agent import TurnContext
-{%- endif %}
+from artifactr.agent import Liveness{% if use_relayr %}, TurnContext{% endif %}
 from artifactr.core import Actor, {% if use_ui and use_diagrams %}Command, {% endif %}ExternalAgentActor, {% if access == 'grantr' %}Forbidden, {% endif %}TenantId
 from artifactr.fastapi import Unauthorized, artifactr_router
 {% if not use_relayr -%}
@@ -62,6 +62,8 @@ from {{ package_name }}.settings import GatewaySettings
 from {{ package_name }}.telemetry import TelemetryHandle
 
 PREFIX = "/artifactr"
+
+LOGGER = logging.getLogger(__name__)
 {%- if use_ui and use_diagrams %}
 
 
@@ -154,6 +156,9 @@ class Collaboration:
         langfuse = telemetry.langfuse if telemetry else None
         self._langfuse = langfuse
         self._mirrors: Mirrors | None = None
+        self._recovered: set[tuple[str, str]] = set()
+        """The workspaces this process has recovered, once each, as they first opened."""
+        self._recovering: set[asyncio.Task[None]] = set()
         if langfuse is not None:
             sink = LangfuseScoreSink(langfuse)
 
@@ -195,6 +200,7 @@ class Collaboration:
             authorize=authorize,
             hidden=hidden,
             on_open=opened(
+                self._recover,
                 self._mirrors.watch if self._mirrors else None,
 {%- if use_files %}
                 files.opened,
@@ -235,6 +241,14 @@ class Collaboration:
             turn_context={% if use_relayr %}turn_context{% else %}langfuse_turn if langfuse else None{% endif %},
             tracer_provider=tracer_provider,
             meter_provider=meter_provider,
+            liveness=Liveness(
+                first_output=gateway.first_output_seconds,
+                no_output=gateway.no_output_seconds,
+                local_first_output=gateway.local_first_output_seconds,
+                local_no_output=gateway.local_no_output_seconds,
+                local_models=frozenset(gateway.local_models),
+                hosted_models=frozenset(gateway.hosted_models),
+            ),
         )
 {%- if use_files %}
         files.tend(self.workspaces{% if use_diagrams %}, storage{% endif %})
@@ -247,6 +261,29 @@ class Collaboration:
         )
         self._tracer_provider = tracer_provider
         self._meter_provider = meter_provider
+
+    async def _recover(self, tenant_id: str, workspace_id: str) -> None:
+        """Take what a process that died left in a workspace, the first time it opens here.
+
+        A run it left ``running`` is recorded as abandoned, and a turn it was asked for and
+        never took is started (artifactr ADR-0070, ADR-0095). It runs in the background, so
+        the open that found the workspace isn't slowed; the runner acts as the system.
+        """
+        key = (tenant_id, workspace_id)
+        if key in self._recovered:
+            return
+        self._recovered.add(key)
+
+        async def recover() -> None:
+            try:
+                workspace = await self.workspaces.open(tenant_id, workspace_id, actor=SystemActor())
+                await self.runner.recover(workspace)
+            except Exception:
+                LOGGER.exception("recovering workspace %s of %s failed", workspace_id, tenant_id)
+
+        task = asyncio.create_task(recover())
+        self._recovering.add(task)
+        task.add_done_callback(self._recovering.discard)
 
     async def migrate(self, database: Database) -> None:
         """Upgrade the database to artifactr's schema, as its owner, granting the app's role it."""
@@ -269,6 +306,9 @@ class Collaboration:
             async with {% if use_files %}self._files.lifespan(), {% endif %}self.mcp.lifespan():
                 yield
         finally:
+            for task in self._recovering:
+                task.cancel()
+            await asyncio.gather(*self._recovering, return_exceptions=True)
             await self.runner.aclose()
             if self._mirrors is not None:
                 await self._mirrors.aclose()

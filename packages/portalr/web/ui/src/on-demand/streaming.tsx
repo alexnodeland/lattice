@@ -8,7 +8,6 @@
 import type { Artifactr } from "@portalr/client";
 import { useEffect, useState } from "react";
 import type { Usage } from "../chat";
-import { cn } from "../cn";
 import { TYPE } from "../type";
 
 /** How long without a frame before the strip says the model is being waited on. */
@@ -22,16 +21,17 @@ const kb = (chars: number) =>
   `${chars < 10_000 ? (chars / 1000).toFixed(1) : Math.round(chars / 1000)} KB`;
 
 /** What a running turn is doing, in words. */
-function doing({ phase, tool, running, argsChars }: Artifactr.Live): string {
+function doing({ phase, tool, calls, argsChars }: Artifactr.Live): string {
   switch (phase) {
     case "thinking":
       return "Thinking";
     case "writing":
       return "Writing the reply";
     case "tool":
-      return running
-        ? `Running ${tool}`
-        : `Preparing ${tool} call${argsChars > 0 ? `, ${kb(argsChars)}` : ""}`;
+      if (calls > 0) {
+        return `Running ${tool ?? "a tool"}${calls > 1 ? ` and ${calls - 1} more` : ""}`;
+      }
+      return `Preparing ${tool ?? "a"} call${argsChars > 0 ? `, ${kb(argsChars)}` : ""}`;
     default:
       return "Waiting on the model";
   }
@@ -57,55 +57,53 @@ function useSaid(words: string): string {
 
 const count = (n: number) => n.toLocaleString();
 
+/** The seconds since the run's last frame, or 0 before any. */
+const idle = (live: Artifactr.Live, now: Date) =>
+  live.at > 0 ? Math.floor((now.getTime() - live.at) / 1000) : 0;
+
 /** How the run goes and what it is doing, as the strip's one status says it. */
 export function Said({ run, status, now }: { run: Artifactr.Run; status: string; now: Date }) {
   const waiting = idle(run.live, now) * 1000 >= IDLE_MS;
   return useSaid(`${status}: ${doing(run.live)}${waiting ? ", nothing for a while" : ""}`);
 }
 
-/** The seconds since the run's last frame, or 0 before any. */
-const idle = (live: Artifactr.Live, now: Date) =>
-  live.at > 0 ? Math.floor((now.getTime() - live.at) / 1000) : 0;
+/**
+ * What a running turn is doing, in the strip's line, with how long since the last frame once
+ * that is a while. Never announced: `Said` announces the phase.
+ */
+export function Phase({ run, now }: { run: Artifactr.Run; now: Date }) {
+  const since = idle(run.live, now);
+  return (
+    <span className={TYPE.note}>
+      {doing(run.live)}
+      {since * 1000 >= IDLE_MS && `, ${since} s since the last output`}
+    </span>
+  );
+}
 
 /**
- * What a running turn is doing, in the strip: the line that says it, with how long since the
- * last frame once that is a while; and the turn's tokens, a quiet line of its own, estimated
- * from the characters sent and streamed until `usage` says exactly. Neither is announced: the
- * tokens change with every frame, and `Said` announces the phase.
+ * The turn's tokens, for the strip's quiet line: estimated from the characters sent and streamed
+ * until `usage` says exactly; never announced, as it changes with every frame. The estimate of
+ * what was sent counts the thread's messages alone, so it is a floor.
  */
-export function Doing({
+export function Tokens({
   run,
-  now,
   history,
   usage,
 }: {
   run: Artifactr.Run;
-  now: Date;
   /** The characters of the thread's history the turn was sent, or null where that isn't known. */
   history: number | null;
   usage: Usage | null;
 }) {
-  const { live } = run;
-  const since = idle(live, now);
-  const tokens = usage
-    ? [
-        `${count(usage.input)} in`,
-        `${count(usage.output)} out`,
-        ...(usage.cacheRead ? [`${count(usage.cacheRead)} from cache`] : []),
-        ...(usage.reasoning ? [`${count(usage.reasoning)} thinking`] : []),
-      ].join(", ")
-    : `${history === null ? "" : `about ${count(Math.ceil(history / 4))} in, `}about ${count(
-        Math.ceil(live.outputChars / 4),
-      )} out, estimated`;
-  return (
-    <>
-      <span className={TYPE.note}>
-        {doing(live)}
-        {since * 1000 >= IDLE_MS && `, ${since} s since the last output`}
-      </span>
-      {(history !== null || live.outputChars > 0) && (
-        <span className={cn(TYPE.note, "order-1 basis-full tabular-nums")}>Tokens: {tokens}</span>
-      )}
-    </>
-  );
+  if (usage) {
+    return `Tokens: ${[
+      `${count(usage.input)} in`,
+      `${count(usage.output)} out`,
+      ...(usage.cacheRead ? [`${count(usage.cacheRead)} from cache`] : []),
+      ...(usage.reasoning ? [`${count(usage.reasoning)} thinking`] : []),
+    ].join(", ")}`;
+  }
+  const sent = history === null ? "" : `at least about ${count(Math.ceil(history / 4))} in, `;
+  return `Tokens: ${sent}about ${count(Math.ceil(run.live.outputChars / 4))} out, estimated`;
 }

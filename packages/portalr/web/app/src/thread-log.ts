@@ -22,7 +22,7 @@ export type Entry =
       readonly question: Artifactr.Question;
     }
   | { readonly kind: "failed"; readonly seq: number; readonly run: Artifactr.Run }
-  /** What a run that failed, or was stopped, had streamed before it ended (portalr ADR-0083). */
+  /** What a run that failed, or was stopped, had streamed before it ended; a stop itself (portalr ADR-0083). */
   | {
       readonly kind: "partial";
       readonly seq: number;
@@ -30,13 +30,16 @@ export type Entry =
     }
   | { readonly kind: "artifact"; readonly seq: number; readonly artifact: Artifactr.Artifact };
 
-/** A run that ended before its reply, with what it had streamed: its words, or its thinking. */
+/**
+ * A run that ended before its reply, with what it had streamed, its words or its thinking; a
+ * stopped one is shown even with none, as the thread says it stopped there.
+ */
 function unfinished(
   run: Artifactr.Run,
 ): run is Artifactr.Run & { readonly status: "failed" | "stopped" } {
   return (
-    (run.status === "failed" || run.status === "stopped") &&
-    (run.text !== "" || run.live.thinking !== "")
+    run.status === "stopped" ||
+    (run.status === "failed" && (run.text !== "" || run.live.thinking !== ""))
   );
 }
 

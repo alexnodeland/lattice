@@ -49,12 +49,14 @@ test("open, it shows its arguments indented and what it returned, each to copy",
   await expect.element(screen.getByText("Done: note_1 is now at version 1.")).toBeVisible();
   await screen.getByRole("button", { name: "Copy the result of create_artifact" }).click();
   expect(written).toHaveBeenCalledWith("Done: note_1 is now at version 1.");
-  // Copy copies the value as the run recorded it, whichever view is shown.
+  // Copy copies what is shown: Raw, the value as the run recorded it; Formatted, the JSON indented.
   await screen.getByRole("button", { name: "Copy the arguments of create_artifact" }).click();
   expect(written).toHaveBeenLastCalledWith('{"kind": "note", "data": {"text": "Ship Friday"}}');
   await screen.getByRole("button", { name: "Formatted" }).click();
   await screen.getByRole("button", { name: "Copy the arguments of create_artifact" }).click();
-  expect(written).toHaveBeenLastCalledWith('{"kind": "note", "data": {"text": "Ship Friday"}}');
+  expect(written).toHaveBeenLastCalledWith(
+    JSON.stringify({ kind: "note", data: { text: "Ship Friday" } }, null, 2),
+  );
 });
 
 test("the keyboard opens and closes a call", async () => {
@@ -235,11 +237,19 @@ test("the formatted view lays out JSON, shows a string's lines as a block, and c
   await expect
     .element(toggle.getByRole("button", { name: "Raw" }))
     .toHaveAttribute("aria-pressed", "false");
-  // The HTML is a code block, its lines real, labelled by its language, and never run.
+  // The toggle sits in the header, outside the box that scrolls.
   const region = screen.getByRole("region", { name: "The arguments of create_app" });
-  await expect.element(region.getByRole("region", { name: "html code" })).toBeVisible();
+  expect(region.element().contains(toggle.element())).toBe(false);
+  // The HTML is a code block, its lines real, labelled by its language, and never run.
+  await expect.element(region.getByText("html", { exact: true })).toBeVisible();
   expect(region.element().querySelector("body")).toBeNull();
-  expect(region.getByRole("region", { name: "html code" }).element().textContent).toBe(html);
+  const block = region.getByText("html", { exact: true }).element().closest("div")?.parentElement;
+  expect(block?.querySelector("pre")?.textContent).toBe(html);
+  await expect.element(region.getByRole("button", { name: "Copy this html value" })).toBeVisible();
+  // One region takes the focus: the block inside it is no region, nor tab stop, of its own.
+  expect(region.element().querySelectorAll("section, [role=region], pre[tabindex]")).toHaveLength(
+    0,
+  );
   // A string with lines, not code, is a block of its own, wrapped; scalars sit in their lines.
   const lines = region.getByText("one two").element();
   expect(lines.tagName).toBe("PRE");
@@ -281,7 +291,10 @@ test("a value cut short is formatted from what parses, and one that isn't JSON h
   );
   await screen.getByText("create_artifact").click();
   await expect.element(screen.getByText('"Ship Fri"')).toBeVisible();
-  await expect.element(screen.getByText("Formatted from what parses of it.")).toBeVisible();
+  const note = screen.getByText("Cut short: values at the end may be incomplete.");
+  await expect.element(note).toBeVisible();
+  const region = screen.getByRole("region", { name: "The arguments of create_artifact" });
+  expect(region.element().contains(note.element())).toBe(false);
   await expect
     .element(screen.getByText("Cut short: the run keeps the first part of each value."))
     .toBeVisible();
@@ -289,4 +302,52 @@ test("a value cut short is formatted from what parses, and one that isn't JSON h
     screen.getByRole("group", { name: "View of the result of create_artifact" }).elements(),
   ).toHaveLength(0);
   await expect.element(screen.getByText("Done.")).toBeVisible();
+});
+
+test("each part has its own view, a scalar has none, and a string's direction marks show as escapes", async () => {
+  onTestFinished(() => localStorage.removeItem("portalr:tool-call-view"));
+  const screen = await render(
+    <ToolCalls>
+      <ToolCall
+        tool={tool({
+          args: '{"note": "right\u202eleft", "n": 12345678901234567890}',
+          result: '{"ok": true}',
+        })}
+      />
+    </ToolCalls>,
+  );
+  await screen.getByText("create_artifact").click();
+  const args = screen.getByRole("group", { name: "View of the arguments of create_artifact" });
+  const result = screen.getByRole("group", { name: "View of the result of create_artifact" });
+  await args.getByRole("button", { name: "Raw" }).click();
+  await expect
+    .element(args.getByRole("button", { name: "Raw" }))
+    .toHaveAttribute("aria-pressed", "true");
+  await expect
+    .element(result.getByRole("button", { name: "Formatted" }))
+    .toHaveAttribute("aria-pressed", "true");
+  await args.getByRole("button", { name: "Formatted" }).click();
+  await expect.element(screen.getByText('"right\\u202eleft"')).toBeVisible();
+  await expect.element(screen.getByText(/Long numbers may be rounded here/)).toBeVisible();
+  await screen.rerender(
+    <ToolCalls>
+      <ToolCall key="scalar" tool={tool({ args: "42", result: '"done"' })} />
+    </ToolCalls>,
+  );
+  await screen.getByText("create_artifact").click();
+  const shown = screen.getByRole("region", { name: "The arguments of create_artifact" });
+  await expect.element(shown.getByText("42")).toBeVisible();
+  expect(screen.getByRole("group").elements()).toHaveLength(0);
+});
+
+test("a value too heavy to lay out is shown as recorded, with a note", async () => {
+  const wide = `[${Array.from({ length: 6000 }, () => "1").join(",")}]`;
+  const screen = await render(
+    <ToolCalls>
+      <ToolCall tool={tool({ args: wide, result: "ok" })} />
+    </ToolCalls>,
+  );
+  await screen.getByText("create_artifact").click();
+  await expect.element(screen.getByText("Too much to format: shown as recorded.")).toBeVisible();
+  expect(screen.getByRole("group").elements()).toHaveLength(0);
 });

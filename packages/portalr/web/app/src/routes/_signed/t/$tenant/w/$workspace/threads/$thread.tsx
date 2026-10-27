@@ -23,6 +23,7 @@ import {
   NotFound as NotFoundPage,
   PageHeader,
   ProposalCard,
+  prefetchStreaming,
   Questions,
   Request,
   RunFailed,
@@ -184,11 +185,17 @@ function Chat() {
   // The requests already waiting when this thread is first shown live: they don't take the focus,
   // which starts at the page's heading; one that arrives while the page is open does (portalr
   // ADR-0068). Kept with the thread's id, so another thread's page starts afresh.
-  const [atLoad, setAtLoad] = useState<{ id: string; waiting: ReadonlySet<string> } | null>(null);
+  const [atLoad, setAtLoad] = useState<{
+    id: string;
+    waiting: ReadonlySet<string>;
+    /** The log's position as the thread was shown live: what ends after it happened here. */
+    seq: number;
+  } | null>(null);
   useEffect(() => {
     if (snapshot.status === "live" && atLoad?.id !== id) {
       setAtLoad({
         id,
+        seq: snapshot.seq,
         waiting: new Set(
           Object.values(runs)
             .filter((run) => run.threadId === id)
@@ -197,6 +204,19 @@ function Chat() {
       });
     }
   }, [snapshot.status, runs, id, atLoad]);
+  // What a turn shows as it streams is loaded ahead of the first (portalr ADR-0083).
+  useEffect(() => prefetchStreaming(), []);
+  // The thread before each turn, as sent to the model, for its token estimate (portalr
+  // ADR-0083): the characters of its messages, summed once per message, read by a turn's start.
+  const messages = thread?.messages ?? [];
+  const sentBefore = useMemo(
+    () => (started: number) =>
+      messages.reduce(
+        (chars, message) => (message.seq < started ? chars + message.content.length : chars),
+        0,
+      ),
+    [messages],
+  );
   // How far this browser has read the thread: where it is active at, once shown live (portalr
   // ADR-0080), for the list's mark of what has moved since.
   const readTo = thread?.active;
@@ -249,6 +269,7 @@ function Chat() {
   const active = Object.values(runs).filter(
     (run) => run.threadId === id && (run.status === "running" || run.status === "paused"),
   );
+
   const proposed = Object.values(proposals).filter((proposal) => proposal.threadId === id);
   // The artifacts made here whose kind the thread shows, each once, where it was made.
   const inline = Object.values(artifacts).filter(
@@ -382,15 +403,23 @@ function Chat() {
                 />
               );
             case "partial":
-              return (
-                <Streaming
-                  key={`${entry.run.id}-partial`}
-                  text={entry.run.text}
-                  live={entry.run.live}
-                  ended={entry.run.status}
-                  author="Assistant"
-                />
-              );
+              return [
+                (entry.run.text !== "" || entry.run.live.thinking !== "") && (
+                  <Streaming
+                    key={`${entry.run.id}-partial`}
+                    text={entry.run.text}
+                    live={entry.run.live}
+                    ended={entry.run.status}
+                    author="Assistant"
+                  />
+                ),
+                // A line of the log, which announces it: the one end nothing else says.
+                entry.run.status === "stopped" && (
+                  <li key={`${entry.run.id}-stopped`} className="self-start text-muted text-xs">
+                    Stopped here.
+                  </li>
+                ),
+              ];
             case "failed":
               return (
                 <RunFailed
@@ -398,6 +427,8 @@ function Chat() {
                   reason={entry.run.reason}
                   // What it failed with, which may name the reader's own words, is its author's.
                   error={entry.run.actsFor === me ? entry.run.error : null}
+                  // One that failed while the page was open is announced, whoever started it.
+                  live={(atLoad?.id === id && (entry.run.ended ?? 0) > atLoad.seq) || undefined}
                   {...(retry?.run === entry.run.id &&
                     (retry.id === null
                       ? { retryRefused: RETRY_TAKEN }
@@ -436,13 +467,8 @@ function Chat() {
         <div key={run.id} className="flex flex-col gap-2">
           <RunStrip
             run={run}
-            // The thread before the turn, as sent to the model, for its token estimate (portalr
-            // ADR-0083); the exact count, once a run says it, goes in `usage`.
-            history={thread.messages.reduce(
-              (chars, message) =>
-                message.seq < run.started ? chars + message.content.length : chars,
-              0,
-            )}
+            // The exact count, once a run says it, goes in `usage`.
+            history={sentBefore(run.started)}
             {...(run.status === "running" &&
               allowed.has("artifactr:stop_run") && {
                 onStop: () => stream.send({ type: "stop_run", run_id: run.id }),

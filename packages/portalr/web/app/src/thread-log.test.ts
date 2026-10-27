@@ -21,7 +21,7 @@ const run = (change: Partial<Artifactr.Run>): Artifactr.Run => ({
   live: {
     phase: "starting",
     tool: null,
-    running: false,
+    calls: 0,
     argsChars: 0,
     thinking: "",
     thoughtMs: 0,
@@ -29,6 +29,9 @@ const run = (change: Partial<Artifactr.Run>): Artifactr.Run => ({
     since: 0,
     at: 0,
     part: null,
+    reply: "pending",
+    truncated: false,
+    framed: false,
   },
   requests: [],
   answered: [],
@@ -110,10 +113,13 @@ test("a turn that failed, or was stopped, shows what it had streamed before why,
     live: { ...failed.live, thinking: "Hmm" },
   });
   const quiet = run({ id: "run_3", status: "completed", started: 6, ended: 7 });
+  const bare = run({ id: "run_4", status: "stopped", started: 8, ended: 9 });
   const kinds = threadLog(thread(message("m1", "alice")), {
     run_1: failed,
     run_2: stopped,
     run_3: quiet,
+    run_4: bare,
   }).map((entry) => `${entry.kind}@${entry.seq}`);
-  expect(kinds).toEqual(["message@1", "partial@3", "failed@3", "partial@5"]);
+  // A stop is shown even where nothing had streamed; a failure with nothing streamed isn't.
+  expect(kinds).toEqual(["message@1", "partial@3", "failed@3", "partial@5", "partial@9"]);
 });

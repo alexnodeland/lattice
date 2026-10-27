@@ -64,6 +64,7 @@ export {
   Messages,
   ModeSwitch,
   ProposalCard,
+  prefetchStreaming,
   proposedOn,
   Request,
   RunStatus,

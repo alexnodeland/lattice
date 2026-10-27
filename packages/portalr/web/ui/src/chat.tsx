@@ -33,7 +33,7 @@ import { glyphs } from "./icons";
 import { FeatureOff, useFormLock } from "./integrations";
 import { Markdown } from "./markdown";
 import { Menu, type MenuItem } from "./menu";
-import { useOnDemand } from "./on-demand";
+import { useRetrying } from "./on-demand";
 import { Questions, type QuestionsAnswer } from "./questions";
 import { SchemaForm } from "./schema-form";
 import { type Segment, SegmentedFilter } from "./segmented-filter";
@@ -395,10 +395,19 @@ export function Message({
 const loadStreaming = () => import("./on-demand/streaming");
 
 /**
+ * Load what a turn shows beyond its words ahead of the first run: a thread's page calls it as it
+ * opens, so a turn's first phase doesn't wait on a round trip.
+ */
+export function prefetchStreaming(): void {
+  loadStreaming().catch(() => {}); // a failure here is heard, and tried again, by the strip
+}
+
+/**
  * What a run is streaming, as it arrives, in the bubble its message will have, so nothing moves
  * when the message replaces it: its thinking, folded, then its words; before either, three dots.
  * Nothing of it is announced as it grows (`aria-live="off"` in the log): the posted message is.
- * A run that failed, or was stopped, keeps what it had streamed, quietly, as `ended` says.
+ * A run that failed, or was stopped, keeps what it had streamed, quietly, as `ended` says; the
+ * thread says a stop as a line of the log, which announces it.
  */
 export function Streaming({
   text,
@@ -416,11 +425,13 @@ export function Streaming({
   const thinking = live?.thinking ?? "";
   const thought = !ended && live?.phase === "thinking" ? null : (live?.thoughtMs ?? 0);
   const state = ended ? "didn't finish" : text ? "is writing" : "is thinking";
+  // The start of what streamed may be missing: cut to its cap, or lost to a reconnect.
+  const words = live?.truncated ? `…${text}` : text;
   return (
     <li
       className={cn(
         "flex max-w-[min(100%,var(--bubble-max-width))] flex-col items-start gap-1 self-start",
-        ended && "opacity-70",
+        ended && "opacity-45",
       )}
       aria-live="off"
       aria-busy={ended ? undefined : "true"}
@@ -431,7 +442,12 @@ export function Streaming({
         // The thinking, folded under a line that says it is thinking, or for how long it
         // thought: live only, never kept, which the panel says. Nothing of it is announced.
         <Disclosure
-          summary={thought === null ? "Thinking…" : `Thought for ${Math.round(thought / 1000)} s`}
+          summary={
+            thought === null
+              ? "Thinking…"
+              : // "a moment" under a second, or for longer where a reconnect lost the count
+                `Thought for ${thought < 1000 ? "a moment" : `${Math.round(thought / 1000)} s`}`
+          }
           className={TYPE.note}
         >
           <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words font-mono text-xs">
@@ -440,10 +456,10 @@ export function Streaming({
           <p className="mt-1">Thinking isn't kept: it goes when the page does.</p>
         </Disclosure>
       )}
-      <div className={bubble(false)}>
-        {text ? <Markdown streaming={!ended}>{text}</Markdown> : ended ? null : <Thinking />}
+      {/* Words the model wrote before calling a tool aren't the reply: they fade as it calls. */}
+      <div className={cn(bubble(false), !ended && live?.reply === "stale" && "opacity-45")}>
+        {text ? <Markdown streaming={!ended}>{words}</Markdown> : ended ? null : <Thinking />}
       </div>
-      {ended === "stopped" && <span className={TYPE.note}>Stopped here.</span>}
       <div aria-hidden="true" className="min-h-7" />
     </li>
   );
@@ -1134,7 +1150,8 @@ export interface Usage {
  * how long (portalr ADR-0083), its tokens, and what can be done about it: Stop while it works,
  * where the reader may; and the way to its question while it waits. One status announces how it
  * goes and, once the add-on that words it has loaded, what it does, as that changes; the clock,
- * the idle count and the tokens are never announced.
+ * the idle count and the tokens are never announced; how the turn ended, the log says: its reply,
+ * its failure's notice, or that it was stopped.
  */
 export function RunStrip({
   run,
@@ -1169,7 +1186,8 @@ export function RunStrip({
   const since = elapsed(run.startedAt, at);
   const [tone, status] = RUN_STATUS[run.status];
   const working = run.status === "running";
-  const addon = useOnDemand(loadStreaming, working);
+  // An add-on that failed to load, as offline, is tried again as the next run starts.
+  const addon = useRetrying(loadStreaming, working, run.id);
   return (
     <fieldset
       aria-label="This turn"
@@ -1182,7 +1200,7 @@ export function RunStrip({
       <span role="status" className="sr-only">
         {working && addon ? <addon.Said run={run} status={status} now={at} /> : status}
       </span>
-      {working && addon && <addon.Doing run={run} now={at} history={history} usage={usage} />}
+      {working && addon && <addon.Phase run={run} now={at} />}
       {since !== null && active && (
         <span className={cn(TYPE.note, "tabular-nums")}>
           {run.status === "paused" ? "waiting " : <span className="sr-only">for </span>}
@@ -1197,6 +1215,12 @@ export function RunStrip({
         )}
         {working && onStop && <CommandButton onSend={onStop}>Stop</CommandButton>}
       </span>
+      {/* The tokens' row is kept from the start, so the strip doesn't grow as the add-on loads. */}
+      {working && (
+        <span className={cn(TYPE.note, "w-full tabular-nums")}>
+          {addon ? <addon.Tokens run={run} history={history} usage={usage} /> : "\u00a0"}
+        </span>
+      )}
     </fieldset>
   );
 }

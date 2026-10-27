@@ -59,9 +59,10 @@ export interface Protocol<State, Frame, Command, R extends Result> {
   other(state: State, frame: Frame): State;
   /**
    * The state as a connection is welcomed without a reset, which keeps what the events built:
-   * what the server sends again on every connection, such as a run's live frames, starts over.
+   * what the server sends again on every connection, such as a run's live frames, starts over,
+   * from what the welcome says, such as the runs under way.
    */
-  welcome?(state: State): State;
+  welcome?(state: State, frame: Frame): State;
   /** Whether the command creates something under an id the client chose. */
   creates(command: Command): boolean;
 }
@@ -227,6 +228,10 @@ export class Stream<State, Frame, Command, R extends Result, Hello> {
     }
     this.#timer = null;
     this.#stable = null;
+    if (this.#later !== null) {
+      cancel(this.#later);
+      this.#later = null;
+    }
     const socket = this.#socket;
     this.#socket = null;
     socket?.close(1000);
@@ -283,7 +288,7 @@ export class Stream<State, Frame, Command, R extends Result, Hello> {
     const classified = this.protocol.classify(frame);
     switch (classified.kind) {
       case "welcome": {
-        const state = this.protocol.welcome?.(this.#current.state) ?? this.#current.state;
+        const state = this.protocol.welcome?.(this.#current.state, frame) ?? this.#current.state;
         if (this.#fromHead) {
           this.#fromHead = false;
           this.#update({ state, seq: classified.headSeq, status: "replaying" });
@@ -403,8 +408,14 @@ export class Stream<State, Frame, Command, R extends Result, Hello> {
   }
 }
 
-/** The browser's next frame, or a moment's wait where there are none, as in a test. */
-const [frame, cancel]: [(fn: () => void) => unknown, (handle: unknown) => void] =
-  typeof requestAnimationFrame === "function"
-    ? [requestAnimationFrame, (handle) => cancelAnimationFrame(handle as number)]
-    : [(fn) => setTimeout(fn, 16), (handle) => clearTimeout(handle as number)];
+/**
+ * The browser's next frame, or a moment's wait where there are none, as in a test: read as each
+ * is asked for, so a test may give the browser's. A hidden tab draws no frames, so what it holds
+ * waits until it is shown, or until the next event, which tells at once.
+ */
+const frame = (fn: () => void): unknown =>
+  typeof requestAnimationFrame === "function" ? requestAnimationFrame(fn) : setTimeout(fn, 16);
+const cancel = (handle: unknown): void =>
+  typeof cancelAnimationFrame === "function"
+    ? cancelAnimationFrame(handle as number)
+    : clearTimeout(handle as number);

@@ -437,6 +437,7 @@ test("reconnect() mid-backoff connects once, starts the backoff over, and leaves
   last().drop(1006);
   expect(waitForNext()).toBe(100);
   expect(FakeSocket.all).toHaveLength(before + 2);
+});
 
 const delta = (text: string) => ({
   type: "live",
@@ -469,4 +470,25 @@ test("a run's frames are taken at once and heard once a frame later, and a welco
   await until(stream, (s) => s.status === "live" && s.state.runs.run_1?.text === "Hello");
   await new Promise((resolve) => setTimeout(resolve, 50));
   expect(stream.snapshot().state.runs.run_1?.text).toBe("Hello");
+});
+
+test("with the browser's frames, a run's frames are heard as the next is drawn, not before", async () => {
+  const drawn: FrameRequestCallback[] = [];
+  vi.stubGlobal("requestAnimationFrame", (fn: FrameRequestCallback) => drawn.push(fn));
+  vi.stubGlobal("cancelAnimationFrame", () => {});
+  server.append({ type: "run_started", run_id: "run_1", thread_id: "thr_1" });
+  open();
+  await until(stream, (s) => s.status === "live");
+  let heard = 0;
+  stream.subscribe(() => {
+    heard += 1;
+  });
+  server.send(delta("He"));
+  server.send(delta("llo"));
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  expect(stream.snapshot().state.runs.run_1?.text).toBe("Hello"); // taken at once
+  expect(heard).toBe(0); // told once a frame is drawn
+  expect(drawn).toHaveLength(1);
+  drawn[0]?.(0);
+  expect(heard).toBe(1);
 });

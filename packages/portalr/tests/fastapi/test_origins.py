@@ -161,6 +161,12 @@ def test_an_editor_is_kept_on_its_origin_as_a_browser_compares_it_its_path_kept(
     assert made.editors == {"files:gridcraft": "https://editor.example/grid/"}
 
 
+@pytest.mark.parametrize("url", ["https://editor.example/?x=1", "https://editor.example/#top"])
+def test_an_editor_with_a_query_or_fragment_is_refused(url: str) -> None:
+    with pytest.raises(ValidationError, match="no query or fragment"):
+        site(editors={"files:gridcraft": url})
+
+
 def test_without_aliases_or_an_origin_a_site_is_as_it_was() -> None:
     made = site(apps=APPS, editors=EDITORS)
     assert (made.origin, made.aliases) == (None, {})

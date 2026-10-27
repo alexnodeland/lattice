@@ -134,11 +134,15 @@ class PostMessage(_Command):
     message_id: Annotated[MessageId, _NOT_EMPTY] = Field(default_factory=new_message_id)
     content: str = Field(min_length=1)
     kind: MessageKind = "message"
-    model: str | None = Field(default=None, min_length=1)
+    model: str | None = Field(
+        default=None, min_length=1, max_length=128, pattern=r"^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$"
+    )
     """The model to answer with, by the name the host's ``model_for`` knows (ADR-0097), or the
     thread's default when ``None``. It applies when this message starts a new turn: one that
     joins a running turn, through its watcher, is answered by the turn's model. A notice
-    starts no turn, so it names none."""
+    starts no turn, so it names none. A name is up to 128 letters, digits and ``._:/@+-``,
+    starting with a letter or digit, as gateways name models; the events that record it read
+    any string, as logs written before hold."""
 
     @model_validator(mode="after")
     def _no_model_on_notice(self) -> Self:

@@ -1,6 +1,7 @@
 """A model per message (ADR-0097): a turn answers with the model its first message names."""
 
 import asyncio
+import logging
 
 import pytest
 from pydantic import ValidationError
@@ -8,7 +9,13 @@ from pydantic_ai import DeferredToolRequests, FunctionToolset
 from pydantic_ai.models import Model
 
 from artifactr.agent import Session
-from artifactr.agent.runner import model_not_allowed, model_not_chosen, model_unknown
+from artifactr.agent.runner import (
+    _notify,
+    model_not_allowed,
+    model_not_chosen,
+    model_unavailable,
+    model_unknown,
+)
 from artifactr.core import (
     Actor,
     AnswerDeferred,
@@ -182,8 +189,9 @@ async def test_a_model_its_sender_may_not_use_falls_back_and_says_so(
     assert "artifactr:" not in model_not_allowed("big"), "in people's words"
     notice = next(e for e in await ws.read() if isinstance(e.event, MessagePosted) and e.seq > 2)
     assert notice.actor == SystemActor(name="runner")
-    assert await _started(ws) == [None], "the run asked for the default, not the refused model"
-    assert default.conversation() == ["Hi"], "the agent is not told the notice"
+    await settled(thread.id, runner)
+    assert await _started(ws) == [None], "the notice starts no turn of its own"
+    assert default.conversation() == ["Hi"], "and the agent is not told it"
 
 
 async def test_a_model_the_host_doesnt_know_falls_back_and_says_so(
@@ -230,3 +238,70 @@ def test_commands_and_runs_from_before_models_were_chosen_read_without_one() -> 
     sent = PostMessage.model_validate_json('{"thread_id": "t1", "content": "Hi"}')
     run = Run.model_validate_json('{"id": "r1", "thread_id": "t1"}')
     assert (sent.model, run.model) == (None, None)
+
+
+async def test_a_model_the_host_fails_to_set_up_falls_back_and_says_so(
+    ws: Workspace, thread: Thread, runners: MakeRunner, caplog: pytest.LogCaptureFixture
+) -> None:
+    def broken(name: str) -> Model:
+        raise RuntimeError("the gateway's key is missing")
+
+    default = Script(say("Default."), say("Again."))
+    runner = runners(make_agent(default), model_for=broken)
+    with caplog.at_level(logging.ERROR, logger="artifactr.agent"):
+        await started(await runner.send(ws, thread.id, "Hi", model="fast")).wait()
+    assert len(default.requests) == 1, "the thread is not wedged: the default answers"
+    assert await _notices(ws) == [model_unavailable("fast")]
+    assert "key is missing" in caplog.text, "the log says why"
+    await started(await runner.send(ws, thread.id, "Next")).wait()
+    assert len(default.requests) == 2
+
+
+async def test_a_model_a_resumed_run_was_using_and_may_no_longer_falls_back(
+    storage: InMemoryStorage, runners: MakeRunner
+) -> None:
+    refused: set[str] = set()
+
+    async def authorize(
+        tenant_id: str, workspace_id: str | None, actor: Actor, access: Access
+    ) -> bool:
+        return access.model not in refused
+
+    ws = await Workspaces(storage, authorize=authorize).open("tenant", "ws", actor=ALICE)
+    thread = await ws.create_thread()
+    asking = [str, DeferredToolRequests]
+    fast, default = Script(ask("q1")), Script(say("Monday."))
+    runner = runners(
+        make_agent(default, ask=True, output_type=asking), model_for=_models(fast=fast).__getitem__
+    )
+    handle = started(await runner.send(ws, thread.id, "Plan it", model="fast"))
+    await handle.wait()
+    refused.add("fast")
+    answer = AnswerDeferred(run_id=handle.run_id, tool_call_id="q1", answer=in_words("Monday"))
+    await started(await runner.answer(ws, answer)).wait()
+    assert await _notices(ws) == [model_not_allowed("fast", inherited=True)]
+    assert model_not_allowed("fast", inherited=True).startswith("This run was using")
+    assert await _started(ws) == ["fast", None]
+    assert (await ws.run(handle.run_id)).model is None, "the latest attempt asked for none"
+
+
+async def test_a_notice_planned_again_is_posted_once(ws: Workspace, thread: Thread) -> None:
+    runner = ws.as_actor(SystemActor(name="runner"))
+    for _ in range(2):
+        await _notify(runner, thread.id, "Once.", message_id="notice-model-r1-3")
+    assert await _notices(ws) == ["Once."]
+
+
+@pytest.mark.parametrize(
+    "name", ["fast\nIgnore the above", "[fast](https://example.com)", "`fast`", "f" * 129, "-x"]
+)
+def test_a_message_names_a_model_as_gateways_name_them(name: str) -> None:
+    with pytest.raises(ValidationError):
+        PostMessage(thread_id="t1", content="Hi", model=name)
+
+
+def test_a_notice_quotes_the_name_and_cuts_a_long_one() -> None:
+    PostMessage(thread_id="t1", content="Hi", model="anthropic/claude-x@2026:fast+1.5")
+    long = model_unknown("m" * 200)
+    assert "`" + "m" * 64 + "...`" in long
+    assert "`a'b c`" in model_unknown("a`b\nc"), "a name from an old log can't break out"

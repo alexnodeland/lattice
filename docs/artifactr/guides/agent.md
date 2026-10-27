@@ -211,12 +211,12 @@ models = {name: OpenAIChatModel(name, provider=gateway) for name in ("default", 
 runner = Runner(agent, app=deps, model_for=models.__getitem__)
 ```
 
-The runner calls `model_for` as each turn starts, so build each model once and keep it, as the dict does. Without `model_for`, every turn answers with the agent's own model, as before.
+The runner calls `model_for` as each turn starts, so build each model once and keep it, as the dict does. Keep it a closed list of the models you offer: a function that builds a model from whatever name it is given lets anyone who may choose use any model your gateway serves. A name is up to 128 letters, digits and `._:/@+-`, starting with a letter or digit. Without `model_for`, every turn answers with the agent's own model, as before.
 
-- **A turn answers with the model its first message names**, or with the agent's own when it names none. A message that joins a running turn, through its watcher, is answered by the turn's model: the model applies when the message starts a new turn. A client shows this beside its picker.
+- **A turn answers with the model its first message names**, or with the agent's own when it names none. A message that joins a running turn, through its watcher, is answered by the turn's model, with no notice: the model applies when the message starts a new turn. A client shows this beside its picker, or disables the picker while a run is active.
 - **A resumed run** answers with the model its reply names, or else the one the run last asked for (`Run.model`).
 - **Who may choose.** The turn asks `artifactr:use_model` as its agent acting for its author, with the model's name in `Access.model`. grantr's `editor` holds it for every model.
-- **Never silent.** A model its author may not use, one `model_for` doesn't know, or any model where there is no `model_for`, is not refused: the turn answers with the agent's own, and the runner posts a notice that says which model was asked for, that the default is answering instead, and what to do.
+- **Never silent.** A model its author may not use, one `model_for` doesn't know or fails to set up (the failure is logged), or any model where there is no `model_for`, is not refused: the turn answers with the agent's own, and the runner posts a notice that says which model was asked for, that the default is answering instead, and what to do.
 - **Which model answered.** `run_started.model` is the model the turn asked for, `None` for the agent's own; each step of the run's usage names the model that answered, which a gateway that falls back to another reports ([Token counts](live-output.md#token-counts)).
 
 ### Running without a runner

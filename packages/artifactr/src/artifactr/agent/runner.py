@@ -185,29 +185,51 @@ The Runner calls it as each turn starts, so a host caches its models, one per na
 """
 
 
-def model_not_allowed(name: str) -> str:
-    """The notice when a message asks for a model its sender may not use (ADR-0097)."""
+_SHOWN: Final = 64
+"""How much of a model's name a notice shows: a name from an old log may be any length."""
+
+
+def _named(name: str, *, inherited: bool) -> str:
+    """How a notice names the model: the last message's choice, or the one a run resumes with."""
+    shown = name if len(name) <= _SHOWN else f"{name[:_SHOWN]}..."
+    quoted = "`" + shown.replace("`", "'").replace("\n", " ") + "`"
+    if inherited:
+        return f"This run was using the model {quoted}"
+    return f"The last message asked for the model {quoted}"
+
+
+def model_not_allowed(name: str, *, inherited: bool = False) -> str:
+    """The notice when a turn asks for a model its author may not use (ADR-0097)."""
     return (
-        f"The last message asked for the model {name}, which its sender isn't allowed to use "
-        "here, so the default model is answering it instead. To use that model, ask an admin "
-        "of this workspace for access, or pick another one."
+        f"{_named(name, inherited=inherited)}, which the sender of the last message isn't "
+        "allowed to use here, so the default model is answering instead. To use that model, "
+        "ask an admin of this workspace for access, or pick another one."
     )
 
 
-def model_unknown(name: str) -> str:
-    """The notice when a message asks for a model the app doesn't offer (ADR-0097)."""
+def model_unknown(name: str, *, inherited: bool = False) -> str:
+    """The notice when a turn asks for a model the app doesn't offer (ADR-0097)."""
     return (
-        f"The last message asked for the model {name}, which this app doesn't offer, so the "
-        "default model is answering it instead. Pick one of the models offered, or send it "
+        f"{_named(name, inherited=inherited)}, which this app doesn't offer, so the default "
+        "model is answering instead. Pick one of the models offered, or send the message "
         "without choosing one."
     )
 
 
-def model_not_chosen(name: str) -> str:
-    """The notice when a message asks for a model in an app that answers with one (ADR-0097)."""
+def model_unavailable(name: str, *, inherited: bool = False) -> str:
+    """The notice when the host failed to set up the model a turn asked for (ADR-0097)."""
     return (
-        f"The last message asked for the model {name}, but this app answers with one model "
-        "only, so that model is answering it instead. Send messages without choosing a model."
+        f"{_named(name, inherited=inherited)}, which couldn't be set up right now, so the "
+        "default model is answering instead. Try that model again in a moment, or pick "
+        "another one."
+    )
+
+
+def model_not_chosen(name: str, *, inherited: bool = False) -> str:
+    """The notice when a turn asks for a model in an app that answers with one (ADR-0097)."""
+    return (
+        f"{_named(name, inherited=inherited)}, but this app answers with one model only, so "
+        "that model is answering instead. Send messages without choosing a model."
     )
 
 
@@ -798,21 +820,31 @@ class Runner[AppDepsT]:
         and not used is never a silence (ADR-0097): the notice says what was asked, what
         answers instead, and what to do.
         """
-        name = turn.model
+        name, inherited = turn.model, turn.inherited
         if name is None:
             return turn
         if self._model_for is None:
-            notice = model_not_chosen(name)
+            notice = model_not_chosen(name, inherited=inherited)
         else:
             use = Access(action=USE_MODEL, thread_id=agent.thread_id, model=name)
             try:
                 await runner.as_actor(agent).check(use)
-                return replace(turn, resolved=self._model_for(name))
             except Forbidden:
-                notice = model_not_allowed(name)
-            except LookupError:
-                notice = model_unknown(name)
-        await _notify(runner, agent.thread_id, notice)
+                notice = model_not_allowed(name, inherited=inherited)
+            else:
+                try:
+                    return replace(turn, resolved=self._model_for(name))
+                except LookupError:
+                    notice = model_unknown(name, inherited=inherited)
+                except Exception:
+                    # A host's failure falls back too: raised here, before the turn takes its
+                    # message, it would plan the same turn again on every claim.
+                    logger.exception("thread %s: setting up model %r failed", agent.thread_id, name)
+                    notice = model_unavailable(name, inherited=inherited)
+        # One notice per turn, however often it is planned: a claim lost after posting it plans
+        # the same turn, from the same place in the log, again.
+        notice_id = f"notice-model-{turn.run_id}-{turn.watch_after}"
+        await _notify(runner, agent.thread_id, notice, message_id=notice_id)
         return replace(turn, model=None)
 
     @staticmethod
@@ -1062,11 +1094,18 @@ async def _cancel_when_lost(lost: asyncio.Event, run: "asyncio.Task[Any]") -> No
     run.cancel()
 
 
-async def _notify(workspace: Workspace, thread_id: ThreadId, notice: str) -> None:
-    """Post a notice in a thread as the Runner; one it may not post is logged, not raised."""
+async def _notify(
+    workspace: Workspace, thread_id: ThreadId, notice: str, *, message_id: MessageId | None = None
+) -> None:
+    """Post a notice in a thread as the Runner; one it may not post is logged, not raised.
+
+    With a ``message_id`` already used, the notice was posted before, so it is not posted again.
+    """
     try:
-        await workspace.post_message(thread_id, notice, kind="notice")
+        await workspace.post_message(thread_id, notice, kind="notice", message_id=message_id)
     except Rejection as rejection:
+        if message_id is not None and isinstance(rejection, InvalidState):
+            return  # its id is used: it was posted before
         logger.warning("thread %s: a notice was refused: %s", thread_id, rejection.message)
 
 
@@ -1121,6 +1160,8 @@ class _Turn:
     reply's or else the run's. ``None`` for the agent's own (ADR-0097)."""
     resolved: Model | None = None
     """``model``, as the host's ``model_for`` gave it, once its author may use it."""
+    inherited: bool = False
+    """Whether ``model`` is the resumed run's own, its reply naming none."""
 
 
 def _resume(
@@ -1172,6 +1213,7 @@ def _resume(
         traceparent=None if by is None else by.traceparent,
         message_ids=tuple(e.message_id for e in carried if isinstance(e, MessagePosted)),
         model=chosen or run.model,
+        inherited=chosen is None and run.model is not None,
     )
 
 

@@ -71,6 +71,7 @@ const LOOKS = {
     "a select's trigger",
     "a select's trigger, disabled",
     "a disclosure's trigger",
+    "a run's tool calls' quiet line (muted, in the note size)",
   ],
   headings: ["the page's (h1)", "a section's", "a label's"],
   badges: [

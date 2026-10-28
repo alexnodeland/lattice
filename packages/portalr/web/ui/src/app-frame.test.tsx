@@ -390,7 +390,9 @@ test("what an app reports went wrong is shown as plain text under it, and said i
   fromFrame(frame, { method: APP_BOOT, params: { drawn: "something", canvases: 1 } });
   await vi.waitFor(() =>
     expect(warned).toHaveBeenCalledWith(
-      expect.stringMatching(/^\[app-frame\] boot: drawn=something canvases=1 outer=[\d.]+x[\d.]+$/),
+      expect.stringMatching(
+        /^\[app-frame\] boot: drawn=something canvases=1 outer=[\d.]+x[\d.]+ container=\d+$/,
+      ),
     ),
   );
   expect(screen.getByText("The app reported a problem").query()).toBeNull();

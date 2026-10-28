@@ -33,7 +33,7 @@ function scope({ framed = true, search = `?host=${encodeURIComponent(PORTAL)}` }
     document: {
       createElement: document.createElement.bind(document),
       body,
-      documentElement: document.documentElement,
+      documentElement: { clientWidth: 0, clientHeight: 0 },
     },
     addEventListener: (_: string, listener: (event: Partial<MessageEvent>) => void) =>
       listeners.push(listener),
@@ -155,8 +155,9 @@ function measured(width: number, height: number) {
     addEventListener: (_: string, run: () => void) => resized.push(run),
   };
   const frame = document.createElement("iframe");
-  fit(scope as unknown as Window, frame);
-  return { root, scope, frame, resized, observed };
+  const tell = fit(scope as unknown as Window, frame);
+  const size = () => [frame.style.width, frame.style.height];
+  return { root, scope, frame, resized, observed, tell, size };
 }
 
 test("the app's frame is sized to the sandbox's window in pixels, and follows it", () => {
@@ -170,15 +171,45 @@ test("the app's frame is sized to the sandbox's window in pixels, and follows it
   expect(frame.style.width).toBe("320px");
 });
 
-test("a window measured at nothing leaves the frame placed against it, never sized to 0", () => {
-  const { root, scope, frame, resized } = measured(0, 0);
-  expect([frame.style.width, frame.style.height]).toEqual(["100%", "100%"]);
-  scope.innerWidth = 390;
-  scope.innerHeight = 360;
-  resized[0]?.();
-  expect([frame.style.width, frame.style.height]).toEqual(["390px", "360px"]);
+test("a window measured at nothing falls back to the floor, never to 0", () => {
+  expect(measured(0, 0).size()).toEqual(["320px", "360px"]);
+});
+
+test("a window measured at nothing falls back to the last size it measured", () => {
+  const { root, resized, size } = measured(390, 500);
   root.clientWidth = 0;
-  scope.innerWidth = 0;
+  root.clientHeight = 0;
   resized[0]?.();
-  expect(frame.style.width).toBe("100%");
+  expect(size()).toEqual(["390px", "500px"]);
+});
+
+test("a window measured at nothing falls back to the size the host says its frame is", () => {
+  const { root, resized, tell, size } = measured(390, 500);
+  root.clientWidth = 0;
+  root.clientHeight = 0;
+  tell(412, 640);
+  expect(size()).toEqual(["412px", "640px"]);
+  root.clientWidth = 375;
+  resized[0]?.();
+  expect(size()).toEqual(["375px", "640px"]);
+});
+
+test("the host's viewport, given or answered, is told to the frame's size", () => {
+  const { parent, body, hear } = scope();
+  const source = parent as unknown as Window;
+  hear({ source, origin: PORTAL, data: { method: RESOURCE_READY, params: { html: "" } } });
+  const frame = body.querySelector("iframe") as HTMLIFrameElement;
+  const viewport = { width: 412, height: 640 };
+  expect([frame.style.width, frame.style.height]).toEqual(["390px", "360px"]);
+  hear({ source, origin: PORTAL, data: { id: 1, result: { hostContext: { viewport } } } });
+  expect([frame.style.width, frame.style.height]).toEqual(["390px", "640px"]);
+  const changed = "ui/notifications/host-context-changed";
+  hear({ source, origin: PORTAL, data: { method: changed, params: { viewport: { width: "x" } } } });
+  hear({
+    source,
+    origin: PORTAL,
+    data: { method: changed, params: { viewport: { ...viewport, height: 700 } } },
+  });
+  expect(frame.style.height).toBe("700px");
+  frame.remove();
 });

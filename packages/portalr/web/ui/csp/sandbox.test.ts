@@ -247,23 +247,32 @@ test("the app's frame fills the sandbox's window even where its body has no heig
     document.documentElement.style.height = "auto";
     document.body.style.height = "auto";
   });
-  // The window shrinks to the app's height as the host hears it, and the frame is fitted to it a
-  // resize later: each read is a fresh look, until the frame has caught up with the window.
-  const sizes = () =>
-    sandbox?.evaluate(() => {
-      const { width, height } = (
-        document.querySelector("iframe") as Element
-      ).getBoundingClientRect();
-      return { frame: [width, height], window: [innerWidth, innerHeight] };
-    });
+  // The host shrinks the sandbox's window to the app's height, and the frame is fitted to it at
+  // the next rendering, a resize later: a read between the two sees the frame a size behind. So
+  // the sizes are read until three reads 200 ms apart agree, and then the frame must fill it.
+  const sizes = async () =>
+    JSON.stringify(
+      await sandbox?.evaluate(() => {
+        const { width, height } = (
+          document.querySelector("iframe") as Element
+        ).getBoundingClientRect();
+        return { frame: [width, height], window: [innerWidth, innerHeight] };
+      }),
+    );
+  const reads: string[] = [];
   await expect
-    .poll(async () => {
-      const { frame, window } = (await sizes()) ?? { frame: [], window: [] };
-      return (window[1] ?? 0) > 0 && frame.join("x") === window.join("x");
-    }, SETTLED)
+    .poll(
+      async () => {
+        reads.push(await sizes());
+        return new Set(reads.slice(-3)).size === 1 && reads.length >= 3;
+      },
+      { ...SETTLED, interval: 200 },
+    )
     .toBe(true);
-  const { frame, window } = (await sizes()) ?? { frame: [], window: [] };
-  expect(frame).toEqual(window);
+  const last = reads.slice(-3).join(" ");
+  const { frame, window } = JSON.parse(reads.at(-1) as string);
+  expect(window[1], last).toBeGreaterThan(0);
+  expect(frame, last).toEqual(window);
   await page.close();
 });
 

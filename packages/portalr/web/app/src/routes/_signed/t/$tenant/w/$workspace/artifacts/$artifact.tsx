@@ -7,7 +7,9 @@ import {
   ArtifactContent,
   ButtonLink,
   Card,
+  FiredContext,
   FormHostContext,
+  firedOf,
   NotFound as NotFoundPage,
   PageHeader,
   ProposalCard,
@@ -25,6 +27,7 @@ import { useFormHost } from "../../../../../../../form-host";
 import { KillSwitch } from "../../../../../../../kill-switch";
 import { NATIVE, wordsChanged } from "../../../../../../../native";
 import { RENDERERS } from "../../../../../../../renderers";
+import { RuleProposal } from "../../../../../../../rule-proposal";
 import { titleOf } from "../../../../../../../titles";
 import { Connection, useStream, useWorkspace } from "../../../../../../../workspace";
 
@@ -181,12 +184,14 @@ function Artifact() {
             {latest.kind === "app" && (
               <KillSwitch queries={queries} tenant={tenant} workspace={workspace} />
             )}
-            <ArtifactContent
-              kind={latest.kind}
-              data={untitled(latest.data, title)}
-              shown={{ id, version: latest.version, archived: latest.archived }}
-              renderers={RENDERERS}
-            />
+            <FiredContext value={firedOf(Object.values(snapshot.state.proposals), id)}>
+              <ArtifactContent
+                kind={latest.kind}
+                data={untitled(latest.data, title)}
+                shown={{ id, version: latest.version, archived: latest.archived }}
+                renderers={RENDERERS}
+              />
+            </FiredContext>
           </AppHostContext>
         </FormHostContext>
       </Card>
@@ -209,7 +214,13 @@ function Artifact() {
                 onRespond={onRespond}
               />
             ) : (
-              <ProposalCard key={proposal.id} proposal={proposal} onRespond={onRespond} />
+              <ProposalCard key={proposal.id} proposal={proposal} onRespond={onRespond}>
+                <RuleProposal
+                  proposal={proposal}
+                  kind={latest.kind}
+                  place={{ context, tenant, workspace }}
+                />
+              </ProposalCard>
             );
           })}
         </section>

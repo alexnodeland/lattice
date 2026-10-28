@@ -167,7 +167,7 @@ export class Limiter {
  * counted apart so no earlier report can crowd them out, four of whether it stopped.
  */
 export const MOST_REPORTS = 8;
-export const MOST_STOPPED = 4;
+const MOST_STOPPED = 4;
 
 /** Each report's fields: text kept to so many characters, or a number (`0`). Others are dropped. */
 const REPORTED: Readonly<Record<string, Readonly<Record<string, number>>>> = {

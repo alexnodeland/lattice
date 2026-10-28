@@ -50,20 +50,28 @@ async function thread(path = "/t/acme/w/notes/threads/thr_1", log: unknown = WOR
   );
   const box = screen.getByRole("textbox", { name: "Message" });
   await expect.element(box).toBeInTheDocument();
+  // The footer is there to tap once its + is: what a click on it would otherwise race.
+  const plus = screen.getByRole("button", { name: "Add", exact: true });
+  await expect.element(plus).toBeVisible();
   (box.element() as HTMLElement).focus();
-  return { screen, sent, box };
+  return { screen, sent, box, plus };
 }
 
-test("+ opens Add; Mode is a radio group behind Back, Escape goes back first, and the focus follows", async () => {
-  const { screen, sent } = await thread();
-  const plus = screen.getByRole("button", { name: "Add", exact: true });
+/** + tapped, then Add's Mode: the Mode sheet, its Back focused, and its radio group. */
+async function inMode() {
+  const opened = await thread();
+  const { screen, plus } = opened;
   await plus.click();
   const sheet = screen.getByRole("dialog", { name: "Add" });
   await expect.element(sheet).toBeVisible();
   await sheet.getByRole("button", { name: /^Mode/ }).click();
   const modes = screen.getByRole("dialog", { name: "Agent mode" });
   await expect.element(modes.getByRole("button", { name: "Back to Add" })).toHaveFocus();
-  const group = modes.getByRole("radiogroup", { name: "Agent mode" });
+  return { ...opened, group: modes.getByRole("radiogroup", { name: "Agent mode" }) };
+}
+
+test("+ opens Add, whose Mode is a radio group behind Back, and the arrows choose", async () => {
+  const { sent, group } = await inMode();
   await expect.element(group.getByRole("radio", { name: "Auto" })).toBeChecked();
   await expect
     .element(group.getByRole("radio", { name: "Ask" }))
@@ -72,6 +80,10 @@ test("+ opens Add; Mode is a radio group behind Back, Escape goes back first, an
   (group.getByRole("radio", { name: "Auto" }).element() as HTMLElement).focus();
   await userEvent.keyboard("{ArrowDown}");
   await expect.poll(() => sent.find((c) => c.type === "set_thread_mode")?.mode).toBe("suggest");
+});
+
+test("in Mode, Escape goes back to Add first, then closes, and the focus follows", async () => {
+  const { screen, plus } = await inMode();
   // Escape goes back to Add, to the Mode row; again, it closes, and the focus is +'s.
   await userEvent.keyboard("{Escape}");
   await expect
@@ -83,9 +95,9 @@ test("+ opens Add; Mode is a radio group behind Back, Escape goes back first, an
 });
 
 test("Add files closes the sheet and opens the system's chooser, whose files go to the uploader", async () => {
-  const { screen } = await thread();
+  const { screen, plus } = await thread();
   const clicked = vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => undefined);
-  await screen.getByRole("button", { name: "Add", exact: true }).click();
+  await plus.click();
   await screen
     .getByRole("dialog", { name: "Add" })
     .getByRole("button", { name: "Add files" })

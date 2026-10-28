@@ -224,6 +224,9 @@ crafts:
     vectorcraft: {version: "0.12.0", type: VectorImage}
     designcraft: {version: "0.9.0", type: PageLayout}
     figcraft: {version: "0.6.0", type: Design}
+    filmcraft: {version: "0.8.0", type: VideoProject}
+    effectcraft: {version: "0.11.1", type: MotionGraphics}
+    soundcraft: {version: "0.8.0", type: AudioSession}
     freecad: {version: "1.1.4", type: CadModel}
     blender:
       version: "5.2.2"

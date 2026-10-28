@@ -245,7 +245,7 @@ def test_the_application_mounts_native_files_while_an_app_runs(script: Script) -
 @pytest.mark.parametrize(
     ("environ", "refusal"),
     [
-        ({"FILES_CRAFTS": "wordcraft,filmcraft"}, "names filmcraft: a worker runs wordcraft"),
+        ({"FILES_CRAFTS": "wordcraft,lightcraft"}, "names lightcraft: a worker runs wordcraft"),
         ({"FILES_CRAFTS": "wordcraft"}, "needs FILES_WORDCRAFT_TOKEN, of at least 32"),
         ({"FILES_CRAFTS": "wordcraft", "FILES_WORDCRAFT_TOKEN": "short"}, "of at least 32"),
         ({"FILES_WORKSPACE_QUOTA": "lots"}, "FILES_WORKSPACE_QUOTA is <bytes> or <bytes>,<files>"),

@@ -107,6 +107,15 @@ jobs:
           name: ui-screenshots
           path: packages/portalr/web/ui/.vitest/attachments/
           retention-days: 7
+      # The app's phone tests' Playwright traces, kept only for a test that failed: open one with
+      # `bun x playwright show-trace` to see what the page was doing as it stalled.
+      - name: Upload the app's traces
+        if: failure() && hashFiles('packages/portalr/web/app/.vitest/traces/**') != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: app-traces
+          path: packages/portalr/web/app/.vitest/traces/
+          retention-days: 7
 
   tests:
     name: Tests (Python ${{ matrix.python }})

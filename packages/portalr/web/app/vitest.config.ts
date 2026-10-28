@@ -49,10 +49,12 @@ export default defineConfig({
           },
         },
       },
-      {
+      // A project per scheme, so each keeps a failing test's Playwright trace in a folder of its
+      // own: two schemes' traces written to one collide.
+      ...(["light", "dark"] as const).map((scheme) => ({
         extends: true,
         test: {
-          name: "phone",
+          name: `phone-${scheme}`,
           include: ["src/**/*.touch.test.tsx"],
           setupFiles: ["./src/test/setup.ts"],
           api: { host: "127.0.0.1" },
@@ -60,10 +62,17 @@ export default defineConfig({
             enabled: true,
             headless: true,
             provider: playwright(),
-            instances: [phone("light"), phone("dark")],
+            instances: [phone(scheme)],
+            // Its DOM and its actions, without screenshots, which a page that stalls can't
+            // take: what CI uploads as app-traces.
+            trace: {
+              mode: "retain-on-failure" as const,
+              tracesDir: `.vitest/traces/${scheme}`,
+              screenshots: false,
+            },
           },
         },
-      },
+      })),
     ],
   },
 });

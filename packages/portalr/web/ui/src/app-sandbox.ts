@@ -176,7 +176,7 @@ const STARTED = `parent.postMessage({ jsonrpc: "2.0", method: "${APP_STARTED}" }
  * cut short (WebKit says the app's own errors only as "Script error."). And what it drew, 1.5 s
  * after the document loaded and, if nothing yet, again at 5 s, then once more when it first
  * does: its visible content, its largest visible canvas's size, the context the app asked of it,
- * and, for a 2D one alone, whether 8 by 8 pixels at its centre are transparent; the window, and
+ * and, for a 2D one alone, whether nine pixels on a 3 by 3 grid across it are transparent; the window, and
  * which of the APIs a game leans on it has. It said "nothing" only where both looks found no
  * visible text or element, and no canvas, one the app never drew on, or a 2D one transparent at
  * its centre. `getContext` is wrapped to remember which context each canvas was given, and the
@@ -191,6 +191,12 @@ const DIAGNOSED = [
   "    const context = getContext.call(this, type, ...rest);",
   "    if (context && !kinds.has(this)) kinds.set(this, String(type));",
   "    return context;",
+  "  };",
+  "  const offscreen = HTMLCanvasElement.prototype.transferControlToOffscreen;",
+  "  if (offscreen) HTMLCanvasElement.prototype.transferControlToOffscreen = function (...rest) {",
+  "    const handed = offscreen.apply(this, rest);",
+  '    kinds.set(this, "offscreen");',
+  "    return handed;",
   "  };",
   '  const cut = (text, most) => { try { return String(text == null ? "" : text).slice(0, most); } catch { return ""; } };',
   '  const post = (method, params) => parent.postMessage({ jsonrpc: "2.0", method, params }, "*");',
@@ -231,10 +237,12 @@ const DIAGNOSED = [
   '    let pixels = "";',
   '    if (kind === "2d") {',
   "      try {",
-  "        const x = Math.max(0, (largest.width >> 1) - 4), y = Math.max(0, (largest.height >> 1) - 4);",
-  '        const data = largest.getContext("2d").getImageData(x, y, Math.min(8, largest.width), Math.min(8, largest.height)).data;',
+  '        const context = largest.getContext("2d");',
   '        pixels = "blank";',
-  '        for (let i = 3; i < data.length; i += 4) if (data[i] !== 0) pixels = "drawn";',
+  "        for (const fx of [1, 2, 3]) for (const fy of [1, 2, 3]) {",
+  "          const at = context.getImageData((largest.width * fx) >> 2, (largest.height * fy) >> 2, 1, 1).data;",
+  '          if (at[3] !== 0) pixels = "drawn";',
+  "        }",
   '      } catch { pixels = "unread"; }',
   "    }",
   '    const nothing = !content && (!largest || kind === "none" || pixels === "blank");',

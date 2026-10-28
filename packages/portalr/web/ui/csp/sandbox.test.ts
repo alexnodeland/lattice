@@ -480,7 +480,7 @@ test.each([
   ],
   [
     "a WebGL canvas",
-    `<body style="margin:0"><canvas width="200" height="100"></canvas><script>const g=document.querySelector("canvas").getContext("webgl");if(g){g.clearColor(0,0,1,1);g.clear(g.COLOR_BUFFER_BIT)}</script>`,
+    `<body style="margin:0"><canvas width="200" height="100"></canvas><script>const g=document.querySelector("canvas").getContext("webgl");if(g){g.clearColor(0,0,1,1);g.clear(g.COLOR_BUFFER_BIT)}else document.body.append("No WebGL here")</script>`,
   ],
 ])("an app with %s is never said to have drawn nothing", async (_, html) => {
   const { page, said } = await watched(html);
@@ -491,6 +491,16 @@ test.each([
   expect(await saysNothing(page)).toBe(0);
   expect(said.filter((line) => !line.startsWith("[app-frame] boot:"))).toEqual([]);
   expect(await page.getByText("The app reported a problem").count()).toBe(0);
+  await page.close();
+});
+
+test("the wrapped getContext gives the browser's own context, on its canvas, and refuses as it does", async () => {
+  const { page } = await watched(
+    `<body><p>Probe</p><script>const c=document.createElement("canvas");const a=c.getContext("2d",{alpha:false});const b=document.createElement("canvas");const r=b.getContext("bitmaprenderer");document.body.dataset.ok=String(a===c.getContext("2d")&&a.canvas===c&&a.getContextAttributes().alpha===false&&c.getContext("webgl")===null&&(r===null||b.getContext("2d")===null))</script>`,
+  );
+  await expect
+    .poll(() => appFrame(page)?.evaluate(() => document.body.dataset.ok), SETTLED)
+    .toBe("true");
   await page.close();
 });
 
@@ -524,6 +534,11 @@ test("an app's document says the first five errors that differ, and no more", as
   expect(errors()).toHaveLength(5);
   expect(errors().filter((line) => line.includes("again"))).toHaveLength(1);
   await page.getByText("The app reported a problem").click();
-  expect(await page.locator("details li").count()).toBe(5);
+  expect(
+    await page
+      .locator("details li")
+      .filter({ hasNotText: /^boot:/ })
+      .count(),
+  ).toBe(5);
   await page.close();
 });

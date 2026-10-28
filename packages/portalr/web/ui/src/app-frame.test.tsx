@@ -392,6 +392,9 @@ test("what an app reports went wrong is shown as plain text under it, and said i
     expect(warned).toHaveBeenCalledWith("[app-frame] boot: drawn=something canvases=1"),
   );
   expect(screen.getByText("The app reported a problem").query()).toBeNull();
+  const looked = screen.getByText("What the app reported");
+  await looked.click();
+  await expect.element(screen.getByText("boot: drawn=something canvases=1")).toBeVisible();
   expect(screen.getByText(DREW_NOTHING, { exact: false }).query()).toBeNull();
   const message = "<b>boom</b> \u202eevil";
   fromFrame(frame, {
@@ -403,13 +406,17 @@ test("what an app reports went wrong is shown as plain text under it, and said i
     params: { kind: "policy", message: "style-src refused", blocked: "inline" },
   });
   const summary = screen.getByText("The app reported a problem");
+  // Open already, from the look before: the same disclosure, now saying there is a problem.
   await expect.element(summary).toBeInTheDocument();
-  await summary.click();
   const said = "error: <b>boom</b>  evil at about:srcdoc:9";
   await expect.element(screen.getByText(said)).toBeVisible();
   await expect.element(screen.getByText("policy: style-src refused (inline)")).toBeVisible();
   expect(screen.container.querySelector("b")).toBeNull();
   expect(warned).toHaveBeenCalledWith(`[app-frame] ${said}`);
+  fromFrame(frame, { method: APP_ERROR, params: { kind: "error", message: "Script error." } });
+  await expect
+    .element(screen.getByText("error: the app threw an error; this browser doesn't say which"))
+    .toBeVisible();
 });
 
 test("an app said to have drawn nothing is said to, until it draws; Try again makes it afresh", async () => {

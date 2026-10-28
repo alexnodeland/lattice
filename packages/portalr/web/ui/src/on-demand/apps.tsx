@@ -122,6 +122,9 @@ function reportLine({ method, params }: Report): string {
     const said = Object.entries(params).map(([name, value]) => `${name}=${value}`);
     return `boot: ${said.join(" ")}`;
   }
+  if (params.message === "Script error.") {
+    return "error: the app threw an error; this browser doesn't say which";
+  }
   const where = params.source ? ` at ${params.source}:${params.line ?? 0}` : "";
   const refused = params.blocked ? ` (${params.blocked})` : "";
   return `${params.kind ?? "error"}: ${params.message ?? ""}${where}${refused}`;
@@ -185,6 +188,8 @@ export function Running({
   // What the app's document reported went wrong, and whether it drew nothing: shown, never kept.
   const [problems, setProblems] = useState<readonly string[]>([]);
   const [blank, setBlank] = useState(false);
+  // The app's latest look at what it drew, shown quietly under it once said.
+  const [boot, setBoot] = useState<string | null>(null);
   const [run, setRun] = useState({ html: app.html, count: 0 });
   // A new version's HTML runs afresh; its state alone changing does not.
   if (run.html !== app.html) {
@@ -245,6 +250,7 @@ export function Running({
     setStalled(null);
     setProblems([]);
     setBlank(false);
+    setBoot(null);
     time(); // a frame that never loads is timed too
     const { id } = head.current.shown;
     const kept = new StateKeeper(
@@ -294,6 +300,7 @@ export function Running({
           const line = reportLine(report);
           console.warn(`[app-frame] ${line}`);
           if (report.method === APP_BOOT) {
+            setBoot(line);
             const { drawn } = report.params;
             if (drawn === "nothing" || drawn === "something") {
               setBlank(drawn === "nothing");
@@ -431,13 +438,16 @@ export function Running({
           </span>
         </Alert>
       )}
-      {problems.length > 0 && (
+      {(problems.length > 0 || boot !== null) && (
         <details className="text-muted text-xs">
-          <summary>The app reported a problem</summary>
+          <summary>
+            {problems.length > 0 ? "The app reported a problem" : "What the app reported"}
+          </summary>
           <ul className="mt-1 flex flex-col gap-1 break-all font-mono">
             {problems.map((line) => (
               <li key={line}>{line}</li>
             ))}
+            {boot !== null && <li>{boot}</li>}
           </ul>
         </details>
       )}

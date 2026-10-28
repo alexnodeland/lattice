@@ -42,8 +42,7 @@ export function Dialog({
   children,
 }: {
   open: boolean;
-  /** With Base UI's reason, such as "escape-key", and a way to cancel the change. */
-  onOpenChange: (open: boolean, details?: { reason: string; cancel: () => void }) => void;
+  onOpenChange: (open: boolean) => void;
   title: ReactNode;
   description?: ReactNode;
   /** The words on the button that closes it. */

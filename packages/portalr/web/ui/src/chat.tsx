@@ -739,7 +739,11 @@ export function Composer({
           disabled={disabled || !text.trim()}
           pending={pending}
         >
-          Send
+          {/* Its arrow alone on a phone, where the row is narrow; still named Send (portalr ADR-0087). */}
+          <span className="sr-only">Send</span>
+          <span aria-hidden="true" className="phone:hidden">
+            Send
+          </span>
           <Icon icon={glyphs.arrowRight} className="size-3.5" />
         </Button>
       </div>

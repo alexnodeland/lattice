@@ -155,13 +155,54 @@ for (const [what, review] of [
   });
 }
 
-test("on a small phone the composer's row, bar and all, takes at most a quarter of the window", async () => {
-  await page.viewport(375, 667);
-  const { screen } = await open("/t/acme/w/notes/threads/thr_1", serve, () => null, WORLD);
-  await expect.element(screen.getByText("Which week should the note cover?")).toBeVisible();
-  await expect.poll(() => bar()?.textContent).toContain("Answer");
-  expect(dock().getBoundingClientRect().height).toBeLessThanOrEqual(window.innerHeight / 4);
-});
+/**
+ * The dock's height once it has settled: after the faces have loaded, the same in two readings a
+ * frame apart, so a row that wraps as they arrive is measured as it ends, not as it starts.
+ */
+async function settled(): Promise<number> {
+  await document.fonts.ready;
+  let last = -1;
+  return expect
+    .poll(
+      async () => {
+        await new Promise(requestAnimationFrame);
+        const now = dock().getBoundingClientRect().height;
+        const same = now === last;
+        last = now;
+        return same ? now : Number.NaN;
+      },
+      { timeout: 5_000, interval: 50 },
+    )
+    .not.toBeNaN()
+    .then(() => last);
+}
+
+for (const [width, height] of [
+  [320, 568],
+  [360, 640],
+  [375, 667],
+  [390, 844],
+  [430, 932],
+] as const) {
+  test(`at ${width}px the composer's row, bar and all, keeps the agent's mode on one line, and from 375px the dock at most a quarter of the window`, async () => {
+    await page.viewport(width, height);
+    const { screen } = await open("/t/acme/w/notes/threads/thr_1", serve, () => null, WORLD);
+    await expect.element(screen.getByText("Which week should the note cover?")).toBeVisible();
+    await expect.poll(() => bar()?.textContent).toContain("Answer");
+    const tall = await settled();
+    // The agent's mode keeps its two options on one line at every width (portalr ADR-0087).
+    const mode = screen.getByRole("radiogroup", { name: "Agent mode" }).element();
+    const options = [...mode.querySelectorAll("[role=radio]")].map(
+      (o) => o.getBoundingClientRect().top,
+    );
+    expect(new Set(options).size).toBe(1);
+    // From the common small phone (375 by 667) up the row is one line and the dock at most a
+    // quarter of the window; narrower, the thumb bar's Answer takes a second line.
+    if (width >= 375) {
+      expect(tall).toBeLessThanOrEqual(window.innerHeight / 4);
+    }
+  });
+}
 
 test("the account menu, the thread's menu and the attach panel open as sheets, and the page is never wider", async () => {
   await page.viewport(390, 844);

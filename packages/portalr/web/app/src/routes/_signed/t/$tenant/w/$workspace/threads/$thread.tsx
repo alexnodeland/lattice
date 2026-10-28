@@ -609,7 +609,7 @@ function Chat() {
               onSend={send}
               onFiles={setDropped}
               attach={
-                <div className="flex min-w-0 flex-1 items-center gap-2">
+                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
                   <Uploader
                     context={context}
                     tenant={tenant}
@@ -620,6 +620,11 @@ function Chat() {
                   />
                   {/* The agent's mode, a setting of the thread's, beside what is sent to it (portalr ADR-0085). */}
                   {mode}
+                  {/* A phone's thumb bar: the request's next step, at the row's end (portalr ADR-0082). */}
+                  {latestRequest !== undefined && (
+                    <ThumbBar target={`request-${latestRequest.tool_call_id}`} />
+                  )}
+                  {/* The model's choice last: where the row is narrow it wraps to a line of its own (portalr ADR-0087). */}
                   {picker && (
                     <picker.ModelPicker
                       place={place}
@@ -629,10 +634,6 @@ function Chat() {
                       running={active.length > 0}
                       Select={SelectField}
                     />
-                  )}
-                  {/* A phone's thumb bar: the request's next step, at the row's end (portalr ADR-0082). */}
-                  {latestRequest !== undefined && (
-                    <ThumbBar target={`request-${latestRequest.tool_call_id}`} />
                   )}
                 </div>
               }

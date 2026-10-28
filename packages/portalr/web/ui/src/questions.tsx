@@ -503,14 +503,14 @@ function Asked({
 }
 
 /** An option's row, which is its control: checked, it is edged and washed in the working colour. */
-const ROW = cn(
+export const ROW = cn(
   "group flex w-full cursor-pointer items-start gap-3 rounded-(--question-option-radius) border border-line bg-surface px-(--question-option-pad-x) py-(--question-option-pad-y) text-start hover:border-edge data-checked:border-accent data-checked:bg-wash data-disabled:cursor-not-allowed data-disabled:hover:border-line",
   RING,
   FEEDBACK,
 );
 
 /** The mark in an option's row: a ring, or a box, filled in the working colour once checked. */
-const MARK = cn(
+export const MARK = cn(
   "mt-0.5 grid size-4 shrink-0 place-items-center border border-edge bg-surface group-data-checked:border-accent",
   FEEDBACK,
 );

@@ -55,7 +55,11 @@ export function SegmentedFilter<V extends string>({
       value={value}
       disabled={disabled}
       onValueChange={(chosen) => onValueChange(chosen)}
-      className="inline-flex flex-wrap gap-0.5 self-start rounded-(--segmented-radius) border border-line bg-subtle p-(--segmented-pad) aria-invalid:border-status-failed"
+      className={cn(
+        "inline-flex gap-0.5 self-start rounded-(--segmented-radius) border border-line bg-subtle p-(--segmented-pad) aria-invalid:border-status-failed",
+        // In a row of controls, one line at its content's width, never squeezed into two.
+        size === "sm" ? "shrink-0" : "flex-wrap",
+      )}
     >
       {segments.map((segment) => (
         <Radio.Root

@@ -107,6 +107,7 @@ export type Kind3 = "message" | "notice";
  * via the `definition` "MessageId".
  */
 export type MessageId = string;
+export type Model = string | null;
 export type Type7 = "post_message";
 export type ArtifactIds = ArtifactId[];
 export type Type8 = "set_focus";
@@ -217,6 +218,7 @@ export type ArtifactIds1 = ArtifactId[];
 export type Type21 = "focus_changed";
 export type Content1 = string;
 export type Kind13 = "message" | "notice";
+export type Model1 = string | null;
 export type Type22 = "message_posted";
 export type Kind14 = string;
 export type Type23 = "artifact_created";
@@ -239,6 +241,7 @@ export type Reason1 = string | null;
 export type Type27 = "proposal_resolved";
 export type Version5 = number | null;
 export type MessageIds = MessageId[];
+export type Model2 = string | null;
 /**
  * This interface was referenced by `ArtifactrV1`'s JSON-Schema
  * via the `definition` "TraceId".
@@ -268,7 +271,7 @@ export type Type31 = "run_paused";
 export type CacheReadTokens = number;
 export type CacheWriteTokens = number;
 export type InputTokens = number;
-export type Model = string | null;
+export type Model3 = string | null;
 export type OutputTokens = number;
 export type ReasoningTokens = number;
 export type Requests1 = number;
@@ -276,7 +279,7 @@ export type CacheReadTokens1 = number;
 export type CacheWriteTokens1 = number;
 export type DurationMs = number | null;
 export type InputTokens1 = number;
-export type Model1 = string | null;
+export type Model4 = string | null;
 export type OutputTokens1 = number;
 export type ReasoningTokens1 = number;
 export type Steps = StepUsage[];
@@ -600,6 +603,7 @@ export interface PostMessage {
   content: Content;
   kind?: Kind3;
   message_id?: MessageId;
+  model?: Model;
   thread_id: ThreadId;
   type: Type7;
 }
@@ -926,6 +930,7 @@ export interface MessagePosted {
   content: Content1;
   kind?: Kind13;
   message_id: MessageId;
+  model?: Model1;
   run_id?: RunId | null;
   thread_id: ThreadId;
   type: Type22;
@@ -1021,6 +1026,7 @@ export interface ProposalResolved {
  */
 export interface RunStarted {
   message_ids?: MessageIds;
+  model?: Model2;
   run_id: RunId;
   thread_id: ThreadId;
   trace_id?: TraceId | null;
@@ -1105,7 +1111,7 @@ export interface RunUsage {
   cache_read_tokens?: CacheReadTokens;
   cache_write_tokens?: CacheWriteTokens;
   input_tokens?: InputTokens;
-  model?: Model;
+  model?: Model3;
   output_tokens?: OutputTokens;
   reasoning_tokens?: ReasoningTokens;
   requests?: Requests1;
@@ -1122,7 +1128,7 @@ export interface StepUsage {
   cache_write_tokens?: CacheWriteTokens1;
   duration_ms?: DurationMs;
   input_tokens?: InputTokens1;
-  model?: Model1;
+  model?: Model4;
   output_tokens?: OutputTokens1;
   reasoning_tokens?: ReasoningTokens1;
 }

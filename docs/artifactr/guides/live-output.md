@@ -51,6 +51,8 @@ A request that never answers, or a stream that stops mid-reply, would otherwise 
 
 As each model request ends, `ArtifactWorkspace` sends a `usage` frame: what the request used, as the provider counted it (input, output, of the input what was read from and written to the prompt cache, of the output what was spent reasoning), the model that answered, as the response names it, how long the request took, and the run's total so far. The total is a whole count, not an increment, so a client replaces what it has with the total that counts the most requests, and a frame it is sent again on reconnect counts nothing twice. Every `run_ended` and `run_paused` carries the same in `usage`, each request a step of `usage.steps`, whether the run completed, paused, was stopped or failed. Until the first request ends, a client can only estimate ([ADR-0096](../adr/0096-a-run-counts-each-model-request-exactly-live-and-at-its-end.md)).
 
+The model a step names is the one that answered, which can differ from the one the run asked for, `run_started.model`, when a gateway falls back to another: a client that shows the model shows the step's, so a fallback is never silent ([ADR-0097](../adr/0097-a-message-chooses-the-model-of-the-turn-it-starts.md)).
+
 Through an OpenAI-compatible gateway, pydantic-ai maps `prompt_tokens_details.cached_tokens` to the cache read and `completion_tokens_details.reasoning_tokens` to the reasoning; LiteLLM reports Anthropic's cache writes as a top-level `cache_creation_input_tokens`, which artifactr reads too. A provider that says none of these counts 0.
 
 ## Drafts and progress from your tools

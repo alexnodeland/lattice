@@ -71,6 +71,10 @@ class Session[AppDepsT]:
     message_ids: tuple[MessageId, ...] = ()
     """The messages the run segment's start carries out, which its ``run_started`` names."""
 
+    model: str | None = None
+    """The model the run segment asked for, by the host's name for it, which its
+    ``run_started`` names; ``None`` for the agent's own (ADR-0097)."""
+
     delivered: Delivered = field(default_factory=Delivered, init=False, repr=False, compare=False)
     """How far the run has taken the log: to ``watch_after`` once it has started, then as far as
     its watcher delivers. The capability records it with the run's start and its end."""
@@ -102,6 +106,7 @@ class Session[AppDepsT]:
         watch_after: int | None = None,
         on_behalf_of: UserActor | ExternalAgentActor | None = None,
         message_ids: tuple[MessageId, ...] = (),
+        model: str | None = None,
     ) -> "Session[AppDepsT]":
         """Return a session for a new (or resuming) run of the thread's agent.
 
@@ -116,6 +121,7 @@ class Session[AppDepsT]:
             on_behalf_of: Whom the run segment acts for: the person, or the person's client,
                 whose message or answer started it.
             message_ids: The messages its start carries out.
+            model: The model it asks for, by the host's name for it; ``None`` for the agent's.
         """
         run_id = run_id or new_run_id()
         actor = AgentActor(
@@ -129,6 +135,7 @@ class Session[AppDepsT]:
             trigger=trigger,
             watch_after=watch_after,
             message_ids=message_ids,
+            model=model,
         )
 
 

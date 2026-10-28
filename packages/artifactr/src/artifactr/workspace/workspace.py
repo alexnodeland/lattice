@@ -138,6 +138,8 @@ ACTIONS: Final = frozenset(
         "artifactr:answer_deferred",
         "artifactr:give_feedback",
         "artifactr:stop_run",
+        # what a turn a message starts asks as its author: answering with the model it names
+        "artifactr:use_model",
         # what a person does beside the workspace's commands: a native file's upload over HTTP
         "artifactr:create_native_file",
         # what the agent does beside the workspace, for the person it acts for
@@ -181,6 +183,11 @@ class Access(BaseModel):
 
     artifact_id: ArtifactId | None = None
     """The artifact it is about, when it names one."""
+
+    model: str | None = None
+    """The model it is about: ``artifactr:use_model``'s, the name a message asked to answer with
+    (ADR-0097). It is not a workspace item, so an ``authorize`` that scopes by item, as grantr's
+    does, asks it of the thread; one that limits models reads it here."""
 
 
 Authorize = Callable[[TenantId, WorkspaceId | None, Actor, Access], Awaitable[bool]]

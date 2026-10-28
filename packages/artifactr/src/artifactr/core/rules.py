@@ -573,6 +573,7 @@ def _post_message(command: PostMessage, state: State, actor: Actor) -> CommitRes
                 content=command.content,
                 run_id=_run_id(actor),
                 kind=command.kind,
+                model=command.model,
             ),
         ),
         messages=(command.message_id,),
@@ -741,7 +742,7 @@ def _run_started(fact: RunStarted, state: State) -> CommitResult:
         traces = existing.trace_ids
     if fact.trace_id is not None:
         traces = (*traces, fact.trace_id)
-    run = Run(id=fact.run_id, thread_id=fact.thread_id, trace_ids=traces)
+    run = Run(id=fact.run_id, thread_id=fact.thread_id, trace_ids=traces, model=fact.model)
     return CommitResult(outcome=Recorded(), events=(fact,), runs=(run,))
 
 

@@ -36,6 +36,7 @@ An application's own, with its custom roles, is in its `access.md` ([Roles and g
 | `artifactr:set_focus` |  |  | ✓ | ✓ |  | ✓ | ✓ |  |  |
 | `artifactr:set_thread_mode` |  |  | ✓ | ✓ |  | ✓ | ✓ |  |  |
 | `artifactr:stop_run` |  |  | ✓ | ✓ |  | ✓ | ✓ |  |  |
+| `artifactr:use_model` |  |  | ✓ | ✓ |  | ✓ | ✓ |  |  |
 | `grantr:add_member` |  |  | ✓ | ✓ |  |  |  |  |  |
 | `grantr:create_tenant` | ✓ |  |  |  |  |  |  |  |  |
 | `grantr:define_role` |  |  | ✓ | ✓ |  |  |  |  |  |

@@ -15,9 +15,9 @@ import zipfile
 from pathlib import Path
 from typing import Any
 
-from mcp.server.mcpserver import Image, MCPServer
+from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
-from mcp.types import CallToolResult, TextContent
+from mcp.types import CallToolResult, ImageContent, TextContent
 
 LISTED = """\
 3 commands (id — label [menu] (shortcut) params; * = undoable):
@@ -52,6 +52,8 @@ def main() -> None:
                 design["comments"].append(
                     {"id": len(design["comments"]) + 1, "text": params["text"]}
                 )
+            elif step["command"] == "page.background":
+                design["background"] = params["color"]
             else:
                 raise ToolError(f"unknown command `{step['command']}`")
         return replied([{"id": 2}] * len(commands))
@@ -70,7 +72,14 @@ def main() -> None:
     ) -> CallToolResult:
         texts = [{"name": w, "type": "TEXT", "characters": w} for w in design["words"]]
         frame = {"name": "Frame", "type": "FRAME", "children": texts}
-        pages = [{"name": "Page 1", "type": "PAGE", "children": [frame] if depth > 1 else []}]
+        pages = [
+            {
+                "name": "Page 1",
+                "type": "PAGE",
+                "background": design.get("background", "#F5F5F5CC"),
+                "children": [frame] if depth > 1 else [],
+            }
+        ]
         return replied({"pages": pages})
 
     @server.tool()
@@ -85,10 +94,17 @@ def main() -> None:
         return replied({"comments": design["comments"]})
 
     @server.tool()
-    async def screenshot() -> Image:
+    async def screenshot() -> CallToolResult:
+        if "Unrenderable" in design["words"]:
+            raise ToolError("the renderer crashed")
         if not design["words"]:
-            raise ToolError("the current page is empty: nothing to render")
-        return Image(data=PNG, format="png")
+            # As FigCraft words it: its own text, which ToolError would prefix.
+            return CallToolResult(
+                content=[TextContent(text="the current page is empty: nothing to render")],
+                is_error=True,
+            )
+        data = base64.b64encode(PNG).decode()
+        return CallToolResult(content=[ImageContent(data=data, mime_type="image/png")])
 
     @server.tool()
     async def list_commands(filter: str = "") -> CallToolResult:

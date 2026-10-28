@@ -1012,6 +1012,59 @@
         "title": "NewTenant",
         "type": "object"
       },
+      "OfferedModel": {
+        "description": "A model the picker offers.",
+        "properties": {
+          "family": {
+            "default": "",
+            "title": "Family",
+            "type": "string"
+          },
+          "id": {
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          },
+          "local": {
+            "default": false,
+            "title": "Local",
+            "type": "boolean"
+          },
+          "reasoning": {
+            "default": false,
+            "title": "Reasoning",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "label"
+        ],
+        "title": "OfferedModel",
+        "type": "object"
+      },
+      "OfferedModels": {
+        "description": "The models a workspace allows, in the order the application lists them.",
+        "properties": {
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/OfferedModel"
+            },
+            "title": "Models",
+            "type": "array"
+          }
+        },
+        "required": [
+          "models"
+        ],
+        "title": "OfferedModels",
+        "type": "object"
+      },
       "Ok_Adoption_": {
         "properties": {
           "data": {
@@ -3661,6 +3714,91 @@
           }
         },
         "summary": "Metrics"
+      }
+    },
+    "/portalr/v1/models": {
+      "get": {
+        "description": "The models a person may choose for a turn in a workspace (portalr ADR-0086).\n\nThey are in the application's order, for the tenant ``X-Tenant`` names. The caller must\nhold ``artifactr:use_model`` in the workspace, as the turn's own check asks; what is\nlisted is what the workspace's ``models:allowed`` allows, read where that check reads\nit. A model's name and how it is shown, never where it is served.",
+        "operationId": "offered_portalr_v1_models_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/TenantId"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OfferedModels"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          }
+        },
+        "summary": "Offered"
       }
     },
     "/portalr/v1/people": {

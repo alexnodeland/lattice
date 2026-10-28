@@ -30,9 +30,11 @@ import {
   RunSteps,
   RunStrip,
   rendererFor,
+  SelectField,
   StatusBadge,
   Streaming,
   ThumbBar,
+  useLoaded,
 } from "@portalr/ui";
 import {
   type UseSuspenseQueryOptions,
@@ -76,6 +78,9 @@ const threadOf = (workspace: string, thread: string) =>
   ({ kind: "thread", workspace, id: thread }) as const;
 
 const TENANT = { kind: "tenant" } as const;
+
+/** The composer's choice of model, loaded as the composer first takes the focus (portalr ADR-0086). */
+const loadPicker = () => import("../../../../../../../on-demand/model-picker");
 
 /**
  * A thread's chat: its messages, its runs as they go, its proposals, and a message to post where
@@ -166,6 +171,23 @@ function Chat() {
   const { posting, post } = usePosting(thread?.messages);
   // Files dropped on the composer, for the uploader it holds (portalr ADR-0080).
   const [dropped, setDropped] = useState<FileList | null>(null);
+  // The model the next message names, or null for the default (portalr ADR-0086): the models,
+  // and the picker, are read the first time the composer takes the focus, never as the page loads.
+  const [focused, setFocused] = useState(false);
+  const composer = useRef<HTMLDivElement>(null);
+  // After every render, not once: the composer is drawn only once the thread is, and may go.
+  useEffect(() => {
+    const box = composer.current;
+    if (focused || box === null) {
+      return;
+    }
+    const heard = () => setFocused(true);
+    box.addEventListener("focusin", heard);
+    return () => box.removeEventListener("focusin", heard);
+  });
+  const [model, setModel] = useState<string | null>(null);
+  const picker = useLoaded(loadPicker, focused).module;
+  const place = { api: context.api, tenant, workspace };
   // The people who posted without a name of their own, named when drawn: the stream's state
   // holds the actors as the server sent them, never an email.
   const names = usePeople(
@@ -293,7 +315,14 @@ function Chat() {
   const send = async (content: string, messageId?: string) => {
     const sent = await post(
       content,
-      (message_id) => stream.send({ type: "post_message", thread_id: id, content, message_id }),
+      (message_id) =>
+        stream.send({
+          type: "post_message",
+          thread_id: id,
+          content,
+          message_id,
+          ...(model !== null && { model }),
+        }),
       messageId,
     );
     if (sent.outcome === "refused") {
@@ -479,6 +508,7 @@ function Chat() {
               })}
             />
           )}
+          {picker && <picker.AnsweredBy place={place} run={run} />}
           {[
             ...run.requests
               .filter((request) => request.tool_name !== ASK_USER)
@@ -517,28 +547,41 @@ function Chat() {
       ))}
       {snapshot.status !== "closed" && allowed.has("artifactr:post_message") && (
         <ComposerDock>
-          <Composer
-            onSend={send}
-            onFiles={setDropped}
-            attach={
-              <div className="flex min-w-0 flex-1 items-center gap-2">
-                <Uploader
-                  context={context}
-                  tenant={tenant}
-                  workspace={workspace}
-                  thread={id}
-                  attach
-                  files={dropped}
-                />
-                {/* The agent's mode, a setting of the thread's, beside what is sent to it (portalr ADR-0085). */}
-                {mode}
-                {/* A phone's thumb bar: the request's next step, at the row's end (portalr ADR-0082). */}
-                {latestRequest !== undefined && (
-                  <ThumbBar target={`request-${latestRequest.tool_call_id}`} />
-                )}
-              </div>
-            }
-          />
+          {/* The composer's first focus loads the model picker (portalr ADR-0086). */}
+          <div className="contents" ref={composer}>
+            <Composer
+              onSend={send}
+              onFiles={setDropped}
+              attach={
+                <div className="flex min-w-0 flex-1 items-center gap-2">
+                  <Uploader
+                    context={context}
+                    tenant={tenant}
+                    workspace={workspace}
+                    thread={id}
+                    attach
+                    files={dropped}
+                  />
+                  {/* The agent's mode, a setting of the thread's, beside what is sent to it (portalr ADR-0085). */}
+                  {mode}
+                  {picker && (
+                    <picker.ModelPicker
+                      place={place}
+                      thread={id}
+                      value={model}
+                      onChange={setModel}
+                      running={active.length > 0}
+                      Select={SelectField}
+                    />
+                  )}
+                  {/* A phone's thumb bar: the request's next step, at the row's end (portalr ADR-0082). */}
+                  {latestRequest !== undefined && (
+                    <ThumbBar target={`request-${latestRequest.tool_call_id}`} />
+                  )}
+                </div>
+              }
+            />
+          </div>
         </ComposerDock>
       )}
       {snapshot.status !== "closed" && !allowed.has("artifactr:post_message") && (

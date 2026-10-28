@@ -91,5 +91,6 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0083](0083-a-turn-shows-its-progress-phase-thinking-and-an-estimated-count.md) | A turn shows its progress: phase, thinking, and an estimated count | Accepted |
 | [0084](0084-several-portal-origins-an-allow-list-aliases-and-a-union-policy.md) | Several portal origins: an allow-list, aliases, and a union policy | Accepted |
 | [0085](0085-polish-one-shape-per-part-and-what-is-folded.md) | Polish: one shape per part, and what is folded | Accepted |
+| [0086](0086-the-composer-chooses-the-model-of-the-next-turn.md) | The composer chooses the model of the next turn | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

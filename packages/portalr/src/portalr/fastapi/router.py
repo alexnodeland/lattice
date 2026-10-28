@@ -32,6 +32,7 @@ from grantr.core import (
     Forbidden,
     GrantrError,
     Invalid,
+    Resource,
     Subject,
     TenantId,
     User,
@@ -56,6 +57,7 @@ from portalr.analytics.replay import MOST_REPLAY_BYTES, ReplayBatch, expansion
 from portalr.fastapi.site import Place, Site, Surfaces
 from portalr.fastapi.ui import ui_router
 from portalr.invites import Invite, InviteFailed
+from portalr.models import Models, OfferedModels
 from portalr.people import People
 from portalr.readers import (
     Adoption,
@@ -289,6 +291,7 @@ def portalr_router(
     ui: Path = UI,
     people: People | None = None,
     relay: Relay | None = None,
+    models: Models | None = None,
 ) -> APIRouter:
     """Build portalr's router, for an application to mount at ``/portalr``.
 
@@ -304,6 +307,8 @@ def portalr_router(
             show a short id, and there is no people route.
         relay: Product analytics from people's browsers, with their consent (lattice RFC-0008);
             without it, there are no analytics routes.
+        models: The models a workspace allows a turn to name (portalr ADR-0086); without it,
+            there is no models route, and the composer offers no choice.
     """
     router = APIRouter()
     router.include_router(ui_router(site, ui))
@@ -549,6 +554,8 @@ def portalr_router(
 
     if people is not None:
         _naming(api, grants, people, current)
+    if models is not None:
+        _choosing(api, grants, models, current)
     if relay is not None:
         _analytics(api, grants, relay, current, ui)
     if invite is not None:
@@ -608,6 +615,37 @@ def _naming(router: APIRouter, grants: Grants, people: People, current: Any) -> 
         visible = await _visible(grants, who, x_tenant, list(dict.fromkeys(id)))
         got: Mapping[str, str] = await people(visible) if visible else {}
         return Names(people={each: email for each in visible if (email := got.get(each))})
+
+
+USE_MODEL: Final = "artifactr:use_model"
+"""What choosing a turn's model asks of grantr: the runner asks it again of the turn."""
+
+
+def _choosing(router: APIRouter, grants: Grants, models: Models, current: Any) -> None:
+    @router.get("/v1/models", response_model=OfferedModels)
+    async def offered(
+        response: Response,
+        workspace: Annotated[Id, Query()],
+        x_tenant: TenantHeader = None,
+        who: Caller = current,
+    ) -> OfferedModels:
+        """The models a person may choose for a turn in a workspace (portalr ADR-0086).
+
+        They are in the application's order, for the tenant ``X-Tenant`` names. The caller must
+        hold ``artifactr:use_model`` in the workspace, as the turn's own check asks; what is
+        listed is what the workspace's ``models:allowed`` allows, read where that check reads
+        it. A model's name and how it is shown, never where it is served.
+        """
+        named = x_tenant or who.tenant
+        if named is None:
+            raise _refusal("tenant_required", "name the tenant with X-Tenant")
+        if who.tenant is not None and who.tenant != named:
+            raise _refusal("forbidden", "this caller's key is for another tenant")
+        here = Resource(kind="workspace", workspace=workspace)
+        if not await grants.check(named, who.subject, USE_MODEL, here):
+            raise _refusal("forbidden", f"the caller may not choose a model in {workspace}")
+        response.headers["Cache-Control"] = "no-store"
+        return OfferedModels(models=list(await models(named, workspace)))
 
 
 def _refused(error: GrantrError) -> HTTPException:

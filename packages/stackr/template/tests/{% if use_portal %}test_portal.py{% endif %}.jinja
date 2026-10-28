@@ -23,7 +23,9 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-{% if use_artifactr %}from artifactr.core import feedback_types as artifactr_types
+{% if use_artifactr %}from artifactr import new_id
+from artifactr.agent.runner import model_not_allowed
+from artifactr.core import feedback_types as artifactr_types
 {% endif %}from grantr.core import User
 from portalr.analytics import Relay, SessionStamp
 from portalr.invites import InviteFailed, SupabaseInvite
@@ -39,9 +41,19 @@ from {{ package_name }}.portal import (
     readers,
     umami,
 )
+{%- if use_artifactr %}
+from {{ package_name }}.settings import (
+    ALWAYS,
+    AuthSettings,
+    ModelInfo,
+    PortalSettings,
+    Settings,
+)
+{%- else %}
 from {{ package_name }}.settings import AuthSettings, PortalSettings, Settings
+{%- endif %}
 
-from conftest import TENANT, Script, app, bearer, seeded, settings, token
+from conftest import TENANT, Script, app, bearer, {% if use_artifactr %}in_thread, say, {% endif %}seeded, settings, token{% if use_artifactr %}, wait_for{% endif %}
 
 SUPABASE = "http://127.0.0.1:54321"
 SECURE = "https://app.example.com"
@@ -844,4 +856,54 @@ def test_the_portals_thumbs_are_feedback_the_libraries_take() -> None:
 {%- endif %}
 {%- if use_reflexr %}
     assert reflexr_types()["thumbs"].targets == {"run"}
+{%- endif %}
+{%- if use_artifactr %}
+
+
+def test_the_composer_lists_the_models_a_turn_may_use_from_the_same_settings(
+    script: Script, ui: Path
+) -> None:
+    """The portal's list and the runner's check read one ``models:allowed``: narrowed for acme,
+    a model it leaves out is neither listed nor used, and a message naming it gets a notice."""
+    deep = ModelInfo(id="deep", label="Deep", family="anthropic", reasoning=True)
+    named = with_portal(ui_dir=str(ui))
+    gateway = replace(
+        named.gateway, models=(*ALWAYS, deep), allowed_models=("default", "fast", "deep")
+    )
+    named = replace(named, gateway=gateway)
+    grants = seeded(gateway)
+    listed = {"workspace": "main"}
+    script.steps += [say("The default answers.")]
+    with TestClient(app(script, named, grants=grants), headers=bearer("alice")) as client:
+        offered = client.get("/portalr/v1/models", params=listed).json()["models"]
+        assert [model["id"] for model in offered] == ["default", "fast", "deep"]
+        assert offered[2] == {
+            "id": "deep",
+            "label": "Deep",
+            "family": "anthropic",
+            "local": False,
+            "reasoning": True,
+        }
+        alice = User(id="alice")
+        in_thread(grants.set_setting(TENANT, "models:allowed", ["default", "fast"], by=alice))
+        offered = client.get("/portalr/v1/models", params=listed).json()["models"]
+        assert [model["id"] for model in offered] == ["default", "fast"]
+        commands = "/artifactr/v1/workspaces/main/commands"
+        for command in (
+            {"type": "create_thread", "thread_id": "t1"},
+            {"type": "post_message", "thread_id": "t1", "content": "Hi", "model": "deep"},
+        ):
+            frame = {"type": "command", "command_id": new_id("cmd"), "command": command}
+            client.post(commands, json=frame)
+
+        def posted() -> list[dict[str, Any]]:
+            read = client.get("/artifactr/v1/workspaces/main/events").json()
+            return [e["event"] for e in read if e["event"]["type"] == "message_posted"]
+
+        wait_for(lambda: len(posted()) == 3)
+        notice, answer = posted()[1:]
+        assert (notice["kind"], notice["content"]) == ("notice", model_not_allowed("deep"))
+        assert answer["content"] == "The default answers."
+        refused = client.get("/portalr/v1/models", params=listed, headers=bearer("carol"))
+        assert refused.status_code == 403
 {%- endif %}

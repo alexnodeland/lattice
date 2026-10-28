@@ -52,6 +52,7 @@ export {
 } from "./landing";
 export type { LogRecord, Logs } from "./logs";
 export { useMe } from "./me";
+export { fellBack, models, type OfferedModel } from "./models";
 export { keepWithin, type Names, namesOf, shortId, usePeople } from "./people";
 export {
   type AuditFilter,

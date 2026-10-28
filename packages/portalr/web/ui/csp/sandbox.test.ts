@@ -243,16 +243,25 @@ test("the app's frame fills the sandbox's window even where its body has no heig
   const page = await running(`<body style="margin:0">Board</body>`);
   await expect.poll(() => appFrame(page) !== undefined, SETTLED).toBe(true);
   const sandbox = appFrame(page)?.parentFrame();
+  await sandbox?.evaluate(() => {
+    document.documentElement.style.height = "auto";
+    document.body.style.height = "auto";
+  });
+  // The window shrinks to the app's height as the host hears it, and the frame is fitted to it a
+  // resize later: each read is a fresh look, until the frame has caught up with the window.
   const sizes = () =>
     sandbox?.evaluate(() => {
-      document.documentElement.style.height = "auto";
-      document.body.style.height = "auto";
       const { width, height } = (
         document.querySelector("iframe") as Element
       ).getBoundingClientRect();
       return { frame: [width, height], window: [innerWidth, innerHeight] };
     });
-  await expect.poll(async () => (await sizes())?.window[1], SETTLED).toBeGreaterThan(0);
+  await expect
+    .poll(async () => {
+      const { frame, window } = (await sizes()) ?? { frame: [], window: [] };
+      return (window[1] ?? 0) > 0 && frame.join("x") === window.join("x");
+    }, SETTLED)
+    .toBe(true);
   const { frame, window } = (await sizes()) ?? { frame: [], window: [] };
   expect(frame).toEqual(window);
   await page.close();

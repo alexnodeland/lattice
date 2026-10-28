@@ -289,9 +289,10 @@ export function startSandbox(scope: Window): void {
     return; // not framed: nothing to run, and no one to tell
   }
   let app: HTMLIFrameElement | null = null;
+  let tell: ((width: number, height: number) => void) | null = null;
   scope.addEventListener("message", (event) => {
     if (app !== null && event.source === app.contentWindow) {
-      const text = relayed(event.data);
+      const text = relayed(sized(scope, app, event.data));
       if (text !== null) {
         scope.parent.postMessage(text, host);
       }
@@ -302,10 +303,17 @@ export function startSandbox(scope: Window): void {
     }
     if (app === null) {
       app = framed(scope.document, event.data);
+      if (app !== null) {
+        tell = fit(scope, app);
+      }
       return;
     }
     if (isObject(event.data) && event.data.method === RESOURCE_READY) {
       return; // the host gives the app on every ready and load: the first one runs, alone
+    }
+    const size = viewport(event.data);
+    if (size !== null) {
+      tell?.(...size);
     }
     app.contentWindow?.postMessage(event.data, "*");
   });
@@ -325,10 +333,81 @@ function framed(document: Document, data: unknown): HTMLIFrameElement | null {
   frame.setAttribute("sandbox", APP_SANDBOX);
   frame.setAttribute("referrerpolicy", "no-referrer");
   frame.title = isString(title) ? title : "An app";
-  frame.style.cssText = "display:block;width:100%;height:100%;border:0";
+  // Placed against the window, not in a body iOS may lay out at nothing; `fit` sizes it.
+  frame.style.cssText = "position:absolute;inset:0;border:0";
   frame.srcdoc = appDocument(html);
   document.body.append(frame);
   return frame;
+}
+
+/** The app's frame's size where nothing measured it: the host's first height, a phone's width. */
+const FLOOR = [320, 360] as const;
+
+/**
+ * The app's frame sized in pixels, never by percentages, now and whenever the sandbox's window
+ * changes: on iOS the frame, sized by percentages, was laid out at 0 by 0, and an app that fits
+ * its canvas to its window drew nothing to see. Each side is the window's, measured, or where it
+ * measures 0, the size the host last said its frame is, or the last one measured, or `FLOOR`.
+ * What it returns is how the host's size is said to it.
+ */
+export function fit(
+  scope: Window,
+  frame: HTMLIFrameElement,
+): (width: number, height: number) => void {
+  const root = scope.document.documentElement;
+  let told: readonly [number, number] = [0, 0];
+  let last = told;
+  const size = () => {
+    last = [
+      root.clientWidth || scope.innerWidth || told[0] || last[0] || FLOOR[0],
+      root.clientHeight || scope.innerHeight || told[1] || last[1] || FLOOR[1],
+    ];
+    frame.style.width = `${last[0]}px`;
+    frame.style.height = `${last[1]}px`;
+  };
+  size();
+  scope.addEventListener("resize", size);
+  frame.addEventListener("load", size);
+  const Observer = (scope as Window & { ResizeObserver?: typeof ResizeObserver }).ResizeObserver;
+  if (Observer) {
+    new Observer(size).observe(root);
+  }
+  return (width, height) => {
+    told = [width, height];
+    size();
+  };
+}
+
+/** The host's frame's size, if `data` says it: its context's `viewport`, as given or answered. */
+function viewport(data: unknown): [number, number] | null {
+  const context = isObject(data)
+    ? isObject(data.result) && isObject(data.result.hostContext)
+      ? data.result.hostContext
+      : data.method === "ui/notifications/host-context-changed" && data.params
+    : null;
+  const said = isObject(context) ? context.viewport : null;
+  return isObject(said) && typeof said.width === "number" && typeof said.height === "number"
+    ? [said.width, said.height]
+    : null;
+}
+
+/**
+ * The app's look at what it drew, with the sandbox's window and the app's frame as laid out, so a
+ * blank frame says which of them was at nothing. They are the sandbox's: an app's own are replaced.
+ */
+function sized(scope: Window, frame: HTMLIFrameElement, data: unknown): unknown {
+  if (!isObject(data) || data.method !== APP_BOOT || !isObject(data.params)) {
+    return data;
+  }
+  const { width, height } = frame.getBoundingClientRect();
+  const params = {
+    ...data.params,
+    sandboxWidth: scope.innerWidth,
+    sandboxHeight: scope.innerHeight,
+    frameWidth: width,
+    frameHeight: height,
+  };
+  return { ...data, params };
 }
 
 /** What the app sent, as JSON text within `MOST_MESSAGE`; null for what can't be, dropped. */

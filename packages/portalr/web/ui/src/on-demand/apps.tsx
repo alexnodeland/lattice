@@ -102,8 +102,11 @@ function hostContext(within: Element, displayMode: DisplayMode): JsonObject {
   const chosen = within.closest("[data-theme]")?.getAttribute("data-theme");
   const dark =
     chosen === "dark" || (chosen !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+  // The frame's size, as MCP Apps' `viewport`: the sandbox's fallback if its window measures 0.
+  const { width, height } = within.getBoundingClientRect();
   return {
     theme: dark ? "dark" : "light",
+    viewport: { width: Math.round(width), height: Math.round(height) },
     styles: { variables },
     displayMode,
     availableDisplayModes: ["inline", "fullscreen"],
@@ -116,11 +119,15 @@ function hostContext(within: Element, displayMode: DisplayMode): JsonObject {
   };
 }
 
-/** A report as one line of plain text: what it says, where, and what its policy refused. */
-function reportLine({ method, params }: Report): string {
+/**
+ * A report as one line of plain text: what it says, where, and what its policy refused. A look at
+ * what the app drew ends with the size of its frame in the page, `outer`, and its container's width.
+ */
+function reportLine({ method, params }: Report, frame: Element, container: number): string {
   if (method === APP_BOOT) {
     const said = Object.entries(params).map(([name, value]) => `${name}=${value}`);
-    return `boot: ${said.join(" ")}`;
+    const { width, height } = frame.getBoundingClientRect();
+    return `boot: ${said.join(" ")} outer=${width}x${height} container=${container}`;
   }
   if (params.message === "Script error.") {
     return "error: the app threw an error; this browser doesn't say which";
@@ -179,6 +186,21 @@ export function Running({
   // The frame itself, so the bridge starts again with a new one, as when the HTML changes.
   const [element, setElement] = useState<HTMLIFrameElement | null>(null);
   const [height, setHeight] = useState(FIRST_HEIGHT);
+  // The frame's width in pixels, its container's, rather than a percentage: 0 until measured.
+  const [width, setWidth] = useState(0);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const within = box.current;
+    if (within === null) {
+      return;
+    }
+    const observer = new ResizeObserver(() => {
+      setWidth(within.clientWidth);
+      bridged.current?.contextChanged();
+    });
+    observer.observe(within);
+    return () => observer.disconnect();
+  }, []);
   const [failure, setFailure] = useState<string | null>(null);
   const [asking, setAsking] = useState<Asking | null>(null);
   // The question open, read at once by the bridge, which a state would give a render late.
@@ -297,7 +319,7 @@ export function Running({
         },
         reported: (report) => {
           // For the browser's own console, where a person debugging the app looks; nothing else.
-          const line = reportLine(report);
+          const line = reportLine(report, element, box.current?.clientWidth ?? 0);
           console.warn(`[app-frame] ${line}`);
           if (report.method === APP_BOOT) {
             setBoot(line);
@@ -387,6 +409,7 @@ export function Running({
           </Button>
         </div>
         <div
+          ref={box}
           className={cn(
             "overflow-hidden rounded-lg border-2 border-edge bg-paper forced-colors:border-[CanvasText]",
             full && "flex min-h-0 flex-1 flex-col",
@@ -400,7 +423,11 @@ export function Running({
             sandbox="allow-scripts allow-same-origin"
             referrerPolicy="no-referrer"
             className={cn("block w-full", full && "min-h-0 flex-1")}
-            style={full ? undefined : { height, maxHeight: FITS }}
+            style={
+              full
+                ? undefined
+                : { width: width || undefined, height: height || FIRST_HEIGHT, maxHeight: FITS }
+            }
           />
         </div>
       </div>

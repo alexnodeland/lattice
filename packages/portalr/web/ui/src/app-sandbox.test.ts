@@ -1,7 +1,7 @@
 import { expect, test, vi } from "vitest";
 import POLICY from "../csp/app-policy.txt?raw";
-import { MOST_MESSAGE, PROXY_READY, RESOURCE_READY } from "./app-bridge";
-import { APP_POLICY, APP_SANDBOX, appDocument, startSandbox } from "./app-sandbox";
+import { APP_BOOT, MOST_MESSAGE, PROXY_READY, RESOURCE_READY } from "./app-bridge";
+import { APP_POLICY, APP_SANDBOX, appDocument, fit, startSandbox } from "./app-sandbox";
 
 const PORTAL = "https://app.example.com";
 
@@ -28,7 +28,13 @@ function scope({ framed = true, search = `?host=${encodeURIComponent(PORTAL)}` }
   const body = document.createElement("div");
   const window: Record<string, unknown> = {
     location: { search },
-    document: { createElement: document.createElement.bind(document), body },
+    innerWidth: 390,
+    innerHeight: 0,
+    document: {
+      createElement: document.createElement.bind(document),
+      body,
+      documentElement: { clientWidth: 0, clientHeight: 0 },
+    },
     addEventListener: (_: string, listener: (event: Partial<MessageEvent>) => void) =>
       listeners.push(listener),
   };
@@ -100,6 +106,27 @@ test("the app's messages reach the host as JSON text within the limit; others ar
   frame?.remove();
 });
 
+test("the app's look at what it drew carries the sandbox's window and the app's frame", () => {
+  const { posted, parent, body, hear } = scope();
+  hear({
+    source: parent as unknown as Window,
+    origin: PORTAL,
+    data: { jsonrpc: "2.0", method: RESOURCE_READY, params: { html: "" } },
+  });
+  const frame = body.querySelector("iframe") as HTMLIFrameElement;
+  const app = frame.contentWindow as Window;
+  vi.spyOn(frame, "getBoundingClientRect").mockReturnValue(new DOMRect(0, 0, 390, 0));
+  hear({ source: app, data: { method: APP_BOOT, params: { drawn: "nothing", frameWidth: 9 } } });
+  expect(JSON.parse(posted.at(-1)?.[0] as string).params).toEqual({
+    drawn: "nothing",
+    sandboxWidth: 390,
+    sandboxHeight: 0,
+    frameWidth: 390,
+    frameHeight: 0,
+  });
+  frame.remove();
+});
+
 test("a sandbox given an app that isn't one makes no frame", () => {
   const { parent, body, hear } = scope();
   const source = parent as unknown as Window;
@@ -107,4 +134,82 @@ test("a sandbox given an app that isn't one makes no frame", () => {
   hear({ source, origin: PORTAL, data: { method: RESOURCE_READY } });
   hear({ source, origin: PORTAL, data: "text" });
   expect(body.querySelector("iframe")).toBeNull();
+});
+
+/** A window measured at `width` by `height`, its resize listeners and observers to run by hand. */
+function measured(width: number, height: number) {
+  const resized: (() => void)[] = [];
+  const observed: (() => void)[] = [];
+  const root = { clientWidth: width, clientHeight: height };
+  class Observer {
+    constructor(run: () => void) {
+      observed.push(run);
+    }
+    observe() {}
+  }
+  const scope = {
+    document: { documentElement: root },
+    innerWidth: 0,
+    innerHeight: 0,
+    ResizeObserver: Observer,
+    addEventListener: (_: string, run: () => void) => resized.push(run),
+  };
+  const frame = document.createElement("iframe");
+  const tell = fit(scope as unknown as Window, frame);
+  const size = () => [frame.style.width, frame.style.height];
+  return { root, scope, frame, resized, observed, tell, size };
+}
+
+test("the app's frame is sized to the sandbox's window in pixels, and follows it", () => {
+  const { root, frame, resized, observed } = measured(390, 360);
+  expect([frame.style.width, frame.style.height]).toEqual(["390px", "360px"]);
+  root.clientHeight = 500;
+  resized[0]?.();
+  expect(frame.style.height).toBe("500px");
+  root.clientWidth = 320;
+  observed[0]?.();
+  expect(frame.style.width).toBe("320px");
+});
+
+test("a window measured at nothing falls back to the floor, never to 0", () => {
+  expect(measured(0, 0).size()).toEqual(["320px", "360px"]);
+});
+
+test("a window measured at nothing falls back to the last size it measured", () => {
+  const { root, resized, size } = measured(390, 500);
+  root.clientWidth = 0;
+  root.clientHeight = 0;
+  resized[0]?.();
+  expect(size()).toEqual(["390px", "500px"]);
+});
+
+test("a window measured at nothing falls back to the size the host says its frame is", () => {
+  const { root, resized, tell, size } = measured(390, 500);
+  root.clientWidth = 0;
+  root.clientHeight = 0;
+  tell(412, 640);
+  expect(size()).toEqual(["412px", "640px"]);
+  root.clientWidth = 375;
+  resized[0]?.();
+  expect(size()).toEqual(["375px", "640px"]);
+});
+
+test("the host's viewport, given or answered, is told to the frame's size", () => {
+  const { parent, body, hear } = scope();
+  const source = parent as unknown as Window;
+  hear({ source, origin: PORTAL, data: { method: RESOURCE_READY, params: { html: "" } } });
+  const frame = body.querySelector("iframe") as HTMLIFrameElement;
+  const viewport = { width: 412, height: 640 };
+  expect([frame.style.width, frame.style.height]).toEqual(["390px", "360px"]);
+  hear({ source, origin: PORTAL, data: { id: 1, result: { hostContext: { viewport } } } });
+  expect([frame.style.width, frame.style.height]).toEqual(["390px", "640px"]);
+  const changed = "ui/notifications/host-context-changed";
+  hear({ source, origin: PORTAL, data: { method: changed, params: { viewport: { width: "x" } } } });
+  hear({
+    source,
+    origin: PORTAL,
+    data: { method: changed, params: { viewport: { ...viewport, height: 700 } } },
+  });
+  expect(frame.style.height).toBe("700px");
+  frame.remove();
 });

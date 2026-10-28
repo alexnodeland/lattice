@@ -30,6 +30,11 @@ TAILNET_EDITORS = {
     "files:gridcraft": "https://my-machine.my-tailnet.ts.net:8802/",
     "files:pdfcraft": "https://my-machine.my-tailnet.ts.net:8803/",
 }
+LINKS = {"tracker:plane": "http://127.0.0.1:8090/", "tracker:vikunja": "http://localhost:3456"}
+TAILNET_LINKS = {
+    "tracker:plane": "https://my-machine.my-tailnet.ts.net:8090/",
+    "tracker:vikunja": "https://my-machine.my-tailnet.ts.net:3456",
+}
 KEY = "sb_publishable_x"
 PAGE = "<!doctype html><title>Sandbox</title><script>relay()</script>"
 
@@ -210,6 +215,68 @@ def test_without_aliases_or_an_origin_a_site_is_as_it_was() -> None:
     assert (made.origin, made.aliases) == (None, {})
 
 
+# Links: each connected app's address (portalr ADR-0088)
+
+
+def test_a_link_is_kept_on_its_origin_its_path_kept_and_moved_beside_on_its_port() -> None:
+    made = site(links={"tracker:plane": "HTTPS://Plane.Example.com:443/projects/"})
+    assert made.links == {"tracker:plane": "https://plane.example.com/projects/"}
+    assert beside(LOOPBACK, TAILNET, apps=None, editors={}, links=LINKS) == Place(
+        links=TAILNET_LINKS
+    )
+
+
+@pytest.mark.parametrize(
+    ("links", "said"),
+    [
+        ({"Not A Key": "https://a.example"}, "no integration"),
+        ({"tracker:plane": "http://plane.lan:8090"}, "https, or http on loopback"),
+        ({"tracker:plane": "https://user:pw@plane.example"}, "tracker:plane"),
+        ({"tracker:plane": "https://*.example"}, "no wildcard"),
+        ({"tracker:plane": "https://plane.example/?a=1"}, "no query or fragment"),
+        ({"tracker:plane": "https://plane.example/a/../b"}, "no empty, . or .. segment"),
+        ({"tracker:plane": "javascript:alert(1)"}, "tracker:plane"),
+    ],
+)
+def test_a_link_at_no_web_address_of_its_own_is_refused(links: dict[str, str], said: str) -> None:
+    with pytest.raises(ValidationError, match=said):
+        site(links=links)
+    with pytest.raises(ValidationError, match=said):
+        site(origin=LOOPBACK, aliases={TAILNET: {"links": links}})
+
+
+@pytest.mark.parametrize(
+    "given",
+    [
+        {"origin": LOOPBACK, "links": {"tracker:plane": f"{LOOPBACK}/plane/"}},
+        {"apps": APPS, "links": {"tracker:plane": f"{APPS}/"}},
+        {
+            "supabase_url": "https://project.supabase.co",
+            "links": {"tracker:plane": "https://project.supabase.co/x"},
+        },
+        {"origin": LOOPBACK, "aliases": {TAILNET: {"links": {"tracker:plane": f"{TAILNET}/p"}}}},
+    ],
+)
+def test_no_link_is_on_a_portals_the_apps_or_supabases_origin(given: dict[str, Any]) -> None:
+    with pytest.raises(
+        ValidationError, match=r"tracker:plane is at .*: give it an origin of its own"
+    ):
+        site(**given)
+
+
+def test_a_link_at_an_edge_has_no_port_to_be_beside() -> None:
+    with pytest.raises(
+        ValueError, match=r"tracker:plane is at https://plane\.example\.com/, with no"
+    ):
+        beside(
+            LOOPBACK,
+            TAILNET,
+            apps=None,
+            editors={},
+            links={"tracker:plane": "https://plane.example.com/"},
+        )
+
+
 # The portal's policy: a union
 
 
@@ -254,7 +321,8 @@ async def test_config_carries_the_origin_and_each_alias(
         apps=APPS,
         editors=EDITORS,
         origin=LOOPBACK,
-        aliases={TAILNET: beside(LOOPBACK, TAILNET, apps=APPS, editors=EDITORS)},
+        links=LINKS,
+        aliases={TAILNET: beside(LOOPBACK, TAILNET, apps=APPS, editors=EDITORS, links=LINKS)},
     )
     app = app_for(grants, stack.readers(), None, ui, site=made)
     async with httpx.AsyncClient(
@@ -263,7 +331,10 @@ async def test_config_carries_the_origin_and_each_alias(
         config = (await client.get("/config.json")).json()
         page = await client.get("/app/")
     assert config["origin"] == LOOPBACK
-    assert config["aliases"] == {TAILNET: {"apps": TAILNET_APPS, "editors": TAILNET_EDITORS}}
+    assert config["links"] == LINKS
+    assert config["aliases"] == {
+        TAILNET: {"apps": TAILNET_APPS, "editors": TAILNET_EDITORS, "links": TAILNET_LINKS}
+    }
     # The portal sets no cookie, and never may: cookies are host-scoped, not port-scoped, and
     # SameSite ignores the port, so on loopback or a tailnet, where the portal, the sandbox and
     # each editor share a host and differ by port alone, a cookie here would reach them all.

@@ -6,7 +6,7 @@
  * the person viewing it: the page never parses the file.
  */
 
-import { Refused } from "@portalr/client";
+import { deploymentAt, Refused } from "@portalr/client";
 import {
   Alert,
   fileSize,
@@ -23,7 +23,6 @@ import { useQuery } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { editorAt, type Place } from "./check-out";
-import { deploymentAt } from "./deployment";
 import { useEditing } from "./editing";
 import type { Native } from "./native";
 import { downloadingSaid, FileControls, useDownload } from "./native-file";

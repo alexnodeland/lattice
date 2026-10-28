@@ -26,6 +26,7 @@ const CONFIG: Config = {
   people: true,
   editors: {},
   apps: null,
+  links: {},
   aliases: {},
   replay: false,
 };

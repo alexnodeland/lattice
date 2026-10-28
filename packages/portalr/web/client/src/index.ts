@@ -18,6 +18,7 @@ export {
   NOT_READ,
   readConsent,
 } from "./consent";
+export { type Deployment, deploymentAt, portalsOf } from "./deployment";
 export { type Feedback, type Thumb, thumbs } from "./feedback";
 export {
   type CheckedIn,

@@ -143,6 +143,9 @@ dotenv = $(shell sed -n 's/^$(1)=//p' .env 2>/dev/null | tail -n 1)
 APP_URL = http://127.0.0.1:$(or $(call dotenv,APP_PORT),{{ app_port }})
 {%- if hosting != 'host' %}
 TAILNET_BESIDE = $(if $(call dotenv,PORTAL_APPS_URL),$(or $(call dotenv,APPS_PORT),{{ app_port + 1 }}))
+# Each connected app on a port of this machine's loopback, in PORTAL_LINKS, beside it too.
+TAILNET_LINKS = $(shell sed -n 's/^PORTAL_LINKS=//p' .env 2>/dev/null | tail -n 1 | grep -oE '[a-z]+://[^"/]+')
+TAILNET_BESIDE += $(patsubst http://127.0.0.1:%,%,$(filter http://127.0.0.1:%,$(TAILNET_LINKS)))
 {%- if use_files %}
 {%- for name, craft in crafts.items() if craft.editor %}
 TAILNET_BESIDE += $(if $(filter {{ name }},$(FILES)),$(or $(call dotenv,{{ name | upper }}_EDITOR_PORT),{{ app_port + craft.editor }}))
@@ -152,6 +155,7 @@ TAILNET_BESIDE += $(if $(filter {{ name }},$(FILES)),$(or $(call dotenv,{{ name 
 # isn't a port of this machine's loopback, so has no port to be beside it.
 TAILNET_REFUSED = $(strip \
 	$(if $(filter-out http://127.0.0.1:%,$(call dotenv,PORTAL_APPS_URL)),PORTAL_APPS_URL isn't http://127.0.0.1:<port>) \
+	$(if $(filter-out http://127.0.0.1:%,$(TAILNET_LINKS)),PORTAL_LINKS names an app that isn't on http://127.0.0.1:<port>) \
 	$(if $(call dotenv,FILES_EDITORS),FILES_EDITORS names the editors elsewhere) \
 	$(if $(call dotenv,FILES_EDITOR_DOMAIN),FILES_EDITOR_DOMAIN puts the editors at an edge))
 {%- else %}

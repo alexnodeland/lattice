@@ -72,3 +72,13 @@ test("every integration of lattice's registry is named by its sentence's start",
     expect(`${name}: ${description}`.toLowerCase()).toBe(known.description.toLowerCase());
   }
 });
+
+test("an integration that is on is opened at its link; one off, or with none, isn't", () => {
+  const links = { "markdown:mermaid": "https://mermaid.example/" };
+  const names = (id: string) => id;
+  expect(rowsOf([state({ enabled: true })], false, names, links)[0]?.open).toBe(
+    "https://mermaid.example/",
+  );
+  expect(rowsOf([state()], false, names, links)[0]?.open).toBeUndefined();
+  expect(rowsOf([state({ enabled: true })], false, names)[0]?.open).toBeUndefined();
+});

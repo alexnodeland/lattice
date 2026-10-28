@@ -1,3 +1,4 @@
+import { deploymentAt, portalsOf } from "@portalr/client";
 /**
  * What lets a page's mini apps run (lattice RFC-0005, portalr ADR-0051): the apps' origin, as
  * `config.json` names it, and the two commands an app's bridge sends as the person viewing it,
@@ -8,7 +9,6 @@
 import type { AppHost } from "@portalr/ui";
 import { useMemo } from "react";
 import type { Context } from "./context";
-import { deploymentAt, portalsOf } from "./deployment";
 import { useStream } from "./workspace";
 
 /** The app host of a page in a workspace, for the deployment and the person `context` holds. */

@@ -51,6 +51,8 @@ class Place(BaseModel):
     """The origin mini apps run on, for a portal at this origin; None where it runs none."""
     editors: dict[str, str] = {}
     """Each native file's hosted editor, by its app's integration, for a portal at this origin."""
+    links: dict[str, str] = {}
+    """Each connected app's address, by its integration, for a portal at this origin."""
 
     @field_validator("apps")
     @classmethod
@@ -61,6 +63,11 @@ class Place(BaseModel):
     @classmethod
     def _editors(cls, editors: dict[str, str]) -> dict[str, str]:
         return _editor_urls(editors)
+
+    @field_validator("links")
+    @classmethod
+    def _links(cls, links: dict[str, str]) -> dict[str, str]:
+        return _link_urls(links)
 
 
 class Site(BaseModel):
@@ -86,6 +93,12 @@ class Site(BaseModel):
     the site is made, as the application starts, so a kit with a fault fails the start with every
     fault listed; None for portalr's own look. The kit, read, is :attr:`kit`."""
     _kit: Kit | None = PrivateAttr(default=None)
+    links: dict[str, str] = {}
+    """Each connected app's address, by the integration that brings it, such as
+    ``tracker:plane``: a sidecar app with a UI of its own, such as Plane or an editor, which the
+    admin opens beside the integration's switch and the palette lists where the integration is on
+    in the workspace, each in a new tab (portalr ADR-0088). Each is held to the editors' rule: a
+    web origin of its own, a path at most; and none signs in through the portal."""
     apps: str | None = None
     """The origin mini apps run on (lattice RFC-0005), such as ``https://apps.example.com``: a
     host of its own, the same site as the portal's, for which nothing sets or reads a cookie,
@@ -131,6 +144,12 @@ class Site(BaseModel):
         """Refuse an editor for no native file's app, or one at no web address of its own."""
         return _editor_urls(editors)
 
+    @field_validator("links")
+    @classmethod
+    def _links(cls, links: dict[str, str]) -> dict[str, str]:
+        """Refuse a link for no integration's key, or one at no web address of its own."""
+        return _link_urls(links)
+
     @field_validator("origin")
     @classmethod
     def _origin(cls, origin: str | None) -> str | None:
@@ -161,23 +180,25 @@ class Site(BaseModel):
 
     @model_validator(mode="after")
     def _editors_apart(self) -> "Site":
-        """Refuse mini apps or an editor on a portal origin, or an editor on apps' or Supabase's.
+        """Refuse mini apps, an editor or a link on a portal's origin, or on apps' or Supabase's.
 
-        The portal frames them with their origin's scripts allowed, so each must be an origin of
-        its own. The portal's origins are known here only where ``origin`` and the aliases name
-        them; the UIs refuse an editor on their own origin in any case.
+        The portal frames mini apps and editors with their origin's scripts allowed, so each must
+        be an origin of its own; a connected app is a site of its own, never the portal's. The
+        portal's origins are known here only where ``origin`` and the aliases name them; the UIs
+        refuse an editor on their own origin in any case.
         """
         portals = {self.origin, *self.aliases} - {None}
-        places = [(self.apps, self.editors)]
-        places += [(place.apps, place.editors) for place in self.aliases.values()]
-        for apps, editors in places:
+        places = [(self.apps, self.editors, self.links)]
+        places += [(p.apps, p.editors, p.links) for p in self.aliases.values()]
+        for apps, editors, links in places:
             if apps in portals:
                 raise ValueError(f"mini apps at {apps} would share a portal's origin")
             named = (apps, self.supabase_url)
             others = portals | ({_origin_of(url) for url in named if url} - {None})
-            for key, url in editors.items():
+            named_urls = {f"{key}'s editor": url for key, url in editors.items()} | links
+            for what, url in named_urls.items():
                 if _origin_of(url) in others:
-                    raise ValueError(f"{key}'s editor is at {url}: give it an origin of its own")
+                    raise ValueError(f"{what} is at {url}: give it an origin of its own")
         return self
 
     @field_validator("supabase_key")
@@ -189,8 +210,15 @@ class Site(BaseModel):
         return key
 
 
-def beside(portal: str, extra: str, *, apps: str | None, editors: dict[str, str]) -> Place:
-    """Where mini apps and the editors are for the portal reached at `extra`, beside `portal`.
+def beside(
+    portal: str,
+    extra: str,
+    *,
+    apps: str | None,
+    editors: dict[str, str],
+    links: dict[str, str] | None = None,
+) -> Place:
+    """Where mini apps, the editors and the links are for the portal reached at `extra`.
 
     The rule is the port's: an application on one machine serves the portal, the sandbox and
     each editor on ports of its own, and an address that reaches the machine under another
@@ -204,6 +232,8 @@ def beside(portal: str, extra: str, *, apps: str | None, editors: dict[str, str]
         apps: The canonical apps origin, with its port, such as ``http://127.0.0.1:8801``; None
             where the deployment runs no apps.
         editors: The canonical editors, each with its port, such as ``http://127.0.0.1:8802/``.
+        links: The canonical connected apps' addresses, each with its port, such as
+            ``http://127.0.0.1:8090/``; none if omitted.
 
     Raises:
         ValueError: If `extra` is `portal` itself, or the apps origin or an editor has no port
@@ -226,6 +256,7 @@ def beside(portal: str, extra: str, *, apps: str | None, editors: dict[str, str]
     return Place(
         apps=None if origin is None else moved(origin, "mini apps"),
         editors={key: moved(url, f"{key}'s editor") for key, url in _editor_urls(editors).items()},
+        links={key: moved(url, key) for key, url in _link_urls(links or {}).items()},
     )
 
 
@@ -241,19 +272,43 @@ def _editor_urls(editors: dict[str, str]) -> dict[str, str]:
         ValueError: If a key is no native file's app, or a URL has no web origin, or a query or
             fragment.
     """
-    kept: dict[str, str] = {}
-    for key, url in editors.items():
+    for key in editors:
         if not (key.startswith("files:") and KEY.fullmatch(key)):
             raise ValueError(f"{key} is no native file's app: its key is files:<app>")
+    return _urls(editors, "'s editor")
+
+
+def _link_urls(links: dict[str, str]) -> dict[str, str]:
+    """Each connected app's URL on its web origin as a browser compares it, its path kept.
+
+    Raises:
+        ValueError: If a key is no integration's, or a URL has no web origin, or a query or
+            fragment.
+    """
+    return _urls(links, "")
+
+
+def _urls(urls: dict[str, str], whose: str) -> dict[str, str]:
+    """Each URL on its web origin as a browser compares it, its path kept: an editor's or a link's.
+
+    Raises:
+        ValueError: If a key isn't an integration's, or a URL has no web origin, or a query or
+            fragment, or a path with an empty, ``.`` or ``..`` segment.
+    """
+    kept: dict[str, str] = {}
+    for key, url in urls.items():
+        if not KEY.fullmatch(key):
+            raise ValueError(f"{key} is no integration: its key is a name or family:name")
+        what = f"{key}{whose}"
         parts = urlsplit(url)
         if parts.query or parts.fragment:
-            raise ValueError(f"{key}'s editor is at {url}: no query or fragment")
-        # An editor is a URL, which may have a path; its origin is what must be a web origin.
+            raise ValueError(f"{what} is at {url}: no query or fragment")
+        # The URL may have a path; its origin is what must be a web origin.
         origin = urlunsplit((parts.scheme, parts.netloc, "", "", ""))
-        at = web_origin(origin, what=f"{key}'s editor")
+        at = web_origin(origin, what=what)
         if not EDITOR_PATH.fullmatch(parts.path):
             raise ValueError(
-                f"{key}'s editor is at {url}: a path of letters, digits and ._~-/, "
+                f"{what} is at {url}: a path of letters, digits and ._~-/, "
                 "no empty, . or .. segment"
             )
         kept[key] = at + parts.path

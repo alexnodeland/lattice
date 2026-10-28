@@ -55,11 +55,15 @@ export function namedOf(state: IntegrationState): { name: string; description: s
   };
 }
 
-/** Each integration at a level as the list shows it, with who set it there named as `names` does. */
+/**
+ * Each integration at a level as the list shows it, with who set it there named as `names` does,
+ * and, where it is on and brings an app at an address of `links`, the way to open it.
+ */
 export function rowsOf(
   states: readonly IntegrationState[],
   workspace: boolean,
   names: Names,
+  links: Readonly<Record<string, string>> = {},
 ): IntegrationRow[] {
   return states.map((state) => {
     const here = workspace ? state.workspace : state.tenant;
@@ -69,6 +73,7 @@ export function rowsOf(
       on: state.enabled,
       source: sourceOf(state, workspace),
       changed: here ? { by: actor(here.by, names), at: here.at } : null,
+      open: state.enabled ? links[state.key] : undefined,
     };
   });
 }

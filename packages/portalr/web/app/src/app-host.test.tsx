@@ -322,7 +322,7 @@ test("at an alias of the portal, the app runs on the apps' origin beside it (por
   const { screen } = await open("/t/acme/w/notes/artifacts/app_1", serving(on), () => null, {
     apps: "http://127.0.0.1:8",
     origin: "https://elsewhere.example",
-    aliases: { [location.origin]: { apps: APPS, editors: {} } },
+    aliases: { [location.origin]: { apps: APPS, editors: {}, links: {} } },
   });
   const frame = screen.getByTitle(TITLE);
   await expect
@@ -335,7 +335,11 @@ test("at an address the deployment names no apps for, the app says where to open
     apps: APPS,
     origin: "https://elsewhere.example",
     aliases: {
-      "https://m.my-tailnet.ts.net": { apps: "https://m.my-tailnet.ts.net:8801", editors: {} },
+      "https://m.my-tailnet.ts.net": {
+        apps: "https://m.my-tailnet.ts.net:8801",
+        editors: {},
+        links: {},
+      },
     },
   });
   await expect

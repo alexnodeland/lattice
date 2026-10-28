@@ -7,6 +7,7 @@
 
 import {
   type createQueries,
+  deploymentAt,
   type FilesApi,
   type Names,
   Refused,
@@ -28,7 +29,6 @@ import {
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { CheckOut, editorAt, type Place, type Said } from "./check-out";
-import { deploymentAt } from "./deployment";
 import { useEditing } from "./editing";
 import type { Native } from "./native";
 

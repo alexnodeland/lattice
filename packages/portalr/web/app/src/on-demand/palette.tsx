@@ -6,7 +6,7 @@
  * the way it was opened from (`finalFocus`, the bar's magnifier).
  */
 
-import type { Artifactr } from "@portalr/client";
+import { type Artifactr, INTEGRATIONS } from "@portalr/client";
 import { Button, type Glyph, glyphs, Icon, PaletteFrame, RunStatus } from "@portalr/ui";
 import { type ReactNode, type RefObject, useId, useState } from "react";
 
@@ -18,6 +18,8 @@ interface Choice {
   readonly icon: Glyph;
   readonly to: string;
   readonly hash?: string;
+  /** Opened in a new tab, apart from the portal: a connected app. */
+  readonly away?: boolean;
   readonly end?: ReactNode;
 }
 
@@ -34,6 +36,7 @@ export function Palette({
   titles,
   base,
   go,
+  links,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -49,6 +52,8 @@ export function Palette({
   base: string;
   /** Go to a path, at `hash` if given. */
   go: (to: string, hash?: string) => void;
+  /** Each connected app the workspace has on, by its integration, at its address. */
+  links: Readonly<Record<string, string>>;
 }) {
   const [query, setQuery] = useState("");
   const [chosen, setChosen] = useState(0);
@@ -121,12 +126,26 @@ export function Palette({
           },
         ]
       : []),
+    ...INTEGRATIONS.filter(({ key }) => links[key])
+      .map(({ key, description }) => ({ key, label: `Open ${description.split(":")[0]}` }))
+      .filter(({ label }) => matches(label))
+      .map(({ key, label }) => ({
+        key,
+        group: "Connected apps",
+        label,
+        icon: glyphs.externalLink,
+        to: links[key] as string,
+        away: true,
+        end: <span className="sr-only">, opens in a new tab</span>,
+      })),
   ];
   const at = Math.min(chosen, choices.length - 1);
   const follow = (choice: Choice | undefined) => {
     if (choice) {
       onOpenChange(false);
-      go(choice.to, choice.hash);
+      choice.away
+        ? window.open(choice.to, "_blank", "noopener,noreferrer")
+        : go(choice.to, choice.hash);
     }
   };
   const option = (index: number) => `${list}-${index}`;

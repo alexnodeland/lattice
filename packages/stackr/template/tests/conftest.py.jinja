@@ -10,7 +10,7 @@ import asyncio
 import contextlib
 import socket
 import time
-from collections.abc import AsyncIterator, Callable, Iterator
+from collections.abc import AsyncIterator, Callable, {% if access == 'grantr' %}Coroutine, {% endif %}Iterator
 {%- if access == 'grantr' %}
 from concurrent.futures import ThreadPoolExecutor
 {%- endif %}
@@ -153,12 +153,20 @@ async def _seed(grants: Grants) -> None:
     await grants.provision_tenant("globex", owner="carol")
 
 
-def seeded() -> Grants:
-    """grantr in memory, with acme, initech and globex; seeded in a thread, from any test."""
-    grants = build_grants(InMemoryStorage(), name=Settings().service_name)
-    with ThreadPoolExecutor(1) as thread:
-        thread.submit(asyncio.run, _seed(grants)).result()
+def seeded({% if use_artifactr %}gateway: GatewaySettings | None = None{% endif %}) -> Grants:
+    """grantr in memory, with acme, initech and globex; seeded in a thread, from any test.{% if use_artifactr %}
+
+    It knows the models ``gateway`` lists, if given, as the application would.
+    """{% else %}"""{% endif %}
+    grants = build_grants(InMemoryStorage(), name=Settings().service_name{% if use_artifactr %}, gateway=gateway{% endif %})
+    in_thread(_seed(grants))
     return grants
+
+
+def in_thread(work: Coroutine[Any, Any, object]) -> None:
+    """Run ``work`` to its end in a thread of its own: grantr's seeding, from any test."""
+    with ThreadPoolExecutor(1) as thread:
+        thread.submit(asyncio.run, work).result()
 {%- endif %}
 
 

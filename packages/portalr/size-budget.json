@@ -16,7 +16,8 @@
       "replay": { "total": 61000, "largest": 61000 },
       "streaming": { "total": 1300, "largest": 1300 },
       "json-view": { "total": 2800, "largest": 2800 },
-      "touch": { "total": 2500, "largest": 2500 }
+      "touch": { "total": 2500, "largest": 2500 },
+      "model-picker": { "total": 1100, "largest": 1100 }
     }
   },
   "admin": {

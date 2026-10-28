@@ -333,6 +333,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/portalr/v1/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Offered
+         * @description The models a person may choose for a turn in a workspace (portalr ADR-0086).
+         *
+         *     They are in the application's order, for the tenant ``X-Tenant`` names. The caller must
+         *     hold ``artifactr:use_model`` in the workspace, as the turn's own check asks; what is
+         *     listed is what the workspace's ``models:allowed`` allows, read where that check reads
+         *     it. A model's name and how it is shown, never where it is served.
+         */
+        get: operations["offered_portalr_v1_models_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/portalr/v1/people": {
         parameters: {
             query?: never;
@@ -883,6 +908,39 @@ export interface components {
             /** Owner Email */
             owner_email: string;
             tenant: components["schemas"]["TenantId"];
+        };
+        /**
+         * OfferedModel
+         * @description A model the picker offers.
+         */
+        OfferedModel: {
+            /**
+             * Family
+             * @default
+             */
+            family: string;
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /**
+             * Local
+             * @default false
+             */
+            local: boolean;
+            /**
+             * Reasoning
+             * @default false
+             */
+            reasoning: boolean;
+        };
+        /**
+         * OfferedModels
+         * @description The models a workspace allows, in the order the application lists them.
+         */
+        OfferedModels: {
+            /** Models */
+            models: components["schemas"]["OfferedModel"][];
         };
         /** Ok[Adoption] */
         Ok_Adoption_: {
@@ -2364,6 +2422,66 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Ok_list_Point__"] | components["schemas"]["Unavailable"] | components["schemas"]["Unconfigured"];
+                };
+            };
+            /** @description Refused */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+        };
+    };
+    offered_portalr_v1_models_get: {
+        parameters: {
+            query: {
+                workspace: components["schemas"]["Id"];
+            };
+            header?: {
+                "X-Tenant"?: components["schemas"]["TenantId"] | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OfferedModels"];
                 };
             };
             /** @description Refused */

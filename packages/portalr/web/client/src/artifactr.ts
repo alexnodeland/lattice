@@ -31,6 +31,8 @@ export interface Message {
   readonly runId: v1.RunId | null;
   /** The feedback given on it, oldest first. */
   readonly feedback: readonly Feedback[];
+  /** The model it asked its turn to answer with (artifactr ADR-0097), where it named one. */
+  readonly model?: string;
 }
 
 export interface Thread {
@@ -194,6 +196,16 @@ export interface Run {
   readonly questions: readonly Question[];
   /** The feedback given on the turn, oldest first. */
   readonly feedback: readonly Feedback[];
+  /**
+   * The model its latest start answers with, as its message named it and the runner allowed;
+   * none for the default, which answers a message that named none, or one it may not use.
+   */
+  readonly model?: string | undefined;
+  /**
+   * The model the message that made its latest start asked for, where it named one: a resumed
+   * run's reply, not its first message.
+   */
+  readonly asked?: string | undefined;
 }
 
 export interface Workspace {
@@ -352,6 +364,7 @@ const handlers: Handlers = {
       kind: event.kind ?? "message",
       runId: event.run_id ?? null,
       feedback: [],
+      ...(event.model && { model: event.model }),
     };
     const next = withThread(state, event.thread_id, {
       messages: [...thread(state, event.thread_id).messages, message],
@@ -429,6 +442,10 @@ const handlers: Handlers = {
       status: "running",
       started: envelope.seq,
       startedAt: envelope.ts,
+      model: event.model ?? undefined,
+      asked: thread(state, event.thread_id).messages.find(
+        (message) => message.id === event.message_ids?.[0],
+      )?.model,
       ...(!seeded && { text: "", live: fresh(now) }),
       ...(first && { prompt: first }),
       ...(actor.kind === "agent" &&

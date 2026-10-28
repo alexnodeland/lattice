@@ -117,6 +117,7 @@ A file whose name ends in `.jinja` in `template/` is rendered with the answers; 
 | `tests/test_admin.py` | `access == 'grantr'` | rendered |
 | `tests/test_evals.py` | `evals` | rendered |
 | `tests/test_collaboration.py` | `use_artifactr` | rendered |
+| `tests/test_models.py` | `use_artifactr` | rendered |
 | `tests/test_diagrams.py` | `use_diagrams` | rendered |
 | `tests/test_files.py` | `use_files` | rendered |
 | `tests/test_portal.py` | `use_portal` | rendered |

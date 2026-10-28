@@ -20,6 +20,7 @@ from portalr.actions import ACTIONS
 from portalr.analytics import Relay
 from portalr.fastapi import Site, portalr_router
 from portalr.invites import Invite
+from portalr.models import Models
 from portalr.people import People
 from portalr.readers import Grafana, Langfuse, LiteLLM, Loki, Prometheus, Readers, Tempo
 from tests.tools import Tool
@@ -140,6 +141,7 @@ def app_for(
     people: People | None = None,
     site: Site = SITE,
     relay: Relay | None = None,
+    models: Models | None = None,
 ) -> FastAPI:
     app = FastAPI()
     router = portalr_router(
@@ -151,6 +153,7 @@ def app_for(
         ui=ui,
         people=people,
         relay=relay,
+        models=models,
     )
     app.include_router(router, prefix="/portalr")
     return app

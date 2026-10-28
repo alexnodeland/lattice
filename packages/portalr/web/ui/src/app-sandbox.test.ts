@@ -1,6 +1,13 @@
-import { expect, test, vi } from "vitest";
+import { expect, onTestFinished, test, vi } from "vitest";
 import POLICY from "../csp/app-policy.txt?raw";
-import { APP_BOOT, MOST_MESSAGE, PROXY_READY, RESOURCE_READY } from "./app-bridge";
+import {
+  APP_BOOT,
+  APP_ERROR,
+  APP_STOPPED,
+  MOST_MESSAGE,
+  PROXY_READY,
+  RESOURCE_READY,
+} from "./app-bridge";
 import { APP_POLICY, APP_SANDBOX, appDocument, fit, startSandbox } from "./app-sandbox";
 
 const PORTAL = "https://app.example.com";
@@ -212,4 +219,144 @@ test("the host's viewport, given or answered, is told to the frame's size", () =
   });
   expect(frame.style.height).toBe("700px");
   frame.remove();
+});
+
+// ─── the app's document, run: its errors and whether it stopped ──────────────
+
+/**
+ * `html` run as an app's document in a frame of this page, sandboxed to scripts as the sandbox
+ * frames it, and what it said of itself: its errors and whether it stopped. The frame's own
+ * uncaught errors are reported in its window, not this page's.
+ */
+function ran(html: string) {
+  const frame = document.createElement("iframe");
+  frame.setAttribute("sandbox", APP_SANDBOX);
+  frame.srcdoc = appDocument(html);
+  const errors: Record<string, unknown>[] = [];
+  const stopped: string[] = [];
+  const heard = (event: MessageEvent) => {
+    if (event.source !== frame.contentWindow) {
+      return;
+    }
+    const { method, params } = event.data ?? {};
+    if (method === APP_ERROR) {
+      errors.push(params);
+    } else if (method === APP_STOPPED) {
+      stopped.push(params.stopped);
+    }
+  };
+  addEventListener("message", heard);
+  document.body.append(frame);
+  onTestFinished(() => {
+    removeEventListener("message", heard);
+    frame.remove();
+  });
+  return { errors, stopped };
+}
+
+/** Tells the test page `value`, from inside the app, as its own message. */
+const tell = (value: string) => `parent.postMessage({ method: "probe", value: ${value} }, "*")`;
+
+/** What the app told the test page by `tell`, in order. */
+function told() {
+  const values: unknown[] = [];
+  const heard = (event: MessageEvent) => {
+    if (event.data?.method === "probe") {
+      values.push(event.data.value);
+    }
+  };
+  addEventListener("message", heard);
+  onTestFinished(() => removeEventListener("message", heard));
+  return values;
+}
+
+/** A frame loop that throws `error` on its third frame, as the game that froze on a phone did. */
+const LOOP = (error: string) =>
+  `<script>let n=0;const p=null;function loop(){n+=1;if(n===3)${error};requestAnimationFrame(loop)}requestAnimationFrame(loop)</script>`;
+
+test("an error thrown in a frame is said by its name, message and stack, and still thrown", async () => {
+  const values = told();
+  const { errors } = ran(
+    `<script>addEventListener("error",(e)=>{${tell('"thrown: "+e.error.message')}})</script>${LOOP("p.dir.x")}`,
+  );
+  await vi.waitFor(() => expect(errors).toHaveLength(1), { timeout: 5000 });
+  expect(errors[0]?.kind).toBe("error");
+  expect(errors[0]?.message).toMatch(/^TypeError: Cannot read properties of null/);
+  expect(errors[0]?.stack).toMatch(/loop/);
+  // The app's own handler heard it: thrown on, as it would have been.
+  await vi.waitFor(() =>
+    expect(values).toContain("thrown: Cannot read properties of null (reading 'dir')"),
+  );
+});
+
+test("an error the browser says only as 'Script error.' is said by its own text instead", async () => {
+  // WebKit's report of a script's error in an opaque origin, which Chromium doesn't make: made here.
+  const { errors } = ran(
+    LOOP(
+      `{queueMicrotask(()=>dispatchEvent(new ErrorEvent("error",{message:"Script error."})));throw new RangeError("too far")}`,
+    ),
+  );
+  await vi.waitFor(() => expect(errors).toHaveLength(1), { timeout: 5000 });
+  await new Promise((settle) => setTimeout(settle, 300));
+  expect(errors.map((error) => error.message)).toEqual(["RangeError: too far"]);
+});
+
+test("callbacks are wrapped transparently: their this, return and removal are the app's", async () => {
+  const values = told();
+  ran(`<button>b</button><script>
+    const b = document.querySelector("button");
+    let heard = 0;
+    const listener = function () { heard += 1; ${tell('this === b ? "this" : "other"')}; };
+    b.addEventListener("click", listener);
+    b.click();
+    b.removeEventListener("click", listener);
+    b.click();
+    const id = setTimeout(() => ${tell('"never"')}, 0);
+    clearTimeout(id);
+    const frame = requestAnimationFrame(() => ${tell('"never"')});
+    cancelAnimationFrame(frame);
+    setTimeout((a, c) => ${tell('"timer " + a + c')}, 0, 1, 2);
+    ${tell('"heard " + heard + " " + typeof id + " " + typeof frame')};
+  </script>`);
+  await vi.waitFor(() => expect(values).toEqual(["this", "heard 1 number number", "timer 12"]));
+  await new Promise((settle) => setTimeout(settle, 100));
+  expect(values).not.toContain("never");
+});
+
+test("errors from a timer and a listener are said once each, though the window reports them too", async () => {
+  const { errors } = ran(
+    `<button>b</button><script>setTimeout(()=>{throw new Error("timed")});const b=document.querySelector("button");b.addEventListener("click",()=>{throw new Error("clicked")});setTimeout(()=>b.click(),50)</script>`,
+  );
+  await vi.waitFor(() => expect(errors).toHaveLength(2), { timeout: 5000 });
+  await new Promise((settle) => setTimeout(settle, 300));
+  expect(errors.map((error) => error.message)).toEqual(["Error: timed", "Error: clicked"]);
+});
+
+test("a long message and stack are cut short in the app's document", async () => {
+  const { errors } = ran(LOOP(`throw new Error("x".repeat(1000))`));
+  await vi.waitFor(() => expect(errors).toHaveLength(1), { timeout: 5000 });
+  expect(String(errors[0]?.message)).toHaveLength(300);
+  expect(String(errors[0]?.stack).length).toBeLessThanOrEqual(400);
+});
+
+test("a frame loop that dies with its error is said to have stopped, once", async () => {
+  const { stopped } = ran(LOOP("p.dir.x"));
+  await vi.waitFor(() => expect(stopped).toEqual(["yes"]), { timeout: 6000 });
+});
+
+test("a frame loop that goes on past its error is said to be running", async () => {
+  const { stopped, errors } = ran(
+    `<script>let n=0;function loop(){n+=1;requestAnimationFrame(loop);if(n===3)null.x}requestAnimationFrame(loop)</script>`,
+  );
+  await vi.waitFor(() => expect(stopped).toEqual(["no"]), { timeout: 6000 });
+  expect(errors).toHaveLength(1);
+});
+
+test("an app that never drew a frame is never said to have stopped", async () => {
+  const { stopped, errors } = ran(
+    `<script>setTimeout(()=>{throw new Error("no loop")},100)</script>`,
+  );
+  await vi.waitFor(() => expect(errors).toHaveLength(1), { timeout: 5000 });
+  await new Promise((settle) => setTimeout(settle, 2500));
+  expect(stopped).toEqual([]);
 });

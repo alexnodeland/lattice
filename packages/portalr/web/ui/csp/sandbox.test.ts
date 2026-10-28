@@ -472,6 +472,46 @@ test("an app that throws, or loads what its policy refuses, is said under it and
 
 const NOTHING_YET = "The app hasn't drawn anything yet.";
 
+const STOPPED = "The app stopped after an error";
+
+test("a game whose frame loop throws is said to have stopped, with its own error, and reloads", async () => {
+  // As the game that froze on a phone: a frame loop reading a ghost's direction it no longer has.
+  const { page, said } = await watched(
+    `<body style="margin:0"><canvas width="200" height="100"></canvas><script>const c=document.querySelector("canvas").getContext("2d");let n=0,p={dir:{x:1}};function loop(){n+=1;c.fillRect(n%200,0,4,4);if(n===30)p=null;const x=p.dir.x;requestAnimationFrame(loop)}requestAnimationFrame(loop)</script>`,
+  );
+  await expect.poll(() => page.getByText(STOPPED).count(), SETTLED).toBe(1);
+  await expect
+    .poll(() =>
+      page
+        .getByText("TypeError: Cannot read properties of null (reading 'dir')", { exact: true })
+        .count(),
+    )
+    .toBe(1);
+  expect(said.join("\n")).toContain("stopped: no frame came in the 2 s after an error");
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.getByRole("button", { name: "Copy the error for the assistant" }).click();
+  await expect.poll(() => page.getByText("Copied.", { exact: false }).count(), SETTLED).toBe(1);
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+    "The app froze after an error: TypeError: Cannot read properties of null (reading 'dir'). Please find the cause and fix it.",
+  );
+  await page.getByRole("button", { name: "Reload app" }).click();
+  await expect.poll(() => page.getByText(STOPPED).count(), SETTLED).toBe(0);
+  // The game starts afresh, and stops again on its thirtieth frame.
+  await expect.poll(() => page.getByText(STOPPED).count(), SETTLED).toBe(1);
+  await page.close();
+});
+
+test("a game that throws in a frame but draws on is said to be running still", async () => {
+  const { page } = await watched(
+    `<body style="margin:0"><canvas width="200" height="100"></canvas><script>const c=document.querySelector("canvas").getContext("2d");let n=0;function loop(){n+=1;requestAnimationFrame(loop);c.fillRect(n%200,0,4,4);if(n===30)null.x}requestAnimationFrame(loop)</script>`,
+  );
+  await expect
+    .poll(() => page.getByText("The app reported an error and is still running").count(), SETTLED)
+    .toBe(1);
+  expect(await page.getByText(STOPPED).count()).toBe(0);
+  await page.close();
+});
+
 /** Whether the page says its app hasn't drawn anything, now. */
 const saysNothing = (page: Page) => page.getByText(NOTHING_YET, { exact: false }).count();
 
@@ -512,6 +552,7 @@ test.each([
   expect(await saysNothing(page)).toBe(0);
   expect(said.filter((line) => !line.startsWith("[app-frame] boot:"))).toEqual([]);
   expect(await page.getByText("The app reported a problem").count()).toBe(0);
+  expect(await page.getByText(STOPPED).count()).toBe(0);
   await page.close();
 });
 

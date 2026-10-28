@@ -11,6 +11,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Alert } from "../alert";
 import {
   APP_BOOT,
+  APP_STOPPED,
   Bridge,
   CALLS_A_MINUTE,
   type JsonObject,
@@ -129,12 +130,34 @@ function reportLine({ method, params }: Report, frame: Element, container: numbe
     const { width, height } = frame.getBoundingClientRect();
     return `boot: ${said.join(" ")} outer=${width}x${height} container=${container}`;
   }
-  if (params.message === "Script error.") {
+  if (method === APP_STOPPED) {
+    return params.stopped === "yes"
+      ? "stopped: no frame came in the 2 s after an error"
+      : "running: frames came after an error";
+  }
+  if (params.message === MASKED) {
     return "error: the app threw an error; this browser doesn't say which";
   }
   const where = params.source ? ` at ${params.source}:${params.line ?? 0}` : "";
   const refused = params.blocked ? ` (${params.blocked})` : "";
   return `${params.kind ?? "error"}: ${params.message ?? ""}${where}${refused}`;
+}
+
+/** What WebKit says of an error thrown by a callback the sandbox couldn't wrap. */
+const MASKED = "Script error.";
+
+/** The app's latest error, as it said it, and whether its frames stopped after it. */
+type Fault = { readonly message: string; readonly stack: string; readonly stopped: boolean | null };
+
+/**
+ * A sentence to hand the assistant: what the app did, and its error, the app's own text. Nothing
+ * is sent: the person pastes it where they choose.
+ */
+function forAssistant({ message, stopped }: Fault): string {
+  const did = stopped ? "The app froze after an error" : "The app reported an error";
+  return message === MASKED
+    ? `${did} that the browser didn't name. Please find the cause and fix it.`
+    : `${did}: ${message.replace(/\.$/, "")}. Please find the cause and fix it.`;
 }
 
 /** A question open, and how its answer, yes or no, reaches the bridge. */
@@ -210,6 +233,9 @@ export function Running({
   // What the app's document reported went wrong, and whether it drew nothing: shown, never kept.
   const [problems, setProblems] = useState<readonly string[]>([]);
   const [blank, setBlank] = useState(false);
+  // The app's latest error, and whether a copy of it for the assistant was made or must be by hand.
+  const [fault, setFault] = useState<Fault | null>(null);
+  const [copied, setCopied] = useState<"done" | "by hand" | null>(null);
   // The app's latest look at what it drew, shown quietly under it once said.
   const [boot, setBoot] = useState<string | null>(null);
   const [run, setRun] = useState({ html: app.html, count: 0 });
@@ -273,6 +299,8 @@ export function Running({
     setProblems([]);
     setBlank(false);
     setBoot(null);
+    setFault(null);
+    setCopied(null);
     time(); // a frame that never loads is timed too
     const { id } = head.current.shown;
     const kept = new StateKeeper(
@@ -329,6 +357,18 @@ export function Running({
             }
             return;
           }
+          if (report.method === APP_STOPPED) {
+            setFault((now) => now && { ...now, stopped: report.params.stopped === "yes" });
+            return;
+          }
+          const { kind, message, stack } = report.params;
+          if (kind === "error" || kind === "rejection") {
+            setFault((now) => ({
+              message: String(message ?? ""),
+              stack: String(stack ?? ""),
+              stopped: now?.stopped ?? null,
+            }));
+          }
           setProblems((now) => (now.includes(line) ? now : [...now, line]));
         },
       },
@@ -372,6 +412,14 @@ export function Running({
   }, [element, host, origin]);
 
   const again = () => setRun({ ...run, count: run.count + 1 });
+  const copy = async (sentence: string) => {
+    try {
+      await navigator.clipboard.writeText(sentence);
+      setCopied("done");
+    } catch {
+      setCopied("by hand"); // no clipboard here, as over plain HTTP: the sentence is selected instead
+    }
+  };
   const settle = (yes: boolean) => {
     open.current?.settle(yes);
     open.current = null;
@@ -462,6 +510,51 @@ export function Running({
             <Button variant="secondary" className="px-2 py-1 text-xs" onClick={again}>
               Try again
             </Button>
+          </span>
+        </Alert>
+      )}
+      {fault !== null && fault.stopped !== null && (
+        <Alert tone={fault.stopped ? "error" : "warn"}>
+          <span className="flex flex-col items-start gap-2">
+            <span className="font-medium">
+              {fault.stopped
+                ? "The app stopped after an error"
+                : "The app reported an error and is still running"}
+            </span>
+            <code className="break-words font-mono text-xs">
+              {fault.message === MASKED ? "This browser doesn't say which error." : fault.message}
+            </code>
+            {(fault.stack || boot) && (
+              <details className="text-muted text-xs">
+                <summary className="min-h-(--disclosure-target) cursor-pointer">Details</summary>
+                <ul className="flex flex-col gap-1 break-words font-mono">
+                  {fault.stack && <li>{fault.stack}</li>}
+                  {boot && <li>{boot}</li>}
+                </ul>
+              </details>
+            )}
+            <span className="flex flex-wrap gap-2">
+              <Button variant="secondary" onClick={again}>
+                Reload app
+              </Button>
+              <Button variant="secondary" onClick={() => copy(forAssistant(fault))}>
+                Copy the error for the assistant
+              </Button>
+            </span>
+            <span aria-live="polite" className="text-muted text-xs">
+              {copied === "done" && "Copied. Paste it into your message to the assistant."}
+              {copied === "by hand" && "This browser didn't let the page copy. Copy this instead:"}
+            </span>
+            {copied === "by hand" && (
+              <span
+                ref={(node) => {
+                  node && getSelection()?.selectAllChildren(node);
+                }}
+                className="text-xs"
+              >
+                {forAssistant(fault)}
+              </span>
+            )}
           </span>
         </Alert>
       )}

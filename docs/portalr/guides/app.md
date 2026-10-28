@@ -40,6 +40,8 @@ A running mini app is shown whole, as tall as it draws, up to twice the window's
 
 An app that doesn't start says so, with **Try again**. One that starts but throws an error, refuses a promise, loads what its policy refuses, or draws nothing shows **The app reported a problem** under it (and an app that starts shows, collapsed, **What the app reported**: what it drew, its window, its frames' sizes and its browser), or **The app hasn't drawn anything yet.**, and writes each line, and what it drew, to the browser's console as `[app-frame] …`. To debug an app on a phone, open the console of the portal's page (Safari's Web Inspector, from a Mac, for an iPhone) and look for those lines. They stay in the browser: nothing is sent or kept ([ADR-0051](../adr/0051-mini-apps-the-sandboxed-frame-and-its-bridge.md)).
 
+An app that was drawing frames and threw an error says, under it, **The app stopped after an error** where no frame came in the 2 seconds after, or **The app reported an error and is still running** where frames went on, with the error in the app's own words (on an iPhone too, where the browser otherwise hides it), its stack under **Details**, **Reload app**, which starts it afresh, and **Copy the error for the assistant**, which copies a sentence to paste into a message asking the agent to fix it. Where the page can't copy, as over plain HTTP, the sentence is shown and selected to copy by hand. Nothing is sent: you choose where it goes.
+
 ## Proposals
 
 Every proposal in the workspace, the open ones first, each linking to the artifact it would change, to accept or reject. An agent only proposes changes to an artifact it may not edit; a person with the right accepts.

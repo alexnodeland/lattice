@@ -187,7 +187,9 @@ function Threads() {
     />
   );
   return (
-    <>
+    // A collection at most 1200 pixels wide, centred: rows wider than that only part the words
+    // from their status (portalr ADR-0087).
+    <div className="mx-auto flex w-full max-w-300 flex-1 flex-col gap-6 lg:gap-8">
       {/* The filter on the title's line, in its corner; on a phone, the row under it. */}
       <PageHeader
         title="Threads"
@@ -208,16 +210,20 @@ function Threads() {
         // next's, and rows below it (portalr ADR-0087).
         <div className="contents">
           <div className="max-lg:hidden">
-            <Table caption="Threads">
+            <Table caption="Threads" className="table-fixed">
               <thead>
                 <tr>
-                  <th scope="col">Thread</th>
+                  <th scope="col" className="w-[32%]">
+                    Thread
+                  </th>
                   <th scope="col">Last message</th>
-                  <th scope="col">Status</th>
-                  <th scope="col" data-num="">
+                  <th scope="col" className="w-40">
+                    Status
+                  </th>
+                  <th scope="col" data-num="" className="w-32">
                     Active
                   </th>
-                  <th scope="col">
+                  <th scope="col" className="w-10">
                     <span className="sr-only">Actions</span>
                   </th>
                 </tr>
@@ -225,16 +231,16 @@ function Threads() {
               <tbody onKeyDown={arrows}>
                 {rows.map(({ thread, title, status, said, when, moved, link }) => (
                   <tr key={thread.id} className="group relative">
-                    <th scope="row" className="w-[35%]">
+                    <th scope="row" className="truncate">
                       {moved && unread}
                       <RowLink render={link}>{title}</RowLink>
                     </th>
-                    <td className="max-w-0 truncate text-muted">{said}</td>
+                    <td className="truncate text-muted">{said}</td>
                     <td>{status && <RunStatus status={status} />}</td>
                     <td data-num="" className="whitespace-nowrap text-muted">
                       {when}
                     </td>
-                    <td className="w-0">
+                    <td>
                       {moved && (
                         <span className="block fine:opacity-0 fine:group-focus-within:opacity-100 fine:group-hover:opacity-100">
                           <IconButton
@@ -334,7 +340,7 @@ function Threads() {
           )}
         </div>
       </ComposerDock>
-    </>
+    </div>
   );
 }
 

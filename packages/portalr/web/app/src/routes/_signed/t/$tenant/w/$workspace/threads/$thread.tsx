@@ -399,7 +399,13 @@ function Chat() {
       key={request.tool_call_id}
       id={`request-${request.tool_call_id}`}
       tabIndex={-1}
-      className="outline-none"
+      // An approval waiting holds the window's foot, over what is above it, with the composer's
+      // dock in the flow under it, so Deny and Approve are never off screen or covered (ADR-0087).
+      className={
+        request.kind === "approval" && !split
+          ? "sticky bottom-0 z-10 rounded-(--card-radius) shadow-(--dialog-shadow) outline-none"
+          : "outline-none"
+      }
     >
       <Request
         request={request}
@@ -553,7 +559,8 @@ function Chat() {
           ))}
       </Messages>
       {active.map((run) => (
-        <div key={run.id} className="flex flex-col gap-2">
+        // In the thread's own flow, so a waiting approval's card can hold the window's foot.
+        <div key={run.id} className="contents">
           {(!canPost || run.status !== "running") && strip(run)}
           {picker && <picker.AnsweredBy place={place} run={run} />}
           {[
@@ -580,7 +587,11 @@ function Chat() {
         />
       ))}
       {canPost && (
-        <ComposerDock className="mt-auto flex flex-col gap-2">
+        // While an approval waits in the column, the dock stays in the flow under it, so it never
+        // covers Deny and Approve (portalr ADR-0087).
+        <ComposerDock
+          className={`mt-auto flex flex-col gap-2 ${approvals.length > 0 && !split ? "static" : ""}`}
+        >
           {active.filter((run) => run.status === "running").map(strip)}
           {/* The composer's first focus loads the model picker (portalr ADR-0086). */}
           <div className="contents" ref={composer}>

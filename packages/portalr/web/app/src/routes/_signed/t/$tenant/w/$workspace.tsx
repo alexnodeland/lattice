@@ -151,11 +151,13 @@ function NeedYou({ tenant, workspace }: { tenant: string; workspace: string }) {
   const waiting = Object.values(state.runs)
     .filter((run) => run.status === "paused" && state.threads[run.threadId] !== undefined)
     .reduce((count, run) => count + run.requests.length, 0);
+  const needs = waiting === 1 ? "needs" : "need";
   return (
     waiting > 0 && (
       <ButtonLink
         variant="ghost"
         size="sm"
+        aria-label={`${waiting} ${needs} you`}
         render={
           <Link
             to="/t/$tenant/w/$workspace"
@@ -165,7 +167,9 @@ function NeedYou({ tenant, workspace }: { tenant: string; workspace: string }) {
         }
       >
         <StatusBadge tone="waiting">
-          {waiting} {waiting === 1 ? "needs" : "need"} you
+          {waiting}
+          {/* On a phone, the count alone, named in full (portalr ADR-0087). */}
+          <span className="max-sm:hidden"> {needs} you</span>
         </StatusBadge>
       </ButtonLink>
     )

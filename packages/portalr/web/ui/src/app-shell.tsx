@@ -53,7 +53,7 @@ export function AppShell({
         className="sticky top-0 z-20 flex h-[calc(var(--header-clearance)+env(safe-area-inset-top))] items-center gap-2 border-line border-b bg-paper px-2 pt-[env(safe-area-inset-top)] sm:px-4"
       >
         <span className="me-2 max-lg:hidden">{mark}</span>
-        <div className="min-w-0">{switcher}</div>
+        <div className="flex min-w-0">{switcher}</div>
         {nav && <div className="ms-2 max-lg:hidden">{nav}</div>}
         <div className="ms-auto flex shrink-0 items-center gap-1">
           {search}

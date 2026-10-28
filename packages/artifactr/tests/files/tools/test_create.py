@@ -3,7 +3,7 @@ create, which the agent then edits, offered only for the types whose app is on, 
 refusal told in a sentence.
 """
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 
 import pytest
 from pydantic_ai import Agent, ModelMessage, ModelRequest, ModelResponse, ToolReturnPart
@@ -12,7 +12,8 @@ from pydantic_ai.models.instrumented import InstrumentationSettings
 
 from artifactr.agent import ArtifactWorkspace, Session
 from artifactr.core import Actor, Thread, UserActor, artifact_types
-from artifactr.files.app import FakeApp
+from artifactr.files.app import AppCommand, AppFailed, FakeApp
+from artifactr.files.app import Applied as Made
 from artifactr.files.blobs import InMemoryBlobs, Quota
 from artifactr.files.checkouts import InMemoryCheckouts
 from artifactr.files.manifest import DXF, Drawing, NativeFile, WordDocument
@@ -210,3 +211,27 @@ def _returned(messages: list[ModelMessage]) -> str:
     assert isinstance(last, ModelRequest)
     [part] = [p for p in last.parts if isinstance(p, ToolReturnPart)]
     return str(part.content)
+
+
+class Pageless(FakeApp):
+    """A fake app whose blank file has no page, and which renders none, as FilmCraft's,
+    EffectCraft's and SoundCraft's blank projects."""
+
+    async def apply(
+        self, source: bytes | None, commands: Sequence[AppCommand], *, deadline: float
+    ) -> Made:
+        applied = await super().apply(source, commands, deadline=deadline)
+        return Made(applied.content, applied.inspection.model_copy(update={"pages": 0}))
+
+    async def render(self, source: bytes, page: int, *, scale: float, deadline: float) -> bytes:
+        raise AppFailed("refused", f"no page {page}")
+
+
+async def test_a_blank_project_with_no_page_is_still_created() -> None:
+    files = NativeFiles(InMemoryBlobs(), InMemoryCheckouts(), Pageless())
+    ws, thread = await opened()
+    script = Script(create("video_project"), say("Done."))
+    await run(files, ws, thread, script)
+    [file] = await ws.artifacts(NativeFile)
+    assert script.tool_returns(1)[0].startswith(f"Created {file.id}: a video project named")
+    assert (await ws.get(NativeFile, file.id)).data.pages == 0
